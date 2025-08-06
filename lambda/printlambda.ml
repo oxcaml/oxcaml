@@ -123,7 +123,8 @@ let array_ref_kind ppf k =
 let array_index_kind ppf k =
   match k with
   | Ptagged_int_index -> fprintf ppf "int"
-  | Punboxed_or_untagged_integer_index i -> pp_print_string ppf (unboxed_integer i)
+  | Punboxed_or_untagged_integer_index i ->
+    pp_print_string ppf (unboxed_integer i)
 
 let array_set_kind ppf k =
   let pp_mode ppf = function
@@ -229,7 +230,8 @@ let rec layout ppf layout_ =
   | Ptop -> fprintf ppf "top"
   | Pbottom -> fprintf ppf "bottom"
   | Punboxed_float bf -> fprintf ppf "%s" (unboxed_float_layout bf)
-  | Punboxed_or_untagged_integer bi -> fprintf ppf "%s" (unboxed_integer_layout bi)
+  | Punboxed_or_untagged_integer bi ->
+    fprintf ppf "%s" (unboxed_integer_layout bi)
   | Punboxed_vector bv -> fprintf ppf "%s" (unboxed_vector_layout bv)
   | Punboxed_product layouts ->
     fprintf ppf "@[<hov 1>#(%a)@]"

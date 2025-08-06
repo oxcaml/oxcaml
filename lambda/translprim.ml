@@ -60,7 +60,8 @@ let unboxed_product_uninitialized_array_check loc array_kind =
   | Pgcignorableproductarray igns
     when not (List.exists
         Lambda.ignorable_product_element_kind_involves_int igns) -> ()
-  | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ ->
+  | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+  | Punboxedvectorarray _ ->
     ()
   | Pgenarray | Paddrarray | Pintarray | Pfloatarray
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
@@ -418,7 +419,8 @@ let indexing_primitives =
   let index_kinds =
     [
       (Ptagged_int_index, "");
-      (Punboxed_or_untagged_integer_index Unboxed_nativeint, "_indexed_by_nativeint#");
+      (Punboxed_or_untagged_integer_index Unboxed_nativeint,
+       "_indexed_by_nativeint#");
       (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
       (Punboxed_or_untagged_integer_index Unboxed_int64, "_indexed_by_int64#");
     ]
@@ -493,7 +495,8 @@ let array_vec_primitives =
   let index_kinds =
     [
       (Ptagged_int_index, "");
-      (Punboxed_or_untagged_integer_index Unboxed_nativeint, "_indexed_by_nativeint#");
+      (Punboxed_or_untagged_integer_index Unboxed_nativeint,
+       "_indexed_by_nativeint#");
       (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
       (Punboxed_or_untagged_integer_index Unboxed_int64, "_indexed_by_int64#");
     ]
@@ -696,51 +699,69 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
         3)
     | "%array_safe_get_indexed_by_int64#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode, Punboxed_or_untagged_integer_index Unboxed_int64, Mutable)), 2)
+        ((Parrayrefs (gen_array_ref_kind mode,
+                      Punboxed_or_untagged_integer_index Unboxed_int64,
+                      Mutable)), 2)
     | "%array_safe_set_indexed_by_int64#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()), Punboxed_or_untagged_integer_index Unboxed_int64),
+          (gen_array_set_kind (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_int64),
          3)
     | "%array_unsafe_get_indexed_by_int64#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode, Punboxed_or_untagged_integer_index Unboxed_int64, Mutable), 2)
+        (Parrayrefu (gen_array_ref_kind mode,
+                     Punboxed_or_untagged_integer_index Unboxed_int64,
+                     Mutable), 2)
     | "%array_unsafe_set_indexed_by_int64#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()), Punboxed_or_untagged_integer_index Unboxed_int64)),
+          (gen_array_set_kind (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_int64)),
         3)
     | "%array_safe_get_indexed_by_int32#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode, Punboxed_or_untagged_integer_index Unboxed_int32, Mutable)), 2)
+        ((Parrayrefs (gen_array_ref_kind mode,
+                      Punboxed_or_untagged_integer_index Unboxed_int32,
+                      Mutable)), 2)
     | "%array_safe_set_indexed_by_int32#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()), Punboxed_or_untagged_integer_index Unboxed_int32),
+          (gen_array_set_kind (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_int32),
          3)
     | "%array_unsafe_get_indexed_by_int32#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode, Punboxed_or_untagged_integer_index Unboxed_int32, Mutable), 2)
+        (Parrayrefu (gen_array_ref_kind mode,
+                     Punboxed_or_untagged_integer_index Unboxed_int32,
+                     Mutable), 2)
     | "%array_unsafe_set_indexed_by_int32#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()), Punboxed_or_untagged_integer_index Unboxed_int32)),
+          (gen_array_set_kind (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_int32)),
         3)
     | "%array_safe_get_indexed_by_nativeint#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode, Punboxed_or_untagged_integer_index Unboxed_nativeint, Mutable)), 2)
+        ((Parrayrefs (gen_array_ref_kind mode,
+                      Punboxed_or_untagged_integer_index Unboxed_nativeint,
+                      Mutable)), 2)
     | "%array_safe_set_indexed_by_nativeint#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()), Punboxed_or_untagged_integer_index Unboxed_nativeint),
+          (gen_array_set_kind (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_nativeint),
          3)
     | "%array_unsafe_get_indexed_by_nativeint#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode, Punboxed_or_untagged_integer_index Unboxed_nativeint, Mutable), 2)
+        (Parrayrefu (gen_array_ref_kind mode,
+                     Punboxed_or_untagged_integer_index Unboxed_nativeint,
+                     Mutable), 2)
     | "%array_unsafe_set_indexed_by_nativeint#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()), Punboxed_or_untagged_integer_index Unboxed_nativeint)),
+          (gen_array_set_kind (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_nativeint)),
         3)
     | "%makearray_dynamic" ->
       Primitive (Pmakearray_dynamic (gen_array_kind, mode, With_initializer), 2)
@@ -1087,7 +1108,8 @@ let glb_array_type loc t1 t2 =
 
      WARNING: This trick will stop working when [Config.flat_float_array]
      becomes [false].*)
-  | Pfloatarray, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _) ->
+  | Pfloatarray, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+                 | Punboxedvectorarray _) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
   | (Pgenarray | Punboxedfloatarray Unboxed_float64), Punboxedfloatarray Unboxed_float64 ->
@@ -1096,11 +1118,14 @@ let glb_array_type loc t1 t2 =
     Punboxedfloatarray Unboxed_float32
   | Punboxedfloatarray _, _ | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
-  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int32), Punboxedoruntaggedintarray Unboxed_int32 ->
+  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int32),
+    Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray Unboxed_int32
-  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int64), Punboxedoruntaggedintarray Unboxed_int64 ->
+  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int64),
+    Punboxedoruntaggedintarray Unboxed_int64 ->
     Punboxedoruntaggedintarray Unboxed_int64
-  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_nativeint), Punboxedoruntaggedintarray Unboxed_nativeint ->
+  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_nativeint),
+    Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray Unboxed_nativeint
   | Punboxedoruntaggedintarray _, _ | _, Punboxedoruntaggedintarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
@@ -1154,7 +1179,8 @@ let glb_array_ref_type loc t1 t2 =
 
      WARNING: This trick will stop working when [Config.flat_float_array]
      becomes [false].*)
-  | Pfloatarray_ref _, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _) ->
+  | Pfloatarray_ref _, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+                       | Punboxedvectorarray _) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
   | (Pgenarray_ref _ | Punboxedfloatarray_ref Unboxed_float64), Punboxedfloatarray Unboxed_float64 ->
@@ -1164,11 +1190,14 @@ let glb_array_ref_type loc t1 t2 =
   | Punboxedfloatarray_ref _, _
   | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int32), Punboxedoruntaggedintarray Unboxed_int32 ->
+  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int32),
+    Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_ref Unboxed_int32
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int64), Punboxedoruntaggedintarray Unboxed_int64 ->
+  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int64),
+    Punboxedoruntaggedintarray Unboxed_int64 ->
     Punboxedoruntaggedintarray_ref Unboxed_int64
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_nativeint), Punboxedoruntaggedintarray Unboxed_nativeint ->
+  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_nativeint),
+    Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray_ref Unboxed_nativeint
   | Punboxedoruntaggedintarray_ref _, _ | _, Punboxedoruntaggedintarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
@@ -1236,7 +1265,8 @@ let glb_array_set_type loc t1 t2 =
 
      WARNING: This trick will stop working when [Config.flat_float_array]
      becomes [false].*)
-  | Pfloatarray_set, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _) ->
+  | Pfloatarray_set, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+                     | Punboxedvectorarray _) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
   | (Pgenarray_set _ | Punboxedfloatarray_set Unboxed_float64), Punboxedfloatarray Unboxed_float64 ->
@@ -1246,11 +1276,14 @@ let glb_array_set_type loc t1 t2 =
   | Punboxedfloatarray_set _, _
   | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int32), Punboxedoruntaggedintarray Unboxed_int32 ->
+  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int32),
+    Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_set Unboxed_int32
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int64), Punboxedoruntaggedintarray Unboxed_int64 ->
+  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int64),
+    Punboxedoruntaggedintarray Unboxed_int64 ->
     Punboxedoruntaggedintarray_set Unboxed_int64
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_nativeint), Punboxedoruntaggedintarray Unboxed_nativeint ->
+  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_nativeint),
+    Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray_set Unboxed_nativeint
   | Punboxedoruntaggedintarray_set _, _ | _, Punboxedoruntaggedintarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
@@ -1324,7 +1357,8 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
     | Punboxed_or_untagged_integer Untagged_int16 -> Some Ppp_untagged_int16
     | Punboxed_or_untagged_integer Unboxed_int32 -> Some Ppp_unboxed_int32
     | Punboxed_or_untagged_integer Unboxed_int64 -> Some Ppp_unboxed_int64
-    | Punboxed_or_untagged_integer Unboxed_nativeint -> Some Ppp_unboxed_nativeint
+    | Punboxed_or_untagged_integer Unboxed_nativeint ->
+      Some Ppp_unboxed_nativeint
     | Punboxed_or_untagged_integer Untagged_int -> Some Ppp_untagged_immediate
     | Pvalue { raw_kind = Pintval ; _ } -> Some Ppp_tagged_immediate
     | Ptop

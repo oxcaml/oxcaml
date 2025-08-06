@@ -290,7 +290,8 @@ let array_kind_of_elt ~elt_sort env loc ty =
   | Unboxed_float f -> Punboxedfloatarray f
   | Unboxed_int Untagged_int -> Punboxedoruntaggedintarray Untagged_int
   | Unboxed_int Unboxed_int64 -> Punboxedoruntaggedintarray Unboxed_int64
-  | Unboxed_int Unboxed_nativeint -> Punboxedoruntaggedintarray Unboxed_nativeint
+  | Unboxed_int Unboxed_nativeint ->
+    Punboxedoruntaggedintarray Unboxed_nativeint
   | Unboxed_int Unboxed_int32 -> Punboxedoruntaggedintarray Unboxed_int32
   | Unboxed_int Untagged_int16 -> Punboxedoruntaggedintarray Untagged_int16
   | Unboxed_int Untagged_int8 -> Punboxedoruntaggedintarray Untagged_int8

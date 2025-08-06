@@ -119,7 +119,8 @@ val byte_name: 'a description_gen -> string
 val unboxed_float : boxed_float -> unboxed_float
 val unboxed_or_untagged_integer : boxed_integer -> unboxed_or_untagged_integer
 val unboxed_vector : boxed_vector -> unboxed_vector
-val equal_unboxed_or_untagged_integer : unboxed_or_untagged_integer -> unboxed_or_untagged_integer -> bool
+val equal_unboxed_or_untagged_integer :
+  unboxed_or_untagged_integer -> unboxed_or_untagged_integer -> bool
 val equal_unboxed_float : unboxed_float -> unboxed_float -> bool
 val equal_unboxed_vector : unboxed_vector -> unboxed_vector -> bool
 val compare_unboxed_float : unboxed_float -> unboxed_float -> int

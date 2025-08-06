@@ -257,10 +257,12 @@ let print p osig_val_decl =
   let is_unboxed = function
     | _, Same_as_ocaml_repr (Base Value)
     | _, Repr_poly
-    | _, Unboxed_or_untagged_integer (Untagged_int | Untagged_int8 | Untagged_int16) -> false
+    | _, Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
+                                    | Untagged_int16) -> false
     | _, Unboxed_float _
     | _, Unboxed_vector _
-    | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32 | Unboxed_nativeint) ->
+    | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
+                                    | Unboxed_nativeint) ->
       true
     | _, Same_as_ocaml_repr _ ->
       (* We require [@unboxed] for non-value types in upstream-compatible code,
@@ -276,7 +278,8 @@ let print p osig_val_decl =
     | _, Same_as_ocaml_repr _
     | _, Unboxed_float _
     | _, Unboxed_vector _
-    | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32 | Unboxed_nativeint)
+    | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
+                                    | Unboxed_nativeint)
     | _, Repr_poly -> false
   in
   let all_unboxed = for_all is_unboxed in
@@ -316,9 +319,11 @@ let print p osig_val_decl =
      | Repr_poly -> []
      | Unboxed_float _
      | Unboxed_vector _
-     | Unboxed_or_untagged_integer (Unboxed_int32 | Unboxed_int64 | Unboxed_nativeint) ->
+     | Unboxed_or_untagged_integer (Unboxed_int32 | Unboxed_int64
+                                   | Unboxed_nativeint) ->
        if all_unboxed then [] else [oattr_unboxed]
-     | Unboxed_or_untagged_integer (Untagged_int | Untagged_int8 | Untagged_int16) ->
+     | Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
+                                   | Untagged_int16) ->
        if all_untagged then [] else [oattr_untagged]
      | Same_as_ocaml_repr _->
        if all_unboxed || not (is_unboxed (m, repr))
@@ -374,7 +379,8 @@ let compare_unboxed_vector
       Stdlib.compare v1 v2
 
 let equal_boxed_integer bi1 bi2 =
-  equal_unboxed_or_untagged_integer (unboxed_or_untagged_integer bi1) (unboxed_or_untagged_integer bi2)
+  equal_unboxed_or_untagged_integer (unboxed_or_untagged_integer bi1)
+    (unboxed_or_untagged_integer bi2)
 let equal_boxed_float bf1 bf2 =
   equal_unboxed_float (unboxed_float bf1) (unboxed_float bf2)
 let equal_boxed_vector bv1 bv2 =
@@ -415,7 +421,8 @@ let equal_native_repr nr1 nr2 =
   | Unboxed_vector _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_or_untagged_integer _) -> false
-  | Unboxed_or_untagged_integer bi1, Unboxed_or_untagged_integer bi2 -> equal_unboxed_or_untagged_integer bi1 bi2
+  | Unboxed_or_untagged_integer bi1, Unboxed_or_untagged_integer bi2 ->
+    equal_unboxed_or_untagged_integer bi1 bi2
   | Unboxed_or_untagged_integer _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _) -> false
