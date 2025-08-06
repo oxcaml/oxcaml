@@ -2301,8 +2301,7 @@ and quote_pat_extra loc pat_lam extra =
   let extra, _, _ = extra in
   match extra with
   | Tpat_constraint ty ->
-    Pat.constraint_ loc pat_lam (quote_core_type ty)
-    |> Pat.wrap
+    Pat.constraint_ loc pat_lam (quote_core_type ty) |> Pat.wrap
   | Tpat_unpack -> pat_lam (* handled elsewhere *)
   | Tpat_type _ -> pat_lam (* TODO: consider adding support for #tconst *)
   | Tpat_open _ -> fatal_error "No support for open patterns."
@@ -2417,22 +2416,19 @@ and quote_core_type ty =
   | Ttyp_tuple ts ->
     let tups =
       List.map
-        (fun (s_opt, ty) ->
-          quote_nonopt loc s_opt, quote_core_type ty)
+        (fun (s_opt, ty) -> quote_nonopt loc s_opt, quote_core_type ty)
         ts
     in
     Type.tuple loc tups |> Type.wrap
   | Ttyp_unboxed_tuple ts ->
     let tups =
       List.map
-        (fun (s_opt, ty) ->
-          quote_nonopt loc s_opt, quote_core_type ty)
+        (fun (s_opt, ty) -> quote_nonopt loc s_opt, quote_core_type ty)
         ts
     in
     Type.unboxed_tuple loc tups |> Type.wrap
   | Ttyp_constr (path, _, tys) ->
-    let ident = type_for_path loc path
-    and tys = List.map quote_core_type tys in
+    let ident = type_for_path loc path and tys = List.map quote_core_type tys in
     Type.constr loc ident tys |> Type.wrap
   | Ttyp_object (_, _) -> fatal_error "Still not implemented."
   | Ttyp_class (_, _, _) -> fatal_error "Still not implemented."
@@ -2449,8 +2445,7 @@ and quote_core_type ty =
         (fun rf ->
           match rf.rf_desc with
           | Tinherit ty ->
-            Variant_type.Row_field.inherit_ rf.rf_loc
-              (quote_core_type ty)
+            Variant_type.Row_field.inherit_ rf.rf_loc (quote_core_type ty)
             |> Variant_type.Row_field.wrap
           | Ttag (tag, b, tys) ->
             let variant = Variant.of_string tag.loc tag.txt |> Variant.wrap in
@@ -2486,15 +2481,12 @@ and quote_core_type ty =
     and with_types =
       List.map
         (fun (lid, ty) ->
-          ( quote_fragment_of_lid Asttypes.(lid.loc) lid.txt,
-            quote_core_type ty ))
+          quote_fragment_of_lid Asttypes.(lid.loc) lid.txt, quote_core_type ty)
         pack_fields
     in
     Type.package loc mod_type with_types |> Type.wrap
-  | Ttyp_quote ty ->
-    Type.quote loc (quote_core_type ty) |> Type.wrap
-  | Ttyp_splice _ ->
-    Type.var loc None |> Type.wrap
+  | Ttyp_quote ty -> Type.quote loc (quote_core_type ty) |> Type.wrap
+  | Ttyp_splice _ -> Type.var loc None |> Type.wrap
   | Ttyp_open _ -> fatal_error "Still not implemented."
   | Ttyp_of_kind _ -> fatal_error "Still not implemented."
   | Ttyp_call_pos -> Type.wrap Type.call_pos
