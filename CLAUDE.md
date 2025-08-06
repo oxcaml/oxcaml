@@ -35,8 +35,10 @@ autoconf                  # Generate configure script, needs to be version 2.71
                           # options
                           #     --enable-ocamltest --enable-warn-error
                           #     --enable-dev --prefix="$(pwd)/_install"
-                          # if previously a different install directory was used,
+                          # If previously a different install directory was used,
                           # prefer the old one over $(pwd)/_install.
+                          # Reconfiguring can require removing the _build/
+                          # directory for the changes to take effect.
 ```
 
 ## Misc
