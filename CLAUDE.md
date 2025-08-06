@@ -27,6 +27,18 @@ make promote-one TEST=test-dir/path.ml   # Update expected test output
 make runtest                             # Run all tests in oxcaml/tests
 ```
 
+## Configuration Commands
+```bash
+autoconf                  # Generate configure script, needs to be version 2.71
+                          # or higher; if available, just use autoconf27 directly
+./configure               # Configure the compiler; should by default pass the
+                          # options
+                          #     --enable-ocamltest --enable-warn-error
+                          #     --enable-dev --prefix="$(pwd)/_install"
+                          # if previously a different install directory was used,
+                          # prefer the old one over $(pwd)/_install.
+```
+
 ## Misc
 ```bash
 make fmt                   # Code formatting
