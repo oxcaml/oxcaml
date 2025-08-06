@@ -26,11 +26,18 @@ open Asttypes
 
 type mutability =
   | Immutable
-  | Mutable of Mode.Alloc.Comonadic.Const.t
+  | Mutable of Mode.Value.Comonadic.lr
 
 let is_mutable = function
   | Immutable -> false
   | Mutable _ -> true
+
+(** Takes [m0] which is the parameter of [let mutable], returns the
+    mode of new values in future writes. *)
+let mutable_mode m0 : _ Mode.Value.t =
+  { comonadic = m0
+  ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
+  }
 
 (* Type expressions for the core language *)
 
@@ -282,19 +289,21 @@ module Jkind_mod_bounds = struct
     (not (mem axes (Nonmodal Separability)) ||
      Separability.(le max (separability t)))
 
-  let[@inline] is_max = function
-    | { locality = Local;
-        linearity = Once;
-        uniqueness = Unique;
-        portability = Portable;
-        contention = Uncontended;
-        yielding = Yielding;
-        statefulness = Stateful;
-        visibility = Read_write;
-        externality = External;
-        nullability = Maybe_null;
-        separability = Maybe_separable } -> true
-    | _ -> false
+  let max =
+      { locality = Locality.max;
+        linearity = Linearity.max;
+        uniqueness = Uniqueness.max;
+        portability = Portability.max;
+        contention = Contention.max;
+        yielding = Yielding.max;
+        statefulness = Statefulness.max;
+        visibility = Visibility.max;
+        externality = Externality.max;
+        nullability = Nullability.max;
+        separability = Separability.max}
+
+  let[@inline] is_max m = m = max
+
 
   let debug_print ppf
         { locality;
@@ -479,6 +488,8 @@ module Vars = Misc.String.Map
 
 type value_kind =
     Val_reg                             (* Regular value *)
+  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+                                        (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
   | Val_self of
@@ -648,11 +659,16 @@ and mixed_block_element =
   | Float_boxed
   | Float64
   | Float32
+  | Bits8
+  | Bits16
   | Bits32
   | Bits64
   | Vec128
+  | Vec256
+  | Vec512
   | Word
   | Product of mixed_product_shape
+  | Void
 
 and mixed_product_shape = mixed_block_element array
 
@@ -838,6 +854,7 @@ module type Wrapped = sig
   and module_declaration =
   {
     md_type: module_type;
+    md_modalities: Mode.Modality.Value.t;
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
@@ -894,9 +911,11 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       val_uid
     }
 
-  let module_declaration m {md_type; md_attributes; md_loc; md_uid} =
+  let module_declaration m {md_type; md_modalities; md_attributes;
+    md_loc; md_uid} =
     To.{
       md_type = module_type m md_type;
+      md_modalities;
       md_attributes;
       md_loc;
       md_uid;
@@ -988,18 +1007,23 @@ let compare_tag t1 t2 =
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
   | Value, Value | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
-  | Word, Word | Bits32, Bits32 | Bits64, Bits64 | Vec128, Vec128
+  | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
+  | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Void, Void
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits32 | Bits64 | Vec128
-    | Product _ ), _
+  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits8 | Bits16 | Bits32
+    | Bits64 | Vec128 | Vec256 | Vec512 | Product _ | Void ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Value, Value | Float_boxed, Float_boxed | Float64, Float64 | Float32, Float32
-  | Word, Word | Bits32, Bits32 | Bits64, Bits64 | Vec128, Vec128
+  | Value, Value | Float_boxed, Float_boxed
+  | Float64, Float64 | Float32, Float32
+  | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
+  | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Void, Void
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
@@ -1013,12 +1037,22 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Float32 -> 1
   | Word, _ -> -1
   | _, Word -> 1
+  | Bits8, _ -> -1
+  | _, Bits8 -> 1
+  | Bits16, _ -> -1
+  | _, Bits16 -> 1
   | Bits32, _ -> -1
   | _, Bits32 -> 1
+  | Bits64, _ -> -1
+  | _, Bits64 -> 1
   | Vec128, _ -> -1
   | _, Vec128 -> 1
-  | Product _, _ -> -1
-  | _, Product _ -> 1
+  | Vec256, _ -> -1
+  | _, Vec256 -> 1
+  | Vec512, _ -> -1
+  | _, Vec512 -> 1
+  | Void, _ -> -1
+  | _, Void -> 1
 
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
   array_equal equal_mixed_block_element r1 r2
@@ -1084,8 +1118,7 @@ type 'a gen_label_description =
     lbl_mut: mutability;                (* Is this a mutable field? *)
     lbl_modalities: Mode.Modality.Value.Const.t;(* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
-    lbl_pos: int;                       (* Position in block *)
-    lbl_num: int;                       (* Position in type *)
+    lbl_pos: int;                       (* Position in type *)
     lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
     lbl_repres: 'a;                     (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)
@@ -1139,8 +1172,6 @@ let item_visibility = function
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis) -> vis
 
-let lbl_pos_void = -1
-
 let rec bound_value_identifiers = function
     [] -> []
   | Sig_value(id, {val_kind = Val_reg}, _) :: rem ->
@@ -1166,30 +1197,40 @@ let rec mixed_block_element_to_string = function
   | Float_boxed -> "Float_boxed"
   | Float32 -> "Float32"
   | Float64 -> "Float64"
+  | Bits8 -> "Bits8"
+  | Bits16 -> "Bits16"
   | Bits32 -> "Bits32"
   | Bits64 -> "Bits64"
   | Vec128 -> "Vec128"
+  | Vec256 -> "Vec256"
+  | Vec512 -> "Vec512"
   | Word -> "Word"
   | Product es ->
     "Product ["
     ^ (String.concat ", "
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
+  | Void -> "Void"
 
 let mixed_block_element_to_lowercase_string = function
   | Value -> "value"
   | Float_boxed -> "float"
   | Float32 -> "float32"
   | Float64 -> "float64"
+  | Bits8 -> "bits8"
+  | Bits16 -> "bits16"
   | Bits32 -> "bits32"
   | Bits64 -> "bits64"
   | Vec128 -> "vec128"
+  | Vec256 -> "vec256"
+  | Vec512 -> "vec512"
   | Word -> "word"
   | Product es ->
     "product ["
     ^ (String.concat ", "
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
+  | Void -> "void"
 
 (**** Definitions for backtracking ****)
 
@@ -1816,6 +1857,9 @@ let undo_compress (changes, _old) =
             Transient_expr.set_desc ty desc; r := !next
         | _ -> ())
         log
+
+let functor_param_mode = Mode.Alloc.legacy
+let functor_res_mode = Mode.Alloc.legacy
 
 (* Merlin specific *)
 let linked_variables () = !linked_variables

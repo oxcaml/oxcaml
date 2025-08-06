@@ -745,6 +745,7 @@ rule token = parse
   | "*"  { STAR }
   | ","  { COMMA }
   | "->" { MINUSGREATER }
+  | "$"  { DOLLAR }
   | "."  { DOT }
   | ".." { DOTDOT }
   | ".#" { DOTHASH }
@@ -756,6 +757,7 @@ rule token = parse
   | ";"  { SEMI }
   | ";;" { SEMISEMI }
   | "<"  { LESS }
+  | "<[" { LESSLBRACKET }
   | "<-" { LESSMINUS }
   | "="  { EQUAL }
   | "["  { LBRACKET }
@@ -764,6 +766,7 @@ rule token = parse
   | "[<" { LBRACKETLESS }
   | "[>" { LBRACKETGREATER }
   | "]"  { RBRACKET }
+  | "]>" { RBRACKETGREATER }
   | "{"  { LBRACE }
   | "{<" { LBRACELESS }
   | "|"  { BAR }

@@ -42,6 +42,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_SEMI) -> ";"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_RPAREN) -> ")"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_REC) -> "rec"
+  | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_RBRACKETGREATER) -> "]>"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_RBRACKET) -> "]"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_RBRACE) -> "}"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_QUOTED_STRING_ITEM) -> "QUOTED_STRING_ITEM"
@@ -77,6 +78,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_LETOP) -> "LETOP"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_LET) -> "let"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_LESSMINUS) -> "<-"
+  | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_LESSLBRACKET) -> "<["
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_LESS) -> "<"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_LBRACKETPERCENTPERCENT) -> "[%%"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_LBRACKETPERCENT) -> "[%"
@@ -139,6 +141,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_DOTDOT) -> ".."
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_DOT) -> "."
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_DONE) -> "done"
+  | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_DOLLAR) -> "$"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_DOCSTRING) -> "DOCSTRING"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_DO) -> "do"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_CONSTRAINT) -> "constraint"
@@ -452,6 +455,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.T MenhirInterpreter.T_SEMI -> (fun _ -> ";")
   | MenhirInterpreter.T MenhirInterpreter.T_RPAREN -> (fun _ -> ")")
   | MenhirInterpreter.T MenhirInterpreter.T_REC -> (fun _ -> "rec")
+  | MenhirInterpreter.T MenhirInterpreter.T_RBRACKETGREATER -> (fun _ -> "]>")
   | MenhirInterpreter.T MenhirInterpreter.T_RBRACKET -> (fun _ -> "]")
   | MenhirInterpreter.T MenhirInterpreter.T_RBRACE -> (fun _ -> "}")
   | MenhirInterpreter.T MenhirInterpreter.T_QUOTED_STRING_ITEM -> (string_of_quoted_STRING)
@@ -487,6 +491,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.T MenhirInterpreter.T_LETOP -> (fun _ -> "LETOP")
   | MenhirInterpreter.T MenhirInterpreter.T_LET -> (fun _ -> "let")
   | MenhirInterpreter.T MenhirInterpreter.T_LESSMINUS -> (fun _ -> "<-")
+  | MenhirInterpreter.T MenhirInterpreter.T_LESSLBRACKET -> (fun _ -> "<[")
   | MenhirInterpreter.T MenhirInterpreter.T_LESS -> (fun _ -> "<")
   | MenhirInterpreter.T MenhirInterpreter.T_LBRACKETPERCENTPERCENT -> (fun _ -> "[%%")
   | MenhirInterpreter.T MenhirInterpreter.T_LBRACKETPERCENT -> (fun _ -> "[%")
@@ -549,6 +554,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.T MenhirInterpreter.T_DOTDOT -> (fun _ -> "..")
   | MenhirInterpreter.T MenhirInterpreter.T_DOT -> (fun _ -> ".")
   | MenhirInterpreter.T MenhirInterpreter.T_DONE -> (fun _ -> "done")
+  | MenhirInterpreter.T MenhirInterpreter.T_DOLLAR -> (fun _ -> "$")
   | MenhirInterpreter.T MenhirInterpreter.T_DOCSTRING -> (fun _ -> "DOCSTRING")
   | MenhirInterpreter.T MenhirInterpreter.T_DO -> (fun _ -> "do")
   | MenhirInterpreter.T MenhirInterpreter.T_CONSTRAINT -> (fun _ -> "constraint")
@@ -861,6 +867,7 @@ let print_token = function
   | SEMI -> print_value (MenhirInterpreter.T MenhirInterpreter.T_SEMI) ()
   | RPAREN -> print_value (MenhirInterpreter.T MenhirInterpreter.T_RPAREN) ()
   | REC -> print_value (MenhirInterpreter.T MenhirInterpreter.T_REC) ()
+  | RBRACKETGREATER -> print_value (MenhirInterpreter.T MenhirInterpreter.T_RBRACKETGREATER) ()
   | RBRACKET -> print_value (MenhirInterpreter.T MenhirInterpreter.T_RBRACKET) ()
   | RBRACE -> print_value (MenhirInterpreter.T MenhirInterpreter.T_RBRACE) ()
   | QUOTED_STRING_ITEM v -> print_value (MenhirInterpreter.T MenhirInterpreter.T_QUOTED_STRING_ITEM) v
@@ -896,6 +903,7 @@ let print_token = function
   | LETOP v -> print_value (MenhirInterpreter.T MenhirInterpreter.T_LETOP) v
   | LET -> print_value (MenhirInterpreter.T MenhirInterpreter.T_LET) ()
   | LESSMINUS -> print_value (MenhirInterpreter.T MenhirInterpreter.T_LESSMINUS) ()
+  | LESSLBRACKET -> print_value (MenhirInterpreter.T MenhirInterpreter.T_LESSLBRACKET) ()
   | LESS -> print_value (MenhirInterpreter.T MenhirInterpreter.T_LESS) ()
   | LBRACKETPERCENTPERCENT -> print_value (MenhirInterpreter.T MenhirInterpreter.T_LBRACKETPERCENTPERCENT) ()
   | LBRACKETPERCENT -> print_value (MenhirInterpreter.T MenhirInterpreter.T_LBRACKETPERCENT) ()
@@ -958,6 +966,7 @@ let print_token = function
   | DOTDOT -> print_value (MenhirInterpreter.T MenhirInterpreter.T_DOTDOT) ()
   | DOT -> print_value (MenhirInterpreter.T MenhirInterpreter.T_DOT) ()
   | DONE -> print_value (MenhirInterpreter.T MenhirInterpreter.T_DONE) ()
+  | DOLLAR -> print_value (MenhirInterpreter.T MenhirInterpreter.T_DOLLAR) ()
   | DOCSTRING v -> print_value (MenhirInterpreter.T MenhirInterpreter.T_DOCSTRING) v
   | DO -> print_value (MenhirInterpreter.T MenhirInterpreter.T_DO) ()
   | CONSTRAINT -> print_value (MenhirInterpreter.T MenhirInterpreter.T_CONSTRAINT) ()
@@ -1011,6 +1020,7 @@ let token_of_terminal (type a) (t : a MenhirInterpreter.terminal) (v : a) : toke
   | MenhirInterpreter.T_SEMI -> SEMI
   | MenhirInterpreter.T_RPAREN -> RPAREN
   | MenhirInterpreter.T_REC -> REC
+  | MenhirInterpreter.T_RBRACKETGREATER -> RBRACKETGREATER
   | MenhirInterpreter.T_RBRACKET -> RBRACKET
   | MenhirInterpreter.T_RBRACE -> RBRACE
   | MenhirInterpreter.T_QUOTED_STRING_ITEM -> QUOTED_STRING_ITEM v
@@ -1046,6 +1056,7 @@ let token_of_terminal (type a) (t : a MenhirInterpreter.terminal) (v : a) : toke
   | MenhirInterpreter.T_LETOP -> LETOP v
   | MenhirInterpreter.T_LET -> LET
   | MenhirInterpreter.T_LESSMINUS -> LESSMINUS
+  | MenhirInterpreter.T_LESSLBRACKET -> LESSLBRACKET
   | MenhirInterpreter.T_LESS -> LESS
   | MenhirInterpreter.T_LBRACKETPERCENTPERCENT -> LBRACKETPERCENTPERCENT
   | MenhirInterpreter.T_LBRACKETPERCENT -> LBRACKETPERCENT
@@ -1108,6 +1119,7 @@ let token_of_terminal (type a) (t : a MenhirInterpreter.terminal) (v : a) : toke
   | MenhirInterpreter.T_DOTDOT -> DOTDOT
   | MenhirInterpreter.T_DOT -> DOT
   | MenhirInterpreter.T_DONE -> DONE
+  | MenhirInterpreter.T_DOLLAR -> DOLLAR
   | MenhirInterpreter.T_DOCSTRING -> DOCSTRING v
   | MenhirInterpreter.T_DO -> DO
   | MenhirInterpreter.T_CONSTRAINT -> CONSTRAINT

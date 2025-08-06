@@ -647,11 +647,7 @@ module Conv = struct
         let lst = List.map ~f:loop lst in
         let mut : Asttypes.mutable_flag =
           match mut with
-          | Mutable mode ->
-            assert (
-              Mode.Alloc.Comonadic.Const.equal mode
-                Mode.Alloc.Comonadic.Const.legacy);
-            Mutable
+          | Mutable _mode -> Mutable
           | Immutable -> Immutable
         in
         mkpat (Ppat_array (mut, lst))

@@ -322,6 +322,8 @@ and expression_desc =
         (** let P1 = E1 and ... and Pn = EN in E       (flag = Nonrecursive)
             let rec P1 = E1 and ... and Pn = EN in E   (flag = Recursive)
          *)
+  | Texp_letmutable of value_binding * expression
+        (** let mutable P = E in E' *)
   | Texp_function of
       { params : function_param list;
         body : function_body;
@@ -481,7 +483,9 @@ and expression_desc =
   | Texp_new of
       Path.t * Longident.t loc * Types.class_declaration * apply_position
   | Texp_instvar of Path.t * Path.t * string loc
+  | Texp_mutvar of Ident.t loc
   | Texp_setinstvar of Path.t * Path.t * string loc * expression
+  | Texp_setmutvar of Ident.t loc * Jkind.sort * expression
   | Texp_override of Path.t * (Ident.t * string loc * expression) list
   | Texp_letmodule of
       Ident.t option * string option loc * Types.module_presence * module_expr *
@@ -737,12 +741,23 @@ and class_field_desc =
   | Tcf_initializer of expression
   | Tcf_attribute of attribute
 
+and held_locks = Env.locks * Longident.t * Location.t
+
+and mode_with_locks = Mode.Value.l * held_locks option
+
 (* Value expressions for the module language *)
 
 and module_expr =
   { mod_desc: module_expr_desc;
     mod_loc: Location.t;
     mod_type: Types.module_type;
+    mod_mode : mode_with_locks;
+    (** The mode of the module. The second component is [Some] if [hold_locks]
+    is requested and the module is an identifier. *)
+    (* CR zqian: currently we mode-check bottom-up instead of top-down, in align
+    with the type-checking of modules. They are aligned because module type
+    inclusion check is modal. In the future both should be top-down for better
+    error messages. *)
     mod_env: Env.t;
     mod_attributes: attributes;
    }
@@ -907,6 +922,7 @@ and module_declaration =
      md_uid: Uid.t;
      md_presence: Types.module_presence;
      md_type: module_type;
+     md_modalities: Mode.Modality.Value.t;
      md_attributes: attributes;
      md_loc: Location.t;
     }
@@ -1309,6 +1325,13 @@ val function_arity : function_param list -> function_body -> int
 
 (** Given a declaration, return the location of the bound identifier *)
 val loc_of_decl : uid:Shape.Uid.t -> item_declaration -> string Location.loc
+
+(** When type checking F(M).t, which does not involve modes, we say F(M) is of
+    the strongest mode, to avoid modes in error messages. *)
+val min_mode_with_locks : mode_with_locks
+
+(** Get the mode, asserting no held locks. *)
+val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 
 (* Merlin specific *)
 

@@ -793,6 +793,7 @@ rule token state = parse
   | "*"  { return STAR }
   | ","  { return COMMA }
   | "->" { return MINUSGREATER }
+  | "$"  { return DOLLAR }
   | "."  { return DOT }
   | ".." { return DOTDOT }
   | ".#" { return DOTHASH }
@@ -804,6 +805,7 @@ rule token state = parse
   | ";"  { return SEMI }
   | ";;" { return SEMISEMI }
   | "<"  { return LESS }
+  | "<[" { return LESSLBRACKET }
   | "<-" { return LESSMINUS }
   | "="  { return EQUAL }
   | "["  { return LBRACKET }
@@ -812,6 +814,7 @@ rule token state = parse
   | "[<" { return LBRACKETLESS }
   | "[>" { return LBRACKETGREATER }
   | "]"  { return RBRACKET }
+  | "]>" { return RBRACKETGREATER }
   | "{"  { return LBRACE }
   | "{<" { return LBRACELESS }
   | "|"  { return BAR }

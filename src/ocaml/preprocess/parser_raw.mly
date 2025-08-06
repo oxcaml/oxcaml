@@ -311,6 +311,9 @@ let unclosed opening_name opening_loc closing_name closing_loc =
                                            make_loc closing_loc, closing_name)))
 *)
 
+let quotation_reserved name loc =
+  raise(Syntaxerr.Error(Syntaxerr.Quotation_reserved(make_loc loc, name)))
+
 (* Normal mutable arrays and immutable arrays are parsed identically, just with
    different delimiters.  The parsing is done by the [array_exprs] rule, and the
    [Generic_array] module provides (1) a type representing the possible results,
@@ -707,9 +710,10 @@ let addlb lbs lb =
   );
   { lbs with lbs_bindings = lb :: lbs.lbs_bindings }
 
-let mklbs ext rf lb =
+let mklbs ext mf rf lb =
   let lbs = {
     lbs_bindings = [];
+    lbs_mutable = mf;
     lbs_rec = rf;
     lbs_extension = ext;
   } in
@@ -729,10 +733,27 @@ let val_of_let_bindings ~loc lbs =
            ?value_constraint:lb.lb_constraint lb.lb_pattern lb.lb_expression)
       lbs.lbs_bindings
   in
-  let str = mkstr ~loc (Pstr_value(lbs.lbs_rec, List.rev bindings)) in
-  match lbs.lbs_extension with
-  | None -> str
-  | Some id -> ghstr ~loc (Pstr_extension((id, PStr [str]), []))
+  match lbs.lbs_mutable with
+  | Mutable ->
+    raise (Syntaxerr.Error
+      (Syntaxerr.Let_mutable_not_allowed_at_structure_level (make_loc loc)))
+  | Immutable ->
+    let str = mkstr ~loc (Pstr_value(lbs.lbs_rec, List.rev bindings)) in
+    match lbs.lbs_extension with
+    | None -> str
+    | Some id -> ghstr ~loc (Pstr_extension((id, PStr [str]), []))
+
+
+(* Find the location of the first binding in [bindings] that contains a ghost
+ * function expression. This is used to disallow [let mutable f x y = ..]. *)
+let ghost_fun_binding_loc bindings =
+  List.find_opt (fun binding ->
+    match binding.lb_expression.pexp_loc.loc_ghost,
+          binding.lb_expression.pexp_desc
+    with
+    | true, Pexp_function _ -> true | _ -> false)
+  bindings
+  |> Option.map (fun binding -> binding.lb_loc)
 
 let expr_of_let_bindings ~loc lbs body =
   let bindings =
@@ -743,7 +764,15 @@ let expr_of_let_bindings ~loc lbs body =
           ?value_constraint:lb.lb_constraint  lb.lb_pattern lb.lb_expression)
       lbs.lbs_bindings
   in
-    mkexp_attrs ~loc (Pexp_let(lbs.lbs_rec, List.rev bindings, body))
+  (* Disallow [let mutable f x y = ..] but still allow
+   * [let mutable f = fun x y -> ..]. *)
+  match lbs.lbs_mutable, ghost_fun_binding_loc lbs.lbs_bindings with
+  | Mutable, Some loc ->
+    raise (Syntaxerr.Error
+      (Syntaxerr.Let_mutable_not_allowed_with_function_bindings loc))
+  | _ ->
+    mkexp_attrs ~loc
+      (Pexp_let(lbs.lbs_mutable, lbs.lbs_rec, List.rev bindings, body))
       (lbs.lbs_extension, [])
 
 let class_of_let_bindings ~loc lbs body =
@@ -755,9 +784,14 @@ let class_of_let_bindings ~loc lbs body =
           ?value_constraint:lb.lb_constraint lb.lb_pattern lb.lb_expression)
       lbs.lbs_bindings
   in
-    (* Our use of let_bindings(no_ext) guarantees the following: *)
-    assert (lbs.lbs_extension = None);
-    mkclass ~loc (Pcl_let (lbs.lbs_rec, List.rev bindings, body))
+    match lbs.lbs_mutable with
+    | Mutable ->
+      raise (Syntaxerr.Error
+        (Syntaxerr.Let_mutable_not_allowed_in_class_definition (make_loc loc)))
+    | Immutable ->
+      (* Our use of let_bindings(no_ext) guarantees the following: *)
+      assert (lbs.lbs_extension = None);
+      mkclass ~loc (Pcl_let (lbs.lbs_rec, List.rev bindings, body))
 
 (* If all the parameters are [Pparam_newtype x], then return [Some xs] where
    [xs] is the corresponding list of values [x]. This function is optimized for
@@ -1047,6 +1081,7 @@ let merloc startpos ?endpos x =
 %token COMMA [@symbol ","]
 %token CONSTRAINT [@symbol "constraint"]
 %token DO [@symbol "do"]
+%token DOLLAR [@symbol "$"]
 %token DONE [@symbol "done"]
 %token DOT [@symbol "."]
 %token DOTDOT [@symbol ".."]
@@ -1103,6 +1138,7 @@ let merloc startpos ?endpos x =
 %token LBRACKETPERCENT [@symbol "[%"]
 %token LBRACKETPERCENTPERCENT [@symbol "[%%"]
 %token LESS [@symbol "<"]
+%token LESSLBRACKET [@symbol "<["]
 %token LESSMINUS [@symbol "<-"] [@cost 2]
 %token LET [@symbol "let"]
 %token <string> LIDENT [@cost 2] [@recovery "_"][@printer Printf.sprintf "LIDENT(%S)"]
@@ -1139,6 +1175,7 @@ let merloc startpos ?endpos x =
 %token QUOTE [@symbol "'"]
 %token RBRACE [@symbol "}"]
 %token RBRACKET [@symbol "]"]
+%token RBRACKETGREATER [@symbol "]>"]
 %token REC [@symbol "rec"]
 %token RPAREN [@symbol ")"]
 %token SEMI [@symbol ";"]
@@ -1246,7 +1283,7 @@ The precedences must be listed from low to high.
 /* Finally, the first tokens of simple_expr are above everything else. */
 %nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT HASH_FLOAT INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT UNDERSCORE
+          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR UNDERSCORE
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN
           DOTLESS DOTTILDE GREATERDOT
 
@@ -2942,7 +2979,7 @@ fun_:
       { mkexp_cons ~loc:$sloc $loc($2)
           (ghexp ~loc:$sloc (Pexp_tuple[None, $1; None, (merloc $endpos($2) $3)])) }
   | mkrhs(label) LESSMINUS expr
-      { mkexp ~loc:$sloc (Pexp_setinstvar($1, $3)) }
+      { mkexp ~loc:$sloc (Pexp_setvar($1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
       { mkexp ~loc:$sloc (Pexp_setfield($1, $3, $5)) }
   | indexop_expr(DOT, seq_expr, LESSMINUS v=expr {Some v})
@@ -3277,6 +3314,17 @@ comprehension_clause:
           mkexp_attrs ~loc:($startpos($3), $endpos)
             (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, [])) $5 in
         Pexp_open(od, modexp) }
+  | LESSLBRACKET expr_semi_list RBRACKETGREATER
+      { quotation_reserved "<[" $loc($1) }
+  (*
+  | LESSLBRACKET expr_semi_list error
+      { unclosed "<[" $loc($1) "]>" $loc($3) }
+  *)
+  (*
+  (* Merlin: comment this back in once DOLLAR is parsed for real *)
+  | DOLLAR error
+      { quotation_reserved "$" $loc($1) }
+  *)
   (*
   | mod_longident DOT
     LPAREN MODULE ext_attributes module_expr COLON error
@@ -3402,12 +3450,13 @@ let_bindings(EXT):
   LET
   ext = EXT
   attrs1 = attributes
+  mutable_flag = mutable_flag
   rec_flag = rec_flag
   body = let_binding_body
   attrs2 = post_item_attributes
     {
       let attrs = attrs1 @ attrs2 in
-      mklbs ext rec_flag (mklb ~loc:$sloc true body attrs)
+      mklbs ext mutable_flag rec_flag (mklb ~loc:$sloc true body attrs)
     }
 ;
 and_let_binding:
@@ -4904,6 +4953,17 @@ atomic_type:
       { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
   | LPAREN TYPE COLON jkind=jkind_annotation RPAREN
       { mktyp ~loc:$loc (Ptyp_of_kind jkind) }
+  | LESSLBRACKET core_type RBRACKETGREATER
+      { quotation_reserved "<[" $loc($1) }
+  (*
+  | LESSLBRACKET core_type error
+      { unclosed "<[" $loc($1) "]>" $loc($3) }
+  *)
+  (*
+  (* Merlin: comment this back in once DOLLAR is parsed for real *)
+  | DOLLAR error
+      { quotation_reserved "$" $loc($1) }
+  *)
 
 
 (* This is the syntax of the actual type parameters in an application of

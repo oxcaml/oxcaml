@@ -119,11 +119,19 @@ module Layout = struct
 
       let word = Base Sort.Word
 
+      let bits8 = Base Sort.Bits8
+
+      let bits16 = Base Sort.Bits16
+
       let bits32 = Base Sort.Bits32
 
       let bits64 = Base Sort.Bits64
 
       let vec128 = Base Sort.Vec128
+
+      let vec256 = Base Sort.Vec256
+
+      let vec512 = Base Sort.Vec512
 
       let of_base : Sort.base -> t = function
         | Value -> value
@@ -131,9 +139,13 @@ module Layout = struct
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
+        | Vec256 -> vec256
+        | Vec512 -> vec512
     end
 
     include Static
@@ -339,7 +351,7 @@ module Layout = struct
       | Any -> fprintf ppf "any"
       | Sort s -> Sort.format ppf s
       | Product ts ->
-        let pp_sep ppf () = Format.fprintf ppf " & " in
+        let pp_sep ppf () = Format.fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     in
     pp_element ~nested:false ppf layout
@@ -1426,6 +1438,13 @@ module Const = struct
         name = "void"
       }
 
+    let void_mod_everything =
+      { jkind =
+          mk_jkind (Base Void) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "void mod everything"
+      }
+
     let immediate =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Non_null
@@ -1438,7 +1457,7 @@ module Const = struct
     let immediate_or_null =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+            ~separability:Non_float;
         name = "immediate_or_null"
       }
 
@@ -1546,6 +1565,42 @@ module Const = struct
 
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
+    let bits8 =
+      { jkind =
+          mk_jkind (Base Bits8) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits8"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_int8 =
+      { jkind =
+          mk_jkind (Base Bits8) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits8 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let bits16 =
+      { jkind =
+          mk_jkind (Base Bits16) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits16"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_int16 =
+      { jkind =
+          mk_jkind (Base Bits16) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits16 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let bits32 =
       { jkind =
           mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Non_null
@@ -1591,11 +1646,47 @@ module Const = struct
 
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
+    let vec256 =
+      { jkind =
+          mk_jkind (Base Vec256) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec256"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let vec512 =
+      { jkind =
+          mk_jkind (Base Vec512) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec512"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let kind_of_unboxed_128bit_vectors =
       { jkind =
           mk_jkind (Base Vec128) ~mode_crossing:true ~nullability:Non_null
             ~separability:Non_float;
         name = "vec128 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_256bit_vectors =
+      { jkind =
+          mk_jkind (Base Vec256) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec256 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_512bit_vectors =
+      { jkind =
+          mk_jkind (Base Vec512) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec512 mod everything"
       }
 
     let all =
@@ -1610,6 +1701,7 @@ module Const = struct
         sync_data;
         mutable_data;
         void;
+        void_mod_everything;
         immediate;
         immediate_or_null;
         immediate64;
@@ -1619,12 +1711,20 @@ module Const = struct
         kind_of_unboxed_float32;
         word;
         kind_of_unboxed_nativeint;
+        bits8;
+        kind_of_unboxed_int8;
+        bits16;
+        kind_of_unboxed_int16;
         bits32;
         kind_of_unboxed_int32;
         bits64;
         kind_of_unboxed_int64;
         vec128;
-        kind_of_unboxed_128bit_vectors ]
+        kind_of_unboxed_128bit_vectors;
+        vec256;
+        kind_of_unboxed_256bit_vectors;
+        vec512;
+        kind_of_unboxed_512bit_vectors ]
 
     let of_attribute : Builtin_attributes.jkind_attribute -> t = function
       | Immediate -> immediate
@@ -1886,9 +1986,13 @@ module Const = struct
       | "float64" -> Builtin.float64.jkind
       | "float32" -> Builtin.float32.jkind
       | "word" -> Builtin.word.jkind
+      | "bits8" -> Builtin.bits8.jkind
+      | "bits16" -> Builtin.bits16.jkind
       | "bits32" -> Builtin.bits32.jkind
       | "bits64" -> Builtin.bits64.jkind
       | "vec128" -> Builtin.vec128.jkind
+      | "vec256" -> Builtin.vec256.jkind
+      | "vec512" -> Builtin.vec512.jkind
       | "immutable_data" -> Builtin.immutable_data.jkind
       | "sync_data" -> Builtin.sync_data.jkind
       | "mutable_data" -> Builtin.mutable_data.jkind
@@ -1933,7 +2037,11 @@ module Const = struct
       (jkind : 'd t) =
     let rec scan_layout (l : Layout.Const.t) : Language_extension.maturity =
       match l, Mod_bounds.nullability jkind.mod_bounds with
-      | (Base (Float64 | Float32 | Word | Bits32 | Bits64 | Vec128) | Any), _
+      | ( ( Base
+              ( Float64 | Float32 | Word | Bits32 | Bits64 | Vec128 | Vec256
+              | Vec512 )
+          | Any ),
+          _ )
       | Base Value, Non_null
       | Base Value, Maybe_null ->
         Stable
@@ -1941,7 +2049,8 @@ module Const = struct
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
-      | Base Void, _ -> Alpha
+      | Base (Bits8 | Bits16), (Non_null | Maybe_null) -> Beta
+      | Base Void, _ -> Stable
     in
     scan_layout jkind.layout
 
@@ -1979,7 +2088,7 @@ module Desc = struct
         | Some c -> Const.format ppf c
         | None -> assert false (* handled above *))
     in
-    format_desc ~nested:false ppf t
+    format_desc ppf ~nested:false t
 end
 
 module Jkind_desc = struct
@@ -2325,7 +2434,7 @@ let has_mutable_label lbls =
 
 let all_void_labels lbls =
   List.for_all
-    (fun (lbl : Types.label_declaration) -> Sort.Const.(equal void lbl.ld_sort))
+    (fun (lbl : Types.label_declaration) -> Sort.Const.(all_void lbl.ld_sort))
     lbls
 
 let add_labels_as_with_bounds lbls jkind =
@@ -2371,6 +2480,24 @@ let for_non_float ~(why : History.value_creation_reason) =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation why)
 
+let for_or_null_argument ident =
+  let why =
+    History.Type_argument
+      { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  in
+  let mod_bounds =
+    Mod_bounds.create ~locality:Locality.Const.max
+      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
+      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
+      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
+      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~nullability:Nullability.Non_null
+      ~separability:Separability.Maybe_separable
+  in
+  fresh_jkind
+    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    ~annotation:None ~why:(Value_creation why)
+
 let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of *)
   let jkind = type_jkind_purely ty in
@@ -2387,50 +2514,76 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
     }
     ~annotation:None ~why:Abbreviation
 
-let for_boxed_variant cstrs =
+let for_boxed_variant ~loc cstrs =
   let open Types in
-  if List.for_all
-       (* CR layouts v12: This code assumes that all voids mode-cross. I
-          think that's probably not what we want. *)
-         (fun cstr ->
-         match cstr.cd_args with
-         | Cstr_tuple args ->
-           List.for_all (fun arg -> Sort.Const.(equal void arg.ca_sort)) args
-         | Cstr_record lbls -> all_void_labels lbls)
-       cstrs
-  then Builtin.immediate ~why:Enumeration
-  else
-    let is_mutable =
-      List.exists
+  let has_gadt_constructor =
+    List.exists
+      (fun cstr -> match cstr.cd_res with None -> false | Some _ -> true)
+      cstrs
+  in
+  if has_gadt_constructor
+  then
+    let no_args =
+      List.for_all
         (fun cstr ->
           match cstr.cd_args with
-          | Cstr_tuple _ -> false
-          | Cstr_record lbls -> has_mutable_label lbls)
+          | Cstr_tuple [] | Cstr_record [] -> true
+          | Cstr_tuple _ | Cstr_record _ -> false)
         cstrs
     in
-    let has_gadt_constructor =
-      List.exists
-        (fun cstr -> match cstr.cd_res with None -> false | Some _ -> true)
-        cstrs
+    if no_args
+    then Builtin.immediate ~why:Enumeration
+    else for_non_float ~why:Boxed_variant
+  else
+    let base =
+      let all_args_void =
+        List.for_all
+          (fun cstr ->
+            match cstr.cd_args with
+            | Cstr_tuple args ->
+              List.for_all (fun arg -> Sort.Const.(all_void arg.ca_sort)) args
+            | Cstr_record lbls -> all_void_labels lbls)
+          cstrs
+      in
+      if all_args_void
+      then (
+        let has_args =
+          List.exists
+            (fun cstr ->
+              match cstr.cd_args with
+              | Cstr_tuple (_ :: _) | Cstr_record (_ :: _) -> true
+              | Cstr_tuple [] | Cstr_record [] -> false)
+            cstrs
+        in
+        if has_args && Language_extension.erasable_extensions_only ()
+        then
+          Location.prerr_warning loc
+            (Warnings.Incompatible_with_upstream Warnings.Immediate_void_variant);
+        Builtin.immediate ~why:Enumeration)
+      else
+        let is_mutable =
+          List.exists
+            (fun cstr ->
+              match cstr.cd_args with
+              | Cstr_tuple _ -> false
+              | Cstr_record lbls -> has_mutable_label lbls)
+            cstrs
+        in
+        if is_mutable
+        then Builtin.mutable_data ~why:Boxed_variant
+        else Builtin.immutable_data ~why:Boxed_variant
     in
-    if has_gadt_constructor
-    then for_non_float ~why:Boxed_variant
-    else
-      let base =
-        (if is_mutable then Builtin.mutable_data else Builtin.immutable_data)
-          ~why:Boxed_variant
-        |> mark_best
-      in
-      let add_cstr_args cstr jkind =
-        match cstr.cd_args with
-        | Cstr_tuple args ->
-          List.fold_right
-            (fun arg ->
-              add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
-            args jkind
-        | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
-      in
-      List.fold_right add_cstr_args cstrs base
+    let base = mark_best base in
+    let add_cstr_args cstr jkind =
+      match cstr.cd_args with
+      | Cstr_tuple args ->
+        List.fold_right
+          (fun arg ->
+            add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
+          args jkind
+      | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
+    in
+    List.fold_right add_cstr_args cstrs base
 
 let for_boxed_tuple elts =
   List.fold_right
@@ -2685,6 +2838,18 @@ let apply_modality_r modality jk =
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
+let apply_or_null jkind =
+  match Mod_bounds.nullability jkind.jkind.mod_bounds with
+  | Maybe_null ->
+    let jkind = set_nullability_upper_bound jkind Non_null in
+    let jkind =
+      match Mod_bounds.separability jkind.jkind.mod_bounds with
+      | Maybe_separable -> jkind
+      | Separable | Non_float -> set_separability_upper_bound jkind Non_float
+    in
+    Ok jkind
+  | Non_null -> Error ()
+
 let get_annotation jk = jk.annotation
 
 let decompose_product ({ jkind; _ } as jk) =
@@ -2825,6 +2990,9 @@ module Format_history = struct
          representable at call sites)"
     | Peek_or_poke ->
       fprintf ppf "it's the type being used for a peek or poke primitive"
+    | Mutable_var_assignment ->
+      fprintf ppf "it's the type of a mutable variable used in an assignment"
+    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -2834,7 +3002,6 @@ module Format_history = struct
     | Wildcard -> fprintf ppf "it's a _ in the type"
     | Unification_var -> fprintf ppf "it's a fresh unification variable"
     | Array_element -> fprintf ppf "it's the type of an array element"
-    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
 
   let rec format_annotation_context :
       type l r. _ -> (l * r) History.annotation_context -> unit =
@@ -3253,15 +3420,18 @@ module Violation = struct
       | Sort (Base _) | Any -> false
     in
     let format_layout_or_kind ppf jkind =
+      let indent =
+        pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "")
+      in
       match mismatch_type with
-      | Mode -> Format.fprintf ppf "@,%a" format jkind
-      | Layout -> Layout.format ppf jkind.jkind.layout
+      | Mode -> fprintf ppf "%t%a" indent format jkind
+      | Layout -> fprintf ppf "%t%a" indent Layout.format jkind.jkind.layout
     in
     let subjkind_format verb k2 =
       if has_sort_var (get k2).layout
       then dprintf "%s representable" verb
       else
-        dprintf "%s a sub%s of %a" verb layout_or_kind format_layout_or_kind k2
+        dprintf "%s a sub%s of@ %a" verb layout_or_kind format_layout_or_kind k2
     in
     let Pack_jkind k1, Pack_jkind k2, fmt_k1, fmt_k2, missing_cmi_option =
       match t with
@@ -3279,7 +3449,7 @@ module Violation = struct
         | None ->
           ( Pack_jkind k1,
             Pack_jkind k2,
-            dprintf "%s %a" layout_or_kind format_layout_or_kind k1,
+            dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
             subjkind_format "is not" k2,
             None )
         | Some p ->
@@ -3292,8 +3462,8 @@ module Violation = struct
         assert (Option.is_none missing_cmi);
         ( Pack_jkind k1,
           Pack_jkind k2,
-          dprintf "%s %a" layout_or_kind format_layout_or_kind k1,
-          dprintf "does not overlap with %a" format_layout_or_kind k2,
+          dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
+          dprintf "does not overlap with@ %a" format_layout_or_kind k2,
           None )
     in
     if display_histories
@@ -3301,15 +3471,15 @@ module Violation = struct
       let connective =
         match t.violation, has_sort_var (get k2).layout with
         | Not_a_subjkind _, false ->
-          dprintf "be a sub%s of %a" layout_or_kind format_layout_or_kind k2
+          dprintf "be a sub%s of@ %a" layout_or_kind format_layout_or_kind k2
         | No_intersection _, false ->
-          dprintf "overlap with %a" format_layout_or_kind k2
+          dprintf "overlap with@ %a" format_layout_or_kind k2
         | _, true -> dprintf "be representable"
       in
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
            ~intro:
-             (dprintf "@[<hov 2>The %s of %a is %a@]" layout_or_kind pp_former
+             (dprintf "@[<hov 2>The %s of %a is@ %a@]" layout_or_kind pp_former
                 former format_layout_or_kind k1)
            ~layout_or_kind)
         k1
@@ -3629,6 +3799,8 @@ module Debug_printers = struct
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
+    | Mutable_var_assignment -> fprintf ppf "Mutable_var_assignment"
+    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3637,7 +3809,6 @@ module Debug_printers = struct
     | Wildcard -> fprintf ppf "Wildcard"
     | Unification_var -> fprintf ppf "Unification_var"
     | Array_element -> fprintf ppf "Array_element"
-    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
 
   let rec annotation_context :
       type l r. _ -> (l * r) History.annotation_context -> unit =

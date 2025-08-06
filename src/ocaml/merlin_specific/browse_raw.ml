@@ -372,10 +372,11 @@ let of_method_call obj meth loc env (f : _ f0) acc =
   app (Method_call (obj, meth, loc)) env f acc
 
 let rec of_expression_desc loc = function
-  | Texp_ident _ | Texp_constant _ | Texp_instvar _
+  | Texp_ident _ | Texp_constant _ | Texp_instvar _ | Texp_mutvar _
   | Texp_variant (_, None)
   | Texp_new _ | Texp_src_pos | Texp_typed_hole -> id_fold
   | Texp_let (_, vbs, e) -> of_expression e ** list_fold of_value_binding vbs
+  | Texp_letmutable (vb, e) -> of_expression e ** of_value_binding vb
   | Texp_function { params; body; _ } ->
     list_fold of_function_param params ** of_function_body body
   | Texp_apply (e, ls, _, _, _) ->
@@ -396,6 +397,7 @@ let rec of_expression_desc loc = function
   | Texp_assert (e, _)
   | Texp_lazy e
   | Texp_setinstvar (_, _, _, e) -> of_expression e
+  | Texp_setmutvar (_, _, e) -> of_expression e
   | Texp_record { fields; extended_expression } ->
     option_fold (fun (e, _, _) -> of_expression e) extended_expression
     **

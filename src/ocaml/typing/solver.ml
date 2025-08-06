@@ -339,7 +339,7 @@ module Solver_mono (C : Lattices_mono) = struct
       let f' = C.left_adjoint obj f in
       let src = C.src obj f in
       let a' = C.apply src f' a in
-      assert (Result.is_ok (submode_cv ~log src a' v));
+      submode_cv ~log src a' v |> Result.get_ok;
       Ok ()
 
   (** Returns [Ok ()] if success; [Error x] if failed, and [x] is the next best
@@ -432,8 +432,9 @@ module Solver_mono (C : Lattices_mono) = struct
           let src = C.src dst g in
           let g'f = C.compose src g' (C.disallow_right f) in
           let x = Amorphvar (v, g'f) in
-          if not (VarMap.exists (fun _ mv -> eq_morphvar mv x) u.vlower)
-          then set_vlower ~log u (VarMap.add (get_key x) x u.vlower);
+          let key = get_key x in
+          if not (VarMap.mem key u.vlower)
+          then set_vlower ~log u (VarMap.add key x u.vlower);
           Ok ())
 
   let cnt_id = ref 0
@@ -577,7 +578,7 @@ module Solver_mono (C : Lattices_mono) = struct
   let zap_to_ceil : type a l. a C.obj -> (a, l * allowed) mode -> log:_ -> a =
    fun obj m ~log ->
     let ceil = get_ceil obj m in
-    assert (submode obj (Amode ceil) m ~log |> Result.is_ok);
+    submode obj (Amode ceil) m ~log |> Result.get_ok;
     ceil
 
   (** Zap [mv] to its lower bound. Returns the [log] of the zapping, in
@@ -631,7 +632,7 @@ module Solver_mono (C : Lattices_mono) = struct
           mvs a
       in
       VarMap.iter
-        (fun _ mv -> assert (submode_mvc obj mv floor ~log |> Result.is_ok))
+        (fun _ mv -> submode_mvc obj mv floor ~log |> Result.get_ok)
         mvs;
       floor
 
@@ -687,14 +688,14 @@ module Solver_mono (C : Lattices_mono) = struct
     | Amodevar mv ->
       let u = fresh obj in
       let mu = Amorphvar (u, C.id) in
-      assert (Result.is_ok (submode_mvmv obj ~log:None mu mv));
+      submode_mvmv obj ~log:None mu mv |> Result.get_ok;
       allow_left (Amodevar mu), true
     | Amodemeet (a, mvs) ->
       let u = fresh obj in
       let mu = Amorphvar (u, C.id) in
-      assert (Result.is_ok (submode_mvc obj ~log:None mu a));
+      submode_mvc obj ~log:None mu a |> Result.get_ok;
       VarMap.iter
-        (fun _ mv -> assert (Result.is_ok (submode_mvmv obj ~log:None mu mv)))
+        (fun _ mv -> submode_mvmv obj ~log:None mu mv |> Result.get_ok)
         mvs;
       allow_left (Amodevar mu), true
 end

@@ -521,7 +521,7 @@ let ocaml_ignored_flags =
     "-flambda2-expert-phantom-lets";
     "-flambda2-inlining-report-bin";
     "-flambda2-join-points";
-    "-flambda2-result-types";
+    "-no-flambda2-result-types";
     "-flambda2-result-types-all-functions";
     "-flambda2-result-types-functors-only";
     "-flambda2-speculative-inlining-only-if-arguments-useful";
@@ -554,6 +554,7 @@ let ocaml_ignored_flags =
     "-flambda2-advanced-meet";
     "-directory";
     (* Jane Street specific *)
+    "-disable-builtin-check";
     "-disable-poll-insertion";
     "-gdwarf-may-alter-codegen";
     "-gno-dwarf-may-alter-codegen";
@@ -614,7 +615,18 @@ let ocaml_ignored_flags =
     "-dflambda-heavy-invariants";
     "-cfg-eliminate-dead-trap-handlers";
     "-no-cfg-eliminate-dead-trap-handlers";
-    "-module-entry-functions-section"
+    "-module-entry-functions-section";
+    "-zero-alloc-checker-details-extra";
+    "-no-zero-alloc-checker-details-extra";
+    "-favx512f";
+    "-fno-avx512f";
+    "-favx2";
+    "-fno-avx2";
+    "-favx";
+    "-fno-avx";
+    "-dllvmir";
+    "-keep-llvmir";
+    "-llvm-path"
   ]
 
 let ocaml_ignored_parametrized_flags =

@@ -16,6 +16,8 @@ type boxed_integer = Primitive.boxed_integer =
 
 type boxed_vector = Primitive.boxed_vector =
   | Boxed_vec128
+  | Boxed_vec256
+  | Boxed_vec512
 
 type unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
@@ -25,9 +27,13 @@ type unboxed_integer = Primitive.unboxed_integer =
   | Unboxed_int64
   | Unboxed_nativeint
   | Unboxed_int32
+  | Unboxed_int16
+  | Unboxed_int8
 
 type unboxed_vector = Primitive.unboxed_vector =
   | Unboxed_vec128
+  | Unboxed_vec256
+  | Unboxed_vec512
 
 type array_kind =
     Pgenarray | Paddrarray | Pintarray | Pfloatarray

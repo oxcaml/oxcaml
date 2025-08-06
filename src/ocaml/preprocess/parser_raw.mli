@@ -25,6 +25,7 @@ type token =
   | SEMI
   | RPAREN
   | REC
+  | RBRACKETGREATER
   | RBRACKET
   | RBRACE
   | QUOTED_STRING_ITEM of (string * Location.t * string * Location.t * string option)
@@ -60,6 +61,7 @@ type token =
   | LETOP of (string)
   | LET
   | LESSMINUS
+  | LESSLBRACKET
   | LESS
   | LBRACKETPERCENTPERCENT
   | LBRACKETPERCENT
@@ -122,6 +124,7 @@ type token =
   | DOTDOT
   | DOT
   | DONE
+  | DOLLAR
   | DOCSTRING of (Docstrings.docstring)
   | DO
   | CONSTRAINT
@@ -219,6 +222,7 @@ module MenhirInterpreter : sig
     | T_SEMI : unit terminal
     | T_RPAREN : unit terminal
     | T_REC : unit terminal
+    | T_RBRACKETGREATER : unit terminal
     | T_RBRACKET : unit terminal
     | T_RBRACE : unit terminal
     | T_QUOTED_STRING_ITEM : (string * Location.t * string * Location.t * string option) terminal
@@ -254,6 +258,7 @@ module MenhirInterpreter : sig
     | T_LETOP : (string) terminal
     | T_LET : unit terminal
     | T_LESSMINUS : unit terminal
+    | T_LESSLBRACKET : unit terminal
     | T_LESS : unit terminal
     | T_LBRACKETPERCENTPERCENT : unit terminal
     | T_LBRACKETPERCENT : unit terminal
@@ -316,6 +321,7 @@ module MenhirInterpreter : sig
     | T_DOTDOT : unit terminal
     | T_DOT : unit terminal
     | T_DONE : unit terminal
+    | T_DOLLAR : unit terminal
     | T_DOCSTRING : (Docstrings.docstring) terminal
     | T_DO : unit terminal
     | T_CONSTRAINT : unit terminal

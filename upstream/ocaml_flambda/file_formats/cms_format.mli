@@ -33,6 +33,7 @@ type cms_infos = {
     (Longident.t Location.loc * Shape_reduce.result) array;
   cms_declaration_dependencies :
     (Cmt_format.dependency_kind * Uid.t * Uid.t) list;
+  cms_externals: Vicuna_value_shapes.extfun array;
 }
 
 type error =

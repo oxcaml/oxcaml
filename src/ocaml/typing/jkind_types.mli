@@ -51,9 +51,13 @@ module Sort : sig
     | Float64
     | Float32
     | Word
+    | Bits8
+    | Bits16
     | Bits32
     | Bits64
     | Vec128
+    | Vec256
+    | Vec512
 
   val to_string_base : base -> string
 

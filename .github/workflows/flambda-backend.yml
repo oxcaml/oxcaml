@@ -74,7 +74,7 @@ jobs:
       run: |
         opam switch create 4.14.0 --yes
         opam switch link 4.14.0 --yes
-        opam install --yes dune.3.10.0 menhir.20231231
+        opam install --yes dune.3.19.1 menhir.20231231
 
     - name: Configure, build, and install flambda-backend
       if: steps.cache.outputs.cache-hit != 'true'

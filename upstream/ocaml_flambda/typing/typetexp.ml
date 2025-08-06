@@ -27,6 +27,13 @@ open Ctype
 
 exception Already_bound
 
+type unbound_variable_policy =
+  | Open (* common case *)
+  | Closed (* no wildcards or unqunatified variables allowed *)
+  | Closed_for_upstream_compatibility (* same as above, extra error hint *)
+
+type unbound_variable_reason = | Upstream_compatibility
+
 (* A way to specify what jkind should be used for new type variables:
 
    [Sort] means to initialize variables with representable jkinds (sort
@@ -60,8 +67,9 @@ type jkind_info =
   }
 
 type error =
-  | Unbound_type_variable of string * string list
-  | No_type_wildcards
+  | Unbound_type_variable of
+    string * string list * unbound_variable_reason option
+  | No_type_wildcards of unbound_variable_reason option
   | Undefined_type_constructor of Path.t
   | Type_arity_mismatch of Longident.t * int * int
   | Bound_type_variable of string
@@ -177,10 +185,8 @@ module TyVarEnv : sig
   (* see mli file *)
 
   type policy
-  val make_fixed_policy : jkind_initialization_choice -> policy
-    (* no wildcards allowed *)
-  val make_extensible_policy : jkind_initialization_choice -> policy
-    (* common case *)
+  val make_policy :
+    unbound_variable_policy -> jkind_initialization_choice -> policy
   val univars_policy : policy
     (* fresh variables are univars (in methods), with representable jkinds *)
   val new_any_var : Location.t -> Env.t -> jkind_lr -> policy -> type_expr
@@ -445,28 +451,21 @@ end = struct
 
 
   type flavor = Unification | Universal
-  type extensibility = Extensible | Fixed
   type policy = {
     flavor : flavor;
-    extensibility : extensibility;
+    unbound_variable_policy : unbound_variable_policy;
     jkind_initialization: jkind_initialization_choice;
   }
 
-  let make_fixed_policy jkind_initialization = {
+  let make_policy unbound_variable_policy jkind_initialization = {
     flavor = Unification;
-    extensibility = Fixed;
-    jkind_initialization;
-  }
-
-  let make_extensible_policy jkind_initialization = {
-    flavor = Unification;
-    extensibility = Extensible;
+    unbound_variable_policy;
     jkind_initialization;
   }
 
   let univars_policy = {
     flavor = Universal;
-    extensibility = Extensible;
+    unbound_variable_policy = Open;
     jkind_initialization = Sort;
   }
 
@@ -497,10 +496,14 @@ end = struct
     | Sort -> Jkind.of_new_legacy_sort ~why:(if is_named then Unification_var else Wildcard)
 
   let new_any_var loc env jkind = function
-    | { extensibility = Fixed } -> raise(Error(loc, env, No_type_wildcards))
+    | { unbound_variable_policy = Closed; _ } ->
+      raise(Error(loc, env, No_type_wildcards None))
+    | { unbound_variable_policy = Closed_for_upstream_compatibility; _ } ->
+      raise(Error(loc, env, No_type_wildcards (Some Upstream_compatibility)))
     | policy -> new_var jkind policy
 
-  let globalize_used_variables { flavor; extensibility } env =
+  let globalize_used_variables
+      { flavor; unbound_variable_policy; _ } env =
     let r = ref [] in
     TyVarMap.iter
       (fun name (ty, loc) ->
@@ -511,14 +514,22 @@ end = struct
           then try
             r := (loc, v, lookup_global name) :: !r
           with Not_found ->
-            if extensibility = Fixed && Btype.is_Tvar ty then
+            match unbound_variable_policy, Btype.is_Tvar ty with
+            | Open, _ | (Closed | Closed_for_upstream_compatibility), false ->
+              let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
+              let v2 = new_global_var jkind in
+              r := (loc, v, v2) :: !r;
+              add name v2 jkind
+            | Closed, true ->
               raise(Error(loc, env,
                           Unbound_type_variable (Pprintast.tyvar_of_name name,
-                                                 get_in_scope_names ())));
-            let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
-            let v2 = new_global_var jkind in
-            r := (loc, v, v2) :: !r;
-            add name v2 jkind)
+                                                 get_in_scope_names (),
+                                                 None)))
+            | Closed_for_upstream_compatibility, true ->
+              raise(Error(loc, env,
+                          Unbound_type_variable (Pprintast.tyvar_of_name name,
+                                                 get_in_scope_names (),
+                                                 Some Upstream_compatibility))))
       !used_variables;
     used_variables := TyVarMap.empty;
     fun () ->
@@ -1008,7 +1019,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       end;
       let name = !name in
       let make_row more =
-        create_row ~fields ~more ~closed:(closed = Closed) ~fixed:None ~name
+        create_row ~fields ~more ~closed:(closed = Asttypes.Closed)
+          ~fixed:None ~name
       in
       let more =
         if Btype.static_row
@@ -1301,8 +1313,9 @@ and transl_fields env ~policy ~row_context o fields =
   let fields = Hashtbl.fold (fun s ty l -> (s, ty) :: l) hfields [] in
   let ty_init =
      match o with
-     | Closed -> newty Tnil
-     | Open -> TyVarEnv.new_var (Jkind.Builtin.value ~why:Row_variable) policy
+     | Asttypes.Closed -> newty Tnil
+     | Asttypes.Open ->
+        TyVarEnv.new_var (Jkind.Builtin.value ~why:Row_variable) policy
   in
   let ty = List.fold_left (fun ty (s, ty') ->
       newty (Tfield (s, field_public, ty', ty))) ty_init fields in
@@ -1339,17 +1352,17 @@ let make_fixed_univars ty =
   make_fixed_univars ty;
   Btype.unmark_type ty
 
-let transl_simple_type env ~new_var_jkind ?univars ~closed mode styp =
+let transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp =
   TyVarEnv.reset_locals ?univars ();
-  let policy =
-    if closed
-    then TyVarEnv.make_fixed_policy new_var_jkind
-    else TyVarEnv.make_extensible_policy new_var_jkind
-  in
+  let policy = TyVarEnv.make_policy policy new_var_jkind in
   let typ = transl_type env policy mode styp in
   TyVarEnv.globalize_used_variables policy env ();
   make_fixed_univars typ.ctyp_type;
   typ
+
+let transl_simple_type env ~new_var_jkind ?univars ~closed mode styp =
+  let policy = if closed then Closed else Open in
+  transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp
 
 let transl_simple_type_univars env styp =
   TyVarEnv.reset_locals ();
@@ -1370,7 +1383,7 @@ let transl_simple_type_delayed env mode styp =
   TyVarEnv.reset_locals ();
   let typ, force =
     with_local_level begin fun () ->
-      let policy = TyVarEnv.make_extensible_policy Any in
+      let policy = TyVarEnv.make_policy Open Any in
       let typ = transl_type env policy mode styp in
       make_fixed_univars typ.ctyp_type;
       (* This brings the used variables to the global level, but doesn't link
@@ -1406,8 +1419,13 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
       let univars = transl_bound_vars vars in
       let typed_vars = TyVarEnv.ttyp_poly_arg univars in
       let typ =
-        transl_simple_type ~new_var_jkind:Sort env ~univars ~closed:true Alloc.Const.legacy
-          inner_type
+        if Language_extension.erasable_extensions_only () then
+          transl_simple_type_impl ~new_var_jkind:Sort env ~univars
+            ~policy:Closed_for_upstream_compatibility Alloc.Const.legacy
+            inner_type
+        else
+          transl_simple_type_impl ~new_var_jkind:Sort env ~univars ~policy:Open
+            Alloc.Const.legacy inner_type
       in
       (typed_vars, univars, typ)
     end
@@ -1435,16 +1453,24 @@ open Printtyp
 module Style = Misc.Style
 let pp_tag ppf t = Format.fprintf ppf "`%s" t
 
+let report_unbound_variable_reason ppf = function
+  | Some Upstream_compatibility ->
+      fprintf ppf "@.Hint: Explicit quantification requires quantifying all \
+                   type variables for compatibility with upstream OCaml.\n\
+                   Enable non-erasable extensions to disable this check."
+  | None -> ()
 
 let report_error env ppf =
   function
-  | Unbound_type_variable (name, in_scope_names) ->
+  | Unbound_type_variable (name, in_scope_names, reason) ->
     fprintf ppf "The type variable %a is unbound in this type declaration.@ %a"
       Style.inline_code name
-      did_you_mean (fun () -> Misc.spellcheck in_scope_names name )
-  | No_type_wildcards ->
+      did_you_mean (fun () -> Misc.spellcheck in_scope_names name );
+    report_unbound_variable_reason ppf reason
+  | No_type_wildcards reason ->
       fprintf ppf "A type wildcard %a is not allowed in this type declaration."
-        Style.inline_code "_"
+        Style.inline_code "_";
+      report_unbound_variable_reason ppf reason
   | Undefined_type_constructor p ->
     fprintf ppf "The type constructor@ %a@ is not yet completely defined"
       (Style.as_inline_code path) p

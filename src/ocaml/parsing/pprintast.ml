@@ -995,12 +995,13 @@ and expression ctxt f x =
         pp f "@[<0>@[<hv2>try@ %a@]@ @[<0>with%a@]@]"
              (* "try@;@[<2>%a@]@\nwith@\n%a"*)
           (expression reset_ctxt) e  (case_list ctxt) l
-    | Pexp_let (rf, l, e) ->
+    | Pexp_let (mf, rf, l, e) ->
         (* pp f "@[<2>let %a%a in@;<1 -2>%a@]"
            (*no indentation here, a new line*) *)
         (*   rec_flag rf *)
+        (*   mutable_flag mf *)
         pp f "@[<2>%a in@;<1 -2>%a@]"
-          (bindings reset_ctxt) (rf,l)
+          (bindings reset_ctxt) (mf,rf,l)
           (expression ctxt) e
     | Pexp_apply
       ({ pexp_desc = Pexp_extension({txt = "extension.exclave"}, PStr []) },
@@ -1080,7 +1081,7 @@ and expression ctxt f x =
           (list (expression (under_semi ctxt)) ~sep:";@;") lst
     | Pexp_new (li) ->
         pp f "@[<hov2>new@ %a@]" longident_loc li;
-    | Pexp_setinstvar (s, e) ->
+    | Pexp_setvar (s, e) ->
         pp f "@[<hov2>%a@ <-@ %a@]" ident_of_name s.txt (expression ctxt) e
     | Pexp_override l -> (* FIXME *)
         let string_x_expression f (s, e) =
@@ -1413,7 +1414,7 @@ and class_expr ctxt f x =
           (class_expr ctxt) e
     | Pcl_let (rf, l, ce) ->
         pp f "%a@ in@ %a"
-          (bindings ctxt) (rf,l)
+          (bindings ctxt) (Immutable,rf,l)
           (class_expr ctxt) ce
     | Pcl_apply (ce, l) ->
         pp f "((%a)@ %a)" (* Cf: #7200 *)
@@ -1822,8 +1823,8 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
 
 
 (* [in] is not printed *)
-and bindings ctxt f (rf,l) =
-  let binding kwd rf f x =
+and bindings ctxt f (mf,rf,l) =
+  let binding kwd mf rf f x =
     (* The other modes are printed inside [binding] *)
     let legacy, x =
       if print_modes_in_old_syntax x.pvb_modes then
@@ -1831,18 +1832,18 @@ and bindings ctxt f (rf,l) =
       else
         [], x
     in
-    pp f "@[<2>%s %a%a%a@]%a" kwd rec_flag rf
+    pp f "@[<2>%s %a%a%a%a@]%a" kwd mutable_flag mf rec_flag rf
       optional_legacy_modes legacy
       (binding ctxt) x
       (item_attributes ctxt) x.pvb_attributes
   in
   match l with
   | [] -> ()
-  | [x] -> binding "let" rf f x
+  | [x] -> binding "let" mf rf f x
   | x::xs ->
       pp f "@[<v>%a@,%a@]"
-        (binding "let" rf) x
-        (list ~sep:"@," (binding "and" Nonrecursive)) xs
+        (binding "let" mf rf) x
+        (list ~sep:"@," (binding "and" Immutable Nonrecursive)) xs
 
 and binding_op ctxt f x =
   match x.pbop_pat, x.pbop_exp with
@@ -1864,7 +1865,7 @@ and structure_item ctxt f x =
   | Pstr_type (rf, l)  -> type_def_list ctxt f (rf, true, l)
   | Pstr_value (rf, l) ->
       (* pp f "@[<hov2>let %a%a@]"  rec_flag rf bindings l *)
-      pp f "@[<2>%a@]" (bindings ctxt) (rf,l)
+      pp f "@[<2>%a@]" (bindings ctxt) (Immutable,rf,l)
   | Pstr_typext te -> type_extension ctxt f te
   | Pstr_exception ed -> exception_declaration ctxt f ed
   | Pstr_module x ->
@@ -2302,7 +2303,8 @@ and function_constraint ctxt f x =
   match[@ocaml.warning "+9"] x with
   | { ret_type_constraint = Some (Pconstraint ty); ret_mode_annotations; _ } ->
 
-    pp f "@;:@;%a" (core_type_with_optional_modes ctxt) (ty, ret_mode_annotations)
+    pp f "@;:@;%a@;"
+      (core_type_with_optional_modes ctxt) (ty, ret_mode_annotations)
   | { ret_type_constraint = Some (Pcoerce (ty1, ty2)); _ } ->
     pp f "@;%a:>@;%a"
       (option ~first:":@;" (core_type ctxt)) ty1
@@ -2491,6 +2493,24 @@ let prepare_error err =
   | Malformed_instance_identifier loc ->
       Location.errorf ~source ~loc
         "Syntax error: Unexpected in module instance"
+  | Quotation_reserved (loc, symb) ->
+      Location.errorf ~source ~loc
+        "Syntax error: `%s` is reserved for use in runtime metaprogramming."
+        symb
+  | Let_mutable_not_allowed_at_structure_level loc ->
+      Location.errorf ~source ~loc
+        "Syntax error: Mutable let bindings are not allowed \
+         at the structure level."
+  | Let_mutable_not_allowed_in_class_definition loc ->
+      Location.errorf ~source ~loc
+        "Syntax error: Mutable let bindings are not allowed \
+         inside class definitions."
+  | Let_mutable_not_allowed_with_function_bindings loc ->
+      Location.errorf ~source ~loc
+        "Syntax error: Mutable let is not allowed with function bindings.\n\
+         @{<hint>Hint@}: If you really want a mutable function variable, \
+         use the de-sugared syntax:\n  %a"
+         Style.inline_code "let mutable f = fun x -> .."
 
 let () =
   Location.register_error_of_exn

@@ -570,6 +570,11 @@ let flambda_o3_attribute attr =
     ~name:"flambda_o3"
     ~f:(fun () -> if Config.flambda || Config.flambda2 then Clflags.set_o3 ())
 
+let llvm_backend_attribute attr =
+  clflags_attribute_without_payload' attr
+    ~name:"llvm_backend"
+    ~f:(fun () -> Clflags.llvm_backend := true)
+
 let inline_attribute attr =
   when_attribute_is ["inline"; "ocaml.inline"] attr ~f:(fun () ->
     let err_msg =
@@ -647,7 +652,8 @@ let parse_standard_implementation_attributes attr =
   flambda_o3_attribute attr;
   flambda_oclassic_attribute attr;
   zero_alloc_attribute ~in_signature:false attr;
-  unsafe_allow_any_mode_crossing_attribute attr
+  unsafe_allow_any_mode_crossing_attribute attr;
+  llvm_backend_attribute attr
 
 let has_local_opt attrs =
   has_attribute "local_opt" attrs

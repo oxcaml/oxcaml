@@ -449,7 +449,8 @@ escape characters in string literals, so we use the revert-newlines script.
   'c ->
   'd ->
   'e -> 'f -> 'g -> 'a p2 * 'b p2 * 'c p2 * 'd p2 * 'e p2 * 'f p2 * 'g p2 * 'h 
-  (* 'a : immediate, 'b : immediate, 'c : immediate, 'd : immediate, 'e : immediate, 
+  (* 'a : immediate, 'b : immediate, 'c : immediate, 'd : immediate, 'e : 
+                                                                     immediate, 
      'f : immediate, 'g : immediate *)"
   
 

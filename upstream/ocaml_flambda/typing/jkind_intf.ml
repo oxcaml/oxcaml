@@ -27,9 +27,13 @@ module type Sort = sig
     | Float64  (** Unboxed 64-bit floats *)
     | Float32  (** Unboxed 32-bit floats *)
     | Word  (** Unboxed native-size integers *)
+    | Bits8  (** Unboxed 8-bit integers *)
+    | Bits16  (** Unboxed 16-bit integers *)
     | Bits32  (** Unboxed 32-bit integers *)
     | Bits64  (** Unboxed 64-bit integers *)
     | Vec128  (** Unboxed 128-bit simd vectors *)
+    | Vec256  (** Unboxed 256-bit simd vectors *)
+    | Vec512  (** Unboxed 512-bit simd vectors *)
 
   (** A sort variable that can be unified during type-checking. *)
   type var
@@ -43,6 +47,8 @@ module type Sort = sig
 
     val format : Format.formatter -> t -> unit
 
+    val all_void : t -> bool
+
     val value : t
 
     val void : t
@@ -53,11 +59,19 @@ module type Sort = sig
 
     val word : t
 
+    val bits8 : t
+
+    val bits16 : t
+
     val bits32 : t
 
     val bits64 : t
 
     val vec128 : t
+
+    val vec256 : t
+
+    val vec512 : t
 
     module Debug_printers : sig
       val t : Format.formatter -> t -> unit
@@ -208,6 +222,8 @@ module History = struct
     | Layout_poly_in_external
     | Unboxed_tuple_element
     | Peek_or_poke
+    | Mutable_var_assignment
+    | Old_style_unboxed_type
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
@@ -218,7 +234,6 @@ module History = struct
     | Wildcard
     | Unification_var
     | Array_element
-    | Old_style_unboxed_type
 
   open Allowance
 

@@ -256,7 +256,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
           | Stack_or_heap_enclosing.Alloc_mode alloc_mode, true ->
             let locality =
               alloc_mode
-              |> Mode.Alloc.proj (Comonadic Areality)
+              |> Mode.Alloc.proj_comonadic Areality
               |> Mode.Locality.Guts.check_const_conservative
             in
             let str =
