@@ -857,7 +857,7 @@ let prim_has_valid_reprs ~loc prim =
             match String.Map.find_opt name vector_array_indexing_primitives with
             | Some reprs -> exactly reprs
             | None ->
-              let module I = Scalar.Intrinsic in
+              let module I = Scalar.Operation in
               match I.With_percent_prefix.of_string name with
               | intrinsic ->
                 exactly

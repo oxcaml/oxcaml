@@ -1035,13 +1035,13 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
          match String.Map.find_opt s array_vec_primitives with
          | Some prim -> prim ~mode
          | None ->
-           match Scalar.Intrinsic.With_percent_prefix.of_string s with
+           match Scalar.Operation.With_percent_prefix.of_string s with
            | exception Not_found ->
              raise (Error (loc, Unknown_builtin_primitive s))
            | intrinsic ->
-             let arity = Scalar.Intrinsic.arity intrinsic in
+             let arity = Scalar.Operation.arity intrinsic in
              let intrinsic =
-               Scalar.Intrinsic.map intrinsic
+               Scalar.Operation.map intrinsic
                  ~f:(fun Any_locality_mode -> mode)
              in
              (Primitive (Pscalar intrinsic, arity)))
@@ -2126,8 +2126,8 @@ let lambda_primitive_needs_event_after = function
      places where we may
      collect the call stack. *)
   | Pscalar op ->
-    let { can_raise; result } : _  Scalar.Intrinsic.info =
-      Scalar.Intrinsic.info op
+    let { can_raise; result } : _  Scalar.Operation.info =
+      Scalar.Operation.info op
     in
     let may_allocate =
       match Scalar.ignore_locality result with

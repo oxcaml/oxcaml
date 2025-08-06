@@ -343,7 +343,7 @@ module Float_comparison = struct
     | CFnge -> CFnle
 end
 
-module Intrinsic = struct
+module Operation = struct
   type 'mode info =
     { can_raise : bool;
       result : 'mode t

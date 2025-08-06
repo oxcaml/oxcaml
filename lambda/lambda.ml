@@ -180,7 +180,7 @@ type primitive =
   | Psequand | Psequor | Pnot
   | Pphys_equal of Phys_equal.t
   (* Scalar operations *)
-  | Pscalar of locality_mode Scalar.Intrinsic.t
+  | Pscalar of locality_mode Scalar.Operation.t
   | Poffsetref of int
   (* String operations *)
   | Pstringlength | Pstringrefu  | Pstringrefs
@@ -1900,7 +1900,7 @@ let mixed_block_projection_may_allocate shape ~path =
    closure_conversion.ml). *)
 let primitive_may_allocate : primitive -> locality_mode option = function
   | Pscalar op ->
-    (match (Scalar.Intrinsic.info op).result with
+    (match (Scalar.Operation.info op).result with
      | Naked _ -> None
      | Value (Integral (Taggable (Int8 | Int16 | Int))) -> None
      | Value (Integral (Boxable (Int32 mode | Int64 mode | Nativeint mode))
@@ -2045,7 +2045,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
 
 let primitive_can_raise prim =
   match prim with
-  | Pscalar op -> (Scalar.Intrinsic.info op).can_raise
+  | Pscalar op -> (Scalar.Operation.info op).can_raise
   | Pphys_equal (Eq | Noteq) -> false
   | Pccall _ | Praise _ | Parrayrefs _ | Parraysets _
   | Pstringrefs | Pbytesrefs | Pbytessets
@@ -2297,7 +2297,7 @@ let primitive_result_layout (p : primitive) =
   match p with
   | Pphys_equal (Eq | Noteq) -> layout_int
   | Pscalar op ->
-    let result = Scalar.ignore_locality (Scalar.Intrinsic.info op).result in
+    let result = Scalar.ignore_locality (Scalar.Operation.info op).result in
     (match result with
      | Value (Integral (Taggable (Int8 | Int16 | Int)))  -> layout_int
      | Value (Integral (Boxable (Int32 Any_locality_mode))) ->

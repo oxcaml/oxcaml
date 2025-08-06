@@ -813,7 +813,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
 and comp_binary_scalar_intrinsic op x y =
   let prim prim = Prim (prim, [x; y]) in
   let ccall fmt = kccallf prim fmt in
-  match (op : _ Scalar.Intrinsic.Binary.t) with
+  match (op : _ Scalar.Operation.Binary.t) with
   | Integral (size, op) -> (
     match Scalar.Integral.width size with
     | Taggable taggable -> (
@@ -852,7 +852,7 @@ and comp_binary_scalar_intrinsic op x y =
       | Or -> c "or"
       | Xor -> c "xor"))
   | Floating (size, ((Add | Sub | Mul | Div) as op)) ->
-    let op = Scalar.Intrinsic.Binary.Float_op.to_string op in
+    let op = Scalar.Operation.Binary.Float_op.to_string op in
     let size = Scalar.Floating.Width.to_string (Scalar.Floating.width size) in
     ccall "caml_%s_%s" op size
   | Shift (size, op, Int) -> (
@@ -924,11 +924,11 @@ and comp_binary_scalar_intrinsic op x y =
 and comp_unary_scalar_intrinsic op x =
   let prim prim = Prim (prim, [x]) in
   let ccall fmt = kccallf prim fmt in
-  match (op : _ Scalar.Intrinsic.Unary.t) with
+  match (op : _ Scalar.Operation.Unary.t) with
   | Integral (size, op) -> (
     let comp_offset n =
       comp_binary_scalar_intrinsic
-        (Scalar.Intrinsic.Binary.Integral (size, Add))
+        (Scalar.Operation.Binary.Integral (size, Add))
         x
         (Const (const_int (Scalar.Integral.width size) n))
     in
@@ -954,7 +954,7 @@ and comp_unary_scalar_intrinsic op x =
     match Scalar.Floating.width size with
     | (Float32 Any_locality_mode | Float64 Any_locality_mode) as size ->
       ccall "caml_%s_%s"
-        (Scalar.Intrinsic.Unary.Float_op.to_string op)
+        (Scalar.Operation.Unary.Float_op.to_string op)
         (Scalar.Floating.Width.to_string size))
   | Static_cast { src; dst } ->
     static_cast x ~src:(Scalar.width src) ~dst:(Scalar.width dst)

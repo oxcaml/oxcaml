@@ -227,9 +227,7 @@ end
 
 type 'a scalar := 'a t
 
-module Intrinsic : sig
-  (* CR mshinwell: Concerns have been raised that [Intrinsic] could be misleading,
-     we might consider renaming this later *)
+module Operation : sig
 
   type 'mode info =
     { can_raise : bool;

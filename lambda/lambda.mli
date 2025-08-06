@@ -169,7 +169,7 @@ type primitive =
       equality as referential equality on all values, including immediates
       and immutable blocks. *)
   (* Scalar operations *)
-  | Pscalar of locality_mode Scalar.Intrinsic.t
+  | Pscalar of locality_mode Scalar.Operation.t
   | Poffsetref of int
   (* String operations *)
   | Pstringlength | Pstringrefu  | Pstringrefs

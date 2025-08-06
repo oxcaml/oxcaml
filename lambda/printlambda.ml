@@ -385,8 +385,8 @@ let primitive ppf = function
   | Pscalar scalar ->
     pp_print_string
       ppf
-      (Scalar.Intrinsic.With_percent_prefix.to_string
-         (Scalar.Intrinsic.map scalar
+      (Scalar.Operation.With_percent_prefix.to_string
+         (Scalar.Operation.map scalar
             ~f:(fun (Alloc_heap | Alloc_local) -> Any_locality_mode)));
     Option.iter
       (fun mode -> pp_print_string ppf (locality_kind mode))
@@ -829,8 +829,8 @@ let primitive ppf = function
 
 let name_of_primitive = function
   | Pscalar i ->
-    Scalar.Intrinsic.map i ~f:(fun _ -> Scalar.Any_locality_mode)
-    |> Scalar.Intrinsic.to_string
+    Scalar.Operation.map i ~f:(fun _ -> Scalar.Any_locality_mode)
+    |> Scalar.Operation.to_string
   | Pphys_equal Eq -> "eq"
   | Pphys_equal Noteq -> "noteq"
   | Pbytes_of_string -> "Pbytes_of_string"
