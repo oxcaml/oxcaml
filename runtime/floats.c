@@ -1176,3 +1176,61 @@ CAMLprim value caml_classify_float(value vd)
 {
   return caml_classify_float_unboxed(Double_val(vd));
 }
+
+double caml_simd_float64_min(double x, double y) {
+  return x < y ? x : y;
+}
+
+CAMLprim value caml_simd_float64_min_bytecode(value x, value y) {
+  return Double_val(x) < Double_val(y) ? x : y;
+}
+
+double caml_simd_float64_max(double x, double y) {
+  return x > y ? x : y;
+}
+
+CAMLprim value caml_simd_float64_max_bytecode(value x, value y) {
+  return Double_val(x) > Double_val(y) ? x : y;
+}
+
+int64_t caml_simd_cast_float64_int64(double f)
+{
+  return llrint(f);
+}
+
+CAMLprim value caml_simd_cast_float64_int64_bytecode(value f)
+{
+  return caml_copy_int64(caml_simd_cast_float64_int64(Double_val(f)));
+}
+
+double caml_simd_float64_round_current(double f) {
+  return rint(f);
+}
+
+CAMLprim value caml_simd_float64_round_current_bytecode(value f) {
+  return caml_copy_double(caml_simd_float64_round_current(Double_val(f)));
+}
+
+double caml_simd_float64_round_neg_inf(double f) {
+  return floor(f);
+}
+
+CAMLprim value caml_simd_float64_round_neg_inf_bytecode(value f) {
+  return caml_copy_double(caml_simd_float64_round_neg_inf(Double_val(f)));
+}
+
+double caml_simd_float64_round_pos_inf(double f) {
+  return ceil(f);
+}
+
+CAMLprim value caml_simd_float64_round_pos_inf_bytecode(value f) {
+  return caml_copy_double(caml_simd_float64_round_pos_inf(Double_val(f)));
+}
+
+double caml_simd_float64_round_towards_zero(double f) {
+  return trunc(f);
+}
+
+CAMLprim value caml_simd_float64_round_towards_zero_bytecode(value f) {
+  return caml_copy_double(caml_simd_float64_round_towards_zero(Double_val(f)));
+}

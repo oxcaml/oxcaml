@@ -347,9 +347,6 @@ BUILTIN(caml_int_clz_tagged_to_untagged);
 
 BUILTIN(caml_simd_vec128_interleave_low_32)
 BUILTIN(caml_simd_vec128_interleave_low_64)
-BUILTIN(caml_simd_float64_max);
-BUILTIN(caml_simd_float64_min);
-
 
 #include <float.h>
 #include <math.h>
