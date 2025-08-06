@@ -772,7 +772,8 @@ CAMLexport void caml_do_local_roots (
   scanning_action f, scanning_action_flags fflags, void* fdata,
   struct caml__roots_block *local_roots,
   struct stack_info *current_stack,
-  value * v_gc_regs)
+  value * v_gc_regs,
+  dynamic_thread_t dynamic_bindings)
 {
   struct caml__roots_block *lr;
   int i, j;
@@ -781,6 +782,7 @@ CAMLexport void caml_do_local_roots (
   caml_local_arenas* locals = caml_refresh_locals(current_stack);
 #endif
 
+  caml_dynamic_scan_thread_roots(dynamic_bindings, f, fflags, fdata);
   for (lr = local_roots; lr != NULL; lr = lr->next) {
     for (i = 0; i < lr->ntables; i++){
       for (j = 0; j < lr->nitems; j++){

@@ -261,12 +261,12 @@ static void caml_thread_scan_roots(
     do {
       (*action)(fdata, th->descr, &th->descr);
       (*action)(fdata, th->backtrace_last_exn, &th->backtrace_last_exn);
-      caml_dynamic_scan_thread_roots(th->dynamic, action, fflags, fdata);
       /* Don't rescan the stack of the current thread, it was done already */
       if (th != active) {
         if (th->current_stack != NULL)
           caml_do_local_roots(action, fflags, fdata,
-                              th->local_roots, th->current_stack, th->gc_regs);
+                              th->local_roots, th->current_stack, th->gc_regs,
+                              th->dynamic);
       }
       th = th->next;
     } while (th != active);
