@@ -801,10 +801,10 @@ end
 (******************************)
 (* context *)
 
-type jkind_context = {
-  jkind_of_type : Types.type_expr -> Types.jkind_l option;
-  is_abstract : Path.t -> bool;
-}
+type jkind_context =
+  { jkind_of_type : Types.type_expr -> Types.jkind_l option;
+    is_abstract : Path.t -> bool
+  }
 
 module Layout_and_axes = struct
   module Allow_disallow = Allowance.Magic_allow_disallow (struct
@@ -2131,8 +2131,7 @@ module Jkind_desc = struct
   let equate_or_equal ~allow_mutation t1 t2 =
     Layout_and_axes.equal (Layout.equate_or_equal ~allow_mutation) t1 t2
 
-  let sub (type l r) ~type_equal:_ ~context
-      (sub : (allowed * r) jkind_desc)
+  let sub (type l r) ~type_equal:_ ~context (sub : (allowed * r) jkind_desc)
       ({ layout = lay2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
         (l * allowed) jkind_desc) =
     let axes_max_on_right =
@@ -2688,8 +2687,7 @@ let[@inline] normalize ~mode ~context t =
     match mode with Require_best -> Require_best | Ignore_best -> Ignore_best
   in
   let jkind, fuel_result =
-    Layout_and_axes.normalize ~context ~skip_axes:Axis_set.empty ~mode
-      t.jkind
+    Layout_and_axes.normalize ~context ~skip_axes:Axis_set.empty ~mode t.jkind
   in
   { t with
     jkind;
@@ -3609,11 +3607,9 @@ let intersection_or_error ~type_equal ~context ~reason t1 t2 =
           Not_best (* As required by the fact that this is a [jkind_r] *)
       }
 
-let round_up (type l r) ~context (t : (allowed * r) jkind) :
-    (l * allowed) jkind =
-  let normalized =
-    normalize ~mode:Ignore_best ~context (t |> disallow_right)
-  in
+let round_up (type l r) ~context (t : (allowed * r) jkind) : (l * allowed) jkind
+    =
+  let normalized = normalize ~mode:Ignore_best ~context (t |> disallow_right) in
   { t with
     jkind = { normalized.jkind with with_bounds = No_with_bounds };
     quality = Not_best (* As required by the fact that this is a [jkind_r] *)
@@ -3625,8 +3621,7 @@ let map_type_expr f t =
   else t (* short circuit this common case *)
 
 (* this is hammered on; it must be fast! *)
-let check_sub ~context sub super =
-  Jkind_desc.sub ~context sub.jkind super.jkind
+let check_sub ~context sub super = Jkind_desc.sub ~context sub.jkind super.jkind
 
 let sub_with_reason ~type_equal ~context sub super =
   Sub_result.require_le (check_sub ~type_equal ~context sub super)
@@ -3653,8 +3648,7 @@ let sub_or_error ~type_equal ~context t1 t2 =
       (Violation.of_ ~context
          (Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
-let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub
-    super =
+let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
   (* This function implements the "SUB" judgement from kind-inference.md. *)
   let open Misc.Stdlib.Monad.Result.Syntax in
   let require_le sub_result =
@@ -3718,8 +3712,8 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub
       (* [Jkind_desc.map_normalize] handles the stepping, jkind lookups, and
          joining.  [map_type_info] handles looking for [ty] on the right and
          removing irrelevant axes. *)
-      Layout_and_axes.normalize sub.jkind ~skip_axes:axes_max_on_right
-        ~context ~mode:Ignore_best
+      Layout_and_axes.normalize sub.jkind ~skip_axes:axes_max_on_right ~context
+        ~mode:Ignore_best
         ~map_type_info:(fun ty { relevant_axes = left_relevant_axes } ->
           let right_relevant_axes =
             (* Look for [ty] on the right. There may be multiple occurrences of

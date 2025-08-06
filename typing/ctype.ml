@@ -2285,14 +2285,14 @@ let type_jkind_purely_if_principal' =
 
 (* Helper functions for creating jkind contexts *)
 let mk_is_abstract env p =
-  let decl = 
-    try Env.find_type p env 
+  let decl =
+    try Env.find_type p env
     with Not_found ->
-      Misc.fatal_errorf "mk_is_abstract: type %a not found in environment" 
+      Misc.fatal_errorf "mk_is_abstract: type %a not found in environment"
         Path.print p
   in
   match decl.type_kind with
-  | Type_abstract _ -> 
+  | Type_abstract _ ->
     (* Check if it's truly abstract (no manifest) or just an abbreviation *)
     begin match decl.type_manifest with
     | None -> true  (* Truly abstract - no manifest *)

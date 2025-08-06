@@ -178,10 +178,11 @@ end
 (* context *)
 
 (** Context for jkind operations. *)
-type jkind_context = {
-  jkind_of_type : Types.type_expr -> Types.jkind_l option;
-  is_abstract : Path.t -> bool;  (* Check if a type path refers to an abstract type *)
-}
+type jkind_context =
+  { jkind_of_type : Types.type_expr -> Types.jkind_l option;
+    is_abstract : Path.t -> bool
+        (* Check if a type path refers to an abstract type *)
+  }
 
 (******************************)
 (* errors *)
@@ -202,11 +203,7 @@ module Violation : sig
 
   (** Set [?missing_cmi] to mark [t] as having arisen from a missing cmi *)
 
-  val of_ :
-    context:jkind_context ->
-    ?missing_cmi:Path.t ->
-    violation ->
-    t
+  val of_ : context:jkind_context -> ?missing_cmi:Path.t -> violation -> t
 
   (** Is this error from a missing cmi? *)
   val is_missing_cmi : t -> bool
@@ -632,16 +629,12 @@ val extract_layout : 'd Types.jkind -> Sort.t Layout.t
 
 (** Gets the mode crossing for types of this jkind. *)
 val get_mode_crossing :
-  context:jkind_context ->
-  'd Types.jkind ->
-  Mode.Crossing.t
+  context:jkind_context -> 'd Types.jkind -> Mode.Crossing.t
 
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
 val get_externality_upper_bound :
-  context:jkind_context ->
-  'd Types.jkind ->
-  Jkind_axis.Externality.t
+  context:jkind_context -> 'd Types.jkind -> Jkind_axis.Externality.t
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the externality axis *)
@@ -650,9 +643,7 @@ val set_externality_upper_bound :
 
 (** Gets the nullability from a jkind. *)
 val get_nullability :
-  context:jkind_context ->
-  Types.jkind_l ->
-  Jkind_axis.Nullability.t
+  context:jkind_context -> Types.jkind_l -> Jkind_axis.Nullability.t
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the nullability axis *)
@@ -710,10 +701,7 @@ type normalize_mode =
           with-bounds. *)
 
 val normalize :
-  mode:normalize_mode ->
-  context:jkind_context ->
-  Types.jkind_l ->
-  Types.jkind_l
+  mode:normalize_mode -> context:jkind_context -> Types.jkind_l -> Types.jkind_l
 
 (*********************************)
 (* pretty printing *)
