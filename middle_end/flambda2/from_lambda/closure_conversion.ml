@@ -233,7 +233,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
         (fun new_index arg ->
           match flattened_reordered_shape.(new_index) with
           | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word ->
+          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
             arg
           | Float_boxed _ -> unbox_float_constant arg)
         args

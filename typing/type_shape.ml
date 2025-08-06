@@ -176,6 +176,7 @@ module Type_decl_shape = struct
     | Types.Bits8 -> Layout.Base Bits8
     | Types.Bits16 -> Layout.Base Bits16
     | Types.Bits32 -> Layout.Base Bits32
+    | Types.Untagged_immediate -> Layout.Base Untagged_immediate
     | Types.Bits64 -> Layout.Base Bits64
     | Types.Vec128 -> Layout.Base Vec128
     | Types.Vec256 -> Layout.Base Vec256

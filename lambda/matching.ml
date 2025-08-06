@@ -1924,7 +1924,7 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
         Punboxed_product layouts
       | Value _ | Float_boxed _ | Float64 | Float32
       | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word ->
+      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
     match cstr.cstr_shape with

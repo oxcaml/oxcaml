@@ -401,6 +401,7 @@ and 'a mixed_block_element =
   | Vec256
   | Vec512
   | Word
+  | Untagged_immediate
   | Product of 'a mixed_block_element array
 
 and mixed_block_shape = unit mixed_block_element array
@@ -583,13 +584,14 @@ and equal_mixed_block_element :
   | Vec128, Vec128
   | Vec256, Vec256
   | Vec512, Vec512
-  | Word, Word -> true
+  | Word, Word
+  | Untagged_immediate, Untagged_immediate -> true
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
       es1 es2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-     | Vec256 | Vec512 | Word | Product _), _ -> false
+     | Vec256 | Vec512 | Word | Untagged_immediate | Product _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
   Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
@@ -1446,6 +1448,7 @@ let rec transl_mixed_product_shape ~get_value_kind shape =
     | Vec256 -> Vec256
     | Vec512 -> Vec512
     | Word -> Word
+    | Untagged_immediate -> Untagged_immediate
     | Product shapes ->
       (* CR mshinwell: This [get_value_kind] override is a bit odd, maybe this
          could be improved in the future (same below). *)
@@ -1469,6 +1472,7 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
     | Vec256 -> Vec256
     | Vec512 -> Vec512
     | Word -> Word
+    | Untagged_immediate -> Untagged_immediate
     | Product shapes ->
       let get_value_kind _ = generic_value in
       Product
@@ -1872,7 +1876,7 @@ let project_from_mixed_block_shape
         | Value _
         | Float_boxed _
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-        | Vec128 | Vec256 | Vec512 ->
+        | Untagged_immediate | Vec128 | Vec256 | Vec512 ->
           Misc.fatal_error "project_from_mixed_block_element: path too long \
             for mixed block shape")
     in
@@ -1883,7 +1887,7 @@ let mixed_block_projection_may_allocate shape ~path =
     match element with
     | Float_boxed mode -> Some mode
     | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-    | Vec128 | Vec256 | Vec512 -> None
+    | Untagged_immediate | Vec128 | Vec256 | Vec512 -> None
     | Product shape ->
       Array.fold_left (fun alloc_mode element ->
           let alloc_mode' = allocates element in
@@ -2283,6 +2287,7 @@ let layout_of_mixed_block_shape
     | Bits32 -> layout_unboxed_int32
     | Bits64 -> layout_unboxed_int64
     | Word -> layout_unboxed_nativeint
+    | Untagged_immediate -> layout_unboxed_int Untagged_int
     | Vec128 -> layout_unboxed_vector Unboxed_vec128
     | Vec256 -> layout_unboxed_vector Unboxed_vec256
     | Vec512 -> layout_unboxed_vector Unboxed_vec512

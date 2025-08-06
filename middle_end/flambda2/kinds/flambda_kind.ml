@@ -246,6 +246,7 @@ module Flat_suffix_element0 = struct
     | Vec256 -> Naked_vec256
     | Vec512 -> Naked_vec512
     | Word -> Naked_nativeint
+    | Untagged_immediate -> Naked_nativeint
     | Value _ ->
       (* CR: consider printing the value kind *)
       Misc.fatal_error
@@ -1010,6 +1011,7 @@ module With_subkind = struct
                         | Vec256 -> naked_vec256
                         | Vec512 -> naked_vec512
                         | Word -> naked_nativeint
+                        | Untagged_immediate -> naked_immediate
                       in
                       let fields : t array =
                         let flattened_reordered_shape =

@@ -42,6 +42,7 @@ module Singleton_mixed_block_element = struct
     | Vec256
     | Vec512
     | Word
+    | Untagged_immediate
 
   let print print_locality ppf t =
     match t with
@@ -59,6 +60,7 @@ module Singleton_mixed_block_element = struct
     | Vec256 -> Format.fprintf ppf "Vec256"
     | Vec512 -> Format.fprintf ppf "Vec512"
     | Word -> Format.fprintf ppf "Word"
+    | Untagged_immediate -> Format.fprintf ppf "Untagged_immediate"
 end
 
 type 'a shape = 'a Singleton_mixed_block_element.t array
@@ -181,6 +183,7 @@ let singleton_or_product_of_mixed_block_element
   | Vec256 -> Singleton Vec256
   | Vec512 -> Singleton Vec512
   | Word -> Singleton Word
+  | Untagged_immediate -> Singleton Untagged_immediate
   | Product sub_elements -> Product sub_elements
 
 (* CR-soon xclerc for xclerc: it is probably quite inefficient to map/concat
@@ -241,7 +244,7 @@ let of_mixed_block_elements ~print_locality
       match elem with
       | Value _ -> true
       | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word ->
+      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
         false
     in
     if is_value

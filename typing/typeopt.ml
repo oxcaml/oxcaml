@@ -737,6 +737,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   | Vec256 -> num_nodes_visited, Vec256
   | Vec512 -> num_nodes_visited, Vec512
   | Word -> num_nodes_visited, Word
+  | Untagged_immediate -> num_nodes_visited, Untagged_immediate
   | Product fs ->
     let num_nodes_visited, kinds =
       Array.fold_left_map (fun num_nodes_visited field ->
@@ -991,10 +992,12 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.Punboxed_float Unboxed_float64
   | Base Word when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Unboxed_nativeint
-  | Base Untagged_immediate when
+  | Base Untagged_immediate as const ->
+    if
       Language_extension.(is_at_least Layouts Beta)
-      && Language_extension.(is_at_least Small_numbers Beta) ->
-    Lambda.Punboxed_or_untagged_integer Untagged_int
+      && Language_extension.(is_at_least Small_numbers Beta) then
+      Lambda.Punboxed_or_untagged_integer Untagged_int
+    else error const
   | Base Bits8 when Language_extension.(is_at_least Layouts Beta) &&
                     Language_extension.(is_at_least Small_numbers Beta) ->
     Lambda.Punboxed_or_untagged_integer Untagged_int8
@@ -1025,7 +1028,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       (List.map (layout_of_const_sort_generic
                    ~value_kind:(lazy Lambda.generic_value) ~error)
          consts)
-  | ((  Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
+  | ((  Base (Void | Float32 | Float64 | Word | Bits8 |
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _) as const) ->
     error const

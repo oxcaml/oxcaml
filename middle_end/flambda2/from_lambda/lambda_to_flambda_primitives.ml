@@ -1692,7 +1692,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         (fun new_index arg ->
           match flattened_reordered_shape.(new_index) with
           | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word ->
+          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
             arg
           | Float_boxed _ -> unbox_float arg)
         args
@@ -2204,7 +2204,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
               Value_prefix
                 (convert_block_access_field_kind_from_value_kind value_kind)
             | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-              | Vec256 | Vec512 | Word ) as mixed_block_element ->
+              | Vec256 | Vec512 | Word | Untagged_immediate ) as mixed_block_element ->
               Flat_suffix
                 (K.Flat_suffix_element.from_singleton_mixed_block_element
                    mixed_block_element)
@@ -2222,7 +2222,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         | Float_boxed (mode : Lambda.locality_mode) ->
           box_float mode block_access ~current_region
         | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Vec128 | Vec256 | Vec512 | Word ->
+        | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
           block_access)
       new_indexes
   | ( Psetfield (index, immediate_or_pointer, initialization_or_assignment),
@@ -2295,7 +2295,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
                       (convert_block_access_field_kind_from_value_kind
                          value_kind)
                   | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                    | Vec128 | Vec256 | Vec512 | Word ) as mixed_block_element
+                    | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ) as mixed_block_element
                     ->
                     Flat_suffix
                       (K.Flat_suffix_element.from_singleton_mixed_block_element
@@ -2313,7 +2313,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           let value : H.simple_or_prim =
             match flattened_reordered_shape.(new_index) with
             | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-            | Vec128 | Vec256 | Vec512 | Word ->
+            | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
               value
             | Float_boxed _ -> unbox_float value
           in

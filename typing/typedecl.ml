@@ -1141,7 +1141,7 @@ let record_gets_unboxed_version = function
         (fun (kind : mixed_block_element) ->
           match kind with
           | Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word | Void -> false
+          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void -> false
           | Float_boxed -> true
           | Product shape -> shape_has_float_boxed shape)
         shape

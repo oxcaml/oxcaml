@@ -1,9 +1,9 @@
 (* TEST
- include stdlib_upstream_compatible;
+ include stdlib_beta;
 *)
 
-module Int_u = Stdlib_upstream_compatible.Int_u
-module Int32_u = Stdlib_upstream_compatible.Int32_u
+module Int_u = Stdlib_beta.Int_u
+module Int32_u = Stdlib_beta.Int32_u
 
 (* Print all individual successful tests; used for debugging, as it will cause
    this test to fail *)
@@ -166,7 +166,7 @@ let nonzero_int_input =
   nonzero_integer_input (module Int) Random.int Random.nativebits
 
 let int_shift_amount_input =
-  { generators = List.init Int.size (fun c -> Const c)
+  { generators = List.init Sys.int_size (fun c -> Const c)
   ; to_string  = Int.to_string
   }
 
@@ -299,7 +299,7 @@ let () =
   test_unary     "succ"                Int.succ                Int_u.succ;
   test_unary     "pred"                Int.pred                Int_u.pred;
   test_unary     "abs"                 Int.abs                 Int_u.abs;
-  test_constant  "size"                Int.size                Int_u.size                 int_result;
+  test_constant  "size"                Sys.int_size                Int_u.size                 int_result;
   test_binary    "logand"              Int.logand              Int_u.logand;
   test_binary    "logor"               Int.logor               Int_u.logor;
   test_binary    "logxor"              Int.logxor              Int_u.logxor;
@@ -307,14 +307,14 @@ let () =
   test_shift     "shift_left"          Int.shift_left          Int_u.shift_left;
   test_shift     "shift_right"         Int.shift_right         Int_u.shift_right;
   test_shift     "shift_right_logical" Int.shift_right_logical Int_u.shift_right_logical;
-  test_unary_to  "of_int"              Int.of_int              Int_u.of_int               int_input;
+  test_unary_to  "of_int"              (fun x -> x)              Int_u.of_int               int_input;
   test_unary_of  "to_int"              Int.to_int              Int_u.to_int               int_result;
   test_unary_of  "unsigned_to_int"     Int.unsigned_to_int     Int_u.unsigned_to_int      (option_result (module Int));
   test_unary_to  "of_float"            Int.of_float            Int_u.of_float             float_input;
   test_unary_of  "to_float"            Int.to_float            Int_u.to_float             float_result;
-  test_unary_to  "of_int32"            Int.of_int32            Int_u.of_int32             int32_input;
+  test_unary_to  "of_int32"            (fun x -> x)32            Int_u.of_int32             int32_input;
   test_unary_of  "to_int32"            Int.to_int32            Int_u.to_int32             int32_result;
-  test_unary_to  "of_int32_u"          Int.of_int32            int_u_of_int32             int32_input;
+  test_unary_to  "of_int32_u"          (fun x -> x)32            int_u_of_int32             int32_input;
   test_unary_of  "to_int32_u"          Int.to_int32            int_u_to_int32             int32_result;
   test_unary_to  "of_string"           Int.of_string           Int_u.of_string            int_string_input;
   test_unary_of  "to_string"           Int.to_string           Int_u.to_string            string_result;
