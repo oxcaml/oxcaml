@@ -14,6 +14,8 @@
 
 type any_locality_mode = Any_locality_mode
 
+let equal_any_locality_mode Any_locality_mode Any_locality_mode = true
+
 let ignore_locality _ = Any_locality_mode
 
 module Maybe_naked = struct
@@ -31,6 +33,8 @@ module Maybe_naked = struct
     val to_string : any_locality_mode t -> string
 
     val naked_sort : any_locality_mode t -> Jkind_types.Sort.Const.t
+
+    val equal : ('a -> 'b -> bool) -> 'a t -> 'b t -> bool
   end) =
   struct
     type nonrec 'a t = ('a M.t, any_locality_mode M.t) t
@@ -55,6 +59,13 @@ module Maybe_naked = struct
     let sort = function
       | Value (_ : any_locality_mode M.t) -> Jkind_types.Sort.Const.value
       | Naked t -> M.naked_sort t
+
+    let equal eq x y =
+      match x, y with
+      | Value x, Value y -> M.equal eq x y
+      | Value _, _ -> false
+      | Naked x, Naked y -> M.equal equal_any_locality_mode x y
+      | Naked _, _ -> false
   end
 end
 
@@ -79,6 +90,8 @@ module Integral = struct
         | Int8 -> Jkind_types.Sort.Const.bits8
         | Int16 -> Jkind_types.Sort.Const.bits16
         | Int -> Jkind_types.Sort.Const.untagged_immediate
+
+      let equal _eq (Int8 | Int16 | Int as x) y = x = y
     end
 
     include Maybe_naked.Make1 (struct
@@ -117,6 +130,15 @@ module Integral = struct
         | Int32 Any_locality_mode -> Jkind_types.Sort.Const.bits32
         | Int64 Any_locality_mode -> Jkind_types.Sort.Const.bits64
         | Nativeint Any_locality_mode -> Jkind_types.Sort.Const.word
+
+      let equal eq x y =
+        match x, y with
+        | Int32 x, Int32 y -> eq x y
+        | Int32 _, _ -> false
+        | Nativeint x, Nativeint y -> eq x y
+        | Nativeint _, _ -> false
+        | Int64 x, Int64 y -> eq x y
+        | Int64 _, _ -> false
     end
 
     include Maybe_naked.Make1 (Width)
@@ -144,6 +166,13 @@ module Integral = struct
     let naked_sort = function
       | Taggable t -> Taggable.Width.naked_sort t
       | Boxable b -> Boxable.Width.naked_sort b
+
+    let equal eq x y =
+      match x, y with
+      | Taggable x, Taggable y -> Taggable.Width.equal eq x y
+      | Taggable _, _ -> false
+      | Boxable x, Boxable y -> Boxable.Width.equal eq x y
+      | Boxable _, _ -> false
   end
 
   include Maybe_naked.Make1 (Width)
@@ -169,6 +198,13 @@ module Floating = struct
     let naked_sort = function
       | Float32 Any_locality_mode -> Jkind_types.Sort.Const.float32
       | Float64 Any_locality_mode -> Jkind_types.Sort.Const.float64
+
+    let equal eq x y =
+      match x, y with
+      | Float32 x, Float32 y -> eq x y
+      | Float32 _, _ -> false
+      | Float64 x, Float64 y -> eq x y
+      | Float64 _, _ -> false
   end
 
   include Maybe_naked.Make1 (Width)
@@ -198,6 +234,13 @@ module Width = struct
   let to_string = function
     | Floating f -> Floating.Width.to_string f
     | Integral i -> Integral.Width.to_string i
+
+  let equal eq x y =
+    match x, y with
+    | Floating x, Floating y -> Floating.Width.equal eq x y
+    | Floating _, _ -> false
+    | Integral x, Integral y -> Integral.Width.equal eq x y
+    | Integral _, _ -> false
 end
 
 include Maybe_naked.Make1 (Width)
@@ -598,50 +641,3 @@ module Intrinsic = struct
       else of_string (StringLabels.sub s ~pos:1 ~len:(len - 1))
   end
 end
-
-let equal_any_locality_mode Any_locality_mode Any_locality_mode = true
-
-let equal (type a b) (eq_mode : a -> b -> bool) (t1 : a t) (t2 : b t) : bool =
-  match t1, t2 with
-  | Value (Integral (Taggable Int8)), Value (Integral (Taggable Int8)) -> true
-  | Value (Integral (Taggable Int16)), Value (Integral (Taggable Int16)) -> true
-  | Value (Integral (Taggable Int)), Value (Integral (Taggable Int)) -> true
-  | Value (Integral (Boxable (Int32 m1))), Value (Integral (Boxable (Int32 m2)))
-    ->
-    eq_mode m1 m2
-  | Value (Integral (Boxable (Int64 m1))), Value (Integral (Boxable (Int64 m2)))
-    ->
-    eq_mode m1 m2
-  | ( Value (Integral (Boxable (Nativeint m1))),
-      Value (Integral (Boxable (Nativeint m2))) ) ->
-    eq_mode m1 m2
-  | Value (Floating (Float32 m1)), Value (Floating (Float32 m2)) ->
-    eq_mode m1 m2
-  | Value (Floating (Float64 m1)), Value (Floating (Float64 m2)) ->
-    eq_mode m1 m2
-  | Naked (Integral (Taggable Int8)), Naked (Integral (Taggable Int8)) -> true
-  | Naked (Integral (Taggable Int16)), Naked (Integral (Taggable Int16)) -> true
-  | Naked (Integral (Taggable Int)), Naked (Integral (Taggable Int)) -> true
-  | ( Naked (Integral (Boxable (Int32 Any_locality_mode))),
-      Naked (Integral (Boxable (Int32 Any_locality_mode))) ) ->
-    true
-  | ( Naked (Integral (Boxable (Int64 Any_locality_mode))),
-      Naked (Integral (Boxable (Int64 Any_locality_mode))) ) ->
-    true
-  | ( Naked (Integral (Boxable (Nativeint Any_locality_mode))),
-      Naked (Integral (Boxable (Nativeint Any_locality_mode))) ) ->
-    true
-  | ( Naked (Floating (Float32 Any_locality_mode)),
-      Naked (Floating (Float32 Any_locality_mode)) ) ->
-    true
-  | ( Naked (Floating (Float64 Any_locality_mode)),
-      Naked (Floating (Float64 Any_locality_mode)) ) ->
-    true
-  | ( ( Value (Integral (Taggable (Int8 | Int16 | Int)))
-      | Value (Integral (Boxable (Int32 _ | Int64 _ | Nativeint _)))
-      | Value (Floating (Float32 _ | Float64 _))
-      | Naked (Integral (Taggable (Int8 | Int16 | Int)))
-      | Naked (Integral (Boxable (Int32 _ | Int64 _ | Nativeint _)))
-      | Naked (Floating (Float32 _ | Float64 _)) ),
-      _ ) ->
-    false

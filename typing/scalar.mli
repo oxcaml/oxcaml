@@ -81,6 +81,8 @@
 
 type any_locality_mode = Any_locality_mode
 
+val equal_any_locality_mode : any_locality_mode -> any_locality_mode -> bool
+
 module Maybe_naked : sig
   type ('a, 'b) t =
     | Value of 'a
@@ -108,6 +110,8 @@ module type S := sig
   val to_string : any_locality_mode t -> string
 
   val sort : any_locality_mode t -> Jkind_types.Sort.Const.t
+
+  val equal : ('a -> 'b -> bool) -> 'a t -> 'b t -> bool
 end
 
 (* The following module types define convenient shorthand values for users of scalar.ml,
@@ -221,9 +225,12 @@ module Float_comparison : sig
   val negate : t -> t
 end
 
-(* CR mshinwell: Concerns have been raised that [Intrinsic] could be misleading,
-   we might consider renaming this later *)
+type 'a scalar := 'a t
+
 module Intrinsic : sig
+  (* CR mshinwell: Concerns have been raised that [Intrinsic] could be misleading,
+     we might consider renaming this later *)
+
   type 'mode info =
     { can_raise : bool;
       result : 'mode t
@@ -248,12 +255,12 @@ module Intrinsic : sig
       val to_string : t -> string
     end
 
-    type nonrec 'mode t =
+    type 'mode t =
       | Integral of 'mode Integral.t * Int_op.t
       | Floating of 'mode Floating.t * Float_op.t
       | Static_cast of
-          { src : any_locality_mode t;
-            dst : 'mode t
+          { src : any_locality_mode scalar;
+            dst : 'mode scalar
           }
           (** [Static_cast] performs a conversion between numeric types, which
               may include (un)tagging or (un)boxing.  The jane/doc/scalars.md
@@ -317,13 +324,13 @@ module Intrinsic : sig
     (* CR jvanburen: add comparisons that return naked values *)
 
     (** comparisons return a tagged immediate *)
-    type nonrec 'mode t =
+    type 'mode t =
       | Integral of 'mode Integral.t * Int_op.t
       | Shift of 'mode Integral.t * Shift_op.t * Shift_op.Rhs.t
       | Floating of 'mode Floating.t * Float_op.t
       | Icmp of any_locality_mode Integral.t * Integer_comparison.t
       | Fcmp of any_locality_mode Floating.t * Float_comparison.t
-      | Three_way_compare of any_locality_mode t
+      | Three_way_compare of any_locality_mode scalar
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
@@ -358,7 +365,3 @@ module Intrinsic : sig
     val of_string : string -> t
   end
 end
-
-val equal_any_locality_mode : any_locality_mode -> any_locality_mode -> bool
-
-val equal : ('a -> 'b -> bool) -> 'a t -> 'b t -> bool
