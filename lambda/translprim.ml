@@ -2087,8 +2087,9 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
        ~ret_mode:(to_locality p.prim_native_repr_res)
 
 let lambda_primitive_needs_event_after = function
-  (* We add an event after any primitive resulting in a C call that MAY raise an exception
-     or allocate (this is approximated conservatively). These are places where we may
+  (* We add an event after any primitive resulting in a C call that MAY raise
+     an exception or allocate (this is approximated conservatively). These are
+     places where we may
      collect the call stack. *)
   | Pscalar op ->
     let { can_raise; result } : _  Scalar.Intrinsic.info =

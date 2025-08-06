@@ -426,8 +426,8 @@ let value_kind_of_value_jkind env jkind =
   | Base Value, Internal -> Pgenval
   | Any, _
   | Product _, _
-  | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32 | Bits64 |
-          Vec128 | Vec256 | Vec512) , _ ->
+  | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 |
+          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) , _ ->
     Misc.fatal_error "expected a layout of value"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
@@ -993,8 +993,8 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.Punboxed_float Unboxed_float64
   | Base Word when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_int Unboxed_nativeint
-  | Base Untagged_immediate when Language_extension.(is_at_least Layouts Beta) &&
-                    Language_extension.(is_at_least Small_numbers Beta) ->
+  | Base Untagged_immediate when Language_extension.(is_at_least Layouts Beta)
+                                 && Language_extension.(is_at_least Small_numbers Beta) ->
     Lambda.Punboxed_int Unboxed_int
   | Base Bits8 when Language_extension.(is_at_least Layouts Beta) &&
                     Language_extension.(is_at_least Small_numbers Beta) ->
@@ -1026,8 +1026,8 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       (List.map (layout_of_const_sort_generic
                    ~value_kind:(lazy Lambda.generic_value) ~error)
          consts)
-  | ((  Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
-             | Bits64 | Vec128 | Vec256 | Vec512)
+  | ((  Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
+             Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _) as const) ->
     error const
 
@@ -1046,7 +1046,8 @@ let layout env loc sort ty =
       | Base (Vec128 | Vec256 | Vec512) as const ->
         raise (Error (loc, Simd_sort_without_extension
                              (Jkind.Sort.of_const const, Some ty)))
-      | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 | Bits64) | Product _)
+      | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
+               Bits64) | Product _)
         as const ->
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Stable,
@@ -1067,7 +1068,8 @@ let layout_of_sort loc sort =
     | Base (Vec128 | Vec256 | Vec512) as const ->
       raise (Error (loc, Simd_sort_without_extension
                            (Jkind.Sort.of_const const, None)))
-    | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 | Bits64) | Product _)
+    | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
+             Bits64) | Product _)
       as const ->
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
