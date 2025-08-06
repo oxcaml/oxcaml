@@ -136,6 +136,7 @@ struct caml_thread_struct {
   void * signal_stack;       /* this thread's signal stack */
   size_t signal_stack_size;  /* size of this thread's signal stack in bytes */
   int is_main;               /* whether this is the main thread of its domain */
+  dynamic_thread_t dynamic;  /* dynamic value bindings */
 
 #ifndef NATIVE_CODE
   intnat trap_sp_off;      /* saved value of Caml_state->trap_sp_off */
@@ -264,7 +265,8 @@ static void caml_thread_scan_roots(
       if (th != active) {
         if (th->current_stack != NULL)
           caml_do_local_roots(action, fflags, fdata,
-                              th->local_roots, th->current_stack, th->gc_regs);
+                              th->local_roots, th->current_stack, th->gc_regs,
+                              th->dynamic);
       }
       th = th->next;
     } while (th != active);
@@ -331,6 +333,7 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->external_raise_async = th->external_raise_async;
 #endif
   caml_memprof_enter_thread(th->memprof);
+  caml_dynamic_enter_thread(th->dynamic);
 }
 
 CAMLexport void caml_thread_restore_runtime_state(void)
@@ -395,7 +398,7 @@ static void caml_thread_leave_blocking_section(void)
 /* Create and setup a new thread info block.
    This block has no associated thread descriptor and
    is not inserted in the list of threads. */
-static caml_thread_t caml_thread_new_info(void)
+static caml_thread_t caml_thread_new_info(caml_thread_t parent)
 {
   caml_thread_t th = NULL;
   caml_domain_state *domain_state = Caml_state;
@@ -415,10 +418,12 @@ static caml_thread_t caml_thread_new_info(void)
      must be initialized to a valid value, as in [domain_create]. */
 
   th->current_stack = caml_alloc_main_stack(stack_wsize);
-  if (th->current_stack == NULL) goto out_err1;
+  if (th->current_stack == NULL) goto fail_alloc_stack;
 
   th->memprof = caml_memprof_new_thread(domain_state);
-  if (th->memprof == NULL) goto out_err2;
+  if (th->memprof == NULL) goto fail_memprof;
+  th->dynamic = caml_dynamic_new_thread(parent->dynamic);
+  if (th->dynamic == NULL) goto fail_dynamic;
 
   th->c_stack = NULL;
   th->local_roots = NULL;
@@ -439,9 +444,11 @@ static caml_thread_t caml_thread_new_info(void)
 #endif
   return th;
 
- out_err2:
+ fail_dynamic:
+  caml_memprof_delete_thread(th->memprof);
+ fail_memprof:
   caml_free_stack(th->current_stack);
- out_err1:
+ fail_alloc_stack:
   caml_stat_free(th);
   return NULL;
 }
@@ -466,6 +473,7 @@ void caml_thread_free_info(caml_thread_t th)
      init_mask: stack-allocated
   */
   caml_memprof_delete_thread(th->memprof);
+  caml_dynamic_delete_thread(th->dynamic);
   caml_free_stack(th->current_stack);
   caml_free_backtrace_buffer(th->backtrace_buffer);
 
@@ -497,7 +505,7 @@ static value caml_thread_new_descriptor(value clos)
 /* Allocate a thread info block and add it to the list of threads */
 static caml_thread_t thread_alloc_and_add(void)
 {
-  caml_thread_t th = caml_thread_new_info();
+  caml_thread_t th = caml_thread_new_info(Active_thread);
 
   if (th == NULL) return NULL;
 
@@ -684,12 +692,15 @@ static void caml_thread_domain_initialize_hook(void)
   new_thread->prev = new_thread;
   new_thread->backtrace_last_exn = Val_unit;
   new_thread->memprof = caml_memprof_main_thread(Caml_state);
+  new_thread->dynamic = Caml_state->dynamic_bindings;
+  CAMLassert(new_thread->dynamic);
   new_thread->is_main = 1;
   new_thread->signal_stack = NULL;
 
   This_thread = new_thread;
   Active_thread = new_thread;
   caml_memprof_enter_thread(new_thread->memprof);
+  caml_dynamic_enter_thread(new_thread->dynamic);
 }
 
 static void thread_yield(void);
