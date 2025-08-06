@@ -73,14 +73,32 @@ let check_tag ~env ~res x ~tag =
   let var = Jsir.Var.fresh () in
   Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
 
+let block_access_kind (kind : Flambda_primitive.Block_access_kind.t) :
+    Jsir.field_type =
+  match kind with
+  | Values _ -> Non_float
+  | Naked_floats _ -> Float
+  | Mixed { field_kind = Value_prefix _; _ } -> Non_float
+  | Mixed
+      { field_kind = Flat_suffix (Naked_int32 | Naked_int64 | Naked_nativeint);
+        _
+      } ->
+    Non_float
+  | Mixed { field_kind = Flat_suffix (Naked_float | Naked_float32); _ } -> Float
+  | Mixed
+      { field_kind = Flat_suffix (Naked_vec128 | Naked_vec256 | Naked_vec512);
+        _
+      } ->
+    primitive_not_supported ()
+
 let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   let use_prim' prim = use_prim ~env ~res prim [prim_arg ~env x] in
   match f with
-  | Block_load { kind = _; mut = _; field } ->
+  | Block_load { kind; mut = _; field } ->
     let var = Jsir.Var.fresh () in
     let expr : Jsir.expr =
       match prim_arg ~env x with
-      | Pv v -> Field (v, Targetint_31_63.to_int field, Non_float)
+      | Pv v -> Field (v, Targetint_31_63.to_int field, block_access_kind kind)
       | Pc _ -> Misc.fatal_error "Block_load on constant"
     in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
@@ -214,7 +232,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     use_prim ~env ~res prim [prim_arg ~env x; prim_arg ~env y]
   in
   match f with
-  | Block_set { kind = _; init = _; field } ->
+  | Block_set { kind; init = _; field } ->
     let x =
       match prim_arg ~env x with
       | Pv x -> x
@@ -224,7 +242,8 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     ( None,
       env,
       To_jsir_result.add_instr_exn res
-        (Set_field (x, Targetint_31_63.to_int field, Non_float, y)) )
+        (Set_field (x, Targetint_31_63.to_int field, block_access_kind kind, y))
+    )
   | Array_load (kind, load_kind, _mut) -> (
     match kind, load_kind with
     | ( (Immediates | Values | Naked_floats | Naked_float32s),
