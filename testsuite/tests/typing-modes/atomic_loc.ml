@@ -31,6 +31,13 @@ Line 2, characters 15-16:
 
 |}]
 
+let atomic_loc_mode_crosses_aliased (t : string atomic_loc @ unique) : _ @ aliased
+  = t
+[%%expect{|
+val atomic_loc_mode_crosses_aliased :
+  string atomic_loc @ unique -> string atomic_loc = <fun>
+|}]
+
 (* Test for forbidding non-identity comonadic modalities in [%atomic.loc] *)
 
 (* This is allowed... *)
