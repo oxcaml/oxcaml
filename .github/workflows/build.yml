@@ -137,6 +137,8 @@ jobs:
             config: --enable-middle-end=flambda2
             os: ubuntu-latest
             dwarf_tests_only: true
+            oxcaml_lldb_tag: oxcaml-lldb-16.0.6-minus0
+            oxcaml_lldb_source_branch: lldb
 
     env:
       J: "3"
@@ -287,13 +289,38 @@ jobs:
         OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
         USE_RUNTIME: ${{ matrix.use_runtime }}
 
+    - name: Install custom OxCaml LLDB
+      if: matrix.oxcaml_lldb_tag != '' && contains(matrix.os, 'ubuntu')
+      run: |
+        # Determine architecture
+        if [[ "${{ runner.arch }}" == "X64" ]]; then
+          ARCH="x86_64"
+        elif [[ "${{ runner.arch }}" == "ARM64" ]]; then
+          ARCH="aarch64"
+        else
+          echo "Unsupported architecture: ${{ runner.arch }}"
+          exit 1
+        fi
+
+        OXCAML_LLDB_TAG="${{ matrix.oxcaml_lldb_tag }}"
+        OXCAML_LLDB_SOURCE_BRANCH="${{ matrix.oxcaml_lldb_source_branch }}"
+        OXCAML_LLDB_URL="https://github.com/ocaml-flambda/llvm-project/releases/download/${OXCAML_LLDB_TAG}/${OXCAML_LLDB_TAG}-llvm-linux-${ARCH}-${OXCAML_LLDB_SOURCE_BRANCH}.tar.gz"
+
+        # Download and extract custom OxCaml LLDB
+        cd $GITHUB_WORKSPACE
+        wget -O oxcaml-lldb.tar.gz "$OXCAML_LLDB_URL"
+        mkdir -p oxcaml-lldb
+        tar -xzf oxcaml-lldb.tar.gz -C oxcaml-lldb --strip-components=1
+
     - name: Build and test OxCaml DWARF
       working-directory: oxcaml
-      if: matrix.dwarf_tests_only == true
+      if: matrix.dwarf_tests_only == true && matrix.oxcaml_lldb_tag != '' && contains(matrix.os, 'ubuntu')
       run: |
         export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
         ulimit -c unlimited
         make runtest-dwarf
+      env:
+        OXCAML_LLDB: ${{ github.workspace }}/oxcaml-lldb/bin/lldb
 
     - name: Check other architectures
       working-directory: oxcaml
