@@ -31,6 +31,59 @@ Line 2, characters 15-16:
 
 |}]
 
+let aliased_locs (t @ unique) =
+  [%atomic.loc t.contents], [%atomic.loc t.contents]
+[%%expect{|
+val aliased_locs : 'a atomic @ unique -> 'a atomic_loc * 'a atomic_loc =
+  <fun>
+|}]
+
+type ('a, 'b) two_fields =
+  { mutable a : 'a [@atomic]; mutable b : 'b [@atomic] }
+[%%expect{|
+type ('a, 'b) two_fields = {
+  mutable a : 'a [@atomic];
+  mutable b : 'b [@atomic];
+}
+|}]
+
+let locs_to_two_fields_in_unique_record (t : (_, _) two_fields @ unique) =
+  [%atomic.loc t.a], [%atomic.loc t.b]
+[%%expect{|
+val locs_to_two_fields_in_unique_record :
+  ('a, 'b) two_fields @ unique -> 'a atomic_loc * 'b atomic_loc = <fun>
+|}]
+
+type ('a, 'b, 'c) two_atomic_fields_and_a_regular_one =
+  { mutable a : 'a [@atomic]; mutable b : 'b [@atomic]; c : 'c }
+
+let consume_all_fields
+      (t : (_, _, _) two_atomic_fields_and_a_regular_one @ unique) =
+  [%atomic.loc t.a], [%atomic.loc t.b], t.c
+[%%expect{|
+type ('a, 'b, 'c) two_atomic_fields_and_a_regular_one = {
+  mutable a : 'a [@atomic];
+  mutable b : 'b [@atomic];
+  c : 'c;
+}
+val consume_all_fields :
+  ('a, 'b, 'c) two_atomic_fields_and_a_regular_one @ unique ->
+  'a atomic_loc * 'b atomic_loc * 'c = <fun>
+|}]
+
+let atomic_loc_consumes_record (t : _ atomic @ unique) : _ @ unique =
+  [%atomic.loc t.contents], t
+[%%expect{|
+Line 2, characters 28-29:
+2 |   [%atomic.loc t.contents], t
+                                ^
+Error: This value is used here, but it is already being used as unique:
+Line 2, characters 15-16:
+2 |   [%atomic.loc t.contents], t
+                   ^
+
+|}]
+
 let atomic_loc_mode_crosses_aliased (t : string atomic_loc @ unique) : _ @ aliased
   = t
 [%%expect{|
