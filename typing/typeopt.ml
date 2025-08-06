@@ -993,8 +993,9 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.Punboxed_float Unboxed_float64
   | Base Word when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_int Unboxed_nativeint
-  | Base Untagged_immediate when Language_extension.(is_at_least Layouts Beta)
-                                 && Language_extension.(is_at_least Small_numbers Beta) ->
+  | Base Untagged_immediate when
+      Language_extension.(is_at_least Layouts Beta)
+      && Language_extension.(is_at_least Small_numbers Beta) ->
     Lambda.Punboxed_int Unboxed_int
   | Base Bits8 when Language_extension.(is_at_least Layouts Beta) &&
                     Language_extension.(is_at_least Small_numbers Beta) ->

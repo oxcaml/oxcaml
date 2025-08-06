@@ -3422,7 +3422,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
               | Base Value -> ()
               | Product _
               | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
-                     Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
+                     Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 |
+                     Vec512) ->
                 raise (Error (vb.vb_loc, env,
                               Toplevel_unnamed_nonvalue vb.vb_sort))
               end
