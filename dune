@@ -620,13 +620,16 @@
  (modes byte native)
  ; same flags as for ocamlcommon library
  (flags
-  (-strict-sequence
+  (:standard
+   -strict-sequence
    -bin-annot
    -safe-string
    -strict-formats
    -w
    -67
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
+   -w
+   -32
    ))
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
