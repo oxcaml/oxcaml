@@ -3086,9 +3086,14 @@ let transl_extension_constructor ~scope env type_path type_params
               | _ -> ())
             typext_params
         end;
-        (match Ctype.check_constructor_crossing Rebinding env lid
+        (* Rebinding is safe if constructor arguments mode-cross both ways. *)
+        (match Ctype.check_constructor_crossing_creation env lid
           cdescr.cstr_tag ~res:cstr_res ~args locks with
-        | Ok () -> ()
+        | Ok _ -> ()
+        | Error e -> raise (Error (lid.loc, Constructor_submode_failed e)));
+        (match Ctype.check_constructor_crossing_destruction env lid
+          cdescr.cstr_tag ~res:cstr_res ~args locks with
+        | Ok _ -> ()
         | Error e -> raise (Error (lid.loc, Constructor_submode_failed e)));
         (* Ensure that constructor's type matches the type being extended *)
         let cstr_type_path = Btype.cstr_type_path cdescr in

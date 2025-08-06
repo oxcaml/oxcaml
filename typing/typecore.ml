@@ -3088,7 +3088,7 @@ and type_pat_aux
       end;
 
       let constructor_mode =
-        match Ctype.check_constructor_crossing Destruction !!penv
+        match Ctype.check_constructor_crossing_destruction !!penv
           lid constr.cstr_tag ~res:expected_ty ~args locks with
         | Ok mode -> mode
         | Error e -> raise (Error (lid.loc, !!penv,
@@ -8768,7 +8768,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       end
   in
   let constructor_mode =
-    match Ctype.check_constructor_crossing Creation env lid
+    match Ctype.check_constructor_crossing_creation env lid
       constr.cstr_tag ~res:ty_res ~args:ty_args locks with
     | Ok mode -> mode
     | Error e -> raise (Error (lid.loc, env,

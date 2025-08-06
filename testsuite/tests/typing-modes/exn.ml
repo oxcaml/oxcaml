@@ -96,6 +96,12 @@ Line 3, characters 33-44:
                                      ^^^^^^^^^^^
 Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
        Hint: all argument types must mode-cross for rebinding to succeed.
+|}, Principal{|
+Line 3, characters 33-44:
+3 |         exception Nonportable' = Nonportable
+                                     ^^^^^^^^^^^
+Error: This constructor is at mode "contended", but expected to be at mode "uncontended".
+       Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
 (* Rebinding with crossing types succeeds. *)
@@ -116,7 +122,7 @@ val cross : unit -> 'a = <fun>
 Line 3, characters 30-38:
 3 |         exception Crossing' = Crossing
                                   ^^^^^^^^
-Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
+Error: This constructor is at mode "contended", but expected to be at mode "uncontended".
        Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
@@ -215,12 +221,6 @@ Line 3, characters 31-40:
                                    ^^^^^^^^^
 Error: This constructor is at mode "contended", but expected to be at mode "uncontended".
        Hint: all argument types must mode-cross for rebinding to succeed.
-|}, Principal{|
-Line 3, characters 31-40:
-3 |         exception Contended' = Contended
-                                   ^^^^^^^^^
-Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
-       Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
 let (bar @ portable) () =
@@ -234,7 +234,7 @@ val bar : unit -> 'a = <fun>
 Line 3, characters 34-45:
 3 |         exception Uncontended'' = Uncontended
                                       ^^^^^^^^^^^
-Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
+Error: This constructor is at mode "contended", but expected to be at mode "uncontended".
        Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
