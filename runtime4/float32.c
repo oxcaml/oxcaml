@@ -847,7 +847,7 @@ static value caml_make_unboxed_float32_vect0(value len, int local)
   /* This is only used on 64-bit targets. */
 
   mlsize_t num_elements = Long_val(len);
-  if (num_elements > Max_unboxed_float32_array_wosize)
+  if (num_elements > Max_unboxed_float32_array_wosize) 
     caml_invalid_argument("Array.make");
 
   /* Empty arrays have tag 0 */
@@ -856,11 +856,11 @@ static value caml_make_unboxed_float32_vect0(value len, int local)
   }
 
   mlsize_t num_fields = num_elements / 2 + num_elements % 2;
-
+  
   /* Use appropriate unboxed array tag based on even/odd length */
-  tag_t tag = (num_elements % 2 == 0)
+  tag_t tag = (num_elements % 2 == 0) 
     ? Unboxed_float32_array_even_tag : Unboxed_float32_array_odd_tag;
-
+  
   /* Mixed block with no scannable fields */
   reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
