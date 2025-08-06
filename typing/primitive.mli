@@ -23,10 +23,8 @@ type unboxed_integer =
   | Unboxed_int8
   | Unboxed_int
   (* CR mshinwell: I think [Unboxed_int31_63] might be better *)
-  (** We don't support an [int#] type in the stdlib. However, for consistency,
-      it's important that we have naked types corresponding to all of our
-      integral types.  This is also used when you write [int[@untagged]] in
-      [external] functions. *)
+  (** [Unboxed_int] is used for [int#] and when you write [int[@untagged]] on
+      [external] declarations. *)
 
 type unboxed_float = Unboxed_float64 | Unboxed_float32
 type unboxed_vector = Unboxed_vec128 | Unboxed_vec256 | Unboxed_vec512
