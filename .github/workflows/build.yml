@@ -133,6 +133,11 @@ jobs:
             os: ubuntu-latest
             cc: clang
 
+          - name: dwarf_tests
+            config: --enable-middle-end=flambda2
+            os: ubuntu-latest
+            dwarf_tests_only: true
+
     env:
       J: "3"
       run_testsuite: "true"
@@ -269,6 +274,7 @@ jobs:
 
     - name: Build, install and test OxCaml
       working-directory: oxcaml
+      if: matrix.dwarf_tests_only != true
       run: |
         if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
         export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
@@ -280,6 +286,14 @@ jobs:
         OCAMLPARAM: ${{ matrix.ocamlparam }}
         OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
         USE_RUNTIME: ${{ matrix.use_runtime }}
+
+    - name: Build and test OxCaml DWARF
+      working-directory: oxcaml
+      if: matrix.dwarf_tests_only == true
+      run: |
+        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+        ulimit -c unlimited
+        make runtest-dwarf
 
     - name: Check other architectures
       working-directory: oxcaml

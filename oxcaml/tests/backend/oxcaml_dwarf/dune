@@ -1,28 +1,7 @@
-(rule
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{env:TEST_OXCAML_DWARF=false} "true")))
- (targets test_basic_dwarf.exe)
- (deps test_basic_dwarf.ml)
- (action (run %{bin:ocamlopt.opt} %{deps} -g -o test_basic_dwarf.exe)))
+(include dune.inc)
 
-(rule
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{env:TEST_OXCAML_DWARF=false} "true")))
- (targets test_basic_dwarf.output.corrected)
- (deps test_basic_dwarf.exe)
- (action
-  (with-outputs-to test_basic_dwarf.output.corrected
-   (run ./test_basic_dwarf.exe))))
+(rule (with-stdout-to dune.inc.gen (run ./gen/gen_dune.exe)))
 
 (rule
  (alias runtest)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{env:TEST_OXCAML_DWARF=false} "true")))
- (deps test_basic_dwarf.output test_basic_dwarf.output.corrected)
- (action (diff test_basic_dwarf.output test_basic_dwarf.output.corrected)))
+ (action (diff dune.inc dune.inc.gen)))
