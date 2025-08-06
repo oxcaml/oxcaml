@@ -136,7 +136,7 @@ type 'a classification =
   | Float
   | Void
   | Unboxed_float of unboxed_float
-  | Unboxed_int of unboxed_integer
+  | Unboxed_int of Primitive.unboxed_or_untagged_integer
   | Unboxed_vector of unboxed_vector
   | Lazy
   | Addr  (* any value except a float or a lazy *)
@@ -213,15 +213,15 @@ let classify ~classify_product env ty sort : _ classification =
   end
   | Base Float64 -> Unboxed_float Unboxed_float64
   | Base Float32 -> Unboxed_float Unboxed_float32
-  | Base Bits8 -> Unboxed_int Unboxed_int8
-  | Base Bits16 -> Unboxed_int Unboxed_int16
+  | Base Bits8 -> Unboxed_int Untagged_int8
+  | Base Bits16 -> Unboxed_int Untagged_int16
   | Base Bits32 -> Unboxed_int Unboxed_int32
   | Base Bits64 -> Unboxed_int Unboxed_int64
   | Base Vec128 -> Unboxed_vector Unboxed_vec128
   | Base Vec256 -> Unboxed_vector Unboxed_vec256
   | Base Vec512 -> Unboxed_vector Unboxed_vec512
   | Base Word -> Unboxed_int Unboxed_nativeint
-  | Base Untagged_immediate -> Unboxed_int Unboxed_int
+  | Base Untagged_immediate -> Unboxed_int Untagged_int
   | Base Void -> Void
   | Product c -> Product (classify_product ty c)
 
@@ -251,12 +251,12 @@ and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   | Base Value -> Pint_ignorable
   | Base Float64 -> Punboxedfloat_ignorable Unboxed_float64
   | Base Float32 -> Punboxedfloat_ignorable Unboxed_float32
-  | Base Bits8 -> Punboxedint_ignorable Unboxed_int8
-  | Base Bits16 -> Punboxedint_ignorable Unboxed_int16
-  | Base Bits32 -> Punboxedint_ignorable Unboxed_int32
-  | Base Bits64 -> Punboxedint_ignorable Unboxed_int64
-  | Base Word -> Punboxedint_ignorable Unboxed_nativeint
-  | Base Untagged_immediate -> Punboxedint_ignorable Unboxed_int
+  | Base Bits8 -> Punboxedoruntaggedint_ignorable Untagged_int8
+  | Base Bits16 -> Punboxedoruntaggedint_ignorable Untagged_int16
+  | Base Bits32 -> Punboxedoruntaggedint_ignorable Unboxed_int32
+  | Base Bits64 -> Punboxedoruntaggedint_ignorable Unboxed_int64
+  | Base Word -> Punboxedoruntaggedint_ignorable Unboxed_nativeint
+  | Base Untagged_immediate -> Punboxedoruntaggedint_ignorable Untagged_int
   | Base (Vec128 | Vec256 | Vec512) ->
     raise (Error (loc, Unsupported_vector_in_product_array))
   | Base Void -> raise (Error (loc, Unsupported_void_in_array))
@@ -291,12 +291,12 @@ let array_kind_of_elt ~elt_sort env loc ty =
   | Addr | Lazy -> Paddrarray
   | Int -> Pintarray
   | Unboxed_float f -> Punboxedfloatarray f
-  | Unboxed_int Unboxed_int -> Punboxedintarray Unboxed_int
-  | Unboxed_int Unboxed_int64 -> Punboxedintarray Unboxed_int64
-  | Unboxed_int Unboxed_nativeint -> Punboxedintarray Unboxed_nativeint
-  | Unboxed_int Unboxed_int32 -> Punboxedintarray Unboxed_int32
-  | Unboxed_int Unboxed_int16 -> Punboxedintarray Unboxed_int16
-  | Unboxed_int Unboxed_int8 -> Punboxedintarray Unboxed_int8
+  | Unboxed_int Untagged_int -> Punboxedoruntaggedintarray Untagged_int
+  | Unboxed_int Unboxed_int64 -> Punboxedoruntaggedintarray Unboxed_int64
+  | Unboxed_int Unboxed_nativeint -> Punboxedoruntaggedintarray Unboxed_nativeint
+  | Unboxed_int Unboxed_int32 -> Punboxedoruntaggedintarray Unboxed_int32
+  | Unboxed_int Untagged_int16 -> Punboxedoruntaggedintarray Untagged_int16
+  | Unboxed_int Untagged_int8 -> Punboxedoruntaggedintarray Untagged_int8
   | Unboxed_vector v -> Punboxedvectorarray v
   | Product c -> c
   | Void ->
@@ -313,7 +313,7 @@ let array_type_kind ~elt_sort ~elt_ty env loc ty =
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
         raise (Error (loc, Product_iarrays_unsupported))
       | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
-      | Punboxedintarray _ | Punboxedvectorarray _  ->
+      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _  ->
         kind
       end
   | Tconstr(p, [], _) when Path.same p Predef.path_floatarray ->
@@ -992,21 +992,21 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   | Base Float64 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_float Unboxed_float64
   | Base Word when Language_extension.(is_at_least Layouts Stable) ->
-    Lambda.Punboxed_int Unboxed_nativeint
+    Lambda.Punboxed_or_untagged_integer Unboxed_nativeint
   | Base Untagged_immediate when
       Language_extension.(is_at_least Layouts Beta)
       && Language_extension.(is_at_least Small_numbers Beta) ->
-    Lambda.Punboxed_int Unboxed_int
+    Lambda.Punboxed_or_untagged_integer Untagged_int
   | Base Bits8 when Language_extension.(is_at_least Layouts Beta) &&
                     Language_extension.(is_at_least Small_numbers Beta) ->
-    Lambda.Punboxed_int Unboxed_int8
+    Lambda.Punboxed_or_untagged_integer Untagged_int8
   | Base Bits16 when Language_extension.(is_at_least Layouts Beta) &&
                      Language_extension.(is_at_least Small_numbers Beta) ->
-    Lambda.Punboxed_int Unboxed_int16
+    Lambda.Punboxed_or_untagged_integer Untagged_int16
   | Base Bits32 when Language_extension.(is_at_least Layouts Stable) ->
-    Lambda.Punboxed_int Unboxed_int32
+    Lambda.Punboxed_or_untagged_integer Unboxed_int32
   | Base Bits64 when Language_extension.(is_at_least Layouts Stable) ->
-    Lambda.Punboxed_int Unboxed_int64
+    Lambda.Punboxed_or_untagged_integer Unboxed_int64
   | Base Float32 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_float Unboxed_float32
   | Base Vec128 when Language_extension.(is_at_least Layouts Stable) &&
@@ -1160,14 +1160,14 @@ let rec layout_union l1 l2 =
       Pvalue (value_kind_union layout1 layout2)
   | Punboxed_float f1, Punboxed_float f2 ->
       if Primitive.equal_unboxed_float f1 f2 then l1 else Ptop
-  | Punboxed_int bi1, Punboxed_int bi2 ->
-      if Primitive.equal_unboxed_integer bi1 bi2 then l1 else Ptop
+  | Punboxed_or_untagged_integer bi1, Punboxed_or_untagged_integer bi2 ->
+      if Primitive.equal_unboxed_or_untagged_integer bi1 bi2 then l1 else Ptop
   | Punboxed_vector vi1, Punboxed_vector vi2 ->
       if Primitive.equal_unboxed_vector vi1 vi2 then l1 else Ptop
   | Punboxed_product layouts1, Punboxed_product layouts2 ->
       if List.compare_lengths layouts1 layouts2 <> 0 then Ptop
       else Punboxed_product (List.map2 layout_union layouts1 layouts2)
-  | (Ptop | Pvalue _ | Punboxed_float _ | Punboxed_int _ |
+  | (Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ |
      Punboxed_vector _ | Punboxed_product _),
     _ ->
       Ptop

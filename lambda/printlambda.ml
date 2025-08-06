@@ -20,9 +20,9 @@ open Types
 open Lambda
 
 let unboxed_integer_suffix = function
-  | Unboxed_int8 -> "int8"
-  | Unboxed_int16 -> "int16"
-  | Unboxed_int -> "int"
+  | Untagged_int8 -> "int8"
+  | Untagged_int16 -> "int16"
+  | Untagged_int -> "int"
   | Unboxed_nativeint -> "nativeint"
   | Unboxed_int32 -> "int32"
   | Unboxed_int64 -> "int64"
@@ -79,7 +79,7 @@ let rec ignorable_product_element_kinds kinds =
 and ignorable_product_element_kind = function
   | Pint_ignorable -> "int"
   | Punboxedfloat_ignorable f -> unboxed_float f
-  | Punboxedint_ignorable i -> unboxed_integer i
+  | Punboxedoruntaggedint_ignorable i -> unboxed_integer i
   | Pproduct_ignorable kinds -> ignorable_product_element_kinds kinds
 
 let array_kind = function
@@ -88,7 +88,7 @@ let array_kind = function
   | Pintarray -> "int"
   | Pfloatarray -> "float"
   | Punboxedfloatarray f -> unboxed_float f
-  | Punboxedintarray i -> unboxed_integer i
+  | Punboxedoruntaggedintarray i -> unboxed_integer i
   | Punboxedvectorarray v -> unboxed_vector v
   | Pgcscannableproductarray kinds ->
     "scannableproduct " ^ scannable_product_element_kinds kinds
@@ -111,7 +111,7 @@ let array_ref_kind ppf k =
   | Pfloatarray_ref mode -> fprintf ppf "float%a" pp_mode mode
   | Punboxedfloatarray_ref Unboxed_float64 -> fprintf ppf "unboxed_float"
   | Punboxedfloatarray_ref Unboxed_float32 -> fprintf ppf "unboxed_float32"
-  | Punboxedintarray_ref i -> pp_print_string ppf (unboxed_integer i)
+  | Punboxedoruntaggedintarray_ref i -> pp_print_string ppf (unboxed_integer i)
   | Punboxedvectorarray_ref Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
   | Punboxedvectorarray_ref Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
   | Punboxedvectorarray_ref Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
@@ -123,7 +123,7 @@ let array_ref_kind ppf k =
 let array_index_kind ppf k =
   match k with
   | Ptagged_int_index -> fprintf ppf "int"
-  | Punboxed_int_index i -> pp_print_string ppf (unboxed_integer i)
+  | Punboxed_or_untagged_integer_index i -> pp_print_string ppf (unboxed_integer i)
 
 let array_set_kind ppf k =
   let pp_mode ppf = function
@@ -137,7 +137,7 @@ let array_set_kind ppf k =
   | Pfloatarray_set -> fprintf ppf "float"
   | Punboxedfloatarray_set Unboxed_float64 -> fprintf ppf "unboxed_float"
   | Punboxedfloatarray_set Unboxed_float32 -> fprintf ppf "unboxed_float32"
-  | Punboxedintarray_set i -> pp_print_string ppf (unboxed_integer i)
+  | Punboxedoruntaggedintarray_set i -> pp_print_string ppf (unboxed_integer i)
   | Punboxedvectorarray_set Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
   | Punboxedvectorarray_set Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
   | Punboxedvectorarray_set Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
@@ -229,7 +229,7 @@ let rec layout ppf layout_ =
   | Ptop -> fprintf ppf "top"
   | Pbottom -> fprintf ppf "bottom"
   | Punboxed_float bf -> fprintf ppf "%s" (unboxed_float_layout bf)
-  | Punboxed_int bi -> fprintf ppf "%s" (unboxed_integer_layout bi)
+  | Punboxed_or_untagged_integer bi -> fprintf ppf "%s" (unboxed_integer_layout bi)
   | Punboxed_vector bv -> fprintf ppf "%s" (unboxed_vector_layout bv)
   | Punboxed_product layouts ->
     fprintf ppf "@[<hov 1>#(%a)@]"
@@ -269,7 +269,7 @@ let return_kind ppf (mode, kind) =
         (fun ppf () -> variant_kind value_kind ppf ~consts ~non_consts) ()
   end
   | Punboxed_float bf -> fprintf ppf ": %s@ " (unboxed_float bf)
-  | Punboxed_int bi -> fprintf ppf ": %s@ " (unboxed_integer bi)
+  | Punboxed_or_untagged_integer bi -> fprintf ppf ": %s@ " (unboxed_integer bi)
   | Punboxed_vector bv -> fprintf ppf ": %s@ " (unboxed_vector bv)
   | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
@@ -371,8 +371,8 @@ let peek_or_poke ppf (pp : peek_or_poke) =
   | Ppp_untagged_immediate -> fprintf ppf "untagged_immediate"
   | Ppp_unboxed_float32 -> fprintf ppf "unboxed_float32"
   | Ppp_unboxed_float -> fprintf ppf "unboxed_float"
-  | Ppp_unboxed_int8 -> fprintf ppf "unboxed_int8"
-  | Ppp_unboxed_int16 -> fprintf ppf "unboxed_int16"
+  | Ppp_untagged_int8 -> fprintf ppf "untagged_int8"
+  | Ppp_untagged_int16 -> fprintf ppf "untagged_int16"
   | Ppp_unboxed_int32 -> fprintf ppf "unboxed_int32"
   | Ppp_unboxed_int64 -> fprintf ppf "unboxed_int64"
   | Ppp_unboxed_nativeint -> fprintf ppf "unboxed_nativeint"

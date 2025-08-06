@@ -369,14 +369,14 @@ and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
-  | Unboxed_integer of unboxed_integer
+  | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
 and external_call_description = extern_repr Primitive.description_gen
 
 and array_kind =
     Pgenarray | Paddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray of unboxed_float
-  | Punboxedintarray of unboxed_integer
+  | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
@@ -390,7 +390,7 @@ and array_ref_kind =
   | Pintarray_ref
   | Pfloatarray_ref of locality_mode
   | Punboxedfloatarray_ref of unboxed_float
-  | Punboxedintarray_ref of unboxed_integer
+  | Punboxedoruntaggedintarray_ref of unboxed_or_untagged_integer
   | Punboxedvectorarray_ref of unboxed_vector
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
@@ -404,7 +404,7 @@ and array_set_kind =
   | Pintarray_set
   | Pfloatarray_set
   | Punboxedfloatarray_set of unboxed_float
-  | Punboxedintarray_set of unboxed_integer
+  | Punboxedoruntaggedintarray_set of unboxed_or_untagged_integer
   | Punboxedvectorarray_set of unboxed_vector
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
@@ -414,7 +414,7 @@ and array_set_kind =
 and ignorable_product_element_kind =
   | Pint_ignorable
   | Punboxedfloat_ignorable of unboxed_float
-  | Punboxedint_ignorable of unboxed_integer
+  | Punboxedoruntaggedint_ignorable of unboxed_or_untagged_integer
   | Pproduct_ignorable of ignorable_product_element_kind list
   (* Invariant: the product element kind list has length >= 2 *)
 
@@ -426,7 +426,7 @@ and scannable_product_element_kind =
 
 and array_index_kind =
   | Ptagged_int_index
-  | Punboxed_int_index of unboxed_integer
+  | Punboxed_or_untagged_integer_index of unboxed_or_untagged_integer
 
 (** [Nullable] value kinds allow the special Null value in addition to the
     values of its underlying type. [Non_nullable] only allows values of the
@@ -461,7 +461,7 @@ and layout =
   | Ptop
   | Pvalue of value_kind
   | Punboxed_float of unboxed_float
-  | Punboxed_int of unboxed_integer
+  | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
   | Punboxed_product of layout list
   | Pbottom
@@ -497,13 +497,13 @@ and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
   | Unboxed_float32
 
-and unboxed_integer = Primitive.unboxed_integer =
+and unboxed_or_untagged_integer = Primitive.unboxed_or_untagged_integer =
   | Unboxed_int64
   | Unboxed_nativeint
   | Unboxed_int32
-  | Unboxed_int16
-  | Unboxed_int8
-  | Unboxed_int
+  | Untagged_int16
+  | Untagged_int8
+  | Untagged_int
 
 and unboxed_vector = Primitive.unboxed_vector =
   | Unboxed_vec128
@@ -529,8 +529,8 @@ and peek_or_poke =
   | Ppp_untagged_immediate
   | Ppp_unboxed_float32
   | Ppp_unboxed_float
-  | Ppp_unboxed_int8
-  | Ppp_unboxed_int16
+  | Ppp_untagged_int8
+  | Ppp_untagged_int16
   | Ppp_unboxed_int32
   | Ppp_unboxed_int64
   | Ppp_unboxed_nativeint

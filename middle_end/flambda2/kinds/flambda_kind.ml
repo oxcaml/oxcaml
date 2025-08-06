@@ -1039,11 +1039,14 @@ module With_subkind = struct
       | Parrayval (Punboxedfloatarray Unboxed_float64) -> Float_array
       | Parrayval (Punboxedfloatarray Unboxed_float32) -> Unboxed_float32_array
       | Parrayval
-          (Punboxedintarray (Unboxed_int8 | Unboxed_int16 | Unboxed_int)) ->
+          (Punboxedoruntaggedintarray
+            (Untagged_int8 | Untagged_int16 | Untagged_int)) ->
         Misc.unboxed_small_int_arrays_are_not_implemented ()
-      | Parrayval (Punboxedintarray Unboxed_int32) -> Unboxed_int32_array
-      | Parrayval (Punboxedintarray Unboxed_int64) -> Unboxed_int64_array
-      | Parrayval (Punboxedintarray Unboxed_nativeint) ->
+      | Parrayval (Punboxedoruntaggedintarray Unboxed_int32) ->
+        Unboxed_int32_array
+      | Parrayval (Punboxedoruntaggedintarray Unboxed_int64) ->
+        Unboxed_int64_array
+      | Parrayval (Punboxedoruntaggedintarray Unboxed_nativeint) ->
         Unboxed_nativeint_array
       | Parrayval (Punboxedvectorarray Unboxed_vec128) -> Unboxed_vec128_array
       | Parrayval (Punboxedvectorarray Unboxed_vec256) -> Unboxed_vec256_array
@@ -1063,12 +1066,12 @@ module With_subkind = struct
     | Pvalue vk -> from_lambda_value_kind vk
     | Punboxed_float Unboxed_float64 -> naked_float
     | Punboxed_float Unboxed_float32 -> naked_float32
-    | Punboxed_int Unboxed_int8 -> naked_int8
-    | Punboxed_int Unboxed_int16 -> naked_int16
-    | Punboxed_int Unboxed_int32 -> naked_int32
-    | Punboxed_int Unboxed_int64 -> naked_int64
-    | Punboxed_int Unboxed_nativeint -> naked_nativeint
-    | Punboxed_int Unboxed_int -> naked_immediate
+    | Punboxed_or_untagged_integer Untagged_int8 -> naked_int8
+    | Punboxed_or_untagged_integer Untagged_int16 -> naked_int16
+    | Punboxed_or_untagged_integer Unboxed_int32 -> naked_int32
+    | Punboxed_or_untagged_integer Unboxed_int64 -> naked_int64
+    | Punboxed_or_untagged_integer Unboxed_nativeint -> naked_nativeint
+    | Punboxed_or_untagged_integer Untagged_int -> naked_immediate
     | Punboxed_vector Unboxed_vec128 -> naked_vec128
     | Punboxed_vector Unboxed_vec256 -> naked_vec256
     | Punboxed_vector Unboxed_vec512 -> naked_vec512

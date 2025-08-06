@@ -342,11 +342,15 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       let suffix =
         match index_kind with
         | Ptagged_int_index
-        | Punboxed_int_index (Unboxed_int16 | Unboxed_int8 | Unboxed_int) ->
+        | Punboxed_or_untagged_integer_index
+            (Untagged_int16 | Untagged_int8 | Untagged_int) ->
           ""
-        | Punboxed_int_index Unboxed_int64 -> "_indexed_by_int64"
-        | Punboxed_int_index Unboxed_int32 -> "_indexed_by_int32"
-        | Punboxed_int_index Unboxed_nativeint -> "_indexed_by_nativeint"
+        | Punboxed_or_untagged_integer_index Unboxed_int64 ->
+          "_indexed_by_int64"
+        | Punboxed_or_untagged_integer_index Unboxed_int32 ->
+          "_indexed_by_int32"
+        | Punboxed_or_untagged_integer_index Unboxed_nativeint ->
+          "_indexed_by_nativeint"
       in
       Ccall (prefix ^ suffix)
     in
@@ -396,7 +400,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         (match kind with
         (* arrays of unboxed types have the same representation
            as the boxed ones on bytecode *)
-        | Pintarray | Paddrarray | Punboxedintarray _
+        | Pintarray | Paddrarray | Punboxedoruntaggedintarray _
         | Punboxedfloatarray Unboxed_float32
         | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
           variadic (Makeblock { tag = 0 })
@@ -424,17 +428,18 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               "Array kind %s should have been ruled out by the frontend for \
                %%makearray_dynamic_uninit"
               (Printlambda.array_kind kind)
-          | Punboxedintarray (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+          | Punboxedoruntaggedintarray
+              (Untagged_int8 | Untagged_int16 | Untagged_int) ->
             Misc.unboxed_small_int_arrays_are_not_implemented ()
           | Punboxedfloatarray Unboxed_float32 ->
             Lconst (Const_base (Const_float32 "0.0"))
           | Punboxedfloatarray Unboxed_float64 ->
             Lconst (Const_base (Const_float "0.0"))
-          | Punboxedintarray Unboxed_int32 ->
+          | Punboxedoruntaggedintarray Unboxed_int32 ->
             Lconst (Const_base (Const_int32 0l))
-          | Punboxedintarray Unboxed_int64 ->
+          | Punboxedoruntaggedintarray Unboxed_int64 ->
             Lconst (Const_base (Const_int64 0L))
-          | Punboxedintarray Unboxed_nativeint ->
+          | Punboxedoruntaggedintarray Unboxed_nativeint ->
             Lconst (Const_base (Const_nativeint 0n))
           | Punboxedvectorarray _ -> raise Not_found
           | Pgcignorableproductarray ignorables ->
@@ -442,18 +447,18 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
                 (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
               match ign with
               | Pint_ignorable -> Lconst (Const_base (Const_int 0))
-              | Punboxedint_ignorable
-                  (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+              | Punboxedoruntaggedint_ignorable
+                  (Untagged_int8 | Untagged_int16 | Untagged_int) ->
                 Misc.unboxed_small_int_arrays_are_not_implemented ()
               | Punboxedfloat_ignorable Unboxed_float32 ->
                 Lconst (Const_base (Const_float32 "0.0"))
               | Punboxedfloat_ignorable Unboxed_float64 ->
                 Lconst (Const_base (Const_float "0.0"))
-              | Punboxedint_ignorable Unboxed_int32 ->
+              | Punboxedoruntaggedint_ignorable Unboxed_int32 ->
                 Lconst (Const_base (Const_int32 0l))
-              | Punboxedint_ignorable Unboxed_int64 ->
+              | Punboxedoruntaggedint_ignorable Unboxed_int64 ->
                 Lconst (Const_base (Const_int64 0L))
-              | Punboxedint_ignorable Unboxed_nativeint ->
+              | Punboxedoruntaggedint_ignorable Unboxed_nativeint ->
                 Lconst (Const_base (Const_nativeint 0n))
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in
@@ -592,9 +597,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Parrayrefs
         ( ( Paddrarray_ref | Pintarray_ref | Pfloatarray_ref _
           | Punboxedfloatarray_ref (Unboxed_float64 | Unboxed_float32)
-          | Punboxedintarray_ref _ | Pgcscannableproductarray_ref _
+          | Punboxedoruntaggedintarray_ref _ | Pgcscannableproductarray_ref _
           | Pgcignorableproductarray_ref _ ),
-          (Punboxed_int_index _ as index_kind),
+          (Punboxed_or_untagged_integer_index _ as index_kind),
           _ ) ->
       binary (indexing_primitive index_kind "caml_array_get")
     | Parrayrefs
@@ -604,7 +609,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       binary (Ccall "caml_floatarray_get")
     | Parrayrefs
         ( ( Punboxedfloatarray_ref Unboxed_float32
-          | Punboxedintarray_ref _ | Paddrarray_ref | Pintarray_ref
+          | Punboxedoruntaggedintarray_ref _ | Paddrarray_ref | Pintarray_ref
           | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
           Ptagged_int_index,
           _ ) ->
@@ -613,9 +618,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Parraysets
         ( ( Paddrarray_set _ | Pintarray_set | Pfloatarray_set
           | Punboxedfloatarray_set (Unboxed_float64 | Unboxed_float32)
-          | Punboxedintarray_set _ | Pgcscannableproductarray_set _
+          | Punboxedoruntaggedintarray_set _ | Pgcscannableproductarray_set _
           | Pgcignorableproductarray_set _ ),
-          (Punboxed_int_index _ as index_kind) ) ->
+          (Punboxed_or_untagged_integer_index _ as index_kind) ) ->
       ternary (indexing_primitive index_kind "caml_array_set")
     | Parraysets
         ( (Punboxedfloatarray_set Unboxed_float64 | Pfloatarray_set),
@@ -623,7 +628,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       ternary (Ccall "caml_floatarray_set")
     | Parraysets
         ( ( Punboxedfloatarray_set Unboxed_float32
-          | Punboxedintarray_set _ | Paddrarray_set _ | Pintarray_set
+          | Punboxedoruntaggedintarray_set _ | Paddrarray_set _ | Pintarray_set
           | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
           Ptagged_int_index ) ->
       ternary (Ccall "caml_array_set_addr")
@@ -631,9 +636,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Parrayrefu
         ( ( Paddrarray_ref | Pintarray_ref | Pfloatarray_ref _
           | Punboxedfloatarray_ref (Unboxed_float64 | Unboxed_float32)
-          | Punboxedintarray_ref _ | Pgcscannableproductarray_ref _
+          | Punboxedoruntaggedintarray_ref _ | Pgcscannableproductarray_ref _
           | Pgcignorableproductarray_ref _ ),
-          (Punboxed_int_index _ as index_kind),
+          (Punboxed_or_untagged_integer_index _ as index_kind),
           _ ) ->
       binary (indexing_primitive index_kind "caml_array_unsafe_get")
     | Parrayrefu
@@ -643,7 +648,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       binary (Ccall "caml_floatarray_unsafe_get")
     | Parrayrefu
         ( ( Punboxedfloatarray_ref Unboxed_float32
-          | Punboxedintarray_ref _ | Paddrarray_ref | Pintarray_ref
+          | Punboxedoruntaggedintarray_ref _ | Paddrarray_ref | Pintarray_ref
           | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
           Ptagged_int_index,
           _ ) ->
@@ -652,9 +657,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Parraysetu
         ( ( Paddrarray_set _ | Pintarray_set | Pfloatarray_set
           | Punboxedfloatarray_set (Unboxed_float64 | Unboxed_float32)
-          | Punboxedintarray_set _ | Pgcscannableproductarray_set _
+          | Punboxedoruntaggedintarray_set _ | Pgcscannableproductarray_set _
           | Pgcignorableproductarray_set _ ),
-          (Punboxed_int_index _ as index_kind) ) ->
+          (Punboxed_or_untagged_integer_index _ as index_kind) ) ->
       ternary (indexing_primitive index_kind "caml_array_unsafe_set")
     | Parraysetu
         ( (Punboxedfloatarray_set Unboxed_float64 | Pfloatarray_set),
@@ -662,7 +667,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       ternary (Ccall "caml_floatarray_unsafe_set")
     | Parraysetu
         ( ( Punboxedfloatarray_set Unboxed_float32
-          | Punboxedintarray_set _ | Paddrarray_set _ | Pintarray_set
+          | Punboxedoruntaggedintarray_set _ | Paddrarray_set _ | Pintarray_set
           | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
           Ptagged_int_index ) ->
       ternary Setvectitem
@@ -764,8 +769,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
          arrays epic for out plan to deal with it. *)
       match kind with
       | Punboxedvectorarray _ -> simd_is_not_supported ()
-      | Pgenarray | Pintarray | Paddrarray | Punboxedintarray _ | Pfloatarray
-      | Punboxedfloatarray _ | Pgcscannableproductarray _
+      | Pgenarray | Pintarray | Paddrarray | Punboxedoruntaggedintarray _
+      | Pfloatarray | Punboxedfloatarray _ | Pgcscannableproductarray _
       | Pgcignorableproductarray _ -> (
         match locality with
         | Alloc_heap -> binary (Ccall "caml_make_vect")
@@ -774,8 +779,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()
       | Pgenarray_set _ | Pintarray_set | Paddrarray_set _
-      | Punboxedintarray_set _ | Pfloatarray_set | Punboxedfloatarray_set _
-      | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
+      | Punboxedoruntaggedintarray_set _ | Pfloatarray_set
+      | Punboxedfloatarray_set _ | Pgcscannableproductarray_set _
+      | Pgcignorableproductarray_set _ ->
         n_ary (Ccall "caml_array_blit") ~arity:5)
     | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"

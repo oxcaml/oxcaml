@@ -15,15 +15,15 @@
 
 (* Description of primitive functions *)
 
-type unboxed_integer =
+type unboxed_or_untagged_integer =
   | Unboxed_int64
   | Unboxed_nativeint
   | Unboxed_int32
-  | Unboxed_int16
-  | Unboxed_int8
-  | Unboxed_int
-  (* CR mshinwell: I think [Unboxed_int31_63] might be better *)
-  (** [Unboxed_int] is used for [int#] and when you write [int[@untagged]] on
+  | Untagged_int16
+  | Untagged_int8
+  | Untagged_int
+  (* CR mshinwell: I think [Untagged_int31_63] might be better *)
+  (** [Untagged_int] is used for [int#] and when you write [int[@untagged]] on
       [external] declarations. *)
 
 type unboxed_float = Unboxed_float64 | Unboxed_float32
@@ -37,14 +37,14 @@ type boxed_vector = Boxed_vec128 | Boxed_vec256 | Boxed_vec512
     of a primitive.
 
     Untagged integers (such as [int[@untagged]]) are represented as
-    [Unboxed_integer Unboxed_int]
+    [Unboxed_integer Untagged_int]
 *)
 type native_repr =
   | Repr_poly
   | Same_as_ocaml_repr of Jkind_types.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
-  | Unboxed_integer of unboxed_integer
+  | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
 (* See [middle_end/semantics_of_primitives.mli] *)
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
@@ -114,9 +114,9 @@ val byte_name: 'a description_gen -> string
 
 
 val unboxed_float : boxed_float -> unboxed_float
-val unboxed_integer : boxed_integer -> unboxed_integer
+val unboxed_or_untagged_integer : boxed_integer -> unboxed_or_untagged_integer
 val unboxed_vector : boxed_vector -> unboxed_vector
-val equal_unboxed_integer : unboxed_integer -> unboxed_integer -> bool
+val equal_unboxed_or_untagged_integer : unboxed_or_untagged_integer -> unboxed_or_untagged_integer -> bool
 val equal_unboxed_float : unboxed_float -> unboxed_float -> bool
 val equal_unboxed_vector : unboxed_vector -> unboxed_vector -> bool
 val compare_unboxed_float : unboxed_float -> unboxed_float -> int

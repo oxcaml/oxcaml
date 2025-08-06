@@ -861,7 +861,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Lconst(Const_float_array(List.map extract_float cl))
                 | Pgenarray ->
                   raise Not_constant    (* can this really happen? *)
-                | Punboxedfloatarray _ | Punboxedintarray _
+                | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                 | Punboxedvectorarray _
                 | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
                   Misc.fatal_error "Use flambda2 for unboxed arrays"
@@ -884,7 +884,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let array_kind = Typeopt.array_kind e elt_sort in
       begin match array_kind with
       | Pgenarray | Paddrarray | Pintarray | Pfloatarray
-      | Punboxedfloatarray _ | Punboxedintarray _ -> ()
+      | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
       | Punboxedvectorarray _ ->
         raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->

@@ -1916,7 +1916,7 @@ module Extended_machtype = struct
     | Punboxed_vector Unboxed_vec128 -> typ_vec128
     | Punboxed_vector Unboxed_vec256 -> typ_vec256
     | Punboxed_vector Unboxed_vec512 -> typ_vec512
-    | Punboxed_int _ ->
+    | Punboxed_or_untagged_integer _ ->
       (* Only 64-bit architectures, so this is always [typ_int] *)
       typ_any_int
     | Pvalue { raw_kind = Pintval; _ } -> typ_tagged_int

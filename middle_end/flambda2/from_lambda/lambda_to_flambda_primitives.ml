@@ -52,22 +52,22 @@ let boxable_number_of_boxed_integer (bint : L.boxed_integer) :
   | Boxed_int32 -> Naked_int32
   | Boxed_int64 -> Naked_int64
 
-let standard_int_of_unboxed_integer : L.unboxed_integer -> K.Standard_int.t =
-  function
-  | Unboxed_int8 -> Naked_int8
-  | Unboxed_int16 -> Naked_int16
+let standard_int_of_unboxed_integer :
+    L.unboxed_or_untagged_integer -> K.Standard_int.t = function
+  | Untagged_int8 -> Naked_int8
+  | Untagged_int16 -> Naked_int16
   | Unboxed_int32 -> Naked_int32
   | Unboxed_nativeint -> Naked_nativeint
-  | Unboxed_int -> Naked_immediate
+  | Untagged_int -> Naked_immediate
   | Unboxed_int64 -> Naked_int64
 
-let standard_int_or_float_of_unboxed_integer (ubint : L.unboxed_integer) :
-    K.Standard_int_or_float.t =
+let standard_int_or_float_of_unboxed_integer
+    (ubint : L.unboxed_or_untagged_integer) : K.Standard_int_or_float.t =
   match ubint with
-  | Unboxed_int -> Naked_immediate
+  | Untagged_int -> Naked_immediate
   | Unboxed_nativeint -> Naked_nativeint
-  | Unboxed_int8 -> Naked_int8
-  | Unboxed_int16 -> Naked_int16
+  | Untagged_int8 -> Naked_int8
+  | Untagged_int16 -> Naked_int16
   | Unboxed_int32 -> Naked_int32
   | Unboxed_int64 -> Naked_int64
 
@@ -78,8 +78,8 @@ let standard_int_or_float_of_peek_or_poke (layout : L.peek_or_poke) :
   | Ppp_untagged_immediate -> Naked_immediate
   | Ppp_unboxed_float32 -> Naked_float32
   | Ppp_unboxed_float -> Naked_float
-  | Ppp_unboxed_int8 -> Naked_int8
-  | Ppp_unboxed_int16 -> Naked_int16
+  | Ppp_untagged_int8 -> Naked_int8
+  | Ppp_untagged_int16 -> Naked_int16
   | Ppp_unboxed_int32 -> Naked_int32
   | Ppp_unboxed_int64 -> Naked_int64
   | Ppp_unboxed_nativeint -> Naked_nativeint
@@ -148,11 +148,12 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
   | Pintarray -> Array_kind Immediates
   | Pfloatarray | Punboxedfloatarray Unboxed_float64 -> Array_kind Naked_floats
   | Punboxedfloatarray Unboxed_float32 -> Array_kind Naked_float32s
-  | Punboxedintarray (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
+    ->
     Misc.unboxed_small_int_arrays_are_not_implemented ()
-  | Punboxedintarray Unboxed_int32 -> Array_kind Naked_int32s
-  | Punboxedintarray Unboxed_int64 -> Array_kind Naked_int64s
-  | Punboxedintarray Unboxed_nativeint -> Array_kind Naked_nativeints
+  | Punboxedoruntaggedintarray Unboxed_int32 -> Array_kind Naked_int32s
+  | Punboxedoruntaggedintarray Unboxed_int64 -> Array_kind Naked_int64s
+  | Punboxedoruntaggedintarray Unboxed_nativeint -> Array_kind Naked_nativeints
   | Punboxedvectorarray Unboxed_vec128 -> Array_kind Naked_vec128s
   | Punboxedvectorarray Unboxed_vec256 -> Array_kind Naked_vec256s
   | Punboxedvectorarray Unboxed_vec512 -> Array_kind Naked_vec512s
@@ -173,11 +174,12 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
       | Pint_ignorable -> Immediates
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
-      | Punboxedint_ignorable (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+      | Punboxedoruntaggedint_ignorable
+          (Untagged_int8 | Untagged_int16 | Untagged_int) ->
         Misc.unboxed_small_int_arrays_are_not_implemented ()
-      | Punboxedint_ignorable Unboxed_int32 -> Naked_int32s
-      | Punboxedint_ignorable Unboxed_int64 -> Naked_int64s
-      | Punboxedint_ignorable Unboxed_nativeint -> Naked_nativeints
+      | Punboxedoruntaggedint_ignorable Unboxed_int32 -> Naked_int32s
+      | Punboxedoruntaggedint_ignorable Unboxed_int64 -> Naked_int64s
+      | Punboxedoruntaggedint_ignorable Unboxed_nativeint -> Naked_nativeints
       | Pproduct_ignorable kinds ->
         Unboxed_product (List.map convert_kind kinds)
     in
@@ -232,13 +234,14 @@ let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
     Array_ref_kind (No_float_array_opt Naked_floats)
   | Punboxedfloatarray_ref Unboxed_float32 ->
     Array_ref_kind (No_float_array_opt Naked_float32s)
-  | Punboxedintarray_ref (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+  | Punboxedoruntaggedintarray_ref
+      (Untagged_int8 | Untagged_int16 | Untagged_int) ->
     Misc.unboxed_small_int_arrays_are_not_implemented ()
-  | Punboxedintarray_ref Unboxed_int32 ->
+  | Punboxedoruntaggedintarray_ref Unboxed_int32 ->
     Array_ref_kind (No_float_array_opt Naked_int32s)
-  | Punboxedintarray_ref Unboxed_int64 ->
+  | Punboxedoruntaggedintarray_ref Unboxed_int64 ->
     Array_ref_kind (No_float_array_opt Naked_int64s)
-  | Punboxedintarray_ref Unboxed_nativeint ->
+  | Punboxedoruntaggedintarray_ref Unboxed_nativeint ->
     Array_ref_kind (No_float_array_opt Naked_nativeints)
   | Punboxedvectorarray_ref Unboxed_vec128 ->
     Array_ref_kind (No_float_array_opt Naked_vec128s)
@@ -264,11 +267,12 @@ let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
       | Pint_ignorable -> Immediates
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
-      | Punboxedint_ignorable (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+      | Punboxedoruntaggedint_ignorable
+          (Untagged_int8 | Untagged_int16 | Untagged_int) ->
         Misc.unboxed_small_int_arrays_are_not_implemented ()
-      | Punboxedint_ignorable Unboxed_int32 -> Naked_int32s
-      | Punboxedint_ignorable Unboxed_int64 -> Naked_int64s
-      | Punboxedint_ignorable Unboxed_nativeint -> Naked_nativeints
+      | Punboxedoruntaggedint_ignorable Unboxed_int32 -> Naked_int32s
+      | Punboxedoruntaggedint_ignorable Unboxed_int64 -> Naked_int64s
+      | Punboxedoruntaggedint_ignorable Unboxed_nativeint -> Naked_nativeints
       | Pproduct_ignorable kinds ->
         Unboxed_product (List.map convert_kind kinds)
     in
@@ -375,13 +379,14 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
     Array_set_kind (No_float_array_opt Naked_floats)
   | Punboxedfloatarray_set Unboxed_float32 ->
     Array_set_kind (No_float_array_opt Naked_float32s)
-  | Punboxedintarray_set (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+  | Punboxedoruntaggedintarray_set
+      (Untagged_int8 | Untagged_int16 | Untagged_int) ->
     Misc.unboxed_small_int_arrays_are_not_implemented ()
-  | Punboxedintarray_set Unboxed_int32 ->
+  | Punboxedoruntaggedintarray_set Unboxed_int32 ->
     Array_set_kind (No_float_array_opt Naked_int32s)
-  | Punboxedintarray_set Unboxed_int64 ->
+  | Punboxedoruntaggedintarray_set Unboxed_int64 ->
     Array_set_kind (No_float_array_opt Naked_int64s)
-  | Punboxedintarray_set Unboxed_nativeint ->
+  | Punboxedoruntaggedintarray_set Unboxed_nativeint ->
     Array_set_kind (No_float_array_opt Naked_nativeints)
   | Punboxedvectorarray_set Unboxed_vec128 ->
     Array_set_kind (No_float_array_opt Naked_vec128s)
@@ -408,11 +413,12 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
       | Pint_ignorable -> Immediates
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
-      | Punboxedint_ignorable (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+      | Punboxedoruntaggedint_ignorable
+          (Untagged_int8 | Untagged_int16 | Untagged_int) ->
         Misc.unboxed_small_int_arrays_are_not_implemented ()
-      | Punboxedint_ignorable Unboxed_int32 -> Naked_int32s
-      | Punboxedint_ignorable Unboxed_int64 -> Naked_int64s
-      | Punboxedint_ignorable Unboxed_nativeint -> Naked_nativeints
+      | Punboxedoruntaggedint_ignorable Unboxed_int32 -> Naked_int32s
+      | Punboxedoruntaggedint_ignorable Unboxed_int64 -> Naked_int64s
+      | Punboxedoruntaggedint_ignorable Unboxed_nativeint -> Naked_nativeints
       | Pproduct_ignorable kinds ->
         Unboxed_product (List.map convert_kind kinds)
     in
@@ -492,13 +498,14 @@ let convert_array_kind_to_duplicate_array_kind (kind : L.array_kind) :
     Duplicate_array_kind (Naked_floats { length = None })
   | Punboxedfloatarray Unboxed_float32 ->
     Duplicate_array_kind (Naked_float32s { length = None })
-  | Punboxedintarray (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
+    ->
     Misc.unboxed_small_int_arrays_are_not_implemented ()
-  | Punboxedintarray Unboxed_int32 ->
+  | Punboxedoruntaggedintarray Unboxed_int32 ->
     Duplicate_array_kind (Naked_int32s { length = None })
-  | Punboxedintarray Unboxed_int64 ->
+  | Punboxedoruntaggedintarray Unboxed_int64 ->
     Duplicate_array_kind (Naked_int64s { length = None })
-  | Punboxedintarray Unboxed_nativeint ->
+  | Punboxedoruntaggedintarray Unboxed_nativeint ->
     Duplicate_array_kind (Naked_nativeints { length = None })
   | Punboxedvectorarray Unboxed_vec128 ->
     Duplicate_array_kind (Naked_vec128s { length = None })
@@ -592,7 +599,7 @@ let unbox_vec512 (arg : H.simple_or_prim) : H.simple_or_prim =
 let convert_index_to_tagged_int ~index ~(index_kind : Lambda.array_index_kind) =
   match index_kind with
   | Ptagged_int_index -> index
-  | Punboxed_int_index ubint ->
+  | Punboxed_or_untagged_integer_index ubint ->
     H.Prim
       (Unary
          ( Num_conv
@@ -606,7 +613,8 @@ let convert_index_to_untagged_int ~index ~(index_kind : Lambda.array_index_kind)
   let src : I_or_f.t =
     match index_kind with
     | Ptagged_int_index -> Tagged_immediate
-    | Punboxed_int_index ubint -> standard_int_or_float_of_unboxed_integer ubint
+    | Punboxed_or_untagged_integer_index ubint ->
+      standard_int_or_float_of_unboxed_integer ubint
   in
   H.Prim (Unary (Num_conv { src; dst = Naked_immediate }, index))
 
@@ -638,7 +646,8 @@ let check_bound ~(index_kind : Lambda.array_index_kind) ~(bound_kind : I.t)
   let index_kind =
     match index_kind with
     | Ptagged_int_index -> I.Tagged_immediate
-    | Punboxed_int_index width -> standard_int_of_unboxed_integer width
+    | Punboxed_or_untagged_integer_index width ->
+      standard_int_of_unboxed_integer width
   in
   let comp_kind : I.t =
     match index_kind, bound_kind with
@@ -1626,12 +1635,13 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         (* float32# arrays are packed *)
         4
       | Punboxedfloatarray Unboxed_float64 -> 8
-      | Punboxedintarray (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+      | Punboxedoruntaggedintarray
+          (Untagged_int8 | Untagged_int16 | Untagged_int) ->
         Misc.unboxed_small_int_arrays_are_not_implemented ()
-      | Punboxedintarray Unboxed_int32 ->
+      | Punboxedoruntaggedintarray Unboxed_int32 ->
         (* int32# arrays are packed *)
         4
-      | Punboxedintarray (Unboxed_int64 | Unboxed_nativeint) -> 8
+      | Punboxedoruntaggedintarray (Unboxed_int64 | Unboxed_nativeint) -> 8
       | Punboxedvectorarray Unboxed_vec128 -> 16
       | Punboxedvectorarray Unboxed_vec256 -> 32
       | Punboxedvectorarray Unboxed_vec512 -> 64
@@ -1701,11 +1711,13 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     | Array_kind array_kind ->
       let args =
         match lambda_array_kind with
-        | Punboxedintarray (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+        | Punboxedoruntaggedintarray
+            (Untagged_int8 | Untagged_int16 | Untagged_int) ->
           Misc.unboxed_small_int_arrays_are_not_implemented ()
         | Pgenarray | Paddrarray | Pintarray
         | Punboxedfloatarray (Unboxed_float64 | Unboxed_float32)
-        | Punboxedintarray (Unboxed_int32 | Unboxed_int64 | Unboxed_nativeint)
+        | Punboxedoruntaggedintarray
+            (Unboxed_int32 | Unboxed_int64 | Unboxed_nativeint)
         | Punboxedvectorarray (Unboxed_vec128 | Unboxed_vec256 | Unboxed_vec512)
         | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
           args
@@ -2722,14 +2734,14 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Parrayrefu
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pintarray_ref
             | Pfloatarray_ref _ | Punboxedfloatarray_ref _
-            | Punboxedintarray_ref _ | Punboxedvectorarray_ref _
+            | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
             | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
             _,
             _ )
       | Parrayrefs
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pintarray_ref
             | Pfloatarray_ref _ | Punboxedfloatarray_ref _
-            | Punboxedintarray_ref _ | Punboxedvectorarray_ref _
+            | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
             | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
             _,
             _ )
@@ -2748,13 +2760,13 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Parraysetu
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pintarray_set
             | Pfloatarray_set | Punboxedfloatarray_set _
-            | Punboxedintarray_set _ | Punboxedvectorarray_set _
+            | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
             | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
             _ )
       | Parraysets
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pintarray_set
             | Pfloatarray_set | Punboxedfloatarray_set _
-            | Punboxedintarray_set _ | Punboxedvectorarray_set _
+            | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
             | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
             _ )
       | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _

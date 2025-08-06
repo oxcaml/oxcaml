@@ -350,7 +350,7 @@ and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
-  | Unboxed_integer of unboxed_integer
+  | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
 and external_call_description = extern_repr Primitive.description_gen
 
@@ -380,7 +380,7 @@ and layout =
   | Ptop
   | Pvalue of value_kind
   | Punboxed_float of unboxed_float
-  | Punboxed_int of unboxed_integer
+  | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
   | Punboxed_product of layout list
   | Pbottom
@@ -415,7 +415,7 @@ and constructor_shape =
 and array_kind =
     Pgenarray | Paddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray of unboxed_float
-  | Punboxedintarray of unboxed_integer
+  | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
@@ -426,7 +426,7 @@ and array_ref_kind =
   | Pintarray_ref
   | Pfloatarray_ref of locality_mode
   | Punboxedfloatarray_ref of unboxed_float
-  | Punboxedintarray_ref of unboxed_integer
+  | Punboxedoruntaggedintarray_ref of unboxed_or_untagged_integer
   | Punboxedvectorarray_ref of unboxed_vector
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
@@ -437,7 +437,7 @@ and array_set_kind =
   | Pintarray_set
   | Pfloatarray_set
   | Punboxedfloatarray_set of unboxed_float
-  | Punboxedintarray_set of unboxed_integer
+  | Punboxedoruntaggedintarray_set of unboxed_or_untagged_integer
   | Punboxedvectorarray_set of unboxed_vector
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
@@ -446,7 +446,7 @@ and array_set_kind =
 and ignorable_product_element_kind =
   | Pint_ignorable
   | Punboxedfloat_ignorable of unboxed_float
-  | Punboxedint_ignorable of unboxed_integer
+  | Punboxedoruntaggedint_ignorable of unboxed_or_untagged_integer
   | Pproduct_ignorable of ignorable_product_element_kind list
 
 and scannable_product_element_kind =
@@ -456,19 +456,19 @@ and scannable_product_element_kind =
 
 and array_index_kind =
   | Ptagged_int_index
-  | Punboxed_int_index of unboxed_integer
+  | Punboxed_or_untagged_integer_index of unboxed_or_untagged_integer
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
   | Unboxed_float32
 
-and unboxed_integer = Primitive.unboxed_integer =
+and unboxed_or_untagged_integer = Primitive.unboxed_or_untagged_integer =
   | Unboxed_int64
   | Unboxed_nativeint
   | Unboxed_int32
-  | Unboxed_int16
-  | Unboxed_int8
-  | Unboxed_int
+  | Untagged_int16
+  | Untagged_int8
+  | Untagged_int
 
 and unboxed_vector = Primitive.unboxed_vector =
   | Unboxed_vec128
@@ -494,8 +494,8 @@ and peek_or_poke =
   | Ppp_untagged_immediate
   | Ppp_unboxed_float32
   | Ppp_unboxed_float
-  | Ppp_unboxed_int8
-  | Ppp_unboxed_int16
+  | Ppp_untagged_int8
+  | Ppp_untagged_int16
   | Ppp_unboxed_int32
   | Ppp_unboxed_int64
   | Ppp_unboxed_nativeint
@@ -616,14 +616,14 @@ let rec compatible_layout x y =
   | _, Pbottom -> true
   | Pvalue _, Pvalue _ -> true
   | Punboxed_float f1, Punboxed_float f2 -> Primitive.equal_unboxed_float f1 f2
-  | Punboxed_int bi1, Punboxed_int bi2 -> Primitive.equal_unboxed_integer bi1 bi2
+  | Punboxed_or_untagged_integer bi1, Punboxed_or_untagged_integer bi2 -> Primitive.equal_unboxed_or_untagged_integer bi1 bi2
   | Punboxed_vector bi1, Punboxed_vector bi2 -> Primitive.equal_unboxed_vector bi1 bi2
   | Punboxed_product layouts1, Punboxed_product layouts2 ->
       List.compare_lengths layouts1 layouts2 = 0
       && List.for_all2 compatible_layout layouts1 layouts2
   | Ptop, Ptop -> true
   | Ptop, _ | _, Ptop -> false
-  | (Pvalue _ | Punboxed_float _ | Punboxed_int _ | Punboxed_vector _ |
+  | (Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ | Punboxed_vector _ |
      Punboxed_product _), _ ->
       false
 
@@ -632,12 +632,12 @@ let rec equal_ignorable_product_element_kind k1 k2 =
   | Pint_ignorable, Pint_ignorable -> true
   | Punboxedfloat_ignorable f1, Punboxedfloat_ignorable f2 ->
     Primitive.equal_unboxed_float f1 f2
-  | Punboxedint_ignorable i1, Punboxedint_ignorable i2 ->
-    Primitive.equal_unboxed_integer i1 i2
+  | Punboxedoruntaggedint_ignorable i1, Punboxedoruntaggedint_ignorable i2 ->
+    Primitive.equal_unboxed_or_untagged_integer i1 i2
   | Pproduct_ignorable p1, Pproduct_ignorable p2 ->
     List.equal equal_ignorable_product_element_kind p1 p2
   | ( Pint_ignorable | Punboxedfloat_ignorable _
-    | Punboxedint_ignorable _ | Pproduct_ignorable _), _ -> false
+    | Punboxedoruntaggedint_ignorable _ | Pproduct_ignorable _), _ -> false
 
 let must_be_value layout =
   match layout with
@@ -1038,13 +1038,13 @@ let layout_module_field = nullable_value Pgenval
 let layout_functor = non_null_value Pgenval
 let layout_boxed_float f = non_null_value (Pboxedfloatval f)
 let layout_unboxed_float f = Punboxed_float f
-let layout_unboxed_nativeint = Punboxed_int Unboxed_nativeint
-let layout_unboxed_int64 = Punboxed_int Unboxed_int64
-let layout_unboxed_int32 = Punboxed_int Unboxed_int32
-let layout_unboxed_int16 = Punboxed_int Unboxed_int16
-let layout_unboxed_int8 = Punboxed_int Unboxed_int8
+let layout_unboxed_nativeint = Punboxed_or_untagged_integer Unboxed_nativeint
+let layout_unboxed_int64 = Punboxed_or_untagged_integer Unboxed_int64
+let layout_unboxed_int32 = Punboxed_or_untagged_integer Unboxed_int32
+let layout_unboxed_int16 = Punboxed_or_untagged_integer Untagged_int16
+let layout_unboxed_int8 = Punboxed_or_untagged_integer Untagged_int8
 let layout_string = non_null_value Pgenval
-let layout_unboxed_int ubi = Punboxed_int ubi
+let layout_unboxed_int ubi = Punboxed_or_untagged_integer ubi
 let layout_boxed_int bi = non_null_value (Pboxedintval bi)
 let layout_unboxed_vector v = Punboxed_vector v
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
@@ -1937,12 +1937,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Parrayblit _
   | Parraysetu _ | Parraysets _
   | Parrayrefu ((Paddrarray_ref | Pintarray_ref
-      | Punboxedfloatarray_ref _ | Punboxedintarray_ref _
+      | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
       | Punboxedvectorarray_ref _
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _)
   | Parrayrefs ((Paddrarray_ref | Pintarray_ref
-      | Punboxedfloatarray_ref _ | Punboxedintarray_ref _
+      | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
       | Punboxedvectorarray_ref _
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _) -> None
@@ -2193,9 +2193,9 @@ let constant_layout: constant -> layout = function
   | Const_int32 _ -> non_null_value (Pboxedintval Boxed_int32)
   | Const_int64 _ -> non_null_value (Pboxedintval Boxed_int64)
   | Const_nativeint _ -> non_null_value (Pboxedintval Boxed_nativeint)
-  | Const_unboxed_int32 _ -> Punboxed_int Unboxed_int32
-  | Const_unboxed_int64 _ -> Punboxed_int Unboxed_int64
-  | Const_unboxed_nativeint _ -> Punboxed_int Unboxed_nativeint
+  | Const_unboxed_int32 _ -> Punboxed_or_untagged_integer Unboxed_int32
+  | Const_unboxed_int64 _ -> Punboxed_or_untagged_integer Unboxed_int64
+  | Const_unboxed_nativeint _ -> Punboxed_or_untagged_integer Unboxed_nativeint
   | Const_float _ -> non_null_value (Pboxedfloatval Boxed_float64)
   | Const_float32 _ -> non_null_value (Pboxedfloatval Boxed_float32)
   | Const_unboxed_float _ -> Punboxed_float Unboxed_float64
@@ -2219,7 +2219,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Bits16 -> layout_unboxed_int16
   | Base Bits32 -> layout_unboxed_int32
   | Base Bits64 -> layout_unboxed_int64
-  | Base Untagged_immediate -> layout_unboxed_int Unboxed_int
+  | Base Untagged_immediate -> layout_unboxed_int Untagged_int
   | Base Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Base Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Base Vec512 -> layout_unboxed_vector Unboxed_vec512
@@ -2230,10 +2230,10 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
   | Unboxed_float bf -> layout_boxed_float bf
-  | Unboxed_integer (Unboxed_int | Unboxed_int8 | Unboxed_int16) ->  layout_int
-  | Unboxed_integer Unboxed_int64 -> layout_boxed_int Boxed_int64
-  | Unboxed_integer Unboxed_int32 -> layout_boxed_int Boxed_int32
-  | Unboxed_integer Unboxed_nativeint -> layout_boxed_int Boxed_nativeint
+  | Unboxed_or_untagged_integer (Untagged_int | Untagged_int8 | Untagged_int16) ->  layout_int
+  | Unboxed_or_untagged_integer Unboxed_int64 -> layout_boxed_int Boxed_int64
+  | Unboxed_or_untagged_integer Unboxed_int32 -> layout_boxed_int Boxed_int32
+  | Unboxed_or_untagged_integer Unboxed_nativeint -> layout_boxed_int Boxed_nativeint
   | Same_as_ocaml_repr s -> layout_of_const_sort s
 
 let rec layout_of_scannable_kinds kinds =
@@ -2250,7 +2250,7 @@ let rec layout_of_ignorable_kinds kinds =
 and layout_of_ignorable_kind = function
   | Pint_ignorable -> layout_int
   | Punboxedfloat_ignorable f -> layout_unboxed_float f
-  | Punboxedint_ignorable i -> layout_unboxed_int i
+  | Punboxedoruntaggedint_ignorable i -> layout_unboxed_int i
   | Pproduct_ignorable kinds -> layout_of_ignorable_kinds kinds
 
 let array_ref_kind_result_layout = function
@@ -2258,7 +2258,7 @@ let array_ref_kind_result_layout = function
   | Pfloatarray_ref _ -> layout_boxed_float Boxed_float64
   | Punboxedfloatarray_ref bf -> layout_unboxed_float bf
   | Pgenarray_ref _ | Paddrarray_ref -> layout_value_field
-  | Punboxedintarray_ref i -> layout_unboxed_int i
+  | Punboxedoruntaggedintarray_ref i -> layout_unboxed_int i
   | Punboxedvectorarray_ref bv -> layout_unboxed_vector bv
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
   | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
@@ -2306,7 +2306,7 @@ let primitive_result_layout (p : primitive) =
        layout_boxed_float Boxed_float32
      | Naked (Integral (Taggable Int8)) -> layout_unboxed_int8
      | Naked (Integral (Taggable Int16)) -> layout_unboxed_int16
-     | Naked (Integral (Taggable Int)) -> layout_unboxed_int Unboxed_int
+     | Naked (Integral (Taggable Int)) -> layout_unboxed_int Untagged_int
      | Naked (Integral (Boxable (Int32 Any_locality_mode))) ->
        layout_unboxed_int32
      | Naked (Integral (Boxable (Int64 Any_locality_mode))) ->
@@ -2465,11 +2465,11 @@ let primitive_result_layout (p : primitive) =
   | Ppeek layout -> (
       match layout with
       | Ppp_tagged_immediate -> layout_int
-      | Ppp_untagged_immediate -> layout_unboxed_int Unboxed_int
+      | Ppp_untagged_immediate -> layout_unboxed_int Untagged_int
       | Ppp_unboxed_float32 -> layout_unboxed_float Unboxed_float32
       | Ppp_unboxed_float -> layout_unboxed_float Unboxed_float64
-      | Ppp_unboxed_int8 -> layout_unboxed_int8
-      | Ppp_unboxed_int16 -> layout_unboxed_int16
+      | Ppp_untagged_int8 -> layout_unboxed_int8
+      | Ppp_untagged_int16 -> layout_unboxed_int16
       | Ppp_unboxed_int32 -> layout_unboxed_int32
       | Ppp_unboxed_int64 -> layout_unboxed_int64
       | Ppp_unboxed_nativeint -> layout_unboxed_nativeint
@@ -2519,7 +2519,7 @@ let array_ref_kind mode = function
   | Paddrarray -> Paddrarray_ref
   | Pintarray -> Pintarray_ref
   | Pfloatarray -> Pfloatarray_ref mode
-  | Punboxedintarray int_kind -> Punboxedintarray_ref int_kind
+  | Punboxedoruntaggedintarray int_kind -> Punboxedoruntaggedintarray_ref int_kind
   | Punboxedfloatarray float_kind -> Punboxedfloatarray_ref float_kind
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_ref vec_kind
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_ref kinds
@@ -2530,7 +2530,7 @@ let array_set_kind mode = function
   | Paddrarray -> Paddrarray_set mode
   | Pintarray -> Pintarray_set
   | Pfloatarray -> Pfloatarray_set
-  | Punboxedintarray int_kind -> Punboxedintarray_set int_kind
+  | Punboxedoruntaggedintarray int_kind -> Punboxedoruntaggedintarray_set int_kind
   | Punboxedfloatarray float_kind -> Punboxedfloatarray_set float_kind
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_set vec_kind
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_set (mode, kinds)
@@ -2541,7 +2541,7 @@ let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
   match kind with
   | Pintarray_set -> Pintarray_ref
   | Punboxedfloatarray_set uf -> Punboxedfloatarray_ref uf
-  | Punboxedintarray_set ui -> Punboxedintarray_ref ui
+  | Punboxedoruntaggedintarray_set ui -> Punboxedoruntaggedintarray_ref ui
   | Punboxedvectorarray_set uv -> Punboxedvectorarray_ref uv
   | Pgcscannableproductarray_set (_, scannables) ->
     Pgcscannableproductarray_ref scannables
@@ -2660,7 +2660,7 @@ let rec count_initializers_scannable
 let rec count_initializers_ignorable
     (ignorable : ignorable_product_element_kind) =
   match ignorable with
-  | Pint_ignorable | Punboxedfloat_ignorable _ | Punboxedint_ignorable _ -> 1
+  | Pint_ignorable | Punboxedfloat_ignorable _ | Punboxedoruntaggedint_ignorable _ -> 1
   | Pproduct_ignorable ignorables ->
     List.fold_left
       (fun acc ignorable -> acc + count_initializers_ignorable ignorable)
@@ -2669,7 +2669,7 @@ let rec count_initializers_ignorable
 let count_initializers_array_kind (lambda_array_kind : array_kind) =
   match lambda_array_kind with
   | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
-  | Punboxedintarray _ | Punboxedvectorarray _ -> 1
+  | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ -> 1
   | Pgcscannableproductarray scannables ->
     List.fold_left
       (fun acc scannable -> acc + count_initializers_scannable scannable)
@@ -2683,7 +2683,7 @@ let rec ignorable_product_element_kind_involves_int
     (kind : ignorable_product_element_kind) =
   match kind with
   | Pint_ignorable -> true
-  | Punboxedfloat_ignorable _ | Punboxedint_ignorable _ -> false
+  | Punboxedfloat_ignorable _ | Punboxedoruntaggedint_ignorable _ -> false
   | Pproduct_ignorable kinds ->
     List.exists ignorable_product_element_kind_involves_int kinds
 

@@ -453,7 +453,10 @@ val unbox_int :
 
 (** Used to prepare 32-bit integers on 64-bit platforms for a lsr operation *)
 val make_unsigned_int :
-  Primitive.unboxed_integer -> expression -> Debuginfo.t -> expression
+  Primitive.unboxed_or_untagged_integer ->
+  expression ->
+  Debuginfo.t ->
+  expression
 
 val unaligned_load_16 :
   ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression

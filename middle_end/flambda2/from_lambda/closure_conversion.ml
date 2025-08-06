@@ -585,31 +585,31 @@ let unarize_extern_repr alloc_mode (extern_repr : Lambda.extern_repr) =
         arg_transformer = Some (P.Unbox_number Naked_float32);
         return_transformer = Some (P.Box_number (Naked_float32, alloc_mode))
       } ]
-  | Unboxed_integer Unboxed_int8 ->
+  | Unboxed_or_untagged_integer Untagged_int8 ->
     [ { kind = K.naked_int8;
         arg_transformer =
           Some (P.Num_conv { src = Tagged_immediate; dst = Naked_int8 });
         return_transformer =
           Some (P.Num_conv { src = Naked_int8; dst = Tagged_immediate })
       } ]
-  | Unboxed_integer Unboxed_int16 ->
+  | Unboxed_or_untagged_integer Untagged_int16 ->
     [ { kind = K.naked_int16;
         arg_transformer =
           Some (P.Num_conv { src = Tagged_immediate; dst = Naked_int16 });
         return_transformer =
           Some (P.Num_conv { src = Naked_int16; dst = Tagged_immediate })
       } ]
-  | Unboxed_integer Unboxed_nativeint ->
+  | Unboxed_or_untagged_integer Unboxed_nativeint ->
     [ { kind = K.naked_nativeint;
         arg_transformer = Some (P.Unbox_number Naked_nativeint);
         return_transformer = Some (P.Box_number (Naked_nativeint, alloc_mode))
       } ]
-  | Unboxed_integer Unboxed_int32 ->
+  | Unboxed_or_untagged_integer Unboxed_int32 ->
     [ { kind = K.naked_int32;
         arg_transformer = Some (P.Unbox_number Naked_int32);
         return_transformer = Some (P.Box_number (Naked_int32, alloc_mode))
       } ]
-  | Unboxed_integer Unboxed_int64 ->
+  | Unboxed_or_untagged_integer Unboxed_int64 ->
     [ { kind = K.naked_int64;
         arg_transformer = Some (P.Unbox_number Naked_int64);
         return_transformer = Some (P.Box_number (Naked_int64, alloc_mode))
@@ -629,7 +629,7 @@ let unarize_extern_repr alloc_mode (extern_repr : Lambda.extern_repr) =
         arg_transformer = Some (P.Unbox_number Naked_vec512);
         return_transformer = Some (P.Box_number (Naked_vec512, alloc_mode))
       } ]
-  | Unboxed_integer Unboxed_int ->
+  | Unboxed_or_untagged_integer Untagged_int ->
     [ { kind = K.naked_immediate;
         arg_transformer = Some P.Untag_immediate;
         return_transformer = Some P.Tag_immediate
@@ -787,13 +787,13 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
     match prim_native_name with
     | "caml_int64_float_of_bits_unboxed" ->
       unboxed_int64_to_and_from_unboxed_float
-        ~src_kind:(Unboxed_integer Unboxed_int64)
+        ~src_kind:(Unboxed_or_untagged_integer Unboxed_int64)
         ~dst_kind:(Unboxed_float Boxed_float64)
         ~op:Unboxed_int64_as_unboxed_float64
     | "caml_int64_bits_of_float_unboxed" ->
       unboxed_int64_to_and_from_unboxed_float
         ~src_kind:(Unboxed_float Boxed_float64)
-        ~dst_kind:(Unboxed_integer Unboxed_int64)
+        ~dst_kind:(Unboxed_or_untagged_integer Unboxed_int64)
         ~op:Unboxed_float64_as_unboxed_int64
     | _ ->
       let callee = Simple.symbol call_symbol in

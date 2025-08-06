@@ -409,7 +409,7 @@ let makearray_dynamic_scannable_unboxed_product env
       in
       List.exists must_be_scanned kinds
     | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
-    | Punboxedintarray _ | Punboxedvectorarray _ ->
+    | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ ->
       Misc.fatal_errorf
         "%s: should have been sent to [makearray_dynamic_singleton]"
         (Printlambda.array_kind lambda_array_kind)
@@ -463,8 +463,8 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
           (Printlambda.array_kind lambda_array_kind)
           Debuginfo.print_compact dbg
       | Pgenarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
-      | Punboxedintarray _ | Punboxedvectorarray _ | Pgcscannableproductarray _
-        ->
+      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+      | Pgcscannableproductarray _ ->
         Misc.fatal_errorf
           "Cannot compile Pmakearray_dynamic at layout %s without an \
            initializer:@ %a"
@@ -489,23 +489,26 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     makearray_dynamic_singleton_uninitialized "unboxed_float64" ~length mode loc
     |> initialize_array env loc ~length (Punboxedfloatarray_set Unboxed_float64)
          Sixty_four_or_more ~init
-  | Punboxedintarray Unboxed_int32 ->
+  | Punboxedoruntaggedintarray Unboxed_int32 ->
     makearray_dynamic_singleton_uninitialized "unboxed_int32" ~length mode loc
-    |> initialize_array env loc ~length (Punboxedintarray_set Unboxed_int32)
+    |> initialize_array env loc ~length
+         (Punboxedoruntaggedintarray_set Unboxed_int32)
          (Thirty_two
             { zero_init = Lconst (Const_base (Const_unboxed_int32 0l)) })
          ~init
-  | Punboxedintarray (Unboxed_int8 | Unboxed_int16 | Unboxed_int) ->
+  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
+    ->
     Misc.unboxed_small_int_arrays_are_not_implemented ()
-  | Punboxedintarray Unboxed_int64 ->
+  | Punboxedoruntaggedintarray Unboxed_int64 ->
     makearray_dynamic_singleton_uninitialized "unboxed_int64" ~length mode loc
-    |> initialize_array env loc ~length (Punboxedintarray_set Unboxed_int64)
-         Sixty_four_or_more ~init
-  | Punboxedintarray Unboxed_nativeint ->
+    |> initialize_array env loc ~length
+         (Punboxedoruntaggedintarray_set Unboxed_int64) Sixty_four_or_more ~init
+  | Punboxedoruntaggedintarray Unboxed_nativeint ->
     makearray_dynamic_singleton_uninitialized "unboxed_nativeint" ~length mode
       loc
-    |> initialize_array env loc ~length (Punboxedintarray_set Unboxed_nativeint)
-         Sixty_four_or_more ~init
+    |> initialize_array env loc ~length
+         (Punboxedoruntaggedintarray_set Unboxed_nativeint) Sixty_four_or_more
+         ~init
   | Punboxedvectorarray Unboxed_vec128 ->
     makearray_dynamic_singleton_uninitialized "unboxed_vec128" ~length mode loc
     |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec128)
@@ -665,7 +668,7 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
     (* Take advantage of various GC-related tricks in [caml_array_blit]. *)
     arrayblit_runtime env args loc
   | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
-  | Punboxedintarray_set _ | Punboxedvectorarray_set _
+  | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
   | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
     arrayblit_expanded env ~src_mutability ~dst_array_set_kind args loc
 
