@@ -48,6 +48,11 @@ let run (module Smallint : Int.S) ~min_int ~max_int =
            (to_int x) (i land mask) i);
     x
   in
+  let rec to_binary (i : int) =
+    if i = 0
+    then "0b0"
+    else Printf.sprintf "%s%d" (to_binary (i lsr 1)) (i land 1)
+  in
   let rng = Random.State.make [| size |] in
   let test_cases =
     (* sparse test cases, concentrated around 0 and the endpoints *)
@@ -153,12 +158,14 @@ let run (module Smallint : Int.S) ~min_int ~max_int =
   test1 (fun x -> assert (Smallint.to_string (of_int x) = Int.to_string x));
   assert (Smallint.of_string "1___2" = of_int 12);
   test1 (fun x ->
+    let mask = (1 lsl Smallint.size) - 1 in
     List.iter
       (fun s -> assert (Smallint.of_string s = of_int x))
       [ Printf.sprintf "%d" x
-      ; Printf.sprintf "0u%u" x
-      ; Printf.sprintf "0x%x" x
-      ; Printf.sprintf "0o%o" x
+      ; Printf.sprintf "0u%u" (x land mask)
+      ; Printf.sprintf "0x%x" (x land mask)
+      ; Printf.sprintf "0o%o" (x land mask)
+      ; to_binary (x land mask)
       ]);
   test_logical2 Smallint.min Int.min;
   test_logical2 Smallint.max Int.max;

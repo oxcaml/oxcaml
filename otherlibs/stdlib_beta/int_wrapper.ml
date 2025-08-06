@@ -181,6 +181,23 @@ module type S = sig
   (** [to_string x] is the written representation of [x] in decimal. *)
   val to_string : t -> string
 
+  (** Convert the given string to a {!size}-bit integer.
+      The string is read in decimal (by default, or if the string
+      begins with [0u]) or in hexadecimal, octal or binary if the
+      string begins with [0x], [0o] or [0b] respectively.
+
+      The [0u] prefix reads the input as an unsigned integer in the range
+      [[0, 2*max_int+1]].  If the input exceeds {!max_int}
+      it is converted to the signed integer
+      [min_int + input - max_int - 1].
+
+      The [_] (underscore) character can appear anywhere in the string
+      and is ignored.
+      @raise Failure if the given string is not
+      a valid representation of an integer, or if the integer represented
+      exceeds the range of integers representable in type [t]. *)
+  val of_string : string -> t
+
   (** A seeded hash function for ints, with the same output value as
       {!Hashtbl.seeded_hash}. This function allows this module to be passed as
       argument to the functor {!Hashtbl.MakeSeeded}. *)
@@ -305,6 +322,8 @@ module Make
   let[@inline available] to_float t = Container.to_float (inject t)
 
   let[@inline available] to_string t = Container.to_string (inject t)
+
+  let[@inline available] of_string s = sign_extend (Container.of_string s)
 
   let[@inline available] seeded_hash seed t =
     Container.seeded_hash seed (inject t)
