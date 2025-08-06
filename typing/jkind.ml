@@ -978,7 +978,54 @@ module Layout_and_axes = struct
           }
 
         (* Note [Abstract types in normalization]
-           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Abstract types need to be handled differently from concrete types in jkind
+            normalization. In particular, abstract types with recursion through with-
+            bounds are problematic, as the following example found by Benjamin Peters
+            shows:
+
+             module type X = sig
+               type t : value mod contended with t
+             end
+             module Xm : X = struct
+               type t = int ref
+             end
+             type q : value mod contended = Xm.t  (* should be rejected *)
+
+           If with-bounds in abstract types were treated the same as with-bounds in
+           concrete recursive types, then `q : value mod contended` would be accepted,
+           because the compiler reasons as follows:
+
+             We want to normalize the jkind `value mod contended with t`.
+             We compute the jkind of t, which is again `value mod contended with t`.
+             The jkind normalization algorithm detects the infinite recursion, and cuts
+             it off the second time, because we've already visited `t`.
+
+           Cutting off the recursion makes the jkind normalization return the
+           kind `value mod contended` for this abstract type. This is incorrect.
+
+           Note that this cutoff mechanism *is* sound for concrete type definitions!
+           Why is it sound for concrete but not abstract types?
+           - For concrete types, we want to compute the *best* jkind that satisfies its
+             recursion equation.
+           - For abstract types, we must compute the *worst* jkind that satisfies its
+             recursion equation, because an implementer of the signature is allowed to
+             choose *any* type that satisfies the recursion equation.
+
+           We accomplish this in the algorithm below by disabling the recursion cut-off
+           for abstract types. This causes the algorithm to recurse until fuel runs out
+           and then return the worst jkind conservatively.
+
+           Another option would have been to change what happens when we detect infinite
+           recursion: for concrete types, return best jkind, for abstract, return worst.
+           However, because we think that users should not and will not typically write
+           recursive kinds for abstract types, we choose to simply not detect infinite
+           recursion for abstract types by not marking them as visited at all.
+           This should be more efficient in the common case, because we avoid storing
+           anything in the cache for abstract types.
+           It should be slightly slower in the uncommon case when a user wrote a recursive
+           jkind for an abstract type, because now instead of immediately detecting and
+           cutting off the recursion, it continues until it runs out of fuel.
         *)
 
         let rec check
