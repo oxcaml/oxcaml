@@ -161,9 +161,6 @@ let classify ~classify_product env ty sort : _ classification =
   | Tconstr (p, _args, _abbrev) ->
       if Path.same p Predef.path_float then Float
       else if Path.same p Predef.path_lazy_t then Lazy
-      else if Path.same p Predef.path_int
-           || Path.same p Predef.path_int8
-           || Path.same p Predef.path_int16 then Int
       else if Path.same p Predef.path_string
            || Path.same p Predef.path_bytes
            || Path.same p Predef.path_array
