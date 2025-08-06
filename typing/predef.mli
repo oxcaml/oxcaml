@@ -186,7 +186,7 @@ val list_argument_jkind : jkind_lr
    recursion between predef and env, we break it by parameterizing
    over Env.t, Env.add_type and Env.add_extension. *)
 
-val build_initial_env :
+val build_initial_env:
   (Ident.t -> type_declaration -> 'a -> 'a) ->
   (Ident.t -> extension_constructor -> 'a -> 'a) ->
   'a -> 'a

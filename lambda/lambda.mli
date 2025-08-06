@@ -373,12 +373,6 @@ and extern_repr =
 
 and external_call_description = extern_repr Primitive.description_gen
 
-and integer_comparison = Scalar.Integer_comparison.t =
-    Ceq | Cne | Clt | Cgt | Cle | Cge
-
-and float_comparison = Scalar.Float_comparison.t =
-    CFeq | CFneq | CFlt | CFnlt | CFgt | CFngt | CFle | CFnle | CFge | CFnge
-
 and array_kind =
     Pgenarray | Paddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray of unboxed_float
@@ -510,7 +504,6 @@ and unboxed_integer = Primitive.unboxed_integer =
   | Unboxed_int16
   | Unboxed_int8
   | Unboxed_int
-
 
 and unboxed_vector = Primitive.unboxed_vector =
   | Unboxed_vec128
@@ -1274,7 +1267,8 @@ val and_ : locality_mode Scalar.Integral.t binop
     cause flambda2 to infer that the arguments are always both tagged
     immediates. Use [phys_equal] to
     compare values when either of them might not be an immediate. *)
-val icmp : integer_comparison -> any_locality_mode Scalar.Integral.t binop
+val icmp :
+  Scalar.Integer_comparison.t -> any_locality_mode Scalar.Integral.t binop
 
 val static_cast
    : src:any_locality_mode Scalar.t

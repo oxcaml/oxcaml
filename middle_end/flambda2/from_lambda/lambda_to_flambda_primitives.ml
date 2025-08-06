@@ -21,7 +21,7 @@ module I_or_f = K.Standard_int_or_float
 module L = Lambda
 module P = Flambda_primitive
 
-let convert_integer_comparison (comp : L.integer_comparison) :
+let convert_integer_comparison (comp : Scalar.Integer_comparison.t) :
     P.signed_or_unsigned P.comparison =
   match comp with
   | Ceq -> Eq
@@ -31,7 +31,8 @@ let convert_integer_comparison (comp : L.integer_comparison) :
   | Cle -> Le Signed
   | Cge -> Ge Signed
 
-let convert_float_comparison (comp : L.float_comparison) : unit P.comparison =
+let convert_float_comparison (comp : Scalar.Float_comparison.t) :
+    unit P.comparison =
   match comp with
   | CFeq -> Eq
   | CFneq -> Neq

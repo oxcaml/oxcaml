@@ -107,7 +107,7 @@ type stack_align =
 
 val equal_stack_align : stack_align -> stack_align -> bool
 
-type integer_comparison = Lambda.integer_comparison =
+type integer_comparison = Scalar.Integer_comparison.t =
   | Ceq
   | Cne
   | Clt
@@ -119,7 +119,7 @@ val negate_integer_comparison : integer_comparison -> integer_comparison
 
 val swap_integer_comparison : integer_comparison -> integer_comparison
 
-type float_comparison = Lambda.float_comparison =
+type float_comparison = Scalar.Float_comparison.t =
   | CFeq
   | CFneq
   | CFlt

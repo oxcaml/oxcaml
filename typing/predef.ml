@@ -667,8 +667,6 @@ let add_small_number_beta_extension_types add_type env =
   |> add_type ident_int16 ~jkind:Jkind.Const.Builtin.immediate
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int16
 
-
-
 let or_null_argument_sort = Jkind.Sort.Const.value
 
 let or_null_kind tvar =

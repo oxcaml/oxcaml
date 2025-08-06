@@ -171,13 +171,13 @@ end
 
 val float_test_of_float_comparison :
   Cmm.float_width ->
-  Lambda.float_comparison ->
+  Scalar.Float_comparison.t ->
   label_false:Label.t ->
   label_true:Label.t ->
   Cfg.float_test
 
 val int_test_of_integer_comparison :
-  Lambda.integer_comparison ->
+  Scalar.Integer_comparison.t ->
   signed:bool ->
   immediate:int option ->
   label_false:Label.t ->

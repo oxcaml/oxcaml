@@ -354,12 +354,6 @@ and extern_repr =
 
 and external_call_description = extern_repr Primitive.description_gen
 
-and integer_comparison = Scalar.Integer_comparison.t =
-    Ceq | Cne | Clt | Cgt | Cle | Cge
-
-and float_comparison = Scalar.Float_comparison.t =
-    CFeq | CFneq | CFlt | CFnlt | CFgt | CFngt | CFle | CFnle | CFge | CFnge
-
 and nullable =
   | Nullable
   | Non_nullable
@@ -1913,7 +1907,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pphys_equal _
   | Pbytes_to_string | Pbytes_of_string
   | Parray_to_iarray | Parray_of_iarray
-  | Pignore  -> None
+  | Pignore -> None
   | Pgetglobal _ | Psetglobal _ | Pgetpredef _ -> None
   | Pmakeblock (_, _, _, m) -> Some m
   | Pmakefloatblock (_, m) -> Some m
@@ -2110,6 +2104,7 @@ let primitive_can_raise prim =
   | Pmakefloatblock _ | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
   | Pmakeufloatblock _ | Pufloatfield _ | Psetufloatfield _ | Psequand | Psequor
+  | Pmakelazyblock _
   | Pmixedfield _ | Psetmixedfield _ | Pmakemixedblock _ | Pnot
   | Poffsetref _
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu | Pbytessetu
@@ -2179,8 +2174,7 @@ let primitive_can_raise prim =
   | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
   | Pbox_vector (_, _)
   | Punbox_vector _ | Punbox_unit | Pmake_unboxed_product _
-  | Punboxed_product_field _ | Pget_header _
-  | Pmakelazyblock _ ->
+  | Punboxed_product_field _ | Pget_header _ ->
     false
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
@@ -2237,9 +2231,9 @@ let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
   | Unboxed_float bf -> layout_boxed_float bf
   | Unboxed_integer (Unboxed_int | Unboxed_int8 | Unboxed_int16) ->  layout_int
-  | Unboxed_integer (Unboxed_int64) -> layout_boxed_int Boxed_int64
-  | Unboxed_integer (Unboxed_int32) -> layout_boxed_int Boxed_int32
-  | Unboxed_integer (Unboxed_nativeint) -> layout_boxed_int Boxed_nativeint
+  | Unboxed_integer Unboxed_int64 -> layout_boxed_int Boxed_int64
+  | Unboxed_integer Unboxed_int32 -> layout_boxed_int Boxed_int32
+  | Unboxed_integer Unboxed_nativeint -> layout_boxed_int Boxed_nativeint
   | Same_as_ocaml_repr s -> layout_of_const_sort s
 
 let rec layout_of_scannable_kinds kinds =

@@ -316,14 +316,14 @@ let print p osig_val_decl =
      | Repr_poly -> []
      | Unboxed_float _
      | Unboxed_vector _
-     | Unboxed_integer (Unboxed_int32 | Unboxed_int64 | Unboxed_nativeint)
-       -> if all_unboxed then [] else [oattr_unboxed]
-     | Unboxed_integer (Unboxed_int | Unboxed_int8 | Unboxed_int16)
-       -> if all_untagged then [] else [oattr_untagged]
+     | Unboxed_integer (Unboxed_int32 | Unboxed_int64 | Unboxed_nativeint) ->
+       if all_unboxed then [] else [oattr_unboxed]
+     | Unboxed_integer (Unboxed_int | Unboxed_int8 | Unboxed_int16) ->
+       if all_untagged then [] else [oattr_untagged]
      | Same_as_ocaml_repr _->
-      if all_unboxed || not (is_unboxed (m, repr))
-      then []
-      else [oattr_unboxed])
+       if all_unboxed || not (is_unboxed (m, repr))
+       then []
+       else [oattr_unboxed])
   in
   let type_attrs =
     List.map attrs_of_mode_and_repr p.prim_native_repr_args @
@@ -361,8 +361,7 @@ let unboxed_vector = function
    they are all constant constructors. *)
 let equal_unboxed_integer
       ((Unboxed_int64 | Unboxed_nativeint | Unboxed_int32 | Unboxed_int16
-        | Unboxed_int8 | Unboxed_int) as i1) i2
-  =
+        | Unboxed_int8 | Unboxed_int) as i1) i2 =
   i1 = i2
 let equal_unboxed_float
       ((Unboxed_float32 | Unboxed_float64) as f1) f2 = f1 = f2

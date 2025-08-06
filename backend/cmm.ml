@@ -162,7 +162,7 @@ let equal_stack_align left right =
   | Align_16, Align_16 | Align_32, Align_32 | Align_64, Align_64 -> true
   | (Align_16 | Align_32 | Align_64), _ -> false
 
-type integer_comparison = Lambda.integer_comparison =
+type integer_comparison = Scalar.Integer_comparison.t =
   | Ceq
   | Cne
   | Clt
@@ -176,7 +176,7 @@ let swap_integer_comparison = Scalar.Integer_comparison.swap
 
 (* With floats [not (x < y)] is not the same as [x >= y] due to NaNs, so we
    provide additional comparisons to represent the negations.*)
-type float_comparison = Lambda.float_comparison =
+type float_comparison = Scalar.Float_comparison.t =
   | CFeq
   | CFneq
   | CFlt

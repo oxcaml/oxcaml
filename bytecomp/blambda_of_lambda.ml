@@ -62,7 +62,8 @@ let is_const = function
   | Const (Const_base (Const_int i)) -> is_immed i
   | _ -> false
 
-let comp_integer_comparison : Lambda.integer_comparison -> comparison = function
+let comp_integer_comparison : Scalar.Integer_comparison.t -> comparison =
+  function
   | Ceq -> Eq
   | Cne -> Neq
   | Clt -> Ltint
@@ -72,8 +73,8 @@ let comp_integer_comparison : Lambda.integer_comparison -> comparison = function
 
 let caml_sys_const name =
   let const_name =
-    (* clearly [Lambda.compile_time_constant] is a bad name as in bytecode mode it's a
-       runtime constant *)
+    (* clearly [Lambda.compile_time_constant] is a bad name as in bytecode mode
+       it's a runtime constant *)
     match (name : Lambda.compile_time_constant) with
     | Big_endian -> "big_endian"
     | Word_size -> "word_size"
@@ -524,8 +525,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       (* See the comment in the [Pmixedfield] case. *)
       binary (Setfield n)
     | Psetmixedfield (path, _, _) -> (
-      (* `Psetmixedfield ([idx0, idx1, ..., idxn], [block; value])` is compiled to
-         `Setfield (idxn, [... Getfield (idx1, [Getfield (idx0, [block])]); value])`
+      (* `Psetmixedfield ([idx0, idx1, ..., idxn], [block; value])` is compiled
+         to
+         `Setfield (idxn, [... Getfield (idx1, [Getfield (idx0, [block])]);
+           value])`
          given the match case above, we know the path should have at least two
          elements. *)
       match args with
@@ -756,9 +759,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           "Bytegen.comp_primitive: Pmakearray_dynamic takes two arguments for \
            [With_initializer]";
       (* CR layouts v4.0: This is "wrong" for unboxed types. It should construct
-         blocks that can't be marshalled. We've decided to ignore that problem in
-         the short term, as it's unlikely to cause issues - see the internal arrays
-         epic for out plan to deal with it. *)
+         blocks that can't be marshalled. We've decided to ignore that problem
+         in the short term, as it's unlikely to cause issues - see the internal
+         arrays epic for out plan to deal with it. *)
       match kind with
       | Punboxedvectorarray _ -> simd_is_not_supported ()
       | Pgenarray | Pintarray | Paddrarray | Punboxedintarray _ | Pfloatarray
