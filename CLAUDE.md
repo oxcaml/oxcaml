@@ -31,15 +31,18 @@ make runtest                             # Run all tests in oxcaml/tests
 ```bash
 autoconf                  # Generate configure script, needs to be version 2.71
                           # or higher; if available, just use autoconf27 directly
-./configure               # Configure the compiler; should by default pass the
-                          # options
-                          #     --enable-ocamltest --enable-warn-error
-                          #     --enable-dev --prefix="$(pwd)/_install"
-                          # If previously a different install directory was used,
-                          # prefer the old one over $(pwd)/_install.
-                          # Reconfiguring can require removing the _build/
-                          # directory for the changes to take effect.
+
+./configure               # Configure the compiler
 ```
+
+Configuration is needed after changing files with extension `.in` or modifying the autoconf script.
+To avod issues with dune caching, removing the `_build/` directory may be needed after configuring.
+By default, unless there is a good reason to omit them, the following options should be used for configuring:
+```bash
+.configure --enable-ocamltest --enable-warn-error --enable-dev --enable-runtime5 --prefix="$(pwd)/_install"
+```
+If previously a different install directory was used, prefer the old one over `$(pwd)/_install` for `--prefix`.
+
 
 ## Misc
 ```bash
