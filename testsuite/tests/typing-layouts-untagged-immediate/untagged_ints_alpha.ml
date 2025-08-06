@@ -200,117 +200,117 @@ let _ =
   print_t_mixed t_mixed2;
   print_t_mixed t_mixed3
 
-(* (**************************************)
- * (* Test: mixed constructor manipulation *)
- *
- * type t_mixed_variant =
- *   | Const
- *   | T of
- *       { a : float;
- *         mutable b : int;
- *         c : int#;
- *         mutable d : int#;
- *         e : int;
- *         mutable f : int# }
- *
- * (* Construction *)
- * let t_mixed_variant1 = T
- *             { a = 317.;
- *               b = 1300;
- *               c = (Stdlib_beta.Int_u.of_int 731);
- *               d = (Stdlib_beta.Int_u.of_int 141);
- *               e = 600;
- *               f = (Stdlib_beta.Int_u.of_int 2710);
- *             }
- *
- * let t_mixed_variant2 = T
- *             { a = (-317.);
- *               b = -1300;
- *               c = (Stdlib_beta.Int_u.of_int (-731));
- *               d = (Stdlib_beta.Int_u.of_int (-141));
- *               e = -600;
- *               f = (Stdlib_beta.Int_u.of_int (-2710));
- *             }
- *
- * let[@warning "-partial-match"] print_t_mixed_variant (T t) =
- *   print_float "  a" t.a;
- *   print_int "  b" t.b;
- *   print_intu "  c" t.c;
- *   print_intu "  d" t.d;
- *   print_int "  e" t.e;
- *   print_intu "  f" t.f
- *
- * let _ =
- *   Printf.printf "Test mixed variant construction:\n";
- *   print_t_mixed_variant t_mixed_variant1;
- *   print_t_mixed_variant t_mixed_variant2 *)
+(**************************************)
+(* Test: mixed constructor manipulation *)
 
-(* (* Matching, projection *)
- * let[@warning "-partial-match"] f_mixed1 (T {c; d; f; _}) r =
- *   match r with
- *   | T ({ a; _ } as r) ->
- *     T
- *       { a = Float.of_int r.e;
- *         b = Int_u.(to_int (of_float a - d));
- *         c = Int_u.(r.c + c);
- *         d = Int_u.(d - (of_int r.b));
- *         e = Int_u.(to_int (f + (of_int r.e)));
- *         f = r.f;
- *       }
- *
- * let _ =
- *   Printf.printf "Test mixed variant matching and projection:\n";
- *   print_t_mixed_variant (f_mixed1 t_mixed_variant1 t_mixed_variant2)
- *
- * (* Variant update and mutation *)
- * let[@warning "-partial-match"] f_mixed2 (T ({a; d; _} as r1)) (T r2) =
- *   r1.d <- (Stdlib_beta.Int_u.of_int 4200);
- *   let T r3 = T { r2 with c = r1.d;
- *                          d = (Stdlib_beta.Int_u.of_int 2500); }
- *   in
- *   r3.b <- Int_u.(to_int (of_float a + d));
- *   r2.b <- 1700;
- *   r1.f <- r2.c;
- *   T r3
- *
- * let _ =
- *   Printf.printf "Test mixed variant update and mutation:\n";
- *   let t_mixed_variant3 = f_mixed2 t_mixed_variant1 t_mixed_variant2 in
- *   print_t_mixed_variant t_mixed_variant1;
- *   print_t_mixed_variant t_mixed_variant2;
- *   print_t_mixed_variant t_mixed_variant3
- *
- * (************************************************************)
- * (* Test mixed records in recursive groups *)
- *
- * let rec f r =
- *   r.d <- Int_u.of_int t_rec1.b;
- *   t_rec2.b <- 42;
- *   t_rec1.f <- Int_u.of_float t_rec1.a;
- *   Int_u.(of_float r.a + of_float t_rec2.a)
- *
- *
- * and t_rec1 = { a = 11.;
- *               b = 2;
- *               c = (Stdlib_beta.Int_u.of_int 33);
- *               d = (Stdlib_beta.Int_u.of_int 44);
- *               e = 5;
- *               f = (Stdlib_beta.Int_u.of_int 66);
- *   }
- *
- * and t_rec2 = { a = (- 51.);
- *               b = -6;
- *               c = (Stdlib_beta.Int_u.of_int (-73));
- *               d = (Stdlib_beta.Int_u.of_int (-84));
- *               e = -9;
- *               f = (Stdlib_beta.Int_u.of_int (-106));
- *             }
- *
- * let _ =
- *   Printf.printf "Test 18, mixed records in recursive groups:\n";
- *   print_t_mixed t_rec1;
- *   print_t_mixed t_rec2;
- *   let result = f t_rec1 in
- *   print_intu "  result (-40)" result;
- *   print_t_mixed t_rec1;
- *   print_t_mixed t_rec2 *)
+type t_mixed_variant =
+  | Const
+  | T of
+      { a : float;
+        mutable b : int;
+        c : int#;
+        mutable d : int#;
+        e : int;
+        mutable f : int# }
+
+(* Construction *)
+let t_mixed_variant1 = T
+            { a = 317.;
+              b = 1300;
+              c = (Stdlib_beta.Int_u.of_int 731);
+              d = (Stdlib_beta.Int_u.of_int 141);
+              e = 600;
+              f = (Stdlib_beta.Int_u.of_int 2710);
+            }
+
+let t_mixed_variant2 = T
+            { a = (-317.);
+              b = -1300;
+              c = (Stdlib_beta.Int_u.of_int (-731));
+              d = (Stdlib_beta.Int_u.of_int (-141));
+              e = -600;
+              f = (Stdlib_beta.Int_u.of_int (-2710));
+            }
+
+let[@warning "-partial-match"] print_t_mixed_variant (T t) =
+  print_float "  a" t.a;
+  print_int "  b" t.b;
+  print_intu "  c" t.c;
+  print_intu "  d" t.d;
+  print_int "  e" t.e;
+  print_intu "  f" t.f
+
+let _ =
+  Printf.printf "Test mixed variant construction:\n";
+  print_t_mixed_variant t_mixed_variant1;
+  print_t_mixed_variant t_mixed_variant2
+
+(* Matching, projection *)
+let[@warning "-partial-match"] f_mixed1 (T {c; d; f; _}) r =
+  match r with
+  | T ({ a; _ } as r) ->
+    T
+      { a = Float.of_int r.e;
+        b = Int_u.(to_int (of_float a - d));
+        c = Int_u.(r.c + c);
+        d = Int_u.(d - (of_int r.b));
+        e = Int_u.(to_int (f + (of_int r.e)));
+        f = r.f;
+      }
+
+let _ =
+  Printf.printf "Test mixed variant matching and projection:\n";
+  print_t_mixed_variant (f_mixed1 t_mixed_variant1 t_mixed_variant2)
+
+(* Variant update and mutation *)
+let[@warning "-partial-match"] f_mixed2 (T ({a; d; _} as r1)) (T r2) =
+  r1.d <- (Stdlib_beta.Int_u.of_int 4200);
+  let T r3 = T { r2 with c = r1.d;
+                         d = (Stdlib_beta.Int_u.of_int 2500); }
+  in
+  r3.b <- Int_u.(to_int (of_float a + d));
+  r2.b <- 1700;
+  r1.f <- r2.c;
+  T r3
+
+let _ =
+  Printf.printf "Test mixed variant update and mutation:\n";
+  let t_mixed_variant3 = f_mixed2 t_mixed_variant1 t_mixed_variant2 in
+  print_t_mixed_variant t_mixed_variant1;
+  print_t_mixed_variant t_mixed_variant2;
+  print_t_mixed_variant t_mixed_variant3
+
+(************************************************************)
+(* Test mixed records in recursive groups *)
+
+let rec f r =
+  r.d <- Int_u.of_int t_rec1.b;
+  t_rec2.b <- 42;
+  t_rec1.f <- Int_u.of_float t_rec1.a;
+  Int_u.(of_float r.a + of_float t_rec2.a)
+
+
+and t_rec1 = { a = 11.;
+              b = 2;
+              c = (Stdlib_beta.Int_u.of_int 33);
+              d = (Stdlib_beta.Int_u.of_int 44);
+              e = 5;
+              f = (Stdlib_beta.Int_u.of_int 66);
+  }
+
+and t_rec2 = { a = (- 51.);
+              b = -6;
+              c = (Stdlib_beta.Int_u.of_int (-73));
+              d = (Stdlib_beta.Int_u.of_int (-84));
+              e = -9;
+              f = (Stdlib_beta.Int_u.of_int (-106));
+            }
+
+let _ =
+  Printf.printf "Test 18, mixed records in recursive groups:\n";
+  print_t_mixed t_rec1;
+  print_t_mixed t_rec2;
+  let result = f t_rec1 in
+  print_intu "  result (-40)" result;
+  print_t_mixed t_rec1;
+  print_t_mixed t_rec2

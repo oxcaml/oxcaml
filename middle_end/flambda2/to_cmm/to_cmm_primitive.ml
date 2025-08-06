@@ -110,7 +110,8 @@ let mixed_block_kinds shape =
         | Naked_vec128 -> KS.naked_vec128
         | Naked_vec256 -> KS.naked_vec256
         | Naked_vec512 -> KS.naked_vec512
-        | Naked_nativeint -> KS.naked_nativeint)
+        | Naked_nativeint -> KS.naked_nativeint
+        | Naked_immediate -> KS.naked_immediate)
       (Array.to_list (K.Mixed_block_shape.flat_suffix shape))
   in
   value_prefix @ flat_suffix
@@ -143,7 +144,7 @@ let memory_chunk_of_flat_suffix_element :
   | Naked_vec128 -> Onetwentyeight_unaligned
   | Naked_vec256 -> Twofiftysix_unaligned
   | Naked_vec512 -> Fivetwelve_unaligned
-  | Naked_int64 | Naked_nativeint -> Word_int
+  | Naked_int64 | Naked_nativeint | Naked_immediate -> Word_int
 
 let block_load ~dbg (kind : P.Block_access_kind.t) (mutability : Mutability.t)
     ~block ~field =

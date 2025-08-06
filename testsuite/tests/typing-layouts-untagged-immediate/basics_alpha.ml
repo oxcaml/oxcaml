@@ -23,10 +23,13 @@ let f1_1 (x : t_untagged_immediate) = x;;
 let f1_2 (x : 'a t_untagged_immediate_id) = x;;
 let f1_3 (x : int#) = x;;
 [%%expect{|
-type t_untagged_immediate : untagged_immediate
-type ('a : untagged_immediate) t_untagged_immediate_id = 'a
+type t_untagged_immediate : untagged_immediate mod non_float
+type ('a : untagged_immediate mod non_float) t_untagged_immediate_id = 'a
 val f1_1 : t_untagged_immediate -> t_untagged_immediate = <fun>
-val f1_2 : ('a : untagged_immediate). 'a t_untagged_immediate_id -> 'a t_untagged_immediate_id = <fun>
+val f1_2 :
+  ('a : untagged_immediate mod non_float).
+    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+  <fun>
 val f1_3 : int# -> int# = <fun>
 |}];;
 
@@ -45,7 +48,10 @@ let f2_3 (x : int#) =
   y;;
 [%%expect{|
 val f2_1 : t_untagged_immediate -> t_untagged_immediate = <fun>
-val f2_2 : ('a : untagged_immediate). 'a t_untagged_immediate_id -> 'a t_untagged_immediate_id = <fun>
+val f2_2 :
+  ('a : untagged_immediate mod non_float).
+    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+  <fun>
 val f2_3 : int# -> int# = <fun>
 |}];;
 
@@ -108,37 +114,39 @@ Error: Types of top-level module bindings must have layout "value", but
 
 let f4_1 (x : t_untagged_immediate) = x, false;;
 [%%expect{|
-Line 1, characters 24-25:
+Line 1, characters 38-39:
 1 | let f4_1 (x : t_untagged_immediate) = x, false;;
-                            ^
-Error: This expression has type "t_untagged_immediate" but an expression was expected of type
-         "('a : value_or_null)"
+                                          ^
+Error: This expression has type "t_untagged_immediate"
+       but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a sublayout of value
          because it's the type of a tuple element.
 |}];;
 
 let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
 [%%expect{|
-Line 1, characters 30-31:
+Line 1, characters 44-45:
 1 | let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
-                                  ^
-Error: This expression has type "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
+                                                ^
+Error: This expression has type
+         "'a t_untagged_immediate_id" = "('a : untagged_immediate mod non_float)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
-         because of the definition of t_untagged_immediate_id at line 2, characters 0-31.
-       But the layout of 'a t_untagged_immediate_id must be a sublayout of value
+         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
+       But the layout of 'a t_untagged_immediate_id must be a sublayout of
+           value
          because it's the type of a tuple element.
 |}];;
 
 let f4_3 (x : int#) = x, false;;
 [%%expect{|
-Line 1, characters 28-29:
+Line 1, characters 22-23:
 1 | let f4_3 (x : int#) = x, false;;
-                                ^
-Error: This expression has type "int#"
-       but an expression was expected of type "('a : value_or_null)"
+                          ^
+Error: This expression has type "int#" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
        But the layout of int# must be a sublayout of value
@@ -147,21 +155,21 @@ Error: This expression has type "int#"
 
 type t4_4 = t_untagged_immediate * string;;
 [%%expect{|
-Line 1, characters 12-18:
+Line 1, characters 12-32:
 1 | type t4_4 = t_untagged_immediate * string;;
-                ^^^^^^
+                ^^^^^^^^^^^^^^^^^^^^
 Error: Tuple element types must have layout value.
        The layout of "t_untagged_immediate" is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of "t_untagged_immediate" must be a sublayout of value
          because it's the type of a tuple element.
 |}];;
 
 type t4_5 = int * int#;;
 [%%expect{|
-Line 1, characters 18-28:
+Line 1, characters 18-22:
 1 | type t4_5 = int * int#;;
-                      ^^^^^^^^^^
+                      ^^^^
 Error: Tuple element types must have layout value.
        The layout of "int#" is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -171,9 +179,9 @@ Error: Tuple element types must have layout value.
 
 type ('a : untagged_immediate) t4_6 = 'a * 'a
 [%%expect{|
-Line 1, characters 24-26:
+Line 1, characters 38-40:
 1 | type ('a : untagged_immediate) t4_6 = 'a * 'a
-                            ^^
+                                          ^^
 Error: Tuple element types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type t4_6.
@@ -184,9 +192,9 @@ Error: Tuple element types must have layout value.
 (* check for layout propagation *)
 type ('a : untagged_immediate, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
 [%%expect{|
-Line 1, characters 43-45:
+Line 1, characters 57-59:
 1 | type ('a : untagged_immediate, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
-                                               ^^
+                                                             ^^
 Error: Tuple element types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type t4_7.
@@ -230,8 +238,8 @@ type t5_5 = A of int * t_untagged_immediate
 type ('a : untagged_immediate) t5_7 = A of int
 type ('a : untagged_immediate) t5_8 = A of 'a;;
 [%%expect{|
-type ('a : untagged_immediate) t5_7 = A of int
-type ('a : untagged_immediate) t5_8 = A of 'a
+type ('a : untagged_immediate mod non_float) t5_7 = A of int
+type ('a : untagged_immediate mod non_float) t5_8 = A of 'a
 |}]
 
 (* No mixed block restriction: the compiler reorders the block for you, moving
@@ -253,33 +261,35 @@ module type S6_1 = sig val x : t_untagged_immediate end
 
 let f6 (m : (module S6_1)) = let module M6 = (val m) in M6.x;;
 [%%expect{|
-Line 1, characters 31-37:
+Line 1, characters 31-51:
 1 | module type S6_1 = sig val x : t_untagged_immediate end
-                                   ^^^^^^
+                                   ^^^^^^^^^^^^^^^^^^^^
 Error: This type signature for "x" is not a value type.
        The layout of type t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
-       But the layout of type t_untagged_immediate must be a sublayout of value
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
+       But the layout of type t_untagged_immediate must be a sublayout of
+           value
          because it's the type of something stored in a module structure.
 |}];;
 
 module type S6_2 = sig val x : 'a t_untagged_immediate_id end
 [%%expect{|
-Line 1, characters 31-43:
+Line 1, characters 31-57:
 1 | module type S6_2 = sig val x : 'a t_untagged_immediate_id end
-                                   ^^^^^^^^^^^^
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type signature for "x" is not a value type.
        The layout of type 'a t_untagged_immediate_id is untagged_immediate
-         because of the definition of t_untagged_immediate_id at line 2, characters 0-31.
-       But the layout of type 'a t_untagged_immediate_id must be a sublayout of value
+         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
+       But the layout of type 'a t_untagged_immediate_id must be a sublayout of
+         value
          because it's the type of something stored in a module structure.
 |}];;
 
 module type S6_3 = sig val x : int# end
 [%%expect{|
-Line 1, characters 31-41:
+Line 1, characters 31-35:
 1 | module type S6_3 = sig val x : int# end
-                                   ^^^^^^^^^^
+                                   ^^^^
 Error: This type signature for "x" is not a value type.
        The layout of type int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -292,37 +302,39 @@ Error: This type signature for "x" is not a value type.
 (* Test 7: Can't be used as polymorphic variant argument *)
 let f7_1 (x : t_untagged_immediate) = `A x;;
 [%%expect{|
-Line 1, characters 27-28:
+Line 1, characters 41-42:
 1 | let f7_1 (x : t_untagged_immediate) = `A x;;
-                               ^
-Error: This expression has type "t_untagged_immediate" but an expression was expected of type
-         "('a : value_or_null)"
+                                             ^
+Error: This expression has type "t_untagged_immediate"
+       but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a sublayout of value
          because it's the type of the field of a polymorphic variant.
 |}];;
 
 let f7_2 (x : 'a t_untagged_immediate_id) = `A x;;
 [%%expect{|
-Line 1, characters 33-34:
+Line 1, characters 47-48:
 1 | let f7_2 (x : 'a t_untagged_immediate_id) = `A x;;
-                                     ^
-Error: This expression has type "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
+                                                   ^
+Error: This expression has type
+         "'a t_untagged_immediate_id" = "('a : untagged_immediate mod non_float)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
-         because of the definition of t_untagged_immediate_id at line 2, characters 0-31.
-       But the layout of 'a t_untagged_immediate_id must be a sublayout of value
+         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
+       But the layout of 'a t_untagged_immediate_id must be a sublayout of
+           value
          because it's the type of the field of a polymorphic variant.
 |}];;
 
 let f7_3 (x : int#) = `A x;;
 [%%expect{|
-Line 1, characters 31-32:
+Line 1, characters 25-26:
 1 | let f7_3 (x : int#) = `A x;;
-                                   ^
-Error: This expression has type "int#"
-       but an expression was expected of type "('a : value_or_null)"
+                             ^
+Error: This expression has type "int#" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
        But the layout of int# must be a sublayout of value
@@ -331,21 +343,21 @@ Error: This expression has type "int#"
 
 type f7_4 = [ `A of t_untagged_immediate ];;
 [%%expect{|
-Line 1, characters 20-26:
+Line 1, characters 20-40:
 1 | type f7_4 = [ `A of t_untagged_immediate ];;
-                        ^^^^^^
+                        ^^^^^^^^^^^^^^^^^^^^
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_untagged_immediate" is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of "t_untagged_immediate" must be a sublayout of value
          because it's the type of the field of a polymorphic variant.
 |}];;
 
 type ('a : untagged_immediate) f7_5 = [ `A of 'a ];;
 [%%expect{|
-Line 1, characters 32-34:
+Line 1, characters 46-48:
 1 | type ('a : untagged_immediate) f7_5 = [ `A of 'a ];;
-                                    ^^
+                                                  ^^
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type f7_5.
@@ -363,44 +375,48 @@ let make_intu () : int# = assert false
 let id_value x = x;;
 [%%expect{|
 val make_t_untagged_immediate : unit -> t_untagged_immediate = <fun>
-val make_t_untagged_immediate_id : ('a : untagged_immediate). unit -> 'a t_untagged_immediate_id = <fun>
+val make_t_untagged_immediate_id :
+  ('a : untagged_immediate mod non_float). unit -> 'a t_untagged_immediate_id =
+  <fun>
 val make_intu : unit -> int# = <fun>
 val id_value : 'a -> 'a = <fun>
 |}];;
 
 let x8_1 = id_value (make_t_untagged_immediate ());;
 [%%expect{|
-Line 1, characters 20-36:
+Line 1, characters 20-50:
 1 | let x8_1 = id_value (make_t_untagged_immediate ());;
-                        ^^^^^^^^^^^^^^^^
-Error: This expression has type "t_untagged_immediate" but an expression was expected of type
-         "('a : value_or_null)"
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "t_untagged_immediate"
+       but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a sublayout of value
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
 let x8_2 = id_value (make_t_untagged_immediate_id ());;
 [%%expect{|
-Line 1, characters 20-39:
+Line 1, characters 20-53:
 1 | let x8_2 = id_value (make_t_untagged_immediate_id ());;
-                        ^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type
+         "'a t_untagged_immediate_id" = "('a : untagged_immediate mod non_float)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
-         because of the definition of t_untagged_immediate_id at line 2, characters 0-31.
-       But the layout of 'a t_untagged_immediate_id must be a sublayout of value
+         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
+       But the layout of 'a t_untagged_immediate_id must be a sublayout of
+           value
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
 let x8_3 = id_value (make_intu ());;
 [%%expect{|
-Line 1, characters 20-40:
+Line 1, characters 20-34:
 1 | let x8_3 = id_value (make_intu ());;
-                        ^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "int#"
-       but an expression was expected of type "('a : value_or_null)"
+                        ^^^^^^^^^^^^^^
+Error: This expression has type "int#" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
        But the layout of int# must be a sublayout of value
@@ -417,10 +433,14 @@ let f9_2 () = twice f1_2 (make_t_untagged_immediate_id ())
 let f9_3 () = twice f1_3 (make_intu ());;
 [%%expect{|
 val twice :
-  ('a : untagged_immediate). ('a t_untagged_immediate_id -> 'a t_untagged_immediate_id) -> 'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+  ('a : untagged_immediate mod non_float).
+    ('a t_untagged_immediate_id -> 'a t_untagged_immediate_id) ->
+    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
   <fun>
 val f9_1 : unit -> t_untagged_immediate t_untagged_immediate_id = <fun>
-val f9_2 : ('a : untagged_immediate). unit -> 'a t_untagged_immediate_id = <fun>
+val f9_2 :
+  ('a : untagged_immediate mod non_float). unit -> 'a t_untagged_immediate_id =
+  <fun>
 val f9_3 : unit -> int# t_untagged_immediate_id = <fun>
 |}];;
 
@@ -437,18 +457,18 @@ val f9_3 : unit -> int# t_untagged_immediate_id = <fun>
 
 external f10_1 : int -> bool -> int# = "foo";;
 [%%expect{|
-Line 1, characters 0-50:
+Line 1, characters 0-44:
 1 | external f10_1 : int -> bool -> int# = "foo";;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The native code version of the primitive is mandatory
        for types with non-value layouts.
 |}];;
 
 external f10_2 : t_untagged_immediate -> int = "foo";;
 [%%expect{|
-Line 1, characters 0-38:
+Line 1, characters 0-52:
 1 | external f10_2 : t_untagged_immediate -> int = "foo";;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The native code version of the primitive is mandatory
        for types with non-value layouts.
 |}];;
@@ -465,23 +485,28 @@ external f10_7 : string -> int# = "foo" "bar"
 
 external f10_8 : int -> int#  = "foo" "bar" [@@unboxed];;
 [%%expect{|
-external f10_8 : (int [@unboxed]) -> int# = "foo" "bar"
+Line 1, characters 17-20:
+1 | external f10_8 : int -> int#  = "foo" "bar" [@@unboxed];;
+                     ^^^
+Error: Don't know how to unbox this type.
+       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       the corresponding unboxed types can be marked unboxed.
 |}];;
 
 external f10_9 : (int#[@untagged]) -> bool -> string  = "foo" "bar";;
 [%%expect{|
-Line 1, characters 18-28:
+Line 1, characters 18-22:
 1 | external f10_9 : (int#[@untagged]) -> bool -> string  = "foo" "bar";;
-                      ^^^^^^^^^^
+                      ^^^^
 Error: Don't know how to untag this type. Only "int8", "int16", "int", and
        other immediate types can be untagged.
 |}];;
 
 external f10_10 : string -> (int#[@untagged])  = "foo" "bar";;
 [%%expect{|
-Line 1, characters 29-39:
+Line 1, characters 29-33:
 1 | external f10_10 : string -> (int#[@untagged])  = "foo" "bar";;
-                                 ^^^^^^^^^^
+                                 ^^^^
 Error: Don't know how to untag this type. Only "int8", "int16", "int", and
        other immediate types can be untagged.
 |}];;
@@ -496,18 +521,18 @@ type t11_1 = ..
 type t11_1 += A of t_untagged_immediate;;
 [%%expect{|
 type t11_1 = ..
-Line 3, characters 14-25:
+Line 3, characters 14-39:
 3 | type t11_1 += A of t_untagged_immediate;;
-                  ^^^^^^^^^^^
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Extensible types can't have fields of unboxed type.
        Consider wrapping the unboxed fields in a record.
 |}]
 
 type t11_1 += B of int#;;
 [%%expect{|
-Line 1, characters 14-29:
+Line 1, characters 14-23:
 1 | type t11_1 += B of int#;;
-                  ^^^^^^^^^^^^^^^
+                  ^^^^^^^^^
 Error: Extensible types can't have fields of unboxed type.
        Consider wrapping the unboxed fields in a record.
 |}]
@@ -519,7 +544,7 @@ type 'a t11_2 += A of int
 type 'a t11_2 += B of 'a;;
 
 [%%expect{|
-type ('a : untagged_immediate) t11_2 = ..
+type ('a : untagged_immediate mod non_float) t11_2 = ..
 type 'a t11_2 += A of int
 Line 5, characters 17-24:
 5 | type 'a t11_2 += B of 'a;;
@@ -545,21 +570,21 @@ Error: Extensible types can't have fields of unboxed type.
 (* First, disallowed uses: in object types, class parameters, etc. *)
 type t12_1 = < x : t_untagged_immediate >;;
 [%%expect{|
-Line 1, characters 15-25:
+Line 1, characters 15-39:
 1 | type t12_1 = < x : t_untagged_immediate >;;
-                   ^^^^^^^^^^
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
        The layout of "t_untagged_immediate" is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of "t_untagged_immediate" must be a sublayout of value
          because it's the type of an object field.
 |}];;
 
 type ('a : untagged_immediate) t12_2 = < x : 'a >;;
 [%%expect{|
-Line 1, characters 27-33:
+Line 1, characters 41-47:
 1 | type ('a : untagged_immediate) t12_2 = < x : 'a >;;
-                               ^^^^^^
+                                             ^^^^^^
 Error: Object field types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type t12_2.
@@ -569,12 +594,13 @@ Error: Object field types must have layout value.
 
 class c12_3 = object method x : t_untagged_immediate = assert false end;;
 [%%expect{|
-Line 1, characters 21-53:
+Line 1, characters 21-67:
 1 | class c12_3 = object method x : t_untagged_immediate = assert false end;;
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The method "x" has type "t_untagged_immediate" but is expected to have type "('a : value)"
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The method "x" has type "t_untagged_immediate"
+       but is expected to have type "('a : value)"
        The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a sublayout of value
          because it's the type of an object field.
 |}];;
@@ -586,11 +612,12 @@ end;;
 Line 2, characters 13-15:
 2 |   method x : 'a t_untagged_immediate_id -> 'a t_untagged_immediate_id = assert false
                  ^^
-Error: This type "('a : value)" should be an instance of type "('b : untagged_immediate)"
+Error: This type "('a : value)" should be an instance of type
+         "('b : untagged_immediate mod non_float)"
        The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with untagged_immediate
-         because of the definition of t_untagged_immediate_id at line 2, characters 0-31.
+         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
 |}];;
 
 class c12_5 = object val x : t_untagged_immediate = assert false end;;
@@ -600,18 +627,17 @@ Line 1, characters 25-26:
                              ^
 Error: Variables bound in a class must have layout value.
        The layout of x is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of x must be a sublayout of value
          because it's the type of a class field.
 |}];;
 
 class type c12_6 = object method x : int# end;;
 [%%expect{|
-Line 1, characters 26-47:
+Line 1, characters 26-41:
 1 | class type c12_6 = object method x : int# end;;
-                              ^^^^^^^^^^^^^^^^^^^^^
-Error: The method "x" has type "int#" but is expected to have type
-         "('a : value)"
+                              ^^^^^^^^^^^^^^^
+Error: The method "x" has type "int#" but is expected to have type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
        But the layout of int# must be a sublayout of value
@@ -620,9 +646,9 @@ Error: The method "x" has type "int#" but is expected to have type
 
 class type c12_7 = object val x : int# end
 [%%expect{|
-Line 1, characters 26-44:
+Line 1, characters 26-38:
 1 | class type c12_7 = object val x : int# end
-                              ^^^^^^^^^^^^^^^^^^
+                              ^^^^^^^^^^^^
 Error: Variables bound in a class must have layout value.
        The layout of x is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -637,11 +663,12 @@ end
 Line 2, characters 10-12:
 2 |   val x : 'a t_untagged_immediate_id -> 'a t_untagged_immediate_id
               ^^
-Error: This type "('a : value)" should be an instance of type "('b : untagged_immediate)"
+Error: This type "('a : value)" should be an instance of type
+         "('b : untagged_immediate mod non_float)"
        The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with untagged_immediate
-         because of the definition of t_untagged_immediate_id at line 2, characters 0-31.
+         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
 |}];;
 
 (* Second, allowed uses: as method parameters / returns *)
@@ -658,8 +685,11 @@ end;;
 type t12_8 = < f : t_untagged_immediate -> t_untagged_immediate >
 val f12_9 : t12_8 -> t_untagged_immediate -> t_untagged_immediate = <fun>
 val f12_10 :
-  < baz : t_untagged_immediate -> t_untagged_immediate -> t_untagged_immediate -> t_untagged_immediate; .. > -> t_untagged_immediate -> t_untagged_immediate =
-  <fun>
+  < baz : t_untagged_immediate ->
+          t_untagged_immediate ->
+          t_untagged_immediate -> t_untagged_immediate;
+    .. > ->
+  t_untagged_immediate -> t_untagged_immediate = <fun>
 class ['a] c12_11 : object method x : t_untagged_immediate -> 'a end
 class ['a] c12_12 : object method x : 'a -> t_untagged_immediate end
 |}];;
@@ -678,7 +708,7 @@ Line 3, characters 17-19:
 Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_untagged_immediate"
        The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a sublayout of value
          because it's the type of a variable captured in an object.
 |}];;
@@ -695,7 +725,7 @@ Line 3, characters 17-19:
                      ^^
 Error: "m1" must have a type of layout value because it is captured by an object.
        The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a sublayout of value
          because it's the type of a variable captured in an object.
 |}];;
@@ -708,48 +738,48 @@ Error: "m1" must have a type of layout value because it is captured by an object
 
 let f13_1 (x : t_untagged_immediate) = x = x;;
 [%%expect{|
-Line 1, characters 25-26:
+Line 1, characters 39-40:
 1 | let f13_1 (x : t_untagged_immediate) = x = x;;
-                             ^
-Error: This expression has type "t_untagged_immediate" but an expression was expected of type
-         "('a : value_or_null)"
+                                           ^
+Error: This expression has type "t_untagged_immediate"
+       but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a sublayout of value.
 |}];;
 
 let f13_2 (x : t_untagged_immediate) = compare x x;;
 [%%expect{|
-Line 1, characters 33-34:
+Line 1, characters 47-48:
 1 | let f13_2 (x : t_untagged_immediate) = compare x x;;
-                                     ^
-Error: This expression has type "t_untagged_immediate" but an expression was expected of type
-         "('a : value_or_null)"
+                                                   ^
+Error: This expression has type "t_untagged_immediate"
+       but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a sublayout of value.
 |}];;
 
 let f13_3 (x : t_untagged_immediate) = Marshal.to_bytes x;;
 [%%expect{|
-Line 1, characters 42-43:
+Line 1, characters 56-57:
 1 | let f13_3 (x : t_untagged_immediate) = Marshal.to_bytes x;;
-                                              ^
-Error: This expression has type "t_untagged_immediate" but an expression was expected of type
-         "('a : value_or_null)"
+                                                            ^
+Error: This expression has type "t_untagged_immediate"
+       but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a sublayout of value.
 |}];;
 
 let f13_4 (x : t_untagged_immediate) = Hashtbl.hash x;;
 [%%expect{|
-Line 1, characters 38-39:
+Line 1, characters 52-53:
 1 | let f13_4 (x : t_untagged_immediate) = Hashtbl.hash x;;
-                                          ^
-Error: This expression has type "t_untagged_immediate" but an expression was expected of type
-         "('a : value)"
+                                                        ^
+Error: This expression has type "t_untagged_immediate"
+       but an expression was expected of type "('a : value)"
        The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-18.
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a sublayout of value.
 |}];;

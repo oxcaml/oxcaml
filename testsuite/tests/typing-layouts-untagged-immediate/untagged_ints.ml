@@ -3,7 +3,9 @@
  flambda2;
  {
    native;
+   flags = "-extension small_numbers_beta";
  }{
+   flags = "-extension small_numbers_beta";
    bytecode;
  }{
    flags = "-extension layouts_alpha -extension small_numbers_beta";
@@ -12,10 +14,10 @@
    flags = "-extension layouts_alpha -extension small_numbers_beta";
    bytecode;
  }{
-   flags = "-extension layouts_beta";
+   flags = "-extension layouts_beta -extension small_numbers_beta";
    native;
  }{
-   flags = "-extension layouts_beta";
+   flags = "-extension layouts_beta -extension small_numbers_beta";
    bytecode;
  }
 *)

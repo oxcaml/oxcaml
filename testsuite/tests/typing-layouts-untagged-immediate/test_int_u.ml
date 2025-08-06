@@ -1,9 +1,10 @@
 (* TEST
- include stdlib_beta;
+   include stdlib_beta;
+   include stdlib_upstream_compatible;
 *)
 
 module Int_u = Stdlib_beta.Int_u
-module Int32_u = Stdlib_beta.Int32_u
+module Int32_u = Stdlib_upstream_compatible.Int32_u
 
 (* Print all individual successful tests; used for debugging, as it will cause
    this test to fail *)

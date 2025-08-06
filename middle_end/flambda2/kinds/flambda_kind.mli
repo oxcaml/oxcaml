@@ -97,6 +97,7 @@ type flat_suffix_element = private
   | Naked_int32
   | Naked_int64
   | Naked_nativeint
+  | Naked_immediate
   | Naked_vec128
   | Naked_vec256
   | Naked_vec512

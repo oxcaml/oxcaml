@@ -1561,6 +1561,13 @@ module Const = struct
         name = "word mod everything"
       }
 
+    let untagged_immediate =
+      { jkind =
+          mk_jkind (Base Untagged_immediate) ~mode_crossing:false
+            ~nullability:Non_null ~separability:Non_float;
+        name = "untagged_immediate"
+      }
+
     let kind_of_untagged_immediate =
       { jkind =
           mk_jkind (Base Untagged_immediate) ~mode_crossing:true
@@ -1987,6 +1994,7 @@ module Const = struct
       | "float64" -> Builtin.float64.jkind
       | "float32" -> Builtin.float32.jkind
       | "word" -> Builtin.word.jkind
+      | "untagged_immediate" -> Builtin.untagged_immediate.jkind
       | "bits8" -> Builtin.bits8.jkind
       | "bits16" -> Builtin.bits16.jkind
       | "bits32" -> Builtin.bits32.jkind

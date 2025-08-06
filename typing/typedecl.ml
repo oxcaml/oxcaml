@@ -1663,6 +1663,7 @@ module Element_repr = struct
     | Vec256
     | Vec512
     | Word
+    | Untagged_immediate
     | Product of t array
 
   and t =
@@ -1696,7 +1697,7 @@ module Element_repr = struct
       | Base Bits16 -> Unboxed_element Bits16
       | Base Bits32 -> Unboxed_element Bits32
       | Base Bits64 -> Unboxed_element Bits64
-      | Base Untagged_immediate -> Unboxed_element Word
+      | Base Untagged_immediate -> Unboxed_element Untagged_immediate
       | Base Vec128 -> Unboxed_element Vec128
       | Base Vec256 -> Unboxed_element Vec256
       | Base Vec512 -> Unboxed_element Vec512
@@ -1723,6 +1724,7 @@ module Element_repr = struct
         | Vec256 -> Vec256
         | Vec512 -> Vec512
         | Word -> Word
+        | Untagged_immediate -> Untagged_immediate
         | Product l -> Product (Array.map of_t l)
       in
       of_t t
@@ -1735,7 +1737,7 @@ module Element_repr = struct
       and count_boxed_in_unboxed_element acc : unboxed_element -> int =
         function
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Vec128 | Vec256 | Vec512 | Word -> acc
+        | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate -> acc
         | Product l -> Array.fold_left count_boxed_in_t acc l
       in
       List.fold_left (fun acc (t,_) -> count_boxed_in_t acc t) 0 ts
@@ -1867,7 +1869,7 @@ let rec update_decl_jkind env dpath decl =
                then repr_summary.atomic_floats <- true;
            | Unboxed_element Float64 -> repr_summary.float64s <- true
            | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                             | Vec128 | Vec256 | Vec512 | Word | Product _ ) ->
+                             | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
            | Value_element -> repr_summary.values <- true
            | Void ->
@@ -1889,7 +1891,7 @@ let rec update_decl_jkind env dpath decl =
                   | Unboxed_element Float64 -> Float64
                   | Void -> Void
                   | Unboxed_element (Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                                    | Vec128 | Vec256 | Vec512 | Word
+                                    | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
                                     | Product _)
                   | Value_element ->
                       Misc.fatal_error "Expected only floats and float64s")

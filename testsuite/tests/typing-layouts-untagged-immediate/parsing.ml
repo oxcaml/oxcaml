@@ -11,7 +11,13 @@ type t = int#;;
 let f (_ : int#) = ();;
 [%%expect {|
 type t = int#
-val f : int# -> unit = <fun>
+Line 2, characters 6-16:
+2 | let f (_ : int#) = ();;
+          ^^^^^^^^^^
+Error: Non-value layout untagged_immediate detected as sort for type
+       int#, but this requires extension layouts, which is not enabled.
+       If you intended to use this layout, please add this flag to your build file.
+       Otherwise, please report this error to the Jane Street compilers team.
 |}];;
 
 type t = C of int#;;
@@ -30,11 +36,10 @@ type t = C : int# -> t
 *)
 type t = int# list;;
 [%%expect {|
-Line 1, characters 9-19:
+Line 1, characters 9-13:
 1 | type t = int# list;;
-             ^^^^^^^^^^
-Error: This type "int#" should be an instance of type
-         "('a : value_or_null)"
+             ^^^^
+Error: This type "int#" should be an instance of type "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
        But the layout of int# must be a sublayout of value
@@ -43,11 +48,10 @@ Error: This type "int#" should be an instance of type
 
 let f (_ : int# list) = ();;
 [%%expect {|
-Line 1, characters 11-21:
+Line 1, characters 11-15:
 1 | let f (_ : int# list) = ();;
-               ^^^^^^^^^^
-Error: This type "int#" should be an instance of type
-         "('a : value_or_null)"
+               ^^^^
+Error: This type "int#" should be an instance of type "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
        But the layout of int# must be a sublayout of value
@@ -56,11 +60,10 @@ Error: This type "int#" should be an instance of type
 
 type t = C of int# list;;
 [%%expect {|
-Line 1, characters 14-24:
+Line 1, characters 14-18:
 1 | type t = C of int# list;;
-                  ^^^^^^^^^^
-Error: This type "int#" should be an instance of type
-         "('a : value_or_null)"
+                  ^^^^
+Error: This type "int#" should be an instance of type "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
        But the layout of int# must be a sublayout of value
@@ -69,11 +72,10 @@ Error: This type "int#" should be an instance of type
 
 type t = C : int# list -> t;;
 [%%expect {|
-Line 1, characters 13-23:
+Line 1, characters 13-17:
 1 | type t = C : int# list -> t;;
-                 ^^^^^^^^^^
-Error: This type "int#" should be an instance of type
-         "('a : value_or_null)"
+                 ^^^^
+Error: This type "int#" should be an instance of type "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
        But the layout of int# must be a sublayout of value
@@ -92,9 +94,9 @@ class ['a] c : object method x : 'a end
 
 type t = int#c;;
 [%%expect {|
-Line 1, characters 9-19:
+Line 1, characters 9-13:
 1 | type t = int#c;;
-             ^^^^^^^^^^
+             ^^^^
 Error: This type "int#" should be an instance of type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -104,9 +106,9 @@ Error: This type "int#" should be an instance of type "('a : value)"
 
 let f (_ : int#c) = ();;
 [%%expect {|
-Line 1, characters 11-21:
+Line 1, characters 11-15:
 1 | let f (_ : int#c) = ();;
-               ^^^^^^^^^^
+               ^^^^
 Error: This type "int#" should be an instance of type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -116,9 +118,9 @@ Error: This type "int#" should be an instance of type "('a : value)"
 
 type t = C of int#c;;
 [%%expect {|
-Line 1, characters 14-24:
+Line 1, characters 14-18:
 1 | type t = C of int#c;;
-                  ^^^^^^^^^^
+                  ^^^^
 Error: This type "int#" should be an instance of type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -128,9 +130,9 @@ Error: This type "int#" should be an instance of type "('a : value)"
 
 type t = C : int#c -> t;;
 [%%expect {|
-Line 1, characters 13-23:
+Line 1, characters 13-17:
 1 | type t = C : int#c -> t;;
-                 ^^^^^^^^^^
+                 ^^^^
 Error: This type "int#" should be an instance of type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -143,9 +145,9 @@ Error: This type "int#" should be an instance of type "('a : value)"
 *)
 type t = int# c;;
 [%%expect {|
-Line 1, characters 9-19:
+Line 1, characters 9-13:
 1 | type t = int# c;;
-             ^^^^^^^^^^
+             ^^^^
 Error: This type "int#" should be an instance of type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -155,9 +157,9 @@ Error: This type "int#" should be an instance of type "('a : value)"
 
 let f (_ : int# c) = ();;
 [%%expect {|
-Line 1, characters 11-21:
+Line 1, characters 11-15:
 1 | let f (_ : int# c) = ();;
-               ^^^^^^^^^^
+               ^^^^
 Error: This type "int#" should be an instance of type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -167,9 +169,9 @@ Error: This type "int#" should be an instance of type "('a : value)"
 
 type t = C of int# c;;
 [%%expect {|
-Line 1, characters 14-24:
+Line 1, characters 14-18:
 1 | type t = C of int# c;;
-                  ^^^^^^^^^^
+                  ^^^^
 Error: This type "int#" should be an instance of type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -179,9 +181,9 @@ Error: This type "int#" should be an instance of type "('a : value)"
 
 type t = C : int# c -> t;;
 [%%expect {|
-Line 1, characters 13-23:
+Line 1, characters 13-17:
 1 | type t = C : int# c -> t;;
-                 ^^^^^^^^^^
+                 ^^^^
 Error: This type "int#" should be an instance of type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -198,17 +200,17 @@ Error: This type "int#" should be an instance of type "('a : value)"
 *)
 type t = int #c;;
 [%%expect {|
-Line 1, characters 0-21:
+Line 1, characters 0-15:
 1 | type t = int #c;;
-    ^^^^^^^^^^^^^^^^^^^^^
+    ^^^^^^^^^^^^^^^
 Error: A type variable is unbound in this type declaration.
        In type "int #c as 'a" the variable "'a" is unbound
 |}];;
 type t = C of int #c;;
 [%%expect {|
-Line 1, characters 0-26:
+Line 1, characters 0-20:
 1 | type t = C of int #c;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ^^^^^^^^^^^^^^^^^^^^
 Error: A type variable is unbound in this type declaration.
        In case "C of (int #c as 'a)" the variable "'a" is unbound
 |}];;
@@ -233,17 +235,17 @@ type t = C : int #c -> t
 
 type t = int # c;;
 [%%expect {|
-Line 1, characters 0-22:
+Line 1, characters 0-16:
 1 | type t = int # c;;
-    ^^^^^^^^^^^^^^^^^^^^^^
+    ^^^^^^^^^^^^^^^^
 Error: A type variable is unbound in this type declaration.
        In type "int #c as 'a" the variable "'a" is unbound
 |}];;
 type t = C of int # c;;
 [%%expect {|
-Line 1, characters 0-27:
+Line 1, characters 0-21:
 1 | type t = C of int # c;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ^^^^^^^^^^^^^^^^^^^^^
 Error: A type variable is unbound in this type declaration.
        In case "C of (int #c as 'a)" the variable "'a" is unbound
 |}];;
@@ -264,18 +266,18 @@ type t = C : int #c -> t
 
 type t = int int#;;
 [%%expect {|
-Line 1, characters 9-23:
+Line 1, characters 9-17:
 1 | type t = int int#;;
-             ^^^^^^^^^^^^^^
+             ^^^^^^^^
 Error: The type constructor "int#" expects 0 argument(s),
        but is here applied to 1 argument(s)
 |}];;
 
 type t = (int, int) int#;;
 [%%expect {|
-Line 1, characters 9-30:
+Line 1, characters 9-24:
 1 | type t = (int, int) int#;;
-             ^^^^^^^^^^^^^^^^^^^^^
+             ^^^^^^^^^^^^^^^
 Error: The type constructor "int#" expects 0 argument(s),
        but is here applied to 2 argument(s)
 |}];;

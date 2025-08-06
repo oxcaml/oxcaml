@@ -186,6 +186,7 @@ type flat_suffix_element =
   | Naked_int32
   | Naked_int64
   | Naked_nativeint
+  | Naked_immediate
   | Naked_vec128
   | Naked_vec256
   | Naked_vec512
@@ -202,6 +203,7 @@ module Flat_suffix_element0 = struct
     | Naked_int32 -> naked_int32
     | Naked_int64 -> naked_int64
     | Naked_nativeint -> naked_nativeint
+    | Naked_immediate -> naked_immediate
     | Naked_vec128 -> naked_vec128
     | Naked_vec256 -> naked_vec256
     | Naked_vec512 -> naked_vec512
@@ -214,7 +216,7 @@ module Flat_suffix_element0 = struct
 
   let size_in_words = function
     | Naked_float | Naked_float32 | Naked_int8 | Naked_int16 | Naked_int32
-    | Naked_int64 | Naked_nativeint ->
+    | Naked_int64 | Naked_nativeint | Naked_immediate ->
       1
     | Naked_vec128 -> 2
     | Naked_vec256 -> 4
@@ -229,6 +231,7 @@ module Flat_suffix_element0 = struct
     | Naked_int32 -> Format.pp_print_string ppf "Naked_int32"
     | Naked_int64 -> Format.pp_print_string ppf "Naked_int64"
     | Naked_nativeint -> Format.pp_print_string ppf "Naked_nativeint"
+    | Naked_immediate -> Format.pp_print_string ppf "Naked_immediate"
     | Naked_vec128 -> Format.pp_print_string ppf "Naked_vec128"
     | Naked_vec256 -> Format.pp_print_string ppf "Naked_vec256"
     | Naked_vec512 -> Format.pp_print_string ppf "Naked_vec512"
@@ -246,7 +249,7 @@ module Flat_suffix_element0 = struct
     | Vec256 -> Naked_vec256
     | Vec512 -> Naked_vec512
     | Word -> Naked_nativeint
-    | Untagged_immediate -> Naked_nativeint
+    | Untagged_immediate -> Naked_immediate
     | Value _ ->
       (* CR: consider printing the value kind *)
       Misc.fatal_error
@@ -1183,6 +1186,7 @@ module Flat_suffix_element = struct
     | Naked_int32 -> With_subkind.naked_int32
     | Naked_int64 -> With_subkind.naked_int64
     | Naked_nativeint -> With_subkind.naked_nativeint
+    | Naked_immediate -> With_subkind.naked_immediate
     | Naked_vec128 -> With_subkind.naked_vec128
     | Naked_vec256 -> With_subkind.naked_vec256
     | Naked_vec512 -> With_subkind.naked_vec512
