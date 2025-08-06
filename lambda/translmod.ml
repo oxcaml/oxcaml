@@ -99,6 +99,7 @@ let rec apply_coercion loc strict restr arg =
       arg
   | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
       name_lambda strict arg Lambda.layout_module (fun id ->
+        let input_repr = transl_module_representation input_repr in
         let output_repr = transl_module_representation output_repr in
         let get_field pos =
           if pos < 0 then lambda_unit
@@ -111,8 +112,7 @@ let rec apply_coercion loc strict restr arg =
             match input_repr with
             | Module_value_only _ -> layout_value_field
             | Module_mixed shape ->
-              shape.(pos) |> transl_mixed_block_element
-                          |> layout_of_mixed_block_element
+              layout_of_mixed_block_element shape.(pos)
         in
         let lam =
           Lprim(block_of_module_representation output_repr,
@@ -666,7 +666,7 @@ and transl_structure ~scopes loc
       let body, repr =
         let repr =
           module_representation_of_mixed_product_shape
-            (fields |> List.rev_map (fun (_, mbe) -> mbe) |> Array.of_list)
+            (List.rev_map (fun (_, mbe) -> mbe) fields |> Array.of_list)
         in
         match cc with
           Tcoerce_none ->
@@ -693,7 +693,7 @@ and transl_structure ~scopes loc
             let get_layout pos =
               if pos < 0 then layout_value_field
               else let _, shape = v.(pos) in
-                shape |> transl_mixed_block_element
+                shape |> transl_mixed_block_element ~value_kind:generic_value
                       |> layout_of_mixed_block_element
             in
             let ids = List.fold_right (fun (id, _) s -> Ident.Set.add id s)
@@ -747,6 +747,7 @@ and transl_structure ~scopes loc
           let mk_lam_let =
             transl_let ~scopes ~return_layout:Lambda.layout_module_field
               ~in_structure:true rec_flag pat_expr_list
+              (* CR jrayman: change [layout_module_field] *)
           in
           let ext_fields =
             List.rev_append
@@ -889,15 +890,16 @@ and transl_structure ~scopes loc
                          |> Jkind.Sort.default_for_transl_and_get
                 in
                 let shape = mixed_block_element_of_const_sort sort in
+                let lambda_layout = layout_of_const_sort sort in
                 let body, repr =
                   rebind_idents (pos + 1) ((id, shape) :: newfields)
                     ids_with_layouts
                 in
-                let lambda_layout = layout_of_const_sort sort in
                 let id_duid = Lambda.debug_uid_none in
                 (* CR sspies: Can we find a better [debug_uid] here? *)
                 Llet(Alias, lambda_layout, id, id_duid,
-                     Lprim(mod_field pos (Module_value_only (-1)), [Lvar mid],
+                     Lprim(mod_field pos (Module_value_only (-1)),
+                           [Lvar mid],
                            of_location ~scopes incl.incl_loc), body),
                 repr
           in
@@ -933,16 +935,18 @@ and transl_structure ~scopes loc
                 bound_value_identifiers_and_layouts
                   ~layout_value:Jkind.(Layout.of_const
                     (Layout.Const.of_sort_const Sort.Const.for_module_field))
-
                   od.open_bound_items
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
+              let open_repr =
+                module_representation_of_signature od.open_bound_items
+              in
+              (* CR jrayman: maybe refactor with above *)
               let rec rebind_idents pos newfields = function
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
                 | (id, layout) :: ids_with_layouts ->
-                  (* CR jrayman: this code is duplicated above *)
                   let sort =
                     layout |> Jkind.Layout.to_sort
                            |> Option.get
@@ -957,10 +961,8 @@ and transl_structure ~scopes loc
                   in
                   let id_duid = Lambda.debug_uid_none in
                   (* CR sspies: Can we find a better [debug_uid] here? *)
-                  (* CR jrayman: Find all [mod_field Value_only] and fix*)
                   Llet(Alias, lambda_layout, id, id_duid,
-                      Lprim(mod_field pos (Module_value_only (-1)),
-                            [Lvar mid],
+                      Lprim(mod_field pos open_repr, [Lvar mid],
                             of_location ~scopes od.open_loc), body),
                   repr
               in
@@ -1632,6 +1634,9 @@ let transl_store_structure ~scopes glob map prims aliases str =
                 | [] when pure = Alias ->
                   transl_store ~scopes rootpath subst cont rem
                 | _ ->
+                    let open_repr =
+                      module_representation_of_signature od.open_bound_items
+                    in
                     let ids = bound_value_identifiers od.open_bound_items in
                     let mid = Ident.create_local "open" in
                     let mid_duid = Lambda.debug_uid_none in
@@ -1643,8 +1648,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
                         (* CR sspies: Can we find a better [debug_uid] here? *)
                           let id_duid = Lambda.debug_uid_none in
                           Llet(Alias, Lambda.layout_module_field, id, id_duid,
-                               Lprim(mod_field pos (Module_value_only (-1)),
-                                     [Lvar mid], loc),
+                               Lprim(mod_field pos open_repr, [Lvar mid], loc),
                                Lsequence(store_ident loc id,
                                          store_idents (pos + 1) idl))
                     in
@@ -2037,12 +2041,15 @@ let transl_toplevel_item ~scopes item =
           let ids = bound_value_identifiers od.open_bound_items in
           let mid = Ident.create_local "open" in
           let mid_duid = Lambda.debug_uid_none in
+          let open_repr =
+            module_representation_of_signature od.open_bound_items
+          in
           let rec set_idents pos = function
               [] ->
                 lambda_unit
             | id :: ids ->
                 Lsequence(toploop_setvalue id
-                            (Lprim(mod_field pos (Module_value_only (-1)),
+                            (Lprim(mod_field pos open_repr,
                               [Lvar mid], Loc_unknown)),
                           set_idents (pos + 1) ids)
           in

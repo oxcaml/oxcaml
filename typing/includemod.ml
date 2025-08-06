@@ -882,8 +882,8 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
             ((id,pos,Tcoerce_none)::l , pos+1)
         | item -> (l, if is_runtime_component item then pos+1 else pos))
       ([], 0) sig1 in
-  let module_repr_of_sig sig_ =
-    sig_ |> List.filter_map Env.field_layout_of_signature_item
+  let module_representation_of_signature sig_ =
+    sig_ |> List.filter_map Env.layout_of_lazy_signature_item
          |> List.map
            (fun layout -> layout |> Jkind.Layout.to_sort
                                  |> Option.get (* CR jrayman *)
@@ -892,8 +892,8 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
          |> Array.of_list
          |> module_representation_of_mixed_product_shape
   in
-  let input_repr = module_repr_of_sig sig1 in
-  let output_repr = module_repr_of_sig sig2 in
+  let input_repr = module_representation_of_signature sig1 in
+  let output_repr = module_representation_of_signature sig2 in
   let exported_len1, runtime_len1, comps1 =
     build_component_table (fun pos _name -> pos) sig1
   in

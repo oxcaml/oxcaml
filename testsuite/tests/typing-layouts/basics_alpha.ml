@@ -3,11 +3,6 @@
  expect;
 *)
 
-
-(* CR jrayman: remember to test coalescing(?) functors.
-   The language feature that swizzles module fields. (the location of this
-   comment is arbitrary) *)
-
 type t_any   : any
 type t_value : value
 type t_imm   : immediate
