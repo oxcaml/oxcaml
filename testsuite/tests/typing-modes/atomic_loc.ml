@@ -91,7 +91,7 @@ val atomic_loc_mode_crosses_aliased :
   string atomic_loc @ unique -> string atomic_loc = <fun>
 |}]
 
-(* Test for forbidding non-identity comonadic modalities in [%atomic.loc] *)
+(* Test for forbidding non-legacy comonadic modalities in [%atomic.loc] *)
 
 (* This is allowed... *)
 type 'a portable_atomic = { mutable contents : 'a @@ portable [@atomic] }
@@ -109,9 +109,9 @@ Error: Fields with modalities are not allowed in "[%atomic.loc]"
 |}]
 
 (* This is allowed... *)
-type 'a local_atomic = { mutable contents : 'a @@ global [@atomic] }
+type 'a local_atomic = { mutable contents : 'a @@ local [@atomic] }
 [%%expect{|
-type 'a local_atomic = { mutable global_ contents : 'a [@atomic]; }
+type 'a local_atomic = { mutable contents : 'a @@ local [@atomic]; }
 |}]
 
 (* ...but you can't make an [%atomic.loc] to the field *)

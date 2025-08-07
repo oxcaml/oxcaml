@@ -477,11 +477,9 @@ let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
       Atom (Monadic Contention, Join_with Contention.Const.legacy);
       Atom (Monadic Visibility, Join_with Visibility.Const.legacy) ]
   in
-  match mut, for_mutable_variable with
-  | Immutable, _ -> []
-  | Mutable { atomic = Nonatomic }, false -> monadic @ comonadic
-  | Mutable { atomic = Atomic }, _ | Mutable { atomic = Nonatomic }, true ->
-    monadic
+  match mut with
+  | Immutable -> []
+  | Mutable _ -> if for_mutable_variable then monadic else monadic @ comonadic
 
 let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
   let l = mutable_implied_modalities ~for_mutable_variable mut in
