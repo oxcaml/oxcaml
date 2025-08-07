@@ -191,7 +191,10 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
           with_int_prefix kind "compare" ~percent_for_imms:false
         in
         use_prim ~env ~res (Extern extern_name)
-      | Unsigned -> primitive_not_supported ()))
+      | Unsigned ->
+        (* CR selee: can do this by subtracting [min_int] before doing the
+           compare *)
+        primitive_not_supported ()))
   | Float_arith (bitwidth, op) ->
     ignore (bitwidth, op);
     primitive_not_supported ()
