@@ -77,7 +77,7 @@ module F = struct
     fprintf ppf
       {|(rule
  ${enabled_if}
- (alias runtest-llvm)
+ (alias runtest-llvmize)
  (deps %a)
  (targets %s.corrected)
  (action
@@ -92,7 +92,7 @@ module F = struct
     fprintf ppf
       {|(rule
  ${enabled_if}
- (alias runtest-llvm)
+ (alias runtest-llvmize)
  (deps %s %s.corrected)
  (action
   (diff %s %s.corrected)))

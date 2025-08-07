@@ -69,7 +69,7 @@ endef
 
 
 .DEFAULT_GOAL := compiler
-.PHONY: boot-compiler boot-runtest runtime-stdlib compiler runtest runtest-llvm runtest-dwarf
+.PHONY: boot-compiler boot-runtest runtime-stdlib compiler runtest runtest-llvmize runtest-dwarf
 
 boot_targets = \
   $(boot_ocamlc) \
@@ -122,8 +122,8 @@ compiler: runtime-stdlib
 runtest: compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_main)
 
-runtest-llvm: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-llvm $(ws_main)
+runtest-llvmize: compiler
+	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-llvmize $(ws_main)
 
 runtest-dwarf: compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-dwarf $(ws_main)
