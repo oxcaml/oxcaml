@@ -1,6 +1,3 @@
-(* CR sspies: Rename this file into [shapeify.ml], since it is no longer purely
-   about type shapes. *)
-
 module Uid = Shape.Uid
 module Layout = Jkind_types.Sort.Const
 

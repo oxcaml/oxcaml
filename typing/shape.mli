@@ -201,7 +201,7 @@ and desc =
   | App of t * t
   | Struct of t Item.Map.t
   | Alias of t
-  | Leaf (* This is also used for unknown declarations and unknown types. *)
+  | Leaf
   | Proj of t * Item.t
   | Comp_unit of string
   | Error of string

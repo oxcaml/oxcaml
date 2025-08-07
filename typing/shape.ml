@@ -782,8 +782,7 @@ let rec print fmt t =
         Format.fprintf fmt "Abs@[%a@,(@[%a,@ @[%a@]@])@]"
           print_uid_opt uid pp_idents (id :: other_idents) aux body
     | App (t1, t2) ->
-        Format.fprintf fmt "@[%a(@,%a)%a@]" aux t1 aux t2
-          print_uid_opt uid
+        Format.fprintf fmt "@[%a(@,%a)%a@]" aux t1 aux t2 print_uid_opt uid
     | Leaf ->
         Format.fprintf fmt "<%a>" (Format.pp_print_option Uid.print) uid
     | Mu (t_body) ->
@@ -824,9 +823,9 @@ let rec print fmt t =
     | Error s ->
         Format.fprintf fmt "Error %s" s
     | Constr (id, args) ->
-        Format.fprintf fmt "Constr %a %a"
-          (Ident.print) id
-          (Format.pp_print_list print) args
+        Format.fprintf fmt "@[%a@ %a@]"
+          Ident.print id
+          (Format.pp_print_list print_nested) args
     | Tuple shapes ->
       Format.fprintf fmt "@[%a@]"
         (Format.pp_print_list
@@ -840,9 +839,14 @@ let rec print fmt t =
             print)
         shapes
     | Predef (predef, args) ->
-      Format.fprintf fmt "Predef %s (%a)"
+      Format.fprintf fmt "%s%a"
         (Predef.to_string predef)
-        (Format.pp_print_list print) args
+        (fun fmt -> function
+          | [] -> ()
+          | args -> Format.fprintf fmt "(@[%a@])"
+              (Format.pp_print_list
+                ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",@ ")
+                print) args) args
     | Arrow (arg, ret) ->
       Format.fprintf fmt "Arrow (%a, %a)" print arg print ret
     | Poly_variant fields ->
@@ -869,12 +873,13 @@ let rec print fmt t =
         (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ | ")
             print_constructor)
         constructors
-  | Variant_unboxed { name; arg_name; arg_shape; arg_layout } ->
-    Format.fprintf fmt
-      "Variant_unboxed name=%s arg_name=%s arg_shape=%a arg_layout=%a"
+  | Variant_unboxed { name; arg_name; arg_shape; arg_layout = _ } ->
+    Format.fprintf fmt "Variant_unboxed %s of %a"
       name
-      (Option.value ~default:"None" arg_name)
-      print arg_shape Layout.format arg_layout
+      (fun fmt -> function
+        | Some arg_name ->
+          Format.fprintf fmt "{ %s: %a }" arg_name print arg_shape
+        | None -> print fmt arg_shape) arg_name
   | Record { fields; kind } ->
     Format.fprintf fmt "Record%s { %a }" (print_record_type kind)
       (Format.pp_print_list ~pp_sep:(print_sep_string "; ") print_field)
@@ -889,8 +894,8 @@ let rec print fmt t =
       in
     Format.fprintf fmt "Mutrec @[%a@]" print_decls m
   | Proj_decl (t, id) ->
-    Format.fprintf fmt "(%a).%a"
-      aux t
+    Format.fprintf fmt "%a.%a"
+      print_nested t
       Ident.print id
 
   in
