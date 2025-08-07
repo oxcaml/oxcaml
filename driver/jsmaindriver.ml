@@ -58,6 +58,13 @@ let main argv ppf =
   with
   | exception Compenv.Exit_with_status n -> n
   | () ->
+    if !Clflags.make_archive then begin
+      Compmisc.init_path ();
+      Jslibrarian.create_archive
+        (Compenv.get_objfiles ~with_ocamlparam:false)
+        (Compenv.extract_output !Clflags.output_name);
+      Warnings.check_fatal ()
+    end;
     (* Prevents outputting when using make install to dump CSVs for whole compiler.
        Example use case: scripts/profile-compiler-build.sh *)
     if not !Clflags.dump_into_csv
