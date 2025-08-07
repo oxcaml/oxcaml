@@ -171,48 +171,61 @@ L135:                                                ; preds = %L114
   store ptr @caml_exn_Division_by_zero, ptr %30
   %111 = load i64, ptr %30
   store i64 %111, ptr %3
-  call  void @llvm.trap()
+  %112 = load i64, ptr %ds
+  %113 = add i64 %112, 48
+  %114 = inttoptr i64 %113 to ptr
+  %115 = load i64, ptr %114
+  %116 = inttoptr i64 %115 to ptr
+  %117 = load i64, ptr %116
+  %118 = add i64 %115, 8
+  %119 = inttoptr i64 %118 to ptr
+  %120 = load ptr, ptr %119
+  %121 = load i64, ptr %3
+  %122 = add i64 %115, 16
+  store i64 %117, ptr %114
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %122)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %121, ptr %120)
   unreachable
 L142:                                                ; preds = %L109
   store ptr @camlGcd_data, ptr %31
-  %112 = load i64, ptr %31
-  store i64 %112, ptr %32
-  %113 = load i64, ptr %32
-  %114 = add i64 %113, 16
-  store i64 %114, ptr %32
-  %115 = load i64, ptr %32
-  %116 = add i64 %115, 0
-  %117 = inttoptr i64 %116 to ptr
-  %118 = load i64, ptr %117
-  store i64 %118, ptr %33
+  %123 = load i64, ptr %31
+  store i64 %123, ptr %32
+  %124 = load i64, ptr %32
+  %125 = add i64 %124, 16
+  store i64 %125, ptr %32
+  %126 = load i64, ptr %32
+  %127 = add i64 %126, 0
+  %128 = inttoptr i64 %127 to ptr
+  %129 = load i64, ptr %128
+  store i64 %129, ptr %33
   store ptr @camlGcd_data, ptr %34
-  %119 = load i64, ptr %34
-  %120 = add i64 %119, 0
-  %121 = inttoptr i64 %120 to ptr
-  %122 = load i64, ptr %121
-  store i64 %122, ptr %35
-  %123 = load i64, ptr %35
-  %124 = add i64 %123, 0
-  %125 = inttoptr i64 %124 to ptr
-  %126 = load i64, ptr %125
-  store i64 %126, ptr %36
-  %127 = load i64, ptr %33
-  %128 = add i64 %127, 0
-  %129 = inttoptr i64 %128 to ptr
-  %130 = load i64, ptr %36
-  store i64 %130, ptr %129
+  %130 = load i64, ptr %34
+  %131 = add i64 %130, 0
+  %132 = inttoptr i64 %131 to ptr
+  %133 = load i64, ptr %132
+  store i64 %133, ptr %35
+  %134 = load i64, ptr %35
+  %135 = add i64 %134, 0
+  %136 = inttoptr i64 %135 to ptr
+  %137 = load i64, ptr %136
+  store i64 %137, ptr %36
+  %138 = load i64, ptr %33
+  %139 = add i64 %138, 0
+  %140 = inttoptr i64 %139 to ptr
+  %141 = load i64, ptr %36
+  store i64 %141, ptr %140
   store i64 1, ptr %37
-  %131 = load i64, ptr %37
-  store i64 %131, ptr %38
+  %142 = load i64, ptr %37
+  store i64 %142, ptr %38
   store i64 1, ptr %39
-  %132 = load i64, ptr %39
-  store i64 %132, ptr %3
-  %133 = extractvalue { { { ptr }, { i64 } } } poison, 0
-  %134 = load ptr, ptr %ds
-  %135 = insertvalue { { ptr }, { i64 } } %133, ptr %134, 0, 0
-  %136 = load i64, ptr %3
-  %137 = insertvalue { { ptr }, { i64 } } %135, i64 %136, 1, 0
-  ret { { ptr }, { i64 } } %137
+  %143 = load i64, ptr %39
+  store i64 %143, ptr %3
+  %144 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %145 = load ptr, ptr %ds
+  %146 = insertvalue { { ptr }, { i64 } } %144, ptr %145, 0, 0
+  %147 = load i64, ptr %3
+  %148 = insertvalue { { ptr }, { i64 } } %146, i64 %147, 1, 0
+  ret { { ptr }, { i64 } } %148
 }
 
 define cc 104 { { ptr }, { i64 } } @camlGcd__entry(ptr %0)  {
@@ -243,9 +256,10 @@ L154:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %14
 }
 
-declare  void @llvm.trap()
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
+declare i32 @llvm.eh.ocaml.try() returns_twice
+declare void @llvm.eh.ocaml.touch(ptr)
 
 @camlGcd_data = external global ptr
 @caml_exn_Division_by_zero = external global ptr

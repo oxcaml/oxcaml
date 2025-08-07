@@ -272,7 +272,7 @@ let select_addressing chunk exp : addressing_mode * Cmm.expression =
   then Iindexed 0, exp
   else select_addressing' chunk exp
 
-let select_store ~is_assign addr (exp : Cmm.expression) :
+let select_store' ~is_assign addr (exp : Cmm.expression) :
     Cfg_selectgen_target_intf.select_store_result =
   match exp with
   | Cconst_int (n, _dbg) when int_is_immediate n ->
@@ -296,6 +296,12 @@ let select_store ~is_assign addr (exp : Cmm.expression) :
   | Ccatch (_, _, _)
   | Cexit (_, _, _) ->
     Use_default
+
+let select_store ~is_assign addr (exp : Cmm.expression) :
+    Cfg_selectgen_target_intf.select_store_result =
+  if !Clflags.llvm_backend
+  then Use_default
+  else select_store' ~is_assign addr exp
 
 let is_store_out_of_range _chunk ~byte_offset:_ :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
