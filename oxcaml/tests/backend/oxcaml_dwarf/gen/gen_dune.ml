@@ -1,7 +1,5 @@
 let () =
-  let enabled_if =
-    {|(enabled_if (= %{context_name} "main"))|}
-  in
+  let enabled_if = {|(enabled_if (= %{context_name} "main"))|} in
   let enabled_if_with_lldb =
     {|(enabled_if
   (and
