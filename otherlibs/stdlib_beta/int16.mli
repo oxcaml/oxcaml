@@ -20,7 +20,7 @@
 (** {1:ints 16-bit Integers} *)
 
 (** The type for 16-bit integer values. *)
-type t : immediate = int16
+type t = int16 [@@immediate]
 
 (** The number of bits in an integer of type {!int16}. *)
 val size : int
