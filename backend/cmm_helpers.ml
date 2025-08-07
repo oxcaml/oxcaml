@@ -2126,8 +2126,7 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
           (* regular scanned part of a block *)
           match memory_chunk with
           | Word_int | Word_val -> ok ()
-          | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed ->
-            error "mixed blocks"
+          | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
           | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
@@ -2139,10 +2138,9 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
           | Word_int | Thirtytwo_unsigned | Thirtytwo_signed | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-          | Fivetwelve_aligned | Single _ ->
-            ok ()
+          | Fivetwelve_aligned | Single _
           | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed ->
-            error "mixed blocks"
+            ok ()
           | Word_val -> error "the flat suffix of a mixed block")
       0 args_memory_chunks
   in
