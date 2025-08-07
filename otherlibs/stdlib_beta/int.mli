@@ -133,6 +133,7 @@ val max : int -> int -> int
 (** {1:convert Converting} *)
 
 external to_int : int -> int = "%identity"
+
 external of_int : int -> int = "%identity"
 
 (** Same as {!to_int}, but interprets the argument

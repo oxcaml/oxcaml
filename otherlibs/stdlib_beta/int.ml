@@ -29,7 +29,7 @@ let zero = 0
 
 let one = 1
 
-let minus_one = (-1)
+let minus_one = -1
 
 external to_int : int -> int = "%identity"
 
@@ -79,7 +79,8 @@ external of_float : float -> int = "%int_of_float"
 
 external to_float : int -> float = "%float_of_int"
 
-external format_int : string -> int -> string @@ portable = "caml_format_int"
+external format_int : string -> int -> string = "caml_format_int"
+
 let[@inline] to_string t = format_int "%d" t
 
 external of_string : string -> int = "caml_int_of_string"
