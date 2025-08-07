@@ -1869,7 +1869,8 @@ let rec update_decl_jkind env dpath decl =
                then repr_summary.atomic_floats <- true;
            | Unboxed_element Float64 -> repr_summary.float64s <- true
            | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                             | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Product _ ) ->
+                             | Vec128 | Vec256 | Vec512 | Word
+                             | Untagged_immediate | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
            | Value_element -> repr_summary.values <- true
            | Void ->
@@ -1891,8 +1892,8 @@ let rec update_decl_jkind env dpath decl =
                   | Unboxed_element Float64 -> Float64
                   | Void -> Void
                   | Unboxed_element (Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                                    | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
-                                    | Product _)
+                                    | Vec128 | Vec256 | Vec512 | Word
+                                    | Untagged_immediate | Product _)
                   | Value_element ->
                       Misc.fatal_error "Expected only floats and float64s")
                 reprs

@@ -634,8 +634,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                         | Value -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
-                        | Float32 | Bits8 | Bits16 | Untagged_immediate | Bits32 | Bits64
-                        | Vec128 | Vec256 | Vec512 | Word | Product _ ->
+                        | Float32 | Bits8 | Bits16 | Untagged_immediate
+                        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+                        | Product _ ->
                             `Stop (Oval_stuff "<abstr>")
                         | Void ->
                             `Stop (Oval_stuff "<void>")
