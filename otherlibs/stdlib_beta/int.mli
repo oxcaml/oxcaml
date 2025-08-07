@@ -120,7 +120,8 @@ external equal : int -> int -> bool = "%int_equal"
 (** [compare x y] is {!Stdlib.compare}[ x y] but more efficient. *)
 external compare : int -> int -> int = "%int_compare"
 
-(** Same as {!compare}, except that arguments are interpreted as {e unsigned} integers. *)
+(** Same as {!compare}, except that arguments
+    are interpreted as {e unsigned} integers. *)
 val unsigned_compare : int -> int -> int
 
 (** Return the lesser of the two arguments. *)
@@ -134,7 +135,8 @@ val max : int -> int -> int
 external to_int : int -> int = "%identity"
 external of_int : int -> int = "%identity"
 
-(** Same as {!to_int}, but interprets the argument as an {e unsigned} integer. *)
+(** Same as {!to_int}, but interprets the argument
+    as an {e unsigned} integer. *)
 val unsigned_to_int : int -> int option
 
 (** [to_float x] is [x] as a floating point number. *)
