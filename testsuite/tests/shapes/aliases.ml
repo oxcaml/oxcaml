@@ -111,14 +111,14 @@ module O = N
  }
 module M : sig type t val x : int end
 {
- "N"[module] -> {<.20>
+ "N"[module] -> {<.19>
                  "t"[type] -> <.15>;
                  };
  }
 module N : sig type t end
 {
- "O"[module] -> Alias(<.21>
-                      {<.20>
+ "O"[module] -> Alias(<.20>
+                      {<.19>
                        "t"[type] -> <.15>;
                        });
  }

@@ -3041,10 +3041,11 @@ let transl_type_decl env rec_flag sdecl_list =
      information is now contained in the shapes themselves. Remove it in a
      subsequent PR (and adjust the printing of the declarations as appropriate).
   *)
-  List.iter (fun (sh, (_, decl)) ->
-    let uid = decl.type_uid in
-    Uid.Tbl.add Type_shape.all_type_decls uid sh;
-  ) (List.combine shapes decls);
+  if !Clflags.debug && not !Clflags.use_old_merlin_shapes then
+    List.iter (fun (sh, (_, decl)) ->
+      let uid = decl.type_uid in
+      Uid.Tbl.add Type_shape.all_type_decls uid sh;
+    ) (List.combine shapes decls);
   (* Keep original declaration *)
   let final_decls =
     List.map2

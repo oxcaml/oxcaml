@@ -14,7 +14,7 @@ val x : unit = ()
 external y : int -> int = "%identity"
 [%%expect{|
 {
- "y"[value] -> <.2>;
+ "y"[value] -> <.1>;
  }
 external y : int -> int = "%identity"
 |}]
@@ -23,11 +23,11 @@ type t = A of foo
 and foo = Bar
 [%%expect{|
 {
- "foo"[type] -> {<.4>
-                 "Bar"[constructor] -> {<.6>};
+ "foo"[type] -> {<.3>
+                 "Bar"[constructor] -> {<.5>};
                  };
- "t"[type] -> {<.3>
-               "A"[constructor] -> {<.5>};
+ "t"[type] -> {<.2>
+               "A"[constructor] -> {<.4>};
                };
  }
 type t = A of foo
@@ -39,7 +39,7 @@ module type S = sig
 end
 [%%expect{|
 {
- "S"[module type] -> <.8>;
+ "S"[module type] -> <.7>;
  }
 module type S = sig type t end
 |}]
@@ -47,7 +47,7 @@ module type S = sig type t end
 exception E
 [%%expect{|
 {
- "E"[extension constructor] -> {<.9>};
+ "E"[extension constructor] -> {<.8>};
  }
 exception E
 |}]
@@ -55,7 +55,7 @@ exception E
 type ext = ..
 [%%expect{|
 {
- "ext"[type] -> <.10>;
+ "ext"[type] -> <.9>;
  }
 type ext = ..
 |}]
@@ -63,8 +63,8 @@ type ext = ..
 type ext += A | B
 [%%expect{|
 {
- "A"[extension constructor] -> {<.11>};
- "B"[extension constructor] -> {<.12>};
+ "A"[extension constructor] -> {<.10>};
+ "B"[extension constructor] -> {<.11>};
  }
 type ext += A | B
 |}]
@@ -74,8 +74,8 @@ module M = struct
 end
 [%%expect{|
 {
- "M"[module] -> {<.14>
-                 "C"[extension constructor] -> {<.13>};
+ "M"[module] -> {<.13>
+                 "C"[extension constructor] -> {<.12>};
                  };
  }
 module M : sig type ext += C end
@@ -104,16 +104,16 @@ end
 [%%expect{|
 {
  "M1"[module] -> {
-                  "t"[type] -> {<.28>
-                                "C"[constructor] -> {<.29>};
+                  "t"[type] -> {<.27>
+                                "C"[constructor] -> {<.28>};
                                 };
                   };
  "M2"[module] ->
    {
-    "t"[type] -> {<.30>
-                  "T"[constructor] -> {<.31>};
+    "t"[type] -> {<.29>
+                  "T"[constructor] -> {<.30>};
                   };
-    "x"[value] -> <.32>;
+    "x"[value] -> <.31>;
     };
  }
 module rec M1 : sig type t = C of M2.t end
@@ -123,9 +123,9 @@ and M2 : sig type t val x : t end
 class c = object end
 [%%expect{|
 {
- "c"[type] -> <.34>;
- "c"[class] -> <.34>;
- "c"[class type] -> <.34>;
+ "c"[type] -> <.32>;
+ "c"[class] -> <.32>;
+ "c"[class type] -> <.32>;
  }
 class c : object  end
 |}]
@@ -133,8 +133,8 @@ class c : object  end
 class type c = object end
 [%%expect{|
 {
- "c"[type] -> <.37>;
- "c"[class type] -> <.37>;
+ "c"[type] -> <.35>;
+ "c"[class type] -> <.35>;
  }
 class type c = object  end
 |}]
@@ -142,7 +142,7 @@ class type c = object  end
 type u = t
 [%%expect{|
 {
- "u"[type] -> <.38>;
+ "u"[type] -> <.36>;
  }
 type u = t
 |}]
