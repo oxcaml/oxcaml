@@ -77,6 +77,10 @@ module Llvm_typ = struct
     | Double (* 64 bit *)
     | Ptr
     | Struct of t list
+    | Array of
+        { size : int;
+          elem_typ : t
+        }
 
   let i64 = Int { width_in_bits = 64 }
 
@@ -116,6 +120,7 @@ module Llvm_typ = struct
       fprintf ppf "{ %a }"
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ", ") pp_t)
         typs
+    | Array { size; elem_typ } -> fprintf ppf "[ %d x %a ]" size pp_t elem_typ
 
   let to_string t = Format.asprintf "%a" pp_t t
 
@@ -124,7 +129,11 @@ module Llvm_typ = struct
     | Int { width_in_bits = x }, Int { width_in_bits = y } -> x = y
     | Float, Float | Double, Double | Ptr, Ptr -> true
     | Struct xs, Struct ys -> List.equal equal xs ys
-    | Int _, _ | Float, _ | Double, _ | Ptr, _ | Struct _, _ -> false
+    | ( Array { size = size1; elem_typ = typ1 },
+        Array { size = size2; elem_typ = typ2 } ) ->
+      size1 = size2 && equal typ1 typ2
+    | Int _, _ | Float, _ | Double, _ | Ptr, _ | Struct _, _ | Array _, _ ->
+      false
 end
 
 module Calling_conventions = struct
@@ -997,23 +1006,34 @@ module F = struct
      [data_item] *)
   let typ_of_data_item (d : Cmm.data_item) =
     match d with
-    | Cdefine_symbol _ -> assert false (* cannot happen *)
-    | Cint _ -> Llvm_typ.Int { width_in_bits = 64 }
+    | Cdefine_symbol _ | Calign _ | Csymbol_offset _ ->
+      (* [Calign] and [Csymbol_offset] are never produced *)
+      Misc.fatal_error "Llvmize: unexpected data item"
+    | Cint _ -> Llvm_typ.i64
+    | Cint8 _ -> Llvm_typ.i8
+    | Cint16 _ -> Llvm_typ.i16
+    | Cint32 _ -> Llvm_typ.i32
     | Csymbol_address _ -> Llvm_typ.Ptr
-    | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
-    | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
-      ->
-      Misc.fatal_error "Llvmize.typ_of_data_item: not implemented"
+    | Cstring s ->
+      Llvm_typ.Array { size = String.length s; elem_typ = Llvm_typ.i8 }
+    | Cskip size -> Llvm_typ.Array { size; elem_typ = Llvm_typ.i8 }
+    | Csingle _ -> Llvm_typ.float
+    | Cdouble _ -> Llvm_typ.double
+    | Cvec128 _ | Cvec256 _ | Cvec512 _ ->
+      Misc.fatal_error "Llvmize: vector data items not implemented"
 
   let pp_const_data_item ppf (d : Cmm.data_item) =
     match d with
-    | Cdefine_symbol _ -> assert false (* cannot happen *)
-    | Cint n -> fprintf ppf "%s" (Nativeint.to_string n)
+    | Cdefine_symbol _ | Calign _ | Csymbol_offset _ ->
+      Misc.fatal_error "Llvmize.typ_of_data_item: unexpected data item"
+    | Cint n | Cint32 n -> fprintf ppf "%s" (Nativeint.to_string n)
+    | Cint8 n | Cint16 n -> fprintf ppf "%d" n
     | Csymbol_address { sym_name; sym_global = _ } -> pp_global ppf sym_name
-    | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
-    | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
-      ->
-      Misc.fatal_error "Llvmize.pp_const_data_item: not implemented"
+    | Cstring s -> fprintf ppf "c\"%s\"" s
+    | Cskip _ -> fprintf ppf "zeroinitializer"
+    | Csingle f | Cdouble f -> fprintf ppf "%f" f
+    | Cvec128 _ | Cvec256 _ | Cvec512 _ ->
+      Misc.fatal_error "Llvmize: vector data item snot implemented"
 
   let pp_typ_and_const ppf (d : Cmm.data_item) =
     fprintf ppf "%a %a" Llvm_typ.pp_t (typ_of_data_item d) pp_const_data_item d
