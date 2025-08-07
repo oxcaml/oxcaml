@@ -199,6 +199,7 @@ type fun_info =
   { fun_name : string;
     fun_has_try : bool;
         (** Whether the function contains try blocks (which means LLVM will always use a frame pointer) *)
+    fun_ret_type : Cmm.machtype;
     ident_gen : Ident.Gen.t;
     reg2ident : Ident.t Reg.Tbl.t;  (** Map register's stamp to identifier  *)
     label2ident : Ident.t Label.Tbl.t;
@@ -228,9 +229,10 @@ type t =
            functions involved in generating try blocks *)
   }
 
-let create_fun_info ~fun_name ~fun_has_try =
+let create_fun_info ~fun_name ~fun_has_try ~fun_ret_type =
   { fun_name;
     fun_has_try;
+    fun_ret_type;
     ident_gen = Ident.Gen.create ();
     reg2ident =
       Reg.Tbl.create 37 (* CR yusumez: change this to be more reasonable *);
@@ -248,15 +250,16 @@ let create ~llvmir_filename ~ppf_dump =
     ppf;
     ppf_dump;
     current_fun_info =
-      create_fun_info ~fun_name:"<no current function>" ~fun_has_try:false;
+      create_fun_info ~fun_name:"<no current function>" ~fun_has_try:false
+        ~fun_ret_type:[||];
     defined_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty;
     called_functions = String.Map.empty;
     emit_exn_intrinsic_decls = false
   }
 
-let reset_fun_info t ~fun_name ~fun_has_try =
-  t.current_fun_info <- create_fun_info ~fun_name ~fun_has_try
+let reset_fun_info t ~fun_name ~fun_has_try ~fun_ret_type =
+  t.current_fun_info <- create_fun_info ~fun_name ~fun_has_try ~fun_ret_type
 
 let get_ident_aux table key ~get_ident ~find_opt ~add =
   match find_opt table key with
@@ -516,13 +519,14 @@ module F = struct
 
   (* Auxiliary function to passing non-local-identifier arguments (like poison
      or global idents). *)
-  let ins_call_custom_arg ~attrs ~cc ~pp_name t name args res =
+  let ins_call_custom_arg ~attrs ~tail ~cc ~pp_name t name args res =
     let pp_arg ppf (typ, arg) =
       fprintf ppf "%a %a" Llvm_typ.pp_t typ Llvm_value.pp_t arg
     in
+    let tail_str = if tail then "musttail" else "" in
     let cc_str = Calling_conventions.to_llvmir_string cc in
     let pp_call res_typ ppf () =
-      fprintf ppf "call %s %s %a(%a) %s" cc_str res_typ pp_name name
+      fprintf ppf "%s call %s %s %a(%a) %s" tail_str cc_str res_typ pp_name name
         (pp_print_list ~pp_sep:pp_comma pp_arg)
         args attrs
     in
@@ -531,8 +535,8 @@ module F = struct
       ins t "%a = %a" pp_ident res (pp_call (Llvm_typ.to_string res_typ)) ()
     | None -> ins t "%a" (pp_call "void") ()
 
-  let ins_call ?(attrs = "") ~cc ~pp_name t name args res =
-    ins_call_custom_arg ~attrs ~cc ~pp_name t name
+  let ins_call ?(attrs = "") ?(tail = false) ~cc ~pp_name t name args res =
+    ins_call_custom_arg ~attrs ~tail ~cc ~pp_name t name
       (List.map (fun (typ, arg) -> typ, Llvm_value.Local_ident arg) args)
       res
 
@@ -674,7 +678,7 @@ module F = struct
       Llvm_typ.(Struct [Struct runtime_reg_types; Struct res_types])
     in
     let res_ident = fresh_ident t in
-    ins_call_custom_arg ~attrs ~cc ~pp_name t fn args
+    ins_call_custom_arg ~attrs ~cc ~tail:false ~pp_name t fn args
       (Some (res_type, res_ident));
     List.iteri
       (fun idx reg ->
@@ -689,8 +693,8 @@ module F = struct
         res)
       res_types
 
-  let call t (i : Cfg.terminator Cfg.instruction) (op : Cfg.func_call_operation)
-      label_after =
+  let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
+      (op : Cfg.func_call_operation) =
     (* Prepare arguments *)
     let args_begin, args_end =
       (* [Indirect] has the function in i.arg.(0) *)
@@ -719,7 +723,11 @@ module F = struct
       (* CR yusumez: check whether registers actually get returned in ds...? *)
       |> List.filter (fun reg -> not (Reg.is_domainstate reg))
     in
-    let res_type = make_ret_type (List.map (fun reg -> reg.Reg.typ) res_regs) in
+    let res_type =
+      if tail
+      then make_ret_type (Array.to_list t.current_fun_info.fun_ret_type)
+      else make_ret_type (List.map (fun reg -> reg.Reg.typ) res_regs)
+    in
     let do_call ~pp_name fn =
       let res_ident = fresh_ident t in
       (* CR yusumez: Despite frame pointers being disabled and no register
@@ -729,12 +737,13 @@ module F = struct
          pointer in such a function. And, unfortunately, LLVM doesn't save RBP
          in that case (perhaps because it is handled specially), so we have to
          do it ourselves ._. *)
-      let should_save_rbp = t.current_fun_info.fun_has_try in
+      let should_save_rbp = t.current_fun_info.fun_has_try && not tail in
       if should_save_rbp
-      then ins t {|call void asm sideeffect "push %%rbp", "~{rsp},~{rbp}"()|};
-      ins_call ~cc:Ocaml ~pp_name t fn args (Some (res_type, res_ident));
+      then ins t {|call void asm sideeffect "push %%rbp", "~{rsp}"()|};
+      ins_call ~tail:true ~cc:Ocaml ~pp_name t fn args
+        (Some (res_type, res_ident));
       if should_save_rbp
-      then ins t {|call void asm sideeffect "pop %%rbp", "~{rsp},~{rbp}"()|};
+      then ins t {|call void asm sideeffect "pop %%rbp", "~{rsp}"()|};
       res_ident
     in
     (* Do the call *)
@@ -751,20 +760,24 @@ module F = struct
           ~src_typ:Llvm_typ.i64 ~dst_typ:Llvm_typ.ptr;
         do_call ~pp_name:pp_ident fun_ptr_temp
     in
-    (* Unpack return value *)
-    List.iteri
-      (fun idx reg ->
-        let temp = fresh_ident t in
-        ins_extractvalue t ~arg:res_ident ~res:temp res_type [0; idx];
-        ins_store t ~src:temp ~dst:reg Llvm_typ.ptr)
-      runtime_regs;
-    List.iteri
-      (fun idx reg ->
-        let temp = fresh_ident t in
-        ins_extractvalue t ~arg:res_ident ~res:temp res_type [1; idx];
-        ins_store_into_reg t temp reg)
-      res_regs;
-    ins_branch t label_after
+    if tail
+    then
+      (* Return as is *)
+      ins t "ret %a %a" Llvm_typ.pp_t res_type pp_ident res_ident
+    else (
+      (* Unpack return value *)
+      List.iteri
+        (fun idx reg ->
+          let temp = fresh_ident t in
+          ins_extractvalue t ~arg:res_ident ~res:temp res_type [0; idx];
+          ins_store t ~src:temp ~dst:reg Llvm_typ.ptr)
+        runtime_regs;
+      List.iteri
+        (fun idx reg ->
+          let temp = fresh_ident t in
+          ins_extractvalue t ~arg:res_ident ~res:temp res_type [1; idx];
+          ins_store_into_reg t temp reg)
+        res_regs)
 
   let return t (i : Cfg.terminator Cfg.instruction) =
     (* Build up return value on the stack and return it. *)
@@ -804,7 +817,7 @@ module F = struct
     ins t "ret %a %a" Llvm_typ.pp_t res_type pp_ident filled
 
   let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
-      ~stack_ofs ~stack_align ~label_after =
+      ~stack_ofs ~stack_align =
     let get_c_stack () =
       let c_stack_addr = load_domainstate_addr t Domain_c_stack in
       let res = fresh_ident t in
@@ -886,9 +899,7 @@ module F = struct
     (* Do the thing *)
     let res_idents = call_func args res_types in
     (* Unpack return values (is it possible to have multiple?) *)
-    List.iter2 (ins_store_into_reg t) res_idents (Array.to_list i.res);
-    (* ...and branch away! *)
-    ins_branch t label_after
+    List.iter2 (ins_store_into_reg t) res_idents (Array.to_list i.res)
 
   let terminator t (i : Cfg.terminator Cfg.instruction) =
     pp_dbg_instr_terminator t.ppf i;
@@ -986,14 +997,23 @@ module F = struct
       line t.ppf "%a:" Ident.print eq_or_uo;
       let is_eq = float_comp t Cmm.CFeq i typ in
       ins_branch_cond t is_eq eq uo
-    | Call { op; label_after } -> call t i op label_after
+    | Call { op; label_after } ->
+      call t i op;
+      ins_branch t label_after
     | Prim { op; label_after } -> (
       match op with
       | Probe _ -> not_implemented_terminator ~msg:"probe" i
       | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
-        extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align ~label_after)
-    | Switch _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _ ->
-      not_implemented_terminator i
+        extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
+        ins_branch t label_after)
+    | Tailcall_self { destination = _ } ->
+      Misc.fatal_errorf "Llvmize: tailcall self - arg = %d, res = %d"
+        (Array.length i.arg) (Array.length i.res)
+    (* ins_branch t destination *)
+    | Tailcall_func op ->
+      (* ...hopefully llvm does the tail call optimisation itself! *)
+      call ~tail:true t i op
+    | Switch _ | Call_no_return _ -> not_implemented_terminator i
 
   let int_op t (i : Cfg.basic Cfg.instruction)
       (op : Operation.integer_operation) ~imm =
@@ -1564,7 +1584,7 @@ let cfg (cl : CL.t) =
     DLL.exists layout ~f:(fun label ->
         (Label.Tbl.find blocks label).is_trap_handler)
   in
-  reset_fun_info t ~fun_name ~fun_has_try;
+  reset_fun_info t ~fun_name ~fun_has_try ~fun_ret_type;
   t.defined_symbols <- String.Set.add fun_name t.defined_symbols;
   (* Make fresh idents for argument regs since these will be different from
      idents assigned to them later on *)
