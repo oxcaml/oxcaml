@@ -171,8 +171,6 @@ type t =
     mutable current_fun_info : fun_info;
         (* Maintains the state of the current function (reset for every
            function) *)
-    mutable data : Cmm.data_item list;
-        (* Collects data items as they come and processes them at the end *)
     mutable defined_symbols : String.Set.t;
         (* Function symbols defined so far *)
     mutable referenced_symbols : String.Set.t;
@@ -198,7 +196,6 @@ let create ~llvmir_filename ~ppf_dump =
     ppf;
     ppf_dump;
     current_fun_info = create_fun_info ();
-    data = [];
     defined_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty;
     called_functions = String.Map.empty
@@ -323,7 +320,12 @@ module F = struct
 
   let pp_machtyp_component ppf c = Format.fprintf ppf "%s" (machtyp_component c)
 
-  let pp_global ppf s = fprintf ppf "@%s" s
+  let pp_global ppf s =
+    (* This is to escape unacceptable symbols (like brackets or commas) in
+       global identifiers (which might be the case in e.g. anonymous
+       functions) *)
+    let encoded = Asm_targets.(Asm_symbol.create s |> Asm_symbol.encode) in
+    fprintf ppf "@%s" encoded
 
   let pp_ident ppf ident = fprintf ppf "%%%a" Ident.print ident
 
@@ -1016,8 +1018,10 @@ module F = struct
   let pp_typ_and_const ppf (d : Cmm.data_item) =
     fprintf ppf "%a %a" Llvm_typ.pp_t (typ_of_data_item d) pp_const_data_item d
 
-  let data_decl t sym (ds : Cmm.data_item list) =
-    line t.ppf "%a = global %a { %a }" pp_global sym Llvm_typ.pp_t
+  let data_decl ?(private_ = false) t sym (ds : Cmm.data_item list) =
+    line t.ppf "%a = %s global %a { %a }, align 8" pp_global sym
+      (if private_ then "private" else "")
+      Llvm_typ.pp_t
       (Llvm_typ.Struct (List.map typ_of_data_item ds))
       (pp_print_list ~pp_sep:pp_comma pp_typ_and_const)
       ds
@@ -1217,56 +1221,50 @@ let cfg (cl : CL.t) =
   let fun_ret_type = make_ret_type (Array.to_list fun_ret_type) in
   F.define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body
 
-(* CR yusumez: Implement this *)
-let data ds =
-  let t = get_current_compilation_unit "data" in
-  t.data <- List.append t.data ds
+(* CR yusumez: We make some assumptions about the structure of the data items we
+   receive. Ideally, [data_item]s would be represented in a more structured
+   manner, but this should do for now. The assumptions are:
 
-(* Define menitoned but not declared data items as extern *)
-let emit_data_extern t =
-  List.iter
-    (fun (d : Cmm.data_item) ->
-      match d with
-      | Cdefine_symbol { sym_name; sym_global = _ } ->
-        (* [t.defined_symbols] now tracks all defined symbols *)
-        t.defined_symbols <- String.Set.add sym_name t.defined_symbols
-      | Csymbol_address { sym_name; sym_global = _ } ->
-        t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
-      | Cint _ | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _
-      | Cvec128 _ | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _
-      | Cskip _ | Calign _ ->
-        ())
-    t.data;
+   - [Calign] is not used anywhere (?)
+
+   - [Cdefine_symbol] occurs in the begining and exactly once.
+
+   - [Cint] might optionally appear before the symbol definition as the
+   header *)
+let make_temp_data_symbol =
+  let idx = ref 0 in
+  fun () ->
+    let res = ".temp" ^ Int.to_string !idx in
+    idx := !idx + 1;
+    res
+
+let data (ds : Cmm.data_item list) =
+  let t = get_current_compilation_unit "data" in
+  let define_symbol ?private_ symbol contents =
+    F.data_decl ?private_ t symbol contents;
+    t.defined_symbols <- String.Set.add symbol t.defined_symbols;
+    List.iter
+      (fun (d : Cmm.data_item) ->
+        match[@warning "-4"] d with
+        | Csymbol_address { sym_name; sym_global = _ } ->
+          t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
+        | _ -> ())
+      contents
+  in
+  match[@warning "-4"] ds with
+  | [] -> ()
+  | Cint header :: Cdefine_symbol { sym_name; sym_global = _ } :: contents ->
+    let header_sym = ".header." ^ sym_name in
+    define_symbol ~private_:true header_sym [Cint header];
+    define_symbol sym_name contents
+  | Cdefine_symbol { sym_name; sym_global = _ } :: contents ->
+    define_symbol sym_name contents
+  | ds -> define_symbol ~private_:true (make_temp_data_symbol ()) ds
+
+(* Declare menitoned but not declared data items as extern *)
+let declare_data t =
   String.Set.diff t.referenced_symbols t.defined_symbols
   |> String.Set.iter (fun sym -> F.data_decl_extern t sym)
-
-(* CR yusumez: We do this cumbersome list wrangling since we receive data
-   declarations as a flat list. Ideally, [data_item]s would be represented in a
-   more structured manner which we can directly pass on to [declare]. *)
-let emit_data t =
-  let declare = F.data_decl t in
-  let fail msg =
-    Misc.fatal_error ("Llvmize: data item not implemented: " ^ msg)
-  in
-  let cur_sym, ds =
-    List.fold_left
-      (fun (cur_sym, ds) (d : Cmm.data_item) ->
-        match d with
-        | Cdefine_symbol { sym_name; sym_global = _ } ->
-          Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
-          Some sym_name, []
-        | Cint _ | Csymbol_address _ -> cur_sym, ds @ [d]
-        | Calign _ -> fail "align"
-        | Cint8 _ | Cint16 _ | Cint32 _ -> fail "int"
-        | Csingle _ | Cdouble _ -> fail "float"
-        | Cvec128 _ | Cvec256 _ | Cvec512 _ -> fail "vec"
-        | Csymbol_offset _ -> fail "symbol offset"
-        | Cstring _ -> fail "string"
-        | Cskip _ -> fail "skip")
-      (None, []) t.data
-  in
-  Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
-  emit_data_extern t
 
 let declare_functions t =
   String.Map.iter
@@ -1337,7 +1335,7 @@ let end_assembly () =
   declare_functions t;
   Format.pp_print_newline t.ppf ();
   (* Emit data declarations *)
-  emit_data t;
+  declare_data t;
   Format.pp_print_newline t.ppf ();
   F.symbol_decl t "data_end";
   F.empty_fun_decl t "code_end";
