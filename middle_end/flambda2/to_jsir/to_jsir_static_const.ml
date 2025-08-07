@@ -1,34 +1,19 @@
 let static_const_not_supported () =
   Misc.fatal_error "This static_const is not yet supported."
 
-let const_or_var ~env ~res ~symbol ~to_jsir_const
-    (const_or_var : 'a Or_variable.t) =
+let const_or_var ~f (const_or_var : 'a Or_variable.t) =
   match const_or_var with
-  | Const c ->
-    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
-      (Constant (to_jsir_const c))
-  | Var (var, _dbg) ->
-    To_jsir_env.add_symbol_alias_of_var_exn env ~symbol ~alias_of:var, res
+  | Var _ ->
+    (* When we are compiling with ocamlj, we turn off static allocation of
+       values that are only determined at runtime (i.e. values containing
+       variables. See [Closure_conversion.classify_fields_of_block],
+       [Reify.reify] and [Simplify_set_of_closures]. *)
+    Misc.fatal_error "Found a variable in Static_const"
+  | Const c -> f c
 
-let const_or_var_to_var ~env ~res ~to_jsir_const
-    (const_or_var : 'a Or_variable.t) =
-  match const_or_var with
-  | Const c ->
-    let var = Jsir.Var.fresh () in
-    ( var,
-      env,
-      To_jsir_result.add_instr_exn res (Let (var, Constant (to_jsir_const c))) )
-  | Var (var, _dbg) -> To_jsir_env.get_var_exn env var, env, res
-
-let const_or_vars_to_vars ~env ~res ~to_jsir_const const_or_vars =
-  let vars, env, res =
-    List.fold_right
-      (fun v (vars, env, res) ->
-        let var, env, res = const_or_var_to_var ~env ~res ~to_jsir_const v in
-        var :: vars, env, res)
-      const_or_vars ([], env, res)
-  in
-  Array.of_list vars, env, res
+let bind_const_or_var_to_symbol ~env ~res ~symbol ~to_jsir_const x =
+  To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+    (Constant (const_or_var ~f:to_jsir_const x))
 
 let float32_to_jsir_const float32 : Jsir.constant =
   Float32
@@ -58,24 +43,32 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     in
     To_jsir_shared.bind_expr_to_symbol ~env ~res symbol expr
   | Boxed_float32 value ->
-    const_or_var ~env ~res ~symbol ~to_jsir_const:float32_to_jsir_const value
+    bind_const_or_var_to_symbol ~env ~res ~symbol
+      ~to_jsir_const:float32_to_jsir_const value
   | Boxed_float value ->
-    const_or_var ~env ~res ~symbol ~to_jsir_const:float_to_jsir_const value
+    bind_const_or_var_to_symbol ~env ~res ~symbol
+      ~to_jsir_const:float_to_jsir_const value
   | Boxed_int32 value ->
-    const_or_var ~env ~res ~symbol ~to_jsir_const:int32_to_jsir_const value
+    bind_const_or_var_to_symbol ~env ~res ~symbol
+      ~to_jsir_const:int32_to_jsir_const value
   | Boxed_int64 value ->
-    const_or_var ~env ~res ~symbol ~to_jsir_const:int64_to_jsir_const value
+    bind_const_or_var_to_symbol ~env ~res ~symbol
+      ~to_jsir_const:int64_to_jsir_const value
   | Boxed_nativeint value ->
-    const_or_var ~env ~res ~symbol ~to_jsir_const:nativeint_to_jsir_const value
+    bind_const_or_var_to_symbol ~env ~res ~symbol
+      ~to_jsir_const:nativeint_to_jsir_const value
   | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _ ->
     (* Need SIMD *)
     static_const_not_supported ()
   | Immutable_float_block values | Immutable_float_array values ->
-    let vars, env, res =
-      const_or_vars_to_vars ~env ~res ~to_jsir_const:float_to_jsir_const values
+    let values =
+      List.map
+        (const_or_var ~f:Numeric_types.Float_by_bit_pattern.to_bits)
+        values
+      |> Array.of_list
     in
     To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
-      (Block (Tag.double_array_tag |> Tag.to_int, vars, Array, Immutable))
+      (Constant (Float_array values))
   | Immutable_float32_array values ->
     ignore values;
     static_const_not_supported ()

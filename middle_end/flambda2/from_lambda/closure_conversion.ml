@@ -1231,7 +1231,7 @@ let classify_fields_of_block env fields alloc_mode =
          (fun simple_with_dbg ->
            Simple.is_var (Simple.With_debuginfo.simple simple_with_dbg))
          fields
-    then Computed_static fields
+    then if !Clflags.jsir then Dynamic_block else Computed_static fields
     else Constant fields
 
 let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
