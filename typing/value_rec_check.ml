@@ -985,14 +985,14 @@ let rec expression : Typedtree.expression -> term_judg =
           *)
           match param.fp_kind with
           | Tparam_pat pat -> pat
-          | Tparam_optional_default (pat, _, _) -> pat
+          | Tparam_optional_default (pat, _, _, _) -> pat
         in
         (* Optional argument defaults.
            G |-{def} P : m
         *)
         let param_default param =
           match param.fp_kind with
-          | Tparam_optional_default (_, default, _) ->
+          | Tparam_optional_default (_, default, _, _) ->
                   (*
                       G |- e : m
                       ------------------

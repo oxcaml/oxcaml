@@ -1,0 +1,21 @@
+File "incompatible_gen_opt.ml", lines 15-19, characters 15-3:
+15 | ...............struct
+16 |   (* This should fail - implementation uses or_null but interface declares
+17 |      option *)
+18 |   let f (?(x = 42) : int or_null) () = x
+19 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : (?x):int or_null -> unit -> int @@ stateless end
+       is not included in
+         S
+       Values do not match:
+         val f : (?x):int or_null -> unit -> int @@ stateless
+       is not included in
+         val f : (?x):int option -> unit -> int
+       The type "(?x):int or_null -> unit -> int"
+       is not compatible with the type "(?x):int option -> unit -> int"
+       File "incompatible_gen_opt.ml", line 12, characters 2-40:
+         Expected declaration
+       File "incompatible_gen_opt.ml", line 18, characters 6-7:
+         Actual declaration

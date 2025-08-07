@@ -159,6 +159,7 @@ type error =
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error
   | Bad_unboxed_attribute of string
+  | Bad_option_like_attribute of string
   | Boxed_and_unboxed
   | Nonrec_gadt
   | Invalid_private_row_declaration of type_expr

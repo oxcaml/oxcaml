@@ -132,6 +132,10 @@ let arg_label i ppf = function
   | Nolabel -> line i ppf "Nolabel\n"
   | Optional s -> line i ppf "Optional \"%s\"\n" s
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
+  | Generic_optional s ->
+      line i ppf "Generic_optional\n";
+      string i ppf s
+
 
 let modality i ppf modality =
   line i ppf "modality %a\n" fmt_string_loc

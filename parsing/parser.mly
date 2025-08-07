@@ -2687,10 +2687,15 @@ labeled_simple_pattern:
       { (Optional (fst $3), $4, snd $3) }
   | QUESTION label_var
       { (Optional (fst $2), None, snd $2) }
+  | LPAREN QUESTION label_let_pattern_with_default RPAREN
+      { let (lab, pat, default) = $3 in
+        (Generic_optional lab, default, pat) }
   | OPTLABEL LPAREN let_pattern opt_default RPAREN
       { (Optional $1, $4, $3) }
   | OPTLABEL pattern_var
       { (Optional $1, None, $2) }
+  | LPAREN OPTLABEL let_pattern_with_default RPAREN
+      { (Generic_optional $2, snd $3, fst $3) }
   | TILDE LPAREN label_let_pattern RPAREN
       { (Labelled (fst $3), None, snd $3) }
   | TILDE label_var
@@ -2710,6 +2715,11 @@ pattern_var:
 
 %inline opt_default:
   preceded(EQUAL, seq_expr)?
+    { $1 }
+;
+
+%inline required_default:
+  preceded(EQUAL, seq_expr)
     { $1 }
 ;
 
@@ -2734,6 +2744,29 @@ label_let_pattern:
         lab, pat
       }
 ;
+
+(* special syntax for generic optional: default requires parenthesis *)
+generic_optional_default(X):
+    LPAREN x = X
+    default = required_default RPAREN
+    { x, Some default }
+  | x = X
+    { x, None }
+
+label_let_pattern_with_default:
+    modes0 = optional_mode_expr_legacy
+    v_default = generic_optional_default(label_var)
+    cty_modes1 = optional_poly_type_and_modes
+      { let x, default = v_default in
+        let lab, pat = x in
+        let cty, modes1 = cty_modes1 in
+        let modes = modes0 @ modes1 in
+        let loc = $startpos(modes0), $endpos(cty_modes1) in
+        let pat = mkpat_with_modes ~loc ~pat ~cty ~modes in
+        lab, pat, default
+      }
+;
+
 %inline label_var:
     mkrhs(LIDENT)
       { ($1.Location.txt, mkpat ~loc:$sloc (Ppat_var $1)) }
@@ -2746,6 +2779,19 @@ let_pattern:
       let modes = modes0 @ modes1 in
       let loc = $startpos(modes0), $endpos(cty_modes1) in
       mkpat_with_modes ~loc ~pat ~cty ~modes
+    }
+;
+
+let_pattern_with_default:
+    modes0 = optional_mode_expr_legacy
+    pat_default = generic_optional_default(pattern)
+    cty_modes1 = optional_poly_type_and_modes
+    {
+      let pat, default = pat_default in
+      let cty, modes1 = cty_modes1 in
+      let modes = modes0 @ modes1 in
+      let loc = $startpos(modes0), $endpos(cty_modes1) in
+      mkpat_with_modes ~loc ~pat ~cty ~modes, default
     }
 ;
 
@@ -4514,6 +4560,8 @@ strict_function_or_labeled_tuple_type:
       { Optional label }
   | label = LIDENT COLON
       { Labelled label }
+  | LPAREN QUESTION label = LIDENT RPAREN COLON
+      { Generic_optional label }
 ;
 
 %inline arg_label:

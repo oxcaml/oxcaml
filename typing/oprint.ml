@@ -416,6 +416,7 @@ let print_arg_label_and_out_type ppf (lbl : arg_label) ty ~print_type =
   | Labelled l -> fprintf ppf "%a:%a" print_lident l print_type ty
   | Position l -> fprintf ppf "%a:[%%call_pos]" print_lident l
   | Optional l -> fprintf ppf "?%a:%a" print_lident l print_type ty
+  | Generic_optional (l) -> fprintf ppf "(?%a):%a" print_lident l print_type ty
 
 let rec print_out_type_0 ppf =
   function

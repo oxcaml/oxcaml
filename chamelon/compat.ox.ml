@@ -144,7 +144,9 @@ let mkTexp_function ?(id = texp_function_defaults)
                 (match optional_default with
                 | None -> Tparam_pat pattern
                 | Some default ->
-                    Tparam_optional_default (pattern, default, id.param_sort));
+                    let mpath = Btype.get_optional_module_path_exn arg_label in
+                    Tparam_optional_default
+                      (pattern, default, id.param_sort, mpath));
               fp_param = param;
               fp_param_debug_uid = Lambda.debug_uid_none;
               fp_partial = partial;
@@ -215,6 +217,7 @@ type matched_expression_desc =
 let untype_label = function
   | Typedtree.Position l | Labelled l -> Asttypes.Labelled l
   | Optional l -> Optional l
+  | Generic_optional (_, l) -> Generic_optional l
   | Nolabel -> Nolabel
 
 let view_texp (e : expression_desc) =
@@ -236,7 +239,7 @@ let view_texp (e : expression_desc) =
           (fun param ->
             let pattern, optional_default =
               match param.fp_kind with
-              | Tparam_optional_default (pattern, optional_default, _) ->
+              | Tparam_optional_default (pattern, optional_default, _, _) ->
                   (pattern, Some optional_default)
               | Tparam_pat pattern -> (pattern, None)
             in

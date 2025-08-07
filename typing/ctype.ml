@@ -3337,8 +3337,14 @@ let rec expands_to_datatype env ty =
       end
   | _ -> false
 
+(* CR generic-optional: This function was needed because [Generic_optional]
+   contained [Location.loc], which needs to be ignored. But now it no longer
+   contains it. *)
+(* CR generic-optional: Investigate whether this is needed to handle aliases *)
+let arg_label_equal l1 l2 = l1 = l2
+
 let equivalent_with_nolabels l1 l2 =
-  l1 = l2 || (match l1, l2 with
+  arg_label_equal l1 l2 || (match l1, l2 with
   | (Nolabel | Labelled _), (Nolabel | Labelled _) -> true
   | _ -> false)
 
@@ -4010,7 +4016,7 @@ and unify3 uenv t1 t1' t2 t2' =
         (Tarrow ((l1,a1,r1), t1, u1, c1),
          Tarrow ((l2,a2,r2), t2, u2, c2))
            when
-             (l1 = l2 ||
+             (arg_label_equal l1 l2 ||
               (!Clflags.classic || in_pattern_mode uenv) &&
                equivalent_with_nolabels l1 l2) ->
           unify_alloc_mode_for Unify a1 a2;
@@ -4557,27 +4563,51 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
+(* CR generic-optional: Remove predef_ prefix when adding non-predef paths *)
+let predef_path_of_optional_module_path = function
+  | Stdlib_option -> Predef.path_option
+  | Stdlib_or_null -> Predef.path_or_null
+
+(* CR generic-optional: Remove predef_ prefix when adding non-predef jkinds *)
+let predef_jkind_of_optional_module_path = function
+  | Stdlib_option -> Predef.option_argument_jkind
+  | Stdlib_or_null -> Jkind.for_or_null_argument Predef.ident_or_null
+
 let filter_arrow env t l ~force_tpoly =
   let function_type level =
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let ty_arg =
       if not force_tpoly then begin
+        (* polymorphic arguments are never optional *)
         assert (not (is_optional l));
         newvar2 level k_arg
       end else begin
         let t1 =
-          if is_optional l then
-            newty2 ~level
-              (* CR layouts v5: Change the Jkind.Builtin.value when option can
-                 hold non-values. *)
-              (Tconstr(Predef.path_option,
-                       [newvar2 level Predef.option_argument_jkind],
-                       ref Mnil))
-          else if is_position l then
-            newty2 ~level (Tconstr (Predef.path_lexing_position, [], ref Mnil))
-          else
-            newvar2 level k_arg
+          match classify_optionality l with
+          | Optional_arg mpath ->
+            (* CR: For generic optional arguments, we need to construct the
+                appropriate type based on the module path. e.g.
+
+              {v
+              let type_ident : Longident.t
+                = Ldot (Ldot (path.txt, "Opt_syntax"), "t") in
+              let (path, _) = Env.lookup_type ~loc:path.loc type_ident env in
+              v}
+
+            *)
+            let t_cons, arg_jkind =
+              predef_path_of_optional_module_path mpath,
+                predef_jkind_of_optional_module_path mpath
+            in
+            newty2 ~level (Tconstr(t_cons,
+              [newvar2 level arg_jkind], ref Mnil))
+          | Required_or_position_arg ->
+            if is_position l then
+              newty2 ~level
+                (Tconstr (Predef.path_lexing_position, [], ref Mnil))
+            else
+              newvar2 level k_arg
         in
         newty2 ~level (Tpoly(t1, []))
       end
@@ -4615,7 +4645,7 @@ let filter_arrow env t l ~force_tpoly =
       link_type t t';
       arrow_desc
   | Tarrow((l', arg_mode, ret_mode), ty_arg, ty_ret, _) ->
-      if l = l' || !Clflags.classic && l = Nolabel &&
+      if arg_label_equal l l' || !Clflags.classic && l = Nolabel &&
         equivalent_with_nolabels l l'
       then
         { ty_arg; arg_mode; ty_ret; ret_mode }
@@ -5228,7 +5258,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               link_type t1' t2
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) when
-               (l1 = l2
+               (arg_label_equal l1 l2
                 || !Clflags.classic && equivalent_with_nolabels l1 l2) ->
               moregen inst_nongen (neg_variance variance) type_pairs env t1 t2;
               moregen inst_nongen variance type_pairs env u1 u2;
@@ -5694,7 +5724,7 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
               eqtype_subst type_pairs subst t1' k1 t2' k2 ~do_jkind_check
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) when
-               (l1 = l2
+               (arg_label_equal l1 l2
                 || !Clflags.classic && equivalent_with_nolabels l1 l2) ->
               eqtype rename type_pairs subst env t1 t2 ~do_jkind_check:true;
               eqtype rename type_pairs subst env u1 u2 ~do_jkind_check:true;
@@ -6516,7 +6546,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
       (Tvar _, _) | (_, Tvar _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
     | (Tarrow((l1,a1,r1), t1, u1, _),
-       Tarrow((l2,a2,r2), t2, u2, _)) when l1 = l2
+       Tarrow((l2,a2,r2), t2, u2, _)) when arg_label_equal l1 l2
       || !Clflags.classic && equivalent_with_nolabels l1 l2 ->
         let cstrs =
           subtype_rec

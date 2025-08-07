@@ -504,6 +504,8 @@ let has_unboxed attrs = has_attribute "unboxed" attrs
 
 let has_boxed attrs = has_attribute "boxed" attrs
 
+let has_option_like attrs = has_attribute "option_like" attrs
+
 let has_unsafe_allow_any_mode_crossing attrs =
   has_attribute "unsafe_allow_any_mode_crossing" attrs
 

@@ -480,6 +480,7 @@ let label : Types.arg_label -> Parsetree.arg_label = function
   | Labelled l | Position l -> Labelled l
   | Optional l -> Optional l
   | Nolabel -> Nolabel
+  | Generic_optional (_, l) -> Generic_optional l
 
 let call_pos_extension = Location.mknoloc "call_pos_extension", PStr []
 
@@ -534,7 +535,7 @@ let expression sub exp =
                let pat, default_arg =
                  match fp.fp_kind with
                  | Tparam_pat pat -> pat, None
-                 | Tparam_optional_default (pat, expr, _) -> pat, Some expr
+                 | Tparam_optional_default (pat, expr, _, _) -> pat, Some expr
                in
                let pat = sub.pat sub pat in
                let default_arg = Option.map (sub.expr sub) default_arg in
