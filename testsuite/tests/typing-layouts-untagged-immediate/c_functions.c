@@ -1,50 +1,62 @@
 #include <caml/mlvalues.h>
-#include <caml/memory.h>
-#include <caml/alloc.h>
-#include <caml/custom.h>
+#include <assert.h>
 
-CAMLprim intnat lognot_UtoU(intnat u) {
+
+intnat lognot_UtoU(intnat u) {
   return ~u;
 }
 
-CAMLprim intnat lognot_BtoU(value u) {
-  return ~Nativeint_val(u);
+intnat lognot_BtoU(value v) {
+  return ~Long_val(v);
 }
 
-CAMLprim value lognot_UtoB(intnat u) {
-  CAMLparam0();
-  CAMLlocal1(result);
-  result = caml_copy_nativeint(~u);
-  CAMLreturn(result);
+value lognot_UtoB(intnat u) {
+  return Val_long(~u);
 }
 
-CAMLprim value lognot_bytecode(value u) {
-  CAMLparam1(u);
-  CAMLlocal1(result);
-  result = caml_copy_nativeint(~Nativeint_val(u));
-  CAMLreturn(result);
+value lognot_bytecode(value v) {
+  return Val_long(~Long_val(v));
 }
 
-CAMLprim intnat sum_7_UBUBUBUtoU(intnat u1, value b2, intnat u3, value b4,
-                                 intnat u5, value b6, intnat u7) {
-  intnat u2 = Nativeint_val(b2);
-  intnat u4 = Nativeint_val(b4);
-  intnat u6 = Nativeint_val(b6);
-  return (u1 + u2 + u3 + u4 + u5 + u6 + u7);
+intnat sum_7_UBUBUBUtoU(intnat u1, value b2, intnat u3, value b4,
+                        intnat u5, value b6, intnat u7) {
+  return Long_val(Val_long(u1 + Long_val(b2) + u3 +
+                           Long_val(b4)
+                           + u5 + Long_val(b6) + u7
+                           ));
 }
 
-CAMLprim value sum_7_bytecode(value* argv, int argn) {
-  CAMLparam0();
-  CAMLassert(argn == 7);
-  if (argn != 7) CAMLreturn(caml_copy_nativeint(-1));
-  intnat u1 = Nativeint_val(argv[0]);
-  intnat u2 = Nativeint_val(argv[1]);
-  intnat u3 = Nativeint_val(argv[2]);
-  intnat u4 = Nativeint_val(argv[3]);
-  intnat u5 = Nativeint_val(argv[4]);
-  intnat u6 = Nativeint_val(argv[5]);
-  intnat u7 = Nativeint_val(argv[6]);
-  CAMLlocal1(result);
-  result = caml_copy_nativeint(u1 + u2 + u3 + u4 + u5 + u6 + u7);
-  CAMLreturn(result);
+value sum_7_bytecode(value* argv, int argn) {
+  assert(argn == 7);
+  intnat u1 = Long_val(argv[0]);
+  intnat u2 = Long_val(argv[1]);
+  intnat u3 = Long_val(argv[2]);
+  intnat u4 = Long_val(argv[3]);
+  intnat u5 = Long_val(argv[4]);
+  intnat u6 = Long_val(argv[5]);
+  intnat u7 = Long_val(argv[6]);
+  return Val_long(u1 + u2 + u3 + u4 + u5 + u6 + u7);
+}
+
+
+value is_sign_extended(intnat u) {
+  if (u != (u << 1) >> 1) {
+    return Val_long(1);
+  } else {
+    return Val_long(0);
+  }
+}
+
+intnat invalid_sign_bit(value unit) {
+  (void)unit;
+  return -1UL >> 1;
+}
+
+value negative_one(value unit) {
+  return Val_long(-1);
+}
+
+value return_true(value ignored) {
+  (void)ignored;
+  return Val_true;
 }

@@ -1,7 +1,5 @@
 (* TEST
  {
-   expect;
- }{
    flags = "-extension layouts_beta";
    expect;
  }

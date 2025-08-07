@@ -1,6 +1,7 @@
 (* TEST
    include stdlib_beta;
    include stdlib_upstream_compatible;
+   flags = "-extension layouts_beta -extension small_numbers_beta";
 *)
 
 module Int = Stdlib_beta.Int_wrapper
