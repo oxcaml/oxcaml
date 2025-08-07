@@ -415,8 +415,9 @@ let value_kind_of_value_jkind env jkind =
   let layout = Jkind.get_layout_defaulting_to_value jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
-  let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
-  let externality_upper_bound = Jkind.get_externality_upper_bound ~jkind_of_type jkind in
+  let context = Ctype.mk_jkind_context_always_principal env in
+  let externality_upper_bound =
+    Jkind.get_externality_upper_bound ~context jkind in
   match layout, externality_upper_bound with
   | Base Value, External -> Pintval
   | Base Value, External64 ->
@@ -506,9 +507,9 @@ let nullable raw_kind = { raw_kind; nullable = Nullable }
    have a jkind. We should pick one, or rationalize why there are two.
 *)
 let add_nullability_from_jkind env jkind raw_kind =
-  let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+  let context = Ctype.mk_jkind_context_always_principal env in
   let nullable =
-    match Jkind.get_nullability ~jkind_of_type jkind with
+    match Jkind.get_nullability ~context jkind with
     | Non_null -> Non_nullable
     | Maybe_null -> Nullable
   in

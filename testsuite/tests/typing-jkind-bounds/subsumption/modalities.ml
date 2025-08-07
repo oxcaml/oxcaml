@@ -390,3 +390,88 @@ type t : immutable_data
 module type S = sig type t : immutable_data end
 module type T = sig type t = t end
 |}]
+
+(* Test case for bug where type abbreviations incorrectly satisfy modal kinds.
+   Before the fix, this was incorrectly accepted even though refs cannot be mod contended. *)
+module type X = sig
+  type t : value mod contended with t
+end
+
+module Xm : X = struct
+  type t = int ref
+end
+[%%expect {|
+module type X = sig type t : value mod contended with t end
+module Xm : X
+|}]
+
+type q : value mod contended = Xm.t
+[%%expect {|
+Line 1, characters 0-35:
+1 | type q : value mod contended = Xm.t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "Xm.t" is value mod contended with Xm.t
+         because of the definition of t at line 2, characters 2-37.
+       But the kind of type "Xm.t" must be a subkind of value mod contended
+         because of the definition of q at line 1, characters 0-35.
+|}]
+
+
+module type X = sig
+  type t : value mod contended portable with t
+
+  val create : int -> t
+  val set : t -> int -> unit
+  val get : t -> int
+end
+[%%expect {|
+module type X =
+  sig
+    type t : value mod contended portable with t
+    val create : int -> t
+    val set : t -> int -> unit
+    val get : t -> int
+  end
+|}]
+
+module Xm : X = struct
+  type t = int ref
+
+  let create n = ref n
+  let set r n = r := n
+  let get r = !r
+end
+[%%expect {|
+module Xm : X
+|}]
+
+
+let fork (f : (unit -> unit) @ portable) = failwith "not implemented";;
+[%%expect {|
+val fork : (unit -> unit) @ portable -> 'a = <fun>
+|}]
+
+(* Data race previously allowed by the compiler! *)
+let r = Xm.create 0;;
+fork (fun () -> Xm.set r 1);;
+Xm.get r;;
+[%%expect {|
+val r : Xm.t = <abstr>
+Line 2, characters 23-24:
+2 | fork (fun () -> Xm.set r 1);;
+                           ^
+Error: The value "r" is nonportable, so cannot be used inside a function that is portable.
+|}]
+
+
+(* Also data race, but this was already a type error: r' is contended *)
+let r' = ref 0;;
+fork (fun () -> r' := 1);;
+!r'
+[%%expect {|
+val r' : int ref = {contents = 0}
+Line 2, characters 16-18:
+2 | fork (fun () -> r' := 1);;
+                    ^^
+Error: This value is "contended" but expected to be "uncontended".
+|}]

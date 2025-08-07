@@ -22,15 +22,17 @@
  (action
   (with-outputs-to
    disabled256.corrected
-   (with-accepted-exit-codes
-    2
-    (run
-     %{bin:ocamlopt.opt}
-     %{ml}
-     -extension
-     simd
-     -color
-     never
-     -error-style
-     short
-     -fno-avx)))))
+   (pipe-outputs
+    (with-accepted-exit-codes
+     2
+     (run
+      %{bin:ocamlopt.opt}
+      %{ml}
+      -extension
+      simd
+      -color
+      never
+      -error-style
+      short
+      -fno-avx))
+    (run head -n 1)))))

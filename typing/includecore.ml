@@ -1490,9 +1490,9 @@ let type_declarations ?(equality = false) ~loc env ~mark name
          (match name with None -> "_" | Some n -> "'" ^ n)
          Printtyp.type_expr ty
   | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
-     let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+     let context = Ctype.mk_jkind_context_always_principal env in
      Some (Parameter_jkind
-             (ty, Jkind.Violation.of_ ~jkind_of_type
+             (ty, Jkind.Violation.of_ ~context
                     (Not_a_subjkind (Jkind.disallow_right original_jkind,
                                      Jkind.disallow_left inferred_jkind,
                                      []))))
