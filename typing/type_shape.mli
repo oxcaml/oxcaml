@@ -3,24 +3,32 @@ module Layout = Jkind_types.Sort.Const
 
 type base_layout = Jkind_types.Sort.base
 
+type path_lookup = Path.t -> args:Shape.t list -> Shape.t option
+
 module Type_shape : sig
-  val of_type_expr :
-    Types.type_expr -> (Path.t -> Uid.t option) -> Shape.without_layout Shape.ts
+  val of_type_expr : Types.type_expr -> path_lookup -> Shape.t
 end
 
 module Type_decl_shape : sig
+  val of_type_declarations :
+    (Ident.t * Types.type_declaration) list -> path_lookup -> Shape.t list
+
   val of_type_declaration :
-    Path.t -> Types.type_declaration -> (Path.t -> Uid.t option) -> Shape.tds
+    Ident.t -> Types.type_declaration -> path_lookup -> Shape.t
 end
 
+(** When producing a type shape with [of_type_expr], the resulting shape is
+      not in normal form. In particular, it can contain mutually recursive
+      declarations from mutually recursive type declarations. This function
+      should be applied after shape reduction. It unfoldes the mutually
+      recursive types to result in one linearized form. *)
+val unfold_and_evaluate : Shape.t -> Shape.t
+
 type shape_with_layout =
-  { type_shape : Shape.without_layout Shape.ts;
-    type_layout : Layout.t
+  { type_shape : Shape.t;
+    type_layout : Layout.t;
+    type_name : string
   }
-(* CR sspies: There are two options here: We can fold the layout into the shape,
-    or we can keep it on the outside. Currently, we keep it on the outside to
-    make it easier to connect type shapes and shapes (which are agnostic about
-   layouts) in subsequent PRs. *)
 (* CR sspies: We need to revist the treatment of layouts for type shapes.
    Currently, as the declaration above indicates, we use the layout from the
    binder of the variable and propagate it through. Once type shapes are merged
@@ -37,22 +45,16 @@ type shape_with_layout =
        recursion on the resulting shape.
 *)
 
-val all_type_decls : Shape.tds Uid.Tbl.t
+val all_type_decls : Shape.t Uid.Tbl.t
 
 val all_type_shapes : shape_with_layout Uid.Tbl.t
 
 (* Passing [Path.t -> Uid.t] instead of [Env.t] to avoid a dependency cycle. *)
 val add_to_type_decls :
-  Path.t -> Types.type_declaration -> (Path.t -> Uid.t option) -> unit
+  (Ident.t * Types.type_declaration) list -> path_lookup -> unit
 
 val add_to_type_shapes :
-  Uid.t ->
-  Types.type_expr ->
-  Jkind_types.Sort.Const.t ->
-  (Path.t -> Uid.t option) ->
-  unit
-
-val find_in_type_decls : Uid.t -> Shape.tds option
+  Uid.t -> Types.type_expr -> Layout.t -> name:string -> path_lookup -> unit
 
 (* CR sspies: [estimate_layout_from_shape] below is only an approximation. It
    does, for example, not deal with type application and, as a result, can find
@@ -62,12 +64,7 @@ val find_in_type_decls : Uid.t -> Shape.tds option
    If the function returns [Some], the layout is precise (regardless of the
    issues mentioned above). It returns [None] whenever estimation failed.
 *)
-val estimate_layout_from_type_shape :
-  Shape.without_layout Shape.ts -> Layout.t option
-
-val estimate_layout_from_type_decl_shape : Shape.tds -> Layout.t option
-
-val type_name : _ Shape.ts -> string
+val estimate_layout_from_type_shape : Shape.t -> Layout.t option
 
 val print_table_all_type_decls : Format.formatter -> unit
 

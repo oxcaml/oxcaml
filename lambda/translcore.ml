@@ -1635,11 +1635,16 @@ and transl_tupled_function
 *)
 
 and add_type_shapes_of_pattern ~env sort pattern =
-  let var_list = Typedtree.pat_bound_idents_full sort pattern in
-  List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
-    Type_shape.add_to_type_shapes var_uid type_expr var_sort
-      (Env.find_uid_of_path env))
-  var_list
+  if !Clflags.debug && not !Clflags.use_old_merlin_shapes then
+    (* CR sspies: The [old_merlin_shapes] guard should go in the future,
+       but the debug guard should stay, since these are only needed for
+       debugging. *)
+    let var_list = Typedtree.pat_bound_idents_full sort pattern in
+    List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
+      let type_name = Format.asprintf "%a" Printtyp.type_expr type_expr in
+      Type_shape.add_to_type_shapes var_uid type_expr var_sort ~name:type_name
+        (Env.shape_for_constr env))
+    var_list
 
 (** [add_type_shapes_of_cases] iterates through a given list of cases and
     associates for each case, the debugging UID of the variable with the type
