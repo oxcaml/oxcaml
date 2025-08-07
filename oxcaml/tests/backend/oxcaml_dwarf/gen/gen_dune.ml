@@ -62,4 +62,5 @@ let () =
     Buffer.output_buffer Out_channel.stdout buf
   in
   (* Generate tests - add more tests here as needed *)
-  print_dwarf_test "test_basic_dwarf"
+  print_dwarf_test "test_basic_dwarf";
+  print_dwarf_test "test_unboxed_dwarf"
