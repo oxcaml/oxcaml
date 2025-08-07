@@ -98,7 +98,7 @@ type error =
   | Bad_jkind_annot of type_expr * Jkind.Violation.t
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
-  | Unknown_generic_optional_argument_type of Parsetree.core_type
+  | Unknown_generic_optional_argument_type of type_expr
   | Generic_optional_argument_missing_option_like_annotation of Path.t
   | Generic_optional_argument_missing_type_annotation
 
@@ -664,20 +664,23 @@ let check_arg_type styp =
     | _ -> ()
   end
 
-let extract_optional_tp_from_type_parsetree_exn env (ty : Parsetree.core_type) =
-  match ty with
-  | {ptyp_desc = Ptyp_constr ({ txt = ident_name}, [arg]);
-          ptyp_loc; _} ->
-      let path_and_decl = Env.lookup_type ~loc:ptyp_loc ident_name env in
-      let (path, decl) = path_and_decl in
+let extract_optional_tp_from_type_exn env (ty : type_expr) loc =
+  let ty =
+    if Btype.is_Tpoly ty && Btype.tpoly_is_mono ty
+    then Btype.tpoly_get_mono ty else ty
+  in
+  let head_expanded = (expand_head env ty) in
+  match get_desc head_expanded  with
+  | Tconstr (path, [arg], _) ->
+      let decl = Env.find_type path env in
       (* Check syntactically that the type has @@option_like *)
       if not (Builtin_attributes.has_option_like decl.type_attributes) then
-        raise (Error (ptyp_loc, env,
+        raise (Error (loc, env,
           Generic_optional_argument_missing_option_like_annotation path));
-      (path_and_decl, arg)
+      ((path, decl), arg)
   | _ ->
-      raise(Error (ty.ptyp_loc, env,
-        Unknown_generic_optional_argument_type ty))
+      raise(Error (loc, env,
+        Unknown_generic_optional_argument_type head_expanded))
 
 let transl_label (label : Parsetree.arg_label)
     (arg_opt : Parsetree.core_type option) =
@@ -821,11 +824,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               | Generic_optional _ ->
                   (* Validate that generic optional arguments have an optional
                      type *)
-                  (* CR generic-optional: This syntactic check doesn't handle
-                     type aliases.  For example, `type int_option = int option`
-                     won't be accepted even though it expands to a valid option
-                     type. *)
-                  let _ = extract_optional_tp_from_type_parsetree_exn env arg in
+                  let _ =
+                    extract_optional_tp_from_type_exn env arg_ty arg.ptyp_loc
+                  in
                   arg_ty
               | Position _ | Labelled _ | Nolabel -> arg_ty
               | Optional _ ->
@@ -1503,6 +1504,14 @@ let transl_type_scheme env styp =
   | _ ->
     transl_type_scheme_mono env styp
 
+let extract_optional_tp_from_type_parsetree_exn env (ty : Parsetree.core_type)
+      mode =
+  (* CR generic-optional: double check this mode translation *)
+  let mode = Typemode.transl_alloc_mode mode in
+  (* CR generic-optional: Look at the constructor for the underlying modes*)
+  let ty = transl_simple_type env ~new_var_jkind:Any ~closed:false mode ty in
+  extract_optional_tp_from_type_exn env ty.ctyp_type ty.ctyp_loc
+
 (* Error report *)
 
 open Format
@@ -1690,7 +1699,7 @@ let report_error env ppf =
   | Unknown_generic_optional_argument_type ty ->
       (* CR generic-optional : Add Hint.  *)
       fprintf ppf "@[Unknown generic optional argument type:@ %a@]"
-        Pprintast.core_type ty
+        Printtyp.type_expr ty
   | Generic_optional_argument_missing_option_like_annotation path ->
       fprintf ppf "@[Generic optional arguments require types with the \
         [@@option_like] attribute.@ Type %a is not marked as option-like@]"

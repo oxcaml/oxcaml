@@ -90,6 +90,14 @@ val transl_label_from_expr :
   Parsetree.arg_label -> Parsetree.expression
   -> Types.arg_label * Parsetree.expression
 
+val extract_optional_tp_from_type_exn:
+  Env.t -> type_expr -> Warnings.loc ->
+  (Btype.generic_optional_type_path * type_declaration) * type_expr
+
+val extract_optional_tp_from_type_parsetree_exn:
+  Env.t -> Parsetree.core_type -> Parsetree.modes ->
+  (Path.t * Types.type_declaration) * type_expr
+
 (* Note about [new_var_jkind]
 
    This is exposed as an option because the same initialization doesn't work in all
@@ -112,10 +120,6 @@ val transl_label_from_expr :
    constrain the type parameters to representable jkinds unnecessarily while maintaining
    the most amount of backwards compatibility. It is for this reason, the left hand side
    of a constraint is typed using [Any] while the right hand side uses [Sort]. *)
-val extract_optional_tp_from_type_parsetree_exn:
-  Env.t -> Parsetree.core_type ->
-  (Path.t * Types.type_declaration) * Parsetree.core_type
-
 val transl_simple_type:
         Env.t -> new_var_jkind:jkind_initialization_choice
         -> ?univars:TyVarEnv.poly_univars
@@ -185,7 +189,7 @@ type error =
   | Bad_jkind_annot of type_expr * Jkind.Violation.t
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
-  | Unknown_generic_optional_argument_type of Parsetree.core_type
+  | Unknown_generic_optional_argument_type of type_expr
   | Generic_optional_argument_missing_option_like_annotation of Path.t
   | Generic_optional_argument_missing_type_annotation
 

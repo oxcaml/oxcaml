@@ -4553,16 +4553,6 @@ let jkind_of_generic_optional_type_path (decl : type_declaration) =
   (* CR generic-optional: Check for phantom types which are currently allowed?
      We should ban them from previous pass. *)
 
-let extract_optional_tp_from_type_exn env (ty : type_expr) =
-  let ty = if tpoly_is_mono ty then tpoly_get_mono ty else ty in
-  let head_expanded = (expand_head env ty) in
-  match get_desc head_expanded  with
-  | Tconstr (path, [arg], _) ->
-      let decl = Env.find_type path env in
-      ((path, decl), arg)
-  | _ ->
-      Misc.fatal_errorf "Non-optional type:"
-
 let filter_arrow env t l ~force_tpoly ~generic_optional_info =
   let function_type level =
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
@@ -4583,27 +4573,15 @@ let filter_arrow env t l ~force_tpoly ~generic_optional_info =
           | Generic_optional_arg ->
               (match generic_optional_info with
               | Some (path, decl) ->
-                  (* Use the provided generic optional type info *)
+                  (* Caller need to provide generic optional type info for
+                     generic optional arg-labels *)
                   let t_cons = path_of_generic_optional_type_path path in
                   let arg_jkind = jkind_of_generic_optional_type_path decl in
                   newty2 ~level (Tconstr(t_cons,
                     [newvar2 level arg_jkind], ref Mnil))
               | None ->
-                  (* Try to extract from existing arrow *)
-                  (match get_desc (expand_head env t) with
-                  | Tarrow((Generic_optional _, _, _), ty_arg, _, _) ->
-                      let (path, decl), _ =
-                        extract_optional_tp_from_type_exn env ty_arg
-                      in
-                      let t_cons, arg_jkind =
-                        path_of_generic_optional_type_path path,
-                          jkind_of_generic_optional_type_path decl
-                      in
-                      newty2 ~level (Tconstr(t_cons,
-                        [newvar2 level arg_jkind], ref Mnil))
-                  | _ ->
-                      Misc.fatal_error "Cannot create fresh generic optional \
-                        without existing type"))
+                  Misc.fatal_error "Cannot create fresh generic optional \
+                        without existing type")
           | Required_or_position_arg ->
               if is_position l then
                 newty2 ~level
