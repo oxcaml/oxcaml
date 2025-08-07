@@ -640,8 +640,14 @@ let link unix ~ppf_dump objfiles output_name =
     let stdexit = "std_exit.cmx" in
     let objfiles =
       if !Clflags.nopervasives then objfiles
-      else if !Clflags.output_c_object then stdlib :: objfiles
-      else stdlib :: (objfiles @ [stdexit]) in
+      else if !Clflags.output_c_object then
+        if !Translcore.uses_eval then
+          stdlib :: "dynlink/dynlink.cmxa" :: "eval.cmxa" :: objfiles
+        else stdlib :: objfiles
+      else
+        if !Translcore.uses_eval then
+          stdlib :: "dynlink/dynlink.cmxa" :: "eval.cmxa" :: (objfiles @ [stdexit])
+        else stdlib :: (objfiles @ [stdexit]) in
     let genfns = Generic_fns.Tbl.make () in
     let ml_objfiles, units_tolink, cached_genfns_imports =
       List.fold_right

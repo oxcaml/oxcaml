@@ -793,8 +793,16 @@ let link objfiles output_name =
       !Clflags.output_complete_executable
     with
     | true, _, _         -> objfiles
-    | false, true, false -> "stdlib.cma" :: objfiles
-    | _                  -> "stdlib.cma" :: objfiles @ ["std_exit.cmo"]
+    | false, true, false ->
+        let libs = "stdlib.cma" :: objfiles in
+        if !Translcore.uses_eval then
+          "stdlib.cma" :: "dynlink/dynlink.cma" :: "eval.cma" :: objfiles
+        else libs
+    | _                  ->
+        let libs = "stdlib.cma" :: objfiles @ ["std_exit.cmo"] in
+        if !Translcore.uses_eval then
+          "stdlib.cma" :: "dynlink/dynlink.cma" :: "eval.cma" :: objfiles @ ["std_exit.cmo"]
+        else libs
   in
   let tolink = List.fold_right scan_file objfiles [] in
   begin
