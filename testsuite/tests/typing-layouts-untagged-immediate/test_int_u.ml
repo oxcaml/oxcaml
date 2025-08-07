@@ -4,7 +4,7 @@
    flags = "-extension layouts_beta -extension small_numbers_beta";
 *)
 
-module Int = Stdlib_beta.Int_wrapper
+module Int = Stdlib_beta.Int
 module Int_u = Stdlib_beta.Int_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 

@@ -12,7 +12,7 @@
 let ( = ) = Int.equal
 
 module Int = struct
-  include Stdlib_beta.Int_wrapper
+  include Stdlib_beta.Int
 
   let ( + ) = add
   let ( - ) = sub
