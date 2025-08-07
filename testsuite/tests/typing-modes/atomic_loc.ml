@@ -86,7 +86,7 @@ Line 2, characters 15-16:
 
 |}]
 
-(* Test for forbidding non-identity comonadic modalities in [%atomic.loc] *)
+(* Test for forbidding non-legacy comonadic modalities in [%atomic.loc] *)
 
 (* This is allowed... *)
 type 'a portable_atomic = { mutable contents : 'a @@ portable [@atomic] }
@@ -100,13 +100,13 @@ let foo (t : _ portable_atomic) = [%atomic.loc t.contents]
 Line 1, characters 34-58:
 1 | let foo (t : _ portable_atomic) = [%atomic.loc t.contents]
                                       ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Fields with modalities are not allowed in "[%atomic.loc]"
+Error: Modalities are not allowed on fields given to "[%atomic.loc]" (here, "contents")
 |}]
 
 (* This is allowed... *)
-type 'a local_atomic = { mutable contents : 'a @@ global [@atomic] }
+type 'a local_atomic = { mutable contents : 'a @@ local [@atomic] }
 [%%expect{|
-type 'a local_atomic = { mutable global_ contents : 'a [@atomic]; }
+type 'a local_atomic = { mutable contents : 'a @@ local [@atomic]; }
 |}]
 
 (* ...but you can't make an [%atomic.loc] to the field *)
@@ -115,7 +115,7 @@ let foo (t : _ local_atomic) = [%atomic.loc t.contents]
 Line 1, characters 31-55:
 1 | let foo (t : _ local_atomic) = [%atomic.loc t.contents]
                                    ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Fields with modalities are not allowed in "[%atomic.loc]"
+Error: Modalities are not allowed on fields given to "[%atomic.loc]" (here, "contents")
 |}]
 
 (* Test for forbidding non-legacy monadic modalities in [%atomic.loc] *)
@@ -132,7 +132,7 @@ let foo (t : _ aliased_atomic) = [%atomic.loc t.contents]
 Line 1, characters 33-57:
 1 | let foo (t : _ aliased_atomic) = [%atomic.loc t.contents]
                                      ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Fields with modalities are not allowed in "[%atomic.loc]"
+Error: Modalities are not allowed on fields given to "[%atomic.loc]" (here, "contents")
 |}]
 
 (* This is allowed... *)
@@ -147,5 +147,5 @@ let foo (t : _ contended_atomic) = [%atomic.loc t.contents]
 Line 1, characters 35-59:
 1 | let foo (t : _ contended_atomic) = [%atomic.loc t.contents]
                                        ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Fields with modalities are not allowed in "[%atomic.loc]"
+Error: Modalities are not allowed on fields given to "[%atomic.loc]" (here, "contents")
 |}]

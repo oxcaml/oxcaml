@@ -562,9 +562,7 @@ let let_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:true
 
 let atomic_mutable_modalities =
-  mutable_implied_modalities
-    (Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Atomic })
-    ~for_mutable_variable:false
+  mutable_implied_modalities true ~for_mutable_variable:false
 
 let untransl_modalities mut t =
   t
