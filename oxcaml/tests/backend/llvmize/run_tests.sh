@@ -1,6 +1,8 @@
 #!/bin/bash
 
 # Usage: ./oxcaml/tests/backend/llvmize/run_tests.sh [branch]
+# Note: This script is no longer needed since Github CI now supports running
+# these tests. It is kept for the time being for convenience.
 
 # Run this from the root directory of oxcaml!!
 ROOT_DIR=$(pwd)
@@ -60,4 +62,4 @@ cmake3 --build . --target install
 
 echo "Running Oxcaml llvmize tests"
 cd $ROOT_DIR
-LLVM_PATH=$LLVM_INSTALL_DIR/bin/clang make runtest-llvm
+OXCAML_CLANG=$LLVM_INSTALL_DIR/bin/clang make runtest-llvm

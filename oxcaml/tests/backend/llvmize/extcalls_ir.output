@@ -122,8 +122,8 @@ L1:
 L105:                                                ; preds = %L1
   %10 = load i64, ptr %3
   store i64 %10, ptr %6
-  store i64 15, ptr %7
-  store i64 7, ptr %8
+  store i64 21, ptr %7
+  store i64 19, ptr %8
   %11 = load i64, ptr %8
   store i64 %11, ptr %4
   %12 = load i64, ptr %7
@@ -177,11 +177,13 @@ L112:                                                ; preds = %L1
 
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
+declare i32 @llvm.eh.ocaml.try() returns_twice
+declare void @llvm.eh.ocaml.touch(ptr)
 
-@camlExtcalls__gc_roots = global { i64, i64 } { i64 0, i64 2816 }
-@camlExtcalls = global { ptr, ptr, i64 } { ptr @camlExtcalls__call_too_many_2, ptr @camlExtcalls__call_print_and_add_3, i64 3063 }
-@camlExtcalls__call_print_and_add_3 = global { ptr, i64, i64 } { ptr @camlExtcalls__call_print_and_add_HIDE_STAMP, i64 108086391056891909, i64 3063 }
-@camlExtcalls__call_too_many_2 = global { ptr, i64, ptr, ptr, ptr } { ptr @camlExtcalls__call_too_many_HIDE_STAMP, i64 108086391056891909, ptr @int_and_float, ptr @too_many, ptr @print_and_add }
+@camlExtcalls__gc_roots = global { i64, i64 } { i64 0, i64 2816 }, align 8
+@camlExtcalls = global { ptr, ptr, i64 } { ptr @camlExtcalls__call_too_many_2, ptr @camlExtcalls__call_print_and_add_3, i64 3063 }, align 8
+@camlExtcalls__call_print_and_add_3 = global { ptr, i64, i64 } { ptr @camlExtcalls__call_print_and_add_HIDE_STAMP, i64 108086391056891909, i64 3063 }, align 8
+@camlExtcalls__call_too_many_2 = global { ptr, i64, ptr, ptr, ptr } { ptr @camlExtcalls__call_too_many_HIDE_STAMP, i64 108086391056891909, ptr @int_and_float, ptr @too_many, ptr @print_and_add }, align 8
 @caml_c_call = external global ptr
 @caml_c_call_stack_args_llvm_backend = external global ptr
 @int_and_float = external global ptr
