@@ -251,21 +251,10 @@ module Move = struct
       from:Reg.t ->
       to_:Reg.t ->
       Instruction.t =
-   fun move ~id ~copy:instr ~from ~to_ ->
-    { desc = Op (op_of_move move);
-      arg = [| from |];
-      res = [| to_ |];
-      dbg = instr.dbg;
-      fdo = instr.fdo;
-      live = instr.live;
-      (* note: recomputed anyway *)
-      stack_offset = instr.stack_offset;
-      id;
-      irc_work_list = Unknown_list;
-      ls_order = -1;
-      available_before = instr.available_before;
-      available_across = instr.available_across
-    }
+   fun move ~id ~copy ~from ~to_ ->
+    Cfg.make_instruction_from_copy copy
+      ~desc:(Cfg.Op (op_of_move move))
+      ~arg:[| from |] ~res:[| to_ |] ~id ()
 
   let to_string = function Plain -> "move" | Load -> "load" | Store -> "store"
 end

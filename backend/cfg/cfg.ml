@@ -557,6 +557,22 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     available_across
   }
 
+let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
+    ?(res = [||]) ?(irc_work_list = Unknown_list) ?(ls_order = -1) () =
+  { desc;
+    arg;
+    res;
+    dbg = copy.dbg;
+    fdo = copy.fdo;
+    live = copy.live;
+    stack_offset = copy.stack_offset;
+    id;
+    irc_work_list;
+    ls_order;
+    available_before = copy.available_before;
+    available_across = copy.available_across
+  }
+
 let invalid_stack_offset = -1
 
 let make_empty_block ?label terminator : basic_block =
