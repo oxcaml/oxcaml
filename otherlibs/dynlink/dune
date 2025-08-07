@@ -122,6 +122,7 @@
   primitive
   zero_alloc
   types
+  camlinternalQuote_bootstrap
   oprint
   typemode
   jkind
@@ -151,7 +152,6 @@
   asttypes
   parsetree
   typedtree
-  camlinternalQuote_bootstrap
   outcometree
   cmo_format
   cmxs_format
@@ -611,6 +611,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Primitive.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__CamlinternalQuote_bootstrap.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Oprint.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Btype.cmo
@@ -708,6 +709,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Primitive.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__CamlinternalQuote_bootstrap.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Oprint.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Btype.cmx
