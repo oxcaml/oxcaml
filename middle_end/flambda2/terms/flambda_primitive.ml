@@ -1895,7 +1895,11 @@ let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
   | Atomic_load_field (Any_value | Immediate) ->
     Arbitrary_effects, Has_coeffects, Strict
   | Poke _ -> Arbitrary_effects, No_coeffects, Strict
-  | Read_offset _ -> Arbitrary_effects, No_coeffects, Strict
+  | Read_offset (_, mut) ->
+    let coeffects : Coeffects.t =
+      match mut with Immutable -> No_coeffects | Mutable -> Has_coeffects
+    in
+    No_effects, coeffects, Strict
 
 let binary_classify_for_printing p =
   match p with
@@ -2166,9 +2170,9 @@ let effects_and_coeffects_of_ternary_primitive p :
   | Array_set _ -> writing_to_an_array
   | Bytes_or_bigstring_set _ -> writing_to_bytes_or_bigstring
   | Bigarray_set (_, kind, _) -> writing_to_a_bigarray kind
-  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
-  | Write_offset _ ->
+  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _ ->
     Arbitrary_effects, Has_coeffects, Strict
+  | Write_offset _ -> writing_to_a_block
 
 let effects_and_coeffects_of_quaternary_primitive p :
     Effects.t * Coeffects.t * Placement.t =
