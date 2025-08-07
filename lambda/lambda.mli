@@ -357,6 +357,9 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  (* Raw field access - bypasses some safety checks *)
+  | Prawfield
+  | Psetrawfield
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)

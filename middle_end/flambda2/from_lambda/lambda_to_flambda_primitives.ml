@@ -2727,6 +2727,72 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     [Ternary (Atomic_field_int_arith Or, atomic, field, i)]
   | Patomic_lxor_field, [[atomic]; [field]; [i]] ->
     [Ternary (Atomic_field_int_arith Xor, atomic, field, i)]
+  | Prawfield, [[block]; [field]] ->
+    (* Convert field number (in words) to byte offset *)
+    (* First untag the field index *)
+    let untagged_field = H.Prim (Unary (Untag_immediate, field)) in
+    (* Word size is 8 on 64-bit systems, 4 on 32-bit systems *)
+    let word_size = if Targetint_32_64.size = 64 then 8 else 4 in
+    let word_size_const =
+      H.Simple
+        (Simple.const
+           (Reg_width_const.naked_immediate (Targetint_31_63.of_int word_size)))
+    in
+    let byte_offset =
+      H.Prim
+        (Binary
+           (Int_arith (Naked_immediate, Mul), untagged_field, word_size_const))
+    in
+    (* Convert untagged immediate to naked int64 for Read_offset *)
+    let byte_offset_int64 =
+      H.Prim
+        (Unary
+           (Num_conv { src = Naked_immediate; dst = Naked_int64 }, byte_offset))
+    in
+    (* Wrap block in Opaque_identity to prevent Flambda2 from analyzing it *)
+    let opaque_block =
+      H.Prim
+        (Unary
+           (Opaque_identity { middle_end_only = true; kind = K.value }, block))
+    in
+    [ Binary
+        ( Read_offset (K.With_subkind.naked_nativeint, Asttypes.Mutable),
+          opaque_block,
+          byte_offset_int64 ) ]
+  | Psetrawfield, [[block]; [field]; [new_value]] ->
+    (* Convert field number (in words) to byte offset *)
+    (* First untag the field index *)
+    let untagged_field = H.Prim (Unary (Untag_immediate, field)) in
+    (* Word size is 8 on 64-bit systems, 4 on 32-bit systems *)
+    let word_size = if Targetint_32_64.size = 64 then 8 else 4 in
+    let word_size_const =
+      H.Simple
+        (Simple.const
+           (Reg_width_const.naked_immediate (Targetint_31_63.of_int word_size)))
+    in
+    let byte_offset =
+      H.Prim
+        (Binary
+           (Int_arith (Naked_immediate, Mul), untagged_field, word_size_const))
+    in
+    (* Convert untagged immediate to naked int64 for Write_offset *)
+    let byte_offset_int64 =
+      H.Prim
+        (Unary
+           (Num_conv { src = Naked_immediate; dst = Naked_int64 }, byte_offset))
+    in
+    (* Wrap block in Opaque_identity to prevent Flambda2 from analyzing it *)
+    let opaque_block =
+      H.Prim
+        (Unary
+           (Opaque_identity { middle_end_only = true; kind = K.value }, block))
+    in
+    [ Ternary
+        ( Write_offset
+            (K.With_subkind.naked_nativeint, Alloc_mode.For_assignments.heap),
+          opaque_block,
+          byte_offset_int64,
+          new_value ) ]
   | Pcpu_relax, _ -> [Nullary Cpu_relax]
   | Pdls_get, _ -> [Nullary Dls_get]
   | Ppoll, _ -> [Nullary Poll]
@@ -2825,7 +2891,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             _,
             _ )
       | Pcompare_ints | Pcompare_floats _ | Pcompare_bints _
-      | Patomic_load_field _ | Ppoke _ ),
+      | Patomic_load_field _ | Ppoke _ | Prawfield ),
       ( []
       | [_]
       | _ :: _ :: _ :: _
@@ -2857,7 +2923,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Punboxed_nativeint_array_set_vec _ | Patomic_set_field _
       | Patomic_exchange_field _ | Patomic_fetch_add_field | Patomic_add_field
       | Patomic_sub_field | Patomic_land_field | Patomic_lxor_field
-      | Patomic_lor_field ),
+      | Patomic_lor_field | Psetrawfield ),
       ( []
       | [_]
       | [_; _]
