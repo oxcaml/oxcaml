@@ -306,6 +306,7 @@ let () =
   test_shift     "shift_right_logical" Int16.shift_right_logical Int16_u.shift_right_logical;
   test_unary_to  "of_int"              Int16.of_int              Int16_u.of_int               int_input;
   test_unary_of  "to_int"              Int16.to_int              Int16_u.to_int               int_result;
+  test_unary_of  "unsigned_to_int"     Int16.unsigned_to_int     Int16_u.unsigned_to_int      int_result;
   test_unary_to  "of_float"            Int16.of_float            Int16_u.of_float             float_input;
   test_unary_of  "to_float"            Int16.to_float            Int16_u.to_float             float_result;
   test_unary_to  "of_string"           Int16.of_string           Int16_u.of_string            int16_string_input;

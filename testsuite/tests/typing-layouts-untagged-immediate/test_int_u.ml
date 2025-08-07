@@ -42,8 +42,6 @@ let mk_result (type a) (module M : Result with type t = a) =
 let float_result     = mk_result (module Float)
 let bool_result      = mk_result (module Bool)
 let int_result       = mk_result (module Int)
-let int32_result     = mk_result (module Int32)
-let int_result = mk_result (module Int)
 let string_result    = mk_result' String.equal to_ocaml_string
 
 let option_result (type a) (module M : Result with type t = a)  =
@@ -162,9 +160,6 @@ let nonzero_integer_input
   { generators; to_string }
 
 let int_input = integer_input (module Int) Random.int Random.bits
-let int32_input = integer_input (module Int32) Random.int32 Random.bits32
-let int_input =
-  integer_input (module Int) Random.int Random.bits
 let nonzero_int_input =
   nonzero_integer_input (module Int) Random.int Random.bits
 
@@ -286,9 +281,6 @@ let test_shift ?n name shift shiftu =
                   (shiftu
                      (Int_u.of_int x)
                      y))
-
-external int_u_of_int32 : int32 -> int# = "%int#_of_int32"
-external int_u_to_int32 : int# -> int32 = "%int32_of_int#"
 
 let () =
   test_unary     "neg"                 Int.neg                 Int_u.neg;
