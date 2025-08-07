@@ -20,7 +20,7 @@
 (* This file tests using external C functions with int8#. *)
 
 
-external to_int8 : int8# -> int8 = "%tag_int8" [@@warning "-187"]
+external to_int8 : int8# -> int8 = "%tag_int8"
 
 let print_int8 s f = Printf.printf "%s: %d\n" s (Stdlib_beta.Int8.to_int f)
 let print_int8u s f = print_int8 s (to_int8 f)

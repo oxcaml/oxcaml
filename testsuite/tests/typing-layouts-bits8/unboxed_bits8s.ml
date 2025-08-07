@@ -129,7 +129,7 @@ let test1 () =
   print_int8u "Test 1, thrice_minus_five" thrice_minus_five;
 
   let twice_minus_five_again = thrice_minus_five - minus_five in
-  print_int8u "Test 1, twice_minus_five_again" twice_minus_five;
+  print_int8u "Test 1, twice_minus_five_again" twice_minus_five_again;
 
   let minus_five_again = twice_minus_five_again / (Stdlib_beta.Int8_u.of_int 2) in
   print_int8u "Test 1, minus_five_again" minus_five_again;
