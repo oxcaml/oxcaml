@@ -1,22 +1,17 @@
 let () =
   let enabled_if =
-    {|(enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{env:TEST_OXCAML_DWARF=false} "true")))|}
+    {|(enabled_if (= %{context_name} "main"))|}
   in
   let enabled_if_with_lldb =
     {|(enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:TEST_OXCAML_DWARF=false} "true")
    (<> %{env:OXCAML_LLDB=} "")))|}
   in
   let enabled_if_without_lldb =
     {|(enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:TEST_OXCAML_DWARF=false} "true")
    (= %{env:OXCAML_LLDB=} "")))|}
   in
   let buf = Buffer.create 1000 in
@@ -48,7 +43,7 @@ let () =
    (bash "sed -e 's/^(lldb) //' -e '/^[[:space:]]*$/d' ${name}.lldb > ${name}_clean.lldb")
    (with-outputs-to ${name}.output.corrected
     (pipe-outputs
-     (run %{env:OXCAML_LLDB=lldb} -s ${name}_clean.lldb ./${name}.exe)
+     (run %{env:OXCAML_LLDB=} -s ${name}_clean.lldb ./${name}.exe)
      (run sh ./${filter}))))))
 
 (rule
@@ -61,7 +56,7 @@ let () =
    (bash "exit 1"))))
 
 (rule
- (alias runtest)
+ (alias runtest-dwarf)
  ${enabled_if}
  (deps ${name}.output ${name}.output.corrected)
  (action (diff ${name}.output ${name}.output.corrected)))

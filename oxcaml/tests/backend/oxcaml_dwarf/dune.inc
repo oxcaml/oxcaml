@@ -1,9 +1,6 @@
 
 (rule
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{env:TEST_OXCAML_DWARF=false} "true")))
+ (enabled_if (= %{context_name} "main"))
  (targets test_basic_dwarf.exe)
  (deps test_basic_dwarf.ml)
  (action (run %{bin:ocamlopt.opt} %{deps} -g -gno-upstream-dwarf -bin-annot-cms -o test_basic_dwarf.exe)))
@@ -12,7 +9,6 @@
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:TEST_OXCAML_DWARF=false} "true")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_basic_dwarf.output.corrected)
  (deps test_basic_dwarf.exe test_basic_dwarf.lldb filter.sh)
@@ -21,14 +17,13 @@
    (bash "sed -e 's/^(lldb) //' -e '/^[[:space:]]*$/d' test_basic_dwarf.lldb > test_basic_dwarf_clean.lldb")
    (with-outputs-to test_basic_dwarf.output.corrected
     (pipe-outputs
-     (run %{env:OXCAML_LLDB=lldb} -s test_basic_dwarf_clean.lldb ./test_basic_dwarf.exe)
+     (run %{env:OXCAML_LLDB=} -s test_basic_dwarf_clean.lldb ./test_basic_dwarf.exe)
      (run sh ./filter.sh))))))
 
 (rule
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:TEST_OXCAML_DWARF=false} "true")
    (= %{env:OXCAML_LLDB=} "")))
  (targets test_basic_dwarf.output.corrected)
  (deps test_basic_dwarf.exe)
@@ -38,10 +33,7 @@
    (bash "exit 1"))))
 
 (rule
- (alias runtest)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{env:TEST_OXCAML_DWARF=false} "true")))
+ (alias runtest-dwarf)
+ (enabled_if (= %{context_name} "main"))
  (deps test_basic_dwarf.output test_basic_dwarf.output.corrected)
  (action (diff test_basic_dwarf.output test_basic_dwarf.output.corrected)))
