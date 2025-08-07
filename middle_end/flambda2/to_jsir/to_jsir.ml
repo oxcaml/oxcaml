@@ -456,11 +456,6 @@ let add_globals ~env ~res ~reachable_names =
   let symbols = Name_occurrences.symbols reachable_names in
   let extern = Symbol.external_symbols_compilation_unit () in
   let predef = Compilation_unit.predef_exn in
-  let global_data = Jsir.Var.fresh () in
-  let res =
-    To_jsir_result.add_instr_exn res
-      (Let (global_data, Prim (Extern "caml_get_global_data", [])))
-  in
   Symbol.Set.fold
     (fun symbol (env, res) ->
       let unit = Symbol.compilation_unit symbol in
@@ -468,8 +463,8 @@ let add_globals ~env ~res ~reachable_names =
          && (not (Compilation_unit.equal unit extern))
          && not (Compilation_unit.equal unit predef)
       then
-        let module_name =
-          Compilation_unit.name unit |> Compilation_unit.Name.to_string
+        let compilation_unit_name, symbol_name =
+          To_jsir_shared.symbol_to_native_strings symbol
         in
         let var = Jsir.Var.fresh () in
         ( To_jsir_env.add_symbol env symbol var,
@@ -477,11 +472,9 @@ let add_globals ~env ~res ~reachable_names =
             (Let
                ( var,
                  Prim
-                   ( Extern "caml_js_get",
-                     [ Pv global_data;
-                       Pc
-                         (NativeString
-                            (Jsir.Native_string.of_string module_name)) ] ) )) )
+                   ( Extern "caml_get_symbol",
+                     [ Pc (NativeString compilation_unit_name);
+                       Pc (NativeString symbol_name) ] ) )) )
       else env, res)
     symbols (env, res)
 

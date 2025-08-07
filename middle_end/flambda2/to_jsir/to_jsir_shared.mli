@@ -51,3 +51,13 @@ val block :
   mut:Mutability.t ->
   fields:Simple.t list ->
   Jsir.expr * To_jsir_env.t * To_jsir_result.t
+
+(** Convert a [Symbol.t] into their compilation unit and symbol names, in a format
+    that we can pass to the [caml_get_symbol] and [caml_register_symbol] runtime
+    functions. *)
+val symbol_to_native_strings :
+  Symbol.t -> Jsir.Native_string.t * Jsir.Native_string.t
+
+(** Register a [Symbol.t] to the global symbol table. *)
+val register_symbol :
+  res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t -> To_jsir_result.t

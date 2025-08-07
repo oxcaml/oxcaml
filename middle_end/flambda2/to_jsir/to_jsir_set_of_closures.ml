@@ -52,6 +52,7 @@ let dynamic_set_of_closures ~env ~res ~bound_vars soc =
 
 let static_set_of_closures ~env ~res ~closure_symbols soc =
   let add_to_env ~env ~res symbol fn_var =
+    let res = To_jsir_shared.register_symbol ~res symbol fn_var in
     (* We may have already encountered the symbol when translating the code, so
        we should check first whether a variable already exists; if so, we should
        make sure that the variable also points to the function variable *)
