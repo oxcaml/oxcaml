@@ -264,4 +264,10 @@ let () =
   print_test_ir_and_run "multi_ret";
   print_test_ir_and_run "indirect_call";
   print_test_c ~c_suffix:"defn" "extcalls";
-  print_test_run_no_main "data_decl"
+  print_test_run_no_main "data_decl";
+  print_test ~extra_subst:[] ~buf ~run:(Some "exn")
+    ~tasks:
+      [ Ocaml_default "exn_part1";
+        Ocaml_llvm { filename = "exn_part2"; stop_after_llvmize = false };
+        Output_ir { source = "exn_part2"; output = "exn_part2_ir" };
+        Ocaml_default "exn_part3" ]

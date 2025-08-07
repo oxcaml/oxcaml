@@ -88,7 +88,9 @@ L105:                                                ; preds = %L101
   %30 = load i64, ptr %3
   %31 = load i64, ptr %4
   %32 = load ptr, ptr %ds
+  call void asm sideeffect "push %rbp", "~{rsp}"()
   %33 = call cc 104 { { ptr }, { i64 } } @camlData_decl__g_HIDE_STAMP(ptr %32, i64 %30, i64 %31)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
   %34 = extractvalue { { ptr }, { i64 } } %33, 0, 0
   store ptr %34, ptr %ds
   %35 = extractvalue { { ptr }, { i64 } } %33, 1, 0
@@ -134,7 +136,9 @@ L112:                                                ; preds = %L1
   store i64 %16, ptr %4
   %17 = load i64, ptr %4
   %18 = load ptr, ptr %ds
+  call void asm sideeffect "push %rbp", "~{rsp}"()
   %19 = call cc 104 { { ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %18, i64 %17)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
   %20 = extractvalue { { ptr }, { i64 } } %19, 0, 0
   store ptr %20, ptr %ds
   %21 = extractvalue { { ptr }, { i64 } } %19, 1, 0
@@ -149,7 +153,9 @@ L114:                                                ; preds = %L112
   store i64 %24, ptr %4
   %25 = load i64, ptr %4
   %26 = load ptr, ptr %ds
+  call void asm sideeffect "push %rbp", "~{rsp}"()
   %27 = call cc 104 { { ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %26, i64 %25)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
   %28 = extractvalue { { ptr }, { i64 } } %27, 0, 0
   store ptr %28, ptr %ds
   %29 = extractvalue { { ptr }, { i64 } } %27, 1, 0
@@ -355,7 +361,9 @@ L133:                                                ; preds = %L130
   %113 = load i64, ptr %3
   %114 = load i64, ptr %4
   %115 = load ptr, ptr %ds
+  call void asm sideeffect "push %rbp", "~{rsp}"()
   %116 = call cc 104 { { ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %115, i64 %112, i64 %113, i64 %114)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
   %117 = extractvalue { { ptr }, { i64 } } %116, 0, 0
   store ptr %117, ptr %ds
   %118 = extractvalue { { ptr }, { i64 } } %116, 1, 0
@@ -377,7 +385,9 @@ L134:                                                ; preds = %L133
   %125 = load i64, ptr %3
   %126 = load i64, ptr %4
   %127 = load ptr, ptr %ds
+  call void asm sideeffect "push %rbp", "~{rsp}"()
   %128 = call cc 104 { { ptr }, { i64 } } @caml_apply2(ptr %127, i64 %124, i64 %125, i64 %126)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
   %129 = extractvalue { { ptr }, { i64 } } %128, 0, 0
   store ptr %129, ptr %ds
   %130 = extractvalue { { ptr }, { i64 } } %128, 1, 0
@@ -393,7 +403,9 @@ L135:                                                ; preds = %L134
   store i64 %133, ptr %2
   %134 = load i64, ptr %2
   %135 = load ptr, ptr %ds
+  call void asm sideeffect "push %rbp", "~{rsp}"()
   %136 = call cc 104 { { ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %135, i64 %134)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
   %137 = extractvalue { { ptr }, { i64 } } %136, 0, 0
   store ptr %137, ptr %ds
   %138 = extractvalue { { ptr }, { i64 } } %136, 1, 0
@@ -417,7 +429,9 @@ L136:                                                ; preds = %L135
   %145 = load i64, ptr %3
   %146 = load i64, ptr %4
   %147 = load ptr, ptr %ds
+  call void asm sideeffect "push %rbp", "~{rsp}"()
   %148 = call cc 104 { { ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %147, i64 %144, i64 %145, i64 %146)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
   %149 = extractvalue { { ptr }, { i64 } } %148, 0, 0
   store ptr %149, ptr %ds
   %150 = extractvalue { { ptr }, { i64 } } %148, 1, 0
@@ -442,7 +456,9 @@ L137:                                                ; preds = %L136
   %161 = load ptr, ptr %ds
   %162 = load i64, ptr %48
   %163 = inttoptr i64 %162 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
   %164 = call cc 104 { { ptr }, { i64 } } %163(ptr %161, i64 %159, i64 %160)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
   %165 = extractvalue { { ptr }, { i64 } } %164, 0, 0
   store ptr %165, ptr %ds
   %166 = extractvalue { { ptr }, { i64 } } %164, 1, 0
@@ -474,6 +490,8 @@ declare cc 104 { { ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_ST
 declare cc 104 { { ptr }, { i64 } } @caml_apply2(ptr, i64, i64, i64)
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
+declare i32 @llvm.eh.ocaml.try() returns_twice
+declare void @llvm.eh.ocaml.touch(ptr)
 
 @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1458$2c4$2d$2d66$5d_550 = external global ptr
 @camlStdlib__print_endline_138 = external global ptr
