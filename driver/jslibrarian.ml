@@ -14,16 +14,6 @@ let copy_compunit ic oc compunit =
   copy_file_chunk ic oc compunit.cu_codesize;
   { compunit with cu_pos = new_pos }
 
-let lib_ccobjs = ref []
-let lib_ccopts = ref []
-let lib_dllibs = ref []
-
-let add_ccobjs l =
-  if not !Clflags.no_auto_link then begin
-    lib_ccobjs := !lib_ccobjs @ l.lib_ccobjs;
-    lib_ccopts := !lib_ccopts @ l.lib_ccopts;
-    lib_dllibs := !lib_dllibs @ l.lib_dllibs
-  end
 
 let copy_object_file oc name =
   let file_name =
@@ -58,7 +48,6 @@ let copy_object_file oc name =
       let toc_pos = input_binary_int ic in
       seek_in ic toc_pos;
       let toc = (input_value ic : library) in
-      add_ccobjs toc;
       let units = List.map (copy_compunit ic oc) toc.lib_units in
       close_in ic;
       units
@@ -80,10 +69,7 @@ let create_archive file_list lib_name =
        let units =
          List.flatten(List.map (copy_object_file outchan) file_list) in
        let toc =
-         { lib_units = units;
-           lib_ccobjs = !Clflags.ccobjs @ !lib_ccobjs;
-           lib_ccopts = !Clflags.all_ccopts @ !lib_ccopts;
-           lib_dllibs = !Clflags.dllibs @ !lib_dllibs } in
+         { lib_units = units } in
        let pos_toc = pos_out outchan in
        output_value outchan toc;
        seek_out outchan ofs_pos_toc;
@@ -107,7 +93,4 @@ let () =
       | _ -> None
     )
 
-let reset () =
-  lib_ccobjs := [];
-  lib_ccopts := [];
-  lib_dllibs := []
+let reset () = ()

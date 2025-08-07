@@ -20,7 +20,4 @@ type compilation_unit_descr =
     cu_imports: Import_info.t array }
 
 type library =
-  { lib_units: compilation_unit_descr list;
-    lib_ccobjs: string list;
-    lib_ccopts: string list;
-    lib_dllibs: string list }
+  { lib_units: compilation_unit_descr list }
