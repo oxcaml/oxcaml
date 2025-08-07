@@ -1013,6 +1013,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
       static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
     | "%box_nativeint" ->
       static_cast ~src:(naked (i nativeint)) ~dst:(i nativeint)
+    | "%untag_int" -> static_cast ~src:(i int) ~dst:(naked (i int))
+    | "%tag_int" -> static_cast ~src:(naked (i int)) ~dst:(i int)
     | "%untag_int8" -> static_cast ~src:(i int8) ~dst:(naked (i int8))
     | "%tag_int8" -> static_cast ~src:(naked (i int8)) ~dst:(i int8)
     | "%untag_int16" -> static_cast ~src:(i int16) ~dst:(naked (i int16))
