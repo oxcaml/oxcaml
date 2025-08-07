@@ -15,6 +15,7 @@ import argparse
 import os
 import subprocess
 import sys
+import math
 
 def parse_size_file(filename):
     """Parse a file containing size and path pairs."""
@@ -73,6 +74,75 @@ def find_outliers(changes, top_n=10):
     
     return increases, decreases
 
+def create_histogram(percentage_changes, bins=10, title="Size Change Distribution", show_stats=True, show_detailed_for_first_bucket=False):
+    """Create a text-based histogram of percentage changes."""
+    if not percentage_changes:
+        return
+    
+    min_change = min(percentage_changes)
+    max_change = max(percentage_changes)
+    
+    # Create bins
+    bin_width = (max_change - min_change) / bins
+    bin_counts = [0] * bins
+    bin_ranges = []
+    
+    for i in range(bins):
+        bin_start = min_change + i * bin_width
+        bin_end = min_change + (i + 1) * bin_width
+        bin_ranges.append((bin_start, bin_end))
+    
+    # Count occurrences in each bin
+    for change in percentage_changes:
+        if change >= max_change:  # Handle edge case for max value
+            bin_index = bins - 1
+        else:
+            bin_index = int((change - min_change) / bin_width)
+        bin_counts[bin_index] += 1
+    
+    # Find max count for scaling
+    max_count = max(bin_counts) if bin_counts else 0
+    if max_count == 0:
+        return
+    
+    # Create histogram
+    if "Detailed" in title:
+        print(f"\n{title} ({len(percentage_changes)} files):")
+    else:
+        print(f"\n{title}:")
+    print(f"Range: {min_change:.1f}% to {max_change:.1f}%")
+    
+    # Scale to 40 characters max width
+    scale = 40 / max_count
+    
+    for i, (count, (bin_start, bin_end)) in enumerate(zip(bin_counts, bin_ranges)):
+        bar_length = int(count * scale)
+        bar = '█' * bar_length
+        percentage = (count / len(percentage_changes)) * 100
+        print(f"{bin_start:6.1f}% - {bin_end:6.1f}%: {count:3d} ({percentage:4.1f}%) {bar}")
+    
+    # Statistical summary
+    if show_stats:
+        mean_change = sum(percentage_changes) / len(percentage_changes)
+        sorted_changes = sorted(percentage_changes)
+        median_change = sorted_changes[len(sorted_changes) // 2]
+        print(f"\nMedian: {median_change:.2f}%, Std dev: {calculate_std_dev(percentage_changes, mean_change):.1f}%")
+    
+    # Create detailed histogram for first bucket
+    if show_detailed_for_first_bucket:
+        first_bucket_max = min_change + bin_width
+        first_bucket_changes = [c for c in percentage_changes if c <= first_bucket_max]
+        if len(first_bucket_changes) > 10:  # Only if there are enough files to make it worthwhile
+            create_histogram(first_bucket_changes, bins=10, title="Detailed view of main group", 
+                           show_stats=False, show_detailed_for_first_bucket=False)
+
+def calculate_std_dev(values, mean):
+    """Calculate standard deviation."""
+    if len(values) <= 1:
+        return 0.0
+    variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
+    return math.sqrt(variance)
+
 def aggregate_cms_files(output_file, search_dir="."):
     """Find all .cms files and save their sizes to output_file."""
     print(f"Searching for .cms files in {os.path.abspath(search_dir)}...")
@@ -122,8 +192,6 @@ def analyze_size_files(file1, file2):
     print("CMS File Size Analysis")
     print("=" * 50)
     
-    # Load data
-    print("Loading data...")
     try:
         new_files = parse_size_file(file1)
         old_files = parse_size_file(file2)
@@ -134,82 +202,40 @@ def analyze_size_files(file1, file2):
         print(f"Error parsing files: {e}")
         sys.exit(1)
     
-    # Basic statistics
-    print("\nBasic Statistics:")
-    print("-" * 20)
-    
     new_stats = calculate_basic_stats(new_files)
     old_stats = calculate_basic_stats(old_files)
-    
-    print(f"File 1 ({file1}) files: {new_stats['total_files']}")
-    print(f"File 2 ({file2}) files: {old_stats['total_files']}")
-    print(f"File 1 average size: {new_stats['average_size']:.1f} bytes")
-    print(f"File 2 average size: {old_stats['average_size']:.1f} bytes")
-    print(f"File 1 total size: {new_stats['total_size']:,} bytes")
-    print(f"File 2 total size: {old_stats['total_size']:,} bytes")
-    
-    # Calculate percentage changes
     changes = calculate_percentage_changes(new_files, old_files)
     
     if not changes:
         print("No matching files found!")
         return
     
-    # Average percentage change and total increase
+    # Summary statistics
     avg_percentage_change = sum(c['percentage_change'] for c in changes) / len(changes)
     total_size_increase = new_stats['total_size'] - old_stats['total_size']
     total_percentage_increase = (total_size_increase / old_stats['total_size']) * 100 if old_stats['total_size'] > 0 else 0
     
-    print(f"\nSummary:")
-    print("-" * 20)
-    print(f"Average percentage change per file: {avg_percentage_change:.5f}%")
-    if total_size_increase >= 0:
-        print(f"Total size increase: {total_size_increase:,} bytes")
-        print(f"Total percentage increase: {total_percentage_increase:.5f}%")
-    else:
-        print(f"Total size decrease: {abs(total_size_increase):,} bytes")
-        print(f"Total percentage decrease: {abs(total_percentage_increase):.5f}%")
+    print(f"Files analyzed: {len(changes)}")
+    print(f"Total size change: {total_size_increase:+,} bytes ({total_percentage_increase:+.2f}%)")
+    print(f"Average per-file change: {avg_percentage_change:+.2f}%")
     
-    # Find outliers
-    increases, decreases = find_outliers(changes)
+    # Generate histogram
+    percentage_changes = [c['percentage_change'] for c in changes]
+    create_histogram(percentage_changes, show_detailed_for_first_bucket=True)
     
-    print(f"\nTop {len(increases)} files with largest percentage increases:")
-    print("-" * 60)
+    # Top outliers
+    increases, decreases = find_outliers(changes, 5)
+    
+    print(f"\nTop size increases:")
     for i, change in enumerate(increases, 1):
         filename = change['path'].split('/')[-1]
-        print(f"{i:2d}. {filename}: +{change['percentage_change']:.3f}% "
-              f"({change['old_size']:,} → {change['new_size']:,} bytes)")
+        print(f"{i}. {filename}: +{change['percentage_change']:.1f}% ({change['old_size']:,} → {change['new_size']:,} bytes)")
     
-    print(f"\nTop {len(decreases)} files with largest percentage decreases:")
-    print("-" * 60)
-    for i, change in enumerate(decreases, 1):
-        if change['percentage_change'] < 0:
+    if any(c['percentage_change'] < 0 for c in decreases):
+        print(f"\nTop size decreases:")
+        for i, change in enumerate([c for c in decreases if c['percentage_change'] < 0][:5], 1):
             filename = change['path'].split('/')[-1]
-            print(f"{i:2d}. {filename}: {change['percentage_change']:.3f}% "
-                  f"({change['old_size']:,} → {change['new_size']:,} bytes)")
-    
-    # Additional verification info
-    print(f"\nVerification Information:")
-    print("-" * 30)
-    print(f"Files analyzed: {len(changes)}")
-    print(f"Files only in new: {len(new_files) - len(changes)}")
-    print(f"Files only in old: {len(old_files) - len(changes)}")
-    
-    # Largest absolute changes
-    abs_increases = sorted(changes, key=lambda x: x['absolute_change'], reverse=True)[:5]
-    abs_decreases = sorted(changes, key=lambda x: x['absolute_change'])[:5]
-    
-    print(f"\nLargest absolute size increases:")
-    for change in abs_increases:
-        if change['absolute_change'] > 0:
-            filename = change['path'].split('/')[-1]
-            print(f"  {filename}: +{change['absolute_change']:,} bytes")
-    
-    print(f"\nLargest absolute size decreases:")
-    for change in abs_decreases:
-        if change['absolute_change'] < 0:
-            filename = change['path'].split('/')[-1]
-            print(f"  {filename}: {change['absolute_change']:,} bytes")
+            print(f"{i}. {filename}: {change['percentage_change']:.1f}% ({change['old_size']:,} → {change['new_size']:,} bytes)")
 
 def main():
     parser = argparse.ArgumentParser(
