@@ -431,7 +431,7 @@ let idx_expected_modalities ~(mut : bool) =
          primitives (see [idx_imm.mli] and [idx_mut.mli] in [Stdlib_beta]). *)
   let modality_of_list l =
     List.fold_left
-      (fun t (Modality.Atom (ax, a)) -> Modality.Value.Const.set ax a t)
+      (fun t (Modality.Atom.P a) -> Modality.Value.Const.set a t)
       Modality.Value.Const.id l
   in
   let expected1 = mutable_implied_modalities mut ~for_mutable_variable:false in
@@ -441,10 +441,10 @@ let idx_expected_modalities ~(mut : bool) =
       (* If this list is updated, the external bindings in the [Idx_imm] and
          [Idx_mut] modules in [Stdlib_beta] may also have to be updated. *)
       modality_of_list
-        [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
-          Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
-          Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
-          Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy) ]
+        [ P (Comonadic (Areality, Meet_with Regionality.Const.legacy));
+          P (Comonadic (Linearity, Meet_with Linearity.Const.legacy));
+          P (Comonadic (Yielding, Meet_with Yielding.Const.legacy));
+          P (Monadic (Uniqueness, Join_with Uniqueness.Const.legacy)) ]
     else Mode.Modality.Value.Const.id
   in
   (* CR layouts v8: only perform this check at most twice: for [mut = true] and

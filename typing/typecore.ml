@@ -11507,16 +11507,16 @@ let report_error ~loc env =
     Location.error ~loc
       "Block indices do not support private records."
   | Block_index_modality_mismatch { mut; err } ->
-    let step, Modality.Value.Error(ax, { left; right }) = err in
+    let step, Modality.Value.Error({ left; right }) = err in
     let print_modality id ppf m =
       Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ppf m
     in
     let expected, actual = match step with
-      | Left_le_right -> Modality.Atom (ax, right), Modality.Atom (ax, left)
-      | Right_le_left -> Modality.Atom (ax, left), Modality.Atom (ax, right)
+      | Left_le_right -> right, left
+      | Right_le_left -> left, right
     in
     let what_element_must_do =
-      if Modality.is_id expected then
+      if Modality.Atom.is_id expected then
         "have the identity modality"
       else
         Format.asprintf "be %a" (print_modality "") expected
