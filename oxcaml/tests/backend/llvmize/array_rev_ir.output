@@ -312,6 +312,8 @@ L151:                                                ; preds = %L1
 
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
+declare i32 @llvm.eh.ocaml.try() returns_twice
+declare void @llvm.eh.ocaml.touch(ptr)
 
 @camlArray_rev_data = external global ptr
 
