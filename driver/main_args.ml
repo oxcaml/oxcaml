@@ -721,6 +721,15 @@ let mk_instantiate_opt = mk_instantiate0 ~ext:"cmx"
 let mk_use_prims f =
   "-use-prims", Arg.String f, "<file>  (undocumented)"
 
+(* CR sspies: The -use-debugging-shapes flag should be removed eventually
+   when these are the only supported shapes. *)
+let mk_use_debugging_shapes f =
+  "-use-debugging-shapes", Arg.Unit f,
+  " Use debugging shapes instead of old merlin shapes"
+
+let mk_use_old_merlin_shapes f =
+  "-use-old-merlin-shapes", Arg.Unit f, " Use old merlin shapes (default)"
+
 let mk_dump_into_file f =
   "-dump-into-file", Arg.Unit f, " dump output like -dlambda into <target>.dump"
 ;;
@@ -1011,6 +1020,8 @@ module type Compiler_options = sig
   val _as_parameter : unit -> unit
   val _binannot : unit -> unit
   val _binannot_cms : unit -> unit
+  val _use_debugging_shapes : unit -> unit
+  val _use_old_merlin_shapes : unit -> unit
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit
@@ -1317,6 +1328,8 @@ struct
 
     mk_match_context_rows F._match_context_rows;
     mk_use_prims F._use_prims;
+    mk_use_debugging_shapes F._use_debugging_shapes;
+    mk_use_old_merlin_shapes F._use_old_merlin_shapes;
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
     mk_dno_locations F._dno_locations;
@@ -1611,6 +1624,8 @@ struct
     mk_dump_dir F._dump_dir;
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
+    mk_use_debugging_shapes F._use_debugging_shapes;
+    mk_use_old_merlin_shapes F._use_old_merlin_shapes;
 
     mk_args F._args;
     mk_args0 F._args0;
@@ -2020,6 +2035,8 @@ module Default = struct
     let _as_parameter = set as_parameter
     let _binannot = set binary_annotations
     let _binannot_cms = set binary_annotations_cms
+    let _use_debugging_shapes () = use_old_merlin_shapes := false
+    let _use_old_merlin_shapes () = use_old_merlin_shapes := true
     let _binannot_occurrences = set store_occurrences
     let _c = set compile_only
     let _cc s = c_compiler := (Some s)

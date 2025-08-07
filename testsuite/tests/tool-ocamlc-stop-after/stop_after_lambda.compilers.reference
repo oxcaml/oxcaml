@@ -1,2 +1,2 @@
 (setglobal Stop_after_lambda!
-  (let (*match*/7 =[value<int>] ( 1)) (makeblock 0)))
+  (let (*match*/12 =[value<int>] ( 1)) (makeblock 0)))

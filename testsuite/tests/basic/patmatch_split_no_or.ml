@@ -15,15 +15,15 @@ let last_is_anys = function
 ;;
 [%%expect{|
 (let
-  (last_is_anys/14 =
+  (last_is_anys/19 =
      (function {nlocal = 0}
-       param/16[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       param/21[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
        : int
        (catch
-         (if (field_imm 0 param/16) (if (field_imm 1 param/16) (exit 1) 1)
-           (if (field_imm 1 param/16) (exit 1) 2))
+         (if (field_imm 0 param/21) (if (field_imm 1 param/21) (exit 1) 1)
+           (if (field_imm 1 param/21) (exit 1) 2))
         with (1) 3)))
-  (apply (field_imm 1 (global Toploop!)) "last_is_anys" last_is_anys/14))
+  (apply (field_imm 1 (global Toploop!)) "last_is_anys" last_is_anys/19))
 val last_is_anys : bool * bool -> int = <fun>
 |}]
 
@@ -34,15 +34,15 @@ let last_is_vars = function
 ;;
 [%%expect{|
 (let
-  (last_is_vars/21 =
+  (last_is_vars/26 =
      (function {nlocal = 0}
-       param/25[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       param/30[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
        : int
        (catch
-         (if (field_imm 0 param/25) (if (field_imm 1 param/25) (exit 3) 1)
-           (if (field_imm 1 param/25) (exit 3) 2))
+         (if (field_imm 0 param/30) (if (field_imm 1 param/30) (exit 3) 1)
+           (if (field_imm 1 param/30) (exit 3) 2))
         with (3) 3)))
-  (apply (field_imm 1 (global Toploop!)) "last_is_vars" last_is_vars/21))
+  (apply (field_imm 1 (global Toploop!)) "last_is_vars" last_is_vars/26))
 val last_is_vars : bool * bool -> int = <fun>
 |}]
 
@@ -56,12 +56,12 @@ type t += A | B of unit | C of bool * int;;
 0
 type t = ..
 (let
-  (A/29 = (makeblock_unique 248 "A" (caml_fresh_oo_id 0))
-   B/30 = (makeblock_unique 248 "B" (caml_fresh_oo_id 0))
-   C/31 = (makeblock_unique 248 "C" (caml_fresh_oo_id 0)))
-  (seq (apply (field_imm 1 (global Toploop!)) "A/29" A/29)
-    (apply (field_imm 1 (global Toploop!)) "B/30" B/30)
-    (apply (field_imm 1 (global Toploop!)) "C/31" C/31)))
+  (A/34 = (makeblock_unique 248 "A" (caml_fresh_oo_id 0))
+   B/35 = (makeblock_unique 248 "B" (caml_fresh_oo_id 0))
+   C/36 = (makeblock_unique 248 "C" (caml_fresh_oo_id 0)))
+  (seq (apply (field_imm 1 (global Toploop!)) "A/34" A/34)
+    (apply (field_imm 1 (global Toploop!)) "B/35" B/35)
+    (apply (field_imm 1 (global Toploop!)) "C/36" C/36)))
 type t += A | B of unit | C of bool * int
 |}]
 
@@ -75,23 +75,23 @@ let f = function
 ;;
 [%%expect{|
 (let
-  (C/31 =? (apply (field_imm 0 (global Toploop!)) "C/31")
-   B/30 =? (apply (field_imm 0 (global Toploop!)) "B/30")
-   A/29 =? (apply (field_imm 0 (global Toploop!)) "A/29")
-   f/32 =
+  (C/36 =? (apply (field_imm 0 (global Toploop!)) "C/36")
+   B/35 =? (apply (field_imm 0 (global Toploop!)) "B/35")
+   A/34 =? (apply (field_imm 0 (global Toploop!)) "A/34")
+   f/37 =
      (function {nlocal = 0}
-       param/34[value<
+       param/39[value<
                  (consts ()) (non_consts ([0: *, value<int>, value<int>]))>]
        : int
-       (let (*match*/35 =a? (field_imm 0 param/34))
+       (let (*match*/40 =a? (field_imm 0 param/39))
          (catch
-           (if (== *match*/35 A/29) (if (field_imm 1 param/34) 1 (exit 8))
+           (if (== *match*/40 A/34) (if (field_imm 1 param/39) 1 (exit 8))
              (exit 8))
           with (8)
-           (if (field_imm 1 param/34)
-             (if (== (field_imm 0 *match*/35) B/30) 2
-               (if (== (field_imm 0 *match*/35) C/31) 3 4))
-             (if (field_imm 2 param/34) 12 11))))))
-  (apply (field_imm 1 (global Toploop!)) "f" f/32))
+           (if (field_imm 1 param/39)
+             (if (== (field_imm 0 *match*/40) B/35) 2
+               (if (== (field_imm 0 *match*/40) C/36) 3 4))
+             (if (field_imm 2 param/39) 12 11))))))
+  (apply (field_imm 1 (global Toploop!)) "f" f/37))
 val f : t * bool * bool -> int = <fun>
 |}]
