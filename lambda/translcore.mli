@@ -21,6 +21,9 @@ open Typedtree
 open Lambda
 open Debuginfo.Scoped_location
 
+(* Track whether any of the compilation units ever uses [%eval] *)
+val uses_eval : bool ref
+
 val pure_module : module_expr -> let_kind
 
 (* Used for translating Alloc_heap values in classes and modules. *)
