@@ -2204,7 +2204,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
               Value_prefix
                 (convert_block_access_field_kind_from_value_kind value_kind)
             | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-              | Vec256 | Vec512 | Word | Untagged_immediate ) as mixed_block_element ->
+              | Vec256 | Vec512 | Word | Untagged_immediate ) as
+              mixed_block_element ->
               Flat_suffix
                 (K.Flat_suffix_element.from_singleton_mixed_block_element
                    mixed_block_element)
@@ -2295,8 +2296,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
                       (convert_block_access_field_kind_from_value_kind
                          value_kind)
                   | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                    | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ) as mixed_block_element
-                    ->
+                    | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ) as
+                    mixed_block_element ->
                     Flat_suffix
                       (K.Flat_suffix_element.from_singleton_mixed_block_element
                          mixed_block_element)

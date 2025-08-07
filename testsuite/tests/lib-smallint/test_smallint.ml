@@ -40,7 +40,6 @@ let test_cases ~int_size =
       [rand (); lnot (rand ()); max_int - rand (); lnot (max_int - rand ())])
   |> List.concat |> List.sort Int.compare
 
-
 (** Generate a bunch of valid strings of integer formats *)
 let test_strings ~int_size ~f =
   let rec int_to_binary = function
@@ -57,15 +56,13 @@ let test_strings ~int_size ~f =
   in
   let arbitrary_wonky_format_that_still_parses = "-0o1___2" in
   List.iter f
-    (
-      arbitrary_wonky_format_that_still_parses
-      :: ListLabels.concat_map (test_cases ~int_size) ~f:(fun x ->
-        [Printf.sprintf "%#d" x; Printf.sprintf "%d" x]
-        @ (if x >= 0 then [Printf.sprintf "+%d" x] else [])
-        @ prefix_formats x ~prefix:""
-        @ prefix_formats x ~prefix:"+"
-        @ prefix_formats x ~prefix:"-")
-    )
+    (arbitrary_wonky_format_that_still_parses
+    :: ListLabels.concat_map (test_cases ~int_size) ~f:(fun x ->
+           [Printf.sprintf "%#d" x; Printf.sprintf "%d" x]
+           @ (if x >= 0 then [Printf.sprintf "+%d" x] else [])
+           @ prefix_formats x ~prefix:""
+           @ prefix_formats x ~prefix:"+"
+           @ prefix_formats x ~prefix:"-"))
 
 let run (module Smallint : Int.S) ~min_int ~max_int =
   let int_size = Smallint.size in
@@ -183,7 +180,7 @@ let run (module Smallint : Int.S) ~min_int ~max_int =
       assert (equal_logical (Smallint.of_float f) x));
   test1 (fun x -> assert (Smallint.to_string (of_int x) = Int.to_string x));
   test_strings ~int_size ~f:(fun s ->
-    assert (equal_arith (Smallint.of_string s) (int_of_string s)));
+      assert (equal_arith (Smallint.of_string s) (int_of_string s)));
   test_logical2 Smallint.min Int.min;
   test_logical2 Smallint.max Int.max;
   ()
