@@ -1,8 +1,8 @@
-This style guide is useful for reviewing diff in PR. 
+This style guide is useful for reviewing diff in PR.
 
 Line Width
 -----
-No line shall exceed 80 characters. You should not 
+No line shall exceed 80 characters. You should not
 
 
 Let In
@@ -21,7 +21,7 @@ GOOD:
 
 BAD:
 ```
-  let x = f short_argument y 
+  let x = f short_argument y
   in
   let y = f long_argument
 	    continue_long_argument in
@@ -44,7 +44,7 @@ BAD:
       f long_argument long_argument y,
         g x
 ```
-        
+
 
 
 Empty Lines
@@ -68,21 +68,46 @@ let g x = x
 
 Parenthesis
 -----
-You should not include unnecessary parenthesis. 
+You should not include unnecessary parenthesis.
 Content should immediately follow an open parenthesis, not in a new line.
 
 GOOD:
 ```
-  | Cons x y -> 
+  | Cons x y ->
       (match f long_argument x with
 ```
 
 BAD:
 ```
-  | Cons x y -> 
+  | Cons x y ->
       (
          match f long_argument x with
 ```
 
+If then else
+------
 
+It is okay for then to be on the same line if.
 
+OKAY:
+```
+  if x then ...
+```
+
+If then is on the next line, then should be indented with the same identation as if.
+
+GOOD:
+```
+  if x
+  then y else z
+```
+
+BAD:
+```
+  if x
+    then y else z
+```
+
+Spelling:
+-----
+There should be no spelling typos in PR comments.
