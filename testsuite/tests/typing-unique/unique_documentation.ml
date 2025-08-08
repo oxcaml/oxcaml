@@ -150,7 +150,8 @@ module Mk : sig val mk : unit -> t end
 Line 6, characters 20-30:
 6 |   let use () = free (Mk.mk ()) in
                         ^^^^^^^^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased"Uncaught exception: Typecore.Error(_, _, _)
+
 |}]
 
 module Unique_array = struct

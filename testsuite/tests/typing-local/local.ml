@@ -9,8 +9,9 @@ let leak n =
 Line 3, characters 2-3:
 3 |   r
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 external idint : local_ int -> int = "%identity"
@@ -40,8 +41,9 @@ let leak n =
 Line 3, characters 2-3:
 3 |   r
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 let leak n =
@@ -51,8 +53,9 @@ let leak n =
 Line 3, characters 2-3:
 3 |   r
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 let leak n =
@@ -62,8 +65,9 @@ let leak n =
 Line 3, characters 2-3:
 3 |   f
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 let leak n =
@@ -73,8 +77,9 @@ let leak n =
 Line 3, characters 2-3:
 3 |   f
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 (* If both type and mode are wrong, complain about type *)
@@ -268,8 +273,9 @@ let apply2 x = f4 x x
 Line 1, characters 15-21:
 1 | let apply2 x = f4 x x
                    ^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
   Hint: This is a partial application
         Adding 2 more arguments will make the value non-local
 |}]
@@ -278,8 +284,9 @@ let apply3 x = f4 x x x
 Line 1, characters 15-23:
 1 | let apply3 x = f4 x x x
                    ^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -319,8 +326,9 @@ let appopt2 (f : ?a:local_ int ref -> unit -> unit) =
 Line 3, characters 2-5:
 3 |   res
       ^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 (* In principle. it would be sound to allow this one:
@@ -332,8 +340,9 @@ let appopt3 (f : ?a:local_ int ref -> int -> int -> unit) =
 Line 3, characters 2-5:
 3 |   res
       ^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 let optret1 (f : ?x:int -> local_ (y:unit -> unit -> int)) = f ()
@@ -341,8 +350,9 @@ let optret1 (f : ?x:int -> local_ (y:unit -> unit -> int)) = f ()
 Line 1, characters 61-65:
 1 | let optret1 (f : ?x:int -> local_ (y:unit -> unit -> int)) = f ()
                                                                  ^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -358,7 +368,9 @@ let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
 Line 1, characters 47-48:
 1 | let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
                                                    ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 let etajoin p (f : ?b:bool -> unit -> int) (local_ g : unit -> int) =
@@ -386,7 +398,7 @@ let foo ?(local_ x = local_ "hello") () = x;;
 Line 1, characters 21-35:
 1 | let foo ?(local_ x = local_ "hello") () = x;;
                          ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo ?(local_ x = local_ "hello") () = local_ x;;
@@ -394,7 +406,7 @@ let foo ?(local_ x = local_ "hello") () = local_ x;;
 Line 1, characters 21-35:
 1 | let foo ?(local_ x = local_ "hello") () = local_ x;;
                          ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (*
@@ -418,7 +430,7 @@ let heap_closure () =
 Line 10, characters 24-26:
 10 |   let _force_heap = ref fn in
                              ^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let local_closure () =
@@ -446,7 +458,7 @@ let toplevel_stack = local_ {contents=42}
 Line 1, characters 21-41:
 1 | let toplevel_stack = local_ {contents=42}
                          ^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 module M = struct
@@ -461,7 +473,7 @@ let _ = local_ {contents=42}
 Line 1, characters 8-28:
 1 | let _ = local_ {contents=42}
             ^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 
@@ -528,7 +540,7 @@ let leak_id =
 Line 2, characters 24-25:
 2 |   use_locally (fun x -> x) 42
                             ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let leak_ref =
@@ -539,7 +551,7 @@ let leak_ref =
 Line 3, characters 43-44:
 3 |   use_locally (fun x -> r.contents <- Some x; x) 42
                                                ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let leak_ref_2 =
@@ -549,7 +561,10 @@ let leak_ref_2 =
 Line 3, characters 39-40:
 3 |   use_locally (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
                                            ^
-Error: The value "r" is local, so cannot be used inside a function that might escape.
+Error: The value "r" is "local" but expected to be "global"
+       because it is used inside a function
+       which is "global"Uncaught exception: Env.Error(_)
+
 |}]
 
 let leak_ref_3 =
@@ -559,7 +574,7 @@ let leak_ref_3 =
 Line 3, characters 64-65:
 3 |   use_locally' (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
                                                                     ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 
@@ -576,7 +591,7 @@ let do_leak_exn =
 Line 2, characters 66-67:
 2 |   use_locally (fun x -> let _exn = local_ raise (Invalid_argument x) in "bluh") "blah"
                                                                       ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* handled exceptions are known to be global *)
@@ -665,7 +680,9 @@ let foo (local_ x) =
 Line 2, characters 30-31:
 2 |   let _ = lazy (print_string !x) in
                                   ^
-Error: The value "x" is local, so cannot be used inside a lazy expression.
+Error: The value "x" is "local" but expected to be "global"
+       because it is used inside a lazy expression which is "global"
+       because lazy expressions are always global.
 |}]
 
 (* Don't escape through a functor *)
@@ -680,7 +697,8 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is local, so cannot be used inside a functor.
+Error: The value "x" is "local" but expected to be "global"
+       because it is used inside a functor which is "global".
 |}]
 
 (* Don't escape through a functor with underscore parameter *)
@@ -695,7 +713,8 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is local, so cannot be used inside a functor.
+Error: The value "x" is "local" but expected to be "global"
+       because it is used inside a functor which is "global".
 |}]
 
 (* Don't escape through a generative functor *)
@@ -710,7 +729,8 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is local, so cannot be used inside a functor.
+Error: The value "x" is "local" but expected to be "global"
+       because it is used inside a functor which is "global".
 |}]
 
 (* Don't escape through a functor with underscore parameter *)
@@ -725,7 +745,8 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is local, so cannot be used inside a functor.
+Error: The value "x" is "local" but expected to be "global"
+       because it is used inside a functor which is "global".
 |}]
 
 (* Don't escape through a generative functor *)
@@ -740,7 +761,8 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is local, so cannot be used inside a functor.
+Error: The value "x" is "local" but expected to be "global"
+       because it is used inside a functor which is "global".
 |}]
 
 (* Don't escape through a class method *)
@@ -813,7 +835,7 @@ let foo (local_ x) =
 Line 4, characters 10-11:
 4 |       let y = x in
               ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -923,7 +945,7 @@ let foo (local_ x) =
 Line 3, characters 14-15:
 3 |   let rec g = x :: g in
                   ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* Cannot pass local values to tail calls *)
@@ -938,9 +960,8 @@ val print : local_ string ref -> unit = <fun>
 Line 5, characters 8-9:
 5 |   print r
             ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is an argument in a tail call.
 |}]
 
 let local_cb (local_ f) = f ()
@@ -950,8 +971,10 @@ val local_cb : local_ (unit -> 'a) -> 'a = <fun>
 Line 2, characters 41-42:
 2 | let foo (local_ x) = local_cb (fun () -> x := 17; 42)
                                              ^
-Error: The value "x" is local, so cannot be used inside a function that might escape.
-Hint: The function might escape because it is an argument to a tail call
+Error: The value "x" is "local" but expected to be "global"
+       because it is used inside a function which is "global"
+       because it Uncaught exception: Env.Error(_)
+
 |}]
 
 let foo x =
@@ -994,9 +1017,8 @@ let foo x =
 Line 4, characters 2-5:
 4 |   foo ()
       ^^^
-Error: This value escapes its region.
-  Hint: This function cannot be local,
-  because it is the function in a tail call.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is the function in a tail call.
 |}]
 
 let foo x =
@@ -1025,8 +1047,9 @@ let foo x =
 Line 3, characters 2-3:
 3 |   r
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 let foo x = exclave_
@@ -1160,8 +1183,9 @@ let foo y =
 Line 3, characters 2-7:
 3 |   x.imm
       ^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 let foo (local_ x) = x.mut
 [%%expect{|
@@ -1195,8 +1219,9 @@ let foo y =
 Line 3, characters 2-5:
 3 |   imm
       ^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 let foo (local_ { mut }) = mut
 [%%expect{|
@@ -1239,7 +1264,7 @@ let foo (local_ mut) =
 Line 2, characters 12-15:
 2 |   let _ = { mut } in
                 ^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1249,7 +1274,7 @@ let foo () =
 Line 3, characters 12-15:
 3 |   let _ = { mut } in
                 ^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 let foo (local_ gbl) =
   let _ = { gbl } in
@@ -1258,7 +1283,7 @@ let foo (local_ gbl) =
 Line 2, characters 12-15:
 2 |   let _ = { gbl } in
                 ^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1268,7 +1293,7 @@ let foo () =
 Line 3, characters 12-15:
 3 |   let _ = { gbl } in
                 ^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* Implicit records version of the same test *)
@@ -1284,8 +1309,9 @@ let foo y =
 Line 3, characters 2-8:
 3 |   x.#imm
       ^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 let foo (local_ x) = x.#mut
 [%%expect{|
@@ -1319,8 +1345,9 @@ let foo y =
 Line 3, characters 2-5:
 3 |   imm
       ^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 let foo (local_ #{ mut }) = mut
 [%%expect{|
@@ -1367,7 +1394,7 @@ let foo (local_ mut) =
 Line 2, characters 13-16:
 2 |   let _ = #{ mut } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1377,7 +1404,7 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ mut } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in
@@ -1386,7 +1413,7 @@ let foo (local_ gbl) =
 Line 2, characters 13-16:
 2 |   let _ = #{ gbl } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1396,7 +1423,7 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ gbl } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* Unboxed records version of the same test *)
@@ -1436,7 +1463,7 @@ let foo (local_ gbl) =
 Line 2, characters 13-16:
 2 |   let _ = #{ gbl } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1446,7 +1473,7 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ gbl } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* Global fields are preserved in module inclusion *)
@@ -1579,9 +1606,7 @@ let foo (local_ x) y =
 Line 4, characters 29-30:
 4 |   | Some _, Some b -> escape b
                                  ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo (local_ x) y =
@@ -1594,9 +1619,7 @@ let foo (local_ x) y =
 Line 5, characters 11-12:
 5 |     escape b
                ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo p (local_ x) y z =
@@ -1618,9 +1641,7 @@ let foo p (local_ x) y (local_ z) =
 Line 5, characters 9-10:
 5 |   escape b;;
              ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo p (local_ x) y z =
@@ -1632,9 +1653,7 @@ let foo p (local_ x) y z =
 Line 5, characters 9-10:
 5 |   escape a;;
              ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo p (local_ x) y z =
@@ -1647,9 +1666,7 @@ let foo p (local_ x) y z =
 Line 6, characters 9-10:
 6 |   escape b;;
              ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* [as] patterns *)
@@ -1670,9 +1687,7 @@ let foo (local_ x) =
 Line 4, characters 26-27:
 4 |   | Some _ as y -> escape y
                               ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1685,9 +1700,7 @@ val foo : local_ int -> unit = <fun>
 Line 3, characters 21-22:
 3 |   | 0 as y -> escape y
                          ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1700,9 +1713,7 @@ val foo : local_ char -> unit = <fun>
 Line 3, characters 28-29:
 3 |   | 'a'..'e' as y -> escape y
                                 ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1713,9 +1724,7 @@ let foo (local_ x) =
 Line 3, characters 23-24:
 3 |   | 1.1 as y -> escape y
                            ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1734,9 +1743,7 @@ let foo (local_ x) =
 Line 3, characters 28-29:
 3 |   | (`Foo _) as y -> escape y
                                 ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1746,9 +1753,7 @@ let foo (local_ x) =
 Line 3, characters 35-36:
 3 |   | (None | Some _) as y -> escape y
                                        ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1758,9 +1763,7 @@ let foo (local_ x) =
 Line 3, characters 33-34:
 3 |   | (Some _|None) as y -> escape y
                                      ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 type foo = [`Foo | `Bar]
@@ -1783,9 +1786,7 @@ type foo = [ `Bar of int | `Foo ]
 Line 5, characters 24-25:
 5 |   | #foo as y -> escape y
                             ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* Primitives *)
@@ -1946,9 +1947,8 @@ val testbool1 : (local_ int ref -> bool) -> bool = <fun>
 Line 3, characters 63-64:
 3 | let testbool2 f = let local_ r = ref 42 in true && (false || f r)
                                                                    ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is an argument in a tail call.
 |}]
 
 (* boolean operator when at tail of function makes the function local-returning
@@ -1974,7 +1974,7 @@ external strange_and : bool -> 'a option -> 'a option = "%sequand"
 Line 5, characters 19-20:
 5 |   strange_and true x
                        ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* mode-crossing using unary + *)
@@ -2432,7 +2432,7 @@ let f (local_ s : string) =
 Line 2, characters 8-9:
 2 |   GFoo (s, "bar")
             ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 let f =
@@ -2442,7 +2442,7 @@ let f =
 Line 3, characters 8-9:
 3 |   GFoo (s, "bar")
             ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* s' extracted from x as global *)
@@ -2475,8 +2475,9 @@ let f (s : string) =
 Line 4, characters 20-22:
 4 |   | GFoo (_, s') -> s'
                         ^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 (* and regional gives regional *)
@@ -2488,7 +2489,7 @@ let f (local_ x : gfoo) =
 Line 3, characters 24-26:
 3 |   | GFoo (_, s') -> ref s'
                             ^^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* Test of array.*)
@@ -2503,7 +2504,7 @@ let f (local_ x : string) = ref [: x; "foo" :]
 Line 1, characters 35-36:
 1 | let f (local_ x : string) = ref [: x; "foo" :]
                                        ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* constructing local iarray from local elements is fine *)
@@ -2527,7 +2528,7 @@ let f (local_ a : string iarray) =
 Line 3, characters 22-23:
 3 |   | [: x; _ :] -> ref x
                           ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* a test that was passing type check *)
@@ -2539,8 +2540,9 @@ let unsafe_globalize (local_ s : string) : string =
 Line 3, characters 14-16:
 3 |   | [:s':] -> s'
                   ^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 let f (local_ a : string iarray) =
@@ -2569,7 +2571,7 @@ let f (local_ x : string) = exclave_ [| x |]
 Line 1, characters 40-41:
 1 | let f (local_ x : string) = exclave_ [| x |]
                                             ^
-Error: This value escapes its region.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* constructing local array from global elements is allowed *)
@@ -2606,8 +2608,9 @@ end
 Line 11, characters 13-59:
 11 |   let f () = fold_until [] ~init:0 ~f:(fun _ _ -> Right ())
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local" but expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
