@@ -23,10 +23,6 @@ module Float64 = struct
 
   external sqrt : t -> t = "caml_vec128_unreachable" "caml_neon_float64_sqrt"
     [@@noalloc] [@@builtin] [@@unboxed]
-
-  external round_near : (t[@unboxed]) -> (t[@unboxed])
-    = "caml_vec128_unreachable" "caml_neon_float64_round_near"
-    [@@noalloc] [@@builtin]
 end
 
 module Float_cond_x86 = struct
