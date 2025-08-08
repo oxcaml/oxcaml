@@ -13,7 +13,72 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Uniqueness analysis, ran after type-checking *)
+(*
+  OCaml has the contraction rule baked in its type checking, which makes the
+  uniqueness/linearity modes inferred by the type system too permissive. This
+  file implements uniqueness analysis, which runs after type checking. It
+  inspects the lexical structure of a program, identifies implicit usages of
+  the contraction rule, and accordingly checks the modes inferred by the type
+  system.
+
+  To that end, we assign a usage to every node in the expression tree. Starting
+  from the bottom, the leaves are the usages representing "use sites" (such as
+  [Pexp_ident]), which are unconstrained at first. Those usages are then
+  composed together by [par], [seq], etc., reflecting the lexical
+  structure of the program. Certain composition of certain usages (such as
+  [seq Unique Unique]) is illegal and leads to Error. Composition of
+  unconstrained usages constrains the usages. For example, [seq u1 u2] will
+  constrain both [u1] and [u2] to be strictly weaker than [Unique].
+
+  In particular, if the usage being constrained represents a "use site", we
+  eagerly apply the constraint on the modes inferred by the type system. For
+  example, [unique_use] in [Texp_ident] is the mode expected by the consumer of
+  the identifier. Type errors are raised if the uniqueness analysis contradicts
+  what is expected in the [unique_use].
+
+  For example:
+  [
+  let x = .. in
+  use_as_unique x;
+  use_as_unique x
+  ]
+
+  The type system would infer both [Pexp_ident x] use sites to be Unique,
+  but uniqueness analysis would infer both to be strictly weaker than Unique.
+  The submode fails and type error is raised (see [mark_multi_use]).
+
+  On top of the naive contraction rule, we adopt the following tweaks:
+
+  - It's useful to express usages in a finer manner than [Unique] vs.
+  [Aliased]. For example, the following example should be allowed:
+
+  let y =
+    match x with
+    | Foo -> true
+    | _ -> false
+  in
+  unique_use x
+
+  The first usage of [x] is confined to the pattern match (not keeping any
+  reference to [x]), and should not forbid a later unique usage of [x]. To
+  that end, we say [x] is used as [Borrowed] by the pattern match. The list of
+  usages can be found in [Module Usage].
+
+  - A naive approach would treat each [Pexp_ident x] as a usage of [x]. This,
+  while being sound, is too strict. For example, the program [unique_use r.x;
+  unique_use r.y] would be rejected as [Pexp_ident r] is used twice. Instead,
+  we should treat this as using [r.x] and [r.y], which is allowed. This is
+  implemented in [module UsageTree].
+
+  - Similarly, it's useful to track aliases instead of treating them as
+  usages. For example, [let x = y in unique_use y] should be allowed, while
+  [let x = y in unique_use y; unique_use x] should be forbidden. This is
+  implemented in [check_uniqueness_exp_as_value].
+
+  The above discussion is about tracking the usages of a single value. To
+  track the usages of multiple values, we lift [module UsageTree] to
+  [module UsageForest].
+*)
 
 open Asttypes
 open Types
@@ -378,33 +443,6 @@ end = struct
 
      And we have Unused (top) > Borrowed > Aliased > Unique > Error (bot). Lower
      usage is stronger.
-
-     A program can use a value multiple times. We take a hierarchical view of the
-     usages. At the bottom are the usages caused by "use sites" (such as
-     [Pexp_ident]). Those usages are then composed together by [par], [seq],
-     etc., reflecting the lexical structure. Certain composition of certain
-     usages (such as [seq Unique Unique]) is illegal and leads to Error.
-
-     The uniqueness analysis is to infer the strongest usage that can be granted
-     to each use site. To do that, each use site will be granted a usage that is
-     unconstrained, which gets constrained during composition with other usages.
-     For example, [seq u1 u2] will constrain both [u1] and [u2] to be weaker than
-     Unique.
-
-     For each use site, the lexically-inferred usage is eagerly compared against
-     the typing-inferred usage (e.g., [unique_use] in [Pexp_ident]). Type errors
-     are raised if that fails.
-
-     For example:
-     [
-     let x = .. in
-     use_as_unique x;
-     use_as_unique x
-     ]
-
-     type checking would infer both [Pexp_ident x] use sites to be Unique, but
-     uniqueness analysis would infer both to be strictly weaker than Unique.
-     Type error is raised.
 
      It is sound for the analysis to infer a use site to have a weaker usage,
      which might result in false mode errors. It is useful for the analysis to
@@ -2289,6 +2327,24 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     let value, uf = check_uniqueness_exp_as_value ienv exp in
     UF.seq uf (Value.mark_maybe_unique value)
   | Texp_setfield (rcd, _, _, _, arg) ->
+    (* Ideally, we should treat this as creating a new alias of [arg], and
+       further usages of the field should be directed at the alias, instead of
+       the old value. However, this would require some big changes to the
+       analysis.
+
+       Instead, we take a conservative approach, treating mutability as opaque.
+       First of all, [type r = { mutable x : 'a }] is viewed as [type r = { x :
+       'b }] where ['b] is some opaque type (think ['a ref]) with some opaque
+       operations [val read: 'b -> 'a] and [val write: 'a -> 'b -> unit]
+
+       Then, field mutation [r.x <- x0] is viewed as [write x0 r.x]. This leads
+       to marking [x0] as fully used, and [r.mem_addr] borrowed, and [r.x] used
+       by [write]. Field projection [r.x] is viewed as [read r.x], which leads
+       to marking [r.mem_addr] borrowed, and [r.x] used by [read].
+
+       Now, note that currently [mutable] implies [many aliased], which means
+       ['b] should cross linearity and uniqueness. Therefore, the above usages
+       on [r.x] can be skipped. *)
     let value, uf_rcd = check_uniqueness_exp_as_value ienv rcd in
     let uf_arg = check_uniqueness_exp ~overwrite:None ienv arg in
     let uf_write = Value.mark_implicit_borrow_memory_address Write value in
