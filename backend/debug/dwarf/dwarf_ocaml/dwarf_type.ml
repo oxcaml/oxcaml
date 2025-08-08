@@ -1611,18 +1611,35 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
 module With_cms_reduce = Shape_reduce.Make (struct
   let fuel = 10
 
+  let cms_file_cache = StringTable.create 10
+
+  let max_number_of_cms_files = ref 20
+  (* A single compilation may not read more than 20 .cms files. *)
+  (* CR sspies: Investigate the performance some more and the balance between
+     different variables. *)
+
   let read_unit_shape ~unit_name =
-    let filename = String.uncapitalize_ascii unit_name in
-    match Load_path.find_normalized (filename ^ ".cms") with
-    | exception Not_found -> None
-    | fn -> (
-      match Cms_format.read fn with
-      | exception Cms_format.Error _ ->
-        (* CR sspies: We could consider throwing a louder error here, since
-           there must be something like a [.cms] version mismatch here. For now,
-           since it's only debugging information, we fail silently. *)
-        None
-      | cms_infos -> cms_infos.cms_impl_shape)
+    match StringTable.find_opt cms_file_cache unit_name with
+    | Some shape -> shape
+    | None ->
+      if !max_number_of_cms_files <= 0
+      then None
+      else (
+        decr max_number_of_cms_files;
+        let filename = String.uncapitalize_ascii unit_name in
+        match Load_path.find_normalized (filename ^ ".cms") with
+        | exception Not_found -> None
+        | fn -> (
+          match Cms_format.read fn with
+          | exception Cms_format.Error _ ->
+            (* CR sspies: We could consider throwing a louder error here, since
+               there must be something like a [.cms] version mismatch here. For
+               now, since it's only debugging information, we fail silently. *)
+            None
+          | cms_infos ->
+            let shape = cms_infos.cms_impl_shape in
+            StringTable.add cms_file_cache unit_name shape;
+            shape))
 end)
 
 let debug_print_reduction_before_and_after = false

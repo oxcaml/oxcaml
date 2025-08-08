@@ -678,10 +678,11 @@ let update_subst_with_mutrec_decl (subst_constr, subst_constr_mut) t map =
 (* To unroll the mutually recursive declarations, we perform a simple call by
    value evaluation and catch cycles for ident binders. *)
 let rec unfold_and_evaluate ~depth subst_type subst_constr (t : Shape.t) =
-  if depth >= 3
+  if depth >= 10
+     (* CR sspies: This depth limit can currently produce very large shapes, and
+        some additional caching would be appropriate. *)
   then Shape.leaf' None
   else
-    let depth = depth + 1 in
     (* we special case the case where the head is a projection, because of
        recursive unfolding *)
     let head, args = decompose_application t in
@@ -694,6 +695,7 @@ let rec unfold_and_evaluate ~depth subst_type subst_constr (t : Shape.t) =
         let str = unfold_and_evaluate ~depth subst_type subst_constr str in
         match str.Shape.desc with
         | Mutrec ts ->
+          let depth = depth + 1 in
           let rec_binder = Recursive_binder.mk_recursive_binder () in
           let subst_constr =
             update_subst_with_mutrec_decl subst_constr str ts
