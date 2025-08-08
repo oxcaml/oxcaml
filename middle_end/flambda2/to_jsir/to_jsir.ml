@@ -191,13 +191,13 @@ and apply_expr ~env ~res e =
       apply_fn ~res ~f ~args ~exact:false
     | Some callee, C_call _ ->
       let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
-      let symbol, _coercion =
+      let symbol =
         match Simple.must_be_symbol callee with
+        | Some (symbol, _coercion) -> symbol
         | None ->
           Misc.fatal_errorf
             "Expected callee to be a symbol for C calls, instead found %a"
             Simple.print callee
-        | Some (symbol, coercion) -> symbol, coercion
       in
       let name = Symbol.linkage_name symbol |> Linkage_name.to_string in
       let expr : Jsir.expr =
