@@ -505,7 +505,7 @@ Process <PID> stopped
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[112, [111, [...]@0x0000000000488cd8]] : 'a @ value) at test_basic_dwarf.ml:119:41
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[112, [111, [...]@0x0000000000488b58]] : 'a @ value) at test_basic_dwarf.ml:119:41
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped

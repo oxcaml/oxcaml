@@ -69,16 +69,19 @@ type simple_record = #{ x: float#; y: int32# }
 type mixed_record = #{ a: int64#; b: bool; c: float# }
 type nested_record = #{ inner: simple_record; outer: int64# }
 
-let[@inline never] [@local never] f_simple_record (x: simple_record) = x
+let[@inline never] [@local never] f_simple_record (x: simple_record) = 
+  let #{ x; y } = x in #{ x; y }
 let _ = f_simple_record #{ x = #4.1; y = #42l }
 let _ = f_simple_record #{ x = #0.0; y = #0l }
 let _ = f_simple_record #{ x = -#3.14; y = -#123l }
 
-let[@inline never] [@local never] f_mixed_record (x: mixed_record) = x
+let[@inline never] [@local never] f_mixed_record (x: mixed_record) = 
+  let #{ a; b; c } = x in #{ a; b; c }
 let _ = f_mixed_record #{ a = #100L; b = true; c = #2.5 }
 let _ = f_mixed_record #{ a = #0L; b = false; c = #0.0 }
 
-let[@inline never] [@local never] f_nested_record (x: nested_record) = x
+let[@inline never] [@local never] f_nested_record (x: nested_record) = 
+  let #{ inner; outer } = x in #{ inner; outer }
 let _ = f_nested_record #{ inner = #{ x = #1.5; y = #10l }; outer = #200L }
 let _ = f_nested_record #{ inner = #{ x = #0.0; y = #0l }; outer = #0L }
 

@@ -26,11 +26,12 @@ let () =
     Buffer.clear buf;
     Buffer.add_substitute buf subst
       {|
-(rule
+(executable
+ (name ${name})
+ (modules ${name})
  ${enabled_if}
- (targets ${name}.exe)
- (deps ${name}.ml)
- (action (run %{bin:ocamlopt.opt} %{deps} -g -gno-upstream-dwarf -bin-annot-cms -o ${name}.exe)))
+ (ocamlopt_flags (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta))
+ (foreign_archives simd_stubs))
 
 (rule
  ${enabled_if_with_lldb}
@@ -64,4 +65,5 @@ let () =
   (* Generate tests - add more tests here as needed *)
   print_dwarf_test "test_basic_dwarf";
   print_dwarf_test "test_unboxed_dwarf";
-  print_dwarf_test "test_datatypes_dwarf"
+  print_dwarf_test "test_datatypes_dwarf";
+  print_dwarf_test "test_simd_dwarf"
