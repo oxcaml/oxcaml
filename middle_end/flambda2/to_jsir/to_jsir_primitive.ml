@@ -216,6 +216,10 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     identity ~env ~res x
   | Project_function_slot { move_from = _; move_to } ->
     Some (To_jsir_env.get_function_slot_exn env move_to), env, res
+  | Project_value_slot { project_from = _; value_slot }
+    when Value_slot.is_imported value_slot ->
+    let str = Value_slot.to_string value_slot in
+    Misc.fatal_errorf "project value slot %s\n" str
   | Project_value_slot { project_from = _; value_slot } ->
     (* CR selee: This is also used to call external functions, will need to
        handle that *)

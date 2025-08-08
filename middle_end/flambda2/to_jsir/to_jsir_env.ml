@@ -84,16 +84,41 @@ let get_exn_handler_exn t cont = Continuation.Map.find cont t.exn_handlers
 let get_var_exn t fvar = Variable.Map.find fvar t.vars
 
 let get_external_symbol ~res symbol =
-  let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
-  let var = Jsir.Var.fresh () in
-  ( var,
-    To_jsir_result.add_instr_exn res
-      (Let
-         ( var,
-           Prim
-             ( Extern "caml_get_symbol",
-               [ Pc (NativeString compilation_unit_name);
-                 Pc (NativeString symbol_name) ] ) )) )
+  match Symbol.is_predefined_exception symbol with
+  | false ->
+    let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+    let var = Jsir.Var.fresh () in
+    let expr : Jsir.expr =
+      Prim
+        ( Extern "caml_get_symbol",
+          [ Pc (NativeString compilation_unit_name);
+            Pc (NativeString symbol_name) ] )
+    in
+    var, To_jsir_result.add_instr_exn res (Let (var, expr))
+  | true ->
+    (* jsoo already registers these in global data *)
+    let global_data = Jsir.Var.fresh () in
+    let res =
+      To_jsir_result.add_instr_exn res
+        (Let (global_data, Prim (Extern "caml_get_global_data", [])))
+    in
+    let symbol_name = Symbol.linkage_name_as_string symbol in
+    (* Chop off caml_exn_ *)
+    let caml_exn_ = "caml_exn_" in
+    if not (String.starts_with ~prefix:caml_exn_ symbol_name)
+    then
+      Misc.fatal_error "Predefined exception doesn't start with \"caml_exn_\"";
+    let symbol_name =
+      String.sub symbol_name (String.length caml_exn_)
+        (String.length symbol_name - String.length caml_exn_)
+      |> Jsir.Native_string.of_string
+    in
+    let var = Jsir.Var.fresh () in
+    let expr : Jsir.expr =
+      Prim
+        (Extern "caml_js_get", [Pv global_data; Pc (NativeString symbol_name)])
+    in
+    var, To_jsir_result.add_instr_exn res (Let (var, expr))
 
 let get_symbol t ~res symbol =
   match Symbol.compilation_unit symbol |> Compilation_unit.is_current with
