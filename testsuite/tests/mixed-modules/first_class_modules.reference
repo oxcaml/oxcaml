@@ -3,20 +3,20 @@ Test 1: basic first-class mixed module
 hello
 3.14
 100
-Test 2: passing mixed modules to functions
+Test 2: passing modules to functions
 142
 hello 3.14
-Test 3: returning mixed modules from functions
+Test 3: returning modules from functions
 10
 ten
-Test 4: list of first-class mixed modules
+Test 4: list of first-class modules
 6
 Test 5: conditional module selection
 222.222
 false branch
 111.111
 true branch
-Test 6: mixed module with unboxed tuples and records
+Test 6: unboxed tuples and records in a first-class module
 42
 answer
 3.14
@@ -26,3 +26,15 @@ answer
 Test 7: functor producing first-class mixed modules
 5
 3.
+Test 8: first-class functors
+5.0 (doubled) (+1.5) = 11.5
+20 (*2) (+3) = 43
+1 [+100] [*2] [+3] = 205
+Test 9: coercing by forgetting abstract types
+42
+3.14
+Test 10: coercion with type equalities preserved
+1
+2.718
+Test 11: coercion with unboxed types in forgotten types
+99.9
