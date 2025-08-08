@@ -4,4 +4,4 @@ val primitive :
   res:To_jsir_result.t ->
   Flambda_primitive.t ->
   Debuginfo.t ->
-  Jsir.Var.t * To_jsir_env.t * To_jsir_result.t
+  Jsir.Var.t option * To_jsir_env.t * To_jsir_result.t
