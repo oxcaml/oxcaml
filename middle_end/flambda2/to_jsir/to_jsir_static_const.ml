@@ -1,8 +1,35 @@
 let static_const_not_supported () =
   Misc.fatal_error "This static_const is not yet supported."
 
-let block_like' ~env ~res (const : Static_const.t) :
-    Jsir.expr * To_jsir_env.t * To_jsir_result.t =
+let const_or_var ~f (const_or_var : 'a Or_variable.t) =
+  match const_or_var with
+  | Var _ ->
+    (* When we are compiling with ocamlj, we turn off static allocation of
+       values that are only determined at runtime (i.e. values containing
+       variables. See [Closure_conversion.classify_fields_of_block],
+       [Reify.reify] and [Simplify_set_of_closures]. *)
+    Misc.fatal_error "Found a variable in Static_const"
+  | Const c -> f c
+
+let bind_const_or_var_to_symbol ~env ~res ~symbol ~to_jsir_const x =
+  To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+    (Constant (const_or_var ~f:to_jsir_const x))
+
+let float32_to_jsir_const float32 : Jsir.constant =
+  Float32
+    (Numeric_types.Float32_by_bit_pattern.to_bits float32 |> Int64.of_int32)
+
+let float_to_jsir_const float : Jsir.constant =
+  Float32 (Numeric_types.Float_by_bit_pattern.to_bits float)
+
+let int32_to_jsir_const int32 : Jsir.constant = Int32 int32
+
+let int64_to_jsir_const int64 : Jsir.constant = Int64 int64
+
+let nativeint_to_jsir_const nativeint : Jsir.constant =
+  Int32 (Targetint_32_64.to_int32 nativeint)
+
+let block_like ~env ~res symbol (const : Static_const.t) =
   match const with
   | Set_of_closures _closures ->
     Misc.fatal_errorf
@@ -10,38 +37,38 @@ let block_like' ~env ~res (const : Static_const.t) :
        Set_of_closures"
       Static_const.print const
   | Block (tag, mut, _shape, fields) ->
-    To_jsir_shared.block ~env ~res ~tag ~mut
-      ~fields:(List.map Simple.With_debuginfo.simple fields)
+    let expr, env, res =
+      To_jsir_shared.block ~env ~res ~tag ~mut
+        ~fields:(List.map Simple.With_debuginfo.simple fields)
+    in
+    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol expr
   | Boxed_float32 value ->
-    ignore value;
-    static_const_not_supported ()
+    bind_const_or_var_to_symbol ~env ~res ~symbol
+      ~to_jsir_const:float32_to_jsir_const value
   | Boxed_float value ->
-    ignore value;
-    static_const_not_supported ()
+    bind_const_or_var_to_symbol ~env ~res ~symbol
+      ~to_jsir_const:float_to_jsir_const value
   | Boxed_int32 value ->
-    ignore value;
-    static_const_not_supported ()
+    bind_const_or_var_to_symbol ~env ~res ~symbol
+      ~to_jsir_const:int32_to_jsir_const value
   | Boxed_int64 value ->
-    ignore value;
-    static_const_not_supported ()
+    bind_const_or_var_to_symbol ~env ~res ~symbol
+      ~to_jsir_const:int64_to_jsir_const value
   | Boxed_nativeint value ->
-    ignore value;
+    bind_const_or_var_to_symbol ~env ~res ~symbol
+      ~to_jsir_const:nativeint_to_jsir_const value
+  | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _ ->
+    (* Need SIMD *)
     static_const_not_supported ()
-  | Boxed_vec128 value ->
-    ignore value;
-    static_const_not_supported ()
-  | Boxed_vec256 value ->
-    ignore value;
-    static_const_not_supported ()
-  | Boxed_vec512 value ->
-    ignore value;
-    static_const_not_supported ()
-  | Immutable_float_block values ->
-    ignore values;
-    static_const_not_supported ()
-  | Immutable_float_array values ->
-    ignore values;
-    static_const_not_supported ()
+  | Immutable_float_block values | Immutable_float_array values ->
+    let values =
+      List.map
+        (const_or_var ~f:Numeric_types.Float_by_bit_pattern.to_bits)
+        values
+      |> Array.of_list
+    in
+    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+      (Constant (Float_array values))
   | Immutable_float32_array values ->
     ignore values;
     static_const_not_supported ()
@@ -72,11 +99,9 @@ let block_like' ~env ~res (const : Static_const.t) :
   | Mutable_string { initial_value } ->
     ignore initial_value;
     static_const_not_supported ()
-  | Immutable_string value -> Constant (String value), env, res
-
-let block_like ~env ~res symbol const =
-  let expr, env, res = block_like' ~env ~res const in
-  To_jsir_shared.bind_expr_to_symbol ~env ~res symbol expr
+  | Immutable_string value ->
+    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+      (Constant (String value))
 
 let code ~env ~res ~translate_body ~code_id code =
   let free_names = Code0.free_names code in

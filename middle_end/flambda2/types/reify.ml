@@ -184,30 +184,34 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
     ~var_is_symbol_projection env t : reification_result =
   let min_name_mode = Name_mode.normal in
   let var_allowed (alloc_mode : Alloc_mode.For_types.t) var =
-    (* It is only safe to lift a [Local] allocation if it can be guaranteed that
-       no locally-allocated value is reachable from it: therefore, any variables
-       involved in the definition of an (inconstant) value to be lifted have
-       their types checked to ensure they cannot hold locally-allocated values.
-       Conversely, [Heap] allocations can be lifted even if inconstant, because
-       the OCaml type system will have validated the correctness of the original
-       non-lifted terms; any places in the compiler where new [Local] blocks are
-       created (e.g. during partial application wrapper expansion) will have
-       been checked to ensure they do not break the invariants; and finally
-       because the Flambda 2 type system accurately propagates the allocation
-       modes (and if it loses information there, we won't lift).
+    if !Clflags.jsir
+    then false
+    else
+      (* It is only safe to lift a [Local] allocation if it can be guaranteed
+         that no locally-allocated value is reachable from it: therefore, any
+         variables involved in the definition of an (inconstant) value to be
+         lifted have their types checked to ensure they cannot hold
+         locally-allocated values. Conversely, [Heap] allocations can be lifted
+         even if inconstant, because the OCaml type system will have validated
+         the correctness of the original non-lifted terms; any places in the
+         compiler where new [Local] blocks are created (e.g. during partial
+         application wrapper expansion) will have been checked to ensure they do
+         not break the invariants; and finally because the Flambda 2 type system
+         accurately propagates the allocation modes (and if it loses information
+         there, we won't lift).
 
-       Also see comment in [Simplify_set_of_closures.
-       type_value_slots_and_make_lifting_decision_for_one_set]. *)
-    TE.mem ~min_name_mode allowed_if_free_vars_defined_in (Name.var var)
-    && (var_is_symbol_projection var
-       || var_is_defined_at_toplevel var
-          &&
-          match alloc_mode with
-          | Heap -> true
-          | Heap_or_local | Local -> (
-            match Provers.never_holds_locally_allocated_values env var with
-            | Proved () -> true
-            | Unknown -> false))
+         Also see comment in [Simplify_set_of_closures.
+         type_value_slots_and_make_lifting_decision_for_one_set]. *)
+      TE.mem ~min_name_mode allowed_if_free_vars_defined_in (Name.var var)
+      && (var_is_symbol_projection var
+         || var_is_defined_at_toplevel var
+            &&
+            match alloc_mode with
+            | Heap -> true
+            | Heap_or_local | Local -> (
+              match Provers.never_holds_locally_allocated_values env var with
+              | Proved () -> true
+              | Unknown -> false))
   in
   let canonical_simple =
     match TE.get_alias_then_canonical_simple_exn env ~min_name_mode t with
