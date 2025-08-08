@@ -687,19 +687,10 @@ let verify_option_like_attr sdecl =
   | Ptype_record_unboxed_product _ -> bad "it is an unboxed record type"
   | Ptype_variant constructors -> begin match constructors with
       | [c1; c2] ->
-          (* Check that exactly one constructor has no arguments and one has
-             one argument *)
-          let check_arg_is_type_param arg_type =
-            match arg_type.ptyp_desc with
-            | Ptyp_var (_, _) -> ()
-            | _ -> raise(Error(arg_type.ptyp_loc,
-                               Bad_option_like_attribute
-                "the constructor argument must be a type variable (e.g. 'a)"))
-          in
           begin match c1.pcd_args, c2.pcd_args with
-          | Pcstr_tuple [], Pcstr_tuple [arg]
-          | Pcstr_tuple [arg], Pcstr_tuple [] ->
-              check_arg_is_type_param arg.pca_type
+          | Pcstr_tuple [], Pcstr_tuple [_]
+          | Pcstr_tuple [_], Pcstr_tuple [] ->
+              ()
           | Pcstr_tuple [], Pcstr_tuple (_::_::_)
           | Pcstr_tuple (_::_::_), Pcstr_tuple [] ->
               bad "the constructor with arguments has more than one argument"

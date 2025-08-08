@@ -232,7 +232,8 @@ end
 Line 3, characters 22-25:
 3 |   let g (?x:(y = 1) : int) () = y
                           ^^^
-Error: Unknown generic optional argument type: int
+Error: Generic optional arguments require types with the [@option_like] attribute.
+       Type "int" is not marked as option-like
 |}]
 
 module M_14 : T = struct

@@ -664,6 +664,25 @@ let check_arg_type styp =
     | _ -> ()
   end
 
+let get_some_and_none_constructors env path =
+  let cstrs = Env.lookup_all_constructors_from_type ~use:false
+    ~loc:Location.none Positive path env
+  in
+  match cstrs with
+  | [] | [_] | _ :: _ :: _ :: _ ->
+      Misc.fatal_error "Expecting exactly two constructors"
+  | [c1, use_c1;c2, use_c2] -> (
+      match c1.cstr_arity, c2.cstr_arity with
+      | 1, 0 -> (c1, use_c1), (c2, use_c2)
+      | 0, 1 -> (c2, use_c2), (c1, use_c1)
+      | _, _ -> Misc.fatal_error "Expecting exactly arities 1 and 0")
+
+let get_some_constructor env path =
+  let (c1, use_c1), _ = get_some_and_none_constructors env path in use_c1(); c1
+
+let get_none_constructor env path =
+  let _, (c2, use_c2) = get_some_and_none_constructors env path in use_c2(); c2
+
 let extract_optional_tp_from_type_exn env (ty : type_expr) loc =
   let ty =
     if Btype.is_Tpoly ty && Btype.tpoly_is_mono ty
@@ -671,12 +690,27 @@ let extract_optional_tp_from_type_exn env (ty : type_expr) loc =
   in
   let head_expanded = (expand_head env ty) in
   match get_desc head_expanded  with
-  | Tconstr (path, [arg], _) ->
+  | Tconstr (path, _, _) ->
       let decl = Env.find_type path env in
       (* Check syntactically that the type has @@option_like *)
       if not (Builtin_attributes.has_option_like decl.type_attributes) then
         raise (Error (loc, env,
           Generic_optional_argument_missing_option_like_annotation path));
+      let some_cons = get_some_constructor env path in
+      let ty_args, ty_res, ty_ex =
+        Ctype.instance_constructor Keep_existentials_flexible some_cons
+      in
+      unify env ty_res ty;
+      (* CR generic_optional: support GADT with existential arguments *)
+      if List.length ty_ex > 0 then
+        raise(Error (loc, env,
+          Unknown_generic_optional_argument_type head_expanded));
+      let arg =
+        match ty_args with
+        (* This should not be empty as we are using [get_some_constructor] *)
+        | [] | _ :: _ :: _ -> Misc.fatal_error "Expecting args to have arity 1"
+        | [single_arg] -> single_arg.ca_type
+      in
       ((path, decl), arg)
   | _ ->
       raise(Error (loc, env,

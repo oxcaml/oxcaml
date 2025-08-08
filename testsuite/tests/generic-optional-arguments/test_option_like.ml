@@ -54,7 +54,7 @@ Error: This type cannot be marked as option-like because
        it should have exactly one nullary constructor and one unary constructor.
 |}]
 
-(* Invalid: constructor with multiple arguments *)
+(* constructor with multiple arguments *)
 type 'a multi_arg =
   | Empty
   | Many of 'a * 'a
@@ -69,7 +69,15 @@ Error: This type cannot be marked as option-like because
        the constructor with arguments has more than one argument.
 |}]
 
-(* Invalid: constructor with multiple arguments, with two type variables *)
+type 'a multi_arg =
+  | Empty
+  | Many of ('a * 'a)
+[@@option_like]
+[%%expect{|
+type 'a multi_arg = Empty | Many of ('a * 'a)
+|}]
+
+(* constructor with multiple arguments, with two type variables *)
 type ('a, 'b) multi_arg =
   | Full of 'a * 'b
   | Empty
@@ -84,6 +92,13 @@ Error: This type cannot be marked as option-like because
        the constructor with arguments has more than one argument.
 |}]
 
+type ('a, 'b) multi_arg =
+  | Full of ('a * 'b)
+  | Empty
+[@@option_like]
+[%%expect {|
+type ('a, 'b) multi_arg = Full of ('a * 'b) | Empty
+|}]
 type 'a unknown_arg =
   | Full of 'b
   | Empty
@@ -170,30 +185,22 @@ Error: This type cannot be marked as option-like because
        inline records are not supported.
 |}]
 
-(* Invalid: complex args *)
+(* Valid: complex args *)
 type 'a complex_args =
   | Full of 'a list
   | Empty
 [@@option_like]
 [%%expect {|
-Line 2, characters 12-19:
-2 |   | Full of 'a list
-                ^^^^^^^
-Error: This type cannot be marked as option-like because
-       the constructor argument must be a type variable (e.g. 'a).
+type 'a complex_args = Full of 'a list | Empty
 |}]
 
-(* Invalid: constant args *)
+(* Valid: constant args *)
 type constant =
   | Full of int
   | Empty
 [@@option_like]
 [%%expect {|
-Line 2, characters 12-15:
-2 |   | Full of int
-                ^^^
-Error: This type cannot be marked as option-like because
-       the constructor argument must be a type variable (e.g. 'a).
+type constant = Full of int | Empty
 |}]
 
 (* Valid: signature ascription*)

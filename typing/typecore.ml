@@ -899,31 +899,39 @@ let extract_optional_tp_from_pattern_constraint_exn env pat = match pat with
 let type_option ty =
   newty (Tconstr(Predef.path_option,[ty], ref Mnil))
 
-let type_generic_option path ty =
-  newty (Tconstr(path, [ty], ref Mnil))
+let jkind_of_generic_optional_type_path (decl : Types.type_declaration) =
+  List.map (fun param ->
+      match get_desc param with
+      | Tvar {jkind; _} -> jkind
+      | _ -> Misc.fatal_error "Expecting a type variable in type params"
+    ) decl.type_params
+
+(* some_tp here specify to have an underlying sometype,
+  leave none to use a fresh instantiation *)
+let type_generic_option env path (some_tp : type_expr option) =
+  let decl = Env.find_type path env in
+  let jkinds = List.map (fun param ->
+      match get_desc param with
+      | Tvar {jkind; _} -> jkind
+      | _ -> Misc.fatal_error "Expecting a type variable in type params"
+    ) decl.type_params in
+  let tys = List.map newvar jkinds in
+  let result_ty = newty (Tconstr(path, tys, ref Mnil)) in
+  let some_cons = Typetexp.get_some_constructor env path in
+  let ty_args, ty_res, ty_ex =
+    Ctype.instance_constructor Keep_existentials_flexible some_cons
+  in
+  assert (List.length ty_ex = 0);
+  (match ty_args, some_tp with
+  | [single_arg], Some some_tp -> unify env some_tp single_arg.ca_type;
+  | [_], None -> ()
+  | _ -> assert false);
+  unify env ty_res result_ty;
+  result_ty
 
 let mkexp exp_desc exp_type exp_loc exp_env =
   { exp_desc; exp_type;
     exp_loc; exp_env; exp_extra = []; exp_attributes = [] }
-
-let get_some_and_none_constructors env path =
-  let cstrs = Env.lookup_all_constructors_from_type ~use:false
-    ~loc:Location.none Positive path env
-  in
-  match cstrs with
-  | [] | [_] | _ :: _ :: _ :: _ ->
-      Misc.fatal_error "Expecting exactly two constructors"
-  | [c1, use_c1;c2, use_c2] -> (
-      match c1.cstr_arity, c2.cstr_arity with
-      | 1, 0 -> (c1, use_c1), (c2, use_c2)
-      | 0, 1 -> (c2, use_c2), (c1, use_c1)
-      | _ -> Misc.fatal_error "Expecting exactly arities 1 and 0")
-
-let get_some_constructor env path =
-  let (c1, use_c1), _ = get_some_and_none_constructors env path in use_c1(); c1
-
-let get_none_constructor env path =
-  let _, (c2, use_c2) = get_some_and_none_constructors env path in use_c2(); c2
 
 let type_option_none env ty loc =
   let lid = Longident.Lident "None" in
@@ -931,7 +939,7 @@ let type_option_none env ty loc =
   mkexp (Texp_construct(mknoloc lid, cnone, [], None)) ty loc env
 
 let type_generic_option_none env path ty loc =
-  let cnone = get_none_constructor env path in
+  let cnone = Typetexp.get_none_constructor env path in
   let lid = Longident.Lident cnone.cstr_name in
   mkexp (Texp_construct(mknoloc lid, cnone, [], None)) ty loc env
 
@@ -3332,12 +3340,11 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
           unify_pat val_env pat
             (type_option (newvar Predef.option_argument_jkind));
       | Generic_optional_arg ->
-          let ((path, decl), _, _) =
+          let ((path, _), _, _) =
             extract_optional_tp_from_pattern_constraint_exn met_env spat
           in
           unify_pat val_env pat
-            (type_generic_option path
-              (newvar (jkind_of_generic_optional_type_path decl)))
+            (type_generic_option val_env path None)
       | Required_or_position_arg -> ());
       tps.tps_pattern_variables, pat
     end
@@ -3867,6 +3874,7 @@ let list_labels env ty =
 (* Collecting arguments for function applications *)
 
 (* See also Note [Type-checking applications] *)
+type some_classification = Vanilla_optional_some | Generic_optional_some
 type untyped_apply_arg =
   | Known_arg of
       { sarg : Parsetree.expression;
@@ -3876,7 +3884,7 @@ type untyped_apply_arg =
         commuted : bool;
         mode_fun : Alloc.lr;
         mode_arg : Alloc.lr;
-        wrapped_in_some : bool; }
+        wrapped_in_some : some_classification option; }
   | Unknown_arg of
       { sarg : Parsetree.expression;
         ty_arg_mono : type_expr;
@@ -4189,9 +4197,17 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
           if wrapped_in_some then
             may_warn sarg.pexp_loc
               (Warnings.Not_principal "using an optional argument here");
+          let wrapped_in_some = match wrapped_in_some with
+            | false -> None
+            | true -> match Btype.classify_optionality l with
+              | Vanilla_optional_arg -> Some Vanilla_optional_some
+              | Generic_optional_arg -> Some Generic_optional_some
+              | Required_or_position_arg ->
+                  Misc.fatal_error "Optional arg not correctly classified"
+          in
           Arg (Known_arg
             { sarg; ty_arg; ty_arg0; commuted; sort_arg;
-              mode_fun; mode_arg; wrapped_in_some })
+              mode_fun; mode_arg; wrapped_in_some})
         in
         let eliminate_omittable_arg expected_label =
           may_warn funct.exp_loc
@@ -4556,7 +4572,10 @@ let rec approx_type env sty =
             Typetexp.extract_optional_tp_from_type_parsetree_exn env arg_sty
               arg_mode
           in
-          newvar (jkind_of_generic_optional_type_path decl)
+          (match List.map newvar (jkind_of_generic_optional_type_path decl) with
+          | [single_jkind] -> single_jkind
+          (* CR generic-optional: fix this *)
+          | _ -> failwith "Multi-arg types not supported")
       | Required_or_position_arg ->
       begin
         let arg_mode = Typemode.transl_alloc_mode arg_mode in
@@ -4579,12 +4598,11 @@ let rec approx_type env sty =
         | Vanilla_optional_arg ->
             type_option (newvar Predef.option_argument_jkind)
         | Generic_optional_arg ->
-            let (path, decl), _ =
+            let (path, _), _ =
               Typetexp.extract_optional_tp_from_type_parsetree_exn env arg_sty
                 arg_mode
             in
-            type_generic_option path
-              (newvar (jkind_of_generic_optional_type_path decl))
+            type_generic_option env path None
         | Required_or_position_arg ->
             newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
@@ -7527,7 +7545,7 @@ and type_function
             let (path, decl), _, _ =
               extract_optional_tp_from_pattern_constraint_exn env pat
             in
-            Some (path, decl)
+            Some (path, jkind_of_generic_optional_type_path decl)
         | _ -> None
       in
       let env,
@@ -7569,7 +7587,7 @@ and type_function
                   let (path, _), _, _ =
                     extract_optional_tp_from_pattern_constraint_exn env pat
                   in
-                  unify env (type_generic_option path ty_default_arg)
+                  unify env (type_generic_option env path (Some ty_default_arg))
                     ty_arg_mono
               | Required_or_position_arg ->
                   Misc.fatal_error "not possible")
@@ -8131,10 +8149,10 @@ and type_generic_option_some env path expected_mode sarg ty ty0 =
   let arg =
     type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0'
   in
-  let csome = get_some_constructor env path in
+  let csome = Typetexp.get_some_constructor env path in
   let lid = Longident.Lident csome.cstr_name in
   mkexp (Texp_construct(mknoloc lid , csome, [arg], Some alloc_mode))
-    (type_generic_option path arg.exp_type) arg.exp_loc arg.exp_env
+    (type_generic_option env path (Some arg.exp_type)) arg.exp_loc arg.exp_env
 
 (* [expected_mode] is the expected mode of the field. It's already adjusted for
    allocation, mutation and modalities. *)
@@ -8493,16 +8511,19 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
       let arg =
         if vars = [] then begin
           let ty_arg0' = tpoly_get_mono ty_arg0 in
-          if wrapped_in_some then begin
-            let (path, _), _ =
-              Typetexp.extract_optional_tp_from_type_exn env ty_arg
-                sarg.pexp_loc
-            in
-            type_generic_option_some env path expected_mode sarg ty_arg'
-              ty_arg0'
-          end else begin
-            type_argument ~overwrite:No_overwrite env expected_mode sarg ty_arg' ty_arg0'
-          end
+          match wrapped_in_some with
+          | Some Vanilla_optional_some ->
+              type_option_some env expected_mode sarg ty_arg' ty_arg0'
+          | Some Generic_optional_some ->
+              let (path, _), _ =
+                Typetexp.extract_optional_tp_from_type_exn env ty_arg
+                  sarg.pexp_loc
+              in
+              type_generic_option_some env path expected_mode sarg ty_arg'
+                ty_arg0'
+          | None ->
+              type_argument ~overwrite:No_overwrite env expected_mode sarg
+                ty_arg' ty_arg0'
         end else begin
           if !Clflags.principal
              && get_level ty_arg < Btype.generic_level then begin

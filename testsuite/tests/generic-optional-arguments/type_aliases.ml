@@ -12,7 +12,8 @@ end
 Line 2, characters 16-19:
 2 |   val g : (?x): int -> unit -> int
                     ^^^
-Error: Unknown generic optional argument type: int
+Error: Generic optional arguments require types with the [@option_like] attribute.
+       Type "int" is not marked as option-like
 |}]
 
 (* This should succeed *)
@@ -101,7 +102,8 @@ type 'a option = float
 Line 4, characters 16-26:
 4 |   val g : (?x): int option -> unit -> int
                     ^^^^^^^^^^
-Error: Unknown generic optional argument type: float
+Error: Generic optional arguments require types with the [@option_like] attribute.
+       Type "float" is not marked as option-like
 |}]
 
 type 'b t2 = None | Some of int [@@option_like]
@@ -111,9 +113,7 @@ type 'a t3 = float t2
 let f (?(x = 42) : string t3) () = x
 
 [%%expect{|
-Line 1, characters 28-31:
-1 | type 'b t2 = None | Some of int [@@option_like]
-                                ^^^
-Error: This type cannot be marked as option-like because
-       the constructor argument must be a type variable (e.g. 'a).
+type 'b t2 = None | Some of int
+type 'a t3 = float t2
+val f : (?x):'a t2 -> unit -> int = <fun>
 |}]

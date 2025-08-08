@@ -90,6 +90,9 @@ val transl_label_from_expr :
   Parsetree.arg_label -> Parsetree.expression
   -> Types.arg_label * Parsetree.expression
 
+val get_some_constructor: Env.t -> Path.t -> constructor_description
+val get_none_constructor: Env.t -> Path.t -> constructor_description
+
 val extract_optional_tp_from_type_exn:
   Env.t -> type_expr -> Warnings.loc ->
   (Btype.generic_optional_type_path * type_declaration) * type_expr

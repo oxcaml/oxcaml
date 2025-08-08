@@ -4538,10 +4538,13 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-(* CR generic-optional: Remove predef_ prefix when adding non-predef paths *)
 let path_of_generic_optional_type_path path = path
 
-(* CR generic-optional: Remove predef_ prefix when adding non-predef jkinds *)
+(* CR generic-optional:
+
+This is an old implementation of [jkind_of_generic_optional_type_path].
+We can delete this code once we have a newer version working.
+
 let jkind_of_generic_optional_type_path (decl : type_declaration) =
   match decl.type_params with
   | param :: _ -> (
@@ -4550,8 +4553,10 @@ let jkind_of_generic_optional_type_path (decl : type_declaration) =
     | _ -> Misc.fatal_error "Expecting a type variable in type params"
   )
   | [] -> Misc.fatal_error "Expecting some type variable in type params"
-  (* CR generic-optional: Check for phantom types which are currently allowed?
-     We should ban them from previous pass. *)
+
+  *)
+(* CR generic-optional: Check for phantom types which are currently allowed?
+    We should ban them from previous pass. *)
 
 let filter_arrow env t l ~force_tpoly ~generic_optional_info =
   let function_type level =
@@ -4572,13 +4577,11 @@ let filter_arrow env t l ~force_tpoly ~generic_optional_info =
                         ref Mnil))
           | Generic_optional_arg ->
               (match generic_optional_info with
-              | Some (path, decl) ->
+              | Some (t_cons, arg_jkinds) ->
                   (* Caller need to provide generic optional type info for
                      generic optional arg-labels *)
-                  let t_cons = path_of_generic_optional_type_path path in
-                  let arg_jkind = jkind_of_generic_optional_type_path decl in
                   newty2 ~level (Tconstr(t_cons,
-                    [newvar2 level arg_jkind], ref Mnil))
+                    List.map (newvar2 level) arg_jkinds, ref Mnil))
               | None ->
                   Misc.fatal_error "Cannot create fresh generic optional \
                         without existing type")

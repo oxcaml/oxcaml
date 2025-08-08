@@ -313,10 +313,9 @@ type filtered_arrow =
 
 val path_of_generic_optional_type_path:
         Btype.generic_optional_type_path -> Path.t
-val jkind_of_generic_optional_type_path: type_declaration -> jkind_lr
 
 val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
-                  generic_optional_info:(Path.t * type_declaration) option ->
+                  generic_optional_info:(Path.t * jkind_lr list) option ->
                   filtered_arrow
         (* A special case of unification (with l:'a -> 'b). If
            [force_poly] is false then the usual invariant that the
