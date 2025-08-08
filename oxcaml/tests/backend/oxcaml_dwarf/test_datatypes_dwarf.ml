@@ -29,12 +29,14 @@ let _ = f_complex_variant (Mixed { a = 100; b = #3.14; c = true })
 type basic_record = { x: int; y: float }
 type mixed_record = { a: int; b: float#; c: bool; d: int32 }
 
-let[@inline never] [@local never] f_basic_record (x: basic_record) = x
+let[@inline never] [@local never] f_basic_record (x: basic_record) = 
+  let { x; y } = x in { x; y }
 let _ = f_basic_record { x = 42; y = 3.14 }
 let _ = f_basic_record { x = 0; y = 0.0 }
 let _ = f_basic_record { x = -123; y = -2.5 }
 
-let[@inline never] [@local never] f_mixed_record (x: mixed_record) = x
+let[@inline never] [@local never] f_mixed_record (x: mixed_record) = 
+  let { a; b; c; d } = x in { a; b; c; d }
 let _ = f_mixed_record { a = 42; b = #3.14; c = true; d = 1000l }
 let _ = f_mixed_record { a = 0; b = #0.0; c = false; d = 0l }
 
@@ -55,12 +57,14 @@ let _ = f_unboxed_variant_int (Complex #0l)
 type unboxed_record_simple = { value: int } [@@unboxed]
 type unboxed_record_complex = { data: basic_record } [@@unboxed]
 
-let[@inline never] [@local never] f_unboxed_record_simple (x: unboxed_record_simple) = x
+let[@inline never] [@local never] f_unboxed_record_simple (x: unboxed_record_simple) = 
+  let { value } = x in { value }
 let _ = f_unboxed_record_simple { value = 42 }
 let _ = f_unboxed_record_simple { value = 0 }
 let _ = f_unboxed_record_simple { value = -999 }
 
-let[@inline never] [@local never] f_unboxed_record_complex (x: unboxed_record_complex) = x
+let[@inline never] [@local never] f_unboxed_record_complex (x: unboxed_record_complex) = 
+  let { data } = x in { data }
 let _ = f_unboxed_record_complex { data = { x = 10; y = 2.0 } }
 let _ = f_unboxed_record_complex { data = { x = 0; y = 0.0 } }
 
@@ -99,7 +103,9 @@ type mixed_combo = {
   record_field: basic_record
 }
 
-let[@inline never] [@local never] f_mixed_combo (x: mixed_combo) = x
+let[@inline never] [@local never] f_mixed_combo (x: mixed_combo) = 
+  let { boxed_field; unboxed_field; variant_field; record_field } = x in 
+  { boxed_field; unboxed_field; variant_field; record_field }
 let _ = f_mixed_combo {
   boxed_field = 42;
   unboxed_field = #3.14;
@@ -127,3 +133,48 @@ let _ = f_poly_float64 (Simple #2.5)
 let[@inline never] [@local never] f_poly_bits32 (type a : bits32) (x: a) = x
 let _ = f_poly_bits32 #42l
 let _ = f_poly_bits32 (-#123l)
+
+(* Custom exceptions *)
+exception Simple_exception
+exception Exception_with_int of int
+exception Exception_with_string of string
+exception Exception_with_multiple of int * string * float
+type exception_record = { code: int; message: string }
+exception Exception_with_record of exception_record
+type unboxed_exception_data = { value: float#; flag: bool }
+exception Exception_with_unboxed_record of unboxed_exception_data
+
+let[@inline never] [@local never] f_exception_specific (x: exn) = x
+let _ = f_exception_specific Simple_exception
+let _ = f_exception_specific (Exception_with_int 42)
+let _ = f_exception_specific (Exception_with_string "error occurred")
+let _ = f_exception_specific (Exception_with_multiple (404, "not found", 1.5))
+let _ = f_exception_specific (Exception_with_record { code = 500; message = "internal error" })
+let _ = f_exception_specific (Exception_with_unboxed_record { value = #2.71; flag = true })
+let _ = f_exception_specific (Failure "standard failure")
+let _ = f_exception_specific (Invalid_argument "bad input")
+
+let[@inline never] [@local never] f_exception_poly (x: 'a) = x
+let _ = f_exception_poly Simple_exception
+let _ = f_exception_poly (Exception_with_int 123)
+let _ = f_exception_poly (Exception_with_string "polymorphic error")
+let _ = f_exception_poly (Exception_with_multiple (200, "ok", 0.0))
+let _ = f_exception_poly (Exception_with_record { code = 201; message = "created" })
+let _ = f_exception_poly (Exception_with_unboxed_record { value = #3.14; flag = false })
+let _ = f_exception_poly (Failure "polymorphic failure")
+
+let[@inline never] [@local never] f_exception_with_record (x: exn) =
+  match x with
+  | Exception_with_record data -> 
+    let { code; message } = data in
+    let _ = { code; message } in x
+  | _ -> x
+let _ = f_exception_with_record (Exception_with_record { code = 300; message = "redirect" })
+
+let[@inline never] [@local never] f_exception_with_unboxed (x: exn) =
+  match x with  
+  | Exception_with_unboxed_record data ->
+    let { value; flag } = data in
+    let _ = { value; flag } in x
+  | _ -> x
+let _ = f_exception_with_unboxed (Exception_with_unboxed_record { value = #1.41; flag = true })
