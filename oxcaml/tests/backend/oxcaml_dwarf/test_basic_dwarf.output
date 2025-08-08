@@ -381,22 +381,22 @@ Breakpoint 17: where = test_basic_dwarf.exe`Test_basic_dwarf.f_exn at test_basic
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 17.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Failure"; id = 9223372036854775805 }; raw = [<object>@0x00000000004875b8, "test"] } : exn @ value) at test_basic_dwarf.ml:179:40
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Failure"; id = 9223372036854775805 }; raw = [<object>@<ADDRESS>, "test"] } : exn @ value) at test_basic_dwarf.ml:179:40
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 17.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Invalid_argument"; id = 9223372036854775804 }; raw = [<object>@0x00000000004875e0, "bad arg"] } : exn @ value) at test_basic_dwarf.ml:179:40
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Invalid_argument"; id = 9223372036854775804 }; raw = [<object>@<ADDRESS>, "bad arg"] } : exn @ value) at test_basic_dwarf.ml:179:40
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 17.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Not_found"; id = 9223372036854775801 }; raw = <object>@0x0000000000487680 } : exn @ value) at test_basic_dwarf.ml:179:40
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Not_found"; id = 9223372036854775801 }; raw = <object>@<ADDRESS> } : exn @ value) at test_basic_dwarf.ml:179:40
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 17.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Sys_error"; id = 9223372036854775806 }; raw = [<object>@0x0000000000487588, "io error"] } : exn @ value) at test_basic_dwarf.ml:179:40
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Sys_error"; id = 9223372036854775806 }; raw = [<object>@<ADDRESS>, "io error"] } : exn @ value) at test_basic_dwarf.ml:179:40
 (lldb) b Test_basic_dwarf.f_float_array
 Breakpoint 18: where = test_basic_dwarf.exe`Test_basic_dwarf.f_float_array at test_basic_dwarf.ml:189:48, address = <ADDRESS>
 (lldb) c
@@ -505,7 +505,7 @@ Process <PID> stopped
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[112, [111, [...]@0x0000000000488b58]] : 'a @ value) at test_basic_dwarf.ml:218:41
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[112, [111, [...]@<ADDRESS>]] : 'a @ value) at test_basic_dwarf.ml:218:41
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
@@ -520,7 +520,7 @@ Process <PID> stopped
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[<object>@0x00000000004875b8, "poly error"] : 'a @ value) at test_basic_dwarf.ml:218:41
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[<object>@<ADDRESS>, "poly error"] : 'a @ value) at test_basic_dwarf.ml:218:41
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
