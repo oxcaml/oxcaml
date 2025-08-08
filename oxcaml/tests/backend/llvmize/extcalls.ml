@@ -22,5 +22,5 @@ let[@inline never] [@local never] call_too_many () =
 
 let[@inline never] [@local never] call_print_and_add () = print_and_add 9 10
 
-(* let[@inline never] [@local never] call_int_and_float () = int_and_float 1 2.0
-   3 4.0 *)
+let[@inline never] [@local never] call_int_and_float () =
+  int_and_float 1 2.0 3 4.0

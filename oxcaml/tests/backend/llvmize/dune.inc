@@ -650,3 +650,54 @@
  (action
   (diff alloc_ir.output alloc_ir.output.corrected)))
 
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets tailcall2.cmx tailcall.cmx tailcall_ir.output.corrected tailcall.output.exe)
+ (deps tailcall2.ml tailcall.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} tailcall2.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} tailcall.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (with-outputs-to tailcall_ir.output.corrected (pipe-outputs (run cat tailcall.ll) (run ./filter.sh)))
+   (run %{bin:ocamlopt.opt} tailcall2.cmx tailcall.cmx -opaque -o tailcall.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps tailcall2.cmx tailcall.cmx)
+ (targets tailcall.output.corrected)
+ (action
+  (with-outputs-to
+   tailcall.output.corrected
+   (run ./tailcall.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps tailcall.output tailcall.output.corrected)
+ (action
+  (diff tailcall.output tailcall.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps tailcall_ir.output tailcall_ir.output.corrected)
+ (action
+  (diff tailcall_ir.output tailcall_ir.output.corrected)))
+

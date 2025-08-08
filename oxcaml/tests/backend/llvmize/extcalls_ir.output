@@ -4,12 +4,18 @@ source_filename = "extcalls.ml"
 define void @camlExtcalls__code_begin() { ret void }
 
 @camlExtcalls__gc_roots = global { i64 } { i64 0 }, align 8
-@.header.camlExtcalls = global { i64 } { i64 2816 }, align 8
-@camlExtcalls = global { ptr, ptr } { ptr @camlExtcalls__call_too_many_2, ptr @camlExtcalls__call_print_and_add_3 }, align 8
-@.header.camlExtcalls__call_print_and_add_3 = global { i64 } { i64 3063 }, align 8
-@camlExtcalls__call_print_and_add_3 = global { ptr, i64 } { ptr @camlExtcalls__call_print_and_add_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlExtcalls__call_too_many_2 = global { i64 } { i64 3063 }, align 8
-@camlExtcalls__call_too_many_2 = global { ptr, i64 } { ptr @camlExtcalls__call_too_many_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExtcalls = global { i64 } { i64 3840 }, align 8
+@camlExtcalls = global { ptr, ptr, ptr } { ptr @camlExtcalls__call_too_many_3, ptr @camlExtcalls__call_print_and_add_4, ptr @camlExtcalls__call_int_and_float_5 }, align 8
+@.header.camlExtcalls__call_int_and_float_5 = global { i64 } { i64 3063 }, align 8
+@camlExtcalls__call_int_and_float_5 = global { ptr, i64 } { ptr @camlExtcalls__call_int_and_float_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExtcalls__call_print_and_add_4 = global { i64 } { i64 3063 }, align 8
+@camlExtcalls__call_print_and_add_4 = global { ptr, i64 } { ptr @camlExtcalls__call_print_and_add_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExtcalls__call_too_many_3 = global { i64 } { i64 3063 }, align 8
+@camlExtcalls__call_too_many_3 = global { ptr, i64 } { ptr @camlExtcalls__call_too_many_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExtcalls__float25 = global { i64 } { i64 2045 }, align 8
+@camlExtcalls__float25 = global { double } { double 4.00000000000000000000 }, align 8
+@.header.camlExtcalls__float23 = global { i64 } { i64 2045 }, align 8
+@camlExtcalls__float23 = global { double } { double 2.00000000000000000000 }, align 8
 define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__call_too_many_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
@@ -99,7 +105,7 @@ L101:                                                ; preds = %L1
   %55 = load i64, ptr %29
   %56 = load ptr, ptr %ds
   %57 = load ptr, ptr %alloc
-  %58 = call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call_stack_args_llvm_backend(ptr %56, ptr %57, ptr @too_many, i64 48, i64 %44, i64 %45, i64 %46, i64 %47, i64 %48, i64 %49, i64 %50, i64 %51, i64 %52, i64 %53, i64 %54, i64 %55)
+  %58 =  call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call_stack_args_llvm_backend(ptr %56, ptr %57, ptr @too_many, i64 48, i64 %44, i64 %45, i64 %46, i64 %47, i64 %48, i64 %49, i64 %50, i64 %51, i64 %52, i64 %53, i64 %54, i64 %55)
   %59 = extractvalue { { ptr, ptr }, { i64 } } %58, 0, 0
   store ptr %59, ptr %ds
   %60 = extractvalue { { ptr, ptr }, { i64 } } %58, 0, 1
@@ -151,7 +157,7 @@ L105:                                                ; preds = %L1
   %15 = load i64, ptr %6
   %16 = load ptr, ptr %ds
   %17 = load ptr, ptr %alloc
-  %18 = call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %16, ptr %17, ptr @print_and_add, i64 poison, i64 %14, i64 %15)
+  %18 =  call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %16, ptr %17, ptr @print_and_add, i64 poison, i64 %14, i64 %15)
   %19 = extractvalue { { ptr, ptr }, { i64 } } %18, 0, 0
   store ptr %19, ptr %ds
   %20 = extractvalue { { ptr, ptr }, { i64 } } %18, 0, 1
@@ -174,6 +180,70 @@ L107:                                                ; preds = %L105
   ret { { ptr, ptr }, { i64 } } %30
 }
 
+define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__call_int_and_float_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
+  %4 = alloca i64
+  store i64 %2, ptr %4
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  br label %L1
+L1:
+  br label %L109
+L109:                                                ; preds = %L1
+  %15 = load i64, ptr %4
+  store i64 %15, ptr %9
+  store ptr @camlExtcalls__float25, ptr %10
+  store i64 7, ptr %11
+  store ptr @camlExtcalls__float23, ptr %12
+  store i64 3, ptr %13
+  %16 = load i64, ptr %13
+  store i64 %16, ptr %5
+  %17 = load i64, ptr %12
+  store i64 %17, ptr %6
+  %18 = load i64, ptr %11
+  store i64 %18, ptr %7
+  %19 = load i64, ptr %10
+  store i64 %19, ptr %8
+  %20 = load i64, ptr %5
+  %21 = load i64, ptr %6
+  %22 = load i64, ptr %7
+  %23 = load i64, ptr %8
+  %24 = load ptr, ptr %ds
+  %25 = load ptr, ptr %alloc
+  %26 =  call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %24, ptr %25, ptr @int_and_float, i64 poison, i64 %20, i64 %21, i64 %22, i64 %23)
+  %27 = extractvalue { { ptr, ptr }, { i64 } } %26, 0, 0
+  store ptr %27, ptr %ds
+  %28 = extractvalue { { ptr, ptr }, { i64 } } %26, 0, 1
+  store ptr %28, ptr %alloc
+  %29 = extractvalue { { ptr, ptr }, { i64 } } %26, 1, 0
+  store i64 %29, ptr %4
+  br label %L111
+L111:                                                ; preds = %L109
+  %30 = load i64, ptr %4
+  store i64 %30, ptr %14
+  %31 = load i64, ptr %14
+  store i64 %31, ptr %4
+  %32 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %33 = load ptr, ptr %ds
+  %34 = insertvalue { { ptr, ptr }, { i64 } } %32, ptr %33, 0, 0
+  %35 = load ptr, ptr %alloc
+  %36 = insertvalue { { ptr, ptr }, { i64 } } %34, ptr %35, 0, 1
+  %37 = load i64, ptr %4
+  %38 = insertvalue { { ptr, ptr }, { i64 } } %36, i64 %37, 1, 0
+  ret { { ptr, ptr }, { i64 } } %38
+}
+
 define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__entry(ptr %0, ptr %1)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
@@ -186,8 +256,8 @@ define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__entry(ptr %0, ptr %1)  {
   %7 = alloca i64
   br label %L1
 L1:
-  br label %L112
-L112:                                                ; preds = %L1
+  br label %L116
+L116:                                                ; preds = %L1
   store ptr @camlExtcalls, ptr %5
   %8 = load i64, ptr %5
   store i64 %8, ptr %6
