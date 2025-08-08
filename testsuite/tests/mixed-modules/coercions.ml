@@ -94,3 +94,46 @@ let _ = print_string " "
 let _ =
   print_float (Float_u.to_float (id Coerced_module_3.Numbers.smallest_float_u))
 let _ = print_endline ""
+
+
+let _ = print_endline "Test 4: composed coercions"
+
+module type S = sig
+  module K : sig
+    val x : float#
+    val t : string
+    val y : float#
+    val s : string
+  end
+end
+
+module type S' = sig
+  module K : sig
+    val y : float#
+    val s : string
+    val x : float#
+  end
+end
+
+module M = struct
+  module K : sig
+    val s : string
+    val y : float#
+    val x : float#
+    val t : string
+  end = struct
+    let x = #1.0
+    let y = #2.0
+    let s = "s"
+    let t = "s"
+    let z = #3.0
+  end
+end
+
+module N = ((M : S) : S')
+
+let _ = print_float (Float_u.to_float (id N.K.x))
+let _ = print_string " "
+let _ = print_float (Float_u.to_float (id N.K.y))
+let _ = print_string " "
+let _ = print_endline (id N.K.s)
