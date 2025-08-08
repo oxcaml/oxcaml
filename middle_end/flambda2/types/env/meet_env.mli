@@ -46,6 +46,9 @@ val typing_env : t -> Typing_env.t
 
 val add_equation : t -> Name.t -> Type_grammar.t -> meet_type:meet_type -> t
 
+val add_equation_on_simple :
+  t -> Simple.t -> Type_grammar.t -> meet_type:meet_type -> t
+
 val add_equation_strict :
   t -> Name.t -> Type_grammar.t -> meet_type:meet_type -> t Or_bottom.t
 
