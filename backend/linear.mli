@@ -35,7 +35,8 @@ type instruction =
 
 and instruction_desc =
   | Lprologue
-  | Lepilogue
+  | Lepilogue_open
+  | Lepilogue_close
   | Lend
   | Lop of Operation.t
   | Lcall_op of call_operation

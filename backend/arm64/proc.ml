@@ -337,7 +337,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Intop_imm _ | Intop_atomic _
         | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
         | Begin_region | End_region | Dls_get)
-  | Poptrap _ | Prologue
+  | Poptrap _ | Prologue | Epilogue
   | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
                           Float32_of_float | Float_of_int64 | Int64_of_float |
                           Float32_of_int32 | Int32_of_float32 |

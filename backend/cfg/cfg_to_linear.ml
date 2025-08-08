@@ -393,6 +393,19 @@ let run cfg_with_layout =
       let block = Label.Tbl.find cfg.blocks label in
       assert (Label.equal label block.start);
       let body =
+        let has_epilogue =
+          DLL.exists block.body ~f:(fun instr ->
+              match[@ocaml.warning "-4"] instr.Cfg.desc with
+              | Cfg.Epilogue -> true
+              | _ -> false)
+        in
+        if has_epilogue
+        then
+          next
+            := { Linear_utils.label = Label.none;
+                 insn = to_linear_instr Lepilogue_close ~next:!next.insn
+               }
+        else ();
         let terminator, terminator_tailrec_label =
           linearize_terminator cfg_with_layout cfg.fun_name block.start
             block.terminator ~next:!next

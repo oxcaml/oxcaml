@@ -1768,7 +1768,7 @@ let emit_instr ~first ~fallthrough i =
       then (
         I.sub (int n) rsp;
         D.cfi_adjust_cfa_offset ~bytes:n)
-  | Lepilogue ->
+  | Lepilogue_open ->
     (* Deallocate the stack frame before a return or tail call *)
     assert !frame_required;
     let n = frame_size () - 8 - if fp then 8 else 0 in
@@ -1776,8 +1776,11 @@ let emit_instr ~first ~fallthrough i =
     then (
       I.add (int n) rsp;
       D.cfi_adjust_cfa_offset ~bytes:(-n));
-    if fp then I.pop rbp;
+    if fp then I.pop rbp
+  | Lepilogue_close ->
     (* reset CFA back cause function body may continue *)
+    assert !frame_required;
+    let n = frame_size () - 8 - if fp then 8 else 0 in
     if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop (Const_int n) ->
@@ -2415,8 +2418,8 @@ let emit_instr ~first ~fallthrough i =
 let rec emit_all ~first ~fallthrough i =
   match i.desc with
   | Lend -> ()
-  | Lprologue | Lepilogue | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-  | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
+  | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+  | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
   | Lcondbranch (_, _)
   | Lcondbranch3 (_, _, _)
   | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _
@@ -2765,8 +2768,8 @@ let emit_probe_handler_wrapper p =
       name, handler_code_sym
     | Lcall_op
         (Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _ | Lextcall _)
-    | Lprologue | Lepilogue | Lend | Lreloadretaddr | Lreturn | Lentertrap
-    | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
+    | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+    | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
     | Lcondbranch (_, _)
     | Lcondbranch3 (_, _, _)
     | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -2929,8 +2932,8 @@ let emit_probe_notes0 () =
       | Lcall_op
           ( Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _
           | Lextcall _ )
-      | Lprologue | Lepilogue | Lend | Lreloadretaddr | Lreturn | Lentertrap
-      | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
       | Lcondbranch (_, _)
       | Lcondbranch3 (_, _, _)
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
