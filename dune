@@ -119,6 +119,7 @@
   value_rec_types
   asttypes
   cmo_format
+  cmj_format
   outcometree
   parsetree
   debug_event
@@ -290,6 +291,7 @@
   value_rec_types
   asttypes
   cmo_format
+  cmj_format
   outcometree
   parsetree
   debug_event))
@@ -346,7 +348,8 @@
  (libraries ocamlcommon flambda2)
  (modules
    jsmaindriver
-   jscompile))
+   jscompile
+   jslibrarian))
 
 (executable
  (name boot_ocamlj)
