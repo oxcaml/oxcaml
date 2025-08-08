@@ -8,18 +8,6 @@ type t : void
 external void_id : t -> t = "%identity"
 [%%expect{|
 type t : void
-Line 3, characters 19-20:
-3 | external void_id : t -> t = "%identity"
-                       ^
-Warning 187 [incompatible-with-upstream]: [@unboxed] attribute must be added to external declaration
-argument type with layout void for upstream compatibility.
-
-Line 3, characters 24-25:
-3 | external void_id : t -> t = "%identity"
-                            ^
-Warning 187 [incompatible-with-upstream]: [@unboxed] attribute must be added to external declaration
-argument type with layout void for upstream compatibility.
-
 external void_id : t -> t = "%identity" [@@unboxed]
 |}]
 

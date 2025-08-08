@@ -3512,8 +3512,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
         sort_or_poly with
   | Native_repr_attr_absent, Poly ->
     Repr_poly
-  | Native_repr_attr_absent, Sort (Base Value) ->
-    Same_as_ocaml_repr (Base Value)
+  | Native_repr_attr_absent, Sort (Base (Value | Void) as base) ->
+    Same_as_ocaml_repr base
   | Native_repr_attr_absent, (Sort (Base sort as c)) ->
     (if Language_extension.erasable_extensions_only ()
     then
