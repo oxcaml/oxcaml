@@ -381,6 +381,8 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         use_prim' (Extern extern_name)
       | Unsigned ->
         (* Also unimplemented in Cmm. See [To_cmm_primitive]. *)
+        (* CR selee: can do this by subtracting [min_int] before doing the
+           compare *)
         primitive_not_supported ()))
   | Float_arith (bitwidth, op) ->
     let op_name =

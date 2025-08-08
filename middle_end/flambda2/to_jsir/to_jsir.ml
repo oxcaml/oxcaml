@@ -281,13 +281,13 @@ and apply_expr ~env ~res e =
          the case that we don't know *)
       apply_fn ~res ~f ~args ~exact:false
     | Some callee, C_call _ ->
-      let symbol, _coercion =
+      let symbol =
         match Simple.must_be_symbol callee with
+        | Some (symbol, _coercion) -> symbol
         | None ->
           Misc.fatal_errorf
             "Expected callee to be a symbol for C calls, instead found %a"
             Simple.print callee
-        | Some (symbol, coercion) -> symbol, coercion
       in
       To_jsir_primitive.extern ~env ~res symbol args
   in

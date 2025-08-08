@@ -4,3 +4,5 @@ jsmain.ml
 jsmain.mli
 jsmaindriver.ml
 jsmaindriver.mli
+jslibrarian.ml
+jslibrarian.mli
