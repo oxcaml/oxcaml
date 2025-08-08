@@ -131,6 +131,10 @@ module type Sort = sig
     val for_tuple : t
 
     val for_idx : t
+
+    val for_loop_index : t
+
+    val for_constructor : t
   end
 
   module Var : sig

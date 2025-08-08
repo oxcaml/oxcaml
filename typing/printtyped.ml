@@ -340,11 +340,13 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   end;
   match x.pat_desc with
   | Tpat_any -> line i ppf "Tpat_any\n";
-  | Tpat_var (s,_,_,m) ->
+  | Tpat_var (s,_,_,sort,m) ->
       line i ppf "Tpat_var \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" Jkind.Sort.format sort;
       value_mode i ppf m
-  | Tpat_alias (p, s,_,_,m,_) ->
+  | Tpat_alias (p, s,_,_,sort,m,_) ->
       line i ppf "Tpat_alias \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" Jkind.Sort.format sort;
       value_mode i ppf m;
       pattern i ppf p;
   | Tpat_constant (c) -> line i ppf "Tpat_constant %a\n" fmt_constant c;
