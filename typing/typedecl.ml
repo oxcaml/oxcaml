@@ -3512,8 +3512,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
         sort_or_poly with
   | Native_repr_attr_absent, Poly ->
     Repr_poly
-  | Native_repr_attr_absent, Sort (Base Value) ->
-    Same_as_ocaml_repr (Base Value)
+  | Native_repr_attr_absent, Sort (Base (Value | Void) as base) ->
+    Same_as_ocaml_repr base
   | Native_repr_attr_absent, (Sort (Base sort as c)) ->
     (if Language_extension.erasable_extensions_only ()
     then
@@ -3546,12 +3546,12 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
       raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type kind))
     | Some repr -> repr
     end
+  | Native_repr_attr_present Unboxed, (Sort (Product _ | Base Void)) ->
+    raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unboxed))
   | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
-    (* We allow [@unboxed] on non-value sorts.
-
-       This is to enable upstream-compatibility. We want the code to
-       still work when all the layout annotations and unboxed types
-       get erased.
+    (* We allow [@unboxed] on upstream-compatible numerical sorts. To enable
+       upstream-compatibility, we want the code to still work when all the
+       layout annotations and unboxed types get erased.
 
        One may wonder why can't the erasure process mentioned above
        also add in the [@unboxed] attributes. This is not possible due
@@ -3576,8 +3576,6 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
         (Warnings.Incompatible_with_upstream
               (Warnings.Non_value_sort layout)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_present Unboxed, (Sort (Product _)) ->
-    raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unboxed))
 
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with

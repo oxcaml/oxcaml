@@ -254,7 +254,7 @@ let print p osig_val_decl =
   let for_all f =
     List.for_all f p.prim_native_repr_args && f p.prim_native_repr_res
   in
-  let is_unboxed = function
+  let needs_unboxed_attribute = function
     | _, Same_as_ocaml_repr (Base Value)
     | _, Repr_poly
     | _, Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
@@ -264,6 +264,9 @@ let print p osig_val_decl =
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint) ->
       true
+    | _, Same_as_ocaml_repr (Base Void) -> false
+      (* The [@unboxed] attribute is not supported on void in our compiler
+         or the upstream compiler. *)
     | _, Same_as_ocaml_repr _ ->
       (* We require [@unboxed] for non-value types in upstream-compatible code,
          but treat it as optional otherwise. We thus print the [@unboxed]
@@ -282,7 +285,7 @@ let print p osig_val_decl =
                                     | Unboxed_nativeint)
     | _, Repr_poly -> false
   in
-  let all_unboxed = for_all is_unboxed in
+  let all_unboxed = for_all needs_unboxed_attribute in
   let all_untagged = for_all is_untagged in
   let attrs = if p.prim_alloc then [] else [oattr_noalloc] in
   let attrs = if p.prim_c_builtin then oattr_builtin::attrs else attrs in
@@ -326,7 +329,7 @@ let print p osig_val_decl =
                                    | Untagged_int16) ->
        if all_untagged then [] else [oattr_untagged]
      | Same_as_ocaml_repr _->
-       if all_unboxed || not (is_unboxed (m, repr))
+       if all_unboxed || not (needs_unboxed_attribute (m, repr))
        then []
        else [oattr_unboxed])
   in
