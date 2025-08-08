@@ -2760,6 +2760,28 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
       (fun acc ignorable -> acc + count_initializers_ignorable ignorable)
       0 ignorables
 
+(* CR mshinwell: This function might need revisiting for JSIR and any
+   Flambda 2 -> WASM backend *)
+let array_element_size_in_bytes (array_kind : array_kind) =
+  match array_kind with
+  | Pgenarray | Paddrarray | Pintarray | Pfloatarray -> 8
+  | Punboxedfloatarray Unboxed_float32 ->
+    (* float32# arrays are packed *)
+    4
+  | Punboxedfloatarray Unboxed_float64 -> 8
+  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
+    ->
+    Misc.unboxed_small_int_arrays_are_not_implemented ()
+  | Punboxedoruntaggedintarray Unboxed_int32 ->
+    (* int32# arrays are packed *)
+    4
+  | Punboxedoruntaggedintarray (Unboxed_int64 | Unboxed_nativeint) -> 8
+  | Punboxedvectorarray Unboxed_vec128 -> 16
+  | Punboxedvectorarray Unboxed_vec256 -> 32
+  | Punboxedvectorarray Unboxed_vec512 -> 64
+  | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+    (* All elements of unboxed product arrays are currently 8 bytes wide. *)
+    count_initializers_array_kind array_kind * 8
 let rec ignorable_product_element_kind_involves_int
     (kind : ignorable_product_element_kind) =
   match kind with

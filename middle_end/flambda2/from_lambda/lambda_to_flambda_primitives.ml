@@ -21,6 +21,15 @@ module I_or_f = K.Standard_int_or_float
 module L = Lambda
 module P = Flambda_primitive
 
+let needs_64_bit_target prim dbg =
+  if not (Target_system.is_64_bit ())
+  then
+    Misc.fatal_errorf
+      "Primitive %a is not yet supported on 32-bit targets (this is not \
+       necessarily an inherent incompatibility, but the code in Flambda 2 \
+       needs checking and potentially adapting)"
+      Printlambda.primitive prim dbg
+
 let convert_integer_comparison (comp : Scalar.Integer_comparison.t) :
     P.signed_or_unsigned P.comparison =
   match comp with
@@ -521,31 +530,6 @@ let convert_array_kind_to_duplicate_array_kind (kind : L.array_kind) :
 let convert_field_read_semantics (sem : L.field_read_semantics) : Mutability.t =
   match sem with Reads_agree -> Immutable | Reads_vary -> Mutable
 
-let rec convert_layout_to_flambda_kind_with_subkinds (layout : L.layout) :
-    Flambda_kind.With_subkind.t list =
-  match layout with
-  | Pvalue value_kind -> (
-    match convert_block_access_field_kind_from_value_kind value_kind with
-    | Any_value -> [K.With_subkind.any_value]
-    | Immediate -> [K.With_subkind.naked_immediate])
-  | Punboxed_float Unboxed_float64 -> [K.With_subkind.naked_float]
-  | Punboxed_float Unboxed_float32 -> [K.With_subkind.naked_float32]
-  | Punboxed_or_untagged_integer Untagged_int8 -> [K.With_subkind.naked_int8]
-  | Punboxed_or_untagged_integer Untagged_int16 -> [K.With_subkind.naked_int16]
-  | Punboxed_or_untagged_integer Unboxed_int32 -> [K.With_subkind.naked_int32]
-  | Punboxed_or_untagged_integer Unboxed_int64 -> [K.With_subkind.naked_int64]
-  | Punboxed_or_untagged_integer Unboxed_nativeint ->
-    [K.With_subkind.naked_nativeint]
-  | Punboxed_or_untagged_integer Untagged_int -> [K.With_subkind.naked_immediate]
-  | Punboxed_vector Unboxed_vec128 -> [K.With_subkind.naked_vec128]
-  | Punboxed_vector Unboxed_vec256 -> [K.With_subkind.naked_vec256]
-  | Punboxed_vector Unboxed_vec512 -> [K.With_subkind.naked_vec512]
-  | Punboxed_product layouts ->
-    List.concat_map convert_layout_to_flambda_kind_with_subkinds layouts
-  | Ptop | Pbottom ->
-    Misc.fatal_error
-      "Lambda_to_flambda_primitives.convert_layout_to_offset_access_kinds"
-
 let bigarray_dim_bound b dimension =
   H.Prim (Unary (Bigarray_length { dimension }, b))
 
@@ -621,6 +605,13 @@ let box_vec512 mode (arg : H.expr_primitive) ~current_region : H.expr_primitive
 let unbox_vec512 (arg : H.simple_or_prim) : H.simple_or_prim =
   Prim (Unary (Unbox_number Naked_vec512, arg))
 
+let convert_lambda_index_to_standard_int_or_float
+    (index_kind : L.array_index_kind) : I_or_f.t =
+  match index_kind with
+  | Ptagged_int_index -> Tagged_immediate
+  | Punboxed_or_untagged_integer_index width ->
+    standard_int_or_float_of_unboxed_integer width
+
 let convert_index_to_tagged_int ~index ~(index_kind : Lambda.array_index_kind) =
   match index_kind with
   | Ptagged_int_index -> index
@@ -635,13 +626,13 @@ let convert_index_to_tagged_int ~index ~(index_kind : Lambda.array_index_kind) =
 
 let convert_index_to_untagged_int ~index ~(index_kind : Lambda.array_index_kind)
     =
-  let src : I_or_f.t =
-    match index_kind with
-    | Ptagged_int_index -> Tagged_immediate
-    | Punboxed_or_untagged_integer_index ubint ->
-      standard_int_or_float_of_unboxed_integer ubint
-  in
+  let src = convert_lambda_index_to_standard_int_or_float index_kind in
   H.Prim (Unary (Num_conv { src; dst = Naked_immediate }, index))
+
+let convert_index_to_naked_int64 ~index ~(index_kind : Lambda.array_index_kind)
+    =
+  let src = convert_lambda_index_to_standard_int_or_float index_kind in
+  H.Prim (Unary (Num_conv { src; dst = Naked_int64 }, index))
 
 let check_non_negative_imm imm prim_name =
   if not (Targetint_31_63.is_non_negative imm)
@@ -1594,82 +1585,66 @@ let floating_scalar : P.float_bitwidth -> _ Scalar.t = function
   | Float64 -> Naked (Floating (Float64 Any_locality_mode))
   | Float32 -> Naked (Floating (Float32 Any_locality_mode))
 
-let array_element_size_in_bytes (array_kind : L.array_kind) =
-  match array_kind with
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray -> 8
-  | Punboxedfloatarray Unboxed_float32 ->
-    (* float32# arrays are packed *)
-    4
-  | Punboxedfloatarray Unboxed_float64 -> 8
-  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
-    ->
-    Misc.unboxed_small_int_arrays_are_not_implemented ()
-  | Punboxedoruntaggedintarray Unboxed_int32 ->
-    (* int32# arrays are packed *)
-    4
-  | Punboxedoruntaggedintarray (Unboxed_int64 | Unboxed_nativeint) -> 8
-  | Punboxedvectorarray Unboxed_vec128 -> 16
-  | Punboxedvectorarray Unboxed_vec256 -> 32
-  | Punboxedvectorarray Unboxed_vec512 -> 64
-  | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
-    (* All elements of unboxed product arrays are currently 8 bytes wide. *)
-    L.count_initializers_array_kind array_kind * 8
+(* Compilation of block indices *)
 
-let simple_i64 x = H.Simple (Simple.const (Reg_width_const.naked_int64 x))
+module BC = Mixed_product_bytes.Byte_count
 
-let conv_bc = Mixed_product_bytes.Byte_count.on_64_bit_arch
+let block_index_mask_size = 48
+
+let block_index_mask = Int64.of_int ((1 lsl block_index_mask_size) - 1)
+
+let extract_block_index_offset idx =
+  H.Binary (Int_arith (Naked_int64, And), idx, H.simple_i64 block_index_mask)
 
 (* Given an index that points to data of some layout, produce the list of
    offsets needed to access each element *)
-let idx_access_offsets layout idx =
+let block_index_access_offsets layout idx =
+  assert (Target_system.is_64_bit ());
+  let module MPB = Mixed_product_bytes in
   let mbe = L.mixed_block_element_of_layout layout in
-  let cts = Mixed_product_bytes.count mbe in
-  if Mixed_product_bytes.has_value_and_flat cts
+  let cts = MPB.count mbe in
+  if MPB.has_value_and_flat cts
   then
-    let offset =
-      let mask = Int64.of_int ((1 lsl 48) - 1) in
-      H.Binary (Int_arith (Naked_int64, And), idx, simple_i64 mask)
-    in
+    let offset = extract_block_index_offset idx in
     let gap =
-      let shifter =
-        H.Simple
-          (Simple.const
-             (Reg_width_const.naked_immediate (Targetint_31_63.of_int 48)))
-      in
-      H.Binary (Int_shift (Naked_int64, Lsr), idx, shifter)
+      let shift = H.simple_untagged_int block_index_mask_size in
+      H.Binary (Int_shift (Naked_int64, Lsr), idx, shift)
     in
-    let f (to_left : Mixed_product_bytes.t) (mbe : unit L.mixed_block_element) =
+    let f (to_left : MPB.t) (mbe : unit L.mixed_block_element) =
       let add x y = H.Binary (Int_arith (Naked_int64, Add), Prim x, y) in
       let offset_from_offset : H.simple_or_prim =
         match mbe with
-        | Product _ -> assert false
+        | Product _ ->
+          Misc.fatal_errorf "Unexpected product in block index access: %a"
+            Printlambda.layout layout
         (* Values are (values to left) beyond the offset *)
-        | Value _ -> simple_i64 (Int64.of_int (conv_bc to_left.value))
+        | Value _ ->
+          H.simple_i64 (Int64.of_int (BC.on_64_bit_arch to_left.value))
         (* Flats are gap + (all values) + (flats to left) beyond the offset *)
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
         | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
           Prim
             (add gap
-               (simple_i64
-                  (Int64.of_int (conv_bc cts.value + conv_bc to_left.flat))))
+               (H.simple_i64
+                  (Int64.of_int
+                     (BC.on_64_bit_arch cts.value
+                     + BC.on_64_bit_arch to_left.flat))))
       in
       let prim = add offset offset_from_offset in
-      Mixed_product_bytes.add to_left (Mixed_product_bytes.count mbe), prim
+      MPB.add to_left (MPB.count mbe), prim
     in
-    snd
-      (List.fold_left_map f Mixed_product_bytes.zero
-         (L.mixed_block_element_leaves mbe))
+    snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
   else
-    let f (to_left : Mixed_product_bytes.t) (mbe : unit L.mixed_block_element) =
+    let f (to_left : MPB.t) (mbe : unit L.mixed_block_element) =
       let summand =
-        simple_i64 (Int64.of_int (conv_bc to_left.value + conv_bc to_left.flat))
+        H.simple_i64
+          (Int64.of_int
+             (BC.on_64_bit_arch to_left.value + BC.on_64_bit_arch to_left.flat))
       in
       let prim = H.Binary (Int_arith (Naked_int64, Add), idx, summand) in
-      Mixed_product_bytes.add to_left (Mixed_product_bytes.count mbe), prim
+      MPB.add to_left (MPB.count mbe), prim
     in
-    snd
-      (List.fold_left_map f Mixed_product_bytes.zero
-         (L.mixed_block_element_leaves mbe))
+    snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
 
 (* Primitive conversion *)
 let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
@@ -1728,70 +1703,69 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     in
     List.map (fun arg : H.expr_primitive -> Simple arg) projected_args
   | Parray_element_size_in_bytes array_kind, [_witness] ->
+    (* Also see comment in [L.array_element_size_in_bytes] about target word
+       size *)
+    needs_64_bit_target prim dbg;
     (* This is implemented as a unary primitive, but from our point of view it's
        actually nullary. *)
-    let num_bytes = array_element_size_in_bytes array_kind in
+    let num_bytes = L.array_element_size_in_bytes array_kind in
     [Simple (Simple.const_int (Targetint_31_63.of_int num_bytes))]
   | Pmake_idx_field pos, [] ->
+    needs_64_bit_target prim dbg;
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
-    [Simple (Simple.const (Reg_width_const.naked_int64 idx_raw_value))]
+    [H.simple_i64_expr idx_raw_value]
   | Pmake_idx_mixed_field (shape, pos, path), [] ->
-    let open Mixed_product_bytes.Wrt_path in
-    let { offset_bytes; gap_bytes } =
-      match offset_and_gap (count_shape shape pos path) with
-      | Some { offset_bytes; gap_bytes } -> { offset_bytes; gap_bytes }
-      | None -> Misc.fatal_error "Pidxmixedfield: illegal gap"
+    needs_64_bit_target prim dbg;
+    let module W = Mixed_product_bytes.Wrt_path in
+    let { W.offset_bytes; gap_bytes } =
+      match W.offset_and_gap (W.count_shape shape pos path) with
+      | Some { offset_bytes; gap_bytes } -> { W.offset_bytes; gap_bytes }
+      | None ->
+        Misc.fatal_errorf "Illegal gap:@ %a@ %a" Printlambda.primitive prim
+          Debuginfo.print_compact dbg
     in
     let idx_raw_value =
       Int64.add
-        (Int64.shift_left (Int64.of_int (conv_bc gap_bytes)) 48)
-        (Int64.of_int (conv_bc offset_bytes))
+        (Int64.shift_left
+           (Int64.of_int (BC.on_64_bit_arch gap_bytes))
+           block_index_mask_size)
+        (Int64.of_int (BC.on_64_bit_arch offset_bytes))
     in
-    [Simple (Simple.const (Reg_width_const.naked_int64 idx_raw_value))]
+    [H.simple_i64_expr idx_raw_value]
   | Pmake_idx_array (ak, ik, mbe, path), [[index]] ->
-    let index_as_int64 =
-      let conv_from src =
-        H.Prim (Unary (Num_conv { src; dst = Naked_int64 }, index))
-      in
-      match ik with
-      | Ptagged_int_index -> conv_from Tagged_immediate
-      | Punboxed_or_untagged_integer_index Unboxed_int64 -> index
-      | Punboxed_or_untagged_integer_index Unboxed_int32 ->
-        conv_from Naked_int32
-      | Punboxed_or_untagged_integer_index Untagged_int16 ->
-        conv_from Naked_int16
-      | Punboxed_or_untagged_integer_index Untagged_int8 -> conv_from Naked_int8
-      | Punboxed_or_untagged_integer_index Untagged_int ->
-        conv_from Naked_immediate
-      | Punboxed_or_untagged_integer_index Unboxed_nativeint ->
-        conv_from Naked_nativeint
-    in
-    let index_as_bytes =
-      let el_size = array_element_size_in_bytes ak in
+    needs_64_bit_target prim dbg;
+    let module W = Mixed_product_bytes.Wrt_path in
+    let index_in_bytes =
       H.Prim
         (Binary
            ( Int_arith (Naked_int64, Mul),
-             index_as_int64,
-             simple_i64 (Int64.of_int el_size) ))
+             convert_index_to_naked_int64 ~index_kind:ik ~index,
+             H.simple_i64 (Int64.of_int (L.array_element_size_in_bytes ak)) ))
     in
     let offset_after_index =
-      match Mixed_product_bytes.Wrt_path.(offset_and_gap (count mbe path)) with
+      match W.offset_and_gap (W.count mbe path) with
       | Some { offset_bytes; gap_bytes } ->
         if Mixed_product_bytes.Byte_count.is_zero gap_bytes
         then offset_bytes
         else
-          Misc.fatal_error
-            "Pidxarray: non-zero gap should be prevented by \
-             [will_be_reordered] check in translcore"
-      | None -> Misc.fatal_error "Pidxarray: illegal gap"
+          Misc.fatal_errorf
+            "Non-zero gap should be prevented by [will_be_reordered] check in \
+             translcore:@ %a@ %a"
+            Printlambda.primitive prim Debuginfo.print_compact dbg
+      | None ->
+        Misc.fatal_errorf "Illegal gap:@ %a@ %a" Printlambda.primitive prim
+          Debuginfo.print_compact dbg
     in
     [ Binary
         ( Int_arith (Naked_int64, Add),
-          index_as_bytes,
-          simple_i64 (Int64.of_int (conv_bc offset_after_index)) ) ]
+          index_in_bytes,
+          H.simple_i64 (Int64.of_int (BC.on_64_bit_arch offset_after_index)) )
+    ]
   | Pidx_deepen (mbe, field_path), [[idx]] -> (
+    needs_64_bit_target prim dbg;
+    let module W = Mixed_product_bytes.Wrt_path in
     (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
-    let cts = Mixed_product_bytes.Wrt_path.count mbe field_path in
+    let cts = W.count mbe field_path in
     let open struct
       type deepening_type =
         | Mixed_product_to_mixed_product
@@ -1801,8 +1775,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     end in
     let deepening_type =
       let outer_has_value_and_flat =
-        Mixed_product_bytes.Wrt_path.all cts
-        |> Mixed_product_bytes.has_value_and_flat
+        W.all cts |> Mixed_product_bytes.has_value_and_flat
       in
       if outer_has_value_and_flat
       then
@@ -1813,7 +1786,9 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         | false, false -> Mixed_product_to_mixed_product
         | false, true -> Mixed_product_to_all_values
         | true, false -> Mixed_product_to_all_flats
-        | true, true -> assert false
+        | true, true ->
+          Misc.fatal_errorf "Unexpected value=0 and flat=0 in %a@ %a"
+            Printlambda.primitive prim Debuginfo.print_compact dbg
       else All_values_or_flats
     in
     match deepening_type with
@@ -1821,9 +1796,10 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       (* The initial index isn't mixed, so all 64 of its bits are an offset *)
       (* increase this offset by left value + left flats *)
       let to_add =
-        Int64.of_int (conv_bc cts.left.value + conv_bc cts.left.flat)
+        Int64.of_int
+          (BC.on_64_bit_arch cts.left.value + BC.on_64_bit_arch cts.left.flat)
       in
-      [Binary (Int_arith (Naked_int64, Add), idx, simple_i64 to_add)]
+      [Binary (Int_arith (Naked_int64, Add), idx, H.simple_i64 to_add)]
     | Mixed_product_to_mixed_product ->
       (* E.g. move index to a #(i64#, #(string, i32#), string) to the inner
          product *)
@@ -1831,43 +1807,36 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       let to_add =
         Int64.add
           (Int64.shift_left
-             (Int64.of_int (conv_bc cts.right.value + conv_bc cts.left.flat))
-             48)
-          (Int64.of_int (conv_bc cts.left.value))
+             (Int64.of_int
+                (BC.on_64_bit_arch cts.right.value
+                + BC.on_64_bit_arch cts.left.flat))
+             block_index_mask_size)
+          (Int64.of_int (BC.on_64_bit_arch cts.left.value))
       in
-      [Binary (Int_arith (Naked_int64, Add), idx, simple_i64 to_add)]
+      [Binary (Int_arith (Naked_int64, Add), idx, H.simple_i64 to_add)]
     | Mixed_product_to_all_values ->
       (* gap = 0; offset += left value *)
-      let mask = Int64.of_int ((1 lsl 48) - 1) in
-      let gap_removed =
-        H.Binary (Int_arith (Naked_int64, And), idx, simple_i64 mask)
-      in
+      let gap_removed = extract_block_index_offset idx in
       [ Binary
           ( Int_arith (Naked_int64, Add),
             H.Prim gap_removed,
-            simple_i64 (Int64.of_int (conv_bc cts.left.value)) ) ]
+            H.simple_i64 (Int64.of_int (BC.on_64_bit_arch cts.left.value)) ) ]
     | Mixed_product_to_all_flats ->
       (* offset += gap + left value + right value + left flat; gap = 0 *)
-      let mask = Int64.of_int ((1 lsl 48) - 1) in
-      let offset =
-        H.Binary (Int_arith (Naked_int64, And), idx, simple_i64 mask)
-      in
-      let shifter =
-        H.Simple
-          (Simple.const
-             (Reg_width_const.naked_immediate (Targetint_31_63.of_int 48)))
-      in
+      let offset = extract_block_index_offset idx in
+      let shifter = H.simple_untagged_int block_index_mask_size in
       let gap = H.Binary (Int_shift (Naked_int64, Lsr), idx, shifter) in
       let to_add =
         Int64.of_int
-          (conv_bc cts.left.value + conv_bc cts.right.value
-         + conv_bc cts.left.flat)
+          (BC.on_64_bit_arch cts.left.value
+          + BC.on_64_bit_arch cts.right.value
+          + BC.on_64_bit_arch cts.left.flat)
       in
       [ Binary
           ( Int_arith (Naked_int64, Add),
             H.Prim
               (Binary (Int_arith (Naked_int64, Add), H.Prim offset, H.Prim gap)),
-            simple_i64 to_add ) ])
+            H.simple_i64 to_add ) ])
   | Pmakefloatblock (mutability, mode), _ ->
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
@@ -2912,8 +2881,11 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     let kind = standard_int_or_float_of_peek_or_poke layout in
     [Binary (Poke kind, ptr, new_value)]
   | Pget_idx (layout, mut), [[ptr]; [idx]] ->
-    let offsets = idx_access_offsets layout idx in
-    let kinds = convert_layout_to_flambda_kind_with_subkinds layout in
+    needs_64_bit_target prim dbg;
+    let offsets = block_index_access_offsets layout idx in
+    let kinds =
+      Flambda_arity.unarize (Flambda_arity.from_lambda_list [layout])
+    in
     let reads =
       List.map2
         (fun kind offset ->
@@ -2922,14 +2894,14 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     in
     [H.maybe_create_unboxed_product reads]
   | Pset_idx (layout, mode), [[ptr]; [idx]; new_values] ->
+    needs_64_bit_target prim dbg;
     let mode = Alloc_mode.For_assignments.from_lambda mode in
-    let offsets = idx_access_offsets layout idx in
-    let kinds = convert_layout_to_flambda_kind_with_subkinds layout in
-    let map3 f xs ys zs =
-      List.map2 (fun x (y, z) -> f x y z) xs (List.combine ys zs)
+    let offsets = block_index_access_offsets layout idx in
+    let kinds =
+      Flambda_arity.unarize (Flambda_arity.from_lambda_list [layout])
     in
     let writes =
-      map3
+      Misc.Stdlib.List.map3
         (fun kind offset new_value ->
           H.Ternary (Write_offset (kind, mode), ptr, Prim offset, new_value))
         kinds offsets new_values

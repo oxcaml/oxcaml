@@ -924,7 +924,6 @@ CAMLprim value caml_unsafe_set_idx_bytecode(value base, value idx, value v)
   mlsize_t depth = Wosize_val(idx);
 #ifdef FLAT_FLOAT_ARRAY
   if (Tag_val(base) == Double_array_tag) {
-    // Note that
     CAMLassert (depth == 1);
     intnat pos = Long_val(Field(idx, 0));
     double d = Double_val (v);
@@ -979,7 +978,6 @@ CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
   }
   return block;
 }
-
 
 /* A generic function for extraction and concatenation of sub-arrays */
 

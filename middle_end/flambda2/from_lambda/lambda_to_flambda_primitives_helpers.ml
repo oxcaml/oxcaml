@@ -57,6 +57,16 @@ and simple_or_prim =
   | Simple of Simple.t
   | Prim of expr_primitive
 
+let simple_untagged_int x : simple_or_prim =
+  Simple
+    (Simple.const (Reg_width_const.naked_immediate (Targetint_31_63.of_int x)))
+
+let simple_i64 x : simple_or_prim =
+  Simple (Simple.const (Reg_width_const.naked_int64 x))
+
+let simple_i64_expr x : expr_primitive =
+  Simple (Simple.const (Reg_width_const.naked_int64 x))
+
 let maybe_create_unboxed_product expr_prims =
   match expr_prims with
   | [expr_prim] -> expr_prim

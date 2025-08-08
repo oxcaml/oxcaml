@@ -2155,9 +2155,9 @@ let result_kind_of_ternary_primitive p : result_kind =
   | Atomic_field_int_arith (Add | Sub | And | Or | Xor)
   | Atomic_set_field _ ->
     Unit
-  | Atomic_field_int_arith Fetch_add | Atomic_exchange_field _ | Write_offset _
-    ->
+  | Atomic_field_int_arith Fetch_add | Atomic_exchange_field _ ->
     Singleton K.value
+  | Write_offset _ -> Unit
 
 let result_kind_of_quaternary_primitive p : result_kind =
   match p with

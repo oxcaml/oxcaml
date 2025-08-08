@@ -540,6 +540,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
                be unreachable as the frontend doesn't support these indices. *)
             Misc.fatal_error
               "Array block indices with small int indices not expected"
+            (* CR mshinwell: this is probably ok for now, but it seems like
+               these conversions could silently overflow *)
           | Punboxed_or_untagged_integer_index Unboxed_int64 ->
             unary (Ccall "caml_int64_to_int")
           | Punboxed_or_untagged_integer_index Unboxed_int32 ->

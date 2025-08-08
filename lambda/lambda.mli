@@ -1262,6 +1262,9 @@ val count_initializers_array_kind : array_kind -> int
 val ignorable_product_element_kind_involves_int :
   ignorable_product_element_kind -> bool
 
+(** This function currently assumes a 64-bit target. *)
+val array_element_size_in_bytes : array_kind -> int
+
 (** Construction helpers *)
 
 (** A tagged immediate. *)

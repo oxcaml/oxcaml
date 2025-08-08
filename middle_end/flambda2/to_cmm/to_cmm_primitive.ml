@@ -1186,8 +1186,10 @@ let ternary_primitive _env dbg f x y z =
         match mode with
         | Heap -> C.caml_modify ~dbg addr z
         | Local ->
-          (* divide by 8 to convert offset from bytes to field number *)
-          C.caml_modify_local ~dbg x (C.lsr_int y (Cconst_int (3, dbg)) dbg) z
+          (* divide to convert offset from bytes to field number *)
+          C.caml_modify_local ~dbg x
+            (C.lsr_int y (Cconst_int (C.log2_size_addr, dbg)) dbg)
+            z
       else C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
     in
     C.return_unit dbg store

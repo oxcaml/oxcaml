@@ -40,6 +40,8 @@ end
 
 val arch_bits : int
 
+val log2_size_addr : int
+
 type arity =
   { function_kind : Lambda.function_kind;
     params_layout : Lambda.layout list;
