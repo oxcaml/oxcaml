@@ -2917,7 +2917,7 @@ and type_pat_aux
       let alloc_mode =
         cross_left !!penv expected_ty alloc_mode.mode
       in
-      (* CR jrayman: this is the wrong way to do this *)
+      (* CR jrayman: store in Tpat_var *)
       let layout =
         match Ctype.type_sort !!penv ty ~why:Let_binding ~fixed:false with
         | Error _ -> assert false
