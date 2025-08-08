@@ -678,7 +678,7 @@ let update_subst_with_mutrec_decl (subst_constr, subst_constr_mut) t map =
 (* To unroll the mutually recursive declarations, we perform a simple call by
    value evaluation and catch cycles for ident binders. *)
 let rec unfold_and_evaluate ~depth subst_type subst_constr (t : Shape.t) =
-  if depth >= 10
+  if depth >= 5
      (* CR sspies: This depth limit can currently produce very large shapes, and
         some additional caching would be appropriate. *)
   then Shape.leaf' None
