@@ -334,3 +334,37 @@
  (action
   (diff extcalls_ir.output extcalls_ir.output.corrected)))
 
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (targets data_decl.cmx data_decl_ir.output.corrected data_decl.output.exe)
+ (deps data_decl.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} data_decl.ml -c -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (with-outputs-to data_decl_ir.output.corrected (pipe-outputs (run cat data_decl.ll) (run ./filter.sh)))
+   (run %{bin:ocamlopt.opt} data_decl.cmx -opaque -o data_decl.output.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (alias runtest-llvm)
+ (deps data_decl.cmx)
+ (targets data_decl.output.corrected)
+ (action
+  (with-outputs-to
+   data_decl.output.corrected
+   (run ./data_decl.output.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (alias runtest-llvm)
+ (deps data_decl.output data_decl.output.corrected)
+ (action
+  (diff data_decl.output data_decl.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (alias runtest-llvm)
+ (deps data_decl_ir.output data_decl_ir.output.corrected)
+ (action
+  (diff data_decl_ir.output data_decl_ir.output.corrected)))
+

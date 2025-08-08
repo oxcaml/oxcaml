@@ -209,6 +209,12 @@ let () =
           Output_ir { source = name; output = name ^ "_ir" };
           Ocaml_default main_name ]
   in
+  let print_test_run_no_main name =
+    print_test ~extra_subst:[] ~buf ~run:(Some name)
+      ~tasks:
+        [ Ocaml_llvm { filename = name; stop_after_llvmize = false };
+          Output_ir { source = name; output = name ^ "_ir" } ]
+  in
   print_test_ir_only "id_fn";
   print_test_ir_and_run "const_val";
   print_test_ir_and_run_with_dep ~extra_dep_suffix:"data" "int_ops";
@@ -219,4 +225,5 @@ let () =
     ~extra_dep_with_llvm_backend:true "many_args";
   print_test_ir_and_run "multi_ret";
   print_test_ir_and_run "indirect_call";
-  print_test_c ~c_suffix:"defn" "extcalls"
+  print_test_c ~c_suffix:"defn" "extcalls";
+  print_test_run_no_main "data_decl"

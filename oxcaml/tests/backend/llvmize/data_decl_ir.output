@@ -1,0 +1,490 @@
+source_filename = "data_decl.ml"
+
+@camlData_decl__data_begin = global {  } {  }, align 8
+define void @camlData_decl__code_begin() { ret void }
+
+@camlData_decl__gc_roots = global { i64 } { i64 0 }, align 8
+@.header.camlData_decl = global { i64 } { i64 4864 }, align 8
+@camlData_decl = global { ptr, ptr, ptr, ptr } { ptr @camlData_decl__float4, ptr @camlData_decl__float327, ptr @camlData_decl__f_2, ptr @camlData_decl__g_3 }, align 8
+@.header.camlData_decl__g_3 = global { i64 } { i64 7159 }, align 8
+@camlData_decl__g_3 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855885, ptr @camlData_decl__g_HIDE_STAMP }, align 8
+@.header.camlData_decl__f_2 = global { i64 } { i64 4345 }, align 8
+@camlData_decl__f_2 = global { ptr, i64 } { ptr @camlData_decl__f_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlData_decl__const_block67 = global { i64 } { i64 2827 }, align 8
+@camlData_decl__const_block67 = global { ptr, ptr } { ptr @camlData_decl__immstring63, ptr @camlData_decl__const_block65 }, align 8
+@.header.camlData_decl__const_block65 = global { i64 } { i64 4868 }, align 8
+@camlData_decl__const_block65 = global { i64, i64, i64, ptr } { i64 1, i64 1, i64 1, ptr @camlData_decl__const_block48 }, align 8
+@.header.camlData_decl__immstring63 = global { i64 } { i64 4092 }, align 8
+@camlData_decl__immstring63 = global { [ 20 x i8 ], [ 3 x i8 ], i8 } { [ 20 x i8 ] c"\6d\75\74\75\61\6c\6c\79\5f\72\65\63\75\72\73\69\76\65\3a\20", [ 3 x i8 ] zeroinitializer, i8 3 }, align 8
+@.header.camlData_decl__const_block54 = global { i64 } { i64 4872 }, align 8
+@camlData_decl__const_block54 = global { ptr, i64, ptr, ptr } { ptr @camlData_decl__const_block44, i64 1, ptr @camlData_decl__const_block46, ptr @camlData_decl__const_block52 }, align 8
+@.header.camlData_decl__const_block52 = global { i64 } { i64 2828 }, align 8
+@camlData_decl__const_block52 = global { i64, ptr } { i64 65, ptr @camlData_decl__const_block50 }, align 8
+@.header.camlData_decl__const_block50 = global { i64 } { i64 2818 }, align 8
+@camlData_decl__const_block50 = global { i64, ptr } { i64 1, ptr @camlData_decl__const_block48 }, align 8
+@.header.camlData_decl__const_block48 = global { i64 } { i64 2828 }, align 8
+@camlData_decl__const_block48 = global { i64, i64 } { i64 21, i64 1 }, align 8
+@.header.camlData_decl__const_block46 = global { i64 } { i64 1792 }, align 8
+@camlData_decl__const_block46 = global { i64 } { i64 41 }, align 8
+@.header.camlData_decl__const_block44 = global { i64 } { i64 2816 }, align 8
+@camlData_decl__const_block44 = global { i64, i64 } { i64 1, i64 1 }, align 8
+@.header.camlData_decl__immstring38 = global { i64 } { i64 2044 }, align 8
+@camlData_decl__immstring38 = global { [ 5 x i8 ], [ 2 x i8 ], i8 } { [ 5 x i8 ] c"\25\2e\31\30\67", [ 2 x i8 ] zeroinitializer, i8 2 }, align 8
+@.header.camlData_decl__immstring35 = global { i64 } { i64 5116 }, align 8
+@camlData_decl__immstring35 = global { [ 30 x i8 ], [ 1 x i8 ], i8 } { [ 30 x i8 ] c"\6f\6e\65\20\6f\66\20\74\68\65\20\73\74\72\69\6e\67\73\0a\6f\66\20\61\6c\6c\20\74\69\6d\65", [ 1 x i8 ] zeroinitializer, i8 1 }, align 8
+@.header.camlData_decl__float327 = global { i64 } { i64 3071 }, align 8
+@camlData_decl__float327 = global { ptr, float } { ptr @caml_float32_ops, float 2.71828174591064453125 }, align 8
+@.header.camlData_decl__float4 = global { i64 } { i64 2045 }, align 8
+@camlData_decl__float4 = global { double } { double 3.14159265358979311600 }, align 8
+define cc 104 { { ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %3 = alloca i64
+  store i64 %1, ptr %3
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  br label %L1
+L1:
+  br label %L101
+L101:                                                ; preds = %L1
+  %10 = load i64, ptr %3
+  store i64 %10, ptr %5
+  %11 = load i64, ptr %5
+  %12 = icmp slt i64 %11, 3
+  br i1 %12, label %L103, label %13
+13:
+  %14 = load i64, ptr %5
+  %15 = icmp sgt i64 %14, 3
+  br i1 %15, label %L105, label %L103
+L103:                                                ; preds = %L101
+  store i64 3, ptr %6
+  %16 = load i64, ptr %6
+  store i64 %16, ptr %3
+  %17 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %18 = load ptr, ptr %ds
+  %19 = insertvalue { { ptr }, { i64 } } %17, ptr %18, 0, 0
+  %20 = load i64, ptr %3
+  %21 = insertvalue { { ptr }, { i64 } } %19, i64 %20, 1, 0
+  ret { { ptr }, { i64 } } %21
+L105:                                                ; preds = %L101
+  %22 = load i64, ptr %5
+  store i64 %22, ptr %7
+  %23 = load i64, ptr %7
+  %24 = add i64 %23, -4
+  store i64 %24, ptr %7
+  %25 = load i64, ptr %5
+  store i64 %25, ptr %8
+  %26 = load i64, ptr %8
+  %27 = add i64 %26, -2
+  store i64 %27, ptr %8
+  %28 = load i64, ptr %8
+  store i64 %28, ptr %3
+  %29 = load i64, ptr %7
+  store i64 %29, ptr %4
+  %30 = load i64, ptr %3
+  %31 = load i64, ptr %4
+  %32 = load ptr, ptr %ds
+  %33 = call cc 104 { { ptr }, { i64 } } @camlData_decl__g_HIDE_STAMP(ptr %32, i64 %30, i64 %31)
+  %34 = extractvalue { { ptr }, { i64 } } %33, 0, 0
+  store ptr %34, ptr %ds
+  %35 = extractvalue { { ptr }, { i64 } } %33, 1, 0
+  store i64 %35, ptr %3
+  br label %L107
+L107:                                                ; preds = %L105
+  %36 = load i64, ptr %3
+  store i64 %36, ptr %9
+  %37 = load i64, ptr %9
+  store i64 %37, ptr %3
+  %38 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %39 = load ptr, ptr %ds
+  %40 = insertvalue { { ptr }, { i64 } } %38, ptr %39, 0, 0
+  %41 = load i64, ptr %3
+  %42 = insertvalue { { ptr }, { i64 } } %40, i64 %41, 1, 0
+  ret { { ptr }, { i64 } } %42
+}
+
+define cc 104 { { ptr }, { i64 } } @camlData_decl__g_HIDE_STAMP(ptr %0, i64 %1, i64 %2)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %4 = alloca i64
+  store i64 %1, ptr %4
+  %5 = alloca i64
+  store i64 %2, ptr %5
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  br label %L1
+L1:
+  br label %L112
+L112:                                                ; preds = %L1
+  %14 = load i64, ptr %4
+  store i64 %14, ptr %6
+  %15 = load i64, ptr %5
+  store i64 %15, ptr %7
+  %16 = load i64, ptr %7
+  store i64 %16, ptr %4
+  %17 = load i64, ptr %4
+  %18 = load ptr, ptr %ds
+  %19 = call cc 104 { { ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %18, i64 %17)
+  %20 = extractvalue { { ptr }, { i64 } } %19, 0, 0
+  store ptr %20, ptr %ds
+  %21 = extractvalue { { ptr }, { i64 } } %19, 1, 0
+  store i64 %21, ptr %4
+  br label %L114
+L114:                                                ; preds = %L112
+  %22 = load i64, ptr %4
+  store i64 %22, ptr %8
+  %23 = load i64, ptr %8
+  store i64 %23, ptr %9
+  %24 = load i64, ptr %6
+  store i64 %24, ptr %4
+  %25 = load i64, ptr %4
+  %26 = load ptr, ptr %ds
+  %27 = call cc 104 { { ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %26, i64 %25)
+  %28 = extractvalue { { ptr }, { i64 } } %27, 0, 0
+  store ptr %28, ptr %ds
+  %29 = extractvalue { { ptr }, { i64 } } %27, 1, 0
+  store i64 %29, ptr %4
+  br label %L115
+L115:                                                ; preds = %L114
+  %30 = load i64, ptr %4
+  store i64 %30, ptr %10
+  %31 = load i64, ptr %10
+  store i64 %31, ptr %11
+  %32 = load i64, ptr %11
+  store i64 %32, ptr %12
+  %33 = load i64, ptr %12
+  %34 = load i64, ptr %9
+  %35 = add i64 %33, %34
+  store i64 %35, ptr %12
+  %36 = load i64, ptr %12
+  store i64 %36, ptr %13
+  %37 = load i64, ptr %13
+  %38 = add i64 %37, -1
+  store i64 %38, ptr %13
+  %39 = load i64, ptr %13
+  store i64 %39, ptr %4
+  %40 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %41 = load ptr, ptr %ds
+  %42 = insertvalue { { ptr }, { i64 } } %40, ptr %41, 0, 0
+  %43 = load i64, ptr %4
+  %44 = insertvalue { { ptr }, { i64 } } %42, i64 %43, 1, 0
+  ret { { ptr }, { i64 } } %44
+}
+
+define cc 104 { { ptr }, { i64 } } @camlData_decl__entry(ptr %0)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = alloca i64
+  %20 = alloca i64
+  %21 = alloca i64
+  %22 = alloca i64
+  %23 = alloca i64
+  %24 = alloca i64
+  %25 = alloca i64
+  %26 = alloca i64
+  %27 = alloca i64
+  %28 = alloca i64
+  %29 = alloca i64
+  %30 = alloca i64
+  %31 = alloca i64
+  %32 = alloca i64
+  %33 = alloca i64
+  %34 = alloca i64
+  %35 = alloca i64
+  %36 = alloca i64
+  %37 = alloca i64
+  %38 = alloca i64
+  %39 = alloca i64
+  %40 = alloca i64
+  %41 = alloca i64
+  %42 = alloca i64
+  %43 = alloca i64
+  %44 = alloca i64
+  %45 = alloca i64
+  %46 = alloca i64
+  %47 = alloca i64
+  %48 = alloca i64
+  %49 = alloca i64
+  %50 = alloca i64
+  %51 = alloca i64
+  %52 = alloca i64
+  %53 = alloca i64
+  br label %L1
+L1:
+  br label %L122
+L122:                                                ; preds = %L1
+  store i64 61, ptr %9
+  store i64 1, ptr %10
+  store ptr @camlData_decl__immstring35, ptr %11
+  store ptr @camlStdlib__print_endline_138, ptr %12
+  %54 = load i64, ptr %12
+  store i64 %54, ptr %13
+  %55 = load i64, ptr %13
+  %56 = add i64 %55, 16
+  store i64 %56, ptr %13
+  %57 = load i64, ptr %13
+  %58 = add i64 %57, 0
+  %59 = inttoptr i64 %58 to ptr
+  %60 = load i64, ptr %59
+  store i64 %60, ptr %14
+  %61 = load i64, ptr %14
+  store i64 %61, ptr %4
+  %62 = load i64, ptr %11
+  store i64 %62, ptr %5
+  %63 = load i64, ptr %10
+  store i64 %63, ptr %6
+  %64 = load i64, ptr %9
+  store i64 %64, ptr %7
+  %65 = load i64, ptr %4
+  %66 = load i64, ptr %5
+  %67 = load i64, ptr %6
+  %68 = load i64, ptr %7
+  %69 = call cc 105 { i64 } @caml_c_call(ptr @caml_ml_output, i64 poison, i64 %65, i64 %66, i64 %67, i64 %68)
+  %70 = extractvalue { i64 } %69, 0
+  store i64 %70, ptr %2
+  br label %L124
+L124:                                                ; preds = %L122
+  %71 = load i64, ptr %2
+  store i64 %71, ptr %15
+  %72 = load i64, ptr %15
+  store i64 %72, ptr %16
+  store i64 21, ptr %17
+  store ptr @camlStdlib__print_endline_138, ptr %18
+  %73 = load i64, ptr %18
+  store i64 %73, ptr %19
+  %74 = load i64, ptr %19
+  %75 = add i64 %74, 16
+  store i64 %75, ptr %19
+  %76 = load i64, ptr %19
+  %77 = add i64 %76, 0
+  %78 = inttoptr i64 %77 to ptr
+  %79 = load i64, ptr %78
+  store i64 %79, ptr %20
+  %80 = load i64, ptr %20
+  store i64 %80, ptr %4
+  %81 = load i64, ptr %17
+  store i64 %81, ptr %5
+  %82 = load i64, ptr %4
+  %83 = load i64, ptr %5
+  %84 = call cc 105 { i64 } @caml_c_call(ptr @caml_ml_output_char, i64 poison, i64 %82, i64 %83)
+  %85 = extractvalue { i64 } %84, 0
+  store i64 %85, ptr %2
+  br label %L127
+L127:                                                ; preds = %L124
+  %86 = load i64, ptr %2
+  store i64 %86, ptr %21
+  %87 = load i64, ptr %21
+  store i64 %87, ptr %22
+  store ptr @camlStdlib__print_endline_138, ptr %23
+  %88 = load i64, ptr %23
+  store i64 %88, ptr %24
+  %89 = load i64, ptr %24
+  %90 = add i64 %89, 16
+  store i64 %90, ptr %24
+  %91 = load i64, ptr %24
+  %92 = add i64 %91, 0
+  %93 = inttoptr i64 %92 to ptr
+  %94 = load i64, ptr %93
+  store i64 %94, ptr %25
+  %95 = load i64, ptr %25
+  store i64 %95, ptr %4
+  %96 = load i64, ptr %4
+  %97 = call cc 105 { i64 } @caml_c_call(ptr @caml_ml_flush, i64 poison, i64 %96)
+  %98 = extractvalue { i64 } %97, 0
+  store i64 %98, ptr %2
+  br label %L130
+L130:                                                ; preds = %L127
+  %99 = load i64, ptr %2
+  store i64 %99, ptr %26
+  %100 = load i64, ptr %26
+  store i64 %100, ptr %27
+  store ptr @camlData_decl__float327, ptr %28
+  store ptr @camlData_decl__immstring38, ptr %29
+  %101 = load i64, ptr %29
+  store i64 %101, ptr %4
+  %102 = load i64, ptr %28
+  store i64 %102, ptr %5
+  %103 = load i64, ptr %4
+  %104 = load i64, ptr %5
+  %105 = call cc 105 { i64 } @caml_c_call(ptr @caml_format_float32, i64 poison, i64 %103, i64 %104)
+  %106 = extractvalue { i64 } %105, 0
+  store i64 %106, ptr %2
+  br label %L133
+L133:                                                ; preds = %L130
+  %107 = load i64, ptr %2
+  store i64 %107, ptr %30
+  %108 = load i64, ptr %30
+  store i64 %108, ptr %31
+  store ptr @camlData_decl__const_block54, ptr %32
+  store i64 1, ptr %33
+  store ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1458$2c4$2d$2d66$5d_550, ptr %34
+  %109 = load i64, ptr %34
+  store i64 %109, ptr %2
+  %110 = load i64, ptr %33
+  store i64 %110, ptr %3
+  %111 = load i64, ptr %32
+  store i64 %111, ptr %4
+  %112 = load i64, ptr %2
+  %113 = load i64, ptr %3
+  %114 = load i64, ptr %4
+  %115 = load ptr, ptr %ds
+  %116 = call cc 104 { { ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %115, i64 %112, i64 %113, i64 %114)
+  %117 = extractvalue { { ptr }, { i64 } } %116, 0, 0
+  store ptr %117, ptr %ds
+  %118 = extractvalue { { ptr }, { i64 } } %116, 1, 0
+  store i64 %118, ptr %2
+  br label %L134
+L134:                                                ; preds = %L133
+  %119 = load i64, ptr %2
+  store i64 %119, ptr %35
+  %120 = load i64, ptr %35
+  store i64 %120, ptr %36
+  store ptr @camlData_decl__float4, ptr %37
+  %121 = load i64, ptr %37
+  store i64 %121, ptr %2
+  %122 = load i64, ptr %31
+  store i64 %122, ptr %3
+  %123 = load i64, ptr %36
+  store i64 %123, ptr %4
+  %124 = load i64, ptr %2
+  %125 = load i64, ptr %3
+  %126 = load i64, ptr %4
+  %127 = load ptr, ptr %ds
+  %128 = call cc 104 { { ptr }, { i64 } } @caml_apply2(ptr %127, i64 %124, i64 %125, i64 %126)
+  %129 = extractvalue { { ptr }, { i64 } } %128, 0, 0
+  store ptr %129, ptr %ds
+  %130 = extractvalue { { ptr }, { i64 } } %128, 1, 0
+  store i64 %130, ptr %2
+  br label %L135
+L135:                                                ; preds = %L134
+  %131 = load i64, ptr %2
+  store i64 %131, ptr %38
+  %132 = load i64, ptr %38
+  store i64 %132, ptr %39
+  store i64 11, ptr %40
+  %133 = load i64, ptr %40
+  store i64 %133, ptr %2
+  %134 = load i64, ptr %2
+  %135 = load ptr, ptr %ds
+  %136 = call cc 104 { { ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %135, i64 %134)
+  %137 = extractvalue { { ptr }, { i64 } } %136, 0, 0
+  store ptr %137, ptr %ds
+  %138 = extractvalue { { ptr }, { i64 } } %136, 1, 0
+  store i64 %138, ptr %2
+  br label %L136
+L136:                                                ; preds = %L135
+  %139 = load i64, ptr %2
+  store i64 %139, ptr %41
+  %140 = load i64, ptr %41
+  store i64 %140, ptr %42
+  store ptr @camlData_decl__const_block67, ptr %43
+  store i64 1, ptr %44
+  store ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1458$2c4$2d$2d66$5d_550, ptr %45
+  %141 = load i64, ptr %45
+  store i64 %141, ptr %2
+  %142 = load i64, ptr %44
+  store i64 %142, ptr %3
+  %143 = load i64, ptr %43
+  store i64 %143, ptr %4
+  %144 = load i64, ptr %2
+  %145 = load i64, ptr %3
+  %146 = load i64, ptr %4
+  %147 = load ptr, ptr %ds
+  %148 = call cc 104 { { ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %147, i64 %144, i64 %145, i64 %146)
+  %149 = extractvalue { { ptr }, { i64 } } %148, 0, 0
+  store ptr %149, ptr %ds
+  %150 = extractvalue { { ptr }, { i64 } } %148, 1, 0
+  store i64 %150, ptr %2
+  br label %L137
+L137:                                                ; preds = %L136
+  %151 = load i64, ptr %2
+  store i64 %151, ptr %46
+  %152 = load i64, ptr %46
+  store i64 %152, ptr %47
+  %153 = load i64, ptr %47
+  %154 = add i64 %153, 0
+  %155 = inttoptr i64 %154 to ptr
+  %156 = load i64, ptr %155
+  store i64 %156, ptr %48
+  %157 = load i64, ptr %42
+  store i64 %157, ptr %2
+  %158 = load i64, ptr %47
+  store i64 %158, ptr %3
+  %159 = load i64, ptr %2
+  %160 = load i64, ptr %3
+  %161 = load ptr, ptr %ds
+  %162 = load i64, ptr %48
+  %163 = inttoptr i64 %162 to ptr
+  %164 = call cc 104 { { ptr }, { i64 } } %163(ptr %161, i64 %159, i64 %160)
+  %165 = extractvalue { { ptr }, { i64 } } %164, 0, 0
+  store ptr %165, ptr %ds
+  %166 = extractvalue { { ptr }, { i64 } } %164, 1, 0
+  store i64 %166, ptr %2
+  br label %L138
+L138:                                                ; preds = %L137
+  %167 = load i64, ptr %2
+  store i64 %167, ptr %49
+  %168 = load i64, ptr %49
+  store i64 %168, ptr %50
+  store ptr @camlData_decl, ptr %51
+  %169 = load i64, ptr %51
+  store i64 %169, ptr %52
+  %170 = load i64, ptr %52
+  store i64 %170, ptr %8
+  store i64 1, ptr %53
+  %171 = load i64, ptr %53
+  store i64 %171, ptr %2
+  %172 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %173 = load ptr, ptr %ds
+  %174 = insertvalue { { ptr }, { i64 } } %172, ptr %173, 0, 0
+  %175 = load i64, ptr %2
+  %176 = insertvalue { { ptr }, { i64 } } %174, i64 %175, 1, 0
+  ret { { ptr }, { i64 } } %176
+}
+
+@.temp.Data_decl.0 = global { ptr } { ptr @caml_format_float32 }, align 8
+declare cc 104 { { ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr, i64, i64, i64)
+declare cc 104 { { ptr }, { i64 } } @caml_apply2(ptr, i64, i64, i64)
+declare i64 @llvm.read_register.i64(metadata)
+declare void @llvm.write_register.i64(metadata, i64)
+
+@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1458$2c4$2d$2d66$5d_550 = external global ptr
+@camlStdlib__print_endline_138 = external global ptr
+@caml_c_call = external global ptr
+@caml_curry2 = external global ptr
+@caml_float32_ops = external global ptr
+@caml_format_float32 = external global ptr
+@caml_ml_flush = external global ptr
+@caml_ml_output = external global ptr
+@caml_ml_output_char = external global ptr
+
+@camlData_decl__data_end = global {  } {  }, align 8
+define void @camlData_decl__code_end() { ret void }
+@camlData_decl__frametable = global {  } {  }, align 8

@@ -693,6 +693,7 @@ module F = struct
     let make_ocaml_c_call caml_c_call_symbol args res_type =
       let res_ident = fresh_ident t in
       add_referenced_symbol t caml_c_call_symbol;
+      add_referenced_symbol t func_symbol;
       ins_call_custom_arg ~cc:Ocaml_c_call ~pp_name:pp_global ~pp_arg t
         caml_c_call_symbol args
         (Some (res_type, res_ident));
@@ -735,6 +736,8 @@ module F = struct
         write_rsp c_sp;
         (* Do the thing (omitting cc defaults to C calling convention) *)
         let res_ident = fresh_ident t in
+        add_called_fun t func_symbol ~cc:Default ~args:(List.map fst args)
+          ~res:(Some res_type);
         ins_call ~cc:Default ~pp_name:pp_global t func_symbol args
           (Some (res_type, res_ident));
         (* Recover stack pointer *)
@@ -1026,32 +1029,40 @@ module F = struct
     match d with
     | Cdefine_symbol _ | Calign _ | Csymbol_offset _ ->
       Misc.fatal_error "Llvmize.typ_of_data_item: unexpected data item"
-    | Cint n | Cint32 n -> fprintf ppf "%s" (Nativeint.to_string n)
+    | Cint n | Cint32 n -> fprintf ppf "%nd" n
     | Cint8 n | Cint16 n -> fprintf ppf "%d" n
     | Csymbol_address { sym_name; sym_global = _ } -> pp_global ppf sym_name
-    | Cstring s -> fprintf ppf "c\"%s\"" s
+    | Cstring s ->
+      fprintf ppf "c\"";
+      String.iter (fun c -> fprintf ppf "\\%02x" (Char.code c)) s;
+      fprintf ppf "\""
     | Cskip _ -> fprintf ppf "zeroinitializer"
-    | Csingle f | Cdouble f -> fprintf ppf "%f" f
+    | Csingle f | Cdouble f -> fprintf ppf "%.20f" f
     | Cvec128 _ | Cvec256 _ | Cvec512 _ ->
       Misc.fatal_error "Llvmize: vector data item snot implemented"
 
   let pp_typ_and_const ppf (d : Cmm.data_item) =
     fprintf ppf "%a %a" Llvm_typ.pp_t (typ_of_data_item d) pp_const_data_item d
 
-  let data_decl ?(private_ = false) t sym (ds : Cmm.data_item list) =
-    line t.ppf "%a = %s global %a { %a }, align 8" pp_global sym
-      (if private_ then "private" else "")
-      Llvm_typ.pp_t
+  let data_decl ?(private_ = false) ?(align = Some 8) t sym
+      (ds : Cmm.data_item list) =
+    ignore private_;
+    (* CR yusumez: If private global variables are not referenced anywhere
+       directly, LLVM will delete them in the globaldce (dead global
+       elimination) pass, so we don't mark anything as private for now. *)
+    line t.ppf "%a = global %a { %a }%s" pp_global sym Llvm_typ.pp_t
       (Llvm_typ.Struct (List.map typ_of_data_item ds))
       (pp_print_list ~pp_sep:pp_comma pp_typ_and_const)
       ds
+      (match align with
+      | None -> ""
+      | Some align -> ", align " ^ Int.to_string align)
 
   let data_decl_extern t sym =
     line t.ppf "%a = external global %a" pp_global sym Llvm_typ.pp_t
       Llvm_typ.ptr
 
-  let symbol_decl t sym =
-    line t.ppf "%a = global i64 0" pp_global (Cmm_helpers.make_symbol sym)
+  let empty_symbol_decl t sym = data_decl t (Cmm_helpers.make_symbol sym) []
 
   let empty_fun_decl t sym =
     line t.ppf "define void %a() { ret void }" pp_global
@@ -1242,26 +1253,32 @@ let cfg (cl : CL.t) =
   F.define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body
 
 (* CR yusumez: We make some assumptions about the structure of the data items we
-   receive. Ideally, [data_item]s would be represented in a more structured
-   manner, but this should do for now. The assumptions are:
-
-   - [Calign] is not used anywhere (?)
-
-   - [Cdefine_symbol] occurs in the begining and exactly once.
-
-   - [Cint] might optionally appear before the symbol definition as the
-   header *)
+   receive and decode it manually here. Ideally, [data_item]s would be
+   represented in a more structured manner, but this should do for now. *)
 let make_temp_data_symbol =
   let idx = ref 0 in
   fun () ->
-    let res = ".temp" ^ Int.to_string !idx in
+    let module_name =
+      Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
+    in
+    let res = Format.asprintf ".temp.%s.%d" module_name !idx in
     idx := !idx + 1;
     res
 
 let data (ds : Cmm.data_item list) =
   let t = get_current_compilation_unit "data" in
-  let define_symbol ?private_ symbol contents =
-    F.data_decl ?private_ t symbol contents;
+  let define_symbol' ~private_ ~header ~symbol contents =
+    let symbol =
+      match symbol with
+      | None -> make_temp_data_symbol ()
+      | Some symbol -> symbol
+    in
+    (match header with
+    | None -> ()
+    | Some header ->
+      let header_sym = ".header." ^ symbol in
+      F.data_decl ~private_:true t header_sym [Cint header]);
+    F.data_decl ~private_ t symbol contents;
     t.defined_symbols <- String.Set.add symbol t.defined_symbols;
     List.iter
       (fun (d : Cmm.data_item) ->
@@ -1271,15 +1288,71 @@ let data (ds : Cmm.data_item list) =
         | _ -> ())
       contents
   in
-  match[@warning "-4"] ds with
-  | [] -> ()
-  | Cint header :: Cdefine_symbol { sym_name; sym_global = _ } :: contents ->
-    let header_sym = ".header." ^ sym_name in
-    define_symbol ~private_:true header_sym [Cint header];
-    define_symbol sym_name contents
-  | Cdefine_symbol { sym_name; sym_global = _ } :: contents ->
-    define_symbol sym_name contents
-  | ds -> define_symbol ~private_:true (make_temp_data_symbol ()) ds
+  let define_symbol ~private_ ~header ~symbol contents =
+    if private_ && List.length contents = 0
+    then () (* No need to declare a private symbol with no contents *)
+    else define_symbol' ~private_ ~header ~symbol contents
+  in
+  let peek_int = function[@warning "-4"] Cmm.Cint n -> Some n | _ -> None in
+  let peek_define_symbol = function[@warning "-4"]
+    | Cmm.Cdefine_symbol { sym_name; sym_global = _ } -> Some sym_name
+    | _ -> None
+  in
+  let eat_if peek = function
+    | [] -> None
+    | d :: ds -> peek d |> Option.map (fun i -> i, ds)
+  in
+  let closure_block ds =
+    let function_slot ds =
+      let header, ds = eat_if peek_int ds |> Option.get in
+      let symbol, ds = eat_if peek_define_symbol ds |> Option.get in
+      (*= A function slot is either:
+          | code pointer | closinfo | (if the function has arity 0 or 1)
+          | code pointer | closinfo | second code pointer | (arity >= 2)
+          See mlvalues.h for details. *)
+      let closinfo = List.nth ds 1 |> peek_int |> Option.get in
+      let arity = Nativeint.shift_right_logical closinfo 56 in
+      let slot_size = if arity <= 1n then 2 else 3 in
+      let slot, tail = Misc.Stdlib.List.split_at slot_size ds in
+      define_symbol ~private_:false ~header:(Some header) ~symbol:(Some symbol)
+        slot;
+      let is_last =
+        Nativeint.(shift_right_logical (shift_left closinfo 8) (size - 1) = 1n)
+      in
+      tail, is_last
+    in
+    let rec iter_slots ds =
+      let tail, is_last = function_slot ds in
+      if is_last
+      then define_symbol ~private_:true ~header:None ~symbol:None tail
+      else iter_slots tail
+    in
+    iter_slots ds
+  in
+  let block ds =
+    match eat_if peek_int ds with
+    | Some (i, after_i) -> (
+      match eat_if peek_define_symbol after_i with
+      | Some (symbol, after_symbol) ->
+        (* [i] is a header *)
+        if Nativeint.(logand i 0xffn = 247n)
+        then closure_block ds
+        else
+          define_symbol ~private_:false ~header:(Some i) ~symbol:(Some symbol)
+            after_symbol
+      | None ->
+        (* [i] is not a header *)
+        define_symbol ~private_:true ~header:None ~symbol:None ds)
+    | None -> (
+      (* No header *)
+      match eat_if peek_define_symbol ds with
+      | Some (symbol, after_symbol) ->
+        define_symbol ~private_:false ~header:None ~symbol:(Some symbol)
+          after_symbol
+      | None -> define_symbol ~private_:true ~header:None ~symbol:None ds)
+  in
+  try block ds
+  with _ -> Misc.fatal_error "Llvmize: error while decoding data items"
 
 (* Declare menitoned but not declared data items as extern *)
 let declare_data t =
@@ -1340,7 +1413,7 @@ let begin_assembly ~sourcefile =
   (* CR yusumez: Get target triple *)
   (* F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\""; *)
   Format.pp_print_newline t.ppf ();
-  F.symbol_decl t "data_begin";
+  F.empty_symbol_decl t "data_begin";
   F.empty_fun_decl t "code_begin";
   Format.pp_print_newline t.ppf ()
 
@@ -1357,9 +1430,9 @@ let end_assembly () =
   (* Emit data declarations *)
   declare_data t;
   Format.pp_print_newline t.ppf ();
-  F.symbol_decl t "data_end";
+  F.empty_symbol_decl t "data_end";
   F.empty_fun_decl t "code_end";
-  F.symbol_decl t "frametable";
+  F.empty_symbol_decl t "frametable";
   (* Close channel to .ll file *)
   Out_channel.close t.oc;
   (* Call clang to compile .ll to .s *)
