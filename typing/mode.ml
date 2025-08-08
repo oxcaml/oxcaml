@@ -1933,12 +1933,11 @@ module Axerror = struct
     let report_axerror :
         type a.
         ?target:_ ->
-        left_obj:a Lattices_mono.obj ->
-        right_obj:a Lattices_mono.obj ->
+        a Lattices_mono.obj ->
         a axerror ->
         Format.formatter ->
         unit =
-     fun ?target ~left_obj ~right_obj err ppf ->
+     fun ?target obj err ppf ->
       let open Format in
       (match target with
       | None -> fprintf ppf "This value is "
@@ -1946,11 +1945,11 @@ module Axerror = struct
         fprintf ppf "The %a %a is " Hint.print_lock_item target_item
           (Misc.Style.as_inline_code !print_longident)
           target_lid);
-      (match print_axhint_chain `Actual err.left left_obj err.left_hint ppf with
+      (match print_axhint_chain `Actual err.left obj err.left_hint ppf with
       | HintPrinted -> fprintf ppf ".@\nHowever, it is expected to be "
       | NothingPrinted -> fprintf ppf "@ but expected to be ");
       ignore
-        (print_axhint_chain `Expected err.right right_obj err.right_hint ppf);
+        (print_axhint_chain `Expected err.right obj err.right_hint ppf);
       fprintf ppf "."
   end
 
@@ -2731,9 +2730,8 @@ module Comonadic_with (Areality : Areality) = struct
   type error = Error : 'a Axis.t * 'a axerror -> error
 
   let report_error ?target ppf (Error (ax, err)) =
-    let right_obj = proj_obj ax in
-    let left_obj = proj_obj ax in
-    Axerror.Printing.report_axerror ?target ~left_obj ~right_obj err ppf
+    let obj = proj_obj ax in
+    Axerror.Printing.report_axerror ?target obj err ppf
 
   type equate_error = equate_step * error
 
@@ -2873,9 +2871,8 @@ module Monadic = struct
   type error = Error : 'a Axis.t * 'a axerror -> error
 
   let report_error ?target ppf (Error (ax, err)) =
-    let right_obj = proj_obj ax in
-    let left_obj = proj_obj ax in
-    Axerror.Printing.report_axerror ?target ~left_obj ~right_obj err ppf
+    let obj = proj_obj ax in
+    Axerror.Printing.report_axerror ?target obj err ppf
 
   type equate_error = equate_step * error
 
@@ -3342,9 +3339,8 @@ module Value_with (Areality : Areality) = struct
   type error = Error : 'a Axis.t * 'a axerror -> error
 
   let report_error ?target ppf (Error (ax, err)) =
-    let right_obj = proj_obj ax in
-    let left_obj = proj_obj ax in
-    Axerror.Printing.report_axerror ?target ~left_obj ~right_obj err ppf
+    let obj = proj_obj ax in
+    Axerror.Printing.report_axerror ?target obj err ppf
 
   type equate_error = equate_step * error
 
