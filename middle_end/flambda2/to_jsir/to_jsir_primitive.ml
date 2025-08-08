@@ -183,19 +183,20 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Gt Signed -> use_prim' ~env ~res Lt y x
       | Gt Unsigned -> use_prim' ~env ~res Ult y x
       | Le Signed -> use_prim' ~env ~res Le x y
-      | Le Unsigned -> failwith "bruh"
+      | Le Unsigned -> primitive_not_supported ()
       | Ge Signed -> use_prim' ~env ~res Le y x
-      | Ge Unsigned -> failwith "bruh")
-    | Yielding_int_like_compare_functions signed_or_unsigned ->
-      let env, res =
-        match signed_or_unsigned with
-        | Signed -> env, res
-        | Unsigned -> failwith "bruh"
-      in
-      let extern_name =
-        with_int_prefix kind "compare" ~percent_for_imms:false
-      in
-      use_prim ~env ~res (Extern extern_name))
+      | Ge Unsigned -> primitive_not_supported ())
+    | Yielding_int_like_compare_functions signed_or_unsigned -> (
+      match signed_or_unsigned with
+      | Signed ->
+        let extern_name =
+          with_int_prefix kind "compare" ~percent_for_imms:false
+        in
+        use_prim ~env ~res (Extern extern_name)
+      | Unsigned ->
+        (* CR selee: can do this by subtracting [min_int] before doing the
+           compare *)
+        primitive_not_supported ()))
   | Float_arith (bitwidth, op) ->
     ignore (bitwidth, op);
     primitive_not_supported ()
