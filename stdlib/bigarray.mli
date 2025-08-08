@@ -685,7 +685,7 @@ module Array1 : sig
       Use with caution and only when the program logic guarantees that
       the access is within bounds. *)
 
-  external unsafe_set: ('a, 'b, 'c) t -> int -> ('a[@local_opt]) -> unit
+  external unsafe_set: ('a, 'b, 'c) t -> int -> 'a @ local -> unit
                      = "%caml_ba_unsafe_set_1"
   (** Like {!Bigarray.Array1.set}, but bounds checking is not always performed.
       Use with caution and only when the program logic guarantees that

@@ -197,7 +197,7 @@ module Array1 = struct
     = "%caml_ba_set_1"
   external unsafe_get: ('a, 'b, 'c) t -> int -> 'a @@ portable = "%caml_ba_unsafe_ref_1"
   external unsafe_set
-    : ('a, 'b, 'c) t -> int -> ('a[@local_opt]) -> unit @@ portable
+    : ('a, 'b, 'c) t -> int -> 'a @ local -> unit @@ portable
     = "%caml_ba_unsafe_set_1"
   external dim: ('a, 'b, 'c) t -> int @@ portable = "%caml_ba_dim_1"
   external kind: ('a, 'b, 'c) t -> ('a, 'b) kind @@ portable = "caml_ba_kind"
