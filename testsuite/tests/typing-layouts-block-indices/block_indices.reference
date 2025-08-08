@@ -42,6 +42,11 @@ Mixed block record (nativeint# field)
 1
 2
 
+Mixed block record with unboxed record with value, flat, and void
+{ a 1.000000 #() }
+{ b 2.000000 #() }
+{ c 3.000000 #() }
+
 Nested product update and deepen mixed product to mixed product
 { 1 { a 2 } b }
 { 10 { aa 20 } bb }

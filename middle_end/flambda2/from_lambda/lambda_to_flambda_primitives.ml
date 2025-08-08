@@ -1615,6 +1615,7 @@ let block_index_access_offsets layout idx =
       let offset_from_offset : H.simple_or_prim =
         match mbe with
         | Product _ ->
+          (* Products not produced by [L.mixed_block_element_leaves] *)
           Misc.fatal_errorf "Unexpected product in block index access: %a"
             Printlambda.layout layout
         (* Values are (values to left) beyond the offset *)
@@ -1771,6 +1772,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         | Mixed_product_to_mixed_product
         | Mixed_product_to_all_values
         | Mixed_product_to_all_flats
+        | Mixed_product_to_empty
         | All_values_or_flats
     end in
     let deepening_type =
@@ -1786,9 +1788,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         | false, false -> Mixed_product_to_mixed_product
         | false, true -> Mixed_product_to_all_values
         | true, false -> Mixed_product_to_all_flats
-        | true, true ->
-          Misc.fatal_errorf "Unexpected value=0 and flat=0 in %a@ %a"
-            Printlambda.primitive prim Debuginfo.print_compact dbg
+        | true, true -> Mixed_product_to_empty
       else All_values_or_flats
     in
     match deepening_type with
@@ -1836,7 +1836,10 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           ( Int_arith (Naked_int64, Add),
             H.Prim
               (Binary (Int_arith (Naked_int64, Add), H.Prim offset, H.Prim gap)),
-            H.simple_i64 to_add ) ])
+            H.simple_i64 to_add ) ]
+    | Mixed_product_to_empty ->
+      (* Accesses to an index to a product of voids will not actually access *)
+      [Simple (Simple.const (Reg_width_const.naked_int64 Int64.zero))])
   | Pmakefloatblock (mutability, mode), _ ->
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in

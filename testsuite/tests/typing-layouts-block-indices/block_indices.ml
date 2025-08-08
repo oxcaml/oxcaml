@@ -45,6 +45,11 @@ external[@layout_poly] set :
   ('a : any mod separable) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a -> unit =
   "%array_safe_set"
 
+type void : void
+external void : unit -> void = "%unbox_unit"
+
+let[@inline never] use_void (_ : void) = "#()"
+
 (*******************************************************)
 (* Reads and writes for various record representations *)
 
@@ -169,6 +174,33 @@ let () =
   Printf.printf "%d\n" (Nativeint_u.to_int x);
   Idx_mut.unsafe_set r (.i) #2n;
   Printf.printf "%d\n" (Nativeint_u.to_int r.i);
+  print_newline ()
+
+type u = #{ v : void; s : string; f : float# }
+type has_unboxed_record_with_value_flat_void = { mutable u : u }
+
+let () =
+  print_endline
+    "Mixed block record with unboxed record with value, flat, and void";
+  let r = { u = #{ v = void (); s = "a"; f = #1. } } in
+  let s = Idx_mut.unsafe_get r (.u.#s) in
+  let f = Idx_mut.unsafe_get r (.u.#f) in
+  let v = Idx_mut.unsafe_get r (.u.#v) in
+  Printf.printf "{ %s %f %s }\n" s (Float_u.to_float f) (use_void v);
+  Idx_mut.unsafe_set r (.u.#s) "b";
+  Idx_mut.unsafe_set r (.u.#f) #2.;
+  Idx_mut.unsafe_set r (.u.#v) (void ());
+  let s = Idx_mut.unsafe_get r (.u.#s) in
+  let f = Idx_mut.unsafe_get r (.u.#f) in
+  let v = Idx_mut.unsafe_get r (.u.#v) in
+  Printf.printf "{ %s %f %s }\n" s (Float_u.to_float f) (use_void v);
+  Idx_mut.unsafe_set r (.idx_mut((.u)).#s) "c";
+  Idx_mut.unsafe_set r (.idx_mut((.u)).#f) #3.;
+  Idx_mut.unsafe_set r (.idx_mut((.u)).#v) (void ());
+  let s = Idx_mut.unsafe_get r (.idx_mut((.u)).#s) in
+  let f = Idx_mut.unsafe_get r (.idx_mut((.u)).#f) in
+  let v = Idx_mut.unsafe_get r (.idx_mut((.u)).#v) in
+  Printf.printf "{ %s %f %s }\n" s (Float_u.to_float f) (use_void v);
   print_newline ()
 
 (***************************************)
