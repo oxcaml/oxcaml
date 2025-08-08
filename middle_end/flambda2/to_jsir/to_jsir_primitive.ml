@@ -341,8 +341,6 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     match behaviour with
     | Yielding_bool comparison -> (
       let unsigned_le x y =
-        let x, res = prim_arg ~env ~res x in
-        let y, res = prim_arg ~env ~res y in
         let var_ule = Jsir.Var.fresh () in
         let var_eq = Jsir.Var.fresh () in
         let var_or = Jsir.Var.fresh () in
@@ -361,16 +359,18 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
           env,
           To_jsir_result.add_instr_exn res (Jsir.Let (var_or, expr_or)) )
       in
+      let x, res = prim_arg ~env ~res x in
+      let y, res = prim_arg ~env ~res y in
       match comparison with
-      | Eq -> use_prim' Eq
-      | Neq -> use_prim' Neq
-      | Lt Signed -> use_prim' Lt
-      | Lt Unsigned -> use_prim' Ult
-      | Gt Signed -> use_prim' Lt
-      | Gt Unsigned -> use_prim' Ult
-      | Le Signed -> use_prim' Le
+      | Eq -> use_prim ~env ~res Eq [x; y]
+      | Neq -> use_prim ~env ~res Neq [x; y]
+      | Lt Signed -> use_prim ~env ~res Lt [x; y]
+      | Lt Unsigned -> use_prim ~env ~res Ult [x; y]
+      | Gt Signed -> use_prim ~env ~res Lt [y; x]
+      | Gt Unsigned -> use_prim ~env ~res Ult [y; x]
+      | Le Signed -> use_prim ~env ~res Le [x; y]
       | Le Unsigned -> unsigned_le x y
-      | Ge Signed -> use_prim' Le
+      | Ge Signed -> use_prim ~env ~res Le [y; x]
       | Ge Unsigned -> unsigned_le y x)
     | Yielding_int_like_compare_functions signed_or_unsigned -> (
       match signed_or_unsigned with
