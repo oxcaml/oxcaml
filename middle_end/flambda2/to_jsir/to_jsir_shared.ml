@@ -1,3 +1,18 @@
+let bind_expr_to_var' ~env ~res fvar expr =
+  let jvar = Jsir.Var.fresh () in
+  ( jvar,
+    To_jsir_env.add_var env fvar jvar,
+    To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr)) )
+
+let bind_expr_to_var ~env ~res fvar expr =
+  let _jvar, env, res = bind_expr_to_var' ~env ~res fvar expr in
+  env, res
+
+let bind_expr_to_symbol ~env ~res symbol expr =
+  let jvar = Jsir.Var.fresh () in
+  ( To_jsir_env.add_symbol env symbol jvar,
+    To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr)) )
+
 let reg_width_const const : Jsir.constant =
   match Reg_width_const.descr const with
   | Naked_immediate targetint | Tagged_immediate targetint ->
@@ -30,7 +45,7 @@ let simple ~env ~res simple =
     ~const:(fun const ->
       let var = Jsir.Var.fresh () in
       let expr = Jsir.Constant (reg_width_const const) in
-      let res = To_jsir_result.add_instr res (Let (var, expr)) in
+      let res = To_jsir_result.add_instr_exn res (Let (var, expr)) in
       var, res)
 
 let simples ~env ~res simples =
