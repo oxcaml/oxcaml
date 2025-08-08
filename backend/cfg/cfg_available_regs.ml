@@ -312,7 +312,8 @@ module Transfer = struct
             | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
             | Probe_is_enabled _ | Opaque | Begin_region | End_region
             | Specific _ | Dls_get | Poll | Alloc _ | Pause )
-        | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
+        | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+        | Stack_check _ ->
           let is_op_end_region = Cfg.is_end_region in
           common ~avail_before ~destroyed_at:Proc.destroyed_at_basic
             ~is_interesting_constructor:is_op_end_region
@@ -379,7 +380,7 @@ module Analysis = Cfg_dataflow.Forward (Domain) (Transfer)
 let get_name_for_debugger_regs (b : Cfg.basic) =
   match b with
   | Op (Name_for_debugger { regs; _ }) -> Some regs
-  | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
+  | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
       | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _

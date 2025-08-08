@@ -2625,7 +2625,7 @@ end = struct
           (* treated as no-op here, flow and handling of exceptions is
              incorporated into the blocks and edges of the CFG *)
           Ok next
-        | Reloadretaddr | Prologue | Stack_check _ -> Ok next
+        | Reloadretaddr | Prologue | Epilogue | Stack_check _ -> Ok next
 
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
         let dbg = i.dbg in
