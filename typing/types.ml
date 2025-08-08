@@ -541,31 +541,41 @@ and method_privacy =
 
 module Variance = struct
   type t = int
-  type f = May_pos | May_neg | May_weak | Inj | Pos | Neg | Inv
+  type f =
+    | May_pos | May_neg | May_weak | May_noncontractive 
+    | Inj | Pos | Neg | Inv
   let single = function
     | May_pos -> 1
     | May_neg -> 2 + 4
     | May_weak -> 4
-    | Inj -> 8
-    | Pos -> 16 + 8 + 1
-    | Neg -> 32 + 8 + 4 + 2
-    | Inv -> 63
+    | May_noncontractive -> 8
+    | Inj -> 16
+    | Pos -> 32 + 16 + 1
+    | Neg -> 64 + 16 + 4 + 2
+    | Inv -> 127
   let union v1 v2 = v1 lor v2
   let inter v1 v2 = v1 land v2
+  let subtract v1 v2 = v1 land (lnot v2)
   let subset v1 v2 = (v1 land v2 = v1)
   let eq (v1 : t) v2 = (v1 = v2)
   let set x v = union v (single x)
+  let unset x v = subtract v (single x)
   let set_if b x v = if b then set x v else v
   let mem x = subset (single x)
   let null = 0
-  let unknown = 7
+  let unknown = 15
   let full = single Inv
-  let covariant = single Pos
+  let covariant = union (single Pos) (single May_noncontractive)
   let swap f1 f2 v v' =
     set_if (mem f2 v) f1 (set_if (mem f1 v) f2 v')
   let conjugate v =
-    let v' = inter v (union (single Inj) (single May_weak)) in
+    let v' =
+      inter v
+        (union (single Inj)
+           (union (single May_weak) (single May_noncontractive)))
+    in
     swap Pos Neg v (swap May_pos May_neg v v')
+  let contractive v = unset May_noncontractive v
   let compose v1 v2 =
     if mem Inv v1 && mem Inj v2 then full else
     let mp =
@@ -573,15 +583,18 @@ module Variance = struct
     and mn =
       mem May_pos v1 && mem May_neg v2 || mem May_neg v1 && mem May_pos v2
     and mw = mem May_weak v1 && v2 <> null || v1 <> null && mem May_weak v2
+    and mnc = mem May_noncontractive v1 && mem May_noncontractive v2
     and inj = mem Inj v1 && mem Inj v2
     and pos = mem Pos v1 && mem Pos v2 || mem Neg v1 && mem Neg v2
     and neg = mem Pos v1 && mem Neg v2 || mem Neg v1 && mem Pos v2 in
     List.fold_left (fun v (b,f) -> set_if b f v) null
-      [mp, May_pos; mn, May_neg; mw, May_weak; inj, Inj; pos, Pos; neg, Neg]
+      [mp, May_pos; mn, May_neg; mw, May_weak; mnc, May_noncontractive;
+       inj, Inj; pos, Pos; neg, Neg]
   let strengthen v =
     if mem May_neg v then v else v land (full - single May_weak)
   let get_upper v = (mem May_pos v, mem May_neg v)
   let get_lower v = (mem Pos v, mem Neg v, mem Inj v)
+  let is_null v = (v = null)
   let unknown_signature ~injective ~arity =
     let v = if injective then set Inj unknown else unknown in
     Misc.replicate_list v arity
