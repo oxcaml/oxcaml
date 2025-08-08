@@ -23,6 +23,14 @@ let create_let_prim ~env ~res fvar prim dbg =
   let jvar, env, res = To_jsir_primitive.primitive ~env ~res prim dbg in
   To_jsir_env.add_var env fvar jvar, res
 
+(** Apply the function pointed to by the variable in [f] with [args], bind the
+    return value to a variable, and return the variable and the result. *)
+let apply_fn ~res ~f ~args ~exact =
+  let apply : Jsir.expr = Apply { f; args; exact } in
+  let var = Jsir.Var.fresh () in
+  let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
+  var, res
+
 let rec expr ~env ~res e =
   match Expr.descr e with
   | Let e' -> let_expr ~env ~res e'
@@ -99,9 +107,14 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
   | Non_recursive
       { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
-        let res, addr = To_jsir_result.new_block res ~params:[] in
-        let env = To_jsir_env.add_continuation env k addr in
-        expr ~env ~res body)
+        let handler = Non_recursive_let_cont_handler.handler handler in
+        Continuation_handler.pattern_match handler
+          ~f:(fun params ~handler:cont_body ->
+            let params, env = To_jsir_shared.bound_parameters ~env params in
+            let res, addr = To_jsir_result.new_block res ~params in
+            let _env, res = expr ~env ~res cont_body in
+            let env = To_jsir_env.add_continuation env k addr in
+            expr ~env ~res body))
   | Recursive handlers ->
     Recursive_let_cont_handlers.pattern_match handlers
       ~f:(fun ~invariant_params ~body conts ->
@@ -117,15 +130,8 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
 and apply_expr ~env ~res e =
   let continuation = Apply_expr.continuation e in
   let exn_continuation = Apply_expr.exn_continuation e in
-  let expected_continuation : Apply_expr.Result_continuation.t =
-    Return (To_jsir_env.return_continuation env)
-  in
-  (* CR selee: Currently function applications are extremely limited and we're
-     not implementing proper CPS, it's only here essentially to test mutually
-     recursive closures. Will be coming back and fixing this later *)
-  if continuation <> expected_continuation
-     || Exn_continuation.exn_handler exn_continuation
-        <> To_jsir_env.exn_continuation env
+  if Exn_continuation.exn_handler exn_continuation
+     <> To_jsir_env.exn_continuation env
   then failwith "unimplemented for now";
   let f, res =
     match Apply_expr.callee e with
@@ -135,10 +141,17 @@ and apply_expr ~env ~res e =
   let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
   (* CR selee: assume exact = false for now, JSIR seems to assume false in the
      case that we don't know *)
-  let apply : Jsir.expr = Apply { f; args; exact = false } in
-  let var = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
-  env, To_jsir_result.end_block_with_last_exn res (Return var)
+  let var, res = apply_fn ~res ~f ~args ~exact:false in
+  match continuation with
+  | Never_returns ->
+    env, To_jsir_result.end_block_with_last_exn res (Return var)
+  | Return cont -> (
+    match To_jsir_env.get_continuation_exn env cont with
+    | Exception ->
+      failwith "unimplemented" (* CR selee: or should be disallowed? *)
+    | Return -> env, To_jsir_result.end_block_with_last_exn res (Return var)
+    | Block addr ->
+      env, To_jsir_result.end_block_with_last_exn res (Branch (addr, [var])))
 
 and apply_cont ~env ~res apply_cont =
   let args, res =
