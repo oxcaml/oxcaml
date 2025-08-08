@@ -11,18 +11,22 @@ let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
   in
   if prologue_required
   then (
+    let terminator_as_basic terminator =
+      { terminator with Cfg.desc = Cfg.Prologue }
+    in
     let entry_block = Cfg.get_block_exn cfg cfg.entry_label in
     let next_instr =
       Option.value (DLL.hd entry_block.body)
-        ~default:{ entry_block.terminator with desc = Cfg.Prologue }
+        ~default:(terminator_as_basic entry_block.terminator)
     in
     DLL.add_begin entry_block.body
       (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
          ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
          ());
     let add_epilogue (block : Cfg.basic_block) =
+      let terminator = terminator_as_basic block.terminator in
       DLL.add_end block.body
-        (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Epilogue
+        (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
            ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
            ())
     in
