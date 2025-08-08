@@ -7591,16 +7591,7 @@ and type_function
                   let (path, _), underlying_typ, new_pat =
                     extract_optional_tp_from_pattern_constraint_exn env pat
                   in
-                  (* Note: the new pattern we get back has already dropped
-                     the type constraint, and this is fine because
-                     [ty_default_arg] is checked against the [defaut_arg],
-                     and [ty_arg_mono] and [ty_arg] were already extracted
-                  *)
-                  (* CR generic-optional: (someday) investigate how this check
-                     relates to the [type_expect] immediately below. Are we
-                     doing a repetitive type_expect here? *)
-                  let _  = type_expect env mode_legacy default
-                            (mk_expected underlying_typ) in
+                  unify env underlying_typ ty_default_arg;
                   default, new_pat, Some path
               | Required_or_position_arg -> assert false
             in
