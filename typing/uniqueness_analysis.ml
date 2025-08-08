@@ -44,7 +44,7 @@
 
   The type system would infer both [Pexp_ident x] use sites to be Unique,
   but uniqueness analysis would infer both to be strictly weaker than Unique.
-  Type error is raised.
+  The submode fails and type error is raised (see [mark_multi_use]).
 
   On top of the naive contraction rule, we adopt the following tweaks:
 
@@ -68,7 +68,7 @@
 
   The above discussion is about tracking the usages of a single value. To
   track the usages of multiple values, we lift [module UsageTree] to
-  [module UsageTree].
+  [module UsageForest].
 *)
 
 open Asttypes
