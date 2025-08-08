@@ -3,11 +3,13 @@ type t =
     return_continuation : Continuation.t;
     exn_continuation : Continuation.t;
     continuations : Jsir.Addr.t Continuation.Map.t;
+    exn_handlers : (Jsir.Addr.t * Jsir.Var.t) Continuation.Map.t;
     vars : Jsir.Var.t Variable.Map.t;
     symbols : Jsir.Var.t Symbol.Map.t;
     code_ids : (Jsir.Addr.t * Jsir.Var.t list) Code_id.Map.t;
     function_slots : Jsir.Var.t Function_slot.Map.t;
-    value_slots : Jsir.Var.t Value_slot.Map.t
+    value_slots : Jsir.Var.t Value_slot.Map.t;
+    traps : Continuation.t list
   }
 
 let create ~module_symbol ~return_continuation ~exn_continuation =
@@ -15,11 +17,13 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     return_continuation;
     exn_continuation;
     continuations = Continuation.Map.empty;
+    exn_handlers = Continuation.Map.empty;
     vars = Variable.Map.empty;
     symbols = Symbol.Map.empty;
     code_ids = Code_id.Map.empty;
     function_slots = Function_slot.Map.empty;
-    value_slots = Value_slot.Map.empty
+    value_slots = Value_slot.Map.empty;
+    traps = []
   }
 
 let return_continuation t = t.return_continuation
@@ -33,6 +37,11 @@ let module_symbol t = t.module_symbol
 
 let add_continuation t cont addr =
   { t with continuations = Continuation.Map.add cont addr t.continuations }
+
+let add_exn_handler t cont ~addr ~param =
+  { t with
+    exn_handlers = Continuation.Map.add cont (addr, param) t.exn_handlers
+  }
 
 let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
 
@@ -48,17 +57,9 @@ let add_function_slot t fslot jvar =
 let add_value_slot t vslot jvar =
   { t with value_slots = Value_slot.Map.add vslot jvar t.value_slots }
 
-type continuation =
-  | Return
-  | Exception
-  | Block of Jsir.Addr.t
+let get_continuation_exn t cont = Continuation.Map.find cont t.continuations
 
-let get_continuation_exn t cont =
-  if Continuation.equal cont t.return_continuation
-  then Return
-  else if Continuation.equal cont t.exn_continuation
-  then Exception
-  else Block (Continuation.Map.find cont t.continuations)
+let get_exn_handler_exn t cont = Continuation.Map.find cont t.exn_handlers
 
 let get_var_exn t fvar = Variable.Map.find fvar t.vars
 

@@ -20,6 +20,8 @@ let with_int_prefix (kind : Flambda_kind.Standard_int.t) ~percent_for_imms op =
   in
   prefix ^ "_" ^ op
 
+let no_op ~env ~res = Jsir.Var.fresh (), env, res
+
 (* CR selee: implement primitives *)
 
 let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
@@ -44,9 +46,14 @@ let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
 let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   ignore (env, res, x);
   match f with
-  | Block_load { kind; mut; field } ->
-    ignore (kind, mut, field);
-    primitive_not_supported ()
+  | Block_load { kind = _; mut = _; field } ->
+    let expr : Jsir.expr =
+      match prim_arg ~env x with
+      | Pv v -> Field (v, Targetint_31_63.to_int field, Non_float)
+      | Pc _ -> Misc.fatal_error "Block_load on constant"
+    in
+    let var = Jsir.Var.fresh () in
+    var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Duplicate_block { kind } ->
     ignore kind;
     primitive_not_supported ()
@@ -102,12 +109,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     To_jsir_env.get_value_slot_exn env value_slot, env, res
   | Is_boxed_float -> primitive_not_supported ()
   | Is_flat_float_array -> primitive_not_supported ()
-  | End_region { ghost } ->
-    ignore ghost;
-    primitive_not_supported ()
-  | End_try_region { ghost } ->
-    ignore ghost;
-    primitive_not_supported ()
+  | End_region _ | End_try_region _ -> no_op ~env ~res
   | Obj_dup -> primitive_not_supported ()
   | Get_header -> primitive_not_supported ()
   | Atomic_load kind ->
@@ -122,7 +124,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
 
 let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   let use_prim' ~env ~res prim x y =
-    let expr : Jsir.expr = Prim (prim, [x; y]) in
+    let expr : Jsir.expr = Prim (prim, [prim_arg ~env x; prim_arg ~env y]) in
     let var = Jsir.Var.fresh () in
     var, env, To_jsir_result.add_instr_exn res (Jsir.Let (var, expr))
   in
@@ -239,15 +241,16 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
 let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   ignore (env, res, xs);
   match f with
-  | Begin_region { ghost } ->
-    ignore ghost;
-    primitive_not_supported ()
-  | Begin_try_region { ghost } ->
-    ignore ghost;
-    primitive_not_supported ()
-  | Make_block (kind, mut, mode) ->
-    ignore (kind, mut, mode);
-    primitive_not_supported ()
+  | Begin_region _ | Begin_try_region _ -> no_op ~env ~res
+  | Make_block (kind, mut, _alloc_mode) ->
+    let tag =
+      match kind with
+      | Values (tag, _with_subkind) -> tag
+      | Naked_floats | Mixed _ -> failwith "unimplemented block kind"
+    in
+    let expr, env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields:xs in
+    let var = Jsir.Var.fresh () in
+    var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Make_array (kind, mut, mode) ->
     ignore (kind, mut, mode);
     primitive_not_supported ()
@@ -255,8 +258,7 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
 let primitive ~env ~res (prim : Flambda_primitive.t) _dbg =
   match prim with
   | Nullary f -> nullary ~env ~res f
-  | Unary (f, x) -> unary ~env ~res f (prim_arg ~env x)
-  | Binary (f, x, y) -> binary ~env ~res f (prim_arg ~env x) (prim_arg ~env y)
-  | Ternary (f, x, y, z) ->
-    ternary ~env ~res f (prim_arg ~env x) (prim_arg ~env y) (prim_arg ~env z)
-  | Variadic (f, xs) -> variadic ~env ~res f (List.map (prim_arg ~env) xs)
+  | Unary (f, x) -> unary ~env ~res f x
+  | Binary (f, x, y) -> binary ~env ~res f x y
+  | Ternary (f, x, y, z) -> ternary ~env ~res f x y z
+  | Variadic (f, xs) -> variadic ~env ~res f xs

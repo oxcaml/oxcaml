@@ -10,21 +10,8 @@ let block_like' ~env ~res (const : Static_const.t) :
        Set_of_closures"
       Static_const.print const
   | Block (tag, mut, _shape, fields) ->
-    (* CR selee: is it ok to ignore shape? *)
-    let tag = Tag.Scannable.to_int tag in
-    let mutability : Jsir.mutability =
-      match mut with
-      | Mutable -> Maybe_mutable
-      | Immutable -> Immutable
-      | Immutable_unique ->
-        (* CR selee: check *)
-        Immutable
-    in
-    let fields, res =
-      To_jsir_shared.simples ~env ~res
-        (List.map Simple.With_debuginfo.simple fields)
-    in
-    Block (tag, Array.of_list fields, NotArray, mutability), env, res
+    To_jsir_shared.block ~env ~res ~tag ~mut
+      ~fields:(List.map Simple.With_debuginfo.simple fields)
   | Boxed_float32 value ->
     ignore value;
     static_const_not_supported ()
@@ -123,17 +110,13 @@ let code ~env ~res ~translate_body ~code_id code =
          ~exn_continuation
          bound_params
          ~body
-         ~my_closure
+         ~my_closure:_
          ~is_my_closure_used:_
          ~my_region:_
          ~my_ghost_region:_
          ~my_depth:_
          ~free_names_of_body:_
        ->
-      (* CR selee: A hack to get things to work, should figure out what
-         [my_closure] is actually used for *)
-      let var = Jsir.Var.fresh () in
-      let env = To_jsir_env.add_var env my_closure var in
       let fn_params, env_with_params =
         To_jsir_shared.bound_parameters ~env bound_params
       in
