@@ -53,6 +53,22 @@ let[@inline never] [@local never] f_unboxed_variant_int (x: unboxed_variant_int)
 let _ = f_unboxed_variant_int (Complex #42l)
 let _ = f_unboxed_variant_int (Complex #0l)
 
+type unboxed_variant_value_int = ValueInt of int [@@unboxed]
+type unboxed_variant_value_string = ValueString of string [@@unboxed]
+type unboxed_variant_value_bool = ValueBool of bool [@@unboxed]
+
+let[@inline never] [@local never] f_unboxed_variant_value_int (x: unboxed_variant_value_int) = x
+let _ = f_unboxed_variant_value_int (ValueInt 42)
+let _ = f_unboxed_variant_value_int (ValueInt 0)
+
+let[@inline never] [@local never] f_unboxed_variant_value_string (x: unboxed_variant_value_string) = x  
+let _ = f_unboxed_variant_value_string (ValueString "hello")
+let _ = f_unboxed_variant_value_string (ValueString "")
+
+let[@inline never] [@local never] f_unboxed_variant_value_bool (x: unboxed_variant_value_bool) = x
+let _ = f_unboxed_variant_value_bool (ValueBool true)
+let _ = f_unboxed_variant_value_bool (ValueBool false)
+
 (* Unboxed records *)
 type unboxed_record_simple = { value: int } [@@unboxed]
 type unboxed_record_complex = { data: basic_record } [@@unboxed]

@@ -40,7 +40,7 @@ let _ = f_float32x4_unboxed (float32x4_of_floats (-#2.5s) #10.0s (-#100.0s) #1e5
 
 (* Cast to different element types *)
 let[@inline never] [@local never] f_int8x16_unboxed (x: int8x16#) = x
-let _ = f_int8x16_unboxed (int8x16_of_int64x2_unboxed (int64x2_of_int64s #0x0123456789abcdefL #0xfedcba9876543210L))
+let _ = f_int8x16_unboxed (int8x16_of_int64x2_unboxed (int64x2_of_int64s #0x0123456789abcdefL #0xfedcba9876543210L)) (* CR sspies: int8 vector elements display inconsistently as mix of hex escapes and ASCII characters *)
 let _ = f_int8x16_unboxed (int8x16_of_int64x2_unboxed (int64x2_of_int64s #0L #0L))
 
 let[@inline never] [@local never] f_int16x8_unboxed (x: int16x8#) = x
@@ -80,13 +80,13 @@ let _ = f_int16x8_boxed (int16x8_of_int64x2_boxed (int64x2_of_int64s_boxed 0L 0L
 (* Polymorphic functions with SIMD types *)
 let[@inline never] [@local never] f_poly_simd_unboxed (x: 'a) = x
 let _ = f_poly_simd_unboxed (int64x2_of_int64s #1L #2L)
-let _ = f_poly_simd_unboxed (int32x4_of_int32s #1l #2l #3l #4l)
+let _ = f_poly_simd_unboxed (int32x4_of_int32s #1l #2l #3l #4l) (* CR sspies: SIMD vectors in polymorphic context display as incomprehensible large integers *)
 let _ = f_poly_simd_unboxed (float64x2_of_floats #1.0 #2.1)
 let _ = f_poly_simd_unboxed (float32x4_of_floats #1.1s #2.0s #3.0s #4.1s)
 
 let[@inline never] [@local never] f_poly_simd_boxed (x: 'a) = x
 let _ = f_poly_simd_boxed (int64x2_of_int64s_boxed 1L 2L)
-let _ = f_poly_simd_boxed (int32x4_of_int32s_boxed 1l 2l 3l 4l)
+let _ = f_poly_simd_boxed (int32x4_of_int32s_boxed 1l 2l 3l 4l) (* CR sspies: boxed SIMD vectors in polymorphic context show as opaque abstract objects *)
 let _ = f_poly_simd_boxed (float64x2_of_floats_boxed 1.0 2.1)
 let _ = f_poly_simd_boxed (float32x4_of_floats_boxed 1.1s 2.0s 3.0s 4.1s)
 
