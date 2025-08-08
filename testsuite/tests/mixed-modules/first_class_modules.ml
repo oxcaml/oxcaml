@@ -42,23 +42,23 @@ let () =
   print_endline ""
 
 
-let _ = print_endline "Test 2: passing mixed modules to functions"
+let _ = print_endline "Test 2: passing modules to functions"
 
-let use_mixed_module m =
+let use_module m =
   let module M = (val m : S1) in
   let sum = M.boxed_int + Int64_u.to_int M.unboxed_int64 in
   let concat = M.boxed_string ^ " " ^ string_of_float (Float_u.to_float M.unboxed_float) in
   (sum, concat)
 
-let (sum, concat) = use_mixed_module packed
+let (sum, concat) = use_module packed
 let _ = print_int (id sum)
 let _ = print_endline ""
 let _ = print_endline (id concat)
 
 
-let _ = print_endline "Test 3: returning mixed modules from functions"
+let _ = print_endline "Test 3: returning modules from functions"
 
-let make_mixed_module n s =
+let make_module n s =
   (module struct
     let boxed_int = n
     let boxed_string = s
@@ -66,15 +66,15 @@ let make_mixed_module n s =
     let unboxed_int64 = Int64_u.of_int64 (Int64.of_int (n * 2))
   end : S1)
 
-let m2 = make_mixed_module 10 "ten"
-module M2 = (val m2 : S1)
-let _ = print_int (id M2.boxed_int)
+let m3 = make_module 10 "ten"
+module M3 = (val m3 : S1)
+let _ = print_int (id M3.boxed_int)
 let _ = print_endline ""
-let _ = print_string (id M2.boxed_string)
+let _ = print_string (id M3.boxed_string)
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 4: list of first-class mixed modules"
+let _ = print_endline "Test 4: list of first-class modules"
 
 let modules = [
   (module struct
@@ -137,43 +137,43 @@ let _ = print_endline ""
 let _ = print_string (id Selected2.boxed_string)
 let _ = print_endline ""
 
-let _ = print_endline "Test 6: mixed module with unboxed tuples and records"
+let _ = print_endline "Test 6: unboxed tuples and records in a first-class module"
 
-module type S2 = sig
+module type S6 = sig
   val regular_tuple : int * string
   val unboxed_tuple : #(float# * int64#)
   type unboxed_record = #{ x : float#; y : int64# }
   val unboxed_rec : unboxed_record
-  val mixed_fun : int -> float#
+  val f : int -> float#
 end
 
-module MC : S2 = struct
+module M6 : S6 = struct
   let regular_tuple = (42, "answer")
   let unboxed_tuple = #(#3.14, #271828L)
   type unboxed_record = #{ x : float#; y : int64# }
   let unboxed_rec = #{ x = #2.718; y = #314159L }
-  let mixed_fun n = Float_u.of_float (float_of_int (n * n))
+  let f n = Float_u.of_float (float_of_int (n * n))
 end
 
-let packed_complex = (module MC : S2)
-module MCC = (val (id packed_complex) : S2)
+let packed6 = (module M6 : S6)
+module M6_unpacked = (val (id packed6) : S6)
 
 let _ =
-  let (n, s) = MCC.regular_tuple in
+  let (n, s) = M6_unpacked.regular_tuple in
   print_int (id n);
   print_endline "";
   print_string (id s);
   print_endline ""
 
 let _ =
-  let #(f, i) = MCC.unboxed_tuple in
+  let #(f, i) = M6_unpacked.unboxed_tuple in
   print_float (Float_u.to_float (id f));
   print_endline "";
   print_int (Int64_u.to_int (id i));
   print_endline ""
 
 let _ =
-  let #{ MCC.x; y } = MCC.unboxed_rec in
+  let #{ M6_unpacked.x; y } = M6_unpacked.unboxed_rec in
   print_float (Float_u.to_float (id x));
   print_endline "";
   print_int (Int64_u.to_int (id y));
@@ -201,9 +201,195 @@ let make_from_input n (base : float#) =
   end in
   (module MakeS1(I) : S1)
 
-let m3 = make_from_input 5 #1.5
-module M3 = (val m3 : S1)
-let _ = print_int (id M3.boxed_int)
+let m7 = make_from_input 5 #1.5
+module M7 = (val m7 : S1)
+let _ = print_int (id M7.boxed_int)
 let _ = print_endline ""
-let _ = print_float (Float_u.to_float (id M3.unboxed_float))
+let _ = print_float (Float_u.to_float (id M7.unboxed_float))
+let _ = print_endline ""
+
+
+let _ = print_endline "Test 8: first-class functors"
+
+module type S8 = sig
+  val foo : float#
+  val bar : string
+  module F : functor (X : S1) -> S1
+  module S : sig
+    val baz : int64#
+    val qux : string
+  end
+end
+
+module type Transform = functor (X : S8) -> S8
+
+let double_transform : (module Transform) =
+  (module functor (X : S8) -> struct
+    let foo = Float_u.mul X.foo #2.0
+    let bar = X.bar ^ " (doubled)"
+    module F = functor (Y : S1) -> struct
+      module R = X.F(Y)
+      let boxed_int = R.boxed_int * 2
+      let boxed_string = R.boxed_string ^ " [*2]"
+      let unboxed_float = Float_u.mul R.unboxed_float #2.0
+      let unboxed_int64 = Int64_u.mul R.unboxed_int64 #2L
+    end
+    module S = struct
+      let baz = Int64_u.mul X.S.baz #2L
+      let qux = X.S.qux ^ " (*2)"
+    end
+  end)
+
+let add_transform n (f : float#) : (module Transform) =
+  (module functor (X : S8) -> struct
+    let foo = Float_u.add X.foo f
+    let bar = X.bar ^ " (+" ^ (Float_u.to_string f) ^ ")"
+    module F = functor (Y : S1) -> struct
+      module R = X.F(Y)
+      let boxed_int = R.boxed_int + n
+      let boxed_string = R.boxed_string ^ " [+" ^ string_of_int n ^ "]"
+      let unboxed_float = Float_u.add R.unboxed_float f
+      let unboxed_int64 =
+        Int64_u.add R.unboxed_int64 (Int64_u.of_int64 (Int64.of_int n))
+    end
+    module S = struct
+      let baz = Int64_u.add X.S.baz (Int64_u.of_int64 (Int64.of_int n))
+      let qux = X.S.qux ^ " (+" ^ string_of_int n ^ ")"
+    end
+  end)
+
+let apply_transform transform m =
+  let module F = (val transform : Transform) in
+  let module M = (val m : S8) in
+  (module F(M) : S8)
+
+let m8_base = (module struct
+  let foo = #5.0
+  let bar = "5.0"
+  module F = functor (X : S1) -> struct
+    let boxed_int = X.boxed_int + 100
+    let boxed_string = X.boxed_string ^ " [+100]"
+    let unboxed_float = Float_u.add X.unboxed_float #100.0
+    let unboxed_int64 = Int64_u.add X.unboxed_int64 #100L
+  end
+  module S = struct
+    let baz = #20L
+    let qux = "20"
+  end
+end : S8)
+
+let m8_doubled = apply_transform (id double_transform) (id m8_base)
+let m8_final = apply_transform (id (add_transform 3 #1.5)) (id m8_doubled)
+
+module M8 = (val m8_final : S8)
+let _ = print_string (id M8.bar)
+let _ = print_string " = "
+let _ = print_float (Float_u.to_float (id M8.foo))
+let _ = print_endline ""
+let _ = print_string (id M8.S.qux)
+let _ = print_string " = "
+let _ = print_int (Int64_u.to_int (id M8.S.baz))
+let _ = print_endline ""
+
+let test_input = (module struct
+  let boxed_int = 1
+  let boxed_string = "1"
+  let unboxed_float = #1.0
+  let unboxed_int64 = #1L
+end : S1)
+
+module M8_F_Result = M8.F(val test_input : S1)
+let _ = print_string (id M8_F_Result.boxed_string)
+let _ = print_string " = "
+let _ = print_int (id M8_F_Result.boxed_int)
+let _ = print_endline ""
+
+
+let _ = print_endline "Test 9: subtype by forgetting abstract types"
+
+module type S9_base = sig
+  type t : any
+  val x : int
+  val y : float#
+end
+
+module type S9_extended = sig
+  type t : any
+  type u : any
+  type v : any
+  val x : int
+  val y : float#
+end
+
+let m9_extended = (module struct
+  type t = string
+  type u = int64#
+  type v = #(bool * float#)
+  let x = 42
+  let y = #3.14
+end : S9_extended with type t = string and type u = int64#
+                   and type v = #(bool * float#))
+
+let m9_base = (m9_extended :> (module S9_base with type t = string))
+module M9 = (val m9_base : S9_base with type t = string)
+let _ = print_int (id M9.x)
+let _ = print_endline ""
+let _ = print_float (Float_u.to_float (id M9.y))
+let _ = print_endline ""
+
+
+let _ = print_endline "Test 10: subtype by forgetting type alias"
+
+module type S10_with_eq = sig
+  type t
+  type u = t * t
+  val x : t -> int
+  val y : float#
+end
+
+module type S10_fewer_types = sig
+  type t
+  val x : t -> int
+  val y : float#
+end
+
+let m10_eq = (module struct
+  type t = bool
+  type u = t * t
+  let x b = if b then 1 else 0
+  let y = #2.718
+end : S10_with_eq with type t = bool)
+
+let m10_fewer = (m10_eq :> (module S10_fewer_types with type t = bool))
+module M10 = (val m10_fewer : S10_fewer_types with type t = bool)
+let _ = print_int (id (M10.x true))
+let _ = print_endline ""
+let _ = print_float (Float_u.to_float (id M10.y))
+let _ = print_endline ""
+
+
+let _ = print_endline "Test 11: subtype with unboxed type in forgotten types"
+
+module type S11_many_unboxed = sig
+  type t = float#
+  type u = int64#
+  type v
+  val x : t
+end
+
+module type S11_one_unboxed = sig
+  type t = float#
+  val x : t
+end
+
+let m11_many = (module struct
+  type t = float#
+  type u = int64#
+  type v = string
+  let x = #99.9
+end : S11_many_unboxed with type v = string)
+
+let m11_one = (m11_many :> (module S11_one_unboxed))
+module M11 = (val m11_one : S11_one_unboxed)
+let _ = print_float (Float_u.to_float (id M11.x))
 let _ = print_endline ""
