@@ -177,6 +177,73 @@ let print_cmi_infos name crcs kind params global_name_bindings =
     Array.iter print_global_name_binding global_name_bindings
   end
 
+let print_impl_shape impl_shape =
+  if !shape then begin
+    printf "Implementation shape:";
+    (match impl_shape with
+    | None -> printf " (none)\n"
+    | Some shape ->
+      Format.printf "\n        %a@." Shape.print shape;
+      Format.print_flush ())
+  end
+
+let print_ident_occurrences ident_occurrences =
+  if !index then begin
+    Format.printf "@[<v 8>Indexed shapes:";
+    Array.iter (fun (loc, item) ->
+      let pp_loc fmt { Location.txt; loc } =
+        Format.fprintf fmt "%a (%a)"
+          Pprintast.longident txt Location.print_loc loc
+      in
+      Format.printf "@;@[<hov 2>%a:@ %a@]"
+        Shape_reduce.print_result item pp_loc loc)
+      ident_occurrences;
+    Format.printf "@]@.";
+    Format.print_flush ()
+  end
+
+let print_declaration_dependencies declaration_dependencies =
+  if !uid_deps then begin
+    Format.printf "@[<v 8>Uid dependencies:";
+    let arr = Array.of_list declaration_dependencies in
+    let () =
+      Array.sort (fun (_tr, u1, u2) (_tr', u1', u2') ->
+                    match Shape.Uid.compare u1 u1' with
+                    | 0 -> Shape.Uid.compare u2 u2'
+                    | n -> n) arr
+    in
+    Array.iter (fun (rk, u1, u2) ->
+      let rk = match (rk : Cmt_format.dependency_kind) with
+        | Definition_to_declaration -> "<-"
+        | Declaration_to_declaration -> "<->"
+      in
+      Format.printf "@;@[<h>%a %s %a@]"
+        Shape.Uid.print u1
+        rk
+        Shape.Uid.print u2) arr;
+    Format.printf "@]@.";
+    Format.print_flush ()
+  end
+
+let print_decls uid_to_decl ~loc_name_of_decl =
+  if !decls then begin
+    Format.printf "@[<v 8>Uid of decls:";
+    let decls = Array.of_list (Shape.Uid.Tbl.to_list uid_to_decl) in
+    Array.sort (fun (uid, _) (uid', _) -> Shape.Uid.compare uid uid') decls;
+    Array.iter (fun (uid, item) ->
+      let loc = loc_name_of_decl item in
+      let pp_loc fmt { Location.txt; loc } =
+        Format.fprintf fmt "%s (%a)"
+           txt Location.print_loc loc
+      in
+      Format.printf "@;@[<hov 2>%a:@ %a@]"
+        Shape.Uid.print uid
+        pp_loc loc)
+      decls;
+    Format.printf "@]@.";
+    Format.print_flush ()
+  end
+
 let print_cmt_infos cmt =
   let open Cmt_format in
   if not !quiet then begin
@@ -197,51 +264,12 @@ let print_cmt_infos cmt =
       | None -> ""
       | Some crc -> string_of_crc crc);
   end;
-  if !shape then begin
-    printf "Implementation shape: ";
-    (match cmt.cmt_impl_shape with
-    | None -> printf "(none)\n"
-    | Some shape -> Format.printf "\n%a" Shape.print shape)
-  end;
-  if !index then begin
-    printf "Indexed shapes:\n";
-    Array.iter (fun (loc, item) ->
-      let pp_loc fmt { Location.txt; loc } =
-        Format.fprintf fmt "%a (%a)"
-          Pprintast.longident txt Location.print_loc loc
-      in
-      Format.printf "@[<hov 2>%a:@ %a@]@;"
-        Shape_reduce.print_result item pp_loc loc)
-      cmt.cmt_ident_occurrences;
-    Format.print_flush ()
-  end;
-  if !uid_deps then begin
-    printf "\nUid dependencies:\n";
-    let arr = Array.of_list cmt.cmt_declaration_dependencies in
-    let () =
-      Array.sort (fun (_tr, u1, u2) (_tr', u1', u2') ->
-                    match Shape.Uid.compare u1 u1' with
-                    | 0 -> Shape.Uid.compare u2 u2'
-                    | n -> n) arr
-    in
-    Format.printf "@[<v>";
-    Array.iter (fun (rk, u1, u2) ->
-      let rk = match rk with
-        | Definition_to_declaration -> "<-"
-        | Declaration_to_declaration -> "<->"
-      in
-      Format.printf "@[<h>%a %s %a@]@;"
-        Shape.Uid.print u1
-        rk
-        Shape.Uid.print u2) arr;
-    Format.printf "@]";
-  end;
-  if !decls then begin
-    printf "\nUid of decls:\n";
-    let decls = Array.of_list (Shape.Uid.Tbl.to_list cmt.cmt_uid_to_decl) in
-    Array.sort (fun (uid, _) (uid', _) -> Shape.Uid.compare uid uid') decls;
-    Array.iter (fun (uid, item) ->
-      let loc = match (item : Typedtree.item_declaration) with
+  print_impl_shape cmt.cmt_impl_shape;
+  print_ident_occurrences cmt.cmt_ident_occurrences;
+  print_declaration_dependencies cmt.cmt_declaration_dependencies;
+  print_decls cmt.cmt_uid_to_decl
+    ~loc_name_of_decl:(fun item ->
+      match (item : Typedtree.item_declaration) with
         | Value vd -> vd.val_name
         | Value_binding vb ->
           let (_, name, _, _) =
@@ -261,24 +289,17 @@ let print_cmt_infos cmt =
             txt = Option.value mb.mb_name.txt ~default:"_" }
         | Module_type mtd -> mtd.mtd_name
         | Class cd -> cd.ci_id_name
-        | Class_type ctd -> ctd.ci_id_name
-      in
-      let pp_loc fmt { Location.txt; loc } =
-        Format.fprintf fmt "%s (%a)"
-           txt Location.print_loc loc
-      in
-      Format.printf "@[<hov 2>%a:@ %a@]@;"
-        Shape.Uid.print uid
-        pp_loc loc)
-      decls;
-    Format.print_flush ()
-  end
+        | Class_type ctd -> ctd.ci_id_name)
 
 let print_cms_infos cms =
   let open Cms_format in
   printf "Cms unit name: %a\n" Compilation_unit.output cms.cms_modname;
   printf "Source file: %s\n"
-    (match cms.cms_sourcefile with None -> "(none)" | Some f -> f)
+    (match cms.cms_sourcefile with None -> "(none)" | Some f -> f);
+  print_impl_shape cms.cms_impl_shape;
+  print_ident_occurrences cms.cms_ident_occurrences;
+  print_declaration_dependencies cms.cms_declaration_dependencies;
+  print_decls cms.cms_uid_to_loc ~loc_name_of_decl:(fun name -> name)
 
 let print_general_infos print_name name crc defines arg_descr mbf
     iter_cmi iter_cmx =
