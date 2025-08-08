@@ -2379,11 +2379,14 @@ and transl_idx ~scopes loc env ba uas =
       | Index_int ->
         Jkind.Sort.Const.value, Ptagged_int_index
       | Index_unboxed_int64 ->
-        Jkind.Sort.Const.bits64, Punboxed_int_index Unboxed_int64
+        Jkind.Sort.Const.bits64,
+        Punboxed_or_untagged_integer_index Unboxed_int64
       | Index_unboxed_int32 ->
-        Jkind.Sort.Const.bits32, Punboxed_int_index Unboxed_int32
+        Jkind.Sort.Const.bits32,
+        Punboxed_or_untagged_integer_index Unboxed_int32
       | Index_unboxed_nativeint ->
-        Jkind.Sort.Const.word, Punboxed_int_index Unboxed_nativeint
+        Jkind.Sort.Const.word,
+        Punboxed_or_untagged_integer_index Unboxed_nativeint
     in
     let index = transl_exp ~scopes index_sort index in
     let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in

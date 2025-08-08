@@ -530,11 +530,13 @@ let rec convert_layout_to_flambda_kind_with_subkinds (layout : L.layout) :
     | Immediate -> [K.With_subkind.naked_immediate])
   | Punboxed_float Unboxed_float64 -> [K.With_subkind.naked_float]
   | Punboxed_float Unboxed_float32 -> [K.With_subkind.naked_float32]
-  | Punboxed_int Unboxed_int8 -> [K.With_subkind.naked_int8]
-  | Punboxed_int Unboxed_int16 -> [K.With_subkind.naked_int16]
-  | Punboxed_int Unboxed_int32 -> [K.With_subkind.naked_int32]
-  | Punboxed_int Unboxed_int64 -> [K.With_subkind.naked_int64]
-  | Punboxed_int Unboxed_nativeint -> [K.With_subkind.naked_nativeint]
+  | Punboxed_or_untagged_integer Untagged_int8 -> [K.With_subkind.naked_int8]
+  | Punboxed_or_untagged_integer Untagged_int16 -> [K.With_subkind.naked_int16]
+  | Punboxed_or_untagged_integer Unboxed_int32 -> [K.With_subkind.naked_int32]
+  | Punboxed_or_untagged_integer Unboxed_int64 -> [K.With_subkind.naked_int64]
+  | Punboxed_or_untagged_integer Unboxed_nativeint ->
+    [K.With_subkind.naked_nativeint]
+  | Punboxed_or_untagged_integer Untagged_int -> [K.With_subkind.naked_immediate]
   | Punboxed_vector Unboxed_vec128 -> [K.With_subkind.naked_vec128]
   | Punboxed_vector Unboxed_vec256 -> [K.With_subkind.naked_vec256]
   | Punboxed_vector Unboxed_vec512 -> [K.With_subkind.naked_vec512]
@@ -1599,12 +1601,13 @@ let array_element_size_in_bytes (array_kind : L.array_kind) =
     (* float32# arrays are packed *)
     4
   | Punboxedfloatarray Unboxed_float64 -> 8
-  | Punboxedintarray (Unboxed_int8 | Unboxed_int16) ->
+  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
+    ->
     Misc.unboxed_small_int_arrays_are_not_implemented ()
-  | Punboxedintarray Unboxed_int32 ->
+  | Punboxedoruntaggedintarray Unboxed_int32 ->
     (* int32# arrays are packed *)
     4
-  | Punboxedintarray (Unboxed_int64 | Unboxed_nativeint) -> 8
+  | Punboxedoruntaggedintarray (Unboxed_int64 | Unboxed_nativeint) -> 8
   | Punboxedvectorarray Unboxed_vec128 -> 16
   | Punboxedvectorarray Unboxed_vec256 -> 32
   | Punboxedvectorarray Unboxed_vec512 -> 64
@@ -1644,7 +1647,7 @@ let idx_access_offsets layout idx =
         | Value _ -> simple_i64 (Int64.of_int (conv_bc to_left.value))
         (* Flats are gap + (all values) + (flats to left) beyond the offset *)
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Word | Vec128 | Vec256 | Vec512 ->
+        | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
           Prim
             (add gap
                (simple_i64
@@ -1752,11 +1755,16 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       in
       match ik with
       | Ptagged_int_index -> conv_from Tagged_immediate
-      | Punboxed_int_index Unboxed_int64 -> index
-      | Punboxed_int_index Unboxed_int32 -> conv_from Naked_int32
-      | Punboxed_int_index Unboxed_int16 -> conv_from Naked_int16
-      | Punboxed_int_index Unboxed_int8 -> conv_from Naked_int8
-      | Punboxed_int_index Unboxed_nativeint -> conv_from Naked_nativeint
+      | Punboxed_or_untagged_integer_index Unboxed_int64 -> index
+      | Punboxed_or_untagged_integer_index Unboxed_int32 ->
+        conv_from Naked_int32
+      | Punboxed_or_untagged_integer_index Untagged_int16 ->
+        conv_from Naked_int16
+      | Punboxed_or_untagged_integer_index Untagged_int8 -> conv_from Naked_int8
+      | Punboxed_or_untagged_integer_index Untagged_int ->
+        conv_from Naked_immediate
+      | Punboxed_or_untagged_integer_index Unboxed_nativeint ->
+        conv_from Naked_nativeint
     in
     let index_as_bytes =
       let el_size = array_element_size_in_bytes ak in

@@ -52,7 +52,7 @@ let rec count (el : _ Lambda.mixed_block_element) : t =
   match el with
   | Value _ -> { value = 8; flat = 0 }
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-    ->
+  | Untagged_immediate ->
     (* In a record, bits8/bits16/bits32/float32 aren't packed tightly *)
     { value = 0; flat = 8 }
   | Vec128 -> { value = 0; flat = 16 }
@@ -82,7 +82,7 @@ module Wrt_path = struct
       match el with
       | Product shape -> count_shape_wrt_path shape i path_rest
       | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-      | Bits64 | Word | Vec128 | Vec256 | Vec512 ->
+      | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
         Misc.fatal_error "Mixed_product_bytes_wrt_path: bad mixed block path")
 
   and count_shape_wrt_path (shape : Lambda.mixed_block_shape) pos path =

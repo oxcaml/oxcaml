@@ -2324,14 +2324,15 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Pvalue value_kind -> Value value_kind
   | Punboxed_float Unboxed_float64 -> Float64
   | Punboxed_float Unboxed_float32 -> Float32
-  | Punboxed_int Unboxed_int64 -> Bits64
-  | Punboxed_int Unboxed_int32 -> Bits32
-  | Punboxed_int Unboxed_int16 -> Bits16
-  | Punboxed_int Unboxed_int8 -> Bits8
-  | Punboxed_int Unboxed_nativeint -> Word
+  | Punboxed_or_untagged_integer Unboxed_int64 -> Bits64
+  | Punboxed_or_untagged_integer Unboxed_int32 -> Bits32
+  | Punboxed_or_untagged_integer Untagged_int16 -> Bits16
+  | Punboxed_or_untagged_integer Untagged_int8 -> Bits8
+  | Punboxed_or_untagged_integer Unboxed_nativeint -> Word
   | Punboxed_vector Unboxed_vec128 -> Vec128
   | Punboxed_vector Unboxed_vec256 -> Vec256
   | Punboxed_vector Unboxed_vec512 -> Vec512
+  | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
 
 let rec mixed_block_element_leaves (el : _ mixed_block_element)
   : _ mixed_block_element list =
@@ -2339,7 +2340,7 @@ let rec mixed_block_element_leaves (el : _ mixed_block_element)
   | Product els ->
     List.concat_map mixed_block_element_leaves (Array.to_list els)
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Word | Vec128 | Vec256 | Vec512 ->
+  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
     [el]
 
 type will_be_reordered_acc = { seen_flat : bool; last_value_after_flat : bool }
@@ -2351,7 +2352,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
         | Product _ -> assert false
         | Value _ -> { acc with last_value_after_flat = acc.seen_flat }
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Word | Vec128 |  Vec256 | Vec512 ->
+        | Word | Vec128 |  Vec256 | Vec512 | Untagged_immediate ->
           { acc with seen_flat = true })
       { seen_flat = false; last_value_after_flat = false }
       (mixed_block_element_leaves mbe)
@@ -2413,7 +2414,7 @@ let primitive_result_layout (p : primitive) =
   | Parray_element_size_in_bytes _ -> layout_int
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
   | Pidx_deepen _ ->
-    Punboxed_int Unboxed_int64
+    Punboxed_or_untagged_integer Unboxed_int64
   | Pfloatfield _ -> layout_boxed_float Boxed_float64
   | Pufloatfield _ -> Punboxed_float Unboxed_float64
   | Pbox_vector (v, _) -> layout_boxed_vector v
