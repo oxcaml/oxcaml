@@ -1201,6 +1201,7 @@ type pattern_variable =
     pv_loc: Location.t;
     pv_as_var: bool;
     pv_attributes: attributes;
+    pv_sort: Jkind_types.Sort.t;
   }
 
 type module_variable =
@@ -1354,7 +1355,7 @@ let add_module_variables env module_variables =
   ) env module_variables_as_list
 
 let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
-    ~kind ty attrs =
+    ~kind ty attrs sort =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
       tps.tps_pattern_variables
   then raise(Error(loc, Env.empty, Multiply_bound_variable name.txt));
@@ -1392,7 +1393,8 @@ let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
      pv_loc = loc;
      pv_as_var = is_as_variable;
      pv_attributes = attrs;
-     pv_uid} :: tps.tps_pattern_variables;
+     pv_uid;
+     pv_sort = sort} :: tps.tps_pattern_variables;
   id, pv_uid
 
 let sort_pattern_variables vs =
@@ -2011,7 +2013,9 @@ let type_for_loop_index ~loc ~env ~param =
             let pv =
               { pv_id; pv_uid; pv_mode;
                 pv_kind=Val_reg; pv_type; pv_loc; pv_as_var;
-                pv_attributes }
+                pv_attributes;
+                pv_sort = Jkind.Sort.(of_const Const.for_loop_index)
+                }
             in
             (pv_id, pv_uid), add_pattern_variables ~check ~check_as:check env [pv])
 
@@ -2034,7 +2038,8 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
             name
             pv_mode
             pv_type
-            pv_attributes)
+            pv_attributes
+            Jkind.Sort.(of_const Const.for_loop_index))
 
 let check_let_mutable (mf : mutable_flag) env ?restriction vbs =
   match vbs, mf with
@@ -2906,6 +2911,12 @@ and type_pat_aux
       let alloc_mode =
         cross_left !!penv expected_ty alloc_mode.mode
       in
+      (* CR jrayman: set why *)
+      let sort =
+        match Ctype.type_sort !!penv ty ~why:Let_binding ~fixed:false with
+        | Error _ -> assert false
+        | Ok sort -> sort
+      in
       let mode, kind =
         match mutable_flag with
         | Immutable -> alloc_mode, Val_reg
@@ -2930,7 +2941,7 @@ and type_pat_aux
             mode, kind
       in
       let id, uid =
-        enter_variable tps loc name mode ~kind ty sp.ppat_attributes
+        enter_variable tps loc name mode ~kind ty sp.ppat_attributes sort
       in
       rvp {
         pat_desc = Tpat_var (id, name, uid, alloc_mode);
@@ -2956,8 +2967,11 @@ and type_pat_aux
           (* We're able to pass ~is_module:true here without an error because
              [Ppat_unpack] is a case identified by [may_contain_modules]. See
              the comment on [may_contain_modules]. *)
-          let id, uid = enter_variable tps loc v alloc_mode.mode
-                          t ~is_module:true ~kind:Val_reg sp.ppat_attributes in
+          let id, uid =
+            enter_variable tps loc v alloc_mode.mode t ~is_module:true
+            ~kind:Val_reg sp.ppat_attributes
+            Jkind.Sort.(of_const Const.for_module)
+          in
           rvp {
             pat_desc = Tpat_var (id, v, uid, alloc_mode.mode);
             pat_loc = sp.ppat_loc;
@@ -2971,9 +2985,15 @@ and type_pat_aux
       let q = type_pat tps Value sq expected_ty in
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
+      (* CR jrayman: set why *)
+      let sort =
+        match Ctype.type_sort !!penv ty_var ~why:Let_binding ~fixed:false with
+        | Error _ -> assert false
+        | Ok sort -> sort
+      in
       let id, uid =
         enter_variable ~is_as_variable:true ~kind:Val_reg tps name.loc name mode
-          ty_var sp.ppat_attributes
+          ty_var sp.ppat_attributes sort
       in
       rvp { pat_desc = Tpat_alias(q, id, name, uid, mode, ty_var);
             pat_loc = loc; pat_extra=[];
