@@ -123,6 +123,9 @@ val find_modtype_expansion_lazy: Path.t -> t -> Subst.Lazy.module_type
 val find_hash_type: Path.t -> t -> type_declaration
 (* Find the "#t" type given the path for "t" *)
 
+val find_implicit_jkind: string -> t -> jkind_lr option
+(* Find the implicit jkind for a type variable name. *)
+
 val find_value_address: Path.t -> t -> address
 val find_module_address: Path.t -> t -> address
 val find_class_address: Path.t -> t -> address
@@ -452,6 +455,8 @@ val add_modtype_lazy: update_summary:bool ->
 val add_class: Ident.t -> class_declaration -> t -> t
 val add_cltype: Ident.t -> class_type_declaration -> t -> t
 val add_local_constraint: Path.t -> type_declaration -> t -> t
+val add_implicit_jkind: string -> jkind_lr -> t -> t
+val clear_implicit_jkinds : t -> t
 
 (* Insertion of persistent signatures *)
 

@@ -682,6 +682,7 @@ type t = {
   functor_args: unit Ident.tbl;
   summary: summary;
   local_constraints: type_declaration Path.Map.t;
+  implicit_jkinds: jkind_lr String.Map.t;
   flags: int;
 }
 
@@ -954,6 +955,7 @@ let empty = {
   modules = IdTbl.empty; modtypes = IdTbl.empty;
   classes = IdTbl.empty; cltypes = IdTbl.empty;
   summary = Env_empty; local_constraints = Path.Map.empty;
+  implicit_jkinds = String.Map.empty;
   flags = 0;
   functor_args = Ident.empty;
  }
@@ -1667,6 +1669,9 @@ let find_hash_type path env =
       let cltda = NameMap.find name c.comp_cltypes in
       cltda.cltda_declaration.clty_hash_type
   | Papply _ | Pextra_ty _ -> raise Not_found
+
+let find_implicit_jkind name env =
+  String.Map.find_opt name env.implicit_jkinds
 
 let global_of_instance_compilation_unit cu =
   let global_name = Compilation_unit.to_global_name_exn cu in
@@ -2781,6 +2786,13 @@ let add_module ?arg ?shape id presence mty ?mode env =
 let add_local_constraint path info env =
   { env with
     local_constraints = Path.Map.add path info env.local_constraints }
+
+let add_implicit_jkind name jkind env =
+  { env with
+    implicit_jkinds = String.Map.add name jkind env.implicit_jkinds }
+
+let clear_implicit_jkinds env =
+  { env with implicit_jkinds = String.Map.empty }
 
 (* Insertion of bindings by name *)
 
