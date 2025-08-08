@@ -1,0 +1,11 @@
+(library 
+  (name ocaml_ir_common)
+  (libraries 
+    sexplib
+    ocaml_ir_fiber
+    ocaml_ir_interval_tree
+    ocaml_ir_merlin
+    ocamlcommon
+    parsexp
+    str)
+  )
