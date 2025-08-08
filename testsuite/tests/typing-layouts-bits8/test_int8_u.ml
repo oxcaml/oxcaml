@@ -310,34 +310,34 @@ let () =
   let module I = Int8_u in
 
   (* Test that -1 (0xFF) > 0 when compared as unsigned *)
-  assert (I.unsigned_compare I.minus_one I.zero = 1);
-  assert (I.unsigned_compare I.zero I.minus_one = -1);
+  assert (I.unsigned_compare (I.minus_one ()) (I.zero ()) = 1);
+  assert (I.unsigned_compare (I.zero ()) (I.minus_one ()) = -1);
 
   (* Test that -128 (0x80) > 127 (0x7F) when compared as unsigned *)
-  assert (I.unsigned_compare I.min_int I.max_int = 1);
-  assert (I.unsigned_compare I.max_int I.min_int = -1);
+  assert (I.unsigned_compare (I.min_int ()) (I.max_int ()) = 1);
+  assert (I.unsigned_compare (I.max_int ()) (I.min_int ()) = -1);
 
   (* Test ordering: when viewed as unsigned:
      0 < 1 < 127 < 128 (min_int) < 255 (minus_one) *)
-  assert (I.unsigned_compare I.zero I.one = -1);
-  assert (I.unsigned_compare I.one I.max_int = -1);
-  assert (I.unsigned_compare I.max_int I.min_int = -1);
-  assert (I.unsigned_compare I.min_int I.minus_one = -1);
+  assert (I.unsigned_compare (I.zero ()) (I.one ()) = -1);
+  assert (I.unsigned_compare (I.one ()) (I.max_int ()) = -1);
+  assert (I.unsigned_compare (I.max_int ()) (I.min_int ()) = -1);
+  assert (I.unsigned_compare (I.min_int ()) (I.minus_one ()) = -1);
 
   (* Test equality *)
-  assert (I.unsigned_compare I.zero I.zero = 0);
-  assert (I.unsigned_compare I.minus_one I.minus_one = 0);
+  assert (I.unsigned_compare (I.zero ()) (I.zero ()) = 0);
+  assert (I.unsigned_compare (I.minus_one ()) (I.minus_one ()) = 0);
 
   (* Test the unsigned_lt primitive directly *)
-  assert (unsigned_lt I.zero I.minus_one = true); (* 0 < 255 *)
-  assert (unsigned_lt I.minus_one I.zero = false); (* 255 not < 0 *)
-  assert (unsigned_lt I.max_int I.min_int = true); (* 127 < 128 *)
-  assert (unsigned_lt I.min_int I.max_int = false); (* 128 not < 127 *)
+  assert (unsigned_lt (I.zero ()) (I.minus_one ()) = true); (* 0 < 255 *)
+  assert (unsigned_lt (I.minus_one ()) (I.zero ()) = false); (* 255 not < 0 *)
+  assert (unsigned_lt (I.max_int ()) (I.min_int ()) = true); (* 127 < 128 *)
+  assert (unsigned_lt (I.min_int ()) (I.max_int ()) = false); (* 128 not < 127 *)
 
   (* Test unsigned greater than using primitive comparisons *)
-  assert (unsigned_gt I.minus_one I.zero = true); (* 255 > 0 *)
-  assert (unsigned_gt I.zero I.minus_one = false); (* 0 not > 255 *)
-  assert (unsigned_gt I.min_int I.max_int = true); (* 128 > 127 *)
-  assert (unsigned_gt I.max_int I.min_int = false); (* 127 not > 128 *)
+  assert (unsigned_gt (I.minus_one ()) (I.zero ()) = true); (* 255 > 0 *)
+  assert (unsigned_gt (I.zero ()) (I.minus_one ()) = false); (* 0 not > 255 *)
+  assert (unsigned_gt (I.min_int ()) (I.max_int ()) = true); (* 128 > 127 *)
+  assert (unsigned_gt (I.max_int ()) (I.min_int ()) = false); (* 127 not > 128 *)
 
   ()
