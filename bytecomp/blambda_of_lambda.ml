@@ -945,7 +945,10 @@ and comp_binary_scalar_intrinsic :
           y, Ugeint, x
       in
       Prim (Intcomp cmp, [x; y])
-    | Boxable (Int32 Any_locality_mode | Nativeint Any_locality_mode | Int64 Any_locality_mode) -> (
+    | Boxable
+        ( Int32 Any_locality_mode
+        | Nativeint Any_locality_mode
+        | Int64 Any_locality_mode ) -> (
       let make_unsigned_comparison name =
         make_unsigned_comparison size (fun x y -> Prim (Ccall name, [x; y])) x y
       in
@@ -1055,8 +1058,8 @@ and make_unsigned_comparison size signed_comparison x y =
   let min_int =
     (* for some widths we can do better *)
     match Scalar.Integral.width size with
-    | Taggable Int8 -> Const (const_int size ( -0x80 ))
-    | Taggable Int16 -> Const (const_int size ( -0x8000 ))
+    | Taggable Int8 -> Const (const_int size (-0x80))
+    | Taggable Int16 -> Const (const_int size (-0x8000))
     | Taggable Int -> min_int
     | Boxable (Int32 Any_locality_mode) ->
       Const (Const_base (Const_int32 Int32.min_int))

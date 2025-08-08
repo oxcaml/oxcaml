@@ -323,4 +323,34 @@ let () =
   test_binary_of "equal"               Nativeint.equal               Nativeint_u.equal                bool_result;
   test_binary    "min"                 Nativeint.min                 Nativeint_u.min;
   test_binary    "max"                 Nativeint.max                 Nativeint_u.max;
+  
+  (* Explicit unsigned comparison tests with hardcoded expected values *)
+  let module I = Nativeint_u in
+  
+  (* Test that -1 > 0 when compared as unsigned *)
+  assert (I.unsigned_compare I.minus_one I.zero = 1);
+  assert (I.unsigned_compare I.zero I.minus_one = -1);
+  
+  (* Test that min_int > max_int when compared as unsigned *)
+  assert (I.unsigned_compare I.min_int I.max_int = 1);
+  assert (I.unsigned_compare I.max_int I.min_int = -1);
+  
+  (* Test ordering: when viewed as unsigned:
+     0 < 1 < max_int < min_int < -1 *)
+  assert (I.unsigned_compare I.zero I.one = -1);
+  assert (I.unsigned_compare I.one I.max_int = -1);
+  assert (I.unsigned_compare I.max_int I.min_int = -1);
+  assert (I.unsigned_compare I.min_int I.minus_one = -1);
+  
+  (* Test equality *)
+  assert (I.unsigned_compare I.zero I.zero = 0);
+  assert (I.unsigned_compare I.minus_one I.minus_one = 0);
+  assert (I.unsigned_compare I.min_int I.min_int = 0);
+  
+  (* Test specific values *)
+  let neg_million = I.of_int (-1000000) in
+  let pos_million = I.of_int 1000000 in
+  assert (I.unsigned_compare neg_million pos_million = 1);
+  assert (I.unsigned_compare pos_million neg_million = -1);
+  
   ()
