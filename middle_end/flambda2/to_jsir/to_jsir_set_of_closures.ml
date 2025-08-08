@@ -1,10 +1,10 @@
 let set_of_closures ~env ~res ~bindings ~add_to_env soc =
   let fun_decls = Set_of_closures.function_decls soc in
   let decls =
-    Function_declarations.funs_in_order fun_decls |> Function_slot.Lmap.to_seq
+    Function_declarations.funs_in_order fun_decls |> Function_slot.Lmap.bindings
   in
   let env, res =
-    Seq.fold_left2
+    List.fold_left2
       (fun (env, res) binding (slot, decl) ->
         match
           (decl : Function_declarations.code_id_in_function_declaration)
@@ -44,7 +44,7 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
     (env, res)
 
 let dynamic_set_of_closures ~env ~res ~bound_vars soc =
-  let vars = List.to_seq bound_vars |> Seq.map Bound_var.var in
+  let vars = List.map Bound_var.var bound_vars in
   set_of_closures ~env ~res ~bindings:vars
     ~add_to_env:(fun ~env ~res var fn_var ->
       To_jsir_env.add_var env var fn_var, res)
@@ -59,5 +59,5 @@ let static_set_of_closures ~env ~res ~closure_symbols soc =
     | Some var -> env, To_jsir_result.add_instr_exn res (Assign (var, fn_var))
     | None -> To_jsir_env.add_symbol env symbol fn_var, res
   in
-  let symbols = Function_slot.Lmap.to_seq closure_symbols |> Seq.map snd in
+  let symbols = Function_slot.Lmap.data closure_symbols in
   set_of_closures ~env ~res ~bindings:symbols ~add_to_env soc
