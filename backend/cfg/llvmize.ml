@@ -154,11 +154,15 @@ type fun_sig =
     res : Llvm_typ.t option
   }
 
+let unreachable_label_name = "unreachable_default"
+
 type fun_info =
   { ident_gen : Ident.Gen.t;
     reg2ident : Ident.t Reg.Tbl.t;  (** Map register's stamp to identifier  *)
-    label2ident : Ident.t Label.Tbl.t
+    label2ident : Ident.t Label.Tbl.t;
         (** Map label to identifier. Avoid clashes between pre-existing Cfg labels and unnamed identifiers. *)
+    mutable needs_unreachable_label : bool
+        (** Whether we need to emit the unreachable label at the end of the function *)
   }
 
 type t =
@@ -185,7 +189,8 @@ let create_fun_info () =
   { ident_gen = Ident.Gen.create ();
     reg2ident =
       Reg.Tbl.create 37 (* CR yusumez: change this to be more reasonable *);
-    label2ident = Label.Tbl.create 37
+    label2ident = Label.Tbl.create 37;
+    needs_unreachable_label = false
   }
 
 let create ~llvmir_filename ~ppf_dump =
@@ -316,6 +321,8 @@ module F = struct
     pp_indent t.ppf ();
     kfprintf (fun ppf -> pp_print_newline ppf ()) t.ppf
 
+  let ins_unreachable t = ins t "unreachable"
+
   let source_filename t s = line t.ppf "source_filename = \"%s\"" s
 
   let machtyp_component (m : Cmm.machtype_component) =
@@ -364,6 +371,10 @@ module F = struct
     line t.ppf "define %s %a @%s(%a) %a {" cc_str Llvm_typ.pp_t fun_ret_type
       fun_name pp_fun_args fun_args pp_attrs fun_attrs;
     pp_body ();
+    if t.current_fun_info.needs_unreachable_label
+    then (
+      line t.ppf "%s:" unreachable_label_name;
+      ins_unreachable t);
     line t.ppf "}";
     line t.ppf ""
 
@@ -406,6 +417,23 @@ module F = struct
   let ins_branch_cond_ident t cond ifso ifnot =
     ins t "br i1 %a, label %a, label %a" pp_ident cond pp_ident ifso pp_ident
       ifnot
+
+  (* note: `ins_switch` does not take a default label, as switches are assumed
+     to be exhaustive. Since it is mandatory in LLVM, we will use a per-function
+     label with an `unreachable` instruction, on a per-need basis (See
+     `fun_info.needs_unreachable_label` field). *)
+  let ins_switch t typ value labels =
+    t.current_fun_info.needs_unreachable_label <- true;
+    let discr = fresh_ident t in
+    ins_load t ~src:value ~dst:discr typ;
+    ins t "switch %a %a, label %%%s [" Llvm_typ.pp_t typ pp_ident discr
+      unreachable_label_name;
+    Array.iteri
+      (fun index label ->
+        pp_indent t.ppf ();
+        ins t "%a %d, %a" Llvm_typ.pp_t typ index (pp_label t) label)
+      labels;
+    ins t "]"
 
   let ins_conv t op ~src ~dst ~src_typ ~dst_typ =
     ins t "%a = %s %a %a to %a" pp_ident dst op Llvm_typ.pp_t src_typ pp_ident
@@ -793,7 +821,7 @@ module F = struct
       (* CR yusumez: Implement this *)
       add_called_fun t "llvm.trap" ~cc:Default ~args:[] ~res:None;
       ins_call ~cc:Default ~pp_name:pp_global t "llvm.trap" [] None;
-      ins t "unreachable"
+      ins_unreachable t
     | Float_test { width; lt; eq; gt; uo } ->
       let typ =
         match width with
@@ -816,7 +844,10 @@ module F = struct
       | Probe _ -> not_implemented_terminator ~msg:"probe" i
       | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
         extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align ~label_after)
-    | Switch _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _ ->
+    | Switch labels ->
+      let arg = get_ident_for_reg t i.arg.(0) in
+      ins_switch t Llvm_typ.i64 arg labels
+    | Tailcall_self _ | Tailcall_func _ | Call_no_return _ ->
       not_implemented_terminator i
 
   let int_op t (i : Cfg.basic Cfg.instruction)
