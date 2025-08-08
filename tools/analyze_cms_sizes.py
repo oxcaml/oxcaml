@@ -17,6 +17,22 @@ import subprocess
 import sys
 import math
 
+class BasicStats:
+    def __init__(self, total_files, total_size, average_size, min_size, max_size):
+        self.total_files = total_files
+        self.total_size = total_size
+        self.average_size = average_size
+        self.min_size = min_size
+        self.max_size = max_size
+
+class FileChange:
+    def __init__(self, path, new_size, old_size, absolute_change, percentage_change):
+        self.path = path
+        self.new_size = new_size
+        self.old_size = old_size
+        self.absolute_change = absolute_change
+        self.percentage_change = percentage_change
+
 def parse_size_file(filename):
     """Parse a file containing size and path pairs."""
     files = {}
@@ -38,13 +54,13 @@ def calculate_basic_stats(files):
     total_size = sum(sizes)
     average_size = total_size / total_files if total_files > 0 else 0
     
-    return {
-        'total_files': total_files,
-        'total_size': total_size,
-        'average_size': average_size,
-        'min_size': min(sizes) if sizes else 0,
-        'max_size': max(sizes) if sizes else 0
-    }
+    return BasicStats(
+        total_files=total_files,
+        total_size=total_size,
+        average_size=average_size,
+        min_size=min(sizes) if sizes else 0,
+        max_size=max(sizes) if sizes else 0
+    )
 
 def calculate_percentage_changes(new_files, old_files):
     """Calculate percentage changes for each file."""
@@ -57,22 +73,29 @@ def calculate_percentage_changes(new_files, old_files):
             
             if old_size > 0:
                 percentage_change = ((new_size - old_size) / old_size) * 100
-                changes.append({
-                    'path': path,
-                    'new_size': new_size,
-                    'old_size': old_size,
-                    'absolute_change': new_size - old_size,
-                    'percentage_change': percentage_change
-                })
+                changes.append(FileChange(
+                    path=path,
+                    new_size=new_size,
+                    old_size=old_size,
+                    absolute_change=new_size - old_size,
+                    percentage_change=percentage_change
+                ))
     
     return changes
 
 def find_outliers(changes, top_n=10):
     """Find the top N files with largest percentage increases and decreases."""
-    increases = sorted(changes, key=lambda x: x['percentage_change'], reverse=True)[:top_n]
-    decreases = sorted(changes, key=lambda x: x['percentage_change'])[:top_n]
+    increases = sorted(changes, key=lambda x: x.percentage_change, reverse=True)[:top_n]
+    decreases = sorted(changes, key=lambda x: x.percentage_change)[:top_n]
     
     return increases, decreases
+
+def calculate_std_dev(values, mean):
+    """Calculate standard deviation."""
+    if len(values) <= 1:
+        return 0.0
+    variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
+    return math.sqrt(variance)
 
 def create_histogram(percentage_changes, bins=10, title="Size Change Distribution", show_stats=True, show_detailed_for_first_bucket=False):
     """Create a text-based histogram of percentage changes."""
@@ -135,13 +158,6 @@ def create_histogram(percentage_changes, bins=10, title="Size Change Distributio
         if len(first_bucket_changes) > 10:  # Only if there are enough files to make it worthwhile
             create_histogram(first_bucket_changes, bins=10, title="Detailed view of main group", 
                            show_stats=False, show_detailed_for_first_bucket=False)
-
-def calculate_std_dev(values, mean):
-    """Calculate standard deviation."""
-    if len(values) <= 1:
-        return 0.0
-    variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-    return math.sqrt(variance)
 
 def aggregate_cms_files(output_file, search_dir="."):
     """Find all .cms files and save their sizes to output_file."""
@@ -211,16 +227,16 @@ def analyze_size_files(file1, file2):
         return
     
     # Summary statistics
-    avg_percentage_change = sum(c['percentage_change'] for c in changes) / len(changes)
-    total_size_increase = new_stats['total_size'] - old_stats['total_size']
-    total_percentage_increase = (total_size_increase / old_stats['total_size']) * 100 if old_stats['total_size'] > 0 else 0
+    avg_percentage_change = sum(c.percentage_change for c in changes) / len(changes)
+    total_size_increase = new_stats.total_size - old_stats.total_size
+    total_percentage_increase = (total_size_increase / old_stats.total_size) * 100 if old_stats.total_size > 0 else 0
     
     print(f"Files analyzed: {len(changes)}")
     print(f"Total size change: {total_size_increase:+,} bytes ({total_percentage_increase:+.2f}%)")
     print(f"Average per-file change: {avg_percentage_change:+.2f}%")
     
     # Generate histogram
-    percentage_changes = [c['percentage_change'] for c in changes]
+    percentage_changes = [c.percentage_change for c in changes]
     create_histogram(percentage_changes, show_detailed_for_first_bucket=True)
     
     # Top outliers
@@ -228,14 +244,14 @@ def analyze_size_files(file1, file2):
     
     print(f"\nTop size increases:")
     for i, change in enumerate(increases, 1):
-        filename = change['path'].split('/')[-1]
-        print(f"{i}. {filename}: +{change['percentage_change']:.1f}% ({change['old_size']:,} → {change['new_size']:,} bytes)")
+        filename = change.path.split('/')[-1]
+        print(f"{i}. {filename}: +{change.percentage_change:.1f}% ({change.old_size:,} → {change.new_size:,} bytes)")
     
-    if any(c['percentage_change'] < 0 for c in decreases):
+    if any(c.percentage_change < 0 for c in decreases):
         print(f"\nTop size decreases:")
-        for i, change in enumerate([c for c in decreases if c['percentage_change'] < 0][:5], 1):
-            filename = change['path'].split('/')[-1]
-            print(f"{i}. {filename}: {change['percentage_change']:.1f}% ({change['old_size']:,} → {change['new_size']:,} bytes)")
+        for i, change in enumerate([c for c in decreases if c.percentage_change < 0][:5], 1):
+            filename = change.path.split('/')[-1]
+            print(f"{i}. {filename}: {change.percentage_change:.1f}% ({change.old_size:,} → {change.new_size:,} bytes)")
 
 def main():
     parser = argparse.ArgumentParser(
