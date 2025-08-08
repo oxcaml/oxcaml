@@ -1839,7 +1839,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             H.simple_i64 to_add ) ]
     | Mixed_product_to_empty ->
       (* Accesses to an index to a product of voids will not actually access *)
-      [Simple (Simple.const (Reg_width_const.naked_int64 Int64.zero))])
+      [H.simple_i64_expr 0L])
   | Pmakefloatblock (mutability, mode), _ ->
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
