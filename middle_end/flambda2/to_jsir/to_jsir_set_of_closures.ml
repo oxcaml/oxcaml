@@ -12,7 +12,9 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
         | Deleted _ -> env, res
         | Code_id { code_id; only_full_applications = _ } ->
           (* CR selee: thread through debug information *)
-          let addr, params = To_jsir_env.get_code_id_exn env code_id in
+          let addr, params, is_my_closure_used =
+            To_jsir_env.get_code_id_exn env code_id
+          in
           let expr : Jsir.expr = Closure (params, (addr, []), None) in
           (* If this function slot is used, it should've already been added when
              the code using it was defined *)
@@ -26,6 +28,13 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
               To_jsir_env.add_function_slot env slot var, var
           in
           let res = To_jsir_result.add_instr_exn res (Let (fn_var, expr)) in
+          (* We need to register the fact that this closure needs an explicit
+             [my_closure] argument. *)
+          let env =
+            match is_my_closure_used with
+            | false -> env
+            | true -> To_jsir_env.register_need_my_closure env fn_var
+          in
           add_to_env ~env ~res binding fn_var)
       (env, res) bindings decls
   in
