@@ -1,21 +1,28 @@
-Test 1: attempting first-class module with mixed content
+Test 1: basic first-class mixed module
 42
+hello
 3.14
-Test 2: mixed module with conversion functions
-2.718
-999
-Test 3: list of modules with mixed content via conversions
-3.
-Test 4: functor producing mixed module (direct use, not packed)
-20
-11.
+100
+Test 2: passing mixed modules to functions
+142
+hello 3.14
+Test 3: returning mixed modules from functions
 10
-Test 5: conditional selection with wrapper
-222
-222.
-Test 6: higher-order function with mixed module access
-60
-Test 7: module with both boxed and unboxed, using records
+ten
+Test 4: list of first-class mixed modules
+6
+Test 5: conditional module selection
+222.222
+false branch
+111.111
+true branch
+Test 6: mixed module with unboxed tuples and records
 42
-3.14159
+answer
+3.14
 271828
+2.718
+314159
+Test 7: functor producing first-class mixed modules
+5
+3.
