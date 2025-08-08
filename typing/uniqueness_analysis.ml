@@ -14,7 +14,7 @@
 (**************************************************************************)
 
 (*
-  OCaml has contraction rule baked in its type checking, which makes the
+  OCaml has the contraction rule baked in its type checking, which makes the
   uniqueness/linearity modes inferred by the type system too permissive. This
   file implements uniqueness analysis, which runs after type checking. It
   inspects the lexical structure of a program, identifies implicit usages of
@@ -23,8 +23,8 @@
 
   To that end, we assign a usage to every node in the expression tree. Starting
   from the bottom, the leaves are the usages representing "use sites" (such as
-  [Pexp_ident]). which is unconstrained in the begining. Those usages are then
-  composed together by [par], [seq], etc. in a way reflecting the lexical
+  [Pexp_ident]), which are unconstrained at first. Those usages are then
+  composed together by [par], [seq], etc., reflecting the lexical
   structure of the program. Certain composition of certain usages (such as
   [seq Unique Unique]) is illegal and leads to Error. Composition of
   unconstrained usages constrains the usages. For example, [seq u1 u2] will
@@ -32,8 +32,8 @@
 
   In particular, if the usage being constrained represents a "use site", we
   eagerly apply the constraint on the modes inferred by the type system. For
-  example, [unique_use] in [Pexp_ident] is the mode expected by the consumer of
-  the identifier. Type errors are raised if that fails.
+  example, [unique_use] in [Texp_ident] is the mode expected by the consumer of
+  the identifier. Type errors are raised if the uniqueness analysis contradicts what is expected in the [unique_use].
 
   For example:
   [
@@ -2322,7 +2322,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     further usages of the field should be directed at the alias, instead of the
     old value. However, this would require some big changes to the analysis.
 
-    Instead, we take a conservative approach where mutability is opaque. First
+    Instead, we take a conservative approach, treating mutability as opaque. First
     of all, [type r = { mutable x : 'a }] is viewed as [type r = { x : 'b }]
     where ['b] is some opaque type (think ['a ref]) with some opaque operations
     [val read: 'b -> 'a] and [val write: 'a -> 'b -> unit]
