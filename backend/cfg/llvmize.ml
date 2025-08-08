@@ -17,6 +17,11 @@ module CL = Cfg_with_layout
 module DLL = Oxcaml_utils.Doubly_linked_list
 module String = Misc.Stdlib.String
 
+module List = struct
+  include List
+  include Misc.Stdlib.List
+end
+
 type error = Asm_generation of (string * int)
 
 exception Error of error
@@ -348,7 +353,7 @@ module F = struct
 
   let block_label_with_predecessors t label preds =
     pp_label_def t t.ppf label;
-    if not (Misc.Stdlib.List.is_empty preds)
+    if not (List.is_empty preds)
     then
       fprintf t.ppf
         "                                                ; preds = %a\n"
@@ -1037,7 +1042,11 @@ module F = struct
       String.iter (fun c -> fprintf ppf "\\%02x" (Char.code c)) s;
       fprintf ppf "\""
     | Cskip _ -> fprintf ppf "zeroinitializer"
-    | Csingle f | Cdouble f -> fprintf ppf "%.20f" f
+    | Csingle f | Cdouble f ->
+      fprintf ppf "%.20f" f
+      (* 64-bit floats with at least 17 digits are guaranteed to round trip
+         exactly through string conversions by the IEEE 754 standard (9 digits
+         for 32-bit floats). *)
     | Cvec128 _ | Cvec256 _ | Cvec512 _ ->
       Misc.fatal_error "Llvmize: vector data item snot implemented"
 
@@ -1225,7 +1234,7 @@ let cfg (cl : CL.t) =
   let pp_block label =
     let block = Label.Tbl.find blocks label in
     let preds = Cfg.predecessor_labels block in
-    if Label.equal entry_label label && not (Misc.Stdlib.List.is_empty preds)
+    if Label.equal entry_label label && not (List.is_empty preds)
     then Misc.fatal_errorf "Llvmize: entry label must not have predecessors";
     F.block_label_with_predecessors t label preds;
     DLL.iter ~f:(F.basic t) block.body;
@@ -1262,7 +1271,7 @@ let make_temp_data_symbol =
       Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
     in
     let res = Format.asprintf ".temp.%s.%d" module_name !idx in
-    idx := !idx + 1;
+    incr idx;
     res
 
 let data (ds : Cmm.data_item list) =
@@ -1289,7 +1298,7 @@ let data (ds : Cmm.data_item list) =
       contents
   in
   let define_symbol ~private_ ~header ~symbol contents =
-    if private_ && List.length contents = 0
+    if private_ && List.is_empty contents
     then () (* No need to declare a private symbol with no contents *)
     else define_symbol' ~private_ ~header ~symbol contents
   in
@@ -1313,7 +1322,7 @@ let data (ds : Cmm.data_item list) =
       let closinfo = List.nth ds 1 |> peek_int |> Option.get in
       let arity = Nativeint.shift_right_logical closinfo 56 in
       let slot_size = if arity <= 1n then 2 else 3 in
-      let slot, tail = Misc.Stdlib.List.split_at slot_size ds in
+      let slot, tail = List.split_at slot_size ds in
       define_symbol ~private_:false ~header:(Some header) ~symbol:(Some symbol)
         slot;
       let is_last =
@@ -1335,7 +1344,7 @@ let data (ds : Cmm.data_item list) =
       match eat_if peek_define_symbol after_i with
       | Some (symbol, after_symbol) ->
         (* [i] is a header *)
-        if Nativeint.(logand i 0xffn = 247n)
+        if Nativeint.(logand i 0xffn = of_int Obj.closure_tag)
         then closure_block ds
         else
           define_symbol ~private_:false ~header:(Some i) ~symbol:(Some symbol)
