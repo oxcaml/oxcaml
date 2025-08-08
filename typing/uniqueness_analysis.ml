@@ -2328,22 +2328,23 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     UF.seq uf (Value.mark_maybe_unique value)
   | Texp_setfield (rcd, _, _, _, arg) ->
     (* Ideally, we should treat this as creating a new alias of [arg], and
-    further usages of the field should be directed at the alias, instead of the
-    old value. However, this would require some big changes to the analysis.
+       further usages of the field should be directed at the alias, instead of
+       the old value. However, this would require some big changes to the
+       analysis.
 
-    Instead, we take a conservative approach, treating mutability as opaque. First
-    of all, [type r = { mutable x : 'a }] is viewed as [type r = { x : 'b }]
-    where ['b] is some opaque type (think ['a ref]) with some opaque operations
-    [val read: 'b -> 'a] and [val write: 'a -> 'b -> unit]
+       Instead, we take a conservative approach, treating mutability as opaque.
+       First of all, [type r = { mutable x : 'a }] is viewed as [type r = { x :
+       'b }] where ['b] is some opaque type (think ['a ref]) with some opaque
+       operations [val read: 'b -> 'a] and [val write: 'a -> 'b -> unit]
 
-    Then, field mutation [r.x <- x0] is viewed as [write x0 r.x]. This leads to
-    marking [x0] as fully used, and [r.mem_addr] borrowed, and [r.x] used by
-    [write]. Field projection [r.x] is viewed as [read r.x], which leads to
-    marking [r.mem_addr] borrowed, and [r.x] used by [read].
+       Then, field mutation [r.x <- x0] is viewed as [write x0 r.x]. This leads
+       to marking [x0] as fully used, and [r.mem_addr] borrowed, and [r.x] used
+       by [write]. Field projection [r.x] is viewed as [read r.x], which leads
+       to marking [r.mem_addr] borrowed, and [r.x] used by [read].
 
-    Now, note that currently [mutable] implies [many aliased], which means ['b]
-    should cross linearity and uniqueness. Therefore, the above usages on [r.x]
-    can be skipped. *)
+       Now, note that currently [mutable] implies [many aliased], which means
+       ['b] should cross linearity and uniqueness. Therefore, the above usages
+       on [r.x] can be skipped. *)
     let value, uf_rcd = check_uniqueness_exp_as_value ienv rcd in
     let uf_arg = check_uniqueness_exp ~overwrite:None ienv arg in
     let uf_write = Value.mark_implicit_borrow_memory_address Write value in
