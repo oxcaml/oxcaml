@@ -114,6 +114,10 @@ type integer_comparison = Scalar.Integer_comparison.t =
   | Cgt
   | Cle
   | Cge
+  | Cult
+  | Cugt
+  | Cule
+  | Cuge
 
 val negate_integer_comparison : integer_comparison -> integer_comparison
 
@@ -413,7 +417,6 @@ type operation =
   | Ccmpi of integer_comparison
   | Caddv (* pointer addition that produces a [Val] (well-formed Caml value) *)
   | Cadda (* pointer addition that produces a [Addr] (derived heap pointer) *)
-  | Ccmpa of integer_comparison
   | Cnegf of float_width
   | Cabsf of float_width
   | Caddf of float_width

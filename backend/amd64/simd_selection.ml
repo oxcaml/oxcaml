@@ -1102,7 +1102,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       in
       Option.bind ops (fun (sse, avx) ->
           sse_or_avx sse avx |> make_default ~arg_count ~res_count)
-    | Icomp (Isigned intcomp) -> (
+    | Icomp intcomp -> (
       match intcomp with
       | Ceq ->
         let sse, avx =
@@ -1128,12 +1128,12 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | W8 -> pcmpgtb, vpcmpgtb_X_X_Xm128
         in
         sse_or_avx sse avx |> make_default ~arg_count ~res_count
-      | Cne | Clt | Cle | Cge ->
+      | Cne | Clt | Cle | Cge | Cult | Cugt | Cule | Cuge ->
         None
         (* These instructions seem to not have a simd counterpart yet, could
            also implement as a combination of other instructions if needed in
            the future *))
-    | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp (Iunsigned _) -> None
+    | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt -> None
   in
   match List.hd cfg_ops with
   | Move -> Operation.Move |> make_default ~arg_count ~res_count

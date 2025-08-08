@@ -169,6 +169,10 @@ type integer_comparison = Scalar.Integer_comparison.t =
   | Cgt
   | Cle
   | Cge
+  | Cult
+  | Cugt
+  | Cule
+  | Cuge
 
 let negate_integer_comparison = Scalar.Integer_comparison.negate
 
@@ -442,7 +446,6 @@ type operation =
   | Ccmpi of integer_comparison
   | Caddv
   | Cadda
-  | Ccmpa of integer_comparison
   | Cnegf of float_width
   | Cabsf of float_width
   | Caddf of float_width
@@ -634,8 +637,8 @@ let iter_shallow_tail f = function
         | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
-        | Catomic _ | Ccmpi _ | Ccmpa _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
-        | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+        | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
+        | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
         | Ccmpf (_, _)
         | Cprobe _ | Cprobe_is_enabled _
         | Ctuple_field (_, _) ),
@@ -668,8 +671,8 @@ let map_shallow_tail f = function
           | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
-          | Catomic _ | Ccmpi _ | Ccmpa _ | Cnegf _ | Cabsf _ | Caddf _
-          | Csubf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+          | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
+          | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
           | Ccmpf (_, _)
           | Cprobe _ | Cprobe_is_enabled _
           | Ctuple_field (_, _) ),
@@ -987,21 +990,7 @@ let equal_memory_chunk left right =
       | Fivetwelve_aligned ) ) ->
     false
 
-let equal_integer_comparison left right =
-  match left, right with
-  | Ceq, Ceq -> true
-  | Cne, Cne -> true
-  | Clt, Clt -> true
-  | Cgt, Cgt -> true
-  | Cle, Cle -> true
-  | Cge, Cge -> true
-  | Ceq, (Cne | Clt | Cgt | Cle | Cge)
-  | Cne, (Ceq | Clt | Cgt | Cle | Cge)
-  | Clt, (Ceq | Cne | Cgt | Cle | Cge)
-  | Cgt, (Ceq | Cne | Clt | Cle | Cge)
-  | Cle, (Ceq | Cne | Clt | Cgt | Cge)
-  | Cge, (Ceq | Cne | Clt | Cgt | Cle) ->
-    false
+let equal_integer_comparison = Scalar.Integer_comparison.equal
 
 let caml_flambda2_invalid = "caml_flambda2_invalid"
 

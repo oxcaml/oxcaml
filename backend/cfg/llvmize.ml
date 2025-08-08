@@ -496,16 +496,16 @@ module F = struct
     let typ = Llvm_typ.of_machtyp_component i.arg.(0).typ in
     let comp_name =
       match comp with
-      | Isigned Ceq | Iunsigned Ceq -> "eq"
-      | Isigned Cne | Iunsigned Cne -> "ne"
-      | Isigned Clt -> "slt"
-      | Isigned Cgt -> "sgt"
-      | Isigned Cle -> "sle"
-      | Isigned Cge -> "sge"
-      | Iunsigned Clt -> "ult"
-      | Iunsigned Cgt -> "ugt"
-      | Iunsigned Cle -> "ule"
-      | Iunsigned Cge -> "ult"
+      | Ceq -> "eq"
+      | Cne -> "ne"
+      | Clt -> "slt"
+      | Cgt -> "sgt"
+      | Cle -> "sle"
+      | Cge -> "sge"
+      | Cult -> "ult"
+      | Cugt -> "ugt"
+      | Cule -> "ule"
+      | Cuge -> "uge"
     in
     match imm with
     | None ->
@@ -799,8 +799,17 @@ module F = struct
     | Int_test { lt; eq; gt; is_signed; imm } ->
       let make_comp comp =
         match is_signed with
-        | true -> Operation.Isigned comp
-        | false -> Operation.Iunsigned comp
+        | Scalar.Signedness.Signed -> comp
+        | Scalar.Signedness.Unsigned -> (
+          (* Map signed comparisons to unsigned versions *)
+          match comp with
+          | Cmm.Clt -> Cmm.Cult
+          | Cmm.Cgt -> Cmm.Cugt
+          | Cmm.Cle -> Cmm.Cule
+          | Cmm.Cge -> Cmm.Cuge
+          | (Cmm.Ceq | Cmm.Cne | Cmm.Cult | Cmm.Cugt | Cmm.Cule | Cmm.Cuge) as c
+            ->
+            c)
       in
       let is_lt = int_comp t (make_comp Cmm.Clt) i ~imm in
       let ge = fresh_ident t in
