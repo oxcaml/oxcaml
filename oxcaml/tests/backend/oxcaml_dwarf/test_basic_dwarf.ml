@@ -119,7 +119,8 @@ let _ = f_string "hello world!"
 
 let _ = f_string "a"
 
-let _ = f_string "special chars: \n\t\"" (* CR sspies: debugger shows the newline as an actual line break in output *)
+let _ = f_string "special chars: \n\t\""
+(* CR sspies: debugger shows the newline as an actual line break in output *)
 
 let _ = f_string "unicode: αβγ"
 
@@ -149,7 +150,9 @@ let _ = f_list []
 
 let _ = f_list ['x']
 
-let _ = f_list ['a'; 'b'; 'c'] (* CR sspies: lists display as low-level cons cell structure rather than user-friendly list syntax *)
+let _ = f_list ['a'; 'b'; 'c']
+(* CR sspies: lists display as low-level cons cell structure rather than
+   user-friendly list syntax *)
 
 let _ = f_list ['1'; '2'; '3'; '4'; '5']
 
@@ -165,7 +168,9 @@ let _ = f_option (Some '\000')
 
 let[@inline never] [@local never] f_lazy (x : char lazy_t) = x
 
-let _ = f_lazy (lazy 'a') (* CR sspies: lazy values show their contents as ASCII numeric codes rather than character representations *)
+let _ = f_lazy (lazy 'a')
+(* CR sspies: lazy values show their contents as ASCII numeric codes rather than
+   character representations *)
 
 let _ = f_lazy (lazy 'X')
 
@@ -240,7 +245,9 @@ let _ = f_poly "polymorphic"
 
 let _ = f_poly (Bytes.of_string "poly")
 
-let _ = f_poly [| 'p'; 'o'; 'l'; 'y' |] (* CR sspies: char arrays in polymorphic context show as ASCII codes instead of characters *)
+let _ = f_poly [| 'p'; 'o'; 'l'; 'y' |]
+(* CR sspies: char arrays in polymorphic context show as ASCII codes instead of
+   characters *)
 
 let _ = f_poly ['p'; 'o'; 'l'; 'y']
 
