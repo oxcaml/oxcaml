@@ -1818,7 +1818,7 @@ module Axerror = struct
         wrap_print_hint (dprintf "it is a lazy expression that is forced")
       | Is_function_return ->
         wrap_print_hint
-          (dprintf "it is a function return value without an exclave annotation")
+          (dprintf "it is a function return value.@\nHint: Use exclave_ to return a local value.")
       | Stack_expression -> wrap_print_hint (dprintf "it is a stack expression")
 
     let print_morph_hint :
@@ -1868,11 +1868,11 @@ module Axerror = struct
         let mode_printer = Misc.Style.as_inline_code (C.print x_obj) in
         let default_printer () = mode_printer ppf x in
         match side, x_obj, x with
-        | _, Regionality, Regional ->
-          (* In the special case that we are talking about the regional mode,
-             we print a more user-friendly message, as below, instead of referring
-             directly to the regional mode, as the user doesn't need to know about it *)
-          fprintf ppf "local to the parent region"
+        | `Actual, Regionality, Regional ->
+          (* In the special case where the actual mode is regional (and thus the
+           expected is global), it's more user friendly to say "local" than
+           "regional" or "local to the parent region" etc. *)
+          mode_printer ppf C.Regionality.Local
         | `Expected, Contention_op, Shared ->
           (* When printing the "shared" mode on the "expected" side (noting that expected
              modes only appear on the right side of inequalities (on the "greater" side)),
@@ -1881,6 +1881,9 @@ module Axerror = struct
              as this is confusing to put in an error message. *)
           fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
             C.Contention.Uncontended
+        | `Expected, Regionality, Regional ->
+          fprintf ppf "in the parent region or %a" mode_printer
+            C.Regionality.Global
         | _ ->
           (* Otherwise, we just use the default mode constant printer *)
           default_printer ()
