@@ -11,16 +11,12 @@ type t
 *)
 val create :
   module_symbol:Symbol.t ->
-  exported_offsets:Exported_offsets.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   t
 
 (** Symbol corresponding to the module currently compiling. *)
 val module_symbol : t -> Symbol.t
-
-(** Exported offsets for function and value slots *)
-val exported_offsets : t -> Exported_offsets.t
 
 val return_continuation : t -> Continuation.t
 
@@ -51,14 +47,21 @@ val add_exn_handler :
 (** Map a Flambda2 variable to a JSIR variable. *)
 val add_var : t -> Variable.t -> Jsir.Var.t -> t
 
-(** Map a Flambda2 symbol to a JSIR variable. *)
-val add_symbol : t -> Symbol.t -> Jsir.Var.t -> t
+(** Map a Flambda2 symbol to a JSIR variable, and register it to the global symbol
+    table. *)
+val add_symbol :
+  t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t -> t * To_jsir_result.t
 
-(** Set [var] to be an alias of [alias_of]. Raises if [alias_of] is not found
-    in the environment. *)
+(** Set [var] to be an alias of [alias_of]. Raises if [alias_of] is from the current
+    compilation unit and is not found in the environment. *)
 val add_var_alias_of_var_exn : t -> var:Variable.t -> alias_of:Variable.t -> t
 
-val add_var_alias_of_symbol_exn : t -> var:Variable.t -> alias_of:Symbol.t -> t
+val add_var_alias_of_symbol_exn :
+  t ->
+  res:To_jsir_result.t ->
+  var:Variable.t ->
+  alias_of:Symbol.t ->
+  t * To_jsir_result.t
 
 (** Map a Flambda2 code ID to the address of the corresponding JSIR block
     as well as the parameters. *)
@@ -84,10 +87,18 @@ val get_exn_handler_exn :
     an unbound variable. *)
 val get_var_exn : t -> Variable.t -> Jsir.Var.t
 
-(** Return the JSIR variable for the given Flambda symbol. *)
-val get_symbol : t -> Symbol.t -> Jsir.Var.t option
+(** Return the JSIR variable for the given Flambda symbol.
 
-val get_symbol_exn : t -> Symbol.t -> Jsir.Var.t
+    If the symbol is from the current compilation unit, we look it up in the environment;
+    otherwise, we fetch from the global symbol table. *)
+val get_symbol :
+  t ->
+  res:To_jsir_result.t ->
+  Symbol.t ->
+  (Jsir.Var.t * To_jsir_result.t) option
+
+val get_symbol_exn :
+  t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t * To_jsir_result.t
 
 (** Return the block address and parameter variables corresponding to the given
     [Code_id.t]. *)

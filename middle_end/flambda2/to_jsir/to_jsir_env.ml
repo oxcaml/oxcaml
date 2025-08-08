@@ -1,6 +1,5 @@
 type t =
   { module_symbol : Symbol.t;
-    exported_offsets : Exported_offsets.t;
     return_continuation : Continuation.t;
     exn_continuation : Continuation.t;
     continuations : Jsir.Addr.t Continuation.Map.t;
@@ -14,10 +13,8 @@ type t =
     traps : Continuation.t list
   }
 
-let create ~module_symbol ~exported_offsets ~return_continuation
-    ~exn_continuation =
+let create ~module_symbol ~return_continuation ~exn_continuation =
   { module_symbol;
-    exported_offsets;
     return_continuation;
     exn_continuation;
     continuations = Continuation.Map.empty;
@@ -31,8 +28,6 @@ let create ~module_symbol ~exported_offsets ~return_continuation
   }
 
 let module_symbol t = t.module_symbol
-
-let exported_offsets t = t.exported_offsets
 
 let return_continuation t = t.return_continuation
 
@@ -52,8 +47,26 @@ let add_exn_handler t cont ~addr ~exn_param ~extra_args =
 
 let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
 
-let add_symbol t symbol jvar =
-  { t with symbols = Symbol.Map.add symbol jvar t.symbols }
+let symbol_to_native_strings symbol =
+  ( Symbol.compilation_unit symbol
+    |> Compilation_unit.name |> Compilation_unit.Name.to_string
+    |> Jsir.Native_string.of_string,
+    Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
+
+let register_symbol ~res symbol var =
+  let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+  To_jsir_result.add_instr_exn res
+    (Let
+       ( Jsir.Var.fresh (),
+         Prim
+           ( Extern "caml_register_symbol",
+             [ Pc (NativeString compilation_unit_name);
+               Pc (NativeString symbol_name);
+               Pv var ] ) ))
+
+let add_symbol t ~res symbol jvar =
+  ( { t with symbols = Symbol.Map.add symbol jvar t.symbols },
+    register_symbol ~res symbol jvar )
 
 let add_code_id t code_id ~addr ~params =
   { t with code_ids = Code_id.Map.add code_id (addr, params) t.code_ids }
@@ -70,9 +83,27 @@ let get_exn_handler_exn t cont = Continuation.Map.find cont t.exn_handlers
 
 let get_var_exn t fvar = Variable.Map.find fvar t.vars
 
-let get_symbol t symbol = Symbol.Map.find_opt symbol t.symbols
+let get_external_symbol ~res symbol =
+  let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+  let var = Jsir.Var.fresh () in
+  ( var,
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( var,
+           Prim
+             ( Extern "caml_get_symbol",
+               [ Pc (NativeString compilation_unit_name);
+                 Pc (NativeString symbol_name) ] ) )) )
 
-let get_symbol_exn t symbol = Symbol.Map.find symbol t.symbols
+let get_symbol t ~res symbol =
+  match Symbol.compilation_unit symbol |> Compilation_unit.is_current with
+  | true -> Option.map (fun v -> v, res) (Symbol.Map.find_opt symbol t.symbols)
+  | false -> Some (get_external_symbol ~res symbol)
+
+let get_symbol_exn t ~res symbol =
+  match get_symbol t ~res symbol with
+  | Some (v, res) -> v, res
+  | None -> raise Not_found
 
 let get_code_id_exn t code_id = Code_id.Map.find code_id t.code_ids
 
@@ -90,15 +121,15 @@ let add_var_alias_of_var_exn t ~var ~alias_of =
   let jvar = get_var_exn t alias_of in
   { t with vars = Variable.Map.add var jvar t.vars }
 
-let add_var_alias_of_symbol_exn t ~var ~alias_of =
-  let jvar =
-    match get_symbol t alias_of with
+let add_var_alias_of_symbol_exn t ~res ~var ~alias_of =
+  let jvar, res =
+    match get_symbol t ~res alias_of with
     | None ->
       Misc.fatal_errorf "Symbol %a not found in the environment" Symbol.print
         alias_of
-    | Some v -> v
+    | Some (v, res) -> v, res
   in
-  { t with vars = Variable.Map.add var jvar t.vars }
+  { t with vars = Variable.Map.add var jvar t.vars }, res
 
 let add_if_not_found map item ~mem ~add =
   if mem item map

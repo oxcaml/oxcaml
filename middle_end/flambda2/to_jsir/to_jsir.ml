@@ -16,10 +16,8 @@ let create_let_simple ~env ~res fvar simple =
       env, res)
     ~symbol:(fun symbol ~coercion:_ ->
       (* CR selee: come back *)
-      let env =
-        To_jsir_env.add_var_alias_of_symbol_exn env ~var:fvar ~alias_of:symbol
-      in
-      env, res)
+      To_jsir_env.add_var_alias_of_symbol_exn env ~res ~var:fvar
+        ~alias_of:symbol)
     ~const:(fun const ->
       let expr = Jsir.Constant (To_jsir_shared.reg_width_const const) in
       To_jsir_shared.bind_expr_to_var ~env ~res fvar expr)
@@ -452,43 +450,15 @@ and switch ~env ~res e =
 
 and invalid ~env ~res _msg = env, res
 
-let add_globals ~env ~res ~reachable_names =
-  let symbols = Name_occurrences.symbols reachable_names in
-  let extern = Symbol.external_symbols_compilation_unit () in
-  let predef = Compilation_unit.predef_exn in
-  Symbol.Set.fold
-    (fun symbol (env, res) ->
-      let unit = Symbol.compilation_unit symbol in
-      if (not (Compilation_unit.is_current unit))
-         && (not (Compilation_unit.equal unit extern))
-         && not (Compilation_unit.equal unit predef)
-      then
-        let compilation_unit_name, symbol_name =
-          To_jsir_shared.symbol_to_native_strings symbol
-        in
-        let var = Jsir.Var.fresh () in
-        ( To_jsir_env.add_symbol env symbol var,
-          To_jsir_result.add_instr_exn res
-            (Let
-               ( var,
-                 Prim
-                   ( Extern "caml_get_symbol",
-                     [ Pc (NativeString compilation_unit_name);
-                       Pc (NativeString symbol_name) ] ) )) )
-      else env, res)
-    symbols (env, res)
-
-let unit ~offsets ~all_code:_ ~reachable_names flambda_unit =
+let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
   let env =
     To_jsir_env.create
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
-      ~exported_offsets:offsets
       ~return_continuation:(Flambda_unit.return_continuation flambda_unit)
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
   in
   let res = To_jsir_result.create () in
   let res, _addr = To_jsir_result.new_block res ~params:[] in
-  let env, res = add_globals ~env ~res ~reachable_names in
   let _env, res = expr ~env ~res (Flambda_unit.body flambda_unit) in
   let program = To_jsir_result.to_program_exn res in
   Jsir.invariant program;

@@ -1,20 +1,3 @@
-let symbol_to_native_strings symbol =
-  ( Symbol.compilation_unit symbol
-    |> Compilation_unit.name |> Compilation_unit.Name.to_string
-    |> Jsir.Native_string.of_string,
-    Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
-
-let register_symbol ~res symbol var =
-  let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
-  To_jsir_result.add_instr_exn res
-    (Let
-       ( Jsir.Var.fresh (),
-         Prim
-           ( Extern "caml_register_symbol",
-             [ Pc (NativeString compilation_unit_name);
-               Pc (NativeString symbol_name);
-               Pv var ] ) ))
-
 let bind_expr_to_var' ~env ~res fvar expr =
   let jvar = Jsir.Var.fresh () in
   ( jvar,
@@ -28,7 +11,7 @@ let bind_expr_to_var ~env ~res fvar expr =
 let bind_expr_to_symbol ~env ~res symbol expr =
   let jvar = Jsir.Var.fresh () in
   let res = To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr)) in
-  To_jsir_env.add_symbol env symbol jvar, register_symbol ~res symbol jvar
+  To_jsir_env.add_symbol env ~res symbol jvar
 
 let reg_width_const const : Jsir.constant =
   match Reg_width_const.descr const with
@@ -58,7 +41,7 @@ let simple ~env ~res simple =
   Simple.pattern_match' simple
     ~var:(fun name ~coercion:_ -> To_jsir_env.get_var_exn env name, res)
     ~symbol:(fun symbol ~coercion:_ ->
-      To_jsir_env.get_symbol_exn env symbol, res)
+      To_jsir_env.get_symbol_exn env ~res symbol)
     ~const:(fun const ->
       let var = Jsir.Var.fresh () in
       let expr = Jsir.Constant (reg_width_const const) in

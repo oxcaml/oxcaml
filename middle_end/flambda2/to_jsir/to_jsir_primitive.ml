@@ -3,12 +3,21 @@ let primitive_not_supported () =
     "This primitive is not supported for JavaScript/WASM compilation."
 
 (** Convert a [Simple.t] into a [Jsir.prim_arg]. *)
-let prim_arg ~env simple =
+let prim_arg ~env ~res simple =
   Simple.pattern_match' simple
-    ~var:(fun name ~coercion:_ -> Jsir.Pv (To_jsir_env.get_var_exn env name))
+    ~var:(fun name ~coercion:_ ->
+      Jsir.Pv (To_jsir_env.get_var_exn env name), res)
     ~symbol:(fun symbol ~coercion:_ ->
-      Jsir.Pv (To_jsir_env.get_symbol_exn env symbol))
-    ~const:(fun const -> Jsir.Pc (To_jsir_shared.reg_width_const const))
+      let var, res = To_jsir_env.get_symbol_exn env ~res symbol in
+      Jsir.Pv var, res)
+    ~const:(fun const -> Jsir.Pc (To_jsir_shared.reg_width_const const), res)
+
+let prim_args ~env ~res simples =
+  List.fold_right
+    (fun simple (args, res) ->
+      let arg, res = prim_arg ~env ~res simple in
+      arg :: args, res)
+    simples ([], res)
 
 let with_int_prefix ~(kind : Flambda_kind.Standard_int.t) ~percent_for_imms op =
   let prefix =
@@ -38,8 +47,12 @@ let use_prim ~env ~res prim args =
   let var = Jsir.Var.fresh () in
   Some var, env, To_jsir_result.add_instr_exn res (Jsir.Let (var, expr))
 
+let use_prim' ~env ~res prim simples =
+  let args, res = prim_args ~env ~res simples in
+  use_prim ~env ~res prim args
+
 let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
-  let use_prim' prim = use_prim ~env ~res prim [] in
+  let use_prim' prim = use_prim' ~env ~res prim [] in
   match f with
   | Invalid _ -> use_prim' (Extern "caml_invalid_primitive")
   | Optimised_out _ ->
@@ -58,10 +71,10 @@ let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
 
 let get_tag ~env ~res x =
   let var = Jsir.Var.fresh () in
-  let expr : Jsir.expr =
-    match prim_arg ~env x with
-    | Pv v -> Field (v, 0, Non_float)
-    | Pc _ -> Misc.fatal_error "Get_tag on constant"
+  let expr, res =
+    match prim_arg ~env ~res x with
+    | Pv v, res -> Jsir.Field (v, 0, Non_float), res
+    | Pc _, _res -> Misc.fatal_error "Get_tag on constant"
   in
   var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
 
@@ -92,27 +105,32 @@ let block_access_kind (kind : Flambda_primitive.Block_access_kind.t) :
     primitive_not_supported ()
 
 let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
-  let use_prim' prim = use_prim ~env ~res prim [prim_arg ~env x] in
+  let use_prim' prim = use_prim' ~env ~res prim [x] in
   match f with
   | Block_load { kind; mut = _; field } ->
     let var = Jsir.Var.fresh () in
-    let expr : Jsir.expr =
-      match prim_arg ~env x with
-      | Pv v -> Field (v, Targetint_31_63.to_int field, block_access_kind kind)
-      | Pc _ -> Misc.fatal_error "Block_load on constant"
+    let expr, res =
+      match prim_arg ~env ~res x with
+      | Pv v, res ->
+        ( Jsir.Field (v, Targetint_31_63.to_int field, block_access_kind kind),
+          res )
+      | Pc _, _res -> Misc.fatal_error "Block_load on constant"
     in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Duplicate_block _ | Duplicate_array _ | Obj_dup ->
     use_prim' (Extern "caml_obj_dup")
   | Is_int _ -> use_prim' IsInt
-  | Is_null -> use_prim ~env ~res Eq [prim_arg ~env x; Pc Null]
+  | Is_null ->
+    let x, res = prim_arg ~env ~res x in
+    use_prim ~env ~res Eq [x; Pc Null]
   | Get_tag ->
     let var, env, res = get_tag ~env ~res x in
     Some var, env, res
   | Array_length _ -> use_prim' Vectlength
   | Bigarray_length { dimension } ->
+    let x, res = prim_arg ~env ~res x in
     use_prim ~env ~res (Extern "caml_ba_dim")
-      [prim_arg ~env x; Pc (Int (Targetint.of_int dimension))]
+      [x; Pc (Int (Targetint.of_int dimension))]
   | String_length _ -> use_prim' (Extern "caml_ml_string_length")
   | Int_as_pointer _ -> use_prim' (Extern "caml_int_as_pointer")
   | Opaque_identity { middle_end_only = _; kind = _ } ->
@@ -198,19 +216,6 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     identity ~env ~res x
   | Project_function_slot { move_from = _; move_to } ->
     Some (To_jsir_env.get_function_slot_exn env move_to), env, res
-  | Project_value_slot { project_from = _; value_slot }
-    when Value_slot.is_imported value_slot ->
-    let offsets = To_jsir_env.exported_offsets env in
-    let offset, size, is_scanned =
-      match Exported_offsets.value_slot_offset offsets value_slot with
-      | None | Some Dead_value_slot ->
-        Misc.fatal_error "Encountered unknown value slot"
-      | Some (Live_value_slot { offset; size; is_scanned }) ->
-        offset, size, is_scanned
-    in
-    Format.printf "VALUE SLOT %a offset %d size %d is_scanned %b\n"
-      Value_slot.print value_slot offset size is_scanned;
-    None, env, res
   | Project_value_slot { project_from = _; value_slot } ->
     (* CR selee: This is also used to call external functions, will need to
        handle that *)
@@ -241,15 +246,13 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
 
 let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
-  let use_prim' prim =
-    use_prim ~env ~res prim [prim_arg ~env x; prim_arg ~env y]
-  in
+  let use_prim' prim = use_prim' ~env ~res prim [x; y] in
   match f with
   | Block_set { kind; init = _; field } ->
-    let x =
-      match prim_arg ~env x with
-      | Pv x -> x
-      | Pc _ -> Misc.fatal_error "Block_set on constant"
+    let x, res =
+      match prim_arg ~env ~res x with
+      | Pv x, res -> x, res
+      | Pc _, _res -> Misc.fatal_error "Block_set on constant"
     in
     let y, res = To_jsir_shared.simple ~env ~res y in
     ( None,
@@ -334,6 +337,8 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     match behaviour with
     | Yielding_bool comparison -> (
       let unsigned_le x y =
+        let x, res = prim_arg ~env ~res x in
+        let y, res = prim_arg ~env ~res y in
         let var_ule = Jsir.Var.fresh () in
         let var_eq = Jsir.Var.fresh () in
         let var_or = Jsir.Var.fresh () in
@@ -352,18 +357,16 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
           env,
           To_jsir_result.add_instr_exn res (Jsir.Let (var_or, expr_or)) )
       in
-      let x = prim_arg ~env x in
-      let y = prim_arg ~env y in
       match comparison with
-      | Eq -> use_prim ~env ~res Eq [x; y]
-      | Neq -> use_prim ~env ~res Neq [x; y]
-      | Lt Signed -> use_prim ~env ~res Lt [x; y]
-      | Lt Unsigned -> use_prim ~env ~res Ult [x; y]
-      | Gt Signed -> use_prim ~env ~res Lt [y; x]
-      | Gt Unsigned -> use_prim ~env ~res Ult [y; x]
-      | Le Signed -> use_prim ~env ~res Le [x; y]
+      | Eq -> use_prim' Eq
+      | Neq -> use_prim' Neq
+      | Lt Signed -> use_prim' Lt
+      | Lt Unsigned -> use_prim' Ult
+      | Gt Signed -> use_prim' Lt
+      | Gt Unsigned -> use_prim' Ult
+      | Le Signed -> use_prim' Le
       | Le Unsigned -> unsigned_le x y
-      | Ge Signed -> use_prim ~env ~res Le [y; x]
+      | Ge Signed -> use_prim' Le
       | Ge Unsigned -> unsigned_le y x)
     | Yielding_int_like_compare_functions signed_or_unsigned -> (
       match signed_or_unsigned with
@@ -424,18 +427,16 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     primitive_not_supported ()
 
 let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
-  let use_prim' prim =
-    use_prim ~env ~res prim [prim_arg ~env x; prim_arg ~env y; prim_arg ~env z]
-  in
+  let use_prim' prim = use_prim' ~env ~res prim [x; y; z] in
   match f with
   | Array_set (kind, set_kind) -> (
     match kind, set_kind with
     | ( (Immediates | Values | Naked_floats | Naked_float32s),
         (Immediates | Values _ | Naked_floats | Naked_float32s) ) ->
-      let arr =
-        match prim_arg ~env x with
-        | Pv v -> v
-        | Pc _ -> Misc.fatal_error "Array_set on constant"
+      let arr, res =
+        match prim_arg ~env ~res x with
+        | Pv v, res -> v, res
+        | Pc _, _res -> Misc.fatal_error "Array_set on constant"
       in
       let index, res = To_jsir_shared.simple ~env ~res y in
       let new_value, res = To_jsir_shared.simple ~env ~res z in
@@ -482,7 +483,7 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     use_prim' (Extern "caml_atomic_compare_exchange")
 
 let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
-  let use_prim' prim = use_prim ~env ~res prim (List.map (prim_arg ~env) xs) in
+  let use_prim' prim = use_prim' ~env ~res prim xs in
   match f with
   | Begin_region _ | Begin_try_region _ -> no_op ~env ~res
   | Make_block (kind, mut, _alloc_mode) ->
@@ -512,7 +513,7 @@ let primitive ~env ~res (prim : Flambda_primitive.t) _dbg =
   | Variadic (f, xs) -> variadic ~env ~res f xs
 
 let extern ~env ~res symbol args =
-  let args = List.map (prim_arg ~env) args in
+  let args, res = prim_args ~env ~res args in
   let name = Symbol.linkage_name_as_string symbol in
   let var = Jsir.Var.fresh () in
   var, To_jsir_result.add_instr_exn res (Let (var, Prim (Extern name, args)))
