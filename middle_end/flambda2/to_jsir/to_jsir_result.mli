@@ -40,3 +40,7 @@ val end_block_with_last_exn : t -> Jsir.last -> t
     current block. This function raises if there are still blocks being
     worked on, or there is a reserved address that has not been used yet. *)
 val to_program_exn : t -> Jsir.program
+
+(** Returns the address for a special block for invalid switches, creating one if it
+    doesn't exist already. *)
+val invalid_switch_block : t -> t * Jsir.Addr.t
