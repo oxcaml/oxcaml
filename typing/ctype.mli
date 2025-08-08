@@ -315,10 +315,6 @@ val path_of_generic_optional_type_path:
         Btype.generic_optional_type_path -> Path.t
 val jkind_of_generic_optional_type_path: type_declaration -> jkind_lr
 
-val extract_optional_tp_from_type_exn:
-        Env.t -> type_expr ->
-        (Btype.generic_optional_type_path * type_declaration) * type_expr
-
 val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
                   generic_optional_info:(Path.t * type_declaration) option ->
                   filtered_arrow

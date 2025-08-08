@@ -166,7 +166,7 @@ val type_argument:
 val extract_optional_tp_from_pattern_constraint_exn:
         Env.t -> Parsetree.pattern ->
         (Btype.generic_optional_type_path * type_declaration) *
-        Parsetree.core_type * Parsetree.pattern
+        type_expr * Parsetree.pattern
 
 val type_option_some:
         Env.t -> Parsetree.expression ->

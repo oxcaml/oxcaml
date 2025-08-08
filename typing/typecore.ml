@@ -887,12 +887,11 @@ let constant_or_raise env loc cst =
 let extract_optional_tp_from_pattern_constraint_exn env pat = match pat with
   | {Parsetree.ppat_desc = Ppat_constraint (under_pat, Some ty, modes); _} ->
       let (path_and_decl, arg) =
-        Typetexp.extract_optional_tp_from_type_parsetree_exn env ty
+        (* CR generic-optional: Look at the constructor for the underlying
+           modes *)
+        Typetexp.extract_optional_tp_from_type_parsetree_exn env ty modes
       in
-      (path_and_decl, arg,
-      (* CR generic-optional: Look at the constructor for the underlying modes*)
-      {pat with
-        Parsetree.ppat_desc = Ppat_constraint (under_pat, Some arg, modes)})
+      (path_and_decl, arg, under_pat)
   | _ -> Misc.fatal_error "Missing type annotation"
 
 (* Specific version of type_option, using newty rather than newgenty *)
@@ -4555,6 +4554,7 @@ let rec approx_type env sty =
       | Generic_optional_arg ->
           let (_, decl), _ =
             Typetexp.extract_optional_tp_from_type_parsetree_exn env arg_sty
+              arg_mode
           in
           newvar (jkind_of_generic_optional_type_path decl)
       | Required_or_position_arg ->
@@ -4573,7 +4573,6 @@ let rec approx_type env sty =
       end
     end
   | Ptyp_arrow (p, arg_sty, sty, arg_mode, _) ->
-      let arg_mode = Typemode.transl_alloc_mode arg_mode in
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
         match classify_optionality p with
@@ -4582,12 +4581,14 @@ let rec approx_type env sty =
         | Generic_optional_arg ->
             let (path, decl), _ =
               Typetexp.extract_optional_tp_from_type_parsetree_exn env arg_sty
+                arg_mode
             in
             type_generic_option path
               (newvar (jkind_of_generic_optional_type_path decl))
         | Required_or_position_arg ->
             newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
+      let arg_mode = Typemode.transl_alloc_mode arg_mode in
       let ret = approx_type env sty in
       let marg = Alloc.of_const arg_mode in
       let mret = Alloc.newvar () in
@@ -7590,9 +7591,8 @@ and type_function
                   let (path, _), underlying_typ, new_pat =
                     extract_optional_tp_from_pattern_constraint_exn env pat
                   in
-                  let gloc = { default.pexp_loc with loc_ghost = true } in
-                  Ast_helper.Exp.constraint_ default (Some underlying_typ)
-                    ~loc:gloc [], new_pat, Some path
+                  unify env underlying_typ ty_default_arg;
+                  default, new_pat, Some path
               | Required_or_position_arg -> assert false
             in
             (* Defaults are always global. They can be moved out of the
@@ -8314,7 +8314,8 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                     sarg.pexp_loc
               | Generic_optional_arg ->
                   let (path, _), _ =
-                    extract_optional_tp_from_type_exn env ty_arg
+                    Typetexp.extract_optional_tp_from_type_exn env ty_arg
+                      Location.none
                   in
                   type_generic_option_none env path
                     (instance (tpoly_get_mono ty_arg)) sarg.pexp_loc
@@ -8493,7 +8494,10 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
         if vars = [] then begin
           let ty_arg0' = tpoly_get_mono ty_arg0 in
           if wrapped_in_some then begin
-            let (path, _), _ = extract_optional_tp_from_type_exn env ty_arg in
+            let (path, _), _ =
+              Typetexp.extract_optional_tp_from_type_exn env ty_arg
+                sarg.pexp_loc
+            in
             type_generic_option_some env path expected_mode sarg ty_arg'
               ty_arg0'
           end else begin
@@ -8548,7 +8552,9 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
           let arg = type_option_none env (instance ty_arg) Location.none in
           (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
       | Generic_optional _ ->
-          let (path, _), _ = extract_optional_tp_from_type_exn env ty_arg in
+          let (path, _), _ =
+            Typetexp.extract_optional_tp_from_type_exn env ty_arg Location.none
+          in
           let arg = type_generic_option_none env path
                       (instance ty_arg) Location.none
           in
