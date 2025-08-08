@@ -567,6 +567,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
     ~return:Lambda.layout_module
     ~attr:{
       inline = inline_attribute;
+      expose = Default_expose; (* TODO XXX *)
       specialise = Default_specialise;
       local = Default_local;
       poll = Default_poll;
@@ -747,6 +748,10 @@ and transl_structure ~scopes loc fields cc rootpath final_env = function
           in
           let module_body =
             Translattribute.add_inline_attribute module_body mb.mb_loc
+                                                 mb.mb_attributes
+          in
+          let module_body =
+            Translattribute.add_expose_attribute module_body mb.mb_loc
                                                  mb.mb_attributes
           in
           (* Translate remainder second *)
