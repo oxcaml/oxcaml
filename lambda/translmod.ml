@@ -186,6 +186,9 @@ and apply_coercion_result loc strict funct params args cc_res =
                       ap_probe=None;
                     })))
 
+(* CR jrayman: delete [skip_wrap] *)
+and skip_wrap = Option.is_some (Sys.getenv_opt "SKIP_WRAP")
+
 and wrap_id_pos_list loc id_pos_list get_field get_layout lam =
   let fv = free_variables lam in
   (*Format.eprintf "%a@." Printlambda.lambda lam;
@@ -193,7 +196,7 @@ and wrap_id_pos_list loc id_pos_list get_field get_layout lam =
   Format.eprintf "@.";*)
   let (lam, _fv, s) =
     List.fold_left (fun (lam, fv, s) (id',pos,c) ->
-      if Ident.Set.mem id' fv then
+      if (not skip_wrap) && Ident.Set.mem id' fv then
         let id'' = Ident.create_local (Ident.name id') in
         let id''_duid = Lambda.debug_uid_none in
         let rhs = apply_coercion loc Alias c (get_field pos) in
@@ -1112,6 +1115,7 @@ let transl_implementation_module ~scopes module_id (str, cc, cc2) =
     let _ = add_arg_block_to_module_block in
     failwith "CR jrayman"
     (* add_arg_block_to_module_block lam repr cc2 *)
+    (* CR jrayman: talk with Luke with Chris *)
 
 let wrap_toplevel_functor_in_struct code =
   Lprim(Pmakeblock(0, Immutable, None, Lambda.alloc_heap),

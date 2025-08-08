@@ -6,3 +6,5 @@ Test 2: mixed to value only
 hello
 Test 3: nested modules
 1. 0. 0. 0.
+Test 4: composed coercions
+1. 2. s
