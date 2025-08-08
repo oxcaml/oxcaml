@@ -157,11 +157,13 @@ and 'k pattern_desc =
   (* value patterns *)
   | Tpat_any : value pattern_desc
         (** _ *)
-  | Tpat_var : Ident.t * string loc * Uid.t * Mode.Value.l -> value pattern_desc
+  | Tpat_var :
+      Ident.t * string loc * Uid.t * Jkind_types.Sort.t * Mode.Value.l ->
+      value pattern_desc
         (** x *)
   | Tpat_alias :
-      value general_pattern * Ident.t * string loc * Uid.t * Mode.Value.l
-      * Types.type_expr
+      value general_pattern * Ident.t * string loc * Uid.t * Jkind_types.Sort.t
+      * Mode.Value.l * Types.type_expr
         -> value pattern_desc
         (** P as a *)
   | Tpat_constant : constant -> value pattern_desc
