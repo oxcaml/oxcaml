@@ -348,7 +348,20 @@ L149:                                                ; preds = %L136
   store ptr @caml_exn_Division_by_zero, ptr %18
   %72 = load i64, ptr %18
   store i64 %72, ptr %3
-  call  void @llvm.trap()
+  %73 = load i64, ptr %ds
+  %74 = add i64 %73, 48
+  %75 = inttoptr i64 %74 to ptr
+  %76 = load i64, ptr %75
+  %77 = inttoptr i64 %76 to ptr
+  %78 = load i64, ptr %77
+  %79 = add i64 %76, 8
+  %80 = inttoptr i64 %79 to ptr
+  %81 = load ptr, ptr %80
+  %82 = load i64, ptr %3
+  %83 = add i64 %76, 16
+  store i64 %78, ptr %75
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %83)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %82, ptr %81)
   unreachable
 }
 
@@ -447,7 +460,20 @@ L172:                                                ; preds = %L154
   store ptr @caml_exn_Division_by_zero, ptr %18
   %61 = load i64, ptr %18
   store i64 %61, ptr %3
-  call  void @llvm.trap()
+  %62 = load i64, ptr %ds
+  %63 = add i64 %62, 48
+  %64 = inttoptr i64 %63 to ptr
+  %65 = load i64, ptr %64
+  %66 = inttoptr i64 %65 to ptr
+  %67 = load i64, ptr %66
+  %68 = add i64 %65, 8
+  %69 = inttoptr i64 %68 to ptr
+  %70 = load ptr, ptr %69
+  %71 = load i64, ptr %3
+  %72 = add i64 %65, 16
+  store i64 %67, ptr %64
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %72)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %71, ptr %70)
   unreachable
 }
 
@@ -1400,9 +1426,10 @@ L308:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %14
 }
 
-declare  void @llvm.trap()
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
+declare i32 @llvm.eh.ocaml.try() returns_twice
+declare void @llvm.eh.ocaml.touch(ptr)
 
 @camlInt_ops_data = external global ptr
 @caml_exn_Division_by_zero = external global ptr

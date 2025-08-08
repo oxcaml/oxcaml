@@ -41,7 +41,9 @@ L101:                                                ; preds = %L1
   %20 = load ptr, ptr %ds
   %21 = load i64, ptr %8
   %22 = inttoptr i64 %21 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
   %23 = call cc 104 { { ptr }, { i64 } } %22(ptr %20, i64 %18, i64 %19)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
   %24 = extractvalue { { ptr }, { i64 } } %23, 0, 0
   store ptr %24, ptr %ds
   %25 = extractvalue { { ptr }, { i64 } } %23, 1, 0
@@ -90,6 +92,8 @@ L109:                                                ; preds = %L1
 
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
+declare i32 @llvm.eh.ocaml.try() returns_twice
+declare void @llvm.eh.ocaml.touch(ptr)
 
 @caml_curry2 = external global ptr
 

@@ -1,0 +1,1642 @@
+source_filename = "exn_part2.ml"
+
+@camlExn_part2__data_begin = global {  } {  }, align 8
+define void @camlExn_part2__code_begin() { ret void }
+
+@camlExn_part2__gc_roots = global { ptr, i64 } { ptr @camlExn_part2__Exn3169, i64 0 }, align 8
+@.header.camlExn_part2 = global { i64 } { i64 8960 }, align 8
+@camlExn_part2 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlExn_part2__Exn3169, ptr @camlExn_part2__catch_exn1_from_llvm_7, ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_8, ptr @camlExn_part2__catch_exn1_nested_from_llvm_9, ptr @camlExn_part2__raise_1_10, ptr @camlExn_part2__raise_2_11, ptr @camlExn_part2__raise_HIDE_STAMP, ptr @camlExn_part2__complicated_13 }, align 8
+@.header.camlExn_part2__complicated_13 = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__complicated_13 = global { ptr, i64 } { ptr @camlExn_part2__complicated_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__raise_HIDE_STAMP = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__raise_3_12 = global { ptr, i64 } { ptr @camlExn_part2__raise_3_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__raise_HIDE_STAMP = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__raise_2_11 = global { ptr, i64 } { ptr @camlExn_part2__raise_2_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__raise_HIDE_STAMP = global { i64 } { i64 4087 }, align 8
+@camlExn_part2__raise_1_10 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlExn_part2__raise_1_HIDE_STAMP }, align 8
+@.header.camlExn_part2__catch_exn1_nested_from_llvm_9 = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__catch_exn1_nested_from_llvm_9 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__raise_exn1_catch_exn2_from_llvm_8 = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__raise_exn1_catch_exn2_from_llvm_8 = global { ptr, i64 } { ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__catch_exn1_from_llvm_7 = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__catch_exn1_from_llvm_7 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__Exn3169 = global { i64 } { i64 3064 }, align 8
+@camlExn_part2__Exn3169 = global { ptr, i64 } { ptr @camlExn_part2__immstring6, i64 1 }, align 8
+@.header.camlExn_part2__immstring6 = global { i64 } { i64 3068 }, align 8
+@camlExn_part2__immstring6 = global { [ 14 x i8 ], [ 1 x i8 ], i8 } { [ 14 x i8 ] c"\45\78\6e\5f\70\61\72\74\32\2e\45\78\6e\33", [ 1 x i8 ] zeroinitializer, i8 1 }, align 8
+define cc 104 { { ptr }, { i64 } } @camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %3 = alloca i64
+  store i64 %1, ptr %3
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = alloca i64
+  %20 = alloca i64
+  %21 = alloca i64
+  %22 = alloca i64
+  %23 = alloca i64
+  %24 = alloca i64
+  %25 = alloca i64
+  %26 = alloca i64
+  %27 = alloca i64
+  %28 = alloca i64
+  %29 = alloca i64
+  %30 = alloca i64
+  %31 = alloca i64
+  %32 = alloca i64
+  %33 = alloca i64
+  %34 = alloca i64
+  %35 = alloca i64
+  %36 = alloca i64
+  %37 = alloca i64
+  %38 = alloca i64
+  %39 = alloca i64
+  %40 = alloca i64
+  %41 = alloca i64
+  %42 = alloca i64
+  %43 = alloca i64
+  %44 = alloca i64
+  br label %L1
+L1:
+  br label %L101
+L101:                                                ; preds = %L1
+  %45 = load i64, ptr %3
+  store i64 %45, ptr %5
+  store ptr @camlExn_part1, ptr %6
+  %46 = load i64, ptr %6
+  store i64 %46, ptr %7
+  %47 = load i64, ptr %7
+  %48 = add i64 %47, 16
+  store i64 %48, ptr %7
+  %49 = load i64, ptr %7
+  %50 = add i64 %49, 0
+  %51 = inttoptr i64 %50 to ptr
+  %52 = load i64, ptr %51
+  store i64 %52, ptr %8
+  %53 = load i64, ptr %8
+  store i64 %53, ptr %9
+  %54 = load i64, ptr %ds
+  %55 = add i64 %54, 64
+  %56 = inttoptr i64 %55 to ptr
+  %57 = load i64, ptr %56
+  store i64 %57, ptr %10
+  %58 = load i64, ptr %10
+  store i64 %58, ptr %11
+  call void asm sideeffect "", "~{rax},~{rbx},~{rcx},~{rdx},~{rsi},~{rdi},~{r8},~{r9},~{r10},~{r11},~{r12},~{r13},~{r14},~{r15}"()
+  %59 = call  i32 @llvm.eh.ocaml.try() returns_twice
+  %60 = trunc i32 %59 to i1
+  br i1 %60, label %L106, label %61
+61:
+  %62 = alloca { i64, i64, i64, i64 }
+  %63 = load i64, ptr %ds
+  %64 = add i64 %63, 48
+  %65 = inttoptr i64 %64 to ptr
+  %66 = load i64, ptr %65
+  %67 = ptrtoint ptr %62 to i64
+  %68 = add i64 %67, 16
+  %69 = inttoptr i64 %68 to ptr
+  %70 = ptrtoint ptr %62 to i64
+  %71 = add i64 %70, 8
+  %72 = inttoptr i64 %71 to ptr
+  %73 = ptrtoint ptr %62 to i64
+  %74 = add i64 %73, 0
+  %75 = inttoptr i64 %74 to ptr
+  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %69)
+  store ptr blockaddress(@camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP, %L106), ptr %72
+  store i64 %66, ptr %75
+  store ptr %62, ptr %65
+  store i64 5, ptr %13
+  %76 = load i64, ptr %9
+  %77 = add i64 %76, 0
+  %78 = inttoptr i64 %77 to ptr
+  %79 = load i64, ptr %13
+  store i64 %79, ptr %78
+  store i64 1, ptr %14
+  %80 = load i64, ptr %14
+  store i64 %80, ptr %15
+  store ptr @camlExn_part1, ptr %16
+  %81 = load i64, ptr %16
+  store i64 %81, ptr %17
+  %82 = load i64, ptr %17
+  %83 = add i64 %82, 40
+  store i64 %83, ptr %17
+  %84 = load i64, ptr %17
+  %85 = add i64 %84, 0
+  %86 = inttoptr i64 %85 to ptr
+  %87 = load i64, ptr %86
+  store i64 %87, ptr %18
+  %88 = load i64, ptr %18
+  store i64 %88, ptr %19
+  store i64 1, ptr %20
+  %89 = load i64, ptr %19
+  %90 = add i64 %89, 0
+  %91 = inttoptr i64 %90 to ptr
+  %92 = load i64, ptr %91
+  store i64 %92, ptr %21
+  %93 = load i64, ptr %20
+  store i64 %93, ptr %3
+  %94 = load i64, ptr %19
+  store i64 %94, ptr %4
+  %95 = load i64, ptr %3
+  %96 = load i64, ptr %4
+  %97 = load ptr, ptr %ds
+  %98 = load i64, ptr %21
+  %99 = inttoptr i64 %98 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %100 = call cc 104 { { ptr }, { i64 } } %99(ptr %97, i64 %95, i64 %96)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %101 = extractvalue { { ptr }, { i64 } } %100, 0, 0
+  store ptr %101, ptr %ds
+  %102 = extractvalue { { ptr }, { i64 } } %100, 1, 0
+  store i64 %102, ptr %3
+  br label %L117
+L117:                                                ; preds = %L101
+  %103 = load i64, ptr %3
+  store i64 %103, ptr %22
+  %104 = load i64, ptr %22
+  store i64 %104, ptr %23
+  %105 = load i64, ptr %ds
+  %106 = add i64 %105, 48
+  %107 = inttoptr i64 %106 to ptr
+  %108 = load i64, ptr %62
+  store i64 %108, ptr %107
+  %109 = load i64, ptr %23
+  store i64 %109, ptr %3
+  %110 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %111 = load ptr, ptr %ds
+  %112 = insertvalue { { ptr }, { i64 } } %110, ptr %111, 0, 0
+  %113 = load i64, ptr %3
+  %114 = insertvalue { { ptr }, { i64 } } %112, i64 %113, 1, 0
+  ret { { ptr }, { i64 } } %114
+L106:                                                ; preds = %L101
+  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""()
+  call  void @llvm.eh.ocaml.touch(ptr %9)
+  call  void @llvm.eh.ocaml.touch(ptr %11)
+  %115 = call i64 asm sideeffect "movq %rax, $0", "=r,~{rax}"()
+  store i64 %115, ptr %3
+  %116 = load i64, ptr %3
+  store i64 %116, ptr %12
+  %117 = load i64, ptr %11
+  %118 = load i64, ptr %ds
+  %119 = add i64 %118, 64
+  %120 = inttoptr i64 %119 to ptr
+  store i64 %117, ptr %120
+  store i64 1, ptr %24
+  %121 = load i64, ptr %24
+  store i64 %121, ptr %25
+  store ptr @camlExn_part1, ptr %26
+  %122 = load i64, ptr %26
+  %123 = add i64 %122, 0
+  %124 = inttoptr i64 %123 to ptr
+  %125 = load i64, ptr %124
+  store i64 %125, ptr %27
+  %126 = load i64, ptr %12
+  %127 = add i64 %126, 0
+  %128 = inttoptr i64 %127 to ptr
+  %129 = load i64, ptr %128
+  store i64 %129, ptr %28
+  %130 = load i64, ptr %28
+  %131 = load i64, ptr %27
+  %132 = icmp slt i64 %130, %131
+  br i1 %132, label %L138, label %133
+133:
+  %134 = load i64, ptr %28
+  %135 = load i64, ptr %27
+  %136 = icmp sgt i64 %134, %135
+  br i1 %136, label %L138, label %L125
+L125:                                                ; preds = %L106
+  store ptr @camlExn_part1, ptr %29
+  %137 = load i64, ptr %29
+  store i64 %137, ptr %30
+  %138 = load i64, ptr %30
+  %139 = add i64 %138, 56
+  store i64 %139, ptr %30
+  %140 = load i64, ptr %30
+  %141 = add i64 %140, 0
+  %142 = inttoptr i64 %141 to ptr
+  %143 = load i64, ptr %142
+  store i64 %143, ptr %31
+  %144 = load i64, ptr %31
+  store i64 %144, ptr %32
+  %145 = load i64, ptr %9
+  %146 = add i64 %145, 0
+  %147 = inttoptr i64 %146 to ptr
+  %148 = load i64, ptr %147
+  store i64 %148, ptr %33
+  %149 = load i64, ptr %32
+  %150 = add i64 %149, 0
+  %151 = inttoptr i64 %150 to ptr
+  %152 = load i64, ptr %151
+  store i64 %152, ptr %34
+  %153 = load i64, ptr %33
+  store i64 %153, ptr %3
+  %154 = load i64, ptr %32
+  store i64 %154, ptr %4
+  %155 = load i64, ptr %3
+  %156 = load i64, ptr %4
+  %157 = load ptr, ptr %ds
+  %158 = load i64, ptr %34
+  %159 = inttoptr i64 %158 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %160 = call cc 104 { { ptr }, { i64 } } %159(ptr %157, i64 %155, i64 %156)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %161 = extractvalue { { ptr }, { i64 } } %160, 0, 0
+  store ptr %161, ptr %ds
+  %162 = extractvalue { { ptr }, { i64 } } %160, 1, 0
+  store i64 %162, ptr %3
+  br label %L129
+L129:                                                ; preds = %L125
+  %163 = load i64, ptr %3
+  store i64 %163, ptr %35
+  %164 = load i64, ptr %35
+  store i64 %164, ptr %36
+  store ptr @camlExn_part1, ptr %37
+  %165 = load i64, ptr %37
+  store i64 %165, ptr %38
+  %166 = load i64, ptr %38
+  %167 = add i64 %166, 56
+  store i64 %167, ptr %38
+  %168 = load i64, ptr %38
+  %169 = add i64 %168, 0
+  %170 = inttoptr i64 %169 to ptr
+  %171 = load i64, ptr %170
+  store i64 %171, ptr %39
+  %172 = load i64, ptr %39
+  store i64 %172, ptr %40
+  %173 = load i64, ptr %12
+  store i64 %173, ptr %41
+  %174 = load i64, ptr %41
+  %175 = add i64 %174, 8
+  store i64 %175, ptr %41
+  %176 = load i64, ptr %41
+  %177 = add i64 %176, 0
+  %178 = inttoptr i64 %177 to ptr
+  %179 = load i64, ptr %178
+  store i64 %179, ptr %42
+  %180 = load i64, ptr %40
+  %181 = add i64 %180, 0
+  %182 = inttoptr i64 %181 to ptr
+  %183 = load i64, ptr %182
+  store i64 %183, ptr %43
+  %184 = load i64, ptr %42
+  store i64 %184, ptr %3
+  %185 = load i64, ptr %40
+  store i64 %185, ptr %4
+  %186 = load i64, ptr %3
+  %187 = load i64, ptr %4
+  %188 = load ptr, ptr %ds
+  %189 = load i64, ptr %43
+  %190 = inttoptr i64 %189 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %191 = call cc 104 { { ptr }, { i64 } } %190(ptr %188, i64 %186, i64 %187)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %192 = extractvalue { { ptr }, { i64 } } %191, 0, 0
+  store ptr %192, ptr %ds
+  %193 = extractvalue { { ptr }, { i64 } } %191, 1, 0
+  store i64 %193, ptr %3
+  br label %L134
+L134:                                                ; preds = %L129
+  %194 = load i64, ptr %3
+  store i64 %194, ptr %44
+  %195 = load i64, ptr %44
+  store i64 %195, ptr %3
+  %196 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %197 = load ptr, ptr %ds
+  %198 = insertvalue { { ptr }, { i64 } } %196, ptr %197, 0, 0
+  %199 = load i64, ptr %3
+  %200 = insertvalue { { ptr }, { i64 } } %198, i64 %199, 1, 0
+  ret { { ptr }, { i64 } } %200
+L138:                                                ; preds = %L106
+  %201 = load i64, ptr %12
+  store i64 %201, ptr %3
+  %202 = load i64, ptr %ds
+  %203 = add i64 %202, 48
+  %204 = inttoptr i64 %203 to ptr
+  %205 = load i64, ptr %204
+  %206 = inttoptr i64 %205 to ptr
+  %207 = load i64, ptr %206
+  %208 = add i64 %205, 8
+  %209 = inttoptr i64 %208 to ptr
+  %210 = load ptr, ptr %209
+  %211 = load i64, ptr %3
+  %212 = add i64 %205, 16
+  store i64 %207, ptr %204
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %212)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %211, ptr %210)
+  unreachable
+}
+
+define cc 104 { { ptr }, { i64 } } @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %3 = alloca i64
+  store i64 %1, ptr %3
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = alloca i64
+  %20 = alloca i64
+  %21 = alloca i64
+  %22 = alloca i64
+  %23 = alloca i64
+  %24 = alloca i64
+  %25 = alloca i64
+  %26 = alloca i64
+  %27 = alloca i64
+  %28 = alloca i64
+  br label %L1
+L1:
+  br label %L143
+L143:                                                ; preds = %L1
+  %29 = load i64, ptr %3
+  store i64 %29, ptr %5
+  store ptr @camlExn_part1, ptr %6
+  %30 = load i64, ptr %6
+  store i64 %30, ptr %7
+  %31 = load i64, ptr %7
+  %32 = add i64 %31, 16
+  store i64 %32, ptr %7
+  %33 = load i64, ptr %7
+  %34 = add i64 %33, 0
+  %35 = inttoptr i64 %34 to ptr
+  %36 = load i64, ptr %35
+  store i64 %36, ptr %8
+  store i64 7, ptr %9
+  %37 = load i64, ptr %8
+  %38 = add i64 %37, 0
+  %39 = inttoptr i64 %38 to ptr
+  %40 = load i64, ptr %9
+  store i64 %40, ptr %39
+  store i64 1, ptr %10
+  %41 = load i64, ptr %10
+  store i64 %41, ptr %11
+  %42 = load i64, ptr %ds
+  %43 = add i64 %42, 64
+  %44 = inttoptr i64 %43 to ptr
+  %45 = load i64, ptr %44
+  store i64 %45, ptr %12
+  %46 = load i64, ptr %12
+  store i64 %46, ptr %13
+  call void asm sideeffect "", "~{rax},~{rbx},~{rcx},~{rdx},~{rsi},~{rdi},~{r8},~{r9},~{r10},~{r11},~{r12},~{r13},~{r14},~{r15}"()
+  %47 = call  i32 @llvm.eh.ocaml.try() returns_twice
+  %48 = trunc i32 %47 to i1
+  br i1 %48, label %L149, label %49
+49:
+  %50 = alloca { i64, i64, i64, i64 }
+  %51 = load i64, ptr %ds
+  %52 = add i64 %51, 48
+  %53 = inttoptr i64 %52 to ptr
+  %54 = load i64, ptr %53
+  %55 = ptrtoint ptr %50 to i64
+  %56 = add i64 %55, 16
+  %57 = inttoptr i64 %56 to ptr
+  %58 = ptrtoint ptr %50 to i64
+  %59 = add i64 %58, 8
+  %60 = inttoptr i64 %59 to ptr
+  %61 = ptrtoint ptr %50 to i64
+  %62 = add i64 %61, 0
+  %63 = inttoptr i64 %62 to ptr
+  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %57)
+  store ptr blockaddress(@camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP, %L149), ptr %60
+  store i64 %54, ptr %63
+  store ptr %50, ptr %53
+  store ptr @camlExn_part1, ptr %15
+  %64 = load i64, ptr %15
+  store i64 %64, ptr %16
+  %65 = load i64, ptr %16
+  %66 = add i64 %65, 32
+  store i64 %66, ptr %16
+  %67 = load i64, ptr %16
+  %68 = add i64 %67, 0
+  %69 = inttoptr i64 %68 to ptr
+  %70 = load i64, ptr %69
+  store i64 %70, ptr %17
+  %71 = load i64, ptr %17
+  store i64 %71, ptr %18
+  store i64 61, ptr %19
+  %72 = load i64, ptr %18
+  %73 = add i64 %72, 0
+  %74 = inttoptr i64 %73 to ptr
+  %75 = load i64, ptr %74
+  store i64 %75, ptr %20
+  %76 = load i64, ptr %19
+  store i64 %76, ptr %3
+  %77 = load i64, ptr %18
+  store i64 %77, ptr %4
+  %78 = load i64, ptr %3
+  %79 = load i64, ptr %4
+  %80 = load ptr, ptr %ds
+  %81 = load i64, ptr %20
+  %82 = inttoptr i64 %81 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %83 = call cc 104 { { ptr }, { i64 } } %82(ptr %80, i64 %78, i64 %79)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %84 = extractvalue { { ptr }, { i64 } } %83, 0, 0
+  store ptr %84, ptr %ds
+  %85 = extractvalue { { ptr }, { i64 } } %83, 1, 0
+  store i64 %85, ptr %3
+  br label %L159
+L159:                                                ; preds = %L143
+  %86 = load i64, ptr %3
+  store i64 %86, ptr %21
+  %87 = load i64, ptr %21
+  store i64 %87, ptr %22
+  %88 = load i64, ptr %ds
+  %89 = add i64 %88, 48
+  %90 = inttoptr i64 %89 to ptr
+  %91 = load i64, ptr %50
+  store i64 %91, ptr %90
+  %92 = load i64, ptr %22
+  store i64 %92, ptr %3
+  %93 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %94 = load ptr, ptr %ds
+  %95 = insertvalue { { ptr }, { i64 } } %93, ptr %94, 0, 0
+  %96 = load i64, ptr %3
+  %97 = insertvalue { { ptr }, { i64 } } %95, i64 %96, 1, 0
+  ret { { ptr }, { i64 } } %97
+L149:                                                ; preds = %L143
+  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""()
+  call  void @llvm.eh.ocaml.touch(ptr %13)
+  %98 = call i64 asm sideeffect "movq %rax, $0", "=r,~{rax}"()
+  store i64 %98, ptr %3
+  %99 = load i64, ptr %3
+  store i64 %99, ptr %14
+  %100 = load i64, ptr %13
+  %101 = load i64, ptr %ds
+  %102 = add i64 %101, 64
+  %103 = inttoptr i64 %102 to ptr
+  store i64 %100, ptr %103
+  store i64 1, ptr %23
+  %104 = load i64, ptr %23
+  store i64 %104, ptr %24
+  store ptr @camlExn_part1, ptr %25
+  %105 = load i64, ptr %25
+  store i64 %105, ptr %26
+  %106 = load i64, ptr %26
+  %107 = add i64 %106, 8
+  store i64 %107, ptr %26
+  %108 = load i64, ptr %26
+  %109 = add i64 %108, 0
+  %110 = inttoptr i64 %109 to ptr
+  %111 = load i64, ptr %110
+  store i64 %111, ptr %27
+  %112 = load i64, ptr %14
+  %113 = load i64, ptr %27
+  %114 = icmp slt i64 %112, %113
+  br i1 %114, label %L169, label %115
+115:
+  %116 = load i64, ptr %14
+  %117 = load i64, ptr %27
+  %118 = icmp sgt i64 %116, %117
+  br i1 %118, label %L169, label %L167
+L167:                                                ; preds = %L149
+  store i64 1, ptr %28
+  %119 = load i64, ptr %28
+  store i64 %119, ptr %3
+  %120 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %121 = load ptr, ptr %ds
+  %122 = insertvalue { { ptr }, { i64 } } %120, ptr %121, 0, 0
+  %123 = load i64, ptr %3
+  %124 = insertvalue { { ptr }, { i64 } } %122, i64 %123, 1, 0
+  ret { { ptr }, { i64 } } %124
+L169:                                                ; preds = %L149
+  %125 = load i64, ptr %14
+  store i64 %125, ptr %3
+  %126 = load i64, ptr %ds
+  %127 = add i64 %126, 48
+  %128 = inttoptr i64 %127 to ptr
+  %129 = load i64, ptr %128
+  %130 = inttoptr i64 %129 to ptr
+  %131 = load i64, ptr %130
+  %132 = add i64 %129, 8
+  %133 = inttoptr i64 %132 to ptr
+  %134 = load ptr, ptr %133
+  %135 = load i64, ptr %3
+  %136 = add i64 %129, 16
+  store i64 %131, ptr %128
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %136)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %135, ptr %134)
+  unreachable
+}
+
+define cc 104 { { ptr }, { i64 } } @camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %3 = alloca i64
+  store i64 %1, ptr %3
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = alloca i64
+  %20 = alloca i64
+  %21 = alloca i64
+  %22 = alloca i64
+  %23 = alloca i64
+  %24 = alloca i64
+  %25 = alloca i64
+  %26 = alloca i64
+  %27 = alloca i64
+  %28 = alloca i64
+  %29 = alloca i64
+  %30 = alloca i64
+  %31 = alloca i64
+  %32 = alloca i64
+  %33 = alloca i64
+  %34 = alloca i64
+  %35 = alloca i64
+  %36 = alloca i64
+  %37 = alloca i64
+  %38 = alloca i64
+  %39 = alloca i64
+  br label %L1
+L1:
+  br label %L174
+L174:                                                ; preds = %L1
+  %40 = load i64, ptr %3
+  store i64 %40, ptr %5
+  store ptr @camlExn_part1, ptr %6
+  %41 = load i64, ptr %6
+  store i64 %41, ptr %7
+  %42 = load i64, ptr %7
+  %43 = add i64 %42, 16
+  store i64 %43, ptr %7
+  %44 = load i64, ptr %7
+  %45 = add i64 %44, 0
+  %46 = inttoptr i64 %45 to ptr
+  %47 = load i64, ptr %46
+  store i64 %47, ptr %8
+  %48 = load i64, ptr %8
+  store i64 %48, ptr %9
+  %49 = load i64, ptr %ds
+  %50 = add i64 %49, 64
+  %51 = inttoptr i64 %50 to ptr
+  %52 = load i64, ptr %51
+  store i64 %52, ptr %10
+  %53 = load i64, ptr %10
+  store i64 %53, ptr %11
+  call void asm sideeffect "", "~{rax},~{rbx},~{rcx},~{rdx},~{rsi},~{rdi},~{r8},~{r9},~{r10},~{r11},~{r12},~{r13},~{r14},~{r15}"()
+  %54 = call  i32 @llvm.eh.ocaml.try() returns_twice
+  %55 = trunc i32 %54 to i1
+  br i1 %55, label %L179, label %56
+56:
+  %57 = alloca { i64, i64, i64, i64 }
+  %58 = load i64, ptr %ds
+  %59 = add i64 %58, 48
+  %60 = inttoptr i64 %59 to ptr
+  %61 = load i64, ptr %60
+  %62 = ptrtoint ptr %57 to i64
+  %63 = add i64 %62, 16
+  %64 = inttoptr i64 %63 to ptr
+  %65 = ptrtoint ptr %57 to i64
+  %66 = add i64 %65, 8
+  %67 = inttoptr i64 %66 to ptr
+  %68 = ptrtoint ptr %57 to i64
+  %69 = add i64 %68, 0
+  %70 = inttoptr i64 %69 to ptr
+  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %64)
+  store ptr blockaddress(@camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP, %L179), ptr %67
+  store i64 %61, ptr %70
+  store ptr %57, ptr %60
+  store i64 9, ptr %13
+  %71 = load i64, ptr %9
+  %72 = add i64 %71, 0
+  %73 = inttoptr i64 %72 to ptr
+  %74 = load i64, ptr %13
+  store i64 %74, ptr %73
+  store i64 1, ptr %14
+  %75 = load i64, ptr %14
+  store i64 %75, ptr %15
+  store i64 1, ptr %16
+  %76 = load i64, ptr %16
+  store i64 %76, ptr %3
+  %77 = load i64, ptr %3
+  %78 = load ptr, ptr %ds
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %79 = call cc 104 { { ptr }, { i64 } } @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP(ptr %78, i64 %77)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %80 = extractvalue { { ptr }, { i64 } } %79, 0, 0
+  store ptr %80, ptr %ds
+  %81 = extractvalue { { ptr }, { i64 } } %79, 1, 0
+  store i64 %81, ptr %3
+  br label %L188
+L188:                                                ; preds = %L174
+  %82 = load i64, ptr %3
+  store i64 %82, ptr %17
+  %83 = load i64, ptr %17
+  store i64 %83, ptr %18
+  %84 = load i64, ptr %ds
+  %85 = add i64 %84, 48
+  %86 = inttoptr i64 %85 to ptr
+  %87 = load i64, ptr %57
+  store i64 %87, ptr %86
+  %88 = load i64, ptr %18
+  store i64 %88, ptr %3
+  %89 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %90 = load ptr, ptr %ds
+  %91 = insertvalue { { ptr }, { i64 } } %89, ptr %90, 0, 0
+  %92 = load i64, ptr %3
+  %93 = insertvalue { { ptr }, { i64 } } %91, i64 %92, 1, 0
+  ret { { ptr }, { i64 } } %93
+L179:                                                ; preds = %L174
+  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""()
+  call  void @llvm.eh.ocaml.touch(ptr %9)
+  call  void @llvm.eh.ocaml.touch(ptr %11)
+  %94 = call i64 asm sideeffect "movq %rax, $0", "=r,~{rax}"()
+  store i64 %94, ptr %3
+  %95 = load i64, ptr %3
+  store i64 %95, ptr %12
+  %96 = load i64, ptr %11
+  %97 = load i64, ptr %ds
+  %98 = add i64 %97, 64
+  %99 = inttoptr i64 %98 to ptr
+  store i64 %96, ptr %99
+  store i64 1, ptr %19
+  %100 = load i64, ptr %19
+  store i64 %100, ptr %20
+  store ptr @camlExn_part1, ptr %21
+  %101 = load i64, ptr %21
+  %102 = add i64 %101, 0
+  %103 = inttoptr i64 %102 to ptr
+  %104 = load i64, ptr %103
+  store i64 %104, ptr %22
+  %105 = load i64, ptr %12
+  %106 = add i64 %105, 0
+  %107 = inttoptr i64 %106 to ptr
+  %108 = load i64, ptr %107
+  store i64 %108, ptr %23
+  %109 = load i64, ptr %23
+  %110 = load i64, ptr %22
+  %111 = icmp slt i64 %109, %110
+  br i1 %111, label %L208, label %112
+112:
+  %113 = load i64, ptr %23
+  %114 = load i64, ptr %22
+  %115 = icmp sgt i64 %113, %114
+  br i1 %115, label %L208, label %L195
+L195:                                                ; preds = %L179
+  store ptr @camlExn_part1, ptr %24
+  %116 = load i64, ptr %24
+  store i64 %116, ptr %25
+  %117 = load i64, ptr %25
+  %118 = add i64 %117, 56
+  store i64 %118, ptr %25
+  %119 = load i64, ptr %25
+  %120 = add i64 %119, 0
+  %121 = inttoptr i64 %120 to ptr
+  %122 = load i64, ptr %121
+  store i64 %122, ptr %26
+  %123 = load i64, ptr %26
+  store i64 %123, ptr %27
+  %124 = load i64, ptr %9
+  %125 = add i64 %124, 0
+  %126 = inttoptr i64 %125 to ptr
+  %127 = load i64, ptr %126
+  store i64 %127, ptr %28
+  %128 = load i64, ptr %27
+  %129 = add i64 %128, 0
+  %130 = inttoptr i64 %129 to ptr
+  %131 = load i64, ptr %130
+  store i64 %131, ptr %29
+  %132 = load i64, ptr %28
+  store i64 %132, ptr %3
+  %133 = load i64, ptr %27
+  store i64 %133, ptr %4
+  %134 = load i64, ptr %3
+  %135 = load i64, ptr %4
+  %136 = load ptr, ptr %ds
+  %137 = load i64, ptr %29
+  %138 = inttoptr i64 %137 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %139 = call cc 104 { { ptr }, { i64 } } %138(ptr %136, i64 %134, i64 %135)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %140 = extractvalue { { ptr }, { i64 } } %139, 0, 0
+  store ptr %140, ptr %ds
+  %141 = extractvalue { { ptr }, { i64 } } %139, 1, 0
+  store i64 %141, ptr %3
+  br label %L199
+L199:                                                ; preds = %L195
+  %142 = load i64, ptr %3
+  store i64 %142, ptr %30
+  %143 = load i64, ptr %30
+  store i64 %143, ptr %31
+  store ptr @camlExn_part1, ptr %32
+  %144 = load i64, ptr %32
+  store i64 %144, ptr %33
+  %145 = load i64, ptr %33
+  %146 = add i64 %145, 56
+  store i64 %146, ptr %33
+  %147 = load i64, ptr %33
+  %148 = add i64 %147, 0
+  %149 = inttoptr i64 %148 to ptr
+  %150 = load i64, ptr %149
+  store i64 %150, ptr %34
+  %151 = load i64, ptr %34
+  store i64 %151, ptr %35
+  %152 = load i64, ptr %12
+  store i64 %152, ptr %36
+  %153 = load i64, ptr %36
+  %154 = add i64 %153, 8
+  store i64 %154, ptr %36
+  %155 = load i64, ptr %36
+  %156 = add i64 %155, 0
+  %157 = inttoptr i64 %156 to ptr
+  %158 = load i64, ptr %157
+  store i64 %158, ptr %37
+  %159 = load i64, ptr %35
+  %160 = add i64 %159, 0
+  %161 = inttoptr i64 %160 to ptr
+  %162 = load i64, ptr %161
+  store i64 %162, ptr %38
+  %163 = load i64, ptr %37
+  store i64 %163, ptr %3
+  %164 = load i64, ptr %35
+  store i64 %164, ptr %4
+  %165 = load i64, ptr %3
+  %166 = load i64, ptr %4
+  %167 = load ptr, ptr %ds
+  %168 = load i64, ptr %38
+  %169 = inttoptr i64 %168 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %170 = call cc 104 { { ptr }, { i64 } } %169(ptr %167, i64 %165, i64 %166)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %171 = extractvalue { { ptr }, { i64 } } %170, 0, 0
+  store ptr %171, ptr %ds
+  %172 = extractvalue { { ptr }, { i64 } } %170, 1, 0
+  store i64 %172, ptr %3
+  br label %L204
+L204:                                                ; preds = %L199
+  %173 = load i64, ptr %3
+  store i64 %173, ptr %39
+  %174 = load i64, ptr %39
+  store i64 %174, ptr %3
+  %175 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %176 = load ptr, ptr %ds
+  %177 = insertvalue { { ptr }, { i64 } } %175, ptr %176, 0, 0
+  %178 = load i64, ptr %3
+  %179 = insertvalue { { ptr }, { i64 } } %177, i64 %178, 1, 0
+  ret { { ptr }, { i64 } } %179
+L208:                                                ; preds = %L179
+  %180 = load i64, ptr %12
+  store i64 %180, ptr %3
+  %181 = load i64, ptr %ds
+  %182 = add i64 %181, 48
+  %183 = inttoptr i64 %182 to ptr
+  %184 = load i64, ptr %183
+  %185 = inttoptr i64 %184 to ptr
+  %186 = load i64, ptr %185
+  %187 = add i64 %184, 8
+  %188 = inttoptr i64 %187 to ptr
+  %189 = load ptr, ptr %188
+  %190 = load i64, ptr %3
+  %191 = add i64 %184, 16
+  store i64 %186, ptr %183
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %191)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %190, ptr %189)
+  unreachable
+}
+
+define cc 104 { { ptr }, { i64 } } @camlExn_part2__raise_1_HIDE_STAMP(ptr %0, i64 %1, i64 %2)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %4 = alloca i64
+  store i64 %1, ptr %4
+  %5 = alloca i64
+  store i64 %2, ptr %5
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  br label %L1
+L1:
+  br label %L213
+L213:                                                ; preds = %L1
+  %14 = load i64, ptr %4
+  store i64 %14, ptr %6
+  %15 = load i64, ptr %5
+  store i64 %15, ptr %7
+  store ptr @camlExn_part1, ptr %8
+  %16 = load i64, ptr %8
+  store i64 %16, ptr %9
+  %17 = load i64, ptr %9
+  %18 = add i64 %17, 32
+  store i64 %18, ptr %9
+  %19 = load i64, ptr %9
+  %20 = add i64 %19, 0
+  %21 = inttoptr i64 %20 to ptr
+  %22 = load i64, ptr %21
+  store i64 %22, ptr %10
+  %23 = load i64, ptr %10
+  store i64 %23, ptr %11
+  %24 = load i64, ptr %11
+  %25 = add i64 %24, 0
+  %26 = inttoptr i64 %25 to ptr
+  %27 = load i64, ptr %26
+  store i64 %27, ptr %12
+  %28 = load i64, ptr %6
+  store i64 %28, ptr %4
+  %29 = load i64, ptr %11
+  store i64 %29, ptr %5
+  %30 = load i64, ptr %4
+  %31 = load i64, ptr %5
+  %32 = load ptr, ptr %ds
+  %33 = load i64, ptr %12
+  %34 = inttoptr i64 %33 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %35 = call cc 104 { { ptr }, { i64 } } %34(ptr %32, i64 %30, i64 %31)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %36 = extractvalue { { ptr }, { i64 } } %35, 0, 0
+  store ptr %36, ptr %ds
+  %37 = extractvalue { { ptr }, { i64 } } %35, 1, 0
+  store i64 %37, ptr %4
+  br label %L217
+L217:                                                ; preds = %L213
+  %38 = load i64, ptr %4
+  store i64 %38, ptr %13
+  %39 = load i64, ptr %13
+  store i64 %39, ptr %4
+  %40 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %41 = load ptr, ptr %ds
+  %42 = insertvalue { { ptr }, { i64 } } %40, ptr %41, 0, 0
+  %43 = load i64, ptr %4
+  %44 = insertvalue { { ptr }, { i64 } } %42, i64 %43, 1, 0
+  ret { { ptr }, { i64 } } %44
+}
+
+define cc 104 { { ptr }, { i64 } } @camlExn_part2__raise_2_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %3 = alloca i64
+  store i64 %1, ptr %3
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  br label %L1
+L1:
+  br label %L220
+L220:                                                ; preds = %L1
+  %8 = load i64, ptr %3
+  store i64 %8, ptr %4
+  store ptr @camlExn_part1, ptr %5
+  %9 = load i64, ptr %5
+  store i64 %9, ptr %6
+  %10 = load i64, ptr %6
+  %11 = add i64 %10, 8
+  store i64 %11, ptr %6
+  %12 = load i64, ptr %6
+  %13 = add i64 %12, 0
+  %14 = inttoptr i64 %13 to ptr
+  %15 = load i64, ptr %14
+  store i64 %15, ptr %7
+  %16 = load i64, ptr %7
+  store i64 %16, ptr %3
+  %17 = load i64, ptr %ds
+  %18 = add i64 %17, 48
+  %19 = inttoptr i64 %18 to ptr
+  %20 = load i64, ptr %19
+  %21 = inttoptr i64 %20 to ptr
+  %22 = load i64, ptr %21
+  %23 = add i64 %20, 8
+  %24 = inttoptr i64 %23 to ptr
+  %25 = load ptr, ptr %24
+  %26 = load i64, ptr %3
+  %27 = add i64 %20, 16
+  store i64 %22, ptr %19
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %27)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %26, ptr %25)
+  unreachable
+}
+
+define cc 104 { { ptr }, { i64 } } @camlExn_part2__raise_3_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %3 = alloca i64
+  store i64 %1, ptr %3
+  %4 = alloca i64
+  %5 = alloca i64
+  br label %L1
+L1:
+  br label %L225
+L225:                                                ; preds = %L1
+  %6 = load i64, ptr %3
+  store i64 %6, ptr %4
+  store ptr @camlExn_part2__Exn3169, ptr %5
+  %7 = load i64, ptr %5
+  store i64 %7, ptr %3
+  %8 = load i64, ptr %ds
+  %9 = add i64 %8, 48
+  %10 = inttoptr i64 %9 to ptr
+  %11 = load i64, ptr %10
+  %12 = inttoptr i64 %11 to ptr
+  %13 = load i64, ptr %12
+  %14 = add i64 %11, 8
+  %15 = inttoptr i64 %14 to ptr
+  %16 = load ptr, ptr %15
+  %17 = load i64, ptr %3
+  %18 = add i64 %11, 16
+  store i64 %13, ptr %10
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %18)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %17, ptr %16)
+  unreachable
+}
+
+define cc 104 { { ptr }, { i64 } } @camlExn_part2__complicated_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %3 = alloca i64
+  store i64 %1, ptr %3
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = alloca i64
+  %20 = alloca i64
+  %21 = alloca i64
+  %22 = alloca i64
+  %23 = alloca i64
+  %24 = alloca i64
+  %25 = alloca i64
+  %26 = alloca i64
+  %27 = alloca i64
+  %28 = alloca i64
+  %29 = alloca i64
+  %30 = alloca i64
+  %31 = alloca i64
+  %32 = alloca i64
+  %33 = alloca i64
+  %34 = alloca i64
+  %35 = alloca i64
+  %36 = alloca i64
+  %37 = alloca i64
+  %38 = alloca i64
+  %39 = alloca i64
+  %40 = alloca i64
+  %41 = alloca i64
+  %42 = alloca i64
+  %43 = alloca i64
+  %44 = alloca i64
+  %45 = alloca i64
+  %46 = alloca i64
+  %47 = alloca i64
+  %48 = alloca i64
+  %49 = alloca i64
+  %50 = alloca i64
+  %51 = alloca i64
+  %52 = alloca i64
+  %53 = alloca i64
+  %54 = alloca i64
+  %55 = alloca i64
+  %56 = alloca i64
+  %57 = alloca i64
+  %58 = alloca i64
+  %59 = alloca i64
+  %60 = alloca i64
+  %61 = alloca i64
+  %62 = alloca i64
+  %63 = alloca i64
+  %64 = alloca i64
+  %65 = alloca i64
+  %66 = alloca i64
+  %67 = alloca i64
+  %68 = alloca i64
+  br label %L1
+L1:
+  br label %L228
+L228:                                                ; preds = %L1
+  %69 = load i64, ptr %3
+  store i64 %69, ptr %5
+  store ptr @camlExn_part1, ptr %6
+  %70 = load i64, ptr %6
+  store i64 %70, ptr %7
+  %71 = load i64, ptr %7
+  %72 = add i64 %71, 48
+  store i64 %72, ptr %7
+  %73 = load i64, ptr %7
+  %74 = add i64 %73, 0
+  %75 = inttoptr i64 %74 to ptr
+  %76 = load i64, ptr %75
+  store i64 %76, ptr %8
+  %77 = load i64, ptr %8
+  store i64 %77, ptr %9
+  store i64 41, ptr %10
+  %78 = load i64, ptr %9
+  %79 = add i64 %78, 0
+  %80 = inttoptr i64 %79 to ptr
+  %81 = load i64, ptr %80
+  store i64 %81, ptr %11
+  %82 = load i64, ptr %10
+  store i64 %82, ptr %3
+  %83 = load i64, ptr %9
+  store i64 %83, ptr %4
+  %84 = load i64, ptr %3
+  %85 = load i64, ptr %4
+  %86 = load ptr, ptr %ds
+  %87 = load i64, ptr %11
+  %88 = inttoptr i64 %87 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %89 = call cc 104 { { ptr }, { i64 } } %88(ptr %86, i64 %84, i64 %85)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %90 = extractvalue { { ptr }, { i64 } } %89, 0, 0
+  store ptr %90, ptr %ds
+  %91 = extractvalue { { ptr }, { i64 } } %89, 1, 0
+  store i64 %91, ptr %3
+  br label %L232
+L232:                                                ; preds = %L228
+  %92 = load i64, ptr %3
+  store i64 %92, ptr %12
+  %93 = load i64, ptr %12
+  store i64 %93, ptr %13
+  %94 = load i64, ptr %ds
+  %95 = add i64 %94, 64
+  %96 = inttoptr i64 %95 to ptr
+  %97 = load i64, ptr %96
+  store i64 %97, ptr %14
+  %98 = load i64, ptr %14
+  store i64 %98, ptr %15
+  call void asm sideeffect "", "~{rax},~{rbx},~{rcx},~{rdx},~{rsi},~{rdi},~{r8},~{r9},~{r10},~{r11},~{r12},~{r13},~{r14},~{r15}"()
+  %99 = call  i32 @llvm.eh.ocaml.try() returns_twice
+  %100 = trunc i32 %99 to i1
+  br i1 %100, label %L235, label %101
+101:
+  %102 = alloca { i64, i64, i64, i64 }
+  %103 = load i64, ptr %ds
+  %104 = add i64 %103, 48
+  %105 = inttoptr i64 %104 to ptr
+  %106 = load i64, ptr %105
+  %107 = ptrtoint ptr %102 to i64
+  %108 = add i64 %107, 16
+  %109 = inttoptr i64 %108 to ptr
+  %110 = ptrtoint ptr %102 to i64
+  %111 = add i64 %110, 8
+  %112 = inttoptr i64 %111 to ptr
+  %113 = ptrtoint ptr %102 to i64
+  %114 = add i64 %113, 0
+  %115 = inttoptr i64 %114 to ptr
+  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %109)
+  store ptr blockaddress(@camlExn_part2__complicated_HIDE_STAMP, %L235), ptr %112
+  store i64 %106, ptr %115
+  store ptr %102, ptr %105
+  store ptr @camlExn_part1, ptr %18
+  %116 = load i64, ptr %18
+  store i64 %116, ptr %19
+  %117 = load i64, ptr %19
+  %118 = add i64 %117, 48
+  store i64 %118, ptr %19
+  %119 = load i64, ptr %19
+  %120 = add i64 %119, 0
+  %121 = inttoptr i64 %120 to ptr
+  %122 = load i64, ptr %121
+  store i64 %122, ptr %20
+  %123 = load i64, ptr %20
+  store i64 %123, ptr %21
+  store i64 61, ptr %22
+  %124 = load i64, ptr %21
+  %125 = add i64 %124, 0
+  %126 = inttoptr i64 %125 to ptr
+  %127 = load i64, ptr %126
+  store i64 %127, ptr %23
+  %128 = load i64, ptr %22
+  store i64 %128, ptr %3
+  %129 = load i64, ptr %21
+  store i64 %129, ptr %4
+  %130 = load i64, ptr %3
+  %131 = load i64, ptr %4
+  %132 = load ptr, ptr %ds
+  %133 = load i64, ptr %23
+  %134 = inttoptr i64 %133 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %135 = call cc 104 { { ptr }, { i64 } } %134(ptr %132, i64 %130, i64 %131)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %136 = extractvalue { { ptr }, { i64 } } %135, 0, 0
+  store ptr %136, ptr %ds
+  %137 = extractvalue { { ptr }, { i64 } } %135, 1, 0
+  store i64 %137, ptr %3
+  br label %L248
+L248:                                                ; preds = %L232
+  %138 = load i64, ptr %3
+  store i64 %138, ptr %24
+  %139 = load i64, ptr %24
+  store i64 %139, ptr %25
+  %140 = load i64, ptr %ds
+  %141 = add i64 %140, 64
+  %142 = inttoptr i64 %141 to ptr
+  %143 = load i64, ptr %142
+  store i64 %143, ptr %26
+  %144 = load i64, ptr %26
+  store i64 %144, ptr %27
+  call void asm sideeffect "", "~{rax},~{rbx},~{rcx},~{rdx},~{rsi},~{rdi},~{r8},~{r9},~{r10},~{r11},~{r12},~{r13},~{r14},~{r15}"()
+  %145 = call  i32 @llvm.eh.ocaml.try() returns_twice
+  %146 = trunc i32 %145 to i1
+  br i1 %146, label %L251, label %147
+147:
+  %148 = alloca { i64, i64, i64, i64 }
+  %149 = load i64, ptr %ds
+  %150 = add i64 %149, 48
+  %151 = inttoptr i64 %150 to ptr
+  %152 = load i64, ptr %151
+  %153 = ptrtoint ptr %148 to i64
+  %154 = add i64 %153, 16
+  %155 = inttoptr i64 %154 to ptr
+  %156 = ptrtoint ptr %148 to i64
+  %157 = add i64 %156, 8
+  %158 = inttoptr i64 %157 to ptr
+  %159 = ptrtoint ptr %148 to i64
+  %160 = add i64 %159, 0
+  %161 = inttoptr i64 %160 to ptr
+  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %155)
+  store ptr blockaddress(@camlExn_part2__complicated_HIDE_STAMP, %L251), ptr %158
+  store i64 %152, ptr %161
+  store ptr %148, ptr %151
+  store ptr @camlExn_part1, ptr %30
+  %162 = load i64, ptr %30
+  store i64 %162, ptr %31
+  %163 = load i64, ptr %31
+  %164 = add i64 %163, 48
+  store i64 %164, ptr %31
+  %165 = load i64, ptr %31
+  %166 = add i64 %165, 0
+  %167 = inttoptr i64 %166 to ptr
+  %168 = load i64, ptr %167
+  store i64 %168, ptr %32
+  %169 = load i64, ptr %32
+  store i64 %169, ptr %33
+  store i64 81, ptr %34
+  %170 = load i64, ptr %33
+  %171 = add i64 %170, 0
+  %172 = inttoptr i64 %171 to ptr
+  %173 = load i64, ptr %172
+  store i64 %173, ptr %35
+  %174 = load i64, ptr %34
+  store i64 %174, ptr %3
+  %175 = load i64, ptr %33
+  store i64 %175, ptr %4
+  %176 = load i64, ptr %3
+  %177 = load i64, ptr %4
+  %178 = load ptr, ptr %ds
+  %179 = load i64, ptr %35
+  %180 = inttoptr i64 %179 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %181 = call cc 104 { { ptr }, { i64 } } %180(ptr %178, i64 %176, i64 %177)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %182 = extractvalue { { ptr }, { i64 } } %181, 0, 0
+  store ptr %182, ptr %ds
+  %183 = extractvalue { { ptr }, { i64 } } %181, 1, 0
+  store i64 %183, ptr %3
+  br label %L264
+L264:                                                ; preds = %L248
+  %184 = load i64, ptr %3
+  store i64 %184, ptr %36
+  %185 = load i64, ptr %36
+  store i64 %185, ptr %37
+  %186 = load i64, ptr %ds
+  %187 = add i64 %186, 64
+  %188 = inttoptr i64 %187 to ptr
+  %189 = load i64, ptr %188
+  store i64 %189, ptr %38
+  %190 = load i64, ptr %38
+  store i64 %190, ptr %39
+  call void asm sideeffect "", "~{rax},~{rbx},~{rcx},~{rdx},~{rsi},~{rdi},~{r8},~{r9},~{r10},~{r11},~{r12},~{r13},~{r14},~{r15}"()
+  %191 = call  i32 @llvm.eh.ocaml.try() returns_twice
+  %192 = trunc i32 %191 to i1
+  br i1 %192, label %L267, label %193
+193:
+  %194 = alloca { i64, i64, i64, i64 }
+  %195 = load i64, ptr %ds
+  %196 = add i64 %195, 48
+  %197 = inttoptr i64 %196 to ptr
+  %198 = load i64, ptr %197
+  %199 = ptrtoint ptr %194 to i64
+  %200 = add i64 %199, 16
+  %201 = inttoptr i64 %200 to ptr
+  %202 = ptrtoint ptr %194 to i64
+  %203 = add i64 %202, 8
+  %204 = inttoptr i64 %203 to ptr
+  %205 = ptrtoint ptr %194 to i64
+  %206 = add i64 %205, 0
+  %207 = inttoptr i64 %206 to ptr
+  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %201)
+  store ptr blockaddress(@camlExn_part2__complicated_HIDE_STAMP, %L267), ptr %204
+  store i64 %198, ptr %207
+  store ptr %194, ptr %197
+  store i64 1, ptr %41
+  %208 = load i64, ptr %5
+  %209 = add i64 %208, 0
+  %210 = inttoptr i64 %209 to ptr
+  %211 = load i64, ptr %210
+  store i64 %211, ptr %42
+  %212 = load i64, ptr %41
+  store i64 %212, ptr %3
+  %213 = load i64, ptr %5
+  store i64 %213, ptr %4
+  %214 = load i64, ptr %3
+  %215 = load i64, ptr %4
+  %216 = load ptr, ptr %ds
+  %217 = load i64, ptr %42
+  %218 = inttoptr i64 %217 to ptr
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %219 = call cc 104 { { ptr }, { i64 } } %218(ptr %216, i64 %214, i64 %215)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %220 = extractvalue { { ptr }, { i64 } } %219, 0, 0
+  store ptr %220, ptr %ds
+  %221 = extractvalue { { ptr }, { i64 } } %219, 1, 0
+  store i64 %221, ptr %3
+  br label %L275
+L275:                                                ; preds = %L264
+  %222 = load i64, ptr %3
+  store i64 %222, ptr %43
+  %223 = load i64, ptr %43
+  store i64 %223, ptr %44
+  store i64 246247, ptr %45
+  %224 = load i64, ptr %45
+  store i64 %224, ptr %46
+  %225 = load i64, ptr %46
+  store i64 %225, ptr %29
+  %226 = load i64, ptr %ds
+  %227 = add i64 %226, 48
+  %228 = inttoptr i64 %227 to ptr
+  %229 = load i64, ptr %194
+  store i64 %229, ptr %228
+  br label %L292
+L267:                                                ; preds = %L264
+  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""()
+  call  void @llvm.eh.ocaml.touch(ptr %13)
+  call  void @llvm.eh.ocaml.touch(ptr %15)
+  call  void @llvm.eh.ocaml.touch(ptr %25)
+  call  void @llvm.eh.ocaml.touch(ptr %27)
+  call  void @llvm.eh.ocaml.touch(ptr %37)
+  call  void @llvm.eh.ocaml.touch(ptr %39)
+  %230 = call i64 asm sideeffect "movq %rax, $0", "=r,~{rax}"()
+  store i64 %230, ptr %3
+  %231 = load i64, ptr %3
+  store i64 %231, ptr %40
+  %232 = load i64, ptr %39
+  %233 = load i64, ptr %ds
+  %234 = add i64 %233, 64
+  %235 = inttoptr i64 %234 to ptr
+  store i64 %232, ptr %235
+  store i64 1, ptr %47
+  %236 = load i64, ptr %47
+  store i64 %236, ptr %48
+  store ptr @camlExn_part1, ptr %49
+  %237 = load i64, ptr %49
+  store i64 %237, ptr %50
+  %238 = load i64, ptr %50
+  %239 = add i64 %238, 8
+  store i64 %239, ptr %50
+  %240 = load i64, ptr %50
+  %241 = add i64 %240, 0
+  %242 = inttoptr i64 %241 to ptr
+  %243 = load i64, ptr %242
+  store i64 %243, ptr %51
+  %244 = load i64, ptr %40
+  %245 = load i64, ptr %51
+  %246 = icmp slt i64 %244, %245
+  br i1 %246, label %L287, label %247
+247:
+  %248 = load i64, ptr %40
+  %249 = load i64, ptr %51
+  %250 = icmp sgt i64 %248, %249
+  br i1 %250, label %L287, label %L283
+L283:                                                ; preds = %L267
+  %251 = load i64, ptr %25
+  store i64 %251, ptr %52
+  %252 = load i64, ptr %52
+  %253 = load i64, ptr %37
+  %254 = add i64 %252, %253
+  store i64 %254, ptr %52
+  %255 = load i64, ptr %52
+  store i64 %255, ptr %53
+  %256 = load i64, ptr %53
+  %257 = add i64 %256, -1
+  store i64 %257, ptr %53
+  %258 = load i64, ptr %53
+  store i64 %258, ptr %54
+  %259 = load i64, ptr %54
+  store i64 %259, ptr %29
+  br label %L292
+L287:                                                ; preds = %L267
+  %260 = load i64, ptr %40
+  store i64 %260, ptr %3
+  %261 = load i64, ptr %ds
+  %262 = add i64 %261, 48
+  %263 = inttoptr i64 %262 to ptr
+  %264 = load i64, ptr %263
+  %265 = inttoptr i64 %264 to ptr
+  %266 = load i64, ptr %265
+  %267 = add i64 %264, 8
+  %268 = inttoptr i64 %267 to ptr
+  %269 = load ptr, ptr %268
+  %270 = load i64, ptr %3
+  %271 = add i64 %264, 16
+  store i64 %266, ptr %263
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %271)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %270, ptr %269)
+  unreachable
+L292:                                                ; preds = %L275, %L283
+  %272 = load i64, ptr %29
+  store i64 %272, ptr %55
+  %273 = load i64, ptr %55
+  store i64 %273, ptr %17
+  %274 = load i64, ptr %ds
+  %275 = add i64 %274, 48
+  %276 = inttoptr i64 %275 to ptr
+  %277 = load i64, ptr %148
+  store i64 %277, ptr %276
+  br label %L311
+L251:                                                ; preds = %L248, %L287
+  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""()
+  call  void @llvm.eh.ocaml.touch(ptr %13)
+  call  void @llvm.eh.ocaml.touch(ptr %15)
+  call  void @llvm.eh.ocaml.touch(ptr %25)
+  call  void @llvm.eh.ocaml.touch(ptr %27)
+  %278 = call i64 asm sideeffect "movq %rax, $0", "=r,~{rax}"()
+  store i64 %278, ptr %3
+  %279 = load i64, ptr %3
+  store i64 %279, ptr %28
+  %280 = load i64, ptr %27
+  %281 = load i64, ptr %ds
+  %282 = add i64 %281, 64
+  %283 = inttoptr i64 %282 to ptr
+  store i64 %280, ptr %283
+  store i64 1, ptr %56
+  %284 = load i64, ptr %56
+  store i64 %284, ptr %57
+  store ptr @camlExn_part1, ptr %58
+  %285 = load i64, ptr %58
+  %286 = add i64 %285, 0
+  %287 = inttoptr i64 %286 to ptr
+  %288 = load i64, ptr %287
+  store i64 %288, ptr %59
+  %289 = load i64, ptr %28
+  %290 = add i64 %289, 0
+  %291 = inttoptr i64 %290 to ptr
+  %292 = load i64, ptr %291
+  store i64 %292, ptr %60
+  %293 = load i64, ptr %60
+  %294 = load i64, ptr %59
+  %295 = icmp slt i64 %293, %294
+  br i1 %295, label %L306, label %296
+296:
+  %297 = load i64, ptr %60
+  %298 = load i64, ptr %59
+  %299 = icmp sgt i64 %297, %298
+  br i1 %299, label %L306, label %L300
+L300:                                                ; preds = %L251
+  %300 = load i64, ptr %28
+  store i64 %300, ptr %61
+  %301 = load i64, ptr %61
+  %302 = add i64 %301, 8
+  store i64 %302, ptr %61
+  %303 = load i64, ptr %61
+  %304 = add i64 %303, 0
+  %305 = inttoptr i64 %304 to ptr
+  %306 = load i64, ptr %305
+  store i64 %306, ptr %62
+  %307 = load i64, ptr %62
+  store i64 %307, ptr %63
+  %308 = load i64, ptr %63
+  %309 = load i64, ptr %25
+  %310 = add i64 %308, %309
+  store i64 %310, ptr %63
+  %311 = load i64, ptr %63
+  store i64 %311, ptr %64
+  %312 = load i64, ptr %64
+  %313 = add i64 %312, -1
+  store i64 %313, ptr %64
+  %314 = load i64, ptr %64
+  store i64 %314, ptr %65
+  %315 = load i64, ptr %65
+  store i64 %315, ptr %17
+  br label %L311
+L306:                                                ; preds = %L251
+  %316 = load i64, ptr %28
+  store i64 %316, ptr %3
+  %317 = load i64, ptr %ds
+  %318 = add i64 %317, 48
+  %319 = inttoptr i64 %318 to ptr
+  %320 = load i64, ptr %319
+  %321 = inttoptr i64 %320 to ptr
+  %322 = load i64, ptr %321
+  %323 = add i64 %320, 8
+  %324 = inttoptr i64 %323 to ptr
+  %325 = load ptr, ptr %324
+  %326 = load i64, ptr %3
+  %327 = add i64 %320, 16
+  store i64 %322, ptr %319
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %327)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %326, ptr %325)
+  unreachable
+L311:                                                ; preds = %L292, %L300
+  %328 = load i64, ptr %ds
+  %329 = add i64 %328, 48
+  %330 = inttoptr i64 %329 to ptr
+  %331 = load i64, ptr %102
+  store i64 %331, ptr %330
+  %332 = load i64, ptr %17
+  store i64 %332, ptr %3
+  %333 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %334 = load ptr, ptr %ds
+  %335 = insertvalue { { ptr }, { i64 } } %333, ptr %334, 0, 0
+  %336 = load i64, ptr %3
+  %337 = insertvalue { { ptr }, { i64 } } %335, i64 %336, 1, 0
+  ret { { ptr }, { i64 } } %337
+L235:                                                ; preds = %L232, %L306
+  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""()
+  call  void @llvm.eh.ocaml.touch(ptr %13)
+  call  void @llvm.eh.ocaml.touch(ptr %15)
+  %338 = call i64 asm sideeffect "movq %rax, $0", "=r,~{rax}"()
+  store i64 %338, ptr %3
+  %339 = load i64, ptr %3
+  store i64 %339, ptr %16
+  %340 = load i64, ptr %15
+  %341 = load i64, ptr %ds
+  %342 = add i64 %341, 64
+  %343 = inttoptr i64 %342 to ptr
+  store i64 %340, ptr %343
+  store i64 1, ptr %66
+  %344 = load i64, ptr %66
+  store i64 %344, ptr %67
+  store ptr @camlExn_part2__Exn3169, ptr %68
+  %345 = load i64, ptr %16
+  %346 = load i64, ptr %68
+  %347 = icmp slt i64 %345, %346
+  br i1 %347, label %L319, label %348
+348:
+  %349 = load i64, ptr %16
+  %350 = load i64, ptr %68
+  %351 = icmp sgt i64 %349, %350
+  br i1 %351, label %L319, label %L317
+L317:                                                ; preds = %L235
+  %352 = load i64, ptr %13
+  store i64 %352, ptr %3
+  %353 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %354 = load ptr, ptr %ds
+  %355 = insertvalue { { ptr }, { i64 } } %353, ptr %354, 0, 0
+  %356 = load i64, ptr %3
+  %357 = insertvalue { { ptr }, { i64 } } %355, i64 %356, 1, 0
+  ret { { ptr }, { i64 } } %357
+L319:                                                ; preds = %L235
+  %358 = load i64, ptr %16
+  store i64 %358, ptr %3
+  %359 = load i64, ptr %ds
+  %360 = add i64 %359, 48
+  %361 = inttoptr i64 %360 to ptr
+  %362 = load i64, ptr %361
+  %363 = inttoptr i64 %362 to ptr
+  %364 = load i64, ptr %363
+  %365 = add i64 %362, 8
+  %366 = inttoptr i64 %365 to ptr
+  %367 = load ptr, ptr %366
+  %368 = load i64, ptr %3
+  %369 = add i64 %362, 16
+  store i64 %364, ptr %361
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %369)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %368, ptr %367)
+  unreachable
+}
+
+define cc 104 { { ptr }, { i64 } } @camlExn_part2__entry(ptr %0)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  br label %L1
+L1:
+  br label %L327
+L327:                                                ; preds = %L1
+  store i64 1, ptr %6
+  %15 = load i64, ptr %6
+  store i64 %15, ptr %3
+  %16 = load i64, ptr %3
+  %17 = load i64, ptr %ds
+  %18 = add i64 %17, 104
+  %19 = inttoptr i64 %18 to ptr
+  %20 = load i64, ptr %19
+  %21 = call i64 @llvm.read_register.i64(metadata !{!"rsp\00"})
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %20)
+  %22 = call  { i64 } @caml_fresh_oo_id(i64 %16)
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %21)
+  %23 = extractvalue { i64 } %22, 0
+  store i64 %23, ptr %2
+  br label %L329
+L329:                                                ; preds = %L327
+  %24 = load i64, ptr %2
+  store i64 %24, ptr %7
+  %25 = load i64, ptr %7
+  store i64 %25, ptr %8
+  store ptr @camlExn_part2__Exn3169, ptr %9
+  %26 = load i64, ptr %9
+  store i64 %26, ptr %10
+  %27 = load i64, ptr %10
+  %28 = add i64 %27, 8
+  store i64 %28, ptr %10
+  %29 = load i64, ptr %10
+  store i64 %29, ptr %3
+  %30 = load i64, ptr %8
+  store i64 %30, ptr %4
+  %31 = load i64, ptr %3
+  %32 = load i64, ptr %4
+  %33 = load i64, ptr %ds
+  %34 = add i64 %33, 104
+  %35 = inttoptr i64 %34 to ptr
+  %36 = load i64, ptr %35
+  %37 = call i64 @llvm.read_register.i64(metadata !{!"rsp\00"})
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %36)
+  %38 = call  {  } @caml_initialize(i64 %31, i64 %32)
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %37)
+  br label %L330
+L330:                                                ; preds = %L329
+  store i64 1, ptr %11
+  store ptr @camlExn_part2, ptr %12
+  %39 = load i64, ptr %12
+  store i64 %39, ptr %13
+  %40 = load i64, ptr %13
+  store i64 %40, ptr %5
+  store i64 1, ptr %14
+  %41 = load i64, ptr %14
+  store i64 %41, ptr %2
+  %42 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %43 = load ptr, ptr %ds
+  %44 = insertvalue { { ptr }, { i64 } } %42, ptr %43, 0, 0
+  %45 = load i64, ptr %2
+  %46 = insertvalue { { ptr }, { i64 } } %44, i64 %45, 1, 0
+  ret { { ptr }, { i64 } } %46
+}
+
+declare  { i64 } @caml_fresh_oo_id(i64)
+declare  {  } @caml_initialize(i64, i64)
+declare i64 @llvm.read_register.i64(metadata)
+declare void @llvm.write_register.i64(metadata, i64)
+declare i32 @llvm.eh.ocaml.try() returns_twice
+declare void @llvm.eh.ocaml.touch(ptr)
+
+@camlExn_part1 = external global ptr
+@caml_curry2 = external global ptr
+
+@camlExn_part2__data_end = global {  } {  }, align 8
+define void @camlExn_part2__code_end() { ret void }
+@camlExn_part2__frametable = global {  } {  }, align 8

@@ -169,10 +169,13 @@ type fun_sig =
   }
 
 type fun_info =
-  { ident_gen : Ident.Gen.t;
+  { fun_name : string;
+    ident_gen : Ident.Gen.t;
     reg2ident : Ident.t Reg.Tbl.t;  (** Map register's stamp to identifier  *)
-    label2ident : Ident.t Label.Tbl.t
+    label2ident : Ident.t Label.Tbl.t;
         (** Map label to identifier. Avoid clashes between pre-existing Cfg labels and unnamed identifiers. *)
+    trap_blocks : Ident.t Label.Tbl.t
+        (** Map handler labels to the corresponding pushtrap location on the stack *)
   }
 
 type t =
@@ -193,11 +196,13 @@ type t =
         (* Names + signatures (args, ret) of functions called so far *)
   }
 
-let create_fun_info () =
-  { ident_gen = Ident.Gen.create ();
+let create_fun_info fun_name =
+  { fun_name;
+    ident_gen = Ident.Gen.create ();
     reg2ident =
       Reg.Tbl.create 37 (* CR yusumez: change this to be more reasonable *);
-    label2ident = Label.Tbl.create 37
+    label2ident = Label.Tbl.create 37;
+    trap_blocks = Label.Tbl.create 37
   }
 
 let create ~llvmir_filename ~ppf_dump =
@@ -209,13 +214,13 @@ let create ~llvmir_filename ~ppf_dump =
     oc;
     ppf;
     ppf_dump;
-    current_fun_info = create_fun_info ();
+    current_fun_info = create_fun_info "<no current function>";
     defined_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty;
     called_functions = String.Map.empty
   }
 
-let reset_fun_info t = t.current_fun_info <- create_fun_info ()
+let reset_fun_info t fun_name = t.current_fun_info <- create_fun_info fun_name
 
 let get_ident_aux table key ~get_ident ~find_opt ~add =
   match find_opt table key with
@@ -372,7 +377,9 @@ module F = struct
     pp_print_list ~pp_sep:pp_comma pp_fun_arg ppf fun_args
 
   let pp_attrs ppf attrs =
-    fprintf ppf "%a" (pp_print_list ~pp_sep:pp_comma pp_print_string) attrs
+    fprintf ppf "%a"
+      (pp_print_list ~pp_sep:pp_print_space pp_print_string)
+      attrs
 
   let define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body =
     pp_dbg_comment t.ppf fun_name fun_dbg;
@@ -405,6 +412,10 @@ module F = struct
   let ins_store_nativeint t n (reg : Reg.t) =
     ins t "store %a %s, ptr %a" pp_machtyp_component reg.typ
       (Nativeint.to_string n) (pp_reg_ident t) reg
+
+  let ins_store_label_addr t ~label ~dst =
+    ins t "store ptr blockaddress(%a, %a), ptr %a" pp_global
+      t.current_fun_info.fun_name (pp_label_ident t) label pp_ident dst
 
   let ins_branch t label = ins t "br %a" (pp_label t) label
 
@@ -461,25 +472,63 @@ module F = struct
       (pp_print_list ~pp_sep:pp_comma pp_print_int)
       idxs
 
-  let ins_call_custom_arg ~cc ~pp_name ~pp_arg t name args res =
+  let ins_call_custom_arg ~attrs ~cc ~pp_name ~pp_arg t name args res =
     let cc_str = Calling_conventions.to_llvmir_string cc in
     let pp_call res_typ ppf () =
-      fprintf ppf "call %s %s %a(%a)" cc_str res_typ pp_name name
+      fprintf ppf "call %s %s %a(%a) %s" cc_str res_typ pp_name name
         (pp_print_list ~pp_sep:pp_comma pp_arg)
-        args
+        args attrs
     in
     match res with
     | Some (res_typ, res) ->
       ins t "%a = %a" pp_ident res (pp_call (Llvm_typ.to_string res_typ)) ()
     | None -> ins t "%a" (pp_call "void") ()
 
-  let ins_call ~cc ~pp_name t name args res =
-    ins_call_custom_arg ~cc ~pp_name ~pp_arg:pp_fun_arg t name args res
+  let ins_call ?(attrs = "") ~cc ~pp_name t name args res =
+    ins_call_custom_arg ~attrs ~cc ~pp_name ~pp_arg:pp_fun_arg t name args res
+
+  (* Calculate offset of identifier and handle conversions. *)
+  let do_offset ~arg_is_ptr ~res_is_ptr t ident offset =
+    let int_ident =
+      match arg_is_ptr with
+      | false -> ident
+      | true ->
+        let ptr = fresh_ident t in
+        ins_conv t "ptrtoint" ~src:ident ~dst:ptr ~src_typ:Llvm_typ.ptr
+          ~dst_typ:Llvm_typ.i64;
+        ptr
+    in
+    let offset_ident = fresh_ident t in
+    ins_binop_imm t "add" int_ident (Int.to_string offset) offset_ident
+      Llvm_typ.i64;
+    match res_is_ptr with
+    | false -> offset_ident
+    | true ->
+      let ptr = fresh_ident t in
+      ins_conv t "inttoptr" ~src:offset_ident ~dst:ptr ~src_typ:Llvm_typ.i64
+        ~dst_typ:Llvm_typ.ptr;
+      ptr
 
   let load_reg_to_temp t reg =
     let temp = fresh_ident t in
     ins_load_from_reg t temp reg;
     temp
+
+  let load_domainstate_addr ?(as_ptr = true) ?(offset = 0) t ds_field =
+    let ds = fresh_ident t in
+    let offset = offset + (Domainstate.idx_of_field ds_field * 8) in
+    ins_load t ~src:domainstate_ident ~dst:ds Llvm_typ.i64;
+    do_offset ~arg_is_ptr:false ~res_is_ptr:as_ptr t ds offset
+
+  let read_rsp t =
+    let ident = fresh_ident t in
+    ins t "%a = call i64 @llvm.read_register.i64(metadata !{!\"rsp\\00\"})"
+      pp_ident ident;
+    ident
+
+  let write_rsp t ident =
+    ins t "call void @llvm.write_register.i64(metadata !{!\"rsp\\00\"}, i64 %a)"
+      pp_ident ident
 
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
     let offset = Arch.addressing_displacement_for_llvmize addr in
@@ -587,25 +636,28 @@ module F = struct
       |> List.filter (fun reg -> not (Reg.is_domainstate reg))
     in
     let res_type = make_ret_type (List.map (fun reg -> reg.Reg.typ) res_regs) in
+    let do_call ~pp_name fn =
+      let res_ident = fresh_ident t in
+      (* Save RBP in case frame pointers aren't enabled and LLVM decided to use
+         them for some reason... *)
+      ins t {|call void asm sideeffect "push %%rbp", "~{rsp}"()|};
+      ins_call ~cc:Ocaml ~pp_name t fn args (Some (res_type, res_ident));
+      ins t {|call void asm sideeffect "pop %%rbp", "~{rsp}"()|};
+      res_ident
+    in
     (* Do the call *)
     let res_ident =
       match op with
       | Direct { sym_name; sym_global = _ } ->
         add_called_fun t sym_name ~cc:Ocaml ~args:arg_types ~res:(Some res_type);
-        let res_ident = fresh_ident t in
-        ins_call ~cc:Ocaml ~pp_name:pp_global t sym_name args
-          (Some (res_type, res_ident));
-        res_ident
+        do_call ~pp_name:pp_global sym_name
       | Indirect ->
         let fun_temp = load_reg_to_temp t i.arg.(0) in
         let fun_ptr_temp = fresh_ident t in
-        let res_ident = fresh_ident t in
         (* ...we need this since we treat OCaml values as i64 *)
         ins_conv t "inttoptr" ~src:fun_temp ~dst:fun_ptr_temp
           ~src_typ:Llvm_typ.i64 ~dst_typ:Llvm_typ.ptr;
-        ins_call ~cc:Ocaml ~pp_name:pp_ident t fun_ptr_temp args
-          (Some (res_type, res_ident));
-        res_ident
+        do_call ~pp_name:pp_ident fun_ptr_temp
     in
     (* Unpack return value *)
     List.iteri
@@ -661,30 +713,10 @@ module F = struct
 
   let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
       ~stack_ofs ~stack_align ~label_after =
-    let read_rsp () =
-      let ident = fresh_ident t in
-      ins t "%a = call i64 @llvm.read_register.i64(metadata !{!\"rsp\\00\"})"
-        pp_ident ident;
-      ident
-    in
-    let write_rsp ident =
-      ins t
-        "call void @llvm.write_register.i64(metadata !{!\"rsp\\00\"}, i64 %a)"
-        pp_ident ident
-    in
     let get_c_stack () =
-      let ds_base = fresh_ident t in
-      let ds_ofs = fresh_ident t in
-      let ds_ofs_ptr = fresh_ident t in
+      let c_stack_addr = load_domainstate_addr t Domain_c_stack in
       let res = fresh_ident t in
-      let offset_in_bytes = Domainstate.(idx_of_field Domain_c_stack) * 8 in
-      ins_load t ~src:domainstate_ident ~dst:ds_base Llvm_typ.i64;
-      ins_binop_imm t "add" ds_base
-        (Int.to_string offset_in_bytes)
-        ds_ofs Llvm_typ.i64;
-      ins_conv t "inttoptr" ~src:ds_ofs ~dst:ds_ofs_ptr ~src_typ:Llvm_typ.i64
-        ~dst_typ:Llvm_typ.ptr;
-      ins_load t ~src:ds_ofs_ptr ~dst:res Llvm_typ.i64;
+      ins_load t ~src:c_stack_addr ~dst:res Llvm_typ.i64;
       res
     in
     (* Auxiliary function to print arguments. This is necessary since we are
@@ -699,8 +731,8 @@ module F = struct
       let res_ident = fresh_ident t in
       add_referenced_symbol t caml_c_call_symbol;
       add_referenced_symbol t func_symbol;
-      ins_call_custom_arg ~cc:Ocaml_c_call ~pp_name:pp_global ~pp_arg t
-        caml_c_call_symbol args
+      ins_call_custom_arg ~attrs:"" ~cc:Ocaml_c_call ~pp_name:pp_global ~pp_arg
+        t caml_c_call_symbol args
         (Some (res_type, res_ident));
       (* CR yusumez: Insert safepoint here once we have GC support *)
       res_ident
@@ -737,8 +769,8 @@ module F = struct
       else
         (* Prepare stack pointer *)
         let c_sp = get_c_stack () in
-        let ocaml_sp = read_rsp () in
-        write_rsp c_sp;
+        let ocaml_sp = read_rsp t in
+        write_rsp t c_sp;
         (* Do the thing (omitting cc defaults to C calling convention) *)
         let res_ident = fresh_ident t in
         add_called_fun t func_symbol ~cc:Default ~args:(List.map fst args)
@@ -746,7 +778,7 @@ module F = struct
         ins_call ~cc:Default ~pp_name:pp_global t func_symbol args
           (Some (res_type, res_ident));
         (* Recover stack pointer *)
-        write_rsp ocaml_sp;
+        write_rsp t ocaml_sp;
         res_ident
     in
     (* Prepare arguments + return type *)
@@ -808,11 +840,44 @@ module F = struct
       line t.ppf "%a:" Ident.print ge;
       let is_gt = int_comp t (make_comp Cmm.Cgt) i ~imm in
       ins_branch_cond t is_gt gt eq
-    | Raise _ ->
-      (* CR yusumez: Implement this *)
-      add_called_fun t "llvm.trap" ~cc:Default ~args:[] ~res:None;
-      ins_call ~cc:Default ~pp_name:pp_global t "llvm.trap" [] None;
-      ins t "unreachable"
+    | Raise raise_kind -> (
+      match raise_kind with
+      | Raise_notrace | Raise_regular | Raise_reraise ->
+        (* CR yusumez: Handle backtraces appropriately once we have frametables
+           (calling runtime functions expect a safepoint) *)
+        let ds_exn_handler_sp = load_domainstate_addr t Domain_exn_handler in
+        let exn_handler_sp =
+          let res = fresh_ident t in
+          ins_load t ~src:ds_exn_handler_sp ~dst:res Llvm_typ.i64;
+          res
+        in
+        let previous_exn_handler_sp =
+          let ptr = fresh_ident t in
+          let res = fresh_ident t in
+          ins_conv t "inttoptr" ~src:exn_handler_sp ~dst:ptr
+            ~src_typ:Llvm_typ.i64 ~dst_typ:Llvm_typ.ptr;
+          ins_load t ~src:ptr ~dst:res Llvm_typ.i64;
+          res
+        in
+        let exn_handler_addr =
+          let ptr =
+            do_offset ~arg_is_ptr:false ~res_is_ptr:true t exn_handler_sp 8
+          in
+          let res = fresh_ident t in
+          ins_load t ~src:ptr ~dst:res Llvm_typ.ptr;
+          res
+        in
+        let exn_payload = load_reg_to_temp t i.arg.(0) in
+        let new_sp =
+          do_offset ~arg_is_ptr:false ~res_is_ptr:false t exn_handler_sp 16
+        in
+        ins_store t ~src:previous_exn_handler_sp ~dst:ds_exn_handler_sp
+          Llvm_typ.i64;
+        write_rsp t new_sp;
+        ins t
+          {|call void asm sideeffect "movq $0, %%rax; jmpq *$1", "r,r,~{rax}"(i64 %a, ptr %a)|}
+          pp_ident exn_payload pp_ident exn_handler_addr;
+        ins t "unreachable")
     | Float_test { width; lt; eq; gt; uo } ->
       let typ =
         match width with
@@ -994,11 +1059,22 @@ module F = struct
     | Intop_imm (op, n) -> int_op t i op ~imm:(Some n)
     | Floatop (width, op) -> float_op t i width op
     | Stackoffset _ -> () (* We leave stack handling to LLVM *)
-    | Spill | Reload | Const_float32 _ | Const_float _ | Const_vec128 _
-    | Const_vec256 _ | Const_vec512 _ | Intop_atomic _ | Csel _
-    | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Begin_region
-    | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll | Pause
-    | Alloc _ ->
+    | Begin_region ->
+      let local_sp_addr = load_domainstate_addr t Domain_local_sp in
+      let local_sp = fresh_ident t in
+      ins_load t ~src:local_sp_addr ~dst:local_sp Llvm_typ.i64;
+      ins_store_into_reg t local_sp i.res.(0)
+    | End_region ->
+      let arg = load_reg_to_temp t i.arg.(0) in
+      let local_sp = load_domainstate_addr t Domain_local_sp in
+      ins_store t ~src:arg ~dst:local_sp Llvm_typ.i64
+    | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
+    | Const_vec512 _ ->
+      not_implemented_basic ~msg:"const" i
+    | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
+    | Intop_atomic _ | Csel _ | Reinterpret_cast _ | Static_cast _
+    | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Dls_get | Poll
+    | Pause | Alloc _ ->
       not_implemented_basic i
 
   let basic t (i : Cfg.basic Cfg.instruction) =
@@ -1006,7 +1082,71 @@ module F = struct
     match i.desc with
     | Op op -> basic_op t i op
     | Prologue | Reloadretaddr -> ()
-    | Poptrap _ | Pushtrap _ | Stack_check _ -> not_implemented_basic i
+    | Poptrap { lbl_handler } -> (
+      match Label.Tbl.find_opt t.current_fun_info.trap_blocks lbl_handler with
+      | None -> Misc.fatal_error "Llvmize: unbalanced trap pop"
+      | Some trap_block ->
+        let ds_exn_handler_addr = load_domainstate_addr t Domain_exn_handler in
+        let prev_sp =
+          let res = fresh_ident t in
+          ins_load t ~src:trap_block ~dst:res Llvm_typ.i64;
+          res
+        in
+        ins_store t ~src:prev_sp ~dst:ds_exn_handler_addr Llvm_typ.i64)
+    | Pushtrap { lbl_handler } ->
+      (* Force spill... *)
+      ins t
+        {|call void asm sideeffect "", "~{rax},~{rbx},~{rcx},~{rdx},~{rsi},~{rdi},~{r8},~{r9},~{r10},~{r11},~{r12},~{r13},~{r14},~{r15}"()|};
+      (* Call a dummy LLVM intrinsic that will ensure the handler is not removed
+         as dead code and no breaking control flow optimisations are made
+         (thanks to the "returns twice" attribute). It intuitively acts like
+         setjmp but doesn't actually save the state to a buffer. It always
+         returns 0, but the optimiser doesn't know that. *)
+      let dummy = fresh_ident t in
+      let dummy_bool = fresh_ident t in
+      let try_block = fresh_ident t in
+      ins_call ~attrs:"returns_twice" ~cc:Default ~pp_name:pp_global t
+        "llvm.eh.ocaml.try" []
+        (Some (Llvm_typ.i32, dummy));
+      ins_conv t "trunc" ~src:dummy ~dst:dummy_bool ~src_typ:Llvm_typ.i32
+        ~dst_typ:Llvm_typ.bool;
+      ins_branch_cond_ident t dummy_bool
+        (get_ident_for_label t lbl_handler)
+        try_block;
+      line t.ppf "%a:" Ident.print try_block;
+      (* alloca's not done in the entry basic block don't get eliminated by SROA
+         or Mem2Reg, and the previous dummy call + branch ensures this as well.
+         Hence, an alloca here will cause a push at this location, not
+         before. *)
+      let trap_block = fresh_ident t in
+      (* [prev_sp; handler_addr; saved_rbp; padding] - we need to save rbp since
+         it will get clobbered by the time we get to the handler, and LLVM is
+         forced to use rbp since different branches have different stack sizes.
+         Padding is to maintain alignment... *)
+      ins_alloca ~comment:"push trap" t trap_block
+        Llvm_typ.(Struct [i64; i64; i64; i64]);
+      let ds_exn_handler_addr = load_domainstate_addr t Domain_exn_handler in
+      let ds_exn_handler =
+        let res = fresh_ident t in
+        ins_load t ~src:ds_exn_handler_addr ~dst:res Llvm_typ.i64;
+        res
+      in
+      let rbp_slot =
+        do_offset ~arg_is_ptr:true ~res_is_ptr:true t trap_block 16
+      in
+      let handler_slot =
+        do_offset ~arg_is_ptr:true ~res_is_ptr:true t trap_block 8
+      in
+      let prev_sp_slot =
+        do_offset ~arg_is_ptr:true ~res_is_ptr:true t trap_block 0
+      in
+      ins t {|call void asm sideeffect "mov %%rbp, ($0)", "r"(ptr %a)|} pp_ident
+        rbp_slot;
+      ins_store_label_addr t ~label:lbl_handler ~dst:handler_slot;
+      ins_store t ~src:ds_exn_handler ~dst:prev_sp_slot Llvm_typ.i64;
+      ins_store t ~src:trap_block ~dst:ds_exn_handler_addr Llvm_typ.ptr;
+      Label.Tbl.add t.current_fun_info.trap_blocks lbl_handler trap_block
+    | Stack_check _ -> not_implemented_basic i
 
   (* == Cfg data items == *)
 
@@ -1171,14 +1311,7 @@ let make_temps_for_regs t cfg args_and_signature_idents runtime_arg_idents =
     | Stack (Domainstate idx) ->
       (* Compute pointer to where [reg] is located - we can assume [ds] will not
          change through the run of this function *)
-      let offset = idx + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
-      let temp1 = fresh_ident t in
-      let temp2 = fresh_ident t in
-      let res = fresh_ident t in
-      F.ins_load t ~src:domainstate_ident ~dst:temp1 Llvm_typ.i64;
-      F.ins_binop_imm t "add" temp1 (Int.to_string offset) temp2 Llvm_typ.i64;
-      F.ins_conv t "inttoptr" ~src:temp2 ~dst:res ~src_typ:Llvm_typ.i64
-        ~dst_typ:Llvm_typ.ptr;
+      let res = F.load_domainstate_addr ~offset:idx t Domain_extra_params in
       (* Create entry in the [reg2ident] table *)
       Reg.Tbl.add t.current_fun_info.reg2ident reg res
     | Stack (Local _) | Stack (Incoming _) ->
@@ -1192,11 +1325,34 @@ let make_temps_for_regs t cfg args_and_signature_idents runtime_arg_idents =
     args_and_signature_idents;
   Reg.Set.iter (fun reg -> make_temp reg None) temp_regs
 
+let trap_handler_entry ~cfg_with_infos t (block : Cfg.basic_block) =
+  match[@ocaml.warning "-4"]
+    DLL.hd block.body |> Option.map (fun i -> i, i.Cfg.desc)
+  with
+  | Some (i, Op Move) ->
+    (* Restore RBP (+ remove padding) *)
+    F.ins t {|call void asm sideeffect "pop %%rbp; addq $$8, %%rsp", ""()|};
+    (* Touch all live regs to keep them on the stack *)
+    let live = (Cfg_with_infos.liveness_find cfg_with_infos i.id).across in
+    Reg.Set.iter
+      (fun reg ->
+        F.ins_call ~cc:Default ~pp_name:F.pp_global t "llvm.eh.ocaml.touch"
+          [Llvm_typ.ptr, get_ident_for_reg t reg]
+          None)
+      live;
+    let exn_payload = fresh_ident t in
+    (* Move payload from RAX to the appropriate temp *)
+    F.ins t {|%a = call i64 asm sideeffect "movq %%rax, $0", "=r,~{rax}"()|}
+      F.pp_ident exn_payload;
+    F.ins_store_into_reg t exn_payload i.arg.(0)
+  | _ ->
+    Misc.fatal_error "Llvmize: first instruction of trap handler not a move"
+
 let cfg (cl : CL.t) =
   let t = get_current_compilation_unit "cfg" in
-  reset_fun_info t;
   let layout = CL.layout cl in
   let cfg = CL.cfg cl in
+  let cfg_with_infos = Cfg_with_infos.make cl in
   (* CR gyorsh: handle unboxed return type (where is this info? do we need to
      find [Return] instruction to find it? if so, add a field to [Cfg.t] to
      store it explicitly. *)
@@ -1214,6 +1370,7 @@ let cfg (cl : CL.t) =
       } =
     cfg
   in
+  reset_fun_info t fun_name;
   t.defined_symbols <- String.Set.add fun_name t.defined_symbols;
   (* Make fresh idents for argument regs since these will be different from
      idents assigned to them later on *)
@@ -1237,6 +1394,7 @@ let cfg (cl : CL.t) =
     if Label.equal entry_label label && not (List.is_empty preds)
     then Misc.fatal_errorf "Llvmize: entry label must not have predecessors";
     F.block_label_with_predecessors t label preds;
+    if block.is_trap_handler then trap_handler_entry ~cfg_with_infos t block;
     DLL.iter ~f:(F.basic t) block.body;
     F.terminator t block.terminator
   in
@@ -1372,12 +1530,15 @@ let declare_functions t =
   String.Map.iter
     (fun sym fun_sig ->
       if not (String.Set.mem sym t.defined_symbols)
-      then F.fun_decl t sym fun_sig)
+      then F.fun_decl t sym fun_sig;
+      t.defined_symbols <- String.Set.add sym t.defined_symbols)
     t.called_functions;
-  (* Declare these intrinsics manually since we don't have metadata support
-     yet *)
+  (* Register read/write *)
   F.line t.ppf "declare i64 @llvm.read_register.i64(metadata)";
-  F.line t.ppf "declare void @llvm.write_register.i64(metadata, i64)"
+  F.line t.ppf "declare void @llvm.write_register.i64(metadata, i64)";
+  (* Exception handling *)
+  F.line t.ppf "declare i32 @llvm.eh.ocaml.try() returns_twice";
+  F.line t.ppf "declare void @llvm.eh.ocaml.touch(ptr)"
 
 let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
@@ -1399,6 +1560,8 @@ let llvmir_to_assembly t =
            Filename.quote asm_filename;
            "-O3";
            "-S";
+           "-fomit-frame-pointer";
+           "-momit-leaf-frame-pointer";
            "-x ir";
            Filename.quote t.llvmir_filename ])
 
