@@ -33,7 +33,8 @@
   In particular, if the usage being constrained represents a "use site", we
   eagerly apply the constraint on the modes inferred by the type system. For
   example, [unique_use] in [Texp_ident] is the mode expected by the consumer of
-  the identifier. Type errors are raised if the uniqueness analysis contradicts what is expected in the [unique_use].
+  the identifier. Type errors are raised if the uniqueness analysis contradicts
+  what is expected in the [unique_use].
 
   For example:
   [
@@ -49,11 +50,19 @@
   On top of the naive contraction rule, we adopt the following tweaks:
 
   - It's useful to express usages in a finer manner than [Unique] vs.
-  [Aliased]. For example, [print x; unique_use x] should be allowed: the
-  usage of [x] by [print] is confined to the function (not keeping any
+  [Aliased]. For example, the following example should be allowed:
+
+  let y =
+    match x with
+    | Foo -> true
+    | _ -> false
+  in
+  unique_use x
+
+  The first usage of [x] is confined to the pattern match (not keeping any
   reference to [x]), and should not forbid a later unique usage of [x]. To
-  that end, we say [x] is used as [Borrowed] by [print]. The list of usages
-  can be found in [Module Usage].
+  that end, we say [x] is used as [Borrowed] by the pattern match. The list of
+  usages can be found in [Module Usage].
 
   - A naive approach would treat each [Pexp_ident x] as a usage of [x]. This,
   while being sound, is too strict. For example, the program [unique_use r.x;
