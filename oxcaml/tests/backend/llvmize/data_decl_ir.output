@@ -93,7 +93,7 @@ L105:                                                ; preds = %L101
   %34 = load i64, ptr %5
   %35 = load ptr, ptr %ds
   %36 = load ptr, ptr %alloc
-  %37 = call cc 104 { { ptr, ptr }, { i64 } } @camlData_decl__g_HIDE_STAMP(ptr %35, ptr %36, i64 %33, i64 %34)
+  %37 =  call cc 104 { { ptr, ptr }, { i64 } } @camlData_decl__g_HIDE_STAMP(ptr %35, ptr %36, i64 %33, i64 %34)
   %38 = extractvalue { { ptr, ptr }, { i64 } } %37, 0, 0
   store ptr %38, ptr %ds
   %39 = extractvalue { { ptr, ptr }, { i64 } } %37, 0, 1
@@ -146,7 +146,7 @@ L112:                                                ; preds = %L1
   %18 = load i64, ptr %5
   %19 = load ptr, ptr %ds
   %20 = load ptr, ptr %alloc
-  %21 = call cc 104 { { ptr, ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %19, ptr %20, i64 %18)
+  %21 =  call cc 104 { { ptr, ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %19, ptr %20, i64 %18)
   %22 = extractvalue { { ptr, ptr }, { i64 } } %21, 0, 0
   store ptr %22, ptr %ds
   %23 = extractvalue { { ptr, ptr }, { i64 } } %21, 0, 1
@@ -164,7 +164,7 @@ L114:                                                ; preds = %L112
   %28 = load i64, ptr %5
   %29 = load ptr, ptr %ds
   %30 = load ptr, ptr %alloc
-  %31 = call cc 104 { { ptr, ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %29, ptr %30, i64 %28)
+  %31 =  call cc 104 { { ptr, ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %29, ptr %30, i64 %28)
   %32 = extractvalue { { ptr, ptr }, { i64 } } %31, 0, 0
   store ptr %32, ptr %ds
   %33 = extractvalue { { ptr, ptr }, { i64 } } %31, 0, 1
@@ -289,7 +289,7 @@ L122:                                                ; preds = %L1
   %69 = load i64, ptr %8
   %70 = load ptr, ptr %ds
   %71 = load ptr, ptr %alloc
-  %72 = call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %70, ptr %71, ptr @caml_ml_output, i64 poison, i64 %66, i64 %67, i64 %68, i64 %69)
+  %72 =  call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %70, ptr %71, ptr @caml_ml_output, i64 poison, i64 %66, i64 %67, i64 %68, i64 %69)
   %73 = extractvalue { { ptr, ptr }, { i64 } } %72, 0, 0
   store ptr %73, ptr %ds
   %74 = extractvalue { { ptr, ptr }, { i64 } } %72, 0, 1
@@ -322,7 +322,7 @@ L124:                                                ; preds = %L122
   %88 = load i64, ptr %6
   %89 = load ptr, ptr %ds
   %90 = load ptr, ptr %alloc
-  %91 = call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %89, ptr %90, ptr @caml_ml_output_char, i64 poison, i64 %87, i64 %88)
+  %91 =  call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %89, ptr %90, ptr @caml_ml_output_char, i64 poison, i64 %87, i64 %88)
   %92 = extractvalue { { ptr, ptr }, { i64 } } %91, 0, 0
   store ptr %92, ptr %ds
   %93 = extractvalue { { ptr, ptr }, { i64 } } %91, 0, 1
@@ -351,7 +351,7 @@ L127:                                                ; preds = %L124
   %105 = load i64, ptr %5
   %106 = load ptr, ptr %ds
   %107 = load ptr, ptr %alloc
-  %108 = call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %106, ptr %107, ptr @caml_ml_flush, i64 poison, i64 %105)
+  %108 =  call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %106, ptr %107, ptr @caml_ml_flush, i64 poison, i64 %105)
   %109 = extractvalue { { ptr, ptr }, { i64 } } %108, 0, 0
   store ptr %109, ptr %ds
   %110 = extractvalue { { ptr, ptr }, { i64 } } %108, 0, 1
@@ -374,7 +374,7 @@ L130:                                                ; preds = %L127
   %117 = load i64, ptr %6
   %118 = load ptr, ptr %ds
   %119 = load ptr, ptr %alloc
-  %120 = call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %118, ptr %119, ptr @caml_format_float32, i64 poison, i64 %116, i64 %117)
+  %120 =  call cc 105 { { ptr, ptr }, { i64 } } @caml_c_call(ptr %118, ptr %119, ptr @caml_format_float32, i64 poison, i64 %116, i64 %117)
   %121 = extractvalue { { ptr, ptr }, { i64 } } %120, 0, 0
   store ptr %121, ptr %ds
   %122 = extractvalue { { ptr, ptr }, { i64 } } %120, 0, 1
@@ -401,7 +401,7 @@ L133:                                                ; preds = %L130
   %131 = load i64, ptr %5
   %132 = load ptr, ptr %ds
   %133 = load ptr, ptr %alloc
-  %134 = call cc 104 { { ptr, ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %132, ptr %133, i64 %129, i64 %130, i64 %131)
+  %134 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %132, ptr %133, i64 %129, i64 %130, i64 %131)
   %135 = extractvalue { { ptr, ptr }, { i64 } } %134, 0, 0
   store ptr %135, ptr %ds
   %136 = extractvalue { { ptr, ptr }, { i64 } } %134, 0, 1
@@ -426,7 +426,7 @@ L134:                                                ; preds = %L133
   %145 = load i64, ptr %5
   %146 = load ptr, ptr %ds
   %147 = load ptr, ptr %alloc
-  %148 = call cc 104 { { ptr, ptr }, { i64 } } @caml_apply2(ptr %146, ptr %147, i64 %143, i64 %144, i64 %145)
+  %148 =  call cc 104 { { ptr, ptr }, { i64 } } @caml_apply2(ptr %146, ptr %147, i64 %143, i64 %144, i64 %145)
   %149 = extractvalue { { ptr, ptr }, { i64 } } %148, 0, 0
   store ptr %149, ptr %ds
   %150 = extractvalue { { ptr, ptr }, { i64 } } %148, 0, 1
@@ -445,7 +445,7 @@ L135:                                                ; preds = %L134
   %155 = load i64, ptr %3
   %156 = load ptr, ptr %ds
   %157 = load ptr, ptr %alloc
-  %158 = call cc 104 { { ptr, ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %156, ptr %157, i64 %155)
+  %158 =  call cc 104 { { ptr, ptr }, { i64 } } @camlData_decl__f_HIDE_STAMP(ptr %156, ptr %157, i64 %155)
   %159 = extractvalue { { ptr, ptr }, { i64 } } %158, 0, 0
   store ptr %159, ptr %ds
   %160 = extractvalue { { ptr, ptr }, { i64 } } %158, 0, 1
@@ -472,7 +472,7 @@ L136:                                                ; preds = %L135
   %169 = load i64, ptr %5
   %170 = load ptr, ptr %ds
   %171 = load ptr, ptr %alloc
-  %172 = call cc 104 { { ptr, ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %170, ptr %171, i64 %167, i64 %168, i64 %169)
+  %172 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %170, ptr %171, i64 %167, i64 %168, i64 %169)
   %173 = extractvalue { { ptr, ptr }, { i64 } } %172, 0, 0
   store ptr %173, ptr %ds
   %174 = extractvalue { { ptr, ptr }, { i64 } } %172, 0, 1
@@ -500,7 +500,7 @@ L137:                                                ; preds = %L136
   %187 = load ptr, ptr %alloc
   %188 = load i64, ptr %49
   %189 = inttoptr i64 %188 to ptr
-  %190 = call cc 104 { { ptr, ptr }, { i64 } } %189(ptr %186, ptr %187, i64 %184, i64 %185)
+  %190 =  call cc 104 { { ptr, ptr }, { i64 } } %189(ptr %186, ptr %187, i64 %184, i64 %185)
   %191 = extractvalue { { ptr, ptr }, { i64 } } %190, 0, 0
   store ptr %191, ptr %ds
   %192 = extractvalue { { ptr, ptr }, { i64 } } %190, 0, 1

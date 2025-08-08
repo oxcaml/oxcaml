@@ -523,7 +523,11 @@ module F = struct
     let pp_arg ppf (typ, arg) =
       fprintf ppf "%a %a" Llvm_typ.pp_t typ Llvm_value.pp_t arg
     in
-    let tail_str = if tail then "musttail" else "" in
+    let tail_str =
+      if tail
+      then "musttail" (* This forces LLVM to perform tail call optimisation *)
+      else ""
+    in
     let cc_str = Calling_conventions.to_llvmir_string cc in
     let pp_call res_typ ppf () =
       fprintf ppf "%s call %s %s %a(%a) %s" tail_str cc_str res_typ pp_name name
@@ -740,8 +744,7 @@ module F = struct
       let should_save_rbp = t.current_fun_info.fun_has_try && not tail in
       if should_save_rbp
       then ins t {|call void asm sideeffect "push %%rbp", "~{rsp}"()|};
-      ins_call ~tail:true ~cc:Ocaml ~pp_name t fn args
-        (Some (res_type, res_ident));
+      ins_call ~tail ~cc:Ocaml ~pp_name t fn args (Some (res_type, res_ident));
       if should_save_rbp
       then ins t {|call void asm sideeffect "pop %%rbp", "~{rsp}"()|};
       res_ident
@@ -1006,13 +1009,8 @@ module F = struct
       | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
         extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
         ins_branch t label_after)
-    | Tailcall_self { destination = _ } ->
-      Misc.fatal_errorf "Llvmize: tailcall self - arg = %d, res = %d"
-        (Array.length i.arg) (Array.length i.res)
-    (* ins_branch t destination *)
-    | Tailcall_func op ->
-      (* ...hopefully llvm does the tail call optimisation itself! *)
-      call ~tail:true t i op
+    | Tailcall_self { destination } -> ins_branch t destination
+    | Tailcall_func op -> call ~tail:true t i op
     | Switch _ | Call_no_return _ -> not_implemented_terminator i
 
   let int_op t (i : Cfg.basic Cfg.instruction)

@@ -44,7 +44,7 @@ L101:                                                ; preds = %L1
   %22 = load ptr, ptr %alloc
   %23 = load i64, ptr %9
   %24 = inttoptr i64 %23 to ptr
-  %25 = call cc 104 { { ptr, ptr }, { i64 } } %24(ptr %21, ptr %22, i64 %19, i64 %20)
+  %25 =  call cc 104 { { ptr, ptr }, { i64 } } %24(ptr %21, ptr %22, i64 %19, i64 %20)
   %26 = extractvalue { { ptr, ptr }, { i64 } } %25, 0, 0
   store ptr %26, ptr %ds
   %27 = extractvalue { { ptr, ptr }, { i64 } } %25, 0, 1
