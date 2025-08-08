@@ -456,8 +456,29 @@ module type S = sig
 
 end
 [%%expect{|
-Uncaught exception: File "typing/env.ml", line 2087, characters 13-19: Assertion failed
-
+module type S =
+  sig
+    module type S = sig end
+    module type Key = sig module M0 : S end
+    module L :
+      sig
+        module M : Key
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end
+          end
+      end
+    module L' :
+      sig
+        module M : sig module M0 : sig end end
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end
+          end
+      end
+  end
 |}]
 
 (* CR zqian: fix [make_aliases_absent]. *)
@@ -489,6 +510,6 @@ module type S = sig
     @@ portable
 end
 [%%expect{|
-Uncaught exception: File "typing/env.ml", line 2087, characters 13-19: Assertion failed
+Uncaught exception: File "typing/env.ml", line 2139, characters 13-19: Assertion failed
 
 |}]

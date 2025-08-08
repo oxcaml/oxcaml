@@ -6,7 +6,7 @@ module type CORE0 =
   end
 module type CORE =
   sig
-    module V : sig type value type state type usert end
+    module V : VALUE
     val setglobal : V.state -> string -> V.value -> unit
     val apply : V.value -> V.state -> V.value list -> V.value
   end
@@ -31,7 +31,7 @@ module type EVALUATOR =
 module type PARSER = sig type chunk val parse : string -> chunk end
 module type INTERP =
   sig
-    module Value : sig type value type state type usert end
+    module Value : VALUE
     module Ast :
       sig type chunk type program val get_value : chunk -> Value.value end
     type state = Value.state
