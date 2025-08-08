@@ -3661,6 +3661,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
       let block_access pos : P.Block_access_kind.t =
         let field_kind : P.Mixed_block_access_field_kind.t =
+          (* CR jrayman: Maybe refactor? *)
           match flattened_reordered_shape.(pos) with
           | Value _ -> Value_prefix Any_value
           | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
@@ -3672,11 +3673,10 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
         in
         Mixed
           { tag = Known Tag.Scannable.zero;
-            (* CR jrayman: Is this the right tag? *)
-            size = Known (Targetint_31_63.of_int field_count);
-            (* CR jrayman: Is this size in words or number of fields? *)
+            size = Unknown;
+            (* CR jrayman: Is this size in words or number of fields? Test SIMD
+               fields *)
             field_kind;
-            (* CR jrayman: is field_kind correct? *)
             shape = kind_shape
           }
       in
