@@ -315,8 +315,9 @@ module Genarray :
      is not in the range 0 to 16 inclusive, or if one of the dimensions
      is negative. *)
 
-  val init: ('a, 'b) kind -> 'c layout -> int array -> (int array -> 'a) ->
-            ('a, 'b, 'c) t
+  val init
+    : ('a, 'b) kind -> 'c layout -> int array -> (int array -> 'a) @ local ->
+      ('a, 'b, 'c) t
   (** [Genarray.init kind layout dimensions f] returns a new Bigarray [b]
       whose element kind is determined by the parameter [kind] (one of
       [float32], [float64], [int8_signed], etc) and whose layout is
@@ -403,7 +404,7 @@ module Genarray :
      dimensions, or if the coordinates are outside the array bounds.
   *)
 
-  external set: ('a, 'b, 'c) t -> int array -> 'a -> unit
+  external set: ('a, 'b, 'c) t -> int array -> ('a[@local_opt]) -> unit
     = "caml_ba_set_generic"
   (** Assign an element of a generic Bigarray.
      [Genarray.set a [|i1; ...; iN|] v] stores the value [v] in the
@@ -505,7 +506,7 @@ module Genarray :
      to a sub-array of [dst] can be achieved by applying [Genarray.blit]
      to sub-array or slices of [src] and [dst]. *)
 
-  external fill: ('a, 'b, 'c) t -> 'a -> unit = "caml_ba_fill"
+  external fill: ('a, 'b, 'c) t -> ('a[@local_opt]) -> unit = "caml_ba_fill"
   (** Set all elements of a Bigarray to a given value.
      [Genarray.fill a v] stores the value [v] in all elements of
      the Bigarray [a].  Setting only some elements of [a] to [v]
@@ -531,7 +532,7 @@ module Array0 : sig
      [kind] and [layout] determine the array element kind and the array
      layout as described for {!Genarray.create}. *)
 
-  val init: ('a, 'b) kind -> 'c layout -> 'a -> ('a, 'b, 'c) t
+  val init: ('a, 'b) kind -> 'c layout -> 'a @ local -> ('a, 'b, 'c) t
   (** [Array0.init kind layout v] behaves like [Array0.create kind layout]
      except that the element is additionally initialized to the value [v].
 
@@ -558,18 +559,18 @@ module Array0 : sig
   val get: ('a, 'b, 'c) t -> 'a
   (** [Array0.get a] returns the only element in [a]. *)
 
-  val set: ('a, 'b, 'c) t -> 'a -> unit
+  val set: ('a, 'b, 'c) t -> 'a @ local -> unit
   (** [Array0.set a x v] stores the value [v] in [a]. *)
 
   external blit: ('a, 'b, 'c) t -> ('a, 'b, 'c) t -> unit = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Genarray.blit} for more details. *)
 
-  external fill: ('a, 'b, 'c) t -> 'a -> unit = "caml_ba_fill"
+  external fill: ('a, 'b, 'c) t -> ('a[@local_opt]) -> unit = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Genarray.fill} for more details. *)
 
-  val of_value: ('a, 'b) kind -> 'c layout -> 'a -> ('a, 'b, 'c) t
+  val of_value: ('a, 'b) kind -> 'c layout -> 'a @ local -> ('a, 'b, 'c) t
   (** Build a zero-dimensional Bigarray initialized from the
      given value.  *)
 
@@ -596,7 +597,7 @@ module Array1 : sig
      determine the array element kind and the array layout
      as described for {!Genarray.create}. *)
 
-  val init: ('a, 'b) kind -> 'c layout -> int -> (int -> 'a) ->
+  val init: ('a, 'b) kind -> 'c layout -> int -> (int -> 'a) @ local ->
             ('a, 'b, 'c) t
   (** [Array1.init kind layout dim f] returns a new Bigarray [b]
      of one dimension, whose size is [dim].  [kind] and [layout]
@@ -646,7 +647,8 @@ module Array1 : sig
      [x] must be greater or equal than [1] and less or equal than
      [Array1.dim a].  Otherwise, [Invalid_argument] is raised. *)
 
-  external set: ('a, 'b, 'c) t -> int -> 'a -> unit = "%caml_ba_set_1"
+  external set
+    : ('a, 'b, 'c) t -> int -> ('a[@local_opt]) -> unit = "%caml_ba_set_1"
   (** [Array1.set a x v], also written [a.{x} <- v],
      stores the value [v] at index [x] in [a].
      [x] must be inside the bounds of [a] as described in
@@ -670,7 +672,7 @@ module Array1 : sig
   (** Copy the first Bigarray to the second Bigarray.
      See {!Genarray.blit} for more details. *)
 
-  external fill: ('a, 'b, 'c) t -> 'a -> unit = "caml_ba_fill"
+  external fill: ('a, 'b, 'c) t ->('a[@local_opt]) -> unit = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Genarray.fill} for more details. *)
 
@@ -683,7 +685,7 @@ module Array1 : sig
       Use with caution and only when the program logic guarantees that
       the access is within bounds. *)
 
-  external unsafe_set: ('a, 'b, 'c) t -> int -> 'a -> unit
+  external unsafe_set: ('a, 'b, 'c) t -> int -> 'a @ local -> unit
                      = "%caml_ba_unsafe_set_1"
   (** Like {!Bigarray.Array1.set}, but bounds checking is not always performed.
       Use with caution and only when the program logic guarantees that
@@ -711,7 +713,7 @@ module Array2 :
      as described for {!Bigarray.Genarray.create}. *)
 
   val init: ('a, 'b) kind ->  'c layout -> int -> int ->
-            (int -> int -> 'a) -> ('a, 'b, 'c) t
+            (int -> int -> 'a) @ local -> ('a, 'b, 'c) t
   (** [Array2.init kind layout dim1 dim2 f] returns a new Bigarray [b]
      of two dimensions, whose size is [dim2] in the first dimension
      and [dim2] in the second dimension.  [kind] and [layout]
@@ -764,7 +766,8 @@ module Array2 :
      of [a], as described for {!Bigarray.Genarray.get};
      otherwise, [Invalid_argument] is raised. *)
 
-  external set: ('a, 'b, 'c) t -> int -> int -> 'a -> unit = "%caml_ba_set_2"
+  external set:
+    ('a, 'b, 'c) t -> int -> int -> ('a[@local_opt]) -> unit = "%caml_ba_set_2"
   (** [Array2.set a x y v], or alternatively [a.{x,y} <- v],
      stores the value [v] at coordinates ([x], [y]) in [a].
      [x] and [y] must be within the bounds of [a],
@@ -805,7 +808,7 @@ module Array2 :
   (** Copy the first Bigarray to the second Bigarray.
      See {!Bigarray.Genarray.blit} for more details. *)
 
-  external fill: ('a, 'b, 'c) t -> 'a -> unit = "caml_ba_fill"
+  external fill: ('a, 'b, 'c) t -> ('a[@local_opt]) -> unit = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Bigarray.Genarray.fill} for more details. *)
 
@@ -818,7 +821,7 @@ module Array2 :
   (** Like {!Bigarray.Array2.get}, but bounds checking is not always
       performed. *)
 
-  external unsafe_set: ('a, 'b, 'c) t -> int -> int -> 'a -> unit
+  external unsafe_set: ('a, 'b, 'c) t -> int -> int -> ('a[@local_opt]) -> unit
                      = "%caml_ba_unsafe_set_2"
   (** Like {!Bigarray.Array2.set}, but bounds checking is not always
       performed. *)
@@ -843,8 +846,8 @@ module Array3 :
      [kind] and [layout] determine the array element kind and
      the array layout as described for {!Bigarray.Genarray.create}. *)
 
-  val init: ('a, 'b) kind ->  'c layout -> int -> int -> int ->
-            (int -> int -> int -> 'a) -> ('a, 'b, 'c) t
+  val init: ('a, 'b) kind -> 'c layout -> int -> int -> int ->
+            (int -> int -> int -> 'a) @ local -> ('a, 'b, 'c) t
   (** [Array3.init kind layout dim1 dim2 dim3 f] returns a new Bigarray [b]
      of three dimensions, whose size is [dim1] in the first dimension,
      [dim2] in the second dimension, and [dim3] in the third.
@@ -900,7 +903,7 @@ module Array3 :
      as described for {!Bigarray.Genarray.get};
      otherwise, [Invalid_argument] is raised. *)
 
-  external set: ('a, 'b, 'c) t -> int -> int -> int -> 'a -> unit
+  external set: ('a, 'b, 'c) t -> int -> int -> int -> ('a[@local_opt]) -> unit
     = "%caml_ba_set_3"
   (** [Array3.set a x y v], or alternatively [a.{x,y,z} <- v],
      stores the value [v] at coordinates ([x], [y], [z]) in [a].
@@ -962,7 +965,7 @@ module Array3 :
   (** Copy the first Bigarray to the second Bigarray.
      See {!Bigarray.Genarray.blit} for more details. *)
 
-  external fill: ('a, 'b, 'c) t -> 'a -> unit = "caml_ba_fill"
+  external fill: ('a, 'b, 'c) t -> ('a[@local_opt]) -> unit = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Bigarray.Genarray.fill} for more details. *)
 
@@ -976,8 +979,9 @@ module Array3 :
   (** Like {!Bigarray.Array3.get}, but bounds checking is not always
       performed. *)
 
-  external unsafe_set: ('a, 'b, 'c) t -> int -> int -> int -> 'a -> unit
-                     = "%caml_ba_unsafe_set_3"
+  external unsafe_set
+    : ('a, 'b, 'c) t -> int -> int -> int -> ('a[@local_opt]) -> unit
+    = "%caml_ba_unsafe_set_3"
   (** Like {!Bigarray.Array3.set}, but bounds checking is not always
       performed. *)
 
