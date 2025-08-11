@@ -135,6 +135,10 @@ module type Sort = sig
     val for_loop_index : t
 
     val for_constructor : t
+
+    val for_module_field : t
+
+    val for_boxed_variant : t
   end
 
   module Var : sig
