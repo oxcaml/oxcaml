@@ -458,10 +458,6 @@ module type S = sig
               Visibility.Const.t )
             modes
 
-      (** Gets the normal lattice for comonadic axes and the "op"ped lattice for
-        monadic ones. *)
-      val lattice_of_axis : 'a Axis.t -> (module Lattice with type t = 'a)
-
       module Option : sig
         type some = t
 
