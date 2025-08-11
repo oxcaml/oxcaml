@@ -2999,8 +2999,32 @@ end = struct
 
   let report_missing_cmi ppf = function
     | Some p ->
-      fprintf ppf "@,@[No .cmi file found containing %a.%a@]" !printtyp_path p
-        missing_cmi_hint p
+      (* Check if this is a small numbers type that requires an extension *)
+      let type_name = match p with
+        | Path.Pident id -> Ident.name id
+        | _ -> ""
+      in
+      let is_small_number_beta_type =
+        type_name = "int8" || type_name = "int16"
+      in
+      let is_small_number_stable_type =
+        type_name = "float32"
+      in
+      if is_small_number_beta_type && 
+         not (Language_extension.is_at_least Language_extension.Small_numbers Language_extension.Beta)
+      then
+        fprintf ppf "@,@[The type %a requires the small_numbers_beta extension.@]@,\
+                     @[Hint: You must enable -extension small_numbers_beta to use this type.@]"
+          !printtyp_path p
+      else if is_small_number_stable_type &&
+              not (Language_extension.is_at_least Language_extension.Small_numbers Language_extension.Stable)
+      then
+        fprintf ppf "@,@[The type %a requires the small_numbers extension.@]@,\
+                     @[Hint: You must enable -extension small_numbers to use this type.@]"
+          !printtyp_path p
+      else
+        fprintf ppf "@,@[No .cmi file found containing %a.%a@]" !printtyp_path p
+          missing_cmi_hint p
     | None -> ()
 end
 
