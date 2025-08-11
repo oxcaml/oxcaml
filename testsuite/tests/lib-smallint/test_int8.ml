@@ -1,7 +1,7 @@
 (* TEST
-   include stdlib_beta;
+   include stdlib_stable;
    modules = "test_smallint.ml";
-   flags = "-extension small_numbers_beta";
+   flags = "-extension small_numbers";
 *)
 
 (* External declarations for unsigned comparison primitives *)
@@ -10,12 +10,12 @@ external unsigned_gt : int8 -> int8 -> bool = "%int8_unsigned_greaterthan"
 
 let () =
   Test_smallint.run
-    (module Stdlib_beta.Int8)
+    (module Stdlib_stable.Int8)
     ~min_int:(-0x80)
     ~max_int:0x7f;
 
   (* Explicit unsigned comparison tests *)
-  let module I = Stdlib_beta.Int8 in
+  let module I = Stdlib_stable.Int8 in
 
   (* Test that -1 (0xFF) > 0 when compared as unsigned *)
   assert (I.unsigned_compare I.minus_one I.zero = 1);

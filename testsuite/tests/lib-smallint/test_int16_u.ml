@@ -1,5 +1,5 @@
 (* TEST
-   include stdlib_beta;
+   include stdlib_stable;
    include stdlib_upstream_compatible;
    modules = "test_repr.c test_smallint.ml";
    flambda2;
@@ -18,7 +18,7 @@
    }
 *)
 open Test_smallint
-module Smallint = Stdlib_beta.Int16_u
+module Smallint = Stdlib_stable.Int16_u
 let min_int = -0x8000
 let max_int = 0x7fff
 

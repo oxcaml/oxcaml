@@ -24,7 +24,9 @@
    -safe-string
    -strict-formats
    -extension-universe
-   stable))
+   beta
+   -extension
+   small_numbers))
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
  (library_flags

@@ -1,15 +1,15 @@
 (* TEST
-   include stdlib_beta;
+   include stdlib_stable;
    include stdlib_upstream_compatible;
-   flags = "-extension layouts_beta -extension small_numbers_beta";
+   flags = "-extension-universe beta";
 *)
 
 (* External declarations for unsigned comparison primitives *)
 external unsigned_lt : int# -> int# -> bool = "%int#_unsigned_lessthan"
 external unsigned_gt : int# -> int# -> bool = "%int#_unsigned_greaterthan"
 
-module Int = Stdlib_beta.Int
-module Int_u = Stdlib_beta.Int_u
+module Int = Stdlib_stable.Int
+module Int_u = Stdlib_stable.Int_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 
 (* Print all individual successful tests; used for debugging, as it will cause

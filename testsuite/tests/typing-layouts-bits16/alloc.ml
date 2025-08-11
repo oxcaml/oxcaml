@@ -1,7 +1,7 @@
 (* TEST
- include stdlib_beta;
+ include stdlib_stable;
  flambda2;
- flags = "-extension small_numbers_beta -extension layouts_beta";
+ flags = "-extension small_numbers -extension layouts_beta";
  native;
 *)
 
@@ -12,7 +12,7 @@
 let ( = ) = Int.equal
 
 module Int16 = struct
-  include Stdlib_beta.Int16
+  include Stdlib_stable.Int16
 
   let ( + ) = add
   let ( - ) = sub
@@ -25,7 +25,7 @@ module Int16 = struct
 end
 
 module Int16_u = struct
-  include Stdlib_beta.Int16_u
+  include Stdlib_stable.Int16_u
 
   let ( + ) = add
   let ( - ) = sub

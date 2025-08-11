@@ -724,14 +724,13 @@ let add_small_number_extension_types add_type env =
   env
   |> add_type ident_float32 ~jkind:Jkind.Const.Builtin.immutable_data
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_float32
-
-let add_small_number_beta_extension_types add_type env =
-  let _, add_type = mk_add_type add_type in
-  env
   |> add_type ident_int8 ~jkind:Jkind.Const.Builtin.immediate
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int8
   |> add_type ident_int16 ~jkind:Jkind.Const.Builtin.immediate
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int16
+
+let add_small_number_beta_extension_types _add_type env =
+  env
 
 let or_null_argument_sort = Jkind.Sort.Const.value
 

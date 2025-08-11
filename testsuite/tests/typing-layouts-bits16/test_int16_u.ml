@@ -1,14 +1,14 @@
 (* TEST
- include stdlib_beta;
- flags = "-extension layouts_beta -extension small_numbers_beta";
+ include stdlib_stable;
+ flags = "-extension layouts_beta -extension small_numbers";
 *)
 
 (* External declarations for unsigned comparison primitives *)
 external unsigned_lt : int16# -> int16# -> bool = "%int16#_unsigned_lessthan"
 external unsigned_gt : int16# -> int16# -> bool = "%int16#_unsigned_greaterthan"
 
-module Int16 = Stdlib_beta.Int16
-module Int16_u = Stdlib_beta.Int16_u
+module Int16 = Stdlib_stable.Int16
+module Int16_u = Stdlib_stable.Int16_u
 
 (* Print all individual successful tests; used for debugging, as it will cause
    this test to fail *)

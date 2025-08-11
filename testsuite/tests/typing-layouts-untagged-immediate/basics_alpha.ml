@@ -1,6 +1,6 @@
 (* TEST
  {
-   flags = "-extension layouts_alpha -extension small_numbers_beta";
+   flags = "-extension-universe alpha";
    expect;
  }
 *)

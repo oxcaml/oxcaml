@@ -124,7 +124,7 @@ external compare : int# -> int# -> int = "%int#_compare"
 
 (** Same as {!compare}, except that arguments are interpreted as
     {e unsigned} integers. *)
-val unsigned_compare : int# -> int# -> int
+external unsigned_compare : int# -> int# -> int = "%int#_unsigned_compare"
 
 (** Return the lesser of the two arguments. *)
 val min : int# -> int# -> int#
