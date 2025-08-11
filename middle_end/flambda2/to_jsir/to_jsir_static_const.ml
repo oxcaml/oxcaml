@@ -92,8 +92,13 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     ignore values;
     static_const_not_supported ()
   | Immutable_value_array values ->
-    ignore values;
-    static_const_not_supported ()
+    let tag = Tag.zero |> Tag.to_int in
+    let values, res =
+      List.map Simple.With_debuginfo.simple values
+      |> To_jsir_shared.simples ~env ~res
+    in
+    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+      (Block (tag, Array.of_list values, Array, Immutable))
   | Empty_array kind -> (
     match kind with
     | Values_or_immediates_or_naked_floats | Naked_float32s ->
