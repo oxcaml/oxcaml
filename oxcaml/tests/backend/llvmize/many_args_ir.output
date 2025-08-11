@@ -99,9 +99,7 @@ L101:                                                ; preds = %L1
   %63 = load i64, ptr %11
   %64 = load i64, ptr %12
   %65 = load ptr, ptr %ds
-  call void asm sideeffect "push %rbp", "~{rsp}"()
   %66 = call cc 104 { { ptr }, { i64 } } @caml_apply13(ptr %65, i64 %55, i64 %56, i64 %57, i64 %58, i64 %59, i64 %60, i64 %61, i64 %62, i64 %63, i64 %64)
-  call void asm sideeffect "pop %rbp", "~{rsp}"()
   %67 = extractvalue { { ptr }, { i64 } } %66, 0, 0
   store ptr %67, ptr %ds
   %68 = extractvalue { { ptr }, { i64 } } %66, 1, 0

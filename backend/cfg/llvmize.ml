@@ -168,13 +168,20 @@ type fun_sig =
     res : Llvm_typ.t option
   }
 
+type trap_block_info =
+  { trap_block : Ident.t;
+    stacksave_ptr : Ident.t
+  }
+
 type fun_info =
   { fun_name : string;
+    fun_has_try : bool;
+        (** Whether the function contains try blocks (which means LLVM will always use a frame pointer) *)
     ident_gen : Ident.Gen.t;
     reg2ident : Ident.t Reg.Tbl.t;  (** Map register's stamp to identifier  *)
     label2ident : Ident.t Label.Tbl.t;
         (** Map label to identifier. Avoid clashes between pre-existing Cfg labels and unnamed identifiers. *)
-    trap_blocks : Ident.t Label.Tbl.t
+    trap_blocks : trap_block_info Label.Tbl.t
         (** Map handler labels to the corresponding pushtrap location on the stack *)
   }
 
@@ -196,8 +203,9 @@ type t =
         (* Names + signatures (args, ret) of functions called so far *)
   }
 
-let create_fun_info fun_name =
+let create_fun_info ~fun_name ~fun_has_try =
   { fun_name;
+    fun_has_try;
     ident_gen = Ident.Gen.create ();
     reg2ident =
       Reg.Tbl.create 37 (* CR yusumez: change this to be more reasonable *);
@@ -214,13 +222,15 @@ let create ~llvmir_filename ~ppf_dump =
     oc;
     ppf;
     ppf_dump;
-    current_fun_info = create_fun_info "<no current function>";
+    current_fun_info =
+      create_fun_info ~fun_name:"<no current function>" ~fun_has_try:false;
     defined_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty;
     called_functions = String.Map.empty
   }
 
-let reset_fun_info t fun_name = t.current_fun_info <- create_fun_info fun_name
+let reset_fun_info t ~fun_name ~fun_has_try =
+  t.current_fun_info <- create_fun_info ~fun_name ~fun_has_try
 
 let get_ident_aux table key ~get_ident ~find_opt ~add =
   match find_opt table key with
@@ -638,11 +648,18 @@ module F = struct
     let res_type = make_ret_type (List.map (fun reg -> reg.Reg.typ) res_regs) in
     let do_call ~pp_name fn =
       let res_ident = fresh_ident t in
-      (* Save RBP in case frame pointers aren't enabled and LLVM decided to use
-         them for some reason... *)
-      ins t {|call void asm sideeffect "push %%rbp", "~{rsp}"()|};
+      (* CR yusumez: Despite frame pointers being disabled and no register
+         (including RBP) being callee-saved, the presence of different sized
+         alloca's in different branches (which happens if there are any try
+         blocks due to [Pushtrap]) causes LLVM to emit code using RBP as a frame
+         pointer in such a function. And, unfortunately, LLVM doesn't save RBP
+         in that case (perhaps because it is handled specially), so we have to
+         do it ourselves ._. *)
+      if t.current_fun_info.fun_has_try
+      then ins t {|call void asm sideeffect "push %%rbp", "~{rsp}"()|};
       ins_call ~cc:Ocaml ~pp_name t fn args (Some (res_type, res_ident));
-      ins t {|call void asm sideeffect "pop %%rbp", "~{rsp}"()|};
+      if t.current_fun_info.fun_has_try
+      then ins t {|call void asm sideeffect "pop %%rbp", "~{rsp}"()|};
       res_ident
     in
     (* Do the call *)
@@ -734,7 +751,7 @@ module F = struct
       ins_call_custom_arg ~attrs:"" ~cc:Ocaml_c_call ~pp_name:pp_global ~pp_arg
         t caml_c_call_symbol args
         (Some (res_type, res_ident));
-      (* CR yusumez: Insert safepoint here once we have GC support *)
+      (* CR yusumez: Record frame table here *)
       res_ident
     in
     let call_func args res_type =
@@ -1092,16 +1109,24 @@ module F = struct
     | Poptrap { lbl_handler } -> (
       match Label.Tbl.find_opt t.current_fun_info.trap_blocks lbl_handler with
       | None -> Misc.fatal_error "Llvmize: unbalanced trap pop"
-      | Some trap_block ->
+      | Some { trap_block; stacksave_ptr } ->
+        (* Restore previous exn handler sp *)
         let ds_exn_handler_addr = load_domainstate_addr t Domain_exn_handler in
         let prev_sp =
           let res = fresh_ident t in
           ins_load t ~src:trap_block ~dst:res Llvm_typ.i64;
           res
         in
-        ins_store t ~src:prev_sp ~dst:ds_exn_handler_addr Llvm_typ.i64)
-    | Pushtrap { lbl_handler } ->
-      (* Force spill... *)
+        ins_store t ~src:prev_sp ~dst:ds_exn_handler_addr Llvm_typ.i64;
+        (* Pop! *)
+        add_called_fun t "llvm.stackrestore" ~cc:Default ~args:[Llvm_typ.ptr]
+          ~res:None;
+        ins_call ~cc:Default ~pp_name:pp_global t "llvm.stackrestore"
+          [Llvm_typ.ptr, stacksave_ptr]
+          None)
+    | Pushtrap { lbl_handler } -> (
+      (* CR yusumez: Force spilling of all general purpose registers in
+         llvm.eh.ocaml.try instead. *)
       ins t
         {|call void asm sideeffect "", "~{rax},~{rbx},~{rcx},~{rdx},~{rsi},~{rdi},~{r8},~{r9},~{r10},~{r11},~{r12},~{r13},~{r14},~{r15}"()|};
       (* Call a dummy LLVM intrinsic that will ensure the handler is not removed
@@ -1121,10 +1146,12 @@ module F = struct
         (get_ident_for_label t lbl_handler)
         try_block;
       line t.ppf "%a:" Ident.print try_block;
-      (* alloca's not done in the entry basic block don't get eliminated by SROA
-         or Mem2Reg, and the previous dummy call + branch ensures this as well.
-         Hence, an alloca here will cause a push at this location, not
-         before. *)
+      (* Save state of stack *)
+      let stacksave_ptr = fresh_ident t in
+      add_called_fun t "llvm.stacksave" ~cc:Default ~args:[]
+        ~res:(Some Llvm_typ.ptr);
+      ins_call ~cc:Default ~pp_name:pp_global t "llvm.stacksave" []
+        (Some (Llvm_typ.ptr, stacksave_ptr));
       let trap_block = fresh_ident t in
       (* [prev_sp; handler_addr; saved_rbp; padding] - we need to save rbp since
          it will get clobbered by the time we get to the handler, and LLVM is
@@ -1152,7 +1179,12 @@ module F = struct
       ins_store_label_addr t ~label:lbl_handler ~dst:handler_slot;
       ins_store t ~src:ds_exn_handler ~dst:prev_sp_slot Llvm_typ.i64;
       ins_store t ~src:trap_block ~dst:ds_exn_handler_addr Llvm_typ.ptr;
-      Label.Tbl.add t.current_fun_info.trap_blocks lbl_handler trap_block
+      match Label.Tbl.find_opt t.current_fun_info.trap_blocks lbl_handler with
+      | Some _ ->
+        Misc.fatal_error "Llvmize: Multiple pushtraps for the same handler"
+      | None ->
+        Label.Tbl.add t.current_fun_info.trap_blocks lbl_handler
+          { trap_block; stacksave_ptr })
     | Stack_check _ -> not_implemented_basic i
 
   (* == Cfg data items == *)
@@ -1340,6 +1372,9 @@ let trap_handler_entry ~cfg_with_infos t (block : Cfg.basic_block) =
     (* Restore RBP (+ remove padding) *)
     F.ins t {|call void asm sideeffect "pop %%rbp; addq $$8, %%rsp", ""()|};
     (* Touch all live regs to keep them on the stack *)
+    (* CR yusumez: Do we need both this and spilling GPRs right before
+       [ocaml.try] at the same time? It feels like we can get rid of the
+       former. *)
     let live = (Cfg_with_infos.liveness_find cfg_with_infos i.id).across in
     Reg.Set.iter
       (fun reg ->
@@ -1377,7 +1412,11 @@ let cfg (cl : CL.t) =
       } =
     cfg
   in
-  reset_fun_info t fun_name;
+  let fun_has_try =
+    DLL.exists layout ~f:(fun label ->
+        (Label.Tbl.find blocks label).is_trap_handler)
+  in
+  reset_fun_info t ~fun_name ~fun_has_try;
   t.defined_symbols <- String.Set.add fun_name t.defined_symbols;
   (* Make fresh idents for argument regs since these will be different from
      idents assigned to them later on *)
@@ -1557,20 +1596,19 @@ let llvmir_to_assembly t =
   let cmd =
     match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
   in
+  let fp_flags =
+    if Config.with_frame_pointers
+    then ["-fno-omit-frame-pointer"]
+    else ["-fomit-frame-pointer"; "-momit-leaf-frame-pointer"]
+  in
   match t.asm_filename with
   | None -> 0
   | Some asm_filename ->
     Ccomp.command
       (String.concat " "
-         [ cmd;
-           "-o";
-           Filename.quote asm_filename;
-           "-O3";
-           "-S";
-           "-fomit-frame-pointer";
-           "-momit-leaf-frame-pointer";
-           "-x ir";
-           Filename.quote t.llvmir_filename ])
+         ([cmd; "-o"; Filename.quote asm_filename; "-O3"; "-S"]
+         @ fp_flags
+         @ ["-x ir"; Filename.quote t.llvmir_filename]))
 
 let assemble_file ~asm_filename ~obj_filename =
   let cmd =
