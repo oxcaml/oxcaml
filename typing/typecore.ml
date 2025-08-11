@@ -96,7 +96,7 @@ let record_form_to_wrong_kind_sort
 
 type type_block_access_result =
   { ba : block_access; base_ty: type_expr; el_ty: type_expr; flat_float : bool;
-    modality : Modality.Value.Const.t }
+    modality : Modality.Const.t }
 
 type contains_gadt =
   | Contains_gadt
@@ -275,7 +275,7 @@ type error =
   | Block_access_record_unboxed
   | Block_access_private_record
   | Block_index_modality_mismatch of
-      { mut : bool; err : Modality.Value.equate_error }
+      { mut : bool; err : Modality.equate_error }
   | Submode_failed of
       Value.error * submode_reason *
       Env.locality_context option *
@@ -530,7 +530,7 @@ let mode_morph f expected_mode =
 
 let mode_modality modality expected_mode =
   as_single_mode expected_mode
-  |> Modality.Value.Const.apply modality
+  |> Modality.Const.apply modality
   |> mode_default
 
 (* used when entering a function;
@@ -1307,7 +1307,7 @@ let add_pattern_variables ?check ?check_as env pv =
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
          {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
-          val_attributes = pv_attributes; val_modalities = Modality.Value.id;
+          val_attributes = pv_attributes; val_modalities = Modality.id;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
          } env
@@ -1344,7 +1344,7 @@ let add_module_variables env module_variables =
       in
       let md =
         { md_type = modl.mod_type; md_attributes = [];
-          md_modalities = Mode.Modality.Value.id;
+          md_modalities = Mode.Modality.id;
           md_loc = mv_name.loc;
           md_uid = mv_uid; }
       in
@@ -2749,7 +2749,7 @@ and type_pat_aux
       Typemode.transl_modalities ~maturity:Stable mutability []
     in
     check_project_mutability ~loc ~env:!!penv mutability alloc_mode.mode;
-    let alloc_mode = Modality.Value.Const.apply modalities alloc_mode.mode in
+    let alloc_mode = Modality.Const.apply modalities alloc_mode.mode in
     let alloc_mode = simple_pat_mode alloc_mode in
     let pl =
       List.map (fun p -> type_pat ~alloc_mode tps Value p ty_elt arg_sort) spl
@@ -2866,9 +2866,7 @@ and type_pat_aux
           solve_Ppat_record_field ~refine:false loc penv label label_lid
             record_ty record_form in
         check_project_mutability ~loc ~env:!!penv label.lbl_mut alloc_mode.mode;
-        let mode =
-          Modality.Value.Const.apply label.lbl_modalities alloc_mode.mode
-        in
+        let mode = Modality.Const.apply label.lbl_modalities alloc_mode.mode in
         let alloc_mode = simple_pat_mode mode in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg
           (Jkind.Sort.of_const label.lbl_sort))
@@ -3125,7 +3123,7 @@ and type_pat_aux
         List.map2
           (fun p (arg : Types.constructor_argument) ->
              let alloc_mode =
-              Modality.Value.Const.apply arg.ca_modalities alloc_mode.mode
+              Modality.Const.apply arg.ca_modalities alloc_mode.mode
              in
              let alloc_mode =
               Mode.Value.join [ alloc_mode; constructor_mode ]
@@ -3385,7 +3383,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_kind = Val_reg
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
-            ; val_modalities = Modality.Value.id
+            ; val_modalities = Modality.id
             ; val_loc = pv_loc
             ; val_uid = pv_uid
             }
@@ -3397,7 +3395,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_kind = Val_ivar (Immutable, cl_num)
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
-            ; val_modalities = Modality.Value.id
+            ; val_modalities = Modality.id
             ; val_loc = pv_loc
             ; val_uid = pv_uid
             }
@@ -5767,7 +5765,7 @@ and type_expect_
         assign_label_children (List.length lbl_a_list)
           (fun _loc ty mode -> (* only change mode here, see type_label_exp *)
              List.map (fun (_, label, _) ->
-               let mode = Modality.Value.Const.apply label.lbl_modalities mode in
+               let mode = Modality.Const.apply label.lbl_modalities mode in
                Overwrite_label(ty, mode))
                lbl_a_list)
           overwrite
@@ -5805,7 +5803,7 @@ and type_expect_
               with_explanation (fun () ->
                 unify_exp_types record_loc env (instance ty_expected) ty_res2);
               check_project_mutability ~loc:extended_expr_loc ~env lbl.lbl_mut mode;
-              let mode = Modality.Value.Const.apply lbl.lbl_modalities mode in
+              let mode = Modality.Const.apply lbl.lbl_modalities mode in
               check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
                 ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode;
               let argument_mode =
@@ -5925,9 +5923,7 @@ and type_expect_
             match path with
             | Path.Pident id ->
               let modalities = Typemode.let_mutable_modalities in
-              let mode =
-                Modality.Value.Const.apply modalities actual_mode.mode
-              in
+              let mode = Modality.Const.apply modalities actual_mode.mode in
               submode ~loc ~env mode expected_mode;
               Texp_mutvar {loc = lid.loc; txt = id}
             | _ ->
@@ -6363,7 +6359,7 @@ and type_expect_
         end ~post:generalize_structure
       in
       check_project_mutability ~loc:record.exp_loc ~env label.lbl_mut rmode;
-      let mode = Modality.Value.Const.apply label.lbl_modalities rmode in
+      let mode = Modality.Const.apply label.lbl_modalities rmode in
       let boxing : texp_field_boxing =
         let is_float_boxing =
           match label.lbl_repres with
@@ -6419,7 +6415,7 @@ and type_expect_
       if Types.is_mutable label.lbl_mut then
         fatal_error
           "Typecore.type_expect_: unboxed record labels are never mutable";
-      let mode = Modality.Value.Const.apply label.lbl_modalities rmode in
+      let mode = Modality.Const.apply label.lbl_modalities rmode in
       let mode = cross_left env ty_arg mode in
       submode ~loc ~env mode expected_mode;
       let uu = unique_use ~loc ~env mode (as_single_mode expected_mode) in
@@ -6536,7 +6532,7 @@ and type_expect_
                   type_unboxed_access env loc el_ty ua
                 in
                 let modality =
-                  Modality.Value.Const.concat modality ~then_:ua_modality in
+                  Modality.Const.concat modality ~then_:ua_modality in
                 (el_ty, modality), ua
              ))
         (el_ty, modality)
@@ -6544,7 +6540,7 @@ and type_expect_
     in
     let expected_modality = Typemode.idx_expected_modalities ~mut in
     begin
-      match Modality.Value.Const.equate modality expected_modality with
+      match Modality.Const.equate modality expected_modality with
       | Ok () -> ()
       | Error err ->
         raise (Error(loc, env, Block_index_modality_mismatch { mut; err }))
@@ -6847,7 +6843,7 @@ and type_expect_
               let md_shape = Shape.set_uid_if_none md_shape md_uid in
               let md =
                 { md_type = modl.mod_type; md_attributes = [];
-                  md_modalities = Modality.Value.id;
+                  md_modalities = Modality.id;
                   md_loc = name.loc;
                   md_uid; }
               in
@@ -7217,7 +7213,7 @@ and type_expect_
           let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
           unify_exp env record ty_res;
           let alloc_mode, argument_mode = register_allocation expected_mode in
-          begin match Mode.Modality.Value.Const.equate label.lbl_modalities
+          begin match Mode.Modality.Const.equate label.lbl_modalities
                         (Typemode.atomic_mutable_modalities)
           with
           | Ok () -> ()
@@ -8596,7 +8592,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
           { val_type = ty; val_kind = Val_reg;
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
-            val_modalities = Modality.Value.id;
+            val_modalities = Modality.id;
             val_loc = Location.none;
             val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
           }
@@ -9127,7 +9123,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       (fun loc ty mode ->
          let ty_args, _, _ = unify_as_construct ty in
          List.map (fun ty_arg ->
-           let mode = Modality.Value.Const.apply ty_arg.Types.ca_modalities mode in
+           let mode = Modality.Const.apply ty_arg.Types.ca_modalities mode in
            match recarg with
            | Required -> Overwriting(loc, ty_arg.Types.ca_type, mode)
            | Allowed | Rejected -> Assigning(ty_arg.Types.ca_type, mode)
@@ -11602,7 +11598,7 @@ let report_error ~loc env =
     Location.error ~loc
       "Block indices do not support private records."
   | Block_index_modality_mismatch { mut; err } ->
-    let step, Modality.Value.Error({ left; right }) = err in
+    let step, Modality.Error({ left; right }) = err in
     let print_modality id ppf m =
       Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ppf m
     in

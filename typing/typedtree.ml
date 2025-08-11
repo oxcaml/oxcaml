@@ -625,7 +625,7 @@ and primitive_coercion =
 
 and signature = {
   sig_items : signature_item list;
-  sig_modalities : Mode.Modality.Value.Const.t;
+  sig_modalities : Mode.Modality.Const.t;
   sig_type : Types.signature;
   sig_final_env : Env.t;
   sig_sloc : Location.t;
@@ -648,7 +648,7 @@ and signature_item_desc =
   | Tsig_modtype of module_type_declaration
   | Tsig_modtypesubst of module_type_declaration
   | Tsig_open of open_description
-  | Tsig_include of include_description * Mode.Modality.Value.Const.t
+  | Tsig_include of include_description * Mode.Modality.Const.t
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
@@ -660,7 +660,7 @@ and module_declaration =
      md_uid: Uid.t;
      md_presence: module_presence;
      md_type: module_type;
-     md_modalities: Mode.Modality.Value.t;
+     md_modalities: Mode.Modality.t;
      md_attributes: attribute list;
      md_loc: Location.t;
     }
@@ -817,7 +817,7 @@ and label_declaration =
      ld_name: string loc;
      ld_uid: Uid.t;
      ld_mutable: mutability;
-     ld_modalities: Modality.Value.Const.t;
+     ld_modalities: Modality.Const.t;
      ld_type: core_type;
      ld_loc: Location.t;
      ld_attributes: attribute list;
@@ -837,7 +837,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    ca_modalities: Modality.Value.Const.t;
+    ca_modalities: Modality.Const.t;
     ca_type: core_type;
     ca_loc: Location.t;
   }

@@ -1025,18 +1025,18 @@ let scrape_alias =
         t -> Subst.Lazy.module_type -> Subst.Lazy.module_type)
 
 let md md_type =
-  {md_type; md_modalities = Mode.Modality.Value.id; md_attributes=[];
+  {md_type; md_modalities = Mode.Modality.id; md_attributes=[];
    md_loc=Location.none; md_uid = Uid.internal_not_actually_unique}
 
 (** The caller is not interested in modes, and thus [val_modalities] is
 invalidated. *)
 let vda_description vda =
   let vda_description = vda.vda_description in
-  {vda_description with val_modalities = Mode.Modality.Value.undefined}
+  {vda_description with val_modalities = Mode.Modality.undefined}
 
 let normalize_mode modality mode =
-  let vda_mode = Mode.Modality.Value.apply modality mode in
-  Mode.Modality.Value.id, vda_mode
+  let vda_mode = Mode.Modality.apply modality mode in
+  Mode.Modality.id, vda_mode
 
 let normalize_vda_mode vda =
   let vda_description = vda.vda_description in
@@ -1177,7 +1177,7 @@ let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   in
   let md =
     { Subst.Lazy.md_type = Mty_signature sign;
-      md_modalities = Mode.Modality.Value.id;
+      md_modalities = Mode.Modality.id;
       md_loc = Location.none;
       md_attributes = [];
       md_uid = uid;
@@ -2767,7 +2767,7 @@ and add_cltype ?shape id ty env =
 
 let add_module_lazy ~update_summary id presence mty ?mode env =
   let md = Subst.Lazy.{md_type = mty;
-                       md_modalities = Mode.Modality.Value.id;
+                       md_modalities = Mode.Modality.id;
                        md_attributes = [];
                        md_loc = Location.none;
                        md_uid = Uid.internal_not_actually_unique}
@@ -4266,7 +4266,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
           let mode =
             m0
             |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
-            |> Mode.Modality.Value.Const.apply
+            |> Mode.Modality.Const.apply
                 Typemode.let_mutable_modalities
           in
           mutate_value ~use ~loc path vda;
