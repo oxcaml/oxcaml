@@ -1690,6 +1690,68 @@ module Hint = struct
     | Crossing_left -> Crossing_right
     | Register_alloc_mode -> Register_alloc_mode
 
+  (** Print out the text for a constant hint. Either prints nothing when there is
+  no hint and returns [NothingPrinted] or prints " because {hint}" where {hint}
+  is text for the specific constant hint and returns [HintPrinted]. *)
+  let print_const a_obj a ppf : const -> unit =
+    let open Format in
+    let wrap_print_hint t = fprintf ppf "@ because %t" t in
+    function
+    | Debug s -> wrap_print_hint (dprintf "DEBUG[%s]" s)
+    | Skip ->
+      (* The point of the [Skip] constant hint is that it should never have to be printed *)
+      assert false
+    | Result_of_lazy ->
+      wrap_print_hint (dprintf "it is the result of a lazy expression")
+    | Lazy_closure ->
+      wrap_print_hint
+        (dprintf "lazy expressions are always %a" (C.print a_obj) a)
+    | Class ->
+      wrap_print_hint (dprintf "classes are always %a" (C.print a_obj) a)
+    | Tailcall_function ->
+      wrap_print_hint (dprintf "it is the function in a tail call")
+    | Tailcall_argument ->
+      wrap_print_hint (dprintf "it is an argument in a tail call")
+    | Mutable_read ->
+      wrap_print_hint (dprintf "it has a mutable field read from")
+    | Mutable_write ->
+      wrap_print_hint (dprintf "it has a mutable field written to")
+    | Forced_lazy_expression ->
+      wrap_print_hint (dprintf "it is a lazy expression that is forced")
+    | Is_function_return ->
+      wrap_print_hint
+        (dprintf
+           "it is a function return value.@\n\
+            Hint: Use exclave_ to return a local value.")
+    | Stack_expression -> wrap_print_hint (dprintf "it is a stack expression")
+
+  let print_morph : type l r. Format.formatter -> (l * r) morph -> unit =
+    let open Format in
+    fun ppf hint ->
+      match hint with
+      | Debug s -> fprintf ppf "DEBUG[%s]" s
+      | Skip ->
+        (* [Skip] should never be printed as it should only be used with morphisms
+            that don't change the mode value (modulo equating equivalent regionality
+            and locality values), and [Skip] should be a non-rigid hint, which should
+            mean this case never happens *)
+        assert false
+      | Close_over closure ->
+        (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
+        fprintf ppf "closes over the %a %a (at %a)" print_lock_item
+          closure.value_item
+          (Misc.Style.as_inline_code !print_longident)
+          closure.value_lid Location.print_loc closure.value_loc
+      | Is_closed_by closure ->
+        fprintf ppf "is used inside a %a" print_closure_context
+          closure.closure_context
+      | Captured_by_partial_application ->
+        fprintf ppf "is captured by a partial application"
+      | Adj_captured_by_partial_application ->
+        fprintf ppf "has a partial application capturing a value"
+      | Crossing_left | Crossing_right -> fprintf ppf "crosses with something"
+      | Register_alloc_mode -> fprintf ppf "is has an allocation"
+
   module Allow_disallow = Magic_allow_disallow (struct
     type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
 
@@ -1788,69 +1850,6 @@ module Axerror = struct
       | HintPrinted
       | NothingPrinted
 
-    (** Print out the text for a constant hint. Either prints nothing when there is
-  no hint and returns [NothingPrinted] or prints " because {hint}" where {hint}
-  is text for the specific constant hint and returns [HintPrinted]. *)
-    let print_const_hint a_obj a ppf : Hint.const -> unit =
-      let open Format in
-      let wrap_print_hint t = fprintf ppf "@ because %t" t in
-      function
-      | Debug s -> wrap_print_hint (dprintf "DEBUG[%s]" s)
-      | Skip ->
-        (* The point of the [Skip] constant hint is that it should never have to be printed *)
-        assert false
-      | Result_of_lazy ->
-        wrap_print_hint (dprintf "it is the result of a lazy expression")
-      | Lazy_closure ->
-        wrap_print_hint
-          (dprintf "lazy expressions are always %a" (C.print a_obj) a)
-      | Class ->
-        wrap_print_hint (dprintf "classes are always %a" (C.print a_obj) a)
-      | Tailcall_function ->
-        wrap_print_hint (dprintf "it is the function in a tail call")
-      | Tailcall_argument ->
-        wrap_print_hint (dprintf "it is an argument in a tail call")
-      | Mutable_read ->
-        wrap_print_hint (dprintf "it has a mutable field read from")
-      | Mutable_write ->
-        wrap_print_hint (dprintf "it has a mutable field written to")
-      | Forced_lazy_expression ->
-        wrap_print_hint (dprintf "it is a lazy expression that is forced")
-      | Is_function_return ->
-        wrap_print_hint
-          (dprintf
-             "it is a function return value.@\n\
-              Hint: Use exclave_ to return a local value.")
-      | Stack_expression -> wrap_print_hint (dprintf "it is a stack expression")
-
-    let print_morph_hint :
-        type l r. Format.formatter -> (l * r) Hint.morph -> unit =
-      let open Format in
-      fun ppf hint ->
-        match hint with
-        | Debug s -> fprintf ppf "DEBUG[%s]" s
-        | Skip ->
-          (* [Skip] should never be printed as it should only be used with morphisms
-             that don't change the mode value (modulo equating equivalent regionality
-             and locality values), and [Skip] should be a non-rigid hint, which should
-             mean this case never happens *)
-          assert false
-        | Close_over closure ->
-          (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
-          fprintf ppf "closes over the %a %a (at %a)" Hint.print_lock_item
-            closure.value_item
-            (Misc.Style.as_inline_code !print_longident)
-            closure.value_lid Location.print_loc closure.value_loc
-        | Is_closed_by closure ->
-          fprintf ppf "is used inside a %a" Hint.print_closure_context
-            closure.closure_context
-        | Captured_by_partial_application ->
-          fprintf ppf "is captured by a partial application"
-        | Adj_captured_by_partial_application ->
-          fprintf ppf "has a partial application capturing a value"
-        | Crossing_left | Crossing_right -> fprintf ppf "crosses with something"
-        | Register_alloc_mode -> fprintf ppf "is has an allocation"
-
     (** Print a "chain" of axhints, which will consist of zero or more [Apply] axhints,
       terminated with a [Empty] or [Const] axhint *)
     let rec print_axhint_chain :
@@ -1920,11 +1919,11 @@ module Axerror = struct
           print_axhint_chain side b b_obj b_hint ppf
         else (
           fprintf ppf "%a@ because it %a@ which is " (print_mode a_obj) a
-            print_morph_hint morph_hint;
+            Hint.print_morph morph_hint;
           ignore (print_axhint_chain side b b_obj b_hint ppf);
           HintPrinted)
       | Const const_hint ->
-        fprintf ppf "%a%a" (print_mode a_obj) a (print_const_hint a_obj a)
+        fprintf ppf "%a%a" (print_mode a_obj) a (Hint.print_const a_obj a)
           const_hint;
         HintPrinted
       | Nil ->
