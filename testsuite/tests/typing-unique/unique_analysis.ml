@@ -816,14 +816,10 @@ let foo (r : 'a r) =
   ()
 [%%expect{|
 type 'a r = { mutable x : 'a [@atomic]; y : 'a; }
-Line 6, characters 10-11:
-6 |   let _ = r.y in
-              ^
-Error: This value is read from here, but it has already been used as unique:
-Line 4, characters 23-24:
-4 |   let x = [%atomic.loc r.x] in
-                           ^
-
+Line 5, characters 20-21:
+5 |   let _ = unique_id x in
+                        ^
+Error: This value is "aliased" but expected to be "unique".
 |}]
 
 let foo (r : 'a r) =
@@ -842,7 +838,10 @@ let foo (r : 'a r) =
   let _ = unique_id x in
   ()
 [%%expect{|
-val foo : 'a r @ unique -> unit = <fun>
+Line 4, characters 20-21:
+4 |   let _ = unique_id x in
+                        ^
+Error: This value is "aliased" but expected to be "unique".
 |}]
 
 
@@ -852,21 +851,64 @@ let foo (r : 'a r) =
   let _ = unique_id x in
   ()
 [%%expect{|
-Line 3, characters 10-11:
-3 |   let _ = r.y in
-              ^
-Error: This value is read from here, but it has already been used as unique:
+Line 4, characters 20-21:
+4 |   let _ = unique_id x in
+                        ^
+Error: This value is "aliased" but expected to be "unique".
+|}]
+
+let foo (r : 'a r) =
+  let x = [%atomic.loc r.x] in
+  let _ = r.y in
+  let _ = aliased_id x in
+  ()
+[%%expect{|
+val foo : 'a r -> unit = <fun>
+|}]
+
+let foo (r : 'a r @ unique) =
+  let x = [%atomic.loc r.x] in
+  let _ = unique_id r in
+  ()
+[%%expect{|
+Line 3, characters 20-21:
+3 |   let _ = unique_id r in
+                        ^
+Error: This value is used here as unique, but it has already been used:
 Line 2, characters 23-24:
 2 |   let x = [%atomic.loc r.x] in
                            ^
 
 |}]
 
-let foo (r : 'a r) =
+let foo (r : 'a r @ unique) =
   let x = [%atomic.loc r.x] in
-  let _ = r.y in
-  let _ = aliased_id x in
+  let _ = unique_id r.y in
   ()
 [%%expect{|
-val foo : 'a r -> unit = <fun>
+Line 3, characters 20-23:
+3 |   let _ = unique_id r.y in
+                        ^^^
+Error: This value is used here as unique,
+       but it is part of a value that has already been used:
+Line 2, characters 23-24:
+2 |   let x = [%atomic.loc r.x] in
+                           ^
+
+|}]
+
+let foo (r : 'a r @ unique) =
+  let _ = unique_id r.y in
+  let x = [%atomic.loc r.x] in
+  ()
+[%%expect{|
+Line 3, characters 23-24:
+3 |   let x = [%atomic.loc r.x] in
+                           ^
+Error: This value is used here,
+       but part of it has already been used as unique:
+Line 2, characters 20-23:
+2 |   let _ = unique_id r.y in
+                        ^^^
+
 |}]

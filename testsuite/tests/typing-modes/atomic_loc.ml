@@ -12,23 +12,23 @@ let contents_loc t = [%atomic.loc t.contents]
 val contents_loc : 'a atomic -> 'a atomic_loc = <fun>
 |}]
 
+(* [atomic.loc] gives something at legacy (such as nonportable) *)
 let atomic_loc_portable (t @ portable) : _ @ portable = [%atomic.loc t.contents]
 [%%expect{|
-val atomic_loc_portable : 'a atomic @ portable -> 'a atomic_loc @ portable =
-  <fun>
+Line 1, characters 56-80:
+1 | let atomic_loc_portable (t @ portable) : _ @ portable = [%atomic.loc t.contents]
+                                                            ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
+(* [atomic.loc] gives something at legacy, such as aliased *)
 let uses_unique (t @ unique) : _ @ unique =
   [%atomic.loc t.contents], [%atomic.loc t.contents]
 [%%expect{|
-Line 2, characters 41-42:
+Line 2, characters 2-26:
 2 |   [%atomic.loc t.contents], [%atomic.loc t.contents]
-                                             ^
-Error: This value is used here, but it is already being used as unique:
-Line 2, characters 15-16:
-2 |   [%atomic.loc t.contents], [%atomic.loc t.contents]
-                   ^
-
+      ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "aliased" but expected to be "unique".
 |}]
 
 let aliased_locs (t @ unique) =
@@ -74,14 +74,10 @@ val consume_all_fields :
 let atomic_loc_consumes_record (t : _ atomic @ unique) : _ @ unique =
   [%atomic.loc t.contents], t
 [%%expect{|
-Line 2, characters 28-29:
+Line 2, characters 2-26:
 2 |   [%atomic.loc t.contents], t
-                                ^
-Error: This value is used here, but it is already being used as unique:
-Line 2, characters 15-16:
-2 |   [%atomic.loc t.contents], t
-                   ^
-
+      ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "aliased" but expected to be "unique".
 |}]
 
 let atomic_loc_mode_crosses_aliased (t : string atomic_loc @ unique) : _ @ aliased

@@ -7036,7 +7036,7 @@ and type_expect_
           then raise (Error (loc, env, Label_not_atomic lid.txt));
           let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
           unify_exp env record ty_res;
-          let alloc_mode, argument_mode = register_allocation expected_mode in
+          submode ~loc ~env rmode mode_legacy;
           begin match Mode.Modality.Value.Const.equate label.lbl_modalities
                         (Typemode.atomic_mutable_modalities)
           with
@@ -7044,7 +7044,8 @@ and type_expect_
           | Error _ ->
             raise (Error (loc, env, Modalities_on_atomic_field))
           end;
-          submode ~loc ~env rmode argument_mode;
+          let alloc_mode, argument_mode = register_allocation expected_mode in
+          submode ~loc ~env Mode.Value.legacy argument_mode;
           rue {
             exp_desc =
               Texp_atomic_loc

@@ -13,9 +13,13 @@ let contents_loc t = [%atomic.loc t.contents]
 val contents_loc : 'a atomic -> 'a atomic_loc = <fun>
 |}]
 
+(* [atomic.loc] requires record to be legacy (such as global) *)
 let contents_loc_local (t @ local) = exclave_ [%atomic.loc t.contents]
 [%%expect{|
-val contents_loc_local : local_ 'a atomic -> local_ 'a atomic_loc = <fun>
+Line 1, characters 46-70:
+1 | let contents_loc_local (t @ local) = exclave_ [%atomic.loc t.contents]
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value escapes its region.
 |}]
 
 (* This is allowed because mutable implies global *)
