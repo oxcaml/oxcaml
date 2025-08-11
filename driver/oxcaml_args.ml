@@ -805,10 +805,13 @@ let mk_restrict_to_upstream_dwarf f =
     Arg.Unit f,
     " Only emit the same DWARF information as the upstream compiler" )
 
+(* CR sspies: This helper text must be updated when -shape-format is eventually
+   removed. *)
 let mk_no_restrict_to_upstream_dwarf f =
   ( "-gno-upstream-dwarf",
     Arg.Unit f,
-    " Emit potentially more DWARF information than the upstream compiler" )
+    " Emit potentially more DWARF information than the upstream compiler \
+     (implies -shape-format debugging-shapes)" )
 
 let mk_dwarf_inlined_frames f =
   ("-gdwarf-inlined-frames", Arg.Unit f, " Emit DWARF inlined frame information")
@@ -1514,7 +1517,13 @@ module Debugging_options_impl = struct
     Debugging.restrict_to_upstream_dwarf := true
 
   let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false
+    Debugging.restrict_to_upstream_dwarf := false;
+    Clflags.shape_format := Clflags.Debugging_shapes
+  (* CR sspies: We have to be careful here. We can only enable new DWARF on the
+     compiler once we have fixed the Merlin support. Otherwise, we will have
+     different kinds of shape information between the compiler and the code.
+     This would likely break Merlin lookups for code in the compiler, but
+     otherwise probably has limited effect. *)
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
