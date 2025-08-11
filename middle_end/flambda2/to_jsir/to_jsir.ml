@@ -294,16 +294,14 @@ and apply_expr ~env ~res e =
   match Apply_expr.continuation e with
   | Never_returns ->
     env, To_jsir_result.end_block_with_last_exn res (Return return_var)
-  | Return cont -> (
-    match Continuation.sort cont with
-    | Return ->
-      env, To_jsir_result.end_block_with_last_exn res (Return return_var)
-    | Normal_or_exn ->
+  | Return cont ->
+    if Continuation.equal (To_jsir_env.return_continuation env) cont
+    then env, To_jsir_result.end_block_with_last_exn res (Return return_var)
+    else
       let addr = To_jsir_env.get_continuation_exn env cont in
       ( env,
         To_jsir_result.end_block_with_last_exn res (Branch (addr, [return_var]))
       )
-    | Toplevel_return | Define_root_symbol -> failwith "unimplemented")
 
 and apply_cont0 ~env ~res apply_cont =
   let args, res =
@@ -448,7 +446,8 @@ and switch ~env ~res e =
   in
   env, To_jsir_result.end_block_with_last_exn res last
 
-and invalid ~env ~res _msg = env, res
+and invalid ~env ~res _msg =
+  env, To_jsir_result.end_block_with_last_exn res Stop
 
 let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
   let env =
