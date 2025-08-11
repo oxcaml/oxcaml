@@ -4,16 +4,14 @@
    modules = "test_repr.c test_smallint.ml";
    flambda2;
    {
-   flags = "-extension-universe beta";
    native;
    } {
-   flags = "-O3 -extension-universe beta";
+   flags = "-O3";
    native;
    } {
-   flags = "-Oclassic -extension-universe beta";
+   flags = "-Oclassic";
    native;
    } {
-   flags = "-extension-universe beta";
    bytecode;
    }
 *)

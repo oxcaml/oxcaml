@@ -1,7 +1,6 @@
 (* TEST
    include stdlib_stable;
    modules = "test_smallint.ml";
-   flags = "-extension small_numbers";
 *)
 
 (* External declarations for unsigned comparison primitives *)
