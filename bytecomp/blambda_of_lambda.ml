@@ -1040,6 +1040,7 @@ and make_unsigned_comparison size signed_comparison x y =
     let num_bits = Prim (caml_sys_const const_name, []) in
     let one = Const (const_int size 1) in
     let num_bits =
+      assert (is_immed (-1));
       Prim (Offsetint (-1), [num_bits])
       (* this computation is just "num_bits - 1" *)
     in
