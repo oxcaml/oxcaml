@@ -870,6 +870,8 @@ module F = struct
       | Imulh { signed = _ } -> do_binop "mul"
       | Idiv -> do_binop "sdiv"
       | Imod -> do_binop "srem"
+      | Iudiv -> do_binop "udiv"
+      | Iumod -> do_binop "urem"
       | Iand -> do_binop "and"
       | Ior -> do_binop "or"
       | Ixor -> do_binop "xor"

@@ -324,7 +324,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         [||]
       else
         destroy_neon_reg7
-  | Op (Intop (Iadd  | Isub | Imul | Idiv|Imod|Iand|Ior|Ixor|Ilsl
+  | Op (Intop (Iadd  | Isub | Imul | Idiv|Iudiv|Imod|Iumod|Iand|Ior|Ixor|Ilsl
               |Ilsr|Iasr|Imulh _|Iclz _|Ictz _|Icomp _))
   | Op (Specific _
         | Move | Spill | Reload

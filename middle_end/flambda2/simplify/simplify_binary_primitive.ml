@@ -307,6 +307,8 @@ end = struct
     | Mul -> always_some I.Num.mul
     | Div -> I.Num.div n1 n2
     | Mod -> I.Num.mod_ n1 n2
+    | Udiv -> I.Num.udiv n1 n2
+    | Umod -> I.Num.umod n1 n2
     | And -> always_some I.Num.and_
     | Or -> always_some I.Num.or_
     | Xor -> always_some I.Num.xor
@@ -382,6 +384,18 @@ end = struct
       else if Num.equal rhs Num.minus_one
       then Exactly Num.zero
       else Cannot_simplify
+    | Udiv ->
+      if Num.equal rhs Num.zero
+      then Invalid
+      else if Num.equal rhs Num.one
+      then The_other_side
+      else Cannot_simplify
+    | Umod ->
+      if Num.equal rhs Num.zero
+      then Invalid
+      else if Num.equal rhs Num.one
+      then Exactly Num.zero
+      else Cannot_simplify
 
   let op_rhs_unknown (op : P.binary_int_arith_op) ~lhs :
       Num.t binary_arith_outcome_for_one_side_only =
@@ -395,7 +409,7 @@ end = struct
       if Num.equal lhs Num.zero
       then Negation_of_the_other_side
       else Cannot_simplify
-    | Div | Mod -> Cannot_simplify
+    | Div | Mod | Udiv | Umod -> Cannot_simplify
 end
 [@@inline always]
 

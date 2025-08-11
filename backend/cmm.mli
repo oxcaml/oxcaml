@@ -395,6 +395,8 @@ type operation =
   | Cmulhi of { signed : bool }
   | Cdivi
   | Cmodi
+  | Cudivi
+  | Cumodi
   | Cand
   | Cor
   | Cxor

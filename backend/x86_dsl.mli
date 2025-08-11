@@ -120,6 +120,8 @@ module I : sig
 
   val hlt : unit -> unit
 
+  val div : arg -> unit
+
   val idiv : arg -> unit
 
   val imul : arg -> arg option -> unit

@@ -630,6 +630,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%mulint" -> binary (Integral (int, Mul))
     | "%divint" -> binary (Integral (int, Div Safe))
     | "%modint" -> binary (Integral (int, Mod Safe))
+    | "%udivint" -> binary (Integral (int, Udiv Safe))
+    | "%umodint" -> binary (Integral (int, Umod Safe))
     | "%andint" -> binary (Integral (int, And))
     | "%orint" -> binary (Integral (int, Or))
     | "%xorint" -> binary (Integral (int, Xor))

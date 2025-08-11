@@ -89,6 +89,14 @@ module type S = sig
 
   val div : t -> t -> t
 
+  val unsigned_div : t -> t -> t
+
+  val unsigned_rem : t -> t -> t
+
+  val udiv : t -> t -> t
+
+  val umod : t -> t -> t
+
   val and_ : t -> t -> t
 
   val or_ : t -> t -> t
@@ -211,6 +219,14 @@ module Make (I : S) : S with type t = I.t = struct
   let mod_ = I.mod_
 
   let div x y = sign_extend (I.div x y)
+
+  let unsigned_div = I.unsigned_div
+
+  let unsigned_rem = I.unsigned_rem
+
+  let udiv = I.unsigned_div
+
+  let umod = I.unsigned_rem
 
   let and_ = I.and_
 

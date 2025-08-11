@@ -183,8 +183,9 @@ let oper_result_type = function
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
     typ_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
-  | Clsr | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cudivi | Cumodi | Cand
+  | Cor | Cxor | Clsl | Clsr | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _
+  | Ccmpi _ | Ccmpf _ ->
     typ_int
   | Caddv -> typ_val
   | Cadda -> typ_addr

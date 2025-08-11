@@ -94,11 +94,13 @@ let find_compatible_allocations :
           | Csel _ | Specific _ | Name_for_debugger _ | Probe_is_enabled _
           | Static_cast _ | Dls_get
           | Intop
-              ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-              | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ )
+              ( Iadd | Isub | Imul | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _
+              | Icomp _ )
           | Intop_imm
-              ( ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-                | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ ),
+              ( ( Iadd | Isub | Imul | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+                | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz _
+                | Ictz _ | Icomp _ ),
                 _ )
           | Intop_atomic _ ) ->
         loop allocations (DLL.next cell) ~curr_mode ~curr_size)

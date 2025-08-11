@@ -50,6 +50,8 @@ type integer_operation =
   | Imulh of { signed : bool }
   | Idiv
   | Imod
+  | Iudiv
+  | Iumod
   | Iand
   | Ior
   | Ixor

@@ -128,6 +128,7 @@ type instruction =
   | CMP of arg * arg
   | CQO
   | DEC of arg
+  | DIV of arg
   | HLT
   | IDIV of arg
   | IMUL of arg * arg option

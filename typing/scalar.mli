@@ -327,6 +327,8 @@ module Operation : sig
         | Mul
         | Div of division_is_safe
         | Mod of division_is_safe
+        | Udiv of division_is_safe
+        | Umod of division_is_safe
         | And
         | Or
         | Xor

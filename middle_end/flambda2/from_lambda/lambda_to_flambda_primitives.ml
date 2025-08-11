@@ -2050,8 +2050,12 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         | Xor -> Binary (Int_arith (width, Xor), arg1, arg2)
         | Div Unsafe -> Binary (Int_arith (width, Div), arg1, arg2)
         | Mod Unsafe -> Binary (Int_arith (width, Mod), arg1, arg2)
+        | Udiv Unsafe -> Binary (Int_arith (width, Udiv), arg1, arg2)
+        | Umod Unsafe -> Binary (Int_arith (width, Umod), arg1, arg2)
         | Div Safe -> check_zero_division width arg1 arg2 Div dbg
         | Mod Safe -> check_zero_division width arg1 arg2 Mod dbg
+        | Udiv Safe -> check_zero_division width arg1 arg2 Udiv dbg
+        | Umod Safe -> check_zero_division width arg1 arg2 Umod dbg
       in
       [to_expr (maybe_wrap (Prim result))]
     | Shift (outer, op, rhs) ->

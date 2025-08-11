@@ -732,7 +732,9 @@ let instr_for_intop = function
   | Ilsl -> I.sal
   | Ilsr -> I.shr
   | Iasr -> I.sar
-  | Idiv | Imod | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ -> assert false
+  | Idiv | Imod | Iudiv | Iumod | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _
+    ->
+    assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
@@ -2078,6 +2080,11 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Intop (Idiv | Imod)) ->
     I.cqo ();
     I.idiv (arg i 1)
+  | Lop (Intop (Iudiv | Iumod)) ->
+    let rdx = X86_ast.Reg64 RDX in
+    I.xor rdx rdx;
+    (* Clear rdx for unsigned division *)
+    I.div (arg i 1)
   | Lop (Intop ((Ilsl | Ilsr | Iasr) as op)) ->
     (* We have i.arg.(0) = i.res.(0) and i.arg.(1) = %rcx *)
     instr_for_intop op cl (res i 0)

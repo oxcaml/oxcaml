@@ -1602,6 +1602,8 @@ type binary_int_arith_op =
   | Mul
   | Div
   | Mod
+  | Udiv
+  | Umod
   | And
   | Or
   | Xor
@@ -1614,6 +1616,8 @@ let print_binary_int_arith_op ppf o =
   | Mul -> fprintf ppf "*"
   | Div -> fprintf ppf "/"
   | Mod -> fprintf ppf "mod"
+  | Udiv -> fprintf ppf "u/"
+  | Umod -> fprintf ppf "umod"
   | And -> fprintf ppf "and"
   | Or -> fprintf ppf "or"
   | Xor -> fprintf ppf "xor"
@@ -1877,7 +1881,8 @@ let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
   | String_or_bigstring_load ((Bytes | Bigstring), _) ->
     reading_from_a_string_or_bigstring Mutable
   | Phys_equal _ -> No_effects, No_coeffects, Strict
-  | Int_arith (_kind, (Add | Sub | Mul | Div | Mod | And | Or | Xor)) ->
+  | Int_arith
+      (_kind, (Add | Sub | Mul | Div | Mod | Udiv | Umod | And | Or | Xor)) ->
     No_effects, No_coeffects, Strict
   | Int_shift _ -> No_effects, No_coeffects, Strict
   | Int_comp _ -> No_effects, No_coeffects, Strict

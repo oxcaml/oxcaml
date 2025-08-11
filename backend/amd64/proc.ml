@@ -550,7 +550,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_at_reloadretaddr
   | Pushtrap _ ->
     destroyed_at_pushtrap
-  | Op (Intop (Idiv | Imod)) | Op (Intop_imm ((Idiv | Imod), _)) ->
+  | Op (Intop (Idiv | Imod | Iudiv | Iumod)) | Op (Intop_imm ((Idiv | Imod | Iudiv | Iumod), _)) ->
     [| rax; rdx |]
   | Op(Store(Single { reg = Float64 }, _, _)) ->
     destroyed_at_single_float64_store
@@ -733,7 +733,7 @@ let operation_supported = function
     Arch.Extension.enabled_vec512 ()
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cudivi | Cumodi
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccsel _
   | Cbswap _

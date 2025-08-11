@@ -477,6 +477,8 @@ type binary_int_arith_op =
   | Mul
   | Div
   | Mod
+  | Udiv
+  | Umod
   | And
   | Or
   | Xor

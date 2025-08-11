@@ -149,6 +149,14 @@ val mod_ : t -> t -> t
     zero, as specified for {!Stdlib.(/)}. *)
 val div : t -> t -> t
 
+(** Unsigned integer division. Raise [Division_by_zero] if the second argument
+    is zero. *)
+val udiv : t -> t -> t
+
+(** Unsigned integer modulo. Raise [Division_by_zero] if the second argument
+    is zero. *)
+val umod : t -> t -> t
+
 (** Bitwise logical and. *)
 val and_ : t -> t -> t
 

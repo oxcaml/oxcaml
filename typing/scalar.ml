@@ -498,12 +498,27 @@ module Operation = struct
         | Mul
         | Div of division_is_safe
         | Mod of division_is_safe
+        | Udiv of division_is_safe
+        | Umod of division_is_safe
         | And
         | Or
         | Xor
 
       let all =
-        [Add; Sub; Mul; Div Safe; Div Unsafe; Mod Safe; Mod Unsafe; And; Or; Xor]
+        [ Add;
+          Sub;
+          Mul;
+          Div Safe;
+          Div Unsafe;
+          Mod Safe;
+          Mod Unsafe;
+          Udiv Safe;
+          Udiv Unsafe;
+          Umod Safe;
+          Umod Unsafe;
+          And;
+          Or;
+          Xor ]
 
       let to_string = function
         | Add -> "add"
@@ -513,6 +528,10 @@ module Operation = struct
         | Div Unsafe -> "unsafe_div"
         | Mod Safe -> "mod"
         | Mod Unsafe -> "unsafe_mod"
+        | Udiv Safe -> "unsigned_div"
+        | Udiv Unsafe -> "unsafe_unsigned_div"
+        | Umod Safe -> "unsigned_mod"
+        | Umod Unsafe -> "unsafe_unsigned_mod"
         | And -> "and"
         | Or -> "or"
         | Xor -> "xor"
@@ -591,6 +610,8 @@ module Operation = struct
             ( Add | Sub | Mul
             | Div (Safe | Unsafe)
             | Mod (Safe | Unsafe)
+            | Udiv (Safe | Unsafe)
+            | Umod (Safe | Unsafe)
             | And | Or | Xor ) ) ->
         let sort = Integral.sort width in
         sort, sort, sort
@@ -641,10 +662,16 @@ module Operation = struct
 
     let info = function
       | Integral
-          (size, (Add | Sub | Mul | Div Unsafe | Mod Unsafe | And | Or | Xor))
+          ( size,
+            ( Add | Sub | Mul
+            | Div Unsafe
+            | Mod Unsafe
+            | Udiv Unsafe
+            | Umod Unsafe
+            | And | Or | Xor ) )
       | Shift (size, (Lsl | Lsr | Asr), Int) ->
         { result = integral size; can_raise = false }
-      | Integral (size, (Div Safe | Mod Safe)) ->
+      | Integral (size, (Div Safe | Mod Safe | Udiv Safe | Umod Safe)) ->
         { result = integral size; can_raise = true }
       | Floating (size, (Add | Sub | Mul | Div)) ->
         { result = floating size; can_raise = false }

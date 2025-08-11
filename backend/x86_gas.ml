@@ -127,6 +127,7 @@ let print_instr b = function
   | CMP (arg1, arg2) -> i2_s b "cmp" arg1 arg2
   | CQO -> i0 b "cqto"
   | DEC arg -> i1_s b "dec" arg
+  | DIV arg -> i1_s b "div" arg
   | HLT -> i0 b "hlt"
   | IDIV arg -> i1_s b "idiv" arg
   | IMUL (arg, None) -> i1_s b "imul" arg

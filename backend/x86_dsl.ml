@@ -120,6 +120,8 @@ module I = struct
 
   let hlt () = emit HLT
 
+  let div x = emit (DIV x)
+
   let idiv x = emit (IDIV x)
 
   let imul x y = emit (IMUL (x, y))

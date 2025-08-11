@@ -57,6 +57,13 @@ let kccallf f fmt = Printf.ksprintf (fun name -> f (Ccall name)) fmt
 
 let ccallf fmt = kccallf Fun.id fmt
 
+let let_ name arg ~in_ =
+  match arg with
+  | Var _ | Const _ -> in_ arg
+  | arg ->
+    let id = Ident.create_local name in
+    Let { id; arg; body = in_ (Var id) }
+
 let is_immed n = Instruct.immed_min <= n && n <= Instruct.immed_max
 
 let is_representable_const_int = function
@@ -879,13 +886,19 @@ and comp_binary_scalar_intrinsic :
       | Mod (Safe | Unsafe) -> prim Modint |> sign_extend taggable
       | And -> prim Andint
       | Or -> prim Orint
-      | Xor -> prim Xorint)
+      | Xor -> prim Xorint
+      | Udiv (Safe | Unsafe) ->
+        comp_unsigned_div (Scalar.Integral.ignore_locality size) x y
+      | Umod (Safe | Unsafe) ->
+        comp_unsigned_mod (Scalar.Integral.ignore_locality size) x y)
     | Boxable
         (( Int32 Any_locality_mode
          | Nativeint Any_locality_mode
-         | Int64 Any_locality_mode ) as size) -> (
-      let size = Scalar.Integral.Boxable.Width.to_string size in
-      let c suffix = ccall "caml_%s_%s" size suffix in
+         | Int64 Any_locality_mode ) as width) -> (
+      let c suffix =
+        let size = Scalar.Integral.Boxable.Width.to_string width in
+        ccall "caml_%s_%s" size suffix
+      in
       match op with
       | Add -> c "add"
       | Sub -> c "sub"
@@ -894,7 +907,11 @@ and comp_binary_scalar_intrinsic :
       | Mod (Safe | Unsafe) -> c "mod"
       | And -> c "and"
       | Or -> c "or"
-      | Xor -> c "xor"))
+      | Xor -> c "xor"
+      | Udiv (Safe | Unsafe) ->
+        comp_unsigned_div (Scalar.Integral.ignore_locality size) x y
+      | Umod (Safe | Unsafe) ->
+        comp_unsigned_mod (Scalar.Integral.ignore_locality size) x y))
   | Floating (size, ((Add | Sub | Mul | Div) as op)) ->
     let op = Scalar.Operation.Binary.Float_op.to_string op in
     let size = Scalar.Floating.Width.to_string (Scalar.Floating.width size) in
@@ -995,7 +1012,57 @@ and comp_binary_scalar_intrinsic :
     | Float64 Any_locality_mode -> ccall "caml_float_compare"
     | Float32 Any_locality_mode -> ccall "caml_float32_compare")
 
-and comp_unary_scalar_intrinsic op x =
+and comp_unsigned_div (size : Scalar.any_locality_mode Scalar.Integral.t) n d =
+  (* Unsigned division from signed division of the same bitness.
+     See Warren Jr., Henry S. (2013). Hacker's Delight (2 ed.), Sec 9-3. *)
+  let binop op x y = comp_binary_scalar_intrinsic op x y in
+  let_ "d" d ~in_:(fun d ->
+      let_ "n" n ~in_:(fun n ->
+          Ifthenelse
+            { cond = binop (Icmp (size, Clt)) d (Const (const_int size 0));
+              ifso =
+                Ifthenelse
+                  { cond = binop (Icmp (size, Cult)) n d;
+                    ifso = Const (const_int size 0);
+                    ifnot = Const (const_int size 1)
+                  };
+              ifnot =
+                let_ "q"
+                  (binop
+                     (Shift (size, Lsl, Int))
+                     (binop
+                        (Integral (size, Div Safe))
+                        (binop (Shift (size, Lsr, Int)) n (tagged_immediate 1))
+                        d)
+                     (tagged_immediate 1))
+                  ~in_:(fun q ->
+                    let r =
+                      binop
+                        (Integral (size, Sub))
+                        n
+                        (binop (Integral (size, Mul)) q d)
+                    in
+                    Ifthenelse
+                      { cond = binop (Icmp (size, Cult)) r d;
+                        ifso = q;
+                        ifnot =
+                          comp_unary_scalar_intrinsic
+                            (Scalar.Operation.Unary.Integral (size, Succ))
+                            q
+                      })
+            }))
+
+and comp_unsigned_mod (size : Scalar.any_locality_mode Scalar.Integral.t) n d =
+  let binop op x y =
+    comp_binary_scalar_intrinsic
+      (Scalar.Operation.Binary.Integral (size, op))
+      x y
+  in
+  binop Sub n (binop Mul (binop (Div Safe) n d) d)
+
+and comp_unary_scalar_intrinsic :
+    type a. a Scalar.Operation.Unary.t -> blambda -> blambda =
+ fun op x ->
   let prim prim = Prim (prim, [x]) in
   let ccall fmt = kccallf prim fmt in
   match (op : _ Scalar.Operation.Unary.t) with

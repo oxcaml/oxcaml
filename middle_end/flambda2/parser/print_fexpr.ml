@@ -424,6 +424,8 @@ let binary_int_arith_op ppf (o : binary_int_arith_op) =
   | Mul -> "*"
   | Div -> "/"
   | Mod -> "%"
+  | Udiv -> "u/"
+  | Umod -> "u%"
   | And -> "land"
   | Or -> "lor"
   | Xor -> "lxor"

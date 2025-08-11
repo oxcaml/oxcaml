@@ -974,6 +974,13 @@ let emit_mul b ~src =
     emit_mod_rm_reg b rexw [ 0xF7 ] rm opcode_extension
   | _ -> assert false
 
+let emit_div b dst =
+  let reg = 6 in
+  match dst with
+  | (Reg64 _ | Reg32 _ | Mem _ | Mem64_RIP _) as rm ->
+      emit_mod_rm_reg b rexw [ 0xF7 ] rm reg
+  | _ -> assert false
+
 let emit_idiv b dst =
   let reg = 7 in
   match dst with
@@ -1369,6 +1376,7 @@ let assemble_instr b loc = function
   | CMOV (condition, src, dst) -> emit_cmov b condition dst src
   | CDQ -> buf_int8 b 0x99
   | DEC dst -> emit_DEC b [ dst ]
+  | DIV dst -> emit_div b dst
   | HLT -> buf_int8 b 0xF4
   | INC dst -> emit_inc b dst
   | IMUL (src, dst) -> emit_imul b dst src

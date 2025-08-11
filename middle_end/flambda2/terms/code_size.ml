@@ -241,7 +241,8 @@ let binary_int_arith_primitive kind op =
   (* Int64 bits ints on 32-bit archs *)
   | (Naked_int64, Add | Naked_int64, Sub | Naked_int64, Mul) when arch32 ->
     does_not_need_caml_c_call_extcall_size + 2
-  | (Naked_int64, Div | Naked_int64, Mod) when arch32 ->
+  | (Naked_int64, Div | Naked_int64, Mod | Naked_int64, Udiv | Naked_int64, Umod)
+    when arch32 ->
     needs_caml_c_call_extcall_size + 2
   | (Naked_int64, And | Naked_int64, Or | Naked_int64, Xor) when arch32 ->
     does_not_need_caml_c_call_extcall_size + 2
@@ -251,6 +252,8 @@ let binary_int_arith_primitive kind op =
   | Tagged_immediate, Mul -> 4
   | Tagged_immediate, Div -> 4
   | Tagged_immediate, Mod -> 4
+  | Tagged_immediate, Udiv -> 4
+  | Tagged_immediate, Umod -> 4
   | Tagged_immediate, And -> 1
   | Tagged_immediate, Or -> 1
   | Tagged_immediate, Xor -> 2
@@ -282,6 +285,14 @@ let binary_int_arith_primitive kind op =
   | ( ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
       | Naked_immediate ),
       Mod ) ->
+    divmod_bi_check 0 kind + 1
+  | ( ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
+      | Naked_immediate ),
+      Udiv ) ->
+    divmod_bi_check 1 kind + 1
+  | ( ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
+      | Naked_immediate ),
+      Umod ) ->
     divmod_bi_check 0 kind + 1
 
 let binary_int_shift_primitive kind op =

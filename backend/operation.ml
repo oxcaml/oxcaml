@@ -55,6 +55,8 @@ type integer_operation =
   | Imulh of { signed : bool }
   | Idiv
   | Imod
+  | Iudiv
+  | Iumod
   | Iand
   | Ior
   | Ixor
@@ -73,6 +75,8 @@ let string_of_integer_operation = function
   | Imulh { signed } -> " *h " ^ if signed then "" else "u"
   | Idiv -> " div "
   | Imod -> " mod "
+  | Iudiv -> " udiv "
+  | Iumod -> " umod "
   | Iand -> " & "
   | Ior -> " | "
   | Ixor -> " ^ "
@@ -86,8 +90,8 @@ let string_of_integer_operation = function
 
 let is_unary_integer_operation = function
   | Iclz _ | Ictz _ | Ipopcnt -> true
-  | Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-  | Iasr | Icomp _ ->
+  | Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+  | Ixor | Ilsl | Ilsr | Iasr | Icomp _ ->
     false
 
 let equal_integer_operation left right =
@@ -98,6 +102,8 @@ let equal_integer_operation left right =
   | Imulh { signed = left }, Imulh { signed = right } -> Bool.equal left right
   | Idiv, Idiv -> true
   | Imod, Imod -> true
+  | Iudiv, Iudiv -> true
+  | Iumod, Iumod -> true
   | Iand, Iand -> true
   | Ior, Ior -> true
   | Ixor, Ixor -> true
@@ -113,53 +119,59 @@ let equal_integer_operation left right =
   | Ipopcnt, Ipopcnt -> true
   | Icomp left, Icomp right -> equal_integer_comparison left right
   | ( Iadd,
-      ( Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Isub,
-      ( Iadd | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Imul,
-      ( Iadd | Isub | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Imulh _,
-      ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Idiv | Imod | Iudiv | Iumod | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Idiv,
-      ( Iadd | Isub | Imul | Imulh _ | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Imod | Iudiv | Iumod | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Imod,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Iudiv | Iumod | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Iand,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Ior,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Ixor,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Ilsl,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+      | Ixor | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Ilsr,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+      | Ixor | Ilsl | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Iasr,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+      | Ixor | Ilsl | Ilsr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Iclz _,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+      | Ixor | Ilsl | Ilsr | Iasr | Ictz _ | Ipopcnt | Icomp _ ) )
   | ( Ictz _,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+      | Ixor | Ilsl | Ilsr | Iasr | Iclz _ | Ipopcnt | Icomp _ ) )
   | ( Ipopcnt,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ictz _ | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+      | Ixor | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Icomp _ ) )
   | ( Icomp _,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ) ) ->
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iumod | Iand | Ior
+      | Ixor | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ) )
+  | ( Iudiv,
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iumod | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+  | ( Iumod,
+      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iudiv | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) ) ->
     false
 
 type float_width = Cmm.float_width
@@ -370,6 +382,8 @@ let intop (op : integer_operation) =
   | Imulh { signed : bool } -> " *h" ^ if signed then " " else "u "
   | Idiv -> " div "
   | Imod -> " mod "
+  | Iudiv -> " udiv "
+  | Iumod -> " umod "
   | Iand -> " & "
   | Ior -> " | "
   | Ixor -> " ^ "

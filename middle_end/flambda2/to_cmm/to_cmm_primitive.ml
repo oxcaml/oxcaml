@@ -756,7 +756,7 @@ let phys_equal _env dbg op x y =
   | Neq -> C.neq ~dbg x y
 
 let requires_sign_extended_operands : P.binary_int_arith_op -> bool = function
-  | Div | Mod ->
+  | Div | Mod | Udiv | Umod ->
     (* Note that it would be wrong to apply [C.low_bits] to operands for div and
        mod.
 
@@ -827,6 +827,10 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Mul -> wrap C.mul_int_caml
     | Div -> wrap C.div_int_caml
     | Mod -> wrap C.mod_int_caml
+    | Udiv ->
+      wrap C.div_int_caml (* TODO: Use unsigned version when available *)
+    | Umod ->
+      wrap C.mod_int_caml (* TODO: Use unsigned version when available *)
     | And -> wrap C.and_int_caml
     | Or -> wrap C.or_int_caml
     | Xor -> wrap C.xor_int_caml)
@@ -844,6 +848,12 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Mul -> wrap C.mul_int
     | Div -> wrap (C.div_int ~dividend_cannot_be_min_int)
     | Mod -> wrap (C.mod_int ~dividend_cannot_be_min_int)
+    | Udiv ->
+      wrap (C.div_int ~dividend_cannot_be_min_int)
+      (* TODO: Use unsigned version *)
+    | Umod ->
+      wrap (C.mod_int ~dividend_cannot_be_min_int)
+      (* TODO: Use unsigned version *)
     | And -> wrap C.and_int
     | Or -> wrap C.or_int
     | Xor -> wrap C.xor_int)

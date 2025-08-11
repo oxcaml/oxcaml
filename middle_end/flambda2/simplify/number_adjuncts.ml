@@ -74,6 +74,10 @@ module type Num_common = sig
 
   val mod_ : t -> t -> t option
 
+  val udiv : t -> t -> t option
+
+  val umod : t -> t -> t option
+
   val to_const : t -> Reg_width_const.t
 
   val to_immediate : t -> Targetint_31_63.t
@@ -206,6 +210,16 @@ module For_tagged_immediates : Int_number_kind = struct
       then None
       else Some (mod_ t1 t2)
 
+    let udiv t1 t2 =
+      if Targetint_31_63.equal t2 Targetint_31_63.zero
+      then None
+      else Some (udiv t1 t2)
+
+    let umod t1 t2 =
+      if Targetint_31_63.equal t2 Targetint_31_63.zero
+      then None
+      else Some (umod t1 t2)
+
     (* Note this doesn't say 31 and 63! See the comments on the shift operations
        e.g. [lsl] in stdlib.mli. *)
     let integer_bit_width = if Target_system.is_32_bit () then 32 else 64
@@ -280,6 +294,16 @@ module For_naked_immediates : Int_number_kind = struct
       then None
       else Some (mod_ t1 t2)
 
+    let udiv t1 t2 =
+      if Targetint_31_63.equal t2 Targetint_31_63.zero
+      then None
+      else Some (udiv t1 t2)
+
+    let umod t1 t2 =
+      if Targetint_31_63.equal t2 Targetint_31_63.zero
+      then None
+      else Some (umod t1 t2)
+
     let integer_bit_width = if Target_system.is_32_bit () then 31 else 63
 
     let shift_left t shift =
@@ -347,6 +371,12 @@ module For_float32s : Boxable_number_kind = struct
 
     let mod_ t1 t2 = Some (IEEE_semantics.mod_ t1 t2)
 
+    let udiv t1 t2 = Some (IEEE_semantics.div t1 t2)
+    (* No unsigned float division *)
+
+    let umod t1 t2 = Some (IEEE_semantics.mod_ t1 t2)
+    (* No unsigned float modulo *)
+
     let to_const t = Reg_width_const.naked_float32 t
 
     let to_immediate t = Targetint_31_63.of_float (to_float t)
@@ -399,6 +429,12 @@ module For_floats : Boxable_number_kind = struct
     let div t1 t2 = Some (IEEE_semantics.div t1 t2)
 
     let mod_ t1 t2 = Some (IEEE_semantics.mod_ t1 t2)
+
+    let udiv t1 t2 = Some (IEEE_semantics.div t1 t2)
+    (* No unsigned float division *)
+
+    let umod t1 t2 = Some (IEEE_semantics.mod_ t1 t2)
+    (* No unsigned float modulo *)
 
     let to_const t = Reg_width_const.naked_float t
 
@@ -488,6 +524,24 @@ module For_int8s : Int_number_kind = struct
     let div t1 t2 = if equal t2 zero then None else Some (div t1 t2)
 
     let mod_ t1 t2 = if equal t2 zero then None else Some (rem t1 t2)
+
+    let udiv t1 t2 =
+      if equal t2 zero
+      then None
+      else
+        let u1 = to_int t1 land 0xff in
+        (* Treat as unsigned 8-bit *)
+        let u2 = to_int t2 land 0xff in
+        Some (of_int (u1 / u2))
+
+    let umod t1 t2 =
+      if equal t2 zero
+      then None
+      else
+        let u1 = to_int t1 land 0xff in
+        (* Treat as unsigned 8-bit *)
+        let u2 = to_int t2 land 0xff in
+        Some (of_int (u1 mod u2))
 
     let shift_left t shift =
       with_shift shift zero
@@ -597,6 +651,24 @@ module For_int16s : Int_number_kind = struct
 
     let mod_ t1 t2 = if equal t2 zero then None else Some (rem t1 t2)
 
+    let udiv t1 t2 =
+      if equal t2 zero
+      then None
+      else
+        let u1 = to_int t1 land 0xffff in
+        (* Treat as unsigned 16-bit *)
+        let u2 = to_int t2 land 0xffff in
+        Some (of_int (u1 / u2))
+
+    let umod t1 t2 =
+      if equal t2 zero
+      then None
+      else
+        let u1 = to_int t1 land 0xffff in
+        (* Treat as unsigned 16-bit *)
+        let u2 = to_int t2 land 0xffff in
+        Some (of_int (u1 mod u2))
+
     let shift_left t shift =
       with_shift shift zero
         (fun shift -> shift_left t shift)
@@ -678,6 +750,10 @@ module For_int32s : Boxable_int_number_kind = struct
 
     let mod_ t1 t2 = if equal t2 zero then None else Some (rem t1 t2)
 
+    let udiv t1 t2 = if equal t2 zero then None else Some (unsigned_div t1 t2)
+
+    let umod t1 t2 = if equal t2 zero then None else Some (unsigned_rem t1 t2)
+
     let shift_left t shift =
       with_shift shift zero
         (fun shift -> shift_left t shift)
@@ -753,6 +829,10 @@ module For_int64s : Boxable_int_number_kind = struct
 
     let mod_ t1 t2 = if equal t2 zero then None else Some (rem t1 t2)
 
+    let udiv t1 t2 = if equal t2 zero then None else Some (unsigned_div t1 t2)
+
+    let umod t1 t2 = if equal t2 zero then None else Some (unsigned_rem t1 t2)
+
     let shift_left t shift =
       with_shift shift zero
         (fun shift -> shift_left t shift)
@@ -827,6 +907,10 @@ module For_nativeints : Boxable_int_number_kind = struct
     let div t1 t2 = if equal t2 zero then None else Some (div t1 t2)
 
     let mod_ t1 t2 = if equal t2 zero then None else Some (rem t1 t2)
+
+    let udiv t1 t2 = if equal t2 zero then None else Some (unsigned_div t1 t2)
+
+    let umod t1 t2 = if equal t2 zero then None else Some (unsigned_rem t1 t2)
 
     let integer_bit_width = if Target_system.is_32_bit () then 32 else 64
 

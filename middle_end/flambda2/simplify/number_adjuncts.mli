@@ -45,6 +45,10 @@ module type Num_common = sig
 
   val mod_ : t -> t -> t option
 
+  val udiv : t -> t -> t option
+
+  val umod : t -> t -> t option
+
   val to_const : t -> Reg_width_const.t
 
   val to_immediate : t -> Targetint_31_63.t
