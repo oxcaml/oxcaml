@@ -189,4 +189,23 @@ Line 1:
 Error: float32 literal patterns are not supported.
 |}];;
 
+type t = int8;;
+[%%expect{|
+type t = int8
+|}];;
+
+type t = int16;;
+[%%expect{|
+type t = int16
+|}];;
+
+let i8 = Stdlib_stable.Int8.minus_one;;
+[%%expect{|
+val i8 : int8 = -1
+|}];;
+
+let i16 = Stdlib_stable.Int16.minus_one;;
+[%%expect{|
+val i16 : int16 = -1
+|}];;
 

@@ -1,7 +1,6 @@
 (* TEST
  include stdlib_stable;
  flambda2;
- flags = "-extension small_numbers -extension layouts_beta";
  native;
 *)
 

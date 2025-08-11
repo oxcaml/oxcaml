@@ -2,16 +2,20 @@
  include stdlib_stable;
  flambda2;
  {
-   flags = "-extension-universe alpha";
    native;
  }{
-   flags = "-extension-universe alpha";
    bytecode;
  }{
-   flags = "-extension-universe beta";
+   flags = "-extension layouts_alpha";
    native;
  }{
-   flags = "-extension-universe beta";
+   flags = "-extension layouts_alpha";
+   bytecode;
+ }{
+   flags = "-extension layouts_beta";
+   native;
+ }{
+   flags = "-extension layouts_beta";
    bytecode;
  }
 *)

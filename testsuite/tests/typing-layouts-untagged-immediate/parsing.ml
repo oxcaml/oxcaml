@@ -11,13 +11,7 @@ type t = int#;;
 let f (_ : int#) = ();;
 [%%expect {|
 type t = int#
-Line 2, characters 6-16:
-2 | let f (_ : int#) = ();;
-          ^^^^^^^^^^
-Error: Non-value layout untagged_immediate detected as sort for type
-       int#, but this requires extension layouts, which is not enabled.
-       If you intended to use this layout, please add this flag to your build file.
-       Otherwise, please report this error to the Jane Street compilers team.
+val f : int# -> unit = <fun>
 |}];;
 
 type t = C of int#;;

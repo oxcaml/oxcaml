@@ -1,7 +1,6 @@
 (* TEST
  include stdlib_stable;
  flambda2;
- flags = "-extension-universe beta";
  native;
 *)
 

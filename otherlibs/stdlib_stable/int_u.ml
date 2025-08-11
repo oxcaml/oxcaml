@@ -87,7 +87,6 @@ let min_int () = succ (max_int ())
 
 let[@inline] unsigned_to_int t =
   if t < zero () then None else Some (to_int t)
-
 external unsigned_compare : int# -> int# -> int = "%int#_unsigned_compare"
 external unsigned_lt : int# -> int# -> bool = "%int#_unsigned_lessthan"
 
