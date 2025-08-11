@@ -1,6 +1,6 @@
 (* TEST
  include stdlib_stable;
- flags = "-extension layouts_beta -extension small_numbers";
+ flags = "-extension layouts_beta";
 *)
 
 (* External declarations for unsigned comparison primitives *)

@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layouts_beta -extension small_numbers";
+ flags = "-extension layouts_beta";
  expect;
 *)
 

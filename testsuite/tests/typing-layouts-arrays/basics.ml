@@ -2,7 +2,7 @@
  include stdlib_upstream_compatible;
  flambda2;
  {
-   flags = "-extension layouts_beta -extension small_numbers";
+   flags = "-extension layouts_beta";
    expect;
  }{
    flags = "-extension small_numbers";

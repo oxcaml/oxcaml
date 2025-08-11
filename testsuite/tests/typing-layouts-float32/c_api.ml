@@ -9,16 +9,16 @@
    flags = "-extension small_numbers";
    bytecode;
  }{
-   flags = "-extension layouts_alpha -extension small_numbers";
+   flags = "-extension layouts_alpha";
    native;
  }{
-   flags = "-extension layouts_alpha -extension small_numbers";
+   flags = "-extension layouts_alpha";
    bytecode;
  }{
-   flags = "-extension layouts_beta -extension small_numbers";
+   flags = "-extension layouts_beta";
    native;
  }{
-   flags = "-extension layouts_beta -extension small_numbers";
+   flags = "-extension layouts_beta";
    bytecode;
  }
 *)
