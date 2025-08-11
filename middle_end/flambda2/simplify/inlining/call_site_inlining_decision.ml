@@ -190,7 +190,7 @@ let get_rec_info dacc ~function_type =
   | Need_meet -> Rec_info_expr.unknown
   | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline
 
-let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
+let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =
   let must_inline = DE.must_inline (DA.denv dacc) in
   let fail_if_must_inline () =
@@ -303,3 +303,9 @@ let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
               fail_if_must_inline ();
               Unrolling_depth_exceeded)
           | `Always -> Attribute_always))
+
+let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
+    Call_site_inlining_decision_type.t =
+  if !Clflags.jsir
+  then Jsir_inlining_disabled
+  else make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity
