@@ -95,8 +95,8 @@ let instruction ppf = function
   | Kintcomp Gtint -> fprintf ppf "\tgtint"
   | Kintcomp Leint -> fprintf ppf "\tleint"
   | Kintcomp Geint -> fprintf ppf "\tgeint"
-  | Kintcomp Ugeint -> fprintf ppf "\tugeint"
   | Kintcomp Ultint -> fprintf ppf "\tultint"
+  | Kintcomp Ugeint -> fprintf ppf "\tugeint"
   | Koffsetint n -> fprintf ppf "\toffsetint %i" n
   | Koffsetref n -> fprintf ppf "\toffsetref %i" n
   | Kisint -> fprintf ppf "\tisint"

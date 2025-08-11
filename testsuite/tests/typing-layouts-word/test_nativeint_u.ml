@@ -327,39 +327,43 @@ let () =
   test_binary_of "equal"               Nativeint.equal               Nativeint_u.equal                bool_result;
   test_binary    "min"                 Nativeint.min                 Nativeint_u.min;
   test_binary    "max"                 Nativeint.max                 Nativeint_u.max;
-  
+
   (* Explicit unsigned comparison tests with hardcoded expected values *)
   let module I = Nativeint_u in
-  
+
   (* Define constants using literals *)
   let zero = #0n in
   let one = #1n in
   let minus_one = -#1n in
   (* For 64-bit: max_int = 0x7FFFFFFFFFFFFFFF, min_int = 0x8000000000000000 *)
   (* For 32-bit: max_int = 0x7FFFFFFF, min_int = 0x80000000 *)
-  let max_int = if Sys.int_size = 63 then #0x7FFFFFFFFFFFFFFFn else #0x7FFFFFFFn in
-  let min_int = if Sys.int_size = 63 then -#0x8000000000000000n else -#0x80000000n in
-  
+  let max_int =
+    if Sys.int_size = 63 then #0x7FFFFFFFFFFFFFFFn else #0x7FFFFFFFn
+  in
+  let min_int =
+    if Sys.int_size = 63 then -#0x8000000000000000n else -#0x80000000n
+  in
+
   (* Test that -1 > 0 when compared as unsigned *)
   assert (I.unsigned_compare minus_one zero = 1);
   assert (I.unsigned_compare zero minus_one = -1);
-  
+
   (* Test that min_int > max_int when compared as unsigned *)
   assert (I.unsigned_compare min_int max_int = 1);
   assert (I.unsigned_compare max_int min_int = -1);
-  
+
   (* Test ordering: when viewed as unsigned:
      0 < 1 < max_int < min_int < -1 *)
   assert (I.unsigned_compare zero one = -1);
   assert (I.unsigned_compare one max_int = -1);
   assert (I.unsigned_compare max_int min_int = -1);
   assert (I.unsigned_compare min_int minus_one = -1);
-  
+
   (* Test equality *)
   assert (I.unsigned_compare zero zero = 0);
   assert (I.unsigned_compare minus_one minus_one = 0);
   assert (I.unsigned_compare min_int min_int = 0);
-  
+
   (* Test specific values *)
   let neg_million = I.of_int (-1000000) in
   let pos_million = I.of_int 1000000 in

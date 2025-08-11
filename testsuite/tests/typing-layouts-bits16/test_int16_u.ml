@@ -347,12 +347,14 @@ let () =
   assert (unsigned_lt (I.zero ()) (I.minus_one ()) = true); (* 0 < 65535 *)
   assert (unsigned_lt (I.minus_one ()) (I.zero ()) = false); (* 65535 not < 0 *)
   assert (unsigned_lt (I.max_int ()) (I.min_int ()) = true); (* 32767 < 32768 *)
-  assert (unsigned_lt (I.min_int ()) (I.max_int ()) = false); (* 32768 not < 32767 *)
+  assert (unsigned_lt (I.min_int ()) (I.max_int ())
+    = false); (* 32768 not < 32767 *)
 
   (* Test unsigned greater than using primitive comparisons *)
   assert (unsigned_gt (I.minus_one ()) (I.zero ()) = true); (* 65535 > 0 *)
   assert (unsigned_gt (I.zero ()) (I.minus_one ()) = false); (* 0 not > 65535 *)
   assert (unsigned_gt (I.min_int ()) (I.max_int ()) = true); (* 32768 > 32767 *)
-  assert (unsigned_gt (I.max_int ()) (I.min_int ()) = false); (* 32767 not > 32768 *)
+  assert (unsigned_gt (I.max_int ()) (I.min_int ())
+    = false); (* 32767 not > 32768 *)
 
   ()

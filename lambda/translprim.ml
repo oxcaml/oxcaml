@@ -1710,7 +1710,7 @@ let comparison_primitive comparison comparison_kind =
   in
   let icmp size cmp = Pscalar (Binary (Icmp (size, cmp))) in
   let fcmp size cmp = Pscalar (Binary (Fcmp (size, cmp))) in
-  let three_way_comparei size =
+  let three_way_comparei_signed size =
     Pscalar (Binary (Three_way_compare_int (Signed, size)))
   in
   let three_way_comparef size =
@@ -1772,14 +1772,14 @@ let comparison_primitive comparison comparison_kind =
   | Greater_than, Compare_int32s -> icmp int32 Cgt
   | Greater_than, Compare_int64s -> icmp int64 Cgt
   | Compare, Compare_generic -> Pccall caml_compare
-  | Compare, Compare_ints -> three_way_comparei int
+  | Compare, Compare_ints -> three_way_comparei_signed int
   | Compare, Compare_floats -> three_way_comparef float64
   | Compare, Compare_float32s -> three_way_comparef float32
   | Compare, Compare_strings -> Pccall caml_string_compare
   | Compare, Compare_bytes -> Pccall caml_bytes_compare
-  | Compare, Compare_nativeints -> three_way_comparei nativeint
-  | Compare, Compare_int32s -> three_way_comparei int32
-  | Compare, Compare_int64s -> three_way_comparei int64
+  | Compare, Compare_nativeints -> three_way_comparei_signed nativeint
+  | Compare, Compare_int32s -> three_way_comparei_signed int32
+  | Compare, Compare_int64s -> three_way_comparei_signed int64
 
 let lambda_of_loc kind sloc =
   let loc = to_location sloc in

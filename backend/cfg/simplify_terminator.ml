@@ -57,23 +57,13 @@ let simplify_switch (block : C.basic_block) labels =
     assert (len = n + k);
     let desc =
       C.Int_test
-        { is_signed = Scalar.Signedness.Unsigned;
-          imm = Some n;
-          lt = l0;
-          eq = ln;
-          gt = ln
-        }
+        { is_signed = Unsigned; imm = Some n; lt = l0; eq = ln; gt = ln }
     in
     block.terminator <- { block.terminator with desc }
   | [(l0, m); (l1, 1); (l2, _)] when Label.equal l0 l2 ->
     let desc =
       C.Int_test
-        { is_signed = Scalar.Signedness.Unsigned;
-          imm = Some m;
-          lt = l0;
-          eq = l1;
-          gt = l0
-        }
+        { is_signed = Unsigned; imm = Some m; lt = l0; eq = l1; gt = l0 }
     in
     block.terminator <- { block.terminator with desc }
   | [(l0, 1); (l1, 1); (l2, n)] ->
@@ -83,12 +73,7 @@ let simplify_switch (block : C.basic_block) labels =
     assert (len = n + 2);
     let desc =
       C.Int_test
-        { is_signed = Scalar.Signedness.Unsigned;
-          imm = Some 1;
-          lt = l0;
-          eq = l1;
-          gt = l2
-        }
+        { is_signed = Unsigned; imm = Some 1; lt = l0; eq = l1; gt = l2 }
     in
     block.terminator <- { block.terminator with desc }
   | _ -> ()
@@ -123,9 +108,8 @@ let evaluate_terminator ~(reg : Reg.t) ~(const : nativeint)
         let const' = Nativeint.of_int const' in
         let result =
           match is_signed with
-          | Scalar.Signedness.Signed -> Nativeint.compare const const'
-          | Scalar.Signedness.Unsigned ->
-            Nativeint.unsigned_compare const const'
+          | Signed -> Nativeint.compare const const'
+          | Unsigned -> Nativeint.unsigned_compare const const'
         in
         if result < 0 then Some lt else if result > 0 then Some gt else Some eq
       else None)

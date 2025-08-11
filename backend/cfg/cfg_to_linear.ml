@@ -283,11 +283,8 @@ let linearize_terminator cfg_with_layout (func : string) start
            #8677 *)
         let can_emit_Lcondbranch3 =
           match is_signed, imm with
-          | Scalar.Signedness.Unsigned, Some 1 -> true
-          | Scalar.Signedness.Unsigned, Some _
-          | Scalar.Signedness.Unsigned, None
-          | Scalar.Signedness.Signed, _ ->
-            false
+          | Unsigned, Some 1 -> true
+          | Unsigned, Some _ | Unsigned, None | Signed, _ -> false
         in
         if Label.Set.cardinal cond_successor_labels = 2 && can_emit_Lcondbranch3
         then
@@ -308,7 +305,11 @@ let linearize_terminator cfg_with_layout (func : string) start
                     ~lt:(Label.equal lt lbl) ~eq:(Label.equal eq lbl)
                     ~gt:(Label.equal gt lbl)
                 with
-                | Error _ -> assert false
+                | Error result ->
+                  Misc.fatal_errorf
+                    "Cannot linearize terminator: meaningless specification of \
+                     comparison, always has result %b:@ %a"
+                    result Cfg.print_terminator terminator
                 | Ok comp ->
                   let test =
                     match imm with

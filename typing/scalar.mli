@@ -200,20 +200,23 @@ module Signedness : sig
 end
 
 module Integer_comparison : sig
-  (** Integer comparison operators supporting both signed and unsigned comparisons.
-      
-      The first six operators (Ceq through Cge) perform signed comparisons, treating
-      the most significant bit as a sign bit in two's complement representation.
-      
+  (** Integer comparison operators supporting both signed and unsigned
+      comparisons.
+
+      The first six operators (Ceq through Cge) perform signed comparisons,
+      treating the most significant bit as a sign bit in two's complement
+      representation.
+
       The last four operators (Cult through Cuge) perform unsigned comparisons,
       treating all bits as magnitude. This means negative signed integers are
       compared as large positive values:
       - In 8-bit: -1 (0xFF) is treated as 255, thus -1 > 127 unsigned
       - In 32-bit: -1 (0xFFFFFFFF) is treated as 4294967295
-      
+
       Examples with 8-bit integers:
       - Signed: -128 < -1 < 0 < 1 < 127
-      - Unsigned: 0 < 1 < 127 < 128 (which is -128 signed) < 255 (which is -1 signed)
+      - Unsigned:
+        0 < 1 < 127 < 128 (which is -128 signed) < 255 (which is -1 signed)
   *)
   type t =
     | Ceq  (** Equal (signed or unsigned - same result) *)
@@ -235,9 +238,9 @@ module Integer_comparison : sig
 
   val negate : t -> t
 
-  (** Creates a comparison operator from the behavior that should happen in each
-      condition, with the given signedness. If every case is the same, returns [Error] of
-      that case *)
+  (** Creates a comparison operator from the behavior that should happen in
+      each condition, with the given signedness. If every case is the same,
+      returns [Error] of that case *)
   val create : Signedness.t -> lt:bool -> eq:bool -> gt:bool -> (t, bool) result
 end
 

@@ -797,25 +797,23 @@ module F = struct
       ins_branch_cond t is_true b.ifso b.ifnot
     | Return -> return t i
     | Int_test { lt; eq; gt; is_signed; imm } ->
-      let make_comp comp =
-        match is_signed with
-        | Scalar.Signedness.Signed -> comp
-        | Scalar.Signedness.Unsigned -> (
-          (* Map signed comparisons to unsigned versions *)
-          match comp with
-          | Cmm.Clt -> Cmm.Cult
-          | Cmm.Cgt -> Cmm.Cugt
-          | Cmm.Cle -> Cmm.Cule
-          | Cmm.Cge -> Cmm.Cuge
-          | (Cmm.Ceq | Cmm.Cne | Cmm.Cult | Cmm.Cugt | Cmm.Cule | Cmm.Cuge) as c
-            ->
-            c)
+      let open struct
+        type comp =
+          | Lt
+          | Gt
+      end in
+      let make_comp (comp : comp) : Cmm.integer_comparison =
+        match is_signed, comp with
+        | Signed, Lt -> Clt
+        | Signed, Gt -> Cgt
+        | Unsigned, Lt -> Cult
+        | Unsigned, Gt -> Cugt
       in
-      let is_lt = int_comp t (make_comp Cmm.Clt) i ~imm in
+      let is_lt = int_comp t (make_comp Lt) i ~imm in
       let ge = fresh_ident t in
       ins_branch_cond_ident t is_lt (get_ident_for_label t lt) ge;
       line t.ppf "%a:" Ident.print ge;
-      let is_gt = int_comp t (make_comp Cmm.Cgt) i ~imm in
+      let is_gt = int_comp t (make_comp Gt) i ~imm in
       ins_branch_cond t is_gt gt eq
     | Raise _ ->
       (* CR yusumez: Implement this *)

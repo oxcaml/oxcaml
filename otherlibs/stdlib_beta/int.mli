@@ -120,16 +120,18 @@ external equal : int -> int -> bool = "%int_equal"
 (** [compare x y] is {!Stdlib.compare}[ x y] but more efficient. *)
 external compare : int -> int -> int = "%int_compare"
 
-(** Same as {!compare}, except that arguments are interpreted as {e unsigned} integers.
-    
-    In unsigned comparison, negative numbers are treated as large positive values.
-    For example, [-1] is treated as the maximum unsigned value, so 
+(** Same as {!compare}, except that arguments are interpreted as {e unsigned}
+    integers.
+
+    In unsigned comparison, negative numbers are treated as large positive
+    values.  For example, [-1] is treated as the maximum unsigned value, so
     [unsigned_compare (-1) 0 = 1] (greater than).
-    
-    @return [0] if the arguments are equal, a negative integer if the first argument
-    is less than the second (when both are viewed as unsigned), and a positive integer
-    if the first is greater than the second (when both are viewed as unsigned).
-    
+
+    @return [0] if the arguments are equal, a negative integer if the first
+    argument is less than the second (when both are viewed as unsigned), and a
+    positive integer if the first is greater than the second (when both are
+    viewed as unsigned).
+
     Examples:
     - [unsigned_compare 0 1 = -1] (0 < 1 unsigned)
     - [unsigned_compare (-1) 0 = 1] (-1 as unsigned is max_value > 0)

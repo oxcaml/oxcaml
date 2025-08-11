@@ -427,17 +427,18 @@ let int_test_of_integer_comparison :
     Cfg.int_test =
  fun comparison ~immediate:imm ~label_false ~label_true ->
   let lt, eq, gt, is_signed =
+    let module S = Scalar.Signedness in
     match comparison with
-    | Ceq -> label_false, label_true, label_false, Scalar.Signedness.Signed
-    | Cne -> label_true, label_false, label_true, Scalar.Signedness.Signed
-    | Clt -> label_true, label_false, label_false, Scalar.Signedness.Signed
-    | Cgt -> label_false, label_false, label_true, Scalar.Signedness.Signed
-    | Cle -> label_true, label_true, label_false, Scalar.Signedness.Signed
-    | Cge -> label_false, label_true, label_true, Scalar.Signedness.Signed
-    | Cult -> label_true, label_false, label_false, Scalar.Signedness.Unsigned
-    | Cugt -> label_false, label_false, label_true, Scalar.Signedness.Unsigned
-    | Cule -> label_true, label_true, label_false, Scalar.Signedness.Unsigned
-    | Cuge -> label_false, label_true, label_true, Scalar.Signedness.Unsigned
+    | Ceq -> label_false, label_true, label_false, S.Signed
+    | Cne -> label_true, label_false, label_true, S.Signed
+    | Clt -> label_true, label_false, label_false, S.Signed
+    | Cgt -> label_false, label_false, label_true, S.Signed
+    | Cle -> label_true, label_true, label_false, S.Signed
+    | Cge -> label_false, label_true, label_true, S.Signed
+    | Cult -> label_true, label_false, label_false, S.Unsigned
+    | Cugt -> label_false, label_false, label_true, S.Unsigned
+    | Cule -> label_true, label_true, label_false, S.Unsigned
+    | Cuge -> label_false, label_true, label_true, S.Unsigned
   in
   { lt; eq; gt; is_signed; imm }
 

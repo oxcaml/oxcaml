@@ -203,16 +203,26 @@ let init () =
 (* Emission of one instruction *)
 
 let emit_comp = function
-| Eq -> out opEQ    | Neq -> out opNEQ
-| Ltint -> out opLTINT | Leint -> out opLEINT
-| Gtint -> out opGTINT | Geint -> out opGEINT
+| Eq -> out opEQ         | Neq -> out opNEQ
+| Ltint -> out opLTINT   | Leint -> out opLEINT
+| Gtint -> out opGTINT   | Geint -> out opGEINT
 | Ultint -> out opULTINT | Ugeint -> out opUGEINT
 
 and emit_branch_comp = function
-| Eq -> out opBEQ    | Neq -> out opBNEQ
-| Ltint -> out opBLTINT | Leint -> out opBLEINT
-| Gtint -> out opBGTINT | Geint -> out opBGEINT
+| Eq -> out opBEQ         | Neq -> out opBNEQ
+| Ltint -> out opBLTINT   | Leint -> out opBLEINT
+| Gtint -> out opBGTINT   | Geint -> out opBGEINT
 | Ultint -> out opBULTINT | Ugeint -> out opBUGEINT
+
+let negate_integer_comparison = function
+  | Eq -> Neq
+  | Neq -> Eq
+  | Ltint -> Geint
+  | Leint -> Gtint
+  | Gtint -> Leint
+  | Geint -> Ltint
+  | Ultint -> Ugeint
+  | Ugeint -> Ultint
 
 let runtime5_only () =
   if not Config.runtime5 then
@@ -336,17 +346,6 @@ let remerge_events ev1 = function
   | Kevent ev2 :: c ->
     Kevent (Bytegen.merge_events ev1 ev2) :: c
   | c -> Kevent ev1 :: c
-
-
-let negate_integer_comparison = function
-  | Eq -> Neq
-  | Neq -> Eq
-  | Ltint -> Geint
-  | Leint -> Gtint
-  | Gtint -> Leint
-  | Geint -> Ltint
-  | Ultint -> Ugeint
-  | Ugeint -> Ultint
 
 let rec emit = function
     [] -> ()

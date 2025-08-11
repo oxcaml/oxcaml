@@ -120,21 +120,6 @@ type region_close =
   | Rc_nontail
   | Rc_close_at_apply
 
-type integer_comparison = Scalar.Integer_comparison.t =
-  | Ceq
-  | Cne
-  | Clt
-  | Cgt
-  | Cle
-  | Cge
-  | Cult
-  | Cugt
-  | Cule
-  | Cuge
-
-type float_comparison = Scalar.Float_comparison.t =
-    CFeq | CFneq | CFlt | CFnlt | CFgt | CFngt | CFle | CFnle | CFge | CFnge
-
 type any_locality_mode = Scalar.any_locality_mode = Any_locality_mode
 
 module Scalar = Scalar

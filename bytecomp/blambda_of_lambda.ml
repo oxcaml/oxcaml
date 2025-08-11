@@ -34,8 +34,8 @@ module Storer = Switch.Store (struct
   let make_key = Lambda.make_key
 end)
 
-let constant_int size n : constant =
-  match Scalar.Integral.width size with
+let constant_int integral n : constant =
+  match Scalar.Integral.width integral with
   | Taggable Int -> Const_int n
   | Taggable Int8 -> Const_int (Numbers.Int8.to_int (Numbers.Int8.of_int_exn n))
   | Taggable Int16 ->
@@ -1034,38 +1034,29 @@ and comp_unary_scalar_intrinsic op x =
     static_cast x ~src:(Scalar.width src) ~dst:(Scalar.width dst)
 
 and make_unsigned_comparison size signed_comparison x y =
-  (* For unsigned comparisons, we flip the sign bit of both operands and use signed
-     comparison *)
-  (* for int and nativeint, we don't know the target platform width so we have to compute
-     min_int at runtime *)
-  let min_int =
-    let num_bits =
-      match Scalar.Integral.width size with
-      | Taggable Int8 -> tagged_immediate 8
-      | Taggable Int16 -> tagged_immediate 16
-      | Taggable Int -> Prim (caml_sys_const Int_size, [])
-      | Boxable (Int32 Any_locality_mode) -> tagged_immediate 32
-      | Boxable (Int64 Any_locality_mode) -> tagged_immediate 64
-      | Boxable (Nativeint Any_locality_mode) ->
-        Prim (caml_sys_const Word_size, [])
-    in
+  (* For unsigned comparisons, we flip the sign bit of both operands and use
+     signed comparison *)
+  let min_int_at_runtime const_name =
+    let num_bits = Prim (caml_sys_const const_name, []) in
     let one = Const (const_int size 1) in
-    let num_bits = Prim (Offsetint (-1), [num_bits]) in
-    comp_binary_scalar_intrinsic
-      (Scalar.Operation.Binary.Shift (size, Lsl, Int))
-      one num_bits
+    let num_bits =
+      Prim (Offsetint (-1), [num_bits])
+      (* this computation is just "num_bits - 1" *)
+    in
+    comp_binary_scalar_intrinsic (Shift (size, Lsl, Int)) one num_bits
   in
   let min_int =
-    (* for some widths we can do better *)
+    (* For int and nativeint, we don't know the target platform width so we have
+       to compute min_int at runtime.  For other widths we can do better. *)
     match Scalar.Integral.width size with
     | Taggable Int8 -> Const (const_int size (-0x80))
     | Taggable Int16 -> Const (const_int size (-0x8000))
-    | Taggable Int -> min_int
+    | Taggable Int -> min_int_at_runtime Int_size
     | Boxable (Int32 Any_locality_mode) ->
       Const (Const_base (Const_int32 Int32.min_int))
     | Boxable (Int64 Any_locality_mode) ->
       Const (Const_base (Const_int64 Int64.min_int))
-    | Boxable (Nativeint Any_locality_mode) -> min_int
+    | Boxable (Nativeint Any_locality_mode) -> min_int_at_runtime Word_size
   in
   let flip_sign_bit arg =
     comp_binary_scalar_intrinsic (Integral (size, Xor)) arg min_int

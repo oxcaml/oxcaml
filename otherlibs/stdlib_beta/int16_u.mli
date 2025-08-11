@@ -145,8 +145,8 @@ external of_int16 : int16 -> int16# = "%int16#_of_int16"
 (** tag a naked int16 *)
 external to_int16 : int16# -> int16 = "%int16_of_int16#"
 
-(** Same as {!to_int}, but interprets the argument as an
-    {e unsigned} integer. *)
+(** Same as {!to_int}, but interprets the argument as an {e unsigned}
+    integer. *)
 val unsigned_to_int : int16# -> int
 
 (** [to_float x] is [x] as a floating point number. *)
