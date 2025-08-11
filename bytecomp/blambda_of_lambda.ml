@@ -1035,7 +1035,7 @@ and comp_unary_scalar_intrinsic op x =
 
 and make_unsigned_comparison size signed_comparison x y =
   (* For unsigned comparisons, we flip the sign bit of both operands and use
-     signed comparison *)
+     signed comparison (see z3 proof [*] below) *)
   let min_int_at_runtime const_name =
     let num_bits = Prim (caml_sys_const const_name, []) in
     let one = Const (const_int size 1) in
@@ -1062,5 +1062,61 @@ and make_unsigned_comparison size signed_comparison x y =
     comp_binary_scalar_intrinsic (Integral (size, Xor)) arg min_int
   in
   signed_comparison (flip_sign_bit x) (flip_sign_bit y)
+
+(* z3 proof of the above property [*]:
+
+   (define-sort int64 () (_ BitVec 64))
+
+   (declare-const x int64)
+   (declare-const y int64)
+
+   (define-fun flip_sign ((v int64)) int64
+     (bvxor v #x8000000000000000)
+   )
+
+   (push)
+   (echo "checking `lt`...")
+   (assert (not (=
+     (bvult x y)
+     (bvslt (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+
+   (push)
+   (echo "checking `le`...")
+   (assert (not (=
+     (bvule x y)
+     (bvsle (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+
+   (push)
+   (echo "checking `gt`...")
+   (assert (not (=
+     (bvugt x y)
+     (bvsgt (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+
+   (push)
+   (echo "checking `ge`...")
+   (assert (not (=
+     (bvuge x y)
+     (bvsge (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+*)
 
 let blambda_of_lambda x = comp_expr x
