@@ -2,6 +2,21 @@
 
 module DLL = Oxcaml_utils.Doubly_linked_list
 
+(* Before this pass, the CFG should not contain any prologues/epilogues. Iterate
+   over the CFG and make sure that this is the case. *)
+let validate_no_prologue (cfg_with_layout : Cfg_with_layout.t) =
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  Label.Tbl.iter
+    (fun _ block ->
+      let body = block.Cfg.body in
+      DLL.iter body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+          match[@ocaml.warning "-4"] instr.desc with
+          | Prologue | Epilogue ->
+            Misc.fatal_error
+              "Cfg contains prologue/epilogue before Cfg_prologue pass"
+          | _ -> ()))
+    cfg.blocks
+
 let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
@@ -44,4 +59,6 @@ let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
   cfg_with_layout
 
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
- fun cfg_with_layout -> add_prologue_if_required cfg_with_layout
+ fun cfg_with_layout ->
+  validate_no_prologue cfg_with_layout;
+  add_prologue_if_required cfg_with_layout
