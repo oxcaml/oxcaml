@@ -139,6 +139,8 @@ module type Sort = sig
     val for_module_field : t
 
     val for_boxed_variant : t
+
+    val for_exception : t
   end
 
   module Var : sig
