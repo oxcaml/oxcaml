@@ -774,17 +774,17 @@ let verify_unboxed_attr unboxed_attr sdecl =
 *)
 
 
-let shape_map_labels =
+let old_merlin_shape_map_labels =
   List.fold_left (fun map { Types.ld_id; ld_uid; _} ->
     Shape.Map.add_label map ld_id ld_uid)
     Shape.Map.empty
 
-let shape_map_unboxed_labels =
+let old_merlin_shape_map_unboxed_labels =
   List.fold_left (fun map { Types.ld_id; ld_uid; _} ->
     Shape.Map.add_unboxed_label map ld_id ld_uid)
     Shape.Map.empty
 
-let shape_map_cstrs =
+let old_merlin_shape_map_cstrs =
   List.fold_left (fun map { Types.cd_id; cd_uid; cd_args; _ } ->
     let cstr_shape_map =
       let label_decls =
@@ -792,11 +792,46 @@ let shape_map_cstrs =
         | Cstr_tuple _ -> []
         | Cstr_record ldecls -> ldecls
       in
-      shape_map_labels label_decls
+      old_merlin_shape_map_labels label_decls
     in
     Shape.Map.add_constr map cd_id
       @@ Shape.str ~uid:cd_uid cstr_shape_map)
     (Shape.Map.empty)
+
+let old_merlin_shape_declaration decl =
+  let uid = decl.type_uid in
+  match decl.type_kind with
+  | Type_variant (cstrs, _, _) ->
+    Shape.str ~uid (old_merlin_shape_map_cstrs cstrs)
+  | Type_record (labels, _, _) ->
+    Shape.str ~uid (old_merlin_shape_map_labels labels)
+  | Type_record_unboxed_product (labels, _, _) ->
+    Shape.str ~uid (old_merlin_shape_map_unboxed_labels labels)
+  | Type_abstract _ | Type_open -> Shape.leaf uid
+
+let old_merlin_shape_extension_constructor args ext_uid =
+  let map = match args with
+  | Types.Cstr_record lbls -> old_merlin_shape_map_labels lbls
+  | _ -> Shape.Map.empty
+  in
+  Shape.str ~uid:ext_uid map
+
+let shape_declarations env decls =
+  match !Clflags.shape_format with
+  | Clflags.Old_merlin ->
+    List.map (fun (_, decl) -> old_merlin_shape_declaration decl) decls
+  | Clflags.Debugging_shapes ->
+    let _ = env in
+    List.map (fun _ -> Shape.leaf' None) decls
+    (* CR sspies: In the future, we will actually produce shapes with debugging
+       information here. For now, we just use a stub. *)
+
+let shape_extension_constructor ext uid =
+  match !Clflags.shape_format with
+  | Clflags.Old_merlin -> old_merlin_shape_extension_constructor ext uid
+  | Clflags.Debugging_shapes -> Shape.leaf uid
+    (* CR sspies: In the future, we should use a more precise shape here. For
+      now we simply use a leaf to indicate that there is some shape here. *)
 
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
@@ -1076,6 +1111,10 @@ let transl_declaration env sdecl (id, uid) =
       in
       set_private_row env sdecl.ptype_loc p decl
     end;
+    (* CR sspies: We used to compute shapes here, which were then added to
+      various typing environments. The computation of the shapes has moved
+      further down in the translation, so they are currently not added to the
+      intermediate environments. Find out whether that is an issue.   *)
     let decl =
       {
         typ_id = id;
@@ -1091,17 +1130,7 @@ let transl_declaration env sdecl (id, uid) =
         typ_jkind_annotation = jkind_annotation
       }
     in
-    let typ_shape =
-      let uid = decl.typ_type.type_uid in
-      match decl.typ_type.type_kind with
-      | Type_variant (cstrs, _, _) -> Shape.str ~uid (shape_map_cstrs cstrs)
-      | Type_record (labels, _, _) ->
-        Shape.str ~uid (shape_map_labels labels)
-      | Type_record_unboxed_product (labels, _, _) ->
-        Shape.str ~uid (shape_map_unboxed_labels labels)
-      | Type_abstract _ | Type_open -> Shape.leaf uid
-    in
-    decl, typ_shape
+    decl
   end
 
 (* Note [Typechecking unboxed versions of types]
@@ -1786,8 +1815,15 @@ let update_constructor_representation
       Constructor_mixed shape
 
 
-let add_types_to_env decls shapes env =
-  List.fold_right2
+let add_types_to_env ?shapes decls env =
+  match shapes with
+  | None ->
+    List.fold_right
+      (fun (id, decl) env ->
+        add_type ~check:true id decl env)
+      decls env
+  | Some shapes ->
+    List.fold_right2
     (fun (id, decl) shape env ->
       add_type ~check:true ~shape id decl env)
     decls shapes env
@@ -2703,7 +2739,7 @@ let check_redefined_unit (td: Parsetree.type_declaration) =
 *)
 
 (* Normalize the jkinds in a list of (potentially mutually recursive) type declarations *)
-let normalize_decl_jkinds env shapes decls =
+let normalize_decl_jkinds env decls =
   let rec normalize_decl_jkind env original_decl allow_any_crossing decl path =
     let type_unboxed_version =
       Option.map (fun type_unboxed_version ->
@@ -2774,13 +2810,13 @@ let normalize_decl_jkinds env shapes decls =
   (* Add the types, with non-normalized kinds, to the environment to start, so that eg
      types can look up their own (potentially non-normalized) kinds *)
   let env =
-    List.fold_right2
-      (fun (id, _, _, decl) shape env ->
-         add_type ~check:true ~shape id decl env)
-      decls shapes env
+    List.fold_right
+      (fun (id, _, _, decl) env ->
+         add_type ~check:true id decl env)
+      decls env
   in
-  Misc.Stdlib.List.fold_left_map2
-    (fun env (id, original_decl, allow_any_crossing, decl) shape ->
+  List.fold_left_map
+    (fun env (id, original_decl, allow_any_crossing, decl) ->
        let decl =
          normalize_decl_jkind env original_decl allow_any_crossing decl
            (Pident id)
@@ -2788,12 +2824,11 @@ let normalize_decl_jkinds env shapes decls =
        (* Add the decl with the normalized kind back to the environment, so that later
           kinds don't have to normalize this kind if they mention this type in their
           with-bounds *)
-       let env = add_type ~check:false ~shape:shape id decl env in
+       let env = add_type ~check:false id decl env in
        env, (id, decl)
     )
     env
     decls
-    shapes
 
 (* Translate a set of type declarations, mutually recursive or not *)
 let transl_type_decl env rec_flag sdecl_list =
@@ -2827,7 +2862,7 @@ let transl_type_decl env rec_flag sdecl_list =
   (* Translate declarations, using a temporary environment where abbreviations
      expand to a generic type variable. After that, we check the coherence of
      the translated declarations in the resulting new environment. *)
-  let tdecls, decls, shapes, new_env, delayed_jkind_checks =
+  let tdecls, decls, new_env, delayed_jkind_checks =
     Ctype.with_local_level_iter ~post:generalize_decl begin fun () ->
       (* Enter types. *)
       let temp_env =
@@ -2868,7 +2903,6 @@ let transl_type_decl env rec_flag sdecl_list =
          enviroment. *)
       let tdecls =
         List.map2 transl_declaration sdecl_list (List.map ids_slots ids_list) in
-      let tdecls, shapes = List.split tdecls in
       let decls = List.map (fun d -> (d.typ_id, d.typ_type)) tdecls in
       let decls = derive_unboxed_versions decls env in
       let tdecls =
@@ -2879,7 +2913,7 @@ let transl_type_decl env rec_flag sdecl_list =
       (* Check for duplicates *)
       check_duplicates sdecl_list;
       (* Build the final env. *)
-      let new_env = add_types_to_env decls shapes env in
+      let new_env = add_types_to_env decls env in
       (* Update stubs *)
       let delayed_jkind_checks =
         match rec_flag with
@@ -2891,7 +2925,7 @@ let transl_type_decl env rec_flag sdecl_list =
                sdecl.ptype_loc)
             ids_list sdecl_list
       in
-      ((tdecls, decls, shapes, new_env, delayed_jkind_checks), List.map snd decls)
+      ((tdecls, decls, new_env, delayed_jkind_checks), List.map snd decls)
     end
   in
   (* Check for ill-formed abbrevs *)
@@ -2991,7 +3025,7 @@ let transl_type_decl env rec_flag sdecl_list =
         |> Typedecl_variance.update_decls env sdecl_list
         |> Typedecl_separability.update_decls env
         |> update_decls_jkind new_env
-        |> normalize_decl_jkinds new_env shapes
+        |> normalize_decl_jkinds new_env
       in
       let removed, decls = remove_unboxed_versions decls in
       if not (Path.Set.is_empty removed) then
@@ -3006,14 +3040,16 @@ let transl_type_decl env rec_flag sdecl_list =
   in
   (* Check re-exportation, updating [type_jkind] from the manifest *)
   let decls = List.map2 (check_abbrev new_env) sdecl_list decls in
+  let shapes = shape_declarations env decls in
   (* Compute the final environment with variance and immediacy *)
-  let final_env = add_types_to_env decls shapes env in
-  (* Save the shapes of the declarations in [Type_shape] for debug info. *)
-  List.iter (fun (id, decl) ->
-    Type_shape.add_to_type_decls
-      (Pident id) decl
-      (Env.find_uid_of_path final_env)
-  ) decls;
+  let final_env = add_types_to_env decls ~shapes env in
+  (* Save the type shapes of the declarations in [Type_shape] for debug info. *)
+  if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
+    List.iter (fun (id, decl) ->
+      Type_shape.add_to_type_decls
+        (Pident id) decl
+        (Env.find_uid_of_path final_env)
+    ) decls;
   (* Keep original declaration *)
   let final_decls =
     List.map2
@@ -3173,13 +3209,7 @@ let transl_extension_constructor ~scope env type_path type_params
       Typedtree.ext_loc = sext.pext_loc;
       Typedtree.ext_attributes = sext.pext_attributes; }
   in
-  let shape =
-    let map = match args with
-    | Cstr_record lbls -> shape_map_labels lbls
-    | _ -> Shape.Map.empty
-    in
-    Shape.str ~uid:ext_cstrs.ext_type.ext_uid map
- in
+  let shape = shape_extension_constructor args ext_cstrs.ext_type.ext_uid in
   ext_cstrs, shape
 
 let transl_extension_constructor ~scope env type_path type_params

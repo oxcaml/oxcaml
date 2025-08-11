@@ -3031,23 +3031,25 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
   save_signature_with_transform with_imports ~alerts sg modname cu cmi
 
 (* Make the initial environment, without language extensions *)
-let initial =
-  (* We collect all the type declarations that are added to the initial
-     environment in a table. *)
-  let added_types = Ident.Tbl.create 16 in
+let initial () =
   let add_type_and_remember_decl (type_ident : Ident.t) decl env =
-    Ident.Tbl.add added_types type_ident decl;
-    add_type type_ident decl env ~check:false
+    match !Clflags.shape_format with
+    | Clflags.Old_merlin -> add_type type_ident decl env ~check:false
+    | Clflags.Debugging_shapes ->
+      let type_decl_shape =
+        Type_shape.Type_decl_shape.of_type_declaration (Pident type_ident) decl
+          (find_uid_of_path env)
+      in
+      Uid.Tbl.add Type_shape.all_type_decls decl.type_uid type_decl_shape;
+      let shape = Shape.leaf' None in
+      (* CR sspies: This will be replaced by an actual shape computation in
+         the future. *)
+      add_type type_ident ~shape decl env ~check:false
   in
   let initial_env =
     Predef.build_initial_env add_type_and_remember_decl
       (add_extension ~check:false ~rebind:false) empty
   in
-  (* We record the type declarations for the type shapes. *)
-  Ident.Tbl.iter (fun type_ident decl ->
-    Type_shape.add_to_type_decls (Pident type_ident) decl
-      (find_uid_of_path initial_env)
-  ) added_types;
   initial_env
 
 let add_language_extension_types env =
@@ -3059,7 +3061,7 @@ let add_language_extension_types env =
     | false -> env
   in
   lazy
-    Language_extension.(env
+    Language_extension.(env ()
     |> add SIMD Stable Predef.add_simd_stable_extension_types
     |> add SIMD Beta Predef.add_simd_beta_extension_types
     |> add SIMD Alpha Predef.add_simd_alpha_extension_types
