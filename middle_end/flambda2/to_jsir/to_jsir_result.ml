@@ -90,8 +90,10 @@ let to_program_exn
     } =
   if List.length current_blocks <> 0
   then
-    Misc.fatal_error
-      "To_jsir_result.to_program_exn: expected current_blocks to be empty";
+    Misc.fatal_errorf
+      "To_jsir_result.to_program_exn: expected current_blocks to be empty, \
+       instead found %d"
+      (List.length current_blocks);
   if not (Jsir.Addr.Set.is_empty reserved_addrs)
   then
     Misc.fatal_error
