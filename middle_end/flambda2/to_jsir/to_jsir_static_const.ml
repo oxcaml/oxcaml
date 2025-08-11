@@ -37,6 +37,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
        Set_of_closures"
       Static_const.print const
   | Block (tag, mut, _shape, fields) ->
+    let tag = Tag.Scannable.to_tag tag in
     let expr, env, res =
       To_jsir_shared.block ~env ~res ~tag ~mut
         ~fields:(List.map Simple.With_debuginfo.simple fields)

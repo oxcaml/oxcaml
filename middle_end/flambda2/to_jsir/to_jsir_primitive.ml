@@ -42,6 +42,10 @@ let identity ~env ~res x =
   let var, res = To_jsir_shared.simple ~env ~res x in
   Some var, env, res
 
+let unit ~env ~res =
+  let var = Jsir.Var.fresh () in
+  Some var, env, To_jsir_result.add_instr_exn res (Let (var, Constant Null))
+
 let use_prim ~env ~res prim args =
   let expr : Jsir.expr = Prim (prim, args) in
   let var = Jsir.Var.fresh () in
@@ -236,13 +240,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     (* Unsupported in bytecode *)
     primitive_not_supported ()
   | Make_lazy tag ->
-    let tag =
-      match
-        Flambda_primitive.Lazy_block_tag.to_tag tag |> Tag.Scannable.of_tag
-      with
-      | None -> Misc.fatal_error "Lazy tag is not scannable"
-      | Some tag -> tag
-    in
+    let tag = Flambda_primitive.Lazy_block_tag.to_tag tag in
     let expr, env, res =
       To_jsir_shared.block ~env ~res ~tag ~mut:Mutable ~fields:[x]
     in
@@ -415,7 +413,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     primitive_not_supported ()
   | Atomic_set _ ->
     let _var, env, res = use_prim' (Extern "caml_atomic_exchange") in
-    None, env, res
+    unit ~env ~res
   | Atomic_exchange _ -> use_prim' (Extern "caml_atomic_exchange")
   | Atomic_int_arith op ->
     let extern_name =
@@ -489,26 +487,40 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     use_prim' (Extern "caml_atomic_compare_exchange")
 
 let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
-  let use_prim' prim = use_prim' ~env ~res prim xs in
   match f with
   | Begin_region _ | Begin_try_region _ -> no_op ~env ~res
   | Make_block (kind, mut, _alloc_mode) ->
     let tag =
       match kind with
-      | Values (tag, _with_subkind) -> tag
-      | Naked_floats | Mixed _ -> failwith "unimplemented block kind"
+      | Values (tag, _with_subkind) -> Tag.Scannable.to_tag tag
+      | Naked_floats -> Tag.double_array_tag
+      | Mixed _ -> failwith "unimplemented block kind"
     in
     let expr, env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields:xs in
     let var = Jsir.Var.fresh () in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
-  | Make_array (kind, _mut, _mode) -> (
-    match kind with
-    | Immediates | Values | Naked_floats | Naked_float32s ->
-      use_prim' (Extern "caml_make_vect")
-    | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-    | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
-      (* No SIMD *)
-      primitive_not_supported ())
+  | Make_array (kind, mut, _mode) ->
+    let tag =
+      match kind with
+      | Immediates | Values -> Tag.zero
+      | Naked_floats | Naked_float32s -> Tag.double_array_tag
+      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+      | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
+        (* No SIMD *)
+        primitive_not_supported ()
+    in
+    let mutability : Jsir.mutability =
+      match mut with
+      | Mutable -> Maybe_mutable
+      | Immutable | Immutable_unique -> Immutable
+    in
+    let xs, res = To_jsir_shared.simples ~env ~res xs in
+    let var = Jsir.Var.fresh () in
+    ( Some var,
+      env,
+      To_jsir_result.add_instr_exn res
+        (Let (var, Block (Tag.to_int tag, Array.of_list xs, Array, mutability)))
+    )
 
 let primitive ~env ~res (prim : Flambda_primitive.t) _dbg =
   match prim with
