@@ -95,11 +95,11 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     static_const_not_supported ()
   | Empty_array kind -> (
     match kind with
-    | Values_or_immediates_or_naked_floats ->
+    | Values_or_immediates_or_naked_floats | Naked_float32s ->
       To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
         (Prim (Extern "caml_make_vect", [Pc (Int Targetint.zero); Pc Null]))
-    | Unboxed_products | Naked_float32s | Naked_int32s | Naked_int64s
-    | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+    | Unboxed_products | Naked_int32s | Naked_int64s | Naked_nativeints
+    | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
       (* No SIMD *)
       static_const_not_supported ())
   | Mutable_string { initial_value } ->
