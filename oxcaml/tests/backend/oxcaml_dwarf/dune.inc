@@ -3,8 +3,10 @@
  (name test_basic_dwarf)
  (modules test_basic_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta))
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta
+   -extension small_numbers))
  (foreign_archives simd_stubs))
 
 (rule
@@ -50,8 +52,10 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (name test_unboxed_dwarf)
  (modules test_unboxed_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta))
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta
+   -extension small_numbers))
  (foreign_archives simd_stubs))
 
 (rule
@@ -97,8 +101,10 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (name test_datatypes_dwarf)
  (modules test_datatypes_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta))
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta
+   -extension small_numbers))
  (foreign_archives simd_stubs))
 
 (rule
@@ -144,8 +150,10 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (name test_simd_dwarf)
  (modules test_simd_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta))
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta
+   -extension small_numbers))
  (foreign_archives simd_stubs))
 
 (rule

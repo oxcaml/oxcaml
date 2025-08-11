@@ -52,6 +52,18 @@
 (lldb) c
 (lldb) c
 (lldb) c
+(lldb) b Test_basic_dwarf.f_int8
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_int16
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) b Test_basic_dwarf.f_string
 (lldb) c
 (lldb) c
@@ -94,6 +106,10 @@
 (lldb) c
 (lldb) c
 (lldb) b Test_basic_dwarf.f_poly
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) c
 (lldb) c
 (lldb) c

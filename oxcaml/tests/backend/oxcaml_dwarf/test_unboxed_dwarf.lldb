@@ -21,6 +21,18 @@
 (lldb) c
 (lldb) c
 (lldb) c
+(lldb) b Test_unboxed_dwarf.f_unboxed_int8
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_unboxed_int16
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) b Test_unboxed_dwarf.f_poly_float64
 (lldb) c
 (lldb) c
@@ -37,6 +49,12 @@
 (lldb) b Test_unboxed_dwarf.f_poly_word
 (lldb) c
 (lldb) c
+(lldb) b Test_unboxed_dwarf.f_poly_bits8
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_poly_bits16
+(lldb) c
+(lldb) c
 (lldb) b Test_unboxed_dwarf.f_simple_product
 (lldb) c
 (lldb) c
@@ -47,6 +65,14 @@
 (lldb) b Test_unboxed_dwarf.f_nested_product
 (lldb) c
 (lldb) c
+(lldb) b Test_unboxed_dwarf.f_small_int_product
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_mixed_small_product
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) b Test_unboxed_dwarf.f_simple_record
 (lldb) c
 (lldb) c
@@ -55,6 +81,14 @@
 (lldb) c
 (lldb) c
 (lldb) b Test_unboxed_dwarf.f_nested_record
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_small_int_record
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_mixed_small_record
+(lldb) c
 (lldb) c
 (lldb) c
 (lldb) b Test_unboxed_dwarf.f_poly_product

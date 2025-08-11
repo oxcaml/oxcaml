@@ -240,6 +240,8 @@ module Predef = struct
       | Unboxed_nativeint
       | Unboxed_int64
       | Unboxed_int32
+      | Unboxed_int16
+      | Unboxed_int8
       | Unboxed_simd of simd_vec_split
 
     type t =
@@ -251,6 +253,8 @@ module Predef = struct
       | Float32
       | Floatarray
       | Int
+      | Int8
+      | Int16
       | Int32
       | Int64
       | Lazy_t
@@ -309,6 +313,8 @@ module Predef = struct
       | Unboxed_nativeint -> "nativeint"
       | Unboxed_int64 -> "int64"
       | Unboxed_int32 -> "int32"
+      | Unboxed_int16 -> "int16"
+      | Unboxed_int8 -> "int8"
       | Unboxed_simd s -> simd_vec_split_to_string s
 
     let to_string : t -> string = function
@@ -320,6 +326,8 @@ module Predef = struct
       | Float32 -> "float32"
       | Floatarray -> "floatarray"
       | Int -> "int"
+      | Int8 -> "int8"
+      | Int16 -> "int16"
       | Int32 -> "int32"
       | Int64 -> "int64"
       | Lazy_t -> "lazy_t"
@@ -357,6 +365,8 @@ module Predef = struct
       | Unboxed_nativeint -> Word
       | Unboxed_int64 -> Bits64
       | Unboxed_int32 -> Bits32
+      | Unboxed_int16 -> Bits16
+      | Unboxed_int8 -> Bits8
       | Unboxed_simd s -> simd_vec_split_to_layout s
 
     let to_layout : t -> Layout.t = function
@@ -368,6 +378,8 @@ module Predef = struct
       | Float32 -> Base Value
       | Floatarray -> Base Value
       | Int -> Base Value
+      | Int8 -> Base Value
+      | Int16 -> Base Value
       | Int32 -> Base Value
       | Int64 -> Base Value
       | Lazy_t -> Base Value
