@@ -1630,22 +1630,32 @@ let close_exact_or_unknown_apply acc env
   in
   if Flambda_features.classic_mode ()
   then
-    match Inlining.inlinable env apply callee_approx with
-    | Not_inlinable ->
+    if !Clflags.jsir
+    then
       let apply =
         Apply.with_inlined_attribute apply
           (Inlined_attribute.with_use_info (Apply.inlined apply)
-             Unused_because_function_unknown)
+             Jsir_inlining_disabled)
       in
       Expr_with_acc.create_apply acc apply
-    | Inlinable func_desc ->
-      let acc = Acc.mark_continuation_as_untrackable continuation acc in
-      let acc =
-        Acc.mark_continuation_as_untrackable
-          (Exn_continuation.exn_handler apply_exn_continuation)
-          acc
-      in
-      Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env) ~func_desc
+    else
+      match Inlining.inlinable env apply callee_approx with
+      | Not_inlinable ->
+        let apply =
+          Apply.with_inlined_attribute apply
+            (Inlined_attribute.with_use_info (Apply.inlined apply)
+               Unused_because_function_unknown)
+        in
+        Expr_with_acc.create_apply acc apply
+      | Inlinable func_desc ->
+        let acc = Acc.mark_continuation_as_untrackable continuation acc in
+        let acc =
+          Acc.mark_continuation_as_untrackable
+            (Exn_continuation.exn_handler apply_exn_continuation)
+            acc
+        in
+        Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
+          ~func_desc
   else Expr_with_acc.create_apply acc apply
 
 let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
