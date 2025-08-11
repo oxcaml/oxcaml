@@ -120,6 +120,7 @@ external equal : int -> int -> bool = "%int_equal"
 external compare : int -> int -> int = "%int_compare"
 (** [compare x y] is {!Stdlib.compare}[ x y] but more efficient. *)
 
+external unsigned_compare : int -> int -> int = "%int_unsigned_compare"
 (** Same as {!compare}, except that arguments are interpreted as {e unsigned}
     integers.
 
@@ -137,7 +138,6 @@ external compare : int -> int -> int = "%int_compare"
     - [unsigned_compare (-1) 0 = 1] (-1 as unsigned is max_value > 0)
     - [unsigned_compare max_int min_int = -1] (max_int < min_int when unsigned)
 *)
-external unsigned_compare : int -> int -> int = "%int_unsigned_compare"
 
 val min : int -> int -> int
 (** Return the lesser of the two arguments. *)
