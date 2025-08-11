@@ -68,6 +68,7 @@ external of_string : string -> int = "caml_int_of_string"
 let max_int = shift_right_logical minus_one 1
 let min_int = succ max_int
 let[@inline] unsigned_to_int t = if t < 0 then None else Some t
+
 external unsigned_compare : int -> int -> int = "%int_unsigned_compare"
 external unsigned_lt : int -> int -> bool = "%int_unsigned_lessthan"
 
