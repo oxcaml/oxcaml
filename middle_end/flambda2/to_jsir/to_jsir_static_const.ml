@@ -126,11 +126,7 @@ let prepare_code ~env ~res ~code_id code =
         match is_my_closure_used with
         | Known false -> env, without_my_closure, false
         | Known true | Unknown ->
-          (* We need to register the fact that the parameter variable
-             corresponding to [my_closure] needs to be passed in with the extra
-             closure argument. *)
           let my_closure = Jsir.Var.fresh () in
-          let env = To_jsir_env.register_need_my_closure env my_closure in
           env, without_my_closure @ [my_closure], true
       in
       let res, addr = To_jsir_result.reserve_address res in
@@ -172,7 +168,7 @@ let code ~env ~res ~translate_body ~code_id code =
          bound_params
          ~body
          ~my_closure
-         ~is_my_closure_used:_ (* will be getting from env *)
+         ~is_my_closure_used
          ~my_region:_
          ~my_ghost_region:_
          ~my_depth:_
@@ -180,17 +176,15 @@ let code ~env ~res ~translate_body ~code_id code =
        ->
       (* This has already been populated by the first phase of the [Static] arm
          of [To_jsir.let_expr_normal] *)
-      let addr, params_jvar, is_my_closure_used =
-        To_jsir_env.get_code_id_exn env code_id
-      in
+      let addr, params_jvar = To_jsir_env.get_code_id_exn env code_id in
       let res = To_jsir_result.new_block_with_addr_exn res ~addr ~params:[] in
       let params_fvar =
         let without_my_closure =
           Bound_parameters.to_list bound_params |> List.map Bound_parameter.var
         in
         match is_my_closure_used with
-        | false -> without_my_closure
-        | true -> without_my_closure @ [my_closure]
+        | Known false -> without_my_closure
+        | Known true | Unknown -> without_my_closure @ [my_closure]
       in
       let env_with_params =
         List.fold_left2 To_jsir_env.add_var env params_fvar params_jvar

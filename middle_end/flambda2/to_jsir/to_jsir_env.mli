@@ -94,8 +94,8 @@ val get_symbol : t -> Symbol.t -> Jsir.Var.t option
 val get_symbol_exn : t -> Symbol.t -> Jsir.Var.t
 
 (** Return the block address and parameter variables corresponding to the given
-    [Code_id.t], as well as whether it uses [my_closure]. *)
-val get_code_id_exn : t -> Code_id.t -> Jsir.Addr.t * Jsir.Var.t list * bool
+    [Code_id.t]. *)
+val get_code_id_exn : t -> Code_id.t -> Jsir.Addr.t * Jsir.Var.t list
 
 (** Return the variable corresponding to a function slot. *)
 val get_function_slot : t -> Function_slot.t -> Jsir.Var.t option
@@ -117,8 +117,5 @@ val add_function_slot_if_not_found : t -> Function_slot.t -> t
 
 val add_value_slot_if_not_found : t -> Value_slot.t -> t
 
-(** Keep track of whether closures (represented by variables) have an extra parameter at
-    the end for passing in [my_closure]. *)
-val register_need_my_closure : t -> Jsir.Var.t -> t
-
-val needs_my_closure : t -> Jsir.Var.t -> bool
+(** Check whether the given [Code_id.t] needs an extra [my_closures] argument. *)
+val needs_my_closure : t -> Code_id.t -> bool

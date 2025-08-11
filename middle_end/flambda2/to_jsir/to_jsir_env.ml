@@ -6,9 +6,9 @@ type t =
     exn_handlers :
       (Jsir.Addr.t * Jsir.Var.t * Jsir.Var.t list) Continuation.Map.t;
     vars : Jsir.Var.t Variable.Map.t;
-    need_my_closure : Jsir.Var.Set.t;
+    need_my_closure : Code_id.Set.t;
     symbols : Jsir.Var.t Symbol.Map.t;
-    code_ids : (Jsir.Addr.t * Jsir.Var.t list * bool) Code_id.Map.t;
+    code_ids : (Jsir.Addr.t * Jsir.Var.t list) Code_id.Map.t;
     function_slots : Jsir.Var.t Function_slot.Map.t;
     value_slots : Jsir.Var.t Value_slot.Map.t;
     traps : Continuation.t list
@@ -21,7 +21,7 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     continuations = Continuation.Map.empty;
     exn_handlers = Continuation.Map.empty;
     vars = Variable.Map.empty;
-    need_my_closure = Jsir.Var.Set.empty;
+    need_my_closure = Code_id.Set.empty;
     symbols = Symbol.Map.empty;
     code_ids = Code_id.Map.empty;
     function_slots = Function_slot.Map.empty;
@@ -53,10 +53,13 @@ let add_symbol t symbol jvar =
   { t with symbols = Symbol.Map.add symbol jvar t.symbols }
 
 let add_code_id t code_id ~addr ~params ~is_my_closure_used =
-  { t with
-    code_ids =
-      Code_id.Map.add code_id (addr, params, is_my_closure_used) t.code_ids
-  }
+  let code_ids = Code_id.Map.add code_id (addr, params) t.code_ids in
+  let need_my_closure =
+    match is_my_closure_used with
+    | false -> t.need_my_closure
+    | true -> Code_id.Set.add code_id t.need_my_closure
+  in
+  { t with code_ids; need_my_closure }
 
 let add_function_slot t fslot jvar =
   { t with function_slots = Function_slot.Map.add fslot jvar t.function_slots }
@@ -131,7 +134,4 @@ let add_value_slot_if_not_found t slot =
         ~add:Value_slot.Map.add
   }
 
-let register_need_my_closure t var =
-  { t with need_my_closure = Jsir.Var.Set.add var t.need_my_closure }
-
-let needs_my_closure t var = Jsir.Var.Set.mem var t.need_my_closure
+let needs_my_closure t var = Code_id.Set.mem var t.need_my_closure

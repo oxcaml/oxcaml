@@ -273,13 +273,15 @@ and apply_expr ~env ~res e =
   let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
     | None, _ | _, Effect _ -> failwith "effects not implemented yet"
-    | Some callee, (Function _ | Method _) ->
+    | _, Method _ -> failwith "method calls not implemented yet"
+    | Some callee, Function { function_call; alloc_mode = _ } ->
       let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
       let f, res = To_jsir_shared.simple ~env ~res callee in
       let args =
-        match To_jsir_env.needs_my_closure env f with
-        | false -> args
-        | true ->
+        match function_call with
+        | Direct code_id when not (To_jsir_env.needs_my_closure env code_id) ->
+          args
+        | Indirect_unknown_arity | Indirect_known_arity | Direct _ ->
           (* We need to pass in itself as well *)
           args @ [f]
       in
