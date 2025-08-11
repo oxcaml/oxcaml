@@ -354,7 +354,7 @@ let name_expression ~loc ~attrs sort exp =
   let pat =
     { pat_desc =
         Tpat_var(id, mknoloc name, vd.val_uid,
-          Jkind.Sort.value, (* Will be changed soon *)
+          Jkind.Sort.(of_const Const.for_module_field),
           Mode.Value.disallow_right Mode.Value.legacy);
       pat_loc = loc;
       pat_extra = [];

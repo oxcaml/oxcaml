@@ -63,8 +63,7 @@ let extra_pat =
   make_pat
     (Tpat_var (Ident.create_local "+", mknoloc "+",
       Uid.internal_not_actually_unique,
-      (* CR jrayman: should be [for_*] *)
-      Jkind.Sort.value,
+      Jkind.Sort.(of_const Const.for_boxed_variant),
       Mode.Value.disallow_right Mode.Value.max))
     Ctype.none Env.empty
 

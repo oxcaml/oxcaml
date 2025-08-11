@@ -1124,30 +1124,27 @@ let rec iter_bound_idents
 type 'sort full_bound_ident_action =
   Ident.t -> string loc -> type_expr -> Uid.t -> Mode.Value.l -> 'sort -> unit
 
+(* A few of the functions below should work both over [Jkind.Sort.t] and
+   [Jkind.Sort.Const.t], so they take conversion functions
+   [of_sort : Jkind.Sort.t -> 'sort] and [of_const_sort : Jkind.Sort.Const.t ->
+   'sort]. The need for these is somewhat unfortunate, but it's worth it to
+   allow [Jkind.Sort.Const.t] to be used throughout the transl process.
+   Use [for_transl] or [for_typing] to tersely set [~of_sort] and
+   [~of_const_sort]. *)
+
 let for_transl f =
   f ~of_sort:Jkind.Sort.default_for_transl_and_get ~of_const_sort:Fun.id
 
 let for_typing f =
   f ~of_sort:Fun.id ~of_const_sort:Jkind.Sort.of_const
 
-(* The intent is that the sort should be the sort of the type of the pattern.
-   It's used to avoid computing jkinds from types.  `f` then gets passed
-   the sorts of the variables.
-
-   This is occasionally used in places where we don't actually know
-   about the sort of the pattern but `f` doesn't care about the sorts.
-
-   Because this should work both over [Jkind.Sort.t] and [Jkind.Sort.Const.t],
-   this takes conversion functions [of_sort : Jkind.Sort.t -> 'sort] and
-   [of_const_sort : Jkind.Sort.Const.t -> 'sort]. The need for these is somewhat
-   unfortunate, but it's worth it to allow [Jkind.Sort.Const.t] to be used
-   throughout the transl process. *)
 let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
   let rec loop :
     type k . 'sort full_bound_ident_action -> k general_pattern -> _ =
     fun f pat ->
       match pat.pat_desc with
-      (* Cases where we push the sort inwards: *)
+      (* [Tpat_var] and [Tpat_alias] are the only cases that directly
+         bind an ident *)
       | Tpat_var (id, s, uid, sort, mode) ->
           f id s pat.pat_type uid mode (of_sort sort)
       | Tpat_alias(p, id, s, uid, sort, mode, ty) ->
@@ -1157,29 +1154,20 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
         if both_sides_of_or then (loop f p1; loop f p2)
         else loop f p1
       | Tpat_value p -> loop f p
-      (* Cases where we compute the sort of the inner thing from the pattern *)
       | Tpat_construct(_, _, patl, _) ->
           List.iter (loop f) patl
       | Tpat_record (lbl_pat_list, _) ->
-          List.iter (fun (_, _, pat) ->
-            (loop f) pat)
-            lbl_pat_list
+          List.iter (fun (_, _, pat) -> (loop f) pat) lbl_pat_list
       | Tpat_record_unboxed_product (lbl_pat_list, _) ->
-          List.iter (fun (_, _, pat) ->
-            (loop f) pat)
-            lbl_pat_list
-      (* Cases where the inner things must be value: *)
+          List.iter (fun (_, _, pat) -> (loop f) pat) lbl_pat_list
       | Tpat_variant (_, pat, _) -> Option.iter (loop f) pat
       | Tpat_tuple patl ->
         List.iter (fun (_, pat) -> loop f pat) patl
-        (* CR layouts v5: tuple case to change when we allow non-values in
-           tuples *)
       | Tpat_unboxed_tuple patl ->
         List.iter (fun (_, pat, _) -> loop f pat) patl
       | Tpat_array (_, _, patl) ->
         List.iter (loop f) patl
       | Tpat_lazy p | Tpat_exception p -> loop f p
-      (* Cases without variables: *)
       | Tpat_any | Tpat_constant _ -> ()
   in
   loop f pat
