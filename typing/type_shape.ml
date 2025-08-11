@@ -179,6 +179,8 @@ module Type_shape = struct
         Some Unboxed_nativeint
       | p when Path.same p Predef.path_unboxed_int64 -> Some Unboxed_int64
       | p when Path.same p Predef.path_unboxed_int32 -> Some Unboxed_int32
+      | p when Path.same p Predef.path_unboxed_int8 -> Some Unboxed_int8
+      | p when Path.same p Predef.path_unboxed_int16 -> Some Unboxed_int16
       | p -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_path p)
 
     let of_path : Path.t -> t option = function
@@ -191,6 +193,8 @@ module Type_shape = struct
       | p when Path.same p Predef.path_float32 -> Some Float32
       | p when Path.same p Predef.path_floatarray -> Some Floatarray
       | p when Path.same p Predef.path_int -> Some Int
+      | p when Path.same p Predef.path_int8 -> Some Int8
+      | p when Path.same p Predef.path_int16 -> Some Int16
       | p when Path.same p Predef.path_int32 -> Some Int32
       | p when Path.same p Predef.path_int64 -> Some Int64
       | p when Path.same p Predef.path_lazy_t -> Some Lazy_t

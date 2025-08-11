@@ -1184,7 +1184,7 @@ let unboxed_base_type_to_simd_vec_split (x : S.Predef.unboxed) =
   match x with
   | Unboxed_simd s -> Some s
   | Unboxed_float | Unboxed_float32 | Unboxed_nativeint | Unboxed_int64
-  | Unboxed_int32 ->
+  | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 ->
     None
 
 type vec_split_properties =
@@ -1720,7 +1720,7 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
     create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
       ()
   | ( ( Bytes | Extension_constructor | Float | Float32 | Floatarray | Int
-      | Int32 | Int64 | Lazy_t | Nativeint | String ),
+      | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint | String ),
       _ ) ->
     create_base_layout_type ~reference Value ?name ~parent_proto_die
       ~fallback_value_die ()
