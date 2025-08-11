@@ -1115,8 +1115,7 @@ module Layout_and_axes = struct
               let value_for_axis (type a) ~(axis : a Axis.t) : a =
                 if Axis_set.mem relevant_axes axis
                 then
-                  let (module Bound_ops) = Axis.get axis in
-                  Bound_ops.join (Mod_bounds.get ~axis b1)
+                  Per_axis.join axis (Mod_bounds.get ~axis b1)
                     (Mod_bounds.get ~axis b2)
                 else Mod_bounds.get ~axis b1
               in
@@ -1820,17 +1819,16 @@ module Const = struct
       }
 
     let get_modal_bound (type a) ~(axis : a Axis.t) ~(base : a) (actual : a) =
-      let (module A) = Axis.get axis in
       (* CR layouts v2.8: Fix printing! *)
       let less_or_equal a b =
-        let (module Axis_ops) = Axis.get axis in
-        Axis_ops.less_or_equal a b
+        Misc.Le_result.less_or_equal ~le:(Per_axis.le axis) a b
       in
       match less_or_equal actual base with
       | Less | Equal -> (
         match less_or_equal base actual with
         | Less | Equal -> `Valid None
-        | Not_le -> `Valid (Some (Format.asprintf "%a" A.print actual)))
+        | Not_le ->
+          `Valid (Some (Format.asprintf "%a" (Per_axis.print axis) actual)))
       | Not_le -> `Invalid
 
     let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
@@ -3447,9 +3445,8 @@ module Violation = struct
         |> List.iter (fun (Pack axis : Axis.packed) ->
                let pp_bound ppf jkind =
                  let mod_bound = Mod_bounds.get ~axis jkind.mod_bounds in
-                 let (module Axis_ops) = Axis.get axis in
                  let with_bounds =
-                   match Axis_ops.(le max mod_bound) with
+                   match Per_axis.(le axis (max axis) mod_bound) with
                    | true ->
                      (* If the mod_bound is max, then no with-bounds are
                         relevant *)
@@ -3469,7 +3466,9 @@ module Violation = struct
                      (fun acc with_bound ->
                        Outcometree.Ojkind_const_with (acc, with_bound, []))
                      (Outcometree.Ojkind_const_mod
-                        (None, [Format.asprintf "%a" Axis_ops.print mod_bound]))
+                        ( None,
+                          [Format.asprintf "%a" (Per_axis.print axis) mod_bound]
+                        ))
                      with_bounds
                  in
                  !Oprint.out_jkind_const ppf ojkind
