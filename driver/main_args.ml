@@ -724,8 +724,9 @@ let mk_use_prims f =
 let mk_shape_format f =
   "-shape-format",
   Arg.Symbol (["old-merlin"; "debugging-shapes"], f),
-  "  Set shape format (old-merlin|debugging-shapes). Default is old-merlin unless\
-  \ configured with --enable-oxcaml-dwarf."
+  "  Set shape format (old-merlin|debugging-shapes) used in the compiler and\
+  \ stored in .cms files. Default is old-merlin unless configured with\
+  \ --enable-oxcaml-dwarf."
 
 let mk_dump_into_file f =
   "-dump-into-file", Arg.Unit f, " dump output like -dlambda into <target>.dump"
