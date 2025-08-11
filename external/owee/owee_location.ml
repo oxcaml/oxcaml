@@ -76,10 +76,10 @@ let extract_debug_info buffer =
     (*Printf.eprintf "Looking for 0x%X\n" t;*)
     let body = Owee_elf.section_body buffer section in
     let pointers_to_other_sections = Owee_elf.debug_line_pointers buffer sections in
-    let count = count_rows body ~pointers_to_other_sections in
+    let count = count_rows body ~pointers_to_other_sections:(Some pointers_to_other_sections) in
     let debug_entries = Array.make count
         {addr_lo = max_int; addr_hi = max_int; payload = None} in
-    store_rows body debug_entries ~pointers_to_other_sections;
+    store_rows body debug_entries ~pointers_to_other_sections:(Some pointers_to_other_sections);
     debug_entries, (Owee_elf.find_section sections ".text")
 
 let memory_map unix = lazy begin try

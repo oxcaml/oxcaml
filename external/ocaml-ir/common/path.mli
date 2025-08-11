@@ -1,0 +1,54 @@
+val canonicalize : string -> string
+  [@@ocaml.doc
+    " [canonicalize path] returns a path that references the same file or directory as\n\
+    \    [path] but does not use [.], and does not use [..] where possible.\n\n\
+    \    Postconditions:\n\
+    \    - The returned path will contain no [.] parts, unless [path] is relative in \
+     which case\n\
+    \      the returned path will start with [.] and that will be its only occurrence.\n\
+    \    - The returned path will not contain [..] after any directory name, i.e. [..] \
+     can only\n\
+    \      occur arbitrary number of times at the beginning of the returned path.\n\
+    \    - The returned path does not contain trailing slashes.\n\n\
+    \    Example:\n\
+    \    {[\n\
+    \      canonicalize \"./foo/../../bar/\" = \"./../bar\"\n\
+    \    ]} "]
+
+val chop_path_prefix : prefix:string -> string -> string option
+  [@@ocaml.doc
+    " [chop_path_prefix ~prefix path] returns a path to [path] relative from [prefix],\n\
+    \    assuming that [prefix] is a semantic prefix of [path]. Otherwise it returns \
+     None.\n\n\
+    \    [prefix] is not a prefix of [path] if one of the paths is relative and the other\n\
+    \    absolute.\n\n\
+    \    Example:\n\
+    \    {[\n\
+    \      chop_path_prefix ~prefix:\"./foo\" \"foo/bar\" = Some \"bar\"\n\
+    \    ]} "]
+
+val chop_path_prefix_exn : prefix:string -> string -> string
+
+val change_relative_root : current_root:string -> target_root:string -> string -> string
+  [@@ocaml.doc
+    " [change_relative_root current_root target_root path] returns a path relative to the\n\
+    \    [target_root], corresponding to the same path as [path] with [current_root] as \
+     its\n\
+    \    relative root. The returned path will always be relative, i.e. start with \
+     either \".\"\n\
+    \    or \"..\".\n\n\
+    \    Example:\n\
+    \    {[\n\
+    \      change_relative_root ~current_root:\"/foo/bar\" ~target_root:\"/foo/baz\" \
+     \"./sub/file\"\n\
+    \      = \"../bar/sub/file\";\n\
+    \      change_relative_root ~current_root:\"/baz\" ~target_root:\"/foo/bar\" \
+     \"../foo/bar/dir/\"\n\
+    \      = \"./dir\"\n\
+    \    ]}\n\n\
+    \    The function also works in case the [path] is absolute, and in that case\n\
+    \    [current_root] is obviously not taken into account. "]
+
+val parts : string -> string list
+val of_parts : string list -> string
+val ( ^/ ) : string -> string -> string

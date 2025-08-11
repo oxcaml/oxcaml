@@ -1,0 +1,7 @@
+(executable 
+  (name ocaml_ir_comp)
+  (public_name ocaml-ir-comp)
+  (flags (:standard -open Ocaml_ir_comp_lib))
+  (package ocaml)
+  (libraries 
+    ocaml_ir_comp_lib cmdliner ocaml_ir_common ocaml_ir_fiber parsexp sexplib))

@@ -49,6 +49,9 @@ do
     middle_end/flambda2/parser/flambda_parser.ml) ;&
     # Don't check generated simd instruction defs
     tools/simdgen/amd64_simd_instrs.ml)
+        continue ;;
+    # Don't check imported files
+    external/*)
       continue ;;
   esac
 

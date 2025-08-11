@@ -1,0 +1,9 @@
+(library
+ (name sexplib)
+ (libraries parsexp sexplib0)
+ (flags :standard -w -18)
+ (preprocess no_preprocessing))
+
+(ocamllex lexer)
+
+(ocamlyacc parser parser_with_layout)

@@ -1,0 +1,7 @@
+(library
+ (name parsexp)
+ (libraries sexplib0)
+ (preprocess no_preprocessing)
+ (flags :standard -w -18)
+ (lint
+  (pps ppx_js_style -check-doc-comments ppx_sexp_conv -deriving-keep-w32=impl)))
