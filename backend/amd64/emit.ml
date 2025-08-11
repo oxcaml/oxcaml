@@ -1748,6 +1748,10 @@ let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i addr =
   | Mul_f32 -> sse_or_avx3 mulps vmulps_X_X_Xm128 (arg i 0) addr (res i 0)
   | Div_f32 -> sse_or_avx3 divps vdivps_X_X_Xm128 (arg i 0) addr (res i 0)
 
+let prologue_stack_offset () =
+  assert !frame_required;
+  frame_size () - 8 - if fp then 8 else 0
+
 (* Emit an instruction *)
 let emit_instr ~first ~fallthrough i =
   let open Simd_instrs in
@@ -1763,15 +1767,14 @@ let emit_instr ~first ~fallthrough i =
       I.mov rsp rbp);
     if !frame_required
     then
-      let n = frame_size () - 8 - if fp then 8 else 0 in
+      let n = prologue_stack_offset () in
       if n <> 0
       then (
         I.sub (int n) rsp;
         D.cfi_adjust_cfa_offset ~bytes:n)
   | Lepilogue_open ->
     (* Deallocate the stack frame before a return or tail call *)
-    assert !frame_required;
-    let n = frame_size () - 8 - if fp then 8 else 0 in
+    let n = prologue_stack_offset () in
     if n <> 0
     then (
       I.add (int n) rsp;
@@ -1779,8 +1782,7 @@ let emit_instr ~first ~fallthrough i =
     if fp then I.pop rbp
   | Lepilogue_close ->
     (* reset CFA back cause function body may continue *)
-    assert !frame_required;
-    let n = frame_size () - 8 - if fp then 8 else 0 in
+    let n = prologue_stack_offset () in
     if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop (Const_int n) ->

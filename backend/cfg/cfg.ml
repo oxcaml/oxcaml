@@ -484,7 +484,8 @@ let is_pure_basic : basic -> bool = function
     (* [Prologue] grows the stack when entering a function and therefore
        modifies the stack pointer. [Prologue] can be considered pure if it's
        ensured that it wouldn't modify the stack pointer (e.g. there are no used
-       local stack slots nor calls). *)
+       local stack slots nor calls). [Epilogue] shrinks the stack when leaving a
+       function, and can also be considered pure under the same conditions. *)
     false
   | Stack_check _ ->
     (* May reallocate the stack. *)

@@ -333,7 +333,12 @@ let linearize_terminator cfg_with_layout (func : string) start
   in
   let desc_list =
     match has_epilogue with
-    | true -> desc_list @ [L.Lepilogue_close]
+    | true ->
+      (* The corresponding [Lepilogue_open] was already added when converting
+         the body of the block, replacing a [Cfg.Epilogue] instruction. The
+         [Lepilogue_open] should be the last instruction in the block body,
+         immediately preceding the terminator. *)
+      desc_list @ [L.Lepilogue_close]
     | false -> desc_list
   in
   let instr =
