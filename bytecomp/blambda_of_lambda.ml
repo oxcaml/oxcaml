@@ -1037,7 +1037,7 @@ and make_unsigned_comparison size signed_comparison x y =
   (* For unsigned comparisons, we flip the sign bit of both operands and use
      signed comparison (see z3 proof [*] below) *)
   let min_int_at_runtime const_name =
-    let num_bits = Prim (caml_sys_const const_name, []) in
+    let num_bits = Prim (caml_sys_const const_name, [unit]) in
     let one = Const (const_int size 1) in
     let num_bits =
       assert (is_immed (-1));
