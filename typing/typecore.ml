@@ -11574,10 +11574,10 @@ let report_error ~loc env =
                     (Style.as_inline_code Contention.Const.print) Shared
                     (Style.as_inline_code Contention.Const.print) Uncontended
               | _, _ ->
-                  Style.as_inline_code (Value.Const.print_axis ax) ppf right
+                  Style.as_inline_code (Value.Const.Per_axis.print ax) ppf right
             in
             Format.dprintf "This value is %a but expected to be %a."
-              (Style.as_inline_code (Value.Const.print_axis ax)) left
+              (Style.as_inline_code (Value.Const.Per_axis.print ax)) left
               pp_expectation ()
         end
   | Curried_application_complete (lbl, Error (ax, {left; _}), loc_kind) ->
@@ -11603,7 +11603,7 @@ let report_error ~loc env =
       Location.errorf ~loc ~sub
         "@[This application is complete, but surplus arguments were provided afterwards.@ \
          When passing or calling %a values, extra arguments are passed in a separate application.@]"
-         (Alloc.Const.print_axis ax) left
+         (Alloc.Const.Per_axis.print ax) left
   | Param_mode_mismatch (s, Error (ax, {left; right})) ->
       let actual, expected =
         match s with
@@ -11613,8 +11613,8 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[This function takes a parameter which is %a,@ \
         but was expected to take a parameter which is %a.@]"
-        (Style.as_inline_code (Alloc.Const.print_axis ax)) actual
-        (Style.as_inline_code (Alloc.Const.print_axis ax)) expected
+        (Style.as_inline_code (Alloc.Const.Per_axis.print ax)) actual
+        (Style.as_inline_code (Alloc.Const.Per_axis.print ax)) expected
   | Uncurried_function_escapes e -> begin
       match e with
       | Error (Comonadic Areality, _) ->
@@ -11625,8 +11625,8 @@ let report_error ~loc env =
           Location.errorf ~loc
             "This function when partially applied returns a value which is %a,@ \
               but expected to be %a."
-            (Style.as_inline_code (Alloc.Const.print_axis ax)) left
-            (Style.as_inline_code (Alloc.Const.print_axis ax)) right
+            (Style.as_inline_code (Alloc.Const.Per_axis.print ax)) left
+            (Style.as_inline_code (Alloc.Const.Per_axis.print ax)) right
     end
   | Local_return_annotation_mismatch _ ->
       Location.errorf ~loc
