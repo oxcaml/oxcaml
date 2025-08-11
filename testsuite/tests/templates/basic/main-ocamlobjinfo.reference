@@ -66,3 +66,45 @@ Globals in scope:
 	Import{List_element}{Semigroup}
 	List_monoid{List_element}
 	Category_of_monoid[Monoid:List_monoid{List_element}]
+File main.cms
+Cms unit name: Main
+Source file: main.ml
+Implementation shape:
+        {<Main>
+          "append3_lists"[value] -> <Main.14>;
+          "append3_semi"[value] -> <Main.8>;
+          "concat_chain_lists"[value] -> <Main.13>;
+          "concat_chain_semi"[value] -> <Main.7>;
+          "concat_lists"[value] -> <Main.12>;
+          "concat_semi"[value] -> <Main.6>;
+          "concat_string_options"[value] -> <Main.5>;
+          }
+Indexed shapes:
+Uid dependencies:
+        Main.5 <- [intf]Main.1
+        Main.6 <- [intf]Main.2
+        Main.7 <- [intf]Main.3
+        Main.8 <- [intf]Main.0
+        Main.12 <- [intf]Main.5
+        Main.13 <- [intf]Main.6
+        Main.14 <- [intf]Main.4
+Uid of decls:
+        Main.0:
+          Monoid_utils_of_string (File "main.ml", line 3, characters 7-29)
+        Main.1:
+          Monoid_utils_of_semigroup (File "main.ml", line 7, characters 7-32)
+        Main.2:
+          Category_utils_of_semigroup (File "main.ml", line 10, characters 7-34)
+        Main.3:
+          Category_utils_of_list (File "main.ml", line 14, characters 7-29)
+        Main.4:
+          Category_of_list_monoid (File "main.ml", line 18, characters 7-30)
+        Main.5:
+          concat_string_options (File "main.ml", line 22, characters 4-25)
+        Main.6: concat_semi (File "main.ml", line 24, characters 4-15)
+        Main.7: concat_chain_semi (File "main.ml", line 27, characters 4-21)
+        Main.8: append3_semi (File "main.ml", line 29, characters 4-16)
+        Main.12: concat_lists (File "main.ml", line 31, characters 4-16)
+        Main.13:
+          concat_chain_lists (File "main.ml", line 33, characters 4-22)
+        Main.14: append3_lists (File "main.ml", line 35, characters 4-17)
