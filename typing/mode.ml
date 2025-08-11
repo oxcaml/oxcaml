@@ -3318,140 +3318,134 @@ module Modality = struct
       | Comonadic (ax, a) -> Comonadic.print ax ppf a
   end
 
-  module Value = struct
-    type error = Error : 'a Atom.t Solver.error -> error
+  type error = Error : 'a Atom.t Solver.error -> error
 
-    type equate_error = equate_step * error
+  type equate_error = equate_step * error
 
-    module Const = struct
-      module Monadic = Monadic.Const
-      module Comonadic = Comonadic.Const
-
-      type t = (Monadic.t, Comonadic.t) monadic_comonadic
-
-      let id = { monadic = Monadic.id; comonadic = Comonadic.id }
-
-      let is_id { monadic; comonadic } =
-        Monadic.is_id monadic && Comonadic.is_id comonadic
-
-      let sub t0 t1 : (unit, error) Result.t =
-        match Monadic.sub t0.monadic t1.monadic with
-        | Error (Error (ax, { left; right })) ->
-          Error
-            (Error { left = Monadic (ax, left); right = Monadic (ax, right) })
-        | Ok () -> (
-          match Comonadic.sub t0.comonadic t1.comonadic with
-          | Ok () -> Ok ()
-          | Error (Error (ax, { left; right })) ->
-            Error
-              (Error
-                 { left = Comonadic (ax, left); right = Comonadic (ax, right) })
-          )
-
-      let equate = equate_from_submode' sub
-
-      let apply t { monadic; comonadic } =
-        let monadic = Monadic.apply t.monadic monadic in
-        let comonadic = Comonadic.apply t.comonadic comonadic in
-        { monadic; comonadic }
-
-      let concat ~then_ t =
-        let monadic = Monadic.concat ~then_:then_.monadic t.monadic in
-        let comonadic = Comonadic.concat ~then_:then_.comonadic t.comonadic in
-        { monadic; comonadic }
-
-      let proj (type a) (ax : a Value.Axis.t) { monadic; comonadic } : a Atom.t
-          =
-        match ax with
-        | Monadic ax -> Monadic (ax, Monadic.proj ax monadic)
-        | Comonadic ax -> Comonadic (ax, Comonadic.proj ax comonadic)
-
-      let set (type a) (a : a Atom.t) { monadic; comonadic } : t =
-        match a with
-        | Monadic (ax, a) -> { monadic = Monadic.set ax a monadic; comonadic }
-        | Comonadic (ax, a) ->
-          { monadic; comonadic = Comonadic.set ax a comonadic }
-
-      let diff t0 t1 =
-        List.filter_map
-          (fun (P ax : Value.Axis.packed) : Atom.packed option ->
-            let a0 = proj ax t0 in
-            let a1 = proj ax t1 in
-            if a0 = a1 then None else Some (P a1))
-          Value.Axis.all
-
-      let print ppf { monadic; comonadic } =
-        Format.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print
-          comonadic
-    end
+  module Const = struct
+    module Monadic = Monadic.Const
+    module Comonadic = Comonadic.Const
 
     type t = (Monadic.t, Comonadic.t) monadic_comonadic
 
-    let id : t = { monadic = Monadic.id; comonadic = Comonadic.id }
+    let id = { monadic = Monadic.id; comonadic = Comonadic.id }
 
-    let undefined : t = { monadic = Undefined; comonadic = Comonadic.Undefined }
+    let is_id { monadic; comonadic } =
+      Monadic.is_id monadic && Comonadic.is_id comonadic
 
-    let apply t { monadic; comonadic } =
-      let monadic = Monadic.apply t.monadic monadic in
-      let comonadic = Comonadic.apply t.comonadic comonadic in
-      { monadic; comonadic }
-
-    let sub_log t0 t1 ~log : (unit, error) Result.t =
-      match Monadic.sub_log t0.monadic t1.monadic ~log with
+    let sub t0 t1 : (unit, error) Result.t =
+      match Monadic.sub t0.monadic t1.monadic with
       | Error (Error (ax, { left; right })) ->
         Error (Error { left = Monadic (ax, left); right = Monadic (ax, right) })
       | Ok () -> (
-        match Comonadic.sub_log t0.comonadic t1.comonadic ~log with
+        match Comonadic.sub t0.comonadic t1.comonadic with
         | Ok () -> Ok ()
         | Error (Error (ax, { left; right })) ->
           Error
             (Error
                { left = Comonadic (ax, left); right = Comonadic (ax, right) }))
 
-    let sub l r = try_with_log (sub_log l r)
+    let equate = equate_from_submode' sub
 
-    let equate m0 m1 = try_with_log (equate_from_submode sub_log m0 m1)
+    let apply t { monadic; comonadic } =
+      let monadic = Monadic.apply t.monadic monadic in
+      let comonadic = Comonadic.apply t.comonadic comonadic in
+      { monadic; comonadic }
 
-    let print ppf ({ monadic; comonadic } : t) =
+    let concat ~then_ t =
+      let monadic = Monadic.concat ~then_:then_.monadic t.monadic in
+      let comonadic = Comonadic.concat ~then_:then_.comonadic t.comonadic in
+      { monadic; comonadic }
+
+    let proj (type a) (ax : a Value.Axis.t) { monadic; comonadic } : a Atom.t =
+      match ax with
+      | Monadic ax -> Monadic (ax, Monadic.proj ax monadic)
+      | Comonadic ax -> Comonadic (ax, Comonadic.proj ax comonadic)
+
+    let set (type a) (a : a Atom.t) { monadic; comonadic } : t =
+      match a with
+      | Monadic (ax, a) -> { monadic = Monadic.set ax a monadic; comonadic }
+      | Comonadic (ax, a) ->
+        { monadic; comonadic = Comonadic.set ax a comonadic }
+
+    let diff t0 t1 =
+      List.filter_map
+        (fun (P ax : Value.Axis.packed) : Atom.packed option ->
+          let a0 = proj ax t0 in
+          let a1 = proj ax t1 in
+          if a0 = a1 then None else Some (P a1))
+        Value.Axis.all
+
+    let print ppf { monadic; comonadic } =
       Format.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
-
-    let infer ~md_mode ~mode : t =
-      let comonadic =
-        Comonadic.infer ~md_mode:md_mode.comonadic ~mode:mode.comonadic
-      in
-      let monadic = Monadic.infer ~md_mode:md_mode.monadic ~mode:mode.monadic in
-      { monadic; comonadic }
-
-    let zap_to_id t =
-      let { monadic; comonadic } = t in
-      let comonadic = Comonadic.zap_to_id comonadic in
-      let monadic = Monadic.zap_to_id monadic in
-      { monadic; comonadic }
-
-    let zap_to_floor t =
-      let { monadic; comonadic } = t in
-      let comonadic = Comonadic.zap_to_floor comonadic in
-      let monadic = Monadic.zap_to_floor monadic in
-      { monadic; comonadic }
-
-    let to_const_opt t =
-      let { monadic; comonadic } = t in
-      Option.bind (Comonadic.to_const_opt comonadic) (fun comonadic ->
-          Option.bind (Monadic.to_const_opt monadic) (fun monadic ->
-              Some { monadic; comonadic }))
-
-    let to_const_exn t = t |> to_const_opt |> Option.get
-
-    let of_const { monadic; comonadic } =
-      let comonadic = Comonadic.of_const comonadic in
-      let monadic = Monadic.of_const monadic in
-      { monadic; comonadic }
-
-    let max =
-      let monadic = Monadic.max in
-      let comonadic = Comonadic.max in
-      { monadic; comonadic }
   end
+
+  type t = (Monadic.t, Comonadic.t) monadic_comonadic
+
+  let id : t = { monadic = Monadic.id; comonadic = Comonadic.id }
+
+  let undefined : t = { monadic = Undefined; comonadic = Comonadic.Undefined }
+
+  let apply t { monadic; comonadic } =
+    let monadic = Monadic.apply t.monadic monadic in
+    let comonadic = Comonadic.apply t.comonadic comonadic in
+    { monadic; comonadic }
+
+  let sub_log t0 t1 ~log : (unit, error) Result.t =
+    match Monadic.sub_log t0.monadic t1.monadic ~log with
+    | Error (Error (ax, { left; right })) ->
+      Error (Error { left = Monadic (ax, left); right = Monadic (ax, right) })
+    | Ok () -> (
+      match Comonadic.sub_log t0.comonadic t1.comonadic ~log with
+      | Ok () -> Ok ()
+      | Error (Error (ax, { left; right })) ->
+        Error
+          (Error { left = Comonadic (ax, left); right = Comonadic (ax, right) })
+      )
+
+  let sub l r = try_with_log (sub_log l r)
+
+  let equate m0 m1 = try_with_log (equate_from_submode sub_log m0 m1)
+
+  let print ppf ({ monadic; comonadic } : t) =
+    Format.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
+
+  let infer ~md_mode ~mode : t =
+    let comonadic =
+      Comonadic.infer ~md_mode:md_mode.comonadic ~mode:mode.comonadic
+    in
+    let monadic = Monadic.infer ~md_mode:md_mode.monadic ~mode:mode.monadic in
+    { monadic; comonadic }
+
+  let zap_to_id t =
+    let { monadic; comonadic } = t in
+    let comonadic = Comonadic.zap_to_id comonadic in
+    let monadic = Monadic.zap_to_id monadic in
+    { monadic; comonadic }
+
+  let zap_to_floor t =
+    let { monadic; comonadic } = t in
+    let comonadic = Comonadic.zap_to_floor comonadic in
+    let monadic = Monadic.zap_to_floor monadic in
+    { monadic; comonadic }
+
+  let to_const_opt t =
+    let { monadic; comonadic } = t in
+    Option.bind (Comonadic.to_const_opt comonadic) (fun comonadic ->
+        Option.bind (Monadic.to_const_opt monadic) (fun monadic ->
+            Some { monadic; comonadic }))
+
+  let to_const_exn t = t |> to_const_opt |> Option.get
+
+  let of_const { monadic; comonadic } =
+    let comonadic = Comonadic.of_const comonadic in
+    let monadic = Monadic.of_const monadic in
+    { monadic; comonadic }
+
+  let max =
+    let monadic = Monadic.max in
+    let comonadic = Comonadic.max in
+    { monadic; comonadic }
 end
 
 module Crossing = struct
@@ -3632,7 +3626,7 @@ module Crossing = struct
     let l =
       List.filter_map
         (fun (Value.Axis.P ax) ->
-          let a = Modality.Value.Const.proj ax t in
+          let a = Modality.Const.proj ax t in
           if Modality.Atom.is_id a then None else Some (Modality.Atom.P a))
         Value.Axis.all
     in

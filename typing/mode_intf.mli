@@ -650,131 +650,129 @@ module type S = sig
       val axis : 'a t -> 'a Value.Axis.t
     end
 
-    module Value : sig
-      type error = Error : 'a Atom.t Solver.error -> error
+    type error = Error : 'a Atom.t Solver.error -> error
 
-      type nonrec equate_error = equate_step * error
+    type nonrec equate_error = equate_step * error
 
-      (* In the following we have both [Const.t] and [t]. The former is parameterized by
-         constant modes and thus its behavior fully determined. It is what users read and
-         write on constructor arguments, record fields and value descriptions in signatures.
+    (* In the following we have both [Const.t] and [t]. The former is parameterized by
+       constant modes and thus its behavior fully determined. It is what users read and
+       write on constructor arguments, record fields and value descriptions in signatures.
 
-         The latter is parameterized by variable modes and thus its behavior changes as the
-         variable modes change. It is used in module type inference: structures are inferred
-         to have a signature containing a list of value descriptions, each of which carries a
-         modality. This modality depends on the mode of the value, which is a variable.
-         Therefore, we parameterize the modality over the variable mode.
+       The latter is parameterized by variable modes and thus its behavior changes as the
+       variable modes change. It is used in module type inference: structures are inferred
+       to have a signature containing a list of value descriptions, each of which carries a
+       modality. This modality depends on the mode of the value, which is a variable.
+       Therefore, we parameterize the modality over the variable mode.
 
-         Utilities are provided to convert between [Const.t] and [t], such as [of_const],
-         [zap_to_id], [zap_to_floor], etc.. *)
+       Utilities are provided to convert between [Const.t] and [t], such as [of_const],
+       [zap_to_id], [zap_to_floor], etc.. *)
 
-      module Const : sig
-        (** A modality that acts on [Value] modes. Conceptually it is a sequnce
+    module Const : sig
+      (** A modality that acts on [Value] modes. Conceptually it is a sequnce
             of [atom] that acts on individual axes. *)
-        type t
-
-        (** The identity modality. *)
-        val id : t
-
-        (** Test if the given modality is the identity modality. *)
-        val is_id : t -> bool
-
-        (** Apply a modality on mode. *)
-        val apply : t -> ('l * 'r) Value.t -> ('l * 'r) Value.t
-
-        (** [concat ~then t] returns the modality that is [then_] after [t]. *)
-        val concat : then_:t -> t -> t
-
-        (** [set a t] overwrites an axis of [t] to be [a]. *)
-        val set : 'a Atom.t -> t -> t
-
-        (** [proj ax t] projects out the axis [ax] of [t]. *)
-        val proj : 'a Value.Axis.t -> t -> 'a Atom.t
-
-        (** [diff t0 t1] returns a list of atoms in [t1] that are different than
-        [t0]. *)
-        val diff : t -> t -> Atom.packed list
-
-        (** [equate t0 t1] checks that [t0 = t1].
-            Definition: [t0 = t1] iff [t0 <= t1] and [t1 <= t0]. *)
-        val equate : t -> t -> (unit, equate_error) Result.t
-
-        (** Printing for debugging. *)
-        val print : Format.formatter -> t -> unit
-      end
-
-      (** A modality that acts on [Value] modes. Conceptually it is a sequnce of
-          [atom] that acts on individual axes. *)
       type t
 
       (** The identity modality. *)
       val id : t
 
-      (** The undefined modality. *)
-      val undefined : t
+      (** Test if the given modality is the identity modality. *)
+      val is_id : t -> bool
 
-      (* CR zqian: note that currently, [apply] and [sub] and [zap] are NOT
-         coherent for comonadic axes. That is, we do NOT have
-         [apply t m = Const.apply (zap t) m]. This is probably fine. *)
+      (** Apply a modality on mode. *)
+      val apply : t -> ('l * 'r) Value.t -> ('l * 'r) Value.t
 
-      (** Apply a modality on a left mode. The calller should ensure that [apply
+      (** [concat ~then t] returns the modality that is [then_] after [t]. *)
+      val concat : then_:t -> t -> t
+
+      (** [set a t] overwrites an axis of [t] to be [a]. *)
+      val set : 'a Atom.t -> t -> t
+
+      (** [proj ax t] projects out the axis [ax] of [t]. *)
+      val proj : 'a Value.Axis.t -> t -> 'a Atom.t
+
+      (** [diff t0 t1] returns a list of atoms in [t1] that are different than
+        [t0]. *)
+      val diff : t -> t -> Atom.packed list
+
+      (** [equate t0 t1] checks that [t0 = t1].
+            Definition: [t0 = t1] iff [t0 <= t1] and [t1 <= t0]. *)
+      val equate : t -> t -> (unit, equate_error) Result.t
+
+      (** Printing for debugging. *)
+      val print : Format.formatter -> t -> unit
+    end
+
+    (** A modality that acts on [Value] modes. Conceptually it is a sequnce of
+          [atom] that acts on individual axes. *)
+    type t
+
+    (** The identity modality. *)
+    val id : t
+
+    (** The undefined modality. *)
+    val undefined : t
+
+    (* CR zqian: note that currently, [apply] and [sub] and [zap] are NOT
+       coherent for comonadic axes. That is, we do NOT have
+       [apply t m = Const.apply (zap t) m]. This is probably fine. *)
+
+    (** Apply a modality on a left mode. The calller should ensure that [apply
       t m] is only called for [m >= md_mode] for inferred modalities. *)
-      val apply : t -> (allowed * 'r) Value.t -> Value.l
+    val apply : t -> (allowed * 'r) Value.t -> Value.l
 
-      (** [sub t0 t1] checks that [t0 <= t1].
+    (** [sub t0 t1] checks that [t0 <= t1].
           Definition: [t0 <= t1] iff [forall a. t0(a) <= t1(a)].
 
           In case of failure, [Error (ax, {left; right})] is returned, where
           [ax] is the axis on which the modalities disagree. [left] is the
           projection of [t0] on [ax], and [right] is the projection of [t1] on
           [ax]. *)
-      val sub : t -> t -> (unit, error) Result.t
+    val sub : t -> t -> (unit, error) Result.t
 
-      (** [equate t0 t1] checks that [t0 = t1].
+    (** [equate t0 t1] checks that [t0 = t1].
           Definition: [t0 = t1] iff [t0 <= t1] and [t1 <= t0]. *)
-      val equate : t -> t -> (unit, equate_error) Result.t
+    val equate : t -> t -> (unit, equate_error) Result.t
 
-      (** Printing for debugging. *)
-      val print : Format.formatter -> t -> unit
+    (** Printing for debugging. *)
+    val print : Format.formatter -> t -> unit
 
-      (** Given [md_mode] the mode of a module, and [mode] the mode of a value
+    (** Given [md_mode] the mode of a module, and [mode] the mode of a value
       to be put in that module, return the inferred modality to be put on the
       value description in the inferred module type.
 
       The caller should ensure that for comonadic axes, [md_mode >= mode]. *)
-      val infer : md_mode:Value.lr -> mode:Value.lr -> t
+    val infer : md_mode:Value.lr -> mode:Value.lr -> t
 
-      (* The following zapping functions possibly mutate a potentially inferred
-         modality [m] to a constant modality [c]. The constant modality is
-         returned. The following coherence conditions hold:
-         - [m <= c] always holds, even after further mutations to [m].
-         - [c0 <= c1] always holds, where [c0] and [c1] are results of two
-            abitrary zappings of some [m], even after further mutations to [m].
-            Essentially that means [c0 = c1].
+    (* The following zapping functions possibly mutate a potentially inferred
+       modality [m] to a constant modality [c]. The constant modality is
+       returned. The following coherence conditions hold:
+       - [m <= c] always holds, even after further mutations to [m].
+       - [c0 <= c1] always holds, where [c0] and [c1] are results of two
+          abitrary zappings of some [m], even after further mutations to [m].
+          Essentially that means [c0 = c1].
 
-         NB: zapping an inferred modality will mutate both [md_mode] and [mode]
-         to the degree sufficient to fix the modality, but the modes could
-         remain unfixed.
-      *)
+       NB: zapping an inferred modality will mutate both [md_mode] and [mode]
+       to the degree sufficient to fix the modality, but the modes could
+       remain unfixed.
+    *)
 
-      (** Zap an inferred modality towards identity modality. *)
-      val zap_to_id : t -> Const.t
+    (** Zap an inferred modality towards identity modality. *)
+    val zap_to_id : t -> Const.t
 
-      (** Zap an inferred modality towards the lowest (strongest) modality. *)
-      val zap_to_floor : t -> Const.t
+    (** Zap an inferred modality towards the lowest (strongest) modality. *)
+    val zap_to_floor : t -> Const.t
 
-      (** Asserts the given modality is a const modality, and returns it. *)
-      val to_const_exn : t -> Const.t
+    (** Asserts the given modality is a const modality, and returns it. *)
+    val to_const_exn : t -> Const.t
 
-      (** Checks if the given modality is a const modality *)
-      val to_const_opt : t -> Const.t option
+    (** Checks if the given modality is a const modality *)
+    val to_const_opt : t -> Const.t option
 
-      (** Inject a constant modality. *)
-      val of_const : Const.t -> t
+    (** Inject a constant modality. *)
+    val of_const : Const.t -> t
 
-      (** The top modality; [sub x max] succeeds for any [x]. *)
-      val max : t
-    end
+    (** The top modality; [sub x max] succeeds for any [x]. *)
+    val max : t
   end
 
   module Crossing : sig
@@ -796,7 +794,7 @@ module type S = sig
 
     (** [modality m t] gives the mode crossing of type [T] wrapped in modality
     [m] where [T] has mode crossing [t]. *)
-    val modality : Modality.Value.Const.t -> t -> t
+    val modality : Modality.Const.t -> t -> t
 
     (** Apply mode crossing on a left mode, making it stronger. *)
     val apply_left : t -> Value.l -> Value.l
