@@ -19,6 +19,8 @@
    Int_replace_polymorphic_compare *)
 module V = Backend_var
 module VP = Backend_var.With_provenance
+module P = Cmm_peephole_engine
+open P.Syntax
 open Cmm
 open Arch
 
@@ -45,6 +47,33 @@ module Unboxed_array_tags = struct
 
   let unboxed_nativeint_array_tag = 9
 end
+
+let check_equal_1 name f1 f2 arg1 =
+  let r1 = f1 arg1 in
+  let r2 = f2 arg1 in
+  if P.Cmm_comparator.equivalent r1 r2
+  then r1
+  else
+    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r1
+      Printcmm.expression r2
+
+let check_equal_3 name f1 f2 arg1 arg2 arg3 =
+  let r1 = f1 arg1 arg2 arg3 in
+  let r2 = f2 arg1 arg2 arg3 in
+  if P.Cmm_comparator.equivalent r1 r2
+  then r1
+  else
+    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r1
+      Printcmm.expression r2
+
+let check_equal_int_1 name f1 f2 arg1 =
+  let r1 : int = f1 arg1 in
+  let r2 = f2 arg1 in
+  if r1 = r2
+  then r1
+  else
+    Misc.fatal_errorf "Mismatch on %s:@ %d@ vs@ %d@ Arg is %a" name r1 r2
+      Printcmm.expression arg1
 
 let arch_bits = Arch.size_int * 8
 
@@ -372,6 +401,8 @@ let add_no_overflow n x c dbg =
 
 let is_defined_shift n = 0 <= n && n < arch_bits
 
+let is_defined_shift' n env = is_defined_shift env#.n
+
 (** returns true only if [e + n] is definitely the same as [e | n] *)
 let[@inline] can_interchange_add_with_or e n =
   match e with
@@ -429,6 +460,42 @@ let rec add_const c n dbg =
           add_const c (n - x) dbg
         | _ -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
 
+let rec add_const' arg const dbg =
+  let open P.Default_variables in
+  map_tail1 arg ~f:(fun arg ->
+      let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
+      let x = P.create_var Int "x" in
+      P.run res
+        [ (Binop (Add, Any c, Const_int_fixed 0) => fun env -> env#.c);
+          ( Guarded
+              { pat = Binop (Add, Const_int x, Const_int n);
+                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+              }
+          => fun env -> Cconst_int (env#.x + env#.n, dbg) );
+          ( Guarded
+              { pat = Binop (Add, Binop (Add, Const_int x, Any c), Const_int n);
+                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+              }
+          => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
+          ( Guarded
+              { pat = Binop (Add, Binop (Add, Any c, Const_int x), Const_int n);
+                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+              }
+          => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
+          ( Guarded
+              { pat = Binop (Add, Binop (Sub, Const_int x, Any c), Const_int n);
+                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+              }
+          => fun env ->
+            Cop (Csubi, [Cconst_int (env#.n + env#.x, dbg); env#.c], dbg) );
+          ( Guarded
+              { pat = Binop (Add, Binop (Sub, Any c, Const_int x), Const_int n);
+                guard = (fun env -> Misc.no_overflow_sub env#.n env#.x)
+              }
+          => fun env -> add_const' env#.c (env#.n - env#.x) dbg ) ])
+
+let add_const = check_equal_3 "add_const" add_const add_const'
+
 let incr_int c dbg = add_const c 1 dbg
 
 let decr_int c dbg = add_const c (-1) dbg
@@ -443,6 +510,22 @@ let rec add_int c1 c2 dbg =
         add_const (add_int c1 c2 dbg) n2 dbg
       | _, _ -> Cop (Caddi, [c1; c2], dbg))
 
+let rec add_int' arg1 arg2 dbg =
+  let open P.Default_variables in
+  map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
+      let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
+      P.run res
+        [ ( Binop (Add, Const_int n, Any c) => fun env ->
+            add_const env#.c env#.n dbg );
+          ( Binop (Add, Any c, Const_int n) => fun env ->
+            add_const env#.c env#.n dbg );
+          ( Binop (Add, Binop (Add, Any c1, Const_int n1), Any c2) => fun env ->
+            add_const (add_int' env#.c1 env#.c2 dbg) env#.n1 dbg );
+          ( Binop (Add, Any c1, Binop (Add, Any c2, Const_int n2)) => fun env ->
+            add_const (add_int' env#.c1 env#.c2 dbg) env#.n2 dbg ) ])
+
+let add_int = check_equal_3 "add_int" add_int add_int'
+
 let rec sub_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match prefer_add c1, prefer_add c2 with
@@ -452,6 +535,27 @@ let rec sub_int c1 c2 dbg =
       | Cop (Caddi, [c1; Cconst_int (n1, _)], _), _ ->
         add_const (sub_int c1 c2 dbg) n1 dbg
       | _, _ -> Cop (Csubi, [c1; c2], dbg))
+
+let rec sub_int' arg1 arg2 dbg =
+  let open P.Default_variables in
+  map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
+      let res = Cop (Csubi, [prefer_add arg1; prefer_add arg2], dbg) in
+      P.run res
+        [ ( Guarded
+              { pat = Binop (Sub, Any c1, Const_int n2);
+                guard = (fun env -> env#.n2 <> min_int)
+              }
+          => fun env -> add_const env#.c1 (-env#.n2) dbg );
+          ( Guarded
+              { pat = Binop (Sub, Any c1, Binop (Add, Any c2, Const_int n2));
+                guard = (fun env -> env#.n2 <> min_int)
+              }
+          => fun env -> add_const (sub_int' env#.c1 env#.c2 dbg) (-env#.n2) dbg
+          );
+          ( Binop (Sub, Binop (Add, Any c1, Const_int n1), Any c2) => fun env ->
+            add_const (sub_int' env#.c1 env#.c2 dbg) env#.n1 dbg ) ])
+
+let sub_int = check_equal_3 "sub_int" sub_int sub_int'
 
 let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
@@ -490,6 +594,38 @@ let rec max_signed_bit_length e =
     Int.max (max_signed_bit_length x) (max_signed_bit_length y)
   | _ -> arch_bits
 
+let rec max_signed_bit_length' e =
+  let open P.Default_variables in
+  P.run_default
+    ~default:(fun _ -> arch_bits)
+    (prefer_or e)
+    [ (Binop (Comparison, Any c1, Any c2) => fun _env -> 1);
+      ( Guarded
+          { pat = Binop (And, Any c, Const_int n);
+            guard = (fun env -> env#.n > 0)
+          }
+      => fun env -> 1 + Misc.log2 env#.n );
+      ( Guarded
+          { pat = Binop (Lsl, Any c, Const_int n); guard = is_defined_shift' n }
+      => fun env -> Int.min arch_bits (max_signed_bit_length' env#.c + env#.n)
+      );
+      ( Guarded
+          { pat = Binop (Asr, Any c, Const_int n); guard = is_defined_shift' n }
+      => fun env -> Int.max 0 (max_signed_bit_length' env#.c - env#.n) );
+      ( Guarded
+          { pat = Binop (Lsr, Any c, Const_int n); guard = is_defined_shift' n }
+      => fun env ->
+        if env#.n = 0 then max_signed_bit_length' env#.c else arch_bits - env#.n
+      );
+      ( Binop (Bitwise_op, Any c1, Any c2) => fun env ->
+        Int.max
+          (max_signed_bit_length' env#.c1)
+          (max_signed_bit_length' env#.c2) ) ]
+
+let max_signed_bit_length =
+  check_equal_int_1 "max_signed_bit_length" max_signed_bit_length
+    max_signed_bit_length'
+
 let ignore_low_bit_int = function
   | Cop
       ( Caddi,
@@ -499,6 +635,23 @@ let ignore_low_bit_int = function
     c
   | Cop (Cor, [c; Cconst_int (1, _)], _) -> c
   | c -> c
+
+let ignore_low_bit_int' arg =
+  let open P.Default_variables in
+  P.run arg
+    [ ( Guarded
+          { pat =
+              Binop
+                ( Add,
+                  As (c, Binop (Lsl, Any c1, Const_int n)),
+                  Const_int_fixed 1 );
+            guard = (fun env -> env#.n > 0 && is_defined_shift env#.n)
+          }
+      => fun env -> env#.c );
+      (Binop (Or, Any c, Const_int_fixed 1) => fun env -> env#.c) ]
+
+let ignore_low_bit_int =
+  check_equal_1 "ignore_low_bit_int" ignore_low_bit_int ignore_low_bit_int'
 
 let[@inline] get_const = function
   | Cconst_int (i, _) -> Some (Nativeint.of_int i)
@@ -772,10 +925,6 @@ let mk_not dbg cmm =
       tag_int
         (Cop (Ccmpi (negate_integer_comparison cmp), [c1; c2], dbg''))
         dbg'
-    | Cop (Ccmpa cmp, [c1; c2], dbg'') ->
-      tag_int
-        (Cop (Ccmpa (negate_integer_comparison cmp), [c1; c2], dbg''))
-        dbg'
     | Cop (Ccmpf (w, cmp), [c1; c2], dbg'') ->
       tag_int
         (Cop (Ccmpf (w, negate_float_comparison cmp), [c1; c2], dbg''))
@@ -797,6 +946,13 @@ let mk_compare_ints_untagged dbg a1 a2 =
       bind "int_cmp" a1 (fun a1 ->
           let op1 = Cop (Ccmpi Cgt, [a1; a2], dbg) in
           let op2 = Cop (Ccmpi Clt, [a1; a2], dbg) in
+          sub_int op1 op2 dbg))
+
+let mk_unsigned_compare_ints_untagged dbg a1 a2 =
+  bind "uint_cmp" a2 (fun a2 ->
+      bind "uint_cmp" a1 (fun a1 ->
+          let op1 = Cop (Ccmpi Cugt, [a1; a2], dbg) in
+          let op2 = Cop (Ccmpi Cult, [a1; a2], dbg) in
           sub_int op1 op2 dbg))
 
 let mk_compare_ints dbg a1 a2 =
@@ -1481,7 +1637,7 @@ let unboxed_float_array_ref (mutability : Asttypes.mutable_flag) ~block:arr
 let float_array_ref mode arr ofs dbg =
   box_float dbg mode (unboxed_mutable_float_array_ref arr ofs dbg)
 
-let addr_array_set_heap arr ofs newval dbg =
+let caml_modify ~dbg addr newval =
   Cop
     ( Cextcall
         { func = "caml_modify";
@@ -1493,10 +1649,10 @@ let addr_array_set_heap arr ofs newval dbg =
           coeffects = Has_coeffects;
           ty_args = []
         },
-      [array_indexing log2_size_addr arr ofs dbg; newval],
+      [addr; newval],
       dbg )
 
-let addr_array_set_local arr ofs newval dbg =
+let caml_modify_local ~dbg addr i newval =
   Cop
     ( Cextcall
         { func = "caml_modify_local";
@@ -1508,8 +1664,14 @@ let addr_array_set_local arr ofs newval dbg =
           coeffects = Has_coeffects;
           ty_args = []
         },
-      [arr; untag_int ofs dbg; newval],
+      [addr; i; newval],
       dbg )
+
+let addr_array_set_heap arr ofs newval dbg =
+  caml_modify (array_indexing log2_size_addr arr ofs dbg) newval ~dbg
+
+let addr_array_set_local arr ofs newval dbg =
+  caml_modify_local arr (untag_int ofs dbg) newval ~dbg
 
 let addr_array_set (mode : Lambda.modify_mode) arr ofs newval dbg =
   match mode with
@@ -1916,7 +2078,7 @@ module Extended_machtype = struct
     | Punboxed_vector Unboxed_vec128 -> typ_vec128
     | Punboxed_vector Unboxed_vec256 -> typ_vec256
     | Punboxed_vector Unboxed_vec512 -> typ_vec512
-    | Punboxed_int _ ->
+    | Punboxed_or_untagged_integer _ ->
       (* Only 64-bit architectures, so this is always [typ_int] *)
       typ_any_int
     | Pvalue { raw_kind = Pintval; _ } -> typ_tagged_int
@@ -2126,8 +2288,7 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
           (* regular scanned part of a block *)
           match memory_chunk with
           | Word_int | Word_val -> ok ()
-          | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed ->
-            error "mixed blocks"
+          | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
           | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
@@ -2139,10 +2300,9 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
           | Word_int | Thirtytwo_unsigned | Thirtytwo_signed | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-          | Fivetwelve_aligned | Single _ ->
+          | Fivetwelve_aligned | Single _ | Byte_unsigned | Byte_signed
+          | Sixteen_unsigned | Sixteen_signed ->
             ok ()
-          | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed ->
-            error "mixed blocks"
           | Word_val -> error "the flat suffix of a mixed block")
       0 args_memory_chunks
   in
@@ -2829,9 +2989,9 @@ module SArgBlocks = struct
 
   let make_offset arg n = add_const arg n Debuginfo.none
 
-  let make_isout h arg = Cop (Ccmpa Clt, [h; arg], Debuginfo.none)
+  let make_isout h arg = Cop (Ccmpi Cult, [h; arg], Debuginfo.none)
 
-  let make_isin h arg = Cop (Ccmpa Cge, [h; arg], Debuginfo.none)
+  let make_isin h arg = Cop (Ccmpi Cuge, [h; arg], Debuginfo.none)
 
   let make_is_nonzero arg = arg
 
@@ -3293,7 +3453,7 @@ let send_function (arity, result, mode) =
             Clet
               ( VP.create real,
                 Cifthenelse
-                  ( Cop (Ccmpa Cne, [tag'; tag], dbg ()),
+                  ( Cop (Ccmpi Cne, [tag'; tag], dbg ()),
                     dbg (),
                     cache_public_method (Cvar meths) tag cache (dbg ()),
                     dbg (),
@@ -3681,44 +3841,35 @@ let addr_array_length arg dbg =
    to Arbitrary_effects and Has_coeffects, resp. Check if this can be improved
    (e.g., bswap). *)
 
-let bbswap bi arg dbg =
-  match (bi : Primitive.unboxed_integer) with
-  | Unboxed_int8 -> arg
-  | _ ->
-    let bitwidth : Cmm.bswap_bitwidth =
-      match (bi : Primitive.unboxed_integer) with
-      | Unboxed_nativeint -> if size_int = 4 then Thirtytwo else Sixtyfour
-      | Unboxed_int8 -> assert false
-      | Unboxed_int16 -> Sixteen
-      | Unboxed_int32 -> Thirtytwo
-      | Unboxed_int64 -> Sixtyfour
+let bbswap (bitwidth : Cmm.bswap_bitwidth) arg dbg =
+  let op = Cbswap { bitwidth } in
+  if Proc.operation_supported op
+     && not
+          ((match bitwidth with
+           | Sixtyfour -> true
+           | Sixteen | Thirtytwo -> false)
+          && size_int < 8)
+  then Cop (op, [arg], dbg)
+  else
+    let func, tyarg =
+      match bitwidth with
+      | Sixteen -> "caml_bswap16_direct", XInt16
+      | Thirtytwo -> "caml_int32_direct_bswap", XInt32
+      | Sixtyfour -> "caml_int64_direct_bswap", XInt64
     in
-    let op = Cbswap { bitwidth } in
-    if (bi = Primitive.Unboxed_int64 && size_int = 4)
-       || not (Proc.operation_supported op)
-    then
-      let func, tyarg =
-        match (bi : Primitive.unboxed_integer) with
-        | Unboxed_int8 -> assert false
-        | Unboxed_int16 -> "caml_bswap16_direct", XInt16
-        | Unboxed_int32 -> "caml_int32_direct_bswap", XInt32
-        | Unboxed_nativeint -> "caml_nativeint_direct_bswap", XInt
-        | Unboxed_int64 -> "caml_int64_direct_bswap", XInt64
-      in
-      Cop
-        ( Cextcall
-            { func;
-              builtin = false;
-              returns = true;
-              effects = Arbitrary_effects;
-              coeffects = Has_coeffects;
-              ty = typ_int;
-              alloc = false;
-              ty_args = [tyarg]
-            },
-          [arg],
-          dbg )
-    else Cop (op, [arg], dbg)
+    Cop
+      ( Cextcall
+          { func;
+            builtin = false;
+            returns = true;
+            effects = No_effects;
+            coeffects = No_coeffects;
+            ty = typ_int;
+            alloc = false;
+            ty_args = [tyarg]
+          },
+        [arg],
+        dbg )
 
 type binary_primitive = expression -> expression -> Debuginfo.t -> expression
 
@@ -3747,35 +3898,9 @@ let assignment_kind (ptr : Lambda.immediate_or_pointer)
 let setfield n ptr init arg1 arg2 dbg =
   match assignment_kind ptr init with
   | Caml_modify ->
-    return_unit dbg
-      (Cop
-         ( Cextcall
-             { func = "caml_modify";
-               ty = typ_void;
-               alloc = false;
-               builtin = false;
-               returns = true;
-               effects = Arbitrary_effects;
-               coeffects = Has_coeffects;
-               ty_args = []
-             },
-           [field_address arg1 n dbg; arg2],
-           dbg ))
+    return_unit dbg (caml_modify (field_address arg1 n dbg) arg2 ~dbg)
   | Caml_modify_local ->
-    return_unit dbg
-      (Cop
-         ( Cextcall
-             { func = "caml_modify_local";
-               ty = typ_void;
-               alloc = false;
-               builtin = false;
-               returns = true;
-               effects = Arbitrary_effects;
-               coeffects = Has_coeffects;
-               ty_args = []
-             },
-           [arg1; Cconst_int (n, dbg); arg2],
-           dbg ))
+    return_unit dbg (caml_modify_local arg1 (Cconst_int (n, dbg)) arg2 ~dbg)
   | Caml_initialize ->
     return_unit dbg
       (Cop
@@ -4333,13 +4458,13 @@ let gt = binary (Ccmpi Cgt)
 
 let ge = binary (Ccmpi Cge)
 
-let ult = binary (Ccmpa Clt)
+let ult = binary (Ccmpi Cult)
 
-let ule = binary (Ccmpa Cle)
+let ule = binary (Ccmpi Cule)
 
-let ugt = binary (Ccmpa Cgt)
+let ugt = binary (Ccmpi Cugt)
 
-let uge = binary (Ccmpa Cge)
+let uge = binary (Ccmpi Cuge)
 
 let float_abs = unary (Cabsf Float64)
 

@@ -107,19 +107,23 @@ type stack_align =
 
 val equal_stack_align : stack_align -> stack_align -> bool
 
-type integer_comparison = Lambda.integer_comparison =
+type integer_comparison = Scalar.Integer_comparison.t =
   | Ceq
   | Cne
   | Clt
   | Cgt
   | Cle
   | Cge
+  | Cult
+  | Cugt
+  | Cule
+  | Cuge
 
 val negate_integer_comparison : integer_comparison -> integer_comparison
 
 val swap_integer_comparison : integer_comparison -> integer_comparison
 
-type float_comparison = Lambda.float_comparison =
+type float_comparison = Scalar.Float_comparison.t =
   | CFeq
   | CFneq
   | CFlt
@@ -413,7 +417,6 @@ type operation =
   | Ccmpi of integer_comparison
   | Caddv (* pointer addition that produces a [Val] (well-formed Caml value) *)
   | Cadda (* pointer addition that produces a [Addr] (derived heap pointer) *)
-  | Ccmpa of integer_comparison
   | Cnegf of float_width
   | Cabsf of float_width
   | Caddf of float_width

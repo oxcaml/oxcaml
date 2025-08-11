@@ -23,3 +23,5 @@ vicuna_traverse_typed_tree.ml
 vicuna_traverse_typed_tree.mli
 type_shape.mli
 type_shape.ml
+scalar.ml
+scalar.mli

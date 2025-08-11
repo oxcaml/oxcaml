@@ -251,21 +251,10 @@ module Move = struct
       from:Reg.t ->
       to_:Reg.t ->
       Instruction.t =
-   fun move ~id ~copy:instr ~from ~to_ ->
-    { desc = Op (op_of_move move);
-      arg = [| from |];
-      res = [| to_ |];
-      dbg = instr.dbg;
-      fdo = instr.fdo;
-      live = instr.live;
-      (* note: recomputed anyway *)
-      stack_offset = instr.stack_offset;
-      id;
-      irc_work_list = Unknown_list;
-      ls_order = -1;
-      available_before = instr.available_before;
-      available_across = instr.available_across
-    }
+   fun move ~id ~copy ~from ~to_ ->
+    Cfg.make_instruction_from_copy copy
+      ~desc:(Cfg.Op (op_of_move move))
+      ~arg:[| from |] ~res:[| to_ |] ~id ()
 
   let to_string = function Plain -> "move" | Load -> "load" | Store -> "store"
 end
@@ -301,42 +290,6 @@ let save_cfg : string -> Cfg_with_layout.t -> unit =
     ~annotate_succ:(fun lbl1 lbl2 ->
       Printf.sprintf "%s->%s" (Label.to_string lbl1) (Label.to_string lbl2))
     str
-
-let remove_prologue : Cfg.basic_block -> bool =
- fun block ->
-  let removed = ref false in
-  DLL.filter_left block.body ~f:(fun instr ->
-      match[@ocaml.warning "-4"] instr.Cfg.desc with
-      | Cfg.Prologue ->
-        removed := true;
-        false
-      | _ -> true);
-  !removed
-
-let remove_prologue_if_not_required : Cfg_with_layout.t -> unit =
- fun cfg_with_layout ->
-  let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  let prologue_required =
-    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-      ~fun_num_stack_slots:cfg.fun_num_stack_slots
-  in
-  if not prologue_required
-  then
-    (* note: `Cfgize` has put the prologue in the entry block or its
-       successor. *)
-    let entry_block = Cfg.get_block_exn cfg cfg.entry_label in
-    let removed = remove_prologue entry_block in
-    if not removed
-    then
-      match entry_block.terminator.desc with
-      | Always label ->
-        let block = Cfg.get_block_exn cfg label in
-        let removed = remove_prologue block in
-        assert removed
-      | Never | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-      | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-      | Call_no_return _ | Call _ | Prim _ ->
-        assert false
 
 let update_live_fields : Cfg_with_layout.t -> liveness -> unit =
  fun cfg_with_layout liveness ->

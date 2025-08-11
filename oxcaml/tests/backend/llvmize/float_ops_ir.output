@@ -1,8 +1,27 @@
 source_filename = "float_ops.ml"
 
-@camlFloat_ops__data_begin = global i64 0
+@camlFloat_ops__data_begin = global {  } {  }, align 8
 define void @camlFloat_ops__code_begin() { ret void }
 
+@camlFloat_ops__gc_roots = global { i64 } { i64 0 }, align 8
+@.header.camlFloat_ops = global { i64 } { i64 1792 }, align 8
+@camlFloat_ops = global { ptr } { ptr @camlFloat_ops__Pmakeblock253 }, align 8
+@.header.camlFloat_ops__Pmakeblock253 = global { i64 } { i64 7936 }, align 8
+@camlFloat_ops__Pmakeblock253 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlFloat_ops__add_7, ptr @camlFloat_ops__sub_8, ptr @camlFloat_ops__mul_9, ptr @camlFloat_ops__div_10, ptr @camlFloat_ops__neg_11, ptr @camlFloat_ops__abs_12, ptr @camlFloat_ops__compare_13 }, align 8
+@.header.camlFloat_ops__compare_13 = global { i64 } { i64 4087 }, align 8
+@camlFloat_ops__compare_13 = global { ptr, i64, ptr } { ptr @caml_curryF_F, i64 180143985094819847, ptr @camlFloat_ops__compare_HIDE_STAMP }, align 8
+@.header.camlFloat_ops__abs_12 = global { i64 } { i64 3063 }, align 8
+@camlFloat_ops__abs_12 = global { ptr, i64 } { ptr @camlFloat_ops__abs_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlFloat_ops__neg_11 = global { i64 } { i64 3063 }, align 8
+@camlFloat_ops__neg_11 = global { ptr, i64 } { ptr @camlFloat_ops__neg_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlFloat_ops__div_10 = global { i64 } { i64 4087 }, align 8
+@camlFloat_ops__div_10 = global { ptr, i64, ptr } { ptr @caml_curryF_F_RF, i64 180143985094819847, ptr @camlFloat_ops__div_HIDE_STAMP }, align 8
+@.header.camlFloat_ops__mul_9 = global { i64 } { i64 4087 }, align 8
+@camlFloat_ops__mul_9 = global { ptr, i64, ptr } { ptr @caml_curryF_F_RF, i64 180143985094819847, ptr @camlFloat_ops__mul_HIDE_STAMP }, align 8
+@.header.camlFloat_ops__sub_8 = global { i64 } { i64 4087 }, align 8
+@camlFloat_ops__sub_8 = global { ptr, i64, ptr } { ptr @caml_curryF_F_RF, i64 180143985094819847, ptr @camlFloat_ops__sub_HIDE_STAMP }, align 8
+@.header.camlFloat_ops__add_7 = global { i64 } { i64 4087 }, align 8
+@camlFloat_ops__add_7 = global { ptr, i64, ptr } { ptr @caml_curryF_F_RF, i64 180143985094819847, ptr @camlFloat_ops__add_HIDE_STAMP }, align 8
 define cc 104 { { ptr }, { double } } @camlFloat_ops__add_HIDE_STAMP(ptr %0, double %1, double %2)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
@@ -308,19 +327,9 @@ declare  double @llvm.fabs.f64(double)
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
 
-@camlFloat_ops__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
-@camlFloat_ops = global { ptr, i64 } { ptr @camlFloat_ops__Pmakeblock253, i64 7936 }
-@camlFloat_ops__Pmakeblock253 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, i64 } { ptr @camlFloat_ops__add_7, ptr @camlFloat_ops__sub_8, ptr @camlFloat_ops__mul_9, ptr @camlFloat_ops__div_10, ptr @camlFloat_ops__neg_11, ptr @camlFloat_ops__abs_12, ptr @camlFloat_ops__compare_13, i64 4087 }
-@camlFloat_ops__compare_13 = global { ptr, i64, ptr, i64 } { ptr @caml_curryF_F, i64 180143985094819847, ptr @camlFloat_ops__compare_HIDE_STAMP, i64 3063 }
-@camlFloat_ops__abs_12 = global { ptr, i64, i64 } { ptr @camlFloat_ops__abs_HIDE_STAMP, i64 108086391056891909, i64 3063 }
-@camlFloat_ops__neg_11 = global { ptr, i64, i64 } { ptr @camlFloat_ops__neg_HIDE_STAMP, i64 108086391056891909, i64 4087 }
-@camlFloat_ops__div_10 = global { ptr, i64, ptr, i64 } { ptr @caml_curryF_F_RF, i64 180143985094819847, ptr @camlFloat_ops__div_HIDE_STAMP, i64 4087 }
-@camlFloat_ops__mul_9 = global { ptr, i64, ptr, i64 } { ptr @caml_curryF_F_RF, i64 180143985094819847, ptr @camlFloat_ops__mul_HIDE_STAMP, i64 4087 }
-@camlFloat_ops__sub_8 = global { ptr, i64, ptr, i64 } { ptr @caml_curryF_F_RF, i64 180143985094819847, ptr @camlFloat_ops__sub_HIDE_STAMP, i64 4087 }
-@camlFloat_ops__add_7 = global { ptr, i64, ptr } { ptr @caml_curryF_F_RF, i64 180143985094819847, ptr @camlFloat_ops__add_HIDE_STAMP }
 @caml_curryF_F = external global ptr
 @caml_curryF_F_RF = external global ptr
 
-@camlFloat_ops__data_end = global i64 0
+@camlFloat_ops__data_end = global {  } {  }, align 8
 define void @camlFloat_ops__code_end() { ret void }
-@camlFloat_ops__frametable = global i64 0
+@camlFloat_ops__frametable = global {  } {  }, align 8

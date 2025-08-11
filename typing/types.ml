@@ -668,6 +668,7 @@ and mixed_block_element =
   | Float32
   | Bits8
   | Bits16
+  | Untagged_immediate
   | Bits32
   | Bits64
   | Vec128
@@ -998,21 +999,25 @@ let compare_tag t1 t2 =
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
   | Value, Value | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
-  | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
+  | Word, Word | Untagged_immediate, Untagged_immediate
+  | Bits8, Bits8 | Bits16, Bits16
+  | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
   | Void, Void
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits8 | Bits16 | Bits32
-    | Bits64 | Vec128 | Vec256 | Vec512 | Product _ | Void ), _
+  | ( Value | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
+    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
+    | Product _ | Void ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
   | Value, Value | Float_boxed, Float_boxed
   | Float64, Float64 | Float32, Float32
-  | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
+  | Word, Word | Untagged_immediate, Untagged_immediate
+  | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
   | Void, Void
     -> 0
@@ -1028,6 +1033,8 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Float32 -> 1
   | Word, _ -> -1
   | _, Word -> 1
+  | Untagged_immediate, _ -> -1
+  | _, Untagged_immediate -> 1
   | Bits8, _ -> -1
   | _, Bits8 -> 1
   | Bits16, _ -> -1
@@ -1196,6 +1203,7 @@ let rec mixed_block_element_to_string = function
   | Vec256 -> "Vec256"
   | Vec512 -> "Vec512"
   | Word -> "Word"
+  | Untagged_immediate -> "Untagged_immediate"
   | Product es ->
     "Product ["
     ^ (String.concat ", "
@@ -1216,6 +1224,7 @@ let mixed_block_element_to_lowercase_string = function
   | Vec256 -> "vec256"
   | Vec512 -> "vec512"
   | Word -> "word"
+  | Untagged_immediate -> "untagged_immediate"
   | Product es ->
     "product ["
     ^ (String.concat ", "

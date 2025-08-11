@@ -353,6 +353,8 @@ type nullary_primitive =
     the immediate after untagging) and exchanges the two halves of the 16-bit
     quantity. The higher-order bits are zeroed. *)
 type unary_int_arith_op = Swap_byte_endianness
+(* CR mshinwell/jvanburen: we should consider splitting this swapping primitive
+   into two, based on the semantics *)
 
 (** Naked float unary arithmetic operations. *)
 type unary_float_arith_op =
@@ -520,6 +522,7 @@ type binary_primitive =
   (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
      deleting [Atomic_load_field] *)
   | Poke of Flambda_kind.Standard_int_or_float.t
+  | Read_offset of Flambda_kind.With_subkind.t * Asttypes.mutable_flag
 
 (** Atomic arithmetic operations on integers. *)
 type int_atomic_op =
@@ -540,6 +543,7 @@ type ternary_primitive =
   | Atomic_field_int_arith of int_atomic_op
   | Atomic_set_field of Block_access_field_kind.t
   | Atomic_exchange_field of Block_access_field_kind.t
+  | Write_offset of Flambda_kind.With_subkind.t * Alloc_mode.For_assignments.t
 
 (** Primitives taking exactly four arguments. *)
 type quaternary_primitive =

@@ -193,7 +193,7 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
                (*match*/341 =a? (field_imm 0 *match*/340)
                 *match*/343 =o? (field_mut 0 (field_imm 0 *match*/341)))
                (if *match*/343 (field_imm 0 (field_imm 1 *match*/341))
-                 (~ (field_imm 0 (field_imm 1 *match*/341)))))
+                 (%int_neg (field_imm 0 (field_imm 1 *match*/341)))))
              3)))))
   (apply (field_imm 1 (global Toploop!)) "test" test/336))
 val test : 'a -> int = <fun>

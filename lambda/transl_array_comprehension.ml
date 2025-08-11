@@ -716,11 +716,11 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       Immutable StrictOpt, make_float_vect ~loc array_size.var
     | Fixed_size, Punboxedfloatarray Unboxed_float32 ->
       Immutable StrictOpt, make_unboxed_float32_vect ~loc array_size.var
-    | Fixed_size, Punboxedintarray Unboxed_int32 ->
+    | Fixed_size, Punboxedoruntaggedintarray Unboxed_int32 ->
       Immutable StrictOpt, make_unboxed_int32_vect ~loc array_size.var
-    | Fixed_size, Punboxedintarray Unboxed_int64 ->
+    | Fixed_size, Punboxedoruntaggedintarray Unboxed_int64 ->
       Immutable StrictOpt, make_unboxed_int64_vect ~loc array_size.var
-    | Fixed_size, Punboxedintarray Unboxed_nativeint ->
+    | Fixed_size, Punboxedoruntaggedintarray Unboxed_nativeint ->
       Immutable StrictOpt, make_unboxed_nativeint_vect ~loc array_size.var
     | Fixed_size, Punboxedvectorarray Unboxed_vec128 ->
       Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
@@ -737,15 +737,17 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       Mutable, Resizable_array.make ~loc array_kind (unboxed_float 0.)
     | Dynamic_size, Punboxedfloatarray Unboxed_float32 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_float32 0.)
-    | Dynamic_size, Punboxedintarray Unboxed_int32 ->
+    | Dynamic_size, Punboxedoruntaggedintarray Unboxed_int32 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_int32 0l)
-    | Dynamic_size, Punboxedintarray Unboxed_int64 ->
+    | Dynamic_size, Punboxedoruntaggedintarray Unboxed_int64 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_int64 0L)
-    | Dynamic_size, Punboxedintarray Unboxed_nativeint ->
+    | Dynamic_size, Punboxedoruntaggedintarray Unboxed_nativeint ->
       ( Mutable,
         Resizable_array.make ~loc array_kind (unboxed_nativeint Targetint.zero)
       )
-    | _, Punboxedintarray (Unboxed_int8 | Unboxed_int16) ->
+    | ( _,
+        Punboxedoruntaggedintarray
+          (Untagged_int8 | Untagged_int16 | Untagged_int) ) ->
       Misc.unboxed_small_int_arrays_are_not_implemented ()
     | Dynamic_size, Punboxedvectorarray Unboxed_vec128
     | Dynamic_size, Punboxedvectorarray Unboxed_vec256
@@ -844,7 +846,7 @@ let body ~loc ~array_kind ~array_size ~array_sizing ~array ~index ~body =
              layout_unit ))
     | Pintarray | Paddrarray | Pfloatarray
     | Punboxedfloatarray (Unboxed_float64 | Unboxed_float32)
-    | Punboxedintarray _ | Punboxedvectorarray _ ->
+    | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ ->
       set_element_in_bounds body
     | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
       Misc.fatal_error "Transl_array_comprehension.body: unboxed product array"
@@ -856,7 +858,8 @@ let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
     { comp_body; comp_clauses } =
   (match array_kind with
   | Pgenarray | Paddrarray | Pintarray | Pfloatarray -> ()
-  | Punboxedfloatarray _ | Punboxedintarray _ | Punboxedvectorarray _ ->
+  | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+    ->
     if not !Clflags.native_code
     then
       Misc.fatal_errorf

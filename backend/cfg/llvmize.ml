@@ -17,6 +17,11 @@ module CL = Cfg_with_layout
 module DLL = Oxcaml_utils.Doubly_linked_list
 module String = Misc.Stdlib.String
 
+module List = struct
+  include List
+  include Misc.Stdlib.List
+end
+
 type error = Asm_generation of (string * int)
 
 exception Error of error
@@ -77,6 +82,10 @@ module Llvm_typ = struct
     | Double (* 64 bit *)
     | Ptr
     | Struct of t list
+    | Array of
+        { size : int;
+          elem_typ : t
+        }
 
   let i64 = Int { width_in_bits = 64 }
 
@@ -116,6 +125,7 @@ module Llvm_typ = struct
       fprintf ppf "{ %a }"
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ", ") pp_t)
         typs
+    | Array { size; elem_typ } -> fprintf ppf "[ %d x %a ]" size pp_t elem_typ
 
   let to_string t = Format.asprintf "%a" pp_t t
 
@@ -124,7 +134,11 @@ module Llvm_typ = struct
     | Int { width_in_bits = x }, Int { width_in_bits = y } -> x = y
     | Float, Float | Double, Double | Ptr, Ptr -> true
     | Struct xs, Struct ys -> List.equal equal xs ys
-    | Int _, _ | Float, _ | Double, _ | Ptr, _ | Struct _, _ -> false
+    | ( Array { size = size1; elem_typ = typ1 },
+        Array { size = size2; elem_typ = typ2 } ) ->
+      size1 = size2 && equal typ1 typ2
+    | Int _, _ | Float, _ | Double, _ | Ptr, _ | Struct _, _ | Array _, _ ->
+      false
 end
 
 module Calling_conventions = struct
@@ -171,8 +185,6 @@ type t =
     mutable current_fun_info : fun_info;
         (* Maintains the state of the current function (reset for every
            function) *)
-    mutable data : Cmm.data_item list;
-        (* Collects data items as they come and processes them at the end *)
     mutable defined_symbols : String.Set.t;
         (* Function symbols defined so far *)
     mutable referenced_symbols : String.Set.t;
@@ -198,7 +210,6 @@ let create ~llvmir_filename ~ppf_dump =
     ppf;
     ppf_dump;
     current_fun_info = create_fun_info ();
-    data = [];
     defined_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty;
     called_functions = String.Map.empty
@@ -323,7 +334,12 @@ module F = struct
 
   let pp_machtyp_component ppf c = Format.fprintf ppf "%s" (machtyp_component c)
 
-  let pp_global ppf s = fprintf ppf "@%s" s
+  let pp_global ppf s =
+    (* This is to escape unacceptable symbols (like brackets or commas) in
+       global identifiers (which might be the case in e.g. anonymous
+       functions) *)
+    let encoded = Asm_targets.(Asm_symbol.create s |> Asm_symbol.encode) in
+    fprintf ppf "@%s" encoded
 
   let pp_ident ppf ident = fprintf ppf "%%%a" Ident.print ident
 
@@ -337,7 +353,7 @@ module F = struct
 
   let block_label_with_predecessors t label preds =
     pp_label_def t t.ppf label;
-    if not (Misc.Stdlib.List.is_empty preds)
+    if not (List.is_empty preds)
     then
       fprintf t.ppf
         "                                                ; preds = %a\n"
@@ -480,16 +496,16 @@ module F = struct
     let typ = Llvm_typ.of_machtyp_component i.arg.(0).typ in
     let comp_name =
       match comp with
-      | Isigned Ceq | Iunsigned Ceq -> "eq"
-      | Isigned Cne | Iunsigned Cne -> "ne"
-      | Isigned Clt -> "slt"
-      | Isigned Cgt -> "sgt"
-      | Isigned Cle -> "sle"
-      | Isigned Cge -> "sge"
-      | Iunsigned Clt -> "ult"
-      | Iunsigned Cgt -> "ugt"
-      | Iunsigned Cle -> "ule"
-      | Iunsigned Cge -> "ult"
+      | Ceq -> "eq"
+      | Cne -> "ne"
+      | Clt -> "slt"
+      | Cgt -> "sgt"
+      | Cle -> "sle"
+      | Cge -> "sge"
+      | Cult -> "ult"
+      | Cugt -> "ugt"
+      | Cule -> "ule"
+      | Cuge -> "uge"
     in
     match imm with
     | None ->
@@ -682,6 +698,7 @@ module F = struct
     let make_ocaml_c_call caml_c_call_symbol args res_type =
       let res_ident = fresh_ident t in
       add_referenced_symbol t caml_c_call_symbol;
+      add_referenced_symbol t func_symbol;
       ins_call_custom_arg ~cc:Ocaml_c_call ~pp_name:pp_global ~pp_arg t
         caml_c_call_symbol args
         (Some (res_type, res_ident));
@@ -724,6 +741,8 @@ module F = struct
         write_rsp c_sp;
         (* Do the thing (omitting cc defaults to C calling convention) *)
         let res_ident = fresh_ident t in
+        add_called_fun t func_symbol ~cc:Default ~args:(List.map fst args)
+          ~res:(Some res_type);
         ins_call ~cc:Default ~pp_name:pp_global t func_symbol args
           (Some (res_type, res_ident));
         (* Recover stack pointer *)
@@ -778,16 +797,23 @@ module F = struct
       ins_branch_cond t is_true b.ifso b.ifnot
     | Return -> return t i
     | Int_test { lt; eq; gt; is_signed; imm } ->
-      let make_comp comp =
-        match is_signed with
-        | true -> Operation.Isigned comp
-        | false -> Operation.Iunsigned comp
+      let open struct
+        type comp =
+          | Lt
+          | Gt
+      end in
+      let make_comp (comp : comp) : Cmm.integer_comparison =
+        match is_signed, comp with
+        | Signed, Lt -> Clt
+        | Signed, Gt -> Cgt
+        | Unsigned, Lt -> Cult
+        | Unsigned, Gt -> Cugt
       in
-      let is_lt = int_comp t (make_comp Cmm.Clt) i ~imm in
+      let is_lt = int_comp t (make_comp Lt) i ~imm in
       let ge = fresh_ident t in
       ins_branch_cond_ident t is_lt (get_ident_for_label t lt) ge;
       line t.ppf "%a:" Ident.print ge;
-      let is_gt = int_comp t (make_comp Cmm.Cgt) i ~imm in
+      let is_gt = int_comp t (make_comp Gt) i ~imm in
       ins_branch_cond t is_gt gt eq
     | Raise _ ->
       (* CR yusumez: Implement this *)
@@ -995,39 +1021,64 @@ module F = struct
      [data_item] *)
   let typ_of_data_item (d : Cmm.data_item) =
     match d with
-    | Cdefine_symbol _ -> assert false (* cannot happen *)
-    | Cint _ -> Llvm_typ.Int { width_in_bits = 64 }
+    | Cdefine_symbol _ | Calign _ | Csymbol_offset _ ->
+      (* [Calign] and [Csymbol_offset] are never produced *)
+      Misc.fatal_error "Llvmize: unexpected data item"
+    | Cint _ -> Llvm_typ.i64
+    | Cint8 _ -> Llvm_typ.i8
+    | Cint16 _ -> Llvm_typ.i16
+    | Cint32 _ -> Llvm_typ.i32
     | Csymbol_address _ -> Llvm_typ.Ptr
-    | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
-    | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
-      ->
-      Misc.fatal_error "Llvmize.typ_of_data_item: not implemented"
+    | Cstring s ->
+      Llvm_typ.Array { size = String.length s; elem_typ = Llvm_typ.i8 }
+    | Cskip size -> Llvm_typ.Array { size; elem_typ = Llvm_typ.i8 }
+    | Csingle _ -> Llvm_typ.float
+    | Cdouble _ -> Llvm_typ.double
+    | Cvec128 _ | Cvec256 _ | Cvec512 _ ->
+      Misc.fatal_error "Llvmize: vector data items not implemented"
 
   let pp_const_data_item ppf (d : Cmm.data_item) =
     match d with
-    | Cdefine_symbol _ -> assert false (* cannot happen *)
-    | Cint n -> fprintf ppf "%s" (Nativeint.to_string n)
+    | Cdefine_symbol _ | Calign _ | Csymbol_offset _ ->
+      Misc.fatal_error "Llvmize.typ_of_data_item: unexpected data item"
+    | Cint n | Cint32 n -> fprintf ppf "%nd" n
+    | Cint8 n | Cint16 n -> fprintf ppf "%d" n
     | Csymbol_address { sym_name; sym_global = _ } -> pp_global ppf sym_name
-    | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
-    | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
-      ->
-      Misc.fatal_error "Llvmize.pp_const_data_item: not implemented"
+    | Cstring s ->
+      fprintf ppf "c\"";
+      String.iter (fun c -> fprintf ppf "\\%02x" (Char.code c)) s;
+      fprintf ppf "\""
+    | Cskip _ -> fprintf ppf "zeroinitializer"
+    | Csingle f | Cdouble f ->
+      fprintf ppf "%.20f" f
+      (* 64-bit floats with at least 17 digits are guaranteed to round trip
+         exactly through string conversions by the IEEE 754 standard (9 digits
+         for 32-bit floats). *)
+    | Cvec128 _ | Cvec256 _ | Cvec512 _ ->
+      Misc.fatal_error "Llvmize: vector data item snot implemented"
 
   let pp_typ_and_const ppf (d : Cmm.data_item) =
     fprintf ppf "%a %a" Llvm_typ.pp_t (typ_of_data_item d) pp_const_data_item d
 
-  let data_decl t sym (ds : Cmm.data_item list) =
-    line t.ppf "%a = global %a { %a }" pp_global sym Llvm_typ.pp_t
+  let data_decl ?(private_ = false) ?(align = Some 8) t sym
+      (ds : Cmm.data_item list) =
+    ignore private_;
+    (* CR yusumez: If private global variables are not referenced anywhere
+       directly, LLVM will delete them in the globaldce (dead global
+       elimination) pass, so we don't mark anything as private for now. *)
+    line t.ppf "%a = global %a { %a }%s" pp_global sym Llvm_typ.pp_t
       (Llvm_typ.Struct (List.map typ_of_data_item ds))
       (pp_print_list ~pp_sep:pp_comma pp_typ_and_const)
       ds
+      (match align with
+      | None -> ""
+      | Some align -> ", align " ^ Int.to_string align)
 
   let data_decl_extern t sym =
     line t.ppf "%a = external global %a" pp_global sym Llvm_typ.pp_t
       Llvm_typ.ptr
 
-  let symbol_decl t sym =
-    line t.ppf "%a = global i64 0" pp_global (Cmm_helpers.make_symbol sym)
+  let empty_symbol_decl t sym = data_decl t (Cmm_helpers.make_symbol sym) []
 
   let empty_fun_decl t sym =
     line t.ppf "define void %a() { ret void }" pp_global
@@ -1190,7 +1241,7 @@ let cfg (cl : CL.t) =
   let pp_block label =
     let block = Label.Tbl.find blocks label in
     let preds = Cfg.predecessor_labels block in
-    if Label.equal entry_label label && not (Misc.Stdlib.List.is_empty preds)
+    if Label.equal entry_label label && not (List.is_empty preds)
     then Misc.fatal_errorf "Llvmize: entry label must not have predecessors";
     F.block_label_with_predecessors t label preds;
     DLL.iter ~f:(F.basic t) block.body;
@@ -1217,56 +1268,112 @@ let cfg (cl : CL.t) =
   let fun_ret_type = make_ret_type (Array.to_list fun_ret_type) in
   F.define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body
 
-(* CR yusumez: Implement this *)
-let data ds =
-  let t = get_current_compilation_unit "data" in
-  t.data <- List.append t.data ds
+(* CR yusumez: We make some assumptions about the structure of the data items we
+   receive and decode it manually here. Ideally, [data_item]s would be
+   represented in a more structured manner, but this should do for now. *)
+let make_temp_data_symbol =
+  let idx = ref 0 in
+  fun () ->
+    let module_name =
+      Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
+    in
+    let res = Format.asprintf ".temp.%s.%d" module_name !idx in
+    incr idx;
+    res
 
-(* Define menitoned but not declared data items as extern *)
-let emit_data_extern t =
-  List.iter
-    (fun (d : Cmm.data_item) ->
-      match d with
-      | Cdefine_symbol { sym_name; sym_global = _ } ->
-        (* [t.defined_symbols] now tracks all defined symbols *)
-        t.defined_symbols <- String.Set.add sym_name t.defined_symbols
-      | Csymbol_address { sym_name; sym_global = _ } ->
-        t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
-      | Cint _ | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _
-      | Cvec128 _ | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _
-      | Cskip _ | Calign _ ->
-        ())
-    t.data;
+let data (ds : Cmm.data_item list) =
+  let t = get_current_compilation_unit "data" in
+  let define_symbol' ~private_ ~header ~symbol contents =
+    let symbol =
+      match symbol with
+      | None -> make_temp_data_symbol ()
+      | Some symbol -> symbol
+    in
+    (match header with
+    | None -> ()
+    | Some header ->
+      let header_sym = ".header." ^ symbol in
+      F.data_decl ~private_:true t header_sym [Cint header]);
+    F.data_decl ~private_ t symbol contents;
+    t.defined_symbols <- String.Set.add symbol t.defined_symbols;
+    List.iter
+      (fun (d : Cmm.data_item) ->
+        match[@warning "-4"] d with
+        | Csymbol_address { sym_name; sym_global = _ } ->
+          t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
+        | _ -> ())
+      contents
+  in
+  let define_symbol ~private_ ~header ~symbol contents =
+    if private_ && List.is_empty contents
+    then () (* No need to declare a private symbol with no contents *)
+    else define_symbol' ~private_ ~header ~symbol contents
+  in
+  let peek_int = function[@warning "-4"] Cmm.Cint n -> Some n | _ -> None in
+  let peek_define_symbol = function[@warning "-4"]
+    | Cmm.Cdefine_symbol { sym_name; sym_global = _ } -> Some sym_name
+    | _ -> None
+  in
+  let eat_if peek = function
+    | [] -> None
+    | d :: ds -> peek d |> Option.map (fun i -> i, ds)
+  in
+  let closure_block ds =
+    let function_slot ds =
+      let header, ds = eat_if peek_int ds |> Option.get in
+      let symbol, ds = eat_if peek_define_symbol ds |> Option.get in
+      (*= A function slot is either:
+          | code pointer | closinfo | (if the function has arity 0 or 1)
+          | code pointer | closinfo | second code pointer | (arity >= 2)
+          See mlvalues.h for details. *)
+      let closinfo = List.nth ds 1 |> peek_int |> Option.get in
+      let arity = Nativeint.shift_right_logical closinfo 56 in
+      let slot_size = if arity <= 1n then 2 else 3 in
+      let slot, tail = List.split_at slot_size ds in
+      define_symbol ~private_:false ~header:(Some header) ~symbol:(Some symbol)
+        slot;
+      let is_last =
+        Nativeint.(shift_right_logical (shift_left closinfo 8) (size - 1) = 1n)
+      in
+      tail, is_last
+    in
+    let rec iter_slots ds =
+      let tail, is_last = function_slot ds in
+      if is_last
+      then define_symbol ~private_:true ~header:None ~symbol:None tail
+      else iter_slots tail
+    in
+    iter_slots ds
+  in
+  let block ds =
+    match eat_if peek_int ds with
+    | Some (i, after_i) -> (
+      match eat_if peek_define_symbol after_i with
+      | Some (symbol, after_symbol) ->
+        (* [i] is a header *)
+        if Nativeint.(logand i 0xffn = of_int Obj.closure_tag)
+        then closure_block ds
+        else
+          define_symbol ~private_:false ~header:(Some i) ~symbol:(Some symbol)
+            after_symbol
+      | None ->
+        (* [i] is not a header *)
+        define_symbol ~private_:true ~header:None ~symbol:None ds)
+    | None -> (
+      (* No header *)
+      match eat_if peek_define_symbol ds with
+      | Some (symbol, after_symbol) ->
+        define_symbol ~private_:false ~header:None ~symbol:(Some symbol)
+          after_symbol
+      | None -> define_symbol ~private_:true ~header:None ~symbol:None ds)
+  in
+  try block ds
+  with _ -> Misc.fatal_error "Llvmize: error while decoding data items"
+
+(* Declare menitoned but not declared data items as extern *)
+let declare_data t =
   String.Set.diff t.referenced_symbols t.defined_symbols
   |> String.Set.iter (fun sym -> F.data_decl_extern t sym)
-
-(* CR yusumez: We do this cumbersome list wrangling since we receive data
-   declarations as a flat list. Ideally, [data_item]s would be represented in a
-   more structured manner which we can directly pass on to [declare]. *)
-let emit_data t =
-  let declare = F.data_decl t in
-  let fail msg =
-    Misc.fatal_error ("Llvmize: data item not implemented: " ^ msg)
-  in
-  let cur_sym, ds =
-    List.fold_left
-      (fun (cur_sym, ds) (d : Cmm.data_item) ->
-        match d with
-        | Cdefine_symbol { sym_name; sym_global = _ } ->
-          Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
-          Some sym_name, []
-        | Cint _ | Csymbol_address _ -> cur_sym, ds @ [d]
-        | Calign _ -> fail "align"
-        | Cint8 _ | Cint16 _ | Cint32 _ -> fail "int"
-        | Csingle _ | Cdouble _ -> fail "float"
-        | Cvec128 _ | Cvec256 _ | Cvec512 _ -> fail "vec"
-        | Csymbol_offset _ -> fail "symbol offset"
-        | Cstring _ -> fail "string"
-        | Cskip _ -> fail "skip")
-      (None, []) t.data
-  in
-  Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
-  emit_data_extern t
 
 let declare_functions t =
   String.Map.iter
@@ -1322,7 +1429,7 @@ let begin_assembly ~sourcefile =
   (* CR yusumez: Get target triple *)
   (* F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\""; *)
   Format.pp_print_newline t.ppf ();
-  F.symbol_decl t "data_begin";
+  F.empty_symbol_decl t "data_begin";
   F.empty_fun_decl t "code_begin";
   Format.pp_print_newline t.ppf ()
 
@@ -1337,11 +1444,11 @@ let end_assembly () =
   declare_functions t;
   Format.pp_print_newline t.ppf ();
   (* Emit data declarations *)
-  emit_data t;
+  declare_data t;
   Format.pp_print_newline t.ppf ();
-  F.symbol_decl t "data_end";
+  F.empty_symbol_decl t "data_end";
   F.empty_fun_decl t "code_end";
-  F.symbol_decl t "frametable";
+  F.empty_symbol_decl t "frametable";
   (* Close channel to .ll file *)
   Out_channel.close t.oc;
   (* Call clang to compile .ll to .s *)

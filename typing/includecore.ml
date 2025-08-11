@@ -336,12 +336,12 @@ let report_modality_sub_error first second ppf e =
   let print_modality id ppf m =
     Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ppf m
   in
-  let Modality.Value.Error(ax, {left; right}) = e in
+  let Modality.Value.Error {left; right} = e in
   Format.fprintf ppf "%s is %a and %s is %a."
     (String.capitalize_ascii second)
-    (print_modality "empty") (Atom (ax, right) : Modality.t)
+    (print_modality "empty") right
     first
-    (print_modality "not") (Atom (ax, left) : Modality.t)
+    (print_modality "not") left
 
 let report_mode_sub_error got expected ppf e =
   let Mode.Value.Error(ax, {left; right}) = e in
@@ -1412,7 +1412,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
   let mark_and_compare_records record_form labels1 rep1 labels2 rep2 =
     if mark then begin
       let mark usage lbls =
-        List.iter (Env.mark_label_used usage) lbls
+        List.iter (fun lbl -> Env.mark_label_used usage lbl.Types.ld_uid) lbls
       in
       let usage : Env.label_usage =
         if decl2.type_private = Public then Env.Exported
@@ -1490,9 +1490,9 @@ let type_declarations ?(equality = false) ~loc env ~mark name
          (match name with None -> "_" | Some n -> "'" ^ n)
          Printtyp.type_expr ty
   | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
-     let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+     let context = Ctype.mk_jkind_context_always_principal env in
      Some (Parameter_jkind
-             (ty, Jkind.Violation.of_ ~jkind_of_type
+             (ty, Jkind.Violation.of_ ~context
                     (Not_a_subjkind (Jkind.disallow_right original_jkind,
                                      Jkind.disallow_left inferred_jkind,
                                      []))))

@@ -335,7 +335,8 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
               | Naked_vec128 -> UK.naked_vec128_fields
               | Naked_vec256 -> UK.naked_vec256_fields
               | Naked_vec512 -> UK.naked_vec512_fields
-              | Naked_int64 | Naked_nativeint -> UK.naked_int64s)
+              | Naked_int64 | Naked_nativeint | Naked_immediate ->
+                UK.naked_int64s)
             (Flambda_kind.Mixed_block_shape.flat_suffix shape |> Array.to_list)
         in
         value_prefix @ flat_suffix

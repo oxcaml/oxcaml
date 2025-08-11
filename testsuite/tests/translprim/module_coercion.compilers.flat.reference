@@ -15,19 +15,19 @@
           prim[value<int>] stub : int
           (array.unsafe_set[int indexed by int] prim prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-          (compare_ints prim prim))
+          (%int_compare prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-          (== prim prim))
+          (%eq prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-          (!= prim prim))
+          (%noteq prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-          (< prim prim))
+          (%int_lessthan prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-          (> prim prim))
+          (%int_greaterthan prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-          (<= prim prim))
+          (%int_lessequal prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-          (>= prim prim)))
+          (%int_greaterequal prim prim)))
       (makeblock 0
         (function {nlocal = 0} prim[value<floatarray>] stub : int
           (array.length[float] prim))
@@ -42,19 +42,19 @@
           prim[value<float>] stub : int
           (array.unsafe_set[float indexed by int] prim prim prim))
         (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
-          : int (compare_floats float prim prim))
+          : int (%float_compare prim prim))
         (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
-          : int (Float.== prim prim))
+          : int (%float_ordered_and_equal prim prim))
         (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
-          : int (Float.!= prim prim))
+          : int (%float_unordered_or_notequal prim prim))
         (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
-          : int (Float.< prim prim))
+          : int (%float_ordered_and_lessthan prim prim))
         (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
-          : int (Float.> prim prim))
+          : int (%float_ordered_and_greaterthan prim prim))
         (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
-          : int (Float.<= prim prim))
+          : int (%float_ordered_and_lessequal prim prim))
         (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
-          : int (Float.>= prim prim)))
+          : int (%float_ordered_and_greaterequal prim prim)))
       (makeblock 0
         (function {nlocal = 0} prim[value<addrarray>] stub : int
           (array.length[addr] prim))
@@ -94,19 +94,19 @@
           prim[value<int32>] stub : int
           (array.unsafe_set[addr indexed by int] prim prim prim))
         (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
-          : int (compare_bints int32 prim prim))
+          : int (%int32_compare prim prim))
         (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
-          : int (Int32.== prim prim))
+          : int (%int32_equal prim prim))
         (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
-          : int (Int32.!= prim prim))
+          : int (%int32_notequal prim prim))
         (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
-          : int (Int32.< prim prim))
+          : int (%int32_lessthan prim prim))
         (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
-          : int (Int32.> prim prim))
+          : int (%int32_greaterthan prim prim))
         (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
-          : int (Int32.<= prim prim))
+          : int (%int32_lessequal prim prim))
         (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
-          : int (Int32.>= prim prim)))
+          : int (%int32_greaterequal prim prim)))
       (makeblock 0
         (function {nlocal = 0} prim[value<addrarray>] stub : int
           (array.length[addr] prim))
@@ -121,19 +121,19 @@
           prim[value<int64>] stub : int
           (array.unsafe_set[addr indexed by int] prim prim prim))
         (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
-          : int (compare_bints int64 prim prim))
+          : int (%int64_compare prim prim))
         (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
-          : int (Int64.== prim prim))
+          : int (%int64_equal prim prim))
         (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
-          : int (Int64.!= prim prim))
+          : int (%int64_notequal prim prim))
         (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
-          : int (Int64.< prim prim))
+          : int (%int64_lessthan prim prim))
         (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
-          : int (Int64.> prim prim))
+          : int (%int64_greaterthan prim prim))
         (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
-          : int (Int64.<= prim prim))
+          : int (%int64_lessequal prim prim))
         (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
-          : int (Int64.>= prim prim)))
+          : int (%int64_greaterequal prim prim)))
       (makeblock 0
         (function {nlocal = 0} prim[value<addrarray>] stub : int
           (array.length[addr] prim))
@@ -148,16 +148,16 @@
           prim[value<nativeint>] stub : int
           (array.unsafe_set[addr indexed by int] prim prim prim))
         (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
-          stub : int (compare_bints nativeint prim prim))
+          stub : int (%nativeint_compare prim prim))
         (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
-          stub : int (Nativeint.== prim prim))
+          stub : int (%nativeint_equal prim prim))
         (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
-          stub : int (Nativeint.!= prim prim))
+          stub : int (%nativeint_notequal prim prim))
         (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
-          stub : int (Nativeint.< prim prim))
+          stub : int (%nativeint_lessthan prim prim))
         (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
-          stub : int (Nativeint.> prim prim))
+          stub : int (%nativeint_greaterthan prim prim))
         (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
-          stub : int (Nativeint.<= prim prim))
+          stub : int (%nativeint_lessequal prim prim))
         (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
-          stub : int (Nativeint.>= prim prim))))))
+          stub : int (%nativeint_greaterequal prim prim))))))

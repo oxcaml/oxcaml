@@ -201,7 +201,6 @@ let compute_static_size lam =
     | Psetfield_computed _
     | Psetfloatfield _
     | Psetmixedfield _
-    | Poffsetint _
     | Poffsetref _
     | Pbytessetu
     | Pbytessets
@@ -261,8 +260,9 @@ let compute_static_size lam =
             Block (Regular_block size)
         | Pfloatarray ->
             Block (Float_record size)
-        | Punboxedfloatarray _ | Punboxedintarray _ | Punboxedvectorarray _
-        | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+        | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+        | Punboxedvectorarray _ | Pgcscannableproductarray _
+        | Pgcignorableproductarray _ ->
             Misc.fatal_error "size_of_primitive"
         end
     | Pmakearray_dynamic _ -> Misc.fatal_error "size_of_primitive"
@@ -298,16 +298,6 @@ let compute_static_size lam =
     | Preperform
     | Pccall _
     | Psequand | Psequor | Pnot
-    | Pnegint | Paddint | Psubint | Pmulint
-    | Pdivint _ | Pmodint _
-    | Pandint | Porint | Pxorint
-    | Plslint | Plsrint | Pasrint
-    | Pintcomp _
-    | Pcompare_ints | Pcompare_floats _ | Pcompare_bints _
-    | Pintoffloat _ | Pfloatofint _
-    | Pnegfloat _ | Pabsfloat _
-    | Paddfloat _ | Psubfloat _ | Pmulfloat _ | Pdivfloat _
-    | Pfloatcomp _
     | Pstringlength | Pstringrefu  | Pstringrefs
     | Pbyteslength | Pbytesrefu | Pbytesrefs
     | Parraylength _
@@ -316,22 +306,6 @@ let compute_static_size lam =
     | Pisint _
     | Pisnull
     | Pisout
-    | Pbintofint _
-    | Pintofbint _
-    | Pcvtbint _
-    | Pnegbint _
-    | Paddbint _
-    | Psubbint _
-    | Pmulbint _
-    | Pdivbint _
-    | Pmodbint _
-    | Pandbint _
-    | Porbint _
-    | Pxorbint _
-    | Plslbint _
-    | Plsrbint _
-    | Pasrbint _
-    | Pbintcomp _
     | Pbigarrayref _
     | Pbigarraydim _
     | Pstring_load_16 _
@@ -346,8 +320,6 @@ let compute_static_size lam =
     | Pbigstring_load_32 _
     | Pbigstring_load_f32 _
     | Pbigstring_load_64 _
-    | Pbswap16
-    | Pbbswap _
     | Pint_as_pointer _
     | Patomic_load_field _
     | Patomic_set_field _
@@ -358,7 +330,11 @@ let compute_static_size lam =
     | Popaque _
     | Pdls_get
     | Ppeek _
-    | Ppoke _ ->
+    | Ppoke _
+    | Pscalar _
+    | Pphys_equal _
+    | Pget_idx _
+    | Pset_idx _ ->
         dynamic_size lam
 
     (* Primitives specific to oxcaml *)
@@ -378,6 +354,8 @@ let compute_static_size lam =
     | Punboxed_int64_array_set_vec _
     | Punboxed_nativeint_array_set_vec _
     | Parray_element_size_in_bytes _
+    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+    | Pidx_deepen _
     | Punbox_unit ->
         Constant
 
@@ -391,8 +369,6 @@ let compute_static_size lam =
     | Pgetpredef _
     | Pufloatfield (_, _)
     | Punboxed_product_field (_, _)
-    | Punboxed_float_comp (_, _)
-    | Punboxed_int_comp (_, _)
     | Pstring_load_vec _
     | Pbytes_load_vec _
     | Pbigstring_load_vec _
@@ -406,16 +382,8 @@ let compute_static_size lam =
     | Punboxed_nativeint_array_load_vec _
     | Pprobe_is_enabled _
     | Pobj_magic _
-    | Punbox_float _
-    | Pbox_float (_, _)
-    | Puntag_int _
-    | Ptag_int _
-    | Punbox_int _
-    | Pbox_int (_, _)
     | Punbox_vector _
     | Pbox_vector (_, _)
-    | Pfloatoffloat32 _
-    | Pfloat32offloat _
     | Pget_header _
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63 ->
@@ -558,7 +526,7 @@ let rec split_static_function lfun block_var local_idents lam :
                    [Lvar block_var],
                    no_loc)
           in
-          (succ i, Ident.Map.add var access subst, Lvar var :: fields))
+          (Stdlib.succ i, Ident.Map.add var access subst, Lvar var :: fields))
         local_free_vars (0, Ident.Map.empty, [])
     in
     (* Note: When there are no local free variables, we don't need the
@@ -959,7 +927,7 @@ let compile_letrec input_bindings body =
         in
         let alloc =
           Lprim (Pccall alloc_prim,
-                 List.map (fun n -> Lconst (Lambda.const_int n)) const_args,
+                 List.map Lambda.tagged_immediate const_args,
                  no_loc)
         in
         Llet(Strict, Lambda.layout_letrec, id, duid, alloc, body))

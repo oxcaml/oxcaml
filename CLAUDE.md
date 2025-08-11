@@ -27,6 +27,23 @@ make promote-one TEST=test-dir/path.ml   # Update expected test output
 make runtest                             # Run all tests in oxcaml/tests
 ```
 
+## Configuration Commands
+```bash
+autoconf                  # Generate configure script, needs to be version 2.71
+                          # or higher; if available, just use autoconf27 directly
+
+./configure               # Configure the compiler
+```
+
+Configuration is needed after changing files with extension `.in` or modifying the autoconf script.
+To avoid issues with dune caching, removing the `_build/` directory may be needed after configuring.
+By default, unless there is a good reason to omit them, the following options should be used for configuring:
+```bash
+./configure --enable-ocamltest --enable-warn-error --enable-dev --enable-runtime5 --prefix="$(pwd)/_install"
+```
+If previously a different install directory was used, prefer the old one over `$(pwd)/_install` for `--prefix`.
+
+
 ## Misc
 ```bash
 make fmt                   # Code formatting

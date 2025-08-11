@@ -1,7 +1,7 @@
 (* TEST
  include stdlib_beta;
  include stdlib_upstream_compatible;
- modules = "test_repr.c";
+ modules = "test_repr.c test_smallint.ml";
  flambda2;
  {
    flags = "-extension-universe beta";
@@ -17,39 +17,13 @@
    bytecode;
  }
 *)
-let min_int = -0x80
-
-let max_int = 0x7f
-
+open Test_smallint
 module Smallint = Stdlib_beta.Int8_u
-module Int = Stdlib_beta.Int_wrapper
-
-let same_float x y = Int64.equal (Int64.bits_of_float x) (Int64.bits_of_float y)
+let min_int = -0x80
+let max_int = 0x7f
 
 let same_int x y =
   Int.equal (Smallint.to_int x) y && Smallint.equal x (Smallint.of_int y)
-
-(** generates a random float that rounds toward zero to the same integer value *)
-let nudge rng f =
-  let f_pos = Float.abs f in
-  if not (Float.is_finite f)
-  then f
-  else if f_pos < 1.
-  then Random.State.float rng (Float.pred 1.0)
-  else
-    let lo = Float.floor f_pos in
-    let hi = Float.pred (lo +. 1.) in
-    if not (lo < hi)
-    then f
-    else
-      (* the mantissa is the low bits, and we are only generating normal
-         fractional values so we never need to change the exponent *)
-      let lo = Int64.bits_of_float lo in
-      let hi = Int64.bits_of_float hi in
-      assert (Int64.shift_right lo 52 = Int64.shift_right hi 52);
-      Float.copy_sign
-        (Int64.float_of_bits (Random.State.int64_in_range rng ~min:lo ~max:hi))
-        f
 
 let () =
   let int_size = Smallint.size in
@@ -105,15 +79,15 @@ let () =
     | exception exn -> (
       match y () with _ -> raise exn | exception exn' -> assert (exn = exn'))
   in
-  let test_conv1 (int16_f : Smallint.t -> Smallint.t) int_f ~equal =
+  let test_conv1 (int_u_f : Smallint.t -> Smallint.t) int_f ~equal =
     test1 (fun x ->
-        assert_equal equal (fun () -> int16_f (of_int x)) (fun () -> int_f x))
+        assert_equal equal (fun () -> int_u_f (of_int x)) (fun () -> int_f x))
   in
   let test_conv2 ?(unsigned = false)
-      (int16_f : Smallint.t -> Smallint.t -> Smallint.t) int_f ~equal =
+      (int_u_f : Smallint.t -> Smallint.t -> Smallint.t) int_f ~equal =
     test2 (fun x y ->
         assert_equal equal
-          (fun () -> int16_f (of_int x) (of_int y))
+          (fun () -> int_u_f (of_int x) (of_int y))
           (fun () ->
             if unsigned then int_f (x land mask) (y land mask) else int_f x y))
   in
@@ -141,8 +115,8 @@ let () =
   test_arith2 Smallint.sub Int.sub;
   test_arith2 Smallint.mul Int.mul;
   test_arith2 Smallint.div Int.div;
-  (* test_arith2 Smallint.unsigned_div Int.unsigned_div ~unsigned:true;
-   * test_arith2 Smallint.unsigned_rem Int.unsigned_rem ~unsigned:true; *)
+  test_arith2 Smallint.unsigned_div Int.unsigned_div ~unsigned:true;
+  test_arith2 Smallint.unsigned_rem Int.unsigned_rem ~unsigned:true;
   test_arith2 Smallint.rem Int.rem;
   test_arith1 Smallint.succ Int.succ;
   test_arith1 Smallint.pred Int.pred;
@@ -167,9 +141,11 @@ let () =
       ~equal:(if shift = 0 then equal_logical else equal_arith)
   done;
   test2 (fun x y ->
-      assert (Smallint.equal (of_int x) (of_int y) = Int.equal x y));
+    assert (Smallint.equal (of_int x) (of_int y) = Int.equal x y));
   test2 (fun x y ->
-      assert (Smallint.compare (of_int x) (of_int y) = Int.compare x y));
+    assert (Smallint.compare (of_int x) (of_int y) = Int.compare x y));
+  test2 (fun x y ->
+      assert (Smallint.unsigned_compare (of_int x) (of_int y) = Int.unsigned_compare x y));
   test1 (fun x ->
       assert (same_float (Smallint.to_float (of_int x)) (Int.to_float x)));
   ListLabels.iter
@@ -178,17 +154,17 @@ let () =
   test1 (fun x ->
       (* test that fractional values round toward zero *)
       let f = nudge rng (Int.to_float x) in
-      assert (equal_logical (Smallint.of_float f) x));
+      assert (equal_logical (Smallint.of_float f) (Int.of_float f)));
   test1 (fun x -> assert (Smallint.to_string (of_int x) = Int.to_string x));
+  test_strings ~int_size ~f:(fun s ->
+    assert (equal_arith (Smallint.of_string s) (int_of_string s)));
   test_logical2 Smallint.min Int.min;
   test_logical2 Smallint.max Int.max;
   ()
 
 (* test that the value is stored sign-extended in the register *)
 external get_register : Smallint.t -> nativeint = "get_register_bytecode" "get_register"
-let get_register x = get_register (Smallint.of_int x)
-
 
 let () =
-  assert (get_register ((1 lsl Smallint.size) - 1) = -1n);
+  assert (get_register (Smallint.shift_left (Smallint.max_int()) 1) = -2n);
   ()

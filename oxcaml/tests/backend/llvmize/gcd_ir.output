@@ -1,8 +1,13 @@
 source_filename = "gcd.ml"
 
-@camlGcd__data_begin = global i64 0
+@camlGcd__data_begin = global {  } {  }, align 8
 define void @camlGcd__code_begin() { ret void }
 
+@camlGcd__gc_roots = global { i64 } { i64 0 }, align 8
+@.header.camlGcd = global { i64 } { i64 1792 }, align 8
+@camlGcd = global { ptr } { ptr @camlGcd__gcd_1 }, align 8
+@.header.camlGcd__gcd_1 = global { i64 } { i64 3063 }, align 8
+@camlGcd__gcd_1 = global { ptr, i64 } { ptr @camlGcd__gcd_HIDE_STAMP, i64 108086391056891909 }, align 8
 define cc 104 { { ptr }, { i64 } } @camlGcd__gcd_HIDE_STAMP(ptr %0, i64 %1)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
@@ -242,12 +247,9 @@ declare  void @llvm.trap()
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
 
-@camlGcd__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
-@camlGcd = global { ptr, i64 } { ptr @camlGcd__gcd_1, i64 3063 }
-@camlGcd__gcd_1 = global { ptr, i64 } { ptr @camlGcd__gcd_HIDE_STAMP, i64 108086391056891909 }
 @camlGcd_data = external global ptr
 @caml_exn_Division_by_zero = external global ptr
 
-@camlGcd__data_end = global i64 0
+@camlGcd__data_end = global {  } {  }, align 8
 define void @camlGcd__code_end() { ret void }
-@camlGcd__frametable = global i64 0
+@camlGcd__frametable = global {  } {  }, align 8

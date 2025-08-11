@@ -10,7 +10,22 @@ let sprintf = Printf.sprintf
 
 let failwithf fmt = Printf.ksprintf failwith fmt
 
-let interesting_type_trees : Type_structure.t Tree.t list =
+type test =
+  | Array_idx_access of { local : bool }
+  | Record_idx_access of { local : bool }
+  | Array_idx_deepening
+  | Record_idx_deepening
+  | Record_size
+  | Record_access of
+      { local : bool;
+        with_void : bool
+      }
+
+let is_idx_test = function
+  | Array_idx_access _ | Record_idx_access _ -> true
+  | _ -> false
+
+let interesting_type_trees test : Type_structure.t Tree.t list =
   (* There are many possible type trees, exponential in the size of the tree and
      the number of types we consider.
 
@@ -23,82 +38,101 @@ let interesting_type_trees : Type_structure.t Tree.t list =
     false
   in
   let open Type_structure in
-  List.concat_map
+  let interesting_type_pairs =
     [ [Int; Float];
       [Int; Int32_u];
       [Int; Int64x2_u];
       [Float; Float_u];
       [Unit_u; String]
     ]
-    ~f:(fun leaves ->
-      List.concat_map
-        (Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:3
-        @
-        if patient
-        then
-          [ Branch [Leaf (); Branch [Leaf (); Branch [Leaf ()]]];
-            Branch [Leaf (); Branch [Branch [Leaf (); Leaf ()]]];
-            Branch [Branch [Branch [Leaf (); Leaf ()]; Leaf ()]];
-            Branch [Branch [Leaf (); Branch [Leaf (); Leaf ()]]]
-          ]
-        else []
-        )
-        ~f:(fun shape -> Tree.enumerate ~shape ~leaves)
+  in
+  let interesting_large_trees : _ Tree.t list =
+    [ Branch [Leaf (); Branch [Leaf (); Branch [Leaf ()]]];
+      Branch [Leaf (); Branch [Branch [Leaf (); Leaf ()]]];
+      Branch [Branch [Branch [Leaf (); Leaf ()]; Leaf ()]];
+      Branch [Branch [Leaf (); Branch [Leaf (); Leaf ()]]]
+    ]
+  in
+  let interesting_types =
+    [ Int;
+      Int64;
+      Int32_u;
+      Float;
+      Int64_u;
+      Nativeint_u;
+      Unit_u;
+      Variant [[Unit_u]]
+    ]
+  in
+  let more_interesting_types =
+    interesting_types
+    @ [ Tuple ([Unit_u; Unit_u], Unboxed);
+        Tuple ([Unit_u; Int], Unboxed);
+        Tuple ([Unit_u; Int64_u], Unboxed);
+        Tuple ([Unit_u; String], Unboxed);
+        Variant [[Unit_u]; [Unit_u; Unit_u]; [Tuple ([Unit_u; Unit_u], Unboxed)]]
+      ]
+  in
+  let hardcoded_type_trees : _ Tree.t list =
+    (* Some particular interesting type trees *)
+    [ Branch
+        (* Mixed then all flat *)
+        [Branch [Leaf Int64; Leaf Int64_u]; Branch [Leaf Int64_u; Leaf Float_u]];
+      Branch
+        (* Mixed then all values *)
+        [Branch [Leaf Int64_u; Leaf Int64]; Branch [Leaf Int64; Leaf Int64]];
+      Branch
+        (* All values then mixed *)
+        [Branch [Leaf Int64; Leaf String]; Branch [Leaf Int64_u; Leaf String]];
+      Branch
+        (* All flats then mixed *)
+        [ Branch [Leaf Float32_u; Leaf Int64_u];
+          Branch [Leaf String; Leaf Int64_u]
+        ];
+      Branch
+        (* Mixed then mixed *)
+        [Branch [Leaf Int64_u; Leaf Int64]; Branch [Leaf Float32_u; Leaf Float]];
+      Branch
+        (* An int64x2 that would be reordered to the gap of a "sibling"
+           record *)
+        [Branch [Leaf Int64x2_u; Leaf String]; Branch [Leaf Int64; Leaf Float_u]];
+      Branch
+        (* An int64x2 that would be reordered to the gap of an inner record *)
+        [Leaf Int64x2_u; Branch [Leaf String; Leaf Float_u]]
+    ]
+  in
+  let enumerated_trees =
+    Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:2
+  in
+  let more_enumerated_trees =
+    Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:3
+  in
+  let enumerated_type_trees =
+    (* more trees, fewer types *)
+    List.concat_map interesting_type_pairs ~f:(fun leaves ->
+        List.concat_map
+          (more_enumerated_trees
+          @ if patient then interesting_large_trees else []
+          )
+          ~f:(fun shape -> Tree.enumerate ~shape ~leaves)
     )
-  @ List.concat_map
-      (Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:2)
-      ~f:(fun shape ->
-        Tree.enumerate ~shape
-          ~leaves:
-            ([ Int;
-               Int64;
-               Int32_u;
-               Float;
-               Int64_u;
-               Nativeint_u;
-               Unit_u;
-               Variant [[Unit_u]]
-             ]
-            @
-            if patient
-            then
-              [ Tuple ([Unit_u; Unit_u], Unboxed);
-                Tuple ([Unit_u; Int], Unboxed);
-                Tuple ([Unit_u; Int64_u], Unboxed);
-                Tuple ([Unit_u; String], Unboxed);
-                Variant
-                  [ [Unit_u];
-                    [Unit_u; Unit_u];
-                    [Tuple ([Unit_u; Unit_u], Unboxed)]
-                  ]
-              ]
-            else []
-            )
-    )
-  @ (* Some particular interesting trees *)
-  [ Branch
-      (* Mixed then all flat *)
-      [Branch [Leaf Int64; Leaf Int64_u]; Branch [Leaf Int64_u; Leaf Float_u]];
-    Branch
-      (* Mixed then all values *)
-      [Branch [Leaf Int64_u; Leaf Int64]; Branch [Leaf Int64; Leaf Int64]];
-    Branch
-      (* All values then mixed *)
-      [Branch [Leaf Int64; Leaf String]; Branch [Leaf Int64_u; Leaf String]];
-    Branch
-      (* All flats then mixed *)
-      [Branch [Leaf Float32_u; Leaf Int64_u]; Branch [Leaf String; Leaf Int64_u]];
-    Branch
-      (* Mixed then mixed *)
-      [Branch [Leaf Int64_u; Leaf Int64]; Branch [Leaf Float32_u; Leaf Float]];
-    Branch
-      (* An int64x2 that would be reordered to the gap of a "sibling" record *)
-      [Branch [Leaf Int64x2_u; Leaf String]; Branch [Leaf Int64; Leaf Float_u]];
-    Branch
-      (* An int64x2 that would be reordered to the gap of an inner record *)
-      [Leaf Int64x2_u; Branch [Leaf String; Leaf Float_u]]
-  ]
-  |> List.sort_uniq ~cmp:(Tree.compare Type_structure.compare)
+    (* fewer trees, more types *)
+    @ List.concat_map enumerated_trees ~f:(fun shape ->
+          Tree.enumerate ~shape
+            ~leaves:
+              (if patient then more_interesting_types else interesting_types)
+      )
+    @ hardcoded_type_trees
+  in
+  let enumerated_type_trees =
+    if is_idx_test test && not patient
+    then
+      (* idx tests are expensive, so take a subset *)
+      let () = Random.init (Hashtbl.hash test) in
+      List.filteri ~f:(fun i _ -> Random.int 5 = 0) enumerated_type_trees
+    else enumerated_type_trees
+  in
+  List.sort_uniq enumerated_type_trees ~cmp:(Tree.compare Type_structure.compare)
 
 let preamble =
   {|open Stdlib_upstream_compatible
@@ -138,6 +172,8 @@ let mark_test_run test_id =
 (* Various interesting values *)
 
 let sizes = [ 0; 1; 2; 30 ]
+
+let indices_in_deepening_tests = [0; 100_000]
 
 type packed = P : 'a -> packed
 let ref_to_force_heap_allocation : packed ref = ref (P 0)
@@ -205,6 +241,8 @@ let for_ var ~from ~to_ ~debug_exprs f =
   );
   line "done;"
 
+let for_i_below_size = for_ "i" ~from:"0" ~to_:"size - 1"
+
 (* Iterate through a list of ints *)
 let iter l var ~debug_exprs f =
   line "iter (%s) ~f:(fun %s ->" l var;
@@ -230,6 +268,279 @@ let type_section (ty : Type.t) =
     | _ -> Type.code ty
   in
   section ("  " ^ header ^ "  ")
+
+let test_array_idx_access ~local ty =
+  let makearray_dynamic = makearray_dynamic_fn ~local in
+  let debug_exprs = [{ expr = "size"; format_s = "%d" }] in
+  let ty_array_s = Type.code ty ^ " array" in
+  type_section ty;
+  line "let eq = %s in" (Type.eq_code ty);
+  line "let mk_value i = %s in" (Type.mk_value_body_code ty);
+  line "(* Create an array of size [size] *)";
+  line "let a : %s = %s size %s in" ty_array_s makearray_dynamic
+    (Type.value_code ty 0);
+  line "(* Fill [a] with distinct values using block indices *)";
+  for_i_below_size ~debug_exprs (fun ~debug_exprs ->
+      line "Idx_mut.unsafe_set a (.(i)) (mk_value i);"
+  );
+  line "Gc.compact ();";
+  for_i_below_size ~debug_exprs (fun ~debug_exprs ->
+      seq_assert ~debug_exprs "eq (get a i) (mk_value i)"
+  );
+  line "(* Also read back those values with block indices *)";
+  for_i_below_size ~debug_exprs (fun ~debug_exprs ->
+      seq_assert ~debug_exprs "eq (Idx_mut.unsafe_get a (.(i))) (mk_value i)"
+  );
+  for_i_below_size ~debug_exprs (fun ~debug_exprs ->
+      List.iter (Type.unboxed_paths_by_depth ty)
+        ~f:(fun (depth, unboxed_paths) ->
+          if depth = 0
+          then ()
+          else (
+            line "(* Paths of depth %d *)" depth;
+            line "let next_el = mk_value (i + 100 * %d) in" depth;
+            line
+              "(* We update [a.(i)] at all paths of depth %d to be the \
+               corresponding item *)"
+              depth;
+            line "(* in [next_el].*)";
+            line "(* [el] is the reference value, updated with [with] *)";
+            line "let el = get a i in";
+            List.iter unboxed_paths ~f:(fun unboxed_path ->
+                line "(* Path: [%s] *)" (Path.to_string unboxed_path);
+                let reference_update =
+                  (* To perform our reference update (without block indices) to
+                     [el.#x.#y.#z], we generate [#{ el with x = #{ el.#x with y
+                     = #{ el.#x.#y with z = next_el.#x.#y.#z } } }] *)
+                  let rec f (rev_path : Path.t) new_val =
+                    match rev_path with
+                    | [] -> new_val
+                    | Field _ :: _ -> assert false
+                    | Unboxed_field s :: rest ->
+                      let new_val =
+                        sprintf "#{ el%s with %s = %s }"
+                          (Path.to_string (List.rev rest))
+                          s new_val
+                      in
+                      f rest new_val
+                  in
+                  f (List.rev unboxed_path)
+                    (sprintf "next_el%s" (Path.to_string unboxed_path))
+                in
+                line "let el = %s in" reference_update;
+                line
+                  "Idx_mut.unsafe_set a ((.(i)%s) : (%s array, _) idx_mut) \
+                   next_el%s;"
+                  (Path.to_string unboxed_path)
+                  (Type.code ty)
+                  (Path.to_string unboxed_path);
+                seq_assert ~debug_exprs "eq (Idx_mut.unsafe_get a (.(i))) el"
+            )
+          )
+      );
+      line "()"
+  );
+  line "Gc.compact ();";
+  print_newline ()
+
+(* Splits a list into the first N and the remaining elements *)
+let take_n l n =
+  List.mapi l ~f:(fun i x -> i, x)
+  |> List.partition_map ~f:(fun (i, x) -> if i < n then Left x else Right x)
+
+let test_array_idx_deepening ty =
+  let unboxed_paths_by_depth = Type.unboxed_paths_by_depth ty in
+  let debug_exprs = [] in
+  let ty_array_s = Type.code ty ^ " array" in
+  type_section ty;
+  List.iter unboxed_paths_by_depth ~f:(fun (depth, unboxed_paths) ->
+      List.iter unboxed_paths ~f:(fun unboxed_path ->
+          line "(* Deepening to (.(i)%s) *)" (Path.to_string unboxed_path);
+          line "iter indices_in_deepening_tests ~f:(fun i ->";
+          with_indent (fun () ->
+              line "let unboxed_path : (%s, _) idx_mut = (.(i)%s) in" ty_array_s
+                (Path.to_string unboxed_path);
+              for prefix_len = 0 to depth do
+                let prefix, suffix = take_n unboxed_path prefix_len in
+                line "(* from (.(i)%s) *)" (Path.to_string prefix);
+                line "let shallow : (%s, _) idx_mut = (.(i)%s) in" ty_array_s
+                  (Path.to_string prefix);
+                line "let deepened = (.idx_mut(shallow)%s) in"
+                  (Path.to_string suffix);
+                seq_assert ~debug_exprs
+                  "Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) \
+                   (Idx_repr.of_idx_mut deepened)"
+              done
+          );
+          line ");"
+      )
+  );
+  print_newline ()
+
+let test_record_idx_access ty ~local =
+  type_section ty;
+  line "let eq = %s in" (Type.eq_code ty);
+  let fields =
+    match ty with
+    | Record { name = _; fields; boxing = Boxed } -> fields
+    | _ -> invalid_arg "expected boxed record"
+  in
+  let debug_exprs = [] in
+  List.iter fields ~f:(fun (lbl, fld_t) ->
+      line "let r = %s in" (Type.value_code ty 0);
+      List.iter (Type.unboxed_paths_by_depth fld_t)
+        ~f:(fun (depth, unboxed_paths) ->
+          line "(* Paths of depth %d *)" (depth + 1);
+          line "let next_r = %s in" (Type.value_code ty (100 * (depth + 1)));
+          List.iter unboxed_paths ~f:(fun unboxed_path ->
+              line "(* .%s%s *)" lbl (Path.to_string unboxed_path);
+              let full_path = Path.Field lbl :: unboxed_path in
+              let flattened_float =
+                Type_structure.is_flat_float_record (Type.structure ty)
+                && Type_structure.layout
+                     (Type.structure (Type.follow_path ty full_path))
+                   = Value { ignorable = false; non_float = false }
+              in
+              let sub_ty =
+                if flattened_float
+                then (
+                  line "(* ff *)";
+                  Type.Float_u
+                )
+                else Type.follow_path ty full_path
+              in
+              line "let sub_eq = %s in" (Type.eq_code sub_ty);
+              let reference_update =
+                (* To perform our reference update (without block indices) to
+                   [el.x.#y.#z], we generate [{ el with x = #{ el.#x with y = #{
+                   el.x.#y with z = next_el.x.#y.#z } } }] *)
+                let rec f (rev_path : Path.t) new_val =
+                  match rev_path with
+                  | [] -> new_val
+                  | Field _ :: _ -> assert false
+                  | Unboxed_field s :: rest ->
+                    let new_val =
+                      sprintf "#{ r.%s%s with %s = %s }" lbl
+                        (Path.to_string (List.rev rest))
+                        s new_val
+                    in
+                    f rest new_val
+                in
+                let new_field =
+                  f (List.rev unboxed_path)
+                    (sprintf "next_r.%s%s" lbl (Path.to_string unboxed_path))
+                in
+                sprintf "{ r with %s = %s }" lbl new_field
+              in
+              line "let expected = %s in" reference_update;
+              let idx =
+                sprintf "((.%s%s) : (%s, _) idx_mut)" lbl
+                  (Path.to_string unboxed_path)
+                  (Type.code ty)
+              in
+              let next_r_sub_element_flat =
+                if flattened_float
+                then
+                  (* next_r at some path must be a float(#) or nested singleton
+                     unboxed records to one *)
+                  let ty' = ty in
+                  let rec path_to_float (ty : Type.t) =
+                    match ty with
+                    | Float | Float_u -> []
+                    | Record
+                        { fields = [(lbl, ty)]; boxing = Unboxed; name = _ } ->
+                      Path.Unboxed_field lbl :: path_to_float ty
+                    | Tuple (_, Unboxed) -> failwith "unimplemented"
+                    | _ ->
+                      failwith
+                        (sprintf "ty %s; %s; subty %s; stuck at %s"
+                           (Type.code ty') (Path.to_string full_path)
+                           (Type.code (Type.follow_path ty' full_path))
+                           (Type.code ty)
+                        )
+                  in
+                  sprintf "(Float_u.of_float next_r%s%s)"
+                    (Path.to_string full_path)
+                    (Path.to_string
+                       (path_to_float (Type.follow_path ty full_path))
+                    )
+                else sprintf "next_r%s" (Path.to_string full_path)
+              in
+              line "Idx_mut.unsafe_set r %s %s;" idx next_r_sub_element_flat;
+              seq_assert ~debug_exprs "eq r expected";
+              seq_assert ~debug_exprs
+                (sprintf "sub_eq (Idx_mut.unsafe_get r %s) %s" idx
+                   next_r_sub_element_flat
+                )
+          )
+      )
+  )
+
+let test_record_idx_deepening ty =
+  type_section ty;
+  let fields =
+    match ty with
+    | Record { name = _; fields; boxing = Boxed } -> fields
+    | _ -> invalid_arg "expected boxed record"
+  in
+  List.iter fields ~f:(fun (lbl, fld_t) ->
+      List.iter (Type.unboxed_paths_by_depth fld_t)
+        ~f:(fun (depth, unboxed_paths) ->
+          List.iter unboxed_paths ~f:(fun unboxed_path ->
+              let full_path = Path.Field lbl :: unboxed_path in
+              line "(* Deepening to (%s) *)" (Path.to_string full_path);
+              line "let idx : (%s, _) idx_mut = (%s) in" (Type.code ty)
+                (Path.to_string full_path);
+              line "iter indices_in_deepening_tests ~f:(fun i ->";
+              with_indent (fun () ->
+                  let debug_exprs = [{ expr = "i"; format_s = "%d" }] in
+                  for prefix_len = 0 to depth do
+                    let prefix, suffix = take_n unboxed_path prefix_len in
+                    let prefix = Path.Field lbl :: prefix in
+                    let from_flattened_float =
+                      Type_structure.is_flat_float_record (Type.structure ty)
+                      && Type_structure.layout
+                           (Type.structure (Type.follow_path ty prefix))
+                         = Value { ignorable = false; non_float = false }
+                    in
+                    let to_void =
+                      Type_structure.layout
+                        (Type.structure (Type.follow_path ty full_path))
+                      = Void
+                    in
+                    if (not from_flattened_float) || suffix = []
+                    then (
+                      line "(* from (%s) *)" (Path.to_string prefix);
+                      line "let shallow : (%s, _) idx_mut = (%s) in"
+                        (Type.code ty) (Path.to_string prefix);
+                      line "let deepened = (.idx_mut(shallow)%s) in"
+                        (Path.to_string suffix);
+                      if to_void
+                      then (
+                        line
+                          "(* No guarantees on representation of idx to void *)";
+                        line "let _ignore = #(idx, deepened) in";
+                        line "();"
+                      )
+                      else
+                        seq_assert ~debug_exprs
+                          "Idx_repr.equal (Idx_repr.of_idx_mut idx) \
+                           (Idx_repr.of_idx_mut deepened)"
+                    )
+                    else (
+                      line
+                        "(* Note: can't deepen (%s) because it's a path to a \
+                         flattened"
+                        (Path.to_string prefix);
+                      line "   float, making its element type [float#] *)"
+                    )
+                  done
+              );
+              line ");"
+          )
+      )
+  );
+  print_newline ()
 
 let test_record_size ty ~bytecode =
   type_section ty;
@@ -370,17 +681,17 @@ let toplevel_unit_block f =
   line "let () = to_run ();;";
   line ""
 
-type test =
-  | Record_size
-  | Record_access of
-      { local : bool;
-        with_void : bool
-      }
+let is_idx_test = function
+  | Array_idx_access _ | Record_idx_access _ -> true
+  | _ -> false
 
 let main test ~bytecode =
   let types =
+    let interesting_type_trees = interesting_type_trees test in
     match test with
-    | Record_size ->
+    | Array_idx_access _ | Array_idx_deepening ->
+      List.filter_map interesting_type_trees ~f:Type_structure.array_element
+    | Record_idx_access _ | Record_idx_deepening | Record_size _ ->
       List.filter_map interesting_type_trees
         ~f:Type_structure.boxed_record_containing_unboxed_records
     | Record_access { with_void = false; _ } ->
@@ -410,11 +721,12 @@ let main test ~bytecode =
  include stdlib_upstream_compatible;|};
   if bytecode
   then (
+    line {| modules = "idx_repr.ml stubs.c";|};
     line {| flags = "-extension layouts_alpha";|};
     line {| bytecode;|}
   )
   else (
-    line {| modules = "stubs.c";|};
+    line {| modules = "idx_repr.ml stubs.c";|};
     line {| flags = "-extension simd_beta -extension layouts_alpha";|};
     line {| flambda2;|};
     line {| stack-allocation;|};
@@ -430,6 +742,25 @@ let main test ~bytecode =
   line "";
   begin
     match test with
+    | Array_idx_access { local } ->
+      line "let test size =";
+      with_indent (fun () ->
+          List.iter types ~f:(test_array_idx_access ~local);
+          line "()"
+      );
+      print_endline ";;";
+      print_newline ();
+      toplevel_unit_block (fun () -> line "iter sizes ~f:test;")
+    | Array_idx_deepening ->
+      toplevel_unit_block (fun () -> List.iter types ~f:test_array_idx_deepening)
+    | Record_idx_access { local } ->
+      toplevel_unit_block (fun () ->
+          List.iter types ~f:(test_record_idx_access ~local)
+      )
+    | Record_idx_deepening ->
+      toplevel_unit_block (fun () ->
+          List.iter types ~f:test_record_idx_deepening
+      )
     | Record_size ->
       List.iter types ~f:(fun ty ->
           toplevel_unit_block (fun () -> test_record_size ~bytecode ty)
@@ -453,7 +784,14 @@ let tests =
     "record_access_local", Record_access { local = true; with_void = false };
     "record_access_with_void", Record_access { local = false; with_void = true };
     ( "record_access_with_void_local",
-      Record_access { local = true; with_void = true } )
+      Record_access { local = true; with_void = true } );
+    "array_idx_access", Array_idx_access { local = false };
+    "array_idx_access_local", Array_idx_access { local = true };
+    "record_idx_access", Record_idx_access { local = false };
+    "record_idx_access_local", Record_idx_access { local = true };
+    "array_idx_deepening", Array_idx_deepening;
+    "record_idx_deepening", Record_idx_deepening;
+    "record_size", Record_size
   ]
 
 let () =

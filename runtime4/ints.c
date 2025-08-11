@@ -70,6 +70,8 @@ static int parse_digit(char c)
 }
 
 #define INT_ERRMSG "int_of_string"
+#define INT8_ERRMSG "Int8.of_string"
+#define INT16_ERRMSG "Int16.of_string"
 #define INT32_ERRMSG "Int32.of_string"
 #define INT64_ERRMSG "Int64.of_string"
 #define INTNAT_ERRMSG "Nativeint.of_string"
@@ -137,6 +139,16 @@ CAMLprim value caml_int_compare(value v1, value v2)
 CAMLprim value caml_int_of_string(value s)
 {
     return Val_long(parse_intnat(s, 8 * sizeof(value) - 1, INT_ERRMSG));
+}
+
+CAMLprim value caml_int16_of_string(value s)
+{
+    return Val_long((int16_t)parse_intnat(s, 16, INT16_ERRMSG));
+}
+
+CAMLprim value caml_int8_of_string(value s)
+{
+    return Val_long((int8_t)parse_intnat(s, 8, INT8_ERRMSG));
 }
 
 #define FORMAT_BUFFER_SIZE 32

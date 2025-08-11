@@ -35,6 +35,7 @@ let base_layout_to_byte_size (sort : base_layout) =
   | Bits16 -> 2
   | Bits32 -> 4
   | Bits64 -> 8
+  | Untagged_immediate -> Arch.size_addr
   | Vec128 -> 16
   | Vec256 -> 32
   | Vec512 -> 64
@@ -206,6 +207,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Vec256 -> Vec256
     | Vec512 -> Vec512
     | Word -> Word
+    | Untagged_immediate -> Word
     | Void -> Product [||])
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
 
@@ -991,7 +993,7 @@ let create_base_layout_type ?(simd_vec_split = None) ~reference
   | Float32 | Float64 ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ~name ~byte_size
       ~encoding:Encoding_attribute.float
-  | Void | Bits8 | Bits16 | Bits32 | Bits64 | Word ->
+  | Void | Bits8 | Bits16 | Bits32 | Bits64 | Word | Untagged_immediate ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ~name ~byte_size
       ~encoding:Encoding_attribute.signed
   | Vec128 | Vec256 | Vec512 ->
@@ -1013,7 +1015,7 @@ let rec create_packed_layout_type (layout : Layout.t) ~parent_proto_die
       match b with
       | Value -> assert false
       | Float32 | Float64 -> Encoding_attribute.float
-      | Void | Bits8 | Bits16 | Bits32 | Bits64 | Word ->
+      | Void | Bits8 | Bits16 | Bits32 | Bits64 | Word | Untagged_immediate ->
         Encoding_attribute.signed
       | Vec128 | Vec256 | Vec512 -> Encoding_attribute.unsigned
     in

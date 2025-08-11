@@ -108,9 +108,17 @@ let catch fct arg =
 
 type raw_backtrace_slot : immutable_data
 type raw_backtrace_entry = private int
-type raw_backtrace = raw_backtrace_entry array
+type raw_backtrace = raw_backtrace_entry iarray
 
-let raw_backtrace_entries bt = bt
+external unsafe_iarray_to_array:
+  'a iarray -> 'a array @@ portable = "%array_of_iarray"
+
+external iarray_length:
+  'a iarray -> int @@ portable = "%array_length"
+
+let to_array bt = Array.copy (unsafe_iarray_to_array bt)
+
+let raw_backtrace_entries bt = to_array bt
 
 external get_raw_backtrace:
   unit -> raw_backtrace @@ portable = "caml_get_exception_raw_backtrace"
@@ -261,7 +269,7 @@ let backtrace_slots raw_backtrace =
       else None
 
 let backtrace_slots_of_raw_entry entry =
-  backtrace_slots [| entry |]
+  backtrace_slots [: entry :]
 
 module Slot = struct
   type t = backtrace_slot
@@ -272,7 +280,7 @@ module Slot = struct
   let name = backtrace_slot_defname
 end
 
-let raw_backtrace_length bt = Array.length bt
+let raw_backtrace_length bt = iarray_length bt
 
 external get_raw_backtrace_slot :
   raw_backtrace -> int -> raw_backtrace_slot @@ portable = "caml_raw_backtrace_slot"
@@ -350,7 +358,7 @@ let set_uncaught_exception_handler_safe fn =
 let set_uncaught_exception_handler_unsafe fn =
   set_uncaught_exception_handler_safe (Obj.magic_portable fn)
 
-let empty_backtrace : raw_backtrace = [| |]
+let empty_backtrace : raw_backtrace = [: :]
 
 let try_get_raw_backtrace () =
   try

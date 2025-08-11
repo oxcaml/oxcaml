@@ -428,3 +428,88 @@ end
 [%%expect{|
 module rec Foo : sig val bar : unit -> unit end
 |}]
+
+module type S = sig
+    module type S = sig end
+
+    module type Key = sig
+    module M0 : S
+    end
+
+    module L : sig
+    module M : Key
+
+    module N : sig
+        module Label : Key with M
+
+        include sig
+            module Key : S
+        end
+        with module Key = Label
+    end
+    end
+
+    include sig
+        module L' : S
+    end
+    with module L' = L
+
+end
+[%%expect{|
+module type S =
+  sig
+    module type S = sig end
+    module type Key = sig module M0 : S end
+    module L :
+      sig
+        module M : Key
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end
+          end
+      end
+    module L' :
+      sig
+        module M : sig module M0 : sig end end
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end
+          end
+      end
+  end
+|}]
+
+(* CR zqian: fix [make_aliases_absent]. *)
+module type S = sig
+    module type S = sig end
+
+    module type Key = sig
+    module M0 : S
+    end
+
+    module L : sig
+    module M : Key
+
+    module N : sig
+        module Label : Key with M
+
+        include sig
+            module Key : S
+        end
+        with module Key = Label
+        @@ portable
+    end
+    end
+
+    include sig
+        module L' : S
+    end
+    with module L' = L
+    @@ portable
+end
+[%%expect{|
+Uncaught exception: File "typing/env.ml", line 2139, characters 13-19: Assertion failed
+
+|}]

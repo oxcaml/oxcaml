@@ -20,7 +20,7 @@
 (* This file tests using external C functions with int16#. *)
 
 
-external to_int16 : int16# -> int16 = "%tag_int16" [@@warning "-187"]
+external to_int16 : int16# -> int16 = "%tag_int16"
 
 let print_int16 s f = Printf.printf "%s: %d\n" s (Stdlib_beta.Int16.to_int f)
 let print_int16u s f = print_int16 s (to_int16 f)

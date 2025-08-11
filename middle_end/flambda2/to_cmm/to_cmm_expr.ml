@@ -1268,8 +1268,7 @@ and switch env res switch =
        index in [cases] of the expression to execute when [e] matches [d]. *)
     let max_d, _ = Targetint_31_63.Map.max_binding arms in
     let m = prepare_discriminant ~must_tag:must_tag_discriminant max_d in
-    let unreachable, res = C.invalid res ~message:"unreachable switch case" in
-    let cases = Array.make (n + 1) unreachable in
+    let cases = Array.make (n + 1) None in
     let index = Array.make (m + 1) n in
     let _, res, free_vars, symbol_inits =
       Targetint_31_63.Map.fold
@@ -1290,13 +1289,26 @@ and switch env res switch =
             Env.Symbol_inits.merge symbol_inits action_symbol_inits
           in
           let free_vars = Backend_var.Set.union free_vars action_free_vars in
-          cases.(i) <- cmm_action;
+          cases.(i) <- Some cmm_action;
           index.(d) <- i;
           i + 1, res, free_vars, symbol_inits)
         arms
         (0, res, scrutinee_free_vars, Env.Symbol_inits.empty)
     in
+    let needs_unreachable = Array.exists (fun idx -> Int.equal idx n) index in
+    let cases, res =
+      match needs_unreachable with
+      | false -> Array.sub cases 0 n, res
+      | true ->
+        let unreachable, res =
+          C.invalid res ~message:"unreachable switch case"
+        in
+        cases.(n) <- Some unreachable;
+        cases, res
+    in
     (* CR-someday poechsel: Put a more precise value kind here *)
-    let expr = C.transl_switch_clambda dbg scrutinee index cases in
+    let expr =
+      C.transl_switch_clambda dbg scrutinee index (Array.map Option.get cases)
+    in
     let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res

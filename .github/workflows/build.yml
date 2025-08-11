@@ -133,6 +133,13 @@ jobs:
             os: ubuntu-latest
             cc: clang
 
+          - name: dwarf_tests
+            config: --enable-middle-end=flambda2
+            os: ubuntu-latest
+            dwarf_tests_only: true
+            oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus0
+            oxcaml_llvm_source_branch: lldb
+
     env:
       J: "3"
       run_testsuite: "true"
@@ -269,6 +276,7 @@ jobs:
 
     - name: Build, install and test OxCaml
       working-directory: oxcaml
+      if: matrix.dwarf_tests_only != true
       run: |
         if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
         export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
@@ -280,6 +288,39 @@ jobs:
         OCAMLPARAM: ${{ matrix.ocamlparam }}
         OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
         USE_RUNTIME: ${{ matrix.use_runtime }}
+
+    - name: Install custom OxCaml LLVM
+      if: matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
+      run: |
+        # Determine architecture
+        if [[ "${{ runner.arch }}" == "X64" ]]; then
+          ARCH="x86_64"
+        elif [[ "${{ runner.arch }}" == "ARM64" ]]; then
+          ARCH="aarch64"
+        else
+          echo "Unsupported architecture: ${{ runner.arch }}"
+          exit 1
+        fi
+
+        OXCAML_LLVM_TAG="${{ matrix.oxcaml_llvm_tag }}"
+        OXCAML_LLVM_SOURCE_BRANCH="${{ matrix.oxcaml_llvm_source_branch }}"
+        OXCAML_LLVM_URL="https://github.com/ocaml-flambda/llvm-project/releases/download/${OXCAML_LLVM_TAG}/${OXCAML_LLVM_TAG}-llvm-linux-${ARCH}-${OXCAML_LLVM_SOURCE_BRANCH}.tar.gz"
+
+        # Download and extract custom OxCaml LLVM (includes LLDB and other LLVM tools)
+        cd $GITHUB_WORKSPACE
+        wget -O oxcaml-llvm.tar.gz "$OXCAML_LLVM_URL"
+        mkdir -p oxcaml-llvm
+        tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
+
+    - name: Build and test OxCaml DWARF
+      working-directory: oxcaml
+      if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
+      run: |
+        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+        ulimit -c unlimited
+        make runtest-dwarf
+      env:
+        OXCAML_LLDB: ${{ github.workspace }}/oxcaml-llvm/bin/lldb
 
     - name: Check other architectures
       working-directory: oxcaml
@@ -294,6 +335,10 @@ jobs:
         for allocator in irc ls gi; do \
           ./_build/main/tools/regalloc/regalloc.exe _build \
             -validate -summary -regalloc $allocator || exit 1; \
+        done
+        for allocator in irc ls gi; do \
+          ./_build/main/tools/regalloc/regalloc.exe _build \
+            -validate -param SPLIT_AROUND_LOOPS:on -regalloc $allocator || exit 1; \
         done
 
     - uses: actions/upload-artifact@v4

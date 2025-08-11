@@ -113,7 +113,7 @@ module Type_shape = struct
         | None -> (
           match uid_of_path path with
           | Some uid ->
-            Ts_constr
+            Shape.Ts_constr
               ((uid, path, Layout_to_be_determined), of_expr_list constrs)
           | None -> Ts_other Layout_to_be_determined))
       | Ttuple exprs -> Ts_tuple (of_expr_list (List.map snd exprs))
@@ -123,9 +123,9 @@ module Type_shape = struct
            This code used to only work for [_type_vars = []]. *)
         of_type_expr_go ~depth ~visited type_expr uid_of_path
       | Tunboxed_tuple exprs ->
-        Ts_unboxed_tuple (of_expr_list (List.map snd exprs))
+        Shape.Ts_unboxed_tuple (of_expr_list (List.map snd exprs))
       | Tobject _ | Tnil | Tfield _ ->
-        Ts_other Layout_to_be_determined
+        Shape.Ts_other Layout_to_be_determined
         (* Objects are currently not supported in the debugger. *)
       | Tlink _ | Tsubst _ ->
         Misc.fatal_error "linking and substitution should not reach this stage."
@@ -147,15 +147,15 @@ module Type_shape = struct
                 [{ pv_constr_name = name; pv_constr_args = of_expr_list args }])
             row_fields
         in
-        Ts_variant row_fields
+        Shape.Ts_variant row_fields
       | Tarrow (_, arg, ret, _) ->
-        Ts_arrow
+        Shape.Ts_arrow
           ( of_type_expr_go ~depth ~visited arg uid_of_path,
             of_type_expr_go ~depth ~visited ret uid_of_path )
       | Tunivar { name; _ } -> Ts_var (name, Layout_to_be_determined)
       | Tof_kind _ -> Ts_other Layout_to_be_determined
       | Tpackage _ ->
-        Ts_other
+        Shape.Ts_other
           Layout_to_be_determined (* CR sspies: Support first-class modules. *)
 
   let of_type_expr (expr : Types.type_expr) uid_of_path =
@@ -173,14 +173,15 @@ module Type_decl_shape = struct
          contrary to the name.*)
     | Types.Float64 -> Layout.Base Float64
     | Types.Float32 -> Layout.Base Float32
+    | Types.Bits8 -> Layout.Base Bits8
+    | Types.Bits16 -> Layout.Base Bits16
     | Types.Bits32 -> Layout.Base Bits32
+    | Types.Untagged_immediate -> Layout.Base Untagged_immediate
     | Types.Bits64 -> Layout.Base Bits64
     | Types.Vec128 -> Layout.Base Vec128
     | Types.Vec256 -> Layout.Base Vec256
     | Types.Vec512 -> Layout.Base Vec512
     | Types.Word -> Layout.Base Word
-    | Types.Bits8 -> Layout.Base Bits8
-    | Types.Bits16 -> Layout.Base Bits16
     | Types.Void -> Layout.Base Void
     | Types.Product args ->
       Layout.Product

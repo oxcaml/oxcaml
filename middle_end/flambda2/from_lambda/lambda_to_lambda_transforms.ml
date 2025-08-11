@@ -18,6 +18,9 @@ module Env = Lambda_to_flambda_env
 module L = Lambda
 module P = Flambda_primitive
 
+let int_scalar : _ Scalar.Maybe_naked.t =
+  Value (Scalar.Integral.Width.Taggable Int)
+
 type primitive_transform_result =
   | Primitive of L.primitive * L.lambda list * L.scoped_location
   | Transformed of L.lambda
@@ -127,18 +130,16 @@ let rec_catch_for_for_loop env loc ident duid start stop
   let stop_ident_duid = Lambda.debug_uid_none in
   let first_test : L.lambda =
     match dir with
-    | Upto -> Lprim (Pintcomp Cle, [L.Lvar start_ident; L.Lvar stop_ident], loc)
-    | Downto ->
-      Lprim (Pintcomp Cge, [L.Lvar start_ident; L.Lvar stop_ident], loc)
+    | Upto -> L.icmp Cle L.int (Lvar start_ident) (Lvar stop_ident) ~loc
+    | Downto -> L.icmp Cge L.int (Lvar start_ident) (Lvar stop_ident) ~loc
   in
   let subsequent_test : L.lambda =
-    Lprim (Pintcomp Cne, [L.Lvar ident; L.Lvar stop_ident], loc)
+    L.icmp Cne L.int (Lvar ident) (Lvar stop_ident) ~loc
   in
-  let one : L.lambda = Lconst (Const_base (Const_int 1)) in
-  let next_value_of_counter =
+  let next_value_of_counter : L.lambda =
     match dir with
-    | Upto -> L.Lprim (Paddint, [L.Lvar ident; one], loc)
-    | Downto -> L.Lprim (Psubint, [L.Lvar ident; one], loc)
+    | Upto -> L.succ int_scalar (Lvar ident) ~loc
+    | Downto -> L.pred int_scalar (Lvar ident) ~loc
   in
   let lam : L.lambda =
     (* Care needs to be taken here not to cause overflow if, for an incrementing
@@ -200,12 +201,10 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
       let length_is_greater_than_zero_and_is_one_mod_two =
         L.Lprim
           ( Psequand,
-            [ Lprim (Pintcomp Cgt, [length; Lconst (L.const_int 0)], loc);
-              Lprim
-                ( Pintcomp Cne,
-                  [ Lprim (Pmodint Unsafe, [length; Lconst (L.const_int 2)], loc);
-                    Lconst (L.const_int 0) ],
-                  loc ) ],
+            [ L.icmp ~loc Cgt L.int length (L.tagged_immediate 0);
+              L.icmp ~loc Cne L.int
+                (L.and_ L.int length (L.tagged_immediate 1) ~loc)
+                (L.tagged_immediate 0) ],
             loc )
       in
       L.Lifthenelse
@@ -217,10 +216,8 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
   let env, initialize =
     let index = Ident.create_local "index" in
     let index_duid = Lambda.debug_uid_none in
-    rec_catch_for_for_loop env loc index index_duid
-      (Lconst (L.const_int 0))
-      (L.Lprim (Psubint, [length; Lconst (L.const_int 1)], loc))
-      Upto
+    rec_catch_for_for_loop env loc index index_duid (L.tagged_immediate 0)
+      (L.pred L.int length ~loc) Upto
       (Lprim
          ( Parraysetu (array_set_kind, Ptagged_int_index),
            [Lvar array; Lvar index; init],
@@ -336,7 +333,7 @@ let makearray_dynamic_non_scannable_unboxed_product env
     L.(
       Lprim
         ( Pccall external_call_desc,
-          [Lconst (L.const_int num_components); is_local; length],
+          [tagged_immediate num_components; is_local; length],
           loc ))
   in
   match init with
@@ -412,7 +409,7 @@ let makearray_dynamic_scannable_unboxed_product env
       in
       List.exists must_be_scanned kinds
     | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
-    | Punboxedintarray _ | Punboxedvectorarray _ ->
+    | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ ->
       Misc.fatal_errorf
         "%s: should have been sent to [makearray_dynamic_singleton]"
         (Printlambda.array_kind lambda_array_kind)
@@ -466,8 +463,8 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
           (Printlambda.array_kind lambda_array_kind)
           Debuginfo.print_compact dbg
       | Pgenarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
-      | Punboxedintarray _ | Punboxedvectorarray _ | Pgcscannableproductarray _
-        ->
+      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+      | Pgcscannableproductarray _ ->
         Misc.fatal_errorf
           "Cannot compile Pmakearray_dynamic at layout %s without an \
            initializer:@ %a"
@@ -492,23 +489,26 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     makearray_dynamic_singleton_uninitialized "unboxed_float64" ~length mode loc
     |> initialize_array env loc ~length (Punboxedfloatarray_set Unboxed_float64)
          Sixty_four_or_more ~init
-  | Punboxedintarray Unboxed_int32 ->
+  | Punboxedoruntaggedintarray Unboxed_int32 ->
     makearray_dynamic_singleton_uninitialized "unboxed_int32" ~length mode loc
-    |> initialize_array env loc ~length (Punboxedintarray_set Unboxed_int32)
+    |> initialize_array env loc ~length
+         (Punboxedoruntaggedintarray_set Unboxed_int32)
          (Thirty_two
             { zero_init = Lconst (Const_base (Const_unboxed_int32 0l)) })
          ~init
-  | Punboxedintarray (Unboxed_int8 | Unboxed_int16) ->
+  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
+    ->
     Misc.unboxed_small_int_arrays_are_not_implemented ()
-  | Punboxedintarray Unboxed_int64 ->
+  | Punboxedoruntaggedintarray Unboxed_int64 ->
     makearray_dynamic_singleton_uninitialized "unboxed_int64" ~length mode loc
-    |> initialize_array env loc ~length (Punboxedintarray_set Unboxed_int64)
-         Sixty_four_or_more ~init
-  | Punboxedintarray Unboxed_nativeint ->
+    |> initialize_array env loc ~length
+         (Punboxedoruntaggedintarray_set Unboxed_int64) Sixty_four_or_more ~init
+  | Punboxedoruntaggedintarray Unboxed_nativeint ->
     makearray_dynamic_singleton_uninitialized "unboxed_nativeint" ~length mode
       loc
-    |> initialize_array env loc ~length (Punboxedintarray_set Unboxed_nativeint)
-         Sixty_four_or_more ~init
+    |> initialize_array env loc ~length
+         (Punboxedoruntaggedintarray_set Unboxed_nativeint) Sixty_four_or_more
+         ~init
   | Punboxedvectorarray Unboxed_vec128 ->
     makearray_dynamic_singleton_uninitialized "unboxed_vec128" ~length mode loc
     |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec128)
@@ -572,21 +572,19 @@ let arrayblit_expanded env ~(src_mutability : L.mutable_flag)
     let length = id "length" in
     let length_duid = Lambda.debug_uid_none in
     (* CR mshinwell: support indexing by other types apart from [int] *)
-    let src_end_pos_exclusive =
-      L.Lprim (Paddint, [Lvar src_start_pos; Lvar length], loc)
-    in
-    let src_end_pos_inclusive =
-      L.Lprim (Psubint, [src_end_pos_exclusive; Lconst (L.const_int 1)], loc)
-    in
+    let addint x y = L.add L.int x y ~loc in
+    let subint x y = L.sub L.int x y ~loc in
+    let src_end_pos_exclusive = addint (Lvar src_start_pos) (Lvar length) in
+    let src_end_pos_inclusive = L.pred L.int src_end_pos_exclusive ~loc in
     let dst_start_pos_minus_src_start_pos =
-      L.Lprim (Psubint, [Lvar dst_start_pos; Lvar src_start_pos], loc)
+      subint (Lvar dst_start_pos) (Lvar src_start_pos)
     in
     let dst_start_pos_minus_src_start_pos_var =
       Ident.create_local "dst_start_pos_minus_src_start_pos"
     in
     let dst_start_pos_minus_src_start_pos_var_duid = Lambda.debug_uid_none in
     let must_copy_backwards =
-      L.Lprim (Pintcomp Cgt, [Lvar dst_start_pos; Lvar src_start_pos], loc)
+      L.icmp Cgt L.int (Lvar dst_start_pos) (Lvar src_start_pos) ~loc
     in
     let make_loop env (direction : Asttypes.direction_flag) =
       let src_index = Ident.create_local "index" in
@@ -601,10 +599,7 @@ let arrayblit_expanded env ~(src_mutability : L.mutable_flag)
         (Lprim
            ( Parraysetu (dst_array_set_kind, Ptagged_int_index),
              [ Lvar dst;
-               Lprim
-                 ( Paddint,
-                   [Lvar src_index; dst_start_pos_minus_src_start_pos],
-                   loc );
+               addint (Lvar src_index) dst_start_pos_minus_src_start_pos;
                Lprim
                  ( Parrayrefu
                      ( src_array_ref_kind,
@@ -673,7 +668,7 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
     (* Take advantage of various GC-related tricks in [caml_array_blit]. *)
     arrayblit_runtime env args loc
   | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
-  | Punboxedintarray_set _ | Punboxedvectorarray_set _
+  | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
   | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
     arrayblit_expanded env ~src_mutability ~dst_array_set_kind args loc
 
@@ -717,26 +712,12 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     Misc.fatal_errorf "Pmakeblock with wrong or non-scannable block tag %d" tag
   | Pmakefloatblock (_mut, _mode), args when List.length args < 1 ->
     Misc.fatal_errorf "Pmakefloatblock must have at least one argument"
-  | Pfloatcomp (bf, CFnlt), args ->
-    Primitive (L.Pnot, [L.Lprim (Pfloatcomp (bf, CFlt), args, loc)], loc)
-  | Pfloatcomp (bf, CFngt), args ->
-    Primitive (L.Pnot, [L.Lprim (Pfloatcomp (bf, CFgt), args, loc)], loc)
-  | Pfloatcomp (bf, CFnle), args ->
-    Primitive (L.Pnot, [L.Lprim (Pfloatcomp (bf, CFle), args, loc)], loc)
-  | Pfloatcomp (bf, CFnge), args ->
-    Primitive (L.Pnot, [L.Lprim (Pfloatcomp (bf, CFge), args, loc)], loc)
-  | Punboxed_float_comp (bf, CFnlt), args ->
+  | ( Pscalar
+        (Binary (Fcmp (size, ((CFneq | CFnlt | CFngt | CFnle | CFnge) as cmp)))),
+      args ) ->
+    let cmp = Scalar.Float_comparison.negate cmp in
     Primitive
-      (L.Pnot, [L.Lprim (Punboxed_float_comp (bf, CFlt), args, loc)], loc)
-  | Punboxed_float_comp (bf, CFngt), args ->
-    Primitive
-      (L.Pnot, [L.Lprim (Punboxed_float_comp (bf, CFgt), args, loc)], loc)
-  | Punboxed_float_comp (bf, CFnle), args ->
-    Primitive
-      (L.Pnot, [L.Lprim (Punboxed_float_comp (bf, CFle), args, loc)], loc)
-  | Punboxed_float_comp (bf, CFnge), args ->
-    Primitive
-      (L.Pnot, [L.Lprim (Punboxed_float_comp (bf, CFge), args, loc)], loc)
+      (L.Pnot, [L.Lprim (Pscalar (Binary (Fcmp (size, cmp))), args, loc)], loc)
   | Pbigarrayref (_unsafe, num_dimensions, kind, layout), args -> (
     (* CR mshinwell: factor out with the [Pbigarrayset] case *)
     match

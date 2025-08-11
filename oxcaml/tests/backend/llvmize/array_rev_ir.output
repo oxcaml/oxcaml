@@ -1,8 +1,13 @@
 source_filename = "array_rev.ml"
 
-@camlArray_rev__data_begin = global i64 0
+@camlArray_rev__data_begin = global {  } {  }, align 8
 define void @camlArray_rev__code_begin() { ret void }
 
+@camlArray_rev__gc_roots = global { i64 } { i64 0 }, align 8
+@.header.camlArray_rev = global { i64 } { i64 1792 }, align 8
+@camlArray_rev = global { ptr } { ptr @camlArray_rev__rev_1 }, align 8
+@.header.camlArray_rev__rev_1 = global { i64 } { i64 3063 }, align 8
+@camlArray_rev__rev_1 = global { ptr, i64 } { ptr @camlArray_rev__rev_HIDE_STAMP, i64 108086391056891909 }, align 8
 define cc 104 { { ptr }, { i64 } } @camlArray_rev__rev_HIDE_STAMP(ptr %0, i64 %1)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
@@ -308,11 +313,8 @@ L151:                                                ; preds = %L1
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
 
-@camlArray_rev__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
-@camlArray_rev = global { ptr, i64 } { ptr @camlArray_rev__rev_1, i64 3063 }
-@camlArray_rev__rev_1 = global { ptr, i64 } { ptr @camlArray_rev__rev_HIDE_STAMP, i64 108086391056891909 }
 @camlArray_rev_data = external global ptr
 
-@camlArray_rev__data_end = global i64 0
+@camlArray_rev__data_end = global {  } {  }, align 8
 define void @camlArray_rev__code_end() { ret void }
-@camlArray_rev__frametable = global i64 0
+@camlArray_rev__frametable = global {  } {  }, align 8

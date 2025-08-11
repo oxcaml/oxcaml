@@ -11,7 +11,7 @@ type boxed_float = Pfloat32 | Pfloat64
 type native_repr =
   | Same_as_ocaml_repr
   | Unboxed_float of boxed_float
-  | Unboxed_integer of boxed_integer
+  | Unboxed_or_untagged_integer of boxed_integer
   | Untagged_int
   | Unboxed_vector of boxed_vector
 
@@ -22,8 +22,8 @@ let test_all_combination_up_to_n_args = 5
    representations. No need to test all combination of other
    representations: regarding the calling convention
    [Same_as_ocaml_repr], [Untagged_int] and
-   [Unboxed_integer Pnativeint] are all the same, and are the
-   same as [Unboxed_integer Pint<word-size>].
+   [Unboxed_or_untagged_integer Pnativeint] are all the same, and are the
+   same as [Unboxed_or_untagged_integer Pint<word-size>].
 
    We have specific tests for the other representations and for the
    result representation in [manual_tests].
@@ -31,8 +31,8 @@ let test_all_combination_up_to_n_args = 5
 let test_all_args_combination_of =
   [ Unboxed_float Pfloat32
   ; Unboxed_float Pfloat64
-  ; Unboxed_integer Pint32
-  ; Unboxed_integer Pint64
+  ; Unboxed_or_untagged_integer Pint32
+  ; Unboxed_or_untagged_integer Pint64
   ; Unboxed_vector Pint64x2
   ; Unboxed_vector Pfloat64x2
   ]
@@ -41,9 +41,9 @@ let code_of_repr = function
   | Same_as_ocaml_repr         -> "v" (* for "value" *)
   | Unboxed_float Pfloat64     -> "f"
   | Unboxed_float Pfloat32     -> "s"
-  | Unboxed_integer Pint32     -> "l"
-  | Unboxed_integer Pint64     -> "L"
-  | Unboxed_integer Pnativeint -> "n"
+  | Unboxed_or_untagged_integer Pint32     -> "l"
+  | Unboxed_or_untagged_integer Pint64     -> "L"
+  | Unboxed_or_untagged_integer Pnativeint -> "n"
   | Untagged_int               -> "i"
   | Unboxed_vector Pint64x2    -> "I"
   | Unboxed_vector Pfloat64x2  -> "x"
@@ -52,9 +52,9 @@ let repr_of_code = function
   | 'v' -> Same_as_ocaml_repr
   | 'f' -> Unboxed_float Pfloat64
   | 's' -> Unboxed_float Pfloat32
-  | 'l' -> Unboxed_integer Pint32
-  | 'L' -> Unboxed_integer Pint64
-  | 'n' -> Unboxed_integer Pnativeint
+  | 'l' -> Unboxed_or_untagged_integer Pint32
+  | 'L' -> Unboxed_or_untagged_integer Pint64
+  | 'n' -> Unboxed_or_untagged_integer Pnativeint
   | 'i' -> Untagged_int
   | 'x' -> Unboxed_vector Pfloat64x2
   | 'I' -> Unboxed_vector Pint64x2
@@ -101,9 +101,9 @@ let ocaml_type_of_repr = function
   | Same_as_ocaml_repr         -> "int"
   | Unboxed_float Pfloat64     -> "(float [@unboxed])"
   | Unboxed_float Pfloat32     -> "(float32 [@unboxed])"
-  | Unboxed_integer Pint32     -> "(int32 [@unboxed])"
-  | Unboxed_integer Pint64     -> "(int64 [@unboxed])"
-  | Unboxed_integer Pnativeint -> "(nativeint [@unboxed])"
+  | Unboxed_or_untagged_integer Pint32     -> "(int32 [@unboxed])"
+  | Unboxed_or_untagged_integer Pint64     -> "(int64 [@unboxed])"
+  | Unboxed_or_untagged_integer Pnativeint -> "(nativeint [@unboxed])"
   | Untagged_int               -> "(int [@untagged])"
   | Unboxed_vector Pfloat64x2  -> "(float64x2 [@unboxed])"
   | Unboxed_vector Pint64x2    -> "(int64x2 [@unboxed])"
@@ -113,9 +113,9 @@ let ocaml_type_gadt_of_repr = function
   | Same_as_ocaml_repr         -> "Int"
   | Unboxed_float Pfloat64     -> "Float"
   | Unboxed_float Pfloat32     -> "Float32"
-  | Unboxed_integer Pint32     -> "Int32"
-  | Unboxed_integer Pint64     -> "Int64"
-  | Unboxed_integer Pnativeint -> "Nativeint"
+  | Unboxed_or_untagged_integer Pint32     -> "Int32"
+  | Unboxed_or_untagged_integer Pint64     -> "Int64"
+  | Unboxed_or_untagged_integer Pnativeint -> "Nativeint"
   | Untagged_int               -> "Int"
   | Unboxed_vector Pfloat64x2  -> "Float64x2"
   | Unboxed_vector Pint64x2    -> "Int64x2"
@@ -124,9 +124,9 @@ let c_type_of_repr = function
   | Same_as_ocaml_repr         -> "value"
   | Unboxed_float Pfloat64     -> "double"
   | Unboxed_float Pfloat32     -> "float"
-  | Unboxed_integer Pint32     -> "int32_t"
-  | Unboxed_integer Pint64     -> "int64_t"
-  | Unboxed_integer Pnativeint -> "intnat"
+  | Unboxed_or_untagged_integer Pint32     -> "int32_t"
+  | Unboxed_or_untagged_integer Pint64     -> "int64_t"
+  | Unboxed_or_untagged_integer Pnativeint -> "intnat"
   | Untagged_int               -> "intnat"
   | Unboxed_vector Pfloat64x2  -> "__m128d"
   | Unboxed_vector Pint64x2    -> "__m128i"
@@ -260,9 +260,9 @@ let generate_stubs () =
            | Same_as_ocaml_repr         -> "set_intnat(%d, Long_val(x%d))"
            | Unboxed_float Pfloat64     -> "set_double(%d, x%d)"
            | Unboxed_float Pfloat32     -> "set_float(%d, x%d)"
-           | Unboxed_integer Pint32     -> "set_int32(%d, x%d)"
-           | Unboxed_integer Pint64     -> "set_int64(%d, x%d)"
-           | Unboxed_integer Pnativeint -> "set_intnat(%d, x%d)"
+           | Unboxed_or_untagged_integer Pint32     -> "set_int32(%d, x%d)"
+           | Unboxed_or_untagged_integer Pint64     -> "set_int64(%d, x%d)"
+           | Unboxed_or_untagged_integer Pnativeint -> "set_intnat(%d, x%d)"
            | Untagged_int               -> "set_intnat(%d, x%d)"
            | Unboxed_vector Pint64x2    -> "set_int128(%d, x%d)"
            | Unboxed_vector Pfloat64x2  -> "set_float128(%d, x%d)")
@@ -272,9 +272,9 @@ let generate_stubs () =
          | Same_as_ocaml_repr         -> "Val_long(get_intnat(%d))"
          | Unboxed_float Pfloat64     -> "get_double(%d)"
          | Unboxed_float Pfloat32     -> "get_float(%d)"
-         | Unboxed_integer Pint32     -> "get_int32(%d)"
-         | Unboxed_integer Pint64     -> "get_int64(%d)"
-         | Unboxed_integer Pnativeint -> "get_intnat(%d)"
+         | Unboxed_or_untagged_integer Pint32     -> "get_int32(%d)"
+         | Unboxed_or_untagged_integer Pint64     -> "get_int64(%d)"
+         | Unboxed_or_untagged_integer Pnativeint -> "get_intnat(%d)"
          | Untagged_int               -> "get_intnat(%d)"
          | Unboxed_vector Pint64x2    -> "get_int128(%d)"
          | Unboxed_vector Pfloat64x2  -> "get_float128(%d)")

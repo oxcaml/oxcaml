@@ -51,7 +51,7 @@ Test 3, 5 * 3: : 15
   Test 3, step 7: 0
   Test 3, step 8: 0
   Test 3, step 9: 0
-Test 3, 171: : 228
+Test 3, 228: : 228
   Test 3, step 0: 0
   Test 3, step 1: 0
   Test 3, step 2: 0
@@ -112,4 +112,4 @@ Test 5, 3 + 2 + 1: 6
 Test 6, 3: 3
 Test 6, 32: 32
 Test 6, -44: -44
-Test 7, 16: 16
+Test 7, 32: 32

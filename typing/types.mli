@@ -841,6 +841,7 @@ and mixed_block_element =
   | Float32
   | Bits8
   | Bits16
+  | Untagged_immediate
   | Bits32
   | Bits64
   | Vec128

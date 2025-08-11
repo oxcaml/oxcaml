@@ -1141,7 +1141,7 @@ let record_gets_unboxed_version = function
         (fun (kind : mixed_block_element) ->
           match kind with
           | Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word | Void -> false
+          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void -> false
           | Float_boxed -> true
           | Product shape -> shape_has_float_boxed shape)
         shape
@@ -1306,9 +1306,9 @@ let rec check_constraints_rec env loc visited ty =
         | Unification_failure err ->
           raise (Error(loc, Constraint_failed (env, err)))
         | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
-          let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+          let context = Ctype.mk_jkind_context_always_principal env in
           let violation =
-            Jkind.Violation.of_ ~jkind_of_type
+            Jkind.Violation.of_ ~context
               (Not_a_subjkind (Jkind.disallow_right original_jkind,
                                Jkind.disallow_left inferred_jkind,
                                []))
@@ -1480,9 +1480,9 @@ let narrow_to_manifest_jkind env loc decl =
     begin match Jkind.try_allow_r decl.type_jkind with
     | None -> begin
         let type_equal = Ctype.type_equal env in
-        let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+        let context = Ctype.mk_jkind_context_always_principal env in
         match
-          Jkind.sub_jkind_l ~type_equal ~jkind_of_type
+          Jkind.sub_jkind_l ~type_equal ~context
             manifest_jkind decl.type_jkind
         with
         | Ok () -> ()
@@ -1663,6 +1663,7 @@ module Element_repr = struct
     | Vec256
     | Vec512
     | Word
+    | Untagged_immediate
     | Product of t array
 
   and t =
@@ -1696,6 +1697,7 @@ module Element_repr = struct
       | Base Bits16 -> Unboxed_element Bits16
       | Base Bits32 -> Unboxed_element Bits32
       | Base Bits64 -> Unboxed_element Bits64
+      | Base Untagged_immediate -> Unboxed_element Untagged_immediate
       | Base Vec128 -> Unboxed_element Vec128
       | Base Vec256 -> Unboxed_element Vec256
       | Base Vec512 -> Unboxed_element Vec512
@@ -1722,6 +1724,7 @@ module Element_repr = struct
         | Vec256 -> Vec256
         | Vec512 -> Vec512
         | Word -> Word
+        | Untagged_immediate -> Untagged_immediate
         | Product l -> Product (Array.map of_t l)
       in
       of_t t
@@ -1734,7 +1737,7 @@ module Element_repr = struct
       and count_boxed_in_unboxed_element acc : unboxed_element -> int =
         function
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Vec128 | Vec256 | Vec512 | Word -> acc
+        | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate -> acc
         | Product l -> Array.fold_left count_boxed_in_t acc l
       in
       List.fold_left (fun acc (t,_) -> count_boxed_in_t acc t) 0 ts
@@ -1866,7 +1869,8 @@ let rec update_decl_jkind env dpath decl =
                then repr_summary.atomic_floats <- true;
            | Unboxed_element Float64 -> repr_summary.float64s <- true
            | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                             | Vec128 | Vec256 | Vec512 | Word | Product _ ) ->
+                             | Vec128 | Vec256 | Vec512 | Word
+                             | Untagged_immediate | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
            | Value_element -> repr_summary.values <- true
            | Void ->
@@ -1889,7 +1893,7 @@ let rec update_decl_jkind env dpath decl =
                   | Void -> Void
                   | Unboxed_element (Float32 | Bits8 | Bits16 | Bits32 | Bits64
                                     | Vec128 | Vec256 | Vec512 | Word
-                                    | Product _)
+                                    | Untagged_immediate | Product _)
                   | Value_element ->
                       Misc.fatal_error "Expected only floats and float64s")
                 reprs
@@ -2086,12 +2090,12 @@ let rec update_decl_jkind env dpath decl =
     Jkind.Layout.sub new_decl.type_jkind.jkind.layout decl.type_jkind.jkind.layout
   with
   | Not_le reason ->
-    let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+    let context = Ctype.mk_jkind_context_always_principal env in
     raise (Error (
       decl.type_loc,
       Jkind_mismatch_of_path (
         dpath,
-        Jkind.Violation.of_ ~jkind_of_type (
+        Jkind.Violation.of_ ~context (
           Not_a_subjkind (
             new_decl.type_jkind, decl.type_jkind, Nonempty_list.to_list reason)))))
   | Less | Equal -> new_decl
@@ -2710,7 +2714,8 @@ let normalize_decl_jkinds env shapes decls =
     let normalized_jkind =
       Jkind.normalize
         ~mode:Require_best
-        ~jkind_of_type:(fun ty -> Some (Ctype.type_jkind env ty))
+        ~context:(Ctype.mk_jkind_context env (fun ty ->
+          Some (Ctype.type_jkind env ty)))
         decl.type_jkind
     in
     let decl =
@@ -2725,14 +2730,14 @@ let normalize_decl_jkinds env shapes decls =
          the new jkind (we really only want this check here to check against the
          user-written annotation). We might be able to do a better job here and save
          some work. *)
-      let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+      let context = Ctype.mk_jkind_context_always_principal env in
       let type_equal = Ctype.type_equal env in
       match
         (* CR layouts v2.8: Consider making a function that doesn't compute
            histories for this use-case, which doesn't need it. *)
         Jkind.sub_jkind_l
           ~type_equal
-          ~jkind_of_type
+          ~context
           ~allow_any_crossing
           decl.type_jkind
           original_decl.type_jkind
@@ -3393,21 +3398,21 @@ let native_repr_of_type env kind ty sort_or_poly =
          | Sort (Base Value) -> true
          | Sort (Base _ | Product _) -> false
     ->
-    Some Untagged_immediate
+    Some (Unboxed_or_untagged_integer Untagged_int)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float ->
     Some (Unboxed_float Boxed_float64)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32 ->
     Some (Unboxed_float Boxed_float32)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int8 ->
-    Some (Unboxed_integer Unboxed_int8)
+    Some (Unboxed_or_untagged_integer Untagged_int8)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int16 ->
-    Some (Unboxed_integer Unboxed_int16)
+    Some (Unboxed_or_untagged_integer Untagged_int16)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int32 ->
-    Some (Unboxed_integer Unboxed_int32)
+    Some (Unboxed_or_untagged_integer Unboxed_int32)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int64 ->
-    Some (Unboxed_integer Unboxed_int64)
+    Some (Unboxed_or_untagged_integer Unboxed_int64)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_nativeint ->
-    Some (Unboxed_integer Unboxed_nativeint)
+    Some (Unboxed_or_untagged_integer Unboxed_nativeint)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int8x16 ->
     Some (Unboxed_vector Boxed_vec128)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int16x8 ->

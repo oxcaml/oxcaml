@@ -1,0 +1,4 @@
+(lldb) b Test_basic_dwarf.f
+(lldb) run
+(lldb) c
+(lldb) quit

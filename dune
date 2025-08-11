@@ -185,6 +185,7 @@
   ident
   path
   jkind
+  scalar
   primitive
   shape
   shape_reduce
@@ -254,6 +255,7 @@
   lambda
   matching
   mixed_block_shape
+  mixed_product_bytes
   printlambda
   runtimedef
   runtimetags
@@ -471,6 +473,7 @@
   cmm_helpers
   cmm_builtins
   cmm_invariants
+  cmm_peephole_engine
   cmm
   cmmgen_state
   CSE
@@ -539,6 +542,7 @@
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_prologue
   extra_debug
   label
   linear_utils

@@ -129,7 +129,7 @@ let test1 () =
   print_int8u "Test 1, thrice_minus_five" thrice_minus_five;
 
   let twice_minus_five_again = thrice_minus_five - minus_five in
-  print_int8u "Test 1, twice_minus_five_again" twice_minus_five;
+  print_int8u "Test 1, twice_minus_five_again" twice_minus_five_again;
 
   let minus_five_again = twice_minus_five_again / (Stdlib_beta.Int8_u.of_int 2) in
   print_int8u "Test 1, minus_five_again" minus_five_again;
@@ -266,7 +266,7 @@ let test3 () =
       3 * (1 + 2 + 3 + 5 + 8) = 57
       6 * (1 + 2 + 3 + 5 + 8) = 114
       9 * (1 + 2 + 3 + 5 + 8) = 171
-      12 * (1 + 2 + 3 + 5 + 8) = -28 (mod 255, interpreted as signed)
+     12 * (1 + 2 + 3 + 5 + 8) = -28 (mod 255, interpreted as signed)
   *)
   let steps = Array.init 10 (fun _ -> (Stdlib_beta.Int8.of_int 0)) in
   let x1 = (Stdlib_beta.Int8_u.of_int 1) in
@@ -413,10 +413,10 @@ let _ = test6 ()
 module M = struct
   open Int8_u
   let[@inline never] f () = assert false
-  let g () = if Sys.opaque_identity true then (Stdlib_beta.Int8_u.of_int 8) else f ()
+  let g () = if Sys.opaque_identity true then (Stdlib_beta.Int8_u.of_int 32) else f ()
 end
 
 let test7 () =
-  print_int8u "Test 7, 8" (M.g ())
+  print_int8u "Test 7, 32" (M.g ())
 
 let _ = test7 ()

@@ -384,7 +384,7 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
        n[value<int>] tail_mod_cons
        : (consts (0))
           (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
-       (if (== n 0) 0
+       (if (%eq n 0) 0
          (makeblock 0 (?,value<
                           (consts (0))
                            (non_consts ([0: ?,
@@ -404,7 +404,7 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
                   v 24029))
              (seq
                (apply smap_stutter_dps block 1 f (apply (field_imm 1 xs) 0)
-                 (- n 1))
+                 (%int_sub n 1))
                block)))))
     smap_stutter_dps
       (function {nlocal = 0} dst offset[value<int>] f
@@ -412,7 +412,7 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
         tail_mod_cons
         : (consts (0))
            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
-        (if (== n 0) (setfield_ptr(heap-init)_computed dst offset 0)
+        (if (%eq n 0) (setfield_ptr(heap-init)_computed dst offset 0)
           (let
             (block0_arg0 =? (apply f 0)
              v =? (apply f (makeblock 0 (*) (field_imm 0 xs)))
@@ -434,7 +434,7 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
                                                   (non_consts ([0: ?, *]))>]))>)
                   block0_arg0 block))
               (apply smap_stutter_dps block 1 f (apply (field_imm 1 xs) 0)
-                (- n 1) tailcall))))))
+                (%int_sub n 1) tailcall))))))
   (apply (field_imm 1 (global Toploop!)) "smap_stutter" smap_stutter))
 val smap_stutter : ('a option -> 'b) -> 'a stream -> int -> 'b list = <fun>
 |}]
