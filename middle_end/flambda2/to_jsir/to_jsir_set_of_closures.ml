@@ -35,7 +35,7 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
       | Some var ->
         let simple_var, res = To_jsir_shared.simple ~env ~res simple in
         (* This value slot has been used in the function body, so we should set
-           the used variable to be the appropriate [Simple.t]. *)
+           the used variable to be the appropriate [Simple.t] *)
         env, To_jsir_result.add_instr_exn res (Assign (var, simple_var))
       | None ->
         (* This value slot is not used, so we don't need to do anything *)
