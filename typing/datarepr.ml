@@ -107,10 +107,10 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
 
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
-  let cstr_shapes_and_arg_jkinds =
+  let cstr_shapes_and_arg_jkinds, is_unboxed =
     match rep, cstrs with
     | Variant_extensible, _ -> assert false
-    | Variant_boxed x, _ -> x
+    | Variant_boxed x, _ -> x, false
     | Variant_unboxed, [{ cd_args }] ->
       (* CR layouts: It's tempting just to use [decl.type_jkind] here, instead
          of grabbing the jkind from the argument. However, doing so does not
@@ -124,7 +124,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       begin match cd_args with
       | Cstr_tuple [{ ca_sort = sort }]
       | Cstr_record [{ ld_sort = sort }] ->
-        [| Constructor_uniform_value, [| sort |] |]
+        [| Constructor_uniform_value, [| sort |] |], true
       | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
         Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
       end
@@ -135,15 +135,19 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          users to write their own null constructors. *)
       (* CR layouts v3.3: generalize to [any]. *)
       [| Constructor_uniform_value, [| |]
-       ; Constructor_uniform_value, [| Jkind.Sort.Const.value |] |]
+       ; Constructor_uniform_value, [| Jkind.Sort.Const.value |] |],
+      false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
     Array.map
       (fun (_, sorts) ->
          let all_void = Array.for_all Jkind.Sort.Const.all_void sorts in
-         if all_void then incr num_consts else incr num_nonconsts;
-         all_void)
+         (* constant constructors are constructors of non-[@@unboxed] variants
+            with 0 bits of payload *)
+         let is_const = all_void && not is_unboxed in
+         if is_const then incr num_consts else incr num_nonconsts;
+         is_const)
       cstr_shapes_and_arg_jkinds
   in
   let describe_constructor (src_index, const_tag, nonconst_tag, acc)
