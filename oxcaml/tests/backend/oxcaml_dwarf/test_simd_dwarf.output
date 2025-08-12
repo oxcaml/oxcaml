@@ -357,20 +357,20 @@ Breakpoint 23: where = test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed 
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 23.1
-    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a/1 @ value) at test_simd_dwarf.ml:210:55
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a/2 @ value) at test_simd_dwarf.ml:210:55
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 23.1
-    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a/1 @ value) at test_simd_dwarf.ml:210:55
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a/2 @ value) at test_simd_dwarf.ml:210:55
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 23.1
-    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a/1 @ value) at test_simd_dwarf.ml:210:55
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a/2 @ value) at test_simd_dwarf.ml:210:55
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 23.1
-    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a/1 @ value) at test_simd_dwarf.ml:210:55
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a/2 @ value) at test_simd_dwarf.ml:210:55
 (lldb) quit

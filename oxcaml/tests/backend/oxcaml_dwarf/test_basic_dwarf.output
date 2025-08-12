@@ -325,17 +325,17 @@ Process <PID> stopped
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 14.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_list(x=(:: ('x', [])) : char list @ value) at test_basic_dwarf.ml:147:41
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_list(x=(:: ('x', 0)) : char list @ value) at test_basic_dwarf.ml:147:41
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 14.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_list(x=(:: ('a', (:: ('b', (:: ('c', [])))))) : char list @ value) at test_basic_dwarf.ml:147:41
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_list(x=(:: ('a', [98, [99, 0]])) : char list @ value) at test_basic_dwarf.ml:147:41
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 14.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_list(x=(:: ('1', (:: ('2', (:: ('3', (:: ('4', (:: ('5', [])))))))))) : char list @ value) at test_basic_dwarf.ml:147:41
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_list(x=(:: ('1', [50, [51, [...]@<ADDRESS>]])) : char list @ value) at test_basic_dwarf.ml:147:41
 (lldb) b Test_basic_dwarf.f_option
 Breakpoint 15: where = test_basic_dwarf.exe`Test_basic_dwarf.f_option at test_basic_dwarf.ml:159:43, address = <ADDRESS>
 (lldb) c

@@ -48,6 +48,7 @@ type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
+type shape_format = Old_merlin | Debugging_shapes
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
@@ -84,6 +85,8 @@ let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
 let binary_annotations_cms = ref false  (* -bin-annot-cms *)
+let shape_format =                      (* -shape-format *)
+  ref (if Config.oxcaml_dwarf then Debugging_shapes else Old_merlin)
 let store_occurrences = ref false       (* -bin-annot-occurrences *)
 and use_threads = ref false             (* -thread *)
 and noassert = ref false                (* -noassert *)

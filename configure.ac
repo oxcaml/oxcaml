@@ -2845,7 +2845,7 @@ AS_IF([test x"$with_afl" = "xyes"],
 
 # Configure DWARF debugging flags for oxcaml compiler
 AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
-  [oxcaml_dwarf_flags_for_compiler="-g -gno-upstream-dwarf"],
+  [oxcaml_dwarf_flags_for_compiler="-g -gno-upstream-dwarf -bin-annot-cms -shape-format debugging-shapes"],
   [oxcaml_dwarf_flags_for_compiler=""])
 
 # Ensure compatibility: oxcaml-dwarf-on-compiler requires function-sections to be disabled
