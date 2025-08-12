@@ -19,6 +19,9 @@ val transl_modalities :
 
 val let_mutable_modalities : Mode.Modality.Value.Const.t
 
+(** The (default) modalities for an atomic mutable field *)
+val atomic_mutable_modalities : Mode.Modality.Value.Const.t
+
 val untransl_modality :
   'a Mode.Modality.Atom.t -> Parsetree.modality Location.loc
 
