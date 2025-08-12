@@ -120,7 +120,7 @@ done
 }
 
 output="$(find_diff)"
-if [[ -n "$output" ]]; then
+if [ -n "$output" ]; then
   printf '%s\n' "$output"
 fi
 [[ -z "$output" ]] # if there is output, exit 1
