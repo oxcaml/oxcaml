@@ -6245,7 +6245,7 @@ and type_expect_
       in
       let cases, partial =
         type_cases Computation env arg_pat_mode expected_mode
-          arg.exp_type ty_expected_explained sort
+          arg.exp_type sort ty_expected_explained
           ~check_if_total:true loc caselist in
       if
         List.for_all (fun c -> pattern_needs_partial_application_check c.c_lhs)
@@ -6265,8 +6265,8 @@ and type_expect_
       let arg_mode = simple_pat_mode Value.legacy in
       let cases, _ =
         type_cases Value env arg_mode expected_mode
-          Predef.type_exn ty_expected_explained
-          Jkind.Sort.(of_const Const.for_exception)
+          Predef.type_exn Jkind.Sort.(of_const Const.for_exception)
+          ty_expected_explained
           ~check_if_total:false loc caselist in
       re {
         exp_desc = Texp_try(body, cases);
@@ -7099,7 +7099,7 @@ and type_expect_
       let cases, partial =
         type_cases Value body_env
           (simple_pat_mode Value.legacy) (mode_return Value.legacy)
-          ty_params (mk_expected ty_func_result) param_sort
+          ty_params param_sort (mk_expected ty_func_result)
           ~check_if_total:true loc [scase]
       in
       let body =
@@ -7792,9 +7792,9 @@ and type_function
          optional arguments with defaults, where the external [ty_arg_mono]
          is optional and the internal view is not optional.
       *)
-      let ty_arg_internal, default_arg =
+      let ty_arg_internal, default_arg, sort_arg_internal =
         match default_arg with
-        | None -> ty_arg_mono, None
+        | None -> ty_arg_mono, None, arg_sort
         | Some default ->
             let arg_label =
               match arg_label with
@@ -7825,12 +7825,13 @@ and type_function
             let default_arg =
               type_expect env mode_legacy default (mk_expected ty_default_arg)
             in
-            ty_default_arg, Some (default_arg, arg_label, default_arg_sort)
+            ty_default_arg, Some (default_arg, arg_label, default_arg_sort),
+              default_arg_sort
       in
       let (pat, params, body, ret_info, newtypes, contains_gadt, curry), partial =
         (* Check everything else in the scope of the parameter. *)
         map_half_typed_cases Value env expected_pat_mode
-          ty_arg_internal ty_ret arg_sort pat.ppat_loc
+          ty_arg_internal sort_arg_internal ty_ret pat.ppat_loc
           ~check_if_total:true
           (* We don't make use of [case_data] here so we pass unit. *)
           [ { pattern = pat; has_guard = false; needs_refute = false }, () ]
@@ -9193,7 +9194,7 @@ and map_half_typed_cases
     -> ret list * partial
   = fun ?additional_checks_for_split_cases
     category env pat_mode
-    ty_arg ty_res sort_arg loc caselist ~type_body ~check_if_total ->
+    ty_arg sort_arg ty_res loc caselist ~type_body ~check_if_total ->
   (* ty_arg is _fully_ generalized *)
   let patterns = List.map (fun ((x : untyped_case), _) -> x.pattern) caselist in
   let contains_polyvars = List.exists contains_polymorphic_variant patterns in
@@ -9499,7 +9500,7 @@ and type_cases
            _ -> _ -> _ -> _ -> _ -> _ -> check_if_total:bool -> _ ->
            Parsetree.case list -> k case list * partial
   = fun category env pat_mode expr_mode
-        ty_arg ty_res_explained sort_arg ~check_if_total loc caselist ->
+        ty_arg sort_arg ty_res_explained ~check_if_total loc caselist ->
   let { ty = ty_res; explanation } = ty_res_explained in
   let caselist =
     List.map (fun case -> Parmatch.untyped_case case, case) caselist
@@ -9508,7 +9509,7 @@ and type_cases
      is to typecheck the guards and the cases, and then to check for some
      warnings that can fire in the presence of guards.
   *)
-  map_half_typed_cases category env pat_mode ty_arg ty_res sort_arg loc caselist
+  map_half_typed_cases category env pat_mode ty_arg sort_arg ty_res loc caselist
     ~check_if_total
     ~type_body:begin
       fun { pc_guard; pc_rhs } pat ~ext_env ~ty_expected ~ty_infer
@@ -9561,8 +9562,8 @@ and type_function_cases_expect
     in
     let cases, partial =
       type_cases Value env
-        expected_pat_mode expected_inner_mode ty_arg_mono (mk_expected ty_ret)
-        arg_sort ~check_if_total:true loc cases
+        expected_pat_mode expected_inner_mode ty_arg_mono arg_sort
+        (mk_expected ty_ret) ~check_if_total:true loc cases
     in
     let ty_fun =
       instance
