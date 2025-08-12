@@ -215,6 +215,11 @@ and desc =
     (* CR sspies: We could in principle discard the arguments of the arrow,
        since they are neither needed for printing nor for debug information. *)
   | Poly_variant of t poly_variant_constructors
+  | Mu of t
+  (** [Mu t] represents a binder for a recursive type with body [t]. Its
+      variables are [Rec_var n] below, where [n] is a DeBruijn-index to maximize
+      sharing between alpha-equivalent shapes.  *)
+  | Rec_var of int
 
   (* constructors for type declarations *)
   | Variant of
@@ -242,6 +247,12 @@ and desc =
       { fields : (string * t * Layout.t) list;
         kind : record_kind
       }
+  | Mutrec of t Ident.Map.t
+    (** [Mutrec m] represents a map of (potentially mutually-recursive)
+        declarations. Declarations with type variables are represented as
+        abstractions inside. To project out a declaration, [Proj_decl] can be
+        used. *)
+  | Proj_decl of t * Ident.t
 
 (** For DWARF type emission to work as expected, we store the layouts in the
     declaration alongside the shapes in those cases where the layout "expands"
@@ -326,6 +337,8 @@ val unboxed_tuple : ?uid:Uid.t -> t list -> t
 val predef : ?uid:Uid.t -> Predef.t -> t list -> t
 val arrow : ?uid:Uid.t -> t -> t -> t
 val poly_variant : ?uid:Uid.t -> t poly_variant_constructors -> t
+val mu : ?uid:Uid.t -> t -> t
+val rec_var : ?uid:Uid.t -> int -> t
 
 (* constructors for type declarations *)
 val variant :
@@ -333,6 +346,9 @@ val variant :
 val variant_unboxed :
   ?uid:Uid.t -> string -> string option -> t -> Layout.t -> t
 val record : ?uid:Uid.t -> record_kind -> (string * t * Layout.t) list -> t
+val mutrec : ?uid:Uid.t -> t Ident.Map.t -> t
+val proj_decl : ?uid:Uid.t -> t -> Ident.t -> t
+
 
 val set_approximated : approximated:bool -> t -> t
 
@@ -353,6 +369,10 @@ val complex_constructor_map :
 
 val complex_constructors_map :
   ('a -> 'b) -> 'a complex_constructors -> 'b complex_constructors
+
+val is_mu_closed : t -> bool
+  (** Checks whether the shape is closed with respect to the mu-binders and
+      recursive variables inside of it. *)
 
 module Map : sig
   type shape = t
