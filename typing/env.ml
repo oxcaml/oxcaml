@@ -1732,16 +1732,19 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
   | Class_type ->
       (IdTbl.find_same id env.cltypes).cltda_shape
 
-let find_uid_of_path env path =
-  (* We currently only support looking up debugging uids in the current
-     environment. Future versions will support looking up declarations in other
-     files via the shape mechanism in [shape.ml]. *)
-  match find_type path env with
-  | exception Not_found -> None
-  | type_ -> let uid = type_.type_uid in Some uid
 
 let shape_of_path ~namespace env =
   Shape.of_path ~namespace ~find_shape:(find_shape env)
+
+let shape_of_path_opt ~namespace env path =
+  try
+    (Some (shape_of_path ~namespace env path))
+  with
+    Not_found -> None
+
+let shape_for_constr env path ~args =
+  Option.map (fun sh -> Shape.app_list sh args)
+    (shape_of_path_opt ~namespace:Type env path)
 
 let shape_or_leaf uid = function
   | None -> Shape.leaf uid
@@ -3036,14 +3039,11 @@ let initial () =
     match !Clflags.shape_format with
     | Clflags.Old_merlin -> add_type type_ident decl env ~check:false
     | Clflags.Debugging_shapes ->
-      let type_decl_shape =
-        Type_shape.Type_decl_shape.of_type_declaration (Pident type_ident) decl
-          (find_uid_of_path env)
+      let shape =
+        Type_shape.Type_decl_shape.of_type_declaration type_ident decl
+          (shape_for_constr env)
       in
-      Uid.Tbl.add Type_shape.all_type_decls decl.type_uid type_decl_shape;
-      let shape = Shape.leaf' None in
-      (* CR sspies: This will be replaced by an actual shape computation in
-         the future. *)
+      Uid.Tbl.add Type_shape.all_type_decls decl.type_uid shape;
       add_type type_ident ~shape decl env ~check:false
   in
   let initial_env =

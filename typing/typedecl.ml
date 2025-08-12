@@ -821,10 +821,8 @@ let shape_declarations env decls =
   | Clflags.Old_merlin ->
     List.map (fun (_, decl) -> old_merlin_shape_declaration decl) decls
   | Clflags.Debugging_shapes ->
-    let _ = env in
-    List.map (fun _ -> Shape.leaf' None) decls
-    (* CR sspies: In the future, we will actually produce shapes with debugging
-       information here. For now, we just use a stub. *)
+    Type_shape.Type_decl_shape.of_type_declarations decls
+      (Env.shape_for_constr env)
 
 let shape_extension_constructor ext uid =
   match !Clflags.shape_format with
@@ -3044,12 +3042,15 @@ let transl_type_decl env rec_flag sdecl_list =
   (* Compute the final environment with variance and immediacy *)
   let final_env = add_types_to_env decls ~shapes env in
   (* Save the type shapes of the declarations in [Type_shape] for debug info. *)
+  (* CR sspies: Adding the shapes to the table below is obsolete. The
+     information is now contained in the shapes themselves. Remove it in a
+     subsequent PR (and adjust the printing of the declarations as appropriate).
+  *)
   if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
-    List.iter (fun (id, decl) ->
-      Type_shape.add_to_type_decls
-        (Pident id) decl
-        (Env.find_uid_of_path final_env)
-    ) decls;
+    List.iter (fun (sh, (_, decl)) ->
+      let uid = decl.type_uid in
+      Uid.Tbl.add Type_shape.all_type_decls uid sh;
+    ) (List.combine shapes decls);
   (* Keep original declaration *)
   let final_decls =
     List.map2

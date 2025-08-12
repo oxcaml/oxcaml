@@ -226,7 +226,7 @@ Process <PID> stopped
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_datatypes_', stop reason = breakpoint 15.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant(x=(Node { left = (Leaf 1); right = (Leaf 2); value = 3.14 }) : nested_variant @ value) at test_datatypes_dwarf.ml:114:51
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant(x=(Node { left = [1]; right = [2]; value = 3.14 }) : nested_variant @ value) at test_datatypes_dwarf.ml:114:51
 (lldb) b Test_datatypes_dwarf.f_mixed_combo
 Breakpoint 16: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_mixed_combo at test_datatypes_dwarf.ml:130:48, address = <ADDRESS>
 (lldb) c
