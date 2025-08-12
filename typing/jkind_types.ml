@@ -203,6 +203,8 @@ module Sort = struct
     let for_module_field = value
 
     let for_boxed_variant = value
+
+    let for_exception = value
   end
 
   module Var = struct
