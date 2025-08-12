@@ -721,6 +721,13 @@ let mk_instantiate_opt = mk_instantiate0 ~ext:"cmx"
 let mk_use_prims f =
   "-use-prims", Arg.String f, "<file>  (undocumented)"
 
+let mk_shape_format f =
+  "-shape-format",
+  Arg.Symbol (["old-merlin"; "debugging-shapes"], f),
+  "  Set shape format (old-merlin|debugging-shapes) used in the compiler and\
+  \ stored in .cms files. Default is old-merlin unless configured with\
+  \ --enable-oxcaml-dwarf."
+
 let mk_dump_into_file f =
   "-dump-into-file", Arg.Unit f, " dump output like -dlambda into <target>.dump"
 ;;
@@ -1011,6 +1018,7 @@ module type Compiler_options = sig
   val _as_parameter : unit -> unit
   val _binannot : unit -> unit
   val _binannot_cms : unit -> unit
+  val _shape_format : string -> unit
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit
@@ -1317,6 +1325,7 @@ struct
 
     mk_match_context_rows F._match_context_rows;
     mk_use_prims F._use_prims;
+    mk_shape_format F._shape_format;
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
     mk_dno_locations F._dno_locations;
@@ -1611,6 +1620,7 @@ struct
     mk_dump_dir F._dump_dir;
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
+    mk_shape_format F._shape_format;
 
     mk_args F._args;
     mk_args0 F._args0;
@@ -2020,6 +2030,11 @@ module Default = struct
     let _as_parameter = set as_parameter
     let _binannot = set binary_annotations
     let _binannot_cms = set binary_annotations_cms
+    let _shape_format s =
+      match s with
+      | "old-merlin" -> shape_format := Old_merlin
+      | "debugging-shapes" -> shape_format := Debugging_shapes
+      | _ -> ()
     let _binannot_occurrences = set store_occurrences
     let _c = set compile_only
     let _cc s = c_compiler := (Some s)
