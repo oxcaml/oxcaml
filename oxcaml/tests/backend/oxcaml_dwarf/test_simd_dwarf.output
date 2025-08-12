@@ -1,0 +1,376 @@
+(lldb) target create "./test_simd_dwarf.exe"
+Current executable set to '<PATH>/test_simd_dwarf.exe' (x86_64).
+(lldb) command source -s 0 'test_simd_dwarf_clean.lldb'
+Executing commands in '<BUILD_DIR>'.
+(lldb) b Test_simd_dwarf.f_start
+Breakpoint 1: where = test_simd_dwarf.exe`Test_simd_dwarf.f_start at test_simd_dwarf.ml:1:42, address = <ADDRESS>
+(lldb) run
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 1.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_start(param=0 : ocaml_value) at test_simd_dwarf.ml:1:42
+Process <PID> launched: '<PATH>/test_simd_dwarf.exe' (x86_64)
+(lldb) b Test_simd_dwarf.f_int64x2_unboxed
+Breakpoint 2: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int64x2_unboxed at test_simd_dwarf.ml:36:52, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 2.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int64x2_unboxed(x=(1, 2) : int64x2# @ vec128) at test_simd_dwarf.ml:36:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 2.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int64x2_unboxed(x=(0, 0) : int64x2# @ vec128) at test_simd_dwarf.ml:36:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 2.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int64x2_unboxed(x=(-100, 9223372036854775807) : int64x2# @ vec128) at test_simd_dwarf.ml:36:52
+(lldb) b Test_simd_dwarf.f_int32x4_unboxed
+Breakpoint 3: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int32x4_unboxed at test_simd_dwarf.ml:41:52, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 3.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int32x4_unboxed(x=(1, 2, 3, 4) : int32x4# @ vec128) at test_simd_dwarf.ml:41:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 3.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int32x4_unboxed(x=(0, 0, 0, 0) : int32x4# @ vec128) at test_simd_dwarf.ml:41:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 3.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int32x4_unboxed(x=(-10, 20, -30, 2147483647) : int32x4# @ vec128) at test_simd_dwarf.ml:41:52
+(lldb) b Test_simd_dwarf.f_float64x2_unboxed
+Breakpoint 4: where = test_simd_dwarf.exe`Test_simd_dwarf.f_float64x2_unboxed at test_simd_dwarf.ml:46:54, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float64x2_unboxed(x=(#1., #2.1) : float64x2# @ vec128) at test_simd_dwarf.ml:46:54
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float64x2_unboxed(x=(#0., #0.) : float64x2# @ vec128) at test_simd_dwarf.ml:46:54
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float64x2_unboxed(x=(#-3.14, #1.0E+10) : float64x2# @ vec128) at test_simd_dwarf.ml:46:54
+(lldb) b Test_simd_dwarf.f_float32x4_unboxed
+Breakpoint 5: where = test_simd_dwarf.exe`Test_simd_dwarf.f_float32x4_unboxed at test_simd_dwarf.ml:51:54, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float32x4_unboxed(x=(#1.1s, #2.s, #3.s, #4.1s) : float32x4# @ vec128) at test_simd_dwarf.ml:51:54
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float32x4_unboxed(x=(#0.s, #0.s, #0.s, #0.s) : float32x4# @ vec128) at test_simd_dwarf.ml:51:54
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float32x4_unboxed(x=(#-2.5s, #10.s, #-100.s, #1.0E+5s) : float32x4# @ vec128) at test_simd_dwarf.ml:51:54
+(lldb) b Test_simd_dwarf.f_int8x16_unboxed
+Breakpoint 6: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int8x16_unboxed at test_simd_dwarf.ml:58:52, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int8x16_unboxed(x=('\xef', '\xcd', '\xab', '\x89', 'g', 'E', '#', '\x01', '\x10', '2', 'T', 'v', '\x98', '\xba', '\xdc', '\xfe') : int8x16# @ vec128) at test_simd_dwarf.ml:58:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int8x16_unboxed(x=('\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0') : int8x16# @ vec128) at test_simd_dwarf.ml:58:52
+(lldb) b Test_simd_dwarf.f_int16x8_unboxed
+Breakpoint 7: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int16x8_unboxed at test_simd_dwarf.ml:67:52, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 7.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int16x8_unboxed(x=(-12817, -30293, 17767, 291, 12816, 30292, -17768, -292) : int16x8# @ vec128) at test_simd_dwarf.ml:67:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 7.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int16x8_unboxed(x=(0, 0, 0, 0, 0, 0, 0, 0) : int16x8# @ vec128) at test_simd_dwarf.ml:67:52
+(lldb) b Test_simd_dwarf.f_int64x2_boxed
+Breakpoint 8: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int64x2_boxed at test_simd_dwarf.ml:75:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 8.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int64x2_boxed(x=(1, 2) : int64x2 @ value) at test_simd_dwarf.ml:75:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 8.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int64x2_boxed(x=(0, 0) : int64x2 @ value) at test_simd_dwarf.ml:75:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 8.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int64x2_boxed(x=(-100, 9223372036854775807) : int64x2 @ value) at test_simd_dwarf.ml:75:50
+(lldb) b Test_simd_dwarf.f_int32x4_boxed
+Breakpoint 9: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int32x4_boxed at test_simd_dwarf.ml:80:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 9.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int32x4_boxed(x=(1, 2, 3, 4) : int32x4 @ value) at test_simd_dwarf.ml:80:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 9.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int32x4_boxed(x=(0, 0, 0, 0) : int32x4 @ value) at test_simd_dwarf.ml:80:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 9.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int32x4_boxed(x=(-10, 20, -30, 2147483647) : int32x4 @ value) at test_simd_dwarf.ml:80:50
+(lldb) b Test_simd_dwarf.f_float64x2_boxed
+Breakpoint 10: where = test_simd_dwarf.exe`Test_simd_dwarf.f_float64x2_boxed at test_simd_dwarf.ml:85:52, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 10.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float64x2_boxed(x=(#1., #2.1) : float64x2 @ value) at test_simd_dwarf.ml:85:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 10.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float64x2_boxed(x=(#0., #0.) : float64x2 @ value) at test_simd_dwarf.ml:85:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 10.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float64x2_boxed(x=(#-3.14, #1.0E+10) : float64x2 @ value) at test_simd_dwarf.ml:85:52
+(lldb) b Test_simd_dwarf.f_float32x4_boxed
+Breakpoint 11: where = test_simd_dwarf.exe`Test_simd_dwarf.f_float32x4_boxed at test_simd_dwarf.ml:90:52, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 11.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float32x4_boxed(x=(#1.1s, #2.s, #3.s, #4.1s) : float32x4 @ value) at test_simd_dwarf.ml:90:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 11.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float32x4_boxed(x=(#0.s, #0.s, #0.s, #0.s) : float32x4 @ value) at test_simd_dwarf.ml:90:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 11.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float32x4_boxed(x=(#-2.5s, #10.s, #-100.s, #1.0E+5s) : float32x4 @ value) at test_simd_dwarf.ml:90:52
+(lldb) b Test_simd_dwarf.f_int8x16_boxed
+Breakpoint 12: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int8x16_boxed at test_simd_dwarf.ml:97:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 12.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int8x16_boxed(x=('\xef', '\xcd', '\xab', '\x89', 'g', 'E', '#', '\x01', '\x10', '2', 'T', 'v', '\x98', '\xba', '\xdc', '\xfe') : int8x16 @ value) at test_simd_dwarf.ml:97:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 12.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int8x16_boxed(x=('\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0') : int8x16 @ value) at test_simd_dwarf.ml:97:50
+(lldb) b Test_simd_dwarf.f_int16x8_boxed
+Breakpoint 13: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int16x8_boxed at test_simd_dwarf.ml:104:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 13.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int16x8_boxed(x=(-12817, -30293, 17767, 291, 12816, 30292, -17768, -292) : int16x8 @ value) at test_simd_dwarf.ml:104:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 13.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int16x8_boxed(x=(0, 0, 0, 0, 0, 0, 0, 0) : int16x8 @ value) at test_simd_dwarf.ml:104:50
+(lldb) b Test_simd_dwarf.f_poly_simd_unboxed
+Breakpoint 14: where = test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd_unboxed at test_simd_dwarf.ml:112:54, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 14.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd_unboxed(x=36893488147419103233 : 'a @ vec128) at test_simd_dwarf.ml:112:54
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 14.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd_unboxed(x=316912650112397582603894390785 : 'a @ vec128) at test_simd_dwarf.ml:112:54
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 14.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd_unboxed(x=85074745567721443736243007488547356672 : 'a @ vec128) at test_simd_dwarf.ml:112:54
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 14.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd_unboxed(x=85751821082113164633487092142687702221 : 'a @ vec128) at test_simd_dwarf.ml:112:54
+(lldb) b Test_simd_dwarf.f_poly_simd_boxed
+Breakpoint 15: where = test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd_boxed at test_simd_dwarf.ml:120:52, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd_boxed(x=<abstract|2 words>@<ADDRESS> : 'a @ value) at test_simd_dwarf.ml:120:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd_boxed(x=<abstract|2 words>@<ADDRESS> : 'a @ value) at test_simd_dwarf.ml:120:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd_boxed(x=<abstract|2 words>@<ADDRESS> : 'a @ value) at test_simd_dwarf.ml:120:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd_boxed(x=<abstract|2 words>@<ADDRESS> : 'a @ value) at test_simd_dwarf.ml:120:52
+(lldb) b Test_simd_dwarf.f_poly_vec128
+Breakpoint 16: where = test_simd_dwarf.exe`Test_simd_dwarf.f_poly_vec128 at test_simd_dwarf.ml:129:48, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 16.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_vec128(x=36893488147419103233 : unknown @ vec128) at test_simd_dwarf.ml:129:48
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 16.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_vec128(x=316912650112397582603894390785 : unknown @ vec128) at test_simd_dwarf.ml:129:48
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 16.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_vec128(x=85074745567721443736243007488547356672 : unknown @ vec128) at test_simd_dwarf.ml:129:48
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 16.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_vec128(x=85751821082113164633487092142687702221 : unknown @ vec128) at test_simd_dwarf.ml:129:48
+(lldb) b Test_simd_dwarf.f_int64x4_boxed
+Breakpoint 17: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int64x4_boxed at test_simd_dwarf.ml:163:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 17.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int64x4_boxed(x=(1, 2, 3, 4) : int64x4 @ value) at test_simd_dwarf.ml:163:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 17.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int64x4_boxed(x=(0, 0, 0, 0) : int64x4 @ value) at test_simd_dwarf.ml:163:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 17.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int64x4_boxed(x=(-100, 9223372036854775807, -1000, 1000) : int64x4 @ value) at test_simd_dwarf.ml:163:50
+(lldb) b Test_simd_dwarf.f_int32x8_boxed
+Breakpoint 18: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int32x8_boxed at test_simd_dwarf.ml:169:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 18.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int32x8_boxed(x=(1, 2, 3, 4, 5, 6, 7, 8) : int32x8 @ value) at test_simd_dwarf.ml:169:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 18.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int32x8_boxed(x=(0, 0, 0, 0, 0, 0, 0, 0) : int32x8 @ value) at test_simd_dwarf.ml:169:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 18.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int32x8_boxed(x=(-10, 20, -30, 40, -50, 60, -70, 2147483647) : int32x8 @ value) at test_simd_dwarf.ml:169:50
+(lldb) b Test_simd_dwarf.f_float64x4_boxed
+Breakpoint 19: where = test_simd_dwarf.exe`Test_simd_dwarf.f_float64x4_boxed at test_simd_dwarf.ml:176:52, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float64x4_boxed(x=(#1., #2.1, #3.2, #4.3) : float64x4 @ value) at test_simd_dwarf.ml:176:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float64x4_boxed(x=(#0., #0., #0., #0.) : float64x4 @ value) at test_simd_dwarf.ml:176:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float64x4_boxed(x=(#-3.14, #1.0E+10, #-2.718, #6.28) : float64x4 @ value) at test_simd_dwarf.ml:176:52
+(lldb) b Test_simd_dwarf.f_float32x8_boxed
+Breakpoint 20: where = test_simd_dwarf.exe`Test_simd_dwarf.f_float32x8_boxed at test_simd_dwarf.ml:182:52, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 20.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float32x8_boxed(x=(#1.1s, #2.s, #3.s, #4.1s, #5.2s, #6.3s, #7.4s, #8.5s) : float32x8 @ value) at test_simd_dwarf.ml:182:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 20.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float32x8_boxed(x=(#0.s, #0.s, #0.s, #0.s, #0.s, #0.s, #0.s, #0.s) : float32x8 @ value) at test_simd_dwarf.ml:182:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 20.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_float32x8_boxed(x=(#-2.5s, #10.s, #-100.s, #1.0E+5s, #-1.5s, #2.5s, #-3.5s, #4.5s) : float32x8 @ value) at test_simd_dwarf.ml:182:52
+(lldb) b Test_simd_dwarf.f_int8x32_boxed
+Breakpoint 21: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int8x32_boxed at test_simd_dwarf.ml:192:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 21.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int8x32_boxed(x=('\xef', '\xcd', '\xab', '\x89', 'g', 'E', '#', '\x01', '\x10', '2', 'T', 'v', '\x98', '\xba', '\xdc', '\xfe', '\x88', 'w', 'f', 'U', 'D', '3', '"', '\x11', '\x11', '"', '3', 'D', 'U', 'f', 'w', '\x88') : int8x32 @ value) at test_simd_dwarf.ml:192:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 21.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int8x32_boxed(x=('\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0') : int8x32 @ value) at test_simd_dwarf.ml:192:50
+(lldb) b Test_simd_dwarf.f_int16x16_boxed
+Breakpoint 22: where = test_simd_dwarf.exe`Test_simd_dwarf.f_int16x16_boxed at test_simd_dwarf.ml:200:51, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 22.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int16x16_boxed(x=(-12817, -30293, 17767, 291, 12816, 30292, -17768, -292, 30600, 21862, 13124, 4386, 8721, 17459, 26197, -30601) : int16x16 @ value) at test_simd_dwarf.ml:200:51
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 22.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_int16x16_boxed(x=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) : int16x16 @ value) at test_simd_dwarf.ml:200:51
+(lldb) b Test_simd_dwarf.f_poly_simd256_boxed
+Breakpoint 23: where = test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed at test_simd_dwarf.ml:210:55, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 23.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a @ value) at test_simd_dwarf.ml:210:55
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 23.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a @ value) at test_simd_dwarf.ml:210:55
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 23.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a @ value) at test_simd_dwarf.ml:210:55
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_simd_dwarf', stop reason = breakpoint 23.1
+    frame #N: <ADDRESS> test_simd_dwarf.exe`Test_simd_dwarf.f_poly_simd256_boxed(x=<abstract|4 words>@<ADDRESS> : 'a @ value) at test_simd_dwarf.ml:210:55
+(lldb) quit

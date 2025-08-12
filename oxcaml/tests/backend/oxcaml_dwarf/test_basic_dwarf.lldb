@@ -1,4 +1,118 @@
-(lldb) b Test_basic_dwarf.f
+(lldb) b Test_basic_dwarf.f_start
 (lldb) run
+(lldb) b Test_basic_dwarf.f_unit
+(lldb) c
+(lldb) b Test_basic_dwarf.f_bool
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_int
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_char
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_float
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_float32
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_int32
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_int64
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_nativeint
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_string
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_bytes
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_array
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_list
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_option
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_lazy
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_exn
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_float_array
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_basic_dwarf.f_poly
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) c
 (lldb) quit

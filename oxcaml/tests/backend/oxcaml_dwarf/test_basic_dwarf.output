@@ -2,15 +2,533 @@
 Current executable set to '<PATH>/test_basic_dwarf.exe' (x86_64).
 (lldb) command source -s 0 'test_basic_dwarf_clean.lldb'
 Executing commands in '<BUILD_DIR>'.
-(lldb) b Test_basic_dwarf.f
-Breakpoint 1: where = test_basic_dwarf.exe`Test_basic_dwarf.f at test_basic_dwarf.ml:1:36, address = <ADDRESS>
+(lldb) b Test_basic_dwarf.f_start
+Breakpoint 1: where = test_basic_dwarf.exe`Test_basic_dwarf.f_start at test_basic_dwarf.ml:1:42, address = <ADDRESS>
 (lldb) run
 Process <PID> stopped
 * thread #1, name = 'test_basic_dwar', stop reason = breakpoint 1.1
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f(x="hello world!" : string @ value) at test_basic_dwarf.ml:1:36
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_start(param=0 : ocaml_value) at test_basic_dwarf.ml:1:42
 Process <PID> launched: '<PATH>/test_basic_dwarf.exe' (x86_64)
+(lldb) b Test_basic_dwarf.f_unit
+Breakpoint 2: where = test_basic_dwarf.exe`Test_basic_dwarf.f_unit at test_basic_dwarf.ml:5:41, address = <ADDRESS>
 (lldb) c
-hello world!
 Process <PID> resuming
-Process <PID> exited with status = 0 (0x00000000)
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 2.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_unit(x=() : unit @ value) at test_basic_dwarf.ml:5:41
+(lldb) b Test_basic_dwarf.f_bool
+Breakpoint 3: where = test_basic_dwarf.exe`Test_basic_dwarf.f_bool at test_basic_dwarf.ml:9:41, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 3.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_bool(x=true : bool @ value) at test_basic_dwarf.ml:9:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 3.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_bool(x=false : bool @ value) at test_basic_dwarf.ml:9:41
+(lldb) b Test_basic_dwarf.f_int
+Breakpoint 4: where = test_basic_dwarf.exe`Test_basic_dwarf.f_int at test_basic_dwarf.ml:20:40, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int(x=0 : int @ value) at test_basic_dwarf.ml:20:40
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int(x=123 : int @ value) at test_basic_dwarf.ml:20:40
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int(x=9223372036854775766 : int @ value) at test_basic_dwarf.ml:20:40
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int(x=4611686018427387903 : int @ value) at test_basic_dwarf.ml:20:40
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int(x=4611686018427387904 : int @ value) at test_basic_dwarf.ml:20:40
+(lldb) b Test_basic_dwarf.f_char
+Breakpoint 5: where = test_basic_dwarf.exe`Test_basic_dwarf.f_char at test_basic_dwarf.ml:32:41, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_char(x='a' : char @ value) at test_basic_dwarf.ml:32:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_char(x='Z' : char @ value) at test_basic_dwarf.ml:32:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_char(x='0' : char @ value) at test_basic_dwarf.ml:32:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_char(x=' ' : char @ value) at test_basic_dwarf.ml:32:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_char(x='\n' : char @ value) at test_basic_dwarf.ml:32:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_char(x='\255' : char @ value) at test_basic_dwarf.ml:32:41
+(lldb) b Test_basic_dwarf.f_float
+Breakpoint 6: where = test_basic_dwarf.exe`Test_basic_dwarf.f_float at test_basic_dwarf.ml:46:42, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float(x=0. : float @ value) at test_basic_dwarf.ml:46:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float(x=4.1 : float @ value) at test_basic_dwarf.ml:46:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float(x=-3.14 : float @ value) at test_basic_dwarf.ml:46:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float(x=0.30000000000000004 : float @ value) at test_basic_dwarf.ml:46:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float(x=0.3 : float @ value) at test_basic_dwarf.ml:46:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float(x=1.0E+10 : float @ value) at test_basic_dwarf.ml:46:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float(x=-1.0E-10 : float @ value) at test_basic_dwarf.ml:46:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float(x=+Inf : float @ value) at test_basic_dwarf.ml:46:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float(x=-Inf : float @ value) at test_basic_dwarf.ml:46:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float(x=NaN : float @ value) at test_basic_dwarf.ml:46:42
+(lldb) b Test_basic_dwarf.f_float32
+Breakpoint 7: where = test_basic_dwarf.exe`Test_basic_dwarf.f_float32 at test_basic_dwarf.ml:68:44, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 7.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float32(x=0.s : float32 @ value) at test_basic_dwarf.ml:68:44
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 7.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float32(x=4.1s : float32 @ value) at test_basic_dwarf.ml:68:44
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 7.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float32(x=-2.5s : float32 @ value) at test_basic_dwarf.ml:68:44
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 7.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float32(x=1.0E+5s : float32 @ value) at test_basic_dwarf.ml:68:44
+(lldb) b Test_basic_dwarf.f_int32
+Breakpoint 8: where = test_basic_dwarf.exe`Test_basic_dwarf.f_int32 at test_basic_dwarf.ml:78:42, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 8.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int32(x=0l : int32 @ value) at test_basic_dwarf.ml:78:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 8.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int32(x=42l : int32 @ value) at test_basic_dwarf.ml:78:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 8.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int32(x=-123l : int32 @ value) at test_basic_dwarf.ml:78:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 8.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int32(x=2147483647l : int32 @ value) at test_basic_dwarf.ml:78:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 8.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int32(x=-2147483648l : int32 @ value) at test_basic_dwarf.ml:78:42
+(lldb) b Test_basic_dwarf.f_int64
+Breakpoint 9: where = test_basic_dwarf.exe`Test_basic_dwarf.f_int64 at test_basic_dwarf.ml:90:42, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 9.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int64(x=0L : int64 @ value) at test_basic_dwarf.ml:90:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 9.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int64(x=1000L : int64 @ value) at test_basic_dwarf.ml:90:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 9.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int64(x=-5000L : int64 @ value) at test_basic_dwarf.ml:90:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 9.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int64(x=9223372036854775807L : int64 @ value) at test_basic_dwarf.ml:90:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 9.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_int64(x=-9223372036854775808L : int64 @ value) at test_basic_dwarf.ml:90:42
+(lldb) b Test_basic_dwarf.f_nativeint
+Breakpoint 10: where = test_basic_dwarf.exe`Test_basic_dwarf.f_nativeint at test_basic_dwarf.ml:102:46, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 10.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_nativeint(x=0n : nativeint @ value) at test_basic_dwarf.ml:102:46
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 10.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_nativeint(x=999n : nativeint @ value) at test_basic_dwarf.ml:102:46
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 10.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_nativeint(x=-777n : nativeint @ value) at test_basic_dwarf.ml:102:46
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 10.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_nativeint(x=9223372036854775807n : nativeint @ value) at test_basic_dwarf.ml:102:46
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 10.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_nativeint(x=-9223372036854775808n : nativeint @ value) at test_basic_dwarf.ml:102:46
+(lldb) b Test_basic_dwarf.f_string
+Breakpoint 11: where = test_basic_dwarf.exe`Test_basic_dwarf.f_string at test_basic_dwarf.ml:114:43, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 11.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_string(x="" : string @ value) at test_basic_dwarf.ml:114:43
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 11.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_string(x="hello world!" : string @ value) at test_basic_dwarf.ml:114:43
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 11.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_string(x="a" : string @ value) at test_basic_dwarf.ml:114:43
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 11.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_string(x="special chars: 
+	"" : string @ value) at test_basic_dwarf.ml:114:43
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 11.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_string(x="unicode: αβγ" : string @ value) at test_basic_dwarf.ml:114:43
+(lldb) b Test_basic_dwarf.f_bytes
+Breakpoint 12: where = test_basic_dwarf.exe`Test_basic_dwarf.f_bytes at test_basic_dwarf.ml:127:42, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 12.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_bytes(x="" : bytes @ value) at test_basic_dwarf.ml:127:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 12.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_bytes(x="abc" : bytes @ value) at test_basic_dwarf.ml:127:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 12.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_bytes(x="single" : bytes @ value) at test_basic_dwarf.ml:127:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 12.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_bytes(x="\0\x01\xff" : bytes @ value) at test_basic_dwarf.ml:127:42
+(lldb) b Test_basic_dwarf.f_array
+Breakpoint 13: where = test_basic_dwarf.exe`Test_basic_dwarf.f_array at test_basic_dwarf.ml:137:42, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 13.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_array(x=[|  |] : char @ value array) at test_basic_dwarf.ml:137:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 13.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_array(x=[| 'a' |] : char @ value array) at test_basic_dwarf.ml:137:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 13.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_array(x=[| 'a'; 'b'; 'c' |] : char @ value array) at test_basic_dwarf.ml:137:42
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 13.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_array(x=[| 'x'; 'y'; 'z'; '1'; '2'; '3' |] : char @ value array) at test_basic_dwarf.ml:137:42
+(lldb) b Test_basic_dwarf.f_list
+Breakpoint 14: where = test_basic_dwarf.exe`Test_basic_dwarf.f_list at test_basic_dwarf.ml:147:41, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 14.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_list(x=[] : char list @ value) at test_basic_dwarf.ml:147:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 14.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_list(x=(:: ('x', [])) : char list @ value) at test_basic_dwarf.ml:147:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 14.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_list(x=(:: ('a', (:: ('b', (:: ('c', [])))))) : char list @ value) at test_basic_dwarf.ml:147:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 14.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_list(x=(:: ('1', (:: ('2', (:: ('3', (:: ('4', (:: ('5', [])))))))))) : char list @ value) at test_basic_dwarf.ml:147:41
+(lldb) b Test_basic_dwarf.f_option
+Breakpoint 15: where = test_basic_dwarf.exe`Test_basic_dwarf.f_option at test_basic_dwarf.ml:159:43, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_option(x=None : char option @ value) at test_basic_dwarf.ml:159:43
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_option(x=(Some 'a') : char option @ value) at test_basic_dwarf.ml:159:43
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_option(x=(Some 'Z') : char option @ value) at test_basic_dwarf.ml:159:43
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_option(x=(Some '\000') : char option @ value) at test_basic_dwarf.ml:159:43
+(lldb) b Test_basic_dwarf.f_lazy
+Breakpoint 16: where = test_basic_dwarf.exe`Test_basic_dwarf.f_lazy at test_basic_dwarf.ml:169:41, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 16.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_lazy(x=97 : char lazy_t @ value) at test_basic_dwarf.ml:169:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 16.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_lazy(x=88 : char lazy_t @ value) at test_basic_dwarf.ml:169:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 16.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_lazy(x=57 : char lazy_t @ value) at test_basic_dwarf.ml:169:41
+(lldb) b Test_basic_dwarf.f_exn
+Breakpoint 17: where = test_basic_dwarf.exe`Test_basic_dwarf.f_exn at test_basic_dwarf.ml:179:40, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 17.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Failure"; id = 9223372036854775805 }; raw = [<object>@<ADDRESS>, "test"] } : exn @ value) at test_basic_dwarf.ml:179:40
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 17.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Invalid_argument"; id = 9223372036854775804 }; raw = [<object>@<ADDRESS>, "bad arg"] } : exn @ value) at test_basic_dwarf.ml:179:40
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 17.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Not_found"; id = 9223372036854775801 }; raw = <object>@<ADDRESS> } : exn @ value) at test_basic_dwarf.ml:179:40
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 17.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_exn(x={ exn = { name = "Sys_error"; id = 9223372036854775806 }; raw = [<object>@<ADDRESS>, "io error"] } : exn @ value) at test_basic_dwarf.ml:179:40
+(lldb) b Test_basic_dwarf.f_float_array
+Breakpoint 18: where = test_basic_dwarf.exe`Test_basic_dwarf.f_float_array at test_basic_dwarf.ml:189:48, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 18.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float_array(x=[|  |] : float @ value array) at test_basic_dwarf.ml:189:48
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 18.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float_array(x=[| 1. |] : float @ value array) at test_basic_dwarf.ml:189:48
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 18.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float_array(x=[| 4.1; 4.2; 4.3; 4.4; 4.5 |] : float @ value array) at test_basic_dwarf.ml:189:48
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 18.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float_array(x=[| 4.1; 4.2; 4.3; 4.4; 4.5; 4.6; 4.7; 4.8; 4.9; 5.; <5 more elements in floatarray> |] : float @ value array) at test_basic_dwarf.ml:189:48
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 18.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_float_array(x=[| 0.; -1.5; +Inf; NaN |] : float @ value array) at test_basic_dwarf.ml:189:48
+(lldb) b Test_basic_dwarf.f_poly
+Breakpoint 19: where = test_basic_dwarf.exe`Test_basic_dwarf.f_poly at test_basic_dwarf.ml:218:41, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=0 : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=1 : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=0 : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=9223372036854775685 : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=122 : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=3.14 : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=0.30000000000000004 : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=0.3 : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=2.7s : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=-456l : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=-789L : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=-999n : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x="polymorphic" : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x="poly" : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[112, 111, 108, 121] : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[112, [111, [...]@<ADDRESS>]] : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[112] : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=112 : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[<object>@<ADDRESS>, "poly error"] : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[| 1.; 2.; 3. |] : 'a @ value) at test_basic_dwarf.ml:218:41
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_basic_dwar', stop reason = breakpoint 19.1
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_poly(x=[| 4.1; 4.2; 4.3; 4.4; 4.5; 4.6; 4.7; 4.8; 4.9; 5.; <5 more elements in floatarray> |] : 'a @ value) at test_basic_dwarf.ml:218:41
 (lldb) quit

@@ -1,0 +1,261 @@
+(lldb) target create "./test_unboxed_dwarf.exe"
+Current executable set to '<PATH>/test_unboxed_dwarf.exe' (x86_64).
+(lldb) command source -s 0 'test_unboxed_dwarf_clean.lldb'
+Executing commands in '<BUILD_DIR>'.
+(lldb) b Test_unboxed_dwarf.f_start
+Breakpoint 1: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_start at test_unboxed_dwarf.ml:1:42, address = <ADDRESS>
+(lldb) run
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 1.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_start(param=0 : ocaml_value) at test_unboxed_dwarf.ml:1:42
+Process <PID> launched: '<PATH>/test_unboxed_dwarf.exe' (x86_64)
+(lldb) b Test_unboxed_dwarf.f_unboxed_float
+Breakpoint 2: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float at test_unboxed_dwarf.ml:4:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 2.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float(x=#4.1 : float# @ float64) at test_unboxed_dwarf.ml:4:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 2.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float(x=#0. : float# @ float64) at test_unboxed_dwarf.ml:4:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 2.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float(x=#-3.14 : float# @ float64) at test_unboxed_dwarf.ml:4:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 2.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float(x=#1.0E+10 : float# @ float64) at test_unboxed_dwarf.ml:4:50
+(lldb) b Test_unboxed_dwarf.f_unboxed_float32
+Breakpoint 3: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float32 at test_unboxed_dwarf.ml:13:52, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 3.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float32(x=#4.1s : float32# @ float32) at test_unboxed_dwarf.ml:13:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 3.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float32(x=#0.s : float32# @ float32) at test_unboxed_dwarf.ml:13:52
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 3.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float32(x=#-2.5s : float32# @ float32) at test_unboxed_dwarf.ml:13:52
+(lldb) b Test_unboxed_dwarf.f_unboxed_nativeint
+Breakpoint 4: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_nativeint at test_unboxed_dwarf.ml:18:54, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_nativeint(x=0 : nativeint# @ word) at test_unboxed_dwarf.ml:18:54
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_nativeint(x=81985529216486895 : nativeint# @ word) at test_unboxed_dwarf.ml:18:54
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_nativeint(x=-999 : nativeint# @ word) at test_unboxed_dwarf.ml:18:54
+(lldb) b Test_unboxed_dwarf.f_unboxed_int32
+Breakpoint 5: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_int32 at test_unboxed_dwarf.ml:23:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_int32(x=0 : int32# @ bits32) at test_unboxed_dwarf.ml:23:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_int32(x=305419896 : int32# @ bits32) at test_unboxed_dwarf.ml:23:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_int32(x=-456 : int32# @ bits32) at test_unboxed_dwarf.ml:23:50
+(lldb) b Test_unboxed_dwarf.f_unboxed_int64
+Breakpoint 6: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_int64 at test_unboxed_dwarf.ml:30:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_int64(x=0 : int64# @ bits64) at test_unboxed_dwarf.ml:30:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_int64(x=81985529216486895 : int64# @ bits64) at test_unboxed_dwarf.ml:30:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 6.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_int64(x=-789 : int64# @ bits64) at test_unboxed_dwarf.ml:30:50
+(lldb) b Test_unboxed_dwarf.f_poly_float64
+Breakpoint 7: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_float64 at test_unboxed_dwarf.ml:35:49, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 7.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_float64(x=#4.1 : unknown @ float64) at test_unboxed_dwarf.ml:35:49
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 7.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_float64(x=#-3.14 : unknown @ float64) at test_unboxed_dwarf.ml:35:49
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 7.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_float64(x=#1.0E+10 : unknown @ float64) at test_unboxed_dwarf.ml:35:49
+(lldb) b Test_unboxed_dwarf.f_poly_float32
+Breakpoint 8: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_float32 at test_unboxed_dwarf.ml:40:49, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 8.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_float32(x=#4.1s : unknown @ float32) at test_unboxed_dwarf.ml:40:49
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 8.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_float32(x=#-2.5s : unknown @ float32) at test_unboxed_dwarf.ml:40:49
+(lldb) b Test_unboxed_dwarf.f_poly_bits64
+Breakpoint 9: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_bits64 at test_unboxed_dwarf.ml:44:48, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 9.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_bits64(x=81985529216486895 : unknown @ bits64) at test_unboxed_dwarf.ml:44:48
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 9.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_bits64(x=-789 : unknown @ bits64) at test_unboxed_dwarf.ml:44:48
+(lldb) b Test_unboxed_dwarf.f_poly_bits32
+Breakpoint 10: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_bits32 at test_unboxed_dwarf.ml:48:48, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 10.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_bits32(x=305419896 : unknown @ bits32) at test_unboxed_dwarf.ml:48:48
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 10.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_bits32(x=-456 : unknown @ bits32) at test_unboxed_dwarf.ml:48:48
+(lldb) b Test_unboxed_dwarf.f_poly_word
+Breakpoint 11: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_word at test_unboxed_dwarf.ml:52:46, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 11.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_word(x=81985529216486895 : unknown @ word) at test_unboxed_dwarf.ml:52:46
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 11.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_word(x=-999 : unknown @ word) at test_unboxed_dwarf.ml:52:46
+(lldb) b Test_unboxed_dwarf.f_simple_product
+Breakpoint 12: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_simple_product at test_unboxed_dwarf.ml:60:51, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 12.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_simple_product(x_317_unboxed0=#4.1 : float# @ float64, x_317_unboxed1=42 : int32# @ bits32) at test_unboxed_dwarf.ml:60:51
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 12.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_simple_product(x_317_unboxed0=#0. : float# @ float64, x_317_unboxed1=0 : int32# @ bits32) at test_unboxed_dwarf.ml:60:51
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 12.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_simple_product(x_317_unboxed0=#-3.14 : float# @ float64, x_317_unboxed1=-123 : int32# @ bits32) at test_unboxed_dwarf.ml:60:51
+(lldb) b Test_unboxed_dwarf.f_mixed_product
+Breakpoint 13: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_mixed_product at test_unboxed_dwarf.ml:65:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 13.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_mixed_product(x_320_unboxed0=-100 : int64# @ bits64, x_320_unboxed1=true : bool @ value, x_320_unboxed2=#-2.5 : float# @ float64) at test_unboxed_dwarf.ml:65:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 13.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_mixed_product(x_320_unboxed0=0 : int64# @ bits64, x_320_unboxed1=false : bool @ value, x_320_unboxed2=#0. : float# @ float64) at test_unboxed_dwarf.ml:65:50
+(lldb) b Test_unboxed_dwarf.f_nested_product
+Breakpoint 14: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_nested_product at test_unboxed_dwarf.ml:69:51, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 14.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_nested_product(x_323_unboxed0=#1.5 : float# @ float64, x_323_unboxed1=10 : int32# @ bits32, x_323_unboxed2=200 : int64# @ bits64) at test_unboxed_dwarf.ml:69:51
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 14.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_nested_product(x_323_unboxed0=#0. : float# @ float64, x_323_unboxed1=0 : int32# @ bits32, x_323_unboxed2=0 : int64# @ bits64) at test_unboxed_dwarf.ml:69:51
+(lldb) b Test_unboxed_dwarf.f_simple_record
+Breakpoint 15: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_simple_record at test_unboxed_dwarf.ml:77:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_simple_record(x_336_unboxed0=#4.1 : float# @ float64, x_336_unboxed1=42 : int32# @ bits32) at test_unboxed_dwarf.ml:77:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_simple_record(x_336_unboxed0=#0. : float# @ float64, x_336_unboxed1=0 : int32# @ bits32) at test_unboxed_dwarf.ml:77:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 15.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_simple_record(x_336_unboxed0=#-3.14 : float# @ float64, x_336_unboxed1=-123 : int32# @ bits32) at test_unboxed_dwarf.ml:77:50
+(lldb) b Test_unboxed_dwarf.f_mixed_record
+Breakpoint 16: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_mixed_record at test_unboxed_dwarf.ml:83:49, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 16.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_mixed_record(x_341_unboxed0=100 : int64# @ bits64, x_341_unboxed1=true : bool @ value, x_341_unboxed2=#2.5 : float# @ float64) at test_unboxed_dwarf.ml:83:49
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 16.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_mixed_record(x_341_unboxed0=0 : int64# @ bits64, x_341_unboxed1=false : bool @ value, x_341_unboxed2=#0. : float# @ float64) at test_unboxed_dwarf.ml:83:49
+(lldb) b Test_unboxed_dwarf.f_nested_record
+Breakpoint 17: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_nested_record at test_unboxed_dwarf.ml:88:50, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 17.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_nested_record(x_347_unboxed0=#1.5 : float# @ float64, x_347_unboxed1=10 : int32# @ bits32, x_347_unboxed2=200 : int64# @ bits64) at test_unboxed_dwarf.ml:88:50
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 17.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_nested_record(x_347_unboxed0=#0. : float# @ float64, x_347_unboxed1=0 : int32# @ bits32, x_347_unboxed2=0 : int64# @ bits64) at test_unboxed_dwarf.ml:88:50
+(lldb) b Test_unboxed_dwarf.f_poly_product
+Breakpoint 18: where = test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_product at test_unboxed_dwarf.ml:94:4, address = <ADDRESS>
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 18.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_product(x_353_unboxed0=4 : unknown @ bits64, x_353_unboxed1=4L : unknown @ value) at test_unboxed_dwarf.ml:94:4
+(lldb) c
+Process <PID> resuming
+Process <PID> stopped
+* thread #1, name = 'test_unboxed_dw', stop reason = breakpoint 18.1
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_product(x_353_unboxed0=100 : unknown @ bits64, x_353_unboxed1=1 : unknown @ value) at test_unboxed_dwarf.ml:94:4
+(lldb) quit
