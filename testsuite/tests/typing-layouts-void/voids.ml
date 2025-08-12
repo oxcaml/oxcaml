@@ -712,4 +712,18 @@ let test18 () =
 
 let _ = test18 ()
 
+(*********************************************)
+(* Test 19: unboxed variants containing void *)
+
+type t = P of void [@@unboxed]
+let create () = P (void ())
+
+let test19 () =
+  start_test "unboxed variants containing void";
+  let v = create () in
+  match v with
+  | P v -> assert (use_void v = 1)
+
+let _ = test19 ()
+
 let () = print_endline "All tests passed."

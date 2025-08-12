@@ -966,7 +966,10 @@ type constructor_description =
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
     cstr_shape: constructor_representation; (* Repr of the constructor itself *)
-    cstr_constant: bool;                (* True if all args are void *)
+    cstr_constant: bool;
+    (* True if it's the constructor of a non-[@@unboxed] variant with 0 bits of
+       payload. (Or equivalently, if it's represented as either a tagged int or
+       the null pointer) *)
     cstr_consts: int;                   (* Number of constant constructors *)
     cstr_nonconsts: int;                (* Number of non-const constructors *)
     cstr_generalized: bool;             (* Constrained return type? *)

@@ -507,7 +507,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Null, Variant_with_null -> Lconst Const_null
       | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
         assert false
-      | Ordinary {runtime_tag}, _ when cstr.cstr_constant ->
+      | Ordinary {runtime_tag},
+        (Variant_boxed _ | Variant_extensible) when cstr.cstr_constant ->
           assert (
             List.for_all
               (fun (_, s) -> Jkind.Sort.Const.all_void s) args_with_sorts);
