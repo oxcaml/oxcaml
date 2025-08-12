@@ -36,7 +36,7 @@
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant(x=`Alpha : [> `Alpha | `Beta of int ] @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant(x=(`Beta 123) : [> `Alpha | `Beta of int ] @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant(x=(Leaf 42) : nested_variant @ value)
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant(x=(Node { left = [1]; right = [2]; value = 3.14 }) : nested_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant(x=(Node { left = (Leaf 1); right = (Leaf 2); value = 3.14 }) : nested_variant @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_mixed_combo(x={ boxed_field = 42; variant_field = (C 100); record_field = { x = 10; y = 2.5 }; unboxed_field = #3.14 } : mixed_combo @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_option_variant(x=None : int option_variant @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_option_variant(x=(Some 42) : int option_variant @ value)
