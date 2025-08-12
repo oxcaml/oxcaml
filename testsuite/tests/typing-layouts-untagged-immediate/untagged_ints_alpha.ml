@@ -1,11 +1,11 @@
 (* TEST
- include stdlib_beta;
+ include stdlib_stable;
  flambda2;
  {
-   flags = "-extension layouts_alpha -extension small_numbers_beta";
+   flags = "-extension-universe alpha";
    native;
  }{
-   flags = "-extension layouts_alpha -extension small_numbers_beta";
+   flags = "-extension-universe alpha";
    bytecode;
  }
 *)
@@ -23,7 +23,7 @@
 (* Prelude: Functions on unboxed ints. *)
 
 module Int_u = struct
-  include Stdlib_beta.Int_u
+  include Stdlib_stable.Int_u
 
   let ( + ) = add
   let ( - ) = sub
@@ -81,7 +81,7 @@ let[@inline_never] f_mixed_blocks_and_closures
              x5; x6_1; x6_2; } as iargs) () =
   let[@inline never] rec go k =
     if k = end_k
-    then (Stdlib_beta.Int_u.of_int 0)
+    then (Int_u.of_int 0)
     else begin
       let (x2_1, x2_2) = iargs.x2_1, iargs.x2_2 in
       let {x4_1; x4_2; _} = iargs in
@@ -103,11 +103,11 @@ let test_mixed_blocks_and_closures () =
       9 * (1 + 2 + 3 + 5 + 8) = 171
   *)
   let steps = Array.init 10 (fun _ -> 0) in
-  let x1 = (Stdlib_beta.Int_u.of_int 1) in
-  let x3 = (Stdlib_beta.Int_u.of_int 2) in
-  let x5 = (Stdlib_beta.Int_u.of_int 3) in
-  let x7 = (Stdlib_beta.Int_u.of_int 5) in
-  let x9 = (Stdlib_beta.Int_u.of_int 8) in
+  let x1 = (Int_u.of_int 1) in
+  let x3 = (Int_u.of_int 2) in
+  let x5 = (Int_u.of_int 3) in
+  let x7 = (Int_u.of_int 5) in
+  let x9 = (Int_u.of_int 8) in
 
   (* all these 8 numbers together sum to 3 *)
   let x2_1, x2_2 = (7, 42) in
@@ -139,18 +139,18 @@ type t_mixed_record =
 (* Construction *)
 let t_mixed1 = { a = 317.;
               b = 1300;
-              c = (Stdlib_beta.Int_u.of_int 731);
-              d = (Stdlib_beta.Int_u.of_int 141);
+              c = (Int_u.of_int 731);
+              d = (Int_u.of_int 141);
               e = 600;
-              f = (Stdlib_beta.Int_u.of_int 2710);
+              f = (Int_u.of_int 2710);
             }
 
 let t_mixed2 = { a = (-317.);
               b = -1300;
-              c = (Stdlib_beta.Int_u.of_int (-731));
-              d = (Stdlib_beta.Int_u.of_int (-141));
+              c = (Int_u.of_int (-731));
+              d = (Int_u.of_int (-141));
               e = -600;
-              f = (Stdlib_beta.Int_u.of_int (-2710));
+              f = (Int_u.of_int (-2710));
             }
 
 let print_t_mixed t =
@@ -184,9 +184,9 @@ let _ =
 
 (* Record update and mutation *)
 let f_mixed2 ({a; d; _} as r1) r2 =
-  r1.d <- (Stdlib_beta.Int_u.of_int 4200);
+  r1.d <- (Int_u.of_int 4200);
   let r3 = { r2 with c = r1.d;
-                     d = (Stdlib_beta.Int_u.of_int 2500); }
+                     d = (Int_u.of_int 2500); }
   in
   r3.b <- Int_u.(to_int (of_float a + d));
   r2.b <- 1700;
@@ -217,19 +217,19 @@ type t_mixed_variant =
 let t_mixed_variant1 = T
             { a = 317.;
               b = 1300;
-              c = (Stdlib_beta.Int_u.of_int 731);
-              d = (Stdlib_beta.Int_u.of_int 141);
+              c = (Int_u.of_int 731);
+              d = (Int_u.of_int 141);
               e = 600;
-              f = (Stdlib_beta.Int_u.of_int 2710);
+              f = (Int_u.of_int 2710);
             }
 
 let t_mixed_variant2 = T
             { a = (-317.);
               b = -1300;
-              c = (Stdlib_beta.Int_u.of_int (-731));
-              d = (Stdlib_beta.Int_u.of_int (-141));
+              c = (Int_u.of_int (-731));
+              d = (Int_u.of_int (-141));
               e = -600;
-              f = (Stdlib_beta.Int_u.of_int (-2710));
+              f = (Int_u.of_int (-2710));
             }
 
 let[@warning "-partial-match"] print_t_mixed_variant (T t) =
@@ -264,9 +264,9 @@ let _ =
 
 (* Variant update and mutation *)
 let[@warning "-partial-match"] f_mixed2 (T ({a; d; _} as r1)) (T r2) =
-  r1.d <- (Stdlib_beta.Int_u.of_int 4200);
+  r1.d <- (Int_u.of_int 4200);
   let T r3 = T { r2 with c = r1.d;
-                         d = (Stdlib_beta.Int_u.of_int 2500); }
+                         d = (Int_u.of_int 2500); }
   in
   r3.b <- Int_u.(to_int (of_float a + d));
   r2.b <- 1700;
@@ -292,18 +292,18 @@ let rec f r =
 
 and t_rec1 = { a = 11.;
               b = 2;
-              c = (Stdlib_beta.Int_u.of_int 33);
-              d = (Stdlib_beta.Int_u.of_int 44);
+              c = (Int_u.of_int 33);
+              d = (Int_u.of_int 44);
               e = 5;
-              f = (Stdlib_beta.Int_u.of_int 66);
+              f = (Int_u.of_int 66);
   }
 
 and t_rec2 = { a = (- 51.);
               b = -6;
-              c = (Stdlib_beta.Int_u.of_int (-73));
-              d = (Stdlib_beta.Int_u.of_int (-84));
+              c = (Int_u.of_int (-73));
+              d = (Int_u.of_int (-84));
               e = -9;
-              f = (Stdlib_beta.Int_u.of_int (-106));
+              f = (Int_u.of_int (-106));
             }
 
 let _ =

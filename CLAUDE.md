@@ -4,7 +4,9 @@ You are working on the OxCaml compiler, implemented in OCaml.
 It's a branch of the OCaml compiler with Jane Street extensions.
 
 Do not stage or commit your changes unless prompted to.
-Always check that your changes build with `make boot-compiler`.
+Always check that your changes build with both:
+1. `make boot-compiler` - Quick build check
+2. `make test` - Full test suite (required before declaring success)
 
 Some style hints:
 - Make use of pattern-matching and other functional programming idioms.

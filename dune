@@ -624,7 +624,8 @@
  (modes byte native)
  ; same flags as for ocamlcommon library
  (flags
-  (-strict-sequence
+  (:standard
+   -strict-sequence
    -bin-annot
    -safe-string
    -strict-formats

@@ -1,7 +1,7 @@
 (* TEST
- flags = "-extension layouts_alpha -extension small_numbers";
+ flags = "-extension layouts_alpha";
  {
-   flags = "-extension layouts_beta -extension small_numbers";
+   flags = "-extension layouts_beta";
    expect;
  }
 *)

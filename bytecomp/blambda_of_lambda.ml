@@ -34,8 +34,8 @@ module Storer = Switch.Store (struct
   let make_key = Lambda.make_key
 end)
 
-let constant_int size n : constant =
-  match (size : Scalar.any_locality_mode Scalar.Integral.Width.t) with
+let constant_int integral n : constant =
+  match Scalar.Integral.width integral with
   | Taggable Int -> Const_int n
   | Taggable Int8 -> Const_int (Numbers.Int8.to_int (Numbers.Int8.of_int_exn n))
   | Taggable Int16 ->
@@ -47,7 +47,7 @@ let constant_int size n : constant =
 
 let const_int size n = Const_base (constant_int size n)
 
-let tagged_immediate n = Const (const_int (Taggable Int) n)
+let tagged_immediate n = Const (const_int (Value (Taggable Int)) n)
 
 let unit = Const Lambda.const_unit
 
@@ -62,15 +62,6 @@ let is_immed n = Instruct.immed_min <= n && n <= Instruct.immed_max
 let is_representable_const_int = function
   | Const (Const_base (Const_int i)) -> is_immed i
   | _ -> false
-
-let comp_integer_comparison : Scalar.Integer_comparison.t -> comparison =
-  function
-  | Ceq -> Eq
-  | Cne -> Neq
-  | Clt -> Ltint
-  | Cgt -> Gtint
-  | Cle -> Leint
-  | Cge -> Geint
 
 let caml_sys_const name =
   let const_name =
@@ -861,7 +852,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         comp_binary_scalar_intrinsic binary (comp_expr x) (comp_expr y)
       | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2))
 
-and comp_binary_scalar_intrinsic op x y =
+and comp_binary_scalar_intrinsic :
+    type a. a Scalar.Operation.Binary.t -> blambda -> blambda -> blambda =
+ fun op x y ->
   let prim prim = Prim (prim, [x; y]) in
   let ccall fmt = kccallf prim fmt in
   match (op : _ Scalar.Operation.Binary.t) with
@@ -926,24 +919,50 @@ and comp_binary_scalar_intrinsic op x y =
   | Icmp (size, cmp) -> (
     match Scalar.Integral.width size with
     | Taggable (Int | Int8 | Int16) ->
-      if is_representable_const_int y && not (is_representable_const_int x)
-      then
-        Prim
-          ( Intcomp
-              (comp_integer_comparison (Scalar.Integer_comparison.swap cmp)),
-            [y; x] )
-      else prim (Intcomp (comp_integer_comparison cmp))
+      let x, cmp, y =
+        (* Optimization in emitcode.ml if one operand is a constant. *)
+        if is_representable_const_int y && not (is_representable_const_int x)
+        then y, Scalar.Integer_comparison.swap cmp, x
+        else x, cmp, y
+      in
+      let x, cmp, y =
+        match (cmp : Scalar.Integer_comparison.t) with
+        | Ceq -> x, Eq, y
+        | Cne -> x, Neq, y
+        | Clt -> x, Ltint, y
+        | Cgt -> x, Gtint, y
+        | Cle -> x, Leint, y
+        | Cge -> x, Geint, y
+        | Cult -> x, Ultint, y
+        | Cuge -> x, Ugeint, y
+        (* Bytecode only has Ultint and Ugeint instructions.
+           For Cugt and Cule, we swap arguments and use the opposite comparison. *)
+        | Cugt ->
+          (* [x >u y] becomes [y <u x] *)
+          y, Ultint, x
+        | Cule ->
+          (* [x <=u y] becomes [y >=u x] *)
+          y, Ugeint, x
+      in
+      Prim (Intcomp cmp, [x; y])
     | Boxable
         ( Int32 Any_locality_mode
         | Nativeint Any_locality_mode
         | Int64 Any_locality_mode ) -> (
+      let make_unsigned_comparison name =
+        make_unsigned_comparison size (fun x y -> Prim (Ccall name, [x; y])) x y
+      in
       match cmp with
-      | Ceq -> prim (Ccall "caml_equal")
-      | Cne -> prim (Ccall "caml_notequal")
-      | Clt -> prim (Ccall "caml_lessthan")
-      | Cle -> prim (Ccall "caml_lessequal")
-      | Cgt -> prim (Ccall "caml_greaterthan")
-      | Cge -> prim (Ccall "caml_greaterequal")))
+      | Ceq -> ccall "caml_equal"
+      | Cne -> ccall "caml_notequal"
+      | Clt -> ccall "caml_lessthan"
+      | Cle -> ccall "caml_lessequal"
+      | Cgt -> ccall "caml_greaterthan"
+      | Cge -> ccall "caml_greaterequal"
+      | Cult -> make_unsigned_comparison "caml_lessthan"
+      | Cugt -> make_unsigned_comparison "caml_greaterthan"
+      | Cule -> make_unsigned_comparison "caml_lessequal"
+      | Cuge -> make_unsigned_comparison "caml_greaterequal"))
   | Fcmp (size, cmp) -> (
     match Scalar.Floating.width size with
     | (Float64 Any_locality_mode | Float32 Any_locality_mode) as size -> (
@@ -960,17 +979,21 @@ and comp_binary_scalar_intrinsic op x y =
       | CFnle -> c "le" |> boolnot
       | CFge -> c "ge"
       | CFnge -> c "ge" |> boolnot))
-  | Three_way_compare size -> (
-    match Scalar.width size with
-    | Integral (Taggable (Int | Int8 | Int16)) -> ccall "caml_int_compare"
-    | ( Integral
-          (Boxable
-            ( Int32 Any_locality_mode
-            | Nativeint Any_locality_mode
-            | Int64 Any_locality_mode ))
-      | Floating (Float64 Any_locality_mode | Float32 Any_locality_mode) ) as
-      size ->
-      ccall "caml_%s_compare" (Scalar.Width.to_string size))
+  | Three_way_compare_int (signedness, size) -> (
+    let make_signed_compare x y =
+      match Scalar.Integral.width size with
+      | Taggable (Int | Int8 | Int16) -> Prim (Ccall "caml_int_compare", [x; y])
+      | Boxable (Int32 _) -> Prim (Ccall "caml_int32_compare", [x; y])
+      | Boxable (Int64 _) -> Prim (Ccall "caml_int64_compare", [x; y])
+      | Boxable (Nativeint _) -> Prim (Ccall "caml_nativeint_compare", [x; y])
+    in
+    match (signedness : Scalar.Signedness.t) with
+    | Signed -> make_signed_compare x y
+    | Unsigned -> make_unsigned_comparison size make_signed_compare x y)
+  | Three_way_compare_float size -> (
+    match Scalar.Floating.width size with
+    | Float64 Any_locality_mode -> ccall "caml_float_compare"
+    | Float32 Any_locality_mode -> ccall "caml_float32_compare")
 
 and comp_unary_scalar_intrinsic op x =
   let prim prim = Prim (prim, [x]) in
@@ -981,7 +1004,7 @@ and comp_unary_scalar_intrinsic op x =
       comp_binary_scalar_intrinsic
         (Scalar.Operation.Binary.Integral (size, Add))
         x
-        (Const (const_int (Scalar.Integral.width size) n))
+        (Const (const_int size n))
     in
     match op with
     | Succ -> comp_offset 1
@@ -1009,5 +1032,92 @@ and comp_unary_scalar_intrinsic op x =
         (Scalar.Floating.Width.to_string size))
   | Static_cast { src; dst } ->
     static_cast x ~src:(Scalar.width src) ~dst:(Scalar.width dst)
+
+and make_unsigned_comparison size signed_comparison x y =
+  (* For unsigned comparisons, we flip the sign bit of both operands and use
+     signed comparison (see z3 proof [*] below) *)
+  let min_int_at_runtime const_name =
+    let num_bits = Prim (caml_sys_const const_name, [unit]) in
+    let one = Const (const_int size 1) in
+    let num_bits =
+      assert (is_immed (-1));
+      Prim (Offsetint (-1), [num_bits])
+      (* this computation is just "num_bits - 1" *)
+    in
+    comp_binary_scalar_intrinsic (Shift (size, Lsl, Int)) one num_bits
+  in
+  let min_int =
+    (* For int and nativeint, we don't know the target platform width so we have
+       to compute min_int at runtime.  For other widths we can do better. *)
+    match Scalar.Integral.width size with
+    | Taggable Int8 -> Const (const_int size (-0x80))
+    | Taggable Int16 -> Const (const_int size (-0x8000))
+    | Taggable Int -> min_int_at_runtime Int_size
+    | Boxable (Int32 Any_locality_mode) ->
+      Const (Const_base (Const_int32 Int32.min_int))
+    | Boxable (Int64 Any_locality_mode) ->
+      Const (Const_base (Const_int64 Int64.min_int))
+    | Boxable (Nativeint Any_locality_mode) -> min_int_at_runtime Word_size
+  in
+  let flip_sign_bit arg =
+    comp_binary_scalar_intrinsic (Integral (size, Xor)) arg min_int
+  in
+  signed_comparison (flip_sign_bit x) (flip_sign_bit y)
+
+(* z3 proof of the above property [*]:
+
+   (define-sort int64 () (_ BitVec 64))
+
+   (declare-const x int64)
+   (declare-const y int64)
+
+   (define-fun flip_sign ((v int64)) int64
+     (bvxor v #x8000000000000000)
+   )
+
+   (push)
+   (echo "checking `lt`...")
+   (assert (not (=
+     (bvult x y)
+     (bvslt (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+
+   (push)
+   (echo "checking `le`...")
+   (assert (not (=
+     (bvule x y)
+     (bvsle (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+
+   (push)
+   (echo "checking `gt`...")
+   (assert (not (=
+     (bvugt x y)
+     (bvsgt (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+
+   (push)
+   (echo "checking `ge`...")
+   (assert (not (=
+     (bvuge x y)
+     (bvsge (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+*)
 
 let blambda_of_lambda x = comp_expr x

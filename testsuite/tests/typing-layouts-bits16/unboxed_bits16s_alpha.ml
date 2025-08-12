@@ -1,11 +1,11 @@
 (* TEST
- include stdlib_beta;
+ include stdlib_stable;
  flambda2;
  {
-   flags = "-extension layouts_alpha -extension small_numbers_beta";
+   flags = "-extension layouts_alpha";
    native;
  }{
-   flags = "-extension layouts_alpha -extension small_numbers_beta";
+   flags = "-extension layouts_alpha";
    bytecode;
  }
 *)
@@ -22,10 +22,10 @@
 (*****************************************)
 (* Prelude: Functions on unboxed int16s. *)
 
-module Int16 = Stdlib_beta.Int16
+module Int16 = Stdlib_stable.Int16
 
 module Int16_u = struct
-  include Stdlib_beta.Int16_u
+  include Stdlib_stable.Int16_u
 
   let ( + ) = add
   let ( - ) = sub

@@ -189,20 +189,59 @@ val integral : 'a Integral.t -> 'a t
 
 val floating : 'a Floating.t -> 'a t
 
-module Integer_comparison : sig
+module Signedness : sig
   type t =
-    | Ceq
-    | Cne
-    | Clt
-    | Cgt
-    | Cle
-    | Cge
+    | Signed
+    | Unsigned
+
+  val equal : t -> t -> bool
+
+  val print : Format.formatter -> t -> unit
+end
+
+module Integer_comparison : sig
+  (** Integer comparison operators supporting both signed and unsigned
+      comparisons.
+
+      The first six operators (Ceq through Cge) perform signed comparisons,
+      treating the most significant bit as a sign bit in two's complement
+      representation.
+
+      The last four operators (Cult through Cuge) perform unsigned comparisons,
+      treating all bits as magnitude. This means negative signed integers are
+      compared as large positive values:
+      - In 8-bit: -1 (0xFF) is treated as 255, thus -1 > 127 unsigned
+      - In 32-bit: -1 (0xFFFFFFFF) is treated as 4294967295
+
+      Examples with 8-bit integers:
+      - Signed: -128 < -1 < 0 < 1 < 127
+      - Unsigned:
+        0 < 1 < 127 < 128 (which is -128 signed) < 255 (which is -1 signed)
+  *)
+  type t =
+    | Ceq  (** Equal (signed or unsigned - same result) *)
+    | Cne  (** Not equal (signed or unsigned - same result) *)
+    | Clt  (** Less than (signed) *)
+    | Cgt  (** Greater than (signed) *)
+    | Cle  (** Less or equal (signed) *)
+    | Cge  (** Greater or equal (signed) *)
+    | Cult  (** Less than (unsigned) *)
+    | Cugt  (** Greater than (unsigned) *)
+    | Cule  (** Less or equal (unsigned) *)
+    | Cuge  (** Greater or equal (unsigned) *)
+
+  val equal : t -> t -> bool
 
   val to_string : t -> string
 
   val swap : t -> t
 
   val negate : t -> t
+
+  (** Creates a comparison operator from the behavior that should happen in
+      each condition, with the given signedness. If every case is the same,
+      returns [Error] of that case *)
+  val create : Signedness.t -> lt:bool -> eq:bool -> gt:bool -> (t, bool) result
 end
 
 module Float_comparison : sig
@@ -327,7 +366,8 @@ module Operation : sig
       | Floating of 'mode Floating.t * Float_op.t
       | Icmp of any_locality_mode Integral.t * Integer_comparison.t
       | Fcmp of any_locality_mode Floating.t * Float_comparison.t
-      | Three_way_compare of any_locality_mode scalar
+      | Three_way_compare_int of Signedness.t * any_locality_mode Integral.t
+      | Three_way_compare_float of any_locality_mode Floating.t
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
 

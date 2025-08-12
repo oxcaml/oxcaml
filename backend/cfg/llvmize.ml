@@ -496,16 +496,16 @@ module F = struct
     let typ = Llvm_typ.of_machtyp_component i.arg.(0).typ in
     let comp_name =
       match comp with
-      | Isigned Ceq | Iunsigned Ceq -> "eq"
-      | Isigned Cne | Iunsigned Cne -> "ne"
-      | Isigned Clt -> "slt"
-      | Isigned Cgt -> "sgt"
-      | Isigned Cle -> "sle"
-      | Isigned Cge -> "sge"
-      | Iunsigned Clt -> "ult"
-      | Iunsigned Cgt -> "ugt"
-      | Iunsigned Cle -> "ule"
-      | Iunsigned Cge -> "ult"
+      | Ceq -> "eq"
+      | Cne -> "ne"
+      | Clt -> "slt"
+      | Cgt -> "sgt"
+      | Cle -> "sle"
+      | Cge -> "sge"
+      | Cult -> "ult"
+      | Cugt -> "ugt"
+      | Cule -> "ule"
+      | Cuge -> "uge"
     in
     match imm with
     | None ->
@@ -797,16 +797,23 @@ module F = struct
       ins_branch_cond t is_true b.ifso b.ifnot
     | Return -> return t i
     | Int_test { lt; eq; gt; is_signed; imm } ->
-      let make_comp comp =
-        match is_signed with
-        | true -> Operation.Isigned comp
-        | false -> Operation.Iunsigned comp
+      let open struct
+        type comp =
+          | Lt
+          | Gt
+      end in
+      let make_comp (comp : comp) : Cmm.integer_comparison =
+        match is_signed, comp with
+        | Signed, Lt -> Clt
+        | Signed, Gt -> Cgt
+        | Unsigned, Lt -> Cult
+        | Unsigned, Gt -> Cugt
       in
-      let is_lt = int_comp t (make_comp Cmm.Clt) i ~imm in
+      let is_lt = int_comp t (make_comp Lt) i ~imm in
       let ge = fresh_ident t in
       ins_branch_cond_ident t is_lt (get_ident_for_label t lt) ge;
       line t.ppf "%a:" Ident.print ge;
-      let is_gt = int_comp t (make_comp Cmm.Cgt) i ~imm in
+      let is_gt = int_comp t (make_comp Gt) i ~imm in
       ins_branch_cond t is_gt gt eq
     | Raise _ ->
       (* CR yusumez: Implement this *)

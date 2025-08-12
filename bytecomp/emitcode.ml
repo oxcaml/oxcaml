@@ -17,7 +17,7 @@
 
 open Config
 open Misc
-open Blambda
+open Lambda
 open Instruct
 open Opcodes
 open Cmo_format
@@ -214,7 +214,7 @@ and emit_branch_comp = function
 | Gtint -> out opBGTINT   | Geint -> out opBGEINT
 | Ultint -> out opBULTINT | Ugeint -> out opBUGEINT
 
-let negate_comparison = function
+let negate_integer_comparison = function
   | Eq -> Neq
   | Neq -> Eq
   | Ltint -> Geint
@@ -359,20 +359,7 @@ let rec emit = function
         emit rem
   | Kpush::Kconst k::Kintcomp c::Kbranchifnot lbl::rem
       when is_immed_const k ->
-        emit_branch_comp (negate_comparison c) ;
-        out_const k ;
-        out_label lbl ;
-        emit rem
-(* same for range tests *)
-  | Kpush::Kconst k::Kintcomp Ultint::Kbranchif lbl::rem
-      when is_immed_const k ->
-        out opBULTINT ;
-        out_const k ;
-        out_label lbl ;
-        emit rem
-  | Kpush::Kconst k::Kintcomp Ultint::Kbranchifnot lbl::rem
-      when is_immed_const k ->
-        out opBUGEINT ;
+        emit_branch_comp (negate_integer_comparison c) ;
         out_const k ;
         out_label lbl ;
         emit rem

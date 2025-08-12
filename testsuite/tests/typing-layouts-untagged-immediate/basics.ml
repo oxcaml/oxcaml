@@ -25,14 +25,12 @@ let f1_3 (x : int#) = x;;
 [%%expect{|
 type t_untagged_immediate : untagged_immediate mod non_float
 type ('a : untagged_immediate mod non_float) t_untagged_immediate_id = 'a
-Line 7, characters 38-39:
-7 | let f1_1 (x : t_untagged_immediate) = x;;
-                                          ^
-Error: Non-value layout untagged_immediate detected as sort for type
-       t_untagged_immediate,
-       but this requires extension layouts, which is not enabled.
-       If you intended to use this layout, please add this flag to your build file.
-       Otherwise, please report this error to the Jane Street compilers team.
+val f1_1 : t_untagged_immediate -> t_untagged_immediate = <fun>
+val f1_2 :
+  ('a : untagged_immediate mod non_float).
+    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+  <fun>
+val f1_3 : int# -> int# = <fun>
 |}];;
 
 (*****************************************)
@@ -49,14 +47,12 @@ let f2_3 (x : int#) =
   let y = x in
   y;;
 [%%expect{|
-Lines 2-3, characters 2-3:
-2 | ..let y = x in
-3 |   y..
-Error: Non-value layout untagged_immediate detected as sort for type
-       t_untagged_immediate,
-       but this requires extension layouts, which is not enabled.
-       If you intended to use this layout, please add this flag to your build file.
-       Otherwise, please report this error to the Jane Street compilers team.
+val f2_1 : t_untagged_immediate -> t_untagged_immediate = <fun>
+val f2_2 :
+  ('a : untagged_immediate mod non_float).
+    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+  <fun>
+val f2_3 : int# -> int# = <fun>
 |}];;
 
 (*****************************************)
@@ -383,38 +379,53 @@ let make_intu () : int# = assert false
 
 let id_value x = x;;
 [%%expect{|
-Line 1, characters 58-70:
-1 | let make_t_untagged_immediate () : t_untagged_immediate = assert false
-                                                              ^^^^^^^^^^^^
-Error: Non-value layout untagged_immediate detected as sort for type
-       t_untagged_immediate,
-       but this requires extension layouts, which is not enabled.
-       If you intended to use this layout, please add this flag to your build file.
-       Otherwise, please report this error to the Jane Street compilers team.
+val make_t_untagged_immediate : unit -> t_untagged_immediate = <fun>
+val make_t_untagged_immediate_id :
+  ('a : untagged_immediate mod non_float). unit -> 'a t_untagged_immediate_id =
+  <fun>
+val make_intu : unit -> int# = <fun>
+val id_value : 'a -> 'a = <fun>
 |}];;
 
 let x8_1 = id_value (make_t_untagged_immediate ());;
 [%%expect{|
-Line 1, characters 11-19:
+Line 1, characters 20-50:
 1 | let x8_1 = id_value (make_t_untagged_immediate ());;
-               ^^^^^^^^
-Error: Unbound value "id_value"
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "t_untagged_immediate"
+       but an expression was expected of type "('a : value_or_null)"
+       The layout of t_untagged_immediate is untagged_immediate
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
+       But the layout of t_untagged_immediate must be a sublayout of value
+         because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
 let x8_2 = id_value (make_t_untagged_immediate_id ());;
 [%%expect{|
-Line 1, characters 11-19:
+Line 1, characters 20-53:
 1 | let x8_2 = id_value (make_t_untagged_immediate_id ());;
-               ^^^^^^^^
-Error: Unbound value "id_value"
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type
+         "'a t_untagged_immediate_id" = "('a : untagged_immediate mod non_float)"
+       but an expression was expected of type "('b : value_or_null)"
+       The layout of 'a t_untagged_immediate_id is untagged_immediate
+         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
+       But the layout of 'a t_untagged_immediate_id must be a sublayout of
+           value
+         because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
 let x8_3 = id_value (make_intu ());;
 [%%expect{|
-Line 1, characters 11-19:
+Line 1, characters 20-34:
 1 | let x8_3 = id_value (make_intu ());;
-               ^^^^^^^^
-Error: Unbound value "id_value"
+                        ^^^^^^^^^^^^^^
+Error: This expression has type "int#" but an expression was expected of type
+         "('a : value_or_null)"
+       The layout of int# is untagged_immediate
+         because it is the unboxed version of the primitive type int.
+       But the layout of int# must be a sublayout of value
+         because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
 (*************************************)
@@ -426,14 +437,16 @@ let f9_1 () = twice f1_1 (make_t_untagged_immediate ())
 let f9_2 () = twice f1_2 (make_t_untagged_immediate_id ())
 let f9_3 () = twice f1_3 (make_intu ());;
 [%%expect{|
-Line 1, characters 47-54:
-1 | let twice f (x : 'a t_untagged_immediate_id) = f (f x)
-                                                   ^^^^^^^
-Error: Non-value layout untagged_immediate detected as sort for type
-       'a t_untagged_immediate_id,
-       but this requires extension layouts, which is not enabled.
-       If you intended to use this layout, please add this flag to your build file.
-       Otherwise, please report this error to the Jane Street compilers team.
+val twice :
+  ('a : untagged_immediate mod non_float).
+    ('a t_untagged_immediate_id -> 'a t_untagged_immediate_id) ->
+    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+  <fun>
+val f9_1 : unit -> t_untagged_immediate t_untagged_immediate_id = <fun>
+val f9_2 :
+  ('a : untagged_immediate mod non_float). unit -> 'a t_untagged_immediate_id =
+  <fun>
+val f9_3 : unit -> int# t_untagged_immediate_id = <fun>
 |}];;
 
 (**************************************************)
@@ -675,14 +688,15 @@ class ['a] c12_12 = object
 end;;
 [%%expect{|
 type t12_8 = < f : t_untagged_immediate -> t_untagged_immediate >
-Line 2, characters 26-31:
-2 | let f12_9 (o : t12_8) x = o#f x
-                              ^^^^^
-Error: Non-value layout untagged_immediate detected as sort for type
-       t_untagged_immediate,
-       but this requires extension layouts, which is not enabled.
-       If you intended to use this layout, please add this flag to your build file.
-       Otherwise, please report this error to the Jane Street compilers team.
+val f12_9 : t12_8 -> t_untagged_immediate -> t_untagged_immediate = <fun>
+val f12_10 :
+  < baz : t_untagged_immediate ->
+          t_untagged_immediate ->
+          t_untagged_immediate -> t_untagged_immediate;
+    .. > ->
+  t_untagged_immediate -> t_untagged_immediate = <fun>
+class ['a] c12_11 : object method x : t_untagged_immediate -> 'a end
+class ['a] c12_12 : object method x : 'a -> t_untagged_immediate end
 |}];;
 
 (* Third, another disallowed use: capture in an object. *)
@@ -693,10 +707,15 @@ let f12_13 m1 m2 = object
     ()
 end;;
 [%%expect{|
-Line 3, characters 12-16:
+Line 3, characters 17-19:
 3 |     let _ = f1_1 m1 in
-                ^^^^
-Error: Unbound value "f1_1"
+                     ^^
+Error: This expression has type "('a : value_or_null)"
+       but an expression was expected of type "t_untagged_immediate"
+       The layout of t_untagged_immediate is untagged_immediate
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
+       But the layout of t_untagged_immediate must be a sublayout of value
+         because it's the type of a variable captured in an object.
 |}];;
 
 let f12_14 (m1 : t_untagged_immediate) (m2 : t_untagged_immediate) = object
@@ -706,10 +725,14 @@ let f12_14 (m1 : t_untagged_immediate) (m2 : t_untagged_immediate) = object
     ()
 end;;
 [%%expect{|
-Line 3, characters 12-16:
+Line 3, characters 17-19:
 3 |     let _ = f1_1 m1 in
-                ^^^^
-Error: Unbound value "f1_1"
+                     ^^
+Error: "m1" must have a type of layout value because it is captured by an object.
+       The layout of t_untagged_immediate is untagged_immediate
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
+       But the layout of t_untagged_immediate must be a sublayout of value
+         because it's the type of a variable captured in an object.
 |}];;
 
 (*********************************************************************)

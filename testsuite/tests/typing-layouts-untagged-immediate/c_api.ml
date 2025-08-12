@@ -1,24 +1,25 @@
 (* TEST
  modules = "c_functions.c";
- include stdlib_beta;
+ include stdlib_stable;
  flambda2;
 
  {
-   flags = "-extension layouts_alpha -extension small_numbers_beta";
+   flags = "-extension-universe alpha";
    native;
  }{
-   flags = "-extension layouts_alpha -extension small_numbers_beta";
+   flags = "-extension-universe alpha";
    bytecode;
  }{
-   flags = "-extension layouts_beta -extension small_numbers_beta";
+   flags = "-extension-universe beta";
    native;
  }{
-   flags = "-extension layouts_beta -extension small_numbers_beta";
+   flags = "-extension-universe beta";
    bytecode;
  }
 *)
 
 (* This file tests using external C functions with int#. *)
+open Stdlib_stable
 
 external to_int : int# -> (int[@local_opt]) = "%tag_int"
 
@@ -39,7 +40,7 @@ external lognot_UtoBU : int# -> (int[@untagged]) =
   "lognot_bytecode" "lognot_UtoU"
 
 let () =
-  let i = lognot_UtoU (Stdlib_beta.Int_u.of_int 42) in
+  let i = lognot_UtoU (Int_u.of_int 42) in
   print_intu "int# -> int#, ~42" i
 
 let () =
@@ -47,7 +48,7 @@ let () =
   print_intu "int -> int#, ~(-100)" i
 
 let () =
-  let f = lognot_UtoB (Stdlib_beta.Int_u.of_int 255) in
+  let f = lognot_UtoB (Int_u.of_int 255) in
   print_int "int# -> int, ~255" f
 
 let () =
@@ -55,7 +56,7 @@ let () =
   print_intu "(int[@untagged]) -> int#, ~1024" f
 
 let () =
-  let f = lognot_UtoBU ((Stdlib_beta.Int_u.of_int (-1726))) in
+  let f = lognot_UtoBU ((Int_u.of_int (-1726))) in
   print_int "int# -> (int[@untagged]), ~(-1726)" f
 
 (* If there are more than 5 args, you get an array in bytecode *)
@@ -67,8 +68,8 @@ external sum_7 :
 let () =
   let f =
     sum_7
-      (Stdlib_beta.Int_u.of_int 1) 2 (Stdlib_beta.Int_u.of_int 3) 4
-      (Stdlib_beta.Int_u.of_int 5) 6 (Stdlib_beta.Int_u.of_int 7)
+      (Int_u.of_int 1) 2 (Stdlib_stable.Int_u.of_int 3) 4
+      (Int_u.of_int 5) 6 (Stdlib_stable.Int_u.of_int 7)
   in
   print_intu "Function of 7 args, 1+2+3+4+5+6+7" f
 

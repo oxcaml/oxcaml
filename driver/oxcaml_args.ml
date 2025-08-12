@@ -13,6 +13,11 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
+
+(* TODO Consider removing unused declarations or binding them to _
+   individually *)
+[@@@warning "-unused-value-declaration"]
+
 let format_default flag = if flag then " (default)" else ""
 let format_not_default flag = if flag then "" else " (default)"
 
