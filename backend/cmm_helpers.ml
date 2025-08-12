@@ -879,6 +879,8 @@ and asr_const c n dbg = asr_int c (Cconst_int (n, dbg)) dbg
 
 and lsr_const c n dbg = lsr_int c (Cconst_int (n, dbg)) dbg
 
+let lsl_const0 c n dbg = Cop (Clsl, [c; Cconst_int (n, dbg)], dbg)
+
 let is_power2 n = n = 1 lsl Misc.log2 n
 
 and mult_power2 c n dbg = lsl_int c (Cconst_int (Misc.log2 n, dbg)) dbg
@@ -1741,7 +1743,7 @@ let rec low_bits ~bits ~dbg x =
           when 0 <= right && right <= left && left <= unused_bits ->
           (* these sign-extensions can be replaced with a left shift since we
              don't care about the high bits that it changed *)
-          low_bits ~bits (lsl_const x (left - right) dbg) ~dbg
+          low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
         | x -> (
           match get_const_bitmask x with
           | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->
@@ -1780,7 +1782,7 @@ let rec sign_extend ~bits ~dbg e =
   assert (0 < bits && bits <= arch_bits);
   let unused_bits = arch_bits - bits in
   let sign_extend_via_shift e =
-    asr_const (lsl_const e unused_bits dbg) unused_bits dbg
+    asr_const (lsl_const0 e unused_bits dbg) unused_bits dbg
   in
   if bits = arch_bits
   then e
@@ -1808,7 +1810,7 @@ let rec sign_extend ~bits ~dbg e =
             (* sign-extension is a no-op since the top n bits already match *)
             e
           else
-            let e = lsl_const inner (unused_bits - n) dbg in
+            let e = lsl_const0 inner (unused_bits - n) dbg in
             asr_const e unused_bits dbg
         | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) as e
           -> (
