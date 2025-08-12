@@ -24,4 +24,4 @@ let layout = Jkind.Layout.Debug_printers.t Jkind.Sort.Debug_printers.t
 let mod_bounds ppf m = Types.Jkind_mod_bounds.debug_print ppf m
 let with_bounds ppf w = Jkind.With_bounds.debug_print ppf w
 let with_bounds_types ppf w = Jkind.With_bounds.debug_print_types ppf w
-let modalities = Mode.Modality.Value.Const.print
+let modalities = Mode.Modality.Const.print
