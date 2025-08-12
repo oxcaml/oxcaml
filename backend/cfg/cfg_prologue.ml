@@ -103,24 +103,131 @@ module Instruction_requirements = struct
         Requirements No_requirements
 end
 
+let prologue_needed_block (block : Cfg.basic_block) ~fun_name =
+  block.is_trap_handler
+  || DLL.exists block.Cfg.body ~f:(fun instr ->
+         match Instruction_requirements.basic instr with
+         | Requirements Requires_prologue -> true
+         | Prologue | Epilogue
+         | Requirements (No_requirements | Requires_no_prologue) ->
+           false)
+  ||
+  match Instruction_requirements.terminator block.terminator fun_name with
+  | Requires_prologue -> true
+  | No_requirements | Requires_no_prologue -> false
+
+let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
+  let visited = ref Label.Set.empty in
+  let rec collect label =
+    if not (Label.Set.mem label !visited)
+    then (
+      visited := Label.Set.add label !visited;
+      let block = Cfg.get_block_exn cfg label in
+      Label.Set.iter
+        (fun succ_label -> collect succ_label)
+        (Cfg.successor_labels ~normal:true ~exn:true block))
+  in
+  collect block.start;
+  !visited
+
+(* CR cfalas: move to Cfg_loop_infos? *)
+let is_in_loop : Cfg_loop_infos.t -> Label.t -> bool =
+ fun loops label ->
+  Cfg_edge.Map.exists
+    (fun _ (loop : Cfg_loop_infos.loop) -> Label.Set.mem label loop)
+    loops.loops
+
+let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
+    (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
+  let prologue_block = Cfg.get_block_exn cfg prologue_label in
+  (* Moving a prologue to a loop might cause it to execute multiple times, which
+     is both inefficient as well as makes handling the epilogue tricky to handle
+     (as we would have to know how many times the prologue was added).
+
+     Having a non-zero stack offset means that the prologue is added after a
+     [Pushtrap] or [Stackoffset] which shouldn't be allowed. *)
+  if is_in_loop loop_infos prologue_label || prologue_block.stack_offset <> 0
+  then false
+  else
+    let epilogue_blocks =
+      Label.Set.filter
+        (fun label ->
+          let block = Cfg.get_block_exn cfg label in
+          let fun_name = Cfg.fun_name cfg in
+          match
+            Instruction_requirements.terminator block.terminator fun_name
+          with
+          | Requires_no_prologue -> true
+          | No_requirements | Requires_prologue -> false)
+        (descendants cfg prologue_block)
+    in
+    (* Check that the blocks requiring an epilogue are dominated by the prologue
+       block. Consider the following CFG:
+
+     *  Block A: Condition with branch to Block B / C
+     *  Block B: Contains an instruction requiring a prologue, with 
+        terminator that jumps to Block C
+     *  Block C: Return
+
+       We have the choice of putting the prologue in Block A or B, and we would
+       place an epilogue in Block C.
+
+       If we try to place the prologue in block B, the prologue would not
+       dominate the epilogue in block C, so in some cases the epilogue would be
+       executed without a prologue on the stack, which would be illegal. *)
+    Label.Set.fold
+      (fun epilogue_label acc ->
+        if Cfg_dominators.is_dominating doms prologue_label epilogue_label
+        then acc
+        else false)
+      epilogue_blocks true
+
+let rec find_prologue_block (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
+    (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
+  let block = Cfg.get_block_exn cfg tree.label in
+  if prologue_needed_block block ~fun_name:cfg.fun_name
+  then Some tree.label
+  else
+    let children_prologue_block =
+      List.filter_map
+        (fun tree -> find_prologue_block tree cfg doms loop_infos)
+        tree.children
+    in
+    match children_prologue_block with
+    | [] -> None
+    | [child] ->
+      (* Only a single child needs a prologue, so will consider moving the
+         prologue to that child *)
+      if can_place_prologue child cfg doms loop_infos
+      then Some child
+      else Some tree.label
+    | _ ->
+      (* Multiple children need a prologue. We keep the prologue at the parent
+         to avoid duplication of the prologue. *)
+      Some tree.label
+
 let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  let prologue_required =
-    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-      ~fun_num_stack_slots:cfg.fun_num_stack_slots
-  in
-  if prologue_required
-  then (
+  let doms = Cfg_dominators.build cfg in
+  (* note: the other entries in the forest are dead code *)
+  let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
+  let loop_infos = Cfg_loop_infos.build cfg doms in
+  let prologue_block = find_prologue_block tree cfg doms loop_infos in
+  match prologue_block with
+  | None -> cfg_with_layout
+  | Some prologue_block ->
+    assert (can_place_prologue prologue_block cfg doms loop_infos);
     let terminator_as_basic terminator =
       { terminator with Cfg.desc = Cfg.Prologue }
     in
-    let entry_block = Cfg.get_block_exn cfg cfg.entry_label in
+    let prologue_block = Cfg.get_block_exn cfg prologue_block in
     let next_instr =
-      Option.value (DLL.hd entry_block.body)
-        ~default:(terminator_as_basic entry_block.terminator)
+      Option.value
+        (DLL.hd prologue_block.body)
+        ~default:(terminator_as_basic prologue_block.terminator)
     in
-    DLL.add_begin entry_block.body
+    DLL.add_begin prologue_block.body
       (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
          ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
          ());
@@ -131,13 +238,16 @@ let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
            ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
            ())
     in
-    Cfg.iter_blocks cfg ~f:(fun _label block ->
+    Label.Set.iter
+      (fun label ->
+        let block = Cfg.get_block_exn cfg label in
         match
           Instruction_requirements.terminator block.terminator cfg.fun_name
         with
         | Requires_no_prologue -> add_epilogue block
-        | No_requirements | Requires_prologue -> ()));
-  cfg_with_layout
+        | No_requirements | Requires_prologue -> ())
+      (descendants cfg prologue_block);
+    cfg_with_layout
 
 module Validator = struct
   type state =
