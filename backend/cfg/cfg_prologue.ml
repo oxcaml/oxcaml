@@ -17,6 +17,34 @@ let validate_no_prologue (cfg_with_layout : Cfg_with_layout.t) =
           | _ -> ()))
     cfg.blocks
 
+let instr_uses_stack_slots (instr : _ Cfg.instruction) =
+  let regs_use_stack_slots =
+    Array.exists (fun reg ->
+        match reg.Reg.loc with
+        | Stack (Local _) -> true
+        | Stack (Incoming _ | Outgoing _ | Domainstate _) | Reg _ | Unknown ->
+          false)
+  in
+  regs_use_stack_slots instr.Cfg.arg || regs_use_stack_slots instr.Cfg.res
+
+let is_prologue_needed_terminator (instr : Cfg.terminator Cfg.instruction) =
+  Cfg.is_nontail_call_terminator instr.desc || instr_uses_stack_slots instr
+
+let is_prologue_needed_basic (instr : Cfg.basic Cfg.instruction) =
+  instr_uses_stack_slots instr
+
+let is_epilogue_needed_terminator (terminator : Cfg.terminator) fun_name =
+  match terminator with
+  | Cfg.Return | Tailcall_func Indirect -> true
+  | Tailcall_func (Direct func) when not (String.equal func.sym_name fun_name)
+    ->
+    true
+  | Tailcall_func (Direct _)
+  | Tailcall_self _ | Never | Always _ | Parity_test _ | Truth_test _
+  | Float_test _ | Int_test _ | Switch _ | Raise _ | Call_no_return _ | Prim _
+  | Call _ ->
+    false
+
 let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
@@ -58,7 +86,120 @@ let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
           ()));
   cfg_with_layout
 
+let fun_name = ref ""
+
+module Validator = struct
+  type state =
+    | No_prologue_on_stack
+    | Prologue_on_stack
+
+  (* This is necessary to make a set, but the ordering of elements is
+     arbitrary. *)
+  let state_compare left right =
+    match left, right with
+    | No_prologue_on_stack, No_prologue_on_stack -> 0
+    | No_prologue_on_stack, Prologue_on_stack -> 1
+    | Prologue_on_stack, No_prologue_on_stack -> -1
+    | Prologue_on_stack, Prologue_on_stack -> 0
+
+  module State_set = Set.Make (struct
+    type t = state
+
+    let compare = state_compare
+  end)
+
+  (* The validator domain represents the set of possible states at an
+     instruction (i.e. a state {Prologue_on_stack, No_prologue_on_stack} means
+     that depending on the execution path used to get to that block/instruction,
+     we can either have a prologue on the stack or not).
+
+     Non-singleton states are allowed in cases where there is no Prologue,
+     Epilogue nor any instructions which require a prologue (this happens e.g.
+     when two [raise] terminators reach the same handler, but one is before the
+     prologue, and the other is after the prologue). *)
+  module Domain : Cfg_dataflow.Domain_S with type t = State_set.t = struct
+    type t = State_set.t
+
+    let bot = State_set.empty
+
+    let join = State_set.union
+
+    let less_equal = State_set.subset
+  end
+
+  module Transfer :
+    Cfg_dataflow.Forward_transfer
+      with type domain = State_set.t
+       and type context = unit = struct
+    type domain = State_set.t
+
+    type context = unit
+
+    type image =
+      { normal : domain;
+        exceptional : domain
+      }
+
+    let basic : domain -> Cfg.basic Cfg.instruction -> context -> domain =
+     fun domain instr () ->
+      State_set.map
+        (fun domain ->
+          match[@ocaml.warning "-4"]
+            domain, instr.desc, is_prologue_needed_basic instr
+          with
+          | No_prologue_on_stack, Cfg.Prologue, _ -> Prologue_on_stack
+          | No_prologue_on_stack, Cfg.Epilogue, _ ->
+            Misc.fatal_error "epilogue appears without a prologue on the stack"
+          | No_prologue_on_stack, _, true ->
+            Misc.fatal_error
+              "instruction needs prologue, but no prologue on the stack"
+          | No_prologue_on_stack, _, false -> No_prologue_on_stack
+          | Prologue_on_stack, Cfg.Prologue, _ ->
+            Misc.fatal_error
+              "prologue instruction while prologue is already on the stack"
+          | Prologue_on_stack, Cfg.Epilogue, _ -> No_prologue_on_stack
+          | Prologue_on_stack, _, _ -> Prologue_on_stack)
+        domain
+
+    let terminator :
+        domain -> Cfg.terminator Cfg.instruction -> context -> image =
+     fun domain instr () ->
+      let res =
+        State_set.map
+          (fun domain ->
+            match[@ocaml.warning "-4"]
+              ( domain,
+                is_prologue_needed_terminator instr,
+                is_epilogue_needed_terminator instr.desc !fun_name )
+            with
+            | _, true, true ->
+              Misc.fatal_error
+                "instruction needs to be both before and after terminator, \
+                 this should never happen"
+            | No_prologue_on_stack, true, false ->
+              Misc.fatal_error "instruction needs prologue"
+            | No_prologue_on_stack, false, _ -> No_prologue_on_stack
+            | Prologue_on_stack, _, false -> Prologue_on_stack
+            | Prologue_on_stack, false, true ->
+              Misc.fatal_error "terminator needs epilogue")
+          domain
+      in
+      { normal = res; exceptional = res }
+  end
+
+  include Cfg_dataflow.Forward (Domain) (Transfer)
+end
+
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   validate_no_prologue cfg_with_layout;
-  add_prologue_if_required cfg_with_layout
+  fun_name := Cfg.fun_name (Cfg_with_layout.cfg cfg_with_layout);
+  let cfg_with_layout = add_prologue_if_required cfg_with_layout in
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  match
+    Validator.run cfg
+      ~init:(Validator.State_set.singleton No_prologue_on_stack)
+      ~handlers_are_entry_points:false ()
+  with
+  | Ok _ -> cfg_with_layout
+  | Error () -> Misc.fatal_error "Cfg_prologue.run: dataflow analysis failed"
