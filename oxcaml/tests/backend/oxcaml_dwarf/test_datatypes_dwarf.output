@@ -209,12 +209,12 @@ Breakpoint 14: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_datatypes_', stop reason = breakpoint 14.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant(x=`Alpha : [ `Alpha | `Beta of int ] @ value) at test_datatypes_dwarf.ml:105:4
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant(x=`Alpha : [> `Alpha | `Beta of int ] @ value) at test_datatypes_dwarf.ml:105:4
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_datatypes_', stop reason = breakpoint 14.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant(x=(`Beta 123) : [ `Alpha | `Beta of int ] @ value) at test_datatypes_dwarf.ml:105:4
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant(x=(`Beta 123) : [> `Alpha | `Beta of int ] @ value) at test_datatypes_dwarf.ml:105:4
 (lldb) b Test_datatypes_dwarf.f_nested_variant
 Breakpoint 15: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant at test_datatypes_dwarf.ml:114:51, address = <ADDRESS>
 (lldb) c
@@ -264,24 +264,24 @@ Breakpoint 19: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_floa
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_datatypes_', stop reason = breakpoint 19.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_float64(x=#4.1 : unknown @ float64) at test_datatypes_dwarf.ml:153:49
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_float64(x=#4.1 : a @ float64) at test_datatypes_dwarf.ml:153:49
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_datatypes_', stop reason = breakpoint 19.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_float64(x=#2.5 : unknown @ float64) at test_datatypes_dwarf.ml:153:49
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_float64(x=#2.5 : a @ float64) at test_datatypes_dwarf.ml:153:49
 (lldb) b Test_datatypes_dwarf.f_poly_bits32
 Breakpoint 20: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_bits32 at test_datatypes_dwarf.ml:157:48, address = <ADDRESS>
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_datatypes_', stop reason = breakpoint 20.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_bits32(x=42 : unknown @ bits32) at test_datatypes_dwarf.ml:157:48
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_bits32(x=42 : a/2 @ bits32) at test_datatypes_dwarf.ml:157:48
 (lldb) c
 Process <PID> resuming
 Process <PID> stopped
 * thread #1, name = 'test_datatypes_', stop reason = breakpoint 20.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_bits32(x=-123 : unknown @ bits32) at test_datatypes_dwarf.ml:157:48
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_bits32(x=-123 : a/2 @ bits32) at test_datatypes_dwarf.ml:157:48
 (lldb) b Test_datatypes_dwarf.f_exception_specific
 Breakpoint 21: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific at test_datatypes_dwarf.ml:171:55, address = <ADDRESS>
 (lldb) c
