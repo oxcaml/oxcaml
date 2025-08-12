@@ -1663,7 +1663,7 @@ module Hint = struct
     | Crossing_right -> Format.fprintf ppf "Crossing_right"
     | Register_alloc_mode -> Format.fprintf ppf "Register_alloc_mode"
 
-  let morph_skip = Skip
+  let id = Skip
 
   let is_rigid : type l r. (l * r) morph -> bool = function
     | Debug _ -> true

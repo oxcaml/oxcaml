@@ -348,9 +348,8 @@ module type Hint = sig
 
   val morph_debug_print : Format.formatter -> _ morph -> unit
 
-  (** See comment on [Skip] constructor for ['d morph] in [Mode.Hint] for details
-    about this. *)
-  val morph_skip : 'd morph
+  (** The hint to be used for the identity morphism *)
+  val id : 'd morph
 
   (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
   val left_adjoint : (_ * allowed) morph -> (allowed * disallowed) morph

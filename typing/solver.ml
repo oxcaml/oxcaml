@@ -1287,8 +1287,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then C.print obj ppf ceil
     else print_raw ?verbose obj ppf m
 
-  let newvar obj =
-    Amodevar (Amorphvar (fresh obj, C.id, Base (H.morph_skip, C.id)))
+  let newvar obj = Amodevar (Amorphvar (fresh obj, C.id, Base (H.id, C.id)))
 
   let newvar_above (type a r) (obj : a C.obj) (m : (a, allowed * r) mode) =
     match disallow_right m with
@@ -1308,7 +1307,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                      (Comp_hint.Allow_disallow.disallow_right a_hint_lower)
                    obj,
                  C.id,
-                 Base (H.morph_skip, C.id) )),
+                 Base (H.id, C.id) )),
           true )
     | Amodevar mv ->
       (* [~lower] is not precise (because [mlower mv] is not precise), but
@@ -1319,7 +1318,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                  ~vlower:(VarMap.singleton (get_key mv) mv)
                  obj,
                C.id,
-               Base (H.morph_skip, C.id) )),
+               Base (H.id, C.id) )),
         true )
     | Amodejoin (a, a_hint, mvs) ->
       (* [~lower] is not precise here, but it doesn't need to be *)
@@ -1327,7 +1326,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           (Amorphvar
              ( fresh ~lower:a ~lower_hint:a_hint ~vlower:mvs obj,
                C.id,
-               Base (H.morph_skip, C.id) )),
+               Base (H.id, C.id) )),
         true )
 
   let newvar_below (type a l) (obj : a C.obj) (m : (a, l * allowed) mode) =
@@ -1348,16 +1347,16 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                      (Comp_hint.Allow_disallow.disallow_left a_hint_upper)
                    obj,
                  C.id,
-                 Base (H.morph_skip, C.id) )),
+                 Base (H.id, C.id) )),
           true )
     | Amodevar mv ->
       let u = fresh obj in
-      let mu = Amorphvar (u, C.id, Base (H.morph_skip, C.id)) in
+      let mu = Amorphvar (u, C.id, Base (H.id, C.id)) in
       submode_mvmv obj ~log:None mu mv |> Result.get_ok;
       allow_left (Amodevar mu), true
     | Amodemeet (a, a_hint, mvs) ->
       let u = fresh obj in
-      let mu = Amorphvar (u, C.id, Base (H.morph_skip, C.id)) in
+      let mu = Amorphvar (u, C.id, Base (H.id, C.id)) in
       submode_mvc obj ~log:None mu a a_hint |> Result.get_ok;
       VarMap.iter
         (fun _ mv -> submode_mvmv obj ~log:None mu mv |> Result.get_ok)
