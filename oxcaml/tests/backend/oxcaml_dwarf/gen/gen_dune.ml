@@ -30,7 +30,8 @@ let () =
  (name ${name})
  (modules ${name})
  ${enabled_if}
- (ocamlopt_flags (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta))
+ (ocamlopt_flags
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta))
  (foreign_archives simd_stubs))
 
 (rule
@@ -39,7 +40,9 @@ let () =
  (deps ${name}.exe ${name}.lldb ${filter})
  (action
   (progn
-   (bash "sed -e 's/^(lldb) //' -e '/^[[:space:]]*$/d' ${name}.lldb > ${name}_clean.lldb")
+   (bash
+    "sed -e 's/^(lldb) //' -e '/^[[:space:]]*$/d' ${name}.lldb > \
+     ${name}_clean.lldb")
    (with-outputs-to ${name}.output.corrected
     (pipe-outputs
      (run %{env:OXCAML_LLDB=} -s ${name}_clean.lldb ./${name}.exe)
@@ -51,7 +54,11 @@ let () =
  (deps ${name}.exe)
  (action
   (progn
-   (echo "ERROR: OXCAML_LLDB environment variable not set.\nDWARF tests require a custom LLDB build. Please set OXCAML_LLDB to the path of your custom LLDB binary.\nExample: export OXCAML_LLDB=/path/to/custom/lldb")
+   (echo
+    "ERROR: OXCAML_LLDB environment variable not set.\n\
+DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
+the path of your custom LLDB binary.\n\
+Example: export OXCAML_LLDB=/path/to/custom/lldb")
    (bash "exit 1"))))
 
 (rule

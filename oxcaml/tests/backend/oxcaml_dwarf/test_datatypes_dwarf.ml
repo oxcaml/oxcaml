@@ -44,12 +44,14 @@ let _ = f_mixed_record { a = 0; b = #0.0; c = false; d = 0l }
 type unboxed_variant_float = Simple of float# [@@unboxed]
 type unboxed_variant_int = Complex of int32# [@@unboxed]
 
-let[@inline never] [@local never] f_unboxed_variant_float (x: unboxed_variant_float) = x
+let[@inline never] [@local never] f_unboxed_variant_float
+    (x: unboxed_variant_float) = x
 let _ = f_unboxed_variant_float (Simple #4.1)
 let _ = f_unboxed_variant_float (Simple #0.0)
 let _ = f_unboxed_variant_float (Simple (-#2.5))
 
-let[@inline never] [@local never] f_unboxed_variant_int (x: unboxed_variant_int) = x
+let[@inline never] [@local never] f_unboxed_variant_int
+    (x: unboxed_variant_int) = x
 let _ = f_unboxed_variant_int (Complex #42l)
 let _ = f_unboxed_variant_int (Complex #0l)
 
@@ -57,15 +59,18 @@ type unboxed_variant_value_int = ValueInt of int [@@unboxed]
 type unboxed_variant_value_string = ValueString of string [@@unboxed]
 type unboxed_variant_value_bool = ValueBool of bool [@@unboxed]
 
-let[@inline never] [@local never] f_unboxed_variant_value_int (x: unboxed_variant_value_int) = x
+let[@inline never] [@local never] f_unboxed_variant_value_int
+    (x: unboxed_variant_value_int) = x
 let _ = f_unboxed_variant_value_int (ValueInt 42)
 let _ = f_unboxed_variant_value_int (ValueInt 0)
 
-let[@inline never] [@local never] f_unboxed_variant_value_string (x: unboxed_variant_value_string) = x  
+let[@inline never] [@local never] f_unboxed_variant_value_string
+    (x: unboxed_variant_value_string) = x
 let _ = f_unboxed_variant_value_string (ValueString "hello")
 let _ = f_unboxed_variant_value_string (ValueString "")
 
-let[@inline never] [@local never] f_unboxed_variant_value_bool (x: unboxed_variant_value_bool) = x
+let[@inline never] [@local never] f_unboxed_variant_value_bool
+    (x: unboxed_variant_value_bool) = x
 let _ = f_unboxed_variant_value_bool (ValueBool true)
 let _ = f_unboxed_variant_value_bool (ValueBool false)
 
@@ -73,13 +78,15 @@ let _ = f_unboxed_variant_value_bool (ValueBool false)
 type unboxed_record_simple = { value: int } [@@unboxed]
 type unboxed_record_complex = { data: basic_record } [@@unboxed]
 
-let[@inline never] [@local never] f_unboxed_record_simple (x: unboxed_record_simple) = 
+let[@inline never] [@local never] f_unboxed_record_simple
+    (x: unboxed_record_simple) =
   let { value } = x in { value }
 let _ = f_unboxed_record_simple { value = 42 }
 let _ = f_unboxed_record_simple { value = 0 }
 let _ = f_unboxed_record_simple { value = -999 }
 
-let[@inline never] [@local never] f_unboxed_record_complex (x: unboxed_record_complex) = 
+let[@inline never] [@local never] f_unboxed_record_complex
+    (x: unboxed_record_complex) =
   let { data } = x in { data }
 let _ = f_unboxed_record_complex { data = { x = 10; y = 2.0 } }
 let _ = f_unboxed_record_complex { data = { x = 0; y = 0.0 } }
@@ -94,7 +101,8 @@ let _ = f_poly_variant (`Green 3.14)
 let _ = f_poly_variant (`Yellow "test")
 
 (* Open polymorphic variants *)
-let[@inline never] [@local never] f_open_poly_variant (x: [> `Alpha | `Beta of int]) = x
+let[@inline never] [@local never] f_open_poly_variant
+    (x: [> `Alpha | `Beta of int]) = x
 let _ = f_open_poly_variant `Alpha
 let _ = f_open_poly_variant (`Beta 123)
 
@@ -165,8 +173,10 @@ let _ = f_exception_specific Simple_exception
 let _ = f_exception_specific (Exception_with_int 42)
 let _ = f_exception_specific (Exception_with_string "error occurred")
 let _ = f_exception_specific (Exception_with_multiple (404, "not found", 1.5))
-let _ = f_exception_specific (Exception_with_record { code = 500; message = "internal error" })
-let _ = f_exception_specific (Exception_with_unboxed_record { value = #2.71; flag = true })
+let _ = f_exception_specific
+    (Exception_with_record { code = 500; message = "internal error" })
+let _ = f_exception_specific
+    (Exception_with_unboxed_record { value = #2.71; flag = true })
 let _ = f_exception_specific (Failure "standard failure")
 let _ = f_exception_specific (Invalid_argument "bad input")
 
@@ -175,8 +185,10 @@ let _ = f_exception_poly Simple_exception
 let _ = f_exception_poly (Exception_with_int 123)
 let _ = f_exception_poly (Exception_with_string "polymorphic error")
 let _ = f_exception_poly (Exception_with_multiple (200, "ok", 0.0))
-let _ = f_exception_poly (Exception_with_record { code = 201; message = "created" })
-let _ = f_exception_poly (Exception_with_unboxed_record { value = #3.14; flag = false })
+let _ = f_exception_poly
+    (Exception_with_record { code = 201; message = "created" })
+let _ = f_exception_poly
+    (Exception_with_unboxed_record { value = #3.14; flag = false })
 let _ = f_exception_poly (Failure "polymorphic failure")
 
 let[@inline never] [@local never] f_exception_with_record (x: exn) =
@@ -185,7 +197,8 @@ let[@inline never] [@local never] f_exception_with_record (x: exn) =
     let { code; message } = data in
     let _ = { code; message } in x
   | _ -> x
-let _ = f_exception_with_record (Exception_with_record { code = 300; message = "redirect" })
+let _ = f_exception_with_record
+    (Exception_with_record { code = 300; message = "redirect" })
 
 let[@inline never] [@local never] f_exception_with_unboxed (x: exn) =
   match x with  
@@ -193,4 +206,5 @@ let[@inline never] [@local never] f_exception_with_unboxed (x: exn) =
     let { value; flag } = data in
     let _ = { value; flag } in x
   | _ -> x
-let _ = f_exception_with_unboxed (Exception_with_unboxed_record { value = #1.41; flag = true })
+let _ = f_exception_with_unboxed
+    (Exception_with_unboxed_record { value = #1.41; flag = true })

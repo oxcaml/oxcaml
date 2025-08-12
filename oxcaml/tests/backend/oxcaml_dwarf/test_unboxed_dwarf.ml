@@ -3,8 +3,11 @@ let _ = f_start ()
 
 let[@inline never] [@local never] f_unboxed_float (x: float#) = x
 let _ = f_unboxed_float #4.1
-let _ = f_unboxed_float #0.0 (* CR sspies: floats that end in .0 are printed with just . It would be more uniform to always print the trailing 0. *)
-let _ = f_unboxed_float (-#3.14) (* CR sspies: debugger shows as #-3.14 rather than -#3.14 *)
+let _ = f_unboxed_float #0.0
+(* CR sspies: floats that end in .0 are printed with just .
+   It would be more uniform to always print the trailing 0. *)
+let _ = f_unboxed_float (-#3.14)
+(* CR sspies: debugger shows as #-3.14 rather than -#3.14 *)
 let _ = f_unboxed_float #1e10
 
 let[@inline never] [@local never] f_unboxed_float32 (x: float32#) = x
@@ -18,7 +21,9 @@ let _ = f_unboxed_nativeint #0x123456789abcdefn
 let _ = f_unboxed_nativeint (-#999n)
 
 let[@inline never] [@local never] f_unboxed_int32 (x: int32#) = x
-let _ = f_unboxed_int32 #0l (* CR sspies: unboxed integers are currently not printed correctly (missing the hash and the suffix) *)
+let _ = f_unboxed_int32 #0l
+(* CR sspies: unboxed integers are currently not printed correctly
+   (missing the hash and the suffix) *)
 let _ = f_unboxed_int32 #0x12345678l
 let _ = f_unboxed_int32 (-#456l)
 
@@ -85,6 +90,7 @@ let[@inline never] [@local never] f_nested_record (x: nested_record) =
 let _ = f_nested_record #{ inner = #{ x = #1.5; y = #10l }; outer = #200L }
 let _ = f_nested_record #{ inner = #{ x = #0.0; y = #0l }; outer = #0L }
 
-let[@inline never] [@local never] f_poly_product (type a : bits64 & value) (x: a) = x
+let[@inline never] [@local never] f_poly_product
+    (type a : bits64 & value) (x: a) = x
 let _ = f_poly_product #(#4L, 4L)
 let _ = f_poly_product #(#100L, true)
