@@ -45,7 +45,7 @@ jobs:
           --with-dune=/bin/false
 
     - name: 'Check for the "skip 80ch" PR tag'
-      if: ${{ ! contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
+      if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
       run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
     - name: Check formatting of Flambda 2 and Cfg code
