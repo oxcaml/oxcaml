@@ -28,8 +28,8 @@ if [ -n "${GITHUB_ACTIONS:-}" ]; then
   # In GitHub Actions, use the first parent of the merge commit
   feature_base="HEAD^1"
 else
-  # Check if oxcaml/main exists
-  if ! git rev-parse --verify oxcaml/main >/dev/null 2>&1; then
+  # Check if remote/main exists
+  if ! git rev-parse --verify main@{upstream} >/dev/null 2>&1; then
     echo "Error: Cannot find oxcaml/main branch." >&2
     echo "Please set up the oxcaml remote:" >&2
     echo "  git remote add oxcaml https://github.com/oxcaml/oxcaml.git" >&2
@@ -37,8 +37,8 @@ else
     exit 1
   fi
 
-  # oxcaml/main exists, use merge-base to find common ancestor
-  feature_base="$(git merge-base HEAD oxcaml/main)"
+  # remote/main exists, use merge-base to find common ancestor
+  feature_base="$(git merge-base HEAD main@{upstream})"
 fi
 
 find_diff() {
