@@ -39,6 +39,7 @@ val type_lazy_t: type_expr -> type_expr
 val type_extension_constructor:type_expr
 val type_floatarray:type_expr
 val type_lexing_position:type_expr
+val type_atomic_loc:type_expr -> type_expr
 val type_unboxed_float:type_expr
 val type_unboxed_float32:type_expr
 val type_unboxed_nativeint:type_expr
