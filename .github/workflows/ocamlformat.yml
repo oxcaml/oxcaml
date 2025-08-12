@@ -21,6 +21,10 @@ jobs:
       with:
         path: 'oxcaml'
 
+    - name: Checkout the parent branch
+      working-directory: oxcaml
+      run: git fetch origin HEAD --deepen 1
+
     - name: Setup OCaml ${{ matrix.ocaml-compiler }}
       uses: ocaml/setup-ocaml@v3
       with:
