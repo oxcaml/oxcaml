@@ -1217,16 +1217,16 @@ end
 
 module Cache = Shape_with_layout.Tbl
 (* We add a cache based on type shapes to increase sharing the resulting DWARF.
-   The cache caches the combination of type shape and type layout. *)
+   The cache caches the combination of type shape and type layout. We make sure
+   to only cache closed shapes to avoid issues with the same DeBruijn variable
+   such as 0 that stands for different recursive types. *)
 
 (** This cache maps unnamed type shapes to their references. *)
 let cache = Cache.create 16
 
 let add_to_cache (type_shape : Shape.t) (type_layout : Layout.t) reference =
-  Cache.add cache { type_shape; type_layout } reference
-(* CR sspies: In the future, we need to check that these are closed to avoid
-   caching accidents. Due to the broken treatment of recursive types, this is
-   currently not correct, but good enough for now. *)
+  if Shape.is_mu_closed type_shape
+  then Cache.add cache { type_shape; type_layout } reference
 
 (** This second cache is for named type shapes. Every type name should be
     associated with at most one DWARF die, so this cache maps type names to
@@ -1259,8 +1259,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Constr _ ->
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
-      (* CR sspies: The [Constr] case is a precaution. With proper recursive
-         types, it should never trigger. For now, we simply use a fallback. *)
+      (* CR sspies: The [Constr] case should never trigger. Consider promoting
+         this to a louder error. For now, we are consdervative and allow it via
+         a fallback. *)
     | Unboxed_tuple _ ->
       if !Clflags.dwarf_pedantic
       then
@@ -1410,6 +1411,29 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       in
       create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
         ~constr_name ~arg_name ~arg_layout:base_layout ~arg_die ()
+    | Rec_var i -> (
+      match rec_env i with
+      | Some reference' ->
+        create_typedef_die ~reference ~parent_proto_die ?name reference'
+      | None ->
+        if !Clflags.dwarf_pedantic
+        then
+          Misc.fatal_errorf
+            "Recursive variable environment lookup failed: rec_env returned \
+             None for index %d"
+            i
+        else
+          create_typedef_die ~reference ~parent_proto_die ?name
+            fallback_value_die)
+    | Mu sh ->
+      let reference' =
+        (* CR sspies: We are creating two typedefs for recursive types. One
+           should be enough. *)
+        type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
+          type_layout ~rec_env:(fun i ->
+            if i = 0 then Some reference else rec_env (i - 1))
+      in
+      create_typedef_die ~reference ~parent_proto_die ?name reference'
     | Alias sh ->
       let reference' =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
@@ -1423,12 +1447,22 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
          do not have sufficient information. *)
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
+    | Proj_decl _ ->
+      if !Clflags.dwarf_pedantic
+      then
+        Misc.fatal_errorf
+          "Projections from mutually recursive definitions should have been \
+           resolved at this point. Found %a"
+          Shape.print type_shape
+      else
+        create_base_layout_type ~reference type_layout ?name ~parent_proto_die
+          ~fallback_value_die ()
     | Var _
     (* CR sspies: This case is currently triggered for free type variables. It
        should be taken care of when revisiting the layout computation. *)
-    | Abs _ | Comp_unit _ | Struct _ ->
+    | Abs _ | Comp_unit _ | Struct _ | Mutrec _ ->
       (* CR sspies: Change this to a loud error in the future. These cases
-         should not happen with the new shapes, but at least the [Struct] case
+         should not happen with the new shapes, but at least the [Struct] cases
          does happen for the old Merlin shapes. Investigate when they do happen.
          For now, we simply return the base layout. *)
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
@@ -1604,8 +1638,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       else unknown_base_layouts type_layout)
   | Constr _, Base b -> [Known (type_shape, b)]
   | Constr _, _ -> unknown_base_layouts type_layout
-  (* CR sspies: These should not happen with support for recursive types. For
-     now, we conservatively give back defaults. *)
+  (* CR sspies: These should not happen with support for recursive types. We
+     conservatively give back defaults. *)
   | Predef _, Base base_layout -> [Known (type_shape, base_layout)]
   | Predef _, _ ->
     if !Clflags.dwarf_pedantic
@@ -1699,6 +1733,10 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
          its contents; got: %a and contents: %a"
         Layout.format type_layout Layout.format arg_layout
     else unknown_base_layouts type_layout
+  | Rec_var i, _ ->
+    unknown_base_layouts type_layout
+    (* A projection should not reach the point of a recursive variable. *)
+  | Mu sh, _ -> flatten_shape sh type_layout
   | Alias sh, _ -> flatten_shape sh type_layout
   | (App _ | Error _ | Proj _), _ ->
     (* In these cases, something has gone wrong during reduction, because we do
@@ -1707,7 +1745,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   | Var _, _
   (* CR sspies: This case is currently triggered for free type variables. It
      should be taken care of when revisiting the layout computation. *)
-  | (Abs _ | Comp_unit _ | Struct _), _ ->
+  | (Abs _ | Comp_unit _ | Struct _ | Proj_decl _ | Mutrec _), _ ->
     (* CR sspies: Change this to a loud error in the future. These cases should
        not happen with the new shapes, but at least the [Struct] cases does
        happen for the old Merlin shapes. Investigate when they do happen. For
@@ -1780,10 +1818,7 @@ let type_shape_to_dwarf_die_with_aliased_name (type_name : string)
     let unnamed_die =
       type_shape_to_dwarf_die type_shape type_layout ~parent_proto_die
         ~fallback_value_die (* note that we do not pass the type name here *)
-        ~rec_env:()
-      (* CR sspies: This is currently not used, but will be used for recursive
-         types. Removing it now and then adding it back just increases the diff
-         unnecessarily. *)
+        ~rec_env:(fun _ -> None)
     in
     let reference = Proto_die.create_reference () in
     let layout_name =
@@ -1821,7 +1856,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
   | Some { type_shape; type_name; type_layout } -> (
     let shape_reduce = With_cms_reduce.reduce Env.empty in
     let type_shape = shape_reduce type_shape in
-    (* CR sspies: In the future, we need to unfold recursive types here. *)
+    let type_shape = Type_shape.unfold_and_evaluate type_shape in
     let type_shape =
       match unboxed_projection, type_layout with
       | None, Base b -> Known (type_shape, b)
