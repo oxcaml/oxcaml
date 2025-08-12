@@ -1412,7 +1412,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
   let mark_and_compare_records record_form labels1 rep1 labels2 rep2 =
     if mark then begin
       let mark usage lbls =
-        List.iter (Env.mark_label_used usage) lbls
+        List.iter (fun lbl -> Env.mark_label_used usage lbl.Types.ld_uid) lbls
       in
       let usage : Env.label_usage =
         if decl2.type_private = Public then Env.Exported

@@ -3081,8 +3081,8 @@ let mark_extension_used usage uid =
   | mark -> mark usage
   | exception Not_found -> ()
 
-let mark_label_used usage ld =
-  match Types.Uid.Tbl.find !used_labels ld.ld_uid with
+let mark_label_used usage uid =
+  match Types.Uid.Tbl.find !used_labels uid with
   | mark -> mark usage
   | exception Not_found -> ()
 
