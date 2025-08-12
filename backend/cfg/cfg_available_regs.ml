@@ -14,9 +14,9 @@ module V = Backend_var
    just before a call, and the debugger is standing in the callee. It may
    however affect the semantics of e.g. finalizers. *)
 let extend_live () = false
-  (* CR sspies: This used to be set by [-gdwarf-may-alter-codegen]. But the
-  computation is currently broken, so we've disabled the flag. Fix the
-  compuation and re-enable the flag. *)
+(* CR sspies: This used to be set by [-gdwarf-may-alter-codegen]. But the
+   computation is currently broken, so we've disabled the flag. Fix the
+   compuation and re-enable the flag. *)
 
 (* CR xclerc for xclerc: consider passing this value through the context. *)
 let all_regs_that_might_be_named = ref Reg.Set.empty
