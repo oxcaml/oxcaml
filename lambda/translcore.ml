@@ -45,6 +45,29 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
+let field_offset_for_label lbl =
+  match lbl.lbl_repres with
+  | Record_boxed _
+  | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
+  | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
+      lbl.lbl_pos
+  | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+      lbl.lbl_pos + 1
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
+    (* CR layouts 5.1: For unboxed records, no offset calculation needed in
+       regular field access *)
+      lbl.lbl_pos
+  | Record_float ->
+      lbl.lbl_pos
+  | Record_ufloat ->
+      lbl.lbl_pos
+  | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+      fatal_error "Mixed inlined records not supported for extensible variants"
+  | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
+  | Record_inlined (_, Constructor_mixed _, Variant_with_null)
+  | Record_mixed _ ->
+      lbl.lbl_pos
+
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =
   ref((fun ~scopes:_ _cc _rootpath _modl -> assert false) :
@@ -667,7 +690,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           then
             Some
               (Patomic_load_field { immediate_or_pointer },
-               [targ; Lconst (Const_base (Const_int lbl.lbl_pos))])
+               [targ;
+                Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
           else
             Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
@@ -687,7 +711,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           then
             Some
               (Patomic_load_field { immediate_or_pointer },
-               [targ; Lconst (Const_base (Const_int (lbl.lbl_pos + 1)))])
+               [targ;
+                Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
           else
             Some (Pfield (lbl.lbl_pos + 1, immediate_or_pointer, sem), [targ])
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
@@ -2285,7 +2310,14 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
 
 and transl_atomic_loc ~scopes arg arg_sort lbl =
   let arg = transl_exp ~scopes arg_sort arg in
-  let lbl = Lconst (Const_base (Const_int (lbl.lbl_pos))) in
+  begin match lbl.lbl_repres with
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
+      (* Atomic fields not allowed here *)
+      assert false
+  | _ -> ()
+  end;
+  let field_offset = field_offset_for_label lbl in
+  let lbl = Lconst (Const_base (Const_int field_offset)) in
   (arg, lbl)
 
 and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
