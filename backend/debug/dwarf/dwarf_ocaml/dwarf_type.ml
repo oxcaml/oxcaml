@@ -22,52 +22,52 @@ module Int16 = Numbers.Int16
 module Sort = Jkind_types.Sort
 module Layout = Sort.Const
 module S = Shape
-module StringTable = Misc.Stdlib.String.Tbl
+module String = Misc.Stdlib.String
 
 type base_layout = Sort.base
 
-module Debug_info = struct
-  let enabled = false
+module Debugging_the_compiler = struct
+  let enabled () = !Dwarf_flags.ddwarf_types
 
-  let die_description_table = StringTable.create 0
+  let die_description_table = String.Tbl.create 0
 
   let add ~reference info =
-    if enabled
+    if enabled ()
     then
-      StringTable.add die_description_table
+      String.Tbl.add die_description_table
         (Asm_targets.Asm_label.encode reference)
         info
 
   let add_alias ~from_ref ~to_ref =
-    if enabled
+    if enabled ()
     then
       let desc =
         Format.asprintf "-> %s" (Asm_targets.Asm_label.encode to_ref)
       in
-      StringTable.add die_description_table
+      String.Tbl.add die_description_table
         (Asm_targets.Asm_label.encode from_ref)
         desc
 
   let add_enum ~reference constructors =
-    if enabled
+    if enabled ()
     then
       let desc = Format.asprintf "= %s" (String.concat " | " constructors) in
-      StringTable.add die_description_table
+      String.Tbl.add die_description_table
         (Asm_targets.Asm_label.encode reference)
         desc
 
   let add_ptr ~reference ~inner =
-    if enabled
+    if enabled ()
     then
       let desc =
         Format.asprintf "%s ptr" (Asm_targets.Asm_label.encode inner)
       in
-      StringTable.add die_description_table
+      String.Tbl.add die_description_table
         (Asm_targets.Asm_label.encode reference)
         desc
 
   let print ~die =
-    if enabled
+    if enabled ()
     then
       let indent = ref 0 in
       Proto_die.depth_first_fold die ~init:() ~f:(fun () d ->
@@ -75,7 +75,7 @@ module Debug_info = struct
           | DIE { label; tag; has_children; attribute_values = _; _ } ->
             let indentation = String.make !indent ' ' in
             let info =
-              (StringTable.find_opt die_description_table)
+              (String.Tbl.find_opt die_description_table)
                 (Asm_targets.Asm_label.encode label)
             in
             Format.eprintf "%s+ %a(%s) %a\n" indentation
@@ -121,10 +121,11 @@ let wrap_die_under_a_pointer ~proto_die ~reference ~parent_proto_die =
     ~attribute_values:
       [DAH.create_byte_size_exn ~byte_size:8; DAH.create_type ~proto_die]
     ();
-  Debug_info.add_ptr ~reference ~inner:(Proto_die.reference proto_die)
+  Debugging_the_compiler.add_ptr ~reference
+    ~inner:(Proto_die.reference proto_die)
 
 let create_typedef_die ~reference ~parent_proto_die ?name child_die =
-  Debug_info.add_alias ~from_ref:reference ~to_ref:child_die;
+  Debugging_the_compiler.add_alias ~from_ref:reference ~to_ref:child_die;
   Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
     ~tag:Dwarf_tag.Typedef
     ~attribute_values:
@@ -149,12 +150,12 @@ let create_array_die ~reference ~parent_proto_die ~child_die ?name () =
       [ (* Thankfully, all that lldb cares about is DW_AT_count. *)
         DAH.create_count_const 0L ]
     ();
-  (* LLDB currently uses custom printing for arrays instead of respecting the
-     name attached to the [Array_type] node. Thus, we introduce a typedef with
-     the right name here if the name is provided. *)
+  (* OxCaml LLDB currently uses custom printing for arrays instead of respecting
+     the name attached to the [Array_type] node. Thus, we introduce a typedef
+     with the right name here if the name is provided. *)
   let pointer_reference =
     match name with
-    | None -> reference (* no need to add a type def *)
+    | None -> reference (* no need to add a typedef *)
     | Some _ -> Proto_die.create_reference ()
   in
   wrap_die_under_a_pointer ~proto_die:array_die ~reference:pointer_reference
@@ -178,7 +179,7 @@ let create_char_die ~reference ~parent_proto_die ?name () =
            correctly as [name] in lldb. *)
       ()
   in
-  Debug_info.add ~reference "char enum";
+  Debugging_the_compiler.add ~reference "char enum";
   List.iter
     (fun i ->
       Proto_die.create_ignore ~parent:(Some enum) ~tag:Dwarf_tag.Enumerator
@@ -229,7 +230,9 @@ let create_record_die ~reference ~parent_proto_die ?name ~fields () =
                 ~byte_offset:(Int64.of_int !offset) ]
           ()
       in
-      Debug_info.add ~reference:(Proto_die.reference field) ("." ^ field_name);
+      Debugging_the_compiler.add
+        ~reference:(Proto_die.reference field)
+        ("." ^ field_name);
       offset := !offset + field_size)
     fields;
   wrap_die_under_a_pointer ~proto_die:structure ~reference ~parent_proto_die
@@ -256,7 +259,7 @@ let create_attribute_unboxed_record_die ~reference ~parent_proto_die ?name
 
 let create_simple_variant_die ~reference ~parent_proto_die ?name
     simple_constructors =
-  Debug_info.add_enum ~reference simple_constructors;
+  Debugging_the_compiler.add_enum ~reference simple_constructors;
   let enum =
     Proto_die.create ~reference ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Enumeration_type
@@ -442,7 +445,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
   let complex_constructors_names =
     List.map (fun (name, _) -> name) complex_constructors
   in
-  Debug_info.add_enum ~reference
+  Debugging_the_compiler.add_enum ~reference
     (simple_constructors @ complex_constructors_names);
   let value_size = Arch.size_addr in
   let variant_part_immediate_or_pointer =
@@ -463,7 +466,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
         ~attribute_values:[DAH.create_byte_size_exn ~byte_size:value_size]
         ()
     in
-    Debug_info.add_enum
+    Debugging_the_compiler.add_enum
       ~reference:(Proto_die.reference enum_die)
       ["Immediate"; "Pointer"];
     List.iteri
@@ -491,7 +494,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
             DAH.create_artificial () ]
         ~tag:Dwarf_tag.Member ()
     in
-    Debug_info.add
+    Debugging_the_compiler.add
       ~reference:(Proto_die.reference member_die)
       ("discriminant "
       ^ Asm_targets.Asm_label.encode
@@ -506,7 +509,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
         ~attribute_values:[DAH.create_byte_size_exn ~byte_size:value_size]
         ()
     in
-    Debug_info.add_enum
+    Debugging_the_compiler.add_enum
       ~reference:(Proto_die.reference enum_die)
       simple_constructors;
     List.iteri
@@ -534,7 +537,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
             DAH.create_data_bit_offset ~bit_offset:(Int8.of_int_exn 1) ]
         ()
     in
-    Debug_info.add_alias
+    Debugging_the_compiler.add_alias
       ~from_ref:(Proto_die.reference discr)
       ~to_ref:(Proto_die.reference enum_die)
   in
@@ -557,7 +560,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
               DAH.create_type ~proto_die:ptr_case_structure ]
           ()
       in
-      Debug_info.add_ptr
+      Debugging_the_compiler.add_ptr
         ~reference:(Proto_die.reference ptr_case_pointer_to_structure)
         ~inner:(Proto_die.reference ptr_case_structure);
       let variant_pointer =
@@ -574,7 +577,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
                 ~byte_offset:(Int64.of_int 0) ]
           ()
       in
-      Debug_info.add_alias
+      Debugging_the_compiler.add_alias
         ~from_ref:(Proto_die.reference ptr_mem)
         ~to_ref:(Proto_die.reference ptr_case_pointer_to_structure)
     in
@@ -618,7 +621,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
             ~attribute_values:[DAH.create_discr_value ~value:(Int64.of_int i)]
             ()
         in
-        Debug_info.add
+        Debugging_the_compiler.add
           ~reference:(Proto_die.reference subvariant)
           constructor_name;
         let offset = ref 0 in
@@ -637,7 +640,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
                       ~proto_die_reference:field_type ]
                 ()
             in
-            Debug_info.add_alias
+            Debugging_the_compiler.add_alias
               ~from_ref:(Proto_die.reference member_die)
               ~to_ref:field_type;
             offset := !offset + member_size;
@@ -682,7 +685,7 @@ let create_immediate_or_block ~reference ~parent_proto_die ?name ~immediate_type
       ~attribute_values:[DAH.create_byte_size_exn ~byte_size:value_size]
       ()
   in
-  Debug_info.add_enum
+  Debugging_the_compiler.add_enum
     ~reference:(Proto_die.reference enum_die)
     ["Immediate"; "Pointer"];
   List.iter
@@ -1017,7 +1020,7 @@ let create_tuple_die ~reference ~parent_proto_die ?name fields =
         Proto_die.create ~parent:(Some structure_type) ~tag:Dwarf_tag.Member
           ~attribute_values:member_attributes ()
       in
-      Debug_info.add_alias
+      Debugging_the_compiler.add_alias
         ~from_ref:(Proto_die.reference member)
         ~to_ref:field_die)
     fields;
@@ -1202,7 +1205,7 @@ let cache = Cache.create 16
 (** This second cache is for named type shapes. Every type name should be
     associated with at most one DWARF die, so this cache maps type names to
     type shapes and DWARF dies. *)
-let name_cache = StringTable.create 16
+let name_cache = String.Tbl.create 16
 
 (* CR sspies: We have to be careful here, because LLDB currently disambiguates
    type dies based on the type name; however, we can easily have types with the
@@ -1602,34 +1605,35 @@ let rec flatten_shape (type_shape : Layout.t S.ts) =
           Misc.fatal_error
             "unboxed variant must have same layout as its contents"))
 
-(* Search for the first unused variant of [name] in the [name_cache] cache. If
-   we come along a type of the same name and type shape, then we simply use that
-   reference. *)
+(* Search for the first unused suffix-numbered version of [name] in the
+   [name_cache] cache. If we come along a type of the same name and type shape,
+   then we simply use that reference. *)
 let find_unused_type_name_or_cached (name : string) (type_shape : Layout.t S.ts)
     : (Proto_die.reference, string) Either.t =
-  let rec aux inc =
+  let rec aux inc : _ Either.t =
     let name_suffix = if inc = 0 then "" else "/" ^ string_of_int inc in
     let name = name ^ name_suffix in
-    match StringTable.find_opt name_cache name with
+    match String.Tbl.find_opt name_cache name with
     | Some (type_shape', reference) ->
       if type_shape = type_shape'
          (* CR sspies: Use a better equality check on type shapes in the
             future. *)
-      then Either.Left reference
+      then Left reference
       else aux (inc + 1)
-    | None -> Either.Right name
+    | None -> Right name
   in
   aux 0
 
 (* We represent all types as DIE entries of the form [typedef ... type_name;]
    and use caching for types that have the same name and shape. For name
-   conflicts, we search for the next available derived name [type_name/n]. *)
+   conflicts, we search for the next available suffix-numbered version of the
+   name, [type_name/n]. *)
 let type_shape_to_dwarf_die_with_aliased_name (type_name : string)
     (type_shape : Layout.t S.ts) ~parent_proto_die ~fallback_value_die :
     Proto_die.reference =
   match find_unused_type_name_or_cached type_name type_shape with
-  | Either.Left reference -> reference
-  | Either.Right name ->
+  | Left reference -> reference
+  | Right name ->
     let unnamed_die =
       type_shape_to_dwarf_die ~visited:PathSet.empty type_shape
         ~parent_proto_die
@@ -1640,7 +1644,7 @@ let type_shape_to_dwarf_die_with_aliased_name (type_name : string)
       Format.asprintf "%a" Layout.format (S.shape_layout type_shape)
     in
     let full_name = name ^ " @ " ^ layout_name in
-    StringTable.add name_cache name (type_shape, reference);
+    String.Tbl.add name_cache name (type_shape, reference);
     create_typedef_die ~reference ~name:full_name ~parent_proto_die unnamed_die;
     reference
 
@@ -1699,11 +1703,11 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
         type_shape_to_dwarf_die_with_aliased_name type_name type_shape
           ~parent_proto_die ~fallback_value_die
       in
-      if Debug_info.enabled
+      if Debugging_the_compiler.enabled ()
       then (
         Format.eprintf "%a has become %a@." Uid.print var_uid
           Asm_targets.Asm_label.print reference;
-        Debug_info.print ~die:parent_proto_die);
+        Debugging_the_compiler.print ~die:parent_proto_die);
       reference
     | Unknown base_layout ->
       let reference = Proto_die.create_reference () in

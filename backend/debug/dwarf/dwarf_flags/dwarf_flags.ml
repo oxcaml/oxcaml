@@ -157,6 +157,10 @@ let default_ddebug_invariants = false
 
 let ddebug_invariants = ref default_ddebug_invariants
 
+let default_ddwarf_types = false
+
+let ddwarf_types = ref default_ddwarf_types
+
 type dwarf_format =
   | Thirty_two
   | Sixty_four

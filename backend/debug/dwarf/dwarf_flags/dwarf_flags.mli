@@ -67,6 +67,10 @@ val default_ddebug_invariants : bool
 
 val ddebug_invariants : bool ref
 
+val default_ddwarf_types : bool
+
+val ddwarf_types : bool ref
+
 val gdwarf_may_alter_codegen : bool ref
 
 (** Setting this to [true] will emit sufficient DWARF to get inlined frame
