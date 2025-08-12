@@ -305,9 +305,7 @@ let mk_ddebug_invariants f =
     " Run invariant checks during generation of debugging information" )
 
 let mk_ddwarf_types f =
-  ( "-ddwarf-types",
-    Arg.Unit f,
-    " Enable debug output for DWARF type generation" )
+  ("-ddwarf-types", Arg.Unit f, " Enable debug output for DWARF type generation")
 
 let mk_internal_assembler f =
   ( "-internal-assembler",
