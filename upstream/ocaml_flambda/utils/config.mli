@@ -328,9 +328,6 @@ val has_pclmul : bool
 val has_popcnt : bool
 (* Whether the compiler was configured on a machine with POPCNT *)
 
-val has_lzcnt : bool
-(* Whether the compiler was configured on a machine with LZCNT *)
-
 val has_sse3 : bool
 (* Whether the compiler was configured on a machine with SSE3 *)
 
@@ -354,3 +351,6 @@ val has_avx : bool
 
 val has_avx2 : bool
 (* Whether the compiler was configured on a machine with AVX2 *)
+
+val oxcaml_dwarf : bool
+(* Whether OxCaml DWARF is used by default *)

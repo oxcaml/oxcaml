@@ -1992,7 +1992,11 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
       not @@ Builtin_attributes.has_attribute "no_recursive_modalities"
         sincl.pincl_attributes
     in
-    let sg = apply_modalities_signature ~recursive env modalities sg in
+    let sg =
+      match Mode.Modality.Value.Const.is_id modalities with
+      | true -> sg
+      | false -> apply_modalities_signature ~recursive env modalities sg
+    in
     (* Assume the structure is legacy, for backward compatibility *)
     let sg, newenv = Env.enter_signature ~scope sg ~mode:Value.legacy env in
     Signature_group.iter

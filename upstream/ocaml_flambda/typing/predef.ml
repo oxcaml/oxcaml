@@ -615,16 +615,6 @@ let add_simd_stable_extension_types add_type env =
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
   |> add_type ident_float64x2 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
-
-(* CR-soon mslater:
-  Remaining work:
-    - Correct ASAN checks for 32/64 byte memory chunks
-    - Correct TSAN save/restore SIMD registers
-    - Align Vec256 stack slots on the OCaml stack
-*)
-let add_simd_beta_extension_types add_type env =
-  let _, add_type = mk_add_type add_type in
-  env
   |> add_type ident_int8x32 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_int16x16 ~jkind:Jkind.Const.Builtin.immutable_data
@@ -637,6 +627,8 @@ let add_simd_beta_extension_types add_type env =
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_float64x4 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
+
+let add_simd_beta_extension_types _add_type env = env
 
 let add_simd_alpha_extension_types add_type env =
   let _, add_type = mk_add_type add_type in

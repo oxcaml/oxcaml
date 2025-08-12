@@ -582,8 +582,6 @@ let ocaml_ignored_flags =
     "-fno-bmi2";
     "-fbmi";
     "-fno-bmi";
-    "-flzcnt";
-    "-fno-lzcnt";
     "-fprefetchwt1";
     "-fno-prefetchwt1";
     "-fprefetchw";
