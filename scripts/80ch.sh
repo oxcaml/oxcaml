@@ -36,23 +36,19 @@ else
     echo "  git fetch oxcaml" >&2
     exit 1
   fi
-  
+
   # oxcaml/main exists, use merge-base to find common ancestor
   feature_base="$(git merge-base HEAD oxcaml/main)"
 fi
 
 find_diff() {
 # Iterate through all files changed since this branch forked off of main.
-#
-#  Separate file names with NULLs. This is      Read the next token
-#  standard for lists of files since file       |    Tokens are delimited
-#  names may contain newlines        |          |    |         with NULLs
-#                                    |-         |--- |-------
 git diff --no-ext-diff --name-only "$feature_base" -z | \
 while read -d $'\0' -r changed_file
-#                                                             ^| ^^^^^^^^^^^|
-#                   Don't allow backslashes to escape characters            |
-#                                            Store the token in $changed_file
+#          |-------| || ^^^^^^^^^^^|
+#          |         ||            Store the token in $changed_file
+#          |         |Don't allow backslashes to escape characters
+#          Delimiter is NUL character
 do
   # This case statement skips a hard-coded set of files.
   case "$changed_file" in
