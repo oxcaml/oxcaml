@@ -5884,7 +5884,9 @@ and type_expect_
               Env.find_value_by_name
                 (Longident.Lident ("self-" ^ cl_num)) env
             in
-            Texp_instvar(self_path, path, match lid.txt with Longident.Lident txt -> { txt; loc = lid.loc }
+            Texp_instvar(self_path, path,
+                         match lid.txt with
+                             Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
         | Val_mut (_m0, _) -> begin
             match path with
