@@ -79,7 +79,7 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
          the environment before any of the actual translation happens. Code
          usually does come before it is used in a closure, but for static lets,
          they may be defined within the same let binding. Moreover, code may
-         reference each others' code IDs, not necessarily in the order they are
+         reference each other's code IDs, not necessarily in the order they are
          declared in. Hence, we run two passes: one inserting code into the
          environment, and one doing the actual translation. *)
       let env, res =
