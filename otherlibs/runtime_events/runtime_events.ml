@@ -44,6 +44,8 @@ type runtime_counter =
 | EV_C_STACK_FREED
 | EV_C_STACK_IDLED
 | EV_C_STACK_WOKEN
+| EV_C_MINOR_ALLOCATED_WORDS
+| EV_C_MINOR_PROMOTED_WORDS
 
 type runtime_phase =
 | EV_EXPLICIT_GC_SET
@@ -115,7 +117,9 @@ let runtime_counter_name counter =
   | EV_C_FORCE_MINOR_SET_MINOR_HEAP_SIZE -> "force_minor_set_minor_heap_size"
   | EV_C_FORCE_MINOR_MEMPROF -> "force_minor_memprof"
   | EV_C_MINOR_PROMOTED -> "minor_promoted"
+  | EV_C_MINOR_PROMOTED_WORDS -> "minor_promoted_words"
   | EV_C_MINOR_ALLOCATED -> "minor_allocated"
+  | EV_C_MINOR_ALLOCATED_WORDS -> "minor_allocated_words"
   | EV_C_REQUEST_MAJOR_ALLOC_SHR -> "request_major_alloc_shr"
   | EV_C_REQUEST_MAJOR_ADJUST_GC_SPEED -> "request_major_adjust_gc_speed"
   | EV_C_REQUEST_MINOR_REALLOC_REF_TABLE -> "request_minor_realloc_ref_table"
