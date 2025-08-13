@@ -488,8 +488,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         -> ('a, disallowed * 'r) mode
         (** [Amodemeet a c [mv0, mv1, ..]] represents [a meet mv0 meet mv1 meet ..]
           with the hint [c] for [a] (the morphvars have their own hints). *)
-    constraint 'd = _ * _
-  [@@ocaml.warning "-62"]
 
   (** Prints a mode variable, including the set of variables below it
       (recursively). To handle cycles, [traversed] is the set of variables that

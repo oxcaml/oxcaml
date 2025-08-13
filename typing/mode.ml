@@ -1623,7 +1623,6 @@ module Hint = struct
     | Crossing_left : ('l * disallowed) morph
     | Crossing_right : (disallowed * 'r) morph
     | Register_alloc_mode : ('l * 'r) morph
-  [@@ocaml.warning "-62"]
 
   type 'd neg_const = 'd neg const constraint 'd = _ * _
 

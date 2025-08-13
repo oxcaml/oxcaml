@@ -232,7 +232,6 @@ module type S = sig
       | Crossing_left : ('l * disallowed) morph
       | Crossing_right : (disallowed * 'r) morph
       | Register_alloc_mode : ('l * 'r) morph
-    [@@ocaml.warning "-62"]
 
     (* This is needed for the destructive substitutions in [Common_axis] for
        the monadic axis modules, as we can't use [neg] within the substitution due
@@ -283,7 +282,7 @@ module type S = sig
 
   type nonrec equate_step = equate_step
 
-  type ('a, 'd) mode constraint 'd = 'l * 'r
+  type ('a, 'd) mode
 
   type ('a, 'b) monadic_comonadic =
     { monadic : 'a;

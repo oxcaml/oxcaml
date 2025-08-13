@@ -223,7 +223,7 @@ module type Solver_mono = sig
 
   (** A mode with carrier type ['a] and allowance ['d]. See
   Note [Allowance] in allowance.mli.*)
-  type ('a, 'd) mode constraint 'd = 'l * 'r
+  type ('a, 'd) mode
 
   include Allow_disallow with type ('a, _, 'd) sided = ('a, 'd) mode
 
