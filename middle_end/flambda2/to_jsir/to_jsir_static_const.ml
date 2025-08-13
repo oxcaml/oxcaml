@@ -85,9 +85,7 @@ let block_like' ~env ~res (const : Static_const.t) :
   | Mutable_string { initial_value } ->
     ignore initial_value;
     static_const_not_supported ()
-  | Immutable_string value ->
-    ignore value;
-    static_const_not_supported ()
+  | Immutable_string value -> Constant (String value), env, res
 
 let block_like ~env ~res symbol const =
   let expr, env, res = block_like' ~env ~res const in
