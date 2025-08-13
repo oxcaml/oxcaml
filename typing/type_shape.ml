@@ -75,7 +75,7 @@ end = struct
       Shape.unboxed_tuple ?uid:outer.uid (subst_list shapes)
     | Predef (predef, args) ->
       Shape.predef predef ?uid:outer.uid (subst_list args)
-    | Arrow (arg, ret) -> Shape.arrow ?uid:outer.uid (subst arg) (subst ret)
+    | Arrow -> Shape.arrow ?uid:outer.uid ()
     | Poly_variant fields ->
       Shape.poly_variant ?uid:outer.uid
         (poly_variant_constructors_map subst fields)
@@ -322,10 +322,7 @@ module Type_shape = struct
                 row_fields
             in
             Shape.poly_variant row_fields
-          | Tarrow (_, arg, ret, _) ->
-            Shape.arrow
-              (of_type_expr_go ~depth ~visited arg subst shape_for_constr)
-              (of_type_expr_go ~depth ~visited ret subst shape_for_constr)
+          | Tarrow (_, _, _, _) -> Shape.arrow ()
           | Tunivar _ -> unknown_shape
           | Tof_kind _ -> unknown_shape
           | Tpackage _ -> unknown_shape
@@ -599,7 +596,7 @@ module Type_decl_shape = struct
     | Alias sh -> is_closed_type_shape sh
     | Tuple shapes | Unboxed_tuple shapes ->
       List.for_all is_closed_type_shape shapes
-    | Arrow (arg, ret) -> is_closed_type_shape arg && is_closed_type_shape ret
+    | Arrow -> true
     | Poly_variant constrs ->
       List.for_all
         (fun { pv_constr_name = _; pv_constr_args = shs } ->
@@ -762,7 +759,7 @@ let rec decompose_application (t : Shape.t) =
   | Constr (_, _)
   | Tuple _ | Unboxed_tuple _
   | Predef (_, _)
-  | Arrow (_, _)
+  | Arrow
   | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _ | Record _
   | Mutrec _
   | Proj_decl (_, _) ->
@@ -901,7 +898,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
       | Constr (_, _)
       | Tuple _ | Unboxed_tuple _
       | Predef (_, _)
-      | Arrow (_, _)
+      | Arrow
       | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
       | Record _
       | Proj_decl (_, _) ->
@@ -923,7 +920,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
     | Constr (_, _)
     | Tuple _ | Unboxed_tuple _
     | Predef (_, _)
-    | Arrow (_, _)
+    | Arrow
     | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
     | Record _ | Mutrec _ ->
       None
@@ -961,7 +958,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
         | Constr (_, _)
         | Tuple _ | Unboxed_tuple _
         | Predef (_, _)
-        | Arrow (_, _)
+        | Arrow
         | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
         | Record _ | Mutrec _
         | Proj_decl (_, _) ->
@@ -988,8 +985,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
       | Poly_variant constrs ->
         Shape.poly_variant
           (Shape.poly_variant_constructors_map unfold_and_eval constrs)
-      | Arrow (arg, ret) ->
-        Shape.arrow (unfold_and_eval arg) (unfold_and_eval ret)
+      | Arrow -> Shape.arrow ()
       | Variant_unboxed
           { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout } ->
         Shape.variant_unboxed ~variant_uid ~arg_uid name arg_name
@@ -1060,7 +1056,7 @@ let rec estimate_layout_from_type_shape (t : Shape.t) : Layout.t option =
     Some arg_layout
     (* CR sspies: [arg_layout] could become unreliable in the future. Consider
        recursively descending in that case. *)
-  | Tuple _ | Arrow _ | Variant _ | Poly_variant _ | Record _ ->
+  | Tuple _ | Arrow | Variant _ | Poly_variant _ | Record _ ->
     Some (Layout.Base Value)
   | Alias t -> estimate_layout_from_type_shape t
   | Mu t ->

@@ -236,9 +236,7 @@ and desc =
   | Tuple of t list (* boxed tuple (value layout) *)
   | Unboxed_tuple of t list (* unboxed tuple (product layout) *)
   | Predef of Predef.t * t list (* predef type with arguments *)
-  | Arrow of t * t
-    (* CR sspies: We could in principle discard the arguments of the arrow,
-       since they are neither needed for printing nor for debug information. *)
+  | Arrow
   | Poly_variant of t poly_variant_constructors
   | Mu of t
   (** [Mu t] represents a binder for a recursive type with body [t]. Its
@@ -357,7 +355,7 @@ val constr : ?uid:Uid.t -> Ident.t -> t list -> t
 val tuple : ?uid:Uid.t -> t list -> t
 val unboxed_tuple : ?uid:Uid.t -> t list -> t
 val predef : ?uid:Uid.t -> Predef.t -> t list -> t
-val arrow : ?uid:Uid.t -> t -> t -> t
+val arrow : ?uid:Uid.t -> unit -> t
 val poly_variant : ?uid:Uid.t -> t poly_variant_constructors -> t
 val mu : ?uid:Uid.t -> t -> t
 val rec_var : ?uid:Uid.t -> DeBruijn_index.t -> t
