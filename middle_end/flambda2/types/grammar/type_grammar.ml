@@ -3907,6 +3907,12 @@ let boxed_float32_alias_to ~naked_float32 =
 let boxed_float_alias_to ~naked_float =
   box_float (Naked_float (TD.create_equals (Simple.var naked_float)))
 
+let tagged_int8_alias_to ~naked_int8 =
+  tag_int8 (Naked_int8 (TD.create_equals (Simple.var naked_int8)))
+
+let tagged_int16_alias_to ~naked_int16 =
+  tag_int16 (Naked_int16 (TD.create_equals (Simple.var naked_int16)))
+
 let boxed_int32_alias_to ~naked_int32 =
   box_int32 (Naked_int32 (TD.create_equals (Simple.var naked_int32)))
 

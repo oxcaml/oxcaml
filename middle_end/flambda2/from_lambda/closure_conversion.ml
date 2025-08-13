@@ -233,7 +233,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
         (fun new_index arg ->
           match flattened_reordered_shape.(new_index) with
           | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word ->
+          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
             arg
           | Float_boxed _ -> unbox_float_constant arg)
         args
@@ -542,6 +542,11 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
           arg_transformer = None;
           return_transformer = None
         } ]
+    | Untagged_immediate ->
+      [ { kind = K.naked_immediate;
+          arg_transformer = None;
+          return_transformer = None
+        } ]
     | Vec128 ->
       [ { kind = K.naked_vec128;
           arg_transformer = None;
@@ -580,31 +585,31 @@ let unarize_extern_repr alloc_mode (extern_repr : Lambda.extern_repr) =
         arg_transformer = Some (P.Unbox_number Naked_float32);
         return_transformer = Some (P.Box_number (Naked_float32, alloc_mode))
       } ]
-  | Unboxed_integer Unboxed_int8 ->
+  | Unboxed_or_untagged_integer Untagged_int8 ->
     [ { kind = K.naked_int8;
         arg_transformer =
           Some (P.Num_conv { src = Tagged_immediate; dst = Naked_int8 });
         return_transformer =
           Some (P.Num_conv { src = Naked_int8; dst = Tagged_immediate })
       } ]
-  | Unboxed_integer Unboxed_int16 ->
+  | Unboxed_or_untagged_integer Untagged_int16 ->
     [ { kind = K.naked_int16;
         arg_transformer =
           Some (P.Num_conv { src = Tagged_immediate; dst = Naked_int16 });
         return_transformer =
           Some (P.Num_conv { src = Naked_int16; dst = Tagged_immediate })
       } ]
-  | Unboxed_integer Unboxed_nativeint ->
+  | Unboxed_or_untagged_integer Unboxed_nativeint ->
     [ { kind = K.naked_nativeint;
         arg_transformer = Some (P.Unbox_number Naked_nativeint);
         return_transformer = Some (P.Box_number (Naked_nativeint, alloc_mode))
       } ]
-  | Unboxed_integer Unboxed_int32 ->
+  | Unboxed_or_untagged_integer Unboxed_int32 ->
     [ { kind = K.naked_int32;
         arg_transformer = Some (P.Unbox_number Naked_int32);
         return_transformer = Some (P.Box_number (Naked_int32, alloc_mode))
       } ]
-  | Unboxed_integer Unboxed_int64 ->
+  | Unboxed_or_untagged_integer Unboxed_int64 ->
     [ { kind = K.naked_int64;
         arg_transformer = Some (P.Unbox_number Naked_int64);
         return_transformer = Some (P.Box_number (Naked_int64, alloc_mode))
@@ -624,7 +629,7 @@ let unarize_extern_repr alloc_mode (extern_repr : Lambda.extern_repr) =
         arg_transformer = Some (P.Unbox_number Naked_vec512);
         return_transformer = Some (P.Box_number (Naked_vec512, alloc_mode))
       } ]
-  | Untagged_int ->
+  | Unboxed_or_untagged_integer Untagged_int ->
     [ { kind = K.naked_immediate;
         arg_transformer = Some P.Untag_immediate;
         return_transformer = Some P.Tag_immediate
@@ -782,13 +787,13 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
     match prim_native_name with
     | "caml_int64_float_of_bits_unboxed" ->
       unboxed_int64_to_and_from_unboxed_float
-        ~src_kind:(Unboxed_integer Unboxed_int64)
+        ~src_kind:(Unboxed_or_untagged_integer Unboxed_int64)
         ~dst_kind:(Unboxed_float Boxed_float64)
         ~op:Unboxed_int64_as_unboxed_float64
     | "caml_int64_bits_of_float_unboxed" ->
       unboxed_int64_to_and_from_unboxed_float
         ~src_kind:(Unboxed_float Boxed_float64)
-        ~dst_kind:(Unboxed_integer Unboxed_int64)
+        ~dst_kind:(Unboxed_or_untagged_integer Unboxed_int64)
         ~op:Unboxed_float64_as_unboxed_int64
     | _ ->
       let callee = Simple.symbol call_symbol in
@@ -1095,59 +1100,42 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Psetglobal _ | Pgetpredef _ | Pfield _ | Pfield_computed _ | Psetfield _
       | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
       | Pccall _ | Praise _ | Pufloatfield _ | Psetufloatfield _ | Psequand
-      | Psequor | Pnot | Pnegint | Pmixedfield _ | Psetmixedfield _ | Paddint
-      | Psubint | Pmulint | Pdivint _ | Pmodint _ | Pandint | Porint | Pxorint
-      | Plslint | Plsrint | Pasrint | Pintcomp _ | Pcompare_ints
-      | Pcompare_floats _ | Pcompare_bints _ | Poffsetint _ | Poffsetref _
-      | Pintoffloat _
-      | Pfloatofint (_, _)
-      | Pfloatoffloat32 _ | Pfloat32offloat _
-      | Pnegfloat (_, _)
-      | Pabsfloat (_, _)
-      | Paddfloat (_, _)
-      | Psubfloat (_, _)
-      | Pmulfloat (_, _)
-      | Pdivfloat (_, _)
-      | Pfloatcomp (_, _)
-      | Punboxed_float_comp (_, _)
+      | Psequor | Pnot | Pmixedfield _ | Psetmixedfield _ | Poffsetref _
       | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
       | Pbytessetu | Pbytesrefs | Pbytessets | Pduparray _ | Parraylength _
       | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _ | Pisint _
-      | Pisnull | Pisout | Pbintofint _ | Pintofbint _ | Pcvtbint _ | Pnegbint _
-      | Paddbint _ | Psubbint _ | Pmulbint _ | Pdivbint _ | Pmodbint _
-      | Pandbint _ | Porbint _ | Pxorbint _ | Plslbint _ | Plsrbint _
-      | Pasrbint _ | Pbintcomp _ | Punboxed_int_comp _ | Pbigarrayref _
-      | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_16 _ | Pstring_load_32 _
-      | Pstring_load_f32 _ | Pstring_load_64 _ | Pstring_load_vec _
-      | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-      | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_16 _ | Pbytes_set_32 _
-      | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
-      | Pbigstring_load_16 _ | Pbigstring_load_32 _ | Pbigstring_load_f32 _
-      | Pbigstring_load_64 _ | Pbigstring_load_vec _ | Pbigstring_set_16 _
-      | Pbigstring_set_32 _ | Pbigstring_set_f32 _ | Pbigstring_set_64 _
-      | Pbigstring_set_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
-      | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-      | Punboxed_float32_array_load_vec _ | Punboxed_int32_array_load_vec _
-      | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
-      | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+      | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
+      | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
+      | Pstring_load_64 _ | Pstring_load_vec _ | Pbytes_load_16 _
+      | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _
+      | Pbytes_load_vec _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
+      | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_load_16 _
+      | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
+      | Pbigstring_load_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+      | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+      | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+      | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+      | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+      | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
+      | Pfloat_array_set_vec _ | Pint_array_set_vec _
       | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
       | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
-      | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pbswap16 | Pbbswap _
-      | Pint_as_pointer _ | Popaque _ | Pprobe_is_enabled _ | Pobj_dup
-      | Pobj_magic _ | Punbox_float _
-      | Pbox_float (_, _)
-      | Punbox_vector _
+      | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
+      | Popaque _ | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
+      | Pmakelazyblock _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
-      | Pmakelazyblock _ | Puntag_int _ | Ptag_int _ | Punbox_int _ | Pbox_int _
-      | Punbox_unit | Pmake_unboxed_product _ | Punboxed_product_field _
+      | Pmake_unboxed_product _ | Punboxed_product_field _
       | Parray_element_size_in_bytes _ | Pget_header _ | Prunstack | Pperform
-      | Presume | Preperform | Patomic_exchange_field _
-      | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
-      | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
-      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
-      | Ppoll | Patomic_load_field _ | Patomic_set_field _ | Pcpu_relax
+      | Presume | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
+      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _
+      | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+      | Patomic_compare_set_field _ | Patomic_fetch_add_field
+      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
+      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ppoll
+      | Patomic_load_field _ | Patomic_set_field _
       | Preinterpret_tagged_int63_as_unboxed_int64
-      | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _ ->
+      | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
+      | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
         (* Inconsistent with outer match *)
         assert false
     in

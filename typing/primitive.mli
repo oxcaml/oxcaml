@@ -15,12 +15,16 @@
 
 (* Description of primitive functions *)
 
-type unboxed_integer =
+type unboxed_or_untagged_integer =
   | Unboxed_int64
   | Unboxed_nativeint
   | Unboxed_int32
-  | Unboxed_int16
-  | Unboxed_int8
+  | Untagged_int16
+  | Untagged_int8
+  | Untagged_int
+  (* CR mshinwell: I think [Untagged_int31_63] might be better *)
+  (** [Untagged_int] is used for [int#] and when you write [int[@untagged]] on
+      [external] declarations. *)
 
 type unboxed_float = Unboxed_float64 | Unboxed_float32
 type unboxed_vector = Unboxed_vec128 | Unboxed_vec256 | Unboxed_vec512
@@ -29,15 +33,21 @@ type boxed_integer = Boxed_int64 | Boxed_nativeint | Boxed_int32
 type boxed_float = Boxed_float64 | Boxed_float32
 type boxed_vector = Boxed_vec128 | Boxed_vec256 | Boxed_vec512
 
-(* Representation of arguments/result for the native code version
-   of a primitive *)
+(** Representation of arguments/result for the native code version
+    of a primitive.
+
+    Untagged integers (such as [int[@untagged]]) are represented as
+    [Unboxed_integer Untagged_int]
+*)
 type native_repr =
   | Repr_poly
   | Same_as_ocaml_repr of Jkind_types.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
-  | Unboxed_integer of unboxed_integer
-  | Untagged_immediate
+  | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+(* CR mshinwell/ccasinghino: should we actually use
+   "any_locality_mode Scalar.Integral.Width.t" here rather than defining an
+   additional unboxed_or_untagged_integer type? *)
 
 (* See [middle_end/semantics_of_primitives.mli] *)
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
@@ -107,9 +117,10 @@ val byte_name: 'a description_gen -> string
 
 
 val unboxed_float : boxed_float -> unboxed_float
-val unboxed_integer : boxed_integer -> unboxed_integer
+val unboxed_or_untagged_integer : boxed_integer -> unboxed_or_untagged_integer
 val unboxed_vector : boxed_vector -> unboxed_vector
-val equal_unboxed_integer : unboxed_integer -> unboxed_integer -> bool
+val equal_unboxed_or_untagged_integer :
+  unboxed_or_untagged_integer -> unboxed_or_untagged_integer -> bool
 val equal_unboxed_float : unboxed_float -> unboxed_float -> bool
 val equal_unboxed_vector : unboxed_vector -> unboxed_vector -> bool
 val compare_unboxed_float : unboxed_float -> unboxed_float -> int

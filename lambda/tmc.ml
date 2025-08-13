@@ -875,6 +875,10 @@ let rec choice ctx t =
         Lprim (Popaque layout, [l1], loc)
 
     (* in common cases we just return *)
+    | Pphys_equal _
+    | Pscalar _
+    (* Note for Pscalar: operations returning boxed values could be
+       considered constructions someday *)
     | Pbytes_to_string | Pbytes_of_string
     | Parray_to_iarray | Parray_of_iarray
     | Pgetglobal _ | Psetglobal _ | Pgetpredef _
@@ -886,24 +890,13 @@ let rec choice ctx t =
     | Pccall _
     | Praise _
     | Pnot
-    | Pnegint | Paddint | Psubint | Pmulint | Pdivint _ | Pmodint _
-    | Pandint | Porint | Pxorint
-    | Plslint | Plsrint | Pasrint
-    | Pintcomp _ | Punboxed_int_comp _
-    | Poffsetint _ | Poffsetref _
-    | Pintoffloat _ | Pfloatofint (_, _)
-    | Pfloatoffloat32 _ | Pfloat32offloat _
-    | Pnegfloat (_, _) | Pabsfloat (_, _)
-    | Paddfloat (_, _) | Psubfloat (_, _)
-    | Pmulfloat (_, _) | Pdivfloat (_, _)
-    | Pfloatcomp (_, _) | Punboxed_float_comp (_, _)
+    | Poffsetref _
     | Pstringlength | Pstringrefu  | Pstringrefs
     | Pbyteslength | Pbytesrefu | Pbytessetu | Pbytesrefs | Pbytessets
     | Parraylength _ | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _
     | Parrayblit _
     | Pisint _ | Pisnull | Pisout
     | Pignore
-    | Pcompare_ints | Pcompare_floats _ | Pcompare_bints _
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
     | Punbox_unit
@@ -918,9 +911,6 @@ let rec choice ctx t =
     | Patomic_lor_field | Patomic_lxor_field
     | Patomic_load_field _ | Patomic_set_field _
     | Pcpu_relax
-    | Punbox_float _ | Pbox_float (_, _)
-    | Punbox_int _ | Pbox_int _
-    | Puntag_int _ | Ptag_int _
     | Punbox_vector _ | Pbox_vector (_, _)
 
     (* it doesn't seem worth it to support lazy blocks for tmc *)
@@ -946,15 +936,6 @@ let rec choice ctx t =
     | Pobj_dup
     | Pobj_magic _
     | Pprobe_is_enabled _
-
-    (* operations returning boxed values could be considered
-       constructions someday *)
-    | Pbintofint _ | Pintofbint _
-    | Pcvtbint _
-    | Pnegbint _
-    | Paddbint _ | Psubbint _ | Pmulbint _ | Pdivbint _ | Pmodbint _
-    | Pandbint _ | Porbint _ | Pxorbint _ | Plslbint _ | Plsrbint _ | Pasrbint _
-    | Pbintcomp _
 
     (* more common cases... *)
     | Pbigarrayref _ | Pbigarrayset _
@@ -987,13 +968,13 @@ let rec choice ctx t =
     | Punboxed_nativeint_array_set_vec _
     | Pget_header _
     | Pctconst _
-    | Pbswap16
-    | Pbbswap _
     | Pint_as_pointer _
     | Psequand | Psequor
     | Ppoll
     | Ppeek _ | Ppoke _
-      ->
+    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _
+    | Pmake_idx_array _
+    | Pget_idx _ | Pset_idx _ ->
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
 

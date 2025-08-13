@@ -445,8 +445,15 @@ let slot_offset (loc : Reg.stack_location) ~stack_class ~stack_offset
 (* Calling the assembler *)
 
 let assemble_file infile outfile =
+  let dwarf_flag =
+    if !Clflags.native_code && !Clflags.debug then
+      Dwarf_flags.get_dwarf_as_toolchain_flag ()
+    else
+      ""
+  in
   Ccomp.command (Config.asm ^ " " ^
                  (String.concat " " (Misc.debug_prefix_map_flags ())) ^
+                 dwarf_flag ^
                  " -o " ^ Filename.quote outfile ^ " " ^ Filename.quote infile)
 
 let has_three_operand_float_ops () = false
@@ -466,7 +473,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
-  | Ccmpi _ | Caddv | Cadda | Ccmpa _
+  | Ccmpi _ | Caddv | Cadda
   | Cnegf Float64 | Cabsf Float64 | Caddf Float64
   | Csubf Float64 | Cmulf Float64 | Cdivf Float64
   | Ccmpf _

@@ -441,7 +441,6 @@ let postlude :
         Utils.log "stack_slots[%a]=%d" Stack_class.print stack_class
           num_stack_slots);
     Utils.dedent ());
-  remove_prologue_if_not_required cfg_with_layout;
   update_live_fields cfg_with_layout (Cfg_with_infos.liveness cfg_with_infos);
   f ();
   if debug && Lazy.force invariants

@@ -609,8 +609,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
             match layout with
             | Ptop | Pbottom ->
               Misc.fatal_error "Cannot bind layout [Ptop] or [Pbottom]"
-            | Pvalue _ | Punboxed_int _ | Punboxed_float _ | Punboxed_vector _
-              ->
+            | Pvalue _ | Punboxed_or_untagged_integer _ | Punboxed_float _
+            | Punboxed_vector _ ->
               ( env,
                 [ ( id,
                     Flambda_debug_uid.of_lambda_debug_uid duid,
@@ -745,8 +745,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       let id_duid = Lambda.debug_uid_none in
       let result_layout = L.primitive_result_layout prim in
       (match result_layout with
-      | Pvalue _ | Punboxed_float _ | Punboxed_int _ | Punboxed_vector _
-      | Punboxed_product _ ->
+      | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+      | Punboxed_vector _ | Punboxed_product _ ->
         ()
       | Ptop | Pbottom ->
         Misc.fatal_errorf "Invalid result layout %a for primitive %a"
@@ -1424,8 +1424,8 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           raw_kind = Pgenval | Pintval | Pvariant _ | Parrayval _
         }
     | Pvalue { nullable = Nullable; raw_kind = _ }
-    | Ptop | Pbottom | Punboxed_float _ | Punboxed_int _ | Punboxed_vector _
-    | Punboxed_product _ ->
+    | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
+    | Punboxed_vector _ | Punboxed_product _ ->
       Location.prerr_warning
         (Debuginfo.Scoped_location.to_location loc)
         Warnings.Unboxing_impossible;

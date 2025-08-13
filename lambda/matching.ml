@@ -1924,7 +1924,7 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
         Punboxed_product layouts
       | Value _ | Float_boxed _ | Float64 | Float32
       | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word ->
+      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
     match cstr.cstr_shape with
@@ -2134,9 +2134,7 @@ let inline_lazy_force_cond arg pos loc =
   let varg = Lvar idarg in
   let tag = Ident.create_local "tag" in
   let tag_duid = Lambda.debug_uid_none in
-  let test_tag t =
-    Lprim(Pintcomp Ceq, [Lvar tag; Lconst(Const_base(Const_int t))], loc)
-  in
+  let test_tag t = icmp Ceq int (Lvar tag) (tagged_immediate t) ~loc in
   Llet
     ( Strict,
       Lambda.layout_lazy,
@@ -2572,10 +2570,10 @@ let zero_lam = Lconst (Const_base (Const_int 0))
 
 let tree_way_test loc kind arg lt eq gt =
   Lifthenelse
-    ( Lprim (Pintcomp Clt, [ arg; zero_lam ], loc),
+    ( icmp Clt int arg zero_lam ~loc,
       lt,
       Lifthenelse (
-        Lprim (Pintcomp Clt, [ zero_lam; arg ], loc),
+        icmp Clt int zero_lam arg ~loc,
         gt,
         eq,
         kind),
@@ -2686,14 +2684,25 @@ let rec do_tests_nofail value_kind loc tst arg = function
           do_tests_nofail value_kind loc tst arg rem,
           act, value_kind )
 
-let make_test_sequence value_kind loc fail tst lt_tst arg const_lambda_list =
+let make_test_sequence value_kind loc fail size arg const_lambda_list =
+  let icmp size cmp = Pscalar (Binary (Icmp (size, cmp))) in
+  let fcmp size cmp = Pscalar (Binary (Fcmp (size, cmp))) in
+  let cmp cmp_if_i cmp_if_f =
+    match (size : _ Scalar.t) with
+    | Naked (Integral x) -> icmp (Naked x) cmp_if_i
+    | Value (Integral x) -> icmp (Value x) cmp_if_i
+    | Naked (Floating x) -> fcmp (Naked x) cmp_if_f
+    | Value (Floating x) -> fcmp (Value x) cmp_if_f
+  in
+  let tst = cmp Cne CFneq in
+  let lt_tst = cmp Clt CFlt in
   let const_lambda_list = sort_lambda_list const_lambda_list in
   let hs, const_lambda_list, fail =
     share_actions_tree value_kind const_lambda_list fail
   in
   let rec make_test_sequence const_lambda_list =
-    if List.length const_lambda_list >= 4 && lt_tst <> Pignore then
-      split_sequence const_lambda_list
+    if List.length const_lambda_list >= 4
+    then split_sequence const_lambda_list
     else
       match fail with
       | None -> do_tests_nofail value_kind loc tst arg const_lambda_list
@@ -2712,17 +2721,19 @@ let make_test_sequence value_kind loc fail tst lt_tst arg const_lambda_list =
 module SArg = struct
   type primitive = Lambda.primitive
 
-  let eqint = Pintcomp Ceq
+  let pintcomp cmp = Pscalar (Binary (Icmp (int, cmp)))
 
-  let neint = Pintcomp Cne
+  let eqint = pintcomp Ceq
 
-  let leint = Pintcomp Cle
+  let neint = pintcomp Cne
 
-  let ltint = Pintcomp Clt
+  let leint = pintcomp Cle
 
-  let geint = Pintcomp Cge
+  let ltint = pintcomp Clt
 
-  let gtint = Pintcomp Cgt
+  let geint = pintcomp Cge
+
+  let gtint = pintcomp Cgt
 
   type loc = Lambda.scoped_location
   type arg = Lambda.lambda
@@ -2736,7 +2747,7 @@ module SArg = struct
   let make_offset arg n =
     match n with
     | 0 -> arg
-    | _ -> Lprim (Poffsetint n, [ arg ], Loc_unknown)
+    | _ -> Lambda.add int arg (tagged_immediate n) ~loc:Loc_unknown
 
   let bind arg body =
     let newvar, newvar_duid, newarg =
@@ -2759,12 +2770,9 @@ module SArg = struct
   let make_isin h arg = Lprim (Pnot, [ make_isout h arg ], Loc_unknown)
 
   let make_is_nonzero arg =
-    if !Clflags.native_code then
-      Lprim (Pintcomp Cne,
-             [arg; Lconst (Const_base (Const_int 0))],
-             Loc_unknown)
-    else
-      arg
+    if !Clflags.native_code
+    then icmp Cne int arg (tagged_immediate 0) ~loc:Loc_unknown
+    else arg
 
   let arg_as_test arg = arg
 
@@ -3117,6 +3125,11 @@ let mk_failaction_pos partial seen ctx defs =
 let combine_constant value_kind loc arg cst partial ctx def
     (const_lambda_list, total, _pats) =
   let fail, local_jumps = mk_failaction_neg partial ctx def in
+  let make_scalar_test_sequence scalar =
+    make_test_sequence value_kind loc fail
+      scalar
+      arg const_lambda_list
+  in
   let lambda1 =
     match cst with
     | Const_int _ ->
@@ -3154,47 +3167,32 @@ let combine_constant value_kind loc arg cst partial ctx def
         let hs, sw, fail = share_actions_tree value_kind sw fail in
         hs (Lstringswitch (arg, sw, fail, loc, value_kind))
     | Const_float _ ->
-        make_test_sequence value_kind loc fail (Pfloatcomp (Boxed_float64, CFneq))
-          (Pfloatcomp (Boxed_float64, CFlt)) arg
-          const_lambda_list
+        make_scalar_test_sequence
+          (Scalar.floating (Value (Float64 Any_locality_mode)))
     | Const_float32 _ | Const_unboxed_float32 _ ->
         (* Should be caught in do_compile_matching. *)
         Misc.fatal_error "Found unexpected float32 literal pattern."
     | Const_unboxed_float _ ->
-        make_test_sequence value_kind loc fail
-          (Punboxed_float_comp (Unboxed_float64, CFneq))
-          (Punboxed_float_comp (Unboxed_float64, CFlt))
-          arg const_lambda_list
+        make_scalar_test_sequence
+          (Scalar.floating (Naked (Float64 Any_locality_mode)))
     | Const_int32 _ ->
-        make_test_sequence value_kind loc fail
-          (Pbintcomp (Boxed_int32, Cne))
-          (Pbintcomp (Boxed_int32, Clt))
-          arg const_lambda_list
+        make_scalar_test_sequence
+          (Scalar.integral (Value (Boxable (Int32 Any_locality_mode))))
     | Const_int64 _ ->
-        make_test_sequence value_kind loc fail
-          (Pbintcomp (Boxed_int64, Cne))
-          (Pbintcomp (Boxed_int64, Clt))
-          arg const_lambda_list
+        make_scalar_test_sequence
+          (Scalar.integral (Value (Boxable (Int64 Any_locality_mode))))
     | Const_nativeint _ ->
-        make_test_sequence value_kind loc fail
-          (Pbintcomp (Boxed_nativeint, Cne))
-          (Pbintcomp (Boxed_nativeint, Clt))
-          arg const_lambda_list
+        make_scalar_test_sequence
+          (Scalar.integral (Value (Boxable (Nativeint Any_locality_mode))))
     | Const_unboxed_int32 _ ->
-        make_test_sequence value_kind loc fail
-          (Punboxed_int_comp (Unboxed_int32, Cne))
-          (Punboxed_int_comp (Unboxed_int32, Clt))
-          arg const_lambda_list
+        make_scalar_test_sequence
+          (Scalar.integral (Naked (Boxable (Int32 Any_locality_mode))))
     | Const_unboxed_int64 _ ->
-        make_test_sequence value_kind loc fail
-          (Punboxed_int_comp (Unboxed_int64, Cne))
-          (Punboxed_int_comp (Unboxed_int64, Clt))
-          arg const_lambda_list
+        make_scalar_test_sequence
+          (Scalar.integral (Naked (Boxable (Int64 Any_locality_mode))))
     | Const_unboxed_nativeint _ ->
-        make_test_sequence value_kind loc fail
-          (Punboxed_int_comp (Unboxed_nativeint, Cne))
-          (Punboxed_int_comp (Unboxed_nativeint, Clt))
-          arg const_lambda_list
+        make_scalar_test_sequence
+          (Scalar.integral (Naked (Boxable (Nativeint Any_locality_mode))))
   in
   (lambda1, Jumps.union local_jumps total)
 
@@ -3289,7 +3287,7 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
                   (fun (path, act) rem ->
                     let ext = transl_extension_path loc pat_env path in
                     Lifthenelse
-                      (Lprim (Pintcomp Ceq, [ Lvar tag; ext ], loc), act, rem, value_kind))
+                      (phys_equal ~loc (Lvar tag) ext, act, rem, value_kind))
                   nonconsts default
               in
               let ubr = Translmode.transl_unique_barrier pat_barrier in
@@ -3302,7 +3300,7 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
         List.fold_right
           (fun (path, act) rem ->
             let ext = transl_extension_path loc pat_env path in
-            Lifthenelse (Lprim (Pintcomp Ceq, [ arg; ext ], loc), act, rem,
+            Lifthenelse (phys_equal ~loc arg ext, act, rem,
                          value_kind))
           consts nonconst_lambda
       in

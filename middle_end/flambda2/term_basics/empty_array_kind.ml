@@ -43,11 +43,8 @@ let of_element_kind t =
      arrays there. *)
   match (t : Flambda_kind.t) with
   | Value | Naked_number Naked_float -> Values_or_immediates_or_naked_floats
-  | Naked_number Naked_immediate ->
-    Misc.fatal_errorf
-      "Arrays cannot yet contain elements of kind naked immediate"
   | Naked_number Naked_float32 -> Naked_float32s
-  | Naked_number (Naked_int8 | Naked_int16) ->
+  | Naked_number (Naked_int8 | Naked_int16 | Naked_immediate) ->
     Misc.unboxed_small_int_arrays_are_not_implemented ()
   | Naked_number Naked_int32 -> Naked_int32s
   | Naked_number Naked_int64 -> Naked_int64s
@@ -65,11 +62,12 @@ let of_lambda array_kind =
   | Punboxedfloatarray Unboxed_float64 ->
     Values_or_immediates_or_naked_floats
   | Punboxedfloatarray Unboxed_float32 -> Naked_float32s
-  | Punboxedintarray (Unboxed_int8 | Unboxed_int16) ->
+  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
+    ->
     Misc.unboxed_small_int_arrays_are_not_implemented ()
-  | Punboxedintarray Unboxed_int32 -> Naked_int32s
-  | Punboxedintarray Unboxed_int64 -> Naked_int64s
-  | Punboxedintarray Unboxed_nativeint -> Naked_nativeints
+  | Punboxedoruntaggedintarray Unboxed_int32 -> Naked_int32s
+  | Punboxedoruntaggedintarray Unboxed_int64 -> Naked_int64s
+  | Punboxedoruntaggedintarray Unboxed_nativeint -> Naked_nativeints
   | Punboxedvectorarray Unboxed_vec128 -> Naked_vec128s
   | Punboxedvectorarray Unboxed_vec256 -> Naked_vec256s
   | Punboxedvectorarray Unboxed_vec512 -> Naked_vec512s

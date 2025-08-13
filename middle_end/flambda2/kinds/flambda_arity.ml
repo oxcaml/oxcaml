@@ -75,11 +75,13 @@ module Component_for_creation = struct
     | Pvalue vk -> Singleton (KS.from_lambda_value_kind vk)
     | Punboxed_float Unboxed_float64 -> Singleton KS.naked_float
     | Punboxed_float Unboxed_float32 -> Singleton KS.naked_float32
-    | Punboxed_int Unboxed_int8 -> Singleton KS.naked_int8
-    | Punboxed_int Unboxed_int16 -> Singleton KS.naked_int16
-    | Punboxed_int Unboxed_int32 -> Singleton KS.naked_int32
-    | Punboxed_int Unboxed_int64 -> Singleton KS.naked_int64
-    | Punboxed_int Unboxed_nativeint -> Singleton KS.naked_nativeint
+    | Punboxed_or_untagged_integer Untagged_int8 -> Singleton KS.naked_int8
+    | Punboxed_or_untagged_integer Untagged_int16 -> Singleton KS.naked_int16
+    | Punboxed_or_untagged_integer Unboxed_int32 -> Singleton KS.naked_int32
+    | Punboxed_or_untagged_integer Unboxed_int64 -> Singleton KS.naked_int64
+    | Punboxed_or_untagged_integer Untagged_int -> Singleton KS.naked_immediate
+    | Punboxed_or_untagged_integer Unboxed_nativeint ->
+      Singleton KS.naked_nativeint
     | Punboxed_vector Unboxed_vec128 -> Singleton KS.naked_vec128
     | Punboxed_vector Unboxed_vec256 -> Singleton KS.naked_vec256
     | Punboxed_vector Unboxed_vec512 -> Singleton KS.naked_vec512

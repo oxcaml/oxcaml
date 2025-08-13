@@ -27,10 +27,10 @@ type t_void  : void;;
 type t_void : void
 |}];;
 
-type t_any_non_null : any_non_null;;
+type t_any_mod_separable : any mod separable;;
 
 [%%expect{|
-type t_any_non_null : any_non_null
+type t_any_mod_separable : any mod separable
 |}]
 
 type t_value_or_null : value_or_null;;
@@ -609,7 +609,7 @@ type ('a : void) void4 = Void4 of 'a
 
 type ('a : any) any4 = Any4 of 'a
 [%%expect{|
-type 'a any4 = Any4 of 'a
+type ('a : value_or_null) any4 = Any4 of 'a
 |}];;
 
 (************************************************************)

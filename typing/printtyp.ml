@@ -1380,14 +1380,10 @@ let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
 (* CR layouts v2.8: This should use the annotation in the jkind, if there
    is one. But first that annotation needs to be in Typedtree, not in
    Parsetree. *)
-let out_jkind_option_of_jkind jkind =
+let out_jkind_option_of_jkind ~ignore_null jkind =
   let desc = Jkind.get jkind in
   let elide =
-    (* CR layouts: We ignore nullability here to avoid needlessly printing
-       ['a : value_or_null] when it's not relevant (most cases).
-       Unfortunately, this makes error messages really confusing, because
-       we don't consider jkind annotations. *)
-    Jkind.is_value_for_printing ~ignore_null:true jkind (* C2.1 *)
+    Jkind.is_value_for_printing ~ignore_null jkind (* C2.1 *)
     || (match desc.layout with
         | Sort (Var _) -> not !Clflags.verbose_types (* X1 *)
         | _ -> false)
@@ -1622,8 +1618,13 @@ let rec tree_of_typexp mode alloc_mode ty =
 (* this silently drops any arguments that are not generic Tvar or Tunivar *)
 and tree_of_qtvs qtvs =
   let tree_of_qtv v : (string * out_jkind option) option =
-    let tree jkind = Some (Names.name_of_type Names.new_name v,
-                            out_jkind_option_of_jkind jkind)
+    (* CR layouts: We ignore nullability here to avoid needlessly printing
+       ['a : value_or_null] when it's not relevant (most cases).
+       Unfortunately, this makes error messages really confusing, because
+       we don't consider jkind annotations. *)
+    let tree jkind =
+      Some (Names.name_of_type Names.new_name v,
+            out_jkind_option_of_jkind ~ignore_null:true jkind)
     in
     match v.desc with
     | Tvar { jkind } when v.level = generic_level -> tree jkind
@@ -1730,7 +1731,7 @@ let typexp mode ppf ty =
 
 (* Only used for printing a single modality in error message *)
 let modality ?(id = fun _ppf -> ()) ppf modality =
-  if Mode.Modality.is_id modality then id ppf
+  if Mode.Modality.Atom.is_id modality then id ppf
   else
     modality
     |> Typemode.untransl_modality
@@ -1832,18 +1833,23 @@ let extract_qtvs tyl =
 let param_jkind ty =
   match get_desc ty with
   | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
-     out_jkind_option_of_jkind jkind
+     out_jkind_option_of_jkind ~ignore_null:false jkind
   | _ -> None (* this is (C2.2) from Note [When to print jkind annotations] *)
 
 let tree_of_label l =
   let mut =
     match l.ld_mutable with
-    | Mutable m ->
+    | Mutable { mode; atomic } ->
+        let atomic =
+          match atomic with
+          | Atomic -> Atomic
+          | Nonatomic -> Nonatomic
+        in
         let mut =
           let open Value.Comonadic in
-          match equate m legacy with
-          | Ok () -> Om_mutable None
-          | Error _ -> Om_mutable (Some "<non-legacy>")
+          match equate mode legacy with
+          | Ok () -> Om_mutable (None, atomic)
+          | Error _ -> Om_mutable (Some "<non-legacy>", atomic)
         in
         mut
     | Immutable -> Om_immutable

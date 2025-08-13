@@ -20,12 +20,13 @@ open Parsetree
 
 module String = Misc.Stdlib.String
 
-type unboxed_integer =
+type unboxed_or_untagged_integer =
   | Unboxed_int64
   | Unboxed_nativeint
   | Unboxed_int32
-  | Unboxed_int16
-  | Unboxed_int8
+  | Untagged_int16
+  | Untagged_int8
+  | Untagged_int
 
 type unboxed_float = Unboxed_float64 | Unboxed_float32
 type unboxed_vector = Unboxed_vec128 | Unboxed_vec256 | Unboxed_vec512
@@ -39,8 +40,7 @@ type native_repr =
   | Same_as_ocaml_repr of Jkind_types.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
-  | Unboxed_integer of unboxed_integer
-  | Untagged_immediate
+  | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
 type coeffects = No_coeffects | Has_coeffects
@@ -85,8 +85,7 @@ let check_ocaml_value = function
   | _, Repr_poly -> Bad_layout
   | _, Unboxed_float _
   | _, Unboxed_vector _
-  | _, Unboxed_integer _
-  | _, Untagged_immediate -> Bad_attribute
+  | _, Unboxed_or_untagged_integer _ -> Bad_attribute
 
 let is_builtin_prim_name name = String.length name > 0 && name.[0] = '%'
 
@@ -258,10 +257,13 @@ let print p osig_val_decl =
   let is_unboxed = function
     | _, Same_as_ocaml_repr (Base Value)
     | _, Repr_poly
-    | _, Untagged_immediate -> false
+    | _, Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
+                                    | Untagged_int16) -> false
     | _, Unboxed_float _
     | _, Unboxed_vector _
-    | _, Unboxed_integer _ -> true
+    | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
+                                    | Unboxed_nativeint) ->
+      true
     | _, Same_as_ocaml_repr _ ->
       (* We require [@unboxed] for non-value types in upstream-compatible code,
          but treat it as optional otherwise. We thus print the [@unboxed]
@@ -270,11 +272,14 @@ let print p osig_val_decl =
       Language_extension.erasable_extensions_only ()
   in
   let is_untagged = function
-    | _, Untagged_immediate -> true
+    | _, Unboxed_or_untagged_integer (Untagged_int8 | Untagged_int16) ->
+      Language_extension.erasable_extensions_only ()
+    | _, Unboxed_or_untagged_integer (Untagged_int) -> true
     | _, Same_as_ocaml_repr _
     | _, Unboxed_float _
     | _, Unboxed_vector _
-    | _, Unboxed_integer _
+    | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
+                                    | Unboxed_nativeint)
     | _, Repr_poly -> false
   in
   let all_unboxed = for_all is_unboxed in
@@ -314,12 +319,16 @@ let print p osig_val_decl =
      | Repr_poly -> []
      | Unboxed_float _
      | Unboxed_vector _
-     | Unboxed_integer _ -> if all_unboxed then [] else [oattr_unboxed]
-     | Untagged_immediate -> if all_untagged then [] else [oattr_untagged]
+     | Unboxed_or_untagged_integer (Unboxed_int32 | Unboxed_int64
+                                   | Unboxed_nativeint) ->
+       if all_unboxed then [] else [oattr_unboxed]
+     | Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
+                                   | Untagged_int16) ->
+       if all_untagged then [] else [oattr_untagged]
      | Same_as_ocaml_repr _->
-      if all_unboxed || not (is_unboxed (m, repr))
-      then []
-      else [oattr_unboxed])
+       if all_unboxed || not (is_unboxed (m, repr))
+       then []
+       else [oattr_unboxed])
   in
   let type_attrs =
     List.map attrs_of_mode_and_repr p.prim_native_repr_args @
@@ -338,7 +347,7 @@ let native_name p =
 let byte_name p =
   p.prim_name
 
-let unboxed_integer = function
+let unboxed_or_untagged_integer = function
   | Boxed_int32 -> Unboxed_int32
   | Boxed_nativeint -> Unboxed_nativeint
   | Boxed_int64 -> Unboxed_int64
@@ -355,10 +364,9 @@ let unboxed_vector = function
 (* Since these are just constant constructors, we can just use polymorphic equality and
    comparison at no performance loss. We still match on the variants to prove here that
    they are all constant constructors. *)
-let equal_unboxed_integer
-      ((Unboxed_int8 | Unboxed_int16 | Unboxed_int32 | Unboxed_nativeint
-       | Unboxed_int64) as i1) i2
-  =
+let equal_unboxed_or_untagged_integer
+      ((Unboxed_int64 | Unboxed_nativeint | Unboxed_int32 | Untagged_int16
+        | Untagged_int8 | Untagged_int) as i1) i2 =
   i1 = i2
 let equal_unboxed_float
       ((Unboxed_float32 | Unboxed_float64) as f1) f2 = f1 = f2
@@ -371,7 +379,8 @@ let compare_unboxed_vector
       Stdlib.compare v1 v2
 
 let equal_boxed_integer bi1 bi2 =
-  equal_unboxed_integer (unboxed_integer bi1) (unboxed_integer bi2)
+  equal_unboxed_or_untagged_integer (unboxed_or_untagged_integer bi1)
+    (unboxed_or_untagged_integer bi2)
 let equal_boxed_float bf1 bf2 =
   equal_unboxed_float (unboxed_float bf1) (unboxed_float bf2)
 let equal_boxed_vector bv1 bv2 =
@@ -393,32 +402,29 @@ let equal_unboxed_vector_size v1 v2 =
 let equal_native_repr nr1 nr2 =
   match nr1, nr2 with
   | Repr_poly, Repr_poly -> true
-  | Repr_poly, (Unboxed_float _ | Unboxed_integer _
-               | Untagged_immediate | Unboxed_vector _ | Same_as_ocaml_repr _)
-  | (Unboxed_float _ | Unboxed_integer _
-    | Untagged_immediate | Unboxed_vector _ | Same_as_ocaml_repr _), Repr_poly
+  | Repr_poly, (Unboxed_float _ | Unboxed_or_untagged_integer _
+               | Unboxed_vector _ | Same_as_ocaml_repr _)
+  | (Unboxed_float _ | Unboxed_or_untagged_integer _
+    | Unboxed_vector _ | Same_as_ocaml_repr _), Repr_poly
     -> false
   | Same_as_ocaml_repr s1, Same_as_ocaml_repr s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Same_as_ocaml_repr _,
-    (Unboxed_float _ | Unboxed_integer _ | Untagged_immediate |
+    (Unboxed_float _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _) -> false
   | Unboxed_float f1, Unboxed_float f2 -> equal_boxed_float f1 f2
   | Unboxed_float _,
-    (Same_as_ocaml_repr _ | Unboxed_integer _ | Untagged_immediate |
+    (Same_as_ocaml_repr _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _) -> false
   | Unboxed_vector vi1, Unboxed_vector vi2 ->
     equal_unboxed_vector_size (unboxed_vector vi1) (unboxed_vector vi2)
   | Unboxed_vector _,
-    (Same_as_ocaml_repr _ | Unboxed_float _ | Untagged_immediate |
-     Unboxed_integer _) -> false
-  | Unboxed_integer bi1, Unboxed_integer bi2 -> equal_unboxed_integer bi1 bi2
-  | Unboxed_integer _,
-    (Same_as_ocaml_repr _ | Unboxed_float _ | Untagged_immediate |
-     Unboxed_vector _) -> false
-  | Untagged_immediate, Untagged_immediate -> true
-  | Untagged_immediate,
-    (Same_as_ocaml_repr _ | Unboxed_float _ | Unboxed_integer _ |
+    (Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_or_untagged_integer _) -> false
+  | Unboxed_or_untagged_integer bi1, Unboxed_or_untagged_integer bi2 ->
+    equal_unboxed_or_untagged_integer bi1 bi2
+  | Unboxed_or_untagged_integer _,
+    (Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _) -> false
 
 let equal_effects ef1 ef2 =
@@ -458,8 +464,7 @@ module Repr_check = struct
 
   let value_or_unboxed_or_untagged = function
     | Same_as_ocaml_repr (Base Value)
-    | Unboxed_float _ | Unboxed_integer _ | Unboxed_vector _
-    | Untagged_immediate -> true
+    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _ -> true
     | Same_as_ocaml_repr _ | Repr_poly -> false
 
   let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
@@ -474,13 +479,13 @@ module Repr_check = struct
   let valid_c_stub_arg = function
     | Same_as_ocaml_repr s ->
       not (sort_is_product s) && not (sort_contains_void s)
-    | Unboxed_float _ | Unboxed_integer _ | Unboxed_vector _
-    | Untagged_immediate | Repr_poly -> true
+    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
+    | Repr_poly -> true
 
   let valid_c_stub_return = function
     | Same_as_ocaml_repr (Base _)
-    | Unboxed_float _ | Unboxed_integer _ | Unboxed_vector _
-    | Untagged_immediate | Repr_poly -> true
+    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
+    | Repr_poly -> true
     | Same_as_ocaml_repr (Product [s1; s2] as s) ->
       not (sort_contains_void s) &&
       not (sort_is_product s1) &&
@@ -797,6 +802,25 @@ let prim_has_valid_reprs ~loc prim =
     | "%peek" | "%poke" ->
       (* Arities and layouts of these primitives are checked in [Translprim] *)
       fun _ -> Success
+    | "%unsafe_get_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits64);
+        any
+      ]
+    | "%unsafe_get_idx_imm" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits64);
+        any
+      ]
+    | "%unsafe_set_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits64);
+        any;
+        is (Same_as_ocaml_repr C.value);
+      ]
     | "%box_float" ->
       exactly [Same_as_ocaml_repr C.float64; Same_as_ocaml_repr C.value]
     | "%unbox_float" ->
@@ -809,6 +833,12 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.word; Same_as_ocaml_repr C.value]
     | "%unbox_nativeint" ->
       exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.word]
+    | "%tag_int" ->
+      exactly
+        [Same_as_ocaml_repr C.untagged_immediate; Same_as_ocaml_repr C.value]
+    | "%untag_int" ->
+      exactly
+        [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.untagged_immediate]
     | "%tag_int8" ->
       exactly [Same_as_ocaml_repr C.bits8; Same_as_ocaml_repr C.value]
     | "%untag_int8" ->
@@ -852,9 +882,16 @@ let prim_has_valid_reprs ~loc prim =
             match String.Map.find_opt name vector_array_indexing_primitives with
             | Some reprs -> exactly reprs
             | None ->
+              let module I = Scalar.Operation in
+              match I.With_percent_prefix.of_string name with
+              | intrinsic ->
+                exactly
+                  (List.map (fun sort -> Same_as_ocaml_repr sort)
+                     (I.sort intrinsic))
+              | exception Not_found ->
                 if is_builtin_prim_name name then no_non_value_repr
-                  (* These can probably support non-value reprs if the need
-                     arises:
+                  (* These can probably support non-value reprs if the
+                     need arises:
                      {|
                        | "%send"
                        | "%sendself"

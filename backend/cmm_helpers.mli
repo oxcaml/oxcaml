@@ -40,6 +40,8 @@ end
 
 val arch_bits : int
 
+val log2_size_addr : int
+
 type arity =
   { function_kind : Lambda.function_kind;
     params_layout : Lambda.layout list;
@@ -148,6 +150,9 @@ val mk_compare_ints : Debuginfo.t -> expression -> expression -> expression
 val mk_compare_floats : Debuginfo.t -> expression -> expression -> expression
 
 val mk_compare_ints_untagged :
+  Debuginfo.t -> expression -> expression -> expression
+
+val mk_unsigned_compare_ints_untagged :
   Debuginfo.t -> expression -> expression -> expression
 
 val mk_compare_floats_untagged :
@@ -453,7 +458,10 @@ val unbox_int :
 
 (** Used to prepare 32-bit integers on 64-bit platforms for a lsr operation *)
 val make_unsigned_int :
-  Primitive.unboxed_integer -> expression -> Debuginfo.t -> expression
+  Primitive.unboxed_or_untagged_integer ->
+  expression ->
+  Debuginfo.t ->
+  expression
 
 val unaligned_load_16 :
   ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
@@ -583,7 +591,7 @@ val negint : unary_primitive
 val addr_array_length : unary_primitive
 
 (** Byte swap primitive Operates on Cmm integers (unboxed values) *)
-val bbswap : Primitive.unboxed_integer -> unary_primitive
+val bbswap : bswap_bitwidth -> unary_primitive
 
 type binary_primitive = expression -> expression -> Debuginfo.t -> expression
 
@@ -963,6 +971,11 @@ val store :
   addr:expression ->
   new_value:expression ->
   expression
+
+val caml_modify : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val caml_modify_local :
+  dbg:Debuginfo.t -> expression -> expression -> expression -> expression
 
 (** [direct_call ty f_code args] creates a direct call to the function code
     [f_code] with arguments [args], with a return value of type [ty].

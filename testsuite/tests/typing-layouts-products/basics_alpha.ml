@@ -24,7 +24,7 @@ type t1 : any mod non_null separable
 type t2 : value
 type t3 : any mod non_null separable = #(t1 * t2);;
 [%%expect{|
-type t1 : any_non_null
+type t1 : any mod non_null separable
 type t2
 type t3 = #(t1 * t2)
 |}]
@@ -33,7 +33,7 @@ type t1 : any mod non_null separable
 type t2 : value
 type t3 : any & value mod non_null separable = #(t1 * t2);;
 [%%expect{|
-type t1 : any_non_null
+type t1 : any mod non_null separable
 type t2
 type t3 = #(t1 * t2)
 |}]
@@ -42,7 +42,7 @@ type t1 : any mod non_null separable
 type t2 : value
 type t3 : (any mod non_null separable) & (value mod non_null separable) = #(t1 * t2);;
 [%%expect{|
-type t1 : any_non_null
+type t1 : any mod non_null separable
 type t2
 type t3 = #(t1 * t2)
 |}]
@@ -52,7 +52,7 @@ type t2 : any mod non_null separable
 type t3 : any & (any mod non_null separable) = #(t1 * t2);;
 [%%expect{|
 type t1 : any
-type t2 : any_non_null
+type t2 : any mod non_null separable
 type t3 = #(t1 * t2)
 |}]
 
@@ -62,7 +62,7 @@ type t2 : any mod non_null separable
 type t3 : any mod non_null separable = #(t1 * t2);;
 [%%expect{|
 type t1 : any
-type t2 : any_non_null
+type t2 : any mod non_null separable
 type t3 = #(t1 * t2)
 |}]
 
@@ -71,7 +71,7 @@ type t2 : any mod non_null separable
 type t3 : any & any mod non_null separable = #(t1 * t2);;
 [%%expect{|
 type t1 : any
-type t2 : any_non_null
+type t2 : any mod non_null separable
 type t3 = #(t1 * t2)
 |}]
 
@@ -80,6 +80,6 @@ type t2 : any mod non_null separable
 type t3 : (any mod non_null separable) & (any mod non_null separable) = #(t1 * t2);;
 [%%expect{|
 type t1 : any
-type t2 : any_non_null
+type t2 : any mod non_null separable
 type t3 = #(t1 * t2)
 |}]

@@ -33,6 +33,10 @@ type error =
   | Linking_error of int
   | Multiple_definition of CU.Name.t * filepath * filepath
   | Missing_cmx of filepath * CU.t
+  | Dwarf_fission_objcopy_on_macos
+  | Dwarf_fission_dsymutil_not_macos
+  | Dsymutil_error of int
+  | Objcopy_error of int
 
 exception Error of error
 
@@ -522,9 +526,71 @@ let call_linker file_list_rev startup_file output_name =
     else if !Clflags.output_c_object then Ccomp.Partial
     else Ccomp.Exe
   in
-  let exitcode = Ccomp.call_linker mode output_name files c_lib in
+  (* Determine if we need to use a temporary file for objcopy workflow *)
+  let needs_objcopy_workflow =
+    !Clflags.dwarf_fission = Clflags.Fission_objcopy &&
+    not (Target_system.is_macos ()) &&
+    mode = Ccomp.Exe &&
+    not !Dwarf_flags.restrict_to_upstream_dwarf
+  in
+  let link_output_name =
+    if needs_objcopy_workflow then
+      Filename.temp_file (Filename.basename output_name) ".tmp"
+    else
+      output_name
+  in
+  let exitcode = Ccomp.call_linker mode link_output_name files c_lib in
   if not (exitcode = 0)
-  then raise(Error(Linking_error exitcode))
+  then begin
+    if needs_objcopy_workflow then Misc.remove_file link_output_name;
+    raise(Error(Linking_error exitcode))
+  end
+  else begin
+    (* Handle DWARF fission if requested and linking succeeded *)
+    match !Clflags.dwarf_fission with
+    | Fission_none -> ()
+    | Fission_objcopy ->
+      if Target_system.is_macos () then
+        raise (Error(Dwarf_fission_objcopy_on_macos))
+      else if needs_objcopy_workflow then
+        (* Run objcopy to extract debug info into .debug file *)
+        let debug_file = output_name ^ ".debug" in
+        let compression_flag = 
+          match Dwarf_flags.get_dwarf_objcopy_compression_format () with
+          | Some compression -> 
+            Printf.sprintf " %s=%s" 
+              Config.objcopy_compress_debug_sections_flag compression
+          | None -> ""
+        in
+        let objcopy_cmd = 
+          Printf.sprintf 
+            "objcopy --enable-deterministic-archives \
+             --only-keep-debug%s %s %s && \
+             objcopy --enable-deterministic-archives \
+             --strip-debug --add-gnu-debuglink=%s %s %s"
+            compression_flag
+            (Filename.quote link_output_name)
+            (Filename.quote debug_file)
+            (Filename.quote debug_file)
+            (Filename.quote link_output_name)
+            (Filename.quote output_name)
+        in
+        let objcopy_exit = Ccomp.command objcopy_cmd in
+        Misc.remove_file link_output_name;
+        if objcopy_exit <> 0 then
+          raise (Error(Objcopy_error objcopy_exit))
+    | Fission_dsymutil ->
+      if not (Target_system.is_macos ()) then
+        raise (Error(Dwarf_fission_dsymutil_not_macos))
+      else if mode = Ccomp.Exe && 
+              not !Dwarf_flags.restrict_to_upstream_dwarf then
+        (* Run dsymutil on the executable *)
+        let dsymutil_cmd = 
+          Printf.sprintf "dsymutil %s" (Filename.quote output_name) in
+        let dsymutil_exit = Ccomp.command dsymutil_cmd in
+        if dsymutil_exit <> 0 then
+          raise (Error(Dsymutil_error dsymutil_exit))
+  end
 
 let reset () =
   Cmi_consistbl.clear crc_interfaces;
@@ -655,6 +721,17 @@ let report_error ppf = function
         CU.print name
         Location.print_filename filename
         CU.print name
+  | Dwarf_fission_objcopy_on_macos ->
+      fprintf ppf
+        "Error: -gdwarf-fission=objcopy is not supported on macOS systems.@ \
+         Please use -gdwarf-fission=dsymutil instead."
+  | Dwarf_fission_dsymutil_not_macos ->
+      fprintf ppf
+        "Error: -gdwarf-fission=dsymutil is only supported on macOS systems."
+  | Dsymutil_error exitcode ->
+      fprintf ppf "Error running dsymutil (exit code %d)" exitcode
+  | Objcopy_error exitcode ->
+      fprintf ppf "Error running objcopy (exit code %d)" exitcode
 
 let () =
   Location.register_error_of_exn

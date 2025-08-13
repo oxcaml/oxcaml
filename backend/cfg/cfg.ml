@@ -322,7 +322,7 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
   | Int_test { lt; eq; gt; is_signed; imm } ->
     let cmp =
       Printf.sprintf " %s%s"
-        (if is_signed then "s" else "u")
+        (match is_signed with Signed -> "s" | Unsigned -> "u")
         (match imm with None -> second_arg | Some i -> " " ^ Int.to_string i)
     in
     fprintf ppf "if%s <%s goto %a%s" first_arg cmp Label.format lt sep;
@@ -555,6 +555,22 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ls_order;
     available_before;
     available_across
+  }
+
+let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
+    ?(res = [||]) ?(irc_work_list = Unknown_list) ?(ls_order = -1) () =
+  { desc;
+    arg;
+    res;
+    dbg = copy.dbg;
+    fdo = copy.fdo;
+    live = copy.live;
+    stack_offset = copy.stack_offset;
+    id;
+    irc_work_list;
+    ls_order;
+    available_before = copy.available_before;
+    available_across = copy.available_across
   }
 
 let invalid_stack_offset = -1

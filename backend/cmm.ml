@@ -162,21 +162,25 @@ let equal_stack_align left right =
   | Align_16, Align_16 | Align_32, Align_32 | Align_64, Align_64 -> true
   | (Align_16 | Align_32 | Align_64), _ -> false
 
-type integer_comparison = Lambda.integer_comparison =
+type integer_comparison = Scalar.Integer_comparison.t =
   | Ceq
   | Cne
   | Clt
   | Cgt
   | Cle
   | Cge
+  | Cult
+  | Cugt
+  | Cule
+  | Cuge
 
-let negate_integer_comparison = Lambda.negate_integer_comparison
+let negate_integer_comparison = Scalar.Integer_comparison.negate
 
-let swap_integer_comparison = Lambda.swap_integer_comparison
+let swap_integer_comparison = Scalar.Integer_comparison.swap
 
 (* With floats [not (x < y)] is not the same as [x >= y] due to NaNs, so we
    provide additional comparisons to represent the negations.*)
-type float_comparison = Lambda.float_comparison =
+type float_comparison = Scalar.Float_comparison.t =
   | CFeq
   | CFneq
   | CFlt
@@ -188,9 +192,9 @@ type float_comparison = Lambda.float_comparison =
   | CFge
   | CFnge
 
-let negate_float_comparison = Lambda.negate_float_comparison
+let negate_float_comparison = Scalar.Float_comparison.negate
 
-let swap_float_comparison = Lambda.swap_float_comparison
+let swap_float_comparison = Scalar.Float_comparison.swap
 
 type label = Label.t
 
@@ -442,7 +446,6 @@ type operation =
   | Ccmpi of integer_comparison
   | Caddv
   | Cadda
-  | Ccmpa of integer_comparison
   | Cnegf of float_width
   | Cabsf of float_width
   | Caddf of float_width
@@ -634,8 +637,8 @@ let iter_shallow_tail f = function
         | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
-        | Catomic _ | Ccmpi _ | Ccmpa _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
-        | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+        | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
+        | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
         | Ccmpf (_, _)
         | Cprobe _ | Cprobe_is_enabled _
         | Ctuple_field (_, _) ),
@@ -668,8 +671,8 @@ let map_shallow_tail f = function
           | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
-          | Catomic _ | Ccmpi _ | Ccmpa _ | Cnegf _ | Cabsf _ | Caddf _
-          | Csubf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+          | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
+          | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
           | Ccmpf (_, _)
           | Cprobe _ | Cprobe_is_enabled _
           | Ctuple_field (_, _) ),
@@ -987,21 +990,7 @@ let equal_memory_chunk left right =
       | Fivetwelve_aligned ) ) ->
     false
 
-let equal_integer_comparison left right =
-  match left, right with
-  | Ceq, Ceq -> true
-  | Cne, Cne -> true
-  | Clt, Clt -> true
-  | Cgt, Cgt -> true
-  | Cle, Cle -> true
-  | Cge, Cge -> true
-  | Ceq, (Cne | Clt | Cgt | Cle | Cge)
-  | Cne, (Ceq | Clt | Cgt | Cle | Cge)
-  | Clt, (Ceq | Cne | Cgt | Cle | Cge)
-  | Cgt, (Ceq | Cne | Clt | Cle | Cge)
-  | Cle, (Ceq | Cne | Clt | Cgt | Cge)
-  | Cge, (Ceq | Cne | Clt | Cgt | Cle) ->
-    false
+let equal_integer_comparison = Scalar.Integer_comparison.equal
 
 let caml_flambda2_invalid = "caml_flambda2_invalid"
 

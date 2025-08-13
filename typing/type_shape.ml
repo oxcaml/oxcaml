@@ -113,7 +113,7 @@ module Type_shape = struct
         | None -> (
           match uid_of_path path with
           | Some uid ->
-            Ts_constr
+            Shape.Ts_constr
               ((uid, path, Layout_to_be_determined), of_expr_list constrs)
           | None -> Ts_other Layout_to_be_determined))
       | Ttuple exprs -> Ts_tuple (of_expr_list (List.map snd exprs))
@@ -123,9 +123,9 @@ module Type_shape = struct
            This code used to only work for [_type_vars = []]. *)
         of_type_expr_go ~depth ~visited type_expr uid_of_path
       | Tunboxed_tuple exprs ->
-        Ts_unboxed_tuple (of_expr_list (List.map snd exprs))
+        Shape.Ts_unboxed_tuple (of_expr_list (List.map snd exprs))
       | Tobject _ | Tnil | Tfield _ ->
-        Ts_other Layout_to_be_determined
+        Shape.Ts_other Layout_to_be_determined
         (* Objects are currently not supported in the debugger. *)
       | Tlink _ | Tsubst _ ->
         Misc.fatal_error "linking and substitution should not reach this stage."
@@ -147,15 +147,15 @@ module Type_shape = struct
                 [{ pv_constr_name = name; pv_constr_args = of_expr_list args }])
             row_fields
         in
-        Ts_variant row_fields
+        Shape.Ts_variant row_fields
       | Tarrow (_, arg, ret, _) ->
-        Ts_arrow
+        Shape.Ts_arrow
           ( of_type_expr_go ~depth ~visited arg uid_of_path,
             of_type_expr_go ~depth ~visited ret uid_of_path )
       | Tunivar { name; _ } -> Ts_var (name, Layout_to_be_determined)
       | Tof_kind _ -> Ts_other Layout_to_be_determined
       | Tpackage _ ->
-        Ts_other
+        Shape.Ts_other
           Layout_to_be_determined (* CR sspies: Support first-class modules. *)
 
   let of_type_expr (expr : Types.type_expr) uid_of_path =
@@ -163,9 +163,7 @@ module Type_shape = struct
 end
 
 module Type_decl_shape = struct
-  let rec mixed_block_shape_to_layout =
-    let open Jkind_types.Sort in
-    function
+  let rec mixed_block_shape_to_layout = function
     | Types.Value -> Layout.Base Value
     | Types.Float_boxed ->
       Layout.Base Float64
@@ -173,14 +171,15 @@ module Type_decl_shape = struct
          contrary to the name.*)
     | Types.Float64 -> Layout.Base Float64
     | Types.Float32 -> Layout.Base Float32
+    | Types.Bits8 -> Layout.Base Bits8
+    | Types.Bits16 -> Layout.Base Bits16
     | Types.Bits32 -> Layout.Base Bits32
+    | Types.Untagged_immediate -> Layout.Base Untagged_immediate
     | Types.Bits64 -> Layout.Base Bits64
     | Types.Vec128 -> Layout.Base Vec128
     | Types.Vec256 -> Layout.Base Vec256
     | Types.Vec512 -> Layout.Base Vec512
     | Types.Word -> Layout.Base Word
-    | Types.Bits8 -> Layout.Base Bits8
-    | Types.Bits16 -> Layout.Base Bits16
     | Types.Void -> Layout.Base Void
     | Types.Product args ->
       Layout.Product
@@ -359,7 +358,8 @@ end
 
 type shape_with_layout =
   { type_shape : Shape.without_layout Shape.ts;
-    type_layout : Layout.t
+    type_layout : Layout.t;
+    type_name : string
   }
 
 let (all_type_decls : Shape.tds Uid.Tbl.t) = Uid.Tbl.create 16
@@ -372,9 +372,10 @@ let add_to_type_decls path (type_decl : Types.type_declaration) uid_of_path =
   in
   Uid.Tbl.add all_type_decls type_decl.type_uid type_decl_shape
 
-let add_to_type_shapes var_uid type_expr type_layout uid_of_path =
+let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
+    =
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
-  Uid.Tbl.add all_type_shapes var_uid { type_shape; type_layout }
+  Uid.Tbl.add all_type_shapes var_uid { type_shape; type_name; type_layout }
 
 let find_in_type_decls (type_uid : Uid.t) =
   Uid.Tbl.find_opt all_type_decls type_uid
@@ -406,74 +407,6 @@ and estimate_layout_from_type_decl_shape (tds : Shape.tds) : Layout.t option =
   | Tds_alias t -> estimate_layout_from_type_shape t
   | Tds_other -> None
 
-let tuple_to_string (strings : string list) =
-  match strings with
-  | [] -> ""
-  | hd :: [] -> hd
-  | _ :: _ :: _ -> "(" ^ String.concat " * " strings ^ ")"
-
-let unboxed_tuple_to_string (strings : string list) =
-  match strings with
-  | [] -> ""
-  | hd :: [] -> hd
-  | _ :: _ :: _ -> "(" ^ String.concat " & " strings ^ ")"
-
-let type_arg_list_to_string (strings : string list) =
-  match strings with
-  | [] -> ""
-  | hd :: [] -> hd ^ " "
-  | _ :: _ :: _ -> "(" ^ String.concat ", " strings ^ ") "
-
-let rec type_name : 'a. 'a Shape.ts -> _ =
- fun type_shape ->
-  match type_shape with
-  | Ts_predef (predef, shapes) ->
-    type_arg_list_to_string (List.map type_name shapes)
-    ^ Shape.Predef.to_string predef
-  | Ts_other _ -> "unknown"
-  | Ts_tuple shapes -> tuple_to_string (List.map type_name shapes)
-  | Ts_unboxed_tuple shapes ->
-    unboxed_tuple_to_string (List.map type_name shapes)
-  | Ts_var (name, _) -> "'" ^ Option.value name ~default:"?"
-  | Ts_arrow (shape1, shape2) ->
-    let arg_name = type_name shape1 in
-    let ret_name = type_name shape2 in
-    arg_name ^ " -> " ^ ret_name
-  | Ts_variant fields ->
-    let field_constructors =
-      List.map
-        (fun { Shape.pv_constr_name; pv_constr_args } ->
-          let arg_types = List.map (fun sh -> type_name sh) pv_constr_args in
-          let arg_type_string = String.concat " ∩ " arg_types in
-          (* CR sspies: Currently, our LLDB fork removes ampersands, because
-             it's elsewhere used for printing references. Would be great to fix
-             this in the future. For now we use an intersection. *)
-          let arg_type_string =
-            if List.length pv_constr_args = 0
-            then ""
-            else " of " ^ arg_type_string
-          in
-          "`" ^ pv_constr_name ^ arg_type_string)
-        fields
-    in
-    (* CR sspies: This type is imprecise. The polymorpic variant could
-       potentially have fewer/more constructors. However, there is no need to
-       fix this in this PR, because in a subsequent PR, this code will be
-       replaced by simply remembering the names of types alongside their shape,
-       making the type reconstruction here obsolete. *)
-    Format.asprintf "[ %s ]" (String.concat " | " field_constructors)
-  | Ts_constr ((type_uid, _type_path, _), shapes) -> (
-    match[@warning "-fragile-match"] find_in_type_decls type_uid with
-    | None -> "unknown"
-    | Some { definition = Tds_other; _ } -> "unknown"
-    | Some type_decl_shape ->
-      (* We have found type instantiation shapes [shapes] and a typing
-         declaration shape [type_decl_shape]. *)
-      let type_decl_shape = Shape.replace_tvar type_decl_shape shapes in
-      let args = type_arg_list_to_string (List.map type_name shapes) in
-      let name = Path.name type_decl_shape.path in
-      args ^ name)
-
 let print_table_all_type_decls ppf =
   let entries = Uid.Tbl.to_list all_type_decls in
   let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
@@ -492,15 +425,17 @@ let print_table_all_type_shapes ppf =
   let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
   let entries =
     List.map
-      (fun (k, { type_shape; type_layout }) ->
+      (fun (k, { type_shape; type_name; type_layout }) ->
         ( Format.asprintf "%a" Uid.print k,
-          ( Format.asprintf "%a" Shape.print_type_shape type_shape,
-            Format.asprintf "%a" Layout.format type_layout ) ))
+          ( type_name,
+            ( Format.asprintf "%a" Shape.print_type_shape type_shape,
+              Format.asprintf "%a" Layout.format type_layout ) ) ))
       entries
   in
   let uids, rest = List.split entries in
+  let names, rest = List.split rest in
   let types, sorts = List.split rest in
-  Misc.pp_table ppf ["UID", uids; "Type", types; "Sort", sorts]
+  Misc.pp_table ppf ["UID", uids; "Type", names; "Shape", types; "Sort", sorts]
 
 (* Print debug uid tables when the command line flag [-ddebug-uids] is set. *)
 let print_debug_uid_tables ppf =

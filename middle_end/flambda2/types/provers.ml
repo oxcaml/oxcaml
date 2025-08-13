@@ -551,6 +551,8 @@ let prove_is_a_boxed_or_tagged_number_value _env
     Proved (Boxed (alloc_mode, Naked_vec512, contents_ty))
   | Mutable_block _ | Closures _ | String _ | Array _ -> Unknown
 
+let prove_nothing _env _ : _ proof_of_property = Unknown
+
 let prove_is_a_boxed_or_tagged_number env t =
   gen_value_to_proof prove_is_a_boxed_or_tagged_number_value env t
 

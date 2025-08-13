@@ -24,6 +24,9 @@ module type Sort = sig
   type base =
     | Void  (** No run time representation at all *)
     | Value  (** Standard ocaml value representation *)
+    | Untagged_immediate
+        (** Untagged 31- or 63-bit immediates, but without the tag bit, so they must
+        never be visible to the GC *)
     | Float64  (** Unboxed 64-bit floats *)
     | Float32  (** Unboxed 32-bit floats *)
     | Word  (** Unboxed native-size integers *)
@@ -58,6 +61,8 @@ module type Sort = sig
     val float32 : t
 
     val word : t
+
+    val untagged_immediate : t
 
     val bits8 : t
 
@@ -124,6 +129,8 @@ module type Sort = sig
     val for_predef_value : t (* Predefined value types, e.g. int and string *)
 
     val for_tuple : t
+
+    val for_idx : t
   end
 
   module Var : sig
@@ -224,16 +231,15 @@ module History = struct
     | Peek_or_poke
     | Mutable_var_assignment
     | Old_style_unboxed_type
+    | Array_element
+    | Idx_element
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
-  (* CR layouts v3: after implementing separability, [Array_element]
-     should instead accept representable separable jkinds. *)
   type concrete_legacy_creation_reason =
     | Unannotated_type_parameter of Path.t
     | Wildcard
     | Unification_var
-    | Array_element
 
   open Allowance
 
@@ -305,6 +311,7 @@ module History = struct
     | Univar
     | Default_type_jkind
     | Existential_type_variable
+    | Idx_base
     | Array_comprehension_element
     | List_comprehension_iterator_element
     | Array_comprehension_iterator_element
@@ -339,6 +346,11 @@ module History = struct
     | Wildcard
     | Unification_var
     | Array_type_argument
+    | Type_argument of
+        { parent_path : Path.t;
+          position : int;
+          arity : int
+        }
 
   type product_creation_reason =
     | Unboxed_tuple

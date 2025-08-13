@@ -7,7 +7,7 @@ type ('a : value_or_null) id_value_or_null = 'a
 
 [%%expect{|
 type t_value_or_null : value_or_null
-type 'a id_value_or_null = 'a
+type ('a : value_or_null) id_value_or_null = 'a
 |}]
 
 (* Type parameters default to [value] and need
@@ -81,11 +81,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t = 'a X.t end
        is not included in
-         sig type 'a t end
+         sig type ('a : value_or_null) t end
        Type declarations do not match:
          type 'a t = 'a X.t
        is not included in
-         type 'a t
+         type ('a : value_or_null) t
        The problem is in the kinds of a parameter:
        The kind of 'a is value_or_null
          because of the definition of t at line 1, characters 39-66.
@@ -303,7 +303,7 @@ type (!'a : value_or_null) dummy
 type t = Packed : 'a dummy -> t
 
 [%%expect{|
-type !'a dummy
+type (!'a : value_or_null) dummy
 type t = Packed : 'a dummy -> t
 |}]
 

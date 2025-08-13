@@ -47,6 +47,7 @@ module Singleton_mixed_block_element : sig
     | Vec256
     | Vec512
     | Word
+    | Untagged_immediate
 
   val print :
     (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit

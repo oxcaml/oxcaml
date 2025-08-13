@@ -1992,7 +1992,11 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
       not @@ Builtin_attributes.has_attribute "no_recursive_modalities"
         sincl.pincl_attributes
     in
-    let sg = apply_modalities_signature ~recursive env modalities sg in
+    let sg =
+      match Mode.Modality.Value.Const.is_id modalities with
+      | true -> sg
+      | false -> apply_modalities_signature ~recursive env modalities sg
+    in
     (* Assume the structure is legacy, for backward compatibility *)
     let sg, newenv = Env.enter_signature ~scope sg ~mode:Value.legacy env in
     Signature_group.iter
@@ -3401,8 +3405,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           begin match Jkind.Sort.default_to_value_and_get sort with
           | Base Value -> ()
           | Product _
-          | Base (Void | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
-                 | Bits64 | Vec128 | Vec256 | Vec512) ->
+          | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
+                 Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
             raise (Error (sexpr.pexp_loc, env, Toplevel_unnamed_nonvalue sort))
           end;
         Tstr_eval (expr, sort, attrs), [], shape_map, env
@@ -3421,8 +3425,9 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
               begin match Jkind.Sort.default_to_value_and_get vb.vb_sort with
               | Base Value -> ()
               | Product _
-              | Base (Void | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
-                     | Bits64 | Vec128 | Vec256 | Vec512) ->
+              | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
+                     Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 |
+                     Vec512) ->
                 raise (Error (vb.vb_loc, env,
                               Toplevel_unnamed_nonvalue vb.vb_sort))
               end

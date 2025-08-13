@@ -28,11 +28,25 @@ let unboxed_nativeint_array_tag = 9
 
 
 
-external[@layout_poly] size_in_bytes : ('a : any_non_null). 'a array -> int
+(* Tag definitions from Cmm_helpers.Unboxed_array_tags *)
+let unboxed_product_array_tag = 0
+let unboxed_int64_array_tag = 1
+let unboxed_int32_array_even_tag = 2
+let unboxed_int32_array_odd_tag = 3
+let unboxed_float32_array_even_tag = 4
+let unboxed_float32_array_odd_tag = 5
+let unboxed_vec128_array_tag = 6
+let unboxed_vec256_array_tag = 7
+let unboxed_vec512_array_tag = 8
+let unboxed_nativeint_array_tag = 9
+
+
+
+external[@layout_poly] size_in_bytes : ('a : any mod separable). 'a array -> int
   = "%array_element_size_in_bytes"
 
 external[@layout_poly] makearray_dynamic :
-  ('a : any_non_null). int -> 'a -> 'a array = "%makearray_dynamic"
+  ('a : any mod separable). int -> 'a -> 'a array = "%makearray_dynamic"
 
 let array_sizes_to_check = [0; 1; 2; 25]
 
@@ -87,7 +101,7 @@ let check_int64u ~(init : int64#) ~element_size =
     else begin
       (* Non-empty arrays have specific tags and are mixed blocks *)
       let tag = Obj.tag (Obj.repr x) in
-      let expected_tag = 
+      let expected_tag =
         match Sys.backend_type with
         | Native -> unboxed_int64_array_tag
         | Bytecode | Other _ -> 0
@@ -115,7 +129,7 @@ let check_nativeintu ~(init : nativeint#) ~element_size =
     else begin
       (* Non-empty arrays have specific tags and are mixed blocks *)
       let tag = Obj.tag (Obj.repr x) in
-      let expected_tag = 
+      let expected_tag =
         match Sys.backend_type with
         | Native -> unboxed_nativeint_array_tag
         | Bytecode | Other _ -> 0
@@ -153,8 +167,8 @@ let check_float32u ~(init : float32#) ~element_size =
       match Sys.backend_type with
       | Native ->
         (* Tag is based on original element count, not padded count *)
-        let expected_tag = 
-          if n mod 2 = 0 then unboxed_float32_array_even_tag 
+        let expected_tag =
+          if n mod 2 = 0 then unboxed_float32_array_even_tag
           else unboxed_float32_array_odd_tag in
         assert (tag = expected_tag);
         (* Check mixed block has zero scannable fields *)
@@ -188,8 +202,8 @@ let check_int32u ~(init : int32#) ~element_size =
       match Sys.backend_type with
       | Native ->
         (* Tag is based on original element count, not padded count *)
-        let expected_tag = 
-          if n mod 2 = 0 then unboxed_int32_array_even_tag 
+        let expected_tag =
+          if n mod 2 = 0 then unboxed_int32_array_even_tag
           else unboxed_int32_array_odd_tag in
         assert (tag = expected_tag);
         (* Check mixed block has zero scannable fields *)

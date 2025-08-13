@@ -27,7 +27,9 @@ let () =
         Some msg
     | _ -> None
   in
-  Printexc.Safe.register_printer printer
+  (* need magic because jkind doesn't know [t] crosses portability and
+    contention  *)
+  Printexc.Safe.register_printer (Obj.magic_portable printer)
 
 (* Register the exceptions so that the runtime can access it *)
 type _ t += Should_not_see_this__ : unit t
@@ -57,6 +59,7 @@ module Must_not_enter_gc = struct
     ('a -> 'b) ->
     (exn -> 'b) ->
     ('c t -> ('c, 'b) cont -> last_fiber -> 'b) ->
+    unit -> unit -> (* for dynamic bindings *)
     ('a, 'b) stack = "caml_alloc_stack"
 
   external runstack : ('a, 'b) stack -> ('c -> 'a) -> 'c -> 'b = "%runstack"
@@ -77,7 +80,7 @@ module Must_not_enter_gc = struct
      We must not enter the GC between [alloc_stack] and [runstack].
      [with_stack] is marked as [@inline never] to avoid reordering. *)
   let[@inline never] with_stack valuec exnc effc f x =
-    runstack (alloc_stack valuec exnc effc) f x
+    runstack (alloc_stack valuec exnc effc () ()) f x
 
   (* Retrieve the stack from a [cont]inuation and run [f x] using it.
      We must not enter the GC between [take_cont_noexc] and [resume].

@@ -155,7 +155,7 @@ val operation_is_pure : specific_operation -> bool
 val operation_allocates : specific_operation -> bool
 
 val float_cond_and_need_swap
-  :  Lambda.float_comparison -> X86_ast.float_condition * bool
+  :  Scalar.Float_comparison.t -> X86_ast.float_condition * bool
 
 val isomorphic_specific_operation : specific_operation -> specific_operation -> bool
 (* addressing mode functions *)

@@ -54,7 +54,8 @@ let if_operation_supported op ~f =
   match Proc.operation_supported op with true -> Some (f ()) | false -> None
 
 let if_operation_supported_bi bi op ~f =
-  if Primitive.equal_unboxed_integer bi Primitive.Unboxed_int64 && size_int = 4
+  if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int64
+     && size_int = 4
   then None
   else if_operation_supported op ~f
 
@@ -106,14 +107,15 @@ let clz ~arg_is_non_zero bi arg dbg =
   let op = Cclz { arg_is_non_zero } in
   if_operation_supported_bi bi op ~f:(fun () ->
       let res = Cop (op, [make_unsigned_int bi arg dbg], dbg) in
-      if Primitive.equal_unboxed_integer bi Primitive.Unboxed_int32
+      if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int32
          && size_int = 8
       then Cop (Caddi, [res; Cconst_int (-32, dbg)], dbg)
       else res)
 
 let ctz ~arg_is_non_zero bi arg dbg =
   let arg = make_unsigned_int bi arg dbg in
-  if Primitive.equal_unboxed_integer bi Primitive.Unboxed_int32 && size_int = 8
+  if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int32
+     && size_int = 8
   then
     (* regardless of the value of the argument [arg_is_non_zero], always set the
        corresponding field to [true], because we make it non-zero below by

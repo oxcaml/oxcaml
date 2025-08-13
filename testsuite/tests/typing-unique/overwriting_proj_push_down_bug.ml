@@ -195,7 +195,7 @@ let match_anf_aliased r =
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (catch
          (let (y/341 =a? (field_imm 1 r/339))
-           (if (== y/341 "")
+           (if (%eq y/341 "")
              (let (*match*/348 =[value<int>] 0) (exit 8 y/341))
              (let (*match*/346 =[value<int>] 1) (exit 8 (field_imm 1 r/339)))))
         with (8 y/340)
@@ -228,7 +228,7 @@ let match_anf_unique r =
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (catch
          (let (y/353 =o? (field_mut 1 r/351))
-           (if (== y/353 "")
+           (if (%eq y/353 "")
              (let (*match*/360 =[value<int>] 0) (exit 14 y/353))
              (let (y/354 =o? (field_mut 1 r/351) *match*/358 =[value<int>] 1)
                (exit 14 y/354))))

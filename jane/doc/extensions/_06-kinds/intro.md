@@ -27,12 +27,12 @@ The kind of a type has four components:
 
 The layout describes the shape of the data at runtime, and is used to support
 unboxed types. The modal bounds describe how different types interact with our
-mode system. In particular, some types don't have interesting interactions with
-some modes, so values of these types can safely ignore those modal
-axes. However, container types (among other parameterized types) have modal
-bounds that depend on the bounds of the element type; this dependency is
-captured in the with-bounds. The non-modal bounds capture a grab-bag of other
-properties.
+[mode system](../../modes/intro). In particular, some types don't have
+interesting interactions with some modes, so values of these types can safely
+ignore those modal axes. However, container types (among other parameterized
+types) have modal bounds that depend on the bounds of the element type; this
+dependency is captured in the with-bounds. The non-modal bounds capture a
+grab-bag of other properties.
 
 Kinds are related by a _sub-kinding_ relation, described in more detail
 below. This allows to use a type with a more precise kind where a type with a

@@ -324,6 +324,9 @@ AC_SUBST([ASPP])
 AC_SUBST([endianness])
 AC_SUBST([AS])
 AC_SUBST([asm_cfi_supported])
+AC_SUBST([as_compress_debug_sections_flag])
+AC_SUBST([cc_compress_debug_sections_flag])
+AC_SUBST([objcopy_compress_debug_sections_flag])
 AC_SUBST([sharedlib_cflags])
 AC_SUBST([rpath])
 AC_SUBST([mkdll])
@@ -349,6 +352,8 @@ AC_SUBST([cmm_invariants])
 AC_SUBST([windows_unicode])
 AC_SUBST([flat_float_array])
 AC_SUBST([function_sections])
+AC_SUBST([oxcaml_dwarf_flags_for_compiler])
+AC_SUBST([assembly_flag_for_compiler])
 AC_SUBST([probes])
 AC_SUBST([oc_native_compflags])
 AC_SUBST([afl])
@@ -707,6 +712,18 @@ AC_ARG_ENABLE([stack-allocation],
 AC_ARG_ENABLE([poll-insertion],
   [AS_HELP_STRING([--enable-poll-insertion],
     [enable insertion of poll points])])
+
+AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
+  [AS_HELP_STRING([--enable-oxcaml-dwarf-on-compiler],
+    [Compile the compiler and standard library with OxCaml DWARF])],
+  [],
+  [enable_oxcaml_dwarf_on_compiler=no])
+
+AC_ARG_ENABLE([keep-compiler-asm],
+  [AS_HELP_STRING([--enable-keep-compiler-asm],
+    [Configure the compiler to use -S during bootstrapping, which will produce .s assembly files for the files in the compiler tree. The files can be found in _build/main when building with dune])],
+  [],
+  [enable_keep_compiler_asm=no])
 
 AC_ARG_ENABLE([multidomain],
   [AS_HELP_STRING([--enable-multidomain],
@@ -2627,11 +2644,17 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
 ## Does the assembler support debug prefix map and CFI directives
 as_has_debug_prefix_map=false
 asm_cfi_supported=false
+as_compress_debug_sections_flag=""
+cc_compress_debug_sections_flag=""
+objcopy_compress_debug_sections_flag=""
 AS_IF([$native_compiler],
   [AS_CASE([$host],
     [*-*-mingw32*|*-pc-windows], [],
     [OCAML_AS_HAS_DEBUG_PREFIX_MAP
-    OCAML_AS_HAS_CFI_DIRECTIVES])])
+    OCAML_AS_HAS_CFI_DIRECTIVES
+    OCAML_AS_COMPRESSION_SUPPORT
+    OCAML_CC_COMPRESSION_SUPPORT
+    OCAML_OBJCOPY_COMPRESSION_SUPPORT])])
 
 ## Frame pointers
 
@@ -2826,6 +2849,21 @@ AS_IF([test x"$probes" = "xfalse"],
 AS_IF([test x"$with_afl" = "xyes"],
   [afl=true],
   [afl=false])
+
+# Configure DWARF debugging flags for oxcaml compiler
+AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
+  [oxcaml_dwarf_flags_for_compiler="-g -gno-upstream-dwarf"],
+  [oxcaml_dwarf_flags_for_compiler=""])
+
+# Ensure compatibility: oxcaml-dwarf-on-compiler requires function-sections to be disabled
+AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
+  [AS_IF([test x"$enable_function_sections" != "xno"],
+    [AC_MSG_ERROR([--enable-oxcaml-dwarf-on-compiler requires --disable-function-sections to be passed])])])
+
+# Configure assembly emission flag for compiler
+AS_IF([test x"$enable_keep_compiler_asm" = "xyes"],
+  [assembly_flag_for_compiler="-S"],
+  [assembly_flag_for_compiler=""])
 
 # Enable debugging support
 # TODO: add a --disable-debug-info configure option that disables debugging

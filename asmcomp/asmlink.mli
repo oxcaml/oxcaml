@@ -41,6 +41,10 @@ type error =
   | Linking_error of int
   | Multiple_definition of Compilation_unit.Name.t * filepath * filepath
   | Missing_cmx of filepath * Compilation_unit.t
+  | Dwarf_fission_objcopy_on_macos
+  | Dwarf_fission_dsymutil_not_macos
+  | Dsymutil_error of int
+  | Objcopy_error of int
 
 exception Error of error
 

@@ -28,10 +28,10 @@ type t_void : void;;
 type t_void : void
 |}]
 
-type t_any_non_null : any_non_null;;
+type t_any_mod_separable : any mod separable;;
 
 [%%expect{|
-type t_any_non_null : any_non_null
+type t_any_mod_separable : any mod separable
 |}]
 
 type t_value_or_null : value_or_null;;

@@ -104,6 +104,10 @@ module Type_structure : sig
 
   val is_flat_float_record : t -> bool
 
+  (** [None] if block indices to arrays of [nested_unboxed_record t] are not
+      supported *)
+  val array_element : t Tree.t -> t option
+
   val to_string : t -> string
 
   (** Size in words, as in [Obj.size] *)

@@ -435,6 +435,7 @@ let binary_prim_size prim =
   | Bigarray_get_alignment _ -> 3 (* load data + add index + and *)
   | Atomic_load_field _ -> 1
   | Poke _ -> 1
+  | Read_offset _ -> 1
 
 let ternary_prim_size prim =
   match (prim : Flambda_primitive.ternary_primitive) with
@@ -448,6 +449,7 @@ let ternary_prim_size prim =
   | Atomic_set_field _ -> 1
   | Atomic_exchange_field Immediate -> 1
   | Atomic_exchange_field Any_value -> does_not_need_caml_c_call_extcall_size
+  | Write_offset _ -> 1
 
 let quaternary_prim_size prim =
   match (prim : Flambda_primitive.quaternary_primitive) with

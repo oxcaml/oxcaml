@@ -16,6 +16,7 @@ module Sort = struct
   type base =
     | Void
     | Value
+    | Untagged_immediate
     | Float64
     | Float32
     | Word
@@ -41,6 +42,7 @@ module Sort = struct
     match b1, b2 with
     | Void, Void
     | Value, Value
+    | Untagged_immediate, Untagged_immediate
     | Float64, Float64
     | Float32, Float32
     | Word, Word
@@ -52,14 +54,15 @@ module Sort = struct
     | Vec256, Vec256
     | Vec512, Vec512 ->
       true
-    | ( ( Void | Value | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
-        | Bits64 | Vec128 | Vec256 | Vec512 ),
+    | ( ( Void | Value | Untagged_immediate | Float64 | Float32 | Word | Bits8
+        | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
         _ ) ->
       false
 
   let to_string_base = function
     | Value -> "value"
     | Void -> "void"
+    | Untagged_immediate -> "untagged_immediate"
     | Float64 -> "float64"
     | Float32 -> "float32"
     | Word -> "word"
@@ -94,12 +97,14 @@ module Sort = struct
     let rec all_void = function
       | Base Void -> true
       | Base
-          ( Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-          | Vec128 | Vec256 | Vec512 ) ->
+          ( Value | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
+          | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 ) ->
         false
       | Product ts -> List.for_all all_void ts
 
     let value = Base Value
+
+    let untagged_immediate = Base Untagged_immediate
 
     let void = Base Void
 
@@ -131,6 +136,7 @@ module Sort = struct
               (match b with
               | Void -> "Void"
               | Value -> "Value"
+              | Untagged_immediate -> "Untagged_immediate"
               | Float64 -> "Float64"
               | Float32 -> "Float32"
               | Word -> "Word"
@@ -187,6 +193,8 @@ module Sort = struct
     let for_array_comprehension_element = value
 
     let for_list_element = value
+
+    let for_idx = bits64
   end
 
   module Var = struct
@@ -221,6 +229,7 @@ module Sort = struct
         (match b with
         | Void -> "Void"
         | Value -> "Value"
+        | Untagged_immediate -> "Untagged_immediate"
         | Float64 -> "Float64"
         | Float32 -> "Float32"
         | Word -> "Word"
@@ -274,6 +283,8 @@ module Sort = struct
 
       let value = Base Value
 
+      let untagged_immediate = Base Untagged_immediate
+
       let float64 = Base Float64
 
       let float32 = Base Float32
@@ -297,6 +308,7 @@ module Sort = struct
       let of_base = function
         | Void -> void
         | Value -> value
+        | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
@@ -317,6 +329,8 @@ module Sort = struct
       let value = Some T.value
 
       let void = Some T.void
+
+      let untagged_immediate = Some T.untagged_immediate
 
       let float64 = Some T.float64
 
@@ -341,6 +355,7 @@ module Sort = struct
       let of_base = function
         | Void -> void
         | Value -> value
+        | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
@@ -367,6 +382,8 @@ module Sort = struct
 
       let void = Base Void
 
+      let untagged_immediate = Base Untagged_immediate
+
       let float64 = Base Float64
 
       let float32 = Base Float32
@@ -390,6 +407,7 @@ module Sort = struct
       let of_base : base -> Const.t = function
         | Value -> value
         | Void -> void
+        | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
@@ -559,8 +577,8 @@ module Sort = struct
     match default_to_value_and_get t with
     | Base Void -> true
     | Base
-        ( Value | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32 | Bits64
-        | Vec128 | Vec256 | Vec512 ) ->
+        ( Value | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
+        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
       false
     | Product _ -> false
 

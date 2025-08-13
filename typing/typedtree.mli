@@ -446,6 +446,9 @@ and expression_desc =
               { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
                 extended_expression = Some E0 }
           *)
+  | Texp_atomic_loc of
+      expression * Jkind.sort * Longident.t loc * Types.label_description *
+      alloc_mode
   | Texp_field of expression * Jkind.sort * Longident.t loc *
       Types.label_description * texp_field_boxing * Unique_barrier.t
     (** - The sort is the sort of the whole record (which may be non-value if
@@ -460,6 +463,7 @@ and expression_desc =
       Types.label_description * expression
     (** [alloc_mode] translates to the [modify_mode] of the record *)
   | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
+  | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of Types.mutability * Jkind.sort * comprehension
   | Texp_ifthenelse of expression * expression * expression option
@@ -600,6 +604,21 @@ and meth =
     Tmeth_name of string
   | Tmeth_val of Ident.t
   | Tmeth_ancestor of Ident.t * Path.t
+
+and block_access =
+  | Baccess_field of Longident.t loc * Types.label_description
+  | Baccess_array of {
+      mut: mutable_flag;
+      index_kind: index_kind;
+      index: expression;
+      base_ty: Types.type_expr;
+      elt_ty: Types.type_expr;
+      elt_sort: Jkind.Sort.t
+    }
+  | Baccess_block of mutable_flag * expression
+
+and unboxed_access =
+  | Uaccess_unboxed_field of Longident.t loc * Types.unboxed_label_description
 
 and comprehension =
   {

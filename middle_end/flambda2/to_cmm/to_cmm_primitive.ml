@@ -55,9 +55,9 @@ let unbox_number ~dbg kind arg =
   | Naked_vec128 -> C.unbox_vec128 dbg arg
   | Naked_vec256 -> C.unbox_vec256 dbg arg
   | Naked_vec512 -> C.unbox_vec512 dbg arg
-  | Naked_int32 | Naked_int64 | Naked_nativeint ->
-    let primitive_kind = K.Boxable_number.primitive_kind kind in
-    C.unbox_int dbg primitive_kind arg
+  | Naked_int32 -> C.unbox_int dbg Boxed_int32 arg
+  | Naked_int64 -> C.unbox_int dbg Boxed_int64 arg
+  | Naked_nativeint -> C.unbox_int dbg Boxed_nativeint arg
 
 let box_number ~dbg kind alloc_mode arg =
   let alloc_mode = C.alloc_mode_for_allocations_to_cmm alloc_mode in
@@ -67,9 +67,9 @@ let box_number ~dbg kind alloc_mode arg =
   | Naked_vec128 -> C.box_vec128 dbg alloc_mode arg
   | Naked_vec256 -> C.box_vec256 dbg alloc_mode arg
   | Naked_vec512 -> C.box_vec512 dbg alloc_mode arg
-  | Naked_int32 | Naked_int64 | Naked_nativeint ->
-    let primitive_kind = K.Boxable_number.primitive_kind kind in
-    C.box_int_gen dbg primitive_kind alloc_mode arg
+  | Naked_int32 -> C.box_int_gen dbg Boxed_int32 alloc_mode arg
+  | Naked_int64 -> C.box_int_gen dbg Boxed_int64 alloc_mode arg
+  | Naked_nativeint -> C.box_int_gen dbg Boxed_nativeint alloc_mode arg
 
 (* Block creation and access. For these functions, [index] is a tagged
    integer. *)
@@ -110,7 +110,8 @@ let mixed_block_kinds shape =
         | Naked_vec128 -> KS.naked_vec128
         | Naked_vec256 -> KS.naked_vec256
         | Naked_vec512 -> KS.naked_vec512
-        | Naked_nativeint -> KS.naked_nativeint)
+        | Naked_nativeint -> KS.naked_nativeint
+        | Naked_immediate -> KS.naked_immediate)
       (Array.to_list (K.Mixed_block_shape.flat_suffix shape))
   in
   value_prefix @ flat_suffix
@@ -143,7 +144,7 @@ let memory_chunk_of_flat_suffix_element :
   | Naked_vec128 -> Onetwentyeight_unaligned
   | Naked_vec256 -> Twofiftysix_unaligned
   | Naked_vec512 -> Fivetwelve_unaligned
-  | Naked_int64 | Naked_nativeint -> Word_int
+  | Naked_int64 | Naked_nativeint | Naked_immediate -> Word_int
 
 let block_load ~dbg (kind : P.Block_access_kind.t) (mutability : Mutability.t)
     ~block ~field =
@@ -692,30 +693,34 @@ let unary_int_arith_primitive _env dbg kind op arg =
        cmm_helpers... *)
     match (kind : K.Standard_int.t) with
     | Tagged_immediate ->
-      (* This isn't currently needed since [Lambda_to_flambda_primitives] always
-         untags the integer first. *)
-      Misc.fatal_error "Not yet implemented"
+      (* XXX mshinwell: Why does this case arise when it did not before? *)
+      C.Scalar_type.Integral.conjugate arg ~outer:tagged_immediate
+        ~inner:naked_immediate ~dbg ~f:(fun arg ->
+          C.bbswap Sixteen arg dbg |> C.zero_extend ~bits:16 ~dbg)
     | Naked_immediate ->
       (* This case should not have a sign extension, confusingly, because it
          arises from the [Pbswap16] Lambda primitive. That operation does not
          affect the sign of the resulting value. *)
       C.Scalar_type.Integral.static_cast arg ~dbg ~src:naked_immediate
         ~dst:naked_int16
-      |> (fun arg -> C.bbswap Unboxed_int16 arg dbg)
+      |> (fun arg -> C.bbswap Sixteen arg dbg)
       |> C.zero_extend ~bits:16 ~dbg
     | Naked_int8 -> arg
     | Naked_int16 ->
       (* Byte swaps of small integers need a sign-extension in order to match
          the Lambda semantics (where the swap might affect the sign). *)
-      C.sign_extend (C.bbswap Unboxed_int16 arg dbg) ~bits:16 ~dbg
-    | Naked_int32 ->
-      C.sign_extend (C.bbswap Unboxed_int32 arg dbg) ~bits:32 ~dbg
+      C.sign_extend (C.bbswap Sixteen arg dbg) ~bits:16 ~dbg
+    | Naked_int32 -> C.sign_extend (C.bbswap Thirtytwo arg dbg) ~bits:32 ~dbg
     (* int64 and nativeint don't require a sign-extension since they are already
        register-size, but the code is here for consistency: *)
-    | Naked_int64 ->
-      C.sign_extend (C.bbswap Unboxed_int64 arg dbg) ~bits:64 ~dbg
-    | Naked_nativeint ->
-      C.sign_extend (C.bbswap Unboxed_nativeint arg dbg) ~bits:C.arch_bits ~dbg)
+    | Naked_int64 -> C.sign_extend (C.bbswap Sixtyfour arg dbg) ~bits:64 ~dbg
+    | Naked_nativeint -> (
+      let bits = C.arch_bits in
+      match bits with
+      | 64 -> C.sign_extend (C.bbswap Sixtyfour arg dbg) ~bits ~dbg
+      | 32 -> C.sign_extend (C.bbswap Thirtytwo arg dbg) ~bits ~dbg
+      | arch_bits ->
+        Misc.fatal_errorf "Unexpected C.arch_bits value %d" arch_bits))
 
 let unary_float_arith_primitive _env dbg width op arg =
   match (width : P.float_bitwidth), (op : P.unary_float_arith_op) with
@@ -917,10 +922,7 @@ let binary_int_comp_primitive_yielding_int _env dbg _kind
     (signed : P.signed_or_unsigned) x y =
   match signed with
   | Signed -> C.mk_compare_ints_untagged dbg x y
-  | Unsigned ->
-    Misc.fatal_error
-      "Translation of [Int_comp] yielding an integer -1, 0 or 1 in unsigned \
-       mode is not yet implemented"
+  | Unsigned -> C.mk_unsigned_compare_ints_untagged dbg x y
 
 let binary_float_arith_primitive _env dbg width op x y =
   match (width : P.float_bitwidth), (op : P.binary_float_arith_op) with
@@ -1142,6 +1144,10 @@ let binary_primitive env dbg f x y =
     in
     C.store ~dbg memory_chunk Assignment ~addr:x ~new_value:y
     |> C.return_unit dbg
+  | Read_offset (kind, mut) ->
+    let addr = C.add_int x y dbg in
+    let memory_chunk = C.memory_chunk_of_kind kind in
+    C.load ~dbg memory_chunk mut ~addr
 
 let ternary_primitive _env dbg f x y z =
   match (f : P.ternary_primitive) with
@@ -1168,6 +1174,22 @@ let ternary_primitive _env dbg f x y z =
     C.atomic_exchange_field ~dbg
       (imm_or_ptr block_access_kind)
       x ~field:y ~new_value:z
+  | Write_offset (kind, mode) ->
+    let addr = C.add_int x y dbg in
+    let memory_chunk = C.memory_chunk_of_kind kind in
+    let store =
+      if KS.must_be_gc_scannable kind
+      then
+        match mode with
+        | Heap -> C.caml_modify ~dbg addr z
+        | Local ->
+          (* divide to convert offset from bytes to field number *)
+          C.caml_modify_local ~dbg x
+            (C.lsr_int y (Cconst_int (C.log2_size_addr, dbg)) dbg)
+            z
+      else C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
+    in
+    C.return_unit dbg store
 
 let quaternary_primitive _env dbg f x y z w =
   match (f : P.quaternary_primitive) with

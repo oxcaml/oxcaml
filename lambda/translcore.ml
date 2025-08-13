@@ -37,6 +37,8 @@ type error =
   | Unboxed_vector_in_array_comprehension
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
+  | Block_index_gap_overflow_possible
+  | Element_would_be_reordered_in_record
 
 exception Error of Location.t * error
 
@@ -44,6 +46,29 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
+
+let field_offset_for_label lbl =
+  match lbl.lbl_repres with
+  | Record_boxed _
+  | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
+  | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
+      lbl.lbl_pos
+  | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+      lbl.lbl_pos + 1
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
+    (* CR layouts 5.1: For unboxed records, no offset calculation needed in
+       regular field access *)
+      lbl.lbl_pos
+  | Record_float ->
+      lbl.lbl_pos
+  | Record_ufloat ->
+      lbl.lbl_pos
+  | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+      fatal_error "Mixed inlined records not supported for extensible variants"
+  | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
+  | Record_inlined (_, Constructor_mixed _, Variant_with_null)
+  | Record_mixed _ ->
+      lbl.lbl_pos
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =
@@ -89,7 +114,7 @@ let transl_extension_constructor ~scopes env path ext =
          to pattern typing, as patterns can close over them. *)
       Lprim (Pmakeblock (Obj.object_tag, Immutable_unique, None, alloc_heap),
         [Lconst (Const_base (Const_string (name, ext.ext_loc, None)));
-         Lprim (prim_fresh_oo_id, [Lconst (const_int 0)], loc)],
+         Lprim (prim_fresh_oo_id, [lambda_unit], loc)],
         loc)
   | Text_rebind(path, _lid) ->
       transl_extension_path loc env path
@@ -505,13 +530,14 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Null, Variant_with_null -> Lconst Const_null
       | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
         assert false
-      | Ordinary {runtime_tag}, _ when cstr.cstr_constant ->
+      | Ordinary {runtime_tag},
+        (Variant_boxed _ | Variant_extensible) when cstr.cstr_constant ->
           assert (
             List.for_all
               (fun (_, s) -> Jkind.Sort.Const.all_void s) args_with_sorts);
           List.fold_left
             (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
-            (Lconst(const_int runtime_tag) : lambda)
+            ((tagged_immediate runtime_tag) : lambda)
             ll
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
@@ -618,7 +644,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_variant(l, arg) ->
       let tag = Btype.hash_variant l in
       begin match arg with
-        None -> Lconst(const_int tag)
+        None -> (tagged_immediate tag)
       | Some (arg, alloc_mode) ->
           let lam = transl_exp ~scopes Jkind.Sort.Const.for_poly_variant arg in
           try
@@ -627,7 +653,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable, None,
                              transl_alloc_mode alloc_mode),
-                  [Lconst(const_int tag); lam],
+                  [tagged_immediate tag; lam],
                   of_location ~scopes e.exp_loc)
       end
   | Texp_record {fields; representation; extended_expression; alloc_mode} ->
@@ -638,6 +664,18 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         {fields; representation; extended_expression } ->
       transl_record_unboxed_product ~scopes e.exp_loc e.exp_env
         fields representation extended_expression
+  | Texp_atomic_loc (arg, arg_sort, _id, lbl, alloc_mode) ->
+      let shape =
+        Some
+          [ Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type;
+            { raw_kind = Pintval; nullable = Non_nullable }
+          ]
+      in
+      let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
+      let (arg, lbl) = transl_atomic_loc ~scopes arg arg_sort lbl in
+      let loc = of_location ~scopes e.exp_loc in
+      Lprim (Pmakeblock (0, Immutable, shape, transl_alloc_mode alloc_mode),
+             [arg; lbl], loc)
   | Texp_field(arg, arg_sort, _id, lbl, float, ubr) ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
@@ -645,13 +683,20 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree
       in
       let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
-      begin match lbl.lbl_repres with
+      let prim_and_args =
+        match lbl.lbl_repres with
           Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
-          let ptr_or_imm, _ = maybe_pointer e in
-          Lprim (Pfield (lbl.lbl_pos, ptr_or_imm, sem), [targ],
-                 of_location ~scopes e.exp_loc)
-        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> targ
+          let immediate_or_pointer, _ = maybe_pointer e in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Some
+              (Patomic_load_field { immediate_or_pointer },
+               [targ;
+                Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
+          else
+            Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
+        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
         | Record_float ->
           let alloc_mode =
             match float with
@@ -659,15 +704,19 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             | Non_boxing _ -> assert false
           in
           let mode = transl_alloc_mode alloc_mode in
-          Lprim (Pfloatfield (lbl.lbl_pos, sem, mode), [targ],
-                 of_location ~scopes e.exp_loc)
+          Some (Pfloatfield (lbl.lbl_pos, sem, mode), [targ])
         | Record_ufloat ->
-          Lprim (Pufloatfield (lbl.lbl_pos, sem), [targ],
-                 of_location ~scopes e.exp_loc)
+          Some (Pufloatfield (lbl.lbl_pos, sem), [targ])
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-          let ptr_or_imm, _ = maybe_pointer e in
-          Lprim (Pfield (lbl.lbl_pos + 1, ptr_or_imm, sem), [targ],
-                 of_location ~scopes e.exp_loc)
+          let immediate_or_pointer, _ = maybe_pointer e in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Some
+              (Patomic_load_field { immediate_or_pointer },
+               [targ;
+                Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
+          else
+            Some (Pfield (lbl.lbl_pos + 1, immediate_or_pointer, sem), [targ])
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
@@ -699,9 +748,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                           \ present for float field read")
               shape
           in
-          Lprim (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ],
-                  of_location ~scopes e.exp_loc)
+          Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
         | Record_inlined (_, _, Variant_with_null) -> assert false
+      in
+      begin match prim_and_args with
+      | None -> targ
+      | Some (prim, args) -> Lprim (prim, args, of_location ~scopes e.exp_loc)
       end
   | Texp_unboxed_field(arg, arg_sort, _id, lbl, _) ->
     begin match lbl.lbl_repres with
@@ -725,19 +777,42 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let mode =
         Assignment (transl_modify_mode arg_mode)
       in
-      let access =
+      let sort_arg =
+        (* We know the record is boxed because [@@unboxed] records don't have
+           mutable fields, and this is double checked by the assert in [access]
+           above. *)
+        Jkind.Sort.Const.for_boxed_record
+      in
+      let arg_lambda = transl_exp ~scopes sort_arg arg in
+      let field_lambda = Lconst (Const_base (Const_int lbl.lbl_pos)) in
+      let newval_lambda = transl_exp ~scopes lbl.lbl_sort newval in
+      let prim, args =
         match lbl.lbl_repres with
           Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
-          let ptr_or_imm, _ = maybe_pointer newval in
-          Psetfield(lbl.lbl_pos, ptr_or_imm, mode)
+          let immediate_or_pointer, _ = maybe_pointer newval in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Patomic_set_field { immediate_or_pointer },
+            [arg_lambda; field_lambda; newval_lambda]
+          else
+            Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
+            [arg_lambda; newval_lambda]
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
           assert false
-        | Record_float -> Psetfloatfield (lbl.lbl_pos, mode)
-        | Record_ufloat -> Psetufloatfield (lbl.lbl_pos, mode)
+        | Record_float ->
+          Psetfloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
+        | Record_ufloat ->
+          Psetufloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-          let ptr_or_imm, _ = maybe_pointer newval in
-          Psetfield (lbl.lbl_pos + 1, ptr_or_imm, mode)
+          let immediate_or_pointer, _ = maybe_pointer newval in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Patomic_set_field { immediate_or_pointer },
+            [arg_lambda; field_lambda; newval_lambda]
+          else
+            Psetfield (lbl.lbl_pos + 1, immediate_or_pointer, mode),
+            [arg_lambda; newval_lambda]
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
@@ -762,18 +837,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Lambda.{ raw_kind; nullable })
               shape
             in
-            Psetmixedfield([lbl.lbl_pos], shape, mode)
+            Psetmixedfield([lbl.lbl_pos], shape, mode),
+            [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
-      let sort_arg =
-        (* We know the record is boxed because [@@unboxed] records don't have
-           mutable fields, and this is double checked by the assert in [access]
-           above. *)
-        Jkind.Sort.Const.for_boxed_record
-      in
-      Lprim(access, [transl_exp ~scopes sort_arg arg;
-                     transl_exp ~scopes lbl.lbl_sort newval],
-            of_location ~scopes e.exp_loc)
+      Lprim(prim, args, of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
@@ -833,7 +901,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Lconst(Const_float_array(List.map extract_float cl))
                 | Pgenarray ->
                   raise Not_constant    (* can this really happen? *)
-                | Punboxedfloatarray _ | Punboxedintarray _
+                | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                 | Punboxedvectorarray _
                 | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
                   Misc.fatal_error "Use flambda2 for unboxed arrays"
@@ -843,6 +911,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       with Not_constant ->
         makearray lambda_arr_mut
       end
+  | Texp_idx (ba, uas) ->
+    transl_idx ~scopes e.exp_loc e.exp_env ba uas
   | Texp_list_comprehension comp ->
       let loc = of_location ~scopes e.exp_loc in
       Transl_list_comprehension.comprehension
@@ -856,7 +926,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let array_kind = Typeopt.array_kind e elt_sort in
       begin match array_kind with
       | Pgenarray | Paddrarray | Pintarray | Pfloatarray
-      | Punboxedfloatarray _ | Punboxedintarray _ -> ()
+      | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
       | Punboxedvectorarray _ ->
         raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
@@ -1609,7 +1679,8 @@ and transl_tupled_function
 and add_type_shapes_of_pattern ~env sort pattern =
   let var_list = Typedtree.pat_bound_idents_full sort pattern in
   List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
-    Type_shape.add_to_type_shapes var_uid type_expr var_sort
+    let type_name = Format.asprintf "%a" Printtyp.type_expr type_expr in
+    Type_shape.add_to_type_shapes var_uid type_expr var_sort ~name:type_name
       (Env.find_uid_of_path env))
   var_list
 
@@ -2242,6 +2313,18 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
              transl_exp ~scopes init_expr_sort init_expr, lam)
     end
 
+and transl_atomic_loc ~scopes arg arg_sort lbl =
+  let arg = transl_exp ~scopes arg_sort arg in
+  begin match lbl.lbl_repres with
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
+      (* Atomic fields not allowed here *)
+      assert false
+  | _ -> ()
+  end;
+  let field_offset = field_offset_for_label lbl in
+  let lbl = Lconst (Const_base (Const_int field_offset)) in
+  (arg, lbl)
+
 and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
   match repres with
   | Record_unboxed_product ->
@@ -2281,6 +2364,97 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
       let layout = layout_exp init_expr_sort init_expr in
       let exp = transl_exp ~scopes init_expr_sort init_expr in
       Llet(Strict, layout, init_id, init_id_duid, exp, lam)
+
+(* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
+and transl_idx ~scopes loc env ba uas =
+  let ua_to_pos (Uaccess_unboxed_field (_, lbl)) =
+    (* erase singleton unboxed products before lambda *)
+    if Array.length lbl.lbl_all == 1 then None else Some lbl.lbl_pos
+  in
+  let uas_path = List.filter_map ua_to_pos uas in
+  begin match ba with
+  | Baccess_block (_, idx) ->
+    let idx = transl_exp ~scopes Jkind.Sort.Const.for_idx idx in
+    begin match uas with
+    | [] -> idx
+    | Uaccess_unboxed_field (_, lbl) :: _ ->
+      (* Preserve the invariant that products have at least two elements *)
+      let base_sort =
+        if Int.equal (Array.length lbl.lbl_all) 1 then
+          lbl.lbl_sort
+        else
+          Jkind.Sort.Const.Product
+            (Array.to_list (Array.map (fun lbl -> lbl.lbl_sort) lbl.lbl_all))
+      in
+      (* CR layouts v8: this might unnecessarily compute the value kind, which
+         shouldn't be needed for deepening *)
+      let base_layout = layout env lbl.lbl_loc base_sort lbl.lbl_res in
+      let mbe = mixed_block_element_of_layout base_layout in
+      (* [uas_path] is a path into [mbe] *)
+      Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
+    end
+  | Baccess_field (_id, lbl) ->
+    begin match lbl.lbl_repres with
+    | Record_boxed _
+    | Record_float | Record_ufloat ->
+      (* Assert that all unboxed fields are of singleton records *)
+      List.iter
+        (fun (Uaccess_unboxed_field (_, l)) ->
+            if Array.length l.lbl_all <> 1 then
+              Misc.fatal_error "Texp_idx: non-singleton unboxed record field \
+                in non-mixed boxed record")
+        uas;
+      Lprim (Pmake_idx_field lbl.lbl_pos, [], (of_location ~scopes loc))
+    | Record_inlined _ | Record_unboxed ->
+      Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
+    | Record_mixed shape ->
+      let shape =
+        Lambda.transl_mixed_product_shape
+          ~get_value_kind:(fun _ -> Lambda.generic_value) shape
+      in
+      (* Check to make sure the gap never overflows.
+         See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
+      let cts =
+        Mixed_product_bytes.Wrt_path.count_shape shape lbl.lbl_pos uas_path
+      in
+      if Option.is_none
+           (Mixed_product_bytes.Wrt_path.offset_and_gap cts)
+      then
+        raise (Error (loc, Block_index_gap_overflow_possible));
+      Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
+             (of_location ~scopes loc))
+    end
+  | Baccess_array { mut = _; index_kind; index; base_ty; elt_ty; elt_sort } ->
+    let index_sort, index_kind = match index_kind with
+      (* CR layouts v8: support small ints *)
+      | Index_int ->
+        Jkind.Sort.Const.value, Ptagged_int_index
+      | Index_unboxed_int64 ->
+        Jkind.Sort.Const.bits64,
+        Punboxed_or_untagged_integer_index Unboxed_int64
+      | Index_unboxed_int32 ->
+        Jkind.Sort.Const.bits32,
+        Punboxed_or_untagged_integer_index Unboxed_int32
+      | Index_unboxed_nativeint ->
+        Jkind.Sort.Const.word,
+        Punboxed_or_untagged_integer_index Unboxed_nativeint
+    in
+    let index = transl_exp ~scopes index_sort index in
+    let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
+    let array_kind =
+      array_type_kind ~elt_ty:(Some elt_ty) ~elt_sort:(Some elt_sort) env loc
+        base_ty
+    in
+    let elt_layout = layout env loc elt_sort elt_ty in
+    let mbe = mixed_block_element_of_layout elt_layout in
+    (* CR layouts v8: remove this restriction once we stable sort (within) array
+       elements to place values before non-values, which will likely be done to
+       support striped arrays *)
+    if will_be_reordered mbe then
+      raise (Error (loc, Element_would_be_reordered_in_record));
+    Lprim (Pmake_idx_array (array_kind, index_kind, mbe, uas_path), [index],
+           (of_location ~scopes loc))
+  end
 
 and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
   let return_layout = layout_exp return_sort e in
@@ -2579,7 +2753,17 @@ let report_error ppf = function
   | Unboxed_product_in_let_mutable ->
       fprintf ppf
         "Mutable lets are not yet supported with unboxed products."
-
+  | Block_index_gap_overflow_possible ->
+      (* This error message describes a more conservative rule than we actually
+         enforce, see [Lambda.Mixed_product_bytes_wrt_path] *)
+      fprintf ppf
+        "This block index cannot be created because it refers to values@ \
+         and non-values that are separated by 2^16 or more bytes in their@ \
+         block, or could be deepened to such an index."
+  | Element_would_be_reordered_in_record ->
+      fprintf ppf
+        "Block indices into arrays whose element layout contains a@ \
+         non-value before a value are not yet supported."
 let () =
   Location.register_error_of_exn
     (function

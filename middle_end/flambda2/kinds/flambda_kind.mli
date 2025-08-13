@@ -18,6 +18,9 @@
 
 module Naked_number_kind : sig
   type t =
+    (* CR mshinwell: I think we should consider renaming [Naked_immediate] to
+       [Naked_int] or (maybe better) [Naked_int31_63], to avoid confusion with
+       [Lambda.Const_naked_immediate]. *)
     | Naked_immediate
     | Naked_float32
     | Naked_float
@@ -94,6 +97,7 @@ type flat_suffix_element = private
   | Naked_int32
   | Naked_int64
   | Naked_nativeint
+  | Naked_immediate
   | Naked_vec128
   | Naked_vec256
   | Naked_vec512
@@ -186,8 +190,6 @@ module Boxable_number : sig
     | Naked_vec512
 
   val unboxed_kind : t -> kind
-
-  val primitive_kind : t -> Primitive.boxed_integer
 
   val print_lowercase : Format.formatter -> t -> unit
 

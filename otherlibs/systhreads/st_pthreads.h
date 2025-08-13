@@ -275,6 +275,8 @@ struct caml_thread_tick_args {
   atomic_uintnat* stop;
 };
 
+#define ST_INTERRUPT_FLAG   ((uintnat)1)
+
 /* The tick thread: interrupt the domain periodically to force preemption  */
 static void * caml_thread_tick(void * arg)
 {
@@ -290,7 +292,7 @@ static void * caml_thread_tick(void * arg)
   while(! atomic_load_acquire(stop)) {
     st_msleep(Thread_timeout);
 
-    atomic_store_release(&domain->requested_external_interrupt, 1);
+    atomic_fetch_or(&domain->requested_external_interrupt, ST_INTERRUPT_FLAG);
     caml_interrupt_self();
   }
   return NULL;

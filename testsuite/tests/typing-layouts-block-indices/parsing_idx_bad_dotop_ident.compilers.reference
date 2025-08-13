@@ -1,0 +1,5 @@
+File "parsing_idx_bad_dotop_ident.ml", line 8, characters 18-19:
+8 | let _ = (.*idx_imm(0))
+                      ^
+Error: Syntax error: A parenthesis here can only follow one of: 
+  ".", ".L", ".l", ".n", ".:", ".:L", ".:l", ".:n", ".idx_imm", ".idx_mut".

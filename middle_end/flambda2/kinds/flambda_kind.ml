@@ -186,6 +186,7 @@ type flat_suffix_element =
   | Naked_int32
   | Naked_int64
   | Naked_nativeint
+  | Naked_immediate
   | Naked_vec128
   | Naked_vec256
   | Naked_vec512
@@ -202,6 +203,7 @@ module Flat_suffix_element0 = struct
     | Naked_int32 -> naked_int32
     | Naked_int64 -> naked_int64
     | Naked_nativeint -> naked_nativeint
+    | Naked_immediate -> naked_immediate
     | Naked_vec128 -> naked_vec128
     | Naked_vec256 -> naked_vec256
     | Naked_vec512 -> naked_vec512
@@ -214,7 +216,7 @@ module Flat_suffix_element0 = struct
 
   let size_in_words = function
     | Naked_float | Naked_float32 | Naked_int8 | Naked_int16 | Naked_int32
-    | Naked_int64 | Naked_nativeint ->
+    | Naked_int64 | Naked_nativeint | Naked_immediate ->
       1
     | Naked_vec128 -> 2
     | Naked_vec256 -> 4
@@ -229,6 +231,7 @@ module Flat_suffix_element0 = struct
     | Naked_int32 -> Format.pp_print_string ppf "Naked_int32"
     | Naked_int64 -> Format.pp_print_string ppf "Naked_int64"
     | Naked_nativeint -> Format.pp_print_string ppf "Naked_nativeint"
+    | Naked_immediate -> Format.pp_print_string ppf "Naked_immediate"
     | Naked_vec128 -> Format.pp_print_string ppf "Naked_vec128"
     | Naked_vec256 -> Format.pp_print_string ppf "Naked_vec256"
     | Naked_vec512 -> Format.pp_print_string ppf "Naked_vec512"
@@ -246,6 +249,7 @@ module Flat_suffix_element0 = struct
     | Vec256 -> Naked_vec256
     | Vec512 -> Naked_vec512
     | Word -> Naked_nativeint
+    | Untagged_immediate -> Naked_immediate
     | Value _ ->
       (* CR: consider printing the value kind *)
       Misc.fatal_error
@@ -482,15 +486,6 @@ module Boxable_number = struct
     | Naked_vec256 -> Naked_number Naked_vec256
     | Naked_vec512 -> Naked_number Naked_vec512
 
-  let primitive_kind t : Primitive.boxed_integer =
-    match t with
-    | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_float | Naked_float32
-      ->
-      assert false
-    | Naked_int32 -> Boxed_int32
-    | Naked_int64 -> Boxed_int64
-    | Naked_nativeint -> Boxed_nativeint
-
   include Container_types.Make (struct
     type nonrec t = t
 
@@ -519,9 +514,9 @@ module Boxable_number = struct
     | Naked_int32 -> Format.pp_print_string ppf "naked_int32"
     | Naked_int64 -> Format.pp_print_string ppf "naked_int64"
     | Naked_nativeint -> Format.pp_print_string ppf "naked_nativeint"
-    | Naked_vec128 -> Format.fprintf ppf "naked_vec128"
-    | Naked_vec256 -> Format.fprintf ppf "naked_vec256"
-    | Naked_vec512 -> Format.fprintf ppf "naked_vec512"
+    | Naked_vec128 -> Format.pp_print_string ppf "naked_vec128"
+    | Naked_vec256 -> Format.pp_print_string ppf "naked_vec256"
+    | Naked_vec512 -> Format.pp_print_string ppf "naked_vec512"
 
   let print_lowercase_short ppf t =
     match t with
@@ -1019,6 +1014,7 @@ module With_subkind = struct
                         | Vec256 -> naked_vec256
                         | Vec512 -> naked_vec512
                         | Word -> naked_nativeint
+                        | Untagged_immediate -> naked_immediate
                       in
                       let fields : t array =
                         let flattened_reordered_shape =
@@ -1047,11 +1043,15 @@ module With_subkind = struct
       | Parrayval Pgenarray -> Generic_array
       | Parrayval (Punboxedfloatarray Unboxed_float64) -> Float_array
       | Parrayval (Punboxedfloatarray Unboxed_float32) -> Unboxed_float32_array
-      | Parrayval (Punboxedintarray (Unboxed_int8 | Unboxed_int16)) ->
+      | Parrayval
+          (Punboxedoruntaggedintarray
+            (Untagged_int8 | Untagged_int16 | Untagged_int)) ->
         Misc.unboxed_small_int_arrays_are_not_implemented ()
-      | Parrayval (Punboxedintarray Unboxed_int32) -> Unboxed_int32_array
-      | Parrayval (Punboxedintarray Unboxed_int64) -> Unboxed_int64_array
-      | Parrayval (Punboxedintarray Unboxed_nativeint) ->
+      | Parrayval (Punboxedoruntaggedintarray Unboxed_int32) ->
+        Unboxed_int32_array
+      | Parrayval (Punboxedoruntaggedintarray Unboxed_int64) ->
+        Unboxed_int64_array
+      | Parrayval (Punboxedoruntaggedintarray Unboxed_nativeint) ->
         Unboxed_nativeint_array
       | Parrayval (Punboxedvectorarray Unboxed_vec128) -> Unboxed_vec128_array
       | Parrayval (Punboxedvectorarray Unboxed_vec256) -> Unboxed_vec256_array
@@ -1071,11 +1071,12 @@ module With_subkind = struct
     | Pvalue vk -> from_lambda_value_kind vk
     | Punboxed_float Unboxed_float64 -> naked_float
     | Punboxed_float Unboxed_float32 -> naked_float32
-    | Punboxed_int Unboxed_int8 -> naked_int8
-    | Punboxed_int Unboxed_int16 -> naked_int16
-    | Punboxed_int Unboxed_int32 -> naked_int32
-    | Punboxed_int Unboxed_int64 -> naked_int64
-    | Punboxed_int Unboxed_nativeint -> naked_nativeint
+    | Punboxed_or_untagged_integer Untagged_int8 -> naked_int8
+    | Punboxed_or_untagged_integer Untagged_int16 -> naked_int16
+    | Punboxed_or_untagged_integer Unboxed_int32 -> naked_int32
+    | Punboxed_or_untagged_integer Unboxed_int64 -> naked_int64
+    | Punboxed_or_untagged_integer Unboxed_nativeint -> naked_nativeint
+    | Punboxed_or_untagged_integer Untagged_int -> naked_immediate
     | Punboxed_vector Unboxed_vec128 -> naked_vec128
     | Punboxed_vector Unboxed_vec256 -> naked_vec256
     | Punboxed_vector Unboxed_vec512 -> naked_vec512
@@ -1185,6 +1186,7 @@ module Flat_suffix_element = struct
     | Naked_int32 -> With_subkind.naked_int32
     | Naked_int64 -> With_subkind.naked_int64
     | Naked_nativeint -> With_subkind.naked_nativeint
+    | Naked_immediate -> With_subkind.naked_immediate
     | Naked_vec128 -> With_subkind.naked_vec128
     | Naked_vec256 -> With_subkind.naked_vec256
     | Naked_vec512 -> With_subkind.naked_vec512
