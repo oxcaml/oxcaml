@@ -698,9 +698,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       ( Comp_hint.Morph_hint.Allow_disallow.disallow_left hint,
         Comp_hint.Allow_disallow.disallow_left var.upper_hint )
 
-  let min (type a) (obj : a C.obj) = Amode (C.min obj, Const H.const_skip, Nil)
+  let min (type a) (obj : a C.obj) = Amode (C.min obj, Const H.min, Nil)
 
-  let max (type a) (obj : a C.obj) = Amode (C.max obj, Nil, Const H.const_skip)
+  let max (type a) (obj : a C.obj) = Amode (C.max obj, Nil, Const H.max)
 
   let of_const _obj ?hint a =
     let hint : _ Comp_hint.t =
@@ -1108,7 +1108,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* In this case, [a] is the maximum element, and we can use [a_hint_lower]
            as the output's lower hint *)
-        Amode (a, a_hint_lower, Const H.const_skip)
+        Amode (a, a_hint_lower, Const H.max)
       else
         match rest with
         | [] -> Amodejoin (a, a_hint_lower, mvs)
@@ -1133,7 +1133,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (union_prefer_left mvs' mvs)
               xs)
     in
-    loop (C.min obj) (Const H.const_skip) VarMap.empty l
+    loop (C.min obj) (Const H.min) VarMap.empty l
 
   let meet (type a l) obj l =
     let rec loop :
@@ -1147,7 +1147,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* In this case, [a] is the minimum element, and we can use [a_hint_upper]
            as the output's upper hint *)
-        Amode (a, Const H.const_skip, a_hint_upper)
+        Amode (a, Const H.min, a_hint_upper)
       else
         match rest with
         | [] -> Amodemeet (a, a_hint_upper, mvs)
@@ -1170,7 +1170,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (union_prefer_left mvs' mvs)
               xs)
     in
-    loop (C.max obj) (Const H.const_skip) VarMap.empty l
+    loop (C.max obj) (Const H.max) VarMap.empty l
 
   let get_loose_ceil : type a l r. a C.obj -> (a, l * r) mode -> a =
    fun obj m ->
@@ -1198,9 +1198,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let zap_to_ceil : type a l. a C.obj -> (a, l * allowed) mode -> log:_ -> a =
    fun obj m ~log ->
     let ceil = get_ceil obj m in
-    (* This this [submode] call must suceed, we provide a skip hint *)
-    submode obj (Amode (ceil, Const H.const_skip, Const H.const_skip)) m ~log
-    |> Result.get_ok;
+    (* We want a hint to explain why [ceil] is high. However, we only have hint
+       for why [ceil] is low. There is no good hint to use. *)
+    submode obj (Amode (ceil, Nil, Nil)) m ~log |> Result.get_ok;
     ceil
 
   (** Zap [mv] to its lower bound. Returns the [log] of the zapping, in
@@ -1221,9 +1221,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (mv : (a, allowed * r) morphvar) =
     let rec loop lower =
       let log = ref empty_changes in
-      (* We provide a skip hint to this call to [submode_mvc]
-         as it will either succeed or we will undo the change and not use the hint *)
-      let r = submode_mvc ~log:(Some log) obj mv lower (Const H.const_skip) in
+      (* We want a hint for why [lower] is low, but we only have hint for why [lower] is high. There is no good hint to use. *)
+      let r = submode_mvc ~log:(Some log) obj mv lower Nil in
       match r with
       | Ok () -> !log, lower
       | Error (a, _a_hint) ->
@@ -1260,9 +1259,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       in
       VarMap.iter
         (fun _ mv ->
-          (* Since this call to [submode_mvc] should always succeed,
-             we provide a skip hint *)
-          submode_mvc obj mv floor (Const H.const_skip) ~log |> Result.get_ok)
+          (* We want a hint for why [floor] is low. However, we only have hint
+             for why [floor] is high. There is no hint to use. *)
+          submode_mvc obj mv floor Nil ~log |> Result.get_ok)
         mvs;
       floor
 
@@ -1295,9 +1294,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       if C.le obj (C.max obj) a
       then
         ( Amode
-            ( a,
-              Comp_hint.Allow_disallow.allow_left a_hint_lower,
-              Const H.const_skip ),
+            (a, Comp_hint.Allow_disallow.allow_left a_hint_lower, Const H.max),
           false )
       else
         ( Amodevar
@@ -1335,9 +1332,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       if C.le obj a (C.min obj)
       then
         ( Amode
-            ( a,
-              Const H.const_skip,
-              Comp_hint.Allow_disallow.allow_right a_hint_upper ),
+            (a, Const H.min, Comp_hint.Allow_disallow.allow_right a_hint_upper),
           false )
       else
         ( Amodevar

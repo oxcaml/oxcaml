@@ -1571,7 +1571,9 @@ module Hint = struct
     | Is_function_return
     | Stack_expression
 
-  let const_skip = Skip
+  let max = Skip
+
+  let min = Skip
 
   let const_debug s = Debug s
 

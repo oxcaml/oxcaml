@@ -236,6 +236,9 @@ module type Solver_mono = sig
   (** The maximum mode in the lattice *)
   val max : 'a obj -> ('a, 'l * 'r) mode
 
+  (* CR zqian: [zap_*] should take optional hint, pointing to the location in
+     the source code where zapping happens *)
+
   (** Pushes the mode variable to the lowest constant possible.
       Expensive.
       WARNING: the lattice must be finite for this to terminate.*)
@@ -332,9 +335,11 @@ module type Hint = sig
   (** Hints describing the reasons for constants *)
   type const
 
-  (** See comment on [Skip] constructor for [const] in [Mode.Hint] for details
-    about this. *)
-  val const_skip : const
+  (** The hint to explain an upper bound being the top of the lattice. *)
+  val max : const
+
+  (** The hint to explain a lower bound being the bottom of the lattice. *)
+  val min : const
 
   (** A constant hint that can be used for debugging, by providing a custom string message *)
   val const_debug : string -> const
