@@ -144,6 +144,17 @@ let mk_no_cfg_prologue_validate f =
     Arg.Unit f,
     " Do not validate prologues added to CFG" )
 
+let mk_cfg_prologue_shrink_wrap f =
+  ( "-cfg-prologue-shrink-wrap",
+    Arg.Unit f,
+    " Place prologues optimally in the CFG to minimise unnecessary prologue \
+     executions" )
+
+let mk_no_cfg_prologue_shrink_wrap f =
+  ( "-no-cfg-prologue-shrink-wrap",
+    Arg.Unit f,
+    " Place prologues at the entrypoint of the CFG" )
+
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
     Arg.Int f,
@@ -933,6 +944,8 @@ module type Oxcaml_options = sig
   val no_cfg_eliminate_dead_trap_handlers : unit -> unit
   val cfg_prologue_validate : unit -> unit
   val no_cfg_prologue_validate : unit -> unit
+  val cfg_prologue_shrink_wrap : unit -> unit
+  val no_cfg_prologue_shrink_wrap : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -1062,6 +1075,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_cfg_eliminate_dead_trap_handlers;
       mk_cfg_prologue_validate F.cfg_prologue_validate;
       mk_no_cfg_prologue_validate F.no_cfg_prologue_validate;
+      mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
+      mk_no_cfg_prologue_shrink_wrap F.no_cfg_prologue_shrink_wrap;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1225,6 +1240,8 @@ module Oxcaml_options_impl = struct
 
   let cfg_prologue_validate = set' Oxcaml_flags.cfg_prologue_validate
   let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
+  let cfg_prologue_shrink_wrap = set' Oxcaml_flags.cfg_prologue_shrink_wrap
+  let no_cfg_prologue_shrink_wrap = clear' Oxcaml_flags.cfg_prologue_shrink_wrap
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -1626,6 +1643,7 @@ module Extra_params = struct
     | "cfg-eliminate-dead-trap-handlers" ->
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
+    | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges

@@ -47,6 +47,8 @@ module type Oxcaml_options = sig
   val no_cfg_eliminate_dead_trap_handlers : unit -> unit
   val cfg_prologue_validate : unit -> unit
   val no_cfg_prologue_validate : unit -> unit
+  val cfg_prologue_shrink_wrap : unit -> unit
+  val no_cfg_prologue_shrink_wrap : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit

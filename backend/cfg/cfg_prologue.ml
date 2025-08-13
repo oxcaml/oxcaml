@@ -243,6 +243,42 @@ let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
       (descendants cfg prologue_block);
     cfg_with_layout
 
+let add_prologue_if_required_old : Cfg_with_layout.t -> Cfg_with_layout.t =
+ fun cfg_with_layout ->
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let prologue_required =
+    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
+      ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  in
+  if prologue_required
+  then (
+    let terminator_as_basic terminator =
+      { terminator with Cfg.desc = Cfg.Prologue }
+    in
+    let entry_block = Cfg.get_block_exn cfg cfg.entry_label in
+    let next_instr =
+      Option.value (DLL.hd entry_block.body)
+        ~default:(terminator_as_basic entry_block.terminator)
+    in
+    DLL.add_begin entry_block.body
+      (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
+         ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+         ());
+    let add_epilogue (block : Cfg.basic_block) =
+      let terminator = terminator_as_basic block.terminator in
+      DLL.add_end block.body
+        (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
+           ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+           ())
+    in
+    Cfg.iter_blocks cfg ~f:(fun _label block ->
+        match
+          Instruction_requirements.terminator block.terminator cfg.fun_name
+        with
+        | Requires_no_prologue -> add_epilogue block
+        | No_requirements | Requires_prologue -> ()));
+  cfg_with_layout
+
 module Validator = struct
   type state =
     | No_prologue_on_stack
@@ -372,7 +408,11 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   validate_no_prologue cfg_with_layout;
   let fun_name = Cfg.fun_name (Cfg_with_layout.cfg cfg_with_layout) in
-  let cfg_with_layout = add_prologue_if_required cfg_with_layout in
+  let cfg_with_layout =
+    match !Oxcaml_flags.cfg_prologue_shrink_wrap with
+    | true -> add_prologue_if_required cfg_with_layout
+    | false -> add_prologue_if_required_old cfg_with_layout
+  in
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   match !Oxcaml_flags.cfg_prologue_validate with
   | true -> (
