@@ -1751,15 +1751,6 @@ let addr_array_initialize arr ofs newval dbg =
       [array_indexing log2_size_addr arr ofs dbg; newval],
       dbg )
 
-(** [get_const_bitmask x] returns [Some (y, mask)] if [x] is [y & mask] *)
-let get_const_bitmask = function
-  | Cop (Cand, ([x; Cconst_natint (mask, _)] | [Cconst_natint (mask, _); x]), _)
-    ->
-    Some (x, mask)
-  | Cop (Cand, ([x; Cconst_int (mask, _)] | [Cconst_int (mask, _); x]), _) ->
-    Some (x, Nativeint.of_int mask)
-  | _ -> None
-
 (** [zero_extend ~bits dbg e] returns [e] with the most significant [arch_bits - bits]
     bits set to 0 *)
 let zero_extend ~bits ~dbg e =
