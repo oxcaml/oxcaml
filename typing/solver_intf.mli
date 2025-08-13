@@ -346,10 +346,10 @@ module type Hint = sig
   (** Hints describing the reasons for morphisms applied to modes.
       The type parameter gives the allowance of the hint, which should correspond
       to the allowance of the morphism. *)
-  type 'd morph constraint 'd = 'l * 'r
+  type 'd morph
 
   (** The hint to be used for the identity morphism *)
-  val id : 'd morph
+  val id : ('l * 'r) morph
 
   (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
   val left_adjoint : (_ * allowed) morph -> (allowed * disallowed) morph

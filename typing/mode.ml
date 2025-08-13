@@ -1623,7 +1623,6 @@ module Hint = struct
     | Crossing_left : ('l * disallowed) morph
     | Crossing_right : (disallowed * 'r) morph
     | Register_alloc_mode : ('l * 'r) morph
-    constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
   type 'd neg_const = 'd neg const constraint 'd = _ * _
@@ -1864,7 +1863,7 @@ type 'a comonadic_with = 'a C.comonadic_with =
 module Axis = C.Axis
 
 type axhint =
-  | Apply : 'd Hint.morph * 'b * 'b C.obj * axhint * _ C.morph -> axhint
+  | Apply : ('l * 'r) Hint.morph * 'b * 'b C.obj * axhint * _ C.morph -> axhint
   | Const : 'd Hint.const -> axhint
   | Nil : axhint
 [@@ocaml.warning "-62"]

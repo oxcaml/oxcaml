@@ -232,7 +232,6 @@ module type S = sig
       | Crossing_left : ('l * disallowed) morph
       | Crossing_right : (disallowed * 'r) morph
       | Register_alloc_mode : ('l * 'r) morph
-      constraint 'd = _ * _
     [@@ocaml.warning "-62"]
 
     (* This is needed for the destructive substitutions in [Common_axis] for
