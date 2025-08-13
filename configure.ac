@@ -723,7 +723,7 @@ AC_ARG_ENABLE([keep-compiler-asm],
   [AS_HELP_STRING([--enable-keep-compiler-asm],
     [Configure the compiler to use -S during bootstrapping, which will produce .s assembly files for the files in the compiler tree. The files can be found in _build/main when building with dune])],
   [],
-  [enable_produce_and_keep_assembly_files_for_compiler=no])
+  [enable_keep_compiler_asm=no])
 
 AC_ARG_ENABLE([multidomain],
   [AS_HELP_STRING([--enable-multidomain],
@@ -2861,7 +2861,7 @@ AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
     [AC_MSG_ERROR([--enable-oxcaml-dwarf-on-compiler requires --disable-function-sections to be passed])])])
 
 # Configure assembly emission flag for compiler
-AS_IF([test x"$enable_produce_and_keep_assembly_files_for_compiler" = "xyes"],
+AS_IF([test x"$enable_keep_compiler_asm" = "xyes"],
   [assembly_flag_for_compiler="-S"],
   [assembly_flag_for_compiler=""])
 
