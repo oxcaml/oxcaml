@@ -10,3 +10,5 @@ complicated (raise_2): 72
 complicated (raise_3): 21
 round_trip: 30
 raise_in_loop
+catch_wildcard
+caught
