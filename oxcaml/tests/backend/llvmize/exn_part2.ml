@@ -44,3 +44,8 @@ let[@inline never] [@local never] complicated do_raise =
       with Exn2 -> x + y
     with Exn1 n -> n + x
   with Exn3 -> outer
+
+let[@inline never] [@local never] raise_in_loop () =
+  for i = 0 to 1000 do
+    try raise_exn1_from_ocaml i with Exn1 n -> assert (n = i)
+  done

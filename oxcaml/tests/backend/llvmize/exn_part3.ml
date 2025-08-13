@@ -15,4 +15,6 @@ let () =
   Format.printf "complicated (raise_1 100) %d\n" (complicated (raise_1 100));
   Format.printf "complicated (raise_2): %d\n" (complicated raise_2);
   Format.printf "complicated (raise_3): %d\n" (complicated raise_3);
-  Format.printf "round_trip: %d\n" (round_trip ())
+  Format.printf "round_trip: %d\n" (round_trip ());
+  print_endline "raise_in_loop";
+  raise_in_loop ()

@@ -170,7 +170,8 @@ type fun_sig =
 
 type trap_block_info =
   { trap_block : Ident.t;
-    stacksave_ptr : Ident.t
+    stacksave_ptr : Ident.t;
+    payload : Ident.t
   }
 
 type fun_info =
@@ -425,9 +426,13 @@ module F = struct
 
   let ins_store_label_addr t ~label ~dst =
     ins t "store ptr blockaddress(%a, %a), ptr %a" pp_global
-      t.current_fun_info.fun_name (pp_label_ident t) label pp_ident dst
+      t.current_fun_info.fun_name pp_ident label pp_ident dst
 
+  (* These pairs exist since one takes [Label.t]'s coming from the CFG, while
+     the other takes [Ident.t]'s we created in llvmize. *)
   let ins_branch t label = ins t "br %a" (pp_label t) label
+
+  let ins_branch_ident t label = ins t "br label %a" pp_ident label
 
   let ins_alloca ?comment t ident typ =
     let pp_regname ppf () =
@@ -614,6 +619,32 @@ module F = struct
   (* == Cfg instructions == *)
   (* CR-soon yusumez: Add implementations for missing basic and terminator
      instructions *)
+
+  (* CR yusumez: This needs to be refactored. *)
+  let call_simple ?attrs ~cc ~pp_name t fn args res =
+    let args =
+      List.map
+        (fun ident ->
+          let loaded = fresh_ident t in
+          (* [ident] is a pointer to a pointer *)
+          ins_load t ~src:ident ~dst:loaded Llvm_typ.ptr;
+          Llvm_typ.ptr, loaded)
+        runtime_regs
+      @ args
+    in
+    let res_type =
+      let runtime_reg_types = List.map (fun _ -> Llvm_typ.ptr) runtime_regs in
+      let actual_res_types = res in
+      Llvm_typ.(Struct [Struct runtime_reg_types; Struct actual_res_types])
+    in
+    let res_ident = fresh_ident t in
+    ins_call ?attrs ~cc ~pp_name t fn args (Some (res_type, res_ident));
+    List.iteri
+      (fun idx reg ->
+        let temp = fresh_ident t in
+        ins_extractvalue t ~arg:res_ident ~res:temp res_type [0; idx];
+        ins_store t ~src:temp ~dst:reg Llvm_typ.ptr)
+      runtime_regs
 
   let call t (i : Cfg.terminator Cfg.instruction) (op : Cfg.func_call_operation)
       label_after =
@@ -1109,7 +1140,7 @@ module F = struct
     | Poptrap { lbl_handler } -> (
       match Label.Tbl.find_opt t.current_fun_info.trap_blocks lbl_handler with
       | None -> Misc.fatal_error "Llvmize: unbalanced trap pop"
-      | Some { trap_block; stacksave_ptr } ->
+      | Some { trap_block; stacksave_ptr; payload = _ } ->
         (* Restore previous exn handler sp *)
         let ds_exn_handler_addr = load_domainstate_addr t Domain_exn_handler in
         let prev_sp =
@@ -1125,27 +1156,33 @@ module F = struct
           [Llvm_typ.ptr, stacksave_ptr]
           None)
     | Pushtrap { lbl_handler } -> (
-      (* CR yusumez: Force spilling of all general purpose registers in
-         llvm.eh.ocaml.try instead. *)
-      ins t
-        {|call void asm sideeffect "", "~{rax},~{rbx},~{rcx},~{rdx},~{rsi},~{rdi},~{r8},~{r9},~{r10},~{r11},~{r12},~{r13},~{r14},~{r15}"()|};
-      (* Call a dummy LLVM intrinsic that will ensure the handler is not removed
-         as dead code and no breaking control flow optimisations are made
-         (thanks to the "returns twice" attribute). It intuitively acts like
-         setjmp but doesn't actually save the state to a buffer. It always
-         returns 0, but the optimiser doesn't know that. *)
-      let dummy = fresh_ident t in
-      let dummy_bool = fresh_ident t in
-      let try_block = fresh_ident t in
-      ins_call ~attrs:"returns_twice" ~cc:Default ~pp_name:pp_global t
-        "llvm.eh.ocaml.try" []
-        (Some (Llvm_typ.i32, dummy));
-      ins_conv t "trunc" ~src:dummy ~dst:dummy_bool ~src_typ:Llvm_typ.i32
-        ~dst_typ:Llvm_typ.bool;
-      ins_branch_cond_ident t dummy_bool
-        (get_ident_for_label t lbl_handler)
-        try_block;
-      line t.ppf "%a:" Ident.print try_block;
+      (* Call a function that wraps a dummy LLVM intrinsic that always returns
+         0. We set the handler address to be right after this call to emulate
+         setjmp's behaviour without actually saving the state to a buffer.
+
+         In particular, this ensures registers get spilled (thanks to the OCaml
+         calling convention), the handler is not removed as dead code (thanks to
+         the branch), and no breaking control flow optimisations are made
+         (thanks to the "returns twice" attribute). *)
+      call_simple ~attrs:"returns_twice" ~cc:Ocaml ~pp_name:pp_global t
+        "wrap_try" [] [Llvm_typ.i32];
+      (* Record label here - we will jump here for the handler *)
+      let pre_try_label = fresh_ident t in
+      ins_branch_ident t pre_try_label;
+      line t.ppf "%a:" Ident.print pre_try_label;
+      (* Extract the result of the call, or the exception payload. *)
+      let payload = fresh_ident t in
+      ins t {|%a = call i64 asm sideeffect "mov %%rax, $0", "=r"()|} pp_ident
+        payload;
+      (* If it's nonzero, we have an exception. Otherwise, go to the try
+         block. *)
+      let zero_check = fresh_ident t in
+      let try_block_label = fresh_ident t in
+      ins_icmp_imm t "eq" payload "0" zero_check Llvm_typ.i64;
+      ins_branch_cond_ident t zero_check try_block_label
+        (get_ident_for_label t lbl_handler);
+      (* Enter try block from this point onwards. *)
+      line t.ppf "%a:" Ident.print try_block_label;
       (* Save state of stack *)
       let stacksave_ptr = fresh_ident t in
       add_called_fun t "llvm.stacksave" ~cc:Default ~args:[]
@@ -1176,7 +1213,7 @@ module F = struct
       in
       ins t {|call void asm sideeffect "mov %%rbp, ($0)", "r"(ptr %a)|} pp_ident
         rbp_slot;
-      ins_store_label_addr t ~label:lbl_handler ~dst:handler_slot;
+      ins_store_label_addr t ~label:pre_try_label ~dst:handler_slot;
       ins_store t ~src:ds_exn_handler ~dst:prev_sp_slot Llvm_typ.i64;
       ins_store t ~src:trap_block ~dst:ds_exn_handler_addr Llvm_typ.ptr;
       match Label.Tbl.find_opt t.current_fun_info.trap_blocks lbl_handler with
@@ -1184,7 +1221,7 @@ module F = struct
         Misc.fatal_error "Llvmize: Multiple pushtraps for the same handler"
       | None ->
         Label.Tbl.add t.current_fun_info.trap_blocks lbl_handler
-          { trap_block; stacksave_ptr })
+          { trap_block; stacksave_ptr; payload })
     | Stack_check _ -> not_implemented_basic i
 
   (* == Cfg data items == *)
@@ -1364,29 +1401,24 @@ let make_temps_for_regs t cfg args_and_signature_idents runtime_arg_idents =
     args_and_signature_idents;
   Reg.Set.iter (fun reg -> make_temp reg None) temp_regs
 
-let trap_handler_entry ~cfg_with_infos t (block : Cfg.basic_block) =
+let trap_handler_entry t (block : Cfg.basic_block) label =
   match[@ocaml.warning "-4"]
     DLL.hd block.body |> Option.map (fun i -> i, i.Cfg.desc)
   with
-  | Some (i, Op Move) ->
-    (* Restore RBP (+ remove padding) *)
-    F.ins t {|call void asm sideeffect "pop %%rbp; addq $$8, %%rsp", ""()|};
-    (* Touch all live regs to keep them on the stack *)
-    (* CR yusumez: Do we need both this and spilling GPRs right before
-       [ocaml.try] at the same time? It feels like we can get rid of the
-       former. *)
-    let live = (Cfg_with_infos.liveness_find cfg_with_infos i.id).across in
-    Reg.Set.iter
-      (fun reg ->
-        F.ins_call ~cc:Default ~pp_name:F.pp_global t "llvm.eh.ocaml.touch"
-          [Llvm_typ.ptr, get_ident_for_reg t reg]
-          None)
-      live;
-    let exn_payload = fresh_ident t in
-    (* Move payload from RAX to the appropriate temp *)
-    F.ins t {|%a = call i64 asm sideeffect "movq %%rax, $0", "=r,~{rax}"()|}
-      F.pp_ident exn_payload;
-    F.ins_store_into_reg t exn_payload i.arg.(0)
+  | Some (i, Op Move) -> (
+    match Label.Tbl.find_opt t.current_fun_info.trap_blocks label with
+    | Some { payload; _ } ->
+      (* Restore RBP (+ remove padding) *)
+      F.ins t {|call void asm sideeffect "pop %%rbp; addq $$8, %%rsp", ""()|};
+      (* CR yusumez: add these once we have R15 added to restore it*)
+      (*= let new_alloc_ptr = fresh_ident t in
+      F.ins t
+        {|%a = call i64 asm sideeffect "pop %%rbp; addq $$8, %%rsp; movq %%r15, $0", "=r"()|}
+        F.pp_ident new_alloc_ptr;
+      F.ins_store t ~src:new_alloc_ptr ~dst:allocation_ident Llvm_typ.i64; *)
+      (* Move payload to appropriate temp *)
+      F.ins_store_into_reg t payload i.arg.(0)
+    | None -> ())
   | _ ->
     Misc.fatal_error "Llvmize: first instruction of trap handler not a move"
 
@@ -1394,7 +1426,6 @@ let cfg (cl : CL.t) =
   let t = get_current_compilation_unit "cfg" in
   let layout = CL.layout cl in
   let cfg = CL.cfg cl in
-  let cfg_with_infos = Cfg_with_infos.make cl in
   (* CR gyorsh: handle unboxed return type (where is this info? do we need to
      find [Return] instruction to find it? if so, add a field to [Cfg.t] to
      store it explicitly. *)
@@ -1440,7 +1471,7 @@ let cfg (cl : CL.t) =
     if Label.equal entry_label label && not (List.is_empty preds)
     then Misc.fatal_errorf "Llvmize: entry label must not have predecessors";
     F.block_label_with_predecessors t label preds;
-    if block.is_trap_handler then trap_handler_entry ~cfg_with_infos t block;
+    if block.is_trap_handler then trap_handler_entry t block label;
     DLL.iter ~f:(F.basic t) block.body;
     F.terminator t block.terminator
   in
@@ -1583,8 +1614,26 @@ let declare_functions t =
   F.line t.ppf "declare i64 @llvm.read_register.i64(metadata)";
   F.line t.ppf "declare void @llvm.write_register.i64(metadata, i64)";
   (* Exception handling *)
-  F.line t.ppf "declare i32 @llvm.eh.ocaml.try() returns_twice";
-  F.line t.ppf "declare void @llvm.eh.ocaml.touch(ptr)"
+  F.line t.ppf "declare i32 @llvm.eh.ocaml.try()";
+  F.line t.ppf "%s"
+    {|define private cc 104 {ptr, i32} @wrap_try(ptr %r14) returns_twice noinline {
+  %1 = call i32 @llvm.eh.ocaml.try()
+  %t1 = extractvalue {{ptr, i32}} poison, 0
+  %t2 = insertvalue {ptr, i32} %t1, ptr %r14, 0
+  %t3 = insertvalue {ptr, i32} %t2, i32 %1, 1
+  ret {ptr, i32} %t3
+}|}
+
+(* CR yusumez: change this definition to account for R15 later. *)
+(*= F.line t.ppf "%s"
+    {|define private cc 104 {ptr, ptr, i32} @wrap_try(ptr %r14, ptr %r15) returns_twice noinline {
+  %1 = call i32 @llvm.eh.ocaml.try()
+  %t1 = extractvalue {{ptr, ptr, i32}} poison, 0
+  %t2 = insertvalue {ptr, ptr, i32} %t1, ptr %r14, 0
+  %t3 = insertvalue {ptr, ptr, i32} %t2, ptr %r15, 1
+  %t4 = insertvalue {ptr, ptr, i32} %t3, i32 %1, 2
+  ret {ptr, ptr, i32} %t4
+}|} *)
 
 let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename

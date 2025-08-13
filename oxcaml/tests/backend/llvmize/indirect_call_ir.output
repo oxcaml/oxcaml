@@ -90,8 +90,14 @@ L109:                                                ; preds = %L1
 
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
-declare i32 @llvm.eh.ocaml.try() returns_twice
-declare void @llvm.eh.ocaml.touch(ptr)
+declare i32 @llvm.eh.ocaml.try()
+define private cc 104 {ptr, i32} @wrap_try(ptr %r14) returns_twice noinline {
+  %1 = call i32 @llvm.eh.ocaml.try()
+  %t1 = extractvalue {{ptr, i32}} poison, 0
+  %t2 = insertvalue {ptr, i32} %t1, ptr %r14, 0
+  %t3 = insertvalue {ptr, i32} %t2, i32 %1, 1
+  ret {ptr, i32} %t3
+}
 
 @caml_curry2 = external global ptr
 
