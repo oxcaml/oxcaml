@@ -600,3 +600,53 @@
  (action
   (diff exn_part2_ir.output exn_part2_ir.output.corrected)))
 
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets alloc.cmx alloc_ir.output.corrected alloc.output.exe)
+ (deps alloc.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} alloc.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (with-outputs-to alloc_ir.output.corrected (pipe-outputs (run cat alloc.ll) (run ./filter.sh)))
+   (run %{bin:ocamlopt.opt} alloc.cmx -opaque -o alloc.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps alloc.cmx)
+ (targets alloc.output.corrected)
+ (action
+  (with-outputs-to
+   alloc.output.corrected
+   (run ./alloc.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps alloc.output alloc.output.corrected)
+ (action
+  (diff alloc.output alloc.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps alloc_ir.output alloc_ir.output.corrected)
+ (action
+  (diff alloc_ir.output alloc_ir.output.corrected)))
+
