@@ -1,19 +1,14 @@
 let static_const_not_supported () =
   Misc.fatal_error "This static_const is not yet supported."
 
-let const_or_var ~f (const_or_var : 'a Or_variable.t) =
-  match const_or_var with
-  | Var _ ->
-    (* When we are compiling with ocamlj, we turn off static allocation of
-       values that are only determined at runtime (i.e. values containing
-       variables. See [Closure_conversion.classify_fields_of_block],
-       [Reify.reify] and [Simplify_set_of_closures]. *)
-    Misc.fatal_error "Found a variable in Static_const"
-  | Const c -> f c
-
-let bind_const_or_var_to_symbol ~env ~res ~symbol ~to_jsir_const x =
-  To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
-    (Constant (const_or_var ~f:to_jsir_const x))
+let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
+  match x with
+  | Const c ->
+    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+      (Constant (to_jsir_const c))
+  | Var (v, _dbg) ->
+    (* CR selee: do something with [Debuginfo.t] *)
+    To_jsir_env.add_symbol_alias_of_var_exn env ~symbol ~alias_of:v, res
 
 let float32_to_jsir_const float32 : Jsir.constant =
   Float32
@@ -28,6 +23,42 @@ let int64_to_jsir_const int64 : Jsir.constant = Int64 int64
 
 let nativeint_to_jsir_const nativeint : Jsir.constant =
   Int32 (Targetint_32_64.to_int32 nativeint)
+
+let immutable_float_block_or_array ~env ~res ~symbol values ~array_or_not =
+  let all_consts = List.for_all Or_variable.is_const values in
+  if all_consts
+  then
+    let f (x : 'a Or_variable.t) =
+      match x with
+      | Const c -> Numeric_types.Float_by_bit_pattern.to_bits c
+      | Var _ ->
+        Misc.fatal_error
+          "Found a variable in Or_variable.t, even though we check that all \
+           values are constants"
+    in
+    let values = List.map f values |> Array.of_list in
+    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+      (Constant (Float_array values))
+  else
+    let values, res =
+      List.fold_right
+        (fun x (values, res) ->
+          match (x : Numeric_types.Float_by_bit_pattern.t Or_variable.t) with
+          | Const c ->
+            let bits = Numeric_types.Float_by_bit_pattern.to_bits c in
+            let var = Jsir.Var.fresh () in
+            ( var :: values,
+              To_jsir_result.add_instr_exn res
+                (Let (var, Constant (Float bits))) )
+          | Var (v, _dbg) ->
+            let var = To_jsir_env.get_var_exn env v in
+            var :: values, res)
+        values ([], res)
+    in
+    let values = Array.of_list values in
+    let tag = Tag.double_array_tag |> Tag.to_int in
+    let expr : Jsir.expr = Block (tag, values, array_or_not, Immutable) in
+    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol expr
 
 let block_like ~env ~res symbol (const : Static_const.t) =
   match const with
@@ -44,32 +75,23 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     in
     To_jsir_shared.bind_expr_to_symbol ~env ~res symbol expr
   | Boxed_float32 value ->
-    bind_const_or_var_to_symbol ~env ~res ~symbol
-      ~to_jsir_const:float32_to_jsir_const value
+    const_or_var ~env ~res ~symbol ~to_jsir_const:float32_to_jsir_const value
   | Boxed_float value ->
-    bind_const_or_var_to_symbol ~env ~res ~symbol
-      ~to_jsir_const:float_to_jsir_const value
+    const_or_var ~env ~res ~symbol ~to_jsir_const:float_to_jsir_const value
   | Boxed_int32 value ->
-    bind_const_or_var_to_symbol ~env ~res ~symbol
-      ~to_jsir_const:int32_to_jsir_const value
+    const_or_var ~env ~res ~symbol ~to_jsir_const:int32_to_jsir_const value
   | Boxed_int64 value ->
-    bind_const_or_var_to_symbol ~env ~res ~symbol
-      ~to_jsir_const:int64_to_jsir_const value
+    const_or_var ~env ~res ~symbol ~to_jsir_const:int64_to_jsir_const value
   | Boxed_nativeint value ->
-    bind_const_or_var_to_symbol ~env ~res ~symbol
-      ~to_jsir_const:nativeint_to_jsir_const value
+    const_or_var ~env ~res ~symbol ~to_jsir_const:nativeint_to_jsir_const value
   | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _ ->
     (* Need SIMD *)
     static_const_not_supported ()
-  | Immutable_float_block values | Immutable_float_array values ->
-    let values =
-      List.map
-        (const_or_var ~f:Numeric_types.Float_by_bit_pattern.to_bits)
-        values
-      |> Array.of_list
-    in
-    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
-      (Constant (Float_array values))
+  | Immutable_float_block values ->
+    immutable_float_block_or_array ~env ~res ~symbol values
+      ~array_or_not:NotArray
+  | Immutable_float_array values ->
+    immutable_float_block_or_array ~env ~res ~symbol values ~array_or_not:Array
   | Immutable_float32_array values ->
     ignore values;
     static_const_not_supported ()
@@ -93,12 +115,28 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     static_const_not_supported ()
   | Immutable_value_array values ->
     let tag = Tag.zero |> Tag.to_int in
-    let values, res =
-      List.map Simple.With_debuginfo.simple values
-      |> To_jsir_shared.simples ~env ~res
-    in
-    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
-      (Block (tag, Array.of_list values, Array, Immutable))
+    let values = List.map Simple.With_debuginfo.simple values in
+    let all_consts = List.for_all Simple.is_const values in
+    if all_consts
+    then
+      let values =
+        List.map
+          (fun x ->
+            match Simple.must_be_const x with
+            | None ->
+              Misc.fatal_error
+                "Found a non-constant in a Simple.t, even though we check that \
+                 all values are constants"
+            | Some const -> To_jsir_shared.reg_width_const const)
+          values
+        |> Array.of_list
+      in
+      To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+        (Constant (Tuple (tag, values, Array)))
+    else
+      let values, res = To_jsir_shared.simples ~env ~res values in
+      To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+        (Block (tag, Array.of_list values, Array, Immutable))
   | Empty_array kind -> (
     match kind with
     | Values_or_immediates_or_naked_floats | Naked_float32s ->
