@@ -972,12 +972,10 @@ type program =
    [main_module_block_format] field.
    * In the closure case the code is a sequence of assignments to a
      preallocated block of size [main_module_block_size mbf] using
-     (* CR jrayman: comment *)
      (Setfield(Getpredef(compilation_unit))). The size is used to preallocate
      the block.
    * In the flambda case the code is an expression returning a block
      value of size [main_module_block_size mbf]. The size is used to build
-     (* CR jrayman: comment *)
      the module root as an initialize_symbol
      Initialize_symbol(module_name, 0,
        [getfield 0; ...; getfield (main_module_block_size mbf - 1)])
