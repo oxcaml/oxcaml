@@ -1221,10 +1221,6 @@ val mixed_block_element_for_class : mixed_block_element
     Note: manifest primitives do not correspond to a run-time value! *)
 val bound_value_identifiers: signature -> Ident.t list
 
-val bound_value_identifiers_and_layouts:
-  layout_value:Jkind_types.Sort.t Jkind_types.Layout.t ->
-  signature -> (Ident.t * Jkind_types.Sort.t Jkind_types.Layout.t) list
-
 val signature_item_id : signature_item -> Ident.t
 
 val equal_mixed_block_element :

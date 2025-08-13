@@ -657,6 +657,25 @@ and transl_struct ~scopes loc fields cc rootpath
       {str_final_env; str_items; _} =
   transl_structure ~scopes loc fields cc rootpath str_final_env str_items
 
+and bound_value_identifiers_and_layouts = function
+    [] -> []
+  | Sig_value(id, {val_kind = Val_reg layout}, _) :: rem ->
+      (id, layout) :: bound_value_identifiers_and_layouts rem
+  | Sig_typext(id, _, _, _) :: rem ->
+      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_type_extension)))
+        :: bound_value_identifiers_and_layouts rem
+  | Sig_module(id, Mp_present, _, _, _) :: rem ->
+      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_module))) ::
+        bound_value_identifiers_and_layouts rem
+  | Sig_class(id, _, _, _) :: rem ->
+      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_class))) ::
+        bound_value_identifiers_and_layouts rem
+  | Sig_value(_, {val_kind = (Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _
+                              | Val_anc _)}, _) :: rem
+  | Sig_module(_, Mp_absent, _, _, _) :: rem
+  | (Sig_type _ | Sig_modtype _ | Sig_class_type _) :: rem ->
+      bound_value_identifiers_and_layouts rem
+
 (* The function  transl_structure is called by  the bytecode compiler.
    Some effort is made to compile in top to bottom order, in order to display
    warning by increasing locations. *)
@@ -875,10 +894,7 @@ and transl_structure ~scopes loc
           Value_rec_compiler.compile_letrec class_bindings body, repr
       | Tstr_include incl ->
           let ids_with_layouts =
-            bound_value_identifiers_and_layouts
-              ~layout_value:Jkind.(Layout.of_const (Layout.Const.of_sort_const
-                Sort.Const.for_module_field))
-              incl.incl_type
+            bound_value_identifiers_and_layouts incl.incl_type
           in
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
@@ -939,10 +955,7 @@ and transl_structure ~scopes loc
               transl_structure ~scopes loc fields cc rootpath final_env rem
           | _ ->
               let ids_with_layouts =
-                bound_value_identifiers_and_layouts
-                  ~layout_value:Jkind.(Layout.of_const
-                    (Layout.Const.of_sort_const Sort.Const.for_module_field))
-                  od.open_bound_items
+                bound_value_identifiers_and_layouts od.open_bound_items
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
@@ -2108,6 +2121,7 @@ let transl_package_plain_block component_names coercion =
   let repr =
     match coercion with
     | Tcoerce_none -> Module_value_only (List.length component_names)
+      (* CR jrayman: wrong *)
     | Tcoerce_structure { output_repr; _ } ->
       transl_module_representation output_repr
     | Tcoerce_functor _

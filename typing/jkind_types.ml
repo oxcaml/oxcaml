@@ -198,7 +198,9 @@ module Sort = struct
 
     let for_loop_index = value
 
-    let for_module_field = value
+    let for_type_extension = value
+
+    let for_class = value
   end
 
   module Var = struct
