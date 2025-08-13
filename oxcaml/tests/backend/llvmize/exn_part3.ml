@@ -17,4 +17,6 @@ let () =
   Format.printf "complicated (raise_3): %d\n" (complicated raise_3);
   Format.printf "round_trip: %d\n" (round_trip ());
   print_endline "raise_in_loop";
-  raise_in_loop ()
+  raise_in_loop ();
+  print_endline "catch_wildcard";
+  catch_wildcard ()

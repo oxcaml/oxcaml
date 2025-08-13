@@ -3,27 +3,31 @@ source_filename = "exn_part2.ml"
 @camlExn_part2__data_begin = global {  } {  }, align 8
 define void @camlExn_part2__code_begin() { ret void }
 
-@camlExn_part2__gc_roots = global { ptr, i64 } { ptr @camlExn_part2__Exn3212, i64 0 }, align 8
-@.header.camlExn_part2 = global { i64 } { i64 9984 }, align 8
-@camlExn_part2 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlExn_part2__Exn3212, ptr @camlExn_part2__catch_exn1_from_llvm_8, ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_9, ptr @camlExn_part2__catch_exn1_nested_from_llvm_10, ptr @camlExn_part2__raise_1_11, ptr @camlExn_part2__raise_2_12, ptr @camlExn_part2__raise_HIDE_STAMP, ptr @camlExn_part2__complicated_14, ptr @camlExn_part2__raise_in_loop_15 }, align 8
-@.header.camlExn_part2__raise_in_loop_15 = global { i64 } { i64 3063 }, align 8
-@camlExn_part2__raise_in_loop_15 = global { ptr, i64 } { ptr @camlExn_part2__raise_in_loop_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlExn_part2__complicated_14 = global { i64 } { i64 3063 }, align 8
-@camlExn_part2__complicated_14 = global { ptr, i64 } { ptr @camlExn_part2__complicated_HIDE_STAMP, i64 108086391056891909 }, align 8
+@camlExn_part2__gc_roots = global { ptr, i64 } { ptr @camlExn_part2__Exn3229, i64 0 }, align 8
+@.header.camlExn_part2 = global { i64 } { i64 11008 }, align 8
+@camlExn_part2 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlExn_part2__Exn3229, ptr @camlExn_part2__catch_exn1_from_llvm_9, ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_10, ptr @camlExn_part2__catch_exn1_nested_from_llvm_11, ptr @camlExn_part2__raise_1_12, ptr @camlExn_part2__raise_2_13, ptr @camlExn_part2__raise_HIDE_STAMP, ptr @camlExn_part2__complicated_15, ptr @camlExn_part2__raise_in_loop_16, ptr @camlExn_part2__catch_wildcard_17 }, align 8
+@.header.camlExn_part2__catch_wildcard_17 = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__catch_wildcard_17 = global { ptr, i64 } { ptr @camlExn_part2__catch_wildcard_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__raise_in_loop_16 = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__raise_in_loop_16 = global { ptr, i64 } { ptr @camlExn_part2__raise_in_loop_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__complicated_15 = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__complicated_15 = global { ptr, i64 } { ptr @camlExn_part2__complicated_HIDE_STAMP, i64 108086391056891909 }, align 8
 @.header.camlExn_part2__raise_HIDE_STAMP = global { i64 } { i64 3063 }, align 8
-@camlExn_part2__raise_3_13 = global { ptr, i64 } { ptr @camlExn_part2__raise_3_HIDE_STAMP, i64 108086391056891909 }, align 8
+@camlExn_part2__raise_3_14 = global { ptr, i64 } { ptr @camlExn_part2__raise_3_HIDE_STAMP, i64 108086391056891909 }, align 8
 @.header.camlExn_part2__raise_HIDE_STAMP = global { i64 } { i64 3063 }, align 8
-@camlExn_part2__raise_2_12 = global { ptr, i64 } { ptr @camlExn_part2__raise_2_HIDE_STAMP, i64 108086391056891909 }, align 8
+@camlExn_part2__raise_2_13 = global { ptr, i64 } { ptr @camlExn_part2__raise_2_HIDE_STAMP, i64 108086391056891909 }, align 8
 @.header.camlExn_part2__raise_HIDE_STAMP = global { i64 } { i64 4087 }, align 8
-@camlExn_part2__raise_1_11 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlExn_part2__raise_1_HIDE_STAMP }, align 8
-@.header.camlExn_part2__catch_exn1_nested_from_llvm_10 = global { i64 } { i64 3063 }, align 8
-@camlExn_part2__catch_exn1_nested_from_llvm_10 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlExn_part2__raise_exn1_catch_exn2_from_llvm_9 = global { i64 } { i64 3063 }, align 8
-@camlExn_part2__raise_exn1_catch_exn2_from_llvm_9 = global { ptr, i64 } { ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlExn_part2__catch_exn1_from_llvm_8 = global { i64 } { i64 3063 }, align 8
-@camlExn_part2__catch_exn1_from_llvm_8 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlExn_part2__Exn3212 = global { i64 } { i64 3064 }, align 8
-@camlExn_part2__Exn3212 = global { ptr, i64 } { ptr @camlExn_part2__immstring6, i64 1 }, align 8
+@camlExn_part2__raise_1_12 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlExn_part2__raise_1_HIDE_STAMP }, align 8
+@.header.camlExn_part2__catch_exn1_nested_from_llvm_11 = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__catch_exn1_nested_from_llvm_11 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__raise_exn1_catch_exn2_from_llvm_10 = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__raise_exn1_catch_exn2_from_llvm_10 = global { ptr, i64 } { ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__catch_exn1_from_llvm_9 = global { i64 } { i64 3063 }, align 8
+@camlExn_part2__catch_exn1_from_llvm_9 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExn_part2__Exn3229 = global { i64 } { i64 3064 }, align 8
+@camlExn_part2__Exn3229 = global { ptr, i64 } { ptr @camlExn_part2__immstring6, i64 1 }, align 8
+@.header.camlExn_part2__immstring215 = global { i64 } { i64 2044 }, align 8
+@camlExn_part2__immstring215 = global { [ 6 x i8 ], [ 1 x i8 ], i8 } { [ 6 x i8 ] c"\63\61\75\67\68\74", [ 1 x i8 ] zeroinitializer, i8 1 }, align 8
 @.header.camlExn_part2__Pmakeblock195 = global { i64 } { i64 2816 }, align 8
 @camlExn_part2__Pmakeblock195 = global { ptr, ptr } { ptr @caml_exn_Assert_failure, ptr @camlExn_part2__const_block192 }, align 8
 @.header.camlExn_part2__const_block192 = global { i64 } { i64 3840 }, align 8
@@ -981,7 +985,7 @@ L1:
 L225:                                                ; preds = %L1
   %6 = load i64, ptr %3
   store i64 %6, ptr %4
-  store ptr @camlExn_part2__Exn3212, ptr %5
+  store ptr @camlExn_part2__Exn3229, ptr %5
   %7 = load i64, ptr %5
   store i64 %7, ptr %3
   %8 = load i64, ptr %ds
@@ -1534,7 +1538,7 @@ L235:                                                ; preds = %L232, %L306
   store i64 1, ptr %66
   %356 = load i64, ptr %66
   store i64 %356, ptr %67
-  store ptr @camlExn_part2__Exn3212, ptr %68
+  store ptr @camlExn_part2__Exn3229, ptr %68
   %357 = load i64, ptr %16
   %358 = load i64, ptr %68
   %359 = icmp slt i64 %357, %358
@@ -1821,6 +1825,214 @@ L371:                                                ; preds = %L366
   ret { { ptr }, { i64 } } %162
 }
 
+define cc 104 { { ptr }, { i64 } } @camlExn_part2__catch_wildcard_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %3 = alloca i64
+  store i64 %1, ptr %3
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = alloca i64
+  %20 = alloca i64
+  %21 = alloca i64
+  %22 = alloca i64
+  %23 = alloca i64
+  %24 = alloca i64
+  %25 = alloca i64
+  %26 = alloca i64
+  %27 = alloca i64
+  %28 = alloca i64
+  %29 = alloca i64
+  %30 = alloca i64
+  %31 = alloca i64
+  %32 = alloca i64
+  br label %L1
+L1:
+  br label %L377
+L377:                                                ; preds = %L1
+  %33 = load i64, ptr %3
+  store i64 %33, ptr %8
+  %34 = load i64, ptr %ds
+  %35 = add i64 %34, 64
+  %36 = inttoptr i64 %35 to ptr
+  %37 = load i64, ptr %36
+  store i64 %37, ptr %9
+  %38 = load i64, ptr %9
+  store i64 %38, ptr %10
+  %39 = load ptr, ptr %ds
+  %40 = call cc 104 { { ptr }, { i32 } } @wrap_try(ptr %39) returns_twice
+  %41 = extractvalue { { ptr }, { i32 } } %40, 0, 0
+  store ptr %41, ptr %ds
+  br label %42
+42:
+  %43 = call i64 asm sideeffect "mov %rax, $0", "=r"()
+  %44 = icmp eq i64 %43, 0
+  br i1 %44, label %45, label %L380
+45:
+  %46 = call  ptr @llvm.stacksave()
+  %47 = alloca { i64, i64, i64, i64 }
+  %48 = load i64, ptr %ds
+  %49 = add i64 %48, 48
+  %50 = inttoptr i64 %49 to ptr
+  %51 = load i64, ptr %50
+  %52 = ptrtoint ptr %47 to i64
+  %53 = add i64 %52, 16
+  %54 = inttoptr i64 %53 to ptr
+  %55 = ptrtoint ptr %47 to i64
+  %56 = add i64 %55, 8
+  %57 = inttoptr i64 %56 to ptr
+  %58 = ptrtoint ptr %47 to i64
+  %59 = add i64 %58, 0
+  %60 = inttoptr i64 %59 to ptr
+  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %54)
+  store ptr blockaddress(@camlExn_part2__catch_wildcard_HIDE_STAMP, %42), ptr %57
+  store i64 %51, ptr %60
+  store ptr %47, ptr %50
+  store i64 1, ptr %12
+  %61 = load i64, ptr %12
+  store i64 %61, ptr %3
+  %62 = load i64, ptr %3
+  %63 = load ptr, ptr %ds
+  call void asm sideeffect "push %rbp", "~{rsp}"()
+  %64 = call cc 104 { { ptr }, { i64 } } @camlExn_part2__raise_3_HIDE_STAMP(ptr %63, i64 %62)
+  call void asm sideeffect "pop %rbp", "~{rsp}"()
+  %65 = extractvalue { { ptr }, { i64 } } %64, 0, 0
+  store ptr %65, ptr %ds
+  %66 = extractvalue { { ptr }, { i64 } } %64, 1, 0
+  store i64 %66, ptr %3
+  br label %L388
+L388:                                                ; preds = %L377
+  %67 = load i64, ptr %ds
+  %68 = add i64 %67, 48
+  %69 = inttoptr i64 %68 to ptr
+  %70 = load i64, ptr %47
+  store i64 %70, ptr %69
+  call  void @llvm.stackrestore(ptr %46)
+  %71 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %72 = load ptr, ptr %ds
+  %73 = insertvalue { { ptr }, { i64 } } %71, ptr %72, 0, 0
+  %74 = load i64, ptr %3
+  %75 = insertvalue { { ptr }, { i64 } } %73, i64 %74, 1, 0
+  ret { { ptr }, { i64 } } %75
+L380:                                                ; preds = %L377
+  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""()
+  store i64 %43, ptr %3
+  %76 = load i64, ptr %3
+  store i64 %76, ptr %11
+  %77 = load i64, ptr %10
+  %78 = load i64, ptr %ds
+  %79 = add i64 %78, 64
+  %80 = inttoptr i64 %79 to ptr
+  store i64 %77, ptr %80
+  store i64 1, ptr %13
+  %81 = load i64, ptr %13
+  store i64 %81, ptr %14
+  store i64 13, ptr %15
+  store i64 1, ptr %16
+  store ptr @camlExn_part2__immstring215, ptr %17
+  store ptr @camlStdlib__print_endline_138, ptr %18
+  %82 = load i64, ptr %18
+  store i64 %82, ptr %19
+  %83 = load i64, ptr %19
+  %84 = add i64 %83, 16
+  store i64 %84, ptr %19
+  %85 = load i64, ptr %19
+  %86 = add i64 %85, 0
+  %87 = inttoptr i64 %86 to ptr
+  %88 = load i64, ptr %87
+  store i64 %88, ptr %20
+  %89 = load i64, ptr %20
+  store i64 %89, ptr %4
+  %90 = load i64, ptr %17
+  store i64 %90, ptr %5
+  %91 = load i64, ptr %16
+  store i64 %91, ptr %6
+  %92 = load i64, ptr %15
+  store i64 %92, ptr %7
+  %93 = load i64, ptr %4
+  %94 = load i64, ptr %5
+  %95 = load i64, ptr %6
+  %96 = load i64, ptr %7
+  %97 = call cc 105 { i64 } @caml_c_call(ptr @caml_ml_output, i64 poison, i64 %93, i64 %94, i64 %95, i64 %96)
+  %98 = extractvalue { i64 } %97, 0
+  store i64 %98, ptr %3
+  br label %L393
+L393:                                                ; preds = %L380
+  %99 = load i64, ptr %3
+  store i64 %99, ptr %21
+  %100 = load i64, ptr %21
+  store i64 %100, ptr %22
+  store i64 21, ptr %23
+  store ptr @camlStdlib__print_endline_138, ptr %24
+  %101 = load i64, ptr %24
+  store i64 %101, ptr %25
+  %102 = load i64, ptr %25
+  %103 = add i64 %102, 16
+  store i64 %103, ptr %25
+  %104 = load i64, ptr %25
+  %105 = add i64 %104, 0
+  %106 = inttoptr i64 %105 to ptr
+  %107 = load i64, ptr %106
+  store i64 %107, ptr %26
+  %108 = load i64, ptr %26
+  store i64 %108, ptr %4
+  %109 = load i64, ptr %23
+  store i64 %109, ptr %5
+  %110 = load i64, ptr %4
+  %111 = load i64, ptr %5
+  %112 = call cc 105 { i64 } @caml_c_call(ptr @caml_ml_output_char, i64 poison, i64 %110, i64 %111)
+  %113 = extractvalue { i64 } %112, 0
+  store i64 %113, ptr %3
+  br label %L396
+L396:                                                ; preds = %L393
+  %114 = load i64, ptr %3
+  store i64 %114, ptr %27
+  %115 = load i64, ptr %27
+  store i64 %115, ptr %28
+  store ptr @camlStdlib__print_endline_138, ptr %29
+  %116 = load i64, ptr %29
+  store i64 %116, ptr %30
+  %117 = load i64, ptr %30
+  %118 = add i64 %117, 16
+  store i64 %118, ptr %30
+  %119 = load i64, ptr %30
+  %120 = add i64 %119, 0
+  %121 = inttoptr i64 %120 to ptr
+  %122 = load i64, ptr %121
+  store i64 %122, ptr %31
+  %123 = load i64, ptr %31
+  store i64 %123, ptr %4
+  %124 = load i64, ptr %4
+  %125 = call cc 105 { i64 } @caml_c_call(ptr @caml_ml_flush, i64 poison, i64 %124)
+  %126 = extractvalue { i64 } %125, 0
+  store i64 %126, ptr %3
+  br label %L399
+L399:                                                ; preds = %L396
+  %127 = load i64, ptr %3
+  store i64 %127, ptr %32
+  %128 = load i64, ptr %32
+  store i64 %128, ptr %3
+  %129 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %130 = load ptr, ptr %ds
+  %131 = insertvalue { { ptr }, { i64 } } %129, ptr %130, 0, 0
+  %132 = load i64, ptr %3
+  %133 = insertvalue { { ptr }, { i64 } } %131, i64 %132, 1, 0
+  ret { { ptr }, { i64 } } %133
+}
+
 define cc 104 { { ptr }, { i64 } } @camlExn_part2__entry(ptr %0)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
@@ -1839,8 +2051,8 @@ define cc 104 { { ptr }, { i64 } } @camlExn_part2__entry(ptr %0)  {
   %14 = alloca i64
   br label %L1
 L1:
-  br label %L380
-L380:                                                ; preds = %L1
+  br label %L407
+L407:                                                ; preds = %L1
   store i64 1, ptr %6
   %15 = load i64, ptr %6
   store i64 %15, ptr %3
@@ -1855,13 +2067,13 @@ L380:                                                ; preds = %L1
   call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %21)
   %23 = extractvalue { i64 } %22, 0
   store i64 %23, ptr %2
-  br label %L382
-L382:                                                ; preds = %L380
+  br label %L409
+L409:                                                ; preds = %L407
   %24 = load i64, ptr %2
   store i64 %24, ptr %7
   %25 = load i64, ptr %7
   store i64 %25, ptr %8
-  store ptr @camlExn_part2__Exn3212, ptr %9
+  store ptr @camlExn_part2__Exn3229, ptr %9
   %26 = load i64, ptr %9
   store i64 %26, ptr %10
   %27 = load i64, ptr %10
@@ -1881,8 +2093,8 @@ L382:                                                ; preds = %L380
   call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %36)
   %38 = call  {  } @caml_initialize(i64 %31, i64 %32)
   call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %37)
-  br label %L383
-L383:                                                ; preds = %L382
+  br label %L410
+L410:                                                ; preds = %L409
   store i64 1, ptr %11
   store ptr @camlExn_part2, ptr %12
   %39 = load i64, ptr %12
@@ -1916,8 +2128,13 @@ define private cc 104 {ptr, i32} @wrap_try(ptr %r14) returns_twice noinline {
 }
 
 @camlExn_part1 = external global ptr
+@camlStdlib__print_endline_138 = external global ptr
+@caml_c_call = external global ptr
 @caml_curry2 = external global ptr
 @caml_exn_Assert_failure = external global ptr
+@caml_ml_flush = external global ptr
+@caml_ml_output = external global ptr
+@caml_ml_output_char = external global ptr
 
 @camlExn_part2__data_end = global {  } {  }, align 8
 define void @camlExn_part2__code_end() { ret void }
