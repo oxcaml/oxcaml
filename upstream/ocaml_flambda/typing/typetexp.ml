@@ -1432,6 +1432,7 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
     ~post:(fun (_,_,typ) -> generalize_ctyp typ)
   in
   let _ : _ list = TyVarEnv.instance_poly_univars env loc univars in
+  remove_mode_and_jkind_variables typ.ctyp_type;
   { ctyp_desc = Ttyp_poly (typed_vars, typ);
     ctyp_type = typ.ctyp_type;
     ctyp_env = env;
