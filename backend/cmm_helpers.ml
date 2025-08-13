@@ -748,7 +748,10 @@ let rec mul_int c1 c2 dbg =
 let tag_int i dbg =
   match i with
   | Cconst_int (n, _) -> int_const dbg n
-  | Cop (Casr, [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
+  | Cop
+      ( (Casr | Clsr),
+        [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
+        _ ) ->
     incr_int (lsl_const c 1 dbg) dbg
   | c -> incr_int (lsl_const c 1 dbg) dbg
 
