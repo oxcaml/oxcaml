@@ -720,7 +720,7 @@ AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
   [enable_oxcaml_dwarf_on_compiler=no])
 
 AC_ARG_ENABLE([produce-and-keep-assembly-files-for-compiler],
-  [AS_HELP_STRING([--enable-produce-and-keep-assembly-files-for-compiler],
+  [AS_HELP_STRING([--enable-keep-compiler-asm],
     [Configure the compiler to use -S during bootstrapping, which will produce .s assembly files for the files in the compiler tree. The files can be found in _build/main when building with dune])],
   [],
   [enable_produce_and_keep_assembly_files_for_compiler=no])
