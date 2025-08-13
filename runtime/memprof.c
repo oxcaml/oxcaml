@@ -2210,6 +2210,19 @@ CAMLexport void caml_memprof_enter_thread(memprof_thread_t thread)
 
 /**** Interface to OCaml ****/
 
+/* Set config of the domain and all its threads */
+static void set_config(memprof_domain_t domain, value config)
+{
+  CAMLassert(domain->entries.size == 0);
+  domain->entries.config = config;
+  memprof_thread_t thread = domain->threads;
+  while (thread) {
+    CAMLassert(thread->entries.size == 0);
+    thread->entries.config = config;
+    thread = thread->next;
+  }
+}
+
 CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 {
   CAMLparam3(lv, szv, tracker);
@@ -2259,16 +2272,9 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
     caml_initialize(&Field(config, i), Field(tracker,
                                              i - CONFIG_FIELD_FIRST_CALLBACK));
   }
-  CAMLassert(domain->entries.size == 0);
 
-  /* Set config pointers of the domain and all its threads */
-  domain->entries.config = config;
-  memprof_thread_t thread = domain->threads;
-  while (thread) {
-    CAMLassert(thread->entries.size == 0);
-    thread->entries.config = config;
-    thread = thread->next;
-  }
+
+  set_config(domain, config);
 
   /* reset PRNG, generate first batch of random numbers. */
   rand_init(domain);
@@ -2279,6 +2285,43 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
   set_action_pending_as_needed(domain);
 
   CAMLreturn(config);
+}
+
+CAMLprim value caml_memprof_participate(value config)
+{
+  CAMLparam1(config);
+  memprof_domain_t domain = Caml_state->memprof;
+  CAMLassert(domain);
+
+  if (Sampling(thread_config(domain->current))) {
+    caml_failwith("Gc.Memprof.participate: already profiling.");
+  }
+
+  switch (Status(config)) {
+  case CONFIG_STATUS_DISCARDED:
+    caml_failwith("Gc.Memprof.restart: profile already discarded.");
+  case CONFIG_STATUS_STOPPED:
+    caml_failwith("Gc.Memprof.restart: profile already stopped.");
+  case CONFIG_STATUS_SAMPLING:
+    break;
+  }
+
+  /* Orphan any surviving tracking entries from a previous profile. */
+  if (!orphans_create(domain)) {
+    caml_raise_out_of_memory();
+  }
+
+  set_config(domain, config);
+
+  /* reset PRNG, generate first batch of random numbers. */
+  rand_init(domain);
+
+  caml_memprof_set_trigger(Caml_state);
+  caml_reset_young_limit(Caml_state);
+  orphans_update_pending(domain);
+  set_action_pending_as_needed(domain);
+
+  CAMLreturn(Val_unit);
 }
 
 CAMLprim value caml_memprof_stop(value unit)
@@ -2312,6 +2355,7 @@ CAMLprim value caml_memprof_stop(value unit)
 
 CAMLprim value caml_memprof_discard(value config)
 {
+  CAMLparam1(config);
   uintnat status = Status(config);
   CAMLassert((status == CONFIG_STATUS_STOPPED) ||
              (status == CONFIG_STATUS_SAMPLING) ||
@@ -2328,5 +2372,5 @@ CAMLprim value caml_memprof_discard(value config)
 
   Set_status(config, CONFIG_STATUS_DISCARDED);
 
-  return Val_unit;
+  CAMLreturn(Val_unit);
 }
