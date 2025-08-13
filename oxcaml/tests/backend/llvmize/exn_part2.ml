@@ -49,3 +49,6 @@ let[@inline never] [@local never] raise_in_loop () =
   for i = 0 to 1000 do
     try raise_exn1_from_ocaml i with Exn1 n -> assert (n = i)
   done
+
+let[@inline never] [@local never] catch_wildcard () =
+  try raise_3 () with _ -> print_endline "caught"
