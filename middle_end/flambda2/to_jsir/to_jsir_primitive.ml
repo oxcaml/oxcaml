@@ -330,7 +330,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | (Tagged_immediate | Naked_immediate), Lsr -> "lsr"
       | (Naked_int32 | Naked_int64 | Naked_nativeint), Lsr ->
         "shift_right_unsigned"
-      | (Tagged_immediate | Naked_immediate), Asr -> "shift_right"
+      | (Tagged_immediate | Naked_immediate), Asr -> "asr"
       | (Naked_int32 | Naked_int64 | Naked_nativeint), Asr -> "shift_right"
     in
     let extern_name = with_int_prefix ~kind op_name ~percent_for_imms:true in

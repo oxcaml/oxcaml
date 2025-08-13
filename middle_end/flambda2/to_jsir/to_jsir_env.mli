@@ -63,6 +63,13 @@ val add_var_alias_of_symbol_exn :
   alias_of:Symbol.t ->
   t * To_jsir_result.t
 
+val add_symbol_alias_of_var_exn :
+  t ->
+  res:To_jsir_result.t ->
+  symbol:Symbol.t ->
+  alias_of:Variable.t ->
+  t * To_jsir_result.t
+
 (** Map a Flambda2 code ID to the address of the corresponding JSIR block
     as well as the parameters. *)
 val add_code_id :

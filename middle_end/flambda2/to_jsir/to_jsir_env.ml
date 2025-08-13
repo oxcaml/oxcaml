@@ -156,6 +156,10 @@ let add_var_alias_of_symbol_exn t ~res ~var ~alias_of =
   in
   { t with vars = Variable.Map.add var jvar t.vars }, res
 
+let add_symbol_alias_of_var_exn t ~res ~symbol ~alias_of =
+  let jvar = get_var_exn t alias_of in
+  add_symbol t ~res symbol jvar
+
 let add_if_not_found map item ~mem ~add =
   if mem item map
   then map
