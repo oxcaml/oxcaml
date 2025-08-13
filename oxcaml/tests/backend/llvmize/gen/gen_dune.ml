@@ -272,4 +272,5 @@ let () =
         Ocaml_llvm { filename = "exn_part2"; stop_after_llvmize = false };
         Output_ir { source = "exn_part2"; output = "exn_part2_ir" };
         Ocaml_default "exn_part3" ];
+  print_test_run_no_main "alloc";
   ()
