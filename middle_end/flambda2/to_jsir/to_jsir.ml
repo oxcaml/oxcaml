@@ -4,12 +4,15 @@ open! Flambda.Import
 let unsupported_multiple_return_variables vars =
   match vars with
   | [var] -> var
-  | _ -> Misc.fatal_error "Multiple return variables are currently unsupported."
+  | [] -> Misc.fatal_error "Found return statement with no arguments"
+  | _ :: _ ->
+    Misc.fatal_error "Multiple return variables are currently unsupported."
 
-let unsupported_multiple_params params =
+let exn_handler_unsupported_multiple_params params =
   match params with
   | [param] -> param
-  | _ -> Misc.fatal_error "Multiple parameters are currently unsupported."
+  | [] -> Misc.fatal_error "Found exception handler with no parameters"
+  | _ :: _ -> Misc.fatal_error "Multiple parameters are currently unsupported."
 
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
@@ -130,7 +133,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                 let env = To_jsir_env.add_continuation env k addr in
                 env, res
               | true ->
-                let param = unsupported_multiple_params params in
+                let param = exn_handler_unsupported_multiple_params params in
                 let res, addr = To_jsir_result.new_block res ~params:[] in
                 let _env, res = expr ~env ~res cont_body in
                 let env = To_jsir_env.add_exn_handler env k ~addr ~param in
