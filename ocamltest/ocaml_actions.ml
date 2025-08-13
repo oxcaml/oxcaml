@@ -1365,8 +1365,8 @@ let multidomain = Actions.make
   ~description:"Passes if multiple domains is enabled"
   ~does_something:false
   (Actions_helpers.predicate Config.multidomain
-    "Multidomain disabled"
-    "Multidomain enabled")
+    "Multidomain enabled"
+    "Multidomain disabled")
 
 let runtime4 = Actions.make
   ~name:"runtime4"
