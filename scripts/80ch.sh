@@ -64,10 +64,13 @@ do
   esac
 
   # Only check regular files that currently exist
-  [[ -f "$changed_file" ]] || continue
+  [ -f "$changed_file" ] || continue
 
   # Only check ml, mli, and mly files for long lines
-  [[ "$changed_file" =~ \.ml(i|y)?$ ]] || continue
+  case "$changed_file" in
+    *.ml | *.mli | *.mly) ;;
+    *) continue ;;
+  esac
 
   # Don't check autoformatted files (there's a bug in `ocamlformat` that
   # sometimes produces lines over 80 characters)
