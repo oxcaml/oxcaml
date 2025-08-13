@@ -67,10 +67,7 @@ end = struct
         (List.map
            (fun sh -> shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
            args)
-    | Arrow (arg, ret) ->
-      Shape.arrow ?uid:outer.uid
-        (shape_subst_uid_with_rec_var ~preserve_uid uid rv arg)
-        (shape_subst_uid_with_rec_var ~preserve_uid uid rv ret)
+    | Arrow -> Shape.arrow ?uid:outer.uid ()
     | Poly_variant fields ->
       Shape.poly_variant ?uid:outer.uid
         (poly_variant_constructors_map
@@ -289,10 +286,7 @@ module Type_shape = struct
                 row_fields
             in
             Shape.poly_variant row_fields
-          | Tarrow (_, arg, ret, _) ->
-            Shape.arrow
-              (of_type_expr_go ~depth ~visited arg subst shape_for_constr)
-              (of_type_expr_go ~depth ~visited ret subst shape_for_constr)
+          | Tarrow (_, _, _, _) -> Shape.arrow ()
           | Tunivar _ -> unknown_shape
           | Tof_kind _ -> unknown_shape
           | Tpackage _ -> unknown_shape
@@ -559,7 +553,7 @@ module Type_decl_shape = struct
     | Alias sh -> is_closed_type_shape sh
     | Tuple shapes | Unboxed_tuple shapes ->
       List.for_all is_closed_type_shape shapes
-    | Arrow (arg, ret) -> is_closed_type_shape arg && is_closed_type_shape ret
+    | Arrow -> true
     | Poly_variant constrs ->
       List.for_all
         (fun { pv_constr_name = _; pv_constr_args = shs } ->
@@ -851,10 +845,7 @@ let rec unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
                unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
                  sh)
              constrs)
-      | Arrow (arg, ret) ->
-        Shape.arrow
-          (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr arg)
-          (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr ret)
+      | Arrow -> Shape.arrow ()
       | Variant_unboxed
           { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout } ->
         Shape.variant_unboxed ~variant_uid ~arg_uid name arg_name
@@ -951,7 +942,7 @@ let rec estimate_layout_from_type_shape (t : Shape.t) : Layout.t option =
     Some arg_layout
     (* CR sspies: [arg_layout] could become unreliable in the future. Consider
        recursively descending in that case. *)
-  | Tuple _ | Arrow _ | Variant _ | Poly_variant _ | Record _ ->
+  | Tuple _ | Arrow | Variant _ | Poly_variant _ | Record _ ->
     Some (Layout.Base Value)
   | Alias t -> estimate_layout_from_type_shape t
   | Mu t ->

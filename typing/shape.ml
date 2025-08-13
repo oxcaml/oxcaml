@@ -468,7 +468,7 @@ and desc =
   | Tuple of t list
   | Unboxed_tuple of t list
   | Predef of Predef.t * t list
-  | Arrow of t * t
+  | Arrow
   | Poly_variant of t poly_variant_constructors
   | Mu of t
   | Rec_var of int
@@ -587,8 +587,7 @@ let rec equal_desc0 d1 d2 =
     List.equal equal t1 t2
   | Predef (p1, ts1), Predef (p2, ts2) ->
     Predef.equal p1 p2 && List.equal equal ts1 ts2
-  | Arrow (t1, t1'), Arrow (t2, t2') ->
-    equal t1 t2 && equal t1' t2'
+  | Arrow, Arrow -> true
   | Poly_variant pvs1, Poly_variant pvs2 ->
     List.equal equal_poly_variant_constructor pvs1 pvs2
   | Variant c1, Variant c2 ->
@@ -606,7 +605,7 @@ let rec equal_desc0 d1 d2 =
     && List.equal equal_field r1.fields r2.fields
   | (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _
     | Alias _ | Error _ | Variant _ | Variant_unboxed _ | Record _
-    | Predef _ | Arrow _ | Poly_variant _ | Tuple _ | Unboxed_tuple _
+    | Predef _ | Arrow | Poly_variant _ | Tuple _ | Unboxed_tuple _
     | Constr _ | Mutrec _ | Proj_decl _ | Mu _ | Rec_var _), _
     -> false
 
@@ -739,8 +738,8 @@ let rec print fmt t =
               (Format.pp_print_list
                 ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",@ ")
                 print) args) args
-    | Arrow (arg, ret) ->
-      Format.fprintf fmt "Arrow (%a, %a)" print arg print ret
+    | Arrow ->
+      Format.fprintf fmt "Arrow"
     | Poly_variant fields ->
       Format.fprintf fmt "Poly_variant (%a)"
         (Format.pp_print_list
@@ -974,9 +973,9 @@ let predef ?uid (p : Predef.t) (ts : t list) =
       List.map (fun t -> t.hash) ts);
     approximated = false }
 
-let arrow ?uid t1 t2 =
-  { uid; desc = Arrow (t1, t2);
-    hash = Hashtbl.hash (hash_arrow, uid, t1.hash, t2.hash);
+let arrow ?uid () =
+  { uid; desc = Arrow;
+    hash = Hashtbl.hash (hash_arrow, uid);
     approximated = false }
 
 let poly_variant ?uid t =
@@ -1098,7 +1097,7 @@ let set_uid_if_none t uid =
   | Tuple ts -> tuple ~uid ts
   | Unboxed_tuple ts -> unboxed_tuple ~uid ts
   | Predef (p, ts) -> predef ~uid p ts
-  | Arrow (t1, t2) -> arrow ~uid t1 t2
+  | Arrow -> arrow ~uid ()
   | Poly_variant t -> poly_variant ~uid t
   | Variant cs -> variant ~uid cs
   | Variant_unboxed t ->
@@ -1117,8 +1116,9 @@ let is_mu_closed t =
     | Abs (_, t) | Alias t | Proj (t, _) | Proj_decl (t, _) ->
       debruijn_closed_shape bound t
     | Variant_unboxed t -> debruijn_closed_shape bound t.arg_shape
-    | App (t1, t2) | Arrow (t1, t2) ->
+    | App (t1, t2) ->
       debruijn_closed_shape bound t1 && debruijn_closed_shape bound t2
+    | Arrow -> true
     | Constr (_, ts) | Tuple ts | Unboxed_tuple ts | Predef (_, ts) ->
       List.for_all (debruijn_closed_shape bound) ts
     | Struct t -> Item.Map.for_all (fun _ -> debruijn_closed_shape bound) t
@@ -1146,7 +1146,7 @@ let is_mu_closed t =
     | Proj (sh, _) | Proj_decl (sh, _) -> 1 + size sh
     | App (f, arg) ->
       1 + size f + size arg
-    | Arrow (arg, ret)-> 1 + size arg + size ret
+    | Arrow-> 1
     | Struct items ->
       Item.Map.fold (fun _ sh acc -> acc + size sh) items 1
     | Mutrec map ->

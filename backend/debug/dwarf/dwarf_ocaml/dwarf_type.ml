@@ -1425,7 +1425,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Poly_variant fields ->
       type_shape_to_dwarf_die_poly_variant ~reference ?name ~parent_proto_die
         ~fallback_value_die ~constructors:fields ~rec_env ()
-    | Arrow _ ->
+    | Arrow ->
       type_shape_to_dwarf_die_arrow ~reference ?name ~parent_proto_die
         ~fallback_value_die ()
     | Record { fields; kind = Record_boxed | Record_floats } ->
@@ -1806,8 +1806,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       Misc.fatal_errorf "predefined type must have base layout, but got: %a"
         Layout.format type_layout
     else unknown_base_layouts type_layout
-  | Arrow _, Base Value -> known_value
-  | Arrow _, _ ->
+  | Arrow, Base Value -> known_value
+  | Arrow, _ ->
     if !Clflags.dwarf_pedantic
     then
       Misc.fatal_errorf "arrow must have value layout, but got: %a"
