@@ -687,7 +687,7 @@ and transl_structure ~scopes loc
       let body, repr =
         let repr =
           Typedecl.module_representation_of_mixed_product_shape
-            ~loc:(Debuginfo.Scoped_location.to_location loc)
+            ~loc:(to_location loc)
             (List.rev_map (fun (_, mbe) -> mbe) fields |> Array.of_list)
         in
         match cc with
@@ -908,8 +908,8 @@ and transl_structure ~scopes loc
             | (id, layout) :: ids_with_layouts ->
                 let sort =
                   layout |> Jkind.Layout.to_sort
-                         |> Option.get
-                            (* CR jrayman: is [Option.get] the best choice? *)
+                         |> Misc.Stdlib.Option.get_or_fatal_error
+                              ~error:"Translmod.transl_struct"
                          |> Jkind.Sort.default_for_transl_and_get
                 in
                 let shape = mixed_block_element_of_const_sort sort in
@@ -962,15 +962,14 @@ and transl_structure ~scopes loc
               let open_repr =
                 transl_module_representation od.open_bound_repr
               in
-              (* CR jrayman: maybe refactor with above *)
               let rec rebind_idents pos newfields = function
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
                 | (id, layout) :: ids_with_layouts ->
                   let sort =
                     layout |> Jkind.Layout.to_sort
-                           |> Option.get
-                              (* CR jrayman: is [Option.get] the best choice? *)
+                           |> Misc.Stdlib.Option.get_or_fatal_error
+                                ~error:"Translmod.transl_struct"
                            |> Jkind.Sort.default_for_transl_and_get
                   in
                   let shape = mixed_block_element_of_const_sort sort in
