@@ -8,11 +8,6 @@ let bind_expr_to_var ~env ~res fvar expr =
   let _jvar, env, res = bind_expr_to_var' ~env ~res fvar expr in
   env, res
 
-let bind_expr_to_symbol ~env ~res symbol expr =
-  let jvar = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr)) in
-  To_jsir_env.add_symbol env ~res symbol jvar
-
 let reg_width_const const : Jsir.constant =
   match Reg_width_const.descr const with
   | Naked_immediate targetint | Tagged_immediate targetint ->

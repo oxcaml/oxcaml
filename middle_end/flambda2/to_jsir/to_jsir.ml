@@ -73,6 +73,16 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
     | Set_of_closures bound_vars, Set_of_closures soc ->
       To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
     | Static bound_static, Static_consts consts ->
+      (* Definitions within this group can reference each others' symbols
+         (potentially not in the order they were declared in), so we should
+         first add the symbols to the environment before doing any
+         translation. *)
+      let symbols = Bound_static.symbols_being_defined bound_static in
+      let env =
+        Symbol.Set.fold
+          (fun symbol env -> To_jsir_env.add_symbol_if_not_found env symbol)
+          symbols env
+      in
       (* To translate closures, we require that all the code is inserted into
          the environment before any of the actual translation happens. Code
          usually does come before it is used in a closure, but for static lets,
