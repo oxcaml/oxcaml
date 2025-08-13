@@ -45,10 +45,6 @@ find_diff() {
 # Iterate through all files changed since this branch forked off of main.
 git diff --no-ext-diff --name-only "$feature_base" -z | \
 while read -d $'\0' -r changed_file
-#          |-------| || ^^^^^^^^^^^|
-#          |         ||            Store the token in $changed_file
-#          |         |Don't allow backslashes to escape characters
-#          Delimiter is NUL character
 do
   # This case statement skips a hard-coded set of files.
   case "$changed_file" in
