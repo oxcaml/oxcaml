@@ -170,7 +170,7 @@ module type Solver_mono = sig
 
   type 'd hint_morph constraint 'd = 'l * 'r
 
-  type hint_const
+  type 'd hint_const constraint 'd = 'l * 'r
 
   (** The object type from the [Lattices_mono] we're working with *)
   type 'a obj
@@ -183,7 +183,7 @@ module type Solver_mono = sig
         (** [Apply morph_hint morph x_hint] says the current bound is derived by applying
             morphism [morph] (explained by [morph_hint]) to another bound explained by
             [x_hint] *)
-    | Const : hint_const -> ('a, 'l * 'r) hint
+    | Const : 'd hint_const -> ('a, 'd) hint
         (** [Const c] says the current bound is explained by [c] *)
     | Branch :
         'a * ('a, 'l * 'r) hint * 'a * ('a, 'l * 'r) hint
@@ -228,7 +228,8 @@ module type Solver_mono = sig
   include Allow_disallow with type ('a, _, 'd) sided = ('a, 'd) mode
 
   (** Returns the mode representing the given constant. *)
-  val of_const : 'a obj -> ?hint:hint_const -> 'a -> ('a, 'l * 'r) mode
+  val of_const :
+    'a obj -> ?hint:('l * 'r) hint_const -> 'a -> ('a, 'l * 'r) mode
 
   (** The minimum mode in the lattice *)
   val min : 'a obj -> ('a, 'l * 'r) mode
@@ -332,26 +333,20 @@ end
 
 (** Interface for hints, as needed by the solver *)
 module type Hint = sig
-  (** Hints describing the reasons for constants *)
-  type const
+  (** Hints that explains mode constants. The allowance describes if the
+    constant can be on the LHS or RHS of submode. *)
+  type 'd const constraint 'd = 'l * 'r
 
-  (** The hint to explain an upper bound being the top of the lattice. *)
-  val max : const
+  (** The hint for top on the RHS of submode. *)
+  val max : (disallowed * 'r) const
 
-  (** The hint to explain a lower bound being the bottom of the lattice. *)
-  val min : const
-
-  (** A constant hint that can be used for debugging, by providing a custom string message *)
-  val const_debug : string -> const
-
-  val const_debug_print : Format.formatter -> const -> unit
+  (** The hint for bottom on the LHS of submode. *)
+  val min : ('l * disallowed) const
 
   (** Hints describing the reasons for morphisms applied to modes.
       The type parameter gives the allowance of the hint, which should correspond
       to the allowance of the morphism. *)
   type 'd morph constraint 'd = 'l * 'r
-
-  val morph_debug_print : Format.formatter -> _ morph -> unit
 
   (** The hint to be used for the identity morphism *)
   val id : 'd morph
@@ -363,6 +358,9 @@ module type Hint = sig
   val right_adjoint : (allowed * _) morph -> (disallowed * allowed) morph
 
   module Allow_disallow : Allow_disallow with type (_, _, 'd) sided = 'd morph
+
+  module Allow_disallow_const :
+    Allow_disallow with type (_, _, 'd) sided = 'd const
 end
 
 module type S = sig
@@ -379,5 +377,5 @@ module type S = sig
       with type ('a, 'b, 'd) morph := ('a, 'b, 'd) C.morph
        and type 'a obj := 'a C.obj
        and type 'd hint_morph := 'd Hint.morph
-       and type hint_const := Hint.const
+       and type 'd hint_const := 'd Hint.const
 end

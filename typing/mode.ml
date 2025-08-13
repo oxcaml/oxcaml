@@ -1556,42 +1556,30 @@ end
 
 module C = Lattices_mono
 
+(** Contains everything wrt mode hints, to be used by the solver (and thus
+satisfies [Solver_intf.Hint]) and mode system users (and thus satisfies
+[Mode_intf.Hint]). *)
 module Hint = struct
-  type const =
-    | Debug of string
-    | Skip
-    | Result_of_lazy
-    | Lazy_closure
-    | Class
-    | Tailcall_function
-    | Tailcall_argument
-    | Mutable_read
-    | Mutable_write
-    | Forced_lazy_expression
-    | Is_function_return
-    | Stack_expression
+  type 'd const =
+    | Debug : string -> ('l * 'r) const
+    | Skip : ('l * 'r) const
+    | Result_of_lazy : (disallowed * 'r) pos const
+    | Lazy_closure : (disallowed * 'r) pos const
+    | Class_monadic : ('l * disallowed) neg const
+    | Class_comonadic : ('l * disallowed) pos const
+    | Tailcall_function : (disallowed * 'r) pos const
+    | Tailcall_argument : (disallowed * 'r) pos const
+    | Mutable_read : (disallowed * 'r) neg const
+    | Mutable_write : (disallowed * 'r) neg const
+    | Forced_lazy_expression : (disallowed * 'r) neg const
+    | Is_function_return : (disallowed * 'r) pos const
+    | Stack_expression : ('l * disallowed) pos const
+    constraint 'd = _ * _
+  [@@ocaml.warning "-62"]
 
   let max = Skip
 
   let min = Skip
-
-  let const_debug s = Debug s
-
-  let const_debug_print ppf =
-    let open Format in
-    function
-    | Debug s -> fprintf ppf "Debug (%s)" s
-    | Skip -> fprintf ppf "Skip"
-    | Result_of_lazy -> fprintf ppf "Result_of_lazy"
-    | Lazy_closure -> fprintf ppf "Lazy_closure"
-    | Class -> fprintf ppf "Class"
-    | Tailcall_function -> fprintf ppf "Tailcall_function"
-    | Tailcall_argument -> fprintf ppf "Tailcall_argument"
-    | Mutable_read -> fprintf ppf "Mutable_read"
-    | Mutable_write -> fprintf ppf "Mutable_write"
-    | Forced_lazy_expression -> fprintf ppf "Forced_lazy_expression"
-    | Is_function_return -> fprintf ppf "Is_function_return"
-    | Stack_expression -> fprintf ppf "Stack_expression"
 
   type lock_item =
     | Value
@@ -1624,15 +1612,6 @@ module Hint = struct
       value_item : lock_item
     }
 
-  let closure_details_debug_print ppf
-      { closure_context; value_loc; value_lid; value_item } =
-    Format.fprintf ppf
-      "{ closure_context = %a; value_loc = %a; value_lid = %a; value_item = %a \
-       }"
-      print_closure_context closure_context Location.print_loc value_loc
-      (Misc.Style.as_inline_code !print_longident)
-      value_lid print_lock_item value_item
-
   type 'd morph =
     (* CR pdsouza: TEMP FOR DEBUGGING *)
     | Debug : string -> (_ * _) morph
@@ -1647,23 +1626,13 @@ module Hint = struct
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
+  type 'd neg_const = 'd neg const constraint 'd = _ * _
+
+  type 'd pos_const = 'd pos const constraint 'd = _ * _
+
   type 'd neg_morph = 'd neg morph constraint 'd = _ * _
 
-  let morph_debug_print : type l r. Format.formatter -> (l * r) morph -> unit =
-   fun ppf -> function
-    | Debug s -> Format.fprintf ppf "Debug %s" s
-    | Skip -> Format.fprintf ppf "Skip"
-    | Close_over x ->
-      Format.fprintf ppf "Close_over (%a)" closure_details_debug_print x
-    | Is_closed_by x ->
-      Format.fprintf ppf "Is_closed_by (%a)" closure_details_debug_print x
-    | Captured_by_partial_application ->
-      Format.fprintf ppf "Captured_by_partial_application"
-    | Adj_captured_by_partial_application ->
-      Format.fprintf ppf "Adj_captured_by_partial_application"
-    | Crossing_left -> Format.fprintf ppf "Crossing_left"
-    | Crossing_right -> Format.fprintf ppf "Crossing_right"
-    | Register_alloc_mode -> Format.fprintf ppf "Register_alloc_mode"
+  type 'd pos_morph = 'd pos morph constraint 'd = _ * _
 
   let id = Skip
 
@@ -1695,7 +1664,7 @@ module Hint = struct
   (** Print out the text for a constant hint. Either prints nothing when there is
   no hint and returns [NothingPrinted] or prints " because {hint}" where {hint}
   is text for the specific constant hint and returns [HintPrinted]. *)
-  let print_const a_obj a ppf : const -> unit =
+  let print_const (type l r) a_obj a ppf : (l * r) const -> unit =
     let open Format in
     let wrap_print_hint t = fprintf ppf "@ because %t" t in
     function
@@ -1708,7 +1677,7 @@ module Hint = struct
     | Lazy_closure ->
       wrap_print_hint
         (dprintf "lazy expressions are always %a" (C.print a_obj) a)
-    | Class ->
+    | Class_monadic | Class_comonadic ->
       wrap_print_hint (dprintf "classes are always %a" (C.print a_obj) a)
     | Tailcall_function ->
       wrap_print_hint (dprintf "it is the function in a tail call")
@@ -1806,6 +1775,67 @@ module Hint = struct
        | Crossing_right -> Crossing_right
        | Register_alloc_mode -> Register_alloc_mode
   end)
+
+  module Allow_disallow_const = Magic_allow_disallow (struct
+    type (_, _, 'd) sided = 'd const constraint 'd = 'l * 'r
+
+    let allow_left : type l r. (allowed * r) const -> (l * r) const =
+      fun (type l r) (h : (allowed * r) const) : (l * r) const ->
+       match h with
+       | Debug s -> Debug s
+       | Skip -> Skip
+       | Class_comonadic -> Class_comonadic
+       | Stack_expression -> Stack_expression
+       | Mutable_read -> Mutable_read
+       | Mutable_write -> Mutable_write
+       | Forced_lazy_expression -> Forced_lazy_expression
+
+    let allow_right : type l r. (l * allowed) const -> (l * r) const =
+      fun (type l r) (h : (l * allowed) const) : (l * r) const ->
+       match h with
+       | Debug s -> Debug s
+       | Skip -> Skip
+       | Class_monadic -> Class_monadic
+       | Result_of_lazy -> Result_of_lazy
+       | Lazy_closure -> Lazy_closure
+       | Tailcall_function -> Tailcall_function
+       | Tailcall_argument -> Tailcall_argument
+       | Is_function_return -> Is_function_return
+
+    let disallow_left : type l r. (l * r) const -> (disallowed * r) const =
+      fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
+       match h with
+       | Debug s -> Debug s
+       | Skip -> Skip
+       | Result_of_lazy -> Result_of_lazy
+       | Lazy_closure -> Lazy_closure
+       | Class_comonadic -> Class_comonadic
+       | Class_monadic -> Class_monadic
+       | Tailcall_function -> Tailcall_function
+       | Tailcall_argument -> Tailcall_argument
+       | Mutable_read -> Mutable_read
+       | Mutable_write -> Mutable_write
+       | Forced_lazy_expression -> Forced_lazy_expression
+       | Is_function_return -> Is_function_return
+       | Stack_expression -> Stack_expression
+
+    let disallow_right : type l r. (l * r) const -> (l * disallowed) const =
+      fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
+       match h with
+       | Debug s -> Debug s
+       | Skip -> Skip
+       | Result_of_lazy -> Result_of_lazy
+       | Lazy_closure -> Lazy_closure
+       | Class_comonadic -> Class_comonadic
+       | Class_monadic -> Class_monadic
+       | Tailcall_function -> Tailcall_function
+       | Tailcall_argument -> Tailcall_argument
+       | Mutable_read -> Mutable_read
+       | Mutable_write -> Mutable_write
+       | Forced_lazy_expression -> Forced_lazy_expression
+       | Is_function_return -> Is_function_return
+       | Stack_expression -> Stack_expression
+  end)
 end
 
 module Solver = Solver_mono (Hint) (C)
@@ -1835,7 +1865,7 @@ module Axis = C.Axis
 
 type axhint =
   | Apply : 'd Hint.morph * 'b * 'b C.obj * axhint * _ C.morph -> axhint
-  | Const : Hint.const -> axhint
+  | Const : 'd Hint.const -> axhint
   | Nil : axhint
 [@@ocaml.warning "-62"]
 
@@ -1845,6 +1875,10 @@ type 'a axerror =
     right : 'a;
     right_hint : axhint
   }
+
+module type Common_axis = Common_axis with type 'a axerror := 'a axerror
+
+module type Common_product = Common_product with type 'a axerror := 'a axerror
 
 module Axerror = struct
   module Printing = struct
@@ -2341,7 +2375,7 @@ module Comonadic_common_gen (Obj : Obj) = struct
 
   let zap_to_floor m = with_log (Solver.zap_to_floor obj m)
 
-  let of_const : type l r. ?hint:Hint.const -> const -> (l * r) t =
+  let of_const : type l r. ?hint:(l * r) Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
   let meet_const ?hint c m = Solver.apply obj ?hint (Meet_with c) m
@@ -2405,7 +2439,7 @@ module Monadic_common_gen (Obj : Obj) = struct
 
   let zap_to_floor m = with_log (Solver.zap_to_ceil obj m)
 
-  let of_const : type l r. ?hint:Hint.const -> const -> (l * r) t =
+  let of_const : type l r. ?hint:(r * l) Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
   let join_const ?hint c m = Solver.apply Obj.obj ?hint (Meet_with c) m
@@ -3073,10 +3107,10 @@ module Value_with (Areality : Areality) = struct
       (Monadic.print ?verbose ())
       monadic
 
-  let of_const ?hint c =
+  let of_const ?hint_monadic ?hint_comonadic c =
     let { monadic; comonadic } = split c in
-    let comonadic = Comonadic.of_const ?hint comonadic in
-    let monadic = Monadic.of_const ?hint monadic in
+    let comonadic = Comonadic.of_const ?hint:hint_comonadic comonadic in
+    let monadic = Monadic.of_const ?hint:hint_monadic monadic in
     { comonadic; monadic }
 
   module Const = struct

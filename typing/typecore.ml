@@ -461,7 +461,7 @@ let check_tail_call_local_returning loc env ap_mode {region_mode; _} =
 
 let meet_regional ?hint mode =
   let mode = Value.disallow_left mode in
-  Value.meet [Value.(of_const ?hint {
+  Value.meet [Value.(of_const ?hint_comonadic:hint {
     Const.max with
     areality = Regional
   }); mode]
@@ -546,7 +546,7 @@ let mode_lazy expected_mode_in =
   let base_mode_const = Value.{ Const.max with areality = Regionality.Const.Global; yielding = Yielding.Const.Unyielding } in
   let expected_mode_out =
     mode_coerce
-      (Value.of_const ~hint:Result_of_lazy base_mode_const)
+      (Value.of_const ~hint_comonadic:Result_of_lazy base_mode_const)
       expected_mode_in
   in
   let mode_crossing =
@@ -564,7 +564,7 @@ let mode_lazy expected_mode_in =
   in
   let closure_mode =
     mode_coerce
-      (Value.of_const ~hint:Lazy_closure base_mode_const)
+      (Value.of_const ~hint_comonadic:Lazy_closure base_mode_const)
       expected_mode_in
     |> as_single_mode |> Crossing.apply_right mode_crossing
   in
@@ -605,7 +605,7 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   | _, _, (Nontail | Default) ->
      mode_default vmode, vmode
   | _, _, Tail -> begin
-    Value.submode_exn vmode Value.(of_const ~hint:Tailcall_argument { Const.max with areality = Regional});
+    Value.submode_exn vmode Value.(of_const ~hint_comonadic:Tailcall_argument { Const.max with areality = Regional});
     mode_default vmode, vmode
   end
 
@@ -1001,7 +1001,7 @@ let mode_project_mutable =
     { Value.Const.max with
       visibility = Visibility.Const.Read;
       contention = Contention.Const.Shared }
-    |> Value.of_const ~hint:Mutable_read
+    |> Value.of_const ~hint_monadic:Mutable_read
   in
   mode_default mode
 
@@ -1011,7 +1011,7 @@ let mode_mutate_mutable =
     { Value.Const.max with
       visibility = Read_write;
       contention = Uncontended }
-    |> Value.of_const ~hint:Mutable_write
+    |> Value.of_const ~hint_monadic:Mutable_write
   in
   mode_default mode
 
@@ -1020,7 +1020,7 @@ let mode_force_lazy =
   let mode =
     { Value.Const.max with
       contention = Uncontended }
-    |> Value.of_const ~hint:Forced_lazy_expression
+    |> Value.of_const ~hint_monadic:Forced_lazy_expression
   in
   mode_default mode
 
@@ -5977,7 +5977,7 @@ and type_expect_
         | Tail ->
           let mode, _ =
             Value.(newvar_below
-              (of_const ~hint:Tailcall_function
+              (of_const ~hint_comonadic:Tailcall_function
                 { Const.max with areality = Regional }))
           in
           mode, mode_default mode
@@ -6965,10 +6965,10 @@ and type_expect_
       | Texp_field (_, _, _, _, Boxing (alloc_mode, _), _) ->
         begin
           submode ~loc ~env
-            Value.(of_const ~hint:Stack_expression { Const.min with areality = Local })
+            Value.(of_const ~hint_comonadic:Stack_expression { Const.min with areality = Local })
             expected_mode;
           match
-            Alloc.submode Alloc.(of_const ~hint:Stack_expression { Const.min with areality = Local }) alloc_mode
+            Alloc.submode Alloc.(of_const ~hint_comonadic:Stack_expression { Const.min with areality = Local }) alloc_mode
           with
           | Ok () -> ()
           | Error _ -> raise (Error (e.pexp_loc, env,

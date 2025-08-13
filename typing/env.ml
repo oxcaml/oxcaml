@@ -737,7 +737,7 @@ and cltype_data =
   { cltda_declaration : class_type_declaration;
     cltda_shape : Shape.t }
 
-let clda_mode = Mode.Value.(of_const ~hint:Class Const.legacy) |> Mode.Value.disallow_right
+let clda_mode = Mode.Value.(of_const ~hint_monadic:Class_monadic ~hint_comonadic:Class_comonadic Const.legacy)
 
 let fcomp_res_mode = Types.functor_res_mode |> Mode.Alloc.disallow_right
 
