@@ -2,12 +2,14 @@ open! Flambda.Import
 
 (* CR selee: we should eventually get rid of these *)
 let unsupported_multiple_return_variables vars =
-  if List.length vars <> 1
-  then Misc.fatal_error "Multiple return variables are currently unsupported."
+  match vars with
+  | [var] -> var
+  | _ -> Misc.fatal_error "Multiple return variables are currently unsupported."
 
 let unsupported_multiple_params params =
-  if List.length params <> 1
-  then Misc.fatal_error "Multiple parameters are currently unsupported."
+  match params with
+  | [param] -> param
+  | _ -> Misc.fatal_error "Multiple parameters are currently unsupported."
 
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
@@ -128,13 +130,10 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                 let env = To_jsir_env.add_continuation env k addr in
                 env, res
               | true ->
-                unsupported_multiple_params params;
+                let param = unsupported_multiple_params params in
                 let res, addr = To_jsir_result.new_block res ~params:[] in
                 let _env, res = expr ~env ~res cont_body in
-                let env =
-                  To_jsir_env.add_exn_handler env k ~addr
-                    ~param:(List.hd params)
-                in
+                let env = To_jsir_env.add_exn_handler env k ~addr ~param in
                 env, res
             in
             expr ~env ~res body))
@@ -226,7 +225,7 @@ and apply_cont0 ~env ~res apply_cont =
   let get_last ~raise_kind : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
     | Toplevel_return ->
-      unsupported_multiple_return_variables args;
+      let arg = unsupported_multiple_return_variables args in
       (* CR selee: This is a hack, but I can't find a way to trigger any
          behaviour that isn't calling [caml_register_global] on the toplevel
          module. I suspect for single-file compilation this is always fine. Will
@@ -246,7 +245,7 @@ and apply_cont0 ~env ~res apply_cont =
                Prim
                  ( Extern "caml_register_global",
                    [ Pc (Int (Targetint.of_int_exn 0));
-                     Pv (List.hd args);
+                     Pv arg;
                      Pc
                        (* CR selee: this assumes javascript, WASM needs just
                           String *)
@@ -255,8 +254,8 @@ and apply_cont0 ~env ~res apply_cont =
       in
       Stop, res
     | Return ->
-      unsupported_multiple_return_variables args;
-      Return (List.hd args), res
+      let arg = unsupported_multiple_return_variables args in
+      Return arg, res
     | Normal_or_exn -> (
       match raise_kind with
       | None ->
@@ -269,8 +268,8 @@ and apply_cont0 ~env ~res apply_cont =
           | Reraise -> `Reraise
           | No_trace -> `Notrace
         in
-        unsupported_multiple_return_variables args;
-        Raise (List.hd args, raise_kind), res)
+        let arg = unsupported_multiple_return_variables args in
+        Raise (arg, raise_kind), res)
     | Define_root_symbol -> failwith "unimplemented"
   in
   match Apply_cont.trap_action apply_cont with
@@ -293,6 +292,9 @@ and apply_cont0 ~env ~res apply_cont =
       assert (Option.is_some raise_kind);
       last, res)
     else
+      (* [Jsir.Poptrap] always jumps to a block after popping the exception
+         handler. If we want to do anything than just [Branch], we should jump
+         to a new block that actually does the thing we want. *)
       match last with
       | Branch cont -> Jsir.Poptrap cont, res
       | Return _ | Raise _ | Stop | Cond _ | Switch _ | Pushtrap _ | Poptrap _
