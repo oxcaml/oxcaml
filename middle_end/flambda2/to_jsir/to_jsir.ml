@@ -78,9 +78,10 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       (* To translate closures, we require that all the code is inserted into
          the environment before any of the actual translation happens. Code
          usually does come before it is used in a closure, but for static lets,
-         they may be defined within the same let binding. Hence, we need to run
-         two passes: one inserting code into the environment, and one doing the
-         actual translation. *)
+         they may be defined within the same let binding. Moreover, code may
+         reference each others' code IDs, not necessarily in the order they are
+         declared in. Hence, we run two passes: one inserting code into the
+         environment, and one doing the actual translation. *)
       let env, res =
         Static_const_group.match_against_bound_static consts bound_static
           ~init:(env, res)
