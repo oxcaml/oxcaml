@@ -137,10 +137,12 @@ let mk_no_cfg_eliminate_dead_trap_handlers f =
     " Do not eliminate dead trap handlers" )
 
 let mk_cfg_prologue_validate f =
-  ("-cfg-prologue-validate", Arg.Unit f, " Produce CFG at selection")
+  ("-cfg-prologue-validate", Arg.Unit f, " Validate prologues added to CFG")
 
 let mk_no_cfg_prologue_validate f =
-  ("-no-cfg-prologue-validate", Arg.Unit f, " Do not produce CFG at selection")
+  ( "-no-cfg-prologue-validate",
+    Arg.Unit f,
+    " Do not validate prologues added to CFG" )
 
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
