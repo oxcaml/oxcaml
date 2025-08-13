@@ -8,84 +8,95 @@ define void @camlIndirect_call__code_begin() { ret void }
 @camlIndirect_call = global { ptr } { ptr @camlIndirect_call__apply_1 }, align 8
 @.header.camlIndirect_call__apply_1 = global { i64 } { i64 4087 }, align 8
 @camlIndirect_call__apply_1 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlIndirect_call__apply_HIDE_STAMP }, align 8
-define cc 104 { { ptr }, { i64 } } @camlIndirect_call__apply_HIDE_STAMP(ptr %0, i64 %1, i64 %2)  {
+define cc 104 { { ptr, ptr }, { i64 } } @camlIndirect_call__apply_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %4 = alloca i64
-  store i64 %1, ptr %4
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %5 = alloca i64
   store i64 %2, ptr %5
   %6 = alloca i64
+  store i64 %3, ptr %6
   %7 = alloca i64
   %8 = alloca i64
   %9 = alloca i64
+  %10 = alloca i64
   br label %L1
 L1:
   br label %L101
 L101:                                                ; preds = %L1
-  %10 = load i64, ptr %4
-  store i64 %10, ptr %6
   %11 = load i64, ptr %5
   store i64 %11, ptr %7
   %12 = load i64, ptr %6
-  %13 = add i64 %12, 0
-  %14 = inttoptr i64 %13 to ptr
-  %15 = load i64, ptr %14
-  store i64 %15, ptr %8
-  %16 = load i64, ptr %7
-  store i64 %16, ptr %4
-  %17 = load i64, ptr %6
+  store i64 %12, ptr %8
+  %13 = load i64, ptr %7
+  %14 = add i64 %13, 0
+  %15 = inttoptr i64 %14 to ptr
+  %16 = load i64, ptr %15
+  store i64 %16, ptr %9
+  %17 = load i64, ptr %8
   store i64 %17, ptr %5
-  %18 = load i64, ptr %4
+  %18 = load i64, ptr %7
+  store i64 %18, ptr %6
   %19 = load i64, ptr %5
-  %20 = load ptr, ptr %ds
-  %21 = load i64, ptr %8
-  %22 = inttoptr i64 %21 to ptr
-  %23 = call cc 104 { { ptr }, { i64 } } %22(ptr %20, i64 %18, i64 %19)
-  %24 = extractvalue { { ptr }, { i64 } } %23, 0, 0
-  store ptr %24, ptr %ds
-  %25 = extractvalue { { ptr }, { i64 } } %23, 1, 0
-  store i64 %25, ptr %4
+  %20 = load i64, ptr %6
+  %21 = load ptr, ptr %ds
+  %22 = load ptr, ptr %alloc
+  %23 = load i64, ptr %9
+  %24 = inttoptr i64 %23 to ptr
+  %25 = call cc 104 { { ptr, ptr }, { i64 } } %24(ptr %21, ptr %22, i64 %19, i64 %20)
+  %26 = extractvalue { { ptr, ptr }, { i64 } } %25, 0, 0
+  store ptr %26, ptr %ds
+  %27 = extractvalue { { ptr, ptr }, { i64 } } %25, 0, 1
+  store ptr %27, ptr %alloc
+  %28 = extractvalue { { ptr, ptr }, { i64 } } %25, 1, 0
+  store i64 %28, ptr %5
   br label %L103
 L103:                                                ; preds = %L101
-  %26 = load i64, ptr %4
-  store i64 %26, ptr %9
-  %27 = load i64, ptr %9
-  store i64 %27, ptr %4
-  %28 = extractvalue { { { ptr }, { i64 } } } poison, 0
-  %29 = load ptr, ptr %ds
-  %30 = insertvalue { { ptr }, { i64 } } %28, ptr %29, 0, 0
-  %31 = load i64, ptr %4
-  %32 = insertvalue { { ptr }, { i64 } } %30, i64 %31, 1, 0
-  ret { { ptr }, { i64 } } %32
+  %29 = load i64, ptr %5
+  store i64 %29, ptr %10
+  %30 = load i64, ptr %10
+  store i64 %30, ptr %5
+  %31 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %32 = load ptr, ptr %ds
+  %33 = insertvalue { { ptr, ptr }, { i64 } } %31, ptr %32, 0, 0
+  %34 = load ptr, ptr %alloc
+  %35 = insertvalue { { ptr, ptr }, { i64 } } %33, ptr %34, 0, 1
+  %36 = load i64, ptr %5
+  %37 = insertvalue { { ptr, ptr }, { i64 } } %35, i64 %36, 1, 0
+  ret { { ptr, ptr }, { i64 } } %37
 }
 
-define cc 104 { { ptr }, { i64 } } @camlIndirect_call__entry(ptr %0)  {
+define cc 104 { { ptr, ptr }, { i64 } } @camlIndirect_call__entry(ptr %0, ptr %1)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %2 = alloca i64
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %3 = alloca i64
   %4 = alloca i64
   %5 = alloca i64
   %6 = alloca i64
+  %7 = alloca i64
   br label %L1
 L1:
   br label %L109
 L109:                                                ; preds = %L1
-  store ptr @camlIndirect_call, ptr %4
-  %7 = load i64, ptr %4
-  store i64 %7, ptr %5
+  store ptr @camlIndirect_call, ptr %5
   %8 = load i64, ptr %5
-  store i64 %8, ptr %3
-  store i64 1, ptr %6
+  store i64 %8, ptr %6
   %9 = load i64, ptr %6
-  store i64 %9, ptr %2
-  %10 = extractvalue { { { ptr }, { i64 } } } poison, 0
-  %11 = load ptr, ptr %ds
-  %12 = insertvalue { { ptr }, { i64 } } %10, ptr %11, 0, 0
-  %13 = load i64, ptr %2
-  %14 = insertvalue { { ptr }, { i64 } } %12, i64 %13, 1, 0
-  ret { { ptr }, { i64 } } %14
+  store i64 %9, ptr %4
+  store i64 1, ptr %7
+  %10 = load i64, ptr %7
+  store i64 %10, ptr %3
+  %11 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %12 = load ptr, ptr %ds
+  %13 = insertvalue { { ptr, ptr }, { i64 } } %11, ptr %12, 0, 0
+  %14 = load ptr, ptr %alloc
+  %15 = insertvalue { { ptr, ptr }, { i64 } } %13, ptr %14, 0, 1
+  %16 = load i64, ptr %3
+  %17 = insertvalue { { ptr, ptr }, { i64 } } %15, i64 %16, 1, 0
+  ret { { ptr, ptr }, { i64 } } %17
 }
 
 declare i64 @llvm.read_register.i64(metadata)
