@@ -44,3 +44,7 @@ let apply_renaming t renaming =
 
 let value_map t ~default ~f =
   match t with Const cst -> f cst | Var _ -> default
+
+let is_const t = match t with Const _ -> true | Var _ -> false
+
+let is_var t = match t with Const _ -> false | Var _ -> true

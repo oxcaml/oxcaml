@@ -8,11 +8,6 @@ let bind_expr_to_var ~env ~res fvar expr =
   let _jvar, env, res = bind_expr_to_var' ~env ~res fvar expr in
   env, res
 
-let bind_expr_to_symbol ~env ~res symbol expr =
-  let jvar = Jsir.Var.fresh () in
-  ( To_jsir_env.add_symbol env symbol jvar,
-    To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr)) )
-
 let reg_width_const const : Jsir.constant =
   match Reg_width_const.descr const with
   | Naked_immediate targetint | Tagged_immediate targetint ->
@@ -69,7 +64,7 @@ let bound_parameters ~env bound_params =
 let block ~env ~res ~tag ~mut ~fields :
     Jsir.expr * To_jsir_env.t * To_jsir_result.t =
   (* CR selee: is it ok to ignore shape? *)
-  let tag = Tag.Scannable.to_int tag in
+  let tag = Tag.to_int tag in
   let mutability : Jsir.mutability =
     match (mut : Mutability.t) with
     | Mutable -> Maybe_mutable
