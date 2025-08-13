@@ -195,6 +195,14 @@ module Sort = struct
     let for_list_element = value
 
     let for_idx = bits64
+
+    let for_loop_index = value
+
+    let for_constructor = value
+
+    let for_module_field = value
+
+    let for_boxed_variant = value
   end
 
   module Var = struct
