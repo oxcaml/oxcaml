@@ -10,7 +10,9 @@ val block_like :
   Static_const.t ->
   To_jsir_env.t * To_jsir_result.t
 
-(** Prepare a static block of code to be translated: create a new block and parameter variables and add them to the environment. *)
+(** Prepare a static block of code to be translated: create a new block and parameter
+    variables and add them to the environment, and also add any value or function slots
+    that are used into the environment. *)
 val prepare_code :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
