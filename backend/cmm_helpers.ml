@@ -745,14 +745,51 @@ let rec mul_int c1 c2 dbg =
     add_const (mul_int c (Cconst_int (k, dbg)) dbg) (n * k) dbg
   | c1, c2 -> Cop (Cmuli, [c1; c2], dbg)
 
+(** [get_const_bitmask x] returns [Some (y, mask)] if [x] is [y & mask] *)
+let get_const_bitmask = function
+  | Cop (Cand, ([x; Cconst_natint (mask, _)] | [Cconst_natint (mask, _); x]), _)
+    ->
+    Some (x, mask)
+  | Cop (Cand, ([x; Cconst_int (mask, _)] | [Cconst_int (mask, _); x]), _) ->
+    Some (x, Nativeint.of_int mask)
+  | _ -> None
+
+(** [low_bits ~bits x] is a (potentially simplified) value which agrees with x on at least
+    the low [bits] bits. E.g., [low_bits ~bits x & mask = x & mask], where [mask] is a
+    bitmask of the low [bits] bits . *)
+let rec low_bits ~bits ~dbg x =
+  assert (bits > 0);
+  if bits >= arch_bits
+  then x
+  else
+    let unused_bits = arch_bits - bits in
+    let does_mask_keep_low_bits mask =
+      (* If the mask has all the low bits set, then the low bits are unchanged.
+         This could happen from zero-extension. *)
+      let low_bits = Nativeint.pred (Nativeint.shift_left 1n bits) in
+      Nativeint.equal low_bits (Nativeint.logand mask low_bits)
+    in
+    (* Ignore sign and zero extensions which do not affect the low bits *)
+    map_tail
+      (function
+        | Cop
+            ( (Casr | Clsr),
+              [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
+              _ )
+          when 0 <= right && right <= left && left <= unused_bits ->
+          (* these sign-extensions can be replaced with a left shift since we
+             don't care about the high bits that it changed *)
+          low_bits ~bits (lsl_const x (left - right) dbg) ~dbg
+        | x -> (
+          match get_const_bitmask x with
+          | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->
+            low_bits ~bits x ~dbg
+          | _ -> x))
+      x
+
 let tag_int i dbg =
-  match i with
+  match low_bits i ~bits:(arch_bits - 1) ~dbg with
   | Cconst_int (n, _) -> int_const dbg n
-  | Cop
-      ( (Casr | Clsr),
-        [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
-        _ ) ->
-    incr_int (lsl_const c 1 dbg) dbg
   | c -> incr_int (lsl_const c 1 dbg) dbg
 
 let untag_int i dbg =
@@ -1549,48 +1586,6 @@ let addr_array_initialize arr ofs newval dbg =
         },
       [array_indexing log2_size_addr arr ofs dbg; newval],
       dbg )
-
-(** [get_const_bitmask x] returns [Some (y, mask)] if [x] is [y & mask] *)
-let get_const_bitmask = function
-  | Cop (Cand, ([x; Cconst_natint (mask, _)] | [Cconst_natint (mask, _); x]), _)
-    ->
-    Some (x, mask)
-  | Cop (Cand, ([x; Cconst_int (mask, _)] | [Cconst_int (mask, _); x]), _) ->
-    Some (x, Nativeint.of_int mask)
-  | _ -> None
-
-(** [low_bits ~bits x] is a (potentially simplified) value which agrees with x on at least
-    the low [bits] bits. E.g., [low_bits ~bits x & mask = x & mask], where [mask] is a
-    bitmask of the low [bits] bits . *)
-let rec low_bits ~bits ~dbg x =
-  assert (bits > 0);
-  if bits >= arch_bits
-  then x
-  else
-    let unused_bits = arch_bits - bits in
-    let does_mask_keep_low_bits mask =
-      (* If the mask has all the low bits set, then the low bits are unchanged.
-         This could happen from zero-extension. *)
-      let low_bits = Nativeint.pred (Nativeint.shift_left 1n bits) in
-      Nativeint.equal low_bits (Nativeint.logand mask low_bits)
-    in
-    (* Ignore sign and zero extensions which do not affect the low bits *)
-    map_tail
-      (function
-        | Cop
-            ( (Casr | Clsr),
-              [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
-              _ )
-          when 0 <= right && right <= left && left <= unused_bits ->
-          (* these sign-extensions can be replaced with a left shift since we
-             don't care about the high bits that it changed *)
-          low_bits ~bits (lsl_const x (left - right) dbg) ~dbg
-        | x -> (
-          match get_const_bitmask x with
-          | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->
-            low_bits ~bits x ~dbg
-          | _ -> x))
-      x
 
 (** [zero_extend ~bits dbg e] returns [e] with the most significant [arch_bits - bits]
     bits set to 0 *)
