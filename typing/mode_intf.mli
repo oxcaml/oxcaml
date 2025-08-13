@@ -128,8 +128,6 @@ end
 module type Common_axis = sig
   module Const : Lattice
 
-  type 'd hint_morph constraint 'd = 'l * 'r
-
   type hint_const
 
   type 'a axerror
@@ -139,8 +137,6 @@ module type Common_axis = sig
       with module Const := Const
        and type hint_const := hint_const
        and type error = Const.t axerror
-
-  val apply_hint : ('l * 'r) hint_morph -> ('l * 'r) t -> ('l * 'r) t
 end
 
 module type Axis = sig
@@ -305,7 +301,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
-         and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
          and type 'a axerror := 'a axerror
 
@@ -344,7 +339,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
-         and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
          and type 'a axerror := 'a axerror
 
@@ -368,7 +362,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
-         and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
          and type 'a axerror := 'a axerror
 
@@ -390,7 +383,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
-         and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
          and type 'a axerror := 'a axerror
   end
@@ -410,7 +402,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
-         and type 'd hint_morph := 'd Hint.neg_morph
          and type hint_const := Hint.const
          and type 'a axerror := 'a axerror
 
@@ -435,7 +426,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
-         and type 'd hint_morph := 'd Hint.neg_morph
          and type hint_const := Hint.const
          and type 'a axerror := 'a axerror
   end
@@ -453,7 +443,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
-         and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
          and type 'a axerror := 'a axerror
 
@@ -476,7 +465,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
-         and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
          and type 'a axerror := 'a axerror
 
@@ -503,7 +491,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
-         and type 'd hint_morph := 'd Hint.neg_morph
          and type hint_const := Hint.const
          and type 'a axerror := 'a axerror
 
@@ -725,12 +712,6 @@ module type S = sig
 
     (** Returns the lower bound needed for [B -> C] in relation to [A -> B -> C] *)
     val partial_apply : (allowed * 'r) t -> l
-
-    val apply_hint :
-      ?comonadic:('l * 'r) Hint.morph ->
-      ?monadic:('r * 'l) Hint.morph ->
-      ('l * 'r) t ->
-      ('l * 'r) t
   end
 
   (** The most general mode. Used in most type checking,
