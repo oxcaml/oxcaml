@@ -24,6 +24,29 @@ let int64_to_jsir_const int64 : Jsir.constant = Int64 int64
 let nativeint_to_jsir_const nativeint : Jsir.constant =
   Int32 (Targetint_32_64.to_int32 nativeint)
 
+let block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
+  let fields = List.map Simple.With_debuginfo.simple fields in
+  let all_consts = List.for_all Simple.is_const fields in
+  if all_consts && not (Mutability.is_mutable mut)
+  then
+    let values =
+      List.map
+        (fun x ->
+          match Simple.must_be_const x with
+          | None ->
+            Misc.fatal_error
+              "Found a non-constant in a Simple.t, even though we check that \
+               all values are constants"
+          | Some const -> To_jsir_shared.reg_width_const const)
+        fields
+      |> Array.of_list
+    in
+    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+      (Constant (Tuple (Tag.to_int tag, values, array_or_not)))
+  else
+    let expr, env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields in
+    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol expr
+
 let immutable_float_block_or_array ~env ~res ~symbol values ~array_or_not =
   let all_consts = List.for_all Or_variable.is_const values in
   if all_consts
@@ -69,11 +92,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       Static_const.print const
   | Block (tag, mut, _shape, fields) ->
     let tag = Tag.Scannable.to_tag tag in
-    let expr, env, res =
-      To_jsir_shared.block ~env ~res ~tag ~mut
-        ~fields:(List.map Simple.With_debuginfo.simple fields)
-    in
-    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol expr
+    block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not:NotArray fields
   | Boxed_float32 value ->
     const_or_var ~env ~res ~symbol ~to_jsir_const:float32_to_jsir_const value
   | Boxed_float value ->
@@ -114,29 +133,8 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     ignore values;
     static_const_not_supported ()
   | Immutable_value_array values ->
-    let tag = Tag.zero |> Tag.to_int in
-    let values = List.map Simple.With_debuginfo.simple values in
-    let all_consts = List.for_all Simple.is_const values in
-    if all_consts
-    then
-      let values =
-        List.map
-          (fun x ->
-            match Simple.must_be_const x with
-            | None ->
-              Misc.fatal_error
-                "Found a non-constant in a Simple.t, even though we check that \
-                 all values are constants"
-            | Some const -> To_jsir_shared.reg_width_const const)
-          values
-        |> Array.of_list
-      in
-      To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
-        (Constant (Tuple (tag, values, Array)))
-    else
-      let values, res = To_jsir_shared.simples ~env ~res values in
-      To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
-        (Block (tag, Array.of_list values, Array, Immutable))
+    block_or_array ~env ~res ~symbol ~tag:Tag.zero ~mut:Immutable
+      ~array_or_not:Array values
   | Empty_array kind -> (
     match kind with
     | Values_or_immediates_or_naked_floats | Naked_float32s ->
