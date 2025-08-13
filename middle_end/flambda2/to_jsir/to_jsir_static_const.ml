@@ -11,8 +11,13 @@ let const_or_var ~f (const_or_var : 'a Or_variable.t) =
     Misc.fatal_error "Found a variable in Static_const"
   | Const c -> f c
 
+let bind_expr_to_symbol ~env ~res symbol expr =
+  (* This should already be populated by To_jsir.let_expr_normal *)
+  let jvar = To_jsir_env.get_symbol_exn env symbol in
+  env, To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr))
+
 let bind_const_or_var_to_symbol ~env ~res ~symbol ~to_jsir_const x =
-  To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
+  bind_expr_to_symbol ~env ~res symbol
     (Constant (const_or_var ~f:to_jsir_const x))
 
 let float32_to_jsir_const float32 : Jsir.constant =
@@ -41,7 +46,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       To_jsir_shared.block ~env ~res ~tag ~mut
         ~fields:(List.map Simple.With_debuginfo.simple fields)
     in
-    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol expr
+    bind_expr_to_symbol ~env ~res symbol expr
   | Boxed_float32 value ->
     bind_const_or_var_to_symbol ~env ~res ~symbol
       ~to_jsir_const:float32_to_jsir_const value
@@ -67,8 +72,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
         values
       |> Array.of_list
     in
-    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
-      (Constant (Float_array values))
+    bind_expr_to_symbol ~env ~res symbol (Constant (Float_array values))
   | Immutable_float32_array values ->
     ignore values;
     static_const_not_supported ()
@@ -100,8 +104,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     ignore initial_value;
     static_const_not_supported ()
   | Immutable_string value ->
-    To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
-      (Constant (String value))
+    bind_expr_to_symbol ~env ~res symbol (Constant (String value))
 
 let prepare_code ~env ~res ~code_id code =
   let params_and_body = Code0.params_and_body code in
@@ -127,13 +130,11 @@ let prepare_code ~env ~res ~code_id code =
       let free_names = Code0.free_names code in
       let function_slots = Name_occurrences.all_function_slots free_names in
       let value_slots = Name_occurrences.all_value_slots free_names in
-      let symbols = Name_occurrences.symbols free_names in
-      (* We create new variables that represent each function slot, value slot,
-         and symbol (for static mutually-recursive code blocks) if they don't
-         exist already, and use them everywhere that the corresponding slot is
-         used. We will make sure later (when translating [Set_of_closures]) that
-         the closures or values representing these slots are bound to the
-         correct variables. *)
+      (* We create new variables that represent each function and value slots,
+         if they don't exist already, and use them everywhere that the
+         corresponding slot is used. We will make sure later (when translating
+         [Set_of_closures]) that the closures or values representing these slots
+         are bound to the correct variables. *)
       let env =
         Function_slot.Set.fold
           (fun slot env -> To_jsir_env.add_function_slot_if_not_found env slot)
@@ -143,11 +144,6 @@ let prepare_code ~env ~res ~code_id code =
         Value_slot.Set.fold
           (fun slot env -> To_jsir_env.add_value_slot_if_not_found env slot)
           value_slots env
-      in
-      let env =
-        Symbol.Set.fold
-          (fun symbol env -> To_jsir_env.add_symbol_if_not_found env symbol)
-          symbols env
       in
       env, res)
 
