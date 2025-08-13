@@ -1398,7 +1398,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Poly_variant fields ->
       type_shape_to_dwarf_die_poly_variant ~reference ?name ~parent_proto_die
         ~fallback_value_die ~constructors:fields ~rec_env ()
-    | Arrow _ ->
+    | Arrow ->
       type_shape_to_dwarf_die_arrow ~reference ?name ~parent_proto_die
         ~fallback_value_die ()
     | Record { fields; kind = Record_boxed | Record_floats } ->
@@ -1695,8 +1695,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       "constructor application should have been resolved by unfolding"
   | Predef _, Base base_layout -> [Known (type_shape, base_layout)]
   | Predef _, _ -> Misc.fatal_error "predefined type must have base layout"
-  | Arrow _, Base Value -> known_value
-  | Arrow _, _ -> Misc.fatal_error "arrow must have value layout"
+  | Arrow, Base Value -> known_value
+  | Arrow, _ -> Misc.fatal_error "arrow must have value layout"
   | Poly_variant _, Base Value -> known_value
   | Poly_variant _, _ -> Misc.fatal_error "poly_variant must have value layout"
   | ( Record { fields = _; kind = Record_boxed | Record_mixed _ | Record_floats },
