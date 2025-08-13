@@ -98,7 +98,6 @@ AC_ARG_ENABLE([dev],
 
 AC_SUBST([prefix])
 AC_SUBST([middle_end])
-AC_SUBST([dune])
 
 coverage="$enable_coverage"
 AC_SUBST([coverage])
@@ -477,12 +476,6 @@ AC_ARG_VAR([ASPP], [which assembler (with preprocessor) to use])
 AC_ARG_VAR([PARTIALLD], [how to build partial (relocatable) object files])
 
 # Command-line arguments to configure
-
-AC_PATH_PROG([dune], [dune], [])
-AC_ARG_WITH([dune],
-  [AS_HELP_STRING([--with-dune],
-    [Path to dune executable (otherwise PATH is searched)])],
-  [dune=$with_dune])
 
 AC_ARG_ENABLE([debug-runtime],
   [AS_HELP_STRING([--disable-debug-runtime],
