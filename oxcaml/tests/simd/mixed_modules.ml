@@ -56,7 +56,6 @@ let _ =
   eq f 5.5
 
 
-
 module Outer = struct
   module Inner = struct
     let simd_val = make_int64x2_u 1000L 2000L
