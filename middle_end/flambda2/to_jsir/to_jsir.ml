@@ -233,7 +233,8 @@ and apply_expr ~env ~res e =
          [Let_cont] and expects zero [extra_args]. *)
       []
     else
-      let _addr, _var, extra_params_vars =
+      let ({ addr = _; exn_param = _; extra_args = extra_params_vars }
+            : To_jsir_env.exn_handler) =
         To_jsir_env.get_exn_handler_exn env
           (Exn_continuation.exn_handler exn_continuation)
       in
@@ -370,7 +371,8 @@ and apply_cont0 ~env ~res apply_cont =
   | None -> get_last ~raise_kind:None
   | Some (Push { exn_handler }) -> (
     let last, res = get_last ~raise_kind:None in
-    let handler_addr, handler_var, _extra_args =
+    let ({ addr = handler_addr; exn_param = handler_var; extra_args = _ }
+          : To_jsir_env.exn_handler) =
       To_jsir_env.get_exn_handler_exn env exn_handler
     in
     match last with
