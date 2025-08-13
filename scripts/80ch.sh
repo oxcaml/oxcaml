@@ -121,5 +121,7 @@ done
 output="$(find_diff)"
 if [ -n "$output" ]; then
   printf '%s\n' "$output"
+  exit 1
+else
+  exit 0
 fi
-[ -z "$output" ] # if there is output, exit 1
