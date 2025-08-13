@@ -562,9 +562,7 @@ Line 3, characters 39-40:
 3 |   use_locally (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
                                            ^
 Error: The value "r" is "local" but expected to be "global"
-       because it is used inside a function
-       which is "global"Uncaught exception: Env.Error(_)
-
+       because it is used inside a function which is "global".
 |}]
 
 let leak_ref_3 =
