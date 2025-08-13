@@ -80,7 +80,8 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       let symbols = Bound_static.symbols_being_defined bound_static in
       let env =
         Symbol.Set.fold
-          (fun symbol env -> To_jsir_env.add_symbol_if_not_found env symbol)
+          (fun symbol env ->
+            To_jsir_env.add_symbol_if_not_found_without_registering env symbol)
           symbols env
       in
       (* To translate closures, we require that all the code is inserted into
@@ -99,16 +100,27 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
           ~set_of_closures:(fun (env, res) ~closure_symbols:_ _soc -> env, res)
           ~block_like:(fun (env, res) _symbol _static_const -> env, res)
       in
-      Static_const_group.match_against_bound_static consts bound_static
-        ~init:(env, res)
-        ~code:(fun (env, res) code_id code ->
-          To_jsir_static_const.code ~env ~res ~translate_body:expr ~code_id code)
-        ~deleted_code:(fun (env, res) _code_id -> env, res)
-        ~set_of_closures:(fun (env, res) ~closure_symbols soc ->
-          To_jsir_set_of_closures.static_set_of_closures ~env ~res
-            ~closure_symbols soc)
-        ~block_like:(fun (env, res) symbol static_const ->
-          To_jsir_static_const.block_like ~env ~res symbol static_const)
+      let env, res =
+        Static_const_group.match_against_bound_static consts bound_static
+          ~init:(env, res)
+          ~code:(fun (env, res) code_id code ->
+            To_jsir_static_const.code ~env ~res ~translate_body:expr ~code_id
+              code)
+          ~deleted_code:(fun (env, res) _code_id -> env, res)
+          ~set_of_closures:(fun (env, res) ~closure_symbols soc ->
+            To_jsir_set_of_closures.static_set_of_closures ~env ~res
+              ~closure_symbols soc)
+          ~block_like:(fun (env, res) symbol static_const ->
+            To_jsir_static_const.block_like ~env ~res symbol static_const)
+      in
+      (* We must remember to register all the symbols declared in the global
+         symbol table. *)
+      let res =
+        Symbol.Set.fold
+          (fun symbol res -> To_jsir_env.register_symbol_exn env ~res symbol)
+          symbols res
+      in
+      env, res
     | Singleton _, Rec_info _ -> expr ~env ~res body
     | Singleton _, (Set_of_closures _ | Static_consts _)
     | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)

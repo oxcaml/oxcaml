@@ -52,6 +52,15 @@ val add_var : t -> Variable.t -> Jsir.Var.t -> t
 val add_symbol :
   t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t -> t * To_jsir_result.t
 
+(** Register the given symbol to the global symbol table. Raises if the symbol is not in
+    the environment.
+
+    Note that calling this function is probably a mistake, as most functions that
+    add symbols will automatically call this function. However, it is necessary for
+    [add_symbol_if_not_found_without_registering]. *)
+val register_symbol_exn :
+  t -> res:To_jsir_result.t -> Symbol.t -> To_jsir_result.t
+
 (** Set [var] to be an alias of [alias_of]. Raises if [alias_of] is from the current
     compilation unit and is not found in the environment. *)
 val add_var_alias_of_var_exn : t -> var:Variable.t -> alias_of:Variable.t -> t
@@ -131,7 +140,10 @@ val get_value_slot_exn : t -> Value_slot.t -> Jsir.Var.t
     If it exists, the environment is unchanged. Otherwise, we create a fresh variable,
     and add the mapping to the environment. *)
 
-val add_symbol_if_not_found : t -> Symbol.t -> t
+(** Symbols added through this function must be registered after the definition for them
+    are given, using [register_symbol_exn]. Otherwise, they will not be available to other
+    compilation units. *)
+val add_symbol_if_not_found_without_registering : t -> Symbol.t -> t
 
 val add_function_slot_if_not_found : t -> Function_slot.t -> t
 

@@ -114,8 +114,10 @@ let check_my_closure ~env x =
      now we disable inlining so this case should never occur. *)
   match Simple.must_be_var x with
   | None ->
-    Misc.fatal_error
-      "Expected to see [my_closure], instead found a non-variable"
+    (* CR selee: come back *)
+    ()
+    (* Misc.fatal_error
+     *   "Expected to see [my_closure], instead found a non-variable" *)
   | Some (v, _coercion) when not (To_jsir_env.is_my_closure env v) ->
     Misc.fatal_error
       "Trying to project from a closure that doesn't belong to the body of the \
@@ -235,10 +237,6 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Project_function_slot { move_from = _; move_to } ->
     check_my_closure ~env x;
     Some (To_jsir_env.get_function_slot_exn env move_to), env, res
-  | Project_value_slot { project_from = _; value_slot }
-    when Value_slot.is_imported value_slot ->
-    let str = Value_slot.to_string value_slot in
-    Misc.fatal_errorf "project value slot %s\n" str
   | Project_value_slot { project_from = _; value_slot } ->
     check_my_closure ~env x;
     Some (To_jsir_env.get_value_slot_exn env value_slot), env, res

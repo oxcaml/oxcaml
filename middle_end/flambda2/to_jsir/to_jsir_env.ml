@@ -55,7 +55,7 @@ let symbol_to_native_strings symbol =
     |> Jsir.Native_string.of_string,
     Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
 
-let register_symbol ~res symbol var =
+let register_symbol' ~res symbol var =
   let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
   To_jsir_result.add_instr_exn res
     (Let
@@ -68,7 +68,7 @@ let register_symbol ~res symbol var =
 
 let add_symbol t ~res symbol jvar =
   ( { t with symbols = Symbol.Map.add symbol jvar t.symbols },
-    register_symbol ~res symbol jvar )
+    register_symbol' ~res symbol jvar )
 
 let add_code_id t code_id ~addr ~params ~closure =
   let code_ids = Code_id.Map.add code_id (addr, params, closure) t.code_ids in
@@ -133,6 +133,10 @@ let get_symbol_exn t ~res symbol =
   | Some (v, res) -> v, res
   | None -> raise Not_found
 
+let register_symbol_exn t ~res symbol =
+  (* Using the map directly, because we don't want to load external symbols *)
+  register_symbol' ~res symbol (Symbol.Map.find symbol t.symbols)
+
 let get_code_id_exn t code_id = Code_id.Map.find code_id t.code_ids
 
 let get_function_slot t fslot =
@@ -170,7 +174,7 @@ let add_if_not_found map item ~mem ~add =
     let var = Jsir.Var.fresh () in
     add item var map
 
-let add_symbol_if_not_found t symbol =
+let add_symbol_if_not_found_without_registering t symbol =
   { t with
     symbols =
       add_if_not_found t.symbols symbol ~mem:Symbol.Map.mem ~add:Symbol.Map.add
