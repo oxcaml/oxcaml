@@ -36,6 +36,8 @@ val cfg_stack_checks_threshold : int ref
 
 val cfg_eliminate_dead_trap_handlers : bool ref
 
+val cfg_prologue_validate : bool ref
+
 val reorder_blocks_random : int option ref
 val basic_block_sections : bool ref
 val module_entry_functions_section : bool ref

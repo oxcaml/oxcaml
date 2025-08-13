@@ -196,10 +196,13 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
   fun_name := Cfg.fun_name (Cfg_with_layout.cfg cfg_with_layout);
   let cfg_with_layout = add_prologue_if_required cfg_with_layout in
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  match
-    Validator.run cfg
-      ~init:(Validator.State_set.singleton No_prologue_on_stack)
-      ~handlers_are_entry_points:false ()
-  with
-  | Ok _ -> cfg_with_layout
-  | Error () -> Misc.fatal_error "Cfg_prologue.run: dataflow analysis failed"
+  match !Oxcaml_flags.cfg_prologue_validate with
+  | true -> (
+    match
+      Validator.run cfg
+        ~init:(Validator.State_set.singleton No_prologue_on_stack)
+        ~handlers_are_entry_points:false ()
+    with
+    | Ok _ -> cfg_with_layout
+    | Error () -> Misc.fatal_error "Cfg_prologue.run: dataflow analysis failed")
+  | false -> cfg_with_layout

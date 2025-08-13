@@ -136,6 +136,12 @@ let mk_no_cfg_eliminate_dead_trap_handlers f =
     Arg.Unit f,
     " Do not eliminate dead trap handlers" )
 
+let mk_cfg_prologue_validate f =
+  ("-cfg-prologue-validate", Arg.Unit f, " Produce CFG at selection")
+
+let mk_no_cfg_prologue_validate f =
+  ("-no-cfg-prologue-validate", Arg.Unit f, " Do not produce CFG at selection")
+
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
     Arg.Int f,
@@ -923,6 +929,8 @@ module type Oxcaml_options = sig
   val cfg_stack_checks_threshold : int -> unit
   val cfg_eliminate_dead_trap_handlers : unit -> unit
   val no_cfg_eliminate_dead_trap_handlers : unit -> unit
+  val cfg_prologue_validate : unit -> unit
+  val no_cfg_prologue_validate : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -1050,6 +1058,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_eliminate_dead_trap_handlers F.cfg_eliminate_dead_trap_handlers;
       mk_no_cfg_eliminate_dead_trap_handlers
         F.no_cfg_eliminate_dead_trap_handlers;
+      mk_cfg_prologue_validate F.cfg_prologue_validate;
+      mk_no_cfg_prologue_validate F.no_cfg_prologue_validate;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1210,6 +1220,9 @@ module Oxcaml_options_impl = struct
 
   let no_cfg_eliminate_dead_trap_handlers =
     clear' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
+
+  let cfg_prologue_validate = set' Oxcaml_flags.cfg_prologue_validate
+  let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -1610,6 +1623,7 @@ module Extra_params = struct
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
     | "cfg-eliminate-dead-trap-handlers" ->
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
+    | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges
