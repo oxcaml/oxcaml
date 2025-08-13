@@ -125,33 +125,34 @@ let prepare_code ~env ~res ~code_id code =
       let res, addr = To_jsir_result.reserve_address res in
       let closure = Jsir.Var.fresh () in
       let env = To_jsir_env.add_code_id env code_id ~addr ~params ~closure in
+      let free_names = Code0.free_names code in
+      let function_slots = Name_occurrences.all_function_slots free_names in
+      let value_slots = Name_occurrences.all_value_slots free_names in
+      let symbols = Name_occurrences.symbols free_names in
+      (* We create new variables that represent each function slot, value slot,
+         and symbol (for static mutually-recursive code blocks) if they don't
+         exist already, and use them everywhere that the corresponding slot is
+         used. We will make sure later (when translating [Set_of_closures]) that
+         the closures or values representing these slots are bound to the
+         correct variables. *)
+      let env =
+        Function_slot.Set.fold
+          (fun slot env -> To_jsir_env.add_function_slot_if_not_found env slot)
+          function_slots env
+      in
+      let env =
+        Value_slot.Set.fold
+          (fun slot env -> To_jsir_env.add_value_slot_if_not_found env slot)
+          value_slots env
+      in
+      let env =
+        Symbol.Set.fold
+          (fun symbol env -> To_jsir_env.add_symbol_if_not_found env symbol)
+          symbols env
+      in
       env, res)
 
 let code ~env ~res ~translate_body ~code_id code =
-  let free_names = Code0.free_names code in
-  let function_slots = Name_occurrences.all_function_slots free_names in
-  let value_slots = Name_occurrences.all_value_slots free_names in
-  let symbols = Name_occurrences.symbols free_names in
-  (* We create new variables that represent each function slot, value slot, and
-     symbol (for static mutually-recursive code blocks) if they don't exist
-     already, and use them everywhere that the corresponding slot is used. We
-     will make sure later (when translating [Set_of_closures]) that the closures
-     or values representing these slots are bound to the correct variables. *)
-  let env =
-    Function_slot.Set.fold
-      (fun slot env -> To_jsir_env.add_function_slot_if_not_found env slot)
-      function_slots env
-  in
-  let env =
-    Value_slot.Set.fold
-      (fun slot env -> To_jsir_env.add_value_slot_if_not_found env slot)
-      value_slots env
-  in
-  let env =
-    Symbol.Set.fold
-      (fun symbol env -> To_jsir_env.add_symbol_if_not_found env symbol)
-      symbols env
-  in
   let params_and_body = Code0.params_and_body code in
   Flambda.Function_params_and_body.pattern_match params_and_body
     ~f:(fun
