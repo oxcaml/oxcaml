@@ -20,7 +20,7 @@ let () =
       | "enabled_if_with_lldb" -> enabled_if_with_lldb
       | "enabled_if_without_lldb" -> enabled_if_without_lldb
       | "name" -> name
-      | "filter" -> "filter.sh"
+      | "filter" -> "filter_for_function_call_only.sh"
       | _ -> assert false
     in
     Buffer.clear buf;

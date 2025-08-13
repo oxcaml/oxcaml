@@ -1,378 +1,65 @@
-(lldb) target create "./test_datatypes_dwarf.exe"
-Current executable set to '<PATH>/test_datatypes_dwarf.exe' (x86_64).
-(lldb) command source -s 0 'test_datatypes_dwarf_clean.lldb'
-Executing commands in '<BUILD_DIR>'.
-(lldb) b Test_datatypes_dwarf.f_start
-Breakpoint 1: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_start at test_datatypes_dwarf.ml:1:42, address = <ADDRESS>
-(lldb) run
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 1.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_start(param=0 : ocaml_value) at test_datatypes_dwarf.ml:1:42
-Process <PID> launched: '<PATH>/test_datatypes_dwarf.exe' (x86_64)
-(lldb) b Test_datatypes_dwarf.f_simple_variant
-Breakpoint 2: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant at test_datatypes_dwarf.ml:7:51, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 2.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=A : simple_variant @ value) at test_datatypes_dwarf.ml:7:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 2.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=B : simple_variant @ value) at test_datatypes_dwarf.ml:7:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 2.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=(C 42) : simple_variant @ value) at test_datatypes_dwarf.ml:7:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 2.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=(D 3.14) : simple_variant @ value) at test_datatypes_dwarf.ml:7:51
-(lldb) b Test_datatypes_dwarf.f_complex_variant
-Breakpoint 3: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant at test_datatypes_dwarf.ml:21:52, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 3.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant(x=Empty : complex_variant @ value) at test_datatypes_dwarf.ml:21:52
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 3.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant(x=(Single 123) : complex_variant @ value) at test_datatypes_dwarf.ml:21:52
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 3.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant(x=(Pair (42, 1.5)) : complex_variant @ value) at test_datatypes_dwarf.ml:21:52
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 3.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant(x=(Record { x = 10; y = 2.5 }) : complex_variant @ value) at test_datatypes_dwarf.ml:21:52
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 3.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant(x=(Mixed { a = 100; c = true; b = #3.14 }) : complex_variant @ value) at test_datatypes_dwarf.ml:21:52
-(lldb) b Test_datatypes_dwarf.f_basic_record
-Breakpoint 4: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_basic_record at test_datatypes_dwarf.ml:32:49, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 4.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_basic_record(x={ x = 42; y = 3.14 } : basic_record @ value) at test_datatypes_dwarf.ml:32:49
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 4.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_basic_record(x={ x = 0; y = 0. } : basic_record @ value) at test_datatypes_dwarf.ml:32:49
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 4.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_basic_record(x={ x = 9223372036854775685; y = -2.5 } : basic_record @ value) at test_datatypes_dwarf.ml:32:49
-(lldb) b Test_datatypes_dwarf.f_mixed_record
-Breakpoint 5: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_mixed_record at test_datatypes_dwarf.ml:38:49, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 5.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_mixed_record(x={ a = 42; c = true; d = 1000l; b = #3.14 } : mixed_record @ value) at test_datatypes_dwarf.ml:38:49
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 5.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_mixed_record(x={ a = 0; c = false; d = 0l; b = #0. } : mixed_record @ value) at test_datatypes_dwarf.ml:38:49
-(lldb) b Test_datatypes_dwarf.f_unboxed_variant_float
-Breakpoint 6: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_float at test_datatypes_dwarf.ml:48:4, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 6.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_float(x=(Simple #4.1) : unboxed_variant_float @ float64) at test_datatypes_dwarf.ml:48:4
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 6.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_float(x=(Simple #0.) : unboxed_variant_float @ float64) at test_datatypes_dwarf.ml:48:4
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 6.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_float(x=(Simple #-2.5) : unboxed_variant_float @ float64) at test_datatypes_dwarf.ml:48:4
-(lldb) b Test_datatypes_dwarf.f_unboxed_variant_int
-Breakpoint 7: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_int at test_datatypes_dwarf.ml:54:4, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 7.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_int(x=(Complex 42) : unboxed_variant_int @ bits32) at test_datatypes_dwarf.ml:54:4
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 7.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_int(x=(Complex 0) : unboxed_variant_int @ bits32) at test_datatypes_dwarf.ml:54:4
-(lldb) b Test_datatypes_dwarf.f_unboxed_variant_value_int
-Breakpoint 8: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_int at test_datatypes_dwarf.ml:63:4, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 8.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_int(x=(ValueInt 42) : unboxed_variant_value_int @ value) at test_datatypes_dwarf.ml:63:4
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 8.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_int(x=(ValueInt 0) : unboxed_variant_value_int @ value) at test_datatypes_dwarf.ml:63:4
-(lldb) b Test_datatypes_dwarf.f_unboxed_variant_value_string
-Breakpoint 9: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_string at test_datatypes_dwarf.ml:68:4, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 9.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_string(x=(ValueString "hello") : unboxed_variant_value_string @ value) at test_datatypes_dwarf.ml:68:4
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 9.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_string(x=(ValueString "") : unboxed_variant_value_string @ value) at test_datatypes_dwarf.ml:68:4
-(lldb) b Test_datatypes_dwarf.f_unboxed_variant_value_bool
-Breakpoint 10: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_bool at test_datatypes_dwarf.ml:73:4, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 10.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_bool(x=(ValueBool true) : unboxed_variant_value_bool @ value) at test_datatypes_dwarf.ml:73:4
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 10.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_bool(x=(ValueBool false) : unboxed_variant_value_bool @ value) at test_datatypes_dwarf.ml:73:4
-(lldb) b Test_datatypes_dwarf.f_unboxed_record_simple
-Breakpoint 11: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_simple at test_datatypes_dwarf.ml:82:4, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 11.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_simple(x={ value = 42 } : unboxed_record_simple @ value) at test_datatypes_dwarf.ml:82:4
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 11.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_simple(x={ value = 0 } : unboxed_record_simple @ value) at test_datatypes_dwarf.ml:82:4
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 11.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_simple(x={ value = 9223372036854774809 } : unboxed_record_simple @ value) at test_datatypes_dwarf.ml:82:4
-(lldb) b Test_datatypes_dwarf.f_unboxed_record_complex
-Breakpoint 12: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_complex at test_datatypes_dwarf.ml:89:4, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 12.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_complex(x={ data = { x = 10; y = 2. } } : unboxed_record_complex @ value) at test_datatypes_dwarf.ml:89:4
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 12.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_complex(x={ data = { x = 0; y = 0. } } : unboxed_record_complex @ value) at test_datatypes_dwarf.ml:89:4
-(lldb) b Test_datatypes_dwarf.f_poly_variant
-Breakpoint 13: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_variant at test_datatypes_dwarf.ml:97:49, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 13.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_variant(x=`Red : poly_variant @ value) at test_datatypes_dwarf.ml:97:49
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 13.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_variant(x=(`Blue 42) : poly_variant @ value) at test_datatypes_dwarf.ml:97:49
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 13.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_variant(x=(`Green 3.14) : poly_variant @ value) at test_datatypes_dwarf.ml:97:49
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 13.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_variant(x=(`Yellow "test") : poly_variant @ value) at test_datatypes_dwarf.ml:97:49
-(lldb) b Test_datatypes_dwarf.f_open_poly_variant
-Breakpoint 14: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant at test_datatypes_dwarf.ml:105:4, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 14.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant(x=`Alpha : [> `Alpha | `Beta of int ] @ value) at test_datatypes_dwarf.ml:105:4
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 14.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant(x=(`Beta 123) : [> `Alpha | `Beta of int ] @ value) at test_datatypes_dwarf.ml:105:4
-(lldb) b Test_datatypes_dwarf.f_nested_variant
-Breakpoint 15: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant at test_datatypes_dwarf.ml:114:51, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 15.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant(x=(Leaf 42) : nested_variant @ value) at test_datatypes_dwarf.ml:114:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 15.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant(x=(Node { left = (Leaf 1); right = (Leaf 2); value = 3.14 }) : nested_variant @ value) at test_datatypes_dwarf.ml:114:51
-(lldb) b Test_datatypes_dwarf.f_mixed_combo
-Breakpoint 16: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_mixed_combo at test_datatypes_dwarf.ml:130:48, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 16.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_mixed_combo(x={ boxed_field = 42; variant_field = (C 100); record_field = { x = 10; y = 2.5 }; unboxed_field = #3.14 } : mixed_combo @ value) at test_datatypes_dwarf.ml:130:48
-(lldb) b Test_datatypes_dwarf.f_option_variant
-Breakpoint 17: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_option_variant at test_datatypes_dwarf.ml:144:51, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 17.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_option_variant(x=None : int option_variant @ value) at test_datatypes_dwarf.ml:144:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 17.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_option_variant(x=(Some 42) : int option_variant @ value) at test_datatypes_dwarf.ml:144:51
-(lldb) b Test_datatypes_dwarf.f_either
-Breakpoint 18: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_either at test_datatypes_dwarf.ml:148:43, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 18.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_either(x=(Left 42) : (int, string) either @ value) at test_datatypes_dwarf.ml:148:43
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 18.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_either(x=(Right "hello") : (int, string) either @ value) at test_datatypes_dwarf.ml:148:43
-(lldb) b Test_datatypes_dwarf.f_poly_float64
-Breakpoint 19: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_float64 at test_datatypes_dwarf.ml:153:49, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 19.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_float64(x=#4.1 : a @ float64) at test_datatypes_dwarf.ml:153:49
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 19.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_float64(x=#2.5 : a @ float64) at test_datatypes_dwarf.ml:153:49
-(lldb) b Test_datatypes_dwarf.f_poly_bits32
-Breakpoint 20: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_bits32 at test_datatypes_dwarf.ml:157:48, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 20.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_bits32(x=42 : a/2 @ bits32) at test_datatypes_dwarf.ml:157:48
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 20.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_bits32(x=-123 : a/2 @ bits32) at test_datatypes_dwarf.ml:157:48
-(lldb) b Test_datatypes_dwarf.f_exception_specific
-Breakpoint 21: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific at test_datatypes_dwarf.ml:171:55, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 21.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Simple_exception"; id = 1 }; raw = <object>@<ADDRESS> } : exn @ value) at test_datatypes_dwarf.ml:171:55
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 21.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_int"; id = 2 }; raw = [<object>@<ADDRESS>, 42] } : exn @ value) at test_datatypes_dwarf.ml:171:55
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 21.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_string"; id = 3 }; raw = [<object>@<ADDRESS>, "error occurred"] } : exn @ value) at test_datatypes_dwarf.ml:171:55
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 21.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_multiple"; id = 4 }; raw = [<object>@<ADDRESS>, 404, "not found", 1.5] } : exn @ value) at test_datatypes_dwarf.ml:171:55
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 21.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_record"; id = 5 }; raw = [<object>@<ADDRESS>, [500, "internal error"]] } : exn @ value) at test_datatypes_dwarf.ml:171:55
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 21.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_unboxed_record"; id = 6 }; raw = [<object>@<ADDRESS>, [...]@<ADDRESS>] } : exn @ value) at test_datatypes_dwarf.ml:171:55
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 21.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Failure"; id = 9223372036854775805 }; raw = [<object>@<ADDRESS>, "standard failure"] } : exn @ value) at test_datatypes_dwarf.ml:171:55
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 21.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Invalid_argument"; id = 9223372036854775804 }; raw = [<object>@<ADDRESS>, "bad input"] } : exn @ value) at test_datatypes_dwarf.ml:171:55
-(lldb) b Test_datatypes_dwarf.f_exception_poly
-Breakpoint 22: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly at test_datatypes_dwarf.ml:183:51, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 22.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=<object>@<ADDRESS> : 'a @ value) at test_datatypes_dwarf.ml:183:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 22.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, 123] : 'a @ value) at test_datatypes_dwarf.ml:183:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 22.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, "polymorphic error"] : 'a @ value) at test_datatypes_dwarf.ml:183:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 22.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, 200, "ok", 0.] : 'a @ value) at test_datatypes_dwarf.ml:183:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 22.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, [201, "created"]] : 'a @ value) at test_datatypes_dwarf.ml:183:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 22.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, [...]@<ADDRESS>] : 'a @ value) at test_datatypes_dwarf.ml:183:51
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 22.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, "polymorphic failure"] : 'a @ value) at test_datatypes_dwarf.ml:183:51
-(lldb) b Test_datatypes_dwarf.f_exception_with_record
-Breakpoint 23: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_with_record at test_datatypes_dwarf.ml:194:58, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 23.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_with_record(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_record"; id = 5 }; raw = [<object>@<ADDRESS>, [300, "redirect"]] } : exn @ value) at test_datatypes_dwarf.ml:194:58
-(lldb) b Test_datatypes_dwarf.f_exception_with_unboxed
-Breakpoint 24: where = test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_with_unboxed at test_datatypes_dwarf.ml:203:59, address = <ADDRESS>
-(lldb) c
-Process <PID> resuming
-Process <PID> stopped
-* thread #1, name = 'test_datatypes_', stop reason = breakpoint 24.1
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_with_unboxed(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_unboxed_record"; id = 6 }; raw = [<object>@<ADDRESS>, [...]@<ADDRESS>] } : exn @ value) at test_datatypes_dwarf.ml:203:59
-(lldb) quit
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_start(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=A : simple_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=B : simple_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=(C 42) : simple_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=(D 3.14) : simple_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant(x=Empty : complex_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant(x=(Single 123) : complex_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant(x=(Pair (42, 1.5)) : complex_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant(x=(Record { x = 10; y = 2.5 }) : complex_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_complex_variant(x=(Mixed { a = 100; c = true; b = #3.14 }) : complex_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_basic_record(x={ x = 42; y = 3.14 } : basic_record @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_basic_record(x={ x = 0; y = 0. } : basic_record @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_basic_record(x={ x = 9223372036854775685; y = -2.5 } : basic_record @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_mixed_record(x={ a = 42; c = true; d = 1000l; b = #3.14 } : mixed_record @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_mixed_record(x={ a = 0; c = false; d = 0l; b = #0. } : mixed_record @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_float(x=(Simple #4.1) : unboxed_variant_float @ float64)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_float(x=(Simple #0.) : unboxed_variant_float @ float64)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_float(x=(Simple #-2.5) : unboxed_variant_float @ float64)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_int(x=(Complex 42) : unboxed_variant_int @ bits32)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_int(x=(Complex 0) : unboxed_variant_int @ bits32)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_int(x=(ValueInt 42) : unboxed_variant_value_int @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_int(x=(ValueInt 0) : unboxed_variant_value_int @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_string(x=(ValueString "hello") : unboxed_variant_value_string @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_string(x=(ValueString "") : unboxed_variant_value_string @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_bool(x=(ValueBool true) : unboxed_variant_value_bool @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_variant_value_bool(x=(ValueBool false) : unboxed_variant_value_bool @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_simple(x={ value = 42 } : unboxed_record_simple @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_simple(x={ value = 0 } : unboxed_record_simple @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_simple(x={ value = 9223372036854774809 } : unboxed_record_simple @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_complex(x={ data = { x = 10; y = 2. } } : unboxed_record_complex @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_record_complex(x={ data = { x = 0; y = 0. } } : unboxed_record_complex @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_variant(x=`Red : poly_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_variant(x=(`Blue 42) : poly_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_variant(x=(`Green 3.14) : poly_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_variant(x=(`Yellow "test") : poly_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant(x=`Alpha : [> `Alpha | `Beta of int ] @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_open_poly_variant(x=(`Beta 123) : [> `Alpha | `Beta of int ] @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant(x=(Leaf 42) : nested_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_nested_variant(x=(Node { left = (Leaf 1); right = (Leaf 2); value = 3.14 }) : nested_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_mixed_combo(x={ boxed_field = 42; variant_field = (C 100); record_field = { x = 10; y = 2.5 }; unboxed_field = #3.14 } : mixed_combo @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_option_variant(x=None : int option_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_option_variant(x=(Some 42) : int option_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_either(x=(Left 42) : (int, string) either @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_either(x=(Right "hello") : (int, string) either @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_float64(x=#4.1 : a @ float64)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_float64(x=#2.5 : a @ float64)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_bits32(x=42 : a/2 @ bits32)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_bits32(x=-123 : a/2 @ bits32)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Simple_exception"; id = 1 }; raw = <object>@<ADDRESS> } : exn @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_int"; id = 2 }; raw = [<object>@<ADDRESS>, 42] } : exn @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_string"; id = 3 }; raw = [<object>@<ADDRESS>, "error occurred"] } : exn @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_multiple"; id = 4 }; raw = [<object>@<ADDRESS>, 404, "not found", 1.5] } : exn @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_record"; id = 5 }; raw = [<object>@<ADDRESS>, [500, "internal error"]] } : exn @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_unboxed_record"; id = 6 }; raw = [<object>@<ADDRESS>, [...]@<ADDRESS>] } : exn @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Failure"; id = 9223372036854775805 }; raw = [<object>@<ADDRESS>, "standard failure"] } : exn @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_specific(x={ exn = { name = "Invalid_argument"; id = 9223372036854775804 }; raw = [<object>@<ADDRESS>, "bad input"] } : exn @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=<object>@<ADDRESS> : 'a @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, 123] : 'a @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, "polymorphic error"] : 'a @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, 200, "ok", 0.] : 'a @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, [201, "created"]] : 'a @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, [...]@<ADDRESS>] : 'a @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_poly(x=[<object>@<ADDRESS>, "polymorphic failure"] : 'a @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_with_record(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_record"; id = 5 }; raw = [<object>@<ADDRESS>, [300, "redirect"]] } : exn @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_exception_with_unboxed(x={ exn = { name = "Test_datatypes_dwarf.Exception_with_unboxed_record"; id = 6 }; raw = [<object>@<ADDRESS>, [...]@<ADDRESS>] } : exn @ value)

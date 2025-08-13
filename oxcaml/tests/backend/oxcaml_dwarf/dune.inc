@@ -13,7 +13,7 @@
    (= %{context_name} "main")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_basic_dwarf.output.corrected)
- (deps test_basic_dwarf.exe test_basic_dwarf.lldb filter.sh)
+ (deps test_basic_dwarf.exe test_basic_dwarf.lldb filter_for_function_call_only.sh)
  (action
   (progn
    (bash
@@ -22,7 +22,7 @@
    (with-outputs-to test_basic_dwarf.output.corrected
     (pipe-outputs
      (run %{env:OXCAML_LLDB=} -s test_basic_dwarf_clean.lldb ./test_basic_dwarf.exe)
-     (run sh ./filter.sh))))))
+     (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
  (enabled_if
@@ -60,7 +60,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
    (= %{context_name} "main")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_unboxed_dwarf.output.corrected)
- (deps test_unboxed_dwarf.exe test_unboxed_dwarf.lldb filter.sh)
+ (deps test_unboxed_dwarf.exe test_unboxed_dwarf.lldb filter_for_function_call_only.sh)
  (action
   (progn
    (bash
@@ -69,7 +69,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
    (with-outputs-to test_unboxed_dwarf.output.corrected
     (pipe-outputs
      (run %{env:OXCAML_LLDB=} -s test_unboxed_dwarf_clean.lldb ./test_unboxed_dwarf.exe)
-     (run sh ./filter.sh))))))
+     (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
  (enabled_if
@@ -107,7 +107,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
    (= %{context_name} "main")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_datatypes_dwarf.output.corrected)
- (deps test_datatypes_dwarf.exe test_datatypes_dwarf.lldb filter.sh)
+ (deps test_datatypes_dwarf.exe test_datatypes_dwarf.lldb filter_for_function_call_only.sh)
  (action
   (progn
    (bash
@@ -116,7 +116,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
    (with-outputs-to test_datatypes_dwarf.output.corrected
     (pipe-outputs
      (run %{env:OXCAML_LLDB=} -s test_datatypes_dwarf_clean.lldb ./test_datatypes_dwarf.exe)
-     (run sh ./filter.sh))))))
+     (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
  (enabled_if
@@ -154,7 +154,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
    (= %{context_name} "main")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_simd_dwarf.output.corrected)
- (deps test_simd_dwarf.exe test_simd_dwarf.lldb filter.sh)
+ (deps test_simd_dwarf.exe test_simd_dwarf.lldb filter_for_function_call_only.sh)
  (action
   (progn
    (bash
@@ -163,7 +163,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
    (with-outputs-to test_simd_dwarf.output.corrected
     (pipe-outputs
      (run %{env:OXCAML_LLDB=} -s test_simd_dwarf_clean.lldb ./test_simd_dwarf.exe)
-     (run sh ./filter.sh))))))
+     (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
  (enabled_if
