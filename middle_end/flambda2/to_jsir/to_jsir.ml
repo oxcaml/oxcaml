@@ -124,8 +124,45 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
             "Recursive continuation bindings cannot involve exception \
              handlers:@ %a"
             Let_cont.print e;
-        ignore (invariant_params, body);
-        failwith "recursive continuations not yet supported")
+        let domain = Flambda.Continuation_handlers.domain conts in
+        let env, res =
+          (* See explanation in [To_jsir_static_const.code]: we first reserve
+             addresses representing each continuation, so that mutually
+             recursive continuations can refer to them. *)
+          List.fold_left
+            (fun (env, res) k ->
+              let res, addr = To_jsir_result.reserve_address res in
+              let env = To_jsir_env.add_continuation env k addr in
+              env, res)
+            (env, res) domain
+        in
+        let res =
+          Continuation.Lmap.fold
+            (fun k handler res ->
+              Continuation_handler.pattern_match handler
+                ~f:(fun params ~handler:cont_body ->
+                  let params, env =
+                    To_jsir_shared.bound_parameters ~env
+                      (Bound_parameters.append invariant_params params)
+                  in
+                  let addr =
+                    match To_jsir_env.get_continuation_exn env k with
+                    | Return | Exception ->
+                      Misc.fatal_errorf
+                        "Continuation %a is unexpectedly a return or exception \
+                         continuation of the current environment"
+                        Continuation.print k
+                    | Block addr -> addr
+                  in
+                  let res =
+                    To_jsir_result.new_block_with_addr_exn res ~params ~addr
+                  in
+                  let _env, res = expr ~env ~res cont_body in
+                  res))
+            (Flambda.Continuation_handlers.to_map conts)
+            res
+        in
+        expr ~env ~res body)
 
 and apply_expr ~env ~res e =
   let continuation = Apply_expr.continuation e in
