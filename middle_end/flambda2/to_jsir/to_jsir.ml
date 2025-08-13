@@ -73,27 +73,26 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
     | Set_of_closures bound_vars, Set_of_closures soc ->
       To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
     | Static bound_static, Static_consts consts ->
-      (* To translate closures, we require that code is translated before the
-         corresponding closure, so that the translation environment is set
-         correctly. Code usually does come before it is used in a closure, but
-         for static lets, they may be defined within the same let binding.
-         Hence, we need to run two passes: one only looking at the code, and one
-         skipping the code.
-
-         CR selee: This is slightly tragic, maybe there's a cleaner solution *)
+      (* To translate closures, we require that all the code is inserted into
+         the environment before any of the actual translation happens. Code
+         usually does come before it is used in a closure, but for static lets,
+         they may be defined within the same let binding. Moreover, code may
+         reference each other's code IDs, not necessarily in the order they are
+         declared in. Hence, we run two passes: one inserting code into the
+         environment, and one doing the actual translation. *)
       let env, res =
         Static_const_group.match_against_bound_static consts bound_static
           ~init:(env, res)
           ~code:(fun (env, res) code_id code ->
-            To_jsir_static_const.code ~env ~res ~translate_body:expr ~code_id
-              code)
+            To_jsir_static_const.prepare_code ~env ~res ~code_id code)
           ~deleted_code:(fun (env, res) _code_id -> env, res)
           ~set_of_closures:(fun (env, res) ~closure_symbols:_ _soc -> env, res)
           ~block_like:(fun (env, res) _symbol _static_const -> env, res)
       in
       Static_const_group.match_against_bound_static consts bound_static
         ~init:(env, res)
-        ~code:(fun (env, res) _code_id _code -> env, res)
+        ~code:(fun (env, res) code_id code ->
+          To_jsir_static_const.code ~env ~res ~translate_body:expr ~code_id code)
         ~deleted_code:(fun (env, res) _code_id -> env, res)
         ~set_of_closures:(fun (env, res) ~closure_symbols soc ->
           To_jsir_set_of_closures.static_set_of_closures ~env ~res
@@ -274,7 +273,8 @@ and apply_expr ~env ~res e =
   let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
     | None, _ | _, Effect _ -> failwith "effects not implemented yet"
-    | Some callee, (Function _ | Method _) ->
+    | _, Method _ -> failwith "method calls not implemented yet"
+    | Some callee, Function _ ->
       let args, res = To_jsir_shared.simples ~env ~res args in
       let f, res = To_jsir_shared.simple ~env ~res callee in
       (* CR selee: assume exact = false for now, JSIR seems to assume false in
