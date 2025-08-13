@@ -62,12 +62,7 @@ val add_var_alias_of_symbol_exn : t -> var:Variable.t -> alias_of:Symbol.t -> t
 (** Map a Flambda2 code ID to the address of the corresponding JSIR block
     as well as the parameters. *)
 val add_code_id :
-  t ->
-  Code_id.t ->
-  addr:Jsir.Addr.t ->
-  params:Jsir.Var.t list ->
-  is_my_closure_used:bool ->
-  t
+  t -> Code_id.t -> addr:Jsir.Addr.t -> params:Jsir.Var.t list -> t
 
 (** Map a Flambda2 function slot to the corresponding JSIR closure variable. *)
 val add_function_slot : t -> Function_slot.t -> Jsir.Var.t -> t
@@ -116,6 +111,3 @@ val add_symbol_if_not_found : t -> Symbol.t -> t
 val add_function_slot_if_not_found : t -> Function_slot.t -> t
 
 val add_value_slot_if_not_found : t -> Value_slot.t -> t
-
-(** Check whether the given [Code_id.t] needs an extra [my_closures] argument. *)
-val needs_my_closure : t -> Code_id.t -> bool

@@ -112,27 +112,18 @@ let prepare_code ~env ~res ~code_id code =
          bound_params
          ~body:_
          ~my_closure:_
-         ~is_my_closure_used
+         ~is_my_closure_used:_
          ~my_region:_
          ~my_ghost_region:_
          ~my_depth:_
          ~free_names_of_body:_
        ->
-      let env, params, is_my_closure_used =
-        let without_my_closure =
-          List.init (Bound_parameters.cardinal bound_params) (fun _ ->
-              Jsir.Var.fresh ())
-        in
-        match is_my_closure_used with
-        | Known false -> env, without_my_closure, false
-        | Known true | Unknown ->
-          let my_closure = Jsir.Var.fresh () in
-          env, without_my_closure @ [my_closure], true
+      let params =
+        List.init (Bound_parameters.cardinal bound_params) (fun _ ->
+            Jsir.Var.fresh ())
       in
       let res, addr = To_jsir_result.reserve_address res in
-      let env =
-        To_jsir_env.add_code_id env code_id ~addr ~params ~is_my_closure_used
-      in
+      let env = To_jsir_env.add_code_id env code_id ~addr ~params in
       env, res)
 
 let code ~env ~res ~translate_body ~code_id code =
@@ -167,8 +158,8 @@ let code ~env ~res ~translate_body ~code_id code =
          ~exn_continuation
          bound_params
          ~body
-         ~my_closure
-         ~is_my_closure_used
+         ~my_closure:_
+         ~is_my_closure_used:_
          ~my_region:_
          ~my_ghost_region:_
          ~my_depth:_
@@ -179,12 +170,7 @@ let code ~env ~res ~translate_body ~code_id code =
       let addr, params_jvar = To_jsir_env.get_code_id_exn env code_id in
       let res = To_jsir_result.new_block_with_addr_exn res ~addr ~params:[] in
       let params_fvar =
-        let without_my_closure =
-          Bound_parameters.to_list bound_params |> List.map Bound_parameter.var
-        in
-        match is_my_closure_used with
-        | Known false -> without_my_closure
-        | Known true | Unknown -> without_my_closure @ [my_closure]
+        Bound_parameters.to_list bound_params |> List.map Bound_parameter.var
       in
       let env_with_params =
         List.fold_left2 To_jsir_env.add_var env params_fvar params_jvar
