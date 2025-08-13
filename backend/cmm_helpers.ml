@@ -934,7 +934,7 @@ let rec low_bits ~bits ~dbg x =
           when 0 <= right && right <= left && left <= unused_bits ->
           (* these sign-extensions can be replaced with a left shift since we
              don't care about the high bits that it changed *)
-          low_bits ~bits (lsl_const x (left - right) dbg) ~dbg
+          low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
         | x -> (
           match get_const_bitmask x with
           | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->
