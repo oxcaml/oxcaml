@@ -903,8 +903,7 @@ let type_value_slots_and_make_lifting_decision_for_one_set dacc
     && Simple.pattern_match' simple
          ~const:(fun _ -> true)
          ~symbol:(fun _ ~coercion:_ -> true)
-         ~var:(fun var ~coercion:_ ->
-           if !Clflags.jsir then false else variable_permits_lifting var)
+         ~var:(fun var ~coercion:_ -> variable_permits_lifting var)
   in
   let can_lift =
     Name_mode.is_normal name_mode_of_bound_vars

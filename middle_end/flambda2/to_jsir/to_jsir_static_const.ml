@@ -1,24 +1,20 @@
 let static_const_not_supported () =
   Misc.fatal_error "This static_const is not yet supported."
 
-let const_or_var ~f (const_or_var : 'a Or_variable.t) =
-  match const_or_var with
-  | Var _ ->
-    (* When we are compiling with ocamlj, we turn off static allocation of
-       values that are only determined at runtime (i.e. values containing
-       variables. See [Closure_conversion.classify_fields_of_block],
-       [Reify.reify] and [Simplify_set_of_closures]. *)
-    Misc.fatal_error "Found a variable in Static_const"
-  | Const c -> f c
-
 let bind_expr_to_symbol ~env ~res symbol expr =
   (* This should already be populated by To_jsir.let_expr_normal *)
   let jvar = To_jsir_env.get_symbol_exn env symbol in
   env, To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr))
 
-let bind_const_or_var_to_symbol ~env ~res ~symbol ~to_jsir_const x =
-  bind_expr_to_symbol ~env ~res symbol
-    (Constant (const_or_var ~f:to_jsir_const x))
+let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
+  match x with
+  | Const c -> bind_expr_to_symbol ~env ~res symbol (Constant (to_jsir_const c))
+  | Var (v, _dbg) ->
+    (* CR selee: do something with [Debuginfo.t] *)
+    (* This should already be populated by To_jsir.let_expr_normal *)
+    let symbol_var = To_jsir_env.get_symbol_exn env symbol in
+    let value_var = To_jsir_env.get_var_exn env v in
+    env, To_jsir_result.add_instr_exn res (Assign (symbol_var, value_var))
 
 let float32_to_jsir_const float32 : Jsir.constant =
   Float32
@@ -34,6 +30,64 @@ let int64_to_jsir_const int64 : Jsir.constant = Int64 int64
 let nativeint_to_jsir_const nativeint : Jsir.constant =
   Int32 (Targetint_32_64.to_int32 nativeint)
 
+let block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
+  let fields = List.map Simple.With_debuginfo.simple fields in
+  let all_consts = List.for_all Simple.is_const fields in
+  if all_consts && not (Mutability.is_mutable mut)
+  then
+    let values =
+      List.map
+        (fun x ->
+          match Simple.must_be_const x with
+          | None ->
+            Misc.fatal_error
+              "Found a non-constant in a Simple.t, even though we check that \
+               all values are constants"
+          | Some const -> To_jsir_shared.reg_width_const const)
+        fields
+      |> Array.of_list
+    in
+    bind_expr_to_symbol ~env ~res symbol
+      (Constant (Tuple (Tag.to_int tag, values, array_or_not)))
+  else
+    let expr, env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields in
+    bind_expr_to_symbol ~env ~res symbol expr
+
+let immutable_float_block_or_array ~env ~res ~symbol values ~array_or_not =
+  let all_consts = List.for_all Or_variable.is_const values in
+  if all_consts
+  then
+    let f (x : 'a Or_variable.t) =
+      match x with
+      | Const c -> Numeric_types.Float_by_bit_pattern.to_bits c
+      | Var _ ->
+        Misc.fatal_error
+          "Found a variable in Or_variable.t, even though we check that all \
+           values are constants"
+    in
+    let values = List.map f values |> Array.of_list in
+    bind_expr_to_symbol ~env ~res symbol (Constant (Float_array values))
+  else
+    let values, res =
+      List.fold_right
+        (fun x (values, res) ->
+          match (x : Numeric_types.Float_by_bit_pattern.t Or_variable.t) with
+          | Const c ->
+            let bits = Numeric_types.Float_by_bit_pattern.to_bits c in
+            let var = Jsir.Var.fresh () in
+            ( var :: values,
+              To_jsir_result.add_instr_exn res
+                (Let (var, Constant (Float bits))) )
+          | Var (v, _dbg) ->
+            let var = To_jsir_env.get_var_exn env v in
+            var :: values, res)
+        values ([], res)
+    in
+    let values = Array.of_list values in
+    let tag = Tag.double_array_tag |> Tag.to_int in
+    let expr : Jsir.expr = Block (tag, values, array_or_not, Immutable) in
+    bind_expr_to_symbol ~env ~res symbol expr
+
 let block_like ~env ~res symbol (const : Static_const.t) =
   match const with
   | Set_of_closures _closures ->
@@ -42,37 +96,26 @@ let block_like ~env ~res symbol (const : Static_const.t) =
        Set_of_closures"
       Static_const.print const
   | Block (tag, mut, _shape, fields) ->
-    let expr, env, res =
-      To_jsir_shared.block ~env ~res ~tag ~mut
-        ~fields:(List.map Simple.With_debuginfo.simple fields)
-    in
-    bind_expr_to_symbol ~env ~res symbol expr
+    let tag = Tag.Scannable.to_tag tag in
+    block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not:NotArray fields
   | Boxed_float32 value ->
-    bind_const_or_var_to_symbol ~env ~res ~symbol
-      ~to_jsir_const:float32_to_jsir_const value
+    const_or_var ~env ~res ~symbol ~to_jsir_const:float32_to_jsir_const value
   | Boxed_float value ->
-    bind_const_or_var_to_symbol ~env ~res ~symbol
-      ~to_jsir_const:float_to_jsir_const value
+    const_or_var ~env ~res ~symbol ~to_jsir_const:float_to_jsir_const value
   | Boxed_int32 value ->
-    bind_const_or_var_to_symbol ~env ~res ~symbol
-      ~to_jsir_const:int32_to_jsir_const value
+    const_or_var ~env ~res ~symbol ~to_jsir_const:int32_to_jsir_const value
   | Boxed_int64 value ->
-    bind_const_or_var_to_symbol ~env ~res ~symbol
-      ~to_jsir_const:int64_to_jsir_const value
+    const_or_var ~env ~res ~symbol ~to_jsir_const:int64_to_jsir_const value
   | Boxed_nativeint value ->
-    bind_const_or_var_to_symbol ~env ~res ~symbol
-      ~to_jsir_const:nativeint_to_jsir_const value
+    const_or_var ~env ~res ~symbol ~to_jsir_const:nativeint_to_jsir_const value
   | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _ ->
     (* Need SIMD *)
     static_const_not_supported ()
-  | Immutable_float_block values | Immutable_float_array values ->
-    let values =
-      List.map
-        (const_or_var ~f:Numeric_types.Float_by_bit_pattern.to_bits)
-        values
-      |> Array.of_list
-    in
-    bind_expr_to_symbol ~env ~res symbol (Constant (Float_array values))
+  | Immutable_float_block values ->
+    immutable_float_block_or_array ~env ~res ~symbol values
+      ~array_or_not:NotArray
+  | Immutable_float_array values ->
+    immutable_float_block_or_array ~env ~res ~symbol values ~array_or_not:Array
   | Immutable_float32_array values ->
     ignore values;
     static_const_not_supported ()
@@ -95,11 +138,17 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     ignore values;
     static_const_not_supported ()
   | Immutable_value_array values ->
-    ignore values;
-    static_const_not_supported ()
-  | Empty_array kind ->
-    ignore kind;
-    static_const_not_supported ()
+    block_or_array ~env ~res ~symbol ~tag:Tag.zero ~mut:Immutable
+      ~array_or_not:Array values
+  | Empty_array kind -> (
+    match kind with
+    | Values_or_immediates_or_naked_floats | Naked_float32s ->
+      bind_expr_to_symbol ~env ~res symbol
+        (Prim (Extern "caml_make_vect", [Pc (Int Targetint.zero); Pc Null]))
+    | Unboxed_products | Naked_int32s | Naked_int64s | Naked_nativeints
+    | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+      (* No SIMD *)
+      static_const_not_supported ())
   | Mutable_string { initial_value } ->
     ignore initial_value;
     static_const_not_supported ()
