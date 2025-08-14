@@ -59,23 +59,6 @@ AX_COMPARE_VERSION([$dune_version], [le], [$DUNE_MAX_VERSION],
 
 AC_MSG_NOTICE([Using dune executable: $dune])
 
-dnl Prefer llvm-objcopy. If llvm-objcopy is not found, use objcopy.
-dnl GNU objcopy 2.35.2 sometimes modifies .relro_padding and .init_array
-dnl sections incorrectly, llvm-copy does not.
-default_objcopy="llvm-objcopy objcopy"
-AC_PATH_PROGS([objcopy], [$default_objcopy], [])
-
-AC_ARG_WITH([objcopy],
-  [AS_HELP_STRING([--with-objcopy],
-    [Path to objcopy executable (otherwise PATH is searched for 'llvm-objcopy' or
-    'objcopy')])],
-  [objcopy=$with_objcopy])
-
-AS_IF([test x"$objcopy" = "x"],
-  [AC_MSG_ERROR([objcopy not found on PATH; install, or use --with-objcopy])])
-
-AC_MSG_NOTICE([Using objcopy executable: $objcopy])
-
 AC_ARG_ENABLE([middle-end],
   [AS_HELP_STRING([--enable-middle-end],
     [Deprecated: must provide 'flambda2'])],
@@ -2666,6 +2649,25 @@ AS_IF([$native_compiler],
     OCAML_AS_COMPRESSION_SUPPORT
     OCAML_CC_COMPRESSION_SUPPORT
     OCAML_OBJCOPY_COMPRESSION_SUPPORT])])
+
+dnl Prefer llvm-objcopy. If llvm-objcopy is not found, use objcopy.
+dnl GNU objcopy 2.35.2 sometimes modifies .relro_padding and .init_array
+dnl sections incorrectly, llvm-copy does not.
+default_objcopy="llvm-objcopy objcopy"
+
+AS_IF([$native_compiler],
+  [AS_CASE([$system],
+    [macosx],[],
+    [AC_PATH_PROGS([objcopy], [$default_objcopy], [])
+     AS_IF([test x"$objcopy" = "x"],
+       [AC_MSG_ERROR([objcopy not found on PATH; install, or use --with-objcopy])])
+     AC_MSG_NOTICE([Using objcopy executable: $objcopy])])])
+
+AC_ARG_WITH([objcopy],
+  [AS_HELP_STRING([--with-objcopy],
+    [Path to objcopy executable (otherwise PATH is searched for 'llvm-objcopy' or
+    'objcopy')])],
+  [objcopy=$with_objcopy])
 
 ## Frame pointers
 
