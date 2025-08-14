@@ -28,6 +28,7 @@ type cms_infos = {
   cms_initial_env : Env.t option;
   cms_uid_to_loc : string Location.loc Shape.Uid.Tbl.t;
   cms_uid_to_attributes : Parsetree.attributes Shape.Uid.Tbl.t;
+  cms_shape_format : Clflags.shape_format;
   cms_impl_shape : Shape.t option; (* None for mli *)
   cms_ident_occurrences :
     (Longident.t Location.loc * Shape_reduce.result) array;
