@@ -680,7 +680,7 @@ Line 2, characters 30-31:
                                   ^
 Error: The value "x" is "local" but expected to be "global"
        because it is used inside a lazy expression which is "global"
-       because lazy expressions are always global.
+       because lazy expressions are always "global".
 |}]
 
 (* Don't escape through a functor *)
