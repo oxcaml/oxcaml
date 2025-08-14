@@ -521,6 +521,10 @@ module F = struct
     ins t "%a = fcmp %s %a %a, %a" pp_ident res cond Llvm_typ.pp_t typ pp_ident
       arg1 pp_ident arg2
 
+  let ins_select t ~cond ~ifso ~ifnot ~dst typ =
+    ins t "%a = select i1 %a, %a %a, %a %a" pp_ident dst pp_ident cond
+      Llvm_typ.pp_t typ pp_ident ifso Llvm_typ.pp_t typ pp_ident ifnot
+
   let ins_extractvalue t ~arg ~res typ idxs =
     ins t "%a = extractvalue %a %a, %a" pp_ident res Llvm_typ.pp_t typ pp_ident
       arg
@@ -645,7 +649,6 @@ module F = struct
   let float_comp t (comp : Operation.float_comparison) (i : 'a Cfg.instruction)
       typ =
     let comp_name =
-      (* CR yusumez: is not (ordered cond) == unordered (not cond)? *)
       match comp with
       | CFeq -> "oeq"
       | CFneq -> "une"
@@ -663,6 +666,36 @@ module F = struct
     let res = fresh_ident t in
     ins_fcmp t comp_name arg1 arg2 res typ;
     res
+
+  let odd_test t (i : 'a Cfg.instruction) =
+    let arg = load_reg_to_temp t i.arg.(0) in
+    let is_odd = fresh_ident t in
+    ins_conv t "trunc" ~src:arg ~dst:is_odd
+      ~src_typ:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
+      ~dst_typ:Llvm_typ.bool;
+    is_odd
+
+  (* Returns an i1 for whether [op] holds given the arguments of [i] *)
+  let test t (op : Operation.test) (i : 'a Cfg.instruction) =
+    match op with
+    | Itruetest -> int_comp t Cne i ~imm:(Some 0)
+    | Ifalsetest -> int_comp t Ceq i ~imm:(Some 0)
+    | Iinttest int_comp_op -> int_comp t int_comp_op i ~imm:None
+    | Iinttest_imm (int_comp_op, imm) ->
+      int_comp t int_comp_op i ~imm:(Some imm)
+    | Ifloattest (width, float_comp_op) ->
+      let typ =
+        match width with
+        | Float64 -> Llvm_typ.double
+        | Float32 -> Llvm_typ.float
+      in
+      float_comp t float_comp_op i typ
+    | Ioddtest -> odd_test t i
+    | Ieventest ->
+      let is_odd = odd_test t i in
+      let is_even = fresh_ident t in
+      ins_binop_imm t "xor" is_odd "1" is_even Llvm_typ.bool;
+      is_even
 
   let not_implemented_aux print_ins ?msg i =
     Misc.fatal_error
@@ -926,21 +959,10 @@ module F = struct
     | Never -> assert false
     | Always lbl -> ins_branch t lbl
     | Parity_test b ->
-      (* Check if the argument is even *)
-      let arg_temp = load_reg_to_temp t i.arg.(0) in
-      let is_odd = fresh_ident t in
-      ins_conv t "trunc" ~src:arg_temp ~dst:is_odd
-        ~src_typ:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
-        ~dst_typ:Llvm_typ.bool;
-      (* reverse the branches *)
+      let is_odd = odd_test t i in
       ins_branch_cond t is_odd b.ifnot b.ifso
     | Truth_test b ->
-      (* Check if the argument is true. *)
-      let arg_temp = load_reg_to_temp t i.arg.(0) in
-      let is_true = fresh_ident t in
-      ins_conv t "trunc" ~src:arg_temp ~dst:is_true
-        ~src_typ:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
-        ~dst_typ:Llvm_typ.bool;
+      let is_true = test t Itruetest i in
       ins_branch_cond t is_true b.ifso b.ifnot
     | Return -> return t i
     | Int_test { lt; eq; gt; is_signed; imm } ->
@@ -1311,9 +1333,17 @@ module F = struct
         ins_binop_imm t "add" alloc_ptr_after_gc "8" res Llvm_typ.i64;
         ins_store_into_reg t res i.res.(0))
     | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
-    | Intop_atomic _ | Csel _ | Reinterpret_cast _ | Static_cast _
-    | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Dls_get | Poll
-    | Pause ->
+    | Csel test_op ->
+      let len = Array.length i.arg in
+      let ifso = load_reg_to_temp t i.arg.(len - 2) in
+      let ifnot = load_reg_to_temp t i.arg.(len - 1) in
+      let cond = test t test_op i in
+      let dst = fresh_ident t in
+      ins_select t ~cond ~ifso ~ifnot ~dst
+        (Llvm_typ.of_machtyp_component i.res.(0).typ);
+      ins_store_into_reg t dst i.res.(0)
+    | Intop_atomic _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+    | Specific _ | Name_for_debugger _ | Dls_get | Poll | Pause ->
       not_implemented_basic i
 
   let basic t (i : Cfg.basic Cfg.instruction) =
