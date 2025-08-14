@@ -1,10 +1,15 @@
+type exn_handler =
+  { addr : Jsir.Addr.t;
+    exn_param : Jsir.Var.t;
+    extra_args : Jsir.Var.t list
+  }
+
 type t =
   { module_symbol : Symbol.t;
     return_continuation : Continuation.t;
     exn_continuation : Continuation.t;
     continuations : Jsir.Addr.t Continuation.Map.t;
-    exn_handlers :
-      (Jsir.Addr.t * Jsir.Var.t * Jsir.Var.t list) Continuation.Map.t;
+    exn_handlers : exn_handler Continuation.Map.t;
     vars : Jsir.Var.t Variable.Map.t;
     symbols : Jsir.Var.t Symbol.Map.t;
     code_ids : (Jsir.Addr.t * Jsir.Var.t list) Code_id.Map.t;
@@ -42,7 +47,7 @@ let add_continuation t cont addr =
 let add_exn_handler t cont ~addr ~exn_param ~extra_args =
   { t with
     exn_handlers =
-      Continuation.Map.add cont (addr, exn_param, extra_args) t.exn_handlers
+      Continuation.Map.add cont { addr; exn_param; extra_args } t.exn_handlers
   }
 
 let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
