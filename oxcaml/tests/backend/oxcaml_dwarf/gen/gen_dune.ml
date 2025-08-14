@@ -30,8 +30,10 @@ let () =
  (name ${name})
  (modules ${name})
  ${enabled_if}
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta))
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta
+   -extension small_numbers))
  (foreign_archives simd_stubs))
 
 (rule
