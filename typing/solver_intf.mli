@@ -372,10 +372,9 @@ module type Hint = sig
   (** Given a hint for a mode morphism, return a hint for the right adjoint of the morphism *)
   val right_adjoint : (allowed * _) morph -> (disallowed * allowed) morph
 
-  module Allow_disallow : Allow_disallow with type (_, _, 'd) sided = 'd morph
+  module Morph : Allow_disallow with type (_, _, 'd) sided = 'd morph
 
-  module Allow_disallow_const :
-    Allow_disallow with type (_, _, 'd) sided = 'd const
+  module Const : Allow_disallow with type (_, _, 'd) sided = 'd const
 end
 
 module type S = sig

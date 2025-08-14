@@ -1721,7 +1721,7 @@ module Hint = struct
       | Crossing -> fprintf ppf "crosses with something"
       | Register_alloc_mode -> fprintf ppf "is has an allocation"
 
-  module Allow_disallow = Magic_allow_disallow (struct
+  module Morph = Magic_allow_disallow (struct
     type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
 
     let allow_left : type l r. (allowed * r) morph -> (l * r) morph =
@@ -1772,7 +1772,7 @@ module Hint = struct
        | Register_alloc_mode -> Register_alloc_mode
   end)
 
-  module Allow_disallow_const = Magic_allow_disallow (struct
+  module Const = Magic_allow_disallow (struct
     type (_, _, 'd) sided = 'd const constraint 'd = 'l * 'r
 
     let allow_left : type l r. (allowed * r) const -> (l * r) const =

@@ -107,7 +107,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          fun h ->
           match h with
           | Base (morph_hint, morph) ->
-            Base (H.Allow_disallow.allow_left morph_hint, C.allow_left morph)
+            Base (H.Morph.allow_left morph_hint, C.allow_left morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (allow_left a_morph_hint, allow_left b_morph_hint)
 
@@ -116,7 +116,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          fun h ->
           match h with
           | Base (morph_hint, morph) ->
-            Base (H.Allow_disallow.allow_right morph_hint, C.allow_right morph)
+            Base (H.Morph.allow_right morph_hint, C.allow_right morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (allow_right a_morph_hint, allow_right b_morph_hint)
 
@@ -125,8 +125,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          fun h ->
           match h with
           | Base (morph_hint, morph) ->
-            Base
-              (H.Allow_disallow.disallow_left morph_hint, C.disallow_left morph)
+            Base (H.Morph.disallow_left morph_hint, C.disallow_left morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (disallow_left a_morph_hint, disallow_left b_morph_hint)
 
@@ -135,9 +134,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          fun h ->
           match h with
           | Base (morph_hint, morph) ->
-            Base
-              ( H.Allow_disallow.disallow_right morph_hint,
-                C.disallow_right morph )
+            Base (H.Morph.disallow_right morph_hint, C.disallow_right morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (disallow_right a_morph_hint, disallow_right b_morph_hint)
       end)
@@ -156,7 +153,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let rec allow_left : type a l r. (a, allowed * r) t -> (a, l * r) t =
         function
         | Apply (f_hint, h) -> Apply (Morph_hint.allow_left f_hint, allow_left h)
-        | Const h -> Const (H.Allow_disallow_const.allow_left h)
+        | Const h -> Const (H.Const.allow_left h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, allow_left a_hint, b, allow_left b_hint)
 
@@ -164,7 +161,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         function
         | Apply (f_hint, h) ->
           Apply (Morph_hint.allow_right f_hint, allow_right h)
-        | Const h -> Const (H.Allow_disallow_const.allow_right h)
+        | Const h -> Const (H.Const.allow_right h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, allow_right a_hint, b, allow_right b_hint)
 
@@ -172,7 +169,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           = function
         | Apply (f_hint, h) ->
           Apply (Morph_hint.disallow_left f_hint, disallow_left h)
-        | Const h -> Const (H.Allow_disallow_const.disallow_left h)
+        | Const h -> Const (H.Const.disallow_left h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, disallow_left a_hint, b, disallow_left b_hint)
 
@@ -180,7 +177,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           = function
         | Apply (f_hint, h) ->
           Apply (Morph_hint.disallow_right f_hint, disallow_right h)
-        | Const h -> Const (H.Allow_disallow_const.disallow_right h)
+        | Const h -> Const (H.Const.disallow_right h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, disallow_right a_hint, b, disallow_right b_hint)
     end)
@@ -478,8 +475,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let min (type a) (obj : a C.obj) = Amode (C.min obj, Const H.min, Const H.nil)
 
   let max (type a) (obj : a C.obj) =
-    Amode
-      (C.max obj, Const H.nil, Const (H.Allow_disallow_const.allow_right H.max))
+    Amode (C.max obj, Const H.nil, Const (H.Const.allow_right H.max))
 
   let of_const _obj ?(hint = H.nil) a = Amode (a, Const hint, Const hint)
 
@@ -881,8 +877,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* In this case, [a] is the maximum element, and we can use
            [a_hint_lower] as the output's lower hint *)
-        Amode
-          (a, a_hint_lower, Const (H.Allow_disallow_const.disallow_right H.max))
+        Amode (a, a_hint_lower, Const (H.Const.disallow_right H.max))
       else
         match rest with
         | [] -> Amodejoin (a, a_hint_lower, mvs)
@@ -921,8 +916,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* In this case, [a] is the minimum element, and we can use [a_hint_upper]
            as the output's upper hint *)
-        Amode
-          (a, Const (H.Allow_disallow_const.disallow_left H.min), a_hint_upper)
+        Amode (a, Const (H.Const.disallow_left H.min), a_hint_upper)
       else
         match rest with
         | [] -> Amodemeet (a, a_hint_upper, mvs)
