@@ -109,9 +109,11 @@ let rec apply_coercion loc strict restr arg =
             Pmakemixedblock(0, Immutable, shape, alloc_heap)
         in
         let get_field pos =
+          (* [(pos, _, _)] is an element of in [pos_mbe_cc_list] *)
           if pos < 0 then lambda_unit
           else
-            Lprim(mod_field pos,[Lvar id], loc)
+            (* CR jrayman: this is sometimes wrong *)
+            Lprim(Pfield(pos, Pointer, Reads_agree), [Lvar id], loc)
         in
         let shape =
           pos_mbe_cc_list
@@ -128,11 +130,9 @@ let rec apply_coercion loc strict restr arg =
           then Module_value_only (Array.length shape)
           else Module_mixed shape
         in
-        (* CR jrayman: this is not correct *)
         let get_layout _pos =
-          match repr with
-          | Module_value_only _ -> layout_module_field
-          | Module_mixed _ -> assert false
+          (* CR jrayman: this should be combined with [get_field] *)
+          layout_module_field
         in
         let lam =
           Lprim(block_of ~repr,
@@ -922,8 +922,8 @@ and transl_structure ~scopes loc
                 (* CR sspies: Can we find a better [debug_uid] here? *)
                 Llet(Alias, lambda_layout, id, id_duid,
                      Lprim(mod_field pos, [Lvar mid],
-          (* CR mixed-modules: [mod_field] returns [Pfield(_,Pointer,_)]. Should
-           * it sometimes return [Pfield(_,Immediate,_)] *)
+          (* CR jrayman: [mod_field] returns [Pfield(_,Pointer,_)]. Should
+           * it sometimes return [Pfield(_,Immediate,_)] or [Pmixedfield]? *)
                            of_location ~scopes incl.incl_loc), body),
                 repr
           in
@@ -982,6 +982,7 @@ and transl_structure ~scopes loc
                   in
                   let id_duid = Lambda.debug_uid_none in
                   (* CR sspies: Can we find a better [debug_uid] here? *)
+                  (* CR jrayman: [mod_field] is wrong *)
                   Llet(Alias, lambda_layout, id, id_duid,
                       Lprim(mod_field pos, [Lvar mid],
                             of_location ~scopes od.open_loc), body),
@@ -1601,6 +1602,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
                   let id_duid = Lambda.debug_uid_none in
                   (* CR sspies: Can we find a better [debug_uid] here? *)
                   Llet(Alias, Lambda.layout_module_field, id, id_duid,
+                      (* CR jrayman: [mod_field] is wrong *)
                       Lprim(mod_field pos, [Lvar mid],
                                                  loc),
                        Lsequence(store_ident loc id,
@@ -1660,6 +1662,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
                       | id :: idl ->
                         (* CR sspies: Can we find a better [debug_uid] here? *)
                           let id_duid = Lambda.debug_uid_none in
+                          (* CR jrayman: [mod_field] is wrong *)
                           Llet(Alias, Lambda.layout_module_field, id, id_duid,
                                Lprim(mod_field pos,
                                      [Lvar mid], loc),
@@ -2157,6 +2160,7 @@ let transl_package_set_fields component_names target_name coercion =
                (fun pos _id ->
                  Lprim(mod_setfield pos,
                        [Lprim(Pgetglobal target_name, [], Loc_unknown);
+                        (* CR jrayman: [mod_field] is wrong *)
                         Lprim(mod_field pos, [Lvar blk], Loc_unknown)],
                        Loc_unknown))
                0 pos_mbe_cc_list))

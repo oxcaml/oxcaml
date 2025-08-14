@@ -3642,14 +3642,15 @@ let bind_code_and_sets_of_closures all_code sets_of_closures acc body =
         defining_expr ~body)
     (acc, body) components
 
-type module_representation =
-  | Module_value_only of int
-  | Module_mixed of
-      unit K.Mixed_block_lambda_shape.Singleton_mixed_block_element.t array
-      * K.Mixed_block_shape.t
-
 let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
     ~return_cont ~module_symbol =
+  let open struct
+    type module_representation =
+      | Module_value_only of int
+      | Module_mixed of
+          unit K.Mixed_block_lambda_shape.Singleton_mixed_block_element.t array
+          * K.Mixed_block_shape.t
+  end in
   let module_block_var = Variable.create "module_block" K.value in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
