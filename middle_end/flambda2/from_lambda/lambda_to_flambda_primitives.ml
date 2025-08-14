@@ -1453,8 +1453,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     List.map (List.map (fun arg : H.simple_or_prim -> Simple arg)) args
   in
   let size_int =
-    assert (Targetint_32_64.size mod 8 = 0);
-    Targetint_32_64.size / 8
+    assert (Targetint.size mod 8 = 0);
+    Targetint.size / 8
   in
   match prim, args with
   | Pmakeblock (tag, mutability, shape, mode), _ ->
