@@ -555,37 +555,46 @@ let call_linker file_list_rev startup_file output_name =
       else if needs_objcopy_workflow then
         (* Run objcopy to extract debug info into .debug file *)
         let debug_file = output_name ^ ".debug" in
-        let compression_flag = 
+        let compression_flag =
           match Dwarf_flags.get_dwarf_objcopy_compression_format () with
-          | Some compression -> 
-            Printf.sprintf " %s=%s" 
+          | Some compression ->
+            Printf.sprintf " %s=%s"
               Config.objcopy_compress_debug_sections_flag compression
           | None -> ""
         in
-        let objcopy_cmd = 
-          Printf.sprintf 
-            "objcopy --enable-deterministic-archives \
-             --only-keep-debug%s %s %s && \
-             objcopy --enable-deterministic-archives \
-             --strip-debug --add-gnu-debuglink=%s %s %s"
+        let objcopy_cmd_create_debug =
+          Printf.sprintf
+            "%s --enable-deterministic-archives \
+             --only-keep-debug%s %s %s"
+            Config.objcopy
             compression_flag
             (Filename.quote link_output_name)
             (Filename.quote debug_file)
+        in
+        let objcopy_exit = Ccomp.command objcopy_cmd_create_debug in
+        if objcopy_exit <> 0 then
+          ( Misc.remove_file link_output_name;
+              raise (Error(Objcopy_error objcopy_exit)));
+        let objcopy_cmd_create_stripped_exe =
+          Printf.sprintf
+            "%s --enable-deterministic-archives \
+             --strip-debug --add-gnu-debuglink=%s %s %s"
+            Config.objcopy
             (Filename.quote debug_file)
             (Filename.quote link_output_name)
             (Filename.quote output_name)
         in
-        let objcopy_exit = Ccomp.command objcopy_cmd in
+        let objcopy_exit = Ccomp.command objcopy_cmd_create_stripped_exe in
         Misc.remove_file link_output_name;
         if objcopy_exit <> 0 then
           raise (Error(Objcopy_error objcopy_exit))
     | Fission_dsymutil ->
       if not (Target_system.is_macos ()) then
         raise (Error(Dwarf_fission_dsymutil_not_macos))
-      else if mode = Ccomp.Exe && 
+      else if mode = Ccomp.Exe &&
               not !Dwarf_flags.restrict_to_upstream_dwarf then
         (* Run dsymutil on the executable *)
-        let dsymutil_cmd = 
+        let dsymutil_cmd =
           Printf.sprintf "dsymutil %s" (Filename.quote output_name) in
         let dsymutil_exit = Ccomp.command dsymutil_cmd in
         if dsymutil_exit <> 0 then
