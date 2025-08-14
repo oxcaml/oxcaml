@@ -3078,6 +3078,8 @@ module Format_history = struct
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
          (idx or mut_idx)"
+    | Structure_element ->
+      fprintf ppf "it's the type of something stored in a module structure"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3165,8 +3167,6 @@ module Format_history = struct
       fprintf ppf "the check that a type is definitely not `float`"
     | Polymorphic_variant_field ->
       fprintf ppf "it's the type of the field of a polymorphic variant"
-    | Structure_element ->
-      fprintf ppf "it's the type of something stored in a module structure"
     | V1_safety_check ->
       fprintf ppf "it has to be value for the V1 safety check"
     | Probe -> format_with_notify_js ppf "it's a probe"
@@ -3891,6 +3891,7 @@ module Debug_printers = struct
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
+    | Structure_element -> fprintf ppf "Structure_element"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3951,7 +3952,6 @@ module Debug_printers = struct
     | Tuple_element -> fprintf ppf "Tuple_element"
     | Separability_check -> fprintf ppf "Separability_check"
     | Polymorphic_variant_field -> fprintf ppf "Polymorphic_variant_field"
-    | Structure_element -> fprintf ppf "Structure_element"
     | V1_safety_check -> fprintf ppf "V1_safety_check"
     | Probe -> fprintf ppf "Probe"
     | Captured_in_object -> fprintf ppf "Captured_in_object"
