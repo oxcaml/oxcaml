@@ -42,3 +42,12 @@ val simples :
     environment, and return the variables in order *)
 val bound_parameters :
   env:To_jsir_env.t -> Bound_parameters.t -> Jsir.Var.t list * To_jsir_env.t
+
+(** Make a new block. *)
+val block :
+  env:To_jsir_env.t ->
+  res:To_jsir_result.t ->
+  tag:Tag.Scannable.t ->
+  mut:Mutability.t ->
+  fields:Simple.t list ->
+  Jsir.expr * To_jsir_env.t * To_jsir_result.t

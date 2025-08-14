@@ -1,5 +1,19 @@
 open! Flambda.Import
 
+(* CR selee: we should eventually get rid of these *)
+let unsupported_multiple_return_variables vars =
+  match vars with
+  | [var] -> var
+  | [] -> Misc.fatal_error "Found return statement with no arguments"
+  | _ :: _ ->
+    Misc.fatal_error "Multiple return variables are currently unsupported."
+
+let exn_handler_unsupported_multiple_params params =
+  match params with
+  | [param] -> param
+  | [] -> Misc.fatal_error "Found exception handler with no parameters"
+  | _ :: _ -> Misc.fatal_error "Multiple parameters are currently unsupported."
+
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
 let create_let_simple ~env ~res fvar simple =
@@ -111,9 +125,20 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
         Continuation_handler.pattern_match handler
           ~f:(fun params ~handler:cont_body ->
             let params, env = To_jsir_shared.bound_parameters ~env params in
-            let res, addr = To_jsir_result.new_block res ~params in
-            let _env, res = expr ~env ~res cont_body in
-            let env = To_jsir_env.add_continuation env k addr in
+            let env, res =
+              match Continuation_handler.is_exn_handler handler with
+              | false ->
+                let res, addr = To_jsir_result.new_block res ~params in
+                let _env, res = expr ~env ~res cont_body in
+                let env = To_jsir_env.add_continuation env k addr in
+                env, res
+              | true ->
+                let param = exn_handler_unsupported_multiple_params params in
+                let res, addr = To_jsir_result.new_block res ~params:[] in
+                let _env, res = expr ~env ~res cont_body in
+                let env = To_jsir_env.add_exn_handler env k ~addr ~param in
+                env, res
+            in
             expr ~env ~res body))
   | Recursive handlers ->
     Recursive_let_cont_handlers.pattern_match handlers
@@ -145,15 +170,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                     To_jsir_shared.bound_parameters ~env
                       (Bound_parameters.append invariant_params params)
                   in
-                  let addr =
-                    match To_jsir_env.get_continuation_exn env k with
-                    | Return | Exception ->
-                      Misc.fatal_errorf
-                        "Continuation %a is unexpectedly a return or exception \
-                         continuation of the current environment"
-                        Continuation.print k
-                    | Block addr -> addr
-                  in
+                  let addr = To_jsir_env.get_continuation_exn env k in
                   let res =
                     To_jsir_result.new_block_with_addr_exn res ~params ~addr
                   in
@@ -165,14 +182,8 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
         expr ~env ~res body)
 
 and apply_expr ~env ~res e =
-  let continuation = Apply_expr.continuation e in
-  let exn_continuation = Apply_expr.exn_continuation e in
-  let call_kind = Apply_expr.call_kind e in
-  if Exn_continuation.exn_handler exn_continuation
-     <> To_jsir_env.exn_continuation env
-  then failwith "unimplemented for now";
   let var, res =
-    match Apply_expr.callee e, call_kind with
+    match Apply_expr.callee e, Apply_expr.call_kind e with
     | None, _ | _, Effect _ -> failwith "effects not implemented yet"
     | Some callee, (Function _ | Method _) ->
       let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
@@ -198,73 +209,102 @@ and apply_expr ~env ~res e =
       let res = To_jsir_result.add_instr_exn res (Let (var, expr)) in
       var, res
   in
-  match continuation with
+  match Apply_expr.continuation e with
   | Never_returns ->
     env, To_jsir_result.end_block_with_last_exn res (Return var)
   | Return cont -> (
-    match To_jsir_env.get_continuation_exn env cont with
-    | Exception ->
-      failwith "unimplemented" (* CR selee: or should be disallowed? *)
+    match Continuation.sort cont with
     | Return -> env, To_jsir_result.end_block_with_last_exn res (Return var)
-    | Block addr ->
-      env, To_jsir_result.end_block_with_last_exn res (Branch (addr, [var])))
+    | Normal_or_exn ->
+      let addr = To_jsir_env.get_continuation_exn env cont in
+      env, To_jsir_result.end_block_with_last_exn res (Branch (addr, [var]))
+    | Toplevel_return | Define_root_symbol -> failwith "unimplemented")
 
-and apply_cont0 ~env ~res apply_cont : Jsir.last * To_jsir_result.t =
+and apply_cont0 ~env ~res apply_cont =
   let args, res =
     To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
   in
+  let continuation = Apply_cont.continuation apply_cont in
+  let get_last ~raise_kind : Jsir.last * To_jsir_result.t =
+    match Continuation.sort continuation with
+    | Toplevel_return ->
+      let arg = unsupported_multiple_return_variables args in
+      (* CR selee: This is a hack, but I can't find a way to trigger any
+         behaviour that isn't calling [caml_register_global] on the toplevel
+         module. I suspect for single-file compilation this is always fine. Will
+         come back and review later. *)
+      let compilation_unit =
+        To_jsir_env.module_symbol env |> Symbol.compilation_unit
+      in
+      let module_name =
+        Compilation_unit.name compilation_unit
+        |> Compilation_unit.Name.to_string
+      in
+      let var = Jsir.Var.fresh () in
+      let res =
+        To_jsir_result.add_instr_exn res
+          (Jsir.Let
+             ( var,
+               Prim
+                 ( Extern "caml_register_global",
+                   [ Pc (Int (Targetint.of_int_exn 0));
+                     Pv arg;
+                     Pc
+                       (* CR selee: this assumes javascript, WASM needs just
+                          String *)
+                       (NativeString (Jsir.Native_string.of_string module_name))
+                   ] ) ))
+      in
+      Stop, res
+    | Return ->
+      let arg = unsupported_multiple_return_variables args in
+      Return arg, res
+    | Normal_or_exn -> (
+      match raise_kind with
+      | None ->
+        let addr = To_jsir_env.get_continuation_exn env continuation in
+        Jsir.Branch (addr, args), res
+      | Some (raise_kind : Trap_action.Raise_kind.t) ->
+        let raise_kind =
+          match raise_kind with
+          | Regular -> `Normal
+          | Reraise -> `Reraise
+          | No_trace -> `Notrace
+        in
+        let arg = unsupported_multiple_return_variables args in
+        Raise (arg, raise_kind), res)
+    | Define_root_symbol -> failwith "unimplemented"
+  in
   match Apply_cont.trap_action apply_cont with
-  | None -> (
-    let continuation = Apply_cont.continuation apply_cont in
-    let res_cont = To_jsir_env.get_continuation_exn env continuation in
-    match (res_cont : To_jsir_env.continuation) with
-    | Return -> (
-      match Continuation.sort continuation with
-      | Toplevel_return ->
-        assert (List.length args = 1);
-        (* CR selee: This is a hack, but I can't find a way to trigger any
-           behaviour that isn't calling [caml_register_global] on the toplevel
-           module. I suspect for single-file compilation this is always fine.
-           Will come back and review later. *)
-        let compilation_unit =
-          To_jsir_env.module_symbol env |> Symbol.compilation_unit
-        in
-        let module_name =
-          Compilation_unit.name compilation_unit
-          |> Compilation_unit.Name.to_string
-        in
-        let var = Jsir.Var.fresh () in
-        let res =
-          To_jsir_result.add_instr_exn res
-            (Jsir.Let
-               ( var,
-                 Prim
-                   ( Extern "caml_register_global",
-                     [ Pc (Int (Targetint.of_int_exn 0));
-                       Pv (List.hd args);
-                       Pc
-                         (* CR selee: this assumes javascript, WASM needs just
-                            String *)
-                         (NativeString
-                            (Jsir.Native_string.of_string module_name)) ] ) ))
-        in
-        Stop, res
-      | Return ->
-        if List.length args <> 1
-        then Misc.fatal_error "Currently only one return argument is supported";
-        Jsir.Return (List.hd args), res
-      | Normal_or_exn | Define_root_symbol ->
-        (* CR selee: seems odd, review later *)
-        Misc.fatal_errorf "Unexpected continuation sort for continuation %a"
-          Continuation.print continuation)
-    | Exception -> failwith "unimplemented"
-    | Block addr -> Jsir.Branch (addr, args), res)
-  | Some (Push { exn_handler }) ->
-    ignore exn_handler;
-    failwith "unimplemented"
-  | Some (Pop { exn_handler; raise_kind }) ->
-    ignore (exn_handler, raise_kind);
-    failwith "unimplemented"
+  | None -> get_last ~raise_kind:None
+  | Some (Push { exn_handler }) -> (
+    let last, res = get_last ~raise_kind:None in
+    let handler_addr, handler_var =
+      To_jsir_env.get_exn_handler_exn env exn_handler
+    in
+    match last with
+    | Branch cont -> Jsir.Pushtrap (cont, handler_var, (handler_addr, [])), res
+    | Return _ | Raise _ | Stop | Cond _ | Switch _ | Pushtrap _ | Poptrap _ ->
+      let res, addr = To_jsir_result.new_block res ~params:[] in
+      let res = To_jsir_result.end_block_with_last_exn res last in
+      Jsir.Pushtrap ((addr, []), handler_var, (handler_addr, [])), res)
+  | Some (Pop { exn_handler; raise_kind }) -> (
+    let last, res = get_last ~raise_kind in
+    if Continuation.equal exn_handler (To_jsir_env.exn_continuation env)
+    then (
+      assert (Option.is_some raise_kind);
+      last, res)
+    else
+      (* [Jsir.Poptrap] always jumps to a block after popping the exception
+         handler. If we want to do anything than just [Branch], we should jump
+         to a new block that actually does the thing we want. *)
+      match last with
+      | Branch cont -> Jsir.Poptrap cont, res
+      | Return _ | Raise _ | Stop | Cond _ | Switch _ | Pushtrap _ | Poptrap _
+        ->
+        let res, addr = To_jsir_result.new_block res ~params:[] in
+        let res = To_jsir_result.end_block_with_last_exn res last in
+        Jsir.Poptrap (addr, []), res)
 
 and apply_cont ~env ~res apply_cont =
   let last, res = apply_cont0 ~env ~res apply_cont in
@@ -295,7 +335,7 @@ and switch ~env ~res e =
             let res, addr = To_jsir_result.invalid_switch_block res in
             (Branch (addr, []) : Jsir.last), res
         in
-        match last with
+        match (last : Jsir.last) with
         | Branch cont -> res, cont
         | Return _ | Raise _ | Stop | Cond _ | Switch _ | Pushtrap _ | Poptrap _
           ->
