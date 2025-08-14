@@ -180,7 +180,6 @@ module type S = sig
   module Hint : sig
     (** See [print_const] for what each constructor means. *)
     type 'd const =
-      | Debug : string -> ('l * 'r) const
       | Skip : ('l * 'r) const
       | Result_of_lazy : (disallowed * 'r) pos const
       | Lazy_closure : (disallowed * 'r) pos const
@@ -220,7 +219,6 @@ module type S = sig
       }
 
     type 'd morph =
-      | Debug : string -> (_ * _) morph
       | Gap : ('l * 'r) morph
       | Skip : ('l * 'r) morph
           (** The skip morphism hint. This should be used when we know that the morphism

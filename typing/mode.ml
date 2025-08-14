@@ -1561,7 +1561,6 @@ satisfies [Solver_intf.Hint]) and mode system users (and thus satisfies
 [Mode_intf.Hint]). *)
 module Hint = struct
   type 'd const =
-    | Debug : string -> ('l * 'r) const
     | Skip : ('l * 'r) const
     | Result_of_lazy : (disallowed * 'r) pos const
     | Lazy_closure : (disallowed * 'r) pos const
@@ -1613,8 +1612,6 @@ module Hint = struct
     }
 
   type 'd morph =
-    (* CR pdsouza: TEMP FOR DEBUGGING *)
-    | Debug : string -> (_ * _) morph
     | Gap : ('l * 'r) morph
     | Skip : ('l * 'r) morph
     | Close_over : closure_details -> ('l * disallowed) morph
@@ -1637,7 +1634,6 @@ module Hint = struct
   let gap = Gap
 
   let is_rigid : type l r. (l * r) morph -> bool = function
-    | Debug _ -> true
     | Gap -> assert false
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Adj_captured_by_partial_application ->
@@ -1646,7 +1642,6 @@ module Hint = struct
 
   let left_adjoint : type l. (l * allowed) morph -> (allowed * disallowed) morph
       = function
-    | Debug s -> Debug s
     | Skip -> Skip
     | Gap -> Gap
     | Is_closed_by x -> Close_over x
@@ -1656,7 +1651,6 @@ module Hint = struct
 
   let right_adjoint :
       type r. (allowed * r) morph -> (disallowed * allowed) morph = function
-    | Debug s -> Debug s
     | Skip -> Skip
     | Gap -> Gap
     | Close_over x -> Is_closed_by x
@@ -1671,7 +1665,6 @@ module Hint = struct
     let open Format in
     let wrap_print_hint t = fprintf ppf "@ because %t" t in
     function
-    | Debug s -> wrap_print_hint (dprintf "DEBUG[%s]" s)
     | Skip ->
       (* The point of the [Skip] constant hint is that it should never have to be printed *)
       assert false
@@ -1703,7 +1696,6 @@ module Hint = struct
     let open Format in
     fun ppf hint ->
       match hint with
-      | Debug s -> fprintf ppf "DEBUG[%s]" s
       | Skip ->
         (* [Skip] should never be printed as it should only be used with morphisms
             that don't change the mode value (modulo equating equivalent regionality
@@ -1733,7 +1725,6 @@ module Hint = struct
     let allow_left : type l r. (allowed * r) morph -> (l * r) morph =
       fun (type l r) (h : (allowed * r) morph) : (l * r) morph ->
        match h with
-       | Debug s -> Debug s
        | Skip -> Skip
        | Gap -> Gap
        | Close_over x -> Close_over x
@@ -1745,7 +1736,6 @@ module Hint = struct
     let allow_right : type l r. (l * allowed) morph -> (l * r) morph =
       fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
        match h with
-       | Debug s -> Debug s
        | Skip -> Skip
        | Gap -> Gap
        | Is_closed_by x -> Is_closed_by x
@@ -1756,7 +1746,6 @@ module Hint = struct
     let disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
       fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
        match h with
-       | Debug s -> Debug s
        | Skip -> Skip
        | Gap -> Gap
        | Close_over x -> Close_over x
@@ -1770,7 +1759,6 @@ module Hint = struct
     let disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
       fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
        match h with
-       | Debug s -> Debug s
        | Skip -> Skip
        | Gap -> Gap
        | Close_over x -> Close_over x
@@ -1788,7 +1776,6 @@ module Hint = struct
     let allow_left : type l r. (allowed * r) const -> (l * r) const =
       fun (type l r) (h : (allowed * r) const) : (l * r) const ->
        match h with
-       | Debug s -> Debug s
        | Skip -> Skip
        | Class_comonadic -> Class_comonadic
        | Stack_expression -> Stack_expression
@@ -1799,7 +1786,6 @@ module Hint = struct
     let allow_right : type l r. (l * allowed) const -> (l * r) const =
       fun (type l r) (h : (l * allowed) const) : (l * r) const ->
        match h with
-       | Debug s -> Debug s
        | Skip -> Skip
        | Class_monadic -> Class_monadic
        | Result_of_lazy -> Result_of_lazy
@@ -1811,7 +1797,6 @@ module Hint = struct
     let disallow_left : type l r. (l * r) const -> (disallowed * r) const =
       fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
        match h with
-       | Debug s -> Debug s
        | Skip -> Skip
        | Result_of_lazy -> Result_of_lazy
        | Lazy_closure -> Lazy_closure
@@ -1828,7 +1813,6 @@ module Hint = struct
     let disallow_right : type l r. (l * r) const -> (l * disallowed) const =
       fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
        match h with
-       | Debug s -> Debug s
        | Skip -> Skip
        | Result_of_lazy -> Result_of_lazy
        | Lazy_closure -> Lazy_closure
