@@ -482,9 +482,9 @@ module F = struct
      `fun_info.needs_unreachable_label` field). *)
   let ins_switch t typ value labels =
     let discr = fresh_ident t in
-    let unreachable_label = Cmm.new_label () in
+    let unreachable_label = fresh_ident t in
     ins_load t ~src:value ~dst:discr typ;
-    ins t "switch %a %a, %a [" Llvm_typ.pp_t typ pp_ident discr (pp_label t)
+    ins t "switch %a %a, label %a [" Llvm_typ.pp_t typ pp_ident discr pp_ident
       unreachable_label;
     Array.iteri
       (fun index label ->
@@ -492,8 +492,7 @@ module F = struct
         ins t "%a %d, %a" Llvm_typ.pp_t typ index (pp_label t) label)
       labels;
     ins t "]";
-    pp_label_def t t.ppf unreachable_label;
-    fprintf t.ppf "\n";
+    line t.ppf "%a:" Ident.print unreachable_label;
     ins_unreachable t
 
   let ins_conv t op ~src ~dst ~src_typ ~dst_typ =
