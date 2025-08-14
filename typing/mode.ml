@@ -89,7 +89,8 @@ module Hint = struct
     | Captured_by_partial_application : (disallowed * 'r) morph
     | Adj_captured_by_partial_application : ('l * disallowed) morph
     | Crossing : ('l * 'r) morph
-    | Register_alloc_mode : ('l * 'r) morph
+    | Allocate_left : ('l * disallowed) morph
+    | Allocate_right : (disallowed * 'r) morph
 
   type 'd neg_const = 'd neg const constraint 'd = _ * _
 
@@ -108,7 +109,7 @@ module Hint = struct
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Adj_captured_by_partial_application ->
       true
-    | Skip | Crossing | Register_alloc_mode -> false
+    | Skip | Crossing | Allocate_left | Allocate_right -> false
 
   let left_adjoint : type l. (l * allowed) morph -> (allowed * disallowed) morph
       = function
@@ -117,7 +118,7 @@ module Hint = struct
     | Is_closed_by x -> Close_over x
     | Captured_by_partial_application -> Adj_captured_by_partial_application
     | Crossing -> Crossing
-    | Register_alloc_mode -> Register_alloc_mode
+    | Allocate_right -> Allocate_left
 
   let right_adjoint :
       type r. (allowed * r) morph -> (disallowed * allowed) morph = function
@@ -126,7 +127,7 @@ module Hint = struct
     | Close_over x -> Is_closed_by x
     | Adj_captured_by_partial_application -> Captured_by_partial_application
     | Crossing -> Crossing
-    | Register_alloc_mode -> Register_alloc_mode
+    | Allocate_left -> Allocate_right
 
   (** Print out the text for a constant hint. Either prints nothing when there is
   no hint and returns [NothingPrinted] or prints " because {hint}" where {hint}
@@ -185,7 +186,8 @@ module Hint = struct
       | Adj_captured_by_partial_application ->
         fprintf ppf "has a partial application capturing a value"
       | Crossing -> fprintf ppf "crosses with something"
-      | Register_alloc_mode -> fprintf ppf "is has an allocation"
+      | Allocate_left -> fprintf ppf "allocates on the left"
+      | Allocate_right -> fprintf ppf "allocates on the right"
 
   module Morph = Magic_allow_disallow (struct
     type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
@@ -199,7 +201,7 @@ module Hint = struct
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
        | Crossing -> Crossing
-       | Register_alloc_mode -> Register_alloc_mode
+       | Allocate_left -> Allocate_left
 
     let allow_right : type l r. (l * allowed) morph -> (l * r) morph =
       fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
@@ -209,7 +211,7 @@ module Hint = struct
        | Is_closed_by x -> Is_closed_by x
        | Captured_by_partial_application -> Captured_by_partial_application
        | Crossing -> Crossing
-       | Register_alloc_mode -> Register_alloc_mode
+       | Allocate_right -> Allocate_right
 
     let disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
       fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
@@ -222,7 +224,8 @@ module Hint = struct
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
        | Crossing -> Crossing
-       | Register_alloc_mode -> Register_alloc_mode
+       | Allocate_left -> Allocate_left
+       | Allocate_right -> Allocate_right
 
     let disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
       fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
@@ -235,7 +238,8 @@ module Hint = struct
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
        | Crossing -> Crossing
-       | Register_alloc_mode -> Register_alloc_mode
+       | Allocate_left -> Allocate_left
+       | Allocate_right -> Allocate_right
   end)
 
   module Const = Magic_allow_disallow (struct
@@ -2359,13 +2363,13 @@ module Comonadic_common_gen (Obj : Obj) = struct
   let of_const : type l r. ?hint:(l * r) Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
-  type 'd unhint = (const, 'd) Solver.Unhint.t
-
   let unhint = Solver.Unhint.unhint
 
   let hint ?hint = Solver.Unhint.hint obj ?hint
 
   let wrap ?hint:h f m = m |> unhint |> f |> hint ?hint:h
+
+  let apply_hint hint m = wrap ~hint Fun.id m
 
   let meet_const_unhint c m = Solver.Unhint.apply obj (Meet_with c) m
 
@@ -2432,13 +2436,13 @@ module Monadic_common_gen (Obj : Obj) = struct
   let of_const : type l r. ?hint:(r * l) Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
-  type 'd unhint = (const, 'r * 'l) Solver.Unhint.t constraint 'd = 'l * 'r
-
   let unhint = Solver.Unhint.unhint
 
   let hint ?hint = Solver.Unhint.hint obj ?hint
 
   let wrap ?hint:h f m = m |> unhint |> f |> hint ?hint:h
+
+  let apply_hint hint m = wrap ~hint Fun.id m
 
   let join_const_unhint c m = Solver.Unhint.apply Obj.obj (Meet_with c) m
 
@@ -3108,8 +3112,6 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.of_const ?hint:hint_monadic monadic in
     { comonadic; monadic }
 
-  type 'd unhint = ('d Monadic.unhint, 'd Comonadic.unhint) monadic_comonadic
-
   let unhint { monadic; comonadic } =
     let comonadic = Comonadic.unhint comonadic in
     let monadic = Monadic.unhint monadic in
@@ -3602,13 +3604,21 @@ let alloc_to_value_l2r m =
   m |> Alloc.disallow_right |> Alloc.unhint |> alloc_to_value_l2r_unhint
   |> Value.hint
 
-let value_to_alloc_r2g m =
+let value_to_alloc_r2g_unhint m =
   let { comonadic; monadic } = m in
   let comonadic =
     S.Unhint.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
       comonadic
   in
   { comonadic; monadic }
+
+let value_to_alloc_r2g m =
+  m |> Value.unhint |> value_to_alloc_r2g_unhint |> Alloc.hint
+
+let value_r2g ?hint m =
+  Value.wrap ~monadic:Skip ?comonadic:hint
+    (fun m -> m |> value_to_alloc_r2g_unhint |> alloc_as_value_unhint)
+    m
 
 let value_to_alloc_r2l_unhint m =
   let { comonadic; monadic } = m in
@@ -4270,7 +4280,7 @@ module Crossing = struct
 
   let apply_right_alloc t m =
     m |> Alloc.unhint |> alloc_as_value_unhint |> apply_right_unhint t
-    |> value_to_alloc_r2g
+    |> value_to_alloc_r2g_unhint
     |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_left_right_alloc t m =

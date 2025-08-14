@@ -171,9 +171,7 @@ module type Common_product = sig
 
   val of_const : ?hint:'d hint_const -> Const.t -> 'd t
 
-  type 'd unhint constraint 'd = 'l * 'r
-
-  val wrap : ?hint:'d hint_morph -> ('d unhint -> 'd unhint) -> 'd t -> 'd t
+  val apply_hint : 'd hint_morph -> 'd t -> 'd t
 end
 
 module type S = sig
@@ -232,7 +230,8 @@ module type S = sig
       | Captured_by_partial_application : (disallowed * 'r) morph
       | Adj_captured_by_partial_application : ('l * disallowed) morph
       | Crossing : ('l * 'r) morph
-      | Register_alloc_mode : ('l * 'r) morph
+      | Allocate_left : ('l * disallowed) morph
+      | Allocate_right : (disallowed * 'r) morph
 
     (* This is needed for the destructive substitutions in [Common_axis] for
        the monadic axis modules, as we can't use [neg] within the substitution due
@@ -701,23 +700,6 @@ module type S = sig
 
     (** Returns the lower bound needed for [B -> C] in relation to [A -> B -> C] *)
     val partial_apply : (allowed * 'r) t -> l
-
-    type 'd unhint = ('d Monadic.unhint, 'd Comonadic.unhint) monadic_comonadic
-
-    val wrap :
-      ?monadic:('r * 'l) Hint.morph ->
-      ?comonadic:('l * 'r) Hint.morph ->
-      (('l * 'r) unhint -> ('l * 'r) unhint) ->
-      ('l * 'r) t ->
-      ('l * 'r) t
-
-    val unhint : ('l * 'r) t -> ('l * 'r) unhint
-
-    val hint :
-      ?monadic:('r * 'l) Hint.morph ->
-      ?comonadic:('l * 'r) Hint.morph ->
-      ('l * 'r) unhint ->
-      ('l * 'r) t
   end
 
   (** The most general mode. Used in most type checking,
@@ -751,9 +733,6 @@ module type S = sig
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
   val alloc_as_value : ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
-  (** Same as [alloc_as_value] but with hint to be filled in. *)
-  val alloc_as_value_unhint : ('l * 'r) Alloc.unhint -> ('l * 'r) Value.unhint
-
   (** Similar to [local_to_regional], behaves as identity in other axes *)
   val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
 
@@ -761,7 +740,11 @@ module type S = sig
   val value_to_alloc_r2l : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
-  val value_to_alloc_r2g : ('l * 'r) Value.unhint -> ('l * 'r) Alloc.unhint
+  val value_to_alloc_r2g : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+
+  (** Similar to [value_to_alloc_r2g], but followed by [alloc_as_value]. *)
+  val value_r2g :
+    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Value.t
 
   module Modality : sig
     type 'a raw =

@@ -3310,9 +3310,8 @@ let closure_mode ~errors ~env ~loc ~item ~lid
     match
       Mode.Value.Comonadic.submode
         comonadic
-        (Mode.Value.Comonadic.wrap
-          ~hint:(Is_closed_by ({ closure_context; value_loc = loc; value_lid = lid; value_item = item }))
-          Fun.id
+        (Mode.Value.Comonadic.apply_hint
+          (Is_closed_by ({ closure_context; value_loc = loc; value_lid = lid; value_item = item }))
           comonadic0)
     with
     | Error e ->
@@ -3407,10 +3406,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
       | Region_lock ->
           (* CR zqian: once we have finer regionality, remove this branch *)
           (* First map [regional] to [global], then cap [local] to [regional] *)
-          let mode =
-            Mode.Value.wrap (fun mode ->
-              mode |> Mode.value_to_alloc_r2g |> Mode.alloc_as_value_unhint) mode
-          in
+          let mode = Mode.value_r2g mode in
           Mode.Value.meet
             [mode;
              Mode.Value.max_with_comonadic Areality
