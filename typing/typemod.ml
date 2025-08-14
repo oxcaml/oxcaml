@@ -3398,15 +3398,6 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
             (fun () -> Typecore.type_representable_expression
                          ~why:Structure_item_expression env sexpr)
         in
-        if force_toplevel then
-          (* See comment on [force_toplevel]. *)
-          begin match Jkind.Sort.default_to_value_and_get sort with
-          | Base Value -> ()
-          | Product _
-          | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
-                 Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
-            raise (Error (sexpr.pexp_loc, env, Toplevel_unnamed_nonvalue sort))
-          end;
         Tstr_eval (expr, sort, attrs), [], shape_map, env
     | Pstr_value (rec_flag, sdefs) ->
         let (defs, newenv) =
@@ -3415,22 +3406,6 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           | Recursive -> Typecore.annotate_recursive_bindings env defs
           | Nonrecursive -> defs
         in
-        if force_toplevel then
-          (* See comment on [force_toplevel] *)
-          List.iter (fun vb ->
-            match vb.vb_pat.pat_desc with
-            | Tpat_any ->
-              begin match Jkind.Sort.default_to_value_and_get vb.vb_sort with
-              | Base Value -> ()
-              | Product _
-              | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
-                     Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 |
-                     Vec512) ->
-                raise (Error (vb.vb_loc, env,
-                              Toplevel_unnamed_nonvalue vb.vb_sort))
-              end
-            | _ -> ()
-          ) defs;
         (* Note: Env.find_value does not trigger the value_used event. Values
            will be marked as being used during the signature inclusion test. *)
         let items, shape_map =
