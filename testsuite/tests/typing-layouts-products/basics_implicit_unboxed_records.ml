@@ -44,15 +44,11 @@ Error: This match case could not be refuted.
        Here is an example of a value that would reach it: "#{ _ }"
 |}]
 
-(* We still cannot have top-level products *)
+(* Top-level products *)
 
-let disallowed = #{ i = 1; j = 2 }
+let unboxed_product = #{ i = 1; j = 2 }
 [%%expect{|
-Line 1, characters 4-14:
-1 | let disallowed = #{ i = 1; j = 2 }
-        ^^^^^^^^^^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "disallowed" has layout "value & value".
+val unboxed_product : t# = #{i = 1; j = 2}
 |}]
 
 ;;

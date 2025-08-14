@@ -1805,11 +1805,11 @@ external foo33 : t_any = "foo33";;
 Line 1, characters 17-22:
 1 | external foo33 : t_any = "foo33";;
                      ^^^^^
-Error: This type signature for "foo33" does not have a representable layout.
-       The layout of type t_any is any
+Error: Types in an external must have a representable layout.
+       The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
-       But the layout of type t_any must be representable
-         because it's the type of something stored in a module structure.
+       But the layout of t_any must be representable
+         because it's the type of the result of an external declaration.
 |}]
 
 external foo44 : ('a : any). 'a -> unit = "foo44";;
