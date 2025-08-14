@@ -1615,13 +1615,13 @@ module Hint = struct
   type 'd morph =
     (* CR pdsouza: TEMP FOR DEBUGGING *)
     | Debug : string -> (_ * _) morph
+    | Gap : ('l * 'r) morph
     | Skip : ('l * 'r) morph
     | Close_over : closure_details -> ('l * disallowed) morph
     | Is_closed_by : closure_details -> (disallowed * 'r) morph
     | Captured_by_partial_application : (disallowed * 'r) morph
     | Adj_captured_by_partial_application : ('l * disallowed) morph
-    | Crossing_left : ('l * disallowed) morph
-    | Crossing_right : (disallowed * 'r) morph
+    | Crossing : ('l * 'r) morph
     | Register_alloc_mode : ('l * 'r) morph
 
   type 'd neg_const = 'd neg const constraint 'd = _ * _
@@ -1634,29 +1634,34 @@ module Hint = struct
 
   let id = Skip
 
+  let gap = Gap
+
   let is_rigid : type l r. (l * r) morph -> bool = function
     | Debug _ -> true
+    | Gap -> assert false
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Adj_captured_by_partial_application ->
       true
-    | Skip | Crossing_left | Crossing_right | Register_alloc_mode -> false
+    | Skip | Crossing | Register_alloc_mode -> false
 
   let left_adjoint : type l. (l * allowed) morph -> (allowed * disallowed) morph
       = function
     | Debug s -> Debug s
     | Skip -> Skip
+    | Gap -> Gap
     | Is_closed_by x -> Close_over x
     | Captured_by_partial_application -> Adj_captured_by_partial_application
-    | Crossing_right -> Crossing_left
+    | Crossing -> Crossing
     | Register_alloc_mode -> Register_alloc_mode
 
   let right_adjoint :
       type r. (allowed * r) morph -> (disallowed * allowed) morph = function
     | Debug s -> Debug s
     | Skip -> Skip
+    | Gap -> Gap
     | Close_over x -> Is_closed_by x
     | Adj_captured_by_partial_application -> Captured_by_partial_application
-    | Crossing_left -> Crossing_right
+    | Crossing -> Crossing
     | Register_alloc_mode -> Register_alloc_mode
 
   (** Print out the text for a constant hint. Either prints nothing when there is
@@ -1705,6 +1710,7 @@ module Hint = struct
             and locality values), and [Skip] should be a non-rigid hint, which should
             mean this case never happens *)
         assert false
+      | Gap -> assert false
       | Close_over closure ->
         (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
         fprintf ppf "closes over the %a %a (at %a)" print_lock_item
@@ -1718,7 +1724,7 @@ module Hint = struct
         fprintf ppf "is captured by a partial application"
       | Adj_captured_by_partial_application ->
         fprintf ppf "has a partial application capturing a value"
-      | Crossing_left | Crossing_right -> fprintf ppf "crosses with something"
+      | Crossing -> fprintf ppf "crosses with something"
       | Register_alloc_mode -> fprintf ppf "is has an allocation"
 
   module Allow_disallow = Magic_allow_disallow (struct
@@ -1729,10 +1735,11 @@ module Hint = struct
        match h with
        | Debug s -> Debug s
        | Skip -> Skip
+       | Gap -> Gap
        | Close_over x -> Close_over x
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
-       | Crossing_left -> Crossing_left
+       | Crossing -> Crossing
        | Register_alloc_mode -> Register_alloc_mode
 
     let allow_right : type l r. (l * allowed) morph -> (l * r) morph =
@@ -1740,9 +1747,10 @@ module Hint = struct
        match h with
        | Debug s -> Debug s
        | Skip -> Skip
+       | Gap -> Gap
        | Is_closed_by x -> Is_closed_by x
        | Captured_by_partial_application -> Captured_by_partial_application
-       | Crossing_right -> Crossing_right
+       | Crossing -> Crossing
        | Register_alloc_mode -> Register_alloc_mode
 
     let disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
@@ -1750,13 +1758,13 @@ module Hint = struct
        match h with
        | Debug s -> Debug s
        | Skip -> Skip
+       | Gap -> Gap
        | Close_over x -> Close_over x
        | Is_closed_by x -> Is_closed_by x
        | Captured_by_partial_application -> Captured_by_partial_application
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
-       | Crossing_left -> Crossing_left
-       | Crossing_right -> Crossing_right
+       | Crossing -> Crossing
        | Register_alloc_mode -> Register_alloc_mode
 
     let disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
@@ -1764,13 +1772,13 @@ module Hint = struct
        match h with
        | Debug s -> Debug s
        | Skip -> Skip
+       | Gap -> Gap
        | Close_over x -> Close_over x
        | Is_closed_by x -> Is_closed_by x
        | Captured_by_partial_application -> Captured_by_partial_application
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
-       | Crossing_left -> Crossing_left
-       | Crossing_right -> Crossing_right
+       | Crossing -> Crossing
        | Register_alloc_mode -> Register_alloc_mode
   end)
 
@@ -1838,12 +1846,6 @@ end
 
 module Solver = Solver_mono (Hint) (C)
 module S = Solver
-
-type 'd morph_hint = 'd S.morph_hint =
-  | No_hint
-  | Hint of 'd Hint.morph
-  | Wait
-  constraint 'd = _ * _
 
 type monadic = C.monadic =
   { uniqueness : C.Uniqueness.t;
@@ -1945,6 +1947,9 @@ module Axerror = struct
        [@@ocaml.warning "-4"]
       in
       match hint with
+      | Apply (Gap, _, _, _, _) ->
+        print_mode a_obj ppf a;
+        NothingPrinted
       | Apply (morph_hint, b, b_obj, b_hint, _morph) ->
         if override_mode_eq a_obj b_obj a b && not (Hint.is_rigid morph_hint)
         then
@@ -1963,6 +1968,7 @@ module Axerror = struct
       | Nil ->
         print_mode a_obj ppf a;
         NothingPrinted
+     [@@ocaml.warning "-4"]
 
     (** Report an axerror, printing error traces for both the left and the right sides *)
     let report_axerror :
@@ -2376,12 +2382,21 @@ module Comonadic_common_gen (Obj : Obj) = struct
   let of_const : type l r. ?hint:(l * r) Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
-  let meet_const ?hint c m = Solver.apply obj ?hint (Meet_with c) m
+  let unhint = Solver.Unhint.unhint
 
-  let imply ?hint c m =
-    Solver.apply obj ?hint (Imply c) (Solver.disallow_left m)
+  let hint ?hint = Solver.Unhint.hint obj ?hint
 
-  let apply_hint morph_hint = Solver.apply Obj.obj ~hint:(Hint morph_hint) Id
+  let meet_const_unhint c m = Solver.Unhint.apply obj (Meet_with c) m
+
+  let meet_const ?hint:h c m =
+    m |> unhint |> meet_const_unhint c |> hint ?hint:h
+
+  let imply_unhint c m = Solver.Unhint.apply obj (Imply c) m
+
+  let imply ?hint:h c m =
+    m |> disallow_left |> unhint |> imply_unhint c |> hint ?hint:h
+
+  let apply_hint hint = Solver.apply Obj.obj ~hint Id
 
   module Guts = struct
     let get_floor m = Solver.get_floor obj m
@@ -2440,12 +2455,21 @@ module Monadic_common_gen (Obj : Obj) = struct
   let of_const : type l r. ?hint:(r * l) Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
-  let join_const ?hint c m = Solver.apply Obj.obj ?hint (Meet_with c) m
+  let unhint = Solver.Unhint.unhint
 
-  let subtract ?hint c m =
-    Solver.apply obj ?hint (Imply c) (Solver.disallow_left m)
+  let hint ?hint = Solver.Unhint.hint obj ?hint
 
-  let apply_hint morph_hint = Solver.apply Obj.obj ~hint:(Hint morph_hint) Id
+  let join_const_unhint c m = Solver.Unhint.apply Obj.obj (Meet_with c) m
+
+  let join_const ?hint:h c m =
+    m |> unhint |> join_const_unhint c |> hint ?hint:h
+
+  let subtract_unhint c m = Solver.Unhint.apply obj (Imply c) m
+
+  let subtract ?hint:h c m =
+    m |> disallow_right |> unhint |> subtract_unhint c |> hint ?hint:h
+
+  let apply_hint hint = Solver.apply Obj.obj ~hint Id
 
   module Guts = struct
     let get_ceil m = Solver.get_floor obj m
@@ -2707,14 +2731,12 @@ module Yielding = struct
     match global with true -> zap_to_floor | false -> zap_to_ceil
 end
 
-let regional_to_local ?hint m =
-  S.apply ?hint Locality.Obj.obj C.Regional_to_local m
+let regional_to_local m = S.apply Locality.Obj.obj C.Regional_to_local m
 
 let locality_as_regionality m =
-  S.apply ~hint:(Hint Skip) Regionality.Obj.obj C.Locality_as_regionality m
+  S.apply ~hint:Skip Regionality.Obj.obj C.Locality_as_regionality m
 
-let regional_to_global ?hint m =
-  S.apply ?hint Locality.Obj.obj C.Regional_to_global m
+let regional_to_global m = S.apply Locality.Obj.obj C.Regional_to_global m
 
 module type Areality = sig
   module Const : C.Areality
@@ -2791,8 +2813,7 @@ module Comonadic_with (Areality : Areality) = struct
       | Statefulness -> (module Statefulness.Const)
   end
 
-  let proj ax m =
-    Solver.apply ~hint:(Hint Skip) (proj_obj ax) (Proj (Obj.obj, ax)) m
+  let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   let min_with ax m =
     Solver.apply Obj.obj (Min_with ax) (Solver.disallow_right m)
@@ -2932,8 +2953,7 @@ module Monadic = struct
 
   module Const_op = C.Monadic_op
 
-  let proj ax m =
-    Solver.apply ~hint:(Hint Skip) (proj_obj ax) (Proj (Obj.obj, ax)) m
+  let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   (* The monadic fragment is inverted. *)
 
@@ -3110,6 +3130,16 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.of_const ?hint:hint_comonadic comonadic in
     let monadic = Monadic.of_const ?hint:hint_monadic monadic in
     { comonadic; monadic }
+
+  let unhint { monadic; comonadic } =
+    let comonadic = Comonadic.unhint comonadic in
+    let monadic = Monadic.unhint monadic in
+    { monadic; comonadic }
+
+  let hint ?monadic ?comonadic t =
+    let comonadic = Comonadic.hint ?hint:comonadic t.comonadic in
+    let monadic = Monadic.hint ?hint:monadic t.monadic in
+    { monadic; comonadic }
 
   module Const = struct
     module Monadic = Monadic.Const
@@ -3501,20 +3531,6 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.disallow_right comonadic in
     { comonadic; monadic }
 
-  let apply_hint ?comonadic ?monadic
-      { comonadic = val_comonadic; monadic = val_monadic } =
-    let val_comonadic =
-      match comonadic with
-      | None -> val_comonadic
-      | Some comonadic -> Comonadic.apply_hint comonadic val_comonadic
-    in
-    let val_monadic =
-      match monadic with
-      | None -> val_monadic
-      | Some monadic -> Monadic.apply_hint monadic val_monadic
-    in
-    { comonadic = val_comonadic; monadic = val_monadic }
-
   module List = struct
     type nonrec 'd t = 'd t list
 
@@ -3575,38 +3591,51 @@ module Const = struct
 end
 
 let comonadic_locality_as_regionality comonadic =
-  S.apply ~hint:(Hint Skip) Value.Comonadic.Obj.obj
-    (Map_comonadic Locality_as_regionality) comonadic
-
-let comonadic_regional_to_local ?hint comonadic =
-  S.apply ?hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local)
+  S.Unhint.apply Value.Comonadic.Obj.obj (Map_comonadic Locality_as_regionality)
     comonadic
 
-let alloc_as_value m =
+let comonadic_regional_to_local comonadic =
+  S.Unhint.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local)
+    comonadic
+
+let alloc_as_value_unhint m =
   let { comonadic; monadic } = m in
   let comonadic = comonadic_locality_as_regionality comonadic in
   { comonadic; monadic }
 
-let alloc_to_value_l2r ?hint m =
-  let { comonadic; monadic } = Alloc.disallow_right m in
+let alloc_as_value m =
+  m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint ~comonadic:Skip
+
+let alloc_to_value_l2r_unhint m =
+  let { comonadic; monadic } = m in
   let comonadic =
-    S.apply ?hint Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional)
+    S.Unhint.apply Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional)
+      comonadic
+  in
+  { comonadic; monadic }
+
+let alloc_to_value_l2r m =
+  m |> Alloc.disallow_right |> Alloc.unhint |> alloc_to_value_l2r_unhint
+  |> Value.hint
+
+let value_to_alloc_r2g_unhint m =
+  let { comonadic; monadic } = m in
+  let comonadic =
+    S.Unhint.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
       comonadic
   in
   { comonadic; monadic }
 
 let value_to_alloc_r2g ?hint m =
+  m |> Value.unhint |> value_to_alloc_r2g_unhint |> Alloc.hint ?comonadic:hint
+
+let value_to_alloc_r2l_unhint m =
   let { comonadic; monadic } = m in
-  let comonadic =
-    S.apply ?hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
-      comonadic
-  in
+  let comonadic = comonadic_regional_to_local comonadic in
   { comonadic; monadic }
 
-let value_to_alloc_r2l ?hint m =
-  let { comonadic; monadic } = m in
-  let comonadic = comonadic_regional_to_local ?hint comonadic in
-  { comonadic; monadic }
+let value_to_alloc_r2l m =
+  m |> Value.unhint |> value_to_alloc_r2l_unhint |> Alloc.hint
 
 module Modality = struct
   type 'a raw =
@@ -4162,21 +4191,15 @@ module Crossing = struct
 
     let modality m t = Modality.concat ~then_:t m
 
-    let apply_left ~use_hint : t -> _ -> _ = function
+    let apply_left : t -> _ -> _ = function
       | Join_const c ->
-        fun m ->
-          Mode.subtract
-            ~hint:(if use_hint then Hint Crossing_right else Wait)
-            c
-            (Mode.join_const ~hint:Wait c m)
+        fun m -> Mode.subtract_unhint c (Mode.join_const_unhint c m)
 
-    let apply_right ~use_hint : t -> _ -> _ = function
+    let apply_right : t -> _ -> _ = function
       | Join_const c ->
         fun m ->
           (* The right adjoint of join is a restriction of identity *)
-          Mode.join_const
-            ~hint:(if use_hint then Hint Crossing_left else Wait)
-            c m
+          Mode.join_const_unhint c m
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Join_const c0, Join_const c1 -> Mode.Const.le c1 c0
@@ -4198,21 +4221,15 @@ module Crossing = struct
 
     let modality m t = Modality.concat ~then_:t m
 
-    let apply_left ~use_hint : t -> _ -> _ = function
+    let apply_left : t -> _ -> _ = function
       | Meet_const c ->
         fun m ->
           (* The left adjoint of meet is a restriction of identity *)
-          Mode.meet_const
-            ~hint:(if use_hint then Hint Crossing_left else Wait)
-            c m
+          Mode.meet_const_unhint c m
 
-    let apply_right ~use_hint : t -> _ -> _ = function
+    let apply_right : t -> _ -> _ = function
       | Meet_const c ->
-        fun m ->
-          Mode.imply
-            ~hint:(if use_hint then Hint Crossing_right else Wait)
-            c
-            (Mode.meet_const ~hint:Wait c m)
+        fun m -> Mode.imply_unhint c (Mode.meet_const_unhint c m)
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Meet_const c0, Meet_const c1 -> Mode.Const.le c0 c1
@@ -4234,19 +4251,23 @@ module Crossing = struct
     let comonadic = Comonadic.modality m.comonadic comonadic in
     { monadic; comonadic }
 
-  let apply_left_aux ~use_hint t { monadic; comonadic } =
-    let monadic = Monadic.apply_left ~use_hint t.monadic monadic in
-    let comonadic = Comonadic.apply_left ~use_hint t.comonadic comonadic in
+  let apply_left_unhint t { monadic; comonadic } =
+    let monadic = Monadic.apply_left t.monadic monadic in
+    let comonadic = Comonadic.apply_left t.comonadic comonadic in
     { monadic; comonadic }
 
-  let apply_left = apply_left_aux ~use_hint:true
+  let apply_left t m =
+    m |> Value.unhint |> apply_left_unhint t
+    |> Value.hint ~monadic:Crossing ~comonadic:Crossing
 
-  let apply_right_aux ~use_hint t { monadic; comonadic } =
-    let monadic = Monadic.apply_right ~use_hint t.monadic monadic in
-    let comonadic = Comonadic.apply_right ~use_hint t.comonadic comonadic in
+  let apply_right_unhint t { monadic; comonadic } =
+    let monadic = Monadic.apply_right t.monadic monadic in
+    let comonadic = Comonadic.apply_right t.comonadic comonadic in
     { monadic; comonadic }
 
-  let apply_right = apply_right_aux ~use_hint:true
+  let apply_right t m =
+    m |> Value.unhint |> apply_right_unhint t
+    |> Value.hint ~monadic:Crossing ~comonadic:Crossing
 
   (* Our mode crossing is for [Value] modes, but can be extended to [Alloc]
      modes via [alloc_as_value], defined as follows:
@@ -4262,26 +4283,25 @@ module Crossing = struct
      [regional_to_local] the left adjoint. *)
 
   let apply_left_alloc t m =
-    m |> alloc_as_value
-    |> apply_left_aux ~use_hint:false t
-    |> value_to_alloc_r2l ~hint:Wait
-    |> Alloc.apply_hint ~comonadic:Crossing_left ~monadic:Crossing_right
+    m |> Alloc.unhint |> alloc_as_value_unhint |> apply_left_unhint t
+    |> value_to_alloc_r2l_unhint
+    |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_right_alloc t m =
-    m |> alloc_as_value
-    |> apply_right_aux ~use_hint:false t
-    |> value_to_alloc_r2g ~hint:Wait
-    |> Alloc.apply_hint ~comonadic:Crossing_right ~monadic:Crossing_left
+    m |> Alloc.unhint |> alloc_as_value_unhint |> apply_right_unhint t
+    |> value_to_alloc_r2g_unhint
+    |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
-  let apply_left_right_alloc t { monadic; comonadic } =
-    let monadic = Monadic.apply_right ~use_hint:true t.monadic monadic in
+  let apply_left_right_alloc t m =
+    let { monadic; comonadic } = Alloc.unhint m in
+    let monadic = Monadic.apply_right t.monadic monadic in
     let comonadic =
       comonadic |> comonadic_locality_as_regionality
-      |> Comonadic.apply_left ~use_hint:false t.comonadic
-      |> comonadic_regional_to_local ~hint:(Hint Crossing_left)
+      |> Comonadic.apply_left t.comonadic
+      |> comonadic_regional_to_local
       (* the left adjoint of [locality_as_regionality]*)
     in
-    { monadic; comonadic }
+    Alloc.hint ~monadic:Crossing ~comonadic:Crossing { monadic; comonadic }
 
   let le t0 t1 =
     Monadic.le t0.monadic t1.monadic && Comonadic.le t0.comonadic t1.comonadic

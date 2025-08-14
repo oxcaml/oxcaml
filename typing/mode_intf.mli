@@ -221,6 +221,7 @@ module type S = sig
 
     type 'd morph =
       | Debug : string -> (_ * _) morph
+      | Gap : ('l * 'r) morph
       | Skip : ('l * 'r) morph
           (** The skip morphism hint. This should be used when we know that the morphism
             will not change any values in any user-relevant way (e.g. if it changes from
@@ -229,8 +230,7 @@ module type S = sig
       | Is_closed_by : closure_details -> (disallowed * 'r) morph
       | Captured_by_partial_application : (disallowed * 'r) morph
       | Adj_captured_by_partial_application : ('l * disallowed) morph
-      | Crossing_left : ('l * disallowed) morph
-      | Crossing_right : (disallowed * 'r) morph
+      | Crossing : ('l * 'r) morph
       | Register_alloc_mode : ('l * 'r) morph
 
     (* This is needed for the destructive substitutions in [Common_axis] for
@@ -262,13 +262,6 @@ module type S = sig
   module type Common_axis = Common_axis with type 'a axerror := 'a axerror
 
   module type Common_product = Common_product with type 'a axerror := 'a axerror
-
-  (** See [solver.mli] for description of this type *)
-  type 'd morph_hint =
-    | No_hint
-    | Hint of 'd Hint.morph
-    | Wait
-    constraint 'd = 'l * 'r
 
   type changes
 
@@ -662,7 +655,7 @@ module type S = sig
     val proj_monadic : 'a Monadic.Axis.t -> ('l * 'r) t -> ('a, 'r * 'l) mode
 
     val meet_const :
-      ?hint:('l * 'r) morph_hint ->
+      ?hint:('l * 'r) Hint.morph ->
       Comonadic.Const.t ->
       ('l * 'r) t ->
       ('l * 'r) t
@@ -678,14 +671,14 @@ module type S = sig
       'a Comonadic.Axis.t -> ('a, 'l * 'r) mode -> ('l * disallowed) t
 
     val meet_with :
-      ?hint:('l0 * 'r0) morph_hint ->
+      ?hint:('l0 * 'r0) Hint.morph ->
       'a Comonadic.Axis.t ->
       'a ->
       ('l0 * 'r0) t ->
       ('l0 * 'r0) t
 
     val join_with :
-      ?hint:('r * 'l) morph_hint ->
+      ?hint:('r * 'l) Hint.morph ->
       'a Monadic.Axis.t ->
       'a ->
       ('l * 'r) t ->
@@ -694,7 +687,7 @@ module type S = sig
     val zap_to_legacy : lr -> Const.t
 
     val comonadic_to_monadic :
-      ?hint:('l * 'r) morph_hint -> ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
+      ?hint:('l * 'r) Hint.morph -> ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
 
     (* The following two are about the scenario where we partially apply a
        function [A -> B -> C] to [A] and get back [B -> C]. The mode of the
@@ -729,36 +722,26 @@ module type S = sig
   end
 
   (** Converts regional to local, identity otherwise *)
-  val regional_to_local :
-    ?hint:('l * 'r) morph_hint ->
-    ('l * 'r) Regionality.t ->
-    ('l * 'r) Locality.t
+  val regional_to_local : ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
 
   (** Inject locality into regionality *)
   val locality_as_regionality : ('l * 'r) Locality.t -> ('l * 'r) Regionality.t
 
   (** Converts regional to global, identity otherwise *)
-  val regional_to_global :
-    ?hint:('l * 'r) morph_hint ->
-    ('l * 'r) Regionality.t ->
-    ('l * 'r) Locality.t
+  val regional_to_global : ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
   val alloc_as_value : ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
-  val alloc_to_value_l2r :
-    ?hint:('l * disallowed) morph_hint ->
-    ('l * 'r) Alloc.t ->
-    ('l * disallowed) Value.t
+  val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
-  val value_to_alloc_r2l :
-    ?hint:('l * 'r) morph_hint -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+  val value_to_alloc_r2l : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
   val value_to_alloc_r2g :
-    ?hint:('l * 'r) morph_hint -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   module Modality : sig
     type 'a raw =

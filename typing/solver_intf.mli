@@ -316,19 +316,29 @@ module type Solver_mono = sig
         for the entire series of morphism applications. A [Wait] must always be later
         followed by some [Hint] before any non-morphism application operations are
         performed on the mode. *)
-  type 'd morph_hint =
-    | No_hint
-    | Hint of 'd hint_morph
-    | Wait
-    constraint 'd = 'l * 'r
 
   (** Apply a monotone morphism, and optionally give it a hint *)
   val apply :
     'b obj ->
-    ?hint:('l * 'r) morph_hint ->
+    ?hint:('l * 'r) hint_morph ->
     ('a, 'b, 'l * 'r) morph ->
     ('a, 'l * 'r) mode ->
     ('b, 'l * 'r) mode
+
+  module Unhint : sig
+    type ('a, 'd) t
+
+    val unhint : ('a, 'l * 'r) mode -> ('a, 'l * 'r) t
+
+    val hint :
+      'a obj ->
+      ?hint:('l * 'r) hint_morph ->
+      ('a, 'l * 'r) t ->
+      ('a, 'l * 'r) mode
+
+    val apply :
+      'b obj -> ('a, 'b, 'l * 'r) morph -> ('a, 'l * 'r) t -> ('b, 'l * 'r) t
+  end
 end
 
 (** Interface for hints, as needed by the solver *)
@@ -348,8 +358,11 @@ module type Hint = sig
       to the allowance of the morphism. *)
   type 'd morph
 
-  (** The hint to be used for the identity morphism *)
+  (** The hint for the identity morphism *)
   val id : ('l * 'r) morph
+
+  (** The hint for unexplained morphs *)
+  val gap : ('l * 'r) morph
 
   (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
   val left_adjoint : (_ * allowed) morph -> (allowed * disallowed) morph
