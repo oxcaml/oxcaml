@@ -118,8 +118,7 @@ type loc_kind =
 type atomic_kind =
   | Ref   (* operation on an atomic reference (takes only a pointer) *)
   | Field (* operation on an atomic field (takes a pointer and an offset) *)
-(* CR atomic-record-fields: | Loc
-   (* operation on a first-class field (takes a (pointer, offset) pair *) *)
+  | Loc (* operation on a first-class field (takes a (pointer, offset) pair *)
 
 type atomic_op =
   | Load
@@ -980,26 +979,37 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%get_header" -> Primitive (Pget_header mode, 1)
     | "%atomic_load" -> Atomic(Load, Ref)
     | "%atomic_load_field" -> Atomic(Load, Field)
+    | "%atomic_load_loc" -> Atomic(Load, Loc)
     | "%atomic_set" -> Atomic(Set, Ref)
     | "%atomic_set_field" -> Atomic(Set, Field)
+    | "%atomic_set_loc" -> Atomic(Set, Loc)
     | "%atomic_exchange" -> Atomic(Exchange, Ref)
     | "%atomic_exchange_field" -> Atomic(Exchange, Field)
+    | "%atomic_exchange_loc" -> Atomic(Exchange, Loc)
     | "%atomic_compare_exchange" -> Atomic(Compare_exchange, Ref)
     | "%atomic_compare_exchange_field" -> Atomic(Compare_exchange, Field)
+    | "%atomic_compare_exchange_loc" -> Atomic(Compare_exchange, Loc)
     | "%atomic_cas" -> Atomic(Compare_and_set, Ref)
     | "%atomic_cas_field" -> Atomic(Compare_and_set, Field)
+    | "%atomic_cas_loc" -> Atomic(Compare_and_set, Loc)
     | "%atomic_fetch_add" -> Atomic(Fetch_add, Ref)
     | "%atomic_fetch_add_field" -> Atomic(Fetch_add, Field)
+    | "%atomic_fetch_add_loc" -> Atomic(Fetch_add, Loc)
     | "%atomic_add" -> Atomic(Add, Ref)
     | "%atomic_add_field" -> Atomic(Add, Field)
+    | "%atomic_add_loc" -> Atomic(Add, Loc)
     | "%atomic_sub" -> Atomic(Sub, Ref)
     | "%atomic_sub_field" -> Atomic(Sub, Field)
+    | "%atomic_sub_loc" -> Atomic(Sub, Loc)
     | "%atomic_land" -> Atomic(Land, Ref)
     | "%atomic_land_field" -> Atomic(Land, Field)
+    | "%atomic_land_loc" -> Atomic(Land, Loc)
     | "%atomic_lor" -> Atomic(Lor, Ref)
     | "%atomic_lor_field" -> Atomic(Lor, Field)
+    | "%atomic_lor_loc" -> Atomic(Lor, Loc)
     | "%atomic_lxor" -> Atomic(Lxor, Ref)
     | "%atomic_lxor_field" -> Atomic(Lxor, Field)
+    | "%atomic_lxor_loc" -> Atomic(Lxor, Loc)
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
     | "%runstack" ->
       if runtime5 then Primitive (Prunstack, 3) else Unsupported Prunstack
@@ -1710,8 +1720,11 @@ let comparison_primitive comparison comparison_kind =
   in
   let icmp size cmp = Pscalar (Binary (Icmp (size, cmp))) in
   let fcmp size cmp = Pscalar (Binary (Fcmp (size, cmp))) in
-  let three_way_compare size =
-    Pscalar (Binary (Three_way_compare size))
+  let three_way_comparei_signed size =
+    Pscalar (Binary (Three_way_compare_int (Signed, size)))
+  in
+  let three_way_comparef size =
+    Pscalar (Binary (Three_way_compare_float size))
   in
   match comparison, comparison_kind with
   | Equal, Compare_generic -> Pccall caml_equal
@@ -1769,14 +1782,14 @@ let comparison_primitive comparison comparison_kind =
   | Greater_than, Compare_int32s -> icmp int32 Cgt
   | Greater_than, Compare_int64s -> icmp int64 Cgt
   | Compare, Compare_generic -> Pccall caml_compare
-  | Compare, Compare_ints -> three_way_compare (Scalar.integral int)
-  | Compare, Compare_floats -> three_way_compare (Scalar.floating float64)
-  | Compare, Compare_float32s -> three_way_compare (Scalar.floating float32)
+  | Compare, Compare_ints -> three_way_comparei_signed int
+  | Compare, Compare_floats -> three_way_comparef float64
+  | Compare, Compare_float32s -> three_way_comparef float32
   | Compare, Compare_strings -> Pccall caml_string_compare
   | Compare, Compare_bytes -> Pccall caml_bytes_compare
-  | Compare, Compare_nativeints -> three_way_compare (Scalar.integral nativeint)
-  | Compare, Compare_int32s -> three_way_compare (Scalar.integral int32)
-  | Compare, Compare_int64s -> three_way_compare (Scalar.integral int64)
+  | Compare, Compare_nativeints -> three_way_comparei_signed nativeint
+  | Compare, Compare_int32s -> three_way_comparei_signed int32
+  | Compare, Compare_int64s -> three_way_comparei_signed int64
 
 let lambda_of_loc kind sloc =
   let loc = to_location sloc in
@@ -1830,7 +1843,7 @@ let atomic_arity op (kind : atomic_kind) =
   in
   let extra_kind_arity =
     match kind with
-    | Ref (* | Loc  *)-> 0
+    | Ref | Loc -> 0
     | Field -> 1
   in
   arity_of_op + extra_kind_arity
@@ -1838,6 +1851,13 @@ let atomic_arity op (kind : atomic_kind) =
 let lambda_of_atomic prim_name loc op (kind : atomic_kind) args =
   if List.length args <> atomic_arity op kind then
     raise (Error (to_location loc, Wrong_arity_builtin_primitive prim_name)) ;
+  let split = function
+    | [] ->
+        (* split is only called when [arity >= 1] *)
+        assert false
+    | first :: rest ->
+        first, rest
+  in
   let prim =
     match op with
     | Load -> Patomic_load_field { immediate_or_pointer = Pointer }
@@ -1854,17 +1874,50 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind) args =
     | Lor -> Patomic_lor_field
     | Lxor -> Patomic_lxor_field
   in
-  let args =
-    match kind with
-    | Ref ->
-      begin match args with
-      | hd :: rest ->
-        hd :: tagged_immediate 0 :: rest
-      | _ -> assert false
-      end
-    | Field -> args
-  in
-  Lprim (prim, args, loc)
+  match kind with
+  | Ref ->
+      (* the primitive application
+           [Lprim(%atomic_exchange, [ref; v])]
+         becomes
+           [Lprim(caml_atomic_exchange_field, [ref; 0; v])]
+      *)
+      let ref_arg, rest = split args in
+      let args = ref_arg :: tagged_immediate 0  :: rest in
+      Lprim (prim, args, loc)
+  | Field ->
+      (* the primitive application
+           [Lprim(%atomic_exchange_field, [ptr; ofs; v])]
+         becomes
+           [Lprim(caml_atomic_exchange_field, [ptr; ofs; v])] *)
+      Lprim (prim, args, loc)
+  | Loc ->
+      (* the primitive application
+           [Lprim(%atomic_exchange_loc, [(ptr, ofs); v])]
+         becomes
+           [Lprim(caml_atomic_exchange_field, [ptr; ofs; v])]
+         and in the general case of a non-tuple expression <loc>
+           [Lprim(%atomic_exchange_loc, [loc; v])]
+         becomes
+           [Llet(p, loc,
+              Lprim(caml_atomic_exchange_field, [Field(p, 0); Field(p, 1); v]))]
+      *)
+      let loc_arg, rest = split args in
+      match loc_arg with
+      | Lprim (Pmakeblock _, [ptr; ofs], _argloc) ->
+          let args = ptr :: ofs :: rest in
+          Lprim (prim, args, loc)
+      | _ ->
+          let varg = Ident.create_local "atomic_arg" in
+          let ptr =
+            Lprim (Pfield (0, Pointer, Reads_agree), [Lvar varg], loc)
+          in
+          let ofs =
+            Lprim (Pfield (1, Immediate, Reads_agree), [Lvar varg], loc)
+          in
+          let args = ptr :: ofs :: rest in
+          Llet (
+            Strict, Pvalue { raw_kind = Pgenval; nullable = Non_nullable},
+            varg, Lambda.debug_uid_none, loc_arg, Lprim (prim, args, loc))
 
 let caml_restore_raw_backtrace =
   Lambda.simple_prim_on_values ~name:"caml_restore_raw_backtrace" ~arity:2

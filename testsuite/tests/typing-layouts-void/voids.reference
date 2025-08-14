@@ -19,4 +19,5 @@ Test 18: Obj.tag of records containing void
   Obj.tag of record with void: 0
   Obj.tag of record with multiple voids: 0
   Obj.tag of variant containing record with void: 0
+Test 19: unboxed variants containing void
 All tests passed.

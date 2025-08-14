@@ -1,24 +1,22 @@
 (* TEST
- include stdlib_beta;
+ include stdlib_stable;
  include stdlib_upstream_compatible;
  modules = "test_repr.c test_smallint.ml";
  flambda2;
  {
-   flags = "-extension-universe beta";
    native;
  } {
-   flags = "-O3 -extension-universe beta";
+   flags = "-O3";
    native;
  } {
-   flags = "-Oclassic -extension-universe beta";
+   flags = "-Oclassic";
    native;
  } {
-   flags = "-extension-universe beta";
    bytecode;
  }
 *)
 open Test_smallint
-module Smallint = Stdlib_beta.Int_u
+module Smallint = Stdlib_stable.Int_u
 
 let same_int x y =
   Int.equal (Smallint.to_int x) y && Smallint.equal x (Smallint.of_int y)

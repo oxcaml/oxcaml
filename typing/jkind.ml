@@ -2105,8 +2105,8 @@ module Const = struct
     let rec scan_layout (l : Layout.Const.t) : Language_extension.maturity =
       match l, Mod_bounds.nullability jkind.mod_bounds with
       | ( ( Base
-              ( Float64 | Float32 | Word | Bits32 | Bits64 | Vec128 | Vec256
-              | Vec512 | Untagged_immediate )
+              ( Float64 | Float32 | Word | Bits8 | Bits16 | Bits32 | Bits64
+              | Vec128 | Vec256 | Vec512 | Untagged_immediate )
           | Any ),
           _ )
       | Base Value, Non_null
@@ -2116,7 +2116,6 @@ module Const = struct
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
-      | Base (Bits8 | Bits16), (Non_null | Maybe_null) -> Beta
       | Base Void, _ -> Stable
     in
     scan_layout jkind.layout

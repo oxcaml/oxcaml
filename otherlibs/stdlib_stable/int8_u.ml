@@ -16,19 +16,19 @@
 
 open! Stdlib
 
-type t = int16#
+type t = int8#
 
-let size = 16
+let size = 8
 
-external of_int16 : int16 -> int16# = "%int16#_of_int16"
+external of_int8 : int8 -> int8# = "%int8#_of_int8"
 
-external to_int16 : int16# -> int16 = "%int16_of_int16#"
+external to_int8 : int8# -> int8 = "%int8_of_int8#"
 
-external of_int : int -> int16# = "%int16#_of_int"
+external of_int : int -> int8# = "%int8#_of_int"
 
-external to_int : int16# -> int = "%int_of_int16#"
+external to_int : int8# -> int = "%int_of_int8#"
 
-external ( < ) : int16# -> int16# -> bool = "%int16#_lessthan"
+external ( < ) : int8# -> int8# -> bool = "%int8#_lessthan"
 
 let zero () = of_int 0
 
@@ -36,53 +36,53 @@ let one () = of_int 1
 
 let minus_one () = of_int (-1)
 
-external neg : int16# -> int16# = "%int16#_neg"
+external neg : int8# -> int8# = "%int8#_neg"
 
-external add : int16# -> int16# -> int16# = "%int16#_add"
+external add : int8# -> int8# -> int8# = "%int8#_add"
 
-external sub : int16# -> int16# -> int16# = "%int16#_sub"
+external sub : int8# -> int8# -> int8# = "%int8#_sub"
 
-external mul : int16# -> int16# -> int16# = "%int16#_mul"
+external mul : int8# -> int8# -> int8# = "%int8#_mul"
 
-external div : int16# -> int16# -> int16# = "%int16#_div"
+external div : int8# -> int8# -> int8# = "%int8#_div"
 
-external rem : int16# -> int16# -> int16# = "%int16#_mod"
+external rem : int8# -> int8# -> int8# = "%int8#_mod"
 
-external succ : int16# -> int16# = "%int16#_succ"
+external succ : int8# -> int8# = "%int8#_succ"
 
-external pred : int16# -> int16# = "%int16#_pred"
+external pred : int8# -> int8# = "%int8#_pred"
 
-external logand : int16# -> int16# -> int16# = "%int16#_and"
+external logand : int8# -> int8# -> int8# = "%int8#_and"
 
-external logor : int16# -> int16# -> int16# = "%int16#_or"
+external logor : int8# -> int8# -> int8# = "%int8#_or"
 
-external logxor : int16# -> int16# -> int16# = "%int16#_xor"
+external logxor : int8# -> int8# -> int8# = "%int8#_xor"
 
 let[@inline] lognot x = logxor x (minus_one ())
 
-external shift_left : int16# -> int -> int16# = "%int16#_lsl"
+external shift_left : int8# -> int -> int8# = "%int8#_lsl"
 
-external shift_right : int16# -> int -> int16# = "%int16#_asr"
+external shift_right : int8# -> int -> int8# = "%int8#_asr"
 
-external shift_right_logical : int16# -> int -> int16# = "%int16#_lsr"
+external shift_right_logical : int8# -> int -> int8# = "%int8#_lsr"
 
 let[@inline] abs x = if x < zero () then neg x else x
 
-external equal : int16# -> int16# -> bool = "%int16#_equal"
+external equal : int8# -> int8# -> bool = "%int8#_equal"
 
-external compare : int16# -> int16# -> int = "%int16#_compare"
+external compare : int8# -> int8# -> int = "%int8#_compare"
 
 let[@inline] min x y = if x < y then x else y
 
 let[@inline] max x y = if x < y then y else x
 
-external of_float : float -> int16# = "%int16#_of_float"
+external of_float : float -> int8# = "%int8#_of_float"
 
-external to_float : int16# -> float = "%float_of_int16#"
+external to_float : int8# -> float = "%float_of_int8#"
 
 let[@inline] to_string t = Int.to_string (to_int t)
 
-let[@inline] of_string s = of_int16 (Int16.of_string s)
+let[@inline] of_string s = of_int8 (Int8.of_string s)
 
 let max_int () = shift_right_logical (minus_one ()) 1
 
@@ -90,10 +90,9 @@ let min_int () = succ (max_int ())
 
 let[@inline] unsigned_to_int t = to_int t land ((1 lsl size) - 1)
 
-let[@inline] unsigned_compare n m =
-  compare (sub n (min_int ())) (sub m (min_int ()))
+external unsigned_compare : int8# -> int8# -> int = "%int8#_unsigned_compare"
 
-let[@inline] unsigned_lt n m = sub n (min_int ()) < sub m (min_int ())
+external unsigned_lt : int8# -> int8# -> bool = "%int8#_unsigned_lessthan"
 
 (* Unsigned division from signed division of the same bitness. See Warren Jr.,
    Henry S. (2013). Hacker's Delight (2 ed.), Sec 9-3. *)

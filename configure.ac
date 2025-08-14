@@ -353,6 +353,7 @@ AC_SUBST([windows_unicode])
 AC_SUBST([flat_float_array])
 AC_SUBST([function_sections])
 AC_SUBST([oxcaml_dwarf_flags_for_compiler])
+AC_SUBST([assembly_flag_for_compiler])
 AC_SUBST([probes])
 AC_SUBST([oc_native_compflags])
 AC_SUBST([afl])
@@ -717,6 +718,12 @@ AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
     [Compile the compiler and standard library with OxCaml DWARF])],
   [],
   [enable_oxcaml_dwarf_on_compiler=no])
+
+AC_ARG_ENABLE([keep-compiler-asm],
+  [AS_HELP_STRING([--enable-keep-compiler-asm],
+    [Configure the compiler to use -S during bootstrapping, which will produce .s assembly files for the files in the compiler tree. The files can be found in _build/main when building with dune])],
+  [],
+  [enable_keep_compiler_asm=no])
 
 AC_ARG_ENABLE([multidomain],
   [AS_HELP_STRING([--enable-multidomain],
@@ -2852,6 +2859,11 @@ AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
 AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
   [AS_IF([test x"$enable_function_sections" != "xno"],
     [AC_MSG_ERROR([--enable-oxcaml-dwarf-on-compiler requires --disable-function-sections to be passed])])])
+
+# Configure assembly emission flag for compiler
+AS_IF([test x"$enable_keep_compiler_asm" = "xyes"],
+  [assembly_flag_for_compiler="-S"],
+  [assembly_flag_for_compiler=""])
 
 # Enable debugging support
 # TODO: add a --disable-debug-info configure option that disables debugging

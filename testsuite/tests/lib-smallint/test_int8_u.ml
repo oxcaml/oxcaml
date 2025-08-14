@@ -1,24 +1,22 @@
 (* TEST
- include stdlib_beta;
+ include stdlib_stable;
  include stdlib_upstream_compatible;
  modules = "test_repr.c test_smallint.ml";
  flambda2;
  {
-   flags = "-extension-universe beta";
-   native;
+ native;
  } {
-   flags = "-O3 -extension-universe beta";
-   native;
+ flags = "-O3";
+ native;
  } {
-   flags = "-Oclassic -extension-universe beta";
-   native;
+ flags = "-Oclassic";
+ native;
  } {
-   flags = "-extension-universe beta";
-   bytecode;
+ bytecode;
  }
 *)
 open Test_smallint
-module Smallint = Stdlib_beta.Int8_u
+module Smallint = Stdlib_stable.Int8_u
 let min_int = -0x80
 let max_int = 0x7f
 

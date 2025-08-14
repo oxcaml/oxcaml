@@ -1,7 +1,14 @@
+; Foreign library for SIMD functions
+(foreign_library
+ (archive_name simd_stubs)
+ (language c)
+ (names simd_stubs)
+ (flags (:standard -msse4.2 -mavx2)))
+
 (include dune.inc)
 
 (rule (with-stdout-to dune.inc.gen (run ./gen/gen_dune.exe)))
 
 (rule
- (alias runtest)
+ (alias runtest-dwarf)
  (action (diff dune.inc dune.inc.gen)))

@@ -20,19 +20,21 @@
  (deps
   (:ml disabled256.ml))
  (action
-  (with-outputs-to
-   disabled256.corrected
-   (pipe-outputs
-    (with-accepted-exit-codes
-     2
-     (run
-      %{bin:ocamlopt.opt}
-      %{ml}
-      -extension
-      simd
-      -color
-      never
-      -error-style
-      short
-      -fno-avx))
-    (run head -n 1)))))
+  (setenv
+   OCAMLRUNPARAM b=0
+   (with-outputs-to
+    disabled256.corrected
+    (pipe-outputs
+     (with-accepted-exit-codes
+      2
+      (run
+       %{bin:ocamlopt.opt}
+       %{ml}
+       -extension
+       simd
+       -color
+       never
+       -error-style
+       short
+       -fno-avx))
+     (run head -n 1))))))

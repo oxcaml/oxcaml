@@ -995,15 +995,15 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.Punboxed_or_untagged_integer Unboxed_nativeint
   | Base Untagged_immediate as const ->
     if
-      Language_extension.(is_at_least Layouts Beta)
-      && Language_extension.(is_at_least Small_numbers Beta) then
+      Language_extension.(is_at_least Layouts Stable)
+      && Language_extension.(is_at_least Small_numbers Stable) then
       Lambda.Punboxed_or_untagged_integer Untagged_int
     else error const
-  | Base Bits8 when Language_extension.(is_at_least Layouts Beta) &&
-                    Language_extension.(is_at_least Small_numbers Beta) ->
+  | Base Bits8 when Language_extension.(is_at_least Layouts Stable) &&
+                    Language_extension.(is_at_least Small_numbers Stable) ->
     Lambda.Punboxed_or_untagged_integer Untagged_int8
-  | Base Bits16 when Language_extension.(is_at_least Layouts Beta) &&
-                     Language_extension.(is_at_least Small_numbers Beta) ->
+  | Base Bits16 when Language_extension.(is_at_least Layouts Stable) &&
+                     Language_extension.(is_at_least Small_numbers Stable) ->
     Lambda.Punboxed_or_untagged_integer Untagged_int16
   | Base Bits32 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Unboxed_int32

@@ -101,8 +101,6 @@ val size_machtype : Cmx_format.machtype_component array -> int
 
 val size_expr : environment -> Cmm.expression -> int
 
-val swap_intcomp : Operation.integer_comparison -> Operation.integer_comparison
-
 val current_function_name : string ref
 
 val current_function_is_check_enabled : bool ref
@@ -178,7 +176,6 @@ val float_test_of_float_comparison :
 
 val int_test_of_integer_comparison :
   Scalar.Integer_comparison.t ->
-  signed:bool ->
   immediate:int option ->
   label_false:Label.t ->
   label_true:Label.t ->

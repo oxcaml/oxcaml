@@ -23,6 +23,11 @@ type t =
   | Proj of
       { uid : Lambda.debug_uid;
         unboxed_field : int
+            (* CR sspies: This projection is no longer correct. Instead, it
+               should now be a path as in mixed_block_shape.ml. *)
+            (* CR sspies: Think about how to handle the type names for unboxed
+               products. See also the CR at the end of [dwarf_type.ml] that
+               computes derived type names. *)
       }
 
 let none = Uid Lambda.debug_uid_none

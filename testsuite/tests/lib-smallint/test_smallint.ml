@@ -1,4 +1,4 @@
-module Int = Stdlib_beta.Int
+module Int = Stdlib_stable.Int
 
 module type Smallint = sig
   (** Signed {n}-bit tagged integer values.

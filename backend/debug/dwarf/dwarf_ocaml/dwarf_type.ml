@@ -22,8 +22,69 @@ module Int16 = Numbers.Int16
 module Sort = Jkind_types.Sort
 module Layout = Sort.Const
 module S = Shape
+module String = Misc.Stdlib.String
 
 type base_layout = Sort.base
+
+module Debugging_the_compiler = struct
+  let enabled () = !Dwarf_flags.ddwarf_types
+
+  let die_description_table = String.Tbl.create 0
+
+  let add ~reference info =
+    if enabled ()
+    then
+      String.Tbl.add die_description_table
+        (Asm_targets.Asm_label.encode reference)
+        info
+
+  let add_alias ~from_ref ~to_ref =
+    if enabled ()
+    then
+      let desc =
+        Format.asprintf "-> %s" (Asm_targets.Asm_label.encode to_ref)
+      in
+      String.Tbl.add die_description_table
+        (Asm_targets.Asm_label.encode from_ref)
+        desc
+
+  let add_enum ~reference constructors =
+    if enabled ()
+    then
+      let desc = Format.asprintf "= %s" (String.concat " | " constructors) in
+      String.Tbl.add die_description_table
+        (Asm_targets.Asm_label.encode reference)
+        desc
+
+  let add_ptr ~reference ~inner =
+    if enabled ()
+    then
+      let desc =
+        Format.asprintf "%s ptr" (Asm_targets.Asm_label.encode inner)
+      in
+      String.Tbl.add die_description_table
+        (Asm_targets.Asm_label.encode reference)
+        desc
+
+  let print ~die =
+    if enabled ()
+    then
+      let indent = ref 0 in
+      Proto_die.depth_first_fold die ~init:() ~f:(fun () d ->
+          match d with
+          | DIE { label; tag; has_children; attribute_values = _; _ } ->
+            let indentation = String.make !indent ' ' in
+            let info =
+              (String.Tbl.find_opt die_description_table)
+                (Asm_targets.Asm_label.encode label)
+            in
+            Format.eprintf "%s+ %a(%s) %a\n" indentation
+              Asm_targets.Asm_label.print label (Dwarf_tag.tag_name tag)
+              (Format.pp_print_option Format.pp_print_string)
+              info;
+            if has_children = Child_determination.Yes then indent := !indent + 2
+          | End_of_siblings -> indent := !indent - 2)
+end
 
 let base_layout_to_byte_size (sort : base_layout) =
   match sort with
@@ -49,19 +110,34 @@ let base_layout_to_byte_size (sort : base_layout) =
 let base_layout_to_byte_size_in_mixed_block (sort : base_layout) =
   Int.max (base_layout_to_byte_size sort) Arch.size_addr
 
+let attribute_list_with_optional_name name attributes =
+  match name with
+  | None -> attributes
+  | Some name -> DAH.create_name name :: attributes
+
 let wrap_die_under_a_pointer ~proto_die ~reference ~parent_proto_die =
   Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
     ~tag:Dwarf_tag.Reference_type
     ~attribute_values:
       [DAH.create_byte_size_exn ~byte_size:8; DAH.create_type ~proto_die]
+    ();
+  Debugging_the_compiler.add_ptr ~reference
+    ~inner:(Proto_die.reference proto_die)
+
+let create_typedef_die ~reference ~parent_proto_die ?name child_die =
+  Debugging_the_compiler.add_alias ~from_ref:reference ~to_ref:child_die;
+  Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
+    ~tag:Dwarf_tag.Typedef
+    ~attribute_values:
+      ([DAH.create_type_from_reference ~proto_die_reference:child_die]
+      |> attribute_list_with_optional_name name)
     ()
 
-let create_array_die ~reference ~parent_proto_die ~child_die ~name =
+let create_array_die ~reference ~parent_proto_die ~child_die ?name () =
   let array_die =
     Proto_die.create ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Array_type
       ~attribute_values:
-        [ DAH.create_name name;
-          DAH.create_type_from_reference ~proto_die_reference:child_die;
+        [ DAH.create_type_from_reference ~proto_die_reference:child_die;
           (* We can't use DW_AT_byte_size or DW_AT_bit_size since we don't know
              how large the array might be. *)
           (* DW_AT_byte_stride probably isn't required strictly speaking, but
@@ -74,9 +150,22 @@ let create_array_die ~reference ~parent_proto_die ~child_die ~name =
       [ (* Thankfully, all that lldb cares about is DW_AT_count. *)
         DAH.create_count_const 0L ]
     ();
-  wrap_die_under_a_pointer ~proto_die:array_die ~reference ~parent_proto_die
+  (* OxCaml LLDB currently uses custom printing for arrays instead of respecting
+     the name attached to the [Array_type] node. Thus, we introduce a typedef
+     with the right name here if the name is provided. *)
+  let pointer_reference =
+    match name with
+    | None -> reference (* no need to add a typedef *)
+    | Some _ -> Proto_die.create_reference ()
+  in
+  wrap_die_under_a_pointer ~proto_die:array_die ~reference:pointer_reference
+    ~parent_proto_die;
+  match name with
+  | None -> ()
+  | Some name ->
+    create_typedef_die ~reference ~parent_proto_die ~name pointer_reference
 
-let create_char_die ~reference ~parent_proto_die ~name =
+let create_char_die ~reference ~parent_proto_die ?name () =
   (* As a char is an immediate value, we have to ignore the first bit.
      Unfortunately lldb supports bit offsets only on members of structs, so
      instead, we create a hacky enum containing all possible char values. *)
@@ -84,11 +173,13 @@ let create_char_die ~reference ~parent_proto_die ~name =
     Proto_die.create ~reference ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Enumeration_type
       ~attribute_values:
-        [DAH.create_name name; DAH.create_byte_size_exn ~byte_size:8]
+        ([DAH.create_byte_size_exn ~byte_size:8]
+        |> attribute_list_with_optional_name name)
         (* CR sspies: The name here is displayed as ["enum " ^ name] in gdb, but
            correctly as [name] in lldb. *)
       ()
   in
+  Debugging_the_compiler.add ~reference "char enum";
   List.iter
     (fun i ->
       Proto_die.create_ignore ~parent:(Some enum) ~tag:Dwarf_tag.Enumerator
@@ -98,14 +189,13 @@ let create_char_die ~reference ~parent_proto_die ~name =
         ())
     (List.init 256 (fun i -> i))
 
-let create_unboxed_base_layout_die ~reference ~parent_proto_die ~name ~byte_size
-    ~encoding =
+let create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
+    encoding =
   Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
     ~tag:Dwarf_tag.Base_type
     ~attribute_values:
-      [ DAH.create_name name;
-        DAH.create_byte_size_exn ~byte_size;
-        DAH.create_encoding ~encoding ]
+      ([DAH.create_byte_size_exn ~byte_size; DAH.create_encoding ~encoding]
+      |> attribute_list_with_optional_name name)
     ()
 
 let create_unnamed_unboxed_base_layout_die ~reference ~parent_proto_die
@@ -116,15 +206,7 @@ let create_unnamed_unboxed_base_layout_die ~reference ~parent_proto_die
       [DAH.create_byte_size_exn ~byte_size; DAH.create_encoding ~encoding]
     ()
 
-let create_typedef_die ~reference ~parent_proto_die ~child_die ~name =
-  Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
-    ~tag:Dwarf_tag.Typedef
-    ~attribute_values:
-      [ DAH.create_name name;
-        DAH.create_type_from_reference ~proto_die_reference:child_die ]
-    ()
-
-let create_record_die ~reference ~parent_proto_die ~name ~fields =
+let create_record_die ~reference ~parent_proto_die ?name ~fields () =
   let total_size =
     List.fold_left (fun acc (_, field_size, _) -> acc + field_size) 0 fields
   in
@@ -132,19 +214,25 @@ let create_record_die ~reference ~parent_proto_die ~name ~fields =
     Proto_die.create ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Structure_type
       ~attribute_values:
-        [DAH.create_byte_size_exn ~byte_size:total_size; DAH.create_name name]
+        ([DAH.create_byte_size_exn ~byte_size:total_size]
+        |> attribute_list_with_optional_name name)
       ()
   in
   let offset = ref 0 in
   List.iter
     (fun (field_name, field_size, field_die) ->
-      Proto_die.create_ignore ~parent:(Some structure) ~tag:Dwarf_tag.Member
-        ~attribute_values:
-          [ DAH.create_name field_name;
-            DAH.create_type_from_reference ~proto_die_reference:field_die;
-            DAH.create_data_member_location_offset
-              ~byte_offset:(Int64.of_int !offset) ]
-        ();
+      let field =
+        Proto_die.create ~parent:(Some structure) ~tag:Dwarf_tag.Member
+          ~attribute_values:
+            [ DAH.create_name field_name;
+              DAH.create_type_from_reference ~proto_die_reference:field_die;
+              DAH.create_data_member_location_offset
+                ~byte_offset:(Int64.of_int !offset) ]
+          ()
+      in
+      Debugging_the_compiler.add
+        ~reference:(Proto_die.reference field)
+        ("." ^ field_name);
       offset := !offset + field_size)
     fields;
   wrap_die_under_a_pointer ~proto_die:structure ~reference ~parent_proto_die
@@ -152,13 +240,14 @@ let create_record_die ~reference ~parent_proto_die ~name ~fields =
 (* The following function handles records annotated with [[@@unboxed]]. These
    may only have a single field. ("Unboxed records" of the form [#{ ... }] are
    destructed into their component parts by unarization.) *)
-let create_attribute_unboxed_record_die ~reference ~parent_proto_die ~name
-    ~field_die ~field_name ~field_size =
+let create_attribute_unboxed_record_die ~reference ~parent_proto_die ?name
+    ~field_die ~field_name ~field_size () =
   let structure =
     Proto_die.create ~reference ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Structure_type
       ~attribute_values:
-        [DAH.create_byte_size_exn ~byte_size:field_size; DAH.create_name name]
+        ([DAH.create_byte_size_exn ~byte_size:field_size]
+        |> attribute_list_with_optional_name name)
       ()
   in
   Proto_die.create_ignore ~parent:(Some structure) ~tag:Dwarf_tag.Member
@@ -168,13 +257,15 @@ let create_attribute_unboxed_record_die ~reference ~parent_proto_die ~name
         DAH.create_data_member_location_offset ~byte_offset:(Int64.of_int 0) ]
     ()
 
-let create_simple_variant_die ~reference ~parent_proto_die ~name
-    ~simple_constructors =
+let create_simple_variant_die ~reference ~parent_proto_die ?name
+    simple_constructors =
+  Debugging_the_compiler.add_enum ~reference simple_constructors;
   let enum =
     Proto_die.create ~reference ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Enumeration_type
       ~attribute_values:
-        [DAH.create_byte_size_exn ~byte_size:8; DAH.create_name name]
+        ([DAH.create_byte_size_exn ~byte_size:8]
+        |> attribute_list_with_optional_name name)
       ()
   in
   List.iteri
@@ -280,8 +371,8 @@ let flatten_fields_in_mixed_record ~(mixed_block_shapes : Layout.t array)
    cases. *)
 (* This function deals with variants that are annotated with [@@unboxed]. They
    are only allowed to have a single constructor. *)
-let create_attribute_unboxed_variant_die ~reference ~parent_proto_die ~name
-    ~constr_name ~arg_name ~(arg_layout : Layout.t) ~arg_die =
+let create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
+    ~constr_name ~arg_name ~(arg_layout : Layout.t) ~arg_die () =
   let base_layout =
     match arg_layout with
     | Base base_layout -> base_layout
@@ -294,14 +385,14 @@ let create_attribute_unboxed_variant_die ~reference ~parent_proto_die ~name
   let enum_die =
     Proto_die.create ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Enumeration_type
-      ~attribute_values:
-        [DAH.create_byte_size_exn ~byte_size:width; DAH.create_name name]
+      ~attribute_values:[DAH.create_byte_size_exn ~byte_size:width]
       ()
   in
   let structure_die =
     Proto_die.create ~reference:structure_ref ~parent:(Some parent_proto_die)
       ~attribute_values:
-        [DAH.create_byte_size_exn ~byte_size:width; DAH.create_name name]
+        ([DAH.create_byte_size_exn ~byte_size:width]
+        |> attribute_list_with_optional_name name)
       ~tag:Dwarf_tag.Structure_type ()
   in
   let variant_part_die =
@@ -335,9 +426,6 @@ let create_attribute_unboxed_variant_die ~reference ~parent_proto_die ~name
         ()
     in
     (* Lastly, we add the constructor argument as a member to the variant. *)
-    let member_name =
-      match arg_name with Some name -> [DAH.create_name name] | None -> []
-    in
     Proto_die.create_ignore ~parent:(Some constructor_variant)
       ~tag:Dwarf_tag.Member
       ~attribute_values:
@@ -345,24 +433,27 @@ let create_attribute_unboxed_variant_die ~reference ~parent_proto_die ~name
            DAH.create_byte_size_exn ~byte_size:width;
            DAH.create_data_member_location_offset ~byte_offset:(Int64.of_int 0)
          ]
-        @ member_name)
+        |> attribute_list_with_optional_name arg_name)
       ()
   done
 
-let create_complex_variant_die ~reference ~parent_proto_die ~name
-    ~simple_constructors
-    ~(complex_constructors :
-       (string * (string option * Proto_die.reference * base_layout) list) list)
+let create_complex_variant_die ~reference ~parent_proto_die ?name
+    simple_constructors
+    (complex_constructors :
+      (string * (string option * Proto_die.reference * base_layout) list) list)
     =
   let complex_constructors_names =
     List.map (fun (name, _) -> name) complex_constructors
   in
+  Debugging_the_compiler.add_enum ~reference
+    (simple_constructors @ complex_constructors_names);
   let value_size = Arch.size_addr in
   let variant_part_immediate_or_pointer =
     let int_or_ptr_structure =
       Proto_die.create ~reference ~parent:(Some parent_proto_die)
         ~attribute_values:
-          [DAH.create_byte_size_exn ~byte_size:value_size; DAH.create_name name]
+          ([DAH.create_byte_size_exn ~byte_size:value_size]
+          |> attribute_list_with_optional_name name)
         ~tag:Dwarf_tag.Structure_type ()
     in
     Proto_die.create ~parent:(Some int_or_ptr_structure) ~attribute_values:[]
@@ -372,11 +463,12 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
     let enum_die =
       Proto_die.create ~parent:(Some parent_proto_die)
         ~tag:Dwarf_tag.Enumeration_type
-        ~attribute_values:
-          [ DAH.create_byte_size_exn ~byte_size:value_size;
-            DAH.create_name ("Enum ptr/immediate case " ^ name) ]
+        ~attribute_values:[DAH.create_byte_size_exn ~byte_size:value_size]
         ()
     in
+    Debugging_the_compiler.add_enum
+      ~reference:(Proto_die.reference enum_die)
+      ["Immediate"; "Pointer"];
     List.iteri
       (fun i name ->
         Proto_die.create_ignore ~parent:(Some enum_die)
@@ -402,6 +494,11 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
             DAH.create_artificial () ]
         ~tag:Dwarf_tag.Member ()
     in
+    Debugging_the_compiler.add
+      ~reference:(Proto_die.reference member_die)
+      ("discriminant "
+      ^ Asm_targets.Asm_label.encode
+          (Proto_die.reference enum_immediate_or_pointer));
     Proto_die.add_or_replace_attribute_value variant_part_immediate_or_pointer
       (DAH.create_discr ~proto_die_reference:(Proto_die.reference member_die))
   in
@@ -409,13 +506,12 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
     let enum_die =
       Proto_die.create ~parent:(Some parent_proto_die)
         ~tag:Dwarf_tag.Enumeration_type
-        ~attribute_values:
-          [ DAH.create_byte_size_exn ~byte_size:value_size;
-            DAH.create_name
-              (name ^ " simple constructor enum "
-              ^ String.concat "," simple_constructors) ]
+        ~attribute_values:[DAH.create_byte_size_exn ~byte_size:value_size]
         ()
     in
+    Debugging_the_compiler.add_enum
+      ~reference:(Proto_die.reference enum_die)
+      simple_constructors;
     List.iteri
       (fun i name ->
         Proto_die.create_ignore ~parent:(Some enum_die)
@@ -431,14 +527,19 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
         ~attribute_values:[DAH.create_discr_value ~value:(Int64.of_int 1)]
         ()
     in
-    Proto_die.create_ignore ~parent:(Some variant_immediate_case)
-      ~tag:Dwarf_tag.Member
-      ~attribute_values:
-        [ DAH.create_type ~proto_die:enum_die;
-          DAH.create_bit_size (Int8.of_int_exn ((value_size * 8) - 1));
-          DAH.create_data_member_location_offset ~byte_offset:(Int64.of_int 0);
-          DAH.create_data_bit_offset ~bit_offset:(Int8.of_int_exn 1) ]
-      ()
+    let discr =
+      Proto_die.create ~parent:(Some variant_immediate_case)
+        ~tag:Dwarf_tag.Member
+        ~attribute_values:
+          [ DAH.create_type ~proto_die:enum_die;
+            DAH.create_bit_size (Int8.of_int_exn ((value_size * 8) - 1));
+            DAH.create_data_member_location_offset ~byte_offset:(Int64.of_int 0);
+            DAH.create_data_bit_offset ~bit_offset:(Int8.of_int_exn 1) ]
+        ()
+    in
+    Debugging_the_compiler.add_alias
+      ~from_ref:(Proto_die.reference discr)
+      ~to_ref:(Proto_die.reference enum_die)
   in
   let _variant_complex_constructors =
     let ptr_case_structure =
@@ -447,10 +548,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
         ~attribute_values:
           [ DAH.create_byte_size_exn ~byte_size:value_size;
             DAH.create_ocaml_offset_record_from_pointer
-              ~value:(Int64.of_int (-value_size));
-            DAH.create_name
-              ("variant_part " ^ name ^ " "
-              ^ String.concat "," complex_constructors_names) ]
+              ~value:(Int64.of_int (-value_size)) ]
         ()
     in
     let _attached_structure_to_pointer_variant =
@@ -462,19 +560,26 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
               DAH.create_type ~proto_die:ptr_case_structure ]
           ()
       in
+      Debugging_the_compiler.add_ptr
+        ~reference:(Proto_die.reference ptr_case_pointer_to_structure)
+        ~inner:(Proto_die.reference ptr_case_structure);
       let variant_pointer =
         Proto_die.create ~parent:(Some variant_part_immediate_or_pointer)
           ~tag:Dwarf_tag.Variant
           ~attribute_values:[DAH.create_discr_value ~value:(Int64.of_int 0)]
           ()
       in
-      Proto_die.create_ignore ~parent:(Some variant_pointer)
-        ~tag:Dwarf_tag.Member
-        ~attribute_values:
-          [ DAH.create_type ~proto_die:ptr_case_pointer_to_structure;
-            DAH.create_data_member_location_offset ~byte_offset:(Int64.of_int 0)
-          ]
-        ()
+      let ptr_mem =
+        Proto_die.create ~parent:(Some variant_pointer) ~tag:Dwarf_tag.Member
+          ~attribute_values:
+            [ DAH.create_type ~proto_die:ptr_case_pointer_to_structure;
+              DAH.create_data_member_location_offset
+                ~byte_offset:(Int64.of_int 0) ]
+          ()
+      in
+      Debugging_the_compiler.add_alias
+        ~from_ref:(Proto_die.reference ptr_mem)
+        ~to_ref:(Proto_die.reference ptr_case_pointer_to_structure)
     in
     let variant_part_pointer =
       Proto_die.create ~parent:(Some ptr_case_structure) ~attribute_values:[]
@@ -484,10 +589,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
       let enum_die =
         Proto_die.create ~parent:(Some parent_proto_die)
           ~tag:Dwarf_tag.Enumeration_type
-          ~attribute_values:
-            [ DAH.create_byte_size_exn ~byte_size:1;
-              DAH.create_name
-                (name ^ " " ^ String.concat "," complex_constructors_names) ]
+          ~attribute_values:[DAH.create_byte_size_exn ~byte_size:1]
           ()
       in
       List.iteri
@@ -512,13 +614,16 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
            ~proto_die_reference:(Proto_die.reference discriminant))
     in
     List.iteri
-      (fun i (_, fields) ->
+      (fun i (constructor_name, fields) ->
         let subvariant =
           Proto_die.create ~parent:(Some variant_part_pointer)
             ~tag:Dwarf_tag.Variant
             ~attribute_values:[DAH.create_discr_value ~value:(Int64.of_int i)]
             ()
         in
+        Debugging_the_compiler.add
+          ~reference:(Proto_die.reference subvariant)
+          constructor_name;
         let offset = ref 0 in
         List.iter
           (fun (field_name, field_type, ly) ->
@@ -535,6 +640,9 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
                       ~proto_die_reference:field_type ]
                 ()
             in
+            Debugging_the_compiler.add_alias
+              ~from_ref:(Proto_die.reference member_die)
+              ~to_ref:field_type;
             offset := !offset + member_size;
             match field_name with
             | Some name ->
@@ -552,13 +660,14 @@ type immediate_or_pointer =
 
 let tag_bit = function Immediate -> 1 | Pointer -> 0
 
-let create_immediate_or_block ~reference ~parent_proto_die ~name ~immediate_type
-    ~pointer_type =
+let create_immediate_or_block ~reference ~parent_proto_die ?name ~immediate_type
+    ~pointer_type () =
   let value_size = Arch.size_addr in
   let int_or_ptr_structure =
     Proto_die.create ~reference ~parent:(Some parent_proto_die)
       ~attribute_values:
-        [DAH.create_byte_size_exn ~byte_size:value_size; DAH.create_name name]
+        ([DAH.create_byte_size_exn ~byte_size:value_size]
+        |> attribute_list_with_optional_name name)
       ~tag:Dwarf_tag.Structure_type ()
   in
   (* We create the reference early to use it already for the variant, before we
@@ -576,6 +685,9 @@ let create_immediate_or_block ~reference ~parent_proto_die ~name ~immediate_type
       ~attribute_values:[DAH.create_byte_size_exn ~byte_size:value_size]
       ()
   in
+  Debugging_the_compiler.add_enum
+    ~reference:(Proto_die.reference enum_die)
+    ["Immediate"; "Pointer"];
   List.iter
     (fun elem ->
       Proto_die.create_ignore ~parent:(Some enum_die) ~tag:Dwarf_tag.Enumerator
@@ -647,7 +759,7 @@ let create_immediate_or_block ~reference ~parent_proto_die ~name ~immediate_type
 *)
 
 let create_type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die
-    ~name constructors =
+    ?name constructors =
   let enum_constructor_for_poly_variant ~parent name =
     let hash = Btype.hash_variant name in
     let tagged_constructor_hash =
@@ -748,18 +860,18 @@ let create_type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die
           DAH.create_type ~proto_die:complex_constructors_struct ]
       ()
   in
-  create_immediate_or_block ~reference ~name ~parent_proto_die
+  create_immediate_or_block ~reference ?name ~parent_proto_die
     ~immediate_type:simple_constructor_enum_die
-    ~pointer_type:ptr_case_pointer_to_structure
+    ~pointer_type:ptr_case_pointer_to_structure ()
 
-let create_exception_die ~reference ~fallback_value_die ~parent_proto_die ~name
-    =
+let create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
+    () =
   let exn_structure =
     Proto_die.create ~reference ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Structure_type
       ~attribute_values:
-        [ DAH.create_byte_size_exn ~byte_size:Arch.size_addr;
-          DAH.create_name name ]
+        ([DAH.create_byte_size_exn ~byte_size:Arch.size_addr]
+        |> attribute_list_with_optional_name name)
       ()
   in
   let constructor_ref = Proto_die.create_reference () in
@@ -888,13 +1000,13 @@ let create_exception_die ~reference ~fallback_value_die ~parent_proto_die ~name
         DAH.create_data_member_location_offset ~byte_offset:8L ]
     ()
 
-let create_tuple_die ~reference ~parent_proto_die ~name ~fields =
+let create_tuple_die ~reference ~parent_proto_die ?name fields =
   let structure_type =
     Proto_die.create ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Structure_type
       ~attribute_values:
-        [ DAH.create_byte_size_exn ~byte_size:(List.length fields * 8);
-          DAH.create_name name ]
+        ([DAH.create_byte_size_exn ~byte_size:(List.length fields * 8)]
+        |> attribute_list_with_optional_name name)
       ()
   in
   List.iteri
@@ -904,8 +1016,13 @@ let create_tuple_die ~reference ~parent_proto_die ~name ~fields =
           DAH.create_data_member_location_offset
             ~byte_offset:(Int64.of_int (8 * i)) ]
       in
-      Proto_die.create_ignore ~parent:(Some structure_type)
-        ~tag:Dwarf_tag.Member ~attribute_values:member_attributes ())
+      let member =
+        Proto_die.create ~parent:(Some structure_type) ~tag:Dwarf_tag.Member
+          ~attribute_values:member_attributes ()
+      in
+      Debugging_the_compiler.add_alias
+        ~from_ref:(Proto_die.reference member)
+        ~to_ref:field_die)
     fields;
   wrap_die_under_a_pointer ~proto_die:structure_type ~reference
     ~parent_proto_die
@@ -946,9 +1063,8 @@ let vec_split_to_properties (vec_split : S.Predef.simd_vec_split) =
   | Float32x16 -> { encoding = float; count = 16; size = 4 }
   | Float64x8 -> { encoding = float; count = 8; size = 8 }
 
-let create_simd_vec_split_base_layout_die ~reference ~parent_proto_die ~name
-    ~byte_size ~(split : S.Predef.simd_vec_split option) =
-  let maybe_name = List.map DAH.create_name (Option.to_list name) in
+let create_simd_vec_split_base_layout_die ~reference ~parent_proto_die ?name
+    ~byte_size ~(split : S.Predef.simd_vec_split option) () =
   match split with
   | None ->
     Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
@@ -956,13 +1072,15 @@ let create_simd_vec_split_base_layout_die ~reference ~parent_proto_die ~name
       ~attribute_values:
         ([ DAH.create_encoding ~encoding:Encoding_attribute.unsigned;
            DAH.create_byte_size_exn ~byte_size ]
-        @ maybe_name)
+        |> attribute_list_with_optional_name name)
       ()
   | Some vec_split ->
     let structure =
       Proto_die.create ~reference ~parent:(Some parent_proto_die)
         ~tag:Dwarf_tag.Structure_type
-        ~attribute_values:([DAH.create_byte_size_exn ~byte_size] @ maybe_name)
+        ~attribute_values:
+          ([DAH.create_byte_size_exn ~byte_size]
+          |> attribute_list_with_optional_name name)
         ()
     in
     let { encoding; count; size } = vec_split_to_properties vec_split in
@@ -984,21 +1102,20 @@ let create_simd_vec_split_base_layout_die ~reference ~parent_proto_die ~name
     done
 
 let create_base_layout_type ?(simd_vec_split = None) ~reference
-    (sort : base_layout) ~name ~parent_proto_die ~fallback_value_die =
+    (sort : base_layout) ?name ~parent_proto_die ~fallback_value_die () =
   let byte_size = base_layout_to_byte_size sort in
   match sort with
   | Value ->
-    create_typedef_die ~reference ~parent_proto_die ~name
-      ~child_die:fallback_value_die
+    create_typedef_die ~reference ~parent_proto_die ?name fallback_value_die
   | Float32 | Float64 ->
-    create_unboxed_base_layout_die ~reference ~parent_proto_die ~name ~byte_size
-      ~encoding:Encoding_attribute.float
+    create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
+      Encoding_attribute.float
   | Void | Bits8 | Bits16 | Bits32 | Bits64 | Word | Untagged_immediate ->
-    create_unboxed_base_layout_die ~reference ~parent_proto_die ~name ~byte_size
-      ~encoding:Encoding_attribute.signed
+    create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
+      Encoding_attribute.signed
   | Vec128 | Vec256 | Vec512 ->
-    create_simd_vec_split_base_layout_die ~reference ~parent_proto_die
-      ~name:(Some name) ~byte_size ~split:simd_vec_split
+    create_simd_vec_split_base_layout_die ~reference ~parent_proto_die ?name
+      ~byte_size ~split:simd_vec_split ()
 
 (* In the rare case that we emit product layouts (e.g., inside arrays), this
    function will create a struct die. It does not use SIMD vector splits. *)
@@ -1082,8 +1199,19 @@ end
 module Cache = Shape_with_layout.Tbl
 module PathSet = Set.Make (Path)
 
+(** This cache maps unnamed type shapes to their references. *)
 let cache = Cache.create 16
 
+(** This second cache is for named type shapes. Every type name should be
+    associated with at most one DWARF die, so this cache maps type names to
+    type shapes and DWARF dies. *)
+let name_cache = String.Tbl.create 16
+
+(* CR sspies: We have to be careful here, because LLDB currently disambiguates
+   type dies based on the type name; however, we can easily have types with the
+   same name and different definitions. The function [type_shape_to_dwarf_die]
+   only works for types without names, and types with names are handled in
+   [type_shape_to_dwarf_die_with_aliased_name] below. *)
 let rec type_shape_to_dwarf_die ~visited (type_shape : Layout.t S.ts)
     ~parent_proto_die ~fallback_value_die =
   match Cache.find_opt cache type_shape with
@@ -1094,29 +1222,28 @@ let rec type_shape_to_dwarf_die ~visited (type_shape : Layout.t S.ts)
        types, which can then look up their reference, before it is fully
        defined. That way [type myintlist = MyNil | MyCons of int * myintlist]
        will work correctly (as opposed to diverging). *)
+    (* CR sspies: This function currently only operates on unnamed types, so we
+       fix [name] to be [None]. *)
+    let name = None in
     Cache.add cache type_shape reference;
-    let type_name = Type_shape.type_name type_shape in
-    let layout_name =
-      Format.asprintf "%a" Layout.format (S.shape_layout type_shape)
-    in
-    let name = type_name ^ " @ " ^ layout_name in
     (match type_shape with
     | Ts_other type_layout | Ts_var (_, type_layout) -> (
       match type_layout with
       | Base b ->
-        create_base_layout_type ~reference b ~name ~parent_proto_die
-          ~fallback_value_die
+        create_base_layout_type ~reference b ?name ~parent_proto_die
+          ~fallback_value_die ()
       | Product _ ->
         Misc.fatal_errorf
-          "only base layouts supported, but found unboxed product layout %s"
-          layout_name)
+          "only base layouts supported, but found unboxed product layout %a"
+          Layout.format type_layout)
     | Ts_unboxed_tuple _ ->
-      Misc.fatal_errorf "unboxed tuples cannot have base layout %s" layout_name
+      Misc.fatal_errorf "unboxed tuple %a should have been flatted"
+        S.print_type_shape type_shape
     | Ts_tuple fields ->
       type_shape_to_dwarf_die_tuple ~visited ~reference ~parent_proto_die
         ~fallback_value_die ~name fields
     | Ts_predef (predef, args) ->
-      type_shape_to_dwarf_die_predef ~visited ~reference ~name ~parent_proto_die
+      type_shape_to_dwarf_die_predef ~visited ~reference ?name ~parent_proto_die
         ~fallback_value_die predef args
     | Ts_constr ((type_uid, type_path, type_layout), shapes) -> (
       if (* CR sspies: We can run into infinite cycles here, because the type
@@ -1129,8 +1256,8 @@ let rec type_shape_to_dwarf_die ~visited (type_shape : Layout.t S.ts)
         (* Cycle detected - use the actual type_layout *)
         match type_layout with
         | Base b ->
-          create_base_layout_type ~reference b ~name ~parent_proto_die
-            ~fallback_value_die
+          create_base_layout_type ~reference b ?name ~parent_proto_die
+            ~fallback_value_die ()
         | Product _ ->
           Misc.fatal_errorf "cycle detected with product layout %a"
             S.print_type_shape type_shape
@@ -1139,17 +1266,17 @@ let rec type_shape_to_dwarf_die ~visited (type_shape : Layout.t S.ts)
         match type_layout with
         | Base b ->
           type_shape_to_dwarf_die_type_constructor ~visited:visited' ~reference
-            ~name ~parent_proto_die ~fallback_value_die ~type_uid type_path b
+            ?name ~parent_proto_die ~fallback_value_die ~type_uid type_path b
             shapes
         | Product _ ->
           Misc.fatal_errorf
-            "only base layouts supported, but found product layout %s"
-            layout_name)
+            "only base layouts supported, but found product layout %a"
+            Layout.format type_layout)
     | Ts_variant fields ->
-      type_shape_to_dwarf_die_poly_variant ~visited ~reference ~name
-        ~parent_proto_die ~fallback_value_die ~constructors:fields
+      type_shape_to_dwarf_die_poly_variant ~visited ~reference ~parent_proto_die
+        ~fallback_value_die ?name ~constructors:fields ()
     | Ts_arrow (arg, ret) ->
-      type_shape_to_dwarf_die_arrow ~visited ~reference ~name ~parent_proto_die
+      type_shape_to_dwarf_die_arrow ~visited ~reference ?name ~parent_proto_die
         ~fallback_value_die arg ret);
     reference
 
@@ -1160,9 +1287,9 @@ and type_shape_to_dwarf_die_tuple ~visited ~name ~reference ~parent_proto_die
       (type_shape_to_dwarf_die ~visited ~parent_proto_die ~fallback_value_die)
       fields
   in
-  create_tuple_die ~reference ~parent_proto_die ~name ~fields
+  create_tuple_die ~reference ~parent_proto_die ?name fields
 
-and type_shape_to_dwarf_die_predef ~visited ~name ~reference ~parent_proto_die
+and type_shape_to_dwarf_die_predef ~visited ?name ~reference ~parent_proto_die
     ~fallback_value_die (predef : S.Predef.t) args =
   match predef, args with
   | Array, [element_type_shape] -> (
@@ -1196,7 +1323,7 @@ and type_shape_to_dwarf_die_predef ~visited ~name ~reference ~parent_proto_die
         type_shape_to_dwarf_die ~visited ~parent_proto_die ~fallback_value_die
           element_type_shape
       in
-      create_array_die ~reference ~parent_proto_die ~child_die ~name
+      create_array_die ~reference ~parent_proto_die ~child_die ?name ()
     | Product _ ->
       (* CR sspies: We handle products differently, because they are packed
          specially into arrays. Try to find a unifying approach here. *)
@@ -1204,17 +1331,17 @@ and type_shape_to_dwarf_die_predef ~visited ~name ~reference ~parent_proto_die
         create_packed_layout_type ~parent_proto_die ~fallback_value_die
           argument_layout
       in
-      create_array_die ~reference ~parent_proto_die ~child_die ~name)
+      create_array_die ~reference ~parent_proto_die ~child_die ?name ())
   | Array, args ->
     Misc.fatal_errorf
       "[Array] shapes must be applied to exactly one type shape (found %d)"
       (List.length args)
-  | Char, _ -> create_char_die ~reference ~parent_proto_die ~name
+  | Char, _ -> create_char_die ~reference ~parent_proto_die ?name ()
   | Unboxed b, _ ->
     let type_layout = S.Predef.unboxed_type_to_layout b in
     create_base_layout_type
       ~simd_vec_split:(unboxed_base_type_to_simd_vec_split b)
-      ~reference type_layout ~name ~parent_proto_die ~fallback_value_die
+      ~reference type_layout ?name ~parent_proto_die ~fallback_value_die ()
   | Simd s, _ ->
     (* We represent these vectors as pointers of the form [struct {...} *],
        because their runtime representations are blocks with tag [Abstract_tag]
@@ -1222,23 +1349,24 @@ and type_shape_to_dwarf_die_predef ~visited ~name ~reference ~parent_proto_die
     let base_ref = Proto_die.create_reference () in
     let byte_size = Shape.Predef.simd_vec_split_to_byte_size s in
     create_simd_vec_split_base_layout_die ~split:(Some s) ~reference:base_ref
-      ~name:None ~parent_proto_die ~byte_size;
+      ~parent_proto_die ~byte_size ();
     Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Reference_type
       ~attribute_values:
-        [ DAH.create_byte_size_exn ~byte_size:Arch.size_addr;
-          DAH.create_type_from_reference ~proto_die_reference:base_ref;
-          DAH.create_name name ]
+        ([ DAH.create_byte_size_exn ~byte_size:Arch.size_addr;
+           DAH.create_type_from_reference ~proto_die_reference:base_ref ]
+        |> attribute_list_with_optional_name name)
       ()
   | Exception, _ ->
-    create_exception_die ~reference ~fallback_value_die ~parent_proto_die ~name
+    create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
+      ()
   | ( ( Bytes | Extension_constructor | Float | Float32 | Floatarray | Int
       | Int32 | Int64 | Lazy_t | Nativeint | String ),
       _ ) ->
-    create_base_layout_type ~reference Value ~name ~parent_proto_die
-      ~fallback_value_die
+    create_base_layout_type ~reference Value ?name ~parent_proto_die
+      ~fallback_value_die ()
 
-and type_shape_to_dwarf_die_type_constructor ~visited ~reference ~name
+and type_shape_to_dwarf_die_type_constructor ~visited ~reference ?name
     ~parent_proto_die ~fallback_value_die ~type_uid _type_path
     (type_layout : base_layout) shapes =
   match
@@ -1248,14 +1376,14 @@ and type_shape_to_dwarf_die_type_constructor ~visited ~reference ~name
     Type_shape.find_in_type_decls type_uid
   with
   | None ->
-    create_base_layout_type ~reference type_layout ~name ~parent_proto_die
-      ~fallback_value_die
+    create_base_layout_type ~reference type_layout ?name ~parent_proto_die
+      ~fallback_value_die ()
   | Some type_decl_shape -> (
     let type_decl_shape = S.replace_tvar type_decl_shape shapes in
     match type_decl_shape.definition with
     | Tds_other ->
-      create_base_layout_type ~reference type_layout ~name ~parent_proto_die
-        ~fallback_value_die
+      create_base_layout_type ~reference type_layout ?name ~parent_proto_die
+        ~fallback_value_die ()
     | Tds_alias alias_shape ->
       let alias_shape =
         S.shape_with_layout ~layout:(Base type_layout) alias_shape
@@ -1264,7 +1392,7 @@ and type_shape_to_dwarf_die_type_constructor ~visited ~reference ~name
         type_shape_to_dwarf_die ~visited alias_shape ~parent_proto_die
           ~fallback_value_die
       in
-      create_typedef_die ~reference ~parent_proto_die ~child_die:alias_die ~name
+      create_typedef_die ~reference ~parent_proto_die ?name alias_die
     | Tds_record { fields; kind = Record_boxed | Record_floats } ->
       let fields =
         List.map
@@ -1279,7 +1407,7 @@ and type_shape_to_dwarf_die_type_constructor ~visited ~reference ~name
                 ~fallback_value_die type_shape' ))
           fields
       in
-      create_record_die ~reference ~parent_proto_die ~name ~fields
+      create_record_die ~reference ~parent_proto_die ?name ~fields ()
     | Tds_record { fields = _; kind = Record_unboxed_product } ->
       Misc.fatal_error
         "Unboxed records should not reach this stage. They are deconstructed \
@@ -1293,8 +1421,8 @@ and type_shape_to_dwarf_die_type_constructor ~visited ~reference ~name
           field_shape
       in
       let field_size = base_layout_to_byte_size base_layout in
-      create_attribute_unboxed_record_die ~reference ~parent_proto_die ~name
-        ~field_die ~field_name ~field_size
+      create_attribute_unboxed_record_die ~reference ~parent_proto_die ?name
+        ~field_die ~field_name ~field_size ()
       (* The two cases below are filtered out by the flattening of shapes in
          [flatten_shape]. *)
     | Tds_record { fields = [] | _ :: _ :: _; kind = Record_unboxed } ->
@@ -1319,12 +1447,12 @@ and type_shape_to_dwarf_die_type_constructor ~visited ~reference ~name
             | _ -> assert false)
           fields
       in
-      create_record_die ~reference ~parent_proto_die ~name ~fields
+      create_record_die ~reference ~parent_proto_die ?name ~fields ()
     | Tds_variant { simple_constructors; complex_constructors } -> (
       match complex_constructors with
       | [] ->
-        create_simple_variant_die ~reference ~parent_proto_die ~name
-          ~simple_constructors
+        create_simple_variant_die ~reference ~parent_proto_die ?name
+          simple_constructors
       | _ :: _ ->
         (* We flatten the fields of the constructors first *)
         let complex_constructors =
@@ -1352,8 +1480,8 @@ and type_shape_to_dwarf_die_type_constructor ~visited ~reference ~name
                   fields ))
             complex_constructors
         in
-        create_complex_variant_die ~reference ~parent_proto_die ~name
-          ~simple_constructors ~complex_constructors)
+        create_complex_variant_die ~reference ~parent_proto_die ?name
+          simple_constructors complex_constructors)
     | Tds_variant_unboxed
         { name = constr_name; arg_name; arg_shape; arg_layout } ->
       let arg_shape = S.shape_with_layout ~layout:arg_layout arg_shape in
@@ -1361,23 +1489,22 @@ and type_shape_to_dwarf_die_type_constructor ~visited ~reference ~name
         type_shape_to_dwarf_die ~visited ~parent_proto_die ~fallback_value_die
           arg_shape
       in
-      create_attribute_unboxed_variant_die ~reference ~parent_proto_die ~name
-        ~constr_name ~arg_name ~arg_layout ~arg_die)
+      create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
+        ~constr_name ~arg_name ~arg_layout ~arg_die ())
 
-and type_shape_to_dwarf_die_arrow ~visited ~reference ~name ~parent_proto_die
+and type_shape_to_dwarf_die_arrow ~visited ~reference ?name ~parent_proto_die
     ~fallback_value_die _arg _ret =
   (* There is no need to inspect the argument and return value. *)
-  create_typedef_die ~reference ~parent_proto_die ~name
-    ~child_die:fallback_value_die
+  create_typedef_die ~reference ~parent_proto_die ?name fallback_value_die
 
 and type_shape_to_dwarf_die_poly_variant ~visited ~reference ~parent_proto_die
-    ~fallback_value_die ~name ~constructors =
+    ~fallback_value_die ?name ~constructors () =
   let constructors_with_references =
     S.poly_variant_constructors_map
       (type_shape_to_dwarf_die ~visited ~parent_proto_die ~fallback_value_die)
       constructors
   in
-  create_type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die ~name
+  create_type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die ?name
     constructors_with_references
 
 let rec flatten_to_base_sorts (sort : Layout.t) : base_layout list =
@@ -1478,6 +1605,49 @@ let rec flatten_shape (type_shape : Layout.t S.ts) =
           Misc.fatal_error
             "unboxed variant must have same layout as its contents"))
 
+(* Search for the first unused suffix-numbered version of [name] in the
+   [name_cache] cache. If we come along a type of the same name and type shape,
+   then we simply use that reference. *)
+let find_unused_type_name_or_cached (name : string) (type_shape : Layout.t S.ts)
+    : (Proto_die.reference, string) Either.t =
+  let rec aux inc : _ Either.t =
+    let name_suffix = if inc = 0 then "" else "/" ^ string_of_int inc in
+    let name = name ^ name_suffix in
+    match String.Tbl.find_opt name_cache name with
+    | Some (type_shape', reference) ->
+      if type_shape = type_shape'
+         (* CR sspies: Use a better equality check on type shapes in the
+            future. *)
+      then Left reference
+      else aux (inc + 1)
+    | None -> Right name
+  in
+  aux 0
+
+(* We represent all types as DIE entries of the form [typedef ... type_name;]
+   and use caching for types that have the same name and shape. For name
+   conflicts, we search for the next available suffix-numbered version of the
+   name, [type_name/n]. *)
+let type_shape_to_dwarf_die_with_aliased_name (type_name : string)
+    (type_shape : Layout.t S.ts) ~parent_proto_die ~fallback_value_die :
+    Proto_die.reference =
+  match find_unused_type_name_or_cached type_name type_shape with
+  | Left reference -> reference
+  | Right name ->
+    let unnamed_die =
+      type_shape_to_dwarf_die ~visited:PathSet.empty type_shape
+        ~parent_proto_die
+        ~fallback_value_die (* note that we do not pass the type name here *)
+    in
+    let reference = Proto_die.create_reference () in
+    let layout_name =
+      Format.asprintf "%a" Layout.format (S.shape_layout type_shape)
+    in
+    let full_name = name ^ " @ " ^ layout_name in
+    String.Tbl.add name_cache name (type_shape, reference);
+    create_typedef_die ~reference ~name:full_name ~parent_proto_die unnamed_die;
+    reference
+
 let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
   let fallback_value_die =
     Proto_die.reference (DS.value_type_proto_die state)
@@ -1502,7 +1672,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
      should simply not emit any DWARF information for this variable instead.
 
      mshinwell: or emit an "unknown layout" type *)
-  | Some { type_shape; type_layout } -> (
+  | Some { type_shape; type_name; type_layout } -> (
     let type_shape = S.shape_with_layout ~layout:type_layout type_shape in
     let type_shape =
       match unboxed_projection with
@@ -1516,13 +1686,34 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
             (flattened_length - 1);
         List.nth flattened i
     in
+    let type_name =
+      match unboxed_projection with
+      | None -> type_name
+      | Some i -> type_name ^ "_unboxed" ^ string_of_int i
+      (* CR sspies: In case of unboxed projections, we do not have the type
+         names of the individual fields available. And obtaining them in general
+         is not straightforward, since they could be hidden behind a type alias
+         (e.g., [type prod = #{ a: int64#; b: float# }]). What we currently do
+         is match the style of unarization variables by appending "_unboxed" for
+         the projections to indicate that the type is not the same. *)
+    in
     match type_shape with
     | Known type_shape ->
-      type_shape_to_dwarf_die ~visited:PathSet.empty type_shape
-        ~parent_proto_die ~fallback_value_die
+      let reference =
+        type_shape_to_dwarf_die_with_aliased_name type_name type_shape
+          ~parent_proto_die ~fallback_value_die
+      in
+      if Debugging_the_compiler.enabled ()
+      then (
+        Format.eprintf "%a has become %a@." Uid.print var_uid
+          Asm_targets.Asm_label.print reference;
+        Debugging_the_compiler.print ~die:parent_proto_die);
+      reference
     | Unknown base_layout ->
       let reference = Proto_die.create_reference () in
       create_base_layout_type ~reference ~parent_proto_die
         ~name:("unknown @ " ^ Sort.to_string_base base_layout)
-        ~fallback_value_die base_layout;
+        ~fallback_value_die base_layout ();
+      (* CR sspies: We do have the type name available here, so we could be more
+         precise in principle. *)
       reference)
