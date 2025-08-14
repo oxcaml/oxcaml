@@ -186,6 +186,8 @@ module Sort = struct
 
     let for_module = value
 
+    let for_module_field = value
+
     let for_tuple = value
 
     let for_array_get_result = value
@@ -195,6 +197,8 @@ module Sort = struct
     let for_list_element = value
 
     let for_idx = bits64
+
+    let for_loop_index = value
   end
 
   module Var = struct

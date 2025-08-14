@@ -663,7 +663,7 @@ module Vars  : Map.S with type key = string
 (* Value descriptions *)
 
 type value_kind =
-    Val_reg                             (* Regular value *)
+    Val_reg of Jkind_types.Sort.t Jkind_types.Layout.t     (* Regular value *)
   | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -1200,6 +1200,10 @@ val record_form_to_string : _ record_form -> string
     correspond to a run-time value: values, extensions, modules, classes.
     Note: manifest primitives do not correspond to a run-time value! *)
 val bound_value_identifiers: signature -> Ident.t list
+
+val bound_value_identifiers_and_layouts:
+  layout_value:Jkind_types.Sort.t Jkind_types.Layout.t ->
+  signature -> (Ident.t * Jkind_types.Sort.t Jkind_types.Layout.t) list
 
 val signature_item_id : signature_item -> Ident.t
 
