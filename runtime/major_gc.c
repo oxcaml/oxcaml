@@ -579,11 +579,11 @@ static void adopt_orphaned_work (int expected_status)
        and has orphaned some finalisers but now has to adopt back (the same
        or other) finalisers. */
     if (myf->updated_first){
-      atomic_fetch_add(&num_domains_to_final_update_first, +1);
+      (void)caml_atomic_counter_incr(&num_domains_to_final_update_first);
       myf->updated_first = 0;
     }
     if (myf->updated_last){
-      atomic_fetch_add(&num_domains_to_final_update_last, +1);
+      (void)caml_atomic_counter_incr(&num_domains_to_final_update_last);
       myf->updated_last = 0;
     }
 
