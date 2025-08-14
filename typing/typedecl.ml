@@ -1111,10 +1111,6 @@ let transl_declaration env sdecl (id, uid) =
       in
       set_private_row env sdecl.ptype_loc p decl
     end;
-    (* CR sspies: We used to compute shapes here, which were then added to
-      various typing environments. The computation of the shapes has moved
-      further down in the translation, so they are currently not added to the
-      intermediate environments. Find out whether that is an issue.   *)
     let decl =
       {
         typ_id = id;
@@ -1815,7 +1811,7 @@ let update_constructor_representation
       Constructor_mixed shape
 
 
-let add_types_to_env ?shapes decls env =
+let add_types_to_env ~shapes decls env =
   match shapes with
   | None ->
     List.fold_right
@@ -2913,7 +2909,7 @@ let transl_type_decl env rec_flag sdecl_list =
       (* Check for duplicates *)
       check_duplicates sdecl_list;
       (* Build the final env. *)
-      let new_env = add_types_to_env decls env in
+      let new_env = add_types_to_env ~shapes:None decls env in
       (* Update stubs *)
       let delayed_jkind_checks =
         match rec_flag with
@@ -3042,7 +3038,7 @@ let transl_type_decl env rec_flag sdecl_list =
   let decls = List.map2 (check_abbrev new_env) sdecl_list decls in
   let shapes = shape_declarations env decls in
   (* Compute the final environment with variance and immediacy *)
-  let final_env = add_types_to_env decls ~shapes env in
+  let final_env = add_types_to_env ~shapes:(Some shapes) decls env in
   (* Save the type shapes of the declarations in [Type_shape] for debug info. *)
   if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
     List.iter (fun (id, decl) ->

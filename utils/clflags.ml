@@ -85,6 +85,9 @@ let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
 let binary_annotations_cms = ref false  (* -bin-annot-cms *)
+(* CR sspies: The flag -gno-upstream-dwarf currently implies -shape-fromat
+   debugging-shapes. When -shape-format is eventually removed, the help text for
+   -gno-upstream-dwarf must be updated. *)
 let shape_format =                      (* -shape-format *)
   ref (if Config.oxcaml_dwarf then Debugging_shapes else Old_merlin)
 let store_occurrences = ref false       (* -bin-annot-occurrences *)
