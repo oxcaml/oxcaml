@@ -34,6 +34,12 @@ val module_symbol : t -> Symbol.t
     (use [add_exn_handler]). *)
 val add_continuation : t -> Continuation.t -> Jsir.Addr.t -> t
 
+type exn_handler =
+  { addr : Jsir.Addr.t;
+    exn_param : Jsir.Var.t;
+    extra_args : Jsir.Var.t list
+  }
+
 (** Add continuations used as exception handlers, along with its exception parameter
     and any variables used to pass in [extra_args]. *)
 val add_exn_handler :
@@ -73,8 +79,7 @@ val get_continuation_exn : t -> Continuation.t -> Jsir.Addr.t
 
 (** Return the block address and parameters for exception-handling continuations.
     Raises if given an unbound exception handler. *)
-val get_exn_handler_exn :
-  t -> Continuation.t -> Jsir.Addr.t * Jsir.Var.t * Jsir.Var.t list
+val get_exn_handler_exn : t -> Continuation.t -> exn_handler
 
 (** Return the JSIR variable for the given Flambda variable. Raises if given
     an unbound variable. *)
