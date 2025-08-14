@@ -1845,7 +1845,7 @@ type 'a comonadic_with = 'a C.comonadic_with =
 module Axis = C.Axis
 
 type axhint =
-  | Apply : ('l * 'r) Hint.morph * 'b * 'b C.obj * axhint * _ C.morph -> axhint
+  | Apply : ('l * 'r) Hint.morph * 'b * 'b C.obj * axhint -> axhint
   | Const : 'd Hint.const -> axhint
 [@@ocaml.warning "-62"]
 
@@ -1906,7 +1906,7 @@ module Axerror = struct
           default_printer ()
        [@@ocaml.warning "-4"]
       in
-      let override_mode_eq : type a b. a C.obj -> b C.obj -> a -> b -> bool =
+      let eq_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
        (* An overridden equality function for modes. This makes sure that the "Global"
           and "Local" values of the regionality and locality modes are equated, even
           though they don't come from the actual same axis. In the default case,
@@ -1919,20 +1919,17 @@ module Axerror = struct
        [@@ocaml.warning "-4"]
       in
       match hint with
-      | Apply (Gap, _, _, _, _) ->
+      | Apply (Gap, _, _, _) ->
         print_mode a_obj ppf a;
         NothingPrinted
-      | Apply (morph_hint, b, b_obj, b_hint, _morph) ->
-        if override_mode_eq a_obj b_obj a b && not (Hint.is_rigid morph_hint)
-        then
-          (* When the [a] and [b] modes are equal, and the hint is non-rigid,
-             we can definitely skip printing this line. *)
-          print_axhint_chain side b b_obj b_hint ppf
-        else (
-          fprintf ppf "%a@ because it %a@ which is " (print_mode a_obj) a
-            Hint.print_morph morph_hint;
-          ignore (print_axhint_chain side b b_obj b_hint ppf);
-          HintPrinted)
+      | Apply (morph_hint, b, b_obj, b_hint)
+        when (not (Hint.is_rigid morph_hint)) && eq_mode a_obj b_obj a b ->
+        print_axhint_chain side b b_obj b_hint ppf
+      | Apply (morph_hint, b, b_obj, b_hint) ->
+        fprintf ppf "%a@ because it %a@ which is " (print_mode a_obj) a
+          Hint.print_morph morph_hint;
+        ignore (print_axhint_chain side b b_obj b_hint ppf);
+        HintPrinted
       | Const Nil ->
         print_mode a_obj ppf a;
         NothingPrinted
@@ -2124,13 +2121,13 @@ module Axerror = struct
             (* Note that unlike below, the returned [_b] value will be the same as
                the current [b], so we can discard it. *)
             let b_hint = shint_to_axhint_single rb_obj rb_shint side in
-            Apply (morph_hint, rb, rb_obj, b_hint, morph)
+            Apply (morph_hint, rb, rb_obj, b_hint)
           | Axis b_ax ->
             (* [b] refers to a value in the [b_ax] axis of [rb] *)
             let b_hint = shint_to_axhint_prod rb_obj rb_shint b_ax side in
             let b = Axis.proj b_ax rb in
             let b_obj = proj_obj b_ax rb_obj in
-            Apply (morph_hint, b, b_obj, b_hint, morph))
+            Apply (morph_hint, b, b_obj, b_hint))
         | Const r_const_hint -> Const r_const_hint
         | Branch (x, x_hint, y, y_hint) ->
           let x_axval = Axis.proj ax x in
@@ -2165,13 +2162,13 @@ module Axerror = struct
           | SourceIsSingle ->
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
             let b_hint = shint_to_axhint_single rb_obj rb_shint side in
-            Apply (morph_hint, rb, rb_obj, b_hint, morph)
+            Apply (morph_hint, rb, rb_obj, b_hint)
           | Axis b_ax ->
             let b = Axis.proj b_ax rb in
             let b_obj = proj_obj b_ax rb_obj in
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
             let b_hint = shint_to_axhint_prod rb_obj rb_shint b_ax side in
-            Apply (morph_hint, b, b_obj, b_hint, morph))
+            Apply (morph_hint, b, b_obj, b_hint))
         | Const a_const_hint -> Const a_const_hint
         | Branch (x, x_hint, y, y_hint) ->
           let chosen_hint =
