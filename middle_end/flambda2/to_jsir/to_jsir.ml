@@ -82,7 +82,8 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       let symbols = Bound_static.symbols_being_defined bound_static in
       let env =
         Symbol.Set.fold
-          (fun symbol env -> To_jsir_env.add_symbol_if_not_found env symbol)
+          (fun symbol env ->
+            To_jsir_env.add_symbol env symbol (Jsir.Var.fresh ()))
           symbols env
       in
       (* To translate closures, we require that all the code is inserted into

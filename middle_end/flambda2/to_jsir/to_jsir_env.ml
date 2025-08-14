@@ -107,12 +107,6 @@ let add_if_not_found map item ~mem ~add =
     let var = Jsir.Var.fresh () in
     add item var map
 
-let add_symbol_if_not_found t symbol =
-  { t with
-    symbols =
-      add_if_not_found t.symbols symbol ~mem:Symbol.Map.mem ~add:Symbol.Map.add
-  }
-
 let add_function_slot_if_not_found t slot =
   { t with
     function_slots =
