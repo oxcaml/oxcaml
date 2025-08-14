@@ -853,7 +853,8 @@ Line 1, characters 23-36:
                            ^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
-       However, it is expected to be "global"
+       However, it is expected to be "global" because it is an allocation
+       which is in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value..
 |}]

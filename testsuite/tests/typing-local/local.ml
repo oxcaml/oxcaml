@@ -369,6 +369,7 @@ Line 1, characters 47-48:
 1 | let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
                                                    ^
 Error: This value is "local" but expected to be "global"
+       because it is an allocation which is in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value..
 |}]

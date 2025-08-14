@@ -178,7 +178,7 @@ module type Solver_mono = sig
   (** ['a hint] explains a bound of type ['a], but doesn't include the bound itself *)
   type ('a, 'd) hint =
     | Apply :
-        'd hint_morph * ('b, 'a, 'd) morph * ('b, 'd) hint
+        'd hint_morph * ('b, 'a, 'd) morph * 'b * ('b, 'd) hint
         -> ('a, 'd) hint
         (** [Apply morph_hint morph x_hint] says the current bound is derived by applying
             morphism [morph] (explained by [morph_hint]) to another bound explained by

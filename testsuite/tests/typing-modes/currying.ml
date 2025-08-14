@@ -90,7 +90,8 @@ Line 1, characters 64-79:
 1 | let app1 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42) ()
                                                                     ^^^^^^^^^^^^^^^
 Error: This value is "local" but expected to be "global"
-       because it is captured by a partial application which is "global"
+       because it is captured by a partial application
+       which is in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value..
 |}]
@@ -100,7 +101,8 @@ Line 1, characters 64-79:
 1 | let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42)
                                                                     ^^^^^^^^^^^^^^^
 Error: This value is "local" but expected to be "global"
-       because it is captured by a partial application which is "global"
+       because it is captured by a partial application
+       which is in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value..
 |}]
@@ -110,7 +112,8 @@ Line 1, characters 56-71:
 1 | let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(local_ ref 42)
                                                             ^^^^^^^^^^^^^^^
 Error: This value is "local" but expected to be "global"
-       because it is captured by a partial application which is "global"
+       because it is captured by a partial application
+       which is in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value..
 |}]

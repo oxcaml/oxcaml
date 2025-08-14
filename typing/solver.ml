@@ -30,7 +30,9 @@ end
 
 module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   type ('a, 'd) hint =
-    | Apply : 'd H.morph * ('b, 'a, 'd) C.morph * ('b, 'd) hint -> ('a, 'd) hint
+    | Apply :
+        'd H.morph * ('b, 'a, 'd) C.morph * 'b * ('b, 'd) hint
+        -> ('a, 'd) hint
     | Const : 'd H.const -> ('a, 'd) hint
     | Branch :
         'a * ('a, 'l * 'r) hint * 'a * ('a, 'l * 'r) hint
@@ -141,7 +143,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     end
 
     type ('a, 'd) t =
-      | Apply : ('b, 'a, 'd) Morph_hint.t * ('b, 'd) t -> ('a, 'd) t
+      | Apply : ('b, 'a, 'd) Morph_hint.t * 'b * ('b, 'd) t -> ('a, 'd) t
       | Const : 'd H.const -> ('a, 'd) t
       | Branch : 'a * ('a, 'l * 'r) t * 'a * ('a, 'l * 'r) t -> ('a, 'l * 'r) t
       constraint 'd = _ * _
@@ -152,59 +154,76 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
       let rec allow_left : type a l r. (a, allowed * r) t -> (a, l * r) t =
         function
-        | Apply (f_hint, h) -> Apply (Morph_hint.allow_left f_hint, allow_left h)
+        | Apply (f_hint, b, h) ->
+          Apply (Morph_hint.allow_left f_hint, b, allow_left h)
         | Const h -> Const (H.Const.allow_left h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, allow_left a_hint, b, allow_left b_hint)
 
       let rec allow_right : type a l r. (a, l * allowed) t -> (a, l * r) t =
         function
-        | Apply (f_hint, h) ->
-          Apply (Morph_hint.allow_right f_hint, allow_right h)
+        | Apply (f_hint, b, h) ->
+          Apply (Morph_hint.allow_right f_hint, b, allow_right h)
         | Const h -> Const (H.Const.allow_right h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, allow_right a_hint, b, allow_right b_hint)
 
       let rec disallow_left : type a l r. (a, l * r) t -> (a, disallowed * r) t
           = function
-        | Apply (f_hint, h) ->
-          Apply (Morph_hint.disallow_left f_hint, disallow_left h)
+        | Apply (f_hint, b, h) ->
+          Apply (Morph_hint.disallow_left f_hint, b, disallow_left h)
         | Const h -> Const (H.Const.disallow_left h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, disallow_left a_hint, b, disallow_left b_hint)
 
       let rec disallow_right : type a l r. (a, l * r) t -> (a, l * disallowed) t
           = function
-        | Apply (f_hint, h) ->
-          Apply (Morph_hint.disallow_right f_hint, disallow_right h)
+        | Apply (f_hint, b, h) ->
+          Apply (Morph_hint.disallow_right f_hint, b, disallow_right h)
         | Const h -> Const (H.Const.disallow_right h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, disallow_right a_hint, b, disallow_right b_hint)
     end)
   end
 
+  (* CR zqian: the following functions are currently O(n^2). FIX. *)
+  let rec src_comp_morph_hint :
+      type a b l r. a C.obj -> (b, a, l * r) Comp_hint.Morph_hint.t -> b C.obj =
+   fun obj_a -> function
+    | Base (_, morph) -> C.src obj_a morph
+    | Compose (h1, h2) -> src_comp_morph_hint (src_comp_morph_hint obj_a h1) h2
+
   let rec apply_comp_morph_hint :
       type b a l r.
-      (b, a, l * r) Comp_hint.Morph_hint.t -> (b, l * r) hint -> (a, l * r) hint
-      =
-   fun morph_hint hint ->
+      a C.obj ->
+      (b, a, l * r) Comp_hint.Morph_hint.t ->
+      b ->
+      (b, l * r) hint ->
+      a * (a, l * r) hint =
+   fun obj_a morph_hint b hint ->
     match morph_hint with
-    | Base (morph_hint, morph) -> Apply (morph_hint, morph, hint)
+    | Base (morph_hint, morph) ->
+      let a = C.apply obj_a morph b in
+      a, Apply (morph_hint, morph, b, hint)
     | Compose (h1, h2) ->
-      apply_comp_morph_hint h1 (apply_comp_morph_hint h2 hint)
+      let obj_mid = src_comp_morph_hint obj_a h1 in
+      let mid, hint_mid = apply_comp_morph_hint obj_mid h2 b hint in
+      apply_comp_morph_hint obj_a h1 mid hint_mid
 
   (** This is for removing compositions. This function doesn't contain any [assert false]
   as it is just for a straightforward transformation *)
-  let rec flatten : type a l r. (a, l * r) Comp_hint.t -> (a, l * r) hint =
-    function
+  let rec flatten :
+      type a l r. a C.obj -> (a, l * r) Comp_hint.t -> (a, l * r) hint =
+   fun obj_a -> function
     | Const const_hint -> Const const_hint
     | Branch (x, x_hint, y, y_hint) ->
-      Branch (x, flatten x_hint, y, flatten y_hint)
-    | Apply (morph_hint, subhint) ->
-      let subhint = flatten subhint in
-      apply_comp_morph_hint morph_hint subhint
+      Branch (x, flatten obj_a x_hint, y, flatten obj_a y_hint)
+    | Apply (morph_hint, b, subhint) ->
+      let obj_b = src_comp_morph_hint obj_a morph_hint in
+      let subhint = flatten obj_b subhint in
+      apply_comp_morph_hint obj_a morph_hint b subhint |> snd
 
-  let hint_of_comp_hint x = flatten x
+  let hint_of_comp_hint = flatten
 
   type any_morph = Any_morph : ('a, 'b, 'd) C.morph -> any_morph
 
@@ -463,6 +482,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let mlower_hint (Amorphvar (var, _morph, hint)) : _ Comp_hint.t =
     Apply
       ( Comp_hint.Morph_hint.disallow_right hint,
+        var.lower,
         Comp_hint.disallow_right var.lower_hint )
 
   let mupper dst (Amorphvar (var, morph, _hint)) = C.apply dst morph var.upper
@@ -470,6 +490,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let mupper_hint (Amorphvar (var, _morph, hint)) : _ Comp_hint.t =
     Apply
       ( Comp_hint.Morph_hint.disallow_left hint,
+        var.upper,
         Comp_hint.disallow_left var.upper_hint )
 
   let min (type a) (obj : a C.obj) = Amode (C.min obj, Const H.min, Const H.nil)
@@ -499,22 +520,24 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         ( C.apply dst morph a,
           Apply
             ( Comp_hint.Morph_hint.disallow_right hint,
+              a,
               Comp_hint.disallow_right a_hint_lower ),
           Apply
             ( Comp_hint.Morph_hint.disallow_left hint,
+              a,
               Comp_hint.disallow_left a_hint_upper ) )
     | Amodevar mv -> Amodevar (apply_morphvar dst morph hint mv)
     | Amodejoin (a, a_hint, vs) ->
       let hint = Comp_hint.Morph_hint.disallow_right hint in
       Amodejoin
         ( C.apply dst morph a,
-          Apply (hint, a_hint),
+          Apply (hint, a, a_hint),
           VarMap.map (apply_morphvar dst morph hint) vs )
     | Amodemeet (a, a_hint, vs) ->
       let hint = Comp_hint.Morph_hint.disallow_left hint in
       Amodemeet
         ( C.apply dst morph a,
-          Apply (hint, a_hint),
+          Apply (hint, a, a_hint),
           VarMap.map (apply_morphvar dst morph hint) vs )
 
   module Unhint = struct
@@ -635,7 +658,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let f'_hint = Comp_hint.Morph_hint.left_adjoint obj f_hint in
       let src = C.src obj f in
       let a' = C.apply src f' a in
-      let a'_hint = Comp_hint.Apply (f'_hint, a_hint) in
+      let a'_hint = Comp_hint.Apply (f'_hint, a, a_hint) in
       submode_cv ~log src a' a'_hint v |> Result.get_ok;
       Ok ()
 
@@ -696,7 +719,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let f'_hint = Comp_hint.Morph_hint.right_adjoint obj f_hint in
       let src = C.src obj f in
       let a' = C.apply src f' a in
-      let a'_hint = Comp_hint.Apply (f'_hint, a_hint) in
+      let a'_hint = Comp_hint.Apply (f'_hint, a, a_hint) in
       (* If [mlower] was precise, then the check
          [not (C.le obj (mlower obj mv) a)] should guarantee the following call
          to return [Ok ()]. However, [mlower] is not precise *)
@@ -706,7 +729,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       | Error (e, e_hint) ->
         Error
           ( C.apply obj f e,
-            Apply (Comp_hint.Morph_hint.disallow_right f_hint, e_hint) )
+            Apply (Comp_hint.Morph_hint.disallow_right f_hint, e, e_hint) )
 
   let eq_morphvar :
       type a l0 r0 l1 r1. (a, l0 * r0) morphvar -> (a, l1 * r1) morphvar -> bool
@@ -772,6 +795,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let submode (type a r l) (obj : a C.obj) (a : (a, allowed * r) mode)
       (b : (a, l * allowed) mode) ~log =
+    let hint_of_comp_hint x = hint_of_comp_hint obj x in
     let submode_cc ~log:_ obj left left_hint_lower right right_hint_upper =
       if C.le obj left right
       then Ok ()
