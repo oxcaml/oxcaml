@@ -1055,6 +1055,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Base Bits64 -> Bits64
   | Base Float32 -> Float32
   | Base Float64 -> Float64
+  | Base Untagged_immediate -> Untagged_immediate
   | Base Vec128 -> Vec128
   | Base Vec256 -> Vec256
   | Base Vec512 -> Vec512
