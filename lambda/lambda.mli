@@ -596,6 +596,8 @@ val layout_of_mixed_block_element : 'a. 'a mixed_block_element -> layout
 val layout_of_mixed_block_shape
     : 'a. 'a mixed_block_element array -> path:int list -> layout
 
+val mixed_block_of_sort : Jkind.Sort.Const.t -> Types.mixed_block_element
+
 type structured_constant =
     Const_base of constant
   | Const_block of int * structured_constant list

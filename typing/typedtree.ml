@@ -217,8 +217,7 @@ and arg_label = Types.arg_label =
 
 and expression_desc =
     Texp_ident of
-      Path.t * Jkind.Sort.t array list * Longident.t loc *
-      Types.value_description * ident_kind * unique_use
+      Path.t * Longident.t loc * Types.value_description * ident_kind * unique_use
   | Texp_constant of constant
   | Texp_let of rec_flag * value_binding list * expression
   | Texp_letmutable of value_binding * expression
