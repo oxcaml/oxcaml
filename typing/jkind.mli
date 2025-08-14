@@ -106,7 +106,7 @@ module Layout : sig
   val to_sort : Sort.t t -> Sort.t option
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
-  
+
   val default_to_value_and_get : Sort.t t -> Const.t
 
   module Debug_printers : sig

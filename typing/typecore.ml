@@ -302,13 +302,13 @@ exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
 
 (* CR mixed-modules: move somewhere else *)
-let rec to_sort : Jkind.Sort.t Jkind.Layout.t -> Jkind.Sort.t option = function
-  | Any -> None
-  | Sort b -> Some b
-  | Product ts ->
-    Option.map
-      (fun x -> Jkind_types.Sort.Product x)
-      (Misc.Stdlib.List.map_option to_sort ts)
+(* let rec to_sort : Jkind.Sort.t Jkind.Layout.t -> Jkind.Sort.t option = function *)
+(*   | Any -> None *)
+(*   | Sort b -> Some b *)
+(*   | Product ts -> *)
+(*     Option.map *)
+(*       (fun x -> Jkind_types.Sort.Product x) *)
+(*       (Misc.Stdlib.List.map_option to_sort ts) *)
 
 let error_of_filter_arrow_failure ~explanation ~first ty_fun
   : filter_arrow_failure -> _ = function
@@ -612,14 +612,14 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   let vmode , _ = Value.newvar_below (alloc_as_value marg) in
   if partial_app then mode_default vmode, vmode
   else match funct.exp_desc, index, position_and_mode.apply_position with
-  | Texp_ident (_, _, _, {val_kind =
+  | Texp_ident (_, _, {val_kind =
       Val_prim {Primitive.prim_name = ("%sequor"|"%sequand")}},
                 Id_prim _, _), 1, Tail ->
      (* RHS of (&&) and (||) is at the tail of function region if the
         application is. The argument mode is not constrained otherwise. *)
      mode_with_position vmode (RTail (Option.get position_and_mode.region_mode, FTail)),
      vmode
-  | Texp_ident (_, _, _, _, Id_prim _, _), _, _ ->
+  | Texp_ident (_, _, _, Id_prim _, _), _, _ ->
      (* Other primitives cannot be tail-called *)
      mode_default vmode, vmode
   | _, _, (Nontail | Default) ->
@@ -3908,7 +3908,7 @@ let rec final_subexpression exp =
 
 let is_prim ~name funct =
   match funct.exp_desc with
-  | Texp_ident (_, _, _, {val_kind=Val_prim{Primitive.prim_name; _}}, Id_prim _, _) ->
+  | Texp_ident (_, _, {val_kind=Val_prim{Primitive.prim_name; _}}, Id_prim _, _) ->
       prim_name = name
   | _ -> false
 
@@ -4491,7 +4491,7 @@ let rec is_nonexpansive exp =
   | Texp_assert (exp, _) ->
       is_nonexpansive exp
   | Texp_apply (
-      { exp_desc = Texp_ident (_, _, _, {val_kind = Val_prim prim}, Id_prim _, _) },
+      { exp_desc = Texp_ident (_, _, {val_kind = Val_prim prim}, Id_prim _, _) },
       args, _, _, _) ->
      is_nonexpansive_prim prim args
   | Texp_array (_, _, _ :: _, _)
@@ -5934,10 +5934,9 @@ and type_expect_
   in
   match desc with
   | Pexp_ident lid ->
-      let path, bsorts, (actual_mode : Env.actual_mode), desc, kind =
+      let path, (actual_mode : Env.actual_mode), desc, kind =
         type_ident env ~recarg lid
       in
-      let bsorts = List.map Option.get bsorts in
       let exp_desc =
         match desc.val_kind with
         | Val_ivar (_, cl_num) ->
@@ -5964,11 +5963,11 @@ and type_expect_
             let (path, _) =
               Env.find_value_by_name (Longident.Lident ("self-" ^ cl_num)) env
             in
-            Texp_ident(path, bsorts, lid, desc, kind,
+            Texp_ident(path, lid, desc, kind,
               unique_use ~loc ~env actual_mode.mode
                 (as_single_mode expected_mode))
         | _ ->
-            Texp_ident(path, bsorts, lid, desc, kind,
+            Texp_ident(path, lid, desc, kind,
               unique_use ~loc ~env actual_mode.mode
                 (as_single_mode expected_mode))
       in
@@ -6222,13 +6221,13 @@ and type_expect_
       let (rt, funct), sargs =
         let rt, funct = type_sfunct sfunct in
         match funct.exp_desc, sargs with
-        | Texp_ident (_, _, _, {val_kind = Val_prim {prim_name = "%revapply"}; val_type},
+        | Texp_ident (_, _, {val_kind = Val_prim {prim_name = "%revapply"}; val_type},
                       Id_prim _, _),
           [Nolabel, sarg; Nolabel, actual_sfunct]
           when is_inferred actual_sfunct
             && check_apply_prim_type Revapply val_type ->
             type_sfunct_args actual_sfunct [Nolabel, sarg]
-        | Texp_ident (_, _, _, {val_kind = Val_prim {prim_name = "%apply"}; val_type},
+        | Texp_ident (_, _, {val_kind = Val_prim {prim_name = "%apply"}; val_type},
                       Id_prim _, _),
           [Nolabel, actual_sfunct; Nolabel, sarg]
           when check_apply_prim_type Apply val_type ->
@@ -7324,7 +7323,7 @@ and type_expect_
       | Texp_lazy _ -> unsupported Lazy
       | Texp_object _ -> unsupported Object
       | Texp_pack _ -> unsupported Module
-      | Texp_apply({ exp_desc = Texp_ident(_, _, _, {val_kind = Val_prim _}, _, _)},
+      | Texp_apply({ exp_desc = Texp_ident(_, _, {val_kind = Val_prim _}, _, _)},
           _, _, _, _)
           (* [stack_ (prim foo)] will be checked by [transl_primitive_application]. *)
           (* CR zqian: Move/Copy [Lambda.primitive_may_allocate] to [typing], then we can
@@ -7555,7 +7554,7 @@ and expression_constraint pexp =
     is_self =
       (fun expr ->
          match expr.exp_desc with
-         | Texp_ident (_, _, _, { val_kind = Val_self _ }, _, _) -> true
+         | Texp_ident (_, _, { val_kind = Val_self _ }, _, _) -> true
          | _ -> false);
   }
 
@@ -7685,7 +7684,7 @@ and type_constraint_expect
 and type_ident env ?(recarg=Rejected) lid =
   (* CR zqian: [lookup_value] should close over the memaddr of all prefix
   modules.  *)
-  let path, bsorts, desc, (mode, locks) =
+  let path, desc, (mode, locks) =
     Env.lookup_value ~loc:lid.loc lid.txt env
   in
   (* We cross modes when typing [Ppat_ident], before adding new variables into
@@ -7763,12 +7762,12 @@ and type_ident env ?(recarg=Rejected) lid =
        ty, Id_prim (Option.map Locality.disallow_right mode, sort)
     | _ ->
        instance desc.val_type, Id_value in
-  path, bsorts, actual_mode, { desc with val_type }, kind
+  path, actual_mode, { desc with val_type }, kind
 
 and type_binding_op_ident env s =
   let loc = s.loc in
   let lid = Location.mkloc (Longident.Lident s.txt) loc in
-  let path, _, actual_mode, desc, kind = type_ident env lid in
+  let path, actual_mode, desc, kind = type_ident env lid in
   actual_submode ~env ~loc:lid.loc ~reason:Other actual_mode mode_legacy;
   let path =
     match desc.val_kind with
@@ -8656,7 +8655,6 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
           }
         in
         let exp_env = Env.add_value ~mode id desc env in
-        let bsorts = [[|to_sort layout |> Option.get|]] in
         let uu = unique_use ~loc:sarg.pexp_loc ~env mode mode in
         {pat_desc = Tpat_var (id, mknoloc name, desc.val_uid, sort,
           Value.disallow_right mode);
@@ -8668,7 +8666,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         {exp_type = ty; exp_loc = Location.none; exp_env = exp_env;
          exp_extra = []; exp_attributes = [];
          exp_desc =
-         Texp_ident(Path.Pident id, bsorts, mknoloc (Longident.Lident name),
+         Texp_ident(Path.Pident id, mknoloc (Longident.Lident name),
                     desc, Id_value, uu)}
       in
       let eta_mode, _ = Value.newvar_below (alloc_as_value marg) in
@@ -10583,7 +10581,7 @@ and type_send env loc explanation e met =
   let obj = type_exp env mode_object e in
   let (meth, typ) =
     match obj.exp_desc with
-    | Texp_ident(_, _, _, {val_kind = Val_self(sign, meths, _, _)}, _, _) ->
+    | Texp_ident(_, _, {val_kind = Val_self(sign, meths, _, _)}, _, _) ->
         let id, typ =
           match meths with
           | Self_concrete meths ->
@@ -10613,7 +10611,7 @@ and type_send env loc explanation e met =
           end
         in
         Tmeth_val id, typ
-    | Texp_ident(_, _, _, {val_kind = Val_anc (sign, meths, cl_num)}, _, _) ->
+    | Texp_ident(_, _, {val_kind = Val_anc (sign, meths, cl_num)}, _, _) ->
         let id =
           match Meths.find met meths with
           | id -> id
@@ -10712,7 +10710,7 @@ let type_expression env jkind sexp =
       Pexp_ident lid ->
         let loc = sexp.pexp_loc in
         (* Special case for keeping type variables when looking-up a variable *)
-        let (_path, _bsorts, desc, _) =
+        let (_path, desc, _) =
           Env.lookup_value ~use:false ~loc lid.txt env
         in
         {exp with exp_type = desc.val_type}
