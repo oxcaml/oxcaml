@@ -122,13 +122,13 @@ let make_package_object unix ~ppf_dump members target coercion
       if Config.flambda || Config.flambda2 then Plain_block
       else Set_individual_fields
     in
-    let main_module_block_size, code =
+    let main_module_block_repr, code =
       Translmod.transl_package components compilation_unit coercion
         ~style:transl_style
     in
     let code = Simplif.simplify_lambda code in
     let main_module_block_format : Lambda.main_module_block_format =
-      Mb_struct { mb_repr = Module_value_only main_module_block_size }
+      Mb_struct { mb_repr = main_module_block_repr }
     in
     let arg_block_idx =
       (* Packs not supported as argument modules *)
@@ -161,12 +161,12 @@ let make_package_object unix ~ppf_dump members target coercion
     in
     remove_file objtemp;
     if not (exitcode = 0) then raise(Error Linking_error);
-    main_module_block_size
+    main_module_block_repr
   )
 
 (* Make the .cmx file for the package *)
 
-let build_package_cmx members cmxfile ~main_module_block_size =
+let build_package_cmx members cmxfile ~main_module_block_repr =
   let unit_names =
     List.map (fun m -> m.pm_name) members in
   let filter lst =
@@ -195,7 +195,7 @@ let build_package_cmx members cmxfile ~main_module_block_size =
   let modname = Compilation_unit.name ui.ui_unit in
   let format : Lambda.main_module_block_format =
     (* Open modules not supported with packs, so always just a record *)
-    Mb_struct { mb_repr = Module_value_only main_module_block_size }
+    Mb_struct { mb_repr = main_module_block_repr }
   in
   let pkg_infos =
     { ui_unit = ui.ui_unit;
@@ -232,10 +232,10 @@ let package_object_files unix ~ppf_dump files target
   let pack_path = Unit_info.Artifact.modname target in
   let members = map_left_right (read_member_info pack_path) files in
   check_units members;
-  let main_module_block_size =
+  let main_module_block_repr =
     make_package_object unix ~ppf_dump members target coercion ~flambda2
   in
-  build_package_cmx members targetcmx ~main_module_block_size
+  build_package_cmx members targetcmx ~main_module_block_repr
 
 (* The entry point *)
 

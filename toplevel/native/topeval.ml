@@ -210,26 +210,32 @@ let execute_phrase print_outcome ppf phr =
              str, sg', true
          | None -> str, sg', false
       in
-      let compilation_unit, res, required_globals, size =
+      let compilation_unit, res, required_globals, main_module_block_format =
         if Config.flambda then
-          let { Lambda.compilation_unit; main_module_block_size = size;
+          let { Lambda.compilation_unit; main_module_block_format;
                 required_globals; code = res } =
             Translmod.transl_implementation phrase_comp_unit
               (str, Tcoerce_none, None)
               ~style:Plain_block
           in
           remember compilation_unit sg';
-          compilation_unit, close_phrase res, required_globals, size
+          compilation_unit, close_phrase res, required_globals, repr
         else
-          let size, res = Translmod.transl_store_phrases phrase_comp_unit str in
-          phrase_comp_unit, res, Compilation_unit.Set.empty, size
+          let main_module_block_format, res =
+            Translmod.transl_store_phrases phrase_comp_unit str
+          in
+          ( phrase_comp_unit,
+            res,
+            Compilation_unit.Set.empty,
+            main_module_block_format )
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_lambda ppf ~required_globals ~compilation_unit phrase_name res size
+          load_lambda ppf ~required_globals ~compilation_unit phrase_name res
+            main_module_block_format (* CR jrayman: this should not typecheck *)
         in
         let out_phr =
           match res with

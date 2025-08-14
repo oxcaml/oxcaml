@@ -2917,7 +2917,6 @@ and type_pat_aux
       let alloc_mode =
         cross_left !!penv expected_ty alloc_mode.mode
       in
-      (* CR jrayman: store in Tpat_var *)
       let layout =
         match Ctype.type_sort !!penv ty ~why:Let_binding ~fixed:false with
         | Error _ -> assert false
@@ -2993,7 +2992,6 @@ and type_pat_aux
       let q = type_pat tps Value sq expected_ty in
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
-      (* CR jrayman: this is the wrong way to do this *)
       let layout =
         match Ctype.type_sort !!penv ty_var ~why:Let_binding ~fixed:false with
         | Error _ -> assert false
@@ -8613,10 +8611,6 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let eta_mode, _ = Value.newvar_below (alloc_as_value marg) in
       Regionality.submode_exn
         (Value.proj_comonadic Areality eta_mode) Regionality.regional;
-      (* CR layouts v10: When we add abstract jkinds, the eta expansion here
-         becomes impossible in some cases - we'll need better errors.  For test
-         cases, look toward the end of
-         typing-layouts-missing-cmi/function_arg.ml *)
       let type_sort ~why ty =
         match type_sort ~why ~fixed:false env ty with
         | Ok sort -> sort
@@ -8629,6 +8623,10 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let eta_pat, eta_var =
         var_pair ~mode:eta_mode "eta" ty_arg arg_layout
       in
+      (* CR layouts v10: When we add abstract jkinds, the eta expansion here
+         becomes impossible in some cases - we'll need better errors.  For test
+         cases, look toward the end of
+         typing-layouts-missing-cmi/function_arg.ml *)
       let func texp =
         let ret_mode = alloc_as_value mret in
         let e =

@@ -1207,9 +1207,6 @@ type record_form_packed =
 
 val record_form_to_string : _ record_form -> string
 
-val module_representation_of_mixed_product_shape :
-  mixed_product_shape -> module_representation
-
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 

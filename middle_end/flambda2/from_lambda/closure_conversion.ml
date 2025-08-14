@@ -3684,8 +3684,6 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
         Mixed
           { tag = Known Tag.Scannable.zero;
             size = Unknown;
-            (* CR jrayman: Is this size in words or number of fields? Test SIMD
-               fields *)
             field_kind;
             shape = kind_shape
           }

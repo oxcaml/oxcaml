@@ -325,6 +325,11 @@ module Stdlib = struct
       | None -> Format.pp_print_string ppf "None"
       | Some contents ->
         Format.fprintf ppf "@[(Some@ %a)@]" print_contents contents
+
+    let get_or_fatal_error a ~error =
+      match a with
+      | Some contents -> contents
+      | None -> fatal_error error
   end
 
   module Array = struct

@@ -255,6 +255,8 @@ module Stdlib : sig
       -> Format.formatter
       -> 'a t
       -> unit
+
+    val get_or_fatal_error : 'a t -> error:string -> 'a
   end
 
 (** {2 Extensions to the Array module} *)

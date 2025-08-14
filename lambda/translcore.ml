@@ -26,6 +26,8 @@ open Lambda
 open Translmode
 open Debuginfo.Scoped_location
 
+let module_representation_of_signature _ = assert false
+
 type error =
     Free_super_var
   | Unreachable_reached
