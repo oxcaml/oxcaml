@@ -993,3 +993,53 @@ end
 [%%expect{|
 module M4 : S
 |}]
+
+module type S0 = sig
+  type t : value_or_null mod separable
+end
+
+[%%expect{|
+module type S0 = sig type t : value_or_null mod separable end
+|}]
+
+module M5 : S0 = struct
+  type t = int
+end
+
+[%%expect{|
+module M5 : S0
+|}]
+
+module M6 : S0 = struct
+  type t = string or_null
+end
+
+[%%expect{|
+module M6 : S0
+|}]
+
+module M7_fail : S0 = struct
+  type t = float or_null
+end
+
+[%%expect{|
+Lines 1-3, characters 22-3:
+1 | ......................struct
+2 |   type t = float or_null
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = float or_null end
+       is not included in
+         S0
+       Type declarations do not match:
+         type t = float or_null
+       is not included in
+         type t : value_or_null mod separable
+       The kind of the first is
+           value_or_null mod many unyielding stateless immutable
+         because it is the primitive type or_null.
+       But the kind of the first must be a subkind of
+           value_or_null mod separable
+         because of the definition of t at line 2, characters 2-38.
+|}]
