@@ -133,7 +133,7 @@ let rec eval_address = function
       global_symbol cu
   | Env.Alocal id ->
       toplevel_value id
-  | Env.Adot(a, pos) ->
+  | Env.Adot(a, _, pos) -> (* CR jrayman: fix *)
       Obj.field (eval_address a) pos
 
 let eval_path find env path =
