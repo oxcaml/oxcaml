@@ -206,7 +206,7 @@ and desc =
   | Comp_unit of string
   | Error of string
 
-  (* constructors for types  *)
+  (* constructors for types *)
   | Constr of Ident.t * t list
   | Tuple of t list (* boxed tuple (value layout) *)
   | Unboxed_tuple of t list (* unboxed tuple (product layout) *)
@@ -245,8 +245,9 @@ and desc =
 
 (** For DWARF type emission to work as expected, we store the layouts in the
     declaration alongside the shapes in those cases where the layout "expands"
-    again such as variant constructors, which themselves are values but do
-    point to blocks in memory with layouts for the individual fields. *)
+    again such as variant constructors, which themselves are values but
+    point to blocks in memory.  Here, layouts are stored for the individual
+    fields. *)
 
 and 'a poly_variant_constructors = 'a poly_variant_constructor list
 

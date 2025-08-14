@@ -377,8 +377,7 @@ module Predef = struct
       | Exception -> Base Value
       | Unboxed u -> Base (unboxed_type_to_base_layout u)
 
-
-    let equal_simd_vec_split = fun s1 s2 ->
+    let equal_simd_vec_split s1 s2 =
       match s1, s2 with
       | Int8x16, Int8x16 -> true
       | Int16x8, Int16x8 -> true
@@ -398,10 +397,12 @@ module Predef = struct
       | Int64x8, Int64x8 -> true
       | Float32x16, Float32x16 -> true
       | Float64x8, Float64x8 -> true
-      | _, _ -> false
+      | (Int8x16 | Int16x8 | Int32x4 | Int64x2 | Float32x4 | Float64x2
+        | Int8x32 | Int16x16 | Int32x8 | Int64x4 | Float32x8 | Float64x4
+        | Int8x64 | Int16x32 | Int32x16 | Int64x8 | Float32x16 | Float64x8), _
+        -> false
 
-
-    let equal_unboxed = fun u1 u2 ->
+    let equal_unboxed u1 u2 =
       match u1, u2 with
       | Unboxed_float, Unboxed_float -> true
       | Unboxed_float32, Unboxed_float32 -> true
@@ -409,7 +410,8 @@ module Predef = struct
       | Unboxed_int64, Unboxed_int64 -> true
       | Unboxed_int32, Unboxed_int32 -> true
       | Unboxed_simd s1, Unboxed_simd s2 -> equal_simd_vec_split s1 s2
-      | _, _ -> false
+      | (Unboxed_float | Unboxed_float32 | Unboxed_nativeint
+        | Unboxed_int64 | Unboxed_int32 | Unboxed_simd _), _ -> false
 
     let equal p1 p2 =
       match p1, p2 with
@@ -429,8 +431,9 @@ module Predef = struct
       | Simd s1, Simd s2 -> equal_simd_vec_split s1 s2
       | Exception, Exception -> true
       | Unboxed u1, Unboxed u2 -> equal_unboxed u1 u2
-      | _, _ -> false
-
+      | (Array | Bytes | Char | Extension_constructor | Float | Float32
+        | Floatarray | Int | Int32 | Int64 | Lazy_t | Nativeint | String
+        | Simd _ | Exception | Unboxed _), _ -> false
 end
 
 
@@ -502,7 +505,6 @@ and constructor_representation = mixed_product_shape
 
 and mixed_product_shape = Layout.t array
 
-
 let poly_variant_constructors_map f pvs =
   List.map
     (fun pv -> { pv with pv_constr_args = List.map f pv.pv_constr_args })
@@ -520,14 +522,14 @@ let complex_constructor_map f { name; kind; args } =
 let complex_constructors_map f = List.map (complex_constructor_map f)
 
 let equal_complex_constructor_arguments eq
-  { field_name = field_name1; field_value = field_value1 }
-  { field_name = field_name2; field_value = field_value2 } =
+    { field_name = field_name1; field_value = field_value1 }
+    { field_name = field_name2; field_value = field_value2 } =
   Option.equal String.equal field_name1 field_name2 &&
   eq field_value1 field_value2
 
 let equal_complex_constructor eq
-  { name = name1; kind = kind1; args = args1 }
-  { name = name2; kind = kind2; args = args2 } =
+    { name = name1; kind = kind1; args = args1 }
+    { name = name2; kind = kind2; args = args2 } =
   String.equal name1 name2 &&
   Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
   List.equal (equal_complex_constructor_arguments eq) args1 args2
@@ -584,82 +586,10 @@ let rec equal_desc d1 d2 =
     equal_record_kind r1.kind r2.kind
     && List.equal equal_field r1.fields r2.fields
 
-  | Var _, (Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _
-          | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
-          | Variant _ | Variant_unboxed _ | Record _
-          | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Abs _, (Var _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _
-          | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
-          | Variant _ | Variant_unboxed _ | Record _
-          | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | App _, (Var _ | Abs _ | Struct _ | Leaf  | Constr _ | Tuple _
-          | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
-          | Variant _ | Variant_unboxed _ | Record _
-          | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Struct _, (Var _ | Abs _ | App _ | Leaf  | Constr _ | Tuple _
-            | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
-            | Variant _ | Variant_unboxed _ | Record _
-            | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Leaf, (Var _ | Abs _ | App _ | Struct _ | Proj _ | Constr _
-         | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
-         | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _
-         | Comp_unit _ | Alias _ | Error _)
-  | Proj _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
-          | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
-          | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _
-          | Comp_unit _ | Alias _ | Error _)
-  | Comp_unit _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
-               | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
-               | Poly_variant _ | Variant _ | Variant_unboxed _
-               | Record _ | Proj _ | Alias _
-               | Error _)
-  | Alias _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
-           | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
-           | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _
-           | Proj _ | Comp_unit _ | Error _)
-  | Error _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
-           | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
-           | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _
-           | Proj _ | Comp_unit _ | Alias _)
-  | Variant _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
-             | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
-             | Poly_variant _ | Variant_unboxed _ | Record _
-             | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Variant_unboxed _, (Var _ | Abs _ | App _ | Struct _ | Leaf
-                     | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _
-                     | Arrow _ | Variant _ | Poly_variant _ | Record _
-                     | Proj _ | Comp_unit _
-                     | Alias _ | Error _)
-  | Record _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
-            | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
-            | Poly_variant _ | Variant _ | Variant_unboxed _
-            | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Predef _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
-            | Tuple _ | Unboxed_tuple _ | Arrow _ | Poly_variant _
-            | Variant _ | Variant_unboxed _ | Record _
-            | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Arrow _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
-           | Tuple _ | Unboxed_tuple _ | Predef _ | Poly_variant _
-           | Variant _ | Variant_unboxed _ | Record _
-           | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Poly_variant _, (Var _ | Abs _ | App _ | Struct _ | Leaf
-                   | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _
-                   | Arrow _ | Variant _ | Variant_unboxed _ | Record _
-                   | Proj _ | Comp_unit _ | Alias _
-                   | Error _)
-  | Tuple _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
-           | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
-           | Variant _ | Variant_unboxed _ | Record _
-           | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Unboxed_tuple _, (Var _ | Abs _ | App _ | Struct _ | Leaf
-                    | Constr _ | Tuple _ | Predef _ | Arrow _
-                    | Poly_variant _ | Variant _ | Variant_unboxed _
-                    | Record _ | Proj _
-                    | Comp_unit _ | Alias _ | Error _)
-  | Constr _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Tuple _
-            | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
-            | Variant _ | Variant_unboxed _ | Record _
-            | Proj _ | Comp_unit _ | Alias _ | Error _)
+  | (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _
+    | Alias _ | Error _ | Variant _ | Variant_unboxed _ | Record _
+    | Predef _ | Arrow _ | Poly_variant _ | Tuple _ | Unboxed_tuple _
+    | Constr _), _
     -> false
 
 and equal t1 t2 =
@@ -700,8 +630,6 @@ and equal_poly_variant_constructor
   { pv_constr_name = name2; pv_constr_args = args2 } =
   String.equal name1 name2 &&
   List.equal equal args1 args2
-
-
 
 let rec print fmt t =
   let print_uid_opt =
