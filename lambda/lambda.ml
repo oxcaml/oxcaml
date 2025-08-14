@@ -1424,6 +1424,7 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
     | Bits16 -> Bits16
     | Bits32 -> Bits32
     | Bits64 -> Bits64
+    | Untagged_immediate -> Untagged_immediate
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
@@ -1461,7 +1462,8 @@ let rec transl_address loc = function
         (function
           | Value _ -> true
           | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word | Product _ -> false)
+          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+          | Product _ -> false)
         mixed_blocks
       then
         Lprim(Pfield(pos, Pointer, Reads_agree), [transl_address loc addr], loc)
