@@ -702,3 +702,53 @@
  (action
   (diff tailcall_ir.output tailcall_ir.output.corrected)))
 
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets switch.cmx switch_ir.output.corrected switch.output.exe)
+ (deps switch.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} switch.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (with-outputs-to switch_ir.output.corrected (pipe-outputs (run cat switch.ll) (run ./filter.sh)))
+   (run %{bin:ocamlopt.opt} switch.cmx -opaque -o switch.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps switch.output.exe)
+ (targets switch.output.corrected)
+ (action
+  (with-outputs-to
+   switch.output.corrected
+   (run ./switch.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps switch.output switch.output.corrected)
+ (action
+  (diff switch.output switch.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps switch_ir.output switch_ir.output.corrected)
+ (action
+  (diff switch_ir.output switch_ir.output.corrected)))
+
