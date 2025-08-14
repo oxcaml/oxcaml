@@ -284,8 +284,7 @@ and apply_expr ~env ~res e =
   let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
     | None, _ | _, Effect _ -> failwith "effects not implemented yet"
-    | _, Method _ -> failwith "method calls not implemented yet"
-    | Some callee, Function _ ->
+    | Some callee, (Function _ | Method _) ->
       let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
       let f, res = To_jsir_shared.simple ~env ~res callee in
       (* CR selee: assume exact = false for now, JSIR seems to assume false in
