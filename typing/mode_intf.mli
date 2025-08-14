@@ -182,6 +182,7 @@ module type S = sig
   module Hint : sig
     (** See [print_const] for what each constructor means. *)
     type 'd const =
+      | Nil : ('l * 'r) const
       | Skip : ('l * 'r) const
       | Result_of_lazy : (disallowed * 'r) pos const
       | Lazy_closure : (disallowed * 'r) pos const

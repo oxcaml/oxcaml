@@ -1561,6 +1561,7 @@ satisfies [Solver_intf.Hint]) and mode system users (and thus satisfies
 [Mode_intf.Hint]). *)
 module Hint = struct
   type 'd const =
+    | Nil : ('l * 'r) const
     | Skip : ('l * 'r) const
     | Result_of_lazy : (disallowed * 'r) pos const
     | Lazy_closure : (disallowed * 'r) pos const
@@ -1579,6 +1580,8 @@ module Hint = struct
   let max = Skip
 
   let min = Skip
+
+  let nil = Nil
 
   type lock_item =
     | Value
@@ -1665,7 +1668,8 @@ module Hint = struct
     let open Format in
     let wrap_print_hint t = fprintf ppf "@ because %t" t in
     function
-    | Skip -> Misc.fatal_error "Skip morph hint should not be printed"
+    | Skip -> Misc.fatal_error "Skip hint should not be printed"
+    | Nil -> Misc.fatal_error "Nil hint should not be printed"
     | Result_of_lazy ->
       wrap_print_hint (dprintf "it is the result of a lazy expression")
     | Lazy_closure ->
@@ -1699,8 +1703,8 @@ module Hint = struct
             that don't change the mode value (modulo equating equivalent regionality
             and locality values), and [Skip] should be a non-rigid hint, which should
             mean this case never happens *)
-        assert false
-      | Gap -> assert false
+        Misc.fatal_error "Skip hint should not be printed"
+      | Gap -> Misc.fatal_error "Gap hint should not be printed"
       | Close_over closure ->
         (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
         fprintf ppf "closes over the %a %a (at %a)" print_lock_item
@@ -1775,6 +1779,7 @@ module Hint = struct
       fun (type l r) (h : (allowed * r) const) : (l * r) const ->
        match h with
        | Skip -> Skip
+       | Nil -> Nil
        | Class_comonadic -> Class_comonadic
        | Stack_expression -> Stack_expression
        | Mutable_read -> Mutable_read
@@ -1785,6 +1790,7 @@ module Hint = struct
       fun (type l r) (h : (l * allowed) const) : (l * r) const ->
        match h with
        | Skip -> Skip
+       | Nil -> Nil
        | Class_monadic -> Class_monadic
        | Result_of_lazy -> Result_of_lazy
        | Lazy_closure -> Lazy_closure
@@ -1796,6 +1802,7 @@ module Hint = struct
       fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
        match h with
        | Skip -> Skip
+       | Nil -> Nil
        | Result_of_lazy -> Result_of_lazy
        | Lazy_closure -> Lazy_closure
        | Class_comonadic -> Class_comonadic
@@ -1812,6 +1819,7 @@ module Hint = struct
       fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
        match h with
        | Skip -> Skip
+       | Nil -> Nil
        | Result_of_lazy -> Result_of_lazy
        | Lazy_closure -> Lazy_closure
        | Class_comonadic -> Class_comonadic
@@ -1848,7 +1856,6 @@ module Axis = C.Axis
 type axhint =
   | Apply : ('l * 'r) Hint.morph * 'b * 'b C.obj * axhint * _ C.morph -> axhint
   | Const : 'd Hint.const -> axhint
-  | Nil : axhint
 [@@ocaml.warning "-62"]
 
 type 'a axerror =
@@ -1935,13 +1942,13 @@ module Axerror = struct
             Hint.print_morph morph_hint;
           ignore (print_axhint_chain side b b_obj b_hint ppf);
           HintPrinted)
+      | Const Nil ->
+        print_mode a_obj ppf a;
+        NothingPrinted
       | Const const_hint ->
         fprintf ppf "%a%a" (print_mode a_obj) a (Hint.print_const a_obj a)
           const_hint;
         HintPrinted
-      | Nil ->
-        print_mode a_obj ppf a;
-        NothingPrinted
      [@@ocaml.warning "-4"]
 
     (** Report an axerror, printing error traces for both the left and the right sides *)
@@ -2135,7 +2142,7 @@ module Axerror = struct
           let morph_inv = conv_side_adj side r_obj morph in
           let rb = apply rb_obj morph_inv r in
           match find_responsible_axis_prod morph ax with
-          | NoneResponsible -> a, Nil
+          | NoneResponsible -> a, Const Nil
           | SourceIsSingle ->
             (* Note that unlike below, the returned [_b] value will be the same as
                the current [b], so we can discard it. *)
@@ -2160,7 +2167,6 @@ module Axerror = struct
               assert false
           in
           shint_to_axhint_prod r_obj chosen chosen_hint ax side
-        | Nil -> a, Nil
 
     and shint_to_axhint_single :
         type a left1 right1 left2 right2.
@@ -2180,7 +2186,7 @@ module Axerror = struct
           let morph_inv = conv_side_adj side a_obj morph in
           let rb = apply rb_obj morph_inv a in
           match find_responsible_axis_single morph with
-          | NoneResponsible -> a, Nil
+          | NoneResponsible -> a, Const Nil
           | SourceIsSingle ->
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
             let _b, b_hint = shint_to_axhint_single rb_obj rb rb_shint side in
@@ -2202,7 +2208,6 @@ module Axerror = struct
               assert false
           in
           shint_to_axhint_single a_obj chosen chosen_hint side
-        | Nil -> a, Nil
 
     let flip_axerror { left; left_hint; right; right_hint } =
       { left = right;
@@ -3723,9 +3728,9 @@ module Modality = struct
               (Error
                  ( ax,
                    { left = Join_with left;
-                     left_hint = Nil;
+                     left_hint = Const Nil;
                      right = Join_with right;
-                     right_hint = Nil
+                     right_hint = Const Nil
                    } ))
 
       let concat ~then_ t =
@@ -3765,9 +3770,9 @@ module Modality = struct
             (Error
                ( ax,
                  { left = Join_with left;
-                   left_hint = Nil;
+                   left_hint = Const Nil;
                    right = Join_with (Axis.proj ax c);
-                   right_hint = Nil
+                   right_hint = Const Nil
                  } )))
       | Diff (_, _m0), Diff (_, _m1) ->
         (* [m1] is a left mode so it cannot appear on the right. So we can't do
@@ -3864,9 +3869,9 @@ module Modality = struct
               (Error
                  ( ax,
                    { left = Meet_with left;
-                     left_hint = Nil;
+                     left_hint = Const Nil;
                      right = Meet_with right;
-                     right_hint = Nil
+                     right_hint = Const Nil
                    } ))
 
       let concat ~then_ t =
@@ -3910,9 +3915,9 @@ module Modality = struct
             (Error
                ( ax,
                  { left = Meet_with left;
-                   left_hint = Nil;
+                   left_hint = Const Nil;
                    right = Meet_with (Axis.proj ax c);
-                   right_hint = Nil
+                   right_hint = Const Nil
                  } )))
       | Exactly (_, _m0), Exactly (_, _m1) ->
         (* [m1] is a left mode, so there is no good way to check.

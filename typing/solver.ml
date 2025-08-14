@@ -35,7 +35,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Branch :
         'a * ('a, 'l * 'r) hint * 'a * ('a, 'l * 'r) hint
         -> ('a, 'l * 'r) hint
-    | Nil : ('a, 'l * 'r) hint
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
@@ -148,7 +147,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       | Apply : ('b, 'a, 'd) Morph_hint.t * ('b, 'd) t -> ('a, 'd) t
       | Const : 'd H.const -> ('a, 'd) t
       | Branch : 'a * ('a, 'l * 'r) t * 'a * ('a, 'l * 'r) t -> ('a, 'l * 'r) t
-      | Nil
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]
 
@@ -162,7 +160,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Const h -> Const (H.Allow_disallow_const.allow_left h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, allow_left a_hint, b, allow_left b_hint)
-        | Nil -> Nil
 
       let rec allow_right : type a l r. (a, l * allowed) t -> (a, l * r) t =
         function
@@ -171,7 +168,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Const h -> Const (H.Allow_disallow_const.allow_right h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, allow_right a_hint, b, allow_right b_hint)
-        | Nil -> Nil
 
       let rec disallow_left : type a l r. (a, l * r) t -> (a, disallowed * r) t
           = function
@@ -180,7 +176,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Const h -> Const (H.Allow_disallow_const.disallow_left h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, disallow_left a_hint, b, disallow_left b_hint)
-        | Nil -> Nil
 
       let rec disallow_right : type a l r. (a, l * r) t -> (a, l * disallowed) t
           = function
@@ -190,7 +185,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Const h -> Const (H.Allow_disallow_const.disallow_right h)
         | Branch (a, a_hint, b, b_hint) ->
           Branch (a, disallow_right a_hint, b, disallow_right b_hint)
-        | Nil -> Nil
     end)
   end
 
@@ -211,7 +205,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Const const_hint -> Const const_hint
     | Branch (x, x_hint, y, y_hint) ->
       Branch (x, flatten x_hint, y, flatten y_hint)
-    | Nil -> Nil
     | Apply (morph_hint, subhint) ->
       let subhint = flatten subhint in
       apply_comp_morph_hint morph_hint subhint
@@ -501,16 +494,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       ( Comp_hint.Morph_hint.Allow_disallow.disallow_left hint,
         Comp_hint.Allow_disallow.disallow_left var.upper_hint )
 
-  let min (type a) (obj : a C.obj) = Amode (C.min obj, Const H.min, Nil)
+  let min (type a) (obj : a C.obj) = Amode (C.min obj, Const H.min, Const H.nil)
 
   let max (type a) (obj : a C.obj) =
-    Amode (C.max obj, Nil, Const (H.Allow_disallow_const.allow_right H.max))
+    Amode
+      (C.max obj, Const H.nil, Const (H.Allow_disallow_const.allow_right H.max))
 
-  let of_const _obj ?hint a =
-    let hint : _ Comp_hint.t =
-      match hint with None -> Nil | Some h -> Const h
-    in
-    Amode (a, hint, hint)
+  let of_const _obj ?(hint = H.nil) a = Amode (a, Const hint, Const hint)
 
   let apply_morphvar dst morph morph_hint (Amorphvar (var, morph', morph'_hint))
       =
@@ -800,9 +790,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let id = !cnt_id in
     cnt_id := id + 1;
     let upper = Option.value upper ~default:(C.max obj) in
-    let upper_hint = Option.value upper_hint ~default:Comp_hint.Nil in
+    let upper_hint = Option.value upper_hint ~default:(Comp_hint.Const H.nil) in
     let lower = Option.value lower ~default:(C.min obj) in
-    let lower_hint = Option.value lower_hint ~default:Comp_hint.Nil in
+    let lower_hint = Option.value lower_hint ~default:(Comp_hint.Const H.nil) in
     let vlower = Option.value vlower ~default:VarMap.empty in
     { upper; upper_hint; lower; lower_hint; vlower; id }
 
@@ -1016,7 +1006,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let ceil = get_ceil obj m in
     (* We want a hint to explain why [ceil] is high. However, we only have hint
        for why [ceil] is low. There is no good hint to use. *)
-    submode obj (Amode (ceil, Nil, Nil)) m ~log |> Result.get_ok;
+    submode obj (Amode (ceil, Const H.nil, Const H.nil)) m ~log |> Result.get_ok;
     ceil
 
   (** Zap [mv] to its lower bound. Returns the [log] of the zapping, in
@@ -1038,7 +1028,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let rec loop lower =
       let log = ref empty_changes in
       (* We want a hint for why [lower] is low, but we only have hint for why [lower] is high. There is no good hint to use. *)
-      let r = submode_mvc ~log:(Some log) obj mv lower Nil in
+      let r = submode_mvc ~log:(Some log) obj mv lower (Const H.nil) in
       match r with
       | Ok () -> !log, lower
       | Error (a, _a_hint) ->
@@ -1077,7 +1067,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun _ mv ->
           (* We want a hint for why [floor] is low. However, we only have hint
              for why [floor] is high. There is no hint to use. *)
-          submode_mvc obj mv floor Nil ~log |> Result.get_ok)
+          submode_mvc obj mv floor (Const H.nil) ~log |> Result.get_ok)
         mvs;
       floor
 

@@ -189,7 +189,6 @@ module type Solver_mono = sig
         'a * ('a, 'l * 'r) hint * 'a * ('a, 'l * 'r) hint
         -> ('a, 'l * 'r) hint
         (** [Branch a0 a0_hint a1 a1_hint] says the current bound is jointly explained by either [a0] (explained by [a0_hint]) or [a1] (explaiend by [a1_hint]) (or both) *)
-    | Nil : ('a, 'l * 'r) hint
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
@@ -347,11 +346,14 @@ module type Hint = sig
     constant can be on the LHS or RHS of submode. *)
   type 'd const constraint 'd = 'l * 'r
 
-  (** The hint for top on the RHS of submode. *)
+  (** The hint to explain using top on the RHS of submode. *)
   val max : (disallowed * 'r) const
 
-  (** The hint for bottom on the LHS of submode. *)
+  (** The hint to explain using bottom on the LHS of submode. *)
   val min : ('l * disallowed) const
+
+  (** The hint for unexplained constants *)
+  val nil : ('l * 'r) const
 
   (** Hints describing the reasons for morphisms applied to modes.
       The type parameter gives the allowance of the hint, which should correspond
