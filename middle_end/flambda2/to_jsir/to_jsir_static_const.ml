@@ -30,15 +30,13 @@ let block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
   if all_consts && not (Mutability.is_mutable mut)
   then
     let values =
-      List.map
-        (fun x ->
+      ListLabels.map fields ~f:(fun x ->
           match Simple.must_be_const x with
+          | Some const -> To_jsir_shared.reg_width_const const
           | None ->
             Misc.fatal_error
               "Found a non-constant in a Simple.t, even though we check that \
-               all values are constants"
-          | Some const -> To_jsir_shared.reg_width_const const)
-        fields
+               all values are constants")
       |> Array.of_list
     in
     To_jsir_shared.bind_expr_to_symbol ~env ~res symbol
