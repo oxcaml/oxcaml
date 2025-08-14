@@ -661,23 +661,6 @@ and transl_structure ~scopes loc fields sorts cc rootpath final_env = function
          * Also, I doubt here is the best place to put this function. Any
          * suggestions for where I should put it?
          * Also rename. It does not return a shape. *)
-        let rec shape_of_sort : Jkind.Sort.Const.t
-                              -> Types.mixed_block_element =
-          function
-          | Base Void -> fatal_error "Translmod.transl_structure: \
-            tried to convert Void to layout"
-          | Base Value -> Value
-          | Base Bits32 -> Bits32
-          | Base Bits64 -> Bits64
-          | Base Float32 -> Float32
-          | Base Float64 -> Float64
-          | Base Vec128 -> Vec128
-          | Base Vec256 -> Vec256
-          | Base Vec512 -> Vec512
-          | Base Word -> Word
-          | Product sorts ->
-            Product (Array.map shape_of_sort (Array.of_list sorts))
-        in
         let block_of ~shape =
           if Array.for_all (equal_mixed_block_element Value) shape
           then Pmakeblock(0, Immutable, None, alloc_heap)
@@ -689,7 +672,9 @@ and transl_structure ~scopes loc fields sorts cc rootpath final_env = function
             in
             Pmakemixedblock(0, Immutable, shape, alloc_heap)
         in
-        let shape = Array.map shape_of_sort (Array.of_list (List.rev sorts)) in
+        let shape =
+          Array.map mixed_block_of_sort (Array.of_list (List.rev sorts))
+        in
         match cc with
           Tcoerce_none ->
             Lprim(block_of ~shape,
@@ -711,7 +696,7 @@ and transl_structure ~scopes loc fields sorts cc rootpath final_env = function
               if pos < 0 then Lambda.layout_module_field
               else Lambda.layout_of_mixed_block_element
                 (Lambda.transl_mixed_block_element
-                  (shape_of_sort sort_v.(pos)))
+                  (mixed_block_of_sort sort_v.(pos)))
             in
             let ids = List.fold_right Ident.Set.add fields Ident.Set.empty in
             let lam =
@@ -941,7 +926,7 @@ and transl_structure ~scopes loc fields sorts cc rootpath final_env = function
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
-              let rec rebind_idents pos newfields newsorts= function
+              let rec rebind_idents pos newfields newsorts = function
                   [] -> transl_structure
                           ~scopes loc newfields newsorts cc rootpath
                           final_env rem
