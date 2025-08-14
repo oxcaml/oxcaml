@@ -93,12 +93,12 @@ module F = struct
       (pp_strings pp_space) targets (pp_strings pp_space) deps
       (pp_strings pp_newline) task_rules
 
-  let pp_run_exe_rule ppf ~deps ~output =
+  let pp_run_exe_rule ppf ~output =
     fprintf ppf
       {|(rule
  ${enabled_if}
  (alias runtest-llvmize)
- (deps %a)
+ (deps %s.exe)
  (targets %s.corrected)
  (action
   (with-outputs-to
@@ -106,7 +106,7 @@ module F = struct
    (run ./%s.exe))))
 
 |}
-      (pp_strings pp_space) deps output output output
+      output output output output
 
   let pp_compare_output_rule ppf ~output =
     fprintf ppf
@@ -143,8 +143,8 @@ module F = struct
     pp_compile_rule ppf ~deps ~targets ~task_rules;
     (match run_args with
     | None -> ()
-    | Some (deps, output) ->
-      pp_run_exe_rule ppf ~deps ~output;
+    | Some (_, output) ->
+      pp_run_exe_rule ppf ~output;
       pp_compare_output_rule ppf ~output);
     List.iter
       (function
@@ -207,6 +207,10 @@ let print_test ~extra_subst ~run ~tasks ~buf =
   in
   print_rule ~extra_subst ~buf rule_template
 
+let ocaml_llvm_and_output_ir name =
+  [ Ocaml_llvm { filename = name; stop_after_llvmize = false };
+    Output_ir { source = name; output = name ^ "_ir" } ]
+
 let () =
   let buf = Buffer.create 1000 in
   let print_test_ir_only name =
@@ -218,10 +222,7 @@ let () =
   let print_test_ir_and_run name =
     let main_name = name ^ "_main" in
     print_test ~extra_subst:[] ~buf ~run:(Some name)
-      ~tasks:
-        [ Ocaml_llvm { filename = name; stop_after_llvmize = false };
-          Output_ir { source = name; output = name ^ "_ir" };
-          Ocaml_default main_name ]
+      ~tasks:(ocaml_llvm_and_output_ir name @ [Ocaml_default main_name])
   in
   let print_test_ir_and_run_with_dep ~extra_dep_suffix
       ?(extra_dep_with_llvm_backend = false) name =
@@ -229,13 +230,13 @@ let () =
     let main_name = name ^ "_main" in
     print_test ~extra_subst:[] ~buf ~run:(Some name)
       ~tasks:
-        [ (if extra_dep_with_llvm_backend
-          then
-            Ocaml_llvm { filename = extra_dep_name; stop_after_llvmize = false }
-          else Ocaml_default extra_dep_name);
-          Ocaml_llvm { filename = name; stop_after_llvmize = false };
-          Output_ir { source = name; output = name ^ "_ir" };
-          Ocaml_default main_name ]
+        ([ (if extra_dep_with_llvm_backend
+           then
+             Ocaml_llvm
+               { filename = extra_dep_name; stop_after_llvmize = false }
+           else Ocaml_default extra_dep_name) ]
+        @ ocaml_llvm_and_output_ir name
+        @ [Ocaml_default main_name])
   in
   let print_test_c ~c_suffix name =
     let c_name = name ^ "_" ^ c_suffix in
@@ -249,14 +250,16 @@ let () =
   in
   let print_test_run_no_main name =
     print_test ~extra_subst:[] ~buf ~run:(Some name)
-      ~tasks:
-        [ Ocaml_llvm { filename = name; stop_after_llvmize = false };
-          Output_ir { source = name; output = name ^ "_ir" } ]
+      ~tasks:(ocaml_llvm_and_output_ir name)
   in
   print_rule ~extra_subst:[] ~buf F.check_env_rule;
   print_test_ir_only "id_fn";
   print_test_ir_and_run "const_val";
-  print_test_ir_and_run_with_dep ~extra_dep_suffix:"data" "int_ops";
+  print_test ~extra_subst:[] ~buf ~run:(Some "int_ops")
+    ~tasks:
+      ([C "int_ops_stub"; Ocaml_default "int_ops_data"]
+      @ ocaml_llvm_and_output_ir "int_ops"
+      @ [Ocaml_default "int_ops_main"]);
   print_test_ir_and_run_with_dep ~extra_dep_suffix:"data" "gcd";
   print_test_ir_and_run_with_dep ~extra_dep_suffix:"data" "array_rev";
   print_test_ir_and_run "float_ops";
@@ -268,14 +271,10 @@ let () =
   print_test_run_no_main "data_decl";
   print_test ~extra_subst:[] ~buf ~run:(Some "exn")
     ~tasks:
-      [ Ocaml_default "exn_part1";
-        Ocaml_llvm { filename = "exn_part2"; stop_after_llvmize = false };
-        Output_ir { source = "exn_part2"; output = "exn_part2_ir" };
-        Ocaml_default "exn_part3" ];
+      ([Ocaml_default "exn_part1"]
+      @ ocaml_llvm_and_output_ir "exn_part2"
+      @ [Ocaml_default "exn_part3"]);
   print_test_run_no_main "alloc";
   print_test ~extra_subst:[] ~buf ~run:(Some "tailcall")
-    ~tasks:
-      [ Ocaml_default "tailcall2";
-        Ocaml_llvm { filename = "tailcall"; stop_after_llvmize = false };
-        Output_ir { source = "tailcall"; output = "tailcall" ^ "_ir" } ];
+    ~tasks:([Ocaml_default "tailcall2"] @ ocaml_llvm_and_output_ir "tailcall");
   ()

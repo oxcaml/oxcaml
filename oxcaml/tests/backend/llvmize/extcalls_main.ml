@@ -7,4 +7,5 @@ let () =
   Out_channel.flush stdout;
   Format.printf "too_many res: %d\n" too_many_res;
   Out_channel.flush stdout;
-  Extcalls.call_int_and_float ()
+  Extcalls.call_int_and_float ();
+  Extcalls.call_no_return ()
