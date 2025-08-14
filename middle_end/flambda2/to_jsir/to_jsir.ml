@@ -2,8 +2,11 @@ open! Flambda.Import
 
 (* CR selee: we should eventually get rid of these *)
 let unsupported_multiple_return_variables vars =
-  if List.length vars <> 1
-  then Misc.fatal_error "Multiple return variables are currently unsupported."
+  match vars with
+  | [var] -> var
+  | [] -> Misc.fatal_error "Found return statement with no arguments"
+  | _ :: _ ->
+    Misc.fatal_error "Multiple return variables are currently unsupported."
 
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
@@ -108,6 +111,14 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
   expr ~env ~res body
 
 and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
+  (* Flambda exception handlers have [extra_args], which are used to pass in
+     specific instances of mutable values (that become decomposed into many
+     immutable values) to the exception handler.
+
+     Since JSIR Raise only has one argument, we use mutable variables to pass in
+     the extra_args, and make sure that they are set properly before the
+     Apply_cont containing the Exn_handler containing the extra_args is
+     applied. *)
   let make_mutables ~res n =
     let extra_args_boxed = List.init n (fun _ -> Jsir.Var.fresh ()) in
     let res =
@@ -118,7 +129,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
             To_jsir_result.add_instr_exn res (Let (null, Constant Null))
           in
           To_jsir_result.add_instr_exn res
-            (Let (var, Block (0, Array.of_list [null], NotArray, Maybe_mutable))))
+            (Let (var, Block (0, [| null |], NotArray, Maybe_mutable))))
         res extra_args_boxed
     in
     extra_args_boxed, res
@@ -163,10 +174,6 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                       Continuation.print k
                   | hd :: tl -> hd, tl
                 in
-                (* We wrap the [extra_args] into mutable variables, and use
-                   these where the extra_args are used. Later when calling this
-                   continuation, we will make sure that these are assigned to
-                   the right values. *)
                 let extra_args_boxed, res =
                   make_mutables ~res (List.length extra_args)
                 in
@@ -245,7 +252,8 @@ and apply_expr ~env ~res e =
          [Let_cont] and expects zero [extra_args]. *)
       []
     else
-      let _addr, _var, extra_params_vars =
+      let ({ addr = _; exn_param = _; extra_args = extra_params_vars }
+            : To_jsir_env.exn_handler) =
         To_jsir_env.get_exn_handler_exn env
           (Exn_continuation.exn_handler exn_continuation)
       in
@@ -317,11 +325,13 @@ and apply_cont0 ~env ~res apply_cont =
   let get_last ~raise_kind : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
     | Toplevel_return ->
-      if List.length args <> 1
-      then
-        Misc.fatal_error
-          "Tried to apply a Toplevel_return with multiple arguments";
-      let module_symbol = List.hd args in
+      let module_symbol =
+        match args with
+        | [arg] -> arg
+        | [] -> Misc.fatal_error "Found a Toplevel_return with no arguments"
+        | _ :: _ ->
+          Misc.fatal_error "Found a Toplevel_return with multiple arguments"
+      in
       (* CR selee: This is a hack, but I can't find a way to trigger any
          behaviour that isn't calling [caml_register_global] on the toplevel
          module. I suspect for single-file compilation this is always fine. Will
@@ -350,8 +360,8 @@ and apply_cont0 ~env ~res apply_cont =
       in
       Stop, res
     | Return ->
-      unsupported_multiple_return_variables args;
-      Return (List.hd args), res
+      let arg = unsupported_multiple_return_variables args in
+      Return arg, res
     | Normal_or_exn -> (
       match raise_kind with
       | None ->
@@ -367,7 +377,7 @@ and apply_cont0 ~env ~res apply_cont =
         let exn =
           match args with
           | [exn] -> exn
-          | _ ->
+          | ([] | _ :: _) as args ->
             Misc.fatal_errorf
               "Attempting to call the exception continuation %a with %d \
                arguments (should be one)"
@@ -380,7 +390,8 @@ and apply_cont0 ~env ~res apply_cont =
   | None -> get_last ~raise_kind:None
   | Some (Push { exn_handler }) -> (
     let last, res = get_last ~raise_kind:None in
-    let handler_addr, handler_var, _extra_args =
+    let ({ addr = handler_addr; exn_param = handler_var; extra_args = _ }
+          : To_jsir_env.exn_handler) =
       To_jsir_env.get_exn_handler_exn env exn_handler
     in
     match last with
@@ -396,6 +407,9 @@ and apply_cont0 ~env ~res apply_cont =
       assert (Option.is_some raise_kind);
       last, res)
     else
+      (* [Jsir.Poptrap] always jumps to a block after popping the exception
+         handler. If we want to do anything than just [Branch], we should jump
+         to a new block that actually does the thing we want. *)
       match last with
       | Branch cont -> Jsir.Poptrap cont, res
       | Return _ | Raise _ | Stop | Cond _ | Switch _ | Pushtrap _ | Poptrap _
