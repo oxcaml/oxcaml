@@ -770,16 +770,16 @@ and transl_structure ~scopes loc
           let mk_lam_let =
             transl_let ~scopes ~return_layout:Lambda.layout_module_field
               ~in_structure:true rec_flag pat_expr_list
-              (* CR jrayman: change [layout_module_field] *)
+              (* CR jrayman for reviewer: change [layout_module_field]? *)
           in
           let ext_fields =
             List.rev_append
               (pat_expr_list
-              (* CR jrayman: is this right? *)
+              (* CR jrayman: write [let_bound_idents_with_sorts] after
+                 refactor *)
                 |> let_bound_idents_with_modes_sorts_and_checks
                 |> List.map
                     (fun (id, l, _) ->
-                      (* CR jrayman: [List.hd] is odd here *)
                       let _, _, sort = List.hd l in
                       let shape =
                         sort |> Jkind.Sort.default_for_transl_and_get
@@ -1691,7 +1691,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
     try
       let (pos, cc) = Ident.find_same id map in
       let init_val = apply_coercion loc Alias cc (Lvar id) in
-      Lprim(mod_setfield pos,
+      Lprim(mod_setfield pos (Module_value_only (-1)),
             [Lprim(Pgetglobal glob, [], loc); init_val],
             loc)
     with Not_found ->
@@ -1719,7 +1719,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
     List.fold_right (add_ident may_coerce) idlist subst
 
   and store_primitive (pos, prim) cont =
-    Lsequence(Lprim(mod_setfield pos,
+    Lsequence(Lprim(mod_setfield pos (Module_value_only (-1)),
                     [Lprim(Pgetglobal glob, [], Loc_unknown);
                      Translprim.transl_primitive Loc_unknown
                        prim.pc_desc prim.pc_env prim.pc_type
@@ -1732,7 +1732,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
   and store_alias (pos, env, path, cc) =
     let path_lam = transl_module_path Loc_unknown env path in
     let init_val = apply_coercion Loc_unknown Strict cc path_lam in
-    Lprim(mod_setfield pos,
+    Lprim(mod_setfield pos (Module_value_only (-1)),
           [Lprim(Pgetglobal glob, [], Loc_unknown);
            init_val],
           Loc_unknown)
@@ -1813,7 +1813,8 @@ let store_arg_block_with_module_block
   let arg_field = size in
   let new_size = size + 1 in
   let set_arg_block =
-    Lprim(mod_setfield arg_field, [glob; Lvar arg_block_id], Loc_unknown)
+    Lprim(mod_setfield arg_field (Module_value_only (-1)),
+          [glob; Lvar arg_block_id], Loc_unknown)
   in
   let lam =
     Lsequence(set_primary_fields,
@@ -2162,7 +2163,7 @@ let transl_package_set_fields component_names target_name coercion =
       (Module_value_only (List.length component_names), (* CR jrayman: wrong *)
        make_sequence
          (fun pos id ->
-           Lprim(mod_setfield pos,
+           Lprim(mod_setfield pos (Module_value_only (-1)),
                  [Lprim(Pgetglobal target_name, [], Loc_unknown);
                   get_component id],
                  Loc_unknown))
@@ -2180,7 +2181,7 @@ let transl_package_set_fields component_names target_name coercion =
              apply_coercion Loc_unknown Strict coercion components,
              make_sequence
                (fun pos _id ->
-                 Lprim(mod_setfield pos,
+                 Lprim(mod_setfield pos (Module_value_only (-1)),
                        [Lprim(Pgetglobal target_name, [], Loc_unknown);
                         Lprim(mod_field pos (Module_value_only (-1)),
                           [Lvar blk], Loc_unknown)],
