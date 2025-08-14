@@ -859,6 +859,15 @@ and type_origin =
   | Rec_check_regularity       (* See Typedecl.transl_type_decl *)
   | Existential of string
 
+(* The structure of a module block. This is distinct from
+   [Types.record_representation] since, e.g., modules don't support the float
+   block optimization. *)
+and module_representation =
+  | Module_value_only of int
+  (* All module fields are boxed. The [int] is the number of fields *)
+  | Module_mixed of mixed_product_shape
+  (* The module contains both values and unboxed elements *)
+
 and record_representation =
   | Record_unboxed
   | Record_inlined of tag * constructor_representation * variant_representation
@@ -1194,6 +1203,17 @@ type record_form_packed =
   | P : _ record_form -> record_form_packed
 
 val record_form_to_string : _ record_form -> string
+
+val module_representation_of_mixed_product_shape :
+  mixed_product_shape -> module_representation
+
+val mixed_block_element_of_const_sort :
+  Jkind_types.Sort.Const.t -> mixed_block_element
+
+val mixed_block_element_for_type_extension : mixed_block_element
+val mixed_block_element_for_exception : mixed_block_element
+val mixed_block_element_for_module : mixed_block_element
+val mixed_block_element_for_class : mixed_block_element
 
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that
