@@ -61,16 +61,13 @@ let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
   | Cpu_relax -> use_prim' (Extern "caml_ml_domain_cpu_relax")
 
 let get_tag ~env ~res x =
-  let var = Jsir.Var.fresh () in
-  let expr : Jsir.expr =
-    match prim_arg ~env x with
-    | Pv v -> Field (v, 0, Non_float)
-    | Pc _ -> Misc.fatal_error "Get_tag on constant"
-  in
-  var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
+  use_prim ~env ~res (Extern "%direct_obj_tag") [prim_arg ~env x]
 
 let check_tag ~env ~res x ~tag =
   let tag_var, env, res = get_tag ~env ~res x in
+  let tag_var =
+    match tag_var with None -> failwith "iii" | Some tag_var -> tag_var
+  in
   let expr : Jsir.expr =
     Prim (Eq, [Pv tag_var; Pc (Int (Targetint.of_int tag))])
   in
@@ -110,16 +107,15 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     use_prim' (Extern "caml_obj_dup")
   | Is_int _ -> use_prim' IsInt
   | Is_null -> use_prim ~env ~res Eq [prim_arg ~env x; Pc Null]
-  | Get_tag ->
-    let var, env, res = get_tag ~env ~res x in
-    Some var, env, res
+  | Get_tag -> get_tag ~env ~res x
   | Array_length _ -> use_prim' Vectlength
   | Bigarray_length { dimension } ->
     use_prim ~env ~res (Extern "caml_ba_dim")
       [prim_arg ~env x; Pc (Int (Targetint.of_int dimension))]
   | String_length _ -> use_prim' (Extern "caml_ml_string_length")
   | Int_as_pointer _ -> use_prim' (Extern "caml_int_as_pointer")
-  | Opaque_identity { middle_end_only = _; kind = _ } ->
+  | Opaque_identity { middle_end_only = true; kind = _ } -> identity ~env ~res x
+  | Opaque_identity { middle_end_only = false; kind : Flambda_kind.t = _ } ->
     (* CR selee: treating these as the identity for now *)
     identity ~env ~res x
   | Int_arith (kind, op) ->
