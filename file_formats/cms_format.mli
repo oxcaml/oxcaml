@@ -69,3 +69,5 @@ val register_toplevel_attributes :
 val read_magic_number : in_channel -> string
 
 val clear : unit -> unit
+
+val shape_format_to_string : Clflags.shape_format -> string

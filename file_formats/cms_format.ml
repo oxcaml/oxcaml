@@ -149,3 +149,8 @@ let save_cms target modname binary_annots initial_env shape
   end
 
 let clear () = ()
+
+let shape_format_to_string =
+  function
+  | Clflags.Old_merlin -> "old-merlin"
+  | Clflags.Debugging_shapes -> "debugging-shapes"
