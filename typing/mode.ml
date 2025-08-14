@@ -23,6 +23,283 @@ open Mode_intf
 let print_longident =
   ref (fun _ _ -> assert false : Format.formatter -> Longident.t -> unit)
 
+(** Contains everything wrt mode hints, to be used by the solver (and thus
+satisfies [Solver_intf.Hint]) and mode system users (and thus satisfies
+[Mode_intf.Hint]). *)
+module Hint = struct
+  type 'd const =
+    | Nil : ('l * 'r) const
+    | Skip : ('l * 'r) const
+    | Result_of_lazy : (disallowed * 'r) pos const
+    | Lazy_closure : (disallowed * 'r) pos const
+    | Class_monadic : ('l * disallowed) neg const
+    | Class_comonadic : ('l * disallowed) pos const
+    | Tailcall_function : (disallowed * 'r) pos const
+    | Tailcall_argument : (disallowed * 'r) pos const
+    | Mutable_read : (disallowed * 'r) neg const
+    | Mutable_write : (disallowed * 'r) neg const
+    | Forced_lazy_expression : (disallowed * 'r) neg const
+    | Is_function_return : (disallowed * 'r) pos const
+    | Stack_expression : ('l * disallowed) pos const
+    constraint 'd = _ * _
+  [@@ocaml.warning "-62"]
+
+  let max = Skip
+
+  let min = Skip
+
+  let nil = Nil
+
+  type lock_item =
+    | Value
+    | Module
+    | Class
+
+  let print_lock_item ppf =
+    let open Format in
+    function
+    | Module -> fprintf ppf "module"
+    | Class -> fprintf ppf "class"
+    | Value -> fprintf ppf "value"
+
+  type closure_context =
+    | Function
+    | Functor
+    | Lazy
+
+  let print_closure_context ppf =
+    let open Format in
+    function
+    | Function -> fprintf ppf "function"
+    | Functor -> fprintf ppf "functor"
+    | Lazy -> fprintf ppf "lazy expression"
+
+  type closure_details =
+    { closure_context : closure_context;
+      value_loc : Location.t;
+      value_lid : Longident.t;
+      value_item : lock_item
+    }
+
+  type 'd morph =
+    | Gap : ('l * 'r) morph
+    | Skip : ('l * 'r) morph
+    | Close_over : closure_details -> ('l * disallowed) morph
+    | Is_closed_by : closure_details -> (disallowed * 'r) morph
+    | Captured_by_partial_application : (disallowed * 'r) morph
+    | Adj_captured_by_partial_application : ('l * disallowed) morph
+    | Crossing : ('l * 'r) morph
+    | Register_alloc_mode : ('l * 'r) morph
+
+  type 'd neg_const = 'd neg const constraint 'd = _ * _
+
+  type 'd pos_const = 'd pos const constraint 'd = _ * _
+
+  type 'd neg_morph = 'd neg morph constraint 'd = _ * _
+
+  type 'd pos_morph = 'd pos morph constraint 'd = _ * _
+
+  let id = Skip
+
+  let gap = Gap
+
+  let is_rigid : type l r. (l * r) morph -> bool = function
+    | Gap -> assert false
+    | Close_over _ | Is_closed_by _ | Captured_by_partial_application
+    | Adj_captured_by_partial_application ->
+      true
+    | Skip | Crossing | Register_alloc_mode -> false
+
+  let left_adjoint : type l. (l * allowed) morph -> (allowed * disallowed) morph
+      = function
+    | Skip -> Skip
+    | Gap -> Gap
+    | Is_closed_by x -> Close_over x
+    | Captured_by_partial_application -> Adj_captured_by_partial_application
+    | Crossing -> Crossing
+    | Register_alloc_mode -> Register_alloc_mode
+
+  let right_adjoint :
+      type r. (allowed * r) morph -> (disallowed * allowed) morph = function
+    | Skip -> Skip
+    | Gap -> Gap
+    | Close_over x -> Is_closed_by x
+    | Adj_captured_by_partial_application -> Captured_by_partial_application
+    | Crossing -> Crossing
+    | Register_alloc_mode -> Register_alloc_mode
+
+  (** Print out the text for a constant hint. Either prints nothing when there is
+  no hint and returns [NothingPrinted] or prints " because {hint}" where {hint}
+  is text for the specific constant hint and returns [HintPrinted]. *)
+  let print_const (type l r) print_a ppf : (l * r) const -> unit =
+    let open Format in
+    let wrap_print_hint t = fprintf ppf "@ because %t" t in
+    function
+    | Skip -> Misc.fatal_error "Skip hint should not be printed"
+    | Nil -> Misc.fatal_error "Nil hint should not be printed"
+    | Result_of_lazy ->
+      wrap_print_hint (dprintf "it is the result of a lazy expression")
+    | Lazy_closure ->
+      wrap_print_hint (dprintf "lazy expressions are always %t" print_a)
+    | Class_monadic | Class_comonadic ->
+      wrap_print_hint (dprintf "classes are always %t" print_a)
+    | Tailcall_function ->
+      wrap_print_hint (dprintf "it is the function in a tail call")
+    | Tailcall_argument ->
+      wrap_print_hint (dprintf "it is an argument in a tail call")
+    | Mutable_read ->
+      wrap_print_hint (dprintf "it has a mutable field read from")
+    | Mutable_write ->
+      wrap_print_hint (dprintf "it has a mutable field written to")
+    | Forced_lazy_expression ->
+      wrap_print_hint (dprintf "it is a lazy expression that is forced")
+    | Is_function_return ->
+      wrap_print_hint
+        (dprintf
+           "it is a function return value.@\n\
+            Hint: Use exclave_ to return a local value.")
+    | Stack_expression -> wrap_print_hint (dprintf "it is a stack expression")
+
+  let print_morph : type l r. Format.formatter -> (l * r) morph -> unit =
+    let open Format in
+    fun ppf hint ->
+      match hint with
+      | Skip ->
+        (* [Skip] should never be printed as it should only be used with morphisms
+            that don't change the mode value (modulo equating equivalent regionality
+            and locality values), and [Skip] should be a non-rigid hint, which should
+            mean this case never happens *)
+        Misc.fatal_error "Skip hint should not be printed"
+      | Gap -> Misc.fatal_error "Gap hint should not be printed"
+      | Close_over closure ->
+        (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
+        fprintf ppf "closes over the %a %a (at %a)" print_lock_item
+          closure.value_item
+          (Misc.Style.as_inline_code !print_longident)
+          closure.value_lid Location.print_loc closure.value_loc
+      | Is_closed_by closure ->
+        fprintf ppf "is used inside a %a" print_closure_context
+          closure.closure_context
+      | Captured_by_partial_application ->
+        fprintf ppf "is captured by a partial application"
+      | Adj_captured_by_partial_application ->
+        fprintf ppf "has a partial application capturing a value"
+      | Crossing -> fprintf ppf "crosses with something"
+      | Register_alloc_mode -> fprintf ppf "is has an allocation"
+
+  module Morph = Magic_allow_disallow (struct
+    type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
+
+    let allow_left : type l r. (allowed * r) morph -> (l * r) morph =
+      fun (type l r) (h : (allowed * r) morph) : (l * r) morph ->
+       match h with
+       | Skip -> Skip
+       | Gap -> Gap
+       | Close_over x -> Close_over x
+       | Adj_captured_by_partial_application ->
+         Adj_captured_by_partial_application
+       | Crossing -> Crossing
+       | Register_alloc_mode -> Register_alloc_mode
+
+    let allow_right : type l r. (l * allowed) morph -> (l * r) morph =
+      fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
+       match h with
+       | Skip -> Skip
+       | Gap -> Gap
+       | Is_closed_by x -> Is_closed_by x
+       | Captured_by_partial_application -> Captured_by_partial_application
+       | Crossing -> Crossing
+       | Register_alloc_mode -> Register_alloc_mode
+
+    let disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
+      fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
+       match h with
+       | Skip -> Skip
+       | Gap -> Gap
+       | Close_over x -> Close_over x
+       | Is_closed_by x -> Is_closed_by x
+       | Captured_by_partial_application -> Captured_by_partial_application
+       | Adj_captured_by_partial_application ->
+         Adj_captured_by_partial_application
+       | Crossing -> Crossing
+       | Register_alloc_mode -> Register_alloc_mode
+
+    let disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
+      fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
+       match h with
+       | Skip -> Skip
+       | Gap -> Gap
+       | Close_over x -> Close_over x
+       | Is_closed_by x -> Is_closed_by x
+       | Captured_by_partial_application -> Captured_by_partial_application
+       | Adj_captured_by_partial_application ->
+         Adj_captured_by_partial_application
+       | Crossing -> Crossing
+       | Register_alloc_mode -> Register_alloc_mode
+  end)
+
+  module Const = Magic_allow_disallow (struct
+    type (_, _, 'd) sided = 'd const constraint 'd = 'l * 'r
+
+    let allow_left : type l r. (allowed * r) const -> (l * r) const =
+      fun (type l r) (h : (allowed * r) const) : (l * r) const ->
+       match h with
+       | Skip -> Skip
+       | Nil -> Nil
+       | Class_comonadic -> Class_comonadic
+       | Stack_expression -> Stack_expression
+       | Mutable_read -> Mutable_read
+       | Mutable_write -> Mutable_write
+       | Forced_lazy_expression -> Forced_lazy_expression
+
+    let allow_right : type l r. (l * allowed) const -> (l * r) const =
+      fun (type l r) (h : (l * allowed) const) : (l * r) const ->
+       match h with
+       | Skip -> Skip
+       | Nil -> Nil
+       | Class_monadic -> Class_monadic
+       | Result_of_lazy -> Result_of_lazy
+       | Lazy_closure -> Lazy_closure
+       | Tailcall_function -> Tailcall_function
+       | Tailcall_argument -> Tailcall_argument
+       | Is_function_return -> Is_function_return
+
+    let disallow_left : type l r. (l * r) const -> (disallowed * r) const =
+      fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
+       match h with
+       | Skip -> Skip
+       | Nil -> Nil
+       | Result_of_lazy -> Result_of_lazy
+       | Lazy_closure -> Lazy_closure
+       | Class_comonadic -> Class_comonadic
+       | Class_monadic -> Class_monadic
+       | Tailcall_function -> Tailcall_function
+       | Tailcall_argument -> Tailcall_argument
+       | Mutable_read -> Mutable_read
+       | Mutable_write -> Mutable_write
+       | Forced_lazy_expression -> Forced_lazy_expression
+       | Is_function_return -> Is_function_return
+       | Stack_expression -> Stack_expression
+
+    let disallow_right : type l r. (l * r) const -> (l * disallowed) const =
+      fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
+       match h with
+       | Skip -> Skip
+       | Nil -> Nil
+       | Result_of_lazy -> Result_of_lazy
+       | Lazy_closure -> Lazy_closure
+       | Class_comonadic -> Class_comonadic
+       | Class_monadic -> Class_monadic
+       | Tailcall_function -> Tailcall_function
+       | Tailcall_argument -> Tailcall_argument
+       | Mutable_read -> Mutable_read
+       | Mutable_write -> Mutable_write
+       | Forced_lazy_expression -> Forced_lazy_expression
+       | Is_function_return -> Is_function_return
+       | Stack_expression -> Stack_expression
+  end)
+end
+
 type nonrec allowed = allowed
 
 type nonrec disallowed = disallowed
@@ -1555,285 +1832,6 @@ module Lattices_mono = struct
 end
 
 module C = Lattices_mono
-
-(** Contains everything wrt mode hints, to be used by the solver (and thus
-satisfies [Solver_intf.Hint]) and mode system users (and thus satisfies
-[Mode_intf.Hint]). *)
-module Hint = struct
-  type 'd const =
-    | Nil : ('l * 'r) const
-    | Skip : ('l * 'r) const
-    | Result_of_lazy : (disallowed * 'r) pos const
-    | Lazy_closure : (disallowed * 'r) pos const
-    | Class_monadic : ('l * disallowed) neg const
-    | Class_comonadic : ('l * disallowed) pos const
-    | Tailcall_function : (disallowed * 'r) pos const
-    | Tailcall_argument : (disallowed * 'r) pos const
-    | Mutable_read : (disallowed * 'r) neg const
-    | Mutable_write : (disallowed * 'r) neg const
-    | Forced_lazy_expression : (disallowed * 'r) neg const
-    | Is_function_return : (disallowed * 'r) pos const
-    | Stack_expression : ('l * disallowed) pos const
-    constraint 'd = _ * _
-  [@@ocaml.warning "-62"]
-
-  let max = Skip
-
-  let min = Skip
-
-  let nil = Nil
-
-  type lock_item =
-    | Value
-    | Module
-    | Class
-
-  let print_lock_item ppf =
-    let open Format in
-    function
-    | Module -> fprintf ppf "module"
-    | Class -> fprintf ppf "class"
-    | Value -> fprintf ppf "value"
-
-  type closure_context =
-    | Function
-    | Functor
-    | Lazy
-
-  let print_closure_context ppf =
-    let open Format in
-    function
-    | Function -> fprintf ppf "function"
-    | Functor -> fprintf ppf "functor"
-    | Lazy -> fprintf ppf "lazy expression"
-
-  type closure_details =
-    { closure_context : closure_context;
-      value_loc : Location.t;
-      value_lid : Longident.t;
-      value_item : lock_item
-    }
-
-  type 'd morph =
-    | Gap : ('l * 'r) morph
-    | Skip : ('l * 'r) morph
-    | Close_over : closure_details -> ('l * disallowed) morph
-    | Is_closed_by : closure_details -> (disallowed * 'r) morph
-    | Captured_by_partial_application : (disallowed * 'r) morph
-    | Adj_captured_by_partial_application : ('l * disallowed) morph
-    | Crossing : ('l * 'r) morph
-    | Register_alloc_mode : ('l * 'r) morph
-
-  type 'd neg_const = 'd neg const constraint 'd = _ * _
-
-  type 'd pos_const = 'd pos const constraint 'd = _ * _
-
-  type 'd neg_morph = 'd neg morph constraint 'd = _ * _
-
-  type 'd pos_morph = 'd pos morph constraint 'd = _ * _
-
-  let id = Skip
-
-  let gap = Gap
-
-  let is_rigid : type l r. (l * r) morph -> bool = function
-    | Gap -> assert false
-    | Close_over _ | Is_closed_by _ | Captured_by_partial_application
-    | Adj_captured_by_partial_application ->
-      true
-    | Skip | Crossing | Register_alloc_mode -> false
-
-  let left_adjoint : type l. (l * allowed) morph -> (allowed * disallowed) morph
-      = function
-    | Skip -> Skip
-    | Gap -> Gap
-    | Is_closed_by x -> Close_over x
-    | Captured_by_partial_application -> Adj_captured_by_partial_application
-    | Crossing -> Crossing
-    | Register_alloc_mode -> Register_alloc_mode
-
-  let right_adjoint :
-      type r. (allowed * r) morph -> (disallowed * allowed) morph = function
-    | Skip -> Skip
-    | Gap -> Gap
-    | Close_over x -> Is_closed_by x
-    | Adj_captured_by_partial_application -> Captured_by_partial_application
-    | Crossing -> Crossing
-    | Register_alloc_mode -> Register_alloc_mode
-
-  (** Print out the text for a constant hint. Either prints nothing when there is
-  no hint and returns [NothingPrinted] or prints " because {hint}" where {hint}
-  is text for the specific constant hint and returns [HintPrinted]. *)
-  let print_const (type l r) a_obj a ppf : (l * r) const -> unit =
-    let open Format in
-    let wrap_print_hint t = fprintf ppf "@ because %t" t in
-    function
-    | Skip -> Misc.fatal_error "Skip hint should not be printed"
-    | Nil -> Misc.fatal_error "Nil hint should not be printed"
-    | Result_of_lazy ->
-      wrap_print_hint (dprintf "it is the result of a lazy expression")
-    | Lazy_closure ->
-      wrap_print_hint
-        (dprintf "lazy expressions are always %a" (C.print a_obj) a)
-    | Class_monadic | Class_comonadic ->
-      wrap_print_hint (dprintf "classes are always %a" (C.print a_obj) a)
-    | Tailcall_function ->
-      wrap_print_hint (dprintf "it is the function in a tail call")
-    | Tailcall_argument ->
-      wrap_print_hint (dprintf "it is an argument in a tail call")
-    | Mutable_read ->
-      wrap_print_hint (dprintf "it has a mutable field read from")
-    | Mutable_write ->
-      wrap_print_hint (dprintf "it has a mutable field written to")
-    | Forced_lazy_expression ->
-      wrap_print_hint (dprintf "it is a lazy expression that is forced")
-    | Is_function_return ->
-      wrap_print_hint
-        (dprintf
-           "it is a function return value.@\n\
-            Hint: Use exclave_ to return a local value.")
-    | Stack_expression -> wrap_print_hint (dprintf "it is a stack expression")
-
-  let print_morph : type l r. Format.formatter -> (l * r) morph -> unit =
-    let open Format in
-    fun ppf hint ->
-      match hint with
-      | Skip ->
-        (* [Skip] should never be printed as it should only be used with morphisms
-            that don't change the mode value (modulo equating equivalent regionality
-            and locality values), and [Skip] should be a non-rigid hint, which should
-            mean this case never happens *)
-        Misc.fatal_error "Skip hint should not be printed"
-      | Gap -> Misc.fatal_error "Gap hint should not be printed"
-      | Close_over closure ->
-        (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
-        fprintf ppf "closes over the %a %a (at %a)" print_lock_item
-          closure.value_item
-          (Misc.Style.as_inline_code !print_longident)
-          closure.value_lid Location.print_loc closure.value_loc
-      | Is_closed_by closure ->
-        fprintf ppf "is used inside a %a" print_closure_context
-          closure.closure_context
-      | Captured_by_partial_application ->
-        fprintf ppf "is captured by a partial application"
-      | Adj_captured_by_partial_application ->
-        fprintf ppf "has a partial application capturing a value"
-      | Crossing -> fprintf ppf "crosses with something"
-      | Register_alloc_mode -> fprintf ppf "is has an allocation"
-
-  module Morph = Magic_allow_disallow (struct
-    type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
-
-    let allow_left : type l r. (allowed * r) morph -> (l * r) morph =
-      fun (type l r) (h : (allowed * r) morph) : (l * r) morph ->
-       match h with
-       | Skip -> Skip
-       | Gap -> Gap
-       | Close_over x -> Close_over x
-       | Adj_captured_by_partial_application ->
-         Adj_captured_by_partial_application
-       | Crossing -> Crossing
-       | Register_alloc_mode -> Register_alloc_mode
-
-    let allow_right : type l r. (l * allowed) morph -> (l * r) morph =
-      fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
-       match h with
-       | Skip -> Skip
-       | Gap -> Gap
-       | Is_closed_by x -> Is_closed_by x
-       | Captured_by_partial_application -> Captured_by_partial_application
-       | Crossing -> Crossing
-       | Register_alloc_mode -> Register_alloc_mode
-
-    let disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
-      fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
-       match h with
-       | Skip -> Skip
-       | Gap -> Gap
-       | Close_over x -> Close_over x
-       | Is_closed_by x -> Is_closed_by x
-       | Captured_by_partial_application -> Captured_by_partial_application
-       | Adj_captured_by_partial_application ->
-         Adj_captured_by_partial_application
-       | Crossing -> Crossing
-       | Register_alloc_mode -> Register_alloc_mode
-
-    let disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
-      fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
-       match h with
-       | Skip -> Skip
-       | Gap -> Gap
-       | Close_over x -> Close_over x
-       | Is_closed_by x -> Is_closed_by x
-       | Captured_by_partial_application -> Captured_by_partial_application
-       | Adj_captured_by_partial_application ->
-         Adj_captured_by_partial_application
-       | Crossing -> Crossing
-       | Register_alloc_mode -> Register_alloc_mode
-  end)
-
-  module Const = Magic_allow_disallow (struct
-    type (_, _, 'd) sided = 'd const constraint 'd = 'l * 'r
-
-    let allow_left : type l r. (allowed * r) const -> (l * r) const =
-      fun (type l r) (h : (allowed * r) const) : (l * r) const ->
-       match h with
-       | Skip -> Skip
-       | Nil -> Nil
-       | Class_comonadic -> Class_comonadic
-       | Stack_expression -> Stack_expression
-       | Mutable_read -> Mutable_read
-       | Mutable_write -> Mutable_write
-       | Forced_lazy_expression -> Forced_lazy_expression
-
-    let allow_right : type l r. (l * allowed) const -> (l * r) const =
-      fun (type l r) (h : (l * allowed) const) : (l * r) const ->
-       match h with
-       | Skip -> Skip
-       | Nil -> Nil
-       | Class_monadic -> Class_monadic
-       | Result_of_lazy -> Result_of_lazy
-       | Lazy_closure -> Lazy_closure
-       | Tailcall_function -> Tailcall_function
-       | Tailcall_argument -> Tailcall_argument
-       | Is_function_return -> Is_function_return
-
-    let disallow_left : type l r. (l * r) const -> (disallowed * r) const =
-      fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
-       match h with
-       | Skip -> Skip
-       | Nil -> Nil
-       | Result_of_lazy -> Result_of_lazy
-       | Lazy_closure -> Lazy_closure
-       | Class_comonadic -> Class_comonadic
-       | Class_monadic -> Class_monadic
-       | Tailcall_function -> Tailcall_function
-       | Tailcall_argument -> Tailcall_argument
-       | Mutable_read -> Mutable_read
-       | Mutable_write -> Mutable_write
-       | Forced_lazy_expression -> Forced_lazy_expression
-       | Is_function_return -> Is_function_return
-       | Stack_expression -> Stack_expression
-
-    let disallow_right : type l r. (l * r) const -> (l * disallowed) const =
-      fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
-       match h with
-       | Skip -> Skip
-       | Nil -> Nil
-       | Result_of_lazy -> Result_of_lazy
-       | Lazy_closure -> Lazy_closure
-       | Class_comonadic -> Class_comonadic
-       | Class_monadic -> Class_monadic
-       | Tailcall_function -> Tailcall_function
-       | Tailcall_argument -> Tailcall_argument
-       | Mutable_read -> Mutable_read
-       | Mutable_write -> Mutable_write
-       | Forced_lazy_expression -> Forced_lazy_expression
-       | Is_function_return -> Is_function_return
-       | Stack_expression -> Stack_expression
-  end)
-end
-
 module Solver = Solver_mono (Hint) (C)
 module S = Solver
 
@@ -1946,8 +1944,8 @@ module Axerror = struct
         print_mode a_obj ppf a;
         NothingPrinted
       | Const const_hint ->
-        fprintf ppf "%a%a" (print_mode a_obj) a (Hint.print_const a_obj a)
-          const_hint;
+        let print_a ppf = print_mode a_obj ppf a in
+        fprintf ppf "%t%a" print_a (Hint.print_const print_a) const_hint;
         HintPrinted
      [@@ocaml.warning "-4"]
 
