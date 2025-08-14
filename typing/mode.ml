@@ -105,7 +105,8 @@ module Hint = struct
   let gap = Gap
 
   let is_rigid : type l r. (l * r) morph -> bool = function
-    | Gap -> assert false
+    | Gap ->
+      Misc.fatal_error "Gap morph hint should not be checked for rigidity"
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Adj_captured_by_partial_application ->
       true
@@ -2127,7 +2128,7 @@ module Axerror = struct
         (r, left1 * right1) S.hint ->
         (r, a) Axis.t ->
         (left1, right1, left2, right2) conv_side ->
-        a * axhint =
+        axhint =
       let open Lattices_mono in
       fun r_obj r r_shint ax side ->
         (* This function is for when we have a solver hint (aka "shint") for a product lattice and
@@ -2135,7 +2136,6 @@ module Axerror = struct
         (* In this function, [r] refers to the product and [a] refers to a value in an
            axis of [r] *)
         let a_obj = proj_obj ax r_obj in
-        let a = Axis.proj ax r in
         match r_shint with
         | Apply (morph_hint, morph, rb_shint) -> (
           (* In this branch, [rb] refers to the product (or possibly single axis)
@@ -2144,18 +2144,19 @@ module Axerror = struct
           let morph_inv = conv_side_adj side r_obj morph in
           let rb = apply rb_obj morph_inv r in
           match find_responsible_axis_prod morph ax with
-          | NoneResponsible -> a, Const Nil
+          | NoneResponsible -> Const Nil
           | SourceIsSingle ->
             (* Note that unlike below, the returned [_b] value will be the same as
                the current [b], so we can discard it. *)
-            let _b, b_hint = shint_to_axhint_single rb_obj rb rb_shint side in
-            a, Apply (morph_hint, rb, rb_obj, b_hint, morph)
+            let b_hint = shint_to_axhint_single rb_obj rb rb_shint side in
+            Apply (morph_hint, rb, rb_obj, b_hint, morph)
           | Axis b_ax ->
             (* [b] refers to a value in the [b_ax] axis of [rb] *)
-            let b, b_hint = shint_to_axhint_prod rb_obj rb rb_shint b_ax side in
-            let b_obj = C.proj_obj b_ax rb_obj in
-            a, Apply (morph_hint, b, b_obj, b_hint, morph))
-        | Const r_const_hint -> a, Const r_const_hint
+            let b_hint = shint_to_axhint_prod rb_obj rb rb_shint b_ax side in
+            let b = Axis.proj b_ax rb in
+            let b_obj = proj_obj b_ax rb_obj in
+            Apply (morph_hint, b, b_obj, b_hint, morph))
+        | Const r_const_hint -> Const r_const_hint
         | Branch (x, x_hint, y, y_hint) ->
           let x_axval = Axis.proj ax x in
           let y_axval = Axis.proj ax y in
@@ -2176,7 +2177,7 @@ module Axerror = struct
         a ->
         (a, left1 * right1) S.hint ->
         (left1, right1, left2, right2) conv_side ->
-        a * axhint =
+        axhint =
       let open Lattices_mono in
       fun a_obj a a_shint side ->
         (* This function is for when we have a solver hint (aka "shint") for a
@@ -2188,17 +2189,18 @@ module Axerror = struct
           let morph_inv = conv_side_adj side a_obj morph in
           let rb = apply rb_obj morph_inv a in
           match find_responsible_axis_single morph with
-          | NoneResponsible -> a, Const Nil
+          | NoneResponsible -> Const Nil
           | SourceIsSingle ->
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
-            let _b, b_hint = shint_to_axhint_single rb_obj rb rb_shint side in
-            a, Apply (morph_hint, rb, rb_obj, b_hint, morph)
+            let b_hint = shint_to_axhint_single rb_obj rb rb_shint side in
+            Apply (morph_hint, rb, rb_obj, b_hint, morph)
           | Axis b_ax ->
+            let b = Axis.proj b_ax rb in
+            let b_obj = proj_obj b_ax rb_obj in
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
-            let b, b_hint = shint_to_axhint_prod rb_obj rb rb_shint b_ax side in
-            let b_obj = C.proj_obj b_ax rb_obj in
-            a, Apply (morph_hint, b, b_obj, b_hint, morph))
-        | Const a_const_hint -> a, Const a_const_hint
+            let b_hint = shint_to_axhint_prod rb_obj rb rb_shint b_ax side in
+            Apply (morph_hint, b, b_obj, b_hint, morph))
+        | Const a_const_hint -> Const a_const_hint
         | Branch (x, x_hint, y, y_hint) ->
           let chosen, chosen_hint =
             if conv_side_compare side a_obj x y
@@ -2224,17 +2226,11 @@ convert the error to an [axerror] *)
         type r a. r Lattices_mono.obj -> (r, a) Axis.t -> r S.error -> a axerror
         =
      fun r_obj axis { left; left_hint; right; right_hint } ->
-      let left', left'_hint =
-        shint_to_axhint_prod r_obj left left_hint axis Left
-      in
-      let right', right'_hint =
-        shint_to_axhint_prod r_obj right right_hint axis Right
-      in
-      { left = left';
-        left_hint = left'_hint;
-        right = right';
-        right_hint = right'_hint
-      }
+      let left_hint = shint_to_axhint_prod r_obj left left_hint axis Left in
+      let right_hint = shint_to_axhint_prod r_obj right right_hint axis Right in
+      let left = Axis.proj axis left in
+      let right = Axis.proj axis right in
+      { left; left_hint; right; right_hint }
 
     let flipped_solver_error_to_axerror r_obj axis err =
       solver_error_to_axerror r_obj axis err |> flip_axerror
@@ -2243,17 +2239,9 @@ convert the error to an [axerror] *)
     let solver_error_to_axerror_single :
         type a. a Lattices_mono.obj -> a S.error -> a axerror =
      fun a_obj { left; left_hint; right; right_hint } ->
-      let left', left'_hint =
-        shint_to_axhint_single a_obj left left_hint Left
-      in
-      let right', right'_hint =
-        shint_to_axhint_single a_obj right right_hint Right
-      in
-      { left = left';
-        left_hint = left'_hint;
-        right = right';
-        right_hint = right'_hint
-      }
+      let left_hint = shint_to_axhint_single a_obj left left_hint Left in
+      let right_hint = shint_to_axhint_single a_obj right right_hint Right in
+      { left; left_hint; right; right_hint }
 
     let flipped_solver_error_to_axerror_single r_obj err =
       solver_error_to_axerror_single r_obj err |> flip_axerror
