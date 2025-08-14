@@ -1368,6 +1368,14 @@ let multidomain = Actions.make
     "Multidomain enabled"
     "Multidomain disabled")
 
+let stack_checks = Actions.make
+  ~name:"stack-checks"
+  ~description:"Passes if stack checks are enabled"
+  ~does_something:false
+  (Actions_helpers.predicate (not Config.no_stack_checks)
+    "Stack checks enabled"
+    "Stack checks disabled")
+
 let runtime4 = Actions.make
   ~name:"runtime4"
   ~description:"Passes if the OCaml 4.x runtime is being used"
@@ -1600,6 +1608,7 @@ let init () =
     cc;
     ocamlobjinfo;
     multidomain;
+    stack_checks;
     runtime4;
     runtime5
   ]
