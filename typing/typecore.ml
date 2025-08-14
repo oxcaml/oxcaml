@@ -660,7 +660,7 @@ let register_allocation_mode alloc_mode =
 
 let register_allocation_value_mode mode =
   let alloc_mode = value_to_alloc_r2g mode in
-  let mode = value_r2g ~hint:Allocate_right (Value.disallow_left mode) in
+  let mode = value_r2g (Value.disallow_left mode) in
   register_allocation_mode alloc_mode;
   alloc_mode, mode
 

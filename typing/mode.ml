@@ -89,8 +89,6 @@ module Hint = struct
     | Captured_by_partial_application : (disallowed * 'r) morph
     | Adj_captured_by_partial_application : ('l * disallowed) morph
     | Crossing : ('l * 'r) morph
-    | Allocate_left : ('l * disallowed) morph
-    | Allocate_right : (disallowed * 'r) morph
 
   type 'd neg_const = 'd neg const constraint 'd = _ * _
 
@@ -110,7 +108,7 @@ module Hint = struct
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Adj_captured_by_partial_application ->
       true
-    | Skip | Crossing | Allocate_left | Allocate_right -> false
+    | Skip | Crossing -> false
 
   let left_adjoint : type l. (l * allowed) morph -> (allowed * disallowed) morph
       = function
@@ -119,7 +117,6 @@ module Hint = struct
     | Is_closed_by x -> Close_over x
     | Captured_by_partial_application -> Adj_captured_by_partial_application
     | Crossing -> Crossing
-    | Allocate_right -> Allocate_left
 
   let right_adjoint :
       type r. (allowed * r) morph -> (disallowed * allowed) morph = function
@@ -128,7 +125,6 @@ module Hint = struct
     | Close_over x -> Is_closed_by x
     | Adj_captured_by_partial_application -> Captured_by_partial_application
     | Crossing -> Crossing
-    | Allocate_left -> Allocate_right
 
   (** Print out the text for a constant hint. Either prints nothing when there is
   no hint and returns [NothingPrinted] or prints " because {hint}" where {hint}
@@ -187,8 +183,6 @@ module Hint = struct
       | Adj_captured_by_partial_application ->
         fprintf ppf "has a partial application capturing a value"
       | Crossing -> fprintf ppf "crosses with something"
-      | Allocate_left -> fprintf ppf "is an allocation"
-      | Allocate_right -> fprintf ppf "is an allocation"
 
   module Morph = Magic_allow_disallow (struct
     type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
@@ -202,7 +196,6 @@ module Hint = struct
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
        | Crossing -> Crossing
-       | Allocate_left -> Allocate_left
 
     let allow_right : type l r. (l * allowed) morph -> (l * r) morph =
       fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
@@ -212,7 +205,6 @@ module Hint = struct
        | Is_closed_by x -> Is_closed_by x
        | Captured_by_partial_application -> Captured_by_partial_application
        | Crossing -> Crossing
-       | Allocate_right -> Allocate_right
 
     let disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
       fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
@@ -225,8 +217,6 @@ module Hint = struct
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
        | Crossing -> Crossing
-       | Allocate_left -> Allocate_left
-       | Allocate_right -> Allocate_right
 
     let disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
       fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
@@ -239,8 +229,6 @@ module Hint = struct
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
        | Crossing -> Crossing
-       | Allocate_left -> Allocate_left
-       | Allocate_right -> Allocate_right
   end)
 
   module Const = Magic_allow_disallow (struct

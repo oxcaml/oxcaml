@@ -230,8 +230,6 @@ module type S = sig
       | Captured_by_partial_application : (disallowed * 'r) morph
       | Adj_captured_by_partial_application : ('l * disallowed) morph
       | Crossing : ('l * 'r) morph
-      | Allocate_left : ('l * disallowed) morph
-      | Allocate_right : (disallowed * 'r) morph
 
     (* This is needed for the destructive substitutions in [Common_axis] for
        the monadic axis modules, as we can't use [neg] within the substitution due
