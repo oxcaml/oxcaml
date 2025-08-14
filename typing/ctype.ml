@@ -2541,7 +2541,7 @@ let constrain_type_jkind ~fixed env ty jkind =
             in
             let jkind = Jkind.apply_modality_r modality jkind in
             match
-              Jkind.apply_or_null jkind
+              Jkind.apply_or_null_r jkind
             with
             | Ok jkind ->
               (match
@@ -7281,6 +7281,31 @@ let print_global_state fmt global_state =
 let type_equal env ty1 ty2 = is_equal env false [ty1] [ty2]
 let () = type_equal' := type_equal
 
+let compute_variant_with_null_jkind env type_jkind_purely ty =
+  match get_desc ty with
+  | Tconstr (path, args, _) ->
+    begin try
+      let decl = Env.find_type path env in
+      match decl.type_kind with
+      | Type_variant ([_; {cd_args = Cstr_tuple [{ ca_type; ca_modalities }];
+         _}], Variant_with_null, _) ->
+        let inner_type =
+          apply env decl.type_params ca_type args
+        in
+        let inner_jkind =
+          Jkind.apply_modality_l ca_modalities (type_jkind_purely inner_type)
+        in
+        begin match Jkind.apply_or_null_l inner_jkind with
+        | Ok jkind -> Some jkind
+        | Error () ->
+          Misc.fatal_error "Ctype.compute_variant_with_null_jkind: \
+            the constructor argument type is already maybe-null."
+        end
+      | _ -> None
+    with Not_found | Cannot_apply -> None
+    end
+  | _ -> None
+
 let check_decl_jkind env decl jkind =
   (* CR layouts v2.8: This could use an algorithm like [constrain_type_jkind]
      to expand only as much as needed, but the l/l subtype algorithm is tricky,
@@ -7298,8 +7323,18 @@ let check_decl_jkind env decl jkind =
      so instead of trying to get to the bottom of it, I'm just punting. *)
   let decl_jkind = match decl.type_kind, decl.type_manifest with
     | Type_abstract _, Some inner_ty ->
-      Jkind.for_abbreviation ~type_jkind_purely
-        ~modality:Mode.Modality.Value.Const.id inner_ty
+      (* CR layouts v3.3: Ad-hoc solution, this time due to the magic
+         interaction of [or_null] with separability. Special-cases [or_null]
+         and other [Variant_with_null] types.
+
+         Normally, this would be handled in [constrain_type_jkind]. *)
+      begin match
+        compute_variant_with_null_jkind env type_jkind_purely inner_ty with
+      | Some jkind -> jkind
+      | None ->
+        Jkind.for_abbreviation ~type_jkind_purely
+          ~modality:Mode.Modality.Value.Const.id inner_ty
+      end
     (* These next cases are more properly rule TK_UNBOXED from kind-inference.md
        (not rule FIND_ABBREV, as documented with [Jkind.for_abbreviation]), but
        they should be fine here. This will all get fixed up later with the

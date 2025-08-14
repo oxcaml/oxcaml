@@ -143,21 +143,5 @@ end = struct
 end
 
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = int or_null
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = int or_null end
-       is not included in
-         sig type t : immediate_or_null end
-       Type declarations do not match:
-         type t = int or_null
-       is not included in
-         type t : immediate_or_null
-       The kind of the first is value_or_null mod everything
-         because it is the primitive type or_null.
-       But the kind of the first must be a subkind of immediate_or_null
-         because of the definition of t at line 2, characters 2-28.
+module M : sig type t : immediate_or_null end @@ stateless
 |}]
