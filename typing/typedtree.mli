@@ -314,8 +314,7 @@ and arg_label = Types.arg_label =
 *)
 and expression_desc =
     Texp_ident of
-      Path.t * Jkind.Sort.t array list * Longident.t loc *
-      Types.value_description * ident_kind * unique_use
+      Path.t * Longident.t loc * Types.value_description * ident_kind * unique_use
         (** x
             M.x
          *)

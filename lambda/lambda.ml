@@ -1407,8 +1407,18 @@ let rec transl_address loc = function
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
-  | Env.Adot(addr, _bsorts, pos) ->
-      Lprim(Pfield(pos, Pointer, Reads_agree),
+  | Env.Adot(addr, field_layouts, pos) ->
+      let layout_to_mixed_block layout =
+        match
+          Jkind.Layout.default_to_value_and_get layout
+            |> Jkind.Layout.Const.get_sort
+        with
+        | Some _sort -> failwith "TODO"
+        | None -> fatal_error "CR jrayman: write error"
+      in
+      Lprim(Pmixedfield([pos],
+                        Array.map layout_to_mixed_block field_layouts,
+                        Reads_agree),
                    [transl_address loc addr], loc)
 
 let transl_path find loc env path =
@@ -1461,23 +1471,6 @@ let rec transl_mixed_product_shape shape =
     | Void -> Product [||]
   ) shape
 
-let transl_mixed_block_element :
-  Types.mixed_block_element -> unit mixed_block_element
- = function
-  | Value -> Value generic_value
-  | Float_boxed -> Float_boxed ()
-  | Float64 -> Float64
-  | Float32 -> Float32
-  | Bits32 -> Bits32
-  | Bits64 -> Bits64
-  | Vec128 -> Vec128
-  | Vec256 -> Vec256
-  | Vec512 -> Vec256
-  | Word -> Word
-  | Product shapes ->
-    let get_value_kind _ = generic_value in
-    Product (transl_mixed_product_shape ~get_value_kind shapes)
-
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
@@ -1500,6 +1493,39 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
         (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
     | Void -> Product [||]
   ) shape
+
+let rec mixed_block_of_sort : Jkind.Sort.Const.t
+                      -> Types.mixed_block_element =
+  function
+  | Base Void -> fatal_error "Translmod.transl_structure: \
+    tried to convert Void to layout"
+  | Base Value -> Value
+  | Base Bits32 -> Bits32
+  | Base Bits64 -> Bits64
+  | Base Float32 -> Float32
+  | Base Float64 -> Float64
+  | Base Vec128 -> Vec128
+  | Base Vec256 -> Vec256
+  | Base Vec512 -> Vec512
+  | Base Word -> Word
+  | Product sorts ->
+    Product (Array.map mixed_block_of_sort (Array.of_list sorts))
+
+let transl_mixed_block_element (mixed_block : Types.mixed_block_element) =
+  match mixed_block with
+  | Value -> Value generic_value
+  | Float_boxed -> Float_boxed ()
+  | Float64 -> Float64
+  | Float32 -> Float32
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Vec128 -> Vec128
+  | Vec256 -> Vec256
+  | Vec512 -> Vec256
+  | Word -> Word
+  | Product shapes ->
+    let get_value_kind _ = generic_value in
+    Product (transl_mixed_product_shape ~get_value_kind shapes)
 
 (* Compile a sequence of expressions *)
 
