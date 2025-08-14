@@ -375,11 +375,6 @@ module F = struct
 
   let source_filename t s = line t.ppf "source_filename = \"%s\"" s
 
-  let machtyp_component (m : Cmm.machtype_component) =
-    Llvm_typ.(of_machtyp_component m |> to_string)
-
-  let pp_machtyp_component ppf c = Format.fprintf ppf "%s" (machtyp_component c)
-
   let pp_global ppf s =
     (* This is to escape unacceptable symbols (like brackets or commas) in
        global identifiers (which might be the case in e.g. anonymous
@@ -439,6 +434,10 @@ module F = struct
   let ins_store t ~src ~dst typ =
     ins t "store %a %a, ptr %a" Llvm_typ.pp_t typ pp_ident src pp_ident dst
 
+  let ins_store_value t ~src ~dst typ =
+    ins t "store %a %a, ptr %a" Llvm_typ.pp_t typ Llvm_value.pp_t src pp_ident
+      dst
+
   let ins_load_from_reg t ident (reg : Reg.t) =
     ins_load t ~src:(get_ident_for_reg t reg) ~dst:ident
       (Llvm_typ.of_machtyp_component reg.typ)
@@ -449,10 +448,6 @@ module F = struct
 
   let ins_store_global t sym (reg : Reg.t) =
     ins t "store ptr %a, ptr %a" pp_global sym (pp_reg_ident t) reg
-
-  let ins_store_nativeint t n (reg : Reg.t) =
-    ins t "store %a %s, ptr %a" pp_machtyp_component reg.typ
-      (Nativeint.to_string n) (pp_reg_ident t) reg
 
   let ins_store_label_addr t ~label ~dst =
     ins t "store ptr blockaddress(%a, %a), ptr %a" pp_global
@@ -1011,7 +1006,10 @@ module F = struct
         ins_branch t label_after)
     | Tailcall_self { destination } -> ins_branch t destination
     | Tailcall_func op -> call ~tail:true t i op
-    | Switch _ | Call_no_return _ -> not_implemented_terminator i
+    | Call_no_return { func_symbol; alloc; stack_ofs; stack_align; _ } ->
+      extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
+      ins t "unreachable"
+    | Switch _ -> not_implemented_terminator i
 
   let int_op t (i : Cfg.basic Cfg.instruction)
       (op : Operation.integer_operation) ~imm =
@@ -1029,6 +1027,17 @@ module F = struct
         let res = fresh_ident t in
         ins_binop_imm t op_name arg (string_of_int n) res typ;
         res
+    in
+    let do_unary_intrinsic op_name =
+      let typ = Llvm_typ.i64 in
+      let intrinsic_name = asprintf "llvm.%s.%a" op_name Llvm_typ.pp_t typ in
+      let arg = load_reg_to_temp t i.arg.(0) in
+      let res = fresh_ident t in
+      add_called_fun t intrinsic_name ~cc:Default ~args:[typ] ~res:(Some typ);
+      ins_call ~cc:Default ~pp_name:pp_global t intrinsic_name
+        [typ, arg]
+        (Some (typ, res));
+      res
     in
     let res =
       match op with
@@ -1051,7 +1060,9 @@ module F = struct
         ins_conv t "zext" ~src:bool_res ~dst:int_res ~src_typ:Llvm_typ.bool
           ~dst_typ:typ;
         int_res
-      | Iclz _ | Ictz _ | Ipopcnt -> not_implemented_basic i
+      | Iclz _ -> do_unary_intrinsic "ctlz"
+      | Ictz _ -> do_unary_intrinsic "cttz"
+      | Ipopcnt -> do_unary_intrinsic "ctpop"
     in
     ins_store_into_reg t res i.res.(0)
 
@@ -1104,10 +1115,26 @@ module F = struct
     | Move | Opaque ->
       let temp = load_reg_to_temp t i.arg.(0) in
       ins_store_into_reg t temp i.res.(0)
-    | Const_int n -> ins_store_nativeint t n i.res.(0)
+    | Const_int n ->
+      ins_store_value t
+        ~src:Llvm_value.(Immediate (Nativeint.to_string n))
+        ~dst:(get_ident_for_reg t i.res.(0))
+        (Llvm_typ.of_machtyp_component i.res.(0).typ)
     | Const_symbol { sym_name; sym_global = _ } ->
       add_referenced_symbol t sym_name;
       ins_store_global t sym_name i.res.(0)
+    | Const_float32 bits ->
+      ins_store_value t
+        ~src:Llvm_value.(Immediate (sprintf "%#lx" bits))
+        ~dst:(get_ident_for_reg t i.res.(0))
+        Llvm_typ.float
+    | Const_float bits ->
+      ins_store_value t
+        ~src:Llvm_value.(Immediate (sprintf "%#Lx" bits))
+        ~dst:(get_ident_for_reg t i.res.(0))
+        Llvm_typ.double
+    | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
+      not_implemented_basic ~msg:"const" i
     | Load { memory_chunk; addressing_mode; mutability = _; is_atomic = _ } -> (
       (* Q: what do we do with mutability / is_atomic / is_modify? *)
       let src = load_addr t addressing_mode i 0 in
@@ -1133,7 +1160,13 @@ module F = struct
       | Thirtytwo_signed -> extend "sext" Llvm_typ.i32
       | Single { reg = Float32 } -> basic Llvm_typ.float
       | Double -> basic Llvm_typ.double
-      | Single { reg = Float64 }
+      | Single { reg = Float64 } ->
+        let loaded = fresh_ident t in
+        let extended = fresh_ident t in
+        ins_load t ~src ~dst:loaded Llvm_typ.float;
+        ins_conv t "fpext" ~src:loaded ~dst:extended ~src_typ:Llvm_typ.float
+          ~dst_typ:Llvm_typ.double;
+        ins_store_into_reg t extended i.res.(0)
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ->
@@ -1145,25 +1178,25 @@ module F = struct
         ins_load_from_reg t temp i.arg.(0);
         ins_store t ~src:temp ~dst typ
       in
-      let trunc_int dst_typ =
+      let trunc ?(trunc_op = "trunc") dst_typ =
         let reg_typ = i.arg.(0).typ |> Llvm_typ.of_machtyp_component in
         let temp = fresh_ident t in
         let truncated = fresh_ident t in
         ins_load_from_reg t temp i.arg.(0);
-        ins_conv t "trunc" ~src:temp ~dst:truncated ~src_typ:reg_typ ~dst_typ;
+        ins_conv t trunc_op ~src:temp ~dst:truncated ~src_typ:reg_typ ~dst_typ;
         ins_store t ~src:truncated ~dst dst_typ
       in
       match chunk with
       | Word_int | Word_val -> basic Llvm_typ.i64
-      | Byte_unsigned | Byte_signed -> trunc_int Llvm_typ.i8
-      | Sixteen_unsigned | Sixteen_signed -> trunc_int Llvm_typ.i16
-      | Thirtytwo_signed | Thirtytwo_unsigned -> trunc_int Llvm_typ.i32
+      | Byte_unsigned | Byte_signed -> trunc Llvm_typ.i8
+      | Sixteen_unsigned | Sixteen_signed -> trunc Llvm_typ.i16
+      | Thirtytwo_signed | Thirtytwo_unsigned -> trunc Llvm_typ.i32
       | Single { reg = Float32 } -> basic Llvm_typ.float
       | Double -> basic Llvm_typ.double
+      | Single { reg = Float64 } -> trunc ~trunc_op:"fptrunc" Llvm_typ.float
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-      | Fivetwelve_aligned
-      | Single { reg = Float64 } ->
+      | Fivetwelve_aligned ->
         not_implemented_basic ~msg:"store" i)
     | Intop op -> int_op t i op ~imm:None
     | Intop_imm (op, n) -> int_op t i op ~imm:(Some n)
@@ -1254,9 +1287,6 @@ module F = struct
         ins_load t ~src:allocation_ident ~dst:alloc_ptr_after_gc Llvm_typ.i64;
         ins_binop_imm t "add" alloc_ptr_after_gc "8" res Llvm_typ.i64;
         ins_store_into_reg t res i.res.(0))
-    | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
-    | Const_vec512 _ ->
-      not_implemented_basic ~msg:"const" i
     | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
     | Intop_atomic _ | Csel _ | Reinterpret_cast _ | Static_cast _
     | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Dls_get | Poll

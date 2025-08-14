@@ -4,14 +4,28 @@ source_filename = "extcalls.ml"
 define void @camlExtcalls__code_begin() { ret void }
 
 @camlExtcalls__gc_roots = global { i64 } { i64 0 }, align 8
-@.header.camlExtcalls = global { i64 } { i64 3840 }, align 8
-@camlExtcalls = global { ptr, ptr, ptr } { ptr @camlExtcalls__call_too_many_3, ptr @camlExtcalls__call_print_and_add_4, ptr @camlExtcalls__call_int_and_float_5 }, align 8
-@.header.camlExtcalls__call_int_and_float_5 = global { i64 } { i64 3063 }, align 8
-@camlExtcalls__call_int_and_float_5 = global { ptr, i64 } { ptr @camlExtcalls__call_int_and_float_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlExtcalls__call_print_and_add_4 = global { i64 } { i64 3063 }, align 8
-@camlExtcalls__call_print_and_add_4 = global { ptr, i64 } { ptr @camlExtcalls__call_print_and_add_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlExtcalls__call_too_many_3 = global { i64 } { i64 3063 }, align 8
-@camlExtcalls__call_too_many_3 = global { ptr, i64 } { ptr @camlExtcalls__call_too_many_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExtcalls = global { i64 } { i64 5888 }, align 8
+@camlExtcalls = global { ptr, ptr, ptr, ptr, ptr } { ptr @camlExtcalls__call_too_many_6, ptr @camlExtcalls__call_print_and_add_7, ptr @camlExtcalls__call_int_and_float_8, ptr @camlExtcalls__f_9, ptr @camlExtcalls__call_no_return_10 }, align 8
+@.header.camlExtcalls__call_no_return_10 = global { i64 } { i64 3063 }, align 8
+@camlExtcalls__call_no_return_10 = global { ptr, i64 } { ptr @camlExtcalls__call_no_return_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExtcalls__invalid187 = global { i64 } { i64 30716 }, align 8
+@camlExtcalls__invalid187 = global { [ 230 x i8 ], [ 1 x i8 ], i8 } { [ 230 x i8 ] c"\5b\5d\0a\55\6e\72\65\61\63\68\61\62\6c\65\20\63\6f\64\65\20\62\65\63\61\75\73\65\20\6f\66\0a\64\65\61\64\20\66\75\6e\63\74\69\6f\6e\20\73\6c\6f\74\73\3a\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\31\3b\31\6d\28\66\6e\5b\65\78\74\63\61\6c\6c\73\2e\6d\6c\3a\33\39\2c\34\2d\2d\39\31\5d\2f\35\20\e2\88\b7\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\37\3b\31\6d\f0\9d\95\8d\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\31\3b\31\6d\29\1b\5b\30\6d\0a\64\65\61\64\20\76\61\6c\75\65\20\73\6c\6f\74\73\3a\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\34\33\3b\31\6d\28\61\2f\32\20\e2\88\b7\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\37\3b\31\6d\e2\84\95\f0\9d\95\97\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\34\33\3b\31\6d\29\1b\5b\30\6d\0a", [ 1 x i8 ] zeroinitializer, i8 1 }, align 8
+@.header.camlExtcalls__f_9 = global { i64 } { i64 3063 }, align 8
+@camlExtcalls__f_9 = global { ptr, i64 } { ptr @camlExtcalls__f_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExtcalls__call_int_and_float_8 = global { i64 } { i64 3063 }, align 8
+@camlExtcalls__call_int_and_float_8 = global { ptr, i64 } { ptr @camlExtcalls__call_int_and_float_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExtcalls__call_print_and_add_7 = global { i64 } { i64 3063 }, align 8
+@camlExtcalls__call_print_and_add_7 = global { ptr, i64 } { ptr @camlExtcalls__call_print_and_add_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExtcalls__call_too_many_6 = global { i64 } { i64 3063 }, align 8
+@camlExtcalls__call_too_many_6 = global { ptr, i64 } { ptr @camlExtcalls__call_too_many_HIDE_STAMP, i64 108086391056891909 }, align 8
+@.header.camlExtcalls__float48 = global { i64 } { i64 2045 }, align 8
+@camlExtcalls__float48 = global { double } { double 0.00000000000000000000 }, align 8
+@.header.camlExtcalls__Pmakeblock40 = global { i64 } { i64 2816 }, align 8
+@camlExtcalls__Pmakeblock40 = global { ptr, ptr } { ptr @caml_exn_Assert_failure, ptr @camlExtcalls__const_block37 }, align 8
+@.header.camlExtcalls__const_block37 = global { i64 } { i64 3840 }, align 8
+@camlExtcalls__const_block37 = global { ptr, i64, i64 } { ptr @camlExtcalls__immstring35, i64 69, i64 21 }, align 8
+@.header.camlExtcalls__immstring35 = global { i64 } { i64 3068 }, align 8
+@camlExtcalls__immstring35 = global { [ 11 x i8 ], [ 4 x i8 ], i8 } { [ 11 x i8 ] c"\65\78\74\63\61\6c\6c\73\2e\6d\6c", [ 4 x i8 ] zeroinitializer, i8 4 }, align 8
 @.header.camlExtcalls__float25 = global { i64 } { i64 2045 }, align 8
 @camlExtcalls__float25 = global { double } { double 4.00000000000000000000 }, align 8
 @.header.camlExtcalls__float23 = global { i64 } { i64 2045 }, align 8
@@ -244,6 +258,115 @@ L111:                                                ; preds = %L109
   ret { { ptr, ptr }, { i64 } } %38
 }
 
+define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__f_HIDE_STAMP(ptr %0, ptr %1, double %2)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
+  %4 = alloca double
+  store double %2, ptr %4
+  %5 = alloca i64
+  %6 = alloca double
+  %7 = alloca i64
+  br label %L1
+L1:
+  br label %L113
+L113:                                                ; preds = %L1
+  %8 = load double, ptr %4
+  store double %8, ptr %6
+  store ptr @camlExtcalls__Pmakeblock40, ptr %7
+  %9 = load i64, ptr %7
+  store i64 %9, ptr %5
+  %10 = load i64, ptr %ds
+  %11 = add i64 %10, 48
+  %12 = inttoptr i64 %11 to ptr
+  %13 = load i64, ptr %12
+  %14 = inttoptr i64 %13 to ptr
+  %15 = load i64, ptr %14
+  %16 = add i64 %13, 8
+  %17 = inttoptr i64 %16 to ptr
+  %18 = load ptr, ptr %17
+  %19 = load i64, ptr %5
+  %20 = add i64 %13, 16
+  store i64 %15, ptr %12
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %20)
+  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %19, ptr %18)
+  unreachable
+}
+
+define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__call_no_return_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
+  %4 = alloca i64
+  store i64 %2, ptr %4
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  br label %L1
+L1:
+  br label %L116
+L116:                                                ; preds = %L1
+  %9 = load i64, ptr %4
+  store i64 %9, ptr %5
+  store ptr @camlExtcalls__float48, ptr %6
+  %10 = load i64, ptr %6
+  store i64 %10, ptr %6
+  %11 = load i64, ptr %6
+  store i64 %11, ptr %7
+  store i64 1, ptr %8
+  %12 = load i64, ptr %8
+  store i64 %12, ptr %4
+  %13 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %14 = load ptr, ptr %ds
+  %15 = insertvalue { { ptr, ptr }, { i64 } } %13, ptr %14, 0, 0
+  %16 = load ptr, ptr %alloc
+  %17 = insertvalue { { ptr, ptr }, { i64 } } %15, ptr %16, 0, 1
+  %18 = load i64, ptr %4
+  %19 = insertvalue { { ptr, ptr }, { i64 } } %17, i64 %18, 1, 0
+  ret { { ptr, ptr }, { i64 } } %19
+}
+
+define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__fn$5bextcalls.ml$3a39$2c4$2d$2d91$5d_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
+  %5 = alloca i64
+  store i64 %2, ptr %5
+  %6 = alloca i64
+  store i64 %3, ptr %6
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  br label %L1
+L1:
+  br label %L119
+L119:                                                ; preds = %L1
+  %11 = load i64, ptr %5
+  store i64 %11, ptr %8
+  %12 = load i64, ptr %6
+  store i64 %12, ptr %9
+  store ptr @camlExtcalls__invalid187, ptr %10
+  %13 = load i64, ptr %10
+  store i64 %13, ptr %7
+  %14 = load i64, ptr %7
+  %15 = load i64, ptr %ds
+  %16 = add i64 %15, 104
+  %17 = inttoptr i64 %16 to ptr
+  %18 = load i64, ptr %17
+  %19 = call i64 @llvm.read_register.i64(metadata !{!"rsp\00"})
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %18)
+  %20 =  call  { i64 } @caml_flambda2_invalid(i64 %14)
+  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %19)
+  %21 = extractvalue { i64 } %20, 0
+  store i64 %21, ptr %5
+  unreachable
+}
+
 define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__entry(ptr %0, ptr %1)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
@@ -256,8 +379,8 @@ define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__entry(ptr %0, ptr %1)  {
   %7 = alloca i64
   br label %L1
 L1:
-  br label %L116
-L116:                                                ; preds = %L1
+  br label %L129
+L129:                                                ; preds = %L1
   store ptr @camlExtcalls, ptr %5
   %8 = load i64, ptr %5
   store i64 %8, ptr %6
@@ -277,11 +400,13 @@ L116:                                                ; preds = %L1
 }
 
 @.temp.Extcalls.0 = global { ptr, ptr, ptr } { ptr @int_and_float, ptr @too_many, ptr @print_and_add }, align 8
+declare  { i64 } @caml_flambda2_invalid(i64)
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
 
 @caml_c_call = external global ptr
 @caml_c_call_stack_args_llvm_backend = external global ptr
+@caml_exn_Assert_failure = external global ptr
 @int_and_float = external global ptr
 @print_and_add = external global ptr
 @too_many = external global ptr
