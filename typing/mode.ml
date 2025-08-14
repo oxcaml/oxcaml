@@ -1861,14 +1861,53 @@ module type Common_axis = Common_axis with type 'a axerror := 'a axerror
 module type Common_product = Common_product with type 'a axerror := 'a axerror
 
 module Axerror = struct
-  module Printing = struct
+  module Print = struct
+    open Format
+
     type print_hint_res =
       | HintPrinted
       | NothingPrinted
 
+    let mode :
+        type x.
+        [`Actual | `Expected] -> x C.obj -> Format.formatter -> x -> unit =
+     (* This is a wrapping around the standard [C.print],
+        to make the error messages more readable for the user *)
+     fun side x_obj ppf x ->
+      let mode_printer = Misc.Style.as_inline_code (C.print x_obj) in
+      let default_printer () = mode_printer ppf x in
+      match side, x_obj, x with
+      | `Actual, Regionality, Regional ->
+        (* In the special case where the actual mode is regional (and thus the
+           expected is global), it's more user friendly to say "local" than
+           "regional" or "local to the parent region" etc. *)
+        mode_printer ppf C.Regionality.Local
+      | `Expected, Contention_op, Shared ->
+        (* When printing the "shared" mode on the "expected" side (noting that expected
+           modes only appear on the right side of inequalities (on the "greater" side)),
+           we print that it was expected to be either shared or uncontended, to help
+           the user. We don't do anything similar when printing on the "actual" side
+           as this is confusing to put in an error message. *)
+        fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
+          C.Contention.Uncontended
+      | `Expected, Regionality, Regional ->
+        fprintf ppf "in the parent region or %a" mode_printer
+          C.Regionality.Global
+      | _ ->
+        (* Otherwise, we just use the default mode constant printer *)
+        default_printer ()
+     [@@ocaml.warning "-4"]
+
+    let eq_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
+     fun a_obj b_obj a b ->
+      match C.eq_obj a_obj b_obj with
+      | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
+      | None -> false
+     [@@ocaml.warning "-4"]
+
     (** Print a "chain" of axhints, which will consist of zero or more [Apply] axhints,
       terminated with a [Empty] or [Const] axhint *)
-    let rec print_axhint_chain :
+    let rec axhint :
         type a.
         [`Actual | `Expected] ->
         a ->
@@ -1877,70 +1916,29 @@ module Axerror = struct
         Format.formatter ->
         print_hint_res =
      fun side (a : a) (a_obj : a C.obj) (hint : axhint) ppf ->
-      let open Format in
-      let print_mode : type x. x C.obj -> Format.formatter -> x -> unit =
-       (* This is a wrapping around the standard [C.print],
-          to make the error messages more readable for the user *)
-       fun x_obj ppf x ->
-        let mode_printer = Misc.Style.as_inline_code (C.print x_obj) in
-        let default_printer () = mode_printer ppf x in
-        match side, x_obj, x with
-        | `Actual, Regionality, Regional ->
-          (* In the special case where the actual mode is regional (and thus the
-             expected is global), it's more user friendly to say "local" than
-             "regional" or "local to the parent region" etc. *)
-          mode_printer ppf C.Regionality.Local
-        | `Expected, Contention_op, Shared ->
-          (* When printing the "shared" mode on the "expected" side (noting that expected
-             modes only appear on the right side of inequalities (on the "greater" side)),
-             we print that it was expected to be either shared or uncontended, to help
-             the user. We don't do anything similar when printing on the "actual" side
-             as this is confusing to put in an error message. *)
-          fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
-            C.Contention.Uncontended
-        | `Expected, Regionality, Regional ->
-          fprintf ppf "in the parent region or %a" mode_printer
-            C.Regionality.Global
-        | _ ->
-          (* Otherwise, we just use the default mode constant printer *)
-          default_printer ()
-       [@@ocaml.warning "-4"]
-      in
-      let eq_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
-       (* An overridden equality function for modes. This makes sure that the "Global"
-          and "Local" values of the regionality and locality modes are equated, even
-          though they don't come from the actual same axis. In the default case,
-          we perform a normal equality check, first equating the objects, then the
-          values *)
-       fun a_obj b_obj a b ->
-        match C.eq_obj a_obj b_obj with
-        | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-        | None -> false
-       [@@ocaml.warning "-4"]
-      in
       match hint with
       | Apply (Gap, _, _, _) ->
-        print_mode a_obj ppf a;
+        mode side a_obj ppf a;
         NothingPrinted
       | Apply (morph_hint, b, b_obj, b_hint)
         when (not (Hint.is_rigid morph_hint)) && eq_mode a_obj b_obj a b ->
-        print_axhint_chain side b b_obj b_hint ppf
+        axhint side b b_obj b_hint ppf
       | Apply (morph_hint, b, b_obj, b_hint) ->
-        fprintf ppf "%a@ because it %a@ which is " (print_mode a_obj) a
+        fprintf ppf "%a@ because it %a@ which is " (mode side a_obj) a
           Hint.print_morph morph_hint;
-        ignore (print_axhint_chain side b b_obj b_hint ppf);
+        ignore (axhint side b b_obj b_hint ppf);
         HintPrinted
       | Const Nil ->
-        print_mode a_obj ppf a;
+        mode side a_obj ppf a;
         NothingPrinted
       | Const const_hint ->
-        let print_a ppf = print_mode a_obj ppf a in
+        let print_a ppf = mode side a_obj ppf a in
         fprintf ppf "%t%a" print_a (Hint.print_const print_a) const_hint;
         HintPrinted
      [@@ocaml.warning "-4"]
 
     (** Report an axerror, printing error traces for both the left and the right sides *)
-    let report_axerror :
+    let axerror :
         type a.
         ?target:_ ->
         a Lattices_mono.obj ->
@@ -1955,10 +1953,10 @@ module Axerror = struct
         fprintf ppf "The %a %a is " Hint.print_lock_item target_item
           (Misc.Style.as_inline_code !print_longident)
           target_lid);
-      (match print_axhint_chain `Actual err.left obj err.left_hint ppf with
+      (match axhint `Actual err.left obj err.left_hint ppf with
       | HintPrinted -> fprintf ppf ".@\nHowever, it is expected to be "
       | NothingPrinted -> fprintf ppf "@ but expected to be ");
-      ignore (print_axhint_chain `Expected err.right obj err.right_hint ppf);
+      ignore (axhint `Expected err.right obj err.right_hint ppf);
       fprintf ppf "."
   end
 
@@ -2725,7 +2723,7 @@ module Comonadic_with (Areality : Areality) = struct
 
   let report_error ?target ppf (Error (ax, err)) =
     let obj = proj_obj ax in
-    Axerror.Printing.report_axerror ?target obj err ppf
+    Axerror.Print.axerror ?target obj err ppf
 
   type equate_error = equate_step * error
 
@@ -2865,7 +2863,7 @@ module Monadic = struct
 
   let report_error ?target ppf (Error (ax, err)) =
     let obj = proj_obj ax in
-    Axerror.Printing.report_axerror ?target obj err ppf
+    Axerror.Print.axerror ?target obj err ppf
 
   type equate_error = equate_step * error
 
@@ -3345,7 +3343,7 @@ module Value_with (Areality : Areality) = struct
 
   let report_error ?target ppf (Error (ax, err)) =
     let obj = proj_obj ax in
-    Axerror.Printing.report_axerror ?target obj err ppf
+    Axerror.Print.axerror ?target obj err ppf
 
   type equate_error = equate_step * error
 
