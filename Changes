@@ -1,6 +1,17 @@
 OCaml 5.4.1
 -----------
 
+### Runtime system:
+
+- #14189: Add runtime counters EV_C_MINOR_PROMOTED_WORDS and
+  EV_C_MINOR_ALLOCATED_WORDS. EV_C_MINOR_PROMOTED_WORDS reports words promoted
+  by minor GC and EV_C_MINOR_ALLOCATED_WORDS reports words allocated by minor
+  GC. Both have equivalent bytes counters. Also updated the documentation for
+  EV_C_MINOR_PROMOTED and EV_C_MINOR_ALLOCATED to qualify scope of the values
+  reported as being per-domain.
+  (Tim McGilchrist, review by Nick Barnes, Sadiq Jaffer and
+  Gabriel Scherer)
+
 ### Bug fixes:
 
 - #14010: Fix miscompilation / liveness errors for string operations
