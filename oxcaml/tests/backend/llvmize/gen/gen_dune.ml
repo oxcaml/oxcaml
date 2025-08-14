@@ -277,4 +277,5 @@ let () =
   print_test_run_no_main "alloc";
   print_test ~extra_subst:[] ~buf ~run:(Some "tailcall")
     ~tasks:([Ocaml_default "tailcall2"] @ ocaml_llvm_and_output_ir "tailcall");
+  print_test_run_no_main "switch";
   ()
