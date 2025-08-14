@@ -935,3 +935,61 @@ Error: This expression has type "float" but an expression was expected of type
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
 |}]
+
+(* Module inclusion tests with or_null and separability *)
+
+module type S = sig
+  type ('a : value mod non_float) t : value_or_null mod non_float
+end
+
+module M1 : S = struct
+  type ('a : value mod non_float) t = 'a or_null
+end
+
+[%%expect{|
+module type S =
+  sig type ('a : value mod non_float) t : value_or_null mod non_float end
+module M1 : S
+|}]
+
+module M2 : S = struct
+  type ('a : value mod non_float) t = 'a Or_null_reexport.t
+end
+
+[%%expect{|
+module M2 : S
+|}]
+
+module M3_fail : S = struct
+  type 'a t = float or_null
+end
+
+[%%expect{|
+Lines 1-3, characters 21-3:
+1 | .....................struct
+2 |   type 'a t = float or_null
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = float or_null end
+       is not included in
+         S
+       Type declarations do not match:
+         type 'a t = float or_null
+       is not included in
+         type ('a : value mod non_float) t : value_or_null mod non_float
+       The kind of the first is
+           value_or_null mod many unyielding stateless immutable
+         because it is the primitive type or_null.
+       But the kind of the first must be a subkind of
+           value_or_null mod non_float
+         because of the definition of t at line 2, characters 2-65.
+|}]
+
+module M4 : S = struct
+  type 'a t = int or_null
+end
+
+[%%expect{|
+module M4 : S
+|}]
