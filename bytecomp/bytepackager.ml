@@ -208,7 +208,7 @@ let process_append_pack_member packagename oc state m =
 (* Generate the code that builds the tuple representing the package module *)
 
 let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
-      coercion =
+      coercion repr =
    let components =
     List.map
       (fun m ->
@@ -218,7 +218,7 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
       members
   in
   let main_module_block_repr, lam =
-    Translmod.transl_package components packed_compilation_unit coercion
+    Translmod.transl_package components packed_compilation_unit coercion repr
       ~style:Set_global_to_block
   in
   if !Clflags.dump_rawlambda then
@@ -243,7 +243,7 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
 
 (* Build the .cmo file obtained by packaging the given .cmo files. *)
 
-let package_object_files ~ppf_dump files target coercion =
+let package_object_files ~ppf_dump files target coercion repr =
   let targetfile = Unit_info.Artifact.filename target in
   let packed_compilation_unit = Unit_info.Artifact.modname target in
   let packed_compilation_unit_name = CU.name packed_compilation_unit in
@@ -291,7 +291,7 @@ let package_object_files ~ppf_dump files target coercion =
     in
     let state, main_module_block_repr =
       build_global_target ~ppf_dump oc ~packed_compilation_unit state
-        members coercion
+        members coercion repr
     in
     let pos_debug = pos_out oc in
     (* CR mshinwell: Compression not supported in the OCaml 4 runtime
@@ -359,11 +359,11 @@ let package_files ~ppf_dump initial_env files targetfile =
   in
   Env.set_unit_name (Some unit_info);
   Misc.try_finally (fun () ->
-      let coercion =
+      let coercion, repr =
         Typemod.package_units initial_env files (Unit_info.companion_cmi target)
           comp_unit
       in
-      package_object_files ~ppf_dump files target coercion
+      package_object_files ~ppf_dump files target coercion repr
     )
     ~exceptionally:(fun () -> remove_file targetfile)
 

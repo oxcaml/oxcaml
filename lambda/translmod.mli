@@ -37,13 +37,15 @@ type compilation_unit_style =
 val transl_implementation:
       Compilation_unit.t -> structure * module_coercion * module_coercion option
         -> style:compilation_unit_style -> Lambda.program
-val transl_store_phrases: Compilation_unit.t -> structure -> int * lambda
+val transl_store_phrases:
+      Compilation_unit.t -> structure -> module_representation * lambda
 
 val transl_toplevel_definition: structure -> lambda
 
 val transl_package:
       Compilation_unit.t option list -> Compilation_unit.t -> module_coercion
-        -> style:compilation_unit_style -> module_representation * lambda
+        -> Types.module_representation -> style:compilation_unit_style ->
+        module_representation * lambda
 
 type runtime_arg =
   | (* A module from which we need to project out the argument block *)

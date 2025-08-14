@@ -928,9 +928,8 @@ type runtime_param =
 type module_representation =
   | Module_value_only of int
   (* All module fields are boxed. The [int] is the number of fields *)
-  | Module_mixed of mixed_block_shape
-  (* The module contains both values and unboxed elements.
-     N.B.: [Float_boxed] should not occur in the shape *)
+  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
+  (* The module contains both values and unboxed elements. *)
 
 val module_representation_field_count : module_representation -> int
 
@@ -1057,6 +1056,8 @@ val layout_top : layout
 val layout_bottom : layout
 
 val mixed_block_element_for_module : unit mixed_block_element
+val mixed_block_element_with_locality_mode_for_module :
+  locality_mode mixed_block_element
 
 
 (** [dummy_constant] produces a placeholder value with a recognizable
@@ -1136,6 +1137,8 @@ val transl_mixed_product_shape_for_read :
 val transl_module_representation :
   Types.module_representation -> module_representation
 
+(* CR jrayman: Make sure the correct module representation is being passed 
+   everywhere this is used *)
 val block_of_module_representation :
   module_representation -> primitive
 
@@ -1243,10 +1246,11 @@ val reset: unit -> unit
     Module accesses are always immutable, except in translobj where the
     method cache is stored in a mutable module field.
 *)
+(* CR jrayman: Make sure the correct module representation is being passed
+   everywhere this is used *)
 val mod_field:
   ?read_semantics: field_read_semantics -> int ->
   module_representation -> primitive
-
 val mod_setfield: int -> module_representation -> primitive
 
 val structured_constant_layout : structured_constant -> layout

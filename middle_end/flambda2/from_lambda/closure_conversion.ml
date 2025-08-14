@@ -3658,7 +3658,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
           }
       in
       K.Scannable_block_shape.Value_only, size, block_access
-    | Lambda.Module_mixed shape ->
+    | Lambda.Module_mixed (shape, _) ->
       let shape =
         K.Mixed_block_lambda_shape.of_mixed_block_elements shape
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")

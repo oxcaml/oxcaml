@@ -113,7 +113,7 @@ let rec apply_coercion loc strict restr arg =
           else
             match input_repr with
             | Module_value_only _ -> layout_value_field
-            | Module_mixed shape ->
+            | Module_mixed (shape, _) ->
               layout_of_mixed_block_element shape.(pos)
         in
         let lam =
@@ -1005,6 +1005,7 @@ and transl_include_functor ~generative modl params scopes loc =
   let modl = transl_module ~scopes Tcoerce_none None modl in
   let params = if generative then [params;[]] else [params] in
   let params = List.map (fun coercion ->
+    (* CR jrayman *)
     Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
           List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
@@ -1065,8 +1066,11 @@ let required_globals ~flambda body =
 let add_arg_block_to_module_representation = function
     (* NB: this assumes [arg_block] has layout value *)
   | Module_value_only field_count -> Module_value_only (field_count + 1)
-  | Module_mixed shape ->
-    Module_mixed (Array.append shape [| mixed_block_element_for_module |])
+  | Module_mixed (shape, shape_for_read) ->
+    Module_mixed
+      ( Array.append shape [| mixed_block_element_for_module |],
+        Array.append shape_for_read
+          [| mixed_block_element_with_locality_mode_for_module |] )
 
 let add_arg_block_to_module_block primary_block_lam primary_repr restr =
   let primary_block_id = Ident.create_local "*primary-block*" in
@@ -1087,7 +1091,7 @@ let add_arg_block_to_module_block primary_block_lam primary_repr restr =
        primary_block_id_duid, primary_block_lam,
        Llet(Strict, layout_module, arg_block_id,
             arg_block_id_duid, arg_block_lam,
-            Lprim(block_of_module_representation primary_repr,
+            Lprim(block_of_module_representation new_repr,
                   all_fields,
                   Loc_unknown))),
   new_repr,
@@ -1374,7 +1378,8 @@ let field_of_str loc str =
     | _ -> apply_coercion loc Strict cc (Lvar ids.(pos))
 
 
-let transl_store_structure ~scopes glob map prims aliases str =
+let transl_store_structure ~scopes ~repr glob map prims aliases str =
+  (* CR jrayman: is every use of [repr] correct? *)
   let no_env_update _ _ env = env in
   let rec transl_store ~scopes rootpath subst cont = function
     [] ->
@@ -1490,6 +1495,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
             Lsequence(lam,
                       Llet(Strict, Lambda.layout_module, id, id_duid,
                            Lambda.subst no_env_update subst
+                            (* CR jrayman: not correct *)
                              (Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
                                     List.map field pos_cc_list, loc)),
                            Lsequence(store_ident loc id,
@@ -1691,7 +1697,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
     try
       let (pos, cc) = Ident.find_same id map in
       let init_val = apply_coercion loc Alias cc (Lvar id) in
-      Lprim(mod_setfield pos (Module_value_only (-1)),
+      Lprim(mod_setfield pos repr,
             [Lprim(Pgetglobal glob, [], loc); init_val],
             loc)
     with Not_found ->
@@ -1706,7 +1712,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
       match cc with
         Tcoerce_none ->
           Ident.Map.add id
-            (Lprim(mod_field pos (Module_value_only (-1)),
+            (Lprim(mod_field pos repr,
                    [Lprim(Pgetglobal glob, [], Loc_unknown)],
                    Loc_unknown))
             subst
@@ -1719,7 +1725,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
     List.fold_right (add_ident may_coerce) idlist subst
 
   and store_primitive (pos, prim) cont =
-    Lsequence(Lprim(mod_setfield pos (Module_value_only (-1)),
+    Lsequence(Lprim(mod_setfield pos repr,
                     [Lprim(Pgetglobal glob, [], Loc_unknown);
                      Translprim.transl_primitive Loc_unknown
                        prim.pc_desc prim.pc_env prim.pc_type
@@ -1732,7 +1738,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
   and store_alias (pos, env, path, cc) =
     let path_lam = transl_module_path Loc_unknown env path in
     let init_val = apply_coercion Loc_unknown Strict cc path_lam in
-    Lprim(mod_setfield pos (Module_value_only (-1)),
+    Lprim(mod_setfield pos repr,
           [Lprim(Pgetglobal glob, [], Loc_unknown);
            init_val],
           Loc_unknown)
@@ -1789,7 +1795,8 @@ let build_ident_map restr idlist more_ids =
   natural_map pos map prims aliases more_ids
 
 let store_arg_block_with_module_block
-    module_name set_primary_fields restr size =
+    module_name set_primary_fields restr primary_repr =
+  let size = module_representation_field_count primary_repr in
   let glob = Lprim(Pgetglobal module_name, [], Loc_unknown) in
   let primary_block_id = Ident.create_local "*primary-block*" in
   let primary_block_id_duid = Lambda.debug_uid_none in
@@ -1800,10 +1807,10 @@ let store_arg_block_with_module_block
        hassle. Instead, we access each field of the global and repackage it as a
        new block (which will be optimised away if not needed). *)
     let get_field i =
-      Lprim (mod_field i (Module_value_only (-1)), [glob], Loc_unknown)
+      Lprim (mod_field i primary_repr, [glob], Loc_unknown)
     in
     let fields = List.init size get_field in
-    Lprim(Pmakeblock(0, Immutable, None, alloc_heap), fields, Loc_unknown)
+    Lprim(block_of_module_representation primary_repr, fields, Loc_unknown)
   in
   let arg_block_id = Ident.create_local "*arg-block*" in
   let arg_block_duid = Lambda.debug_uid_none in
@@ -1811,9 +1818,9 @@ let store_arg_block_with_module_block
     apply_coercion Loc_unknown Strict restr (Lvar primary_block_id)
   in
   let arg_field = size in
-  let new_size = size + 1 in
+  let new_repr = add_arg_block_to_module_representation primary_repr in
   let set_arg_block =
-    Lprim(mod_setfield arg_field (Module_value_only (-1)),
+    Lprim(mod_setfield arg_field primary_repr,
           [glob; Lvar arg_block_id], Loc_unknown)
   in
   let lam =
@@ -1823,9 +1830,7 @@ let store_arg_block_with_module_block
                    Llet(Strict, layout_module, arg_block_id, arg_block_duid,
                         arg_block_lam, set_arg_block)))
   in
-  new_size, lam, Some arg_field
-
-(* CR jrayman: audit [size] in this file *)
+  new_repr, lam, Some arg_field
 
 (* Compile an implementation using transl_store_structure
    (for the native-code compiler). *)
@@ -1837,9 +1842,15 @@ let transl_store_gen_init () =
   Translprim.clear_used_primitives ()
 
 let transl_store_structure_gen
-      ~scopes module_name ({ str_items = str }, restr, restr2) topl =
+      ~scopes module_name ({ str_items = str; str_type = sg }, restr, restr2)
+      topl =
   let (map, prims, aliases, size) =
     build_ident_map restr (defined_idents str) (more_idents str) in
+  (* CR jrayman: is this the right [repr]? *)
+  let repr =
+    Includemod.module_representation_of_signature ~loc:Location.none sg
+    |> transl_module_representation
+  in
   let f str =
     let expr =
       match str with
@@ -1849,17 +1860,17 @@ let transl_store_structure_gen
         Lambda.subst (fun _ _ env -> env) !transl_store_subst
           (transl_exp ~scopes sort expr)
       | str ->
-        transl_store_structure ~scopes module_name map prims aliases str
+        transl_store_structure ~repr ~scopes module_name map prims aliases str
     in
     Translcore.declare_probe_handlers expr
   in
-  let size, expr =
-    transl_store_label_init module_name size f str
+  let repr, expr =
+    transl_store_label_init module_name repr f str
   in
   match restr2 with
-  | None -> size, expr, None
+  | None -> repr, expr, None
   | Some restr2 ->
-      store_arg_block_with_module_block module_name expr restr2 size
+      store_arg_block_with_module_block module_name expr restr2 repr
   (*size, transl_label_init (transl_store_structure module_id map prims str)*)
 
 let transl_store_implementation_as_functor
@@ -1871,10 +1882,10 @@ let transl_store_phrases module_name str =
   let scopes =
     enter_compilation_unit ~scopes:empty_scopes module_name
   in
-  let size, lam, _arg_block_field =
+  let repr, lam, _arg_block_field =
     transl_store_structure_gen ~scopes module_name (str,Tcoerce_none,None) true
   in
-  size, lam
+  repr, lam
 
 let transl_store_gen module_name impl topl =
   transl_store_gen_init ();
@@ -1888,12 +1899,12 @@ let transl_implementation_set_fields compilation_unit impl =
   let s = !transl_store_subst in
   transl_store_subst := Ident.Map.empty;
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
-  let i, code, arg_block_idx =
+  let repr, code, arg_block_idx =
     transl_store_gen ~scopes compilation_unit impl false
   in
   transl_store_subst := s;
   { Lambda.main_module_block_format =
-      Mb_struct { mb_repr = Module_value_only i };
+      Mb_struct { mb_repr = repr };
     arg_block_idx;
     code;
     (* compilation_unit is not used by closure, but this allow to share
@@ -2116,26 +2127,15 @@ let get_component = function
     None -> Lconst const_unit
   | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
 
-let transl_package_plain_block component_names coercion =
-  (* CR jrayman: should be a better way of getting [repr] *)
-  let repr =
-    match coercion with
-    | Tcoerce_none -> Module_value_only (List.length component_names)
-      (* CR jrayman: wrong *)
-    | Tcoerce_structure { output_repr; _ } ->
-      transl_module_representation output_repr
-    | Tcoerce_functor _
-    | Tcoerce_primitive _
-    | Tcoerce_alias _ -> assert false
-  in
+let transl_package_plain_block component_names coercion repr =
   repr,
   apply_coercion Loc_unknown Strict coercion
-    (Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
+    (Lprim(block_of_module_representation repr,
            List.map get_component component_names,
            Loc_unknown))
 
-let transl_package_set_global component_names target_name coercion =
-  let repr, block = transl_package_plain_block component_names coercion in
+let transl_package_set_global component_names target_name coercion repr =
+  let repr, block = transl_package_plain_block component_names coercion repr in
   repr, Lprim(Psetglobal target_name, [block], Loc_unknown)
   (*
   let components =
@@ -2153,37 +2153,37 @@ let transl_package_set_global component_names target_name coercion =
   Lprim(Psetglobal target_name, [Lprim(Pmakeblock(0, Immutable), components)])
    *)
 
-let transl_package_set_fields component_names target_name coercion =
+let transl_package_set_fields component_names target_name coercion repr =
   let rec make_sequence fn pos arg =
     match arg with
       [] -> lambda_unit
     | hd :: tl -> Lsequence(fn pos hd, make_sequence fn (pos + 1) tl) in
   match coercion with
     Tcoerce_none ->
-      (Module_value_only (List.length component_names), (* CR jrayman: wrong *)
+      (repr,
        make_sequence
          (fun pos id ->
-           Lprim(mod_setfield pos (Module_value_only (-1)),
+           Lprim(mod_setfield pos repr,
                  [Lprim(Pgetglobal target_name, [], Loc_unknown);
                   get_component id],
                  Loc_unknown))
          0 component_names)
-  | Tcoerce_structure { output_repr; pos_cc_list; _ } ->
+  | Tcoerce_structure { pos_cc_list; _ } ->
       let components =
-        Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
+        Lprim(block_of_module_representation repr,
               List.map get_component component_names,
               Loc_unknown)
       in
       let blk = Ident.create_local "block" in
       let blk_duid = Lambda.debug_uid_none in
-      (transl_module_representation output_repr,
+      (repr,
        Llet (Strict, Lambda.layout_module, blk, blk_duid,
              apply_coercion Loc_unknown Strict coercion components,
              make_sequence
                (fun pos _id ->
-                 Lprim(mod_setfield pos (Module_value_only (-1)),
+                 Lprim(mod_setfield pos repr,
                        [Lprim(Pgetglobal target_name, [], Loc_unknown);
-                        Lprim(mod_field pos (Module_value_only (-1)),
+                        Lprim(mod_field pos repr,
                           [Lvar blk], Loc_unknown)],
                        Loc_unknown))
                0 pos_cc_list))
@@ -2200,14 +2200,15 @@ let transl_package_set_fields component_names target_name coercion =
   *)
   | _ -> assert false
 
-let transl_package component_names target_name coercion ~style =
+let transl_package component_names target_name coercion repr ~style =
+  let repr = transl_module_representation repr in
   match style with
   | Plain_block ->
-      transl_package_plain_block component_names coercion
+      transl_package_plain_block component_names coercion repr
   | Set_global_to_block ->
-      transl_package_set_global component_names target_name coercion
+      transl_package_set_global component_names target_name coercion repr
   | Set_individual_fields ->
-      transl_package_set_fields component_names target_name coercion
+      transl_package_set_fields component_names target_name coercion repr
 
 type runtime_arg =
   | Argument_block of {
@@ -2222,10 +2223,10 @@ let unit_of_runtime_arg arg =
   | Argument_block { ra_unit = cu; _ } | Main_module_block cu -> Some cu
   | Unit -> None
 
-let transl_runtime_arg arg =
+let transl_runtime_arg repr arg =
   match arg with
   | Argument_block { ra_unit; ra_field_idx; } ->
-      Lprim (mod_field ra_field_idx (Module_value_only (-1)),
+      Lprim (mod_field ra_field_idx repr,
              [Lprim (Pgetglobal ra_unit, [], Loc_unknown)],
              Loc_unknown)
   | Main_module_block cu ->
@@ -2243,11 +2244,13 @@ let transl_instance_plain_block
   let instantiating_functor_lam =
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
-    Lprim (mod_field 0 (Module_value_only (-1)),
+    Lprim (mod_field 0 main_module_block_repr,
            [Lprim (Pgetglobal base_compilation_unit, [], Loc_unknown)],
            Loc_unknown)
   in
-  let runtime_args_lam = List.map transl_runtime_arg runtime_args in
+  let runtime_args_lam =
+    List.map (transl_runtime_arg main_module_block_repr) runtime_args
+  in
   let code =
     Lapply {
       ap_func = instantiating_functor_lam;
