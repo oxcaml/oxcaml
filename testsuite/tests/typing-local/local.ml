@@ -970,9 +970,7 @@ Line 2, characters 41-42:
 2 | let foo (local_ x) = local_cb (fun () -> x := 17; 42)
                                              ^
 Error: The value "x" is "local" but expected to be "global"
-       because it is used inside a function which is "global"
-       because it Uncaught exception: Env.Error(_)
-
+       because it is used inside a function which is "global".
 |}]
 
 let foo x =

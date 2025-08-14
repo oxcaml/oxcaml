@@ -459,9 +459,9 @@ let check_tail_call_local_returning loc env ap_mode {region_mode; _} =
     end
   | None -> ()
 
-let meet_regional ?hint mode =
+let meet_regional ?hint:h mode =
   let mode = Value.disallow_left mode in
-  Value.meet [Value.(of_const ?hint_comonadic:hint {
+  Value.meet [Value.(of_const ?hint_comonadic:h ~hint_monadic:Skip  {
     Const.max with
     areality = Regional
   }); mode]
@@ -571,8 +571,8 @@ let mode_lazy expected_mode_in =
   expected_mode_out, closure_mode
 
 let mode_partial_application expected_mode =
-  mode_morph (fun mode -> alloc_as_value
-    (value_to_alloc_r2g ~hint:Captured_by_partial_application mode))
+  mode_morph (Value.wrap ~monadic:Skip ~comonadic:Captured_by_partial_application
+    (fun mode -> alloc_as_value_unhint (value_to_alloc_r2g mode)))
     expected_mode
 
 let mode_trywith expected_mode =
@@ -660,9 +660,14 @@ let register_allocation_mode alloc_mode =
   allocations := alloc_mode :: !allocations
 
 let register_allocation_value_mode mode =
-  let alloc_mode = value_to_alloc_r2g ~hint:Register_alloc_mode mode in
+  let mode = Mode.Value.unhint mode in
+  let alloc_mode = value_to_alloc_r2g mode in
+  let mode = alloc_as_value_unhint alloc_mode in
+  let alloc_mode = Mode.Alloc.hint alloc_mode in
+  let mode =
+    Mode.Value.hint ~comonadic:Register_alloc_mode ~monadic:Skip mode
+  in
   register_allocation_mode alloc_mode;
-  let mode = alloc_as_value alloc_mode in
   alloc_mode, mode
 
 (** Register as allocation the expression constrained by the given

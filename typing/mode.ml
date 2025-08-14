@@ -1665,9 +1665,7 @@ module Hint = struct
     let open Format in
     let wrap_print_hint t = fprintf ppf "@ because %t" t in
     function
-    | Skip ->
-      (* The point of the [Skip] constant hint is that it should never have to be printed *)
-      assert false
+    | Skip -> Misc.fatal_error "Skip morph hint should not be printed"
     | Result_of_lazy ->
       wrap_print_hint (dprintf "it is the result of a lazy expression")
     | Lazy_closure ->
@@ -1917,17 +1915,9 @@ module Axerror = struct
           we perform a normal equality check, first equating the objects, then the
           values *)
        fun a_obj b_obj a b ->
-        match a_obj, a, b_obj, b with
-        (* Equating "global" and "local" for regionality and locality *)
-        | Locality, Global, Regionality, Global
-        | Regionality, Global, Locality, Global
-        | Locality, Local, Regionality, Local
-        | Regionality, Local, Locality, Local ->
-          true (* Default case *)
-        | _ -> (
-          match C.eq_obj a_obj b_obj with
-          | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-          | None -> false)
+        match C.eq_obj a_obj b_obj with
+        | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
+        | None -> false
        [@@ocaml.warning "-4"]
       in
       match hint with
@@ -2366,21 +2356,21 @@ module Comonadic_common_gen (Obj : Obj) = struct
   let of_const : type l r. ?hint:(l * r) Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
+  type 'd unhint = (const, 'd) Solver.Unhint.t
+
   let unhint = Solver.Unhint.unhint
 
   let hint ?hint = Solver.Unhint.hint obj ?hint
 
+  let wrap ?hint:h f m = m |> unhint |> f |> hint ?hint:h
+
   let meet_const_unhint c m = Solver.Unhint.apply obj (Meet_with c) m
 
-  let meet_const ?hint:h c m =
-    m |> unhint |> meet_const_unhint c |> hint ?hint:h
+  let meet_const ?hint c m = wrap ?hint (meet_const_unhint c) m
 
   let imply_unhint c m = Solver.Unhint.apply obj (Imply c) m
 
-  let imply ?hint:h c m =
-    m |> disallow_left |> unhint |> imply_unhint c |> hint ?hint:h
-
-  let apply_hint hint = Solver.apply Obj.obj ~hint Id
+  let imply ?hint c m = m |> disallow_left |> wrap ?hint (imply_unhint c)
 
   module Guts = struct
     let get_floor m = Solver.get_floor obj m
@@ -2439,21 +2429,21 @@ module Monadic_common_gen (Obj : Obj) = struct
   let of_const : type l r. ?hint:(r * l) Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
+  type 'd unhint = (const, 'r * 'l) Solver.Unhint.t constraint 'd = 'l * 'r
+
   let unhint = Solver.Unhint.unhint
 
   let hint ?hint = Solver.Unhint.hint obj ?hint
 
+  let wrap ?hint:h f m = m |> unhint |> f |> hint ?hint:h
+
   let join_const_unhint c m = Solver.Unhint.apply Obj.obj (Meet_with c) m
 
-  let join_const ?hint:h c m =
-    m |> unhint |> join_const_unhint c |> hint ?hint:h
+  let join_const ?hint c m = wrap ?hint (join_const_unhint c) m
 
   let subtract_unhint c m = Solver.Unhint.apply obj (Imply c) m
 
-  let subtract ?hint:h c m =
-    m |> disallow_right |> unhint |> subtract_unhint c |> hint ?hint:h
-
-  let apply_hint hint = Solver.apply Obj.obj ~hint Id
+  let subtract ?hint c m = m |> disallow_right |> wrap ?hint (subtract_unhint c)
 
   module Guts = struct
     let get_ceil m = Solver.get_floor obj m
@@ -2718,7 +2708,7 @@ end
 let regional_to_local m = S.apply Locality.Obj.obj C.Regional_to_local m
 
 let locality_as_regionality m =
-  S.apply ~hint:Skip Regionality.Obj.obj C.Locality_as_regionality m
+  S.apply Regionality.Obj.obj C.Locality_as_regionality m
 
 let regional_to_global m = S.apply Locality.Obj.obj C.Regional_to_global m
 
@@ -3115,6 +3105,8 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.of_const ?hint:hint_monadic monadic in
     { comonadic; monadic }
 
+  type 'd unhint = ('d Monadic.unhint, 'd Comonadic.unhint) monadic_comonadic
+
   let unhint { monadic; comonadic } =
     let comonadic = Comonadic.unhint comonadic in
     let monadic = Monadic.unhint monadic in
@@ -3124,6 +3116,9 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.hint ?hint:comonadic t.comonadic in
     let monadic = Monadic.hint ?hint:monadic t.monadic in
     { monadic; comonadic }
+
+  let wrap ?monadic ?comonadic f t =
+    t |> unhint |> f |> hint ?monadic ?comonadic
 
   module Const = struct
     module Monadic = Monadic.Const
@@ -3574,6 +3569,9 @@ module Const = struct
   let locality_as_regionality = C.locality_as_regionality
 end
 
+(* CR zqian: all the function that converts between [Alloc] and [Value] should
+   operate on [Unhint] so they can be composed and assigned hint as a whole. *)
+
 let comonadic_locality_as_regionality comonadic =
   S.Unhint.apply Value.Comonadic.Obj.obj (Map_comonadic Locality_as_regionality)
     comonadic
@@ -3587,8 +3585,7 @@ let alloc_as_value_unhint m =
   let comonadic = comonadic_locality_as_regionality comonadic in
   { comonadic; monadic }
 
-let alloc_as_value m =
-  m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint ~comonadic:Skip
+let alloc_as_value m = m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint
 
 let alloc_to_value_l2r_unhint m =
   let { comonadic; monadic } = m in
@@ -3602,16 +3599,13 @@ let alloc_to_value_l2r m =
   m |> Alloc.disallow_right |> Alloc.unhint |> alloc_to_value_l2r_unhint
   |> Value.hint
 
-let value_to_alloc_r2g_unhint m =
+let value_to_alloc_r2g m =
   let { comonadic; monadic } = m in
   let comonadic =
     S.Unhint.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
       comonadic
   in
   { comonadic; monadic }
-
-let value_to_alloc_r2g ?hint m =
-  m |> Value.unhint |> value_to_alloc_r2g_unhint |> Alloc.hint ?comonadic:hint
 
 let value_to_alloc_r2l_unhint m =
   let { comonadic; monadic } = m in
@@ -4273,7 +4267,7 @@ module Crossing = struct
 
   let apply_right_alloc t m =
     m |> Alloc.unhint |> alloc_as_value_unhint |> apply_right_unhint t
-    |> value_to_alloc_r2g_unhint
+    |> value_to_alloc_r2g
     |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_left_right_alloc t m =

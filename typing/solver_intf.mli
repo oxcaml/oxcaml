@@ -326,7 +326,7 @@ module type Solver_mono = sig
     ('b, 'l * 'r) mode
 
   module Unhint : sig
-    type ('a, 'd) t
+    type ('a, 'd) t constraint 'd = 'l * 'r
 
     val unhint : ('a, 'l * 'r) mode -> ('a, 'l * 'r) t
 

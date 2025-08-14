@@ -551,8 +551,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           VarMap.map (apply_morphvar dst morph hint) vs )
 
   module Unhint = struct
+    (** mode with suspended morphisms; those morphisms will be combined and
+        explained by a single hint.  *)
     type ('a, 'd) t =
       | Unhint : ('b, 'a, 'd) C.morph * ('b, 'd) mode -> ('a, 'd) t
+      constraint 'd = 'l * 'r
+    [@@ocaml.warning "-62"]
 
     let unhint : type a l r. (a, l * r) mode -> (a, l * r) t =
      fun m -> Unhint (C.id, m)
