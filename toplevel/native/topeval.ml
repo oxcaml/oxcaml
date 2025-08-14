@@ -95,7 +95,7 @@ include Topcommon.MakeEvalPrinter(EvalBase)
 
 let may_trace = ref false (* Global lock on tracing *)
 
-let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam size =
+let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let slam = Simplif.simplify_lambda lam in
@@ -104,7 +104,7 @@ let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam size =
   let program =
     { Lambda.
       code = slam;
-      main_module_block_size = size;
+      main_module_block_repr = repr;
       arg_block_field = None;
       compilation_unit;
       required_globals;
@@ -235,7 +235,7 @@ let execute_phrase print_outcome ppf phr =
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
           load_lambda ppf ~required_globals ~compilation_unit phrase_name res
-            main_module_block_format (* CR jrayman: this should not typecheck *)
+            main_module_block_format
         in
         let out_phr =
           match res with

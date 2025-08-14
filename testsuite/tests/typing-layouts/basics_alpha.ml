@@ -196,13 +196,9 @@ module F2 (X : sig val x : t_void end) = struct
   let f () = X.x
 end;;
 [%%expect{|
-Line 2, characters 13-16:
-2 |   let f () = X.x
-                 ^^^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+module F2 :
+  functor (X : sig val x : t_void end) -> sig val f : unit -> t_void end
 |}];;
-(* CR layouts v5: the test above should be made to work *)
 
 module F2 (X : sig val f : void_record -> unit end) = struct
   let g z = X.f { vr_void = z; vr_int = 42 }
@@ -1709,7 +1705,7 @@ external foo33 : t_any = "foo33";;
 Line 1, characters 17-22:
 1 | external foo33 : t_any = "foo33";;
                      ^^^^^
-Error: This type signature for "foo33" does not have a representable layout.
+Error: This type signature for "foo33" is not representable.
        The layout of type t_any is any
          because of the definition of t_any at line 1, characters 0-18.
        But the layout of type t_any must be representable

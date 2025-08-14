@@ -28,8 +28,6 @@ open Debuginfo.Scoped_location
 
 let const_int i = Lambda.const_int i
 
-let module_representation_of_signature _ = assert false
-
 type unsafe_component =
   | Unsafe_module_binding
   | Unsafe_functor
@@ -670,7 +668,7 @@ and transl_structure ~scopes loc
       let body, repr =
         let repr =
           Typedecl.module_representation_of_mixed_product_shape
-            ~loc:Location.none
+            ~loc:(Debuginfo.Scoped_location.to_location loc)
             (List.rev_map (fun (_, mbe) -> mbe) fields |> Array.of_list)
         in
         match cc with
@@ -886,7 +884,7 @@ and transl_structure ~scopes loc
           let mid = Ident.create_local "include" in
           let mid_duid = Lambda.debug_uid_none in
           let incl_repr =
-            module_representation_of_signature incl.incl_type
+            transl_module_representation incl.incl_repr
           in
           let rec rebind_idents pos newfields = function
               [] ->
@@ -949,7 +947,7 @@ and transl_structure ~scopes loc
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
               let open_repr =
-                module_representation_of_signature od.open_bound_items
+                transl_module_representation od.open_bound_repr
               in
               (* CR jrayman: maybe refactor with above *)
               let rec rebind_idents pos newfields = function
@@ -1590,7 +1588,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
             let mid_duid = Lambda.debug_uid_none in
             let loc = of_location ~scopes incl.incl_loc in
             let incl_repr =
-              module_representation_of_signature incl.incl_type
+              transl_module_representation incl.incl_repr
             in
             let rec store_idents pos = function
               | [] -> transl_store
@@ -1649,7 +1647,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
                   transl_store ~scopes rootpath subst cont rem
                 | _ ->
                     let open_repr =
-                      module_representation_of_signature od.open_bound_items
+                      transl_module_representation od.open_bound_repr
                     in
                     let ids = bound_value_identifiers od.open_bound_items in
                     let mid = Ident.create_local "open" in
@@ -2034,7 +2032,7 @@ let transl_toplevel_item ~scopes item =
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in
       let incl_repr =
-        module_representation_of_signature incl.incl_type
+        transl_module_representation incl.incl_repr
       in
       let rec set_idents pos = function
         [] ->
@@ -2061,7 +2059,7 @@ let transl_toplevel_item ~scopes item =
           let mid = Ident.create_local "open" in
           let mid_duid = Lambda.debug_uid_none in
           let open_repr =
-            module_representation_of_signature od.open_bound_items
+            transl_module_representation od.open_bound_repr
           in
           let rec set_idents pos = function
               [] ->
