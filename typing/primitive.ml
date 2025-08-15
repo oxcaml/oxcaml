@@ -471,14 +471,9 @@ module Repr_check = struct
     | Product _ -> true
     | Base _ -> false
 
-  let rec sort_contains_void : Jkind_types.Sort.Const.t -> bool = function
-    | Base Void -> true
-    | Base _ -> false
-    | Product sorts -> List.exists sort_contains_void sorts
-
   let valid_c_stub_arg = function
     | Same_as_ocaml_repr s ->
-      not (sort_is_product s) && not (sort_contains_void s)
+      not (sort_is_product s)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Repr_poly -> true
 
@@ -486,8 +481,7 @@ module Repr_check = struct
     | Same_as_ocaml_repr (Base _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Repr_poly -> true
-    | Same_as_ocaml_repr (Product [s1; s2] as s) ->
-      not (sort_contains_void s) &&
+    | Same_as_ocaml_repr (Product [s1; s2]) ->
       not (sort_is_product s1) &&
       not (sort_is_product s2)
     | Same_as_ocaml_repr (Product _) -> false

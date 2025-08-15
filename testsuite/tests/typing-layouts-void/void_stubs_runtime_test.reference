@@ -1,0 +1,4 @@
+Test 1: void args/returns
+Test 2: void args, plus an int arg
+Test 3: products of void returns
+All tests passed.
