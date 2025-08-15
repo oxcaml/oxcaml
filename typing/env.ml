@@ -2152,6 +2152,7 @@ let layout_of_lazy_signature_item (item : Subst.Lazy.signature_item) =
     | Val_reg layout -> Some layout
     | Val_ivar _ ->
       Some Jkind_types.Layout.for_instance_var
+    (* CR jrayman: follow the style of [bound_value_identifiers_and_layouts] *)
     | Val_self _ | Val_anc _ ->
       Some Jkind_types.Layout.for_object
     | Val_prim _ | Val_mut _ -> None (* error will be thrown later *)
