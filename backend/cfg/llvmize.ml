@@ -678,8 +678,8 @@ module F = struct
   (* Returns an i1 for whether [op] holds given the arguments of [i] *)
   let test t (op : Operation.test) (i : 'a Cfg.instruction) =
     match op with
-    | Itruetest -> int_comp t Cne i ~imm:(Some 0)
-    | Ifalsetest -> int_comp t Ceq i ~imm:(Some 0)
+    | Itruetest -> int_comp t (Iunsigned Cne) i ~imm:(Some 0)
+    | Ifalsetest -> int_comp t (Iunsigned Ceq) i ~imm:(Some 0)
     | Iinttest int_comp_op -> int_comp t int_comp_op i ~imm:None
     | Iinttest_imm (int_comp_op, imm) ->
       int_comp t int_comp_op i ~imm:(Some imm)

@@ -2210,7 +2210,7 @@ L407:                                                ; preds = %L1
   store i64 %16, ptr %4
   %17 = load i64, ptr %4
   %18 = load i64, ptr %ds
-  %19 = add i64 %18, 104
+  %19 = add i64 %18, 96
   %20 = inttoptr i64 %19 to ptr
   %21 = load i64, ptr %20
   %22 = call i64 @llvm.read_register.i64(metadata !{!"rsp\00"})
@@ -2238,7 +2238,7 @@ L409:                                                ; preds = %L407
   %32 = load i64, ptr %4
   %33 = load i64, ptr %5
   %34 = load i64, ptr %ds
-  %35 = add i64 %34, 104
+  %35 = add i64 %34, 96
   %36 = inttoptr i64 %35 to ptr
   %37 = load i64, ptr %36
   %38 = call i64 @llvm.read_register.i64(metadata !{!"rsp\00"})
