@@ -167,7 +167,7 @@ module Validator = struct
       let res =
         State_set.map
           (fun domain ->
-            match[@ocaml.warning "-4"]
+            match
               ( domain,
                 is_prologue_needed_terminator instr,
                 is_epilogue_needed_terminator instr.desc !fun_name )
