@@ -86,8 +86,6 @@ let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
           ()));
   cfg_with_layout
 
-let fun_name = ref ""
-
 module Validator = struct
   type state =
     | No_prologue_on_stack
@@ -127,13 +125,15 @@ module Validator = struct
     let less_equal = State_set.subset
   end
 
+  type context = { fun_name : string }
+
   module Transfer :
     Cfg_dataflow.Forward_transfer
       with type domain = State_set.t
-       and type context = unit = struct
+       and type context = context = struct
     type domain = State_set.t
 
-    type context = unit
+    type nonrec context = context
 
     type image =
       { normal : domain;
@@ -141,7 +141,7 @@ module Validator = struct
       }
 
     let basic : domain -> Cfg.basic Cfg.instruction -> context -> domain =
-     fun domain instr () ->
+     fun domain instr _ ->
       State_set.map
         (fun domain ->
           match[@ocaml.warning "-4"]
@@ -163,14 +163,14 @@ module Validator = struct
 
     let terminator :
         domain -> Cfg.terminator Cfg.instruction -> context -> image =
-     fun domain instr () ->
+     fun domain instr { fun_name } ->
       let res =
         State_set.map
           (fun domain ->
             match
               ( domain,
                 is_prologue_needed_terminator instr,
-                is_epilogue_needed_terminator instr.desc !fun_name )
+                is_epilogue_needed_terminator instr.desc fun_name )
             with
             | _, true, true ->
               Misc.fatal_error
@@ -187,13 +187,17 @@ module Validator = struct
       { normal = res; exceptional = res }
   end
 
-  include Cfg_dataflow.Forward (Domain) (Transfer)
+  module T = struct
+    include Cfg_dataflow.Forward (Domain) (Transfer)
+  end
+
+  include (T : module type of T with type context := context)
 end
 
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   validate_no_prologue cfg_with_layout;
-  fun_name := Cfg.fun_name (Cfg_with_layout.cfg cfg_with_layout);
+  let fun_name = Cfg.fun_name (Cfg_with_layout.cfg cfg_with_layout) in
   let cfg_with_layout = add_prologue_if_required cfg_with_layout in
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   match !Oxcaml_flags.cfg_prologue_validate with
@@ -201,7 +205,7 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
     match
       Validator.run cfg
         ~init:(Validator.State_set.singleton No_prologue_on_stack)
-        ~handlers_are_entry_points:false ()
+        ~handlers_are_entry_points:false { fun_name }
     with
     | Ok _ -> cfg_with_layout
     | Error () -> Misc.fatal_error "Cfg_prologue.run: dataflow analysis failed")
