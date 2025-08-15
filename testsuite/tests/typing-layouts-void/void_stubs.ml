@@ -1,85 +1,61 @@
 (* TEST
- modules = "stubs.c";
- reference = "${test_source_directory}/void_stubs.reference";
- native;
- flambda2;
- {
-   native;
- }{
-   flags = "-Oclassic";
-   native;
- }{
-   flags = "-O3";
-   native;
- }
+   expect;
 *)
 
-(***********)
-(* Prelude *)
+(* CR layouts v5: improve the error message for disallowed cases *)
 
-type void : void mod everything
-external void : unit -> void = "%unbox_unit"
+(* no product args whatsoever. but we allow (? & ?) returns, including when one
+   or both is void, as long as neither are products *)
 
+type void : void
 type r = #{ v1 : void; v2 : void }
+[%%expect{|
+type void : void
+type r = #{ v1 : void; v2 : void; }
+|}]
 
-let test_num = ref 0
-let start_test name =
-  incr test_num;
-  Printf.printf "Test %d: %s\n" !test_num name
+external ext_void_arg : void -> unit = "foo" "bar"
+[%%expect{|
+external ext_void_arg : void -> unit = "foo" "bar"
+|}]
 
-let[@inline never] use_void (v : void) =
-  let _ : void = v in
-  1
+external ext_void_return : unit -> void = "foo" "bar"
+[%%expect{|
+external ext_void_return : unit -> void = "foo" "bar"
+|}]
 
-(****************************)
-(* Test 1: void arg/returns *)
+external ext_void_in_product_return : unit -> #(string * void) = "foo" "bar"
+[%%expect{|
+external ext_void_in_product_return : unit -> #(string * void) = "foo" "bar"
+|}]
 
-external void_to_void : void -> void = "" "void_to_void"
-external void_to_seven : void -> int = "" "void_to_seven"
-external seven_to_void : int -> void = "" "seven_to_void"
+external ext_void_void_return : unit -> r = "foo" "bar"
+[%%expect{|
+external ext_void_void_return : unit -> r = "foo" "bar"
+|}]
 
-let test1 () =
-  start_test "void args/returns";
-  assert (use_void (void_to_void (void ())) = 1);
-  assert (void_to_seven (void ()) = 7);
-  assert (use_void (seven_to_void 7) = 1);
-  ()
+external ext_void_in_product_arg : #(string * void) -> unit = "foo" "bar"
+[%%expect{|
+Line 1, characters 35-59:
+1 | external ext_void_in_product_arg : #(string * void) -> unit = "foo" "bar"
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+|}]
+external ext_void_void_arg : r -> unit = "foo" "bar"
+[%%expect{|
+Line 1, characters 29-38:
+1 | external ext_void_void_arg : r -> unit = "foo" "bar"
+                                 ^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+|}]
 
-let _ = test1 ()
-
-(*************************************)
-(* Test 2: void arg, plus an int arg *)
-
-external six_to_void_to_seven : int -> void -> int = "" "six_to_seven"
-external void_to_six_to_seven : void -> int -> int = "" "six_to_seven"
-
-let test2 () =
-  start_test "void args, plus an int arg";
-  assert (six_to_void_to_seven 6 (void ()) = 7);
-  assert (void_to_six_to_seven (void ()) 6 = 7);
-  ()
-
-let _ = test2 ()
-
-(************************************)
-(* Test 3: products of void returns *)
-
-external void_to_void_void : void -> #(void * void) = "" "void_to_void"
-external void_to_void_seven : void -> #(void * int) = "" "void_to_seven"
-external void_to_seven_void : void -> #(int * void) = "" "void_to_seven"
-
-let test3 () =
-  start_test "products of void returns";
-  let #(v1, v2) = void_to_void_void (void ()) in
-  assert (use_void v1 = 1 && use_void v2 = 1);
-  let #(v, i) = void_to_void_seven (void ()) in
-  assert (use_void v = 1 && i = 7);
-  let #(i, v) = void_to_seven_void (void ()) in
-  assert (use_void v = 1 && i = 7);
-  ()
-
-let _ = test3 ()
-
-(****************************)
-
-let () = print_endline "All tests passed."
+external ext_void_void_void_return : unit -> #(void * void * void) = "foo" "bar"
+[%%expect{|
+Line 1, characters 37-66:
+1 | external ext_void_void_void_return : unit -> #(void * void * void) = "foo" "bar"
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+|}]
