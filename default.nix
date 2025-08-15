@@ -1,49 +1,50 @@
 {
   nixpkgs ? import <nixpkgs> { },
   src ? ./.,
-  enablePollInsertion ? false,
-  enableRuntime5 ? false,
-  enableFramePointers ? false,
-  enableAddressSanitizer ? false,
-  enableMultidomain ? false,
-  enableStackChecks ? false,
+  addressSanitizer ? false,
+  dev ? false,
+  flambdaInvariants ? false,
+  framePointers ? false,
+  multidomain ? false,
+  ocamltest ? true,
+  pollInsertion ? false,
+  runtime5 ? false,
+  stackChecks ? false,
+  warnError ? true,
+  oxcamlClang ? false,
+  oxcamlLldb ? false,
 }:
 let
-  pkgs = nixpkgs.pkgs or pkgs;
+  pkgs = nixpkgs.pkgs or nixpkgs;
+  inherit (pkgs) lib fetchpatch;
+
+  # Select stdenv based on whether asan is enabled
+  myStdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
 
   # Build configure flags based on features
   configureFlags =
-    pkgs.lib.optionals enablePollInsertion [ "--enable-poll-insertion" ]
-    ++ pkgs.lib.optionals enableRuntime5 [ "--enable-runtime5" ]
-    ++ pkgs.lib.optionals enableFramePointers [ "--enable-frame-pointers" ]
-    ++ pkgs.lib.optionals enableAddressSanitizer [ "--enable-address-sanitizer" ]
-    ++ pkgs.lib.optionals enableMultidomain [ "--enable-multidomain" ]
-    ++ pkgs.lib.optionals enableStackChecks [ "--enable-stack-checks" ];
-
-  # Select stdenv based on whether asan is enabled
-  myStdenv = if enableAddressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
+    let
+      mkFlag = bool: name: if bool then "--enable-${name}" else "--disable-${name}";
+    in
+    [
+      "--cache-file=/dev/null"
+      (mkFlag addressSanitizer "address-sanitizer")
+      (mkFlag dev "dev")
+      (mkFlag flambdaInvariants "flambda-invariants")
+      (mkFlag framePointers "frame-pointers")
+      (mkFlag multidomain "multidomain")
+      (mkFlag pollInsertion "poll-insertion")
+      (mkFlag runtime5 "runtime5")
+      (mkFlag stackChecks "stack-checks")
+      (mkFlag warnError "warn-error")
+      (mkFlag ocamltest "ocamltest")
+    ];
 
   upstream = pkgs.ocaml-ng.ocamlPackages_4_14;
 
-  ocaml = (upstream.ocaml.override { stdenv = myStdenv; }).overrideAttrs ({
-    configurePlatforms = [ ];
-
-    # CR-soon jvanburen: for some reason, SOMETHING is putting nix stuff in our
-    # path even though el8 says not to. We should fix that... For now, set it
-    # explicitly
-    preConfigure =
-      let
-        nonNixPaths = builtins.filter (
-          path: !(pkgs.lib.hasPrefix "/nix" (toString path))
-        ) myStdenv.initialPath;
-      in
-      if nonNixPaths != [ ] then
-        ''
-          export PATH="${pkgs.lib.strings.concatMapStringsSep ":" (x: "${x}/bin") nonNixPaths}:$PATH"
-        ''
-      else
-        "";
-  });
+  ocaml = (upstream.ocaml.override { stdenv = myStdenv; }).overrideAttrs {
+    patches = [ ./arm64-issue-debug-upstream.patch ];
+  };
 
   dune = upstream.dune_3.overrideAttrs (
     new: old: {
@@ -84,115 +85,157 @@ let
       }
     );
 
-  ocamlformat = upstream.ocamlformat_0_24_1;
+  gfortran =
+    # we require fortran for some bigarray tests, but adding `pkgs.gfortran`
+    # directly to `nativeBuildInputs` overrides many `$PATH` entries from
+    # `myStdenv` that we want to keep, such as `as` and `objcopy`
+    pkgs.linkFarm "gfortran-only" { "bin/gfortran" = lib.getExe pkgs.gfortran; };
 
-  # Banner for development environment
-  banner =
-    let
-      enabledness = bool: if bool then "enabled" else "disabled";
-    in
-    ''
-      OxCaml Development Environment
-      ==============================
+  makeLlvm =
+    {
+      pname,
+      version,
+      src,
+      projects,
+    }:
+    pkgs.stdenv.mkDerivation {
+      inherit pname version src;
 
-      Features:
-        Address Sanitizer ${enabledness enableAddressSanitizer}
-        Frame pointers ${enabledness enableFramePointers}
-        Multidomain ${enabledness enableMultidomain}
-        Poll insertion ${enabledness enablePollInsertion}
-        Runtime 5 ${enabledness enableRuntime5}
-        Stack checks ${enabledness enableStackChecks}
+      nativeBuildInputs = with pkgs; [
+        cmake
+        ninja
+        perl
+      ];
 
-      Available commands:
-        make boot-compiler       - Quick build (recommended for development)
-        make boot-_instal        - Quick install (recommended for development)
-        make fmt                 - Auto-format code
-        make                     - Full build
-        make install             - Install
-        make test                - Run all tests
-        make test-one TEST=...   - Run a single test
-    '';
+      buildInputs = with pkgs; [
+        python312
+        libxml2
+        ncurses
+        zlib
+        libedit
+        swig
+      ];
 
+      cmakeFlags = [
+        "-DLLVM_ENABLE_PROJECTS=${lib.strings.concatStringsSep ";" projects}"
+        "-DCMAKE_BUILD_TYPE=Release"
+        "-DLLVM_TARGETS_TO_BUILD=Native"
+        "-DLLDB_ENABLE_PYTHON=ON"
+        "-DLLDB_ENABLE_LIBEDIT=ON"
+        "-DLLDB_ENABLE_CURSES=ON"
+        # Disable tests to avoid needing libc++
+        "-DLLDB_INCLUDE_TESTS=OFF"
+        "-DLLVM_INCLUDE_TESTS=OFF"
+        "-DCLANG_INCLUDE_TESTS=OFF"
+      ];
+
+      sourceRoot = "source/llvm";
+      enableParallelBuilding = true;
+    }
+
+  ;
+
+  lldb = makeLlvm {
+    pname = "oxcaml-lldb";
+    version = "16.0.6-minus0";
+    projects = [
+      "clang"
+      "lldb"
+    ];
+    src = pkgs.fetchFromGitHub {
+      owner = "ocaml-flambda";
+      repo = "llvm-project";
+      tag = "oxcaml-lldb-16.0.6-minus0";
+      sha256 = "sha256-ZIbcC1wj2U9QYt3s1kOYPs+gtaCX+EXfMC3WiiF821E=";
+    };
+  };
+
+  clang = makeLlvm {
+    pname = "llvm";
+    version = "oxcaml-llvmize-16.0.6-minus0";
+
+    projects = [ "clang" ];
+    src = pkgs.fetchFromGitHub {
+      owner = "ocaml-flambda";
+      repo = "llvm-project";
+      tag = "oxcaml-llvmize-16.0.6-minus0";
+      sha256 = "sha256-D3nqlXfj1CI3KaQrERRXaxYCwVDfycOpa0ryeZn8xz8=";
+    };
+  };
 in
 myStdenv.mkDerivation {
   pname = "oxcaml";
   version = "5.2.0+ox";
   inherit src configureFlags;
 
+  OXCAML_LLDB = if oxcamlLldb then "${lldb}/bin/lldb" else null;
+  OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
+
   enableParallelBuilding = true;
 
-  nativeBuildInputs = [
-    pkgs.autoconf
-    pkgs.libtool
-    menhir
-    ocaml
-    dune
-    pkgs.pkg-config
-    pkgs.rsync
-    pkgs.which
-  ];
+  nativeBuildInputs =
+    [
+      pkgs.autoconf
+      menhir
+      ocaml
+      dune
+      pkgs.pkg-config
+      pkgs.rsync
+      pkgs.which
+      pkgs.parallel
+      gfortran # Required for Bigarray Fortran tests
+      upstream.ocamlformat_0_24_1 # required for make fmt
+    ]
+    ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
+    ++ lib.optional oxcamlLldb pkgs.python312;
 
   preConfigure = ''
-    rm -rf _build
-    # Ensure that we still use the same toolchain after we
-    # are out of nix, rather than whatever is in the user's PATH.
-    CC="${myStdenv.cc.meta.mainProgram}"
-
-    if [[ $CC == gcc ]]; then
-        # It seems like oxcaml doesn't pass the build prefix
-        # flag when AS is not as. We should fix that
-        AS=as
-    else
-        AS="$CC -c"
-    fi
-
-    export AS CC
-
-    if [[ $- != *i* ]]; then
-      # Avoid putting dune into the Nix closure by ensuring that the full Nix path
-      # to dune doesn't appear in the output anywhere
-      mkdir -p .local/bin
-      ln -s ${dune}/bin/dune .local/bin/dune
-      configureFlags+=" --cache-file=/dev/null --with-dune=$PWD/.local/bin/dune"
-    fi
+    rm -rf _build _install _runtest
 
     # We don't use autoreconfHook because libtoolize and autoheader are
     # incompatible with ocaml-flambda
     autoconf --force
   '';
 
+  checkPhase = lib.optionalString ocamltest ''
+    make ci
+  '';
+
   postInstall =
     # Get rid of unused artifacts
     ''
       $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
-      (cd $out/bin
-        rm -f dumpobj.byte
-        rm -f extract_externals.byte
-        rm -f generate_cached_generic_functions.exe
-        rm -f ocamlcp
-        rm -f ocamlmklib.byte
-        rm -f ocamlmktop.byte
-        rm -f ocamlobjinfo.byte
-        rm -f ocamlopt.byte
-        rm -f ocamlprof
-      )
+      rm -f $out/bin/dumpobj.byte
+      rm -f $out/bin/extract_externals.byte
+      rm -f $out/bin/generate_cached_generic_functions.exe
+      rm -f $out/bin/ocamlcp
+      rm -f $out/bin/ocamlmklib.byte
+      rm -f $out/bin/ocamlmktop.byte
+      rm -f $out/bin/ocamlobjinfo.byte
+      rm -f $out/bin/ocamlopt.byte
+      rm -f $out/bin/ocamlprof
+      rm -f $out/lib/ocaml/expunge
     '';
 
-  passthru = {
-    inherit configureFlags;
-
-    devTools = [
-      pkgs.gdb
-      pkgs.perf-tools
-      ocamlformat
-      pkgs.git
-    ];
-  };
-
   shellHook = ''
-    export configureFlags+="--enable-dev --enable-warn-error --enable-ocamltest --prefix=$(pwd)/_install"
-    export PS1='$name$ '
-    echo ${pkgs.lib.escapeShellArg banner}
+    export out="$(pwd)/_install"
+    configureFlags+=" --prefix=$out"
+    export PS1="$name$ "
 
+    cat >&2 << EOF
+    OxCaml Development Environment
+    ==============================
+
+    Configure Flags: $configureFlags
+
+    Available commands:
+      make boot-compiler       - Quick build (recommended for development)
+      make boot-_install       - Quick install (recommended for development)
+      make fmt                 - Auto-format code
+      make                     - Full build
+      make install             - Install
+      make test                - Run all tests
+      make test-one TEST=...   - Run a single test
+    EOF
   '';
 }
