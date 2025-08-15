@@ -7281,31 +7281,6 @@ let print_global_state fmt global_state =
 let type_equal env ty1 ty2 = is_equal env false [ty1] [ty2]
 let () = type_equal' := type_equal
 
-let compute_variant_with_null_jkind env type_jkind_purely ty =
-  match get_desc ty with
-  | Tconstr (path, args, _) ->
-    begin try
-      let decl = Env.find_type path env in
-      match decl.type_kind with
-      | Type_variant ([_; {cd_args = Cstr_tuple [{ ca_type; ca_modalities }];
-         _}], Variant_with_null, _) ->
-        let inner_type =
-          apply env decl.type_params ca_type args
-        in
-        let inner_jkind =
-          Jkind.apply_modality_l ca_modalities (type_jkind_purely inner_type)
-        in
-        begin match Jkind.apply_or_null_l inner_jkind with
-        | Ok jkind -> Some jkind
-        | Error () ->
-          Misc.fatal_error "Ctype.compute_variant_with_null_jkind: \
-            the constructor argument type is already maybe-null."
-        end
-      | _ -> None
-    with Not_found | Cannot_apply -> None
-    end
-  | _ -> None
-
 let check_decl_jkind env decl jkind =
   (* CR layouts v2.8: This could use an algorithm like [constrain_type_jkind]
      to expand only as much as needed, but the l/l subtype algorithm is tricky,
@@ -7328,10 +7303,19 @@ let check_decl_jkind env decl jkind =
          and other [Variant_with_null] types.
 
          Normally, this would be handled in [constrain_type_jkind]. *)
-      begin match
-        compute_variant_with_null_jkind env type_jkind_purely inner_ty with
-      | Some jkind -> jkind
-      | None ->
+      begin match unbox_once env inner_ty with
+      | Stepped_or_null { ty; modality; is_open = _ } ->
+          begin match
+            Jkind.apply_modality_l modality (type_jkind_purely ty)
+            |> Jkind.apply_or_null_l with
+          | Ok decl_jkind -> decl_jkind
+          | Error () ->
+            Misc.fatal_error "Ctype.check_decl_jkind: \
+              the constructor argument inside a Variant_with_null \
+              is already maybe-null."
+          end
+      | Final_result | Stepped _ | Stepped_record_unboxed_product _
+      | Missing _ ->
         Jkind.for_abbreviation ~type_jkind_purely
           ~modality:Mode.Modality.Value.Const.id inner_ty
       end
