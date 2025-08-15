@@ -15,25 +15,25 @@ external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 let _ = print_endline "Test 1: Basic include functor with unboxed types"
 
-module MakeStats (M : sig val x : float# val name : string end) = struct
+module Make_stats (M : sig val x : float# val name : string end) = struct
   let doubled = Float_u.mul M.x #2.0
   let squared = Float_u.mul M.x M.x
   let description = M.name ^ "_stats"
 end
 
-module Stats1 = struct
+module Stats = struct
   let x = #3.0
   let name = "three"
-  include functor MakeStats
+  include functor Make_stats
 end
 
-let _ = print_float (Float_u.to_float (id Stats1.x))
+let _ = print_float (Float_u.to_float (id Stats.x))
 let _ = print_endline ""
-let _ = print_float (Float_u.to_float (id Stats1.doubled))
+let _ = print_float (Float_u.to_float (id Stats.doubled))
 let _ = print_endline ""
-let _ = print_float (Float_u.to_float (id Stats1.squared))
+let _ = print_float (Float_u.to_float (id Stats.squared))
 let _ = print_endline ""
-let _ = print_endline (id Stats1.description)
+let _ = print_endline (id Stats.description)
 
 
 let _ = print_endline "Test 2: Include functor with shadowing of mixed values"
@@ -60,21 +60,21 @@ let _ = print_endline ""
 
 let _ = print_endline "Test 3: Multiple include functors with mixed types"
 
-module F1 (M : sig val x : int end) = struct
+module F_3_1 (M : sig val x : int end) = struct
   let x_float = Float_u.of_float (float_of_int M.x)
   let x_string = string_of_int M.x
 end
 
-module F2 (M : sig val x : int val x_float : float# val x_string : string val y : float# end) = struct
+module F_3_2 (M : sig val x : int val x_float : float# val x_string : string val y : float# end) = struct
   let y_doubled = Float_u.mul M.y #2.0
   let y_int64 = Int64_u.of_int64 (Int64.of_float (Float_u.to_float M.y))
 end
 
 module Multi = struct
   let x = 5
-  include functor F1
+  include functor F_3_1
   let y = #7.0
-  include functor F2
+  include functor F_3_2
 end
 
 let _ = print_float (Float_u.to_float Multi.x_float)
@@ -88,7 +88,7 @@ let _ = print_endline ""
 
 let _ = print_endline "Test 4: Include functor that adds unboxed fields to input"
 
-module AddUnboxed (M : sig val n : int val s : string end) = struct
+module Add_unboxed (M : sig val n : int val s : string end) = struct
   let n_float_u = Float_u.of_float (float_of_int M.n)
   let n_int64_u = Int64_u.of_int M.n
 end
@@ -96,7 +96,7 @@ end
 module Enhanced = struct
   let n = 42
   let s = "answer"
-  include functor AddUnboxed
+  include functor Add_unboxed
 end
 
 let _ = print_int (id Enhanced.n)
@@ -110,21 +110,21 @@ let _ = print_endline ""
 
 let _ = print_endline "Test 5: Nested include functor applications"
 
-module AddOne (M : sig val x : float# val final_string : string end) = struct
+module Add_one (M : sig val x : float# val final_string : string end) = struct
   let inner_result = Float_u.add M.x #1.0
   let inner_string = M.final_string ^ "_inner"
 end
 
-module DoubleInner (M : sig val x : float# end) = struct
+module Double_inner (M : sig val x : float# end) = struct
   include M
   let final_string = "final"
-  include functor AddOne
+  include functor Add_one
   let outer_result = Float_u.mul inner_result #2.0
 end
 
 module Nested = struct
   let x = #4.0
-  include functor DoubleInner
+  include functor Double_inner
 end
 
 let _ = print_float (Float_u.to_float (id Nested.outer_result))
@@ -141,14 +141,14 @@ module type S = sig
   val extract : t -> float#
 end
 
-module MakeWrapper (M : sig end) : S = struct
+module Make_wrapper (M : sig end) : S = struct
   type t = float#
   let make x = x
   let extract x = x
 end
 
 module W = struct
-  include functor MakeWrapper
+  include functor Make_wrapper
   let example = make #9.0
 end
 
@@ -158,7 +158,7 @@ let _ = print_endline ""
 
 let _ = print_endline "Test 7: Value-only input to mixed output"
 
-module MixedFromBoxed (M : sig val a : int val b : string end) = struct
+module Mixed_from_boxed (M : sig val a : int val b : string end) = struct
   include M
   let boxed_value = M.a * 2
   let boxed_string = M.b ^ "_modified"
@@ -166,34 +166,34 @@ module MixedFromBoxed (M : sig val a : int val b : string end) = struct
   let unboxed_int64 = Int64_u.of_int64 (Int64.of_int M.a)
 end
 
-module Mixed7 = struct
+module Mixed_7 = struct
   let a = 15
   let b = "test"
-  include functor MixedFromBoxed
+  include functor Mixed_from_boxed
 end
 
-let _ = print_int (id Mixed7.boxed_value)
+let _ = print_int (id Mixed_7.boxed_value)
 let _ = print_endline ""
-let _ = print_endline (id Mixed7.boxed_string)
-let _ = print_float (Float_u.to_float (id Mixed7.unboxed_float))
+let _ = print_endline (id Mixed_7.boxed_string)
+let _ = print_float (Float_u.to_float (id Mixed_7.unboxed_float))
 let _ = print_endline ""
-let _ = print_int (Int64_u.to_int (id Mixed7.unboxed_int64))
+let _ = print_int (Int64_u.to_int (id Mixed_7.unboxed_int64))
 let _ = print_endline ""
 
 
 let _ = print_endline "Test 8: Mixed input with value-only functor"
 
-module type ValueOnlyInput = sig
+module type Value_only_input = sig
   val x : int
   val y : string
 end
 
-module type ValueOnlyOutput = sig
+module type Value_only_output = sig
   val result : int
   val description : string
 end
 
-module ValueOnlyFunctor (M : ValueOnlyInput) : ValueOnlyOutput = struct
+module Value_only_functor (M : Value_only_input) : Value_only_output = struct
   let result = M.x * 3
   let description = M.y ^ "_processed"
 end
@@ -202,7 +202,7 @@ module Result_8 = struct
   let x = 8
   let y = "data"
   let z = #99.0
-  include functor ValueOnlyFunctor
+  include functor Value_only_functor
 end
 
 let _ = print_float (Float_u.to_float (id Result_8.z))
