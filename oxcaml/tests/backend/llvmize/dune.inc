@@ -752,3 +752,54 @@
  (action
   (diff switch_ir.output switch_ir.output.corrected)))
 
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets csel_stub.o csel.cmx csel_ir.output.corrected csel.output.exe)
+ (deps csel_stub.c csel.ml)
+ (action
+  (progn
+   (run clang csel_stub.c -c -g -O3 -I %{project_root}/runtime)
+   (run %{bin:ocamlopt.opt} csel.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (with-outputs-to csel_ir.output.corrected (pipe-outputs (run cat csel.ll) (run ./filter.sh)))
+   (run %{bin:ocamlopt.opt} csel_stub.o csel.cmx -opaque -o csel.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps csel.output.exe)
+ (targets csel.output.corrected)
+ (action
+  (with-outputs-to
+   csel.output.corrected
+   (run ./csel.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps csel.output csel.output.corrected)
+ (action
+  (diff csel.output csel.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps csel_ir.output csel_ir.output.corrected)
+ (action
+  (diff csel_ir.output csel_ir.output.corrected)))
+
