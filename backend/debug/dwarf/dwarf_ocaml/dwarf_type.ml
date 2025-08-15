@@ -195,7 +195,7 @@ end = struct
     | None -> ()
     | Some d ->
       if !Dwarf_flags.ddwarf_shape_reduction_diags
-      then (
+      then
         let diagnostic : DS.Diagnostics.variable_reduction =
           { initial_size_memory = d.shape_size_before_reduction_memory;
             reduced_size_memory = d.shape_size_after_reduction_memory;
@@ -211,20 +211,16 @@ end = struct
                 d.shape_evaluation_diagnostics;
             type_name = d.type_name;
             type_layout = d.type_layout;
-            dwarf_die_size = d.dwarf_die_size_after - d.dwarf_die_size_before
+            dwarf_die_size = d.dwarf_die_size_after - d.dwarf_die_size_before;
+            cms_files_loaded =
+              Shape_reduce.Diagnostics.cms_files_loaded
+                d.shape_reduction_diagnostics;
+            cms_files_cached =
+              Shape_reduce.Diagnostics.cms_files_cached
+                d.shape_reduction_diagnostics
           }
         in
-        DS.add_variable_reduction_diagnostic state diagnostic;
-        let cms_loaded =
-          Shape_reduce.Diagnostics.cms_files_loaded
-            d.shape_reduction_diagnostics
-        in
-        DS.increment_cms_files_loaded state ~by:cms_loaded;
-        let cms_cached =
-          Shape_reduce.Diagnostics.cms_files_cached
-            d.shape_reduction_diagnostics
-        in
-        DS.increment_cms_files_cached state ~by:cms_cached)
+        DS.add_variable_reduction_diagnostic state diagnostic
 end
 
 let base_layout_to_byte_size (sort : base_layout) =
@@ -1759,14 +1755,17 @@ module With_cms_reduce = Shape_reduce.Make (struct
   (* CR sspies: Investigate the performance some more and the balance between
      different variables. *)
 
-  let read_unit_shape ~diagnostics:_ ~unit_name =
+  let read_unit_shape ~diagnostics ~unit_name =
     match StringTable.find_opt cms_file_cache unit_name with
-    | Some shape -> shape
+    | Some shape ->
+      Shape_reduce.Diagnostics.count_cms_file_cached diagnostics;
+      shape
     | None ->
       if !max_number_of_cms_files <= 0
       then None
       else (
         decr max_number_of_cms_files;
+        Shape_reduce.Diagnostics.count_cms_file_loaded diagnostics;
         let filename = String.uncapitalize_ascii unit_name in
         match Load_path.find_normalized (filename ^ ".cms") with
         | exception Not_found -> None

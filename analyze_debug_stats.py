@@ -58,7 +58,7 @@ from io import BytesIO
 class StatEntry:
     def __init__(self, type_name, initial_size_memory, reduced_size_memory, evaluated_size_memory,
                  initial_size, reduced_size, evaluated_size, reduction_steps,
-                 evaluation_steps, dwarf_die_size, file_path):
+                 evaluation_steps, dwarf_die_size, cms_files_loaded, cms_files_cached, file_path):
         self.type_name = type_name
         self.initial_size_memory = initial_size_memory
         self.reduced_size_memory = reduced_size_memory
@@ -69,20 +69,19 @@ class StatEntry:
         self.reduction_steps = reduction_steps
         self.evaluation_steps = evaluation_steps
         self.dwarf_die_size = dwarf_die_size
+        self.cms_files_loaded = cms_files_loaded
+        self.cms_files_cached = cms_files_cached
         self.file_path = file_path
 
 def parse_json_file(file_path):
     """Parse a single JSON file and return (entries, file_metadata) tuple."""
     entries = []
-    file_metadata = {'sourcefile': 'unknown', 'cms_files_loaded': 0, 'cms_files_cached': 0, 'compilation_parameters': None}
+    file_metadata = {'compilation_parameters': None}
     try:
         with open(file_path, 'r') as f:
             data = json.load(f)
 
-        # Extract per-file metadata
-        file_metadata['sourcefile'] = data.get('sourcefile', 'unknown')
-        file_metadata['cms_files_loaded'] = data.get('cms_files_loaded', 0)
-        file_metadata['cms_files_cached'] = data.get('cms_files_cached', 0)
+        # Extract compilation parameters
         file_metadata['compilation_parameters'] = data.get('compilation_parameters', None)
 
         # Process variables
@@ -99,6 +98,8 @@ def parse_json_file(file_path):
                     reduction_steps=int(var_data['reduction_steps']),
                     evaluation_steps=int(var_data['evaluation_steps']),
                     dwarf_die_size=int(var_data['dwarf_die_size']),
+                    cms_files_loaded=int(var_data['cms_files_loaded']),
+                    cms_files_cached=int(var_data['cms_files_cached']),
                     file_path=file_path
                 )
                 entries.append(entry)
@@ -258,12 +259,16 @@ def analyze_stats(search_dir="."):
     # Calculate total DWARF DIEs
     total_dwarf_dies = sum(e.dwarf_die_size for e in all_entries)
 
-    # CMS file statistics for summary
-    cms_loaded_counts = [metadata['cms_files_loaded'] for _, metadata in all_file_metadata]
-    cms_cached_counts = [metadata['cms_files_cached'] for _, metadata in all_file_metadata]
-    total_cms_loaded = sum(cms_loaded_counts)
-    total_cms_cached = sum(cms_cached_counts)
-    files_with_cms_loaded = sum(1 for count in cms_loaded_counts if count > 0)
+    # CMS file statistics for summary - aggregate from per-variable data
+    total_cms_loaded = sum(e.cms_files_loaded for e in all_entries)
+    total_cms_cached = sum(e.cms_files_cached for e in all_entries)
+    
+    # Count files that have variables with CMS files loaded
+    files_with_cms = set()
+    for entry in all_entries:
+        if entry.cms_files_loaded > 0:
+            files_with_cms.add(entry.file_path)
+    files_with_cms_loaded = len(files_with_cms)
 
     # Print summary header
     print("# DWARF Debug Statistics Analysis")
@@ -311,6 +316,8 @@ def analyze_stats(search_dir="."):
     reduction_steps = [e.reduction_steps for e in all_entries]
     evaluation_steps = [e.evaluation_steps for e in all_entries]
     dwarf_die_sizes = [e.dwarf_die_size for e in all_entries]
+    cms_files_loaded = [e.cms_files_loaded for e in all_entries]
+    cms_files_cached = [e.cms_files_cached for e in all_entries]
 
     types = [e.type_name for e in all_entries]
 
@@ -374,6 +381,16 @@ def analyze_stats(search_dir="."):
     print(create_histogram(dwarf_die_sizes, "DWARF DIE Sizes"), end="")
     print_top_values(dwarf_die_sizes, types, "DWARF DIE Sizes")
 
+    # CMS Files Loaded section
+    print("### CMS Files Loaded")
+    print(create_histogram(cms_files_loaded, "CMS Files Loaded"), end="")
+    print_top_values(cms_files_loaded, types, "CMS Files Loaded")
+
+    # CMS Files Cached section
+    print("### CMS Files Cached")
+    print(create_histogram(cms_files_cached, "CMS Files Cached"), end="")
+    print_top_values(cms_files_cached, types, "CMS Files Cached")
+
     # File-level aggregation and statistics
     file_stats = defaultdict(lambda: {'count': 0, 'total_initial_memory': 0, 'total_reduced_memory': 0, 'total_initial': 0, 'total_reduced': 0, 'total_dwarf_dies': 0, 'cms_files_loaded': 0, 'cms_files_cached': 0})
 
@@ -385,19 +402,15 @@ def analyze_stats(search_dir="."):
         file_stats[basename]['total_initial'] += entry.initial_size
         file_stats[basename]['total_reduced'] += entry.reduced_size
         file_stats[basename]['total_dwarf_dies'] += entry.dwarf_die_size
-
-    # Add CMS file counts to file stats
-    for file_path, file_metadata in all_file_metadata:
-        basename = os.path.basename(file_path)
-        file_stats[basename]['cms_files_loaded'] = file_metadata['cms_files_loaded']
-        file_stats[basename]['cms_files_cached'] = file_metadata['cms_files_cached']
+        file_stats[basename]['cms_files_loaded'] += entry.cms_files_loaded
+        file_stats[basename]['cms_files_cached'] += entry.cms_files_cached
 
     print("## File-level Statistics")
     print()
     print("Top 20 files by DWARF DIE size:")
     print()
-    print("| File | Variables | Memory Initial | Memory Reduced | Size Initial | Size Reduced | Total DIEs | CMS Loaded |")
-    print("|------|-----------|----------------|----------------|--------------|--------------|------------|------------|")
+    print("| File | Variables | Memory Initial | Memory Reduced | Size Initial | Size Reduced | Total DIEs | CMS Loaded | CMS Cached |")
+    print("|------|-----------|----------------|----------------|--------------|--------------|------------|------------|------------|")
 
     # Sort by total DIEs descending
     sorted_files = sorted(file_stats.items(),
@@ -410,10 +423,10 @@ def analyze_stats(search_dir="."):
         else:
             source_filename = filename
 
-        print("| {} | {:,} | {:,} | {:,} | {:,} | {:,} | {:,} | {:,} |".format(
+        print("| {} | {:,} | {:,} | {:,} | {:,} | {:,} | {:,} | {:,} | {:,} |".format(
             source_filename, stats['count'], stats['total_initial_memory'],
             stats['total_reduced_memory'], stats['total_initial'], stats['total_reduced'],
-            stats['total_dwarf_dies'], stats['cms_files_loaded']))
+            stats['total_dwarf_dies'], stats['cms_files_loaded'], stats['cms_files_cached']))
 
 if __name__ == "__main__":
     # Parse command line arguments

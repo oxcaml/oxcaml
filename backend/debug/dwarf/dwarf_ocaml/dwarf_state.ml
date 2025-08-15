@@ -29,13 +29,13 @@ module Diagnostics = struct
       evaluation_steps : int;
       type_name : string;
       type_layout : Jkind_types.Sort.Const.t;
-      dwarf_die_size : int
+      dwarf_die_size : int;
+      cms_files_loaded : int;
+      cms_files_cached : int
     }
 
   type t =
-    { mutable variables : variable_reduction list;
-      mutable cms_files_loaded : int;
-      mutable cms_files_cached : int
+    { mutable variables : variable_reduction list
     }
 end
 
@@ -69,7 +69,7 @@ let create ~compilation_unit_header_label ~compilation_unit_proto_die
     function_abstract_instances = Asm_symbol.Tbl.create 42;
     get_file_num;
     sourcefile;
-    diagnostics = { variables = []; cms_files_loaded = 0; cms_files_cached = 0 }
+    diagnostics = { variables = [] }
   }
 
 let compilation_unit_header_label t = t.compilation_unit_header_label
@@ -101,11 +101,6 @@ let diagnostics t = t.diagnostics
 let add_variable_reduction_diagnostic t diagnostic =
   t.diagnostics.variables <- diagnostic :: t.diagnostics.variables
 
-let increment_cms_files_loaded t ~by =
-  t.diagnostics.cms_files_loaded <- t.diagnostics.cms_files_loaded + by
-
-let increment_cms_files_cached t ~by =
-  t.diagnostics.cms_files_cached <- t.diagnostics.cms_files_cached + by
 
 module Debug = struct
   let log f =

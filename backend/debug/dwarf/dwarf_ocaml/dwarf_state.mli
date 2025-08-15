@@ -30,13 +30,13 @@ module Diagnostics : sig
       evaluation_steps : int;
       type_name : string;
       type_layout : Jkind_types.Sort.Const.t;
-      dwarf_die_size : int
+      dwarf_die_size : int;
+      cms_files_loaded : int;
+      cms_files_cached : int
     }
 
   type t =
-    { mutable variables : variable_reduction list;
-      mutable cms_files_loaded : int;
-      mutable cms_files_cached : int
+    { mutable variables : variable_reduction list
     }
 end
 
@@ -85,9 +85,6 @@ val diagnostics : t -> Diagnostics.t
 val add_variable_reduction_diagnostic :
   t -> Diagnostics.variable_reduction -> unit
 
-val increment_cms_files_loaded : t -> by:int -> unit
-
-val increment_cms_files_cached : t -> by:int -> unit
 
 module Debug : sig
   val log : ('a, Format.formatter, unit) format -> 'a
