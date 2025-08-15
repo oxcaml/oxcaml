@@ -56,7 +56,8 @@ let add_symbol t symbol jvar =
   { t with symbols = Symbol.Map.add symbol jvar t.symbols }
 
 let add_code_id t code_id ~addr ~params =
-  { t with code_ids = Code_id.Map.add code_id (addr, params) t.code_ids }
+  let code_ids = Code_id.Map.add code_id (addr, params) t.code_ids in
+  { t with code_ids }
 
 let add_function_slot t fslot jvar =
   { t with function_slots = Function_slot.Map.add fslot jvar t.function_slots }
@@ -110,12 +111,6 @@ let add_if_not_found map item ~mem ~add =
   else
     let var = Jsir.Var.fresh () in
     add item var map
-
-let add_symbol_if_not_found t symbol =
-  { t with
-    symbols =
-      add_if_not_found t.symbols symbol ~mem:Symbol.Map.mem ~add:Symbol.Map.add
-  }
 
 let add_function_slot_if_not_found t slot =
   { t with
