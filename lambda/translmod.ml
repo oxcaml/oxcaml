@@ -934,12 +934,12 @@ and transl_structure ~scopes loc
             match incl.incl_kind with
             | Tincl_structure ->
                 pure_module modl, transl_module ~scopes Tcoerce_none None modl
-            | Tincl_functor ccs ->
+            | Tincl_functor (ccs, input_repr) ->
                 Strict, transl_include_functor ~generative:false modl ccs
-                          scopes loc
-            | Tincl_gen_functor ccs ->
+                          scopes loc ~input_repr
+            | Tincl_gen_functor (ccs, input_repr) ->
                 Strict, transl_include_functor ~generative:true modl ccs
-                          scopes loc
+                          scopes loc ~input_repr
           in
           Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body),
           repr
@@ -998,15 +998,15 @@ and transl_structure ~scopes loc
           transl_structure ~scopes loc fields cc rootpath final_env rem
 
 (* construct functor application in "include functor" case *)
-and transl_include_functor ~generative modl params scopes loc =
+and transl_include_functor ~generative ~input_repr modl params scopes loc =
+  let input_repr = transl_module_representation input_repr in
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module modl
   in
   let modl = transl_module ~scopes Tcoerce_none None modl in
   let params = if generative then [params;[]] else [params] in
   let params = List.map (fun coercion ->
-    (* CR jrayman *)
-    Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
+    Lprim(block_of_module_representation input_repr,
           List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
             coercion,
@@ -1623,10 +1623,12 @@ let transl_store_structure ~scopes ~repr glob map prims aliases str =
             let modl =
               match incl.incl_kind with
               | Tincl_structure -> transl_module ~scopes Tcoerce_none None modl
-              | Tincl_functor ccs ->
+              | Tincl_functor (ccs, input_repr) ->
                   transl_include_functor ~generative:false modl ccs scopes loc
-              | Tincl_gen_functor ccs ->
+                    ~input_repr
+              | Tincl_gen_functor (ccs, input_repr) ->
                   transl_include_functor ~generative:true modl ccs scopes loc
+                    ~input_repr
             in
             Llet(Strict, Lambda.layout_module, mid, mid_duid,
                  Lambda.subst no_env_update subst modl,
@@ -2044,20 +2046,22 @@ let transl_toplevel_item ~scopes item =
       let ids = bound_value_identifiers incl.incl_type in
       let loc = of_location ~scopes incl.incl_loc in
       let modl = incl.incl_mod in
+      let incl_repr =
+        transl_module_representation incl.incl_repr
+      in
       let modl =
         match incl.incl_kind with
         | Tincl_structure ->
             transl_module ~scopes Tcoerce_none None modl
-        | Tincl_functor ccs ->
+        | Tincl_functor (ccs, input_repr) ->
             transl_include_functor ~generative:false modl ccs scopes loc
-        | Tincl_gen_functor ccs ->
+              ~input_repr
+        | Tincl_gen_functor (ccs, input_repr) ->
             transl_include_functor ~generative:true modl ccs scopes loc
+              ~input_repr
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in
-      let incl_repr =
-        transl_module_representation incl.incl_repr
-      in
       let rec set_idents pos = function
         [] ->
           lambda_unit
