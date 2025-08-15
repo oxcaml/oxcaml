@@ -59,10 +59,10 @@ let _ = test1 ()
 (****************************************)
 (* Test 2: void arg mixed with int args *)
 
-external six_to_void_to_seven : int -> void -> int = "six_to_seven" "six_to_seven"
-external void_to_six_to_seven : void -> int -> int = "six_to_seven" "six_to_seven"
-external void_to_six_to_void_to_seven : void -> int -> void -> int = "six_to_seven" "six_to_seven"
-external six_to_void_to_seven_to_eight : int -> void -> int -> int = "six_to_seven_to_eight" "six_to_seven_to_eight"
+external six_to_void_to_seven : int -> void -> int = "six_to_void_to_seven_bytecode" "six_to_seven"
+external void_to_six_to_seven : void -> int -> int = "void_to_six_to_seven_bytecode" "six_to_seven"
+external void_to_six_to_void_to_seven : void -> int -> void -> int = "void_to_six_to_void_to_seven_bytecode" "six_to_seven"
+external six_to_void_to_seven_to_eight : int -> void -> int -> int = "six_to_void_to_seven_to_eight_bytecode" "six_to_seven_to_eight"
 
 let test2 () =
   start_test "void args mixed with int args";
@@ -87,8 +87,8 @@ let _ = test2 ()
 (* Test 3: products of void returns *)
 
 external void_to_void_void : void -> #(void * void) = "void_to_void_bytecode" "void_to_void"
-external void_to_void_seven : void -> #(void * int) = "void_to_seven_bytecode" "void_to_seven"
-external void_to_seven_void : void -> #(int * void) = "void_to_seven_bytecode" "void_to_seven"
+external void_to_void_seven : void -> #(void * int) = "void_to_void_seven_bytecode" "void_to_seven"
+external void_to_seven_void : void -> #(int * void) = "void_to_seven_void_bytecode" "void_to_seven"
 
 let test3 () =
   start_test "products of void returns";
