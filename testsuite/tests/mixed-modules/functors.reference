@@ -10,3 +10,6 @@ Test 3: coercion out, no coercion in
 Test 4: coercion in and out
 6.
 (3)*2
+Test 5: generative functor
+1.
+2.
