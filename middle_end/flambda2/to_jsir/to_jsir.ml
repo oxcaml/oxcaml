@@ -483,6 +483,10 @@ and switch ~env ~res e =
   env, To_jsir_result.end_block_with_last_exn res last
 
 and invalid ~env ~res _msg =
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let (Jsir.Var.fresh (), Prim (Extern "caml_invalid_primitive", [])))
+  in
   env, To_jsir_result.end_block_with_last_exn res Stop
 
 let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
