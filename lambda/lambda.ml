@@ -138,7 +138,6 @@ type primitive =
   | Pignore
     (* Globals *)
   | Pgetglobal of Compilation_unit.t
-  | Psetglobal of Compilation_unit.t
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
@@ -1921,7 +1920,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbytes_to_string | Pbytes_of_string
   | Parray_to_iarray | Parray_of_iarray
   | Pignore -> None
-  | Pgetglobal _ | Psetglobal _ | Pgetpredef _ -> None
+  | Pgetglobal _ | Pgetpredef _ -> None
   | Pmakeblock (_, _, _, m) -> Some m
   | Pmakefloatblock (_, m) -> Some m
   | Pmakeufloatblock (_, m) -> Some m
@@ -2119,7 +2118,7 @@ let primitive_can_raise prim =
   | Pbigarrayset (_, _, _, Pbigarray_unknown_layout) ->
     true
   | Pbytes_to_string | Pbytes_of_string | Parray_of_iarray | Parray_to_iarray
-  | Pignore | Pgetglobal _ | Psetglobal _ | Pgetpredef _ | Pmakeblock _
+  | Pignore | Pgetglobal _ | Pgetpredef _ | Pmakeblock _
   | Pmakefloatblock _ | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
   | Pmakeufloatblock _ | Pufloatfield _ | Psetufloatfield _ | Psequand | Psequor
@@ -2404,7 +2403,7 @@ let primitive_result_layout (p : primitive) =
   | Punboxed_nativeint_array_set_vec _
   | Parrayblit _
     -> layout_unit
-  | Pgetglobal _ | Psetglobal _ | Pgetpredef _ -> layout_module_field
+  | Pgetglobal _ | Pgetpredef _ -> layout_module_field
   | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
   | Pduprecord _ | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
