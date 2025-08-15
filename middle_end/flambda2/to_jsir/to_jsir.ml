@@ -18,7 +18,6 @@ let create_let_simple ~env ~res fvar simple =
       in
       env, res)
     ~symbol:(fun symbol ~coercion:_ ->
-      (* CR selee: come back *)
       To_jsir_env.add_var_alias_of_symbol_exn env ~res ~var:fvar
         ~alias_of:symbol)
     ~const:(fun const ->
