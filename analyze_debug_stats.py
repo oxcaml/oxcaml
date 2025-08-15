@@ -9,14 +9,18 @@
 Analyze DWARF debug stats JSON files and produce aggregated statistics.
 
 Usage:
-    uv run analyze_debug_stats.py [DIRECTORY]
+    uv run analyze_debug_stats.py [OPTIONS] [DIRECTORY]
 
 This script searches for all *.debug-stats.json files recursively from the specified
-directory (or current directory if not provided) and generates a comprehensive markdown 
+directory (or current directory if not provided) and generates a comprehensive markdown
 report of DWARF debugging statistics.
 
 Arguments:
-    DIRECTORY    Directory to search for *.debug-stats.json files (default: current directory)
+    DIRECTORY              Directory to search for *.debug-stats.json files (default: current directory)
+
+Options:
+    --measure FILE         Measure the size of FILE and include in summary. Can be specified multiple times.
+                          Also checks for FILE.debug and includes its size if it exists.
 
 Prerequisites:
     - uv package manager
@@ -35,10 +39,10 @@ Output:
 Example workflow:
     1. Compile OCaml files with debugging flags:
        ocamlopt -ddwarf-shape-reduction-diags -gno-upstream-dwarf -shape-format debugging-shapes -g file.ml
-    
+
     2. Run analysis:
        uv run analyze_debug_stats.py . > report.md
-    
+
     3. View the generated markdown report in a markdown renderer:
        mdcat report.md
        # or open in your preferred markdown viewer/browser
@@ -48,6 +52,7 @@ import json
 import glob
 import os
 import sys
+import argparse
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
@@ -72,6 +77,12 @@ class StatEntry:
         self.cms_files_loaded = cms_files_loaded
         self.cms_files_cached = cms_files_cached
         self.file_path = file_path
+
+class FileMeasurement:
+    def __init__(self, file_path, main_size, debug_size=None):
+        self.file_path = file_path
+        self.main_size = main_size
+        self.debug_size = debug_size
 
 def parse_json_file(file_path):
     """Parse a single JSON file and return (entries, file_metadata) tuple."""
@@ -110,6 +121,28 @@ def parse_json_file(file_path):
         print("Warning: Could not parse {}: {}".format(file_path, e))
 
     return entries, file_metadata
+
+def measure_file_sizes(file_paths):
+    """Measure the sizes of the specified files and their .debug variants if they exist."""
+    measurements = []
+
+    for file_path in file_paths:
+        if not os.path.exists(file_path):
+            print(f"Warning: File '{file_path}' does not exist, skipping measurement.", file=sys.stderr)
+            continue
+
+        # Get the main file size
+        main_size = os.path.getsize(file_path)
+
+        # Check for .debug variant
+        debug_file_path = file_path + ".debug"
+        debug_size = None
+        if os.path.exists(debug_file_path):
+            debug_size = os.path.getsize(debug_file_path)
+
+        measurements.append(FileMeasurement(file_path, main_size, debug_size))
+
+    return measurements
 
 # Not currently used - kept for potential fallback
 def create_histogram_text(values, title, num_buckets=10):
@@ -227,9 +260,21 @@ def create_histogram(values, title, num_buckets=10):
     """Create histogram using matplotlib."""
     if not values:
         return f"{title}: No data\n\n"
-    
+
     svg_data = create_dual_histograms(values, title, num_buckets)
     return f"\n{svg_data}\n"
+
+def display_file_measurements(file_measurements):
+    """Display file size measurements if any are provided."""
+    if file_measurements:
+        print("# File Measurements")
+        print()
+        for measurement in file_measurements:
+            if measurement.debug_size is not None:
+                print("- `{}`: {:,} bytes (+ {:,} bytes .debug)".format(measurement.file_path, measurement.main_size, measurement.debug_size))
+            else:
+                print("- `{}`: {:,} bytes".format(measurement.file_path, measurement.main_size))
+        print()
 
 def analyze_stats(search_dir="."):
     """Main analysis function."""
@@ -262,7 +307,7 @@ def analyze_stats(search_dir="."):
     # CMS file statistics for summary - aggregate from per-variable data
     total_cms_loaded = sum(e.cms_files_loaded for e in all_entries)
     total_cms_cached = sum(e.cms_files_cached for e in all_entries)
-    
+
     # Count files that have variables with CMS files loaded
     files_with_cms = set()
     for entry in all_entries:
@@ -287,10 +332,8 @@ def analyze_stats(search_dir="."):
 
     if not compilation_params_sets:
         print("- **Error:** No compilation parameters found in JSON files.")
-        return
     elif len(compilation_params_sets) > 1:
         print("- **Error:** Files were compiled with different parameters. All files must use the same configuration.")
-        return
     else:
         # All files used the same parameters
         params_dict = dict(list(compilation_params_sets)[0])
@@ -430,15 +473,23 @@ def analyze_stats(search_dir="."):
 
 if __name__ == "__main__":
     # Parse command line arguments
-    if len(sys.argv) > 2:
-        print("Usage: uv run analyze_debug_stats.py [DIRECTORY]", file=sys.stderr)
-        sys.exit(1)
-    
-    search_directory = sys.argv[1] if len(sys.argv) == 2 else "."
-    
+    parser = argparse.ArgumentParser(description='Analyze DWARF debug stats JSON files')
+    parser.add_argument('directory', nargs='?', default='.',
+                       help='Directory to search for *.debug-stats.json files (default: current directory)')
+    parser.add_argument('--measure', action='append', metavar='FILE',
+                       help='Measure the size of FILE and include in summary. Can be specified multiple times.')
+
+    args = parser.parse_args()
+
     # Validate that the directory exists
-    if not os.path.isdir(search_directory):
-        print(f"Error: Directory '{search_directory}' does not exist.", file=sys.stderr)
+    if not os.path.isdir(args.directory):
+        print(f"Error: Directory '{args.directory}' does not exist.", file=sys.stderr)
         sys.exit(1)
-    
-    analyze_stats(search_directory)
+
+    # Measure and display file sizes if requested
+    if args.measure:
+        file_measurements = measure_file_sizes(args.measure)
+        display_file_measurements(file_measurements)
+
+    # Analyze debug stats
+    analyze_stats(args.directory)
