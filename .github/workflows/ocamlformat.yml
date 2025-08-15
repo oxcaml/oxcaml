@@ -7,7 +7,16 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # CR-someday jvanburen: this workflow shouldn't be parameterized over a
+      # matrix, it's just one job
+      matrix:
+        os: [ubuntu-latest]
+        ocaml-compiler:
+          - "4.14.0"
+
     permissions:
       # Required for Magic Nix Cache authentication with GitHub's API
       contents: read
