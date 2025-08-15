@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let make_decision ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
+let make_decision0 ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
     ~is_a_functor ~(recursive : Recursive.t) :
     Function_decl_inlining_decision_type.t =
   (* At present, we follow Closure, taking inlining decisions without first
@@ -58,3 +58,11 @@ let make_decision ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
             small_function_size;
             large_function_size
           }
+
+let make_decision ~inlining_arguments ~inline ~stub ~cost_metrics ~is_a_functor
+    ~recursive : Function_decl_inlining_decision_type.t =
+  if !Clflags.jsir
+  then Jsir_inlining_disabled
+  else
+    make_decision0 ~inlining_arguments ~inline ~stub ~cost_metrics ~is_a_functor
+      ~recursive
