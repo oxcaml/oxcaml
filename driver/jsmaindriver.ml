@@ -16,6 +16,7 @@
 module Options = Main_args.Make_jscomp_options (Main_args.Default.Jsmain)
 
 let main argv ppf =
+  Clflags.jsir := true;
   let program = "ocamlj" in
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -44,6 +45,7 @@ let main argv ppf =
   Clflags.add_arguments __LOC__ Options.list;
   match
     Compenv.readenv ppf Before_args;
+    Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
     Compenv.parse_arguments (ref argv) Compenv.anonymous program;
     Compmisc.read_clflags_from_env ();
     if !Clflags.plugin
