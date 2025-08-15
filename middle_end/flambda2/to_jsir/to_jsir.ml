@@ -13,12 +13,14 @@ let unsupported_multiple_return_variables vars =
 let create_let_simple ~env ~res fvar simple =
   Simple.pattern_match' simple
     ~var:(fun name ~coercion:_ ->
-      let env = To_jsir_env.add_alias_of_var_exn env ~var:fvar ~alias_of:name in
+      let env =
+        To_jsir_env.add_var_alias_of_var_exn env ~var:fvar ~alias_of:name
+      in
       env, res)
     ~symbol:(fun symbol ~coercion:_ ->
       (* CR selee: come back *)
       let env =
-        To_jsir_env.add_alias_of_symbol_exn env ~var:fvar ~alias_of:symbol
+        To_jsir_env.add_var_alias_of_symbol_exn env ~var:fvar ~alias_of:symbol
       in
       env, res)
     ~const:(fun const ->

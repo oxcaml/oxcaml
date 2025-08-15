@@ -86,11 +86,15 @@ let get_value_slot t vslot = Value_slot.Map.find_opt vslot t.value_slots
 
 let get_value_slot_exn t vslot = Value_slot.Map.find vslot t.value_slots
 
-let add_alias_of_var_exn t ~var ~alias_of =
+let add_var_alias_of_var_exn t ~var ~alias_of =
   let jvar = get_var_exn t alias_of in
   { t with vars = Variable.Map.add var jvar t.vars }
 
-let add_alias_of_symbol_exn t ~var ~alias_of =
+let add_symbol_alias_of_var_exn t ~symbol ~alias_of =
+  let jvar = get_var_exn t alias_of in
+  { t with symbols = Symbol.Map.add symbol jvar t.symbols }
+
+let add_var_alias_of_symbol_exn t ~var ~alias_of =
   let jvar =
     match get_symbol t alias_of with
     | None ->
