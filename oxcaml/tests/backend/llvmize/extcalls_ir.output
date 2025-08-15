@@ -355,7 +355,7 @@ L119:                                                ; preds = %L1
   store i64 %13, ptr %7
   %14 = load i64, ptr %7
   %15 = load i64, ptr %ds
-  %16 = add i64 %15, 104
+  %16 = add i64 %15, 96
   %17 = inttoptr i64 %16 to ptr
   %18 = load i64, ptr %17
   %19 = call i64 @llvm.read_register.i64(metadata !{!"rsp\00"})
