@@ -495,44 +495,29 @@ val f : ('a -> 'a -> 'b) -> 'a -> 'b = <fun>
 
 type t = (int -> 'f) as 'f
 [%%expect{|
-type t =
-    int ->
-    Uncaught exception: File "typing/oprint.ml", line 490, characters 11-17: Assertion failed
-
+type t = int -> 'a as 'a
 |}]
 
 type t = (int -> 'f @ local) as 'f
 [%%expect{|
-type t =
-    int ->
-    Uncaught exception: File "typing/oprint.ml", line 490, characters 11-17: Assertion failed
-
+type t = int -> local_ 'a as 'a
 |}]
 
 (* In the following, [local] on [int] doesn't trigger the mode currying on ['f].
    The printing reproduces the parsing. *)
 type t = (int @ local -> 'f) as 'f
 [%%expect{|
-type t =
-    local_ int ->
-    Uncaught exception: File "typing/oprint.ml", line 490, characters 11-17: Assertion failed
-
+type t = local_ int -> 'a as 'a
 |}]
 
 type t = (int @ local -> 'f @ global) as 'f
 [%%expect{|
-type t =
-    local_ int ->
-    Uncaught exception: File "typing/oprint.ml", line 490, characters 11-17: Assertion failed
-
+type t = local_ int -> 'a as 'a
 |}]
 
 type t = (int @ local -> 'f @ local) as 'f
 [%%expect{|
-type t =
-    local_ int ->
-    Uncaught exception: File "typing/oprint.ml", line 490, characters 11-17: Assertion failed
-
+type t = local_ int -> local_ 'a as 'a
 |}]
 
 (* CR zqian: add tests for [Tpoly (_, [])] *)

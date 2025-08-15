@@ -225,10 +225,10 @@ let rec add_native_repr_attributes ty attrs =
   match ty, attrs with
     (* Otyp_poly case might have been added in e.g. tree_of_value_description *)
   | Otyp_poly (vars, ty), _ -> Otyp_poly (vars, add_native_repr_attributes ty attrs)
-  | Otyp_arrow (label, am, a, rm, r), attr_l :: rest ->
+  | Otyp_arrow (label, am, a, Otyp_ret (rm, r)), attr_l :: rest ->
     let r = add_native_repr_attributes r rest in
     let a = add_attribute_list a attr_l in
-    Otyp_arrow (label, am, a, rm, r)
+    Otyp_arrow (label, am, a, Otyp_ret (rm, r))
   | _, [attr_l] -> add_attribute_list ty attr_l
   | _ ->
     assert (List.for_all (fun x -> x = []) attrs);
