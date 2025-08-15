@@ -19,11 +19,17 @@ and collatz_even n cnt =
   else collatz_odd n cnt
 
 (* This makes sure that caml_apply is treated correctly. LLVM complains when
-   parameter counts mismatch for tail calls, but it should be fine in our case.
-   We skip that check in LLVM if the calling conventions are OCaml's. *)
+   parameter counts mismatch for calls with the [musttail] attribute, but it
+   should be fine in our case. We skip that check in LLVM if the calling
+   conventions are OCaml's. *)
 let tail_call_outside n x = Tailcall2.tail_call_me (n + 1) (2 * n) x
+
+let tail_call_outside_prologue n x =
+  Tailcall2.do_nothing () (* Force prologue *);
+  Tailcall2.tail_call_me (n + 1) (2 * n) x
 
 let () =
   Format.printf "fib_general: %d\n" (fib_general ~a0:3 ~a1:7 5);
   Format.printf "collatz_odd: %d\n" (collatz_odd 27 0);
-  tail_call_outside 37 41.3
+  tail_call_outside 37 41.3;
+  tail_call_outside_prologue 37 41.3
