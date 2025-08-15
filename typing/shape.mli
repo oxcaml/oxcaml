@@ -374,6 +374,16 @@ val is_mu_closed : t -> bool
   (** Checks whether the shape is closed with respect to the mu-binders and
       recursive variables inside of it. *)
 
+val size : t -> int
+  (** Naively traverses the shape and counts the number of shape constructors
+      and variant constructors that are encountered. If the shape uses internal
+      sharing (e.g., it is hash-consed as done by shape reduction), constructors
+      will be counted twice compared to the in memory layout of the shape. *)
+
+val size_in_memory : t -> int
+  (** Traverses the shape but compared to [size] avoids double counting by
+      memoizing which shapes have already been encountered. *)
+
 module Map : sig
   type shape = t
   type nonrec t = t Item.Map.t

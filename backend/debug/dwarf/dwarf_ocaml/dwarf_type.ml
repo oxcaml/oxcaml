@@ -86,6 +86,147 @@ module Debug_info = struct
           | End_of_siblings -> indent := !indent - 2)
 end
 
+module Shape_reduction_diagnostics : sig
+  type t
+
+  val create : string -> Layout.t -> t
+
+  val shape_reduce_diagnostics : t -> Shape_reduce.Diagnostics.t
+
+  val shape_evaluation_diagnostics : t -> Type_shape.Evaluation_diagnostics.t
+
+  val record_before_reduction : t -> Shape.t -> unit
+
+  val record_after_reduction : t -> Shape.t -> unit
+
+  val record_after_evaluation : t -> Shape.t -> unit
+
+  val record_before_dwarf_generation : t -> Proto_die.t -> unit
+
+  val record_after_dwarf_generation : t -> Proto_die.t -> unit
+
+  val append_to_dwarf_state : DS.t -> t -> unit
+end = struct
+  type d =
+    { type_name : string;
+      type_layout : Layout.t;
+      mutable shape_size_before_reduction_memory : int;
+      mutable shape_size_after_reduction_memory : int;
+      mutable shape_size_after_evaluation_memory : int;
+      mutable shape_size_before_reduction_tree : int;
+      mutable shape_size_after_reduction_tree : int;
+      mutable shape_size_after_evaluation_tree : int;
+      mutable dwarf_die_size_before : int;
+      mutable dwarf_die_size_after : int;
+      shape_reduction_diagnostics : Shape_reduce.Diagnostics.t;
+      shape_evaluation_diagnostics : Type_shape.Evaluation_diagnostics.t
+    }
+
+  type t = d option
+
+  let create type_name type_layout =
+    if !Dwarf_flags.ddwarf_shape_reduction_diags
+    then
+      Some
+        { type_name;
+          type_layout;
+          shape_size_before_reduction_memory = 0;
+          shape_size_after_reduction_memory = 0;
+          shape_size_after_evaluation_memory = 0;
+          shape_size_before_reduction_tree = 0;
+          shape_size_after_reduction_tree = 0;
+          shape_size_after_evaluation_tree = 0;
+          dwarf_die_size_before = 0;
+          dwarf_die_size_after = 0;
+          shape_reduction_diagnostics =
+            Shape_reduce.Diagnostics.create_diagnostics ();
+          shape_evaluation_diagnostics =
+            Type_shape.Evaluation_diagnostics.create_diagnostics ()
+        }
+    else None
+
+  let shape_reduce_diagnostics d =
+    match d with
+    | None -> Shape_reduce.Diagnostics.no_diagnostics
+    | Some d -> d.shape_reduction_diagnostics
+
+  let shape_evaluation_diagnostics d =
+    match d with
+    | None -> Type_shape.Evaluation_diagnostics.no_diagnostics
+    | Some d -> d.shape_evaluation_diagnostics
+
+  let record_before_reduction d shape =
+    match d with
+    | None -> ()
+    | Some d ->
+      d.shape_size_before_reduction_memory <- Shape.size_in_memory shape;
+      d.shape_size_before_reduction_tree <- Shape.size shape
+
+  let record_after_reduction d shape =
+    match d with
+    | None -> ()
+    | Some d ->
+      d.shape_size_after_reduction_memory <- Shape.size_in_memory shape;
+      d.shape_size_after_reduction_tree <- Shape.size shape
+
+  let record_after_evaluation d shape =
+    match d with
+    | None -> ()
+    | Some d ->
+      d.shape_size_after_evaluation_memory <- Shape.size_in_memory shape;
+      d.shape_size_after_evaluation_tree <- Shape.size shape
+
+  let compute_die_size die =
+    Proto_die.depth_first_fold die ~init:0 ~f:(fun acc d ->
+        match d with DIE _ -> acc + 1 | End_of_siblings -> acc)
+
+  let record_before_dwarf_generation d die =
+    match d with
+    | None -> ()
+    | Some d -> d.dwarf_die_size_before <- compute_die_size die
+
+  let record_after_dwarf_generation d die =
+    match d with
+    | None -> ()
+    | Some d -> d.dwarf_die_size_after <- compute_die_size die
+
+  let append_to_dwarf_state state d =
+    match d with
+    | None -> ()
+    | Some d ->
+      if !Dwarf_flags.ddwarf_shape_reduction_diags
+      then (
+        let diagnostic : DS.Diagnostics.variable_reduction =
+          { initial_size_memory = d.shape_size_before_reduction_memory;
+            reduced_size_memory = d.shape_size_after_reduction_memory;
+            evaluated_size_memory = d.shape_size_after_evaluation_memory;
+            initial_size = d.shape_size_before_reduction_tree;
+            reduced_size = d.shape_size_after_reduction_tree;
+            evaluated_size = d.shape_size_after_evaluation_tree;
+            reduction_steps =
+              Shape_reduce.Diagnostics.reduction_steps
+                d.shape_reduction_diagnostics;
+            evaluation_steps =
+              Type_shape.Evaluation_diagnostics.get_reduction_steps
+                d.shape_evaluation_diagnostics;
+            type_name = d.type_name;
+            type_layout = d.type_layout;
+            dwarf_die_size = d.dwarf_die_size_after - d.dwarf_die_size_before
+          }
+        in
+        DS.add_variable_reduction_diagnostic state diagnostic;
+        let cms_loaded =
+          Shape_reduce.Diagnostics.cms_files_loaded
+            d.shape_reduction_diagnostics
+        in
+        DS.increment_cms_files_loaded state ~by:cms_loaded;
+        let cms_cached =
+          Shape_reduce.Diagnostics.cms_files_cached
+            d.shape_reduction_diagnostics
+        in
+        DS.increment_cms_files_cached state ~by:cms_cached)
+end
+
 let base_layout_to_byte_size (sort : base_layout) =
   match sort with
   | Void -> 0
@@ -1618,7 +1759,7 @@ module With_cms_reduce = Shape_reduce.Make (struct
   (* CR sspies: Investigate the performance some more and the balance between
      different variables. *)
 
-  let read_unit_shape ~unit_name =
+  let read_unit_shape ~diagnostics:_ ~unit_name =
     match StringTable.find_opt cms_file_cache unit_name with
     | Some shape -> shape
     | None ->
@@ -1642,7 +1783,7 @@ module With_cms_reduce = Shape_reduce.Make (struct
             shape))
 end)
 
-let debug_print_reduction_before_and_after = false
+module D = Shape_reduction_diagnostics
 
 (* Search for the first unused variant of [name] in the [name_cache] cache. If
    we come along a type of the same name and type shape, then we simply use that
@@ -1708,14 +1849,22 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
      should simply not emit any DWARF information for this variable instead.
 
      mshinwell: or emit an "unknown layout" type *)
-  | Some { type_shape; type_name; type_layout } -> (
-    let shape_reduce = With_cms_reduce.reduce Env.empty in
-    if debug_print_reduction_before_and_after
-    then Format.eprintf "before reduction %a@." Shape.print type_shape;
+  | Some { type_shape; type_name; type_layout } ->
+    let reduction_diagnostics = D.create type_name type_layout in
+    let shape_reduce =
+      With_cms_reduce.reduce
+        ~diagnostics:(D.shape_reduce_diagnostics reduction_diagnostics)
+        Env.empty
+    in
+    D.record_before_reduction reduction_diagnostics type_shape;
     let type_shape = shape_reduce type_shape in
-    let type_shape = Type_shape.unfold_and_evaluate type_shape in
-    if debug_print_reduction_before_and_after
-    then Format.eprintf "after reduction %a@." Shape.print type_shape;
+    D.record_after_reduction reduction_diagnostics type_shape;
+    let type_shape =
+      Type_shape.unfold_and_evaluate
+        ~diagnostics:(D.shape_evaluation_diagnostics reduction_diagnostics)
+        type_shape
+    in
+    D.record_after_evaluation reduction_diagnostics type_shape;
     let type_shape =
       match unboxed_projection, type_layout with
       | None, Base b -> Known (type_shape, b)
@@ -1741,23 +1890,29 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
          is match the style of unarization variables by appending "_unboxed" for
          the projections to indicate that the type is not the same. *)
     in
-    match type_shape with
-    | Known (type_shape, base_layout) ->
-      let reference =
-        type_shape_to_dwarf_die_with_aliased_name type_name type_shape
-          base_layout ~parent_proto_die ~fallback_value_die
-      in
-      if Debug_info.enabled
-      then (
-        Format.eprintf "%a has become %a@." Uid.print var_uid
-          Asm_targets.Asm_label.print reference;
-        Debug_info.print ~die:parent_proto_die);
-      reference
-    | Unknown base_layout ->
-      let reference = Proto_die.create_reference () in
-      create_base_layout_type ~reference ~parent_proto_die
-        ~name:("unknown @ " ^ Sort.to_string_base base_layout)
-        ~fallback_value_die base_layout ();
-      (* CR sspies: We do have the type name available here, so we could be more
-         precise in principle. *)
-      reference)
+    D.record_before_dwarf_generation reduction_diagnostics parent_proto_die;
+    let reference =
+      match type_shape with
+      | Known (type_shape, base_layout) ->
+        let reference =
+          type_shape_to_dwarf_die_with_aliased_name type_name type_shape
+            base_layout ~parent_proto_die ~fallback_value_die
+        in
+        if Debug_info.enabled
+        then (
+          Format.eprintf "%a has become %a@." Uid.print var_uid
+            Asm_targets.Asm_label.print reference;
+          Debug_info.print ~die:parent_proto_die);
+        reference
+      | Unknown base_layout ->
+        let reference = Proto_die.create_reference () in
+        create_base_layout_type ~reference ~parent_proto_die
+          ~name:("unknown @ " ^ Sort.to_string_base base_layout)
+          ~fallback_value_die base_layout ();
+        (* CR sspies: We do have the type name available here, so we could be
+           more precise in principle. *)
+        reference
+    in
+    D.record_after_dwarf_generation reduction_diagnostics parent_proto_die;
+    D.append_to_dwarf_state state reduction_diagnostics;
+    reference

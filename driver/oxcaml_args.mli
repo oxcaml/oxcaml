@@ -26,6 +26,7 @@ module type Oxcaml_options = sig
   val davail : unit -> unit
   val dranges : unit -> unit
   val ddebug_invariants : unit -> unit
+  val ddwarf_shape_reduction_diags : unit -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : string -> unit

@@ -932,6 +932,22 @@ and print_record_type = function
   | Record_unboxed -> " [@@unboxed]"
   | Record_unboxed_product -> "_unboxed_product"
 
+module With_physical_equality = Identifiable.Make (struct
+  type nonrec t = t
+
+  let compare _ _ = Misc.fatal_error "unimplemented"
+
+  let print _ = Misc.fatal_error "unimplemented"
+
+  let hash x = x.hash
+
+  let equal x y = x == y
+
+  let output _ _ = Misc.fatal_error "unimplemented"
+end)
+
+
+
 let rec strip_head_aliases = function
   | { desc = Alias t; _ } -> strip_head_aliases t
   | t -> t
@@ -1224,6 +1240,87 @@ let is_mu_closed t =
       debruijn_closed_shape bound t) t.fields
     | Mutrec ts -> Ident.Map.for_all (fun _ -> debruijn_closed_shape bound) ts
   in debruijn_closed_shape (-1) t
+
+let rec size (t : t) : int =
+  match t.desc with
+  | Leaf | Error _ | Rec_var _ | Comp_unit _ | Var _ -> 1
+  | Predef (_, args) | Constr (_, args) | Tuple args | Unboxed_tuple args ->
+    List.fold_left (fun acc arg -> acc + size arg) 1 args
+  | Alias sh | Mu sh | Abs (_, sh) | Variant_unboxed { arg_shape = sh; _ }
+  | Proj (sh, _) | Proj_decl (sh, _) -> 1 + size sh
+  | App (f, arg) ->
+    1 + size f + size arg
+  | Arrow (arg, ret)-> 1 + size arg + size ret
+  | Struct items ->
+    Item.Map.fold (fun _ sh acc -> acc + size sh) items 1
+  | Mutrec map ->
+    Ident.Map.fold (fun _ sh acc -> acc + size sh) map 1
+  | Record { fields; _ } ->
+    List.fold_left (fun acc (_, sh, _) -> acc + size sh) 1 fields
+  | Poly_variant constrs ->
+    List.fold_left
+      (fun acc { pv_constr_name = _; pv_constr_args } ->
+        acc
+        + List.fold_left
+            (fun acc' arg -> acc' + size arg)
+            1 pv_constr_args)
+      1 constrs
+  | Variant { complex_constructors; simple_constructors } ->
+    List.fold_left
+      (fun acc { args; _ } ->
+        acc
+        + List.fold_left
+            (fun acc' { field_value = sh, _; _ } ->
+              acc' + size sh)
+            1 args)
+      (1 + List.length simple_constructors)
+      complex_constructors
+
+  let rec size_in_memory_go (visited: unit With_physical_equality.Tbl.t) (t : t) : int =
+    if With_physical_equality.Tbl.mem visited t then 0
+    else
+      (With_physical_equality.Tbl.add visited t ();
+      match t.desc with
+      | Leaf | Error _ | Rec_var _ | Comp_unit _ | Var _ -> 1
+      | Predef (_, args) | Constr (_, args) | Tuple args | Unboxed_tuple args ->
+        List.fold_left (fun acc arg -> acc + size_in_memory_go visited arg) 1 args
+      | Alias sh | Mu sh | Abs (_, sh) | Variant_unboxed { arg_shape = sh; _ }
+      | Proj (sh, _) | Proj_decl (sh, _) -> 1 + size_in_memory_go visited sh
+      | App (f, arg) ->
+        1 + size_in_memory_go visited f + size_in_memory_go visited arg
+      | Arrow (arg, ret)->
+          1 + size_in_memory_go visited arg + size_in_memory_go visited ret
+      | Struct items ->
+        Item.Map.fold
+          (fun _ sh acc -> acc + size_in_memory_go visited sh) items 1
+      | Mutrec map ->
+        Ident.Map.fold
+          (fun _ sh acc -> acc + size_in_memory_go visited sh) map 1
+      | Record { fields; _ } ->
+          List.fold_left
+            (fun acc (_, sh, _) -> acc + size_in_memory_go visited sh) 1 fields
+      | Poly_variant constrs ->
+        List.fold_left
+          (fun acc { pv_constr_name = _; pv_constr_args } ->
+            acc
+            + List.fold_left
+                (fun acc' arg -> acc' + size_in_memory_go visited arg)
+                1 pv_constr_args)
+          1 constrs
+      | Variant { complex_constructors; simple_constructors } ->
+        List.fold_left
+          (fun acc { args; _ } ->
+            acc
+            + List.fold_left
+                (fun acc' { field_value = sh, _; _ } ->
+                  acc' + size_in_memory_go visited sh)
+                1 args)
+          (1 + List.length simple_constructors)
+          complex_constructors)
+
+    let size_in_memory t =
+      size_in_memory_go (With_physical_equality.Tbl.create 10) t
+
 
 
 module Map = struct
