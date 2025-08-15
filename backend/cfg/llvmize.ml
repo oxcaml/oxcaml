@@ -114,6 +114,9 @@ module Llvm_typ = struct
     | Vec128 | Vec256 | Vec512 | Valx2 ->
       Misc.fatal_error "Llvmize.Llvm_typ.of_machtyp_component: not implemented"
 
+  let of_float_width (width : Cmm.float_width) =
+    match width with Float64 -> Double | Float32 -> Float
+
   let rec pp_t ppf t =
     let open Format in
     match t with
@@ -684,11 +687,7 @@ module F = struct
     | Iinttest_imm (int_comp_op, imm) ->
       int_comp t int_comp_op i ~imm:(Some imm)
     | Ifloattest (width, float_comp_op) ->
-      let typ =
-        match width with
-        | Float64 -> Llvm_typ.double
-        | Float32 -> Llvm_typ.float
-      in
+      let typ = Llvm_typ.of_float_width width in
       float_comp t float_comp_op i typ
     | Ioddtest -> odd_test t i
     | Ieventest ->
@@ -1023,11 +1022,7 @@ module F = struct
           pp_ident exn_payload pp_ident exn_handler_addr;
         ins_unreachable t)
     | Float_test { width; lt; eq; gt; uo } ->
-      let typ =
-        match width with
-        | Float64 -> Llvm_typ.double
-        | Float32 -> Llvm_typ.float
-      in
+      let typ = Llvm_typ.of_float_width width in
       let is_lt = float_comp t Cmm.CFlt i typ in
       let ge = fresh_ident t in
       ins_branch_cond_ident t is_lt (get_ident_for_label t lt) ge;
@@ -1342,8 +1337,21 @@ module F = struct
       ins_select t ~cond ~ifso ~ifnot ~dst
         (Llvm_typ.of_machtyp_component i.res.(0).typ);
       ins_store_into_reg t dst i.res.(0)
-    | Intop_atomic _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-    | Specific _ | Name_for_debugger _ | Dls_get | Poll | Pause ->
+    | Static_cast cast_op -> (
+      let do_conv op ~src ~dst =
+        let src_temp = load_reg_to_temp t i.arg.(0) in
+        let converted = fresh_ident t in
+        ins_conv t op ~src:src_temp ~dst:converted ~src_typ:src ~dst_typ:dst;
+        ins_store_into_reg t converted i.res.(0)
+      in
+      match[@warning "-4"] cast_op with
+      | Float_of_int width ->
+        do_conv "sitofp" ~src:Llvm_typ.i64 ~dst:(Llvm_typ.of_float_width width)
+      | Int_of_float width ->
+        do_conv "fptosi" ~src:(Llvm_typ.of_float_width width) ~dst:Llvm_typ.i64
+      | _ -> not_implemented_basic ~msg:"static cast" i)
+    | Intop_atomic _ | Reinterpret_cast _ | Probe_is_enabled _ | Specific _
+    | Name_for_debugger _ | Dls_get | Poll | Pause ->
       not_implemented_basic i
 
   let basic t (i : Cfg.basic Cfg.instruction) =
@@ -1449,7 +1457,8 @@ module F = struct
      [data_item] *)
   let typ_of_data_item (d : Cmm.data_item) =
     match d with
-    | Cdefine_symbol _ | Calign _ | Csymbol_offset _ ->
+    | Cdefine_symbol _ -> Misc.fatal_error "Llvmize: define_symbol"
+    | Calign _ | Csymbol_offset _ ->
       (* [Calign] and [Csymbol_offset] are never produced *)
       Misc.fatal_error "Llvmize: unexpected data item"
     | Cint _ -> Llvm_typ.i64
@@ -1467,7 +1476,8 @@ module F = struct
 
   let pp_const_data_item ppf (d : Cmm.data_item) =
     match d with
-    | Cdefine_symbol _ | Calign _ | Csymbol_offset _ ->
+    | Cdefine_symbol _ -> Misc.fatal_error "Llvmize: define_symbol"
+    | Calign _ | Csymbol_offset _ ->
       Misc.fatal_error "Llvmize.typ_of_data_item: unexpected data item"
     | Cint n | Cint32 n -> fprintf ppf "%nd" n
     | Cint8 n | Cint16 n -> fprintf ppf "%d" n
@@ -1869,7 +1879,12 @@ let llvmir_to_assembly t =
   | Some asm_filename ->
     Ccomp.command
       (String.concat " "
-         ([cmd; "-o"; Filename.quote asm_filename; "-O3"; "-S"]
+         ([ cmd;
+            "-o";
+            Filename.quote asm_filename;
+            "-O3";
+            "-S";
+            "-Wno-override-module" ]
          @ fp_flags
          @ ["-x ir"; Filename.quote t.llvmir_filename]))
 
