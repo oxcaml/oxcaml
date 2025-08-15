@@ -657,6 +657,7 @@ and transl_struct ~scopes loc fields cc rootpath
       {str_final_env; str_items; _} =
   transl_structure ~scopes loc fields cc rootpath str_final_env str_items
 
+(* CR jrayman: move to Types? *)
 and bound_value_identifiers_and_layouts = function
     [] -> []
   | Sig_value(id, {val_kind = Val_reg layout}, _) :: rem ->
@@ -1325,9 +1326,6 @@ let transl_toplevel_item ~scopes item =
       let ids = bound_value_identifiers incl.incl_type in
       let loc = of_location ~scopes incl.incl_loc in
       let modl = incl.incl_mod in
-      let incl_repr =
-        transl_module_representation incl.incl_repr
-      in
       let modl =
         match incl.incl_kind with
         | Tincl_structure ->
@@ -1341,6 +1339,9 @@ let transl_toplevel_item ~scopes item =
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in
+      let incl_repr =
+        transl_module_representation incl.incl_repr
+      in
       let rec set_idents pos = function
         [] ->
           lambda_unit
