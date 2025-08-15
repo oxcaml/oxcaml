@@ -20,6 +20,7 @@ answer
 Test 5: Nested include functor applications
 10.
 final
+final_inner
 Test 6: Include with type
 9.
 Test 7: Value-only input to mixed output
