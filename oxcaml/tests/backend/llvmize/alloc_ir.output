@@ -1229,15 +1229,6 @@ declare cc 104 { { ptr, ptr }, {  } } @caml_call_gc(ptr, ptr)
 declare  void @caml_call_local_realloc()
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
-declare i32 @llvm.eh.ocaml.try()
-define private cc 104 {ptr, ptr, i32} @wrap_try(ptr %r14, ptr %r15) returns_twice noinline {
-  %1 = call i32 @llvm.eh.ocaml.try()
-  %t1 = extractvalue {{ptr, ptr, i32}} poison, 0
-  %t2 = insertvalue {ptr, ptr, i32} %t1, ptr %r14, 0
-  %t3 = insertvalue {ptr, ptr, i32} %t2, ptr %r15, 1
-  %t4 = insertvalue {ptr, ptr, i32} %t3, i32 %1, 2
-  ret {ptr, ptr, i32} %t4
-}
 
 @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1458$2c4$2d$2d66$5d_550 = external global ptr
 @caml_curry2 = external global ptr
