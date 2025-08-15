@@ -6,52 +6,36 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        ocaml-compiler:
-          - "4.14.0"
-
+  check-formatting:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for Magic Nix Cache authentication with GitHub's API
+      contents: read
+      id-token: write
     steps:
-    - name: Checkout the OxCaml repo
-      uses: actions/checkout@master
-      with:
-        path: 'oxcaml'
+      - name: Checkout the OxCaml repo
+        uses: actions/checkout@master
 
-    - name: Checkout the parent branch
-      working-directory: oxcaml
-      run: git fetch origin HEAD --deepen 1
+      - name: Checkout the parent branch
+        run: git fetch origin HEAD --deepen 1
 
-    - name: Setup OCaml ${{ matrix.ocaml-compiler }}
-      uses: ocaml/setup-ocaml@v3
-      with:
-        ocaml-compiler: ${{ matrix.ocaml-compiler }}
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
 
-    - name: Install a recent version of re
-      run: opam install 're>=1.10.0'
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+        with:
+          use-flakehub: false
 
-    - name: Install ocamlformat 0.24.1
-      run: opam pin -y ocamlformat 0.24.1
+      - name: 'Check for the "skip 80ch" PR tag'
+        if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
+        run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
-    - name: autoconf
-      working-directory: oxcaml
-      run: autoconf
-
-    - name: configure
-      working-directory: oxcaml
-      run: |
-        ./configure \
-          --prefix=$GITHUB_WORKSPACE/_install \
-          --enable-middle-end=flambda2 \
-          --with-dune=/bin/false
-
-    - name: 'Check for the "skip 80ch" PR tag'
-      if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
-      run: echo SKIP_80CH=y >> "$GITHUB_ENV"
-
-    - name: Check formatting of Flambda 2 and Cfg code
-      working-directory: oxcaml
-      run: opam exec -- make check-fmt
+      - name: Check formatting
+        run: |
+          nix-shell --run "
+            set -euo pipefail
+            configurePhase
+            git restore .
+            make check-fmt
+          "
