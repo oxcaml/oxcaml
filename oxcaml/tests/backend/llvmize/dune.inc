@@ -549,20 +549,28 @@
   (diff data_decl_ir.output data_decl_ir.output.corrected)))
 
 (rule
- (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
  (targets exn_part1.cmx exn_part2.cmx exn_part2_ir.output.corrected exn_part3.cmx exn.output.exe)
  (deps exn_part1.ml exn_part2.ml exn_part3.ml)
  (action
   (progn
    (run %{bin:ocamlopt.opt} exn_part1.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
-   (run %{bin:ocamlopt.opt} exn_part2.ml -c -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} exn_part2.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to exn_part2_ir.output.corrected (pipe-outputs (run cat exn_part2.ll) (run ./filter.sh)))
    (run %{bin:ocamlopt.opt} exn_part3.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} exn_part1.cmx exn_part2.cmx exn_part3.cmx -opaque -o exn.output.exe))))
 
 (rule
- (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest-llvm)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
  (deps exn_part1.cmx exn_part2.cmx exn_part3.cmx)
  (targets exn.output.corrected)
  (action
@@ -571,15 +579,23 @@
    (run ./exn.output.exe))))
 
 (rule
- (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest-llvm)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
  (deps exn.output exn.output.corrected)
  (action
   (diff exn.output exn.output.corrected)))
 
 (rule
- (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest-llvm)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
  (deps exn_part2_ir.output exn_part2_ir.output.corrected)
  (action
   (diff exn_part2_ir.output exn_part2_ir.output.corrected)))
