@@ -132,7 +132,7 @@ exception Unix_error of error * string * string
 val error_message : error -> string
 (** Return a string describing the given error code. *)
 
-val handle_unix_error : ('a -> 'b) -> 'a -> 'b @@ nonportable
+val handle_unix_error : ('a -> 'b) @ local once -> 'a -> 'b @@ nonportable
 (** [handle_unix_error f x] applies [f] to [x] and returns the result.
    If the exception {!Unix_error} is raised, it prints a message
    describing the error and exits with code 2. *)
@@ -1686,7 +1686,8 @@ val shutdown_connection : in_channel -> unit
    connection is over. *)
 
 val establish_server :
-  (in_channel -> out_channel -> unit) -> addr:sockaddr -> unit @@ nonportable
+  (in_channel -> out_channel -> unit) @ local -> addr:sockaddr
+  -> unit @@ nonportable
 (** Establish a server on the given address.
    The function given as first argument is called for each connection
    with two buffered channels connected to the client. A new process
