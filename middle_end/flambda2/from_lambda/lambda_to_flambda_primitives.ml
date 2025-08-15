@@ -2909,7 +2909,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         kinds offsets new_values
     in
     [H.Sequence writes]
-  | (Psetglobal _ | Praise _ | Pccall _), _ ->
+  | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
        here, either a bug in [Closure_conversion] or the wrong number of \

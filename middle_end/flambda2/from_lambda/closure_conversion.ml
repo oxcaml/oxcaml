@@ -1099,7 +1099,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
         Misc.fatal_error "Closure_conversion.close_primitive: unimplemented"
       | Pmakearray_dynamic _ | Pbytes_to_string | Pbytes_of_string
       | Parray_of_iarray | Parray_to_iarray | Pignore | Pgetglobal _
-      | Psetglobal _ | Pgetpredef _ | Pfield _ | Pfield_computed _ | Psetfield _
+      | Pgetpredef _ | Pfield _ | Pfield_computed _ | Psetfield _
       | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
       | Pccall _ | Praise _ | Pufloatfield _ | Psetufloatfield _ | Psequand
       | Psequor | Pnot | Pmixedfield _ | Psetmixedfield _ | Poffsetref _

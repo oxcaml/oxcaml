@@ -287,7 +287,6 @@ let compute_static_size lam =
     | Pbytes_to_string
     | Pbytes_of_string
     | Pgetglobal _
-    | Psetglobal _
     | Pfield _
     | Pfield_computed _
     | Pfloatfield _

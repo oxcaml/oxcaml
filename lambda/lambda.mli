@@ -122,7 +122,6 @@ type primitive =
   | Pignore
   (* Globals *)
   | Pgetglobal of Compilation_unit.t
-  | Psetglobal of Compilation_unit.t
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
