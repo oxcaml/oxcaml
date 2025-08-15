@@ -127,9 +127,7 @@ end
 (* CR selee: this is extremely sad *)
 let size =
   let compiler_name = Filename.basename Sys.argv.(0) in
-  match compiler_name with
-  | "ocamlj" | "ocamlj.opt" -> 32
-  | _ -> Sys.word_size
+  match compiler_name with "ocamlj" | "ocamlj.opt" -> 32 | _ -> Sys.word_size
 
 module Int32 = struct
   include Int32
