@@ -29,7 +29,9 @@ let create_let_simple ~env ~res fvar simple =
     map [fvar] to this new variable in the environment. *)
 let create_let_prim ~env ~res fvar prim dbg =
   let jvar, env, res = To_jsir_primitive.primitive ~env ~res prim dbg in
-  To_jsir_env.add_var env fvar jvar, res
+  match jvar with
+  | None -> env, res
+  | Some jvar -> To_jsir_env.add_var env fvar jvar, res
 
 (** Apply the function pointed to by the variable in [f] with [args], bind the
     return value to a variable, and return the variable and the result. *)
