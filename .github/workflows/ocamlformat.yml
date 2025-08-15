@@ -6,7 +6,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
-  check-formatting:
+  build:
     runs-on: ubuntu-latest
     permissions:
       # Required for Magic Nix Cache authentication with GitHub's API
