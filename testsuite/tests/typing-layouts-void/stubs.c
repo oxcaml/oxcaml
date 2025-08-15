@@ -31,3 +31,9 @@ value six_to_seven(value six) {
   assert(Long_val(six) == 6);
   return Val_long(7);
 }
+
+value six_to_seven_to_eight(value six, value seven) {
+  assert(Long_val(six) == 6);
+  assert(Long_val(seven) == 7);
+  return Val_long(8);
+}
