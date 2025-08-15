@@ -130,13 +130,6 @@ let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
   collect block.start;
   !visited
 
-(* CR cfalas: move to Cfg_loop_infos? *)
-let is_in_loop : Cfg_loop_infos.t -> Label.t -> bool =
- fun loops label ->
-  Cfg_edge.Map.exists
-    (fun _ (loop : Cfg_loop_infos.loop) -> Label.Set.mem label loop)
-    loops.loops
-
 let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
     (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
   let prologue_block = Cfg.get_block_exn cfg prologue_label in
@@ -146,7 +139,8 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
 
      Having a non-zero stack offset means that the prologue is added after a
      [Pushtrap] or [Stackoffset] which shouldn't be allowed. *)
-  if is_in_loop loop_infos prologue_label || prologue_block.stack_offset <> 0
+  if Cfg_loop_infos.is_in_loop loop_infos prologue_label
+     || prologue_block.stack_offset <> 0
   then false
   else
     let epilogue_blocks =

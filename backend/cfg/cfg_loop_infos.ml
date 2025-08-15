@@ -171,3 +171,9 @@ let build : Cfg.t -> Cfg_dominators.t -> t =
             Format.eprintf "  \n"))
       header_map);
   { back_edges; loops; header_map; loop_depths }
+
+let is_in_loop : t -> Label.t -> bool =
+ fun loops label ->
+  Cfg_edge.Map.exists
+    (fun _ (loop : loop) -> Label.Set.mem label loop)
+    loops.loops
