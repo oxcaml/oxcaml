@@ -4809,18 +4809,18 @@ let report_error ~loc _env = function
         | Comonadic Areality -> Format.dprintf "a structure"
         | _ ->
             Format.dprintf "a %a structure"
-              (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
+              (Style.as_inline_code (Mode.Value.Const.Per_axis.print ax)) right
       in
       Location.errorf ~loc
         "This is %a, but expected to be %a because it is inside %t."
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
+        (Style.as_inline_code (Mode.Value.Const.Per_axis.print ax)) left
+        (Style.as_inline_code (Mode.Value.Const.Per_axis.print ax)) right
         d
   | Submode_failed (Error (ax, {left; right})) ->
       Location.errorf ~loc
         "This is %a, but expected to be %a."
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
+        (Style.as_inline_code (Mode.Value.Const.Per_axis.print ax)) left
+        (Style.as_inline_code (Mode.Value.Const.Per_axis.print ax)) right
   | Unsupported_modal_module e ->
       Location.errorf ~loc
         "Mode annotations on %a are not supported yet."
@@ -4828,8 +4828,8 @@ let report_error ~loc _env = function
   | Legacy_module (reason, Error (ax, {left; right})) ->
       Location.errorf ~loc
         "This is %a, but expected to be %a because it is a %a."
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
+        (Style.as_inline_code (Mode.Value.Const.Per_axis.print ax)) left
+        (Style.as_inline_code (Mode.Value.Const.Per_axis.print ax)) right
         print_legacy_module reason
 
 let report_error env ~loc err =

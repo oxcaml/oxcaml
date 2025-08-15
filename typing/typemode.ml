@@ -151,8 +151,7 @@ let transl_mod_bounds annots =
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
     match Axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
-      let (module A) = Axis.get axis in
-      let is_top = A.le A.max mode in
+      let is_top = Per_axis.le axis (Per_axis.max axis) mode in
       if is_top
       then
         (* CR layouts v2.8: This warning is disabled for now because transl_type_decl

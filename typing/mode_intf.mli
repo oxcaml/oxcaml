@@ -458,10 +458,6 @@ module type S = sig
               Visibility.Const.t )
             modes
 
-      (** Gets the normal lattice for comonadic axes and the "op"ped lattice for
-        monadic ones. *)
-      val lattice_of_axis : 'a Axis.t -> (module Lattice with type t = 'a)
-
       module Option : sig
         type some = t
 
@@ -487,9 +483,8 @@ module type S = sig
         val set : 'a Axis.t -> 'a option -> t -> t
       end
 
-      val is_max : 'a Axis.t -> 'a -> bool
-
-      val is_min : 'a Axis.t -> 'a -> bool
+      module Per_axis :
+        Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
 
       val split : t -> (Monadic.Const.t, Comonadic.Const.t) monadic_comonadic
 
@@ -504,9 +499,6 @@ module type S = sig
 
       (** Similar to [Alloc.partial_apply] but for constants *)
       val partial_apply : t -> t
-
-      (** Prints a constant on any axis. *)
-      val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
 
     type error = Error : 'a Axis.t * 'a Solver.error -> error
