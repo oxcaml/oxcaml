@@ -8,12 +8,13 @@ define void @camlArray_rev__code_begin() { ret void }
 @camlArray_rev = global { ptr } { ptr @camlArray_rev__rev_1 }, align 8
 @.header.camlArray_rev__rev_1 = global { i64 } { i64 3063 }, align 8
 @camlArray_rev__rev_1 = global { ptr, i64 } { ptr @camlArray_rev__rev_HIDE_STAMP, i64 108086391056891909 }, align 8
-define cc 104 { { ptr }, { i64 } } @camlArray_rev__rev_HIDE_STAMP(ptr %0, i64 %1)  {
+define cc 104 { { ptr, ptr }, { i64 } } @camlArray_rev__rev_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64
-  store i64 %1, ptr %3
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %4 = alloca i64
+  store i64 %2, ptr %4
   %5 = alloca i64
   %6 = alloca i64
   %7 = alloca i64
@@ -58,256 +59,265 @@ define cc 104 { { ptr }, { i64 } } @camlArray_rev__rev_HIDE_STAMP(ptr %0, i64 %1
   %46 = alloca i64
   %47 = alloca i64
   %48 = alloca i64
+  %49 = alloca i64
   br label %L1
 L1:
   br label %L101
 L101:                                                ; preds = %L1
-  %49 = load i64, ptr %3
-  store i64 %49, ptr %4
-  store ptr @camlArray_rev_data, ptr %5
-  %50 = load i64, ptr %5
-  store i64 %50, ptr %6
+  %50 = load i64, ptr %4
+  store i64 %50, ptr %5
+  store ptr @camlArray_rev_data, ptr %6
   %51 = load i64, ptr %6
-  %52 = add i64 %51, 8
-  store i64 %52, ptr %6
-  %53 = load i64, ptr %6
-  %54 = add i64 %53, 0
-  %55 = inttoptr i64 %54 to ptr
-  %56 = load i64, ptr %55
-  store i64 %56, ptr %7
-  %57 = load i64, ptr %7
+  store i64 %51, ptr %7
+  %52 = load i64, ptr %7
+  %53 = add i64 %52, 8
+  store i64 %53, ptr %7
+  %54 = load i64, ptr %7
+  %55 = add i64 %54, 0
+  %56 = inttoptr i64 %55 to ptr
+  %57 = load i64, ptr %56
   store i64 %57, ptr %8
   %58 = load i64, ptr %8
   store i64 %58, ptr %9
   %59 = load i64, ptr %9
-  %60 = ashr i64 %59, 1
-  store i64 %60, ptr %9
-  %61 = load i64, ptr %9
+  store i64 %59, ptr %10
+  %60 = load i64, ptr %10
+  %61 = ashr i64 %60, 1
   store i64 %61, ptr %10
   %62 = load i64, ptr %10
   store i64 %62, ptr %11
   %63 = load i64, ptr %11
-  %64 = lshr i64 %63, 63
-  store i64 %64, ptr %11
-  %65 = load i64, ptr %10
+  store i64 %63, ptr %12
+  %64 = load i64, ptr %12
+  %65 = lshr i64 %64, 63
   store i64 %65, ptr %12
-  %66 = load i64, ptr %12
-  %67 = load i64, ptr %11
-  %68 = add i64 %66, %67
-  store i64 %68, ptr %12
-  %69 = load i64, ptr %12
+  %66 = load i64, ptr %11
+  store i64 %66, ptr %13
+  %67 = load i64, ptr %13
+  %68 = load i64, ptr %12
+  %69 = add i64 %67, %68
   store i64 %69, ptr %13
   %70 = load i64, ptr %13
-  %71 = ashr i64 %70, 1
-  store i64 %71, ptr %13
-  %72 = load i64, ptr %13
+  store i64 %70, ptr %14
+  %71 = load i64, ptr %14
+  %72 = ashr i64 %71, 1
   store i64 %72, ptr %14
   %73 = load i64, ptr %14
-  %74 = shl i64 %73, 1
-  store i64 %74, ptr %14
-  %75 = load i64, ptr %14
+  store i64 %73, ptr %15
+  %74 = load i64, ptr %15
+  %75 = shl i64 %74, 1
   store i64 %75, ptr %15
   %76 = load i64, ptr %15
-  %77 = add i64 %76, -1
-  store i64 %77, ptr %15
-  %78 = load i64, ptr %15
+  store i64 %76, ptr %16
+  %77 = load i64, ptr %16
+  %78 = add i64 %77, -1
   store i64 %78, ptr %16
   %79 = load i64, ptr %16
-  %80 = icmp slt i64 %79, 1
-  br i1 %80, label %L144, label %81
-81:
-  %82 = load i64, ptr %16
-  %83 = icmp sgt i64 %82, 1
-  br i1 %83, label %L114, label %L114
+  store i64 %79, ptr %17
+  %80 = load i64, ptr %17
+  %81 = icmp slt i64 %80, 1
+  br i1 %81, label %L144, label %82
+82:
+  %83 = load i64, ptr %17
+  %84 = icmp sgt i64 %83, 1
+  br i1 %84, label %L114, label %L114
 L114:                                                ; preds = %L101
-  store i64 1, ptr %18
-  %84 = load i64, ptr %18
-  store i64 %84, ptr %19
+  store i64 1, ptr %19
   %85 = load i64, ptr %19
-  store i64 %85, ptr %17
+  store i64 %85, ptr %20
+  %86 = load i64, ptr %20
+  store i64 %86, ptr %18
   br label %L116
 L116:                                                ; preds = %L114, %L137
-  store ptr @camlArray_rev_data, ptr %20
-  %86 = load i64, ptr %20
-  %87 = add i64 %86, 0
-  %88 = inttoptr i64 %87 to ptr
-  %89 = load i64, ptr %88
-  store i64 %89, ptr %21
-  %90 = load i64, ptr %21
+  store ptr @camlArray_rev_data, ptr %21
+  %87 = load i64, ptr %21
+  %88 = add i64 %87, 0
+  %89 = inttoptr i64 %88 to ptr
+  %90 = load i64, ptr %89
   store i64 %90, ptr %22
-  %91 = load i64, ptr %17
+  %91 = load i64, ptr %22
   store i64 %91, ptr %23
-  %92 = load i64, ptr %23
-  %93 = shl i64 %92, 2
-  store i64 %93, ptr %23
-  %94 = load i64, ptr %22
+  %92 = load i64, ptr %18
+  store i64 %92, ptr %24
+  %93 = load i64, ptr %24
+  %94 = shl i64 %93, 2
   store i64 %94, ptr %24
-  %95 = load i64, ptr %24
-  %96 = load i64, ptr %23
-  %97 = add i64 %95, %96
-  store i64 %97, ptr %24
-  %98 = load i64, ptr %24
+  %95 = load i64, ptr %23
+  store i64 %95, ptr %25
+  %96 = load i64, ptr %25
+  %97 = load i64, ptr %24
+  %98 = add i64 %96, %97
   store i64 %98, ptr %25
   %99 = load i64, ptr %25
-  %100 = add i64 %99, -4
-  store i64 %100, ptr %25
-  %101 = load i64, ptr %25
-  %102 = add i64 %101, 0
-  %103 = inttoptr i64 %102 to ptr
-  %104 = load i64, ptr %103
-  store i64 %104, ptr %26
-  %105 = load i64, ptr %26
+  store i64 %99, ptr %26
+  %100 = load i64, ptr %26
+  %101 = add i64 %100, -4
+  store i64 %101, ptr %26
+  %102 = load i64, ptr %26
+  %103 = add i64 %102, 0
+  %104 = inttoptr i64 %103 to ptr
+  %105 = load i64, ptr %104
   store i64 %105, ptr %27
-  %106 = load i64, ptr %8
+  %106 = load i64, ptr %27
   store i64 %106, ptr %28
-  %107 = load i64, ptr %28
-  %108 = load i64, ptr %17
-  %109 = sub i64 %107, %108
-  store i64 %109, ptr %28
-  %110 = load i64, ptr %28
+  %107 = load i64, ptr %9
+  store i64 %107, ptr %29
+  %108 = load i64, ptr %29
+  %109 = load i64, ptr %18
+  %110 = sub i64 %108, %109
   store i64 %110, ptr %29
   %111 = load i64, ptr %29
-  %112 = add i64 %111, -1
-  store i64 %112, ptr %29
-  %113 = load i64, ptr %29
+  store i64 %111, ptr %30
+  %112 = load i64, ptr %30
+  %113 = add i64 %112, -1
   store i64 %113, ptr %30
-  %114 = load i64, ptr %17
+  %114 = load i64, ptr %30
   store i64 %114, ptr %31
-  %115 = load i64, ptr %31
-  %116 = shl i64 %115, 2
-  store i64 %116, ptr %31
-  %117 = load i64, ptr %22
+  %115 = load i64, ptr %18
+  store i64 %115, ptr %32
+  %116 = load i64, ptr %32
+  %117 = shl i64 %116, 2
   store i64 %117, ptr %32
-  %118 = load i64, ptr %32
-  %119 = load i64, ptr %31
-  %120 = add i64 %118, %119
-  store i64 %120, ptr %32
-  %121 = load i64, ptr %32
+  %118 = load i64, ptr %23
+  store i64 %118, ptr %33
+  %119 = load i64, ptr %33
+  %120 = load i64, ptr %32
+  %121 = add i64 %119, %120
   store i64 %121, ptr %33
   %122 = load i64, ptr %33
-  %123 = add i64 %122, -4
-  store i64 %123, ptr %33
-  %124 = load i64, ptr %30
+  store i64 %122, ptr %34
+  %123 = load i64, ptr %34
+  %124 = add i64 %123, -4
   store i64 %124, ptr %34
-  %125 = load i64, ptr %34
-  %126 = shl i64 %125, 2
-  store i64 %126, ptr %34
-  %127 = load i64, ptr %22
+  %125 = load i64, ptr %31
+  store i64 %125, ptr %35
+  %126 = load i64, ptr %35
+  %127 = shl i64 %126, 2
   store i64 %127, ptr %35
-  %128 = load i64, ptr %35
-  %129 = load i64, ptr %34
-  %130 = add i64 %128, %129
-  store i64 %130, ptr %35
-  %131 = load i64, ptr %35
+  %128 = load i64, ptr %23
+  store i64 %128, ptr %36
+  %129 = load i64, ptr %36
+  %130 = load i64, ptr %35
+  %131 = add i64 %129, %130
   store i64 %131, ptr %36
   %132 = load i64, ptr %36
-  %133 = add i64 %132, -4
-  store i64 %133, ptr %36
-  %134 = load i64, ptr %36
-  %135 = add i64 %134, 0
-  %136 = inttoptr i64 %135 to ptr
-  %137 = load i64, ptr %136
-  store i64 %137, ptr %37
-  %138 = load i64, ptr %33
-  %139 = add i64 %138, 0
-  %140 = inttoptr i64 %139 to ptr
-  %141 = load i64, ptr %37
-  store i64 %141, ptr %140
-  store i64 1, ptr %38
+  store i64 %132, ptr %37
+  %133 = load i64, ptr %37
+  %134 = add i64 %133, -4
+  store i64 %134, ptr %37
+  %135 = load i64, ptr %37
+  %136 = add i64 %135, 0
+  %137 = inttoptr i64 %136 to ptr
+  %138 = load i64, ptr %137
+  store i64 %138, ptr %38
+  %139 = load i64, ptr %34
+  %140 = add i64 %139, 0
+  %141 = inttoptr i64 %140 to ptr
   %142 = load i64, ptr %38
-  store i64 %142, ptr %39
-  %143 = load i64, ptr %30
+  store i64 %142, ptr %141
+  store i64 1, ptr %39
+  %143 = load i64, ptr %39
   store i64 %143, ptr %40
-  %144 = load i64, ptr %40
-  %145 = shl i64 %144, 2
-  store i64 %145, ptr %40
-  %146 = load i64, ptr %22
+  %144 = load i64, ptr %31
+  store i64 %144, ptr %41
+  %145 = load i64, ptr %41
+  %146 = shl i64 %145, 2
   store i64 %146, ptr %41
-  %147 = load i64, ptr %41
-  %148 = load i64, ptr %40
-  %149 = add i64 %147, %148
-  store i64 %149, ptr %41
-  %150 = load i64, ptr %41
+  %147 = load i64, ptr %23
+  store i64 %147, ptr %42
+  %148 = load i64, ptr %42
+  %149 = load i64, ptr %41
+  %150 = add i64 %148, %149
   store i64 %150, ptr %42
   %151 = load i64, ptr %42
-  %152 = add i64 %151, -4
-  store i64 %152, ptr %42
-  %153 = load i64, ptr %42
-  %154 = add i64 %153, 0
-  %155 = inttoptr i64 %154 to ptr
-  %156 = load i64, ptr %27
-  store i64 %156, ptr %155
-  store i64 1, ptr %43
-  %157 = load i64, ptr %43
-  store i64 %157, ptr %44
-  %158 = load i64, ptr %17
-  %159 = load i64, ptr %16
-  %160 = icmp slt i64 %158, %159
-  br i1 %160, label %L137, label %161
-161:
-  %162 = load i64, ptr %17
-  %163 = load i64, ptr %16
-  %164 = icmp sgt i64 %162, %163
-  br i1 %164, label %L137, label %L140
+  store i64 %151, ptr %43
+  %152 = load i64, ptr %43
+  %153 = add i64 %152, -4
+  store i64 %153, ptr %43
+  %154 = load i64, ptr %43
+  %155 = add i64 %154, 0
+  %156 = inttoptr i64 %155 to ptr
+  %157 = load i64, ptr %28
+  store i64 %157, ptr %156
+  store i64 1, ptr %44
+  %158 = load i64, ptr %44
+  store i64 %158, ptr %45
+  %159 = load i64, ptr %18
+  %160 = load i64, ptr %17
+  %161 = icmp slt i64 %159, %160
+  br i1 %161, label %L137, label %162
+162:
+  %163 = load i64, ptr %18
+  %164 = load i64, ptr %17
+  %165 = icmp sgt i64 %163, %164
+  br i1 %165, label %L137, label %L140
 L137:                                                ; preds = %L116
-  %165 = load i64, ptr %17
-  store i64 %165, ptr %45
-  %166 = load i64, ptr %45
-  %167 = add i64 %166, 2
-  store i64 %167, ptr %45
-  %168 = load i64, ptr %45
+  %166 = load i64, ptr %18
+  store i64 %166, ptr %46
+  %167 = load i64, ptr %46
+  %168 = add i64 %167, 2
   store i64 %168, ptr %46
   %169 = load i64, ptr %46
-  store i64 %169, ptr %17
+  store i64 %169, ptr %47
+  %170 = load i64, ptr %47
+  store i64 %170, ptr %18
   br label %L116
 L140:                                                ; preds = %L116
-  store i64 1, ptr %47
-  %170 = load i64, ptr %47
-  store i64 %170, ptr %3
-  %171 = extractvalue { { { ptr }, { i64 } } } poison, 0
-  %172 = load ptr, ptr %ds
-  %173 = insertvalue { { ptr }, { i64 } } %171, ptr %172, 0, 0
-  %174 = load i64, ptr %3
-  %175 = insertvalue { { ptr }, { i64 } } %173, i64 %174, 1, 0
-  ret { { ptr }, { i64 } } %175
-L144:                                                ; preds = %L101
   store i64 1, ptr %48
-  %176 = load i64, ptr %48
-  store i64 %176, ptr %3
-  %177 = extractvalue { { { ptr }, { i64 } } } poison, 0
-  %178 = load ptr, ptr %ds
-  %179 = insertvalue { { ptr }, { i64 } } %177, ptr %178, 0, 0
-  %180 = load i64, ptr %3
-  %181 = insertvalue { { ptr }, { i64 } } %179, i64 %180, 1, 0
-  ret { { ptr }, { i64 } } %181
+  %171 = load i64, ptr %48
+  store i64 %171, ptr %4
+  %172 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %173 = load ptr, ptr %ds
+  %174 = insertvalue { { ptr, ptr }, { i64 } } %172, ptr %173, 0, 0
+  %175 = load ptr, ptr %alloc
+  %176 = insertvalue { { ptr, ptr }, { i64 } } %174, ptr %175, 0, 1
+  %177 = load i64, ptr %4
+  %178 = insertvalue { { ptr, ptr }, { i64 } } %176, i64 %177, 1, 0
+  ret { { ptr, ptr }, { i64 } } %178
+L144:                                                ; preds = %L101
+  store i64 1, ptr %49
+  %179 = load i64, ptr %49
+  store i64 %179, ptr %4
+  %180 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %181 = load ptr, ptr %ds
+  %182 = insertvalue { { ptr, ptr }, { i64 } } %180, ptr %181, 0, 0
+  %183 = load ptr, ptr %alloc
+  %184 = insertvalue { { ptr, ptr }, { i64 } } %182, ptr %183, 0, 1
+  %185 = load i64, ptr %4
+  %186 = insertvalue { { ptr, ptr }, { i64 } } %184, i64 %185, 1, 0
+  ret { { ptr, ptr }, { i64 } } %186
 }
 
-define cc 104 { { ptr }, { i64 } } @camlArray_rev__entry(ptr %0)  {
+define cc 104 { { ptr, ptr }, { i64 } } @camlArray_rev__entry(ptr %0, ptr %1)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %2 = alloca i64
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %3 = alloca i64
   %4 = alloca i64
   %5 = alloca i64
   %6 = alloca i64
+  %7 = alloca i64
   br label %L1
 L1:
   br label %L151
 L151:                                                ; preds = %L1
-  store ptr @camlArray_rev, ptr %4
-  %7 = load i64, ptr %4
-  store i64 %7, ptr %5
+  store ptr @camlArray_rev, ptr %5
   %8 = load i64, ptr %5
-  store i64 %8, ptr %3
-  store i64 1, ptr %6
+  store i64 %8, ptr %6
   %9 = load i64, ptr %6
-  store i64 %9, ptr %2
-  %10 = extractvalue { { { ptr }, { i64 } } } poison, 0
-  %11 = load ptr, ptr %ds
-  %12 = insertvalue { { ptr }, { i64 } } %10, ptr %11, 0, 0
-  %13 = load i64, ptr %2
-  %14 = insertvalue { { ptr }, { i64 } } %12, i64 %13, 1, 0
-  ret { { ptr }, { i64 } } %14
+  store i64 %9, ptr %4
+  store i64 1, ptr %7
+  %10 = load i64, ptr %7
+  store i64 %10, ptr %3
+  %11 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %12 = load ptr, ptr %ds
+  %13 = insertvalue { { ptr, ptr }, { i64 } } %11, ptr %12, 0, 0
+  %14 = load ptr, ptr %alloc
+  %15 = insertvalue { { ptr, ptr }, { i64 } } %13, ptr %14, 0, 1
+  %16 = load i64, ptr %3
+  %17 = insertvalue { { ptr, ptr }, { i64 } } %15, i64 %16, 1, 0
+  ret { { ptr, ptr }, { i64 } } %17
 }
 
 declare i64 @llvm.read_register.i64(metadata)

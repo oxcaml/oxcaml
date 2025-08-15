@@ -23,6 +23,7 @@ backend/llvmize/float_ops.ml
 backend/llvmize/float_ops_main.ml
 backend/llvmize/multi_ret.ml
 backend/llvmize/multi_ret_main.ml
+backend/llvmize/alloc.ml
 backend/oxcaml_dwarf/test_unboxed_dwarf.ml
 backend/oxcaml_dwarf/test_datatypes_dwarf.ml
 backend/oxcaml_dwarf/test_simd_dwarf.ml
