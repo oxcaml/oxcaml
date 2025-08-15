@@ -36,7 +36,7 @@ let simple ~env ~res simple =
   Simple.pattern_match' simple
     ~var:(fun name ~coercion:_ -> To_jsir_env.get_var_exn env name, res)
     ~symbol:(fun symbol ~coercion:_ ->
-      To_jsir_env.get_symbol_exn env symbol, res)
+      To_jsir_env.get_symbol_exn env ~res symbol)
     ~const:(fun const ->
       let var = Jsir.Var.fresh () in
       let expr = Jsir.Constant (reg_width_const const) in
