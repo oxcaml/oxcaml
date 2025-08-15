@@ -12,7 +12,9 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
         | Deleted _ -> env, res
         | Code_id { code_id; only_full_applications = _ } ->
           (* CR selee: thread through debug information *)
-          let addr, params, fn_var = To_jsir_env.get_code_id_exn env code_id in
+          let ({ addr; params; closure = fn_var } : To_jsir_env.code_id) =
+            To_jsir_env.get_code_id_exn env code_id
+          in
           let expr : Jsir.expr = Closure (params, (addr, []), None) in
           (* If this function slot is used, its corresponding variable should've
              already been added to the environment when the code using it was

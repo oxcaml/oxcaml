@@ -101,11 +101,12 @@ let check_my_closure ~env x =
   | None ->
     Misc.fatal_error
       "Expected to see [my_closure], instead found a non-variable"
-  | Some (v, _coercion) when not (To_jsir_env.is_my_closure env v) ->
-    Misc.fatal_error
-      "Trying to project from a closure that doesn't belong to the body of the \
-       function being translated"
-  | Some _ -> ()
+  | Some (v, _coercion) ->
+    if not (To_jsir_env.is_my_closure env v)
+    then
+      Misc.fatal_error
+        "Trying to project from a closure that doesn't belong to the body of \
+         the function being translated"
 
 let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   let use_prim' prim = use_prim ~env ~res prim [prim_arg ~env x] in

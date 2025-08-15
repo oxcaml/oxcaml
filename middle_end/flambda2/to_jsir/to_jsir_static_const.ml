@@ -212,7 +212,7 @@ let code ~env ~res ~translate_body ~code_id code =
        ->
       (* This has already been populated by the first phase of the [Static] arm
          of [To_jsir.let_expr_normal] *)
-      let addr, params_jvar, closure =
+      let ({ addr; params = params_jvar; closure } : To_jsir_env.code_id) =
         To_jsir_env.get_code_id_exn env code_id
       in
       let res = To_jsir_result.new_block_with_addr_exn res ~addr ~params:[] in
