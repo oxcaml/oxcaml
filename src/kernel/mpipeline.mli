@@ -25,5 +25,8 @@ val final_config : t -> Mconfig.t
 val typer_result : t -> Mtyper.result
 val typer_errors : t -> exn list
 
+val document_overrides : t -> string Overrides.t
+val locate_overrides : t -> Lexing.position Overrides.t
+
 val timing_information : t -> (string * float) list
 val cache_information : t -> Std.json

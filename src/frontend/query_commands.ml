@@ -530,25 +530,33 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     let typer = Mpipeline.typer_result pipeline in
     let pos = Mpipeline.get_lexing_pos pipeline pos in
     Refactor_open.get_rewrites ~mode typer pos
-  | Document (patho, pos) ->
-    let typer = Mpipeline.typer_result pipeline in
-    let local_defs = Mtyper.get_typedtree typer in
-    let config = Mpipeline.final_config pipeline in
+  | Document (patho, pos) -> (
     let pos = Mpipeline.get_lexing_pos pipeline pos in
-    let comments = Mpipeline.reader_comments pipeline in
-    let env, _ = Mbrowse.leaf_node (Mtyper.node_at typer pos) in
-    let path =
-      match patho with
-      | Some p -> p
-      | None ->
-        let path = Misc_utils.reconstruct_identifier pipeline pos None in
-        let path = Mreader_lexer.identifier_suffix path in
-        let path = List.map ~f:(fun { Location.txt; _ } -> txt) path in
-        String.concat ~sep:"." path
+    let from_document_override_attribute =
+      pipeline |> Mpipeline.document_overrides |> Overrides.find ~cursor:pos
+      |> Option.map ~f:Overrides.Override.payload
     in
-    if path = "" then `Invalid_context
-    else
-      Locate.get_doc ~config ~env ~local_defs ~comments ~pos (`User_input path)
+    match from_document_override_attribute with
+    | Some document_override -> `Found document_override
+    | None ->
+      let typer = Mpipeline.typer_result pipeline in
+      let local_defs = Mtyper.get_typedtree typer in
+      let config = Mpipeline.final_config pipeline in
+      let comments = Mpipeline.reader_comments pipeline in
+      let env, _ = Mbrowse.leaf_node (Mtyper.node_at typer pos) in
+      let path =
+        match patho with
+        | Some p -> p
+        | None ->
+          let path = Misc_utils.reconstruct_identifier pipeline pos None in
+          let path = Mreader_lexer.identifier_suffix path in
+          let path = List.map ~f:(fun { Location.txt; _ } -> txt) path in
+          String.concat ~sep:"." path
+      in
+      if path = "" then `Invalid_context
+      else
+        Locate.get_doc ~config ~env ~local_defs ~comments ~pos
+          (`User_input path))
   | Syntax_document pos -> (
     let typer = Mpipeline.typer_result pipeline in
     let pos = Mpipeline.get_lexing_pos pipeline pos in
@@ -567,60 +575,74 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
       `Found
         (Ppx_expand.get_ppxed_source ~ppxed_parsetree ~pos ppx_kind_with_attr)
     | None -> `No_ppx)
-  | Locate (patho, ml_or_mli, pos, context) ->
-    let typer = Mpipeline.typer_result pipeline in
-    let local_defs = Mtyper.get_typedtree typer in
+  | Locate (patho, ml_or_mli, pos, context) -> (
     let pos = Mpipeline.get_lexing_pos pipeline pos in
-    let let_pun_behavior = Mbrowse.Let_pun_behavior.Prefer_expression in
-    let env, _ = Mbrowse.leaf_node (Mtyper.node_at typer pos) in
-    let path =
-      match patho with
-      | Some p -> p
-      | None ->
-        let path = Misc_utils.reconstruct_identifier pipeline pos None in
-        let path = Mreader_lexer.identifier_suffix path in
-        let path = List.map ~f:(fun { Location.txt; _ } -> txt) path in
-        let path = String.concat ~sep:"." path in
-        Locate.log ~title:"reconstructed identifier" "%s" path;
-        path
+    let mconfig = Mpipeline.final_config pipeline in
+    let from_locate_override_attribute =
+      pipeline |> Mpipeline.locate_overrides |> Overrides.find ~cursor:pos
+      |> Option.map ~f:Overrides.Override.payload
     in
-    if path = "" then `Invalid_context
-    else
-      let ml_or_mli =
-        match ml_or_mli with
-        | `ML -> `Smart
-        | `MLI -> `MLI
+    match from_locate_override_attribute with
+    | Some source_position ->
+      let absolute_file_path =
+        (* Path returned is always an absolute path because [mconfig.merlin.source_root]
+           is absolute (see [dot_merlin_reader.ml#prepend_config]) and, when
+           [mconfig.merlin.source_root = None], [canonicalize_filenmae] defaults to
+           [Sys.getcwd ()]. *)
+        Misc.canonicalize_filename ?cwd:mconfig.merlin.source_root
+          source_position.pos_fname
       in
-      let config =
-        Locate.
-          { mconfig = Mpipeline.final_config pipeline;
-            ml_or_mli;
-            traverse_aliases = true
-          }
+      let source_position =
+        { source_position with pos_fname = absolute_file_path }
       in
-      begin
-        let namespaces =
-          Option.map context ~f:(fun ctx ->
-              Locate.Namespace_resolution.From_context ctx)
+      `Found (Some absolute_file_path, source_position)
+    | None ->
+      let typer = Mpipeline.typer_result pipeline in
+      let local_defs = Mtyper.get_typedtree typer in
+      let let_pun_behavior = Mbrowse.Let_pun_behavior.Prefer_expression in
+      let env, _ = Mbrowse.leaf_node (Mtyper.node_at typer pos) in
+      let path =
+        match patho with
+        | Some p -> p
+        | None ->
+          let path = Misc_utils.reconstruct_identifier pipeline pos None in
+          let path = Mreader_lexer.identifier_suffix path in
+          let path = List.map ~f:(fun { Location.txt; _ } -> txt) path in
+          let path = String.concat ~sep:"." path in
+          Locate.log ~title:"reconstructed identifier" "%s" path;
+          path
+      in
+      if path = "" then `Invalid_context
+      else
+        let ml_or_mli =
+          match ml_or_mli with
+          | `ML -> `Smart
+          | `MLI -> `MLI
         in
-        match
-          Locate.from_string ~config ~env ~local_defs ~pos ?namespaces
-            ~let_pun_behavior path
-        with
-        | `Found { file; location; _ } ->
-          Locate.log ~title:"result" "found: %s" file;
-          `Found (Some file, location.loc_start)
-        | `Missing_labels_namespace ->
-          (* Can't happen because we haven't passed a namespace as input. *)
-          assert false
-        | `Builtin (_, s) ->
-          Locate.log ~title:"result" "found builtin %s" s;
-          `Builtin s
-        | `File_not_found { file = reason; _ } -> `File_not_found reason
-        | (`Not_found _ | `At_origin | `Not_in_env _) as otherwise ->
-          Locate.log ~title:"result" "not found";
-          otherwise
-      end
+        let config = Locate.{ mconfig; ml_or_mli; traverse_aliases = true } in
+        begin
+          let namespaces =
+            Option.map context ~f:(fun ctx ->
+                Locate.Namespace_resolution.From_context ctx)
+          in
+          match
+            Locate.from_string ~config ~env ~local_defs ~pos ?namespaces
+              ~let_pun_behavior path
+          with
+          | `Found { file; location; _ } ->
+            Locate.log ~title:"result" "found: %s" file;
+            `Found (Some file, location.loc_start)
+          | `Missing_labels_namespace ->
+            (* Can't happen because we haven't passed a namespace as input. *)
+            assert false
+          | `Builtin (_, s) ->
+            Locate.log ~title:"result" "found builtin %s" s;
+            `Builtin s
+          | `File_not_found { file = reason; _ } -> `File_not_found reason
+          | (`Not_found _ | `At_origin | `Not_in_env _) as otherwise ->
+            Locate.log ~title:"result" "not found";
+            otherwise
+        end)
   | Jump (target, pos) ->
     let typer = Mpipeline.typer_result pipeline in
     let typedtree = Mtyper.get_typedtree typer in
