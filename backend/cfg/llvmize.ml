@@ -422,8 +422,8 @@ module F = struct
   let define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body =
     pp_dbg_comment t.ppf fun_name fun_dbg;
     let cc_str = Calling_conventions.(to_llvmir_string Ocaml) in
-    line t.ppf "define %s %a @%s(%a) %a {" cc_str Llvm_typ.pp_t fun_ret_type
-      fun_name pp_fun_args fun_args pp_attrs fun_attrs;
+    line t.ppf "define %s %a %a(%a) %a {" cc_str Llvm_typ.pp_t fun_ret_type
+      pp_global fun_name pp_fun_args fun_args pp_attrs fun_attrs;
     pp_body ();
     line t.ppf "}";
     line t.ppf ""
