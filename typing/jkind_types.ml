@@ -195,6 +195,12 @@ module Sort = struct
     let for_list_element = value
 
     let for_idx = bits64
+
+    let for_loop_index = value
+
+    let for_type_extension = value
+
+    let for_class = value
   end
 
   module Var = struct
@@ -614,4 +620,16 @@ module Layout = struct
       | Base of Sort.base
       | Product of t list
   end
+
+  let value = Sort Sort.value
+
+  let for_object = value
+
+  let for_type_extension = value
+
+  let for_class = value
+
+  let for_module = value
+
+  let for_instance_var = value
 end

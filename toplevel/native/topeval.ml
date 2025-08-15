@@ -95,7 +95,7 @@ include Topcommon.MakeEvalPrinter(EvalBase)
 
 let may_trace = ref false (* Global lock on tracing *)
 
-let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam size =
+let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let slam = Simplif.simplify_lambda lam in
@@ -104,7 +104,7 @@ let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam size =
   let program =
     { Lambda.
       code = slam;
-      main_module_block_size = size;
+      main_module_block_repr = repr;
       arg_block_field = None;
       compilation_unit;
       required_globals;
@@ -117,8 +117,8 @@ let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam size =
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-      | Sig_value(id, {val_kind = Val_reg; val_type}, _) ->
-          Some (outval_of_value env (toplevel_value id) val_type)
+      | Sig_value(id, {val_kind = Val_reg layout; val_type}, _) ->
+          Some (outval_of_value env (toplevel_value id) val_type layout)
       | _ -> None
     )
 
@@ -210,26 +210,32 @@ let execute_phrase print_outcome ppf phr =
              str, sg', true
          | None -> str, sg', false
       in
-      let compilation_unit, res, required_globals, size =
+      let compilation_unit, res, required_globals, main_module_block_format =
         if Config.flambda then
-          let { Lambda.compilation_unit; main_module_block_size = size;
+          let { Lambda.compilation_unit; main_module_block_format;
                 required_globals; code = res } =
             Translmod.transl_implementation phrase_comp_unit
               (str, Tcoerce_none, None)
               ~style:Plain_block
           in
           remember compilation_unit sg';
-          compilation_unit, close_phrase res, required_globals, size
+          compilation_unit, close_phrase res, required_globals, repr
         else
-          let size, res = Translmod.transl_store_phrases phrase_comp_unit str in
-          phrase_comp_unit, res, Compilation_unit.Set.empty, size
+          let main_module_block_format, res =
+            Translmod.transl_store_phrases phrase_comp_unit str
+          in
+          ( phrase_comp_unit,
+            res,
+            Compilation_unit.Set.empty,
+            main_module_block_format )
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_lambda ppf ~required_globals ~compilation_unit phrase_name res size
+          load_lambda ppf ~required_globals ~compilation_unit phrase_name res
+            main_module_block_format
         in
         let out_phr =
           match res with

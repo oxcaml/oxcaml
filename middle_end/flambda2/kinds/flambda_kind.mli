@@ -128,6 +128,7 @@ module Scannable_block_shape : sig
   type t =
     | Value_only
     | Mixed_record of Mixed_block_shape.t
+  (* CR jrayman for reviewer: should this be renamed to [Mixed]? *)
 
   (** For now if two block shapes do not compare as equal they will be
       incompatible. If that changes, a [compatible] function will be

@@ -418,10 +418,10 @@ let rec print_coercion ppf c =
   let pr fmt = Format.fprintf ppf fmt in
   match c with
     Tcoerce_none -> pr "id"
-  | Tcoerce_structure (fl, nl) ->
+  | Tcoerce_structure { pos_cc_list; id_pos_list } ->
       pr "@[<2>struct@ %a@ %a@]"
-        (print_list print_coercion2) fl
-        (print_list print_coercion3) nl
+        (print_list print_coercion2) pos_cc_list
+        (print_list print_coercion3) id_pos_list
   | Tcoerce_functor (inp, out) ->
       pr "@[<2>functor@ (%a)@ (%a)@]"
         print_coercion inp
@@ -453,15 +453,15 @@ let equal_modtype_paths env p1 subst p2 =
        (Env.normalize_modtype_path env
           (Subst.modtype_path subst p2))
 
-let simplify_structure_coercion cc id_pos_list =
+let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
   let rec is_identity_coercion pos = function
   | [] ->
       true
   | (n, c) :: rem ->
       n = pos && c = Tcoerce_none && is_identity_coercion (pos + 1) rem in
-  if is_identity_coercion 0 cc
+  if is_identity_coercion 0 pos_cc_list
   then Tcoerce_none
-  else Tcoerce_structure (cc, id_pos_list)
+  else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
 
 
 (* Build a table of the components of sig1, along with their positions.
@@ -589,6 +589,30 @@ module Sign_diff = struct
       leftovers = x.leftovers @ y.leftovers
     }
 end
+
+let module_representation_of_layouts ~loc layouts =
+  layouts
+  |> List.map
+    (fun layout ->
+      layout
+      |> Jkind.Layout.to_sort
+          (* we should've already checked that [sg] is representable
+            in [transl_value_decl] *)
+      |> Misc.Stdlib.Option.get_or_fatal_error
+            ~error:"Includemod.module_representation_of_layouts: \
+                      unexpected unrepresentable layout"
+      |> Jkind.Sort.default_for_transl_and_get
+      |> mixed_block_element_of_const_sort)
+  |> Array.of_list
+  |> Typedecl.module_representation_of_mixed_product_shape ~loc
+
+let module_representation_of_signature ~loc sg =
+  sg |> List.filter_map Env.layout_of_signature_item
+     |> module_representation_of_layouts ~loc
+
+let module_representation_of_lazy_signature ~loc sg =
+  sg |> List.filter_map Env.layout_of_lazy_signature_item
+     |> module_representation_of_layouts ~loc
 
 (* Quickly compare module types without expanding them, succeeding only if mty1
   is a subtype of mty2 with no coercion  *)
@@ -907,10 +931,16 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        if runtime_len1 = runtime_len2 then (* see PR#5098 *)
-          Ok (simplify_structure_coercion cc id_pos_list, shape)
-        else
-          Ok (Tcoerce_structure (cc, id_pos_list), shape)
+        let input_repr = module_representation_of_lazy_signature ~loc sig1 in
+        let output_repr = module_representation_of_lazy_signature ~loc sig2 in
+        let coercion =
+          if runtime_len1 = runtime_len2 then (* see PR#5098 *)
+            simplify_structure_coercion input_repr output_repr cc id_pos_list
+          else
+            Tcoerce_structure
+              { input_repr; output_repr; pos_cc_list = cc; id_pos_list }
+        in
+        Ok (coercion, shape)
     | missings, incompatibles, _runtime_coercions, _leftovers ->
         Error {
           Error.env=new_env;

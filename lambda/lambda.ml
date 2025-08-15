@@ -941,17 +941,26 @@ type runtime_param =
   | Rp_main_module_block of Global_module.t
   | Rp_unit
 
+type module_representation =
+  | Module_value_only of int
+  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
+
+let module_representation_field_count = function
+  | Module_value_only field_count -> field_count
+  | Module_mixed (shape, _) -> Array.length shape
+
 type main_module_block_format =
-  | Mb_struct of { mb_size : int }
+  | Mb_struct of { mb_repr : module_representation }
   | Mb_instantiating_functor of
       { mb_runtime_params : runtime_param list;
-        mb_returned_size : int;
+        mb_returned_repr : module_representation;
       }
 
-let main_module_block_size format =
-  match format with
-  | Mb_struct { mb_size } -> mb_size
-  | Mb_instantiating_functor _ -> 1
+
+let main_module_representation = function
+  | Mb_struct { mb_repr } -> mb_repr
+  | Mb_instantiating_functor _ -> Module_value_only 1
+
 
 type program =
   { compilation_unit : Compilation_unit.t;
@@ -1059,6 +1068,7 @@ let layout_unboxed_int ubi = Punboxed_or_untagged_integer ubi
 let layout_boxed_int bi = non_null_value (Pboxedintval bi)
 let layout_unboxed_vector v = Punboxed_vector v
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
+let layout_predef_value = nullable_value Pgenval
 
 let layout_lazy = nullable_value Pgenval
 let layout_lazy_contents = nullable_value Pgenval
@@ -1075,6 +1085,9 @@ let unboxed_vector_of_boxed_vector = function
 (* CR ncourant: use [Ptop] or remove this as soon as possible. *)
 let layout_top = layout_any_value
 let layout_bottom = Pbottom
+
+let mixed_block_element_for_module = Value generic_value
+let mixed_block_element_with_locality_mode_for_module = Value generic_value
 
 let default_function_attribute = {
   inline = Default_inline;
@@ -1402,14 +1415,62 @@ let rec patch_guarded patch = function
 
 (* Translate an access path *)
 
+let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  Array.mapi (fun i (elt : Types.mixed_block_element) ->
+    match elt with
+    | Value -> Value (get_value_kind i)
+    | Float_boxed -> Float_boxed (get_mode i)
+    | Float64 -> Float64
+    | Float32 -> Float32
+    | Bits8 -> Bits8
+    | Bits16 -> Bits16
+    | Bits32 -> Bits32
+    | Bits64 -> Bits64
+    | Untagged_immediate -> Untagged_immediate
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Word -> Word
+    | Product shapes ->
+      let get_value_kind _ = generic_value in
+      Product
+        (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+    | Void -> Product [||]
+  ) shape
+
 let rec transl_address loc = function
   | Env.Aunit cu -> Lprim(Pgetglobal cu, [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
-  | Env.Adot(addr, pos) ->
-      Lprim(Pfield(pos, Pointer, Reads_agree),
+  | Env.Adot(addr, field_layouts, pos) ->
+      let layout_to_mixed_block layout =
+        match Jkind.Layout.to_sort layout with
+        | Some sort ->
+          sort |> Jkind.Sort.default_for_transl_and_get
+               |> Types.mixed_block_element_of_const_sort
+        | None ->
+          fatal_error
+            "Lambda.transl_address: could not determine layout of field"
+      in
+      let mixed_blocks =
+        Array.map layout_to_mixed_block field_layouts
+        |> transl_mixed_product_shape_for_read
+            ~get_value_kind:(fun _ -> generic_value)
+            ~get_mode:(fun _ -> alloc_heap)
+      in
+      if Array.for_all
+        (function
+          | Value _ -> true
+          | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+          | Product _ -> false)
+        mixed_blocks
+      then
+        Lprim(Pfield(pos, Pointer, Reads_agree), [transl_address loc addr], loc)
+      else
+        Lprim(Pmixedfield([pos], mixed_blocks, Reads_agree),
                    [transl_address loc addr], loc)
 
 let transl_path find loc env path =
@@ -1441,52 +1502,50 @@ let transl_prim mod_name name =
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
 
-let rec transl_mixed_product_shape ~get_value_kind shape =
-  Array.mapi (fun i (elt : Types.mixed_block_element) ->
-    match elt with
-    | Value -> Value (get_value_kind i)
-    | Float_boxed -> Float_boxed ()
-    | Float64 -> Float64
-    | Float32 -> Float32
-    | Bits8 -> Bits8
-    | Bits16 -> Bits16
-    | Bits32 -> Bits32
-    | Bits64 -> Bits64
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Word -> Word
-    | Untagged_immediate -> Untagged_immediate
-    | Product shapes ->
-      (* CR mshinwell: This [get_value_kind] override is a bit odd, maybe this
-         could be improved in the future (same below). *)
-      let get_value_kind _ = generic_value in
-      Product (transl_mixed_product_shape ~get_value_kind shapes)
-    | Void -> Product [||]
-  ) shape
+let rec transl_mixed_block_element
+  (elt : Types.mixed_block_element) ~value_kind =
+  match elt with
+  | Value -> Value (Lazy.force value_kind)
+  | Float_boxed -> Float_boxed ()
+  | Float64 -> Float64
+  | Float32 -> Float32
+  | Bits8 -> Bits8
+  | Bits16 -> Bits16
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Vec128 -> Vec128
+  | Vec256 -> Vec256
+  | Vec512 -> Vec512
+  | Word -> Word
+  | Untagged_immediate -> Untagged_immediate
+  | Product shapes ->
+    (* CR mshinwell: This [get_value_kind] override is a bit odd, maybe this
+        could be improved in the future (same below). *)
+    let get_value_kind _ = generic_value in
+    Product (transl_mixed_product_shape ~get_value_kind shapes)
+  | Void -> Product [||]
 
-let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Array.mapi (fun i (elt : Types.mixed_block_element) ->
-    match elt with
-    | Value -> Value (get_value_kind i)
-    | Float_boxed -> Float_boxed (get_mode i)
-    | Float64 -> Float64
-    | Float32 -> Float32
-    | Bits8 -> Bits8
-    | Bits16 -> Bits16
-    | Bits32 -> Bits32
-    | Bits64 -> Bits64
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Word -> Word
-    | Untagged_immediate -> Untagged_immediate
-    | Product shapes ->
-      let get_value_kind _ = generic_value in
-      Product
-        (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
-    | Void -> Product [||]
-  ) shape
+and transl_mixed_product_shape ~get_value_kind shape =
+  Array.mapi
+    (fun i elt -> transl_mixed_block_element elt
+      ~value_kind:(lazy (get_value_kind i)))
+    shape
+
+let transl_module_representation = function
+  | Types.Module_value_only size -> Module_value_only size
+  | Types.Module_mixed shape ->
+    Module_mixed
+      ( transl_mixed_product_shape
+        ~get_value_kind:(fun _ -> generic_value) shape,
+        transl_mixed_product_shape_for_read
+        ~get_value_kind:(fun _ -> generic_value)
+        ~get_mode:(fun _ ->
+           fatal_error "Lambda.transl_module_representation: \
+                          unexpected [Float_boxed].") shape)
+
+let block_of_module_representation = function
+  | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
+  | Module_mixed (shape, _) -> Pmakemixedblock(0, Immutable, shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 
@@ -1820,11 +1879,15 @@ let find_exact_application kind ~arity args =
 let reset () =
   raise_count := 0
 
-let mod_field ?(read_semantics=Reads_agree) pos =
-  Pfield (pos, Pointer, read_semantics)
+let mod_field ?(read_semantics=Reads_agree) pos = function
+  | Module_value_only _ -> Pfield(pos, Pointer, read_semantics)
+  | Module_mixed (_, shape_for_read) ->
+    Pmixedfield([pos], shape_for_read, read_semantics)
 
-let mod_setfield pos =
-  Psetfield (pos, Pointer, Root_initialization)
+let mod_setfield pos = function
+  | Module_value_only _ -> Psetfield (pos, Pointer, Root_initialization)
+  | Module_mixed (shape, _) ->
+    Psetmixedfield([pos], shape, Root_initialization)
 
 let locality_mode_of_primitive_description (p : external_call_description) =
   if not Config.stack_allocation then
@@ -2291,28 +2354,28 @@ let array_ref_kind_result_layout = function
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
   | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
 
+let rec layout_of_mixed_block_element element =
+  match element with
+  | Value value_kind -> Pvalue value_kind
+  | Float_boxed _ -> layout_boxed_float Boxed_float64
+  | Float64 -> layout_unboxed_float Unboxed_float64
+  | Float32 -> layout_unboxed_float Unboxed_float32
+  | Bits8 -> layout_unboxed_int8
+  | Bits16 -> layout_unboxed_int16
+  | Bits32 -> layout_unboxed_int32
+  | Bits64 -> layout_unboxed_int64
+  | Word -> layout_unboxed_nativeint
+  | Untagged_immediate -> layout_unboxed_int Untagged_int
+  | Vec128 -> layout_unboxed_vector Unboxed_vec128
+  | Vec256 -> layout_unboxed_vector Unboxed_vec256
+  | Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Product shape ->
+    Punboxed_product
+      (Array.to_list (Array.map layout_of_mixed_block_element shape))
+
 let layout_of_mixed_block_shape
     : 'a. 'a mixed_block_element array -> path:int list -> layout
     = fun shape ~path ->
-  let rec layout_of_mixed_block_element element =
-    match element with
-    | Value value_kind -> Pvalue value_kind
-    | Float_boxed _ -> layout_boxed_float Boxed_float64
-    | Float64 -> layout_unboxed_float Unboxed_float64
-    | Float32 -> layout_unboxed_float Unboxed_float32
-    | Bits8 -> layout_unboxed_int8
-    | Bits16 -> layout_unboxed_int16
-    | Bits32 -> layout_unboxed_int32
-    | Bits64 -> layout_unboxed_int64
-    | Word -> layout_unboxed_nativeint
-    | Untagged_immediate -> layout_unboxed_int Untagged_int
-    | Vec128 -> layout_unboxed_vector Unboxed_vec128
-    | Vec256 -> layout_unboxed_vector Unboxed_vec256
-    | Vec512 -> layout_unboxed_vector Unboxed_vec512
-    | Product shape ->
-      Punboxed_product
-        (Array.to_list (Array.map layout_of_mixed_block_element shape))
-  in
   layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
 
 let rec mixed_block_element_of_layout (layout : layout) :
@@ -2402,9 +2465,10 @@ let primitive_result_layout (p : primitive) =
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _
-  | Parrayblit _
+  | Parrayblit _ | Psetglobal _
     -> layout_unit
-  | Pgetglobal _ | Psetglobal _ | Pgetpredef _ -> layout_module_field
+  | Pgetglobal _ -> layout_module
+  | Pgetpredef _ -> layout_predef_value
   | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
   | Pduprecord _ | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block

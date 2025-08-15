@@ -203,6 +203,13 @@ val check_functor_application :
 val check_modtype_equiv:
   loc:Location.t -> Env.t -> Ident.t -> module_type -> module_type -> unit
 
+val module_representation_of_signature :
+  loc:Location.t -> Types.signature -> Types.module_representation
+
+val module_representation_of_lazy_signature :
+  loc:Location.t -> Subst.Lazy.signature_item list ->
+  Types.module_representation
+
 val signatures: Env.t -> mark:bool -> modes:modes ->
   signature -> signature -> module_coercion
 

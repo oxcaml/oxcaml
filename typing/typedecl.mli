@@ -89,7 +89,11 @@ module Mixed_product_kind : sig
     | Record
     | Cstr_tuple
     | Cstr_record
+    | Module
 end
+
+val module_representation_of_mixed_product_shape :
+  loc:Warnings.loc -> mixed_product_shape -> module_representation
 
 type mixed_product_violation =
   | Runtime_support_not_enabled of Mixed_product_kind.t
@@ -154,7 +158,7 @@ type error =
       ; err : Jkind.Violation.t
       }
   | Jkind_empty_record
-  | Non_value_in_sig of Jkind.Violation.t * string * type_expr
+  | Non_representable_in_sig of Jkind.Violation.t * string * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error

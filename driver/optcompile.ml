@@ -98,7 +98,7 @@ type starting_point =
   | Emit
   | Instantiation of {
       runtime_args : Translmod.runtime_arg list;
-      main_module_block_size : int;
+      main_module_block_repr : Lambda.module_representation;
       arg_descr : Lambda.arg_descr option;
   }
 
@@ -149,7 +149,7 @@ let implementation_aux unix ~(flambda2 : flambda2) ~start_from
         Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
       info ~backend
   | Emit -> emit unix info ~ppf_dump:info.ppf_dump
-  | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
+  | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
     Compilenv.reset info.target;
     begin
       match !Clflags.as_argument_for with
@@ -166,7 +166,7 @@ let implementation_aux unix ~(flambda2 : flambda2) ~start_from
     in
     let impl =
       Translmod.transl_instance info.module_name ~runtime_args
-        ~main_module_block_size ~arg_block_idx ~style:transl_style
+        ~main_module_block_repr ~arg_block_idx ~style:transl_style
     in
     if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
     compile_from_raw_lambda info impl ~unix ~pipeline ~as_arg_for
@@ -179,10 +179,10 @@ let implementation unix ~flambda2 ~start_from ~source_file
     ~compilation_unit:Inferred_from_output_prefix
 
 let instance unix ~flambda2 ~source_file
-      ~output_prefix ~compilation_unit ~runtime_args ~main_module_block_size
+      ~output_prefix ~compilation_unit ~runtime_args ~main_module_block_repr
       ~arg_descr ~keep_symbol_tables =
   let start_from =
-    Instantiation { runtime_args; main_module_block_size; arg_descr }
+    Instantiation { runtime_args; main_module_block_repr; arg_descr }
   in
   implementation_aux unix ~flambda2 ~start_from ~source_file
     ~output_prefix ~keep_symbol_tables

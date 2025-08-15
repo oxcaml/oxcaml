@@ -494,7 +494,7 @@ module Vars = Misc.Stdlib.String.Map
 (* Value descriptions *)
 
 type value_kind =
-    Val_reg                             (* Regular value *)
+    Val_reg of Jkind_types.Sort.t Jkind_types.Layout.t     (* Regular value *)
   | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -679,6 +679,10 @@ and mixed_block_element =
   | Void
 
 and mixed_product_shape = mixed_block_element array
+
+and module_representation =
+  | Module_value_only of int
+  | Module_mixed of mixed_product_shape
 
 and record_representation =
   | Record_unboxed
@@ -1058,6 +1062,11 @@ let rec compare_mixed_block_element e1 e2 =
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
 
+let equal_module_representation r1 r2 = match r1, r2 with
+  | Module_value_only s1, Module_value_only s2 -> s1 = s2
+  | Module_mixed p1, Module_mixed p2 -> equal_mixed_product_shape p1 p2
+  | (Module_value_only _ | Module_mixed _), _ -> false
+
 let equal_constructor_representation r1 r2 = r1 == r2 || match r1, r2 with
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
@@ -1145,6 +1154,29 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
   | Legacy -> "record"
   | Unboxed_product -> "unboxed record"
 
+let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
+  match sort with
+  | Base Value -> Value
+  | Base Bits8 -> Bits8
+  | Base Bits16 -> Bits16
+  | Base Bits32 -> Bits32
+  | Base Bits64 -> Bits64
+  | Base Float32 -> Float32
+  | Base Float64 -> Float64
+  | Base Untagged_immediate -> Untagged_immediate
+  | Base Vec128 -> Vec128
+  | Base Vec256 -> Vec256
+  | Base Vec512 -> Vec512
+  | Base Word -> Word
+  | Product sorts ->
+    Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
+  | Base Void -> Product [||]
+
+let mixed_block_element_for_type_extension = Value
+let mixed_block_element_for_exception = Value
+let mixed_block_element_for_module = Value
+let mixed_block_element_for_class = Value
+
 let find_unboxed_type decl =
   match decl.type_kind with
     Type_record ([{ld_type = arg; ld_modalities = ms; _}], Record_unboxed, _)
@@ -1175,7 +1207,7 @@ let item_visibility = function
 
 let rec bound_value_identifiers = function
     [] -> []
-  | Sig_value(id, {val_kind = Val_reg}, _) :: rem ->
+  | Sig_value(id, {val_kind = Val_reg _}, _) :: rem ->
       id :: bound_value_identifiers rem
   | Sig_typext(id, _, _, _) :: rem -> id :: bound_value_identifiers rem
   | Sig_module(id, Mp_present, _, _, _) :: rem ->

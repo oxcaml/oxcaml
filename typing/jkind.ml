@@ -3091,6 +3091,8 @@ module Format_history = struct
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
          (idx or mut_idx)"
+    | Structure_element ->
+      fprintf ppf "it's the type of something stored in a module structure"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3904,6 +3906,7 @@ module Debug_printers = struct
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
+    | Structure_element -> fprintf ppf "Structure_element"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function

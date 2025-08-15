@@ -854,8 +854,16 @@ and value_binding =
 
 and module_coercion =
     Tcoerce_none
-  | Tcoerce_structure of (int * module_coercion) list *
-                         (Ident.t * int * module_coercion) list
+  | Tcoerce_structure of
+      (* CR jrayman for reviewer: [input_repr] and [output_repr] are translated
+         into [Lambda.module_representation]s as soon as they are projected.
+         Should they instead somehow be translated when constructed? *)
+      { input_repr : Types.module_representation
+      ; output_repr : Types.module_representation
+      ; pos_cc_list : (int * module_coercion) list
+      ; id_pos_list : (Ident.t * int * module_coercion) list
+      (* [pos] is an index into [input_repr] *)
+      }
   | Tcoerce_functor of module_coercion * module_coercion
   | Tcoerce_primitive of primitive_coercion
   (** External declaration coerced to a regular value.
@@ -966,6 +974,7 @@ and 'a open_infos =
     {
      open_expr: 'a;
      open_bound_items: Types.signature;
+     open_bound_repr: Types.module_representation;
      open_override: override_flag;
      open_env: Env.t;
      open_loc: Location.t;
@@ -978,15 +987,18 @@ and open_declaration = module_expr open_infos
 
 and include_kind =
   | Tincl_structure
-  | Tincl_functor of (Ident.t * module_coercion) list
+  | Tincl_functor of
+      (Ident.t * module_coercion) list * Types.module_representation
       (* S1 -> S2 *)
-  | Tincl_gen_functor of (Ident.t * module_coercion) list
+  | Tincl_gen_functor of
+      (Ident.t * module_coercion) list * Types.module_representation
       (* S1 -> () -> S2 *)
 
 and 'a include_infos =
     {
      incl_mod: 'a;
      incl_type: Types.signature;
+     incl_repr: Types.module_representation;
      incl_loc: Location.t;
      incl_kind: include_kind;
      incl_attributes: attribute list;

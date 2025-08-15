@@ -285,10 +285,27 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
       let printer_steps = ref max_steps in
 
+      let is_value _ty =
+        true
+        (* CR jrayman: pass [layout] to [outval_of_value] to figure this out *)
+      in
+
       let nested_values = ObjTbl.create 8 in
-      let nest_gen err f depth obj ty =
+      let nest_gen err abstr f depth obj ty =
         let repr = obj in
-        if not (is_real_block repr) then
+        (* if (match *)
+        (*     Jkind.Layout.to_sort layout *)
+        (*     |> Option.map Jkind.Sort.default_for_transl_and_get *)
+        (*   with *)
+        (*   | Some Jkind.Sort.Const.(Base Value) -> false *)
+        (*   | _ -> true) *)
+        (*   (1* CR jrayman: this is ugly *1) *)
+        (* then *)
+        (*   abstr *)
+        (* else *)
+        if not (is_value ty) then
+          abstr
+        else if not (is_real_block repr) then
           f depth obj ty
         else
           if ObjTbl.mem nested_values repr then
@@ -301,7 +318,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           end
       in
 
-      let nest f = nest_gen (Oval_stuff "<cycle>") f in
+      let nest f = nest_gen (Oval_stuff "<cycle>") (Oval_stuff "<abstr>") f in
 
       let rec tree_of_val depth obj ty =
         decr printer_steps;
@@ -334,7 +351,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                           nest tree_of_val (depth - 1) (O.field obj 0) ty_arg
                         in
                         let next_obj = O.field obj 1 in
-                        nest_gen (Oval_stuff "<cycle>" :: tree :: tree_list)
+                        nest_gen
+                          (Oval_stuff "<cycle>" :: tree :: tree_list)
+                          (Oval_stuff "<abstr>" :: tree :: tree_list)
                           (tree_of_conses (tree :: tree_list))
                           depth next_obj ty_arg
                       else tree_list

@@ -115,7 +115,7 @@ let close_phrase lam =
   Ident.Set.fold (fun id l ->
     let glb, pos = toplevel_value id in
     let glob =
-      Lprim (mod_field pos,
+      Lprim (mod_field pos (Module_value_only (-1)), (* CR jrayman: wrong *)
              [Lprim (Pgetglobal glb, [], Loc_unknown)],
              Loc_unknown)
     in
@@ -133,7 +133,7 @@ let rec eval_address = function
       global_symbol cu
   | Env.Alocal id ->
       toplevel_value id
-  | Env.Adot(a, pos) ->
+  | Env.Adot(a, _, pos) -> (* CR jrayman: fix *)
       Obj.field (eval_address a) pos
 
 let eval_path find env path =
@@ -281,7 +281,7 @@ let default_load ppf (program : Lambda.program) =
      files) *)
   res
 
-let load_lambda ppf ~compilation_unit ~required_globals lam size =
+let load_lambda ppf ~compilation_unit ~required_globals lam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let slam = Simplif.simplify_lambda lam in
@@ -289,7 +289,7 @@ let load_lambda ppf ~compilation_unit ~required_globals lam size =
   let program =
     { Lambda.
       code = slam;
-      main_module_block_format = Mb_struct { mb_size = size };
+      main_module_block_format = Mb_struct { mb_repr = repr };
       arg_block_idx = None;
       compilation_unit;
       required_globals;
@@ -304,7 +304,7 @@ let load_lambda ppf ~compilation_unit ~required_globals lam size =
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-       | Sig_value(id, {val_kind = Val_reg; val_type; _}, _) ->
+       | Sig_value(id, {val_kind = Val_reg _; val_type; _}, _) ->
           Some (outval_of_value env (toplevel_value id) val_type)
       | _ -> None
     )
@@ -343,7 +343,7 @@ let name_expression ~loc ~attrs sort exp =
   let id = Ident.create_local name in
   let vd =
     { val_type = exp.exp_type;
-      val_kind = Val_reg;
+      val_kind = Val_reg (Jkind.Layout.Sort sort);
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
@@ -425,7 +425,7 @@ let execute_phrase print_outcome ppf phr =
             str, sg', true
         | _ -> str, sg', false
       in
-      let compilation_unit, res, required_globals, size =
+      let compilation_unit, res, required_globals, repr =
         let { Lambda.compilation_unit; main_module_block_format;
               required_globals; code = res } =
           Translmod.transl_implementation compilation_unit
@@ -433,20 +433,20 @@ let execute_phrase print_outcome ppf phr =
             ~style:Plain_block
         in
         remember compilation_unit sg';
-        let size =
+        let repr =
           match main_module_block_format with
-          | Mb_struct { mb_size } -> mb_size;
+          | Mb_struct { mb_repr } -> mb_repr
           | Mb_instantiating_functor _ ->
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
-        compilation_unit, close_phrase res, required_globals, size
+        compilation_unit, close_phrase res, required_globals, repr
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_lambda ppf ~required_globals ~compilation_unit res size
+          load_lambda ppf ~required_globals ~compilation_unit res repr
         in
         let out_phr =
           match res with
