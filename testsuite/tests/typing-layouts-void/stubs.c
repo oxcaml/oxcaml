@@ -69,14 +69,12 @@ value void_to_void_seven_bytecode(value unit1, value unit2) {
   assert(Long_val(unit2) == 0);
   return Val_long(7);
 }
-typedef struct {
-  value a;
-  value b;
-} twovals;
 
-
-twovals void_to_seven_void_bytecode(value unit) {
-  assert(Long_val(unit) == 0);
-  twovals res = { Val_long(7), Val_unit };
-  return res;
+value void_to_seven_void_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal1(res);
+  res = caml_alloc_small(2, 0);
+  Field(res, 0) = Val_long(7);
+  Field(res, 1) = Val_unit;
+  CAMLreturn (res);
 }
