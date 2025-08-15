@@ -124,9 +124,10 @@ module type S = sig
   module Targetint_set = Set
 end
 
-let size = Sys.word_size
-(* Later, this will be set by the configure script in order to support
-   cross-compilation. *)
+(* CR selee: this is extremely sad *)
+let size =
+  let compiler_name = Filename.basename Sys.argv.(0) in
+  match compiler_name with "ocamlj" | "ocamlj.opt" -> 32 | _ -> Sys.word_size
 
 module Int32 = struct
   include Int32
