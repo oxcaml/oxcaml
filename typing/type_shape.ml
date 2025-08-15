@@ -694,7 +694,7 @@ module D = Evaluation_diagnostics
 let rec unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
     (t : Shape.t) =
   D.count_evaluation_step diagnostics;
-  if depth >= 5
+  if depth >= !Clflags.gdwarf_config_shape_eval_depth
      (* CR sspies: This depth limit can currently produce very large shapes, and
         some additional caching would be appropriate. *)
   then Shape.leaf' None

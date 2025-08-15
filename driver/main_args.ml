@@ -896,6 +896,26 @@ let mk_debug_ocaml f =
   "-debug-ocaml", Arg.Unit f, " Debugging output for the compiler\n\
                                (internal use only)"
 
+let mk_gdwarf_config_shape_reduce_depth f =
+  "-gdwarf-config-shape-reduce-depth", Arg.Int f,
+  "<n>  Maximum depth for shape reduction in DWARF debug info (default: 2)"
+
+let mk_gdwarf_config_shape_eval_depth f =
+  "-gdwarf-config-shape-eval-depth", Arg.Int f,
+  "<n>  Maximum depth for shape evaluation in DWARF debug info (default: 1)"
+
+let mk_gdwarf_config_max_cms_files_per_unit f =
+  "-gdwarf-config-max-cms-files-per-unit", Arg.Int f,
+  "<n>  Maximum CMS files per compilation unit in DWARF debug info (default: 0)"
+
+let mk_gdwarf_config_max_cms_files_per_variable f =
+  "-gdwarf-config-max-cms-files-per-variable", Arg.Int f,
+  "<n>  Maximum CMS files per variable in DWARF debug info (default: 0)"
+
+let mk_gdwarf_fidelity f =
+  "-gdwarf-fidelity", Arg.String f,
+  "<level>  Set DWARF debug info fidelity level (low|medium|high|very-high|ultra-high)"
+
 let mk_opaque f =
   "-opaque", Arg.Unit f,
   " Does not generate cross-module optimization information\n\
@@ -1185,6 +1205,11 @@ module type Optcomp_options = sig
   val _save_ir_before : string -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
+  val _gdwarf_config_shape_reduce_depth : int -> unit
+  val _gdwarf_config_shape_eval_depth : int -> unit
+  val _gdwarf_config_max_cms_files_per_unit : int -> unit
+  val _gdwarf_config_max_cms_files_per_variable : int -> unit
+  val _gdwarf_fidelity : string -> unit
 end;;
 
 module type Opttop_options = sig
@@ -1624,6 +1649,11 @@ struct
     mk_dump_dir F._dump_dir;
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
+    mk_gdwarf_config_shape_reduce_depth F._gdwarf_config_shape_reduce_depth;
+    mk_gdwarf_config_shape_eval_depth F._gdwarf_config_shape_eval_depth;
+    mk_gdwarf_config_max_cms_files_per_unit F._gdwarf_config_max_cms_files_per_unit;
+    mk_gdwarf_config_max_cms_files_per_variable F._gdwarf_config_max_cms_files_per_variable;
+    mk_gdwarf_fidelity F._gdwarf_fidelity;
     mk_use_debugging_shapes F._use_debugging_shapes;
     mk_use_old_merlin_shapes F._use_old_merlin_shapes;
 
@@ -2170,6 +2200,18 @@ module Default = struct
     let _v () = Compenv.print_version_and_library "native-code compiler"
     let _no_probes = clear probes
     let _probes = set probes
+    let _gdwarf_config_shape_reduce_depth n = 
+      gdwarf_config_shape_reduce_depth := n
+    let _gdwarf_config_shape_eval_depth n = 
+      gdwarf_config_shape_eval_depth := n
+    let _gdwarf_config_max_cms_files_per_unit n = 
+      gdwarf_config_max_cms_files_per_unit := n
+    let _gdwarf_config_max_cms_files_per_variable n = 
+      gdwarf_config_max_cms_files_per_variable := n
+    let _gdwarf_fidelity s =
+      match Clflags.gdwarf_fidelity_of_string s with
+      | Some fidelity -> Clflags.set_gdwarf_fidelity fidelity
+      | None -> Misc.fatal_error ("Invalid fidelity level: " ^ s)
   end
 
   module Odoc_args = struct

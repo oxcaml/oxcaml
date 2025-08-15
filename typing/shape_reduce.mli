@@ -74,7 +74,11 @@ end
     compilation unit to prevent conflicting entries in these memoization tables.
 *)
 module Make(_ : sig
-    val fuel : int
+    val fuel : unit -> int
+
+    val fuel_for_compilation_units : unit -> int
+
+    val max_compilation_unit_depth : unit -> int
 
     val read_unit_shape : diagnostics:Diagnostics.t -> unit_name:string -> Shape.t option
   end) : sig

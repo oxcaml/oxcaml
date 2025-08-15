@@ -55,6 +55,7 @@ type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
+type gdwarf_fidelity = Fidelity_low | Fidelity_medium | Fidelity_high | Fidelity_very_high | Fidelity_ultra_high
 
 val objfiles : string list ref
 val ccobjs : string list ref
@@ -74,6 +75,13 @@ val debug : bool ref
 val debug_full : bool ref
 val dwarf_c_toolchain_flag : string ref
 val dwarf_fission : dwarf_fission ref
+val gdwarf_config_shape_reduce_depth : int ref
+val gdwarf_config_shape_eval_depth : int ref
+val gdwarf_config_max_cms_files_per_unit : int ref
+val gdwarf_config_max_cms_files_per_variable : int ref
+val gdwarf_fidelity : gdwarf_fidelity option ref
+val gdwarf_fidelity_of_string : string -> gdwarf_fidelity option
+val set_gdwarf_fidelity : gdwarf_fidelity -> unit
 val unsafe : bool ref
 val use_linscan : bool ref
 val link_everything : bool ref

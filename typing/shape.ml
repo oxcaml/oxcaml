@@ -1288,16 +1288,13 @@ let rec size (t : t) : int =
       | Proj (sh, _) | Proj_decl (sh, _) -> 1 + size_in_memory_go visited sh
       | App (f, arg) ->
         1 + size_in_memory_go visited f + size_in_memory_go visited arg
-      | Arrow->  1
+      | Arrow -> 1
       | Struct items ->
-        Item.Map.fold
-          (fun _ sh acc -> acc + size_in_memory_go visited sh) items 1
+        Item.Map.fold (fun _ sh acc -> acc + size_in_memory_go visited sh) items 1
       | Mutrec map ->
-        Ident.Map.fold
-          (fun _ sh acc -> acc + size_in_memory_go visited sh) map 1
+        Ident.Map.fold (fun _ sh acc -> acc + size_in_memory_go visited sh) map 1
       | Record { fields; _ } ->
-          List.fold_left
-            (fun acc (_, sh, _) -> acc + size_in_memory_go visited sh) 1 fields
+        List.fold_left (fun acc (_, sh, _) -> acc + size_in_memory_go visited sh) 1 fields
       | Poly_variant constrs ->
         List.fold_left
           (fun acc { pv_constr_name = _; pv_constr_args } ->
