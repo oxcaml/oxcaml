@@ -379,23 +379,23 @@ module Predef = struct
 
     let equal_simd_vec_split s1 s2 =
       match s1, s2 with
-      | Int8x16, Int8x16 -> true
-      | Int16x8, Int16x8 -> true
-      | Int32x4, Int32x4 -> true
-      | Int64x2, Int64x2 -> true
-      | Float32x4, Float32x4 -> true
-      | Float64x2, Float64x2 -> true
-      | Int8x32, Int8x32 -> true
-      | Int16x16, Int16x16 -> true
-      | Int32x8, Int32x8 -> true
-      | Int64x4, Int64x4 -> true
-      | Float32x8, Float32x8 -> true
-      | Float64x4, Float64x4 -> true
-      | Int8x64, Int8x64 -> true
-      | Int16x32, Int16x32 -> true
-      | Int32x16, Int32x16 -> true
-      | Int64x8, Int64x8 -> true
-      | Float32x16, Float32x16 -> true
+      | Int8x16, Int8x16
+      | Int16x8, Int16x8
+      | Int32x4, Int32x4
+      | Int64x2, Int64x2
+      | Float32x4, Float32x4
+      | Float64x2, Float64x2
+      | Int8x32, Int8x32
+      | Int16x16, Int16x16
+      | Int32x8, Int32x8
+      | Int64x4, Int64x4
+      | Float32x8, Float32x8
+      | Float64x4, Float64x4
+      | Int8x64, Int8x64
+      | Int16x32, Int16x32
+      | Int32x16, Int32x16
+      | Int64x8, Int64x8
+      | Float32x16, Float32x16
       | Float64x8, Float64x8 -> true
       | (Int8x16 | Int16x8 | Int32x4 | Int64x2 | Float32x4 | Float64x2
         | Int8x32 | Int16x16 | Int32x8 | Int64x4 | Float32x8 | Float64x4
@@ -404,10 +404,10 @@ module Predef = struct
 
     let equal_unboxed u1 u2 =
       match u1, u2 with
-      | Unboxed_float, Unboxed_float -> true
-      | Unboxed_float32, Unboxed_float32 -> true
-      | Unboxed_nativeint, Unboxed_nativeint -> true
-      | Unboxed_int64, Unboxed_int64 -> true
+      | Unboxed_float, Unboxed_float
+      | Unboxed_float32, Unboxed_float32
+      | Unboxed_nativeint, Unboxed_nativeint
+      | Unboxed_int64, Unboxed_int64
       | Unboxed_int32, Unboxed_int32 -> true
       | Unboxed_simd s1, Unboxed_simd s2 -> equal_simd_vec_split s1 s2
       | (Unboxed_float | Unboxed_float32 | Unboxed_nativeint
@@ -415,18 +415,18 @@ module Predef = struct
 
     let equal p1 p2 =
       match p1, p2 with
-      | Array, Array -> true
-      | Bytes, Bytes -> true
-      | Char, Char -> true
-      | Extension_constructor, Extension_constructor -> true
-      | Float, Float -> true
-      | Float32, Float32 -> true
-      | Floatarray, Floatarray -> true
-      | Int, Int -> true
-      | Int32, Int32 -> true
-      | Int64, Int64 -> true
-      | Lazy_t, Lazy_t -> true
-      | Nativeint, Nativeint -> true
+      | Array, Array
+      | Bytes, Bytes
+      | Char, Char
+      | Extension_constructor, Extension_constructor
+      | Float, Float
+      | Float32, Float32
+      | Floatarray, Floatarray
+      | Int, Int
+      | Int32, Int32
+      | Int64, Int64
+      | Lazy_t, Lazy_t
+      | Nativeint, Nativeint
       | String, String -> true
       | Simd s1, Simd s2 -> equal_simd_vec_split s1 s2
       | Exception, Exception -> true
@@ -606,16 +606,8 @@ and equal_record_kind k1 k2 =
   | Record_mixed lys1, Record_mixed lys2 ->
     Misc.Stdlib.Array.equal Layout.equal lys1 lys2
   | Record_floats, Record_floats -> true
-  | Record_unboxed,
-    (Record_unboxed_product | Record_boxed | Record_mixed _ | Record_floats)
-  | Record_unboxed_product,
-    (Record_unboxed | Record_boxed | Record_mixed _ | Record_floats)
-  | Record_boxed,
-    (Record_unboxed | Record_unboxed_product | Record_mixed _ | Record_floats)
-  | Record_mixed _,
-    (Record_unboxed | Record_unboxed_product | Record_boxed | Record_floats)
-  | Record_floats,
-    (Record_unboxed | Record_unboxed_product | Record_boxed | Record_mixed _)
+  | (Record_unboxed | Record_unboxed_product | Record_boxed | Record_mixed _ |
+     Record_floats), _
     -> false
 
 and equal_field (s1, sh1, ly1) (s2, sh2, ly2) =
@@ -733,8 +725,10 @@ let rec print fmt t =
                 pv_constr_args))
         fields
     | Variant { simple_constructors; complex_constructors } ->
-      let constructors = List.map (fun c -> `Simple c) simple_constructors @
-        List.map (fun c -> `Complex c) complex_constructors in
+      let constructors =
+        List.map (fun c -> `Simple c) simple_constructors @
+        List.map (fun c -> `Complex c) complex_constructors
+      in
       let print_constructor fmt = function
         | `Simple s -> Format.pp_print_string fmt s
         | `Complex c ->
@@ -764,7 +758,7 @@ let rec print fmt t =
     Format.fprintf fmt "@[%a@]@;" aux t
 
 (* We use custom strings as separators instead of pp_print_space, because the
-    latter introduces line breaks that can mess up the tables with all shapes.*)
+   latter introduces line breaks that can mess up the tables with all shapes. *)
 and print_sep_string str fmt () = Format.pp_print_string fmt str
 
 and print_one_entry print_value ppf { field_name; field_value } =

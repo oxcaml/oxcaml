@@ -1245,8 +1245,8 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Constr _ ->
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
-      (* CR sspies: This case is a precaution. With proper recursive types, it
-         should never trigger. For now, we simply use a fallback. *)
+      (* CR sspies: The [Constr] case is a precaution. With proper recursive
+         types, it should never trigger. For now, we simply use a fallback. *)
     | Unboxed_tuple _ ->
       Misc.fatal_errorf "unboxed tuples cannot have base layout %a"
         Layout.format (Layout.Base type_layout)
@@ -1281,10 +1281,6 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
           fields
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
-    | Record { fields = _; kind = Record_unboxed_product } ->
-      Misc.fatal_error
-        "Unboxed records should not reach this stage. They are deconstructed \
-         by unarization in earlier stages of the compiler."
     | Record
         { fields = [(field_name, sh, Base base_layout)]; kind = Record_unboxed }
       ->
@@ -1295,12 +1291,6 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       let field_size = base_layout_to_byte_size base_layout in
       create_attribute_unboxed_record_die ~reference ~parent_proto_die ?name
         ~field_name ~field_size ~field_die ()
-      (* The two cases below are filtered out by the flattening of shapes in
-         [flatten_shape]. *)
-    | Record { fields = [] | _ :: _ :: _; kind = Record_unboxed } ->
-      assert false
-    | Record { fields = [(_, _, Product _)]; kind = Record_unboxed } ->
-      assert false
     | Record { fields; kind = Record_mixed mixed_block_shapes } ->
       let fields = List.map (fun (name, sh, ly) -> Some name, sh, ly) fields in
       let fields = flatten_fields_in_mixed_record ~mixed_block_shapes fields in
@@ -1317,6 +1307,16 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
           fields
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
+    | Record { fields = _; kind = Record_unboxed_product }
+    | Record { fields = [(_, _, Product _)]; kind = Record_unboxed } ->
+      Misc.fatal_errorf
+        "This form of record shape should have been flattened by \
+         [flatten_shape]: %a"
+        Shape.print type_shape
+    | Record { fields = [] | _ :: _ :: _; kind = Record_unboxed } ->
+      Misc.fatal_errorf
+        "Records with [@unboxed] attributes must have exactly one field:@ %a"
+        Shape.print type_shape
     | Variant { simple_constructors; complex_constructors } -> (
       match complex_constructors with
       | [] ->
@@ -1550,7 +1550,9 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   | Record { fields = [(_, sh, ly)]; kind = Record_unboxed }, _
     when Layout.equal ly type_layout -> (
     match type_layout with
-    | Product _ -> flatten_shape sh ly
+    | Product _ ->
+      (* CR mshinwell: this should preserve the record type *)
+      flatten_shape sh ly
     (* for unboxed products of the form [{ field: ty } [@@unboxed]] where [ty]
        is of product sort, we simply look through the unboxed product.
        Otherwise, we will create an additional DWARF entry for it. *)
