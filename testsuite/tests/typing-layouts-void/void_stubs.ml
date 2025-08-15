@@ -3,8 +3,7 @@
    expect;
 *)
 
-(* Void is not yet allowed in C stubs. *)
-(* CR layouts v5: allow some of these, improve the error message for others *)
+(* CR layouts v5: improve the error messages *)
 
 type void : void
 type r = #{ v1 : void; v2 : void }
