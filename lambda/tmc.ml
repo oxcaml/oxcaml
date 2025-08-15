@@ -881,7 +881,7 @@ let rec choice ctx t =
        considered constructions someday *)
     | Pbytes_to_string | Pbytes_of_string
     | Parray_to_iarray | Parray_of_iarray
-    | Pgetglobal _ | Psetglobal _ | Pgetpredef _
+    | Pgetglobal _ | Pgetpredef _
     | Pfield _ | Pfield_computed _
     | Psetfield _ | Psetfield_computed _
     | Pfloatfield _ | Psetfloatfield _

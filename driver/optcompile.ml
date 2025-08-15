@@ -113,8 +113,7 @@ let implementation_aux unix ~(flambda2 : flambda2) ~start_from
       ~source_file ~output_prefix ~keep_symbol_tables
       ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
   let transl_style : Translmod.compilation_unit_style =
-    if Config.flambda || Config.flambda2 then Plain_block
-    else Set_individual_fields
+    Plain_block
   in
   let pipeline : Asmgen.pipeline =
     Direct_to_cmm (flambda2 ~keep_symbol_tables)

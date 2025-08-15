@@ -494,7 +494,6 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       pseudo_event (variadic (Makeblock { tag }))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal cu -> nullary (Getglobal cu)
-    | Psetglobal cu -> unary (Setglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
     | Pfield (n, _, _) | Punboxed_product_field (n, _) -> unary (Getfield n)
     | Parray_element_size_in_bytes _array_kind -> (

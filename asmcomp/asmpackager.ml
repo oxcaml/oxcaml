@@ -119,8 +119,7 @@ let make_package_object unix ~ppf_dump members target coercion
     let prefixname = Filename.remove_extension objtemp in
     let required_globals = Compilation_unit.Set.empty in
     let transl_style : Translmod.compilation_unit_style =
-      if Config.flambda || Config.flambda2 then Plain_block
-      else Set_individual_fields
+      Plain_block
     in
     let main_module_block_size, code =
       Translmod.transl_package components compilation_unit coercion

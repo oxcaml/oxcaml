@@ -52,6 +52,9 @@ let raw_lambda_to_bytecode i raw_lambda ~as_arg_for =
        |> Simplif.simplify_lambda
        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
        |> Blambda_of_lambda.blambda_of_lambda
+       |> (fun blam -> 
+            (* Wrap the module in Setglobal for bytecode compilation *)
+            Blambda.Prim (Blambda.Setglobal i.module_name, [blam]))
        |> print_if i.ppf_dump Clflags.dump_blambda Printblambda.blambda
        |> Bytegen.compile_implementation i.module_name
        |> print_if i.ppf_dump Clflags.dump_instr Printinstr.instrlist
