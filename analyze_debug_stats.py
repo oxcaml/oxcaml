@@ -53,6 +53,8 @@ import glob
 import os
 import sys
 import argparse
+import subprocess
+import re
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
@@ -79,10 +81,12 @@ class StatEntry:
         self.file_path = file_path
 
 class FileMeasurement:
-    def __init__(self, file_path, main_size, debug_size=None):
+    def __init__(self, file_path, main_size, debug_size=None, dwarf_sections={}, total_dwarf_size=0):
         self.file_path = file_path
         self.main_size = main_size
         self.debug_size = debug_size
+        self.dwarf_sections = dwarf_sections
+        self.total_dwarf_size = total_dwarf_size
 
 def parse_json_file(file_path):
     """Parse a single JSON file and return (entries, file_metadata) tuple."""
@@ -122,6 +126,33 @@ def parse_json_file(file_path):
 
     return entries, file_metadata
 
+def analyze_dwarf_sections(file_path):
+    """Analyze DWARF sections in a binary using objdump."""
+    try:
+        # Run objdump to get section headers
+        result = subprocess.run(['objdump', '-h', file_path],
+                              capture_output=True, text=True, check=True)
+
+        # Parse the output to find debug sections using regex
+        dwarf_sections = {}
+        # Match objdump section lines: idx section_name size vma lma file_off algn
+        section_pattern = re.compile(r'^\s*\d+\s+(\.debug\w*)\s+([0-9a-fA-F]+)')
+
+        for line in result.stdout.split('\n'):
+            match = section_pattern.match(line)
+            if match:
+                section_name = match.group(1)
+                size_hex = match.group(2)
+                try:
+                    size_bytes = int(size_hex, 16)
+                    dwarf_sections[section_name] = size_bytes
+                except ValueError:
+                    continue
+
+        return dwarf_sections
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return {}
+
 def measure_file_sizes(file_paths):
     """Measure the sizes of the specified files and their .debug variants if they exist."""
     measurements = []
@@ -140,7 +171,22 @@ def measure_file_sizes(file_paths):
         if os.path.exists(debug_file_path):
             debug_size = os.path.getsize(debug_file_path)
 
-        measurements.append(FileMeasurement(file_path, main_size, debug_size))
+        # Analyze DWARF sections in the main binary
+        dwarf_sections = analyze_dwarf_sections(file_path)
+
+        # Also analyze DWARF sections in the .debug file if it exists
+        if debug_size is not None:
+            debug_dwarf_sections = analyze_dwarf_sections(debug_file_path)
+            # Merge the sections, summing sizes for sections that appear in both
+            for section_name, section_size in debug_dwarf_sections.items():
+                if section_name in dwarf_sections:
+                    dwarf_sections[section_name] += section_size
+                else:
+                    dwarf_sections[section_name] = section_size
+
+        total_dwarf_size = sum(dwarf_sections.values())
+
+        measurements.append(FileMeasurement(file_path, main_size, debug_size, dwarf_sections, total_dwarf_size))
 
     return measurements
 
@@ -270,11 +316,28 @@ def display_file_measurements(file_measurements):
         print("# File Measurements")
         print()
         for measurement in file_measurements:
+            # Total size is main binary + debug sidecar (they are separate files)
+            total_size = measurement.main_size + (measurement.debug_size or 0)
+            dwarf_percentage = (measurement.total_dwarf_size / total_size * 100) if total_size > 0 else 0
+
+            print("## `{}`".format(measurement.file_path))
+            print("- **Total size**: {:,} bytes".format(total_size))
             if measurement.debug_size is not None:
-                print("- `{}`: {:,} bytes (+ {:,} bytes .debug)".format(measurement.file_path, measurement.main_size, measurement.debug_size))
-            else:
-                print("- `{}`: {:,} bytes".format(measurement.file_path, measurement.main_size))
-        print()
+                print("  - Main binary: {:,} bytes".format(measurement.main_size))
+                print("  - Debug sidecar: {:,} bytes".format(measurement.debug_size))
+            print("- **DWARF sections** (aggregated): {:,} bytes ({:.1f}% of total)".format(
+                measurement.total_dwarf_size, dwarf_percentage))
+
+            if measurement.dwarf_sections:
+                print("  - DWARF section breakdown:")
+                # Sort sections by size descending
+                sorted_sections = sorted(measurement.dwarf_sections.items(),
+                                       key=lambda x: x[1], reverse=True)
+                for section_name, section_size in sorted_sections:
+                    section_percentage = (section_size / measurement.total_dwarf_size * 100) if measurement.total_dwarf_size > 0 else 0
+                    print("    - `{}`: {:,} bytes ({:.1f}% of DWARF)".format(
+                        section_name, section_size, section_percentage))
+            print()
 
 def analyze_stats(search_dir="."):
     """Main analysis function."""
