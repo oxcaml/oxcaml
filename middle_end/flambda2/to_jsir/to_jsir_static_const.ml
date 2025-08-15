@@ -173,7 +173,8 @@ let prepare_code ~env ~res ~code_id code =
             Jsir.Var.fresh ())
       in
       let res, addr = To_jsir_result.reserve_address res in
-      let env = To_jsir_env.add_code_id env code_id ~addr ~params in
+      let closure = Jsir.Var.fresh () in
+      let env = To_jsir_env.add_code_id env code_id ~addr ~params ~closure in
       let free_names = Code0.free_names code in
       let function_slots = Name_occurrences.all_function_slots free_names in
       let value_slots = Name_occurrences.all_value_slots free_names in
@@ -202,7 +203,7 @@ let code ~env ~res ~translate_body ~code_id code =
          ~exn_continuation
          bound_params
          ~body
-         ~my_closure:_
+         ~my_closure
          ~is_my_closure_used:_
          ~my_region:_
          ~my_ghost_region:_
@@ -211,13 +212,18 @@ let code ~env ~res ~translate_body ~code_id code =
        ->
       (* This has already been populated by the first phase of the [Static] arm
          of [To_jsir.let_expr_normal] *)
-      let addr, params_jvar = To_jsir_env.get_code_id_exn env code_id in
+      let ({ addr; params = params_jvar; closure } : To_jsir_env.code_id) =
+        To_jsir_env.get_code_id_exn env code_id
+      in
       let res = To_jsir_result.new_block_with_addr_exn res ~addr ~params:[] in
       let params_fvar =
         Bound_parameters.to_list bound_params |> List.map Bound_parameter.var
       in
       let env_with_params =
         List.fold_left2 To_jsir_env.add_var env params_fvar params_jvar
+      in
+      let env_with_params =
+        To_jsir_env.set_my_closure env_with_params my_closure closure
       in
       let _env_with_params, res =
         (* Throw away the environment after translating the body *)
