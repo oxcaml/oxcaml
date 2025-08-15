@@ -81,3 +81,30 @@ module Six = Double (Three)
 let _ = print_float (Float_u.to_float (id Six.as_float_u))
 let _ = print_endline ""
 let _ = print_endline (id Six.as_string)
+
+
+let _ = print_endline "Test 5: generative functor"
+
+module type Counting_sig = sig
+  val boxed_one : float
+  val unboxed_one : float#
+  val boxed_two : float
+  val unboxed_two : float#
+end
+
+module MakeCounting () : Counting_sig = struct
+  let boxed_one = 1.0
+  let unboxed_one = #1.0
+  let boxed_two = 2.0
+  let unboxed_two = #2.0
+  let boxed_three = 3.0
+  let unboxed_three = #3.0
+end
+
+module Counting = MakeCounting ()
+
+let _ =
+  print_float (Float_u.to_float (id Counting.unboxed_one));
+  print_endline "";
+  print_float (Float_u.to_float (id Counting.unboxed_two));
+  print_endline ""
