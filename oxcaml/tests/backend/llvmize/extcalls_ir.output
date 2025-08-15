@@ -9,7 +9,7 @@ define void @camlExtcalls__code_begin() { ret void }
 @.header.camlExtcalls__call_no_return_10 = global { i64 } { i64 3063 }, align 8
 @camlExtcalls__call_no_return_10 = global { ptr, i64 } { ptr @camlExtcalls__call_no_return_HIDE_STAMP, i64 108086391056891909 }, align 8
 @.header.camlExtcalls__invalid187 = global { i64 } { i64 30716 }, align 8
-@camlExtcalls__invalid187 = global { [ 230 x i8 ], [ 1 x i8 ], i8 } { [ 230 x i8 ] c"\5b\5d\0a\55\6e\72\65\61\63\68\61\62\6c\65\20\63\6f\64\65\20\62\65\63\61\75\73\65\20\6f\66\0a\64\65\61\64\20\66\75\6e\63\74\69\6f\6e\20\73\6c\6f\74\73\3a\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\31\3b\31\6d\28\66\6e\5b\65\78\74\63\61\6c\6c\73\2e\6d\6c\3a\33\39\2c\34\2d\2d\39\31\5d\2f\35\20\e2\88\b7\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\37\3b\31\6d\f0\9d\95\8d\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\31\3b\31\6d\29\1b\5b\30\6d\0a\64\65\61\64\20\76\61\6c\75\65\20\73\6c\6f\74\73\3a\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\34\33\3b\31\6d\28\61\2f\32\20\e2\88\b7\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\37\3b\31\6d\e2\84\95\f0\9d\95\97\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\34\33\3b\31\6d\29\1b\5b\30\6d\0a", [ 1 x i8 ] zeroinitializer, i8 1 }, align 8
+@camlExtcalls__invalid187 = global { [ 230 x i8 ], [ 1 x i8 ], i8 } { [ 230 x i8 ] c"\5b\5d\0a\55\6e\72\65\61\63\68\61\62\6c\65\20\63\6f\64\65\20\62\65\63\61\75\73\65\20\6f\66\0a\64\65\61\64\20\66\75\6e\63\74\69\6f\6e\20\73\6c\6f\74\73\3a\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\31\3b\31\6d\28\66\6e\5b\65\78\74\63\61\6c\6c\73\2e\6d\6c\3a\34\30\2c\34\2d\2d\39\31\5d\2f\35\20\e2\88\b7\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\37\3b\31\6d\f0\9d\95\8d\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\31\3b\31\6d\29\1b\5b\30\6d\0a\64\65\61\64\20\76\61\6c\75\65\20\73\6c\6f\74\73\3a\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\34\33\3b\31\6d\28\61\2f\32\20\e2\88\b7\20\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\33\37\3b\31\6d\e2\84\95\f0\9d\95\97\1b\5b\30\6d\1b\5b\33\38\3b\35\3b\34\33\3b\31\6d\29\1b\5b\30\6d\0a", [ 1 x i8 ] zeroinitializer, i8 1 }, align 8
 @.header.camlExtcalls__f_9 = global { i64 } { i64 3063 }, align 8
 @camlExtcalls__f_9 = global { ptr, i64 } { ptr @camlExtcalls__f_HIDE_STAMP, i64 108086391056891909 }, align 8
 @.header.camlExtcalls__call_int_and_float_8 = global { i64 } { i64 3063 }, align 8
@@ -23,7 +23,7 @@ define void @camlExtcalls__code_begin() { ret void }
 @.header.camlExtcalls__Pmakeblock40 = global { i64 } { i64 2816 }, align 8
 @camlExtcalls__Pmakeblock40 = global { ptr, ptr } { ptr @caml_exn_Assert_failure, ptr @camlExtcalls__const_block37 }, align 8
 @.header.camlExtcalls__const_block37 = global { i64 } { i64 3840 }, align 8
-@camlExtcalls__const_block37 = global { ptr, i64, i64 } { ptr @camlExtcalls__immstring35, i64 69, i64 21 }, align 8
+@camlExtcalls__const_block37 = global { ptr, i64, i64 } { ptr @camlExtcalls__immstring35, i64 71, i64 21 }, align 8
 @.header.camlExtcalls__immstring35 = global { i64 } { i64 3068 }, align 8
 @camlExtcalls__immstring35 = global { [ 11 x i8 ], [ 4 x i8 ], i8 } { [ 11 x i8 ] c"\65\78\74\63\61\6c\6c\73\2e\6d\6c", [ 4 x i8 ] zeroinitializer, i8 4 }, align 8
 @.header.camlExtcalls__float25 = global { i64 } { i64 2045 }, align 8
@@ -329,7 +329,7 @@ L116:                                                ; preds = %L1
   ret { { ptr, ptr }, { i64 } } %19
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__fn$5bextcalls.ml$3a39$2c4$2d$2d91$5d_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3)  {
+define cc 104 { { ptr, ptr }, { i64 } } @camlExtcalls__fn$5bextcalls.ml$3a40$2c4$2d$2d91$5d_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
