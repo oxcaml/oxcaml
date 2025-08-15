@@ -35,6 +35,8 @@ let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
 let cfg_eliminate_dead_trap_handlers = ref false  (* -cfg-eliminate-dead-trap-handlers *)
 
+let cfg_prologue_validate = ref false    (* -[no-]cfg-prologue-validate *)
+
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
 let basic_block_sections = ref false    (* -basic-block-sections *)
 (* -module-entry-functions-section *)
