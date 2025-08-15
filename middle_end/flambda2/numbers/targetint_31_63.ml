@@ -69,9 +69,11 @@ module T0 = struct
   let ( > ) t1 t2 = Stdlib.( > ) (Targetint_32_64.compare t1 t2) 0
 
   let to_int_option t =
-    let min_int_as_int64 = Targetint_32_64.of_int Stdlib.min_int in
-    let max_int_as_int64 = Targetint_32_64.of_int Stdlib.max_int in
-    if min_int_as_int64 <= t && t <= max_int_as_int64
+    let t_as_int64 = to_int64 t in
+    let min_int_as_int64 = Int64.of_int Stdlib.min_int in
+    let max_int_as_int64 = Int64.of_int Stdlib.max_int in
+    let le x y = Stdlib.( <= ) (Int64.compare x y) 0 in
+    if le min_int_as_int64 t_as_int64 && le t_as_int64 max_int_as_int64
     then Some (to_int t)
     else None
 

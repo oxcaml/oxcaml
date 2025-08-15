@@ -2331,7 +2331,15 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     | Word_size ->
       [Simple (Simple.const_int (Targetint_31_63.of_int (8 * size_int)))]
     | Int_size ->
-      [Simple (Simple.const_int (Targetint_31_63.of_int ((8 * size_int) - 1)))]
+      let bits =
+        match !Clflags.jsir with
+        | false -> (8 * size_int) - 1
+        | true ->
+          (* Integers are not tagged in JavaScript, so they are 32 bits wide
+             rather than 31 *)
+          8 * size_int
+      in
+      [Simple (Simple.const_int (Targetint_31_63.of_int bits))]
     | Max_wosize ->
       [ Simple
           (Simple.const_int
