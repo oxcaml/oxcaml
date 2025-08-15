@@ -43,6 +43,8 @@ let
   upstream = pkgs.ocaml-ng.ocamlPackages_4_14;
 
   ocaml = (upstream.ocaml.override { stdenv = myStdenv; }).overrideAttrs {
+    # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
+    # compiler that we use to bootstrap ourselves on ARM64
     patches = [ ./arm64-issue-debug-upstream.patch ];
   };
 
