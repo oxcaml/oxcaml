@@ -34,6 +34,12 @@ val enter_function_body :
     (use [add_exn_handler]). *)
 val add_continuation : t -> Continuation.t -> Jsir.Addr.t -> t
 
+type exn_handler =
+  { addr : Jsir.Addr.t;
+    exn_param : Jsir.Var.t;
+    extra_args : Jsir.Var.t list
+  }
+
 (** Add continuations used as exception handlers, along with its exception parameter
     and any variables used to pass in [extra_args]. *)
 val add_exn_handler :
@@ -52,12 +58,17 @@ val add_var : t -> Variable.t -> Jsir.Var.t -> t
 val add_symbol :
   t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t -> t * To_jsir_result.t
 
+(** Symbols added through this function must be registered after the definition for them
+    are given, using [register_symbol_exn]. Otherwise, they will not be available to other
+    compilation units. *)
+val add_symbol_without_registering : t -> Symbol.t -> Jsir.Var.t -> t
+
 (** Register the given symbol to the global symbol table. Raises if the symbol is not in
     the environment.
 
-    Note that calling this function is probably a mistake, as most functions that
+    Note that calling this function is usually a mistake, as most functions that
     add symbols will automatically call this function. However, it is necessary for
-    [add_symbol_if_not_found_without_registering]. *)
+    [add_symbol_without_registering]. *)
 val register_symbol_exn :
   t -> res:To_jsir_result.t -> Symbol.t -> To_jsir_result.t
 
@@ -101,8 +112,7 @@ val get_continuation_exn : t -> Continuation.t -> Jsir.Addr.t
 
 (** Return the block address and parameters for exception-handling continuations.
     Raises if given an unbound exception handler. *)
-val get_exn_handler_exn :
-  t -> Continuation.t -> Jsir.Addr.t * Jsir.Var.t * Jsir.Var.t list
+val get_exn_handler_exn : t -> Continuation.t -> exn_handler
 
 (** Return the JSIR variable for the given Flambda variable. Raises if given
     an unbound variable. *)
@@ -139,11 +149,6 @@ val get_value_slot_exn : t -> Value_slot.t -> Jsir.Var.t
 (** These functions first check whether the given item exists in the environment.
     If it exists, the environment is unchanged. Otherwise, we create a fresh variable,
     and add the mapping to the environment. *)
-
-(** Symbols added through this function must be registered after the definition for them
-    are given, using [register_symbol_exn]. Otherwise, they will not be available to other
-    compilation units. *)
-val add_symbol_if_not_found_without_registering : t -> Symbol.t -> t
 
 val add_function_slot_if_not_found : t -> Function_slot.t -> t
 

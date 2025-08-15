@@ -1,10 +1,15 @@
+type exn_handler =
+  { addr : Jsir.Addr.t;
+    exn_param : Jsir.Var.t;
+    extra_args : Jsir.Var.t list
+  }
+
 type t =
   { module_symbol : Symbol.t;
     return_continuation : Continuation.t;
     exn_continuation : Continuation.t;
     continuations : Jsir.Addr.t Continuation.Map.t;
-    exn_handlers :
-      (Jsir.Addr.t * Jsir.Var.t * Jsir.Var.t list) Continuation.Map.t;
+    exn_handlers : exn_handler Continuation.Map.t;
     vars : Jsir.Var.t Variable.Map.t;
     symbols : Jsir.Var.t Symbol.Map.t;
     code_ids : (Jsir.Addr.t * Jsir.Var.t list * Jsir.Var.t) Code_id.Map.t;
@@ -44,7 +49,7 @@ let add_continuation t cont addr =
 let add_exn_handler t cont ~addr ~exn_param ~extra_args =
   { t with
     exn_handlers =
-      Continuation.Map.add cont (addr, exn_param, extra_args) t.exn_handlers
+      Continuation.Map.add cont { addr; exn_param; extra_args } t.exn_handlers
   }
 
 let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
@@ -66,9 +71,12 @@ let register_symbol' ~res symbol var =
                Pc (NativeString symbol_name);
                Pv var ] ) ))
 
+let add_symbol_without_registering t symbol jvar =
+  { t with symbols = Symbol.Map.add symbol jvar t.symbols }
+
 let add_symbol t ~res symbol jvar =
-  ( { t with symbols = Symbol.Map.add symbol jvar t.symbols },
-    register_symbol' ~res symbol jvar )
+  let t = add_symbol_without_registering t symbol jvar in
+  t, register_symbol' ~res symbol jvar
 
 let add_code_id t code_id ~addr ~params ~closure =
   let code_ids = Code_id.Map.add code_id (addr, params, closure) t.code_ids in
@@ -173,12 +181,6 @@ let add_if_not_found map item ~mem ~add =
   else
     let var = Jsir.Var.fresh () in
     add item var map
-
-let add_symbol_if_not_found_without_registering t symbol =
-  { t with
-    symbols =
-      add_if_not_found t.symbols symbol ~mem:Symbol.Map.mem ~add:Symbol.Map.add
-  }
 
 let add_function_slot_if_not_found t slot =
   { t with

@@ -48,12 +48,9 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
          |> Simplif.simplify_lambda
          |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
          |> fun lambda ->
-         (* CR selee: we don't need it at this point, but this seems important
-            so I'll keep it around *)
          let arg_descr =
            make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
          in
-         let () = ignore arg_descr in
          lambda |> fun code ->
          (* CR selee: Currently the flambda2 codebase assumes that the target integer
             size is the same as the compiler integer size, which is a wrong assumption.
@@ -61,12 +58,16 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
          Flambda2.lambda_to_flambda ~ppf_dump:i.ppf_dump
            ~prefixname:(Unit_info.prefix i.target)
            { program with code }
-         |> fun (program : Flambda2.flambda_result) ->
-         Flambda2_to_jsir.To_jsir.unit ~offsets:program.offsets
-           ~all_code:program.all_code ~reachable_names:program.reachable_names
-           program.flambda
-         |> print_if i.ppf_dump Clflags.dump_jsir (fun ppf jsir ->
-                Flambda2_to_jsir.Jsir.Print.program ppf (fun _ _ -> "") jsir))
+         |> fun (flambda_result : Flambda2.flambda_result) ->
+         let jsir =
+           Flambda2_to_jsir.To_jsir.unit ~offsets:flambda_result.offsets
+             ~all_code:flambda_result.all_code
+             ~reachable_names:flambda_result.reachable_names
+             flambda_result.flambda
+           |> print_if i.ppf_dump Clflags.dump_jsir (fun ppf jsir ->
+                  Flambda2_to_jsir.Jsir.Print.program ppf (fun _ _ -> "") jsir)
+         in
+         jsir, program.main_module_block_format, arg_descr)
 
 let emit_jsir i jsir_program =
   let cmj = Unit_info.cmj i.target in
@@ -90,17 +91,26 @@ let emit_jsir i jsir_program =
       in
       output_value oc cmj_body)
 
-let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ } =
+let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
+    ~as_arg_for =
   let argument_coercion =
     match argument_interface with
     | Some { ai_coercion_from_primary; ai_signature = _ } ->
       Some ai_coercion_from_primary
     | None -> None
   in
-  (structure, coercion, argument_coercion)
-  |> Profile.(record transl)
-       (Translmod.transl_implementation i.module_name ~style:Plain_block)
-  |> raw_lambda_to_jsir i
+  let raw_lambda =
+    (structure, coercion, argument_coercion)
+    |> Profile.(record transl)
+         (Translmod.transl_implementation i.module_name ~style:Plain_block)
+  in
+  let jsir, main_module_block_format, arg_descr =
+    raw_lambda_to_jsir i raw_lambda ~as_arg_for
+  in
+  Compilenv.save_unit_info
+    (Unit_info.Artifact.filename (Unit_info.cmx i.target))
+    ~main_module_block_format ~arg_descr;
+  jsir
 
 type starting_point =
   | Parsing
@@ -126,6 +136,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
   match start_from with
   | Parsing ->
     let backend info typed =
+      Compilenv.reset info.target;
       let as_arg_for =
         !Clflags.as_argument_for
         |> Option.map Global_module.Parameter_name.of_string
@@ -149,12 +160,22 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       | Some { arg_param; arg_block_idx } -> Some arg_param, Some arg_block_idx
       | None -> None, None
     in
+    Compilenv.reset info.target;
     let impl =
       Translmod.transl_instance info.module_name ~runtime_args
         ~main_module_block_size ~arg_block_idx ~style:Plain_block
     in
-    let jsir = raw_lambda_to_jsir info impl ~as_arg_for in
-    emit_jsir info jsir
+    let jsir, main_module_block_format, arg_descr_computed =
+      raw_lambda_to_jsir info impl ~as_arg_for
+    in
+    emit_jsir info jsir;
+    Compilenv.save_unit_info
+      (Unit_info.Artifact.filename (Unit_info.cmx info.target))
+      ~main_module_block_format
+      ~arg_descr:
+        (match arg_descr with
+        | None -> arg_descr_computed
+        | Some _ -> arg_descr)
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
   let start_from = start_from |> starting_point_of_compiler_pass in
