@@ -1,8 +1,7 @@
 module DLL = Oxcaml_utils.Doubly_linked_list
 open! Int_replace_polymorphic_compare
 
-let are_equal_regs (reg1 : Reg.t) (reg2 : Reg.t) =
-  Reg.same_loc reg1 reg2 && Cmm.equal_machtype_component reg1.typ reg2.typ
+let are_equal_regs (reg1 : Reg.t) (reg2 : Reg.t) = Reg.same_loc reg1 reg2
 
 (* CR-soon gtulba-lecu: Delete this when implementing auto-generated rules. *)
 let go_back_const = 1
