@@ -21,8 +21,6 @@ module Float64 = struct
   external round : (int[@untagged]) -> (t[@unboxed]) -> (t[@unboxed])
     = "" "caml_sse41_float64_round"
     [@@noalloc] [@@builtin]
-
-  let[@inline always] round_near f = round 0x8 f
 end
 
 module Float32x4 = struct

@@ -164,7 +164,6 @@ static inline simd_int128_t vec128i_of_int64x2(simd_int64x2_t v)
 }
 
 static inline simd_float64x2_t simd_float64x2_round_near(simd_float64x2_t v)
-
 {
   return _mm_round_pd(v, 0x8);
 }
@@ -347,9 +346,6 @@ BUILTIN(caml_int_clz_tagged_to_untagged);
 
 BUILTIN(caml_simd_vec128_interleave_low_32)
 BUILTIN(caml_simd_vec128_interleave_low_64)
-BUILTIN(caml_simd_float64_max);
-BUILTIN(caml_simd_float64_min);
-
 
 #include <float.h>
 #include <math.h>

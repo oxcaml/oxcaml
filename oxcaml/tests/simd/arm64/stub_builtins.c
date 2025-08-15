@@ -9,8 +9,6 @@ BUILTIN(caml_neon_float64_div);
 BUILTIN(caml_neon_float64_max);
 BUILTIN(caml_neon_float64_min);
 BUILTIN(caml_neon_float64_sqrt);
-BUILTIN(caml_neon_float64_round_near);
-
 
 BUILTIN(caml_neon_float32x4_cmeq);
 BUILTIN(caml_neon_float32x4_cmgt);
