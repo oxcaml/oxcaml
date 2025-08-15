@@ -23,12 +23,13 @@ type unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
   | Unboxed_float32
 
-type unboxed_integer = Primitive.unboxed_integer =
+type unboxed_or_untagged_integer = Primitive.unboxed_or_untagged_integer =
   | Unboxed_int64
   | Unboxed_nativeint
   | Unboxed_int32
-  | Unboxed_int16
-  | Unboxed_int8
+  | Untagged_int16
+  | Untagged_int8
+  | Untagged_int
 
 type unboxed_vector = Primitive.unboxed_vector =
   | Unboxed_vec128
@@ -38,7 +39,7 @@ type unboxed_vector = Primitive.unboxed_vector =
 type array_kind =
     Pgenarray | Paddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray of unboxed_float
-  | Punboxedintarray of unboxed_integer
+  | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
   | Pgcscannableproductarray of unit
   | Pgcignorableproductarray of unit

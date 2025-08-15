@@ -178,14 +178,14 @@ val mark_value_mutated: Uid.t -> unit
 
 type constructor_usage = Positive | Pattern | Exported_private | Exported
 val mark_constructor_used:
-    constructor_usage -> constructor_declaration -> unit
+    constructor_usage -> Uid.t -> unit
 val mark_extension_used:
-    constructor_usage -> extension_constructor -> unit
+    constructor_usage -> Uid.t -> unit
 
 type label_usage =
     Projection | Mutation | Construct | Exported_private | Exported
 val mark_label_used:
-    label_usage -> label_declaration -> unit
+    label_usage -> Uid.t -> unit
 
 (* Lookup by long identifiers *)
 
@@ -236,6 +236,7 @@ type lock_item =
   | Value
   | Module
   | Class
+  | Constructor
 
 type structure_components_reason =
   | Project
@@ -339,14 +340,14 @@ val lookup_module_instance_path:
 
 val lookup_constructor:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  constructor_description
+  constructor_description * locks
 val lookup_all_constructors:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  ((constructor_description * (unit -> unit)) list,
+  (((constructor_description * locks) * (unit -> unit)) list,
    Location.t * t * lookup_error) result
 val lookup_all_constructors_from_type:
   ?use:bool -> loc:Location.t -> constructor_usage -> Path.t -> t ->
-  (constructor_description * (unit -> unit)) list
+  ((constructor_description * locks) * (unit -> unit)) list
 
 val lookup_label:
   ?use:bool -> record_form:'rcd record_form -> loc:Location.t -> label_usage -> Longident.t -> t ->

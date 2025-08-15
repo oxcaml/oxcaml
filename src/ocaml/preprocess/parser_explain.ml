@@ -10,6 +10,7 @@ let nullable (type a) : a MenhirInterpreter.nonterminal -> bool =
   | N_type_kind -> true
   | N_structure -> true
   | N_signature -> true
+  | N_reversed_llist_unboxed_access_ -> true
   | N_reversed_llist_preceded_CONSTRAINT_constrain__ -> true
   | N_rec_flag -> true
   | N_private_virtual_flags -> true

@@ -1,4 +1,5 @@
 type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
+type shape_format = Old_merlin | Debugging_shapes
 
 (** {0 OCaml compiler compatible command-line parameters}
 
@@ -36,6 +37,7 @@ val infer_with_bounds    : bool ref
 val annotations          : bool ref
 val binary_annotations   : bool ref
 val binary_annotations_cms   : bool ref
+val shape_format         : shape_format ref
 val store_occurrences    : bool ref
 val print_types          : bool ref
 val native_code          : bool ref

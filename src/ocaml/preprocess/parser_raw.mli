@@ -366,6 +366,7 @@ module MenhirInterpreter : sig
     | N_val_extra_ident : (string) nonterminal
     | N_use_file : (Parsetree.toplevel_phrase list) nonterminal
     | N_unboxed_constant : (Parsetree.constant) nonterminal
+    | N_unboxed_access : (Parsetree.unboxed_access) nonterminal
     | N_type_variance : (Asttypes.variance * Asttypes.injectivity) nonterminal
     | N_type_unboxed_longident : (Longident.t) nonterminal
     | N_type_trailing_no_hash : (string) nonterminal
@@ -419,6 +420,7 @@ module MenhirInterpreter : sig
     | N_reversed_nonempty_llist_functor_arg_ : ((Lexing.position * Parsetree.functor_parameter) list) nonterminal
     | N_reversed_nonempty_llist_comprehension_clause_ : (Parsetree.comprehension_clause list) nonterminal
     | N_reversed_nonempty_concat_fun_param_as_list_ : (Parsetree.function_param list) nonterminal
+    | N_reversed_llist_unboxed_access_ : (Parsetree.unboxed_access list) nonterminal
     | N_reversed_llist_preceded_CONSTRAINT_constrain__ : ((Parsetree.core_type * Parsetree.core_type * Location.t) list) nonterminal
     | N_reversed_labeled_tuple_pattern_pattern_no_exn_ : (Asttypes.closed_flag * (string option * Parsetree.pattern) list) nonterminal
     | N_reversed_labeled_tuple_pattern_pattern_ : (Asttypes.closed_flag * (string option * Parsetree.pattern) list) nonterminal
@@ -617,6 +619,7 @@ module MenhirInterpreter : sig
     | N_class_fun_binding : (Parsetree.class_expr) nonterminal
     | N_class_field : (Parsetree.class_field) nonterminal
     | N_class_expr : (Parsetree.class_expr) nonterminal
+    | N_block_access : (Parsetree.block_access) nonterminal
     | N_attribute : (Parsetree.attribute) nonterminal
     | N_attr_payload : (Parsetree.payload) nonterminal
     | N_attr_id : (string Location.loc) nonterminal

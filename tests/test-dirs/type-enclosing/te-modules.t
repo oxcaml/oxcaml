@@ -136,7 +136,7 @@ With index 0 only the first type is shown:
           "col": 14
         },
         "type": "sig
-    type 'a t = 'a list = [] | (::) of 'a * 'a list
+    type ('a : value_or_null) t = 'a list = [] | (::) of 'a * 'a list
     val length : 'a list -> int @@ portable
     val compare_lengths : 'a list -> 'b list -> int @@ portable
     val compare_length_with : 'a list -> int -> int @@ portable

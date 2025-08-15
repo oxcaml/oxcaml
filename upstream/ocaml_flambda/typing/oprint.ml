@@ -605,19 +605,24 @@ and print_typargs ppf =
       pp_print_space ppf ()
 and print_out_label ppf (name, mut, arg, gbl) =
   (* See the notes [NON-LEGACY MODES] *)
-  let mut =
+  let mut, atomic =
     match mut with
-    | Om_immutable -> ""
-    | Om_mutable None -> "mutable "
-    | Om_mutable (Some s) -> "mutable(" ^ s ^ ") "
+    | Om_immutable -> "", Nonatomic
+    | Om_mutable (None, atomic) -> "mutable ", atomic
+    | Om_mutable (Some s, atomic) -> "mutable(" ^ s ^ ") ", atomic
+  in
+  let print_atomic ppf atomic = match atomic with
+    | Nonatomic -> ()
+    | Atomic -> fprintf ppf " [@@atomic]"
   in
   let m_legacy, m_new = partition_modalities gbl in
-  fprintf ppf "@[<2>%s%a%a :@ %a%a@];"
+  fprintf ppf "@[<2>%s%a%a :@ %a%a%a@];"
     mut
     print_out_modalities_legacy m_legacy
     print_lident name
     print_out_type arg
     print_out_modalities_new m_new
+    print_atomic atomic
 
 and print_out_jkind_const ppf ojkind =
   let rec pp_element ~nested ppf (ojkind : Outcometree.out_jkind_const) =

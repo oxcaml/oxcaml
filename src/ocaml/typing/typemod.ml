@@ -3499,8 +3499,8 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) funct_body anchor
           begin match Jkind.Sort.default_to_value_and_get sort with
           | Base Value -> ()
           | Product _
-          | Base (Void | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
-                 | Bits64 | Vec128 | Vec256 | Vec512) ->
+          | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
+                 Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
             raise (Error (sexpr.pexp_loc, env, Toplevel_unnamed_nonvalue sort))
           end;
         Tstr_eval (expr, sort, attrs), [], shape_map, env
@@ -3519,8 +3519,9 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) funct_body anchor
               begin match Jkind.Sort.default_to_value_and_get vb.vb_sort with
               | Base Value -> ()
               | Product _
-              | Base (Void | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
-                     | Bits64 | Vec128 | Vec256 | Vec512) ->
+              | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
+                     Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 |
+                     Vec512) ->
                 raise (Error (vb.vb_loc, env,
                               Toplevel_unnamed_nonvalue vb.vb_sort))
               end

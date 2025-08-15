@@ -624,7 +624,9 @@ let ocaml_ignored_flags =
     "-fno-avx";
     "-dllvmir";
     "-keep-llvmir";
-    "-llvm-path"
+    "-llvm-path";
+    "-ddwarf-types";
+    "-ocamlcfg"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -700,7 +702,10 @@ let ocaml_ignored_parametrized_flags =
     "-dgranularity";
     "-flambda2-expert-cont-lifting-budget";
     "-vectorize-max-block-size";
-    "-save-ir-before"
+    "-save-ir-before";
+    "-shape-format";
+    "-gdwarf-compression";
+    "-gdwarf-fission"
   ]
 
 let ocaml_warnings_spec ~error =

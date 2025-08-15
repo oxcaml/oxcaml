@@ -47,6 +47,8 @@ let cmi_file = ref None
 type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
+type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
+type shape_format = Old_merlin | Debugging_shapes
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
@@ -60,6 +62,8 @@ and print_types = ref false             (* -i *)
 and make_archive = ref false            (* -a *)
 and debug = ref false                   (* -g *)
 and debug_full = ref false              (* For full DWARF support *)
+and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
+and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)
 and unsafe = ref false                  (* -unsafe *)
 and use_linscan = ref false             (* -linscan *)
 and link_everything = ref false         (* -linkall *)
@@ -81,6 +85,8 @@ let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
 let binary_annotations_cms = ref false  (* -bin-annot-cms *)
+let shape_format =                      (* -shape-format *)
+  ref (if Config.oxcaml_dwarf then Debugging_shapes else Old_merlin)
 let store_occurrences = ref false       (* -bin-annot-occurrences *)
 and use_threads = ref false             (* -thread *)
 and noassert = ref false                (* -noassert *)

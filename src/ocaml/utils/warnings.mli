@@ -144,6 +144,7 @@ type t =
       axis : string;
       overriden_by : string;
     }                                       (* 213 *)
+  | Atomic_float_record_boxed               (* 214 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

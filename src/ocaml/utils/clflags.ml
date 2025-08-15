@@ -1,4 +1,5 @@
 type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
+type shape_format = Old_merlin | Debugging_shapes
 
 (** {0 OCaml compiler compatible command-line parameters} *)
 let cmi_file = ref None
@@ -28,6 +29,7 @@ let infer_with_bounds   = ref false
 let annotations         = ref false
 let binary_annotations  = ref true
 let binary_annotations_cms  = ref false
+let shape_format        = ref Old_merlin
 let store_occurrences   = ref true
 let print_types         = ref false
 let native_code         = ref false

@@ -181,6 +181,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_val_extra_ident) -> "val_extra_ident"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_use_file) -> "use_file"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_unboxed_constant) -> "unboxed_constant"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_unboxed_access) -> "unboxed_access"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_type_variance) -> "type_variance"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_type_unboxed_longident) -> "type_unboxed_longident"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_type_trailing_no_hash) -> "type_trailing_no_hash"
@@ -234,6 +235,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_reversed_nonempty_llist_functor_arg_) -> "reversed_nonempty_llist_functor_arg_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_reversed_nonempty_llist_comprehension_clause_) -> "reversed_nonempty_llist_comprehension_clause_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_reversed_nonempty_concat_fun_param_as_list_) -> "reversed_nonempty_concat_fun_param_as_list_"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_reversed_llist_unboxed_access_) -> "reversed_llist_unboxed_access_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_reversed_llist_preceded_CONSTRAINT_constrain__) -> "reversed_llist_preceded_CONSTRAINT_constrain__"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_reversed_labeled_tuple_pattern_pattern_no_exn_) -> "reversed_labeled_tuple_pattern_pattern_no_exn_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_reversed_labeled_tuple_pattern_pattern_) -> "reversed_labeled_tuple_pattern_pattern_"
@@ -419,6 +421,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_class_fun_binding) -> "class_fun_binding"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_class_field) -> "class_field"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_class_expr) -> "class_expr"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_block_access) -> "block_access"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_attribute) -> "attribute"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_attr_payload) -> "attr_payload"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_attr_id) -> "attr_id"
@@ -594,6 +597,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.N MenhirInterpreter.N_val_extra_ident -> (fun _ -> "val_extra_ident")
   | MenhirInterpreter.N MenhirInterpreter.N_use_file -> (fun _ -> "use_file")
   | MenhirInterpreter.N MenhirInterpreter.N_unboxed_constant -> (fun _ -> "unboxed_constant")
+  | MenhirInterpreter.N MenhirInterpreter.N_unboxed_access -> (fun _ -> "unboxed_access")
   | MenhirInterpreter.N MenhirInterpreter.N_type_variance -> (fun _ -> "type_variance")
   | MenhirInterpreter.N MenhirInterpreter.N_type_unboxed_longident -> (fun _ -> "type_unboxed_longident")
   | MenhirInterpreter.N MenhirInterpreter.N_type_trailing_no_hash -> (fun _ -> "type_trailing_no_hash")
@@ -647,6 +651,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.N MenhirInterpreter.N_reversed_nonempty_llist_functor_arg_ -> (fun _ -> "reversed_nonempty_llist_functor_arg_")
   | MenhirInterpreter.N MenhirInterpreter.N_reversed_nonempty_llist_comprehension_clause_ -> (fun _ -> "reversed_nonempty_llist_comprehension_clause_")
   | MenhirInterpreter.N MenhirInterpreter.N_reversed_nonempty_concat_fun_param_as_list_ -> (fun _ -> "reversed_nonempty_concat_fun_param_as_list_")
+  | MenhirInterpreter.N MenhirInterpreter.N_reversed_llist_unboxed_access_ -> (fun _ -> "reversed_llist_unboxed_access_")
   | MenhirInterpreter.N MenhirInterpreter.N_reversed_llist_preceded_CONSTRAINT_constrain__ -> (fun _ -> "reversed_llist_preceded_CONSTRAINT_constrain__")
   | MenhirInterpreter.N MenhirInterpreter.N_reversed_labeled_tuple_pattern_pattern_no_exn_ -> (fun _ -> "reversed_labeled_tuple_pattern_pattern_no_exn_")
   | MenhirInterpreter.N MenhirInterpreter.N_reversed_labeled_tuple_pattern_pattern_ -> (fun _ -> "reversed_labeled_tuple_pattern_pattern_")
@@ -832,6 +837,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.N MenhirInterpreter.N_class_fun_binding -> (fun _ -> "class_fun_binding")
   | MenhirInterpreter.N MenhirInterpreter.N_class_field -> (fun _ -> "class_field")
   | MenhirInterpreter.N MenhirInterpreter.N_class_expr -> (fun _ -> "class_expr")
+  | MenhirInterpreter.N MenhirInterpreter.N_block_access -> (fun _ -> "block_access")
   | MenhirInterpreter.N MenhirInterpreter.N_attribute -> (fun _ -> "attribute")
   | MenhirInterpreter.N MenhirInterpreter.N_attr_payload -> (fun _ -> "attr_payload")
   | MenhirInterpreter.N MenhirInterpreter.N_attr_id -> (fun _ -> "attr_id")

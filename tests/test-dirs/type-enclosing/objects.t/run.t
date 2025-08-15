@@ -27,7 +27,7 @@
         "line": 2,
         "col": 24
       },
-      "type": "int list  type 'a list = [] | (::) of 'a * 'a list",
+      "type": "int list  type ('a : value_or_null) list = [] | (::) of 'a * 'a list",
       "tail": "no"
     },
     {

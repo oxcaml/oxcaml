@@ -371,6 +371,16 @@ let of_method_call obj meth loc env (f : _ f0) acc =
   let loc = { loc with Location.loc_start; loc_end } in
   app (Method_call (obj, meth, loc)) env f acc
 
+let of_block_access = function
+  | Baccess_field (_, _) -> id_fold
+  | Baccess_array
+      { mut = _; index_kind = _; index; base_ty = _; elt_ty = _; elt_sort = _ }
+    -> of_expression index
+  | Baccess_block (_, exp) -> of_expression exp
+
+let of_unboxed_access = function
+  | Uaccess_unboxed_field (_, _) -> id_fold
+
 let rec of_expression_desc loc = function
   | Texp_ident _ | Texp_constant _ | Texp_instvar _ | Texp_mutvar _
   | Texp_variant (_, None)
@@ -472,6 +482,9 @@ let rec of_expression_desc loc = function
   | Texp_probe p -> of_expression p.handler
   | Texp_probe_is_enabled _ -> id_fold
   | Texp_exclave e -> of_expression e
+  | Texp_idx (block_access, unboxed_access) ->
+    of_block_access block_access ** list_fold of_unboxed_access unboxed_access
+  | Texp_atomic_loc (exp, _, _, _, _) -> of_expression exp
   | Texp_hole _ -> id_fold
 
 (* We should consider taking into account param.fp_loc at some point, as it
