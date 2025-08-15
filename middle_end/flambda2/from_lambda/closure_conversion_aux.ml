@@ -427,7 +427,7 @@ module Acc = struct
               | Attribute_inline | Small_function _ -> approx
               | Not_yet_decided | Never_inline_attribute | Stub | Recursive
               | Function_body_too_large _ | Speculatively_inlinable _
-              | Functor _ ->
+              | Functor _ | Jsir_inlining_disabled ->
                 Value_approximation.Closure_approximation
                   { code_id;
                     function_slot;
