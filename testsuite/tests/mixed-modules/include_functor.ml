@@ -110,24 +110,27 @@ let _ = print_endline ""
 
 let _ = print_endline "Test 5: Nested include functor applications"
 
-module AddOne (M : sig val x : float# end) = struct
+module AddOne (M : sig val x : float# val final_string : string end) = struct
   let inner_result = Float_u.add M.x #1.0
+  let inner_string = M.final_string ^ "_inner"
 end
 
-module DoubleInner (M : sig val x : float# val inner_result : float# end) = struct
-  let outer_result = Float_u.mul M.inner_result #2.0
+module DoubleInner (M : sig val x : float# end) = struct
+  include M
   let final_string = "final"
+  include functor AddOne
+  let outer_result = Float_u.mul inner_result #2.0
 end
 
 module Nested = struct
   let x = #4.0
-  include functor AddOne
   include functor DoubleInner
 end
 
 let _ = print_float (Float_u.to_float (id Nested.outer_result))
 let _ = print_endline ""
 let _ = print_endline (id Nested.final_string)
+let _ = print_endline (id Nested.inner_string)
 
 
 let _ = print_endline "Test 6: Include with type"
