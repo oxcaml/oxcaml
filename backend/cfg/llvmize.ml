@@ -200,8 +200,11 @@ type t =
         (* Function symbols defined so far *)
     mutable referenced_symbols : String.Set.t;
         (* Global symbols referenced so far *)
-    mutable called_functions : fun_sig String.Map.t
+    mutable called_functions : fun_sig String.Map.t;
         (* Names + signatures (args, ret) of functions called so far *)
+    mutable emit_exn_intrinsic_decls : bool
+        (* Whether to emit declarations / definitions for intrinsics / wrapper
+           functions involved in generating try blocks *)
   }
 
 let create_fun_info ~fun_name ~fun_has_try =
@@ -227,7 +230,8 @@ let create ~llvmir_filename ~ppf_dump =
       create_fun_info ~fun_name:"<no current function>" ~fun_has_try:false;
     defined_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty;
-    called_functions = String.Map.empty
+    called_functions = String.Map.empty;
+    emit_exn_intrinsic_decls = false
   }
 
 let reset_fun_info t ~fun_name ~fun_has_try =
@@ -1136,7 +1140,7 @@ module F = struct
     pp_dbg_instr_basic t.ppf i;
     match i.desc with
     | Op op -> basic_op t i op
-    | Prologue | Epilogue | Reloadretaddr -> ()
+    | Prologue | Epilogue | Reloadretaddr -> () (* LLVM handles these for us *)
     | Poptrap { lbl_handler } -> (
       match Label.Tbl.find_opt t.current_fun_info.trap_blocks lbl_handler with
       | None -> Misc.fatal_error "Llvmize: unbalanced trap pop"
@@ -1156,6 +1160,7 @@ module F = struct
           [Llvm_typ.ptr, stacksave_ptr]
           None)
     | Pushtrap { lbl_handler } -> (
+      t.emit_exn_intrinsic_decls <- true;
       (* Call a function that wraps a dummy LLVM intrinsic that always returns
          0. We set the handler address to be right after this call to emulate
          setjmp's behaviour without actually saving the state to a buffer.
@@ -1222,7 +1227,10 @@ module F = struct
       | None ->
         Label.Tbl.add t.current_fun_info.trap_blocks lbl_handler
           { trap_block; stacksave_ptr; payload })
-    | Stack_check _ -> not_implemented_basic i
+    | Stack_check _ ->
+      if Config.no_stack_checks || not !Oxcaml_flags.cfg_stack_checks
+      then () (* Don't emit stack checks *)
+      else not_implemented_basic ~msg:"stack check" i
 
   (* == Cfg data items == *)
 
@@ -1603,6 +1611,23 @@ let declare_data t =
   String.Set.diff t.referenced_symbols t.defined_symbols
   |> String.Set.iter (fun sym -> F.data_decl_extern t sym)
 
+let declare_stack_intrinsics t =
+  F.line t.ppf "declare i64 @llvm.read_register.i64(metadata)";
+  F.line t.ppf "declare void @llvm.write_register.i64(metadata, i64)"
+
+let declare_exn_intrinsics t =
+  if t.emit_exn_intrinsic_decls
+  then (
+    F.line t.ppf "declare i32 @llvm.eh.ocaml.try()";
+    F.line t.ppf "%s"
+      {|define private cc 104 {ptr, i32} @wrap_try(ptr %r14) returns_twice noinline {
+  %1 = call i32 @llvm.eh.ocaml.try()
+  %t1 = extractvalue {{ptr, i32}} poison, 0
+  %t2 = insertvalue {ptr, i32} %t1, ptr %r14, 0
+  %t3 = insertvalue {ptr, i32} %t2, i32 %1, 1
+  ret {ptr, i32} %t3
+}|})
+
 let declare_functions t =
   String.Map.iter
     (fun sym fun_sig ->
@@ -1610,19 +1635,8 @@ let declare_functions t =
       then F.fun_decl t sym fun_sig;
       t.defined_symbols <- String.Set.add sym t.defined_symbols)
     t.called_functions;
-  (* Register read/write *)
-  F.line t.ppf "declare i64 @llvm.read_register.i64(metadata)";
-  F.line t.ppf "declare void @llvm.write_register.i64(metadata, i64)";
-  (* Exception handling *)
-  F.line t.ppf "declare i32 @llvm.eh.ocaml.try()";
-  F.line t.ppf "%s"
-    {|define private cc 104 {ptr, i32} @wrap_try(ptr %r14) returns_twice noinline {
-  %1 = call i32 @llvm.eh.ocaml.try()
-  %t1 = extractvalue {{ptr, i32}} poison, 0
-  %t2 = insertvalue {ptr, i32} %t1, ptr %r14, 0
-  %t3 = insertvalue {ptr, i32} %t2, i32 %1, 1
-  ret {ptr, i32} %t3
-}|}
+  declare_stack_intrinsics t;
+  declare_exn_intrinsics t
 
 (* CR yusumez: change this definition to account for R15 later. *)
 (*= F.line t.ppf "%s"

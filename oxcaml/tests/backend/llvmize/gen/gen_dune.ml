@@ -78,6 +78,7 @@ module F = struct
     asprintf "(run ${ocamlopt} %a -opaque -o %s.exe)" (pp_strings pp_space) deps
       output
 
+  (* CR yusumez: Make one rule per task to better use incremental tests. *)
   let pp_compile_rule ppf ~targets ~deps ~task_rules =
     fprintf ppf
       {|(rule
@@ -270,4 +271,5 @@ let () =
       [ Ocaml_default "exn_part1";
         Ocaml_llvm { filename = "exn_part2"; stop_after_llvmize = false };
         Output_ir { source = "exn_part2"; output = "exn_part2_ir" };
-        Ocaml_default "exn_part3" ]
+        Ocaml_default "exn_part3" ];
+  ()
