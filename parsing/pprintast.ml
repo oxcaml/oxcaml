@@ -258,11 +258,12 @@ let constant f = function
       paren (first_is '-' i) (fun f -> pp f "%s") f i
   | Pconst_float (i, Some m) ->
       paren (first_is '-' i) (fun f (i,m) -> pp f "%s%c" i m) f (i,m)
-  | Pconst_unboxed_float (x, None) ->
+  | Pconst_unboxed_float (x, None) 
+  | Pconst_unboxed_integer (x, None) ->
       paren (first_is '-' x) (fun f -> pp f "%s") f
         (Misc.format_as_unboxed_literal x)
   | Pconst_unboxed_float (x, Some suffix)
-  | Pconst_unboxed_integer (x, suffix) ->
+  | Pconst_unboxed_integer (x, Some suffix) ->
       paren (first_is '-' x) (fun f (x, suffix) -> pp f "%s%c" x suffix) f
         (Misc.format_as_unboxed_literal x, suffix)
 

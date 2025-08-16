@@ -578,6 +578,9 @@ module With_subkind = struct
       | Value_array
       | Generic_array
       | Unboxed_float32_array
+      | Untagged_int_array
+      | Untagged_int8_array
+      | Untagged_int16_array
       | Unboxed_int32_array
       | Unboxed_int64_array
       | Unboxed_nativeint_array
@@ -614,6 +617,9 @@ module With_subkind = struct
       | Immediate_array, Immediate_array
       | Value_array, Value_array
       | Generic_array, Generic_array
+      | Untagged_int_array, Untagged_int_array
+      | Untagged_int8_array, Untagged_int8_array
+      | Untagged_int16_array, Untagged_int16_array
       | Unboxed_int32_array, Unboxed_int32_array
       | Unboxed_int64_array, Unboxed_int64_array
       | Unboxed_nativeint_array, Unboxed_nativeint_array
@@ -672,7 +678,8 @@ module With_subkind = struct
           | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
           | Tagged_immediate | Variant _ | Float_block _ | Float_array
           | Immediate_array | Value_array | Generic_array
-          | Unboxed_float32_array | Unboxed_int32_array | Unboxed_int64_array
+          | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
+          | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
           | Unboxed_nativeint_array | Unboxed_product_array
           | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
             ),
@@ -726,10 +733,12 @@ module With_subkind = struct
                 | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
                 | Tagged_immediate | Variant _ | Float_block _ | Float_array
                 | Immediate_array | Value_array | Generic_array
-                | Unboxed_float32_array | Unboxed_int32_array
-                | Unboxed_int64_array | Unboxed_nativeint_array
-                | Unboxed_vec128_array | Unboxed_vec256_array
-                | Unboxed_vec512_array | Unboxed_product_array ),
+                | Unboxed_float32_array | Untagged_int_array
+                | Untagged_int8_array | Untagged_int16_array
+                | Unboxed_int32_array | Unboxed_int64_array
+                | Unboxed_nativeint_array | Unboxed_vec128_array
+                | Unboxed_vec256_array | Unboxed_vec512_array
+                | Unboxed_product_array ),
                 Non_nullable )
             | (Naked_number _ | Region | Rec_info), _, Nullable ->
               assert false
@@ -755,6 +764,15 @@ module With_subkind = struct
           Format.fprintf ppf "%t=Generic_array%t" colour Flambda_colours.pop
         | Unboxed_float32_array ->
           Format.fprintf ppf "%t=Unboxed_float32_array%t" colour
+            Flambda_colours.pop
+        | Untagged_int_array ->
+          Format.fprintf ppf "%t=Untagged_int_array%t" colour
+            Flambda_colours.pop
+        | Untagged_int8_array ->
+          Format.fprintf ppf "%t=Untagged_int8_array%t" colour
+            Flambda_colours.pop
+        | Untagged_int16_array ->
+          Format.fprintf ppf "%t=Untagged_int16_array%t" colour
             Flambda_colours.pop
         | Unboxed_int32_array ->
           Format.fprintf ppf "%t=Unboxed_int32_array%t" colour
@@ -801,7 +819,8 @@ module With_subkind = struct
           | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
           | Tagged_immediate | Variant _ | Float_block _ | Float_array
           | Immediate_array | Value_array | Generic_array
-          | Unboxed_float32_array | Unboxed_int32_array | Unboxed_int64_array
+          | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
+          | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
           | Unboxed_nativeint_array | Unboxed_vec128_array
           | Unboxed_vec256_array | Unboxed_vec512_array | Unboxed_product_array
             ),
@@ -1043,10 +1062,12 @@ module With_subkind = struct
       | Parrayval Pgenarray -> Generic_array
       | Parrayval (Punboxedfloatarray Unboxed_float64) -> Float_array
       | Parrayval (Punboxedfloatarray Unboxed_float32) -> Unboxed_float32_array
-      | Parrayval
-          (Punboxedoruntaggedintarray
-            (Untagged_int8 | Untagged_int16 | Untagged_int)) ->
-        Misc.unboxed_small_int_arrays_are_not_implemented ()
+      | Parrayval (Punboxedoruntaggedintarray Untagged_int) ->
+        Untagged_int_array
+      | Parrayval (Punboxedoruntaggedintarray Untagged_int8) ->
+        Untagged_int8_array
+      | Parrayval (Punboxedoruntaggedintarray Untagged_int16) ->
+        Untagged_int16_array
       | Parrayval (Punboxedoruntaggedintarray Unboxed_int32) ->
         Unboxed_int32_array
       | Parrayval (Punboxedoruntaggedintarray Unboxed_int64) ->
@@ -1100,7 +1121,8 @@ module With_subkind = struct
           | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
           | Tagged_immediate | Variant _ | Float_block _ | Float_array
           | Immediate_array | Value_array | Generic_array
-          | Unboxed_float32_array | Unboxed_int32_array | Unboxed_int64_array
+          | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array 
+          | Untagged_int16_array| Unboxed_int32_array | Unboxed_int64_array
           | Unboxed_nativeint_array | Unboxed_vec128_array
           | Unboxed_vec256_array | Unboxed_vec512_array | Unboxed_product_array
             ),
@@ -1140,6 +1162,7 @@ module With_subkind = struct
       | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
       | Tagged_immediate | Variant _ | Float_block _ | Float_array
       | Immediate_array | Value_array | Generic_array | Unboxed_float32_array
+      | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
       | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
       | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
       | Unboxed_product_array ->
@@ -1161,7 +1184,8 @@ module With_subkind = struct
       | Anything | Boxed_float | Boxed_float32 | Boxed_int32 | Boxed_int64
       | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Variant _
       | Float_block _ | Float_array | Immediate_array | Value_array
-      | Generic_array | Unboxed_float32_array | Unboxed_int32_array
+      | Generic_array | Unboxed_float32_array | Untagged_int_array
+      | Untagged_int8_array | Untagged_int16_array | Unboxed_int32_array
       | Unboxed_int64_array | Unboxed_nativeint_array | Unboxed_vec128_array
       | Unboxed_vec256_array | Unboxed_vec512_array | Unboxed_product_array ->
         true)

@@ -2211,11 +2211,14 @@ let primitive_can_raise prim =
     false
 
 let constant_layout: constant -> layout = function
-  | Const_int _ | Const_char _ -> non_null_value Pintval
+  | Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _ -> non_null_value Pintval
   | Const_string _ -> non_null_value Pgenval
   | Const_int32 _ -> non_null_value (Pboxedintval Boxed_int32)
   | Const_int64 _ -> non_null_value (Pboxedintval Boxed_int64)
   | Const_nativeint _ -> non_null_value (Pboxedintval Boxed_nativeint)
+  | Const_untagged_int _ -> Punboxed_or_untagged_integer Untagged_int
+  | Const_untagged_int8 _ -> Punboxed_or_untagged_integer Untagged_int8
+  | Const_untagged_int16 _ -> Punboxed_or_untagged_integer Untagged_int16
   | Const_unboxed_int32 _ -> Punboxed_or_untagged_integer Unboxed_int32
   | Const_unboxed_int64 _ -> Punboxed_or_untagged_integer Unboxed_int64
   | Const_unboxed_nativeint _ -> Punboxed_or_untagged_integer Unboxed_nativeint
@@ -2769,13 +2772,16 @@ let array_element_size_in_bytes (array_kind : array_kind) =
     (* float32# arrays are packed *)
     4
   | Punboxedfloatarray Unboxed_float64 -> 8
-  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
-    ->
-    Misc.unboxed_small_int_arrays_are_not_implemented ()
+  | Punboxedoruntaggedintarray Untagged_int8 ->
+    (* int8# arrays are packed *)
+    1
+  | Punboxedoruntaggedintarray Untagged_int16 ->
+    (* int16# arrays are packed *)
+    2
   | Punboxedoruntaggedintarray Unboxed_int32 ->
     (* int32# arrays are packed *)
     4
-  | Punboxedoruntaggedintarray (Unboxed_int64 | Unboxed_nativeint) -> 8
+  | Punboxedoruntaggedintarray (Untagged_int | Unboxed_int64 | Unboxed_nativeint) -> 8
   | Punboxedvectorarray Unboxed_vec128 -> 16
   | Punboxedvectorarray Unboxed_vec256 -> 32
   | Punboxedvectorarray Unboxed_vec512 -> 64

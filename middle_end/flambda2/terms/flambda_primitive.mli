@@ -59,6 +59,9 @@ module Array_kind : sig
         (** An array consisting of naked floats, represented using
             [Double_array_tag]. *)
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -107,6 +110,9 @@ module Array_load_kind : sig
         (** An array consisting of naked floats, represented using
             [Double_array_tag]. *)
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -129,6 +135,9 @@ module Array_set_kind : sig
         (** An array consisting of naked floats, represented using
         [Double_array_tag]. *)
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -165,6 +174,9 @@ module Duplicate_array_kind : sig
     | Values
     | Naked_floats of { length : Targetint_31_63.t option }
     | Naked_float32s of { length : Targetint_31_63.t option }
+    | Naked_ints of { length : Targetint_31_63.t option }
+    | Naked_int8s of { length : Targetint_31_63.t option }
+    | Naked_int16s of { length : Targetint_31_63.t option }
     | Naked_int32s of { length : Targetint_31_63.t option }
     | Naked_int64s of { length : Targetint_31_63.t option }
     | Naked_nativeints of { length : Targetint_31_63.t option }

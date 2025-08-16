@@ -104,6 +104,10 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
   match const with
   | Const_base (Const_int c) ->
     acc, reg_width (RWC.tagged_immediate (Targetint_31_63.of_int c)), "int"
+  | Const_base (Const_int8 c) ->
+    acc, reg_width (RWC.tagged_immediate (Targetint_31_63.of_int c)), "int8"
+  | Const_base (Const_int16 c) ->
+    acc, reg_width (RWC.tagged_immediate (Targetint_31_63.of_int c)), "int16"
   | Const_base (Const_char c) ->
     acc, reg_width (RWC.tagged_immediate (Targetint_31_63.of_char c)), "char"
   | Const_base (Const_unboxed_float c) ->
@@ -128,6 +132,12 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     (* CR pchambart: this should be pushed further to lambda *)
     let c = Targetint_32_64.of_int64 (Int64.of_nativeint c) in
     register_const acc dbg (SC.boxed_nativeint (Const c)) "nativeint"
+  | Const_base (Const_untagged_int c) ->
+    acc, reg_width (RWC.naked_immediate (Targetint_31_63.of_int c)), "untagged_int"
+  | Const_base (Const_untagged_int8 c) ->
+    acc, reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn c)), "untagged_int8"
+  | Const_base (Const_untagged_int16 c) ->
+    acc, reg_width (RWC.naked_int16 (Numeric_types.Int16.of_int_exn c)), "untagged_int16"
   | Const_base (Const_unboxed_int32 c) ->
     acc, reg_width (RWC.naked_int32 c), "unboxed_int32"
   | Const_base (Const_unboxed_int64 c) ->
@@ -201,9 +211,10 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       match c with
       | Const_base (Const_float f) -> Const_base (Const_unboxed_float f)
       | Const_base
-          ( Const_int _ | Const_char _ | Const_string _ | Const_float32 _
-          | Const_unboxed_float _ | Const_unboxed_float32 _ | Const_int32 _
-          | Const_int64 _ | Const_nativeint _ | Const_unboxed_int32 _
+          ( Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _ | Const_string _
+          | Const_float32 _ | Const_unboxed_float _ | Const_unboxed_float32 _
+          | Const_int32 _ | Const_int64 _ | Const_nativeint _ | Const_untagged_int _
+          | Const_untagged_int8 _ | Const_untagged_int16 _ | Const_unboxed_int32 _
           | Const_unboxed_int64 _ | Const_unboxed_nativeint _ )
       | Const_block _ | Const_mixed_block _ | Const_float_array _
       | Const_immstring _ | Const_float_block _ | Const_null ->

@@ -1113,9 +1113,17 @@ let rec struct_const ppf = function
       fprintf ppf "%s" (Misc.format_as_unboxed_literal f)
   | Const_base(Const_unboxed_float32 f) ->
       fprintf ppf "%ss" (Misc.format_as_unboxed_literal f)
+  | Const_base(Const_int8 n) -> fprintf ppf "%is" n
+  | Const_base(Const_int16 n) -> fprintf ppf "%iS" n
   | Const_base(Const_int32 n) -> fprintf ppf "%lil" n
   | Const_base(Const_int64 n) -> fprintf ppf "%LiL" n
   | Const_base(Const_nativeint n) -> fprintf ppf "%nin" n
+  | Const_base(Const_untagged_int i) ->
+      fprintf ppf "%s" (Misc.format_as_unboxed_literal (Int.to_string i))
+  | Const_base(Const_untagged_int8 i) ->
+      fprintf ppf "%ss" (Misc.format_as_unboxed_literal (Int.to_string i))
+  | Const_base(Const_untagged_int16 i) ->
+      fprintf ppf "%sS" (Misc.format_as_unboxed_literal (Int.to_string i))
   | Const_base(Const_unboxed_int32 i) ->
       fprintf ppf "%sl" (Misc.format_as_unboxed_literal (Int32.to_string i))
   | Const_base(Const_unboxed_int64 i) ->

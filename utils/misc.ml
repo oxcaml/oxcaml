@@ -25,9 +25,6 @@ let fatal_errorf fmt =
 
 let fatal_error msg = fatal_errorf "%s" msg
 
-let unboxed_small_int_arrays_are_not_implemented () =
-  fatal_error "unboxed int8/int16 and untagged int arrays are not implemented"
-
 (* Exceptions *)
 
 let try_finally ?(always=(fun () -> ())) ?(exceptionally=(fun () -> ())) work =
@@ -831,6 +828,14 @@ module Int_literal_converter = struct
   let int32 s = cvt_int_aux s Int32.neg Int32.of_string
   let int64 s = cvt_int_aux s Int64.neg Int64.of_string
   let nativeint s = cvt_int_aux s Nativeint.neg Nativeint.of_string
+
+  let cvt_small_int str ~bits =
+    let i = int_of_string str in
+    if i < -(1 lsl bits) || i >= (1 lsl bits)
+    then failwith "small int overflow";
+    i
+  let int8 s = cvt_small_int s ~bits:8
+  let int16 s = cvt_small_int s ~bits:16
 end
 
 (* [find_first_mono p] assumes that there exists a natural number

@@ -931,15 +931,11 @@ let with_sign sign num =
   | Positive -> num
   | Negative -> "-" ^ num
 
-let unboxed_int sloc int_loc sign (n, m) =
+let unboxed_int sloc sign (n, m) =
   match m with
-  | Some m -> Pconst_unboxed_integer (with_sign sign n, m)
-  | None ->
-      if Language_extension.is_enabled unboxed_literals_extension then
-        raise
-          Syntaxerr.(Error(Missing_unboxed_literal_suffix (make_loc int_loc)))
-      else
-        not_expecting sloc "line number directive"
+  | None when not (Language_extension.is_enabled unboxed_literals_extension) ->
+      not_expecting sloc "line number directive"
+  | _ -> Pconst_unboxed_integer (with_sign sign n, m)
 
 let unboxed_float sign (f, m) = Pconst_unboxed_float (with_sign sign f, m)
 
@@ -4947,7 +4943,7 @@ value_constant:
   | FLOAT             { let (f, m) = $1 in Pconst_float (f, m) }
 ;
 unboxed_constant:
-  | HASH_INT          { unboxed_int $sloc $sloc Positive $1 }
+  | HASH_INT          { unboxed_int $sloc Positive $1 }
   | HASH_FLOAT        { unboxed_float Positive $1 }
 ;
 constant:
@@ -4964,9 +4960,9 @@ signed_value_constant:
 signed_constant:
     signed_value_constant { $1 }
   | unboxed_constant      { $1 }
-  | MINUS HASH_INT        { unboxed_int $sloc $loc($2) Negative $2 }
+  | MINUS HASH_INT        { unboxed_int $sloc Negative $2 }
   | MINUS HASH_FLOAT      { unboxed_float Negative $2 }
-  | PLUS HASH_INT         { unboxed_int $sloc $loc($2) Positive $2 }
+  | PLUS HASH_INT         { unboxed_int $sloc Positive $2 }
   | PLUS HASH_FLOAT       { unboxed_float Positive $2 }
 ;
 

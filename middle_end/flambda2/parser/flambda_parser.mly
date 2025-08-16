@@ -599,6 +599,9 @@ binop_app:
       | Values -> Values
       | Naked_floats -> Naked_floats
       | Naked_float32s -> Naked_float32s
+      | Naked_ints -> Naked_ints
+      | Naked_int8s -> Naked_int8s
+      | Naked_int16s -> Naked_int16s
       | Naked_int32s -> Naked_int32s
       | Naked_int64s -> Naked_int64s
       | Naked_nativeints -> Naked_nativeints
@@ -636,6 +639,9 @@ ternop_app:
         | Values -> Values ia
         | Naked_floats -> Naked_floats
         | Naked_float32s -> Naked_float32s
+        | Naked_ints -> Naked_ints
+        | Naked_int8s -> Naked_int8s
+        | Naked_int16s -> Naked_int16s
         | Naked_int32s -> Naked_int32s
         | Naked_int64s -> Naked_int64s
         | Naked_nativeints -> Naked_nativeints

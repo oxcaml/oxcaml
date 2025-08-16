@@ -801,19 +801,28 @@ let type_constant: Typedtree.constant -> type_expr = function
   | Const_float32 _ -> instance Predef.type_float32
   | Const_unboxed_float _ -> instance Predef.type_unboxed_float
   | Const_unboxed_float32 _ -> instance Predef.type_unboxed_float32
+  | Const_int8 _ -> instance Predef.type_int8
+  | Const_int16 _ -> instance Predef.type_int16
   | Const_int32 _ -> instance Predef.type_int32
   | Const_int64 _ -> instance Predef.type_int64
   | Const_nativeint _ -> instance Predef.type_nativeint
+  | Const_untagged_int _ -> instance Predef.type_unboxed_int
+  | Const_untagged_int8 _ -> instance Predef.type_unboxed_int8
+  | Const_untagged_int16 _ -> instance Predef.type_unboxed_int16
   | Const_unboxed_int32 _ -> instance Predef.type_unboxed_int32
   | Const_unboxed_int64 _ -> instance Predef.type_unboxed_int64
   | Const_unboxed_nativeint _ -> instance Predef.type_unboxed_nativeint
 
 type constant_integer_result =
+  | Int8 of int
+  | Int16 of int
   | Int32 of int32
   | Int64 of int64
   | Nativeint of nativeint
 
 type constant_integer_error =
+  | Int8_literal_overflow
+  | Int16_literal_overflow
   | Int32_literal_overflow
   | Int64_literal_overflow
   | Nativeint_literal_overflow
@@ -822,6 +831,16 @@ type constant_integer_error =
 let constant_integer i ~suffix :
     (constant_integer_result, constant_integer_error) result =
   match suffix with
+  | 's' ->
+    begin
+      try Ok (Int8 (Misc.Int_literal_converter.int8 i))
+      with Failure _ -> Error Int8_literal_overflow
+    end
+  | 'S' ->
+    begin
+      try Ok (Int16 (Misc.Int_literal_converter.int16 i))
+      with Failure _ -> Error Int16_literal_overflow
+    end
   | 'l' ->
     begin
       try Ok (Int32 (Misc.Int_literal_converter.int32 i))
@@ -843,9 +862,13 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
   function
   | Pconst_integer (i, Some suffix) ->
     begin match constant_integer i ~suffix with
+      | Ok (Int8 v) -> Ok (Const_int8 v)
+      | Ok (Int16 v) -> Ok (Const_int16 v)
       | Ok (Int32 v) -> Ok (Const_int32 v)
       | Ok (Int64 v) -> Ok (Const_int64 v)
       | Ok (Nativeint v) -> Ok (Const_nativeint v)
+      | Error Int8_literal_overflow -> Error (Literal_overflow "int8")
+      | Error Int16_literal_overflow -> Error (Literal_overflow "int16")
       | Error Int32_literal_overflow -> Error (Literal_overflow "int32")
       | Error Int64_literal_overflow -> Error (Literal_overflow "int64")
       | Error Nativeint_literal_overflow -> Error (Literal_overflow "nativeint")
@@ -870,22 +893,34 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
       else Error (Float32_literal (Misc.format_as_unboxed_literal f))
   | Pconst_unboxed_float (x, Some c) ->
       Error (Unknown_literal (Misc.format_as_unboxed_literal x, c))
-  | Pconst_unboxed_integer (i, suffix) ->
+  | Pconst_unboxed_integer (i, Some suffix) ->
       begin match constant_integer i ~suffix with
+      | Ok (Int8 v) -> Ok (Const_untagged_int8 v)
+      | Ok (Int16 v) -> Ok (Const_untagged_int16 v)
       | Ok (Int32 v) -> Ok (Const_unboxed_int32 v)
       | Ok (Int64 v) -> Ok (Const_unboxed_int64 v)
       | Ok (Nativeint v) -> Ok (Const_unboxed_nativeint v)
+      | Error Int8_literal_overflow -> Error (Literal_overflow "int8#")
+      | Error Int16_literal_overflow -> Error (Literal_overflow "int16#")
       | Error Int32_literal_overflow -> Error (Literal_overflow "int32#")
       | Error Int64_literal_overflow -> Error (Literal_overflow "int64#")
       | Error Nativeint_literal_overflow -> Error (Literal_overflow "nativeint#")
       | Error Unknown_constant_literal ->
           Error (Unknown_literal (Misc.format_as_unboxed_literal i, suffix))
       end
+  | Pconst_unboxed_integer (i, None) ->
+     begin
+       try Ok (Const_untagged_int (Misc.Int_literal_converter.int i))
+       with Failure _ -> Error (Literal_overflow "int#")
+     end
 
 let constant_or_raise env loc cst =
   match constant cst with
   | Ok c ->
       (match c with
+       | Const_untagged_int _
+       | Const_untagged_int8 _
+       | Const_untagged_int16 _
        | Const_unboxed_int32 _
        | Const_unboxed_int64 _
        | Const_unboxed_nativeint _
@@ -894,7 +929,8 @@ let constant_or_raise env loc cst =
            Language_extension.assert_enabled ~loc Layouts
              Language_extension.Stable
        | Const_int _ | Const_char _ | Const_string _ | Const_float _
-       | Const_float32 _ | Const_int32 _ | Const_int64 _ | Const_nativeint _ ->
+       | Const_float32 _ | Const_int8 _ | Const_int16 _ | Const_int32 _
+       | Const_int64 _ | Const_nativeint _ ->
            ());
       c
   | Error err -> raise (Error (loc, env, err))

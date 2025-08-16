@@ -17,19 +17,46 @@
 
 open Cmm
 
-(** Tags for unboxed arrays using mixed block headers with scannable_prefix = 0 *)
-module Unboxed_array_tags : sig
+(** Tags for unboxed or untagged arrays using mixed block headers with 
+    scannable_prefix = 0 *)
+module Unboxed_or_untagged_array_tags : sig
+  val untagged_int_array_tag : int 
+
   val unboxed_int64_array_tag : int
 
   val unboxed_nativeint_array_tag : int
 
-  val unboxed_int32_array_even_tag : int
+  val untagged_int8_array_zero_tag : int
+  
+  val untagged_int8_array_one_tag : int
+ 
+  val untagged_int8_array_two_tag : int
+ 
+  val untagged_int8_array_three_tag : int
+ 
+  val untagged_int8_array_four_tag : int
+ 
+  val untagged_int8_array_five_tag : int
+ 
+  val untagged_int8_array_six_tag : int
 
-  val unboxed_int32_array_odd_tag : int
+  val untagged_int8_array_seven_tag : int
+  
+  val untagged_int16_array_zero_tag : int
+  
+  val untagged_int16_array_one_tag : int
+ 
+  val untagged_int16_array_two_tag : int
+ 
+  val untagged_int16_array_three_tag : int
 
-  val unboxed_float32_array_even_tag : int
+  val unboxed_int32_array_zero_tag : int
 
-  val unboxed_float32_array_odd_tag : int
+  val unboxed_int32_array_one_tag : int
+
+  val unboxed_float32_array_zero_tag : int
+
+  val unboxed_float32_array_one_tag : int
 
   val unboxed_vec128_array_tag : int
 
@@ -1211,6 +1238,21 @@ val reperform :
 val allocate_unboxed_float32_array :
   elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
 
+(** Allocate a block to hold an untagged int array for the given number of
+    elements. *)
+val allocate_untagged_int_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an untagged int8 array for the given number of
+    elements. *)
+val allocate_untagged_int8_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an untagged int16 array for the given number of
+    elements. *)
+val allocate_untagged_int16_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
 (** Allocate a block to hold an unboxed int32 array for the given number of
     elements. *)
 val allocate_unboxed_int32_array :
@@ -1244,11 +1286,17 @@ val allocate_unboxed_vec512_array :
 (** Compute the length of an unboxed float32 array. *)
 val unboxed_float32_array_length : expression -> Debuginfo.t -> expression
 
+(** Compute the length of an untagged int8 array. *)
+val untagged_int8_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an untagged int16 array. *)
+val untagged_int16_array_length : expression -> Debuginfo.t -> expression
+
 (** Compute the length of an unboxed int32 array. *)
 val unboxed_int32_array_length : expression -> Debuginfo.t -> expression
 
-(** Compute the length of an unboxed int64 or unboxed nativeint array. *)
-val unboxed_int64_or_nativeint_array_length :
+(** Compute the length of an untagged int or unboxed int64 or unboxed nativeint array. *)
+val unboxed_or_untagged_int_or_int64_or_nativeint_array_length :
   expression -> Debuginfo.t -> expression
 
 (** Compute the length of an unboxed vec128 array. *)
@@ -1294,9 +1342,41 @@ val unboxed_mutable_float32_unboxed_product_array_set :
   Debuginfo.t ->
   expression
 
+(** Read from an untagged int8 array (without bounds check). *)
+val untagged_int8_array_ref :
+  expression -> expression -> Debuginfo.t -> expression
+
+(** Read from an untagged int16 array (without bounds check). *)
+val untagged_int16_array_ref :
+  expression -> expression -> Debuginfo.t -> expression
+
 (** Read from an unboxed int32 array (without bounds check). *)
 val unboxed_int32_array_ref :
   expression -> expression -> Debuginfo.t -> expression
+
+(** Read an untagged int8 from (the least significant bits of) a 64-bit field
+    in an array represented as a mixed block (with tag zero), as used for
+    unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The returned value is always sign extended, but it is not assumed that
+    the 64-bit field in the array contains a sign-extended representation.
+*)
+val untagged_mutable_int8_unboxed_product_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
+
+(** Read an untagged int16 from (the least significant bits of) a 64-bit field
+    in an array represented as a mixed block (with tag zero), as used for
+    unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The returned value is always sign extended, but it is not assumed that
+    the 64-bit field in the array contains a sign-extended representation.
+*)
+val untagged_mutable_int16_unboxed_product_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
 
 (** Read an unboxed int32 from (the least significant bits of) a 64-bit field
     in an array represented as a mixed block (with tag zero), as used for
@@ -1309,6 +1389,36 @@ val unboxed_int32_array_ref :
 *)
 val unboxed_mutable_int32_unboxed_product_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
+
+(** Write an untagged int8 into a 64-bit field in an array represented as
+    a mixed block (with tag zero), as used for unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The write is done as a 64-bit write of a sign-extended version of the
+    supplied [new_value].
+*)
+val untagged_mutable_int8_unboxed_product_array_set :
+  expression ->
+  array_index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Write an untagged int16 into a 64-bit field in an array represented as
+    a mixed block (with tag zero), as used for unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The write is done as a 64-bit write of a sign-extended version of the
+    supplied [new_value].
+*)
+val untagged_mutable_int16_unboxed_product_array_set :
+  expression ->
+  array_index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
 
 (** Write an unboxed int32 into a 64-bit field in an array represented as
     a mixed block (with tag zero), as used for unboxed product arrays.
@@ -1341,6 +1451,22 @@ val unboxed_float32_array_set :
   Debuginfo.t ->
   expression
 
+(** Update an untagged int8 array (without bounds check). *)
+val untagged_int8_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Update an untagged int16 array (without bounds check). *)
+val untagged_int16_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
 (** Update an unboxed int32 array (without bounds check). *)
 val unboxed_int32_array_set :
   expression ->
@@ -1349,10 +1475,10 @@ val unboxed_int32_array_set :
   Debuginfo.t ->
   expression
 
-(** Update an unboxed int64 or unboxed nativeint array (without bounds
+(** Update an unboxed int64 or unboxed nativeint or untagged int array (without bounds
     check).
 *)
-val unboxed_int64_or_nativeint_array_set :
+val unboxed_or_untagged_int_or_int64_or_nativeint_array_set :
   expression ->
   index:expression ->
   new_value:expression ->
