@@ -1430,6 +1430,21 @@ let tree_of_modalities_new mut t =
   let l = Typemode.untransl_modalities mut t in
   List.map (fun ({txt = Parsetree.Modality s; _}) -> s) l
 
+let tree_of_crossing_atom : _ Mode.Crossing.Atom.t -> _ =
+  function
+  | Modality (Monadic (ax, Join_with c)) ->
+      Format.asprintf "%a" (Value.Monadic.Const.Per_axis.print ax) c
+  | Modality (Comonadic (ax, Meet_with c)) ->
+      Format.asprintf "%a" (Value.Comonadic.Const.Per_axis.print ax) c
+
+let tree_of_crossing t =
+  List.filter_map
+    (fun (Value.Axis.P ax) ->
+      let open Mode.Crossing in
+      let a = proj ax t in
+      if Atom.(le ax (max ax) a) then None else Some (tree_of_crossing_atom a))
+    Value.Axis.all
+
 (** [tree_of_mode m l] finds the outcome node in [l] that corresponds to [m].
 Raise if not found. *)
 let tree_of_mode_old (t : Parsetree.mode loc) =
@@ -1772,6 +1787,11 @@ let modality ?(id = fun _ppf -> ()) ppf modality =
     |> Typemode.untransl_modality
     |> tree_of_modality_new
     |> !Oprint.out_modality ppf
+
+let crossing ppf crossing =
+  crossing
+  |> tree_of_crossing
+  |> Format.(pp_print_list ~pp_sep:pp_print_space pp_print_string ppf)
 
 let prepared_type_expr ppf ty = typexp Type ppf ty
 
