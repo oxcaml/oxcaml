@@ -300,7 +300,6 @@ module Predef = struct
       | Float32x16
       | Float64x8 -> 64
 
-
     (* name of the type without the hash *)
     let unboxed_to_string (u : unboxed) =
       match u with
@@ -328,6 +327,9 @@ module Predef = struct
       | Simd s -> simd_vec_split_to_string s
       | Exception -> "exn"
       | Unboxed u -> unboxed_to_string u ^ "#"
+
+    let print fmt t =
+      Format.pp_print_string fmt (to_string t)
 
     let simd_vec_split_to_layout (b : simd_vec_split) : Jkind_types.Sort.base =
       match b with
@@ -436,7 +438,6 @@ module Predef = struct
         | Simd _ | Exception | Unboxed _), _ -> false
 end
 
-
 type var = Ident.t
 type t = { hash:int; uid: Uid.t option; desc: desc; approximated: bool }
 and desc =
@@ -534,8 +535,7 @@ let equal_complex_constructor eq
   Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
   List.equal (equal_complex_constructor_arguments eq) args1 args2
 
-let rec equal_desc d1 d2 =
-  if d1 == d2 then true else
+let rec equal_desc0 d1 d2 =
   match d1, d2 with
   | Var v1, Var v2 -> Ident.equal v1 v2
   | Alias a1, Alias a2 -> equal a1 a2
@@ -553,7 +553,6 @@ let rec equal_desc d1 d2 =
     if Item.compare i1 i2 <> 0 then false
     else equal t1 t2
   | Comp_unit c1, Comp_unit c2 -> String.equal c1 c2
-
   | Constr (c1, ts1), Constr (c2, ts2) ->
     Ident.equal c1 c2
     && List.equal equal ts1 ts2
@@ -561,15 +560,11 @@ let rec equal_desc d1 d2 =
   | Unboxed_tuple t1, Unboxed_tuple t2 ->
     List.equal equal t1 t2
   | Predef (p1, ts1), Predef (p2, ts2) ->
-    if Predef.equal p1 p2 then
-      List.equal equal ts1 ts2
-    else
-      false
+    Predef.equal p1 p2 && List.equal equal ts1 ts2
   | Arrow (t1, t1'), Arrow (t2, t2') ->
     equal t1 t2 && equal t1' t2'
   | Poly_variant pvs1, Poly_variant pvs2 ->
     List.equal equal_poly_variant_constructor pvs1 pvs2
-
   | Variant c1, Variant c2 ->
     List.equal equal_simple_constructor c1.simple_constructors
       c2.simple_constructors
@@ -585,12 +580,14 @@ let rec equal_desc d1 d2 =
   | Record r1, Record r2 ->
     equal_record_kind r1.kind r2.kind
     && List.equal equal_field r1.fields r2.fields
-
   | (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _
     | Alias _ | Error _ | Variant _ | Variant_unboxed _ | Record _
     | Predef _ | Arrow _ | Poly_variant _ | Tuple _ | Unboxed_tuple _
     | Constr _), _
     -> false
+
+and equal_desc d1 d2 =
+  d1 == d2 || equal_desc0 d1 d2
 
 and equal t1 t2 =
   if t1.hash <> t2.hash then false
@@ -703,8 +700,8 @@ let rec print fmt t =
             print)
         shapes
     | Predef (predef, args) ->
-      Format.fprintf fmt "%s%a"
-        (Predef.to_string predef)
+      Format.fprintf fmt "%a%a"
+        Predef.print predef
         (fun fmt -> function
           | [] -> ()
           | args -> Format.fprintf fmt "(@[%a@])"
@@ -807,9 +804,7 @@ let hash_poly_variant = 16
 let hash_variant = 17
 let hash_variant_unboxed = 18
 let hash_record = 19
-
 let hash_constr = 20
-
 
 let fresh_var ?(name="shape-var") uid =
   let var = Ident.create_local name in

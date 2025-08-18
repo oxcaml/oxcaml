@@ -184,6 +184,8 @@ module Predef : sig
 
   val to_string : t -> string
 
+  val print : Format.formatter -> t -> unit
+
   val equal : t -> t -> bool
 
   val unboxed_type_to_base_layout : unboxed -> base_layout

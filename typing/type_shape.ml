@@ -93,9 +93,9 @@ module Type_shape = struct
   (* Similarly to [value_kind], we track a set of visited types to avoid cycles
      in the lookup and we, additionally, carry a maximal depth for the recursion.
      We allow a deeper bound than [value_kind]. *)
-  (* CR sspies: Consider additionally adding a max size for the set of visited types.
-     Also consider reverting to the original value kind depth limit (although 2
-     seems low). *)
+  (* CR sspies: Consider additionally adding a max size for the set of visited
+     types.  Also consider reverting to the original value kind depth limit
+     (although 2 seems low). *)
   let rec of_type_expr_go ~visited ~depth (expr : Types.type_expr)
       (subst : (Types.type_expr * Shape.t) list) shape_for_constr : Shape.t =
     let open Shape in
@@ -114,9 +114,9 @@ module Type_shape = struct
       match
         List.find_opt (fun (p, _) -> Types.get_id p == Types.get_id expr) subst
       with
-      (* CR sspies: Physical equality is also how printing in [printtyp.ml] works. It
-         seems to be the way to substitute type parameters (after type inference has
-         already made them more precise). *)
+      (* CR sspies: Physical equality is also how printing in [printtyp.ml]
+         works. It seems to be the way to substitute type parameters (after
+         type inference has already made them more precise). *)
       | Some (_, s) -> s
       | None ->
         let visited = Numbers.Int.Map.add (Types.get_id expr) () visited in
@@ -142,7 +142,8 @@ module Type_shape = struct
              a layout from the jkind and produce a shape with this layout.
              Revisit this when revisiting the layout generation. *)
           | Tpoly (type_expr, _type_vars) ->
-            (* CR sspies: At the moment, we simply ignore the polymorphic variables.
+            (* CR sspies: At the moment, we simply ignore the polymorphic
+               variables.
                This code used to only work for [_type_vars = []]. Consider
                alternatively introducing abstractions here? *)
             of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
@@ -185,7 +186,8 @@ module Type_shape = struct
           | Tpackage _ -> unknown_shape
           (* CR sspies: Support first-class modules. *)
         in
-        (* CR sspies: For recursive types, we can stick on a recursive binder here. *)
+        (* CR sspies: For recursive types, we can stick on a recursive binder
+           here. *)
         type_shape
 
   let of_type_expr (expr : Types.type_expr) shape_for_constr =
@@ -309,8 +311,8 @@ module Type_decl_shape = struct
     let unknown_shape = Shape.leaf' None in
     let type_params = type_declaration.type_params in
     let type_subst = List.combine type_params type_param_shapes in
-    (* Duplicates are fine, the constraint system makes sure they are instantiated
-       with the same type expression. *)
+    (* Duplicates are fine, the constraint system makes sure they are
+       instantiated with the same type expression. *)
     let definition =
       match type_declaration.type_manifest with
       | Some type_expr ->
@@ -387,10 +389,10 @@ module Type_decl_shape = struct
               lbl_list
           | Record_inlined _ ->
             Misc.fatal_error "inlined records not allowed here"
-            (* Inline records of this form should not occur as part of type declarations.
-               They do not exist for top-level declarations, but they do exist temporarily
-               such as inside of a match (e.g., [t] is an inline record in
-               [match e with Foo t -> ...]). *))
+            (* Inline records of this form should not occur as part of type
+               declarations.  They do not exist for top-level declarations,
+               but they do exist temporarily such as inside of a match (e.g.,
+               [t] is an inline record in [match e with Foo t -> ...]). *))
         | Type_abstract _ -> unknown_shape
         | Type_open -> unknown_shape
         | Type_record_unboxed_product (lbl_list, _, _) ->
@@ -411,9 +413,9 @@ module Type_decl_shape = struct
         | None -> None
         | Some _ ->
           Some (Shape.constr id' inner_args)
-          (* CR sspies: We can use this in a future to deal with recursive declarations.
-             For now, we simply leave the identifier there, which will be emitted as
-             an unknown value. *))
+          (* CR sspies: We can use this in a future to deal with recursive
+             declarations.  For now, we simply leave the identifier there,
+             which will be emitted as an unknown value. *))
       | _ -> None)
 
   let of_type_declaration_with_variables (id : Ident.t)
@@ -495,9 +497,7 @@ let rec estimate_layout_from_type_shape (t : Shape.t) : Layout.t option =
   match t.desc with
   | Predef (t, _) -> Some (Shape.Predef.to_layout t)
   | Constr (_, _) ->
-    None
-    (* recursive occurrence, conservatively not
-       handled for now *)
+    None (* recursive occurrence, conservatively not handled for now *)
   | Unboxed_tuple fields ->
     let field_layouts = List.map estimate_layout_from_type_shape fields in
     if List.for_all Option.is_some field_layouts

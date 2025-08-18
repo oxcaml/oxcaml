@@ -1248,8 +1248,8 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       (* CR sspies: The [Constr] case is a precaution. With proper recursive
          types, it should never trigger. For now, we simply use a fallback. *)
     | Unboxed_tuple _ ->
-      Misc.fatal_errorf "unboxed tuples cannot have base layout %a"
-        Layout.format (Layout.Base type_layout)
+      Misc.fatal_errorf "unboxed tuples cannot have base layout %a:@ %a"
+        Layout.format (Layout.Base type_layout) S.print type_shape
     | Tuple fields ->
       type_shape_to_dwarf_die_tuple ~reference ~parent_proto_die
         ~fallback_value_die ?name ~rec_env fields
@@ -1265,13 +1265,15 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Record { fields; kind = Record_boxed | Record_floats } ->
       let fields =
         List.map
-          (fun (name, type_shape, type_layout) ->
+          (fun (name, type_shape, (type_layout : Layout.t)) ->
             let base_layout =
               match type_layout with
-              | Layout.Base base_layout -> base_layout
-              | _ ->
-                Misc.fatal_error "Record fields should not have product layout"
-              (* CR sspies: Is this true? If not, how should they be handled? *)
+              | Base base_layout -> base_layout
+              | Product _ ->
+                Misc.fatal_errorf
+                  "[Record_boxed] and [Record_floats] records must only have \
+                   fields of [Base] layout:@ %a"
+                  S.print type_shape
             in
             ( name,
               Arch.size_addr,
@@ -1312,11 +1314,11 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       Misc.fatal_errorf
         "This form of record shape should have been flattened by \
          [flatten_shape]: %a"
-        Shape.print type_shape
+        S.print type_shape
     | Record { fields = [] | _ :: _ :: _; kind = Record_unboxed } ->
       Misc.fatal_errorf
         "Records with [@unboxed] attributes must have exactly one field:@ %a"
-        Shape.print type_shape
+        S.print type_shape
     | Variant { simple_constructors; complex_constructors } -> (
       match complex_constructors with
       | [] ->
@@ -1353,10 +1355,12 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Variant_unboxed { name = constr_name; arg_name; arg_shape; arg_layout } ->
       let base_layout =
         match arg_layout with
-        | Layout.Base base_layout -> base_layout
-        | _ ->
-          Misc.fatal_error
-            "unboxed product in unboxed constructor is not allowed"
+        | Base base_layout -> base_layout
+        | Product _ ->
+          Misc.fatal_errorf
+            "[Product] layout in [Variant_unboxed] constructor is not \
+             allowed:@ %a"
+            S.print type_shape
       in
       let arg_die =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die arg_shape
@@ -1369,8 +1373,8 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
           type_layout ~rec_env
       in
-      (* CR sspies: This typedef is only needed if the name is some. Reduce the
-         number of type defs here. *)
+      (* CR sspies: This typedef is only needed if the name is [Some]. Reduce
+         the number of typedefs here. *)
       create_typedef_die ~reference ~parent_proto_die ?name reference'
     | App _ | Error _ | Proj _ ->
       (* In these cases, something has gone wrong during reduction, because we
@@ -1444,9 +1448,11 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
       in
       create_array_die ~reference ~parent_proto_die ~child_die ?name ())
   | Array, _ ->
-    Misc.fatal_error "Array applied to zero or more than one type."
-    (* CR sspies: What should we do in this case. The old code supported it,
-       simply yielding the [fallback_value_die], but that seems strange. *)
+    Misc.fatal_errorf
+      "[Array] predef shape must have exactly one argument:@ %a applied to %a"
+      Shape.Predef.print predef
+      (Format.pp_print_list Shape.print)
+      args
   | Char, _ -> create_char_die ~reference ~parent_proto_die ?name ()
   | Unboxed b, _ ->
     let type_layout = Shape.Predef.unboxed_type_to_base_layout b in
@@ -1454,8 +1460,9 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
       ~simd_vec_split:(unboxed_base_type_to_simd_vec_split b)
       ~reference type_layout ?name ~parent_proto_die ~fallback_value_die ()
   | Simd s, _ ->
-    (* We represent these vectors as pointers of the form [struct {...} *],
-       because their runtime representation are abstract blocks. *)
+    (* We represent these vectors as pointers of the form [struct {...} *].
+       Their runtime representation is non-scannable mixed blocks (see
+       Cmm_helpers). *)
     let base_ref = Proto_die.create_reference () in
     let byte_size = Shape.Predef.simd_vec_split_to_byte_size s in
     create_simd_vec_split_base_layout_die ~split:(Some s) ~reference:base_ref
@@ -1642,7 +1649,7 @@ let find_unused_type_name_or_cached (name : string) (type_shape : S.t) :
     match String.Tbl.find_opt name_cache name with
     | Some (type_shape', reference) ->
       if Shape.equal type_shape type_shape'
-      then Either.Left reference
+      then Left reference
       else aux (inc + 1)
     | None -> Right name
   in
@@ -1707,14 +1714,18 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
       match unboxed_projection, type_layout with
       | None, Base b -> Known (type_shape, b)
       | None, Product _ ->
-        Misc.fatal_error "product layout not flattened by unarization"
+        Misc.fatal_errorf
+          "uid %a: product layout not flattened by unarization for type '%s':@ \
+           %a"
+          Uid.print var_uid type_name S.print type_shape
       | Some i, _ ->
         let flattened = flatten_shape type_shape type_layout in
         let flattened_length = List.length flattened in
         if i < 0 || i >= flattened_length
         then
-          Misc.fatal_errorf "unboxed projection index %d out of bounds 0...%d" i
-            (flattened_length - 1);
+          Misc.fatal_errorf
+            "uid %a: unboxed projection index %d out of bounds 0...%d:@ %a"
+            Uid.print var_uid i (flattened_length - 1) S.print type_shape;
         List.nth flattened i
     in
     let type_name =
