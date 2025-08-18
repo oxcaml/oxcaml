@@ -37,8 +37,8 @@ module Instruction_requirements = struct
     | Requires_prologue
       (* This instruction must only occur when there's no prologue on the stack.
          This is the case for [Return] and tailcalls. Any instruction with this
-         requirement must either in an execution path where there's no prologue,
-         or occur after the epilogue.
+         requirement must either occur on an execution path where there's no
+         prologue, or occur after the epilogue.
 
          Only terminators can have this requirement. *)
     | Requires_no_prologue
@@ -176,9 +176,7 @@ module Validator = struct
      fun domain instr _ ->
       State_set.map
         (fun domain ->
-          match[@ocaml.warning "-4"]
-            domain, Instruction_requirements.basic instr
-          with
+          match domain, Instruction_requirements.basic instr with
           | No_prologue_on_stack, Prologue -> Prologue_on_stack
           | No_prologue_on_stack, Epilogue ->
             error_with_instruction
@@ -193,7 +191,13 @@ module Validator = struct
             error_with_instruction
               "prologue appears while prologue is already on the stack" instr
           | Prologue_on_stack, Epilogue -> No_prologue_on_stack
-          | Prologue_on_stack, _ -> Prologue_on_stack)
+          | Prologue_on_stack, Requirements (No_requirements | Requires_prologue)
+            ->
+            Prologue_on_stack
+          | Prologue_on_stack, Requirements Requires_no_prologue ->
+            error_with_instruction
+              "basic instruction requires no prologue, this should never happen"
+              instr)
         domain
 
     let terminator :
