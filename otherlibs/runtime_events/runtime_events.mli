@@ -113,16 +113,16 @@ Triggering of a minor collection due to dependent table reallocation.
 @since 5.4 *)
 | EV_C_MAJOR_HEAP_POOL_WORDS
 (**
-Total words in a Domain's major heap pools. This is the sum of unallocated and
-live words in each pool.
+Total {b words} in a Domain's major heap pools. This is the sum of
+unallocated and live words in each pool.
 @since 5.1 *)
 | EV_C_MAJOR_HEAP_POOL_LIVE_WORDS
 (**
-Current live words in a Domain's major heap pools.
+Current live {b words} in a Domain's major heap pools.
 @since 5.1 *)
 | EV_C_MAJOR_HEAP_LARGE_WORDS
 (**
-Total words of a Domain's major heap large allocations.
+Total {b words} of a Domain's major heap large allocations.
 A large allocation is an allocation larger than the largest sized pool.
 @since 5.1 *)
 | EV_C_MAJOR_HEAP_POOL_FRAG_WORDS
@@ -184,13 +184,13 @@ resumption (value: bytes copied).
 @since 5.4 *)
 | EV_C_MINOR_ALLOCATED_WORDS
 (**
-Total words allocated in the minor heap of this Domain in the
+Total {b words} allocated in the minor heap of this Domain in the
 last minor collection.
 @since 5.4
 *)
 | EV_C_MINOR_PROMOTED_WORDS
 (**
-Total words promoted from the minor heap of this Domain to the major heap
+Total {b words} promoted from the minor heap of this Domain to the major heap
 in the last minor collection.
 @since 5.4
 *)
