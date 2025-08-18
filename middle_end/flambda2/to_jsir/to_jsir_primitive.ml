@@ -111,17 +111,27 @@ let check_my_closure ~env x =
   (* It is not possible to project values out of other functions' closures in
      Jsoo, but certain inlining simplifications in Flambda may cause this. For
      now we disable inlining so this case should never occur. *)
-  match Simple.must_be_var x with
-  | None ->
-    (* CR selee: come back *)
-    ()
-    (* Misc.fatal_error
-     *   "Expected to see [my_closure], instead found a non-variable" *)
-  | Some (v, _coercion) when not (To_jsir_env.is_my_closure env v) ->
-    Misc.fatal_error
-      "Trying to project from a closure that doesn't belong to the body of the \
-       function being translated"
-  | Some _ -> ()
+  Simple.pattern_match' x
+    ~var:(fun name ~coercion:_ ->
+      if not (To_jsir_env.is_my_closure env name)
+      then
+        Misc.fatal_error
+          "Trying to project from a closure that doesn't belong to the body of \
+           the function being translated")
+    ~symbol:(fun _symbol ~coercion:_ ->
+      (* CR selee: We should check here that this is indeed the correct closure
+         symbol for the current function being translated, but we don't yet keep
+         track of this. We plan to refactor the handling of closures and pieces
+         of code so that we only translate the code once we see the
+         corresponding closure (treating each closure as a new instance of the
+         code), which should make this check much easier. For now, we assume
+         that we have the correct symbol. *)
+      ())
+    ~const:(fun const ->
+      Misc.fatal_errorf
+        "Trying to project from a closure, but found a constant %a (must be a \
+         closure variable or symbol)"
+        Reg_width_const.print const)
 
 let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   let use_prim' prim = use_prim' ~env ~res prim [x] in
