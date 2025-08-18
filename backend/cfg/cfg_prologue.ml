@@ -17,16 +17,6 @@ let validate_no_prologue (cfg_with_layout : Cfg_with_layout.t) =
           | _ -> ()))
     cfg.blocks
 
-let instr_uses_stack_slots (instr : _ Cfg.instruction) =
-  let regs_use_stack_slots =
-    Array.exists (fun reg ->
-        match reg.Reg.loc with
-        | Stack (Local _) -> true
-        | Stack (Incoming _ | Outgoing _ | Domainstate _) | Reg _ | Unknown ->
-          false)
-  in
-  regs_use_stack_slots instr.Cfg.arg || regs_use_stack_slots instr.Cfg.res
-
 module Instruction_requirements = struct
   type t =
     (* This instruction does not use the stack, so it doesn't matter if there's
@@ -51,8 +41,20 @@ module Instruction_requirements = struct
     | Epilogue
     | Requirements of t
 
+  let instr_uses_stack (instr : _ Cfg.instruction) =
+    let regs_use_stack_slots =
+      Array.exists (fun reg ->
+          match reg.Reg.loc with
+          | Stack (Local _) -> true
+          | Stack (Incoming _ | Outgoing _ | Domainstate _) | Reg _ | Unknown ->
+            false)
+    in
+    regs_use_stack_slots instr.Cfg.arg
+    || regs_use_stack_slots instr.Cfg.res
+    || instr.stack_offset <> 0
+
   let terminator (instr : Cfg.terminator Cfg.instruction) fun_name =
-    if instr_uses_stack_slots instr
+    if instr_uses_stack instr
     then Requires_prologue
     else
       match[@ocaml.warning "-4"] instr.desc with
@@ -64,7 +66,7 @@ module Instruction_requirements = struct
       | _ -> No_requirements
 
   let basic (instr : Cfg.basic Cfg.instruction) =
-    if instr_uses_stack_slots instr
+    if instr_uses_stack instr
     then Requirements Requires_prologue
     else
       match instr.desc with
