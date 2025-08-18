@@ -390,7 +390,7 @@ let mk_add_type add_type =
 let mk_add_type1 add_type type_ident
       ?(kind=fun _ -> Type_abstract Definition)
       ~jkind
-      ?(param_jkind=Jkind.Builtin.value_lr ~why:(
+      ?(param_jkind=Jkind.Builtin.value ~why:(
         Type_argument {
           parent_path = Path.Pident type_ident;
           position = 1;
@@ -578,7 +578,7 @@ let build_initial_env add_type add_extension empty_env =
            ~type_expr:param)
   |> add_type2 ident_idx_imm
        ~param1_jkind:(
-         Jkind.Builtin.value_lr ~why:(Type_argument {
+         Jkind.Builtin.value ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_imm;
            position = 1;
            arity = 2;
@@ -596,7 +596,7 @@ let build_initial_env add_type add_extension empty_env =
        ~type_separability:[Separability.Ind; Separability.Ind]
   |> add_type2 ident_idx_mut
        ~param1_jkind:(
-         Jkind.Builtin.value_lr ~why:(Type_argument {
+         Jkind.Builtin.value ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_mut;
            position = 1;
            arity = 2;

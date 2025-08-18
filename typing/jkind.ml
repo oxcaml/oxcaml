@@ -2338,10 +2338,6 @@ module Builtin = struct
     fresh_jkind Jkind_desc.Builtin.value ~annotation:(mk_annot "value")
       ~why:(Value_creation why)
 
-  let value_lr ~(why : History.value_creation_reason) =
-    fresh_jkind Jkind_desc.Builtin.value ~annotation:(mk_annot "value")
-      ~why:(Value_creation why)
-
   let immutable_data ~(why : History.value_creation_reason) =
     fresh_jkind Jkind_desc.Builtin.immutable_data
       ~annotation:(mk_annot "immutable_data")

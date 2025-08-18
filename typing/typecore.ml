@@ -1538,7 +1538,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
       let ty =
         let fields = [l, rf_present ty] in
         newty (Tvariant (create_row ~fields
-                           ~more:(newvar (Jkind.Builtin.value_lr ~why:Row_variable))
+                           ~more:(newvar (Jkind.Builtin.value ~why:Row_variable))
                          ~name:None ~fixed:None ~closed:false))
       in
       ty, mode
@@ -1568,7 +1568,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
             newty (Tvariant (create_row ~fields ~fixed ~name
                                ~closed:false
                                ~more:(newvar
-                                        (Jkind.Builtin.value_lr ~why:Row_variable))))
+                                        (Jkind.Builtin.value ~why:Row_variable))))
           in
           ty, mode
       end
@@ -1701,7 +1701,7 @@ let solve_constructor_annotation
         let jkind =
           Jkind.of_annotation_option_default
             ~context:(Existential_unpack name.txt)
-            ~default:(Jkind.Builtin.value_lr ~why:Existential_type_variable)
+            ~default:(Jkind.Builtin.value ~why:Existential_type_variable)
             jkind_annot_opt
         in
         let decl = new_local_type ~loc:name.loc Definition jkind in
@@ -1859,7 +1859,7 @@ let solve_Ppat_array ~refine loc env mutability expected_ty =
   ty_elt, arg_sort
 
 let solve_Ppat_lazy  ~refine loc env expected_ty =
-  let nv = newgenvar (Jkind.Builtin.value_lr ~why:Lazy_expression) in
+  let nv = newgenvar (Jkind.Builtin.value ~why:Lazy_expression) in
   unify_pat_types_refine ~refine loc env (Predef.type_lazy_t nv)
     (generic_instance expected_ty);
   nv
@@ -1891,13 +1891,13 @@ let solve_Ppat_variant ~refine loc env tag no_arg expected_ty =
   let make_row more =
     create_row ~fields ~closed:false ~more ~fixed:None ~name:None
   in
-  let row = make_row (newgenvar (Jkind.Builtin.value_lr ~why:Row_variable)) in
+  let row = make_row (newgenvar (Jkind.Builtin.value ~why:Row_variable)) in
   let expected_ty = generic_instance expected_ty in
   (* PR#7404: allow some_private_tag blindly, as it would not unify with
      the abstract row variable *)
   if tag <> Parmatch.some_private_tag then
     unify_pat_types_refine ~refine loc env (newgenty(Tvariant row)) expected_ty;
-  (arg_type, make_row (newvar (Jkind.Builtin.value_lr ~why:Row_variable)),
+  (arg_type, make_row (newvar (Jkind.Builtin.value ~why:Row_variable)),
    instance expected_ty)
 
 (* Building the or-pattern corresponding to a polymorphic variant type *)
@@ -1939,10 +1939,10 @@ let build_or_pat env loc lid =
     create_row ~fields ~more ~closed:false ~fixed:None ~name in
   let ty = newty (Tvariant (make_row
                               (newvar
-                                 (Jkind.Builtin.value_lr ~why:Row_variable))))
+                                 (Jkind.Builtin.value ~why:Row_variable))))
   in
   let gloc = Location.ghostify loc in
-  let row' = ref (make_row (newvar (Jkind.Builtin.value_lr ~why:Row_variable))) in
+  let row' = ref (make_row (newvar (Jkind.Builtin.value ~why:Row_variable))) in
   let pats =
     List.map
       (fun (l,p) ->
@@ -3318,7 +3318,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
   let pvs, pat =
     with_local_level_if_principal begin fun () ->
       let tps = create_type_pat_state Modules_rejected in
-      let nv = newvar (Jkind.Builtin.value_lr ~why:Class_term_argument) in
+      let nv = newvar (Jkind.Builtin.value ~why:Class_term_argument) in
       let alloc_mode = simple_pat_mode Value.legacy in
       let equations_scope = get_current_level () in
       let new_penv = Pattern_env.make val_env
@@ -3381,7 +3381,7 @@ let type_self_pattern env spat =
   let open Ast_helper in
   let spat = Pat.mk(Ppat_alias (spat, mknoloc "selfpat-*")) in
   let tps = create_type_pat_state Modules_rejected in
-  let nv = newvar (Jkind.Builtin.value_lr ~why:Object) in
+  let nv = newvar (Jkind.Builtin.value ~why:Object) in
   let alloc_mode = simple_pat_mode Value.legacy in
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
@@ -5075,7 +5075,7 @@ let check_absent_variant env =
       let fields = [s, rf_either ty_arg ~no_arg:(arg=None) ~matched:true] in
       let row' =
         create_row ~fields
-          ~more:(newvar (Jkind.Builtin.value_lr ~why:Row_variable))
+          ~more:(newvar (Jkind.Builtin.value ~why:Row_variable))
           ~closed:false ~fixed:None ~name:None
       in
       (* Should fail *)
@@ -6297,7 +6297,7 @@ and type_expect_
         let row =
           create_row
             ~fields: [l, rf_present arg_type]
-            ~more:   (newvar (Jkind.Builtin.value_lr ~why:Row_variable))
+            ~more:   (newvar (Jkind.Builtin.value ~why:Row_variable))
             ~closed: false
             ~fixed:  None
             ~name:   None
@@ -6457,7 +6457,7 @@ and type_expect_
           || Path.same p Predef.path_idx_mut ->
         arg1
       | _ ->
-        newgenvar (Jkind.Builtin.value_lr ~why:Idx_base)
+        newgenvar (Jkind.Builtin.value ~why:Idx_base)
     in
     let expected_base_ty = expected_base_ty ty_expected in
     let principal = is_principal ty_expected in
@@ -6693,7 +6693,7 @@ and type_expect_
                 (Warnings.Not_principal "this use of a polymorphic method");
             instance_poly tl ty
         | Tvar _ ->
-            let ty' = newvar (Jkind.Builtin.value_lr ~why:Object_field) in
+            let ty' = newvar (Jkind.Builtin.value ~why:Object_field) in
             unify env (instance typ) (newty(Tpoly(ty',[])));
             (* if not !Clflags.nolabels then
                Location.prerr_warning loc (Warnings.Unknown_method met); *)
@@ -6891,7 +6891,7 @@ and type_expect_
       }
   | Pexp_lazy e ->
       let expected_mode, closure_mode = mode_lazy expected_mode in
-      let ty = newgenvar (Jkind.Builtin.value_lr ~why:Lazy_expression) in
+      let ty = newgenvar (Jkind.Builtin.value ~why:Lazy_expression) in
       let to_unify = Predef.type_lazy_t ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
@@ -7416,7 +7416,7 @@ and type_block_access env expected_base_ty principal
     let modality = Typemode.idx_expected_modalities ~mut in
     { ba; base_ty; el_ty = elt_ty; flat_float = false; modality }
   | Baccess_block (mut, idx) ->
-    let base_ty = newvar (Jkind.Builtin.value_lr ~why:Idx_base) in
+    let base_ty = newvar (Jkind.Builtin.value ~why:Idx_base) in
     let el_ty = newvar (Jkind.of_new_sort ~why:Idx_element) in
     let idx_type_expected =
       match mut with
@@ -9449,7 +9449,7 @@ and type_newtype
   let { txt = name; loc = name_loc } : _ Location.loc = name in
   let jkind =
     Jkind.of_annotation_option_default ~context:(Newtype_declaration name)
-      ~default:(Jkind.Builtin.value_lr ~why:Univar) jkind_annot_opt
+      ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
   in
   let ty =
     if Typetexp.valid_tyvar_name name then
@@ -10453,7 +10453,7 @@ and type_comprehension_iterator
         newvar (Jkind.Builtin.value_or_null
                   ~why:Array_comprehension_iterator_element)
       | List_comprehension ->
-        newvar (Jkind.Builtin.value_lr ~why:List_comprehension_iterator_element)
+        newvar (Jkind.Builtin.value ~why:List_comprehension_iterator_element)
       in
       let seq_ty = container_type item_ty in
       let sequence =
@@ -10515,7 +10515,7 @@ and type_send env loc explanation e met =
               | id -> id, Btype.method_type met sign
               | exception Not_found ->
                   let id = Ident.create_local met in
-                  let ty = newvar (Jkind.Builtin.value_lr ~why:Object_field) in
+                  let ty = newvar (Jkind.Builtin.value ~why:Object_field) in
                   meths_ref := Meths.add met id !meths_ref;
                   add_method env met Private Virtual ty sign;
                   Location.prerr_warning loc
