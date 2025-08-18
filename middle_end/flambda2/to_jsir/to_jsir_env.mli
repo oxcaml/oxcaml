@@ -53,6 +53,8 @@ val add_exn_handler :
 (** Map a Flambda2 variable to a JSIR variable. *)
 val add_var : t -> Variable.t -> Jsir.Var.t -> t
 
+(** Set [var] to be an alias of [alias_of]. Raises if [alias_of] is not found
+    in the environment. *)
 val add_var_alias_of_var_exn : t -> var:Variable.t -> alias_of:Variable.t -> t
 
 (** Map a Flambda2 symbol to a JSIR variable, and register it to the global symbol
@@ -74,7 +76,7 @@ val add_symbol_without_registering : t -> Symbol.t -> Jsir.Var.t -> t
 val register_symbol_exn :
   t -> res:To_jsir_result.t -> Symbol.t -> To_jsir_result.t
 
-(** Set [var] to be an alias of [alias_of]. Raises if [alias_of] is from the current
+(** Set [var]/[symbol] to be an alias of [alias_of]. Raises if [alias_of] is from the current
     compilation unit and is not found in the environment. *)
 val add_var_alias_of_symbol_exn :
   t ->
