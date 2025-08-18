@@ -909,7 +909,9 @@ module F = struct
           | Align_64 -> "_avx512"
         in
         make_ocaml_c_call caml_c_call_stack_args args res_types
-      else if alloc
+      else if alloc || true
+              (* ...LLVM sometimes reloads stuff from the stack AFTER we set
+                 rsp, so we always need to use the wrapper. *)
       then
         (* [caml_c_call] doesn't use the second argument since nothing is passed
            on the stack *)
