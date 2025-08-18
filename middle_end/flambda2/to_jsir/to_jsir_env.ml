@@ -4,6 +4,12 @@ type exn_handler =
     extra_args : Jsir.Var.t list
   }
 
+type code_id =
+  { addr : Jsir.Addr.t;
+    params : Jsir.Var.t list;
+    closure : Jsir.Var.t
+  }
+
 type t =
   { module_symbol : Symbol.t;
     return_continuation : Continuation.t;
@@ -12,10 +18,11 @@ type t =
     exn_handlers : exn_handler Continuation.Map.t;
     vars : Jsir.Var.t Variable.Map.t;
     symbols : Jsir.Var.t Symbol.Map.t;
-    code_ids : (Jsir.Addr.t * Jsir.Var.t list) Code_id.Map.t;
+    code_ids : code_id Code_id.Map.t;
     function_slots : Jsir.Var.t Function_slot.Map.t;
     value_slots : Jsir.Var.t Value_slot.Map.t;
-    traps : Continuation.t list
+    traps : Continuation.t list;
+    my_closure : Variable.t option
   }
 
 let create ~module_symbol ~return_continuation ~exn_continuation =
@@ -29,7 +36,8 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     code_ids = Code_id.Map.empty;
     function_slots = Function_slot.Map.empty;
     value_slots = Value_slot.Map.empty;
-    traps = []
+    traps = [];
+    my_closure = None
   }
 
 let return_continuation t = t.return_continuation
@@ -55,8 +63,8 @@ let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
 let add_symbol t symbol jvar =
   { t with symbols = Symbol.Map.add symbol jvar t.symbols }
 
-let add_code_id t code_id ~addr ~params =
-  let code_ids = Code_id.Map.add code_id (addr, params) t.code_ids in
+let add_code_id t code_id ~addr ~params ~closure =
+  let code_ids = Code_id.Map.add code_id { addr; params; closure } t.code_ids in
   { t with code_ids }
 
 let add_function_slot t fslot jvar =
@@ -125,3 +133,12 @@ let add_value_slot_if_not_found t slot =
       add_if_not_found t.value_slots slot ~mem:Value_slot.Map.mem
         ~add:Value_slot.Map.add
   }
+
+let set_my_closure t my_closure var =
+  let t = { t with my_closure = Some my_closure } in
+  add_var t my_closure var
+
+let is_my_closure t var =
+  match t.my_closure with
+  | None -> false
+  | Some my_closure -> Variable.equal var my_closure

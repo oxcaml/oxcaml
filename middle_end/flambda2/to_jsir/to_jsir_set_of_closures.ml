@@ -12,18 +12,19 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
         | Deleted _ -> env, res
         | Code_id { code_id; only_full_applications = _ } ->
           (* CR selee: thread through debug information *)
-          let addr, params = To_jsir_env.get_code_id_exn env code_id in
+          let ({ addr; params; closure = fn_var } : To_jsir_env.code_id) =
+            To_jsir_env.get_code_id_exn env code_id
+          in
           let expr : Jsir.expr = Closure (params, (addr, []), None) in
-          (* If this function slot is used, it should've already been added when
-             the code using it was defined *)
-          let env, fn_var =
+          (* If this function slot is used, its corresponding variable should've
+             already been added to the environment when the code using it was
+             translated. We should make sure that this matches up with our
+             preemptively declared closure variable for this closure. *)
+          let res =
             match To_jsir_env.get_function_slot env slot with
-            | Some fn_var -> env, fn_var
-            | None ->
-              (* This function slot is not used anywhere, so we are free to make
-                 a new variable *)
-              let var = Jsir.Var.fresh () in
-              To_jsir_env.add_function_slot env slot var, var
+            | None -> res
+            | Some fn_var' ->
+              To_jsir_result.add_instr_exn res (Assign (fn_var', fn_var))
           in
           let res = To_jsir_result.add_instr_exn res (Let (fn_var, expr)) in
           add_to_env ~env ~res binding fn_var)

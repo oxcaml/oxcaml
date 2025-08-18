@@ -93,6 +93,21 @@ let block_access_kind (kind : Flambda_primitive.Block_access_kind.t) :
       } ->
     primitive_not_supported ()
 
+let check_my_closure ~env x =
+  (* It is not possible to project values out of other functions' closures in
+     Jsoo, but certain inlining simplifications in Flambda may cause this. For
+     now we disable inlining so this case should never occur. *)
+  match Simple.must_be_var x with
+  | None ->
+    Misc.fatal_error
+      "Expected to see [my_closure], instead found a non-variable"
+  | Some (v, _coercion) ->
+    if not (To_jsir_env.is_my_closure env v)
+    then
+      Misc.fatal_error
+        "Trying to project from a closure that doesn't belong to the body of \
+         the function being translated"
+
 let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   let use_prim' prim = use_prim ~env ~res prim [prim_arg ~env x] in
   match f with
@@ -200,10 +215,10 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     (* everything is boxed and tagged in JS *)
     identity ~env ~res x
   | Project_function_slot { move_from = _; move_to } ->
+    check_my_closure ~env x;
     Some (To_jsir_env.get_function_slot_exn env move_to), env, res
   | Project_value_slot { project_from = _; value_slot } ->
-    (* CR selee: This is also used to call external functions, will need to
-       handle that *)
+    check_my_closure ~env x;
     Some (To_jsir_env.get_value_slot_exn env value_slot), env, res
   | Is_boxed_float -> check_tag ~env ~res x ~tag:Obj.double_tag
   | Is_flat_float_array -> check_tag ~env ~res x ~tag:Obj.double_array_tag
