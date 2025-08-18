@@ -62,9 +62,9 @@ val add_var_alias_of_var_exn : t -> var:Variable.t -> alias_of:Variable.t -> t
 val add_symbol :
   t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t -> t * To_jsir_result.t
 
-(** Symbols added through this function must be registered after the definition for them
-    are given, using [register_symbol_exn]. Otherwise, they will not be available to other
-    compilation units. *)
+(** Symbols added through this function must be registered to the global symbol table
+    after the definitions for them are added to the result, using [register_symbol_exn].
+    Otherwise, they will not be available to other compilation units. *)
 val add_symbol_without_registering : t -> Symbol.t -> Jsir.Var.t -> t
 
 (** Register the given symbol to the global symbol table. Raises if the symbol is not in
