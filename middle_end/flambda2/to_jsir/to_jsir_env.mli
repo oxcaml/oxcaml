@@ -65,6 +65,12 @@ val add_symbol : t -> Symbol.t -> Jsir.Var.t -> t
 
 val add_var_alias_of_symbol_exn : t -> var:Variable.t -> alias_of:Symbol.t -> t
 
+type code_id =
+  { addr : Jsir.Addr.t;
+    params : Jsir.Var.t list;
+    closure : Jsir.Var.t
+  }
+
 (** Map a Flambda2 code ID to the address of the corresponding JSIR block, its parameters,
     and the JSIR varible corresponding to its closure. *)
 val add_code_id :
@@ -100,8 +106,7 @@ val get_symbol_exn : t -> Symbol.t -> Jsir.Var.t
 
 (** Return the block address, parameter variables and closure variable corresponding to
     the given [Code_id.t]. *)
-val get_code_id_exn :
-  t -> Code_id.t -> Jsir.Addr.t * Jsir.Var.t list * Jsir.Var.t
+val get_code_id_exn : t -> Code_id.t -> code_id
 
 (** Return the variable corresponding to a function slot. *)
 val get_function_slot : t -> Function_slot.t -> Jsir.Var.t option
