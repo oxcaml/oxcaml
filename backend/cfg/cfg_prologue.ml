@@ -143,6 +143,11 @@ module Validator = struct
         exceptional : domain
       }
 
+    let error_with_instruction (msg : string) (instr : _ Cfg.instruction) =
+      Misc.fatal_errorf "Cfg_prologue: error validating instruction %s: %s"
+        (InstructionId.to_string_padded instr.id)
+        msg
+
     let basic : domain -> Cfg.basic Cfg.instruction -> context -> domain =
      fun domain instr _ ->
       State_set.map
@@ -152,14 +157,15 @@ module Validator = struct
           with
           | No_prologue_on_stack, Cfg.Prologue, _ -> Prologue_on_stack
           | No_prologue_on_stack, Cfg.Epilogue, _ ->
-            Misc.fatal_error "epilogue appears without a prologue on the stack"
+            error_with_instruction
+              "epilogue appears without a prologue on the stack" instr
           | No_prologue_on_stack, _, true ->
-            Misc.fatal_error
-              "instruction needs prologue, but no prologue on the stack"
+            error_with_instruction
+              "instruction needs prologue but no prologue on the stack" instr
           | No_prologue_on_stack, _, false -> No_prologue_on_stack
           | Prologue_on_stack, Cfg.Prologue, _ ->
-            Misc.fatal_error
-              "prologue instruction while prologue is already on the stack"
+            error_with_instruction
+              "prologue appears while prologue is already on the stack" instr
           | Prologue_on_stack, Cfg.Epilogue, _ -> No_prologue_on_stack
           | Prologue_on_stack, _, _ -> Prologue_on_stack)
         domain
@@ -176,15 +182,20 @@ module Validator = struct
                 is_epilogue_needed_terminator instr.desc fun_name )
             with
             | _, true, true ->
-              Misc.fatal_error
+              error_with_instruction
                 "instruction needs to be both before and after terminator, \
                  this should never happen"
+                instr
             | No_prologue_on_stack, true, false ->
-              Misc.fatal_error "instruction needs prologue"
+              error_with_instruction
+                "instruction needs prologue but no prologue on the stack" instr
             | No_prologue_on_stack, false, _ -> No_prologue_on_stack
             | Prologue_on_stack, _, false -> Prologue_on_stack
             | Prologue_on_stack, false, true ->
-              Misc.fatal_error "terminator needs epilogue")
+              error_with_instruction
+                "terminator needs to appear after epilogue but prologue is on \
+                 stack"
+                instr)
           domain
       in
       { normal = res; exceptional = res }
@@ -211,5 +222,5 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
         ~handlers_are_entry_points:false { fun_name }
     with
     | Ok _ -> cfg_with_layout
-    | Error () -> Misc.fatal_error "Cfg_prologue.run: dataflow analysis failed")
+    | Error () -> Misc.fatal_error "Cfg_prologue: dataflow analysis failed")
   | false -> cfg_with_layout
