@@ -4,6 +4,12 @@ type exn_handler =
     extra_args : Jsir.Var.t list
   }
 
+type code_id =
+  { addr : Jsir.Addr.t;
+    params : Jsir.Var.t list;
+    closure : Jsir.Var.t
+  }
+
 type t =
   { module_symbol : Symbol.t;
     return_continuation : Continuation.t;
@@ -12,7 +18,7 @@ type t =
     exn_handlers : exn_handler Continuation.Map.t;
     vars : Jsir.Var.t Variable.Map.t;
     symbols : Jsir.Var.t Symbol.Map.t;
-    code_ids : (Jsir.Addr.t * Jsir.Var.t list * Jsir.Var.t) Code_id.Map.t;
+    code_ids : code_id Code_id.Map.t;
     function_slots : Jsir.Var.t Function_slot.Map.t;
     value_slots : Jsir.Var.t Value_slot.Map.t;
     traps : Continuation.t list;
@@ -79,7 +85,7 @@ let add_symbol t ~res symbol jvar =
   t, register_symbol' ~res symbol jvar
 
 let add_code_id t code_id ~addr ~params ~closure =
-  let code_ids = Code_id.Map.add code_id (addr, params, closure) t.code_ids in
+  let code_ids = Code_id.Map.add code_id { addr; params; closure } t.code_ids in
   { t with code_ids }
 
 let add_function_slot t fslot jvar =

@@ -15,9 +15,6 @@ val create :
   exn_continuation:Continuation.t ->
   t
 
-(** Symbol corresponding to the module currently compiling. *)
-val module_symbol : t -> Symbol.t
-
 val return_continuation : t -> Continuation.t
 
 val exn_continuation : t -> Continuation.t
@@ -28,6 +25,9 @@ val enter_function_body :
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   t
+
+(** Symbol corresponding to the module currently compiling. *)
+val module_symbol : t -> Symbol.t
 
 (** Map a Flambda2 continuation to the address of the corresponding block.
     Not to be used for continuations used as exception handlers
@@ -53,6 +53,8 @@ val add_exn_handler :
 (** Map a Flambda2 variable to a JSIR variable. *)
 val add_var : t -> Variable.t -> Jsir.Var.t -> t
 
+val add_var_alias_of_var_exn : t -> var:Variable.t -> alias_of:Variable.t -> t
+
 (** Map a Flambda2 symbol to a JSIR variable, and register it to the global symbol
     table. *)
 val add_symbol :
@@ -74,8 +76,6 @@ val register_symbol_exn :
 
 (** Set [var] to be an alias of [alias_of]. Raises if [alias_of] is from the current
     compilation unit and is not found in the environment. *)
-val add_var_alias_of_var_exn : t -> var:Variable.t -> alias_of:Variable.t -> t
-
 val add_var_alias_of_symbol_exn :
   t ->
   res:To_jsir_result.t ->
@@ -89,6 +89,12 @@ val add_symbol_alias_of_var_exn :
   symbol:Symbol.t ->
   alias_of:Variable.t ->
   t * To_jsir_result.t
+
+type code_id =
+  { addr : Jsir.Addr.t;
+    params : Jsir.Var.t list;
+    closure : Jsir.Var.t
+  }
 
 (** Map a Flambda2 code ID to the address of the corresponding JSIR block, its parameters,
     and the JSIR varible corresponding to its closure. *)
@@ -133,8 +139,7 @@ val get_symbol_exn :
 
 (** Return the block address, parameter variables and closure variable corresponding to
     the given [Code_id.t]. *)
-val get_code_id_exn :
-  t -> Code_id.t -> Jsir.Addr.t * Jsir.Var.t list * Jsir.Var.t
+val get_code_id_exn : t -> Code_id.t -> code_id
 
 (** Return the variable corresponding to a function slot. *)
 val get_function_slot : t -> Function_slot.t -> Jsir.Var.t option

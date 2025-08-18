@@ -60,7 +60,7 @@ let use_prim' ~env ~res prim simples =
   use_prim ~env ~res prim args
 
 let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
-  let use_prim' prim = use_prim' ~env ~res prim [] in
+  let use_prim' prim = use_prim ~env ~res prim [] in
   match f with
   | Invalid _ -> use_prim' (Extern "caml_invalid_primitive")
   | Optimised_out _ ->
