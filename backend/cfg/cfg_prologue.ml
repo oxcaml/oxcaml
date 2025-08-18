@@ -41,7 +41,7 @@ module Instruction_requirements = struct
     | Epilogue
     | Requirements of t
 
-  let instr_uses_stack (instr : _ Cfg.instruction) =
+  let instr_uses_stack_slots (instr : _ Cfg.instruction) =
     let regs_use_stack_slots =
       Array.exists (fun reg ->
           match reg.Reg.loc with
@@ -49,12 +49,10 @@ module Instruction_requirements = struct
           | Stack (Incoming _ | Outgoing _ | Domainstate _) | Reg _ | Unknown ->
             false)
     in
-    regs_use_stack_slots instr.Cfg.arg
-    || regs_use_stack_slots instr.Cfg.res
-    || instr.stack_offset <> 0
+    regs_use_stack_slots instr.Cfg.arg || regs_use_stack_slots instr.Cfg.res
 
   let terminator (instr : Cfg.terminator Cfg.instruction) fun_name =
-    if instr_uses_stack instr
+    if instr_uses_stack_slots instr
     then Requires_prologue
     else
       match[@ocaml.warning "-4"] instr.desc with
@@ -66,7 +64,7 @@ module Instruction_requirements = struct
       | _ -> No_requirements
 
   let basic (instr : Cfg.basic Cfg.instruction) =
-    if instr_uses_stack instr
+    if instr_uses_stack_slots instr
     then Requirements Requires_prologue
     else
       match instr.desc with
@@ -188,6 +186,8 @@ module Validator = struct
       State_set.map
         (fun domain ->
           match domain, Instruction_requirements.basic instr with
+          | No_prologue_on_stack, Prologue when instr.stack_offset <> 0 ->
+            error_with_instruction "prologue has a non-zero stack offset" instr
           | No_prologue_on_stack, Prologue -> Prologue_on_stack
           | No_prologue_on_stack, Epilogue ->
             error_with_instruction
