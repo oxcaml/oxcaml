@@ -459,7 +459,8 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
 
 and variant_subkind consts non_consts : Fexpr.subkind =
   let consts =
-    consts |> Target_ocaml_int.Set.elements |> List.map Target_ocaml_int.to_int64
+    consts |> Target_ocaml_int.Set.elements
+    |> List.map Target_ocaml_int.to_int64
   in
   let non_consts =
     non_consts |> Tag.Scannable.Map.bindings

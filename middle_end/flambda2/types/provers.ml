@@ -227,7 +227,8 @@ let prove_is_null_generic env t : _ generic_proof =
 
 let meet_is_null env t = as_meet_shortcut (prove_is_null_generic env t)
 
-let prove_naked_immediates_generic env t : Target_ocaml_int.Set.t generic_proof =
+let prove_naked_immediates_generic env t : Target_ocaml_int.Set.t generic_proof
+    =
   match expand_head env t with
   | Naked_immediate (Ok (Naked_immediates is)) ->
     if Target_ocaml_int.Set.is_empty is then Invalid else Proved is

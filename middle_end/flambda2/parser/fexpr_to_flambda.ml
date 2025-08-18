@@ -262,7 +262,8 @@ let vec512 bits : Vector_types.Vec512.Bit_pattern.t =
 let tag_scannable (tag : Fexpr.tag_scannable) : Tag.Scannable.t =
   Tag.Scannable.create_exn tag
 
-let immediate i = i |> Targetint_32_64.of_string |> Target_ocaml_int.of_targetint
+let immediate i =
+  i |> Targetint_32_64.of_string |> Target_ocaml_int.of_targetint
 
 let float32 f = f |> Numeric_types.Float32_by_bit_pattern.create
 
@@ -728,7 +729,8 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
   | Switch { scrutinee; cases } ->
     let arms =
       List.map
-        (fun (case, apply) -> Target_ocaml_int.of_int case, apply_cont env apply)
+        (fun (case, apply) ->
+          Target_ocaml_int.of_int case, apply_cont env apply)
         cases
       |> Target_ocaml_int.Map.of_list
     in

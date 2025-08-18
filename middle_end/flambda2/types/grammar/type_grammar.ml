@@ -3770,7 +3770,8 @@ let tag_int8 (t : t) : t =
     | Ok (No_alias ints) ->
       let ints =
         Int8.Set.fold
-          (fun x acc -> Target_ocaml_int.Set.add (Target_ocaml_int.of_int8 x) acc)
+          (fun x acc ->
+            Target_ocaml_int.Set.add (Target_ocaml_int.of_int8 x) acc)
           ints Target_ocaml_int.Set.empty
       in
       non_null_value

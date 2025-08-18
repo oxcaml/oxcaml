@@ -593,7 +593,10 @@ let rebuild_named_default_case env (named : Named.t) =
         Named.create_prim
           (P.Unary
              ( Block_load
-                 { field = Target_ocaml_int.of_int field; kind; mut = Immutable },
+                 { field = Target_ocaml_int.of_int field;
+                   kind;
+                   mut = Immutable
+                 },
                arg ))
           dbg)
     | Closure_representation (arg_fields, function_slots, current_function_slot)

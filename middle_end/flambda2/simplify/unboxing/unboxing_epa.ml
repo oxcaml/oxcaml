@@ -415,7 +415,8 @@ and compute_extra_args_for_variant ~pass rewrite_id ~typing_env_at_use
               let field_decision : U.field_decision = { epa; decision; kind } in
               let new_decisions = field_decision :: new_decisions in
               new_decisions, Target_ocaml_int.(add one field_nth))
-            ([], Target_ocaml_int.zero) block_fields
+            ([], Target_ocaml_int.zero)
+            block_fields
         in
         shape, List.rev new_fields_decisions)
       fields_by_tag_from_decision
