@@ -87,6 +87,8 @@ module Llvm_typ = struct
           elem_typ : t
         }
 
+  let i128 = Int { width_in_bits = 128 }
+
   let i64 = Int { width_in_bits = 64 }
 
   let i32 = Int { width_in_bits = 32 }
@@ -498,9 +500,12 @@ module F = struct
     line t.ppf "%a:" Ident.print unreachable_label;
     ins_unreachable t
 
+  let ins_conv' t op ~src ~dst ~src_typ ~dst_typ =
+    ins t "%a = %s %a %a to %a" pp_ident dst op Llvm_typ.pp_t src_typ
+      Llvm_value.pp_t src Llvm_typ.pp_t dst_typ
+
   let ins_conv t op ~src ~dst ~src_typ ~dst_typ =
-    ins t "%a = %s %a %a to %a" pp_ident dst op Llvm_typ.pp_t src_typ pp_ident
-      src Llvm_typ.pp_t dst_typ
+    ins_conv' t op ~src:(Llvm_value.Local_ident src) ~dst ~src_typ ~dst_typ
 
   let ins_binop t op arg1 arg2 res typ =
     ins t "%a = %s %a %a, %a" pp_ident res op Llvm_typ.pp_t typ pp_ident arg1
@@ -1084,7 +1089,31 @@ module F = struct
       | Iadd -> do_binop "add"
       | Isub -> do_binop "sub"
       | Imul -> do_binop "mul"
-      | Imulh { signed = _ } -> do_binop "mul"
+      | Imulh { signed } ->
+        (* Assuming operands are i64 *)
+        let extend_value v =
+          let res = fresh_ident t in
+          let ext_op = if signed then "sext" else "zext" in
+          ins_conv' t ext_op ~src:v ~dst:res ~src_typ:Llvm_typ.i64
+            ~dst_typ:Llvm_typ.i128;
+          res
+        in
+        let arg1 = Llvm_value.Local_ident (load_reg_to_temp t i.arg.(0)) in
+        let arg2 =
+          match imm with
+          | None -> Llvm_value.Local_ident (load_reg_to_temp t i.arg.(1))
+          | Some n -> Llvm_value.Immediate (string_of_int n)
+        in
+        let arg1_ext = extend_value arg1 in
+        let arg2_ext = extend_value arg2 in
+        let res_ext = fresh_ident t in
+        ins_binop t "mul" arg1_ext arg2_ext res_ext Llvm_typ.i128;
+        let shifted = fresh_ident t in
+        ins_binop_imm t "lshr" res_ext (string_of_int 64) shifted Llvm_typ.i128;
+        let res = fresh_ident t in
+        ins_conv t "trunc" ~src:shifted ~dst:res ~src_typ:Llvm_typ.i128
+          ~dst_typ:Llvm_typ.i64;
+        res
       | Idiv -> do_binop "sdiv"
       | Imod -> do_binop "srem"
       | Iand -> do_binop "and"
