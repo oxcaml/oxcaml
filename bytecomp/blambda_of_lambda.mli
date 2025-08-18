@@ -12,4 +12,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val blambda_of_lambda : Lambda.lambda -> Blambda.blambda
+val blambda_of_lambda : 
+  compilation_unit:Compilation_unit.t option -> Lambda.lambda -> Blambda.blambda
+(* If compilation_unit is Some cu, wrap the result in Setglobal *)

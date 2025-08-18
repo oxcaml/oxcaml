@@ -19,10 +19,6 @@
 open Typedtree
 open Lambda
 
-type compilation_unit_style =
-  | Plain_block (* Flambda *)
-  | Set_global_to_block (* Bytecode *)
-
 (* The triple here is the structure, the coercion from the raw structure to
    the main signature, and the coercion from the main signature to the argument
    signature (corresponding to the [structure], [coercion], and
@@ -33,13 +29,13 @@ type compilation_unit_style =
    full implementation. *)
 val transl_implementation:
       Compilation_unit.t -> structure * module_coercion * module_coercion option
-        -> style:compilation_unit_style -> Lambda.program
+        -> Lambda.program
 
 val transl_toplevel_definition: structure -> lambda
 
 val transl_package:
       Compilation_unit.t option list -> Compilation_unit.t -> module_coercion
-        -> style:compilation_unit_style -> int * lambda
+        -> int * lambda
 
 type runtime_arg =
   | (* A module from which we need to project out the argument block *)
@@ -56,7 +52,7 @@ type runtime_arg =
 val transl_instance:
       Compilation_unit.t -> runtime_args:runtime_arg list
         -> main_module_block_size:int -> arg_block_idx:int option
-        -> style:compilation_unit_style -> Lambda.program
+        -> Lambda.program
 
 val toplevel_name: Ident.t -> string
 

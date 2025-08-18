@@ -213,7 +213,6 @@ let execute_phrase print_outcome ppf phr =
               required_globals; code = res } =
           Translmod.transl_implementation phrase_comp_unit
             (str, Tcoerce_none, None)
-            ~style:Plain_block
         in
         remember compilation_unit sg';
         compilation_unit, close_phrase res, required_globals, size

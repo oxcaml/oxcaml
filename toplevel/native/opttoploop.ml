@@ -430,7 +430,6 @@ let execute_phrase print_outcome ppf phr =
               required_globals; code = res } =
           Translmod.transl_implementation compilation_unit
             (str, coercion, None)
-            ~style:Plain_block
         in
         remember compilation_unit sg';
         let size =

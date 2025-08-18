@@ -991,25 +991,14 @@ let wrap_toplevel_functor_in_struct code =
         [ code ],
         Loc_unknown)
 
-(* Convert an flambda-style implementation (module block only) to a
-   non-flambda-style one (set global as side effect) *)
-
-let wrap_in_setglobal implementation =
-  let code =
-    implementation.code
-  in
-  { implementation with code }
 
 (* Compile an implementation *)
 
-type compilation_unit_style =
-  | Plain_block
-  | Set_global_to_block
 
 let has_parameters () =
   Env.parameters () <> []
 
-let transl_implementation_plain_block compilation_unit impl =
+let transl_implementation compilation_unit impl =
   reset_labels ();
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
@@ -1062,14 +1051,6 @@ let transl_implementation_plain_block compilation_unit impl =
     required_globals = required_globals ~flambda:true body;
     code = body }
 
-let transl_implementation_set_global module_name impl =
-  transl_implementation_plain_block module_name impl
-  |> wrap_in_setglobal
-
-let transl_implementation compilation_unit impl ~style =
-  match style with
-  | Plain_block -> transl_implementation_plain_block compilation_unit impl
-  | Set_global_to_block -> transl_implementation_set_global compilation_unit impl
 
 (* Compile a toplevel phrase *)
 
@@ -1272,7 +1253,7 @@ let get_component = function
     None -> Lconst const_unit
   | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
 
-let transl_package_plain_block component_names coercion =
+let transl_package component_names _target_name coercion =
   let size =
     match coercion with
     | Tcoerce_none -> List.length component_names
@@ -1287,31 +1268,6 @@ let transl_package_plain_block component_names coercion =
            List.map get_component component_names,
            Loc_unknown))
 
-let transl_package_set_global component_names _target_name coercion =
-  let size, block = transl_package_plain_block component_names coercion in
-  size, block
-  (*
-  let components =
-    match coercion with
-      Tcoerce_none ->
-        List.map get_component component_names
-    | Tcoerce_structure (pos_cc_list, id_pos_list) ->
-              (* ignore id_pos_list as the ids are already bound *)
-        let g = Array.of_list component_names in
-        List.map
-          (fun (pos, cc) -> apply_coercion Strict cc (get_component g.(pos)))
-          pos_cc_list
-    | _ ->
-        assert false in
-  Lprim(Pmakeblock(0, Immutable), components)
-   *)
-
-let transl_package component_names target_name coercion ~style =
-  match style with
-  | Plain_block ->
-      transl_package_plain_block component_names coercion
-  | Set_global_to_block ->
-      transl_package_set_global component_names target_name coercion
 
 type runtime_arg =
   | Argument_block of {
@@ -1337,7 +1293,7 @@ let transl_runtime_arg arg =
   | Unit ->
       lambda_unit
 
-let transl_instance_plain_block
+let transl_instance_impl
       compilation_unit ~runtime_args ~main_module_block_size
       ~arg_block_idx
     : Lambda.program =
@@ -1381,24 +1337,13 @@ let transl_instance_plain_block
     arg_block_idx;
   }
 
-let transl_instance_set_global
-      compilation_unit ~runtime_args ~main_module_block_size ~arg_block_idx =
-  transl_instance_plain_block compilation_unit ~runtime_args
-    ~main_module_block_size ~arg_block_idx
-  |> wrap_in_setglobal
-
 let transl_instance instance_unit ~runtime_args ~main_module_block_size
-      ~arg_block_idx ~style =
+      ~arg_block_idx =
   assert (Compilation_unit.is_instance instance_unit);
   if (runtime_args = []) then
     Misc.fatal_error "Trying to instantiate but passing no arguments";
-  match style with
-  | Plain_block ->
-      transl_instance_plain_block instance_unit ~runtime_args
-        ~main_module_block_size ~arg_block_idx
-  | Set_global_to_block ->
-      transl_instance_set_global instance_unit ~runtime_args
-        ~main_module_block_size ~arg_block_idx
+  transl_instance_impl instance_unit ~runtime_args
+    ~main_module_block_size ~arg_block_idx
 
 (* Error report *)
 

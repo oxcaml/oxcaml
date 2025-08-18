@@ -1119,4 +1119,8 @@ and make_unsigned_comparison size signed_comparison x y =
    (pop)
 *)
 
-let blambda_of_lambda x = comp_expr x
+let blambda_of_lambda ~compilation_unit x = 
+  let blam = comp_expr x in
+  match compilation_unit with
+  | None -> blam
+  | Some cu -> Blambda.Prim (Blambda.Setglobal cu, [blam])
