@@ -68,3 +68,9 @@ let to_string { name; src; line; col; _ } =
       | None, None -> assert false
     in
     Format.sprintf "%s:%d:%d" file line col
+
+let t_of_debuginfo dbg ~pos =
+  let loc = Debuginfo.to_location dbg in
+  match pos with
+  | `Start -> t_of_pos loc.loc_start
+  | `End -> t_of_pos loc.loc_end

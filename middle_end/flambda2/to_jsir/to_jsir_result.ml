@@ -38,6 +38,9 @@ let add_instr_exn t instr =
   in
   { t with current_blocks = top_current_block :: rest_current_blocks }
 
+let add_debuginfo_exn t dbg ~pos =
+  add_instr_exn t (Event (Parse_info.t_of_debuginfo dbg ~pos))
+
 let new_block t ~params =
   let new_block = { params; body = []; addr = t.next_addr } in
   ( { t with

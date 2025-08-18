@@ -18,6 +18,10 @@ val create : unit -> t
     the new block. This function raises if there are no blocks being worked on. *)
 val add_instr_exn : t -> Jsir.instr -> t
 
+(** Add debugging information as an [Event]. Raises if there are no blocks being worked
+    on. [pos] controls whether we log the start of the region or the end. *)
+val add_debuginfo_exn : t -> Debuginfo.t -> pos:[`Start | `End] -> t
+
 (** Push a new block to the stack of current blocks. *)
 val new_block : t -> params:Jsir.Var.t list -> t * Jsir.Addr.t
 

@@ -544,13 +544,17 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
         (Let (var, Block (Tag.to_int tag, Array.of_list xs, Array, mutability)))
     )
 
-let primitive ~env ~res (prim : Flambda_primitive.t) _dbg =
-  match prim with
-  | Nullary f -> nullary ~env ~res f
-  | Unary (f, x) -> unary ~env ~res f x
-  | Binary (f, x, y) -> binary ~env ~res f x y
-  | Ternary (f, x, y, z) -> ternary ~env ~res f x y z
-  | Variadic (f, xs) -> variadic ~env ~res f xs
+let primitive ~env ~res (prim : Flambda_primitive.t) dbg =
+  let res = To_jsir_result.add_debuginfo_exn res dbg ~pos:`Start in
+  let var, env, res =
+    match prim with
+    | Nullary f -> nullary ~env ~res f
+    | Unary (f, x) -> unary ~env ~res f x
+    | Binary (f, x, y) -> binary ~env ~res f x y
+    | Ternary (f, x, y, z) -> ternary ~env ~res f x y z
+    | Variadic (f, xs) -> variadic ~env ~res f xs
+  in
+  var, env, To_jsir_result.add_debuginfo_exn res dbg ~pos:`End
 
 let extern ~env ~res symbol args =
   let args, res = prim_args ~env ~res args in
