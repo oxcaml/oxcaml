@@ -227,6 +227,10 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
   if !Clflags.dump_lambda then
     Format.fprintf ppf_dump "%a@." Printlambda.lambda lam;
   let blam = Blambda_of_lambda.blambda_of_lambda lam in
+  let blam = 
+    (* Wrap the packed module in Setglobal for bytecode compilation *)
+    Blambda.Prim (Blambda.Setglobal packed_compilation_unit, [blam])
+  in
   if !Clflags.dump_blambda then
     Format.fprintf ppf_dump "%a@." Printblambda.blambda blam;
   let instrs = Bytegen.compile_implementation packed_compilation_unit blam in
