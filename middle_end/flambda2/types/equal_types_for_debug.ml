@@ -313,7 +313,7 @@ let equal_head_of_kind_naked_immediate ~equal_type env
     (t2 : TG.head_of_kind_naked_immediate) =
   match t1, t2 with
   | Naked_immediates is1, Naked_immediates is2 ->
-    Targetint_31_63.Set.equal is1 is2
+    Target_ocaml_int.Set.equal is1 is2
   | Is_int t1, Is_int t2 -> equal_type env t1 t2
   | Get_tag t1, Get_tag t2 -> equal_type env t1 t2
   | Is_null t1, Is_null t2 -> equal_type env t1 t2

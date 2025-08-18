@@ -1038,7 +1038,7 @@ and meet_variant env ~(blocks1 : TG.Row_like_for_blocks.t Or_unknown.t)
 and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
     (t2 : TG.head_of_kind_naked_immediate) :
     TG.head_of_kind_naked_immediate meet_result =
-  let module I = Targetint_31_63 in
+  let module I = Target_ocaml_int in
   let keep_side side : _ meet_result =
     match side with
     | Left -> Ok (Left_input, env)
@@ -2312,7 +2312,7 @@ and n_way_join_variant env
 and n_way_join_head_of_kind_naked_immediate env
     (heads : TG.Head_of_kind_naked_immediate.t Join_env.join_arg list) :
     TG.Head_of_kind_naked_immediate.t n_way_join_result =
-  let module I = Targetint_31_63 in
+  let module I = Target_ocaml_int in
   let immediates, is_int, get_tag, is_null =
     List.fold_left
       (fun (immediates, is_int, get_tag, is_null) (id2, head2) ->

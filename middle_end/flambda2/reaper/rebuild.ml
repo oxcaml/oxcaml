@@ -593,7 +593,7 @@ let rebuild_named_default_case env (named : Named.t) =
         Named.create_prim
           (P.Unary
              ( Block_load
-                 { field = Targetint_31_63.of_int field; kind; mut = Immutable },
+                 { field = Target_ocaml_int.of_int field; kind; mut = Immutable },
                arg ))
           dbg)
     | Closure_representation (arg_fields, function_slots, current_function_slot)
@@ -617,7 +617,7 @@ let rebuild_named_default_case env (named : Named.t) =
   | Prim (Unary (Block_load { kind; field; _ }, arg), _dbg)
     when simple_is_unboxable env arg ->
     let kind = P.Block_access_kind.element_kind_for_load kind in
-    let field = GFG.Field.Block (Targetint_31_63.to_int field, kind) in
+    let field = GFG.Field.Block (Target_ocaml_int.to_int field, kind) in
     rewrite_field_access arg field
   | Prim (Unary (Project_value_slot { value_slot; _ }, arg), _dbg)
     when simple_is_unboxable env arg ->
@@ -630,7 +630,7 @@ let rebuild_named_default_case env (named : Named.t) =
   | Prim (Unary (Block_load { kind; field; _ }, arg), dbg)
     when simple_changed_repr env arg ->
     let kind = P.Block_access_kind.element_kind_for_load kind in
-    let field = GFG.Field.Block (Targetint_31_63.to_int field, kind) in
+    let field = GFG.Field.Block (Target_ocaml_int.to_int field, kind) in
     rewrite_field_access_chg_repr arg field dbg
   | Prim (Unary (Project_value_slot { value_slot; _ }, arg), dbg)
     when simple_changed_repr env arg ->
@@ -1026,7 +1026,7 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
             Named.create_prim
               (P.Unary
                  ( Block_load
-                     { field = Targetint_31_63.of_int field;
+                     { field = Target_ocaml_int.of_int field;
                        kind;
                        mut = Immutable
                      },
@@ -1116,7 +1116,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
     | Prim (Unary (Block_load { field; kind; _ }, arg), dbg) ->
       let field =
         Field.Block
-          ( Targetint_31_63.to_int field,
+          ( Target_ocaml_int.to_int field,
             P.Block_access_kind.element_kind_for_load kind )
       in
       load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
@@ -1331,7 +1331,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
       let ks =
         KS.create K.value
           (Variant
-             { consts = Targetint_31_63.Set.empty;
+             { consts = Target_ocaml_int.Set.empty;
                non_consts =
                  Tag.Scannable.Map.singleton tag (block_shape, subkinds)
              })
@@ -1637,11 +1637,11 @@ and rebuild_expr (env : env) (res : rebuild_result)
         RE.from_expr ~expr ~free_names)
     | Switch switch ->
       let arms =
-        Targetint_31_63.Map.filter_map
+        Target_ocaml_int.Map.filter_map
           (fun _ -> rewrite_apply_cont_expr env)
           (Switch_expr.arms switch)
       in
-      if Targetint_31_63.Map.is_empty arms
+      if Target_ocaml_int.Map.is_empty arms
       then
         RE.from_expr
           ~expr:(Expr.create_invalid Zero_switch_arms)

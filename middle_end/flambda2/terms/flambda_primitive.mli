@@ -145,9 +145,9 @@ module Duplicate_block_kind : sig
   type t =
     | Values of
         { tag : Tag.Scannable.t;
-          length : Targetint_31_63.t
+          length : Target_ocaml_int.t
         }
-    | Naked_floats of { length : Targetint_31_63.t }
+    | Naked_floats of { length : Target_ocaml_int.t }
     | Mixed
         (** We could store tag/length (or other relevant fields) on [Mixed],
             but we don't because the fields of [t] are currently only used for
@@ -163,14 +163,14 @@ module Duplicate_array_kind : sig
   type t =
     | Immediates
     | Values
-    | Naked_floats of { length : Targetint_31_63.t option }
-    | Naked_float32s of { length : Targetint_31_63.t option }
-    | Naked_int32s of { length : Targetint_31_63.t option }
-    | Naked_int64s of { length : Targetint_31_63.t option }
-    | Naked_nativeints of { length : Targetint_31_63.t option }
-    | Naked_vec128s of { length : Targetint_31_63.t option }
-    | Naked_vec256s of { length : Targetint_31_63.t option }
-    | Naked_vec512s of { length : Targetint_31_63.t option }
+    | Naked_floats of { length : Target_ocaml_int.t option }
+    | Naked_float32s of { length : Target_ocaml_int.t option }
+    | Naked_int32s of { length : Target_ocaml_int.t option }
+    | Naked_int64s of { length : Target_ocaml_int.t option }
+    | Naked_nativeints of { length : Target_ocaml_int.t option }
+    | Naked_vec128s of { length : Target_ocaml_int.t option }
+    | Naked_vec256s of { length : Target_ocaml_int.t option }
+    | Naked_vec512s of { length : Target_ocaml_int.t option }
 
   val print : Format.formatter -> t -> unit
 
@@ -202,13 +202,13 @@ module Block_access_kind : sig
   type t =
     | Values of
         { tag : Tag.Scannable.t Or_unknown.t;
-          size : Targetint_31_63.t Or_unknown.t;
+          size : Target_ocaml_int.t Or_unknown.t;
           field_kind : Block_access_field_kind.t
         }
-    | Naked_floats of { size : Targetint_31_63.t Or_unknown.t }
+    | Naked_floats of { size : Target_ocaml_int.t Or_unknown.t }
     | Mixed of
         { tag : Tag.Scannable.t Or_unknown.t;
-          size : Targetint_31_63.t Or_unknown.t;
+          size : Target_ocaml_int.t Or_unknown.t;
           field_kind : Mixed_block_access_field_kind.t;
           shape : Flambda_kind.Mixed_block_shape.t
         }
@@ -375,7 +375,7 @@ type unary_primitive =
   | Block_load of
       { kind : Block_access_kind.t;
         mut : Mutability.t;
-        field : Targetint_31_63.t
+        field : Target_ocaml_int.t
       }
   | Duplicate_block of { kind : Duplicate_block_kind.t }
       (** [Duplicate_block] may not be used to change the tag or the mutability
@@ -499,7 +499,7 @@ type binary_primitive =
   | Block_set of
       { kind : Block_access_kind.t;
         init : Init_or_assign.t;
-        field : Targetint_31_63.t
+        field : Target_ocaml_int.t
       }
   | Array_load of Array_kind.t * Array_load_kind.t * Mutability.t
       (** Unarized or SIMD array load.

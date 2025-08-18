@@ -33,12 +33,12 @@ type unboxer =
 
 module Field : sig
   val unboxing_prim :
-    P.Block_access_kind.t -> block:Simple.t -> index:Targetint_31_63.t -> P.t
+    P.Block_access_kind.t -> block:Simple.t -> index:Target_ocaml_int.t -> P.t
 
   val unboxer :
     poison_const:Const.t ->
     P.Block_access_kind.t ->
-    index:Targetint_31_63.t ->
+    index:Target_ocaml_int.t ->
     unboxer
 end
 

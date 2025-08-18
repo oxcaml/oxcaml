@@ -54,7 +54,7 @@ let simplify_array_set (array_kind : P.Array_kind.t)
            (Array_set (array_kind, array_set_kind), array, index, new_value))
         dbg
     in
-    let unit_ty = Flambda2_types.this_tagged_immediate Targetint_31_63.zero in
+    let unit_ty = Flambda2_types.this_tagged_immediate Target_ocaml_int.zero in
     let dacc = DA.add_variable dacc result_var unit_ty in
     SPR.create named ~try_reify:false dacc
 

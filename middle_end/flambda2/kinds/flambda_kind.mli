@@ -223,7 +223,7 @@ module With_subkind : sig
       | Boxed_vec512
       | Tagged_immediate
       | Variant of
-          { consts : Targetint_31_63.Set.t;
+          { consts : Target_ocaml_int.Set.t;
             non_consts : (Block_shape.t * full_kind list) Tag.Scannable.Map.t
           }
       | Float_block of { num_fields : int }

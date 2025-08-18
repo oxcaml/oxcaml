@@ -563,7 +563,7 @@ let binop ppf binop a b =
       width simple a simple b
   | Block_set { kind; init; field } ->
     Format.fprintf ppf "@[<2>%%block_set%a@ %a.(%a)@ %a %a@]" block_access_kind
-      kind simple a Targetint_31_63.print field init_or_assign init simple b
+      kind simple a Target_ocaml_int.print field init_or_assign init simple b
   | String_or_bigstring_load (slv, saw) ->
     let prim =
       match slv with
@@ -617,7 +617,7 @@ let unop ppf u =
   | Block_load { kind; mut; field } ->
     Format.fprintf ppf "@[<2>%%block_load%a%a@ (%a)@]"
       (mutability ~space:Before) mut block_access_kind kind
-      Targetint_31_63.print field
+      Target_ocaml_int.print field
   | Array_length ak ->
     str "%array_length";
     array_kind_for_length ppf ~space:Before ak

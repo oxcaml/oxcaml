@@ -1178,7 +1178,7 @@ and switch env res switch =
      given the already high number of instructions needed for big switches (but
      this might be debatable for small switches with 3 to 5 arms). *)
   let scrutinee, must_tag_discriminant =
-    match Targetint_31_63.Map.cardinal arms with
+    match Target_ocaml_int.Map.cardinal arms with
     | 2 -> (
       match Env.extra_info env scrutinee with
       | None -> untagged_scrutinee_cmm, false
@@ -1198,7 +1198,7 @@ and switch env res switch =
   in
   let wrap, env, res = Env.flush_delayed_lets ~mode:Branching_point env res in
   let prepare_discriminant ~must_tag d =
-    let targetint_d = Targetint_31_63.to_targetint d in
+    let targetint_d = Target_ocaml_int.to_targetint d in
     Targetint_32_64.to_int_checked
       (if must_tag then C.tag_targetint targetint_d else targetint_d)
   in
@@ -1214,12 +1214,12 @@ and switch env res switch =
         Env.add_inlined_debuginfo env (Apply_cont.debuginfo action) ),
       res )
   in
-  match Targetint_31_63.Map.cardinal arms with
+  match Target_ocaml_int.Map.cardinal arms with
   (* Binary case: if-then-else *)
   | 2 -> (
     let aux = make_arm ~must_tag_discriminant env in
-    let first_arm, res = aux res (Targetint_31_63.Map.min_binding arms) in
-    let second_arm, res = aux res (Targetint_31_63.Map.max_binding arms) in
+    let first_arm, res = aux res (Target_ocaml_int.Map.min_binding arms) in
+    let second_arm, res = aux res (Target_ocaml_int.Map.max_binding arms) in
     match first_arm, second_arm with
     (* These switches are actually if-then-elses. On such switches,
        transl_switch_clambda will introduce a let-binding of the scrutinee
@@ -1266,12 +1266,12 @@ and switch env res switch =
   | n ->
     (* transl_switch_clambda expects an [index] array such that index.(d) is the
        index in [cases] of the expression to execute when [e] matches [d]. *)
-    let max_d, _ = Targetint_31_63.Map.max_binding arms in
+    let max_d, _ = Target_ocaml_int.Map.max_binding arms in
     let m = prepare_discriminant ~must_tag:must_tag_discriminant max_d in
     let cases = Array.make (n + 1) None in
     let index = Array.make (m + 1) n in
     let _, res, free_vars, symbol_inits =
-      Targetint_31_63.Map.fold
+      Target_ocaml_int.Map.fold
         (fun discriminant action (i, res, free_vars, symbol_inits) ->
           let (d, cmm_action, action_free_vars, action_symbol_inits, _dbg), res
               =

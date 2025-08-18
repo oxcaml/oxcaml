@@ -958,7 +958,7 @@ and meet_variant env ~(blocks1 : TG.Row_like_for_blocks.t Or_unknown.t)
 and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
     (t2 : TG.head_of_kind_naked_immediate) :
     TG.head_of_kind_naked_immediate meet_result =
-  let module I = Targetint_31_63 in
+  let module I = Target_ocaml_int in
   let keep_side side : _ meet_result =
     match side with
     | Left -> Ok (Left_input, env)
@@ -1941,11 +1941,11 @@ and join_head_of_kind_naked_immediate env
     (head1 : TG.Head_of_kind_naked_immediate.t)
     (head2 : TG.Head_of_kind_naked_immediate.t) :
     TG.Head_of_kind_naked_immediate.t Or_unknown.t =
-  let module I = Targetint_31_63 in
+  let module I = Target_ocaml_int in
   match head1, head2 with
   | Naked_immediates is1, Naked_immediates is2 -> (
-    assert (not (Targetint_31_63.Set.is_empty is1));
-    assert (not (Targetint_31_63.Set.is_empty is2));
+    assert (not (Target_ocaml_int.Set.is_empty is1));
+    assert (not (Target_ocaml_int.Set.is_empty is2));
     let is = I.Set.union is1 is2 in
     let head = TG.Head_of_kind_naked_immediate.create_naked_immediates is in
     match head with

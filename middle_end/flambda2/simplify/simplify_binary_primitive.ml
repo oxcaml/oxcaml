@@ -427,7 +427,7 @@ module Int_ops_for_binary_shift (I : A.Int_number_kind) : sig
   include Binary_arith_like_sig with type op = P.int_shift_op
 end = struct
   module Lhs = I.Num
-  module Rhs = Targetint_31_63
+  module Rhs = Target_ocaml_int
   module Result = I.Num
 
   type op = P.int_shift_op
@@ -491,7 +491,7 @@ end = struct
 
   let op_lhs_unknown (op : P.int_shift_op) ~rhs :
       Num.t binary_arith_outcome_for_one_side_only =
-    let module O = Targetint_31_63 in
+    let module O = Target_ocaml_int in
     let rhs = rhs in
     match op with
     | Lsl | Lsr | Asr ->
@@ -554,7 +554,7 @@ module Int_ops_for_binary_comp (I : A.Int_number_kind) : sig
 end = struct
   module Lhs = I.Num
   module Rhs = I.Num
-  module Result = Targetint_31_63
+  module Result = Target_ocaml_int
 
   type op = P.signed_or_unsigned P.comparison_behaviour
 
@@ -570,14 +570,14 @@ end = struct
 
   let unknown (op : op) =
     match op with
-    | Yielding_bool _ -> T.these_naked_immediates Targetint_31_63.all_bools
+    | Yielding_bool _ -> T.these_naked_immediates Target_ocaml_int.all_bools
     | Yielding_int_like_compare_functions _signedness ->
-      T.these_naked_immediates Targetint_31_63.zero_one_and_minus_one
+      T.these_naked_immediates Target_ocaml_int.zero_one_and_minus_one
 
   let these s =
     let ty = T.these_naked_immediates s in
     let simple_opt =
-      match Targetint_31_63.Set.get_singleton s with
+      match Target_ocaml_int.Set.get_singleton s with
       | None -> None
       | Some i -> Some (Simple.const (Reg_width_const.naked_immediate i))
     in
@@ -595,7 +595,7 @@ end = struct
   let op (op : P.signed_or_unsigned P.comparison_behaviour) n1 n2 =
     match op with
     | Yielding_bool op -> (
-      let bool b = Targetint_31_63.bool b in
+      let bool b = Target_ocaml_int.bool b in
       match op with
       | Eq -> Some (bool (Num.compare n1 n2 = 0))
       | Neq -> Some (bool (Num.compare n1 n2 <> 0))
@@ -610,7 +610,7 @@ end = struct
     | Yielding_int_like_compare_functions signed_or_unsigned -> (
       match signed_or_unsigned with
       | Signed ->
-        let int i = Targetint_31_63.of_int i in
+        let int i = Target_ocaml_int.of_int i in
         let c = Num.compare n1 n2 in
         if c < 0
         then Some (int (-1))
@@ -618,7 +618,7 @@ end = struct
         then Some (int 0)
         else Some (int 1)
       | Unsigned ->
-        let int i = Targetint_31_63.of_int i in
+        let int i = Target_ocaml_int.of_int i in
         let c = Num.compare_unsigned n1 n2 in
         if c < 0
         then Some (int (-1))
@@ -817,7 +817,7 @@ end = struct
   module F = FP.F
   module Lhs = F
   module Rhs = F
-  module Result = Targetint_31_63
+  module Result = Target_ocaml_int
 
   type op = unit P.comparison_behaviour
 
@@ -833,14 +833,14 @@ end = struct
 
   let unknown (op : op) =
     match op with
-    | Yielding_bool _ -> T.these_naked_immediates Targetint_31_63.all_bools
+    | Yielding_bool _ -> T.these_naked_immediates Target_ocaml_int.all_bools
     | Yielding_int_like_compare_functions () ->
-      T.these_naked_immediates Targetint_31_63.zero_one_and_minus_one
+      T.these_naked_immediates Target_ocaml_int.zero_one_and_minus_one
 
   let these s =
     let ty = T.these_naked_immediates s in
     let simple_opt =
-      match Targetint_31_63.Set.get_singleton s with
+      match Target_ocaml_int.Set.get_singleton s with
       | None -> None
       | Some i -> Some (Simple.const (Reg_width_const.naked_immediate i))
     in
@@ -857,7 +857,7 @@ end = struct
     match op with
     | Yielding_bool op -> (
       let has_nan = F.is_any_nan n1 || F.is_any_nan n2 in
-      let bool b = Targetint_31_63.bool b in
+      let bool b = Target_ocaml_int.bool b in
       match op with
       | Eq -> Some (bool (F.IEEE_semantics.equal n1 n2))
       | Neq -> Some (bool (not (F.IEEE_semantics.equal n1 n2)))
@@ -878,7 +878,7 @@ end = struct
         then Some (bool false)
         else Some (bool (F.IEEE_semantics.compare n1 n2 >= 0)))
     | Yielding_int_like_compare_functions () ->
-      let int i = Targetint_31_63.of_int i in
+      let int i = Target_ocaml_int.of_int i in
       let c = F.IEEE_semantics.compare n1 n2 in
       if c < 0
       then Some (int (-1))
@@ -888,8 +888,8 @@ end = struct
 
   let result_of_comparison_with_nan (op : unit P.comparison) =
     match op with
-    | Neq -> Exactly Targetint_31_63.bool_true
-    | Eq | Lt () | Gt () | Le () | Ge () -> Exactly Targetint_31_63.bool_false
+    | Neq -> Exactly Target_ocaml_int.bool_true
+    | Eq | Lt () | Gt () | Le () | Ge () -> Exactly Target_ocaml_int.bool_false
 
   let op_lhs_unknown (op : op) ~rhs : _ binary_arith_outcome_for_one_side_only =
     match op with
@@ -942,7 +942,7 @@ let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term _dbg
     let result = match op with Eq -> bool | Neq -> not bool in
     let dacc =
       DA.add_variable dacc result_var
-        (T.this_naked_immediate (Targetint_31_63.bool result))
+        (T.this_naked_immediate (Target_ocaml_int.bool result))
     in
     SPR.create
       (Named.create_simple (Simple.untagged_const_bool result))
@@ -950,7 +950,7 @@ let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term _dbg
   | Unknown ->
     let dacc =
       DA.add_variable dacc result_var
-        (T.these_naked_immediates Targetint_31_63.all_bools)
+        (T.these_naked_immediates Target_ocaml_int.all_bools)
     in
     SPR.create original_term ~try_reify:false dacc
 
@@ -1008,16 +1008,16 @@ let simplify_array_load (array_kind : P.Array_kind.t)
           with
           | Unknown -> contents_unknown ()
           | Proved imms -> (
-            match Targetint_31_63.Set.get_singleton imms with
+            match Target_ocaml_int.Set.get_singleton imms with
             | None -> contents_unknown ()
             | Some imm ->
-              if Targetint_31_63.( < ) imm Targetint_31_63.zero
-                 || Targetint_31_63.( >= ) imm
-                      (Array.length fields |> Targetint_31_63.of_int)
+              if Target_ocaml_int.( < ) imm Target_ocaml_int.zero
+                 || Target_ocaml_int.( >= ) imm
+                      (Array.length fields |> Target_ocaml_int.of_int)
               then SPR.create_invalid dacc
               else
                 return_given_type
-                  fields.(Targetint_31_63.to_int imm)
+                  fields.(Target_ocaml_int.to_int imm)
                   ~try_reify:true))))
 
 let simplify_string_or_bigstring_load _string_like_value _string_accessor_width
@@ -1138,7 +1138,7 @@ let recover_comparison_primitive dacc (prim : P.binary_primitive) ~arg1 ~arg2 =
           ~name:(fun _ ~coercion:_ -> None)
           ~const:(fun const ->
             match[@warning "-fragile-match"] Const.descr const with
-            | Tagged_immediate i when Targetint_31_63.(equal i zero) ->
+            | Tagged_immediate i when Target_ocaml_int.(equal i zero) ->
               Simple.pattern_match' left
                 ~const:(fun _ -> None)
                 ~symbol:(fun _ ~coercion:_ -> None)

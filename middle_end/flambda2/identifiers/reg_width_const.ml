@@ -67,12 +67,12 @@ let kind t =
 
 let of_int_of_kind (kind : Flambda_kind.t) i =
   match kind with
-  | Value -> tagged_immediate (Targetint_31_63.of_int i)
+  | Value -> tagged_immediate (Target_ocaml_int.of_int i)
   | Naked_number Naked_float ->
     naked_float (Numeric_types.Float_by_bit_pattern.create (float_of_int i))
   | Naked_number Naked_float32 ->
     naked_float32 (Numeric_types.Float32_by_bit_pattern.create (float_of_int i))
-  | Naked_number Naked_immediate -> naked_immediate (Targetint_31_63.of_int i)
+  | Naked_number Naked_immediate -> naked_immediate (Target_ocaml_int.of_int i)
   | Naked_number Naked_int8 -> naked_int8 (Numeric_types.Int8.of_int i)
   | Naked_number Naked_int16 -> naked_int16 (Numeric_types.Int16.of_int i)
   | Naked_number Naked_int32 -> naked_int32 (Int32.of_int i)

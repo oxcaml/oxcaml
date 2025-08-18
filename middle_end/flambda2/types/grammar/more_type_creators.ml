@@ -95,10 +95,10 @@ let any_tagged_immediate_or_null =
     { non_null = Ok any_tagged_immediate_non_null; is_null = Maybe_null }
 
 let these_tagged_immediates0 imms =
-  match Targetint_31_63.Set.get_singleton imms with
+  match Target_ocaml_int.Set.get_singleton imms with
   | Some imm -> TG.this_tagged_immediate imm
   | _ ->
-    if Targetint_31_63.Set.is_empty imms
+    if Target_ocaml_int.Set.is_empty imms
     then TG.bottom_value
     else
       TG.create_variant ~is_unique:false
@@ -107,9 +107,9 @@ let these_tagged_immediates0 imms =
 
 let these_tagged_immediates imms = these_tagged_immediates0 imms
 
-let any_tagged_bool = these_tagged_immediates Targetint_31_63.all_bools
+let any_tagged_bool = these_tagged_immediates Target_ocaml_int.all_bools
 
-let any_naked_bool = TG.these_naked_immediates Targetint_31_63.all_bools
+let any_naked_bool = TG.these_naked_immediates Target_ocaml_int.all_bools
 
 let this_boxed_float32 f alloc_mode =
   TG.box_float32 (TG.this_naked_float32 f) alloc_mode
@@ -216,7 +216,7 @@ let blocks_with_these_tags tags alloc_mode : _ Or_unknown.t =
          ~extensions:No_extensions)
 
 let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
-  match Targetint_31_63.of_int_option (List.length fields) with
+  match Target_ocaml_int.of_int_option (List.length fields) with
   | None ->
     (* CR-someday mshinwell: This should be a special kind of error. *)
     Misc.fatal_error "Block too long for target"
@@ -229,7 +229,7 @@ let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
       ~extensions:No_extensions
 
 let immutable_block_non_null ~is_unique tag ~shape alloc_mode ~fields =
-  match Targetint_31_63.of_int_option (List.length fields) with
+  match Target_ocaml_int.of_int_option (List.length fields) with
   | None ->
     (* CR-someday mshinwell: This should be a special kind of error. *)
     Misc.fatal_error "Block too long for target"
@@ -243,7 +243,7 @@ let immutable_block_non_null ~is_unique tag ~shape alloc_mode ~fields =
       ~extensions:No_extensions
 
 let immutable_block_with_size_at_least ~tag ~n ~shape ~field_n_minus_one =
-  let n = Targetint_31_63.to_int n in
+  let n = Target_ocaml_int.to_int n in
   let field_tys =
     List.init n (fun index ->
         let field_kind = K.Block_shape.element_kind shape index in

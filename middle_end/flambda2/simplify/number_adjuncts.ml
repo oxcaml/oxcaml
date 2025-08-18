@@ -76,7 +76,7 @@ module type Num_common = sig
 
   val to_const : t -> Reg_width_const.t
 
-  val to_immediate : t -> Targetint_31_63.t
+  val to_immediate : t -> Target_ocaml_int.t
 
   val to_naked_float32 : t -> Numeric_types.Float32_by_bit_pattern.t
 
@@ -126,11 +126,11 @@ module type Int_number_kind = sig
 
     val xor : t -> t -> t
 
-    val shift_left : t -> Targetint_31_63.t -> t
+    val shift_left : t -> Target_ocaml_int.t -> t
 
-    val shift_right : t -> Targetint_31_63.t -> t
+    val shift_right : t -> Target_ocaml_int.t -> t
 
-    val shift_right_logical : t -> Targetint_31_63.t -> t
+    val shift_right_logical : t -> Target_ocaml_int.t -> t
 
     val swap_byte_endianness : t -> t
 
@@ -169,7 +169,7 @@ module type Boxable_int_number_kind = sig
 end
 
 let with_shift shift if_undefined f ~integer_bit_width =
-  match Targetint_31_63.to_int_option shift with
+  match Target_ocaml_int.to_int_option shift with
   | None ->
     (* As per a similar case in [Simplify_binary_primitive], we are here
        assigning a semantics to an operation which has undefined semantics. *)
@@ -189,7 +189,7 @@ let compare_unsigned_generic n1 n2 ~compare ~strictly_negative =
 
 module For_tagged_immediates : Int_number_kind = struct
   module Num = struct
-    include Targetint_31_63
+    include Target_ocaml_int
 
     let strictly_negative t = t < zero
 
@@ -197,12 +197,12 @@ module For_tagged_immediates : Int_number_kind = struct
       compare_unsigned_generic t1 t2 ~compare ~strictly_negative
 
     let div t1 t2 =
-      if Targetint_31_63.equal t2 Targetint_31_63.zero
+      if Target_ocaml_int.equal t2 Target_ocaml_int.zero
       then None
       else Some (div t1 t2)
 
     let mod_ t1 t2 =
-      if Targetint_31_63.equal t2 Targetint_31_63.zero
+      if Target_ocaml_int.equal t2 Target_ocaml_int.zero
       then None
       else Some (mod_ t1 t2)
 
@@ -224,27 +224,27 @@ module For_tagged_immediates : Int_number_kind = struct
         ~integer_bit_width
 
     let swap_byte_endianness =
-      Targetint_31_63.get_least_significant_16_bits_then_byte_swap
+      Target_ocaml_int.get_least_significant_16_bits_then_byte_swap
 
     let to_const t = Reg_width_const.tagged_immediate t
 
     let to_immediate t = t
 
     let to_naked_float32 t =
-      Float32_by_bit_pattern.create (Targetint_31_63.to_float t)
+      Float32_by_bit_pattern.create (Target_ocaml_int.to_float t)
 
     let to_naked_float t =
-      Float_by_bit_pattern.create (Targetint_31_63.to_float t)
+      Float_by_bit_pattern.create (Target_ocaml_int.to_float t)
 
-    let to_naked_int8 t = Int8.of_int (Targetint_31_63.to_int t)
+    let to_naked_int8 t = Int8.of_int (Target_ocaml_int.to_int t)
 
-    let to_naked_int16 t = Int16.of_int (Targetint_31_63.to_int t)
+    let to_naked_int16 t = Int16.of_int (Target_ocaml_int.to_int t)
 
-    let to_naked_int32 t = Targetint_31_63.to_int32 t
+    let to_naked_int32 t = Target_ocaml_int.to_int32 t
 
-    let to_naked_int64 t = Targetint_31_63.to_int64 t
+    let to_naked_int64 t = Target_ocaml_int.to_int64 t
 
-    let to_naked_nativeint t = Targetint_31_63.to_targetint t
+    let to_naked_nativeint t = Target_ocaml_int.to_targetint t
   end
 
   let standard_int_or_float_kind : K.Standard_int_or_float.t = Tagged_immediate
@@ -263,7 +263,7 @@ end
 
 module For_naked_immediates : Int_number_kind = struct
   module Num = struct
-    include Targetint_31_63
+    include Target_ocaml_int
 
     let strictly_negative t = t < zero
 
@@ -271,12 +271,12 @@ module For_naked_immediates : Int_number_kind = struct
       compare_unsigned_generic t1 t2 ~compare ~strictly_negative
 
     let div t1 t2 =
-      if Targetint_31_63.equal t2 Targetint_31_63.zero
+      if Target_ocaml_int.equal t2 Target_ocaml_int.zero
       then None
       else Some (div t1 t2)
 
     let mod_ t1 t2 =
-      if Targetint_31_63.equal t2 Targetint_31_63.zero
+      if Target_ocaml_int.equal t2 Target_ocaml_int.zero
       then None
       else Some (mod_ t1 t2)
 
@@ -296,27 +296,27 @@ module For_naked_immediates : Int_number_kind = struct
         ~integer_bit_width
 
     let swap_byte_endianness =
-      Targetint_31_63.get_least_significant_16_bits_then_byte_swap
+      Target_ocaml_int.get_least_significant_16_bits_then_byte_swap
 
     let to_const t = Reg_width_const.naked_immediate t
 
     let to_immediate t = t
 
     let to_naked_float32 t =
-      Float32_by_bit_pattern.create (Targetint_31_63.to_float t)
+      Float32_by_bit_pattern.create (Target_ocaml_int.to_float t)
 
     let to_naked_float t =
-      Float_by_bit_pattern.create (Targetint_31_63.to_float t)
+      Float_by_bit_pattern.create (Target_ocaml_int.to_float t)
 
-    let to_naked_int8 t = Int8.of_int (Targetint_31_63.to_int t)
+    let to_naked_int8 t = Int8.of_int (Target_ocaml_int.to_int t)
 
-    let to_naked_int16 t = Int16.of_int (Targetint_31_63.to_int t)
+    let to_naked_int16 t = Int16.of_int (Target_ocaml_int.to_int t)
 
-    let to_naked_int32 = Targetint_31_63.to_int32
+    let to_naked_int32 = Target_ocaml_int.to_int32
 
-    let to_naked_int64 = Targetint_31_63.to_int64
+    let to_naked_int64 = Target_ocaml_int.to_int64
 
-    let to_naked_nativeint = Targetint_31_63.to_targetint
+    let to_naked_nativeint = Target_ocaml_int.to_targetint
   end
 
   let standard_int_or_float_kind : K.Standard_int_or_float.t = Naked_immediate
@@ -349,7 +349,7 @@ module For_float32s : Boxable_number_kind = struct
 
     let to_const t = Reg_width_const.naked_float32 t
 
-    let to_immediate t = Targetint_31_63.of_float (to_float t)
+    let to_immediate t = Target_ocaml_int.of_float (to_float t)
 
     let to_naked_float32 t = t
 
@@ -402,7 +402,7 @@ module For_floats : Boxable_number_kind = struct
 
     let to_const t = Reg_width_const.naked_float t
 
-    let to_immediate t = Targetint_31_63.of_float (to_float t)
+    let to_immediate t = Target_ocaml_int.of_float (to_float t)
 
     let to_naked_float32 t = Float32_by_bit_pattern.create (to_float t)
 
@@ -506,7 +506,7 @@ module For_int8s : Int_number_kind = struct
 
     let to_const t = Reg_width_const.naked_int8 t
 
-    let to_immediate t = Targetint_31_63.of_int (to_int t)
+    let to_immediate t = Target_ocaml_int.of_int (to_int t)
 
     let to_naked_float32 t = Float32_by_bit_pattern.create (to_float t)
 
@@ -614,7 +614,7 @@ module For_int16s : Int_number_kind = struct
 
     let to_const t = Reg_width_const.naked_int16 t
 
-    let to_immediate t = Targetint_31_63.of_int (to_int t)
+    let to_immediate t = Target_ocaml_int.of_int (to_int t)
 
     let to_naked_float32 t = Float32_by_bit_pattern.create (to_float t)
 
@@ -695,7 +695,7 @@ module For_int32s : Boxable_int_number_kind = struct
 
     let to_const t = Reg_width_const.naked_int32 t
 
-    let to_immediate t = Targetint_31_63.of_int32 t
+    let to_immediate t = Target_ocaml_int.of_int32 t
 
     let to_naked_float32 t = Float32_by_bit_pattern.create (Int32.to_float t)
 
@@ -770,7 +770,7 @@ module For_int64s : Boxable_int_number_kind = struct
 
     let to_const t = Reg_width_const.naked_int64 t
 
-    let to_immediate t = Targetint_31_63.of_int64 t
+    let to_immediate t = Target_ocaml_int.of_int64 t
 
     let to_naked_float32 t = Float32_by_bit_pattern.create (Int64.to_float t)
 
@@ -845,7 +845,7 @@ module For_nativeints : Boxable_int_number_kind = struct
 
     let to_const t = Reg_width_const.naked_nativeint t
 
-    let to_immediate t = Targetint_31_63.of_targetint t
+    let to_immediate t = Target_ocaml_int.of_targetint t
 
     let to_naked_float32 t =
       Float32_by_bit_pattern.create (Targetint_32_64.to_float t)

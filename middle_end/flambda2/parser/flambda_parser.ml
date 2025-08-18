@@ -2182,7 +2182,7 @@ module Tables = struct
         let _endpos = _endpos_v_ in
         let _v : 'tv_binop_app = 
 # 587 "flambda_parser.mly"
-    ( Binary (Block_set { kind; init; field = Targetint_31_63.of_int field }, block, v) )
+    ( Binary (Block_set { kind; init; field = Target_ocaml_int.of_int field }, block, v) )
 # 2187 "flambda_parser_in.ml"
          in
         {
@@ -13313,7 +13313,7 @@ module Tables = struct
 # 13314 "flambda_parser_in.ml"
         ) = 
 # 436 "flambda_parser.mly"
-    ( Block_load { kind; mut; field = Targetint_31_63.of_int field } )
+    ( Block_load { kind; mut; field = Target_ocaml_int.of_int field } )
 # 13318 "flambda_parser_in.ml"
          in
         {

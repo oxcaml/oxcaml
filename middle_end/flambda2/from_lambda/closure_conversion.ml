@@ -103,9 +103,9 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
   in
   match const with
   | Const_base (Const_int c) ->
-    acc, reg_width (RWC.tagged_immediate (Targetint_31_63.of_int c)), "int"
+    acc, reg_width (RWC.tagged_immediate (Target_ocaml_int.of_int c)), "int"
   | Const_base (Const_char c) ->
-    acc, reg_width (RWC.tagged_immediate (Targetint_31_63.of_char c)), "char"
+    acc, reg_width (RWC.tagged_immediate (Target_ocaml_int.of_char c)), "char"
   | Const_base (Const_unboxed_float c) ->
     let c = Numeric_types.Float_by_bit_pattern.of_string c in
     acc, reg_width (RWC.naked_float c), "unboxed_float"
@@ -1231,7 +1231,7 @@ let simplify_block_load acc body_env ~block ~field : simplified_block_load =
   | Closure_approximation _ | Value_symbol _ | Value_const _ -> Not_a_block
   | Block_approximation (_tag, _shape, approx, _alloc_mode) -> (
     let approx =
-      let i = Targetint_31_63.to_int field in
+      let i = Target_ocaml_int.to_int field in
       if i >= Array.length approx then None else Some approx.(i)
     in
     match approx with
@@ -1736,7 +1736,7 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
           Apply_cont_with_acc.create acc ?trap_action ~args_approx cont ~args
             ~dbg
         in
-        acc, (Targetint_31_63.of_int case, action))
+        acc, (Target_ocaml_int.of_int case, action))
       acc sw.consts
   in
   match arms, sw.failaction with
@@ -1783,12 +1783,12 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
   | _, _ ->
     let acc, arms =
       match sw.failaction with
-      | None -> acc, Targetint_31_63.Map.of_list arms
+      | None -> acc, Target_ocaml_int.Map.of_list arms
       | Some (default, dbg, trap_action, args) ->
         Numeric_types.Int.Set.fold
           (fun case (acc, cases) ->
-            let case = Targetint_31_63.of_int case in
-            if Targetint_31_63.Map.mem case cases
+            let case = Target_ocaml_int.of_int case in
+            if Target_ocaml_int.Map.mem case cases
             then acc, cases
             else
               let acc, args = find_simples acc env args in
@@ -1796,16 +1796,16 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
               let default acc =
                 Apply_cont_with_acc.create acc ?trap_action default ~args ~dbg
               in
-              acc, Targetint_31_63.Map.add case default cases)
+              acc, Target_ocaml_int.Map.add case default cases)
           (Numeric_types.Int.zero_to_n (sw.numconsts - 1))
-          (acc, Targetint_31_63.Map.of_list arms)
+          (acc, Target_ocaml_int.Map.of_list arms)
     in
-    if Targetint_31_63.Map.is_empty arms
+    if Target_ocaml_int.Map.is_empty arms
     then Expr_with_acc.create_invalid acc Zero_switch_arms
     else
       let scrutinee = Simple.var untagged_scrutinee in
       let acc, body =
-        match Targetint_31_63.Map.get_singleton arms with
+        match Target_ocaml_int.Map.get_singleton arms with
         | Some (_discriminant, action) ->
           let acc, action = action acc in
           Expr_with_acc.create_apply_cont acc action
@@ -1813,17 +1813,17 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
           match known_const_scrutinee with
           | None ->
             let acc, arms =
-              Targetint_31_63.Map.fold
+              Target_ocaml_int.Map.fold
                 (fun case action (acc, arms) ->
                   let acc, arm = action acc in
-                  acc, Targetint_31_63.Map.add case arm arms)
+                  acc, Target_ocaml_int.Map.add case arm arms)
                 arms
-                (acc, Targetint_31_63.Map.empty)
+                (acc, Target_ocaml_int.Map.empty)
             in
             Expr_with_acc.create_switch acc
               (Switch.create ~condition_dbg ~scrutinee ~arms)
           | Some case -> (
-            match Targetint_31_63.Map.find case arms acc with
+            match Target_ocaml_int.Map.find case arms acc with
             | acc, action -> Expr_with_acc.create_apply_cont acc action
             | exception Not_found ->
               Expr_with_acc.create_invalid acc Zero_switch_arms))
@@ -1866,7 +1866,7 @@ let unboxing_primitive (k : Function_decl.unboxing_kind) boxed_variable i =
     let block_access_kind : P.Block_access_kind.t =
       Values
         { tag = Known Tag.Scannable.zero;
-          size = Known (Targetint_31_63.of_int (List.length kinds));
+          size = Known (Target_ocaml_int.of_int (List.length kinds));
           field_kind = Any_value
         }
     in
@@ -1877,7 +1877,7 @@ let unboxing_primitive (k : Function_decl.unboxing_kind) boxed_variable i =
     Flambda_primitive.Unary (Unbox_number bn, Simple.var boxed_variable)
   | Unboxed_float_record num_fields ->
     let block_access_kind : P.Block_access_kind.t =
-      Naked_floats { size = Known (Targetint_31_63.of_int num_fields) }
+      Naked_floats { size = Known (Target_ocaml_int.of_int num_fields) }
     in
     Flambda_primitive.Unary
       ( Block_load { kind = block_access_kind; mut = Immutable; field = i },
@@ -2024,8 +2024,8 @@ let compute_body_of_unboxed_function acc my_region my_closure
                      (unboxing_primitive k boxed_variable i)
                      Debuginfo.none)
                   ~body:expr,
-                Targetint_31_63.(add one i) ))
-            ((acc, apply_cont), Targetint_31_63.zero)
+                Target_ocaml_int.(add one i) ))
+            ((acc, apply_cont), Target_ocaml_int.zero)
             vars_with_kinds
         in
         acc, expr
@@ -2129,8 +2129,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
                        ~free_names_of_body:(Known free_names_of_body)),
                   Name_occurrences.union (Named.free_names named)
                     (Name_occurrences.remove_var free_names_of_body ~var),
-                  Targetint_31_63.(add one i) ))
-              (body, free_names_of_body, Targetint_31_63.zero)
+                  Target_ocaml_int.(add one i) ))
+              (body, free_names_of_body, Target_ocaml_int.zero)
               vars_with_kinds
           in
           body, free_names_of_body
@@ -3704,7 +3704,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
     let block_access : P.Block_access_kind.t =
       Values
         { tag = Known Tag.Scannable.zero;
-          size = Known (Targetint_31_63.of_int module_block_size_in_words);
+          size = Known (Target_ocaml_int.of_int module_block_size_in_words);
           field_kind = Any_value
         }
     in
@@ -3712,7 +3712,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       (fun (acc, body) (pos, var, var_duid) ->
         let var = VB.create var var_duid Name_mode.normal in
         let pat = Bound_pattern.singleton var in
-        let pos = Targetint_31_63.of_int pos in
+        let pos = Target_ocaml_int.of_int pos in
         let block = module_block_simple in
         match simplify_block_load acc env ~block ~field:pos with
         | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
