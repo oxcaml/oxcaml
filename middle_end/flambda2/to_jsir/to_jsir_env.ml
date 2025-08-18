@@ -111,7 +111,10 @@ let get_predef_exception ~res symbol =
   (* Chop off caml_exn_ *)
   let caml_exn_ = "caml_exn_" in
   if not (String.starts_with ~prefix:caml_exn_ symbol_name)
-  then Misc.fatal_error "Predefined exception doesn't start with \"caml_exn_\"";
+  then
+    Misc.fatal_errorf
+      "Predefined exception symbol %a doesn't start with \"caml_exn_\""
+      Symbol.print symbol;
   let symbol_name =
     String.sub symbol_name (String.length caml_exn_)
       (String.length symbol_name - String.length caml_exn_)
