@@ -27,23 +27,52 @@ let instr_uses_stack_slots (instr : _ Cfg.instruction) =
   in
   regs_use_stack_slots instr.Cfg.arg || regs_use_stack_slots instr.Cfg.res
 
-let is_prologue_needed_terminator (instr : Cfg.terminator Cfg.instruction) =
-  Cfg.is_nontail_call_terminator instr.desc || instr_uses_stack_slots instr
+module Instruction_requirements = struct
+  type t =
+    (* This instruction does not use the stack, so it doesn't matter if there's
+       a prologue on the stack or not*)
+    | No_requirements
+      (* This instruction uses the stack, either through stack slots or as a
+         call, and hence requires a prologue to already be on the stack. *)
+    | Requires_prologue
+      (* This instruction must only occur when there's no prologue on the stack.
+         This is the case for [Return] and tailcalls. Any instruction with this
+         requirement must either in an execution path where there's no prologue,
+         or occur after the epilogue.
 
-let is_prologue_needed_basic (instr : Cfg.basic Cfg.instruction) =
-  instr_uses_stack_slots instr
+         Only terminators can have this requirement. *)
+    | Requires_no_prologue
 
-let is_epilogue_needed_terminator (terminator : Cfg.terminator) fun_name =
-  match terminator with
-  | Cfg.Return | Tailcall_func Indirect -> true
-  | Tailcall_func (Direct func) when not (String.equal func.sym_name fun_name)
-    ->
-    true
-  | Tailcall_func (Direct _)
-  | Tailcall_self _ | Never | Always _ | Parity_test _ | Truth_test _
-  | Float_test _ | Int_test _ | Switch _ | Raise _ | Call_no_return _ | Prim _
-  | Call _ ->
-    false
+  (* [Prologue] and [Epilogue] instructions will always be treated differently
+     than other instructions (as they affect the state) and hence don't get
+     requirements. *)
+  type or_prologue =
+    | Prologue
+    | Epilogue
+    | Requirements of t
+
+  let terminator (instr : Cfg.terminator Cfg.instruction) fun_name =
+    if instr_uses_stack_slots instr
+    then Requires_prologue
+    else
+      match[@ocaml.warning "-4"] instr.desc with
+      | Cfg.Return | Tailcall_func Indirect -> Requires_no_prologue
+      | Tailcall_func (Direct func)
+        when not (String.equal func.sym_name fun_name) ->
+        Requires_no_prologue
+      | desc when Cfg.is_nontail_call_terminator desc -> Requires_prologue
+      | _ -> No_requirements
+
+  let basic (instr : Cfg.basic Cfg.instruction) =
+    if instr_uses_stack_slots instr
+    then Requirements Requires_prologue
+    else
+      match instr.desc with
+      | Prologue -> Prologue
+      | Epilogue -> Epilogue
+      | Op _ | Pushtrap _ | Poptrap _ | Reloadretaddr | Stack_check _ ->
+        Requirements No_requirements
+end
 
 let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
@@ -74,16 +103,11 @@ let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
            ())
     in
     Cfg.iter_blocks cfg ~f:(fun _label block ->
-        match block.terminator.desc with
-        | Cfg.Return | Tailcall_func Indirect -> add_epilogue block
-        | Tailcall_func (Direct func)
-          when not (String.equal func.sym_name cfg.fun_name) ->
-          add_epilogue block
-        | Tailcall_func (Direct _)
-        | Tailcall_self _ | Never | Always _ | Parity_test _ | Truth_test _
-        | Float_test _ | Int_test _ | Switch _ | Raise _ | Call_no_return _
-        | Prim _ | Call _ ->
-          ()));
+        match
+          Instruction_requirements.terminator block.terminator cfg.fun_name
+        with
+        | Requires_no_prologue -> add_epilogue block
+        | No_requirements | Requires_prologue -> ()));
   cfg_with_layout
 
 module Validator = struct
@@ -153,21 +177,23 @@ module Validator = struct
       State_set.map
         (fun domain ->
           match[@ocaml.warning "-4"]
-            domain, instr.desc, is_prologue_needed_basic instr
+            domain, Instruction_requirements.basic instr
           with
-          | No_prologue_on_stack, Cfg.Prologue, _ -> Prologue_on_stack
-          | No_prologue_on_stack, Cfg.Epilogue, _ ->
+          | No_prologue_on_stack, Prologue -> Prologue_on_stack
+          | No_prologue_on_stack, Epilogue ->
             error_with_instruction
               "epilogue appears without a prologue on the stack" instr
-          | No_prologue_on_stack, _, true ->
+          | No_prologue_on_stack, Requirements Requires_prologue ->
             error_with_instruction
               "instruction needs prologue but no prologue on the stack" instr
-          | No_prologue_on_stack, _, false -> No_prologue_on_stack
-          | Prologue_on_stack, Cfg.Prologue, _ ->
+          | ( No_prologue_on_stack,
+              Requirements (No_requirements | Requires_no_prologue) ) ->
+            No_prologue_on_stack
+          | Prologue_on_stack, Prologue ->
             error_with_instruction
               "prologue appears while prologue is already on the stack" instr
-          | Prologue_on_stack, Cfg.Epilogue, _ -> No_prologue_on_stack
-          | Prologue_on_stack, _, _ -> Prologue_on_stack)
+          | Prologue_on_stack, Epilogue -> No_prologue_on_stack
+          | Prologue_on_stack, _ -> Prologue_on_stack)
         domain
 
     let terminator :
@@ -177,21 +203,16 @@ module Validator = struct
         State_set.map
           (fun domain ->
             match
-              ( domain,
-                is_prologue_needed_terminator instr,
-                is_epilogue_needed_terminator instr.desc fun_name )
+              domain, Instruction_requirements.terminator instr fun_name
             with
-            | _, true, true ->
-              error_with_instruction
-                "instruction needs to be both before and after terminator, \
-                 this should never happen"
-                instr
-            | No_prologue_on_stack, true, false ->
+            | No_prologue_on_stack, Requires_prologue ->
               error_with_instruction
                 "instruction needs prologue but no prologue on the stack" instr
-            | No_prologue_on_stack, false, _ -> No_prologue_on_stack
-            | Prologue_on_stack, _, false -> Prologue_on_stack
-            | Prologue_on_stack, false, true ->
+            | No_prologue_on_stack, (No_requirements | Requires_no_prologue) ->
+              No_prologue_on_stack
+            | Prologue_on_stack, (No_requirements | Requires_prologue) ->
+              Prologue_on_stack
+            | Prologue_on_stack, Requires_no_prologue ->
               error_with_instruction
                 "terminator needs to appear after epilogue but prologue is on \
                  stack"
