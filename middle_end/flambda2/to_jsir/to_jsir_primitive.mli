@@ -5,3 +5,11 @@ val primitive :
   Flambda_primitive.t ->
   Debuginfo.t ->
   Jsir.Var.t option * To_jsir_env.t * To_jsir_result.t
+
+(** Call an external function. *)
+val extern :
+  env:To_jsir_env.t ->
+  res:To_jsir_result.t ->
+  Symbol.t ->
+  Simple.t list ->
+  Jsir.Var.t * To_jsir_result.t

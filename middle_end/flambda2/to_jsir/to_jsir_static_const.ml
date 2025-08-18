@@ -3,7 +3,7 @@ let static_const_not_supported () =
 
 let bind_expr_to_symbol ~env ~res symbol expr =
   (* This should already be populated by To_jsir.let_expr_normal *)
-  let jvar = To_jsir_env.get_symbol_exn env symbol in
+  let jvar, res = To_jsir_env.get_symbol_exn env ~res symbol in
   env, To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr))
 
 let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
@@ -12,7 +12,7 @@ let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
   | Var (v, _dbg) ->
     (* CR selee: do something with [Debuginfo.t] *)
     (* This should already be populated by To_jsir.let_expr_normal *)
-    let symbol_var = To_jsir_env.get_symbol_exn env symbol in
+    let symbol_var, res = To_jsir_env.get_symbol_exn env ~res symbol in
     let value_var = To_jsir_env.get_var_exn env v in
     env, To_jsir_result.add_instr_exn res (Assign (symbol_var, value_var))
 

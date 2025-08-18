@@ -18,11 +18,8 @@ let create_let_simple ~env ~res fvar simple =
       in
       env, res)
     ~symbol:(fun symbol ~coercion:_ ->
-      (* CR selee: come back *)
-      let env =
-        To_jsir_env.add_var_alias_of_symbol_exn env ~var:fvar ~alias_of:symbol
-      in
-      env, res)
+      To_jsir_env.add_var_alias_of_symbol_exn env ~res ~var:fvar
+        ~alias_of:symbol)
     ~const:(fun const ->
       let expr = Jsir.Constant (To_jsir_shared.reg_width_const const) in
       To_jsir_shared.bind_expr_to_var ~env ~res fvar expr)
@@ -80,13 +77,15 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
     | Static bound_static, Static_consts consts ->
       (* Definitions within this group can reference each others' symbols
          (potentially not in the order they were declared in), so we should
-         first add the symbols to the environment before doing any
-         translation. *)
+         first add the symbols to the environment before doing any translation.
+         Crucially, we should not register any symbols at this stage, since they
+         will not yet be defined. *)
       let symbols = Bound_static.symbols_being_defined bound_static in
       let env =
         Symbol.Set.fold
           (fun symbol env ->
-            To_jsir_env.add_symbol env symbol (Jsir.Var.fresh ()))
+            To_jsir_env.add_symbol_without_registering env symbol
+              (Jsir.Var.fresh ()))
           symbols env
       in
       (* To translate closures, we require that all the code is inserted into
@@ -105,16 +104,27 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
           ~set_of_closures:(fun (env, res) ~closure_symbols:_ _soc -> env, res)
           ~block_like:(fun (env, res) _symbol _static_const -> env, res)
       in
-      Static_const_group.match_against_bound_static consts bound_static
-        ~init:(env, res)
-        ~code:(fun (env, res) code_id code ->
-          To_jsir_static_const.code ~env ~res ~translate_body:expr ~code_id code)
-        ~deleted_code:(fun (env, res) _code_id -> env, res)
-        ~set_of_closures:(fun (env, res) ~closure_symbols soc ->
-          To_jsir_set_of_closures.static_set_of_closures ~env ~res
-            ~closure_symbols soc)
-        ~block_like:(fun (env, res) symbol static_const ->
-          To_jsir_static_const.block_like ~env ~res symbol static_const)
+      let env, res =
+        Static_const_group.match_against_bound_static consts bound_static
+          ~init:(env, res)
+          ~code:(fun (env, res) code_id code ->
+            To_jsir_static_const.code ~env ~res ~translate_body:expr ~code_id
+              code)
+          ~deleted_code:(fun (env, res) _code_id -> env, res)
+          ~set_of_closures:(fun (env, res) ~closure_symbols soc ->
+            To_jsir_set_of_closures.static_set_of_closures ~env ~res
+              ~closure_symbols soc)
+          ~block_like:(fun (env, res) symbol static_const ->
+            To_jsir_static_const.block_like ~env ~res symbol static_const)
+      in
+      (* Now that the symbols are defined, we must remember to register all the
+         symbols to the global symbol table. *)
+      let res =
+        Symbol.Set.fold
+          (fun symbol res -> To_jsir_env.register_symbol_exn env ~res symbol)
+          symbols res
+      in
+      env, res
     | Singleton _, Rec_info _ -> expr ~env ~res body
     | Singleton _, (Set_of_closures _ | Static_consts _)
     | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
@@ -290,17 +300,17 @@ and apply_expr ~env ~res e =
             (Set_field (param_var, 0, Non_float, var_to_pass)))
       res extra_param_vars extra_args
   in
+  let args = Apply_expr.args e in
   let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
     | None, _ | _, Effect _ -> failwith "effects not implemented yet"
     | Some callee, (Function _ | Method _) ->
-      let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
+      let args, res = To_jsir_shared.simples ~env ~res args in
       let f, res = To_jsir_shared.simple ~env ~res callee in
       (* CR selee: assume exact = false for now, JSIR seems to assume false in
          the case that we don't know *)
       apply_fn ~res ~f ~args ~exact:false
     | Some callee, C_call _ ->
-      let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
       let symbol =
         match Simple.must_be_symbol callee with
         | Some (symbol, _coercion) -> symbol
@@ -309,27 +319,19 @@ and apply_expr ~env ~res e =
             "Expected callee to be a symbol for C calls, instead found %a"
             Simple.print callee
       in
-      let name = Symbol.linkage_name symbol |> Linkage_name.to_string in
-      let expr : Jsir.expr =
-        Prim (Extern name, List.map (fun arg : Jsir.prim_arg -> Pv arg) args)
-      in
-      let var = Jsir.Var.fresh () in
-      let res = To_jsir_result.add_instr_exn res (Let (var, expr)) in
-      var, res
+      To_jsir_primitive.extern ~env ~res symbol args
   in
   match Apply_expr.continuation e with
   | Never_returns ->
     env, To_jsir_result.end_block_with_last_exn res (Return return_var)
-  | Return cont -> (
-    match Continuation.sort cont with
-    | Return ->
-      env, To_jsir_result.end_block_with_last_exn res (Return return_var)
-    | Normal_or_exn ->
+  | Return cont ->
+    if Continuation.equal (To_jsir_env.return_continuation env) cont
+    then env, To_jsir_result.end_block_with_last_exn res (Return return_var)
+    else
       let addr = To_jsir_env.get_continuation_exn env cont in
       ( env,
         To_jsir_result.end_block_with_last_exn res (Branch (addr, [return_var]))
       )
-    | Toplevel_return | Define_root_symbol -> failwith "unimplemented")
 
 and apply_cont0 ~env ~res apply_cont =
   let args, res =
@@ -480,7 +482,12 @@ and switch ~env ~res e =
   in
   env, To_jsir_result.end_block_with_last_exn res last
 
-and invalid ~env ~res _msg = env, res
+and invalid ~env ~res _msg =
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let (Jsir.Var.fresh (), Prim (Extern "caml_invalid_primitive", [])))
+  in
+  env, To_jsir_result.end_block_with_last_exn res Stop
 
 let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
   let env =
