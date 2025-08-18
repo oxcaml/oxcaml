@@ -319,7 +319,7 @@ let array_type_kind ~elt_sort ~elt_ty env loc ty =
   | _ ->
     begin match elt_ty with
     | Some elt_ty ->
-      let rhs = Jkind.Builtin.value ~why:Array_type_kind in
+      let rhs = Jkind.Builtin.value_or_null ~why:Array_type_kind in
       begin match Ctype.constrain_type_jkind env elt_ty rhs with
       | Ok _ -> Pgenarray
       | Error e ->

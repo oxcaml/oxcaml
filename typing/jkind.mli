@@ -382,7 +382,9 @@ module Builtin : sig
     why:History.value_or_null_creation_reason -> 'd Types.jkind
 
   (** This is the jkind of normal ocaml values *)
-  val value : why:History.value_creation_reason -> 'd Types.jkind
+  val value : why:History.value_creation_reason -> Types.jkind_l
+
+  val value_lr : why:History.value_creation_reason -> Types.jkind_lr
 
   (** This is suitable for records or variants without mutable fields. *)
   val immutable_data : why:History.value_creation_reason -> 'd Types.jkind

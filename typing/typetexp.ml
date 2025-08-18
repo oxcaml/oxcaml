@@ -350,7 +350,7 @@ end = struct
 
   let mk_poly_univars_tuple_without_jkind var =
     let name = var.txt in
-    let original_jkind = Jkind.Builtin.value ~why:Univar in
+    let original_jkind = Jkind.Builtin.value_lr ~why:Univar in
     let jkind_info =
       { original_jkind; defaulted = true }
     in
@@ -913,7 +913,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let name = ref None in
       let mkfield l f =
         newty (Tvariant (create_row ~fields:[l,f]
-                           ~more:(newvar (Jkind.Builtin.value ~why:Row_variable))
+                           ~more:(newvar (Jkind.Builtin.value_lr ~why:Row_variable))
                            ~closed:true ~fixed:None ~name:None)) in
       let hfields = Hashtbl.create 17 in
       let add_typed_field loc l f =
@@ -1024,9 +1024,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       let more =
         if Btype.static_row
-             (make_row (newvar (Jkind.Builtin.value ~why:Row_variable)))
+             (make_row (newvar (Jkind.Builtin.value_lr ~why:Row_variable)))
         then newty Tnil
-        else TyVarEnv.new_var (Jkind.Builtin.value ~why:Row_variable) policy
+        else TyVarEnv.new_var (Jkind.Builtin.value_lr ~why:Row_variable) policy
       in
       more_slot := Some more;
       let ty = newty (Tvariant (make_row more)) in
@@ -1267,7 +1267,7 @@ and transl_fields env ~policy ~row_context o fields =
         begin
           match
             constrain_type_jkind
-              env ty1.ctyp_type (Jkind.Builtin.value ~why:Object_field)
+              env ty1.ctyp_type (Jkind.Builtin.value_lr ~why:Object_field)
           with
           | Ok _ -> ()
           | Error e ->
@@ -1315,7 +1315,7 @@ and transl_fields env ~policy ~row_context o fields =
      match o with
      | Asttypes.Closed -> newty Tnil
      | Asttypes.Open ->
-        TyVarEnv.new_var (Jkind.Builtin.value ~why:Row_variable) policy
+        TyVarEnv.new_var (Jkind.Builtin.value_lr ~why:Row_variable) policy
   in
   let ty = List.fold_left (fun ty (s, ty') ->
       newty (Tfield (s, field_public, ty', ty))) ty_init fields in
