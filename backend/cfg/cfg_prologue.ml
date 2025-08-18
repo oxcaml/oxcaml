@@ -114,7 +114,10 @@ module Validator = struct
      Non-singleton states are allowed in cases where there is no Prologue,
      Epilogue nor any instructions which require a prologue (this happens e.g.
      when two [raise] terminators reach the same handler, but one is before the
-     prologue, and the other is after the prologue). *)
+     prologue, and the other is after the prologue - this is allowed when the
+     handler does not do any stack operations, which means it is not affected if
+     there's a prologue on the stack or not, but should not be a valid state if
+     the handler uses the stack). *)
   module Domain : Cfg_dataflow.Domain_S with type t = State_set.t = struct
     type t = State_set.t
 
