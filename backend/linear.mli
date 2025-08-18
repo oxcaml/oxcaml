@@ -35,6 +35,19 @@ type instruction =
 
 and instruction_desc =
   | Lprologue
+    (* [Lepilogue_open] and [Lepilogue_close] shrink the stack on exiting a
+       function. They are split so that the terminator can be emitted between
+       them, to maintain the correct debug information.
+
+       [Lepilogue_open] reverts the stack pointer and adjusts the CFA offset in
+       preparation for the function ending, and [Lepilogue_close] adjusts the
+       CFA offset back in case the function continues.
+
+       The two instructions should be paired together, with the terminator
+       between them. Any additional instructions between them that affect the
+       stack pointer and/or CFA will likely cause incorrect results. *)
+  | Lepilogue_open
+  | Lepilogue_close
   | Lend
   | Lop of Operation.t
   | Lcall_op of call_operation

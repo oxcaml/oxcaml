@@ -906,7 +906,7 @@ static void verify_object(struct heap_verify_state* st, value v) {
     struct stack_info* stk = Ptr_val(Field(v, 0));
     if (stk != NULL)
       caml_scan_stack(verify_push, verify_scanning_flags, st, stk, 0);
-  } else if (Tag_val(v) < No_scan_tag) {
+  } else if (Scannable_val(v)) {
     int i = 0;
     if (Tag_val(v) == Closure_tag) {
       i = Start_env_closinfo(Closinfo_val(v));
@@ -1099,7 +1099,7 @@ static void compact_update_block(header_t* p)
       offset = Start_env_closinfo(Closinfo_val(Val_hp(p)));
     }
 
-    if (tag < No_scan_tag) {
+    if (Scannable_tag(tag)) {
       mlsize_t scannable_wosz = Scannable_wosize_hd(hd);
       for (mlsize_t i = offset; i < scannable_wosz; i++) {
         compact_update_value_at(&Field(Val_hp(p), i));
@@ -2203,7 +2203,7 @@ void caml_compact_heap(caml_domain_state* domain_state,
   caml_global_barrier(participating_count);
   if (participants[0] == Caml_state) {
      /* We are done, increment the compaction count */
-    atomic_fetch_add(&caml_compactions_count, 1);
+    (void)caml_atomic_counter_incr(&caml_compactions_count);
     CAML_GC_MESSAGE(COMPACT,
                     "Compaction %lu completed (algorithm %lu).\n",
                     caml_compactions_count,

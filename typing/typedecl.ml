@@ -1813,7 +1813,7 @@ let update_constructor_representation
       Constructor_mixed shape
 
 
-let add_types_to_env ?shapes decls env =
+let add_types_to_env ~shapes decls env =
   match shapes with
   | None ->
     List.fold_right
@@ -2911,7 +2911,7 @@ let transl_type_decl env rec_flag sdecl_list =
       (* Check for duplicates *)
       check_duplicates sdecl_list;
       (* Build the final env. *)
-      let new_env = add_types_to_env decls env in
+      let new_env = add_types_to_env ~shapes:None decls env in
       (* Update stubs *)
       let delayed_jkind_checks =
         match rec_flag with
@@ -3040,16 +3040,16 @@ let transl_type_decl env rec_flag sdecl_list =
   let decls = List.map2 (check_abbrev new_env) sdecl_list decls in
   let shapes = shape_declarations env decls in
   (* Compute the final environment with variance and immediacy *)
-  let final_env = add_types_to_env decls ~shapes env in
+  let final_env = add_types_to_env ~shapes:(Some shapes) decls env in
   (* Save the type shapes of the declarations in [Type_shape] for debug info. *)
+  if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
   (* CR sspies: Adding the shapes to the table below is obsolete. The
      information is now contained in the shapes themselves. Remove it in a
      subsequent PR (and adjust the printing of the declarations as appropriate).
   *)
-  if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
     List.iter (fun (sh, (_, decl)) ->
       let uid = decl.type_uid in
-      Uid.Tbl.add Type_shape.all_type_decls uid sh;
+      Uid.Tbl.add Type_shape.all_type_decls uid sh
     ) (List.combine shapes decls);
   (* Keep original declaration *)
   let final_decls =
@@ -3543,8 +3543,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
         sort_or_poly with
   | Native_repr_attr_absent, Poly ->
     Repr_poly
-  | Native_repr_attr_absent, Sort (Base Value) ->
-    Same_as_ocaml_repr (Base Value)
+  | Native_repr_attr_absent, Sort (Base (Value | Void) as base) ->
+    Same_as_ocaml_repr base
   | Native_repr_attr_absent, (Sort (Base sort as c)) ->
     (if Language_extension.erasable_extensions_only ()
     then
@@ -3577,12 +3577,12 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
       raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type kind))
     | Some repr -> repr
     end
+  | Native_repr_attr_present Unboxed, (Sort (Product _ | Base Void)) ->
+    raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unboxed))
   | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
-    (* We allow [@unboxed] on non-value sorts.
-
-       This is to enable upstream-compatibility. We want the code to
-       still work when all the layout annotations and unboxed types
-       get erased.
+    (* We allow [@unboxed] on upstream-compatible numerical sorts. To enable
+       upstream-compatibility, we want the code to still work when all the
+       layout annotations and unboxed types get erased.
 
        One may wonder why can't the erasure process mentioned above
        also add in the [@unboxed] attributes. This is not possible due
@@ -3607,8 +3607,6 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
         (Warnings.Incompatible_with_upstream
               (Warnings.Non_value_sort layout)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_present Unboxed, (Sort (Product _)) ->
-    raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unboxed))
 
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with

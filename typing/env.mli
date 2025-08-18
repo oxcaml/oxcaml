@@ -178,9 +178,9 @@ val mark_value_mutated: Uid.t -> unit
 
 type constructor_usage = Positive | Pattern | Exported_private | Exported
 val mark_constructor_used:
-    constructor_usage -> constructor_declaration -> unit
+    constructor_usage -> Uid.t -> unit
 val mark_extension_used:
-    constructor_usage -> extension_constructor -> unit
+    constructor_usage -> Uid.t -> unit
 
 type label_usage =
     Projection | Mutation | Construct | Exported_private | Exported

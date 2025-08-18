@@ -106,7 +106,8 @@ let cross_section cfg_with_layout src dst =
 
 let linearize_terminator cfg_with_layout (func : string) start
     (terminator : Cfg.terminator Cfg.instruction)
-    ~(next : Linear_utils.labelled_insn) : L.instruction * Label.t option =
+    ~(next : Linear_utils.labelled_insn) ~has_epilogue :
+    L.instruction * Label.t option =
   (* CR-someday gyorsh: refactor, a lot of redundant code for different cases *)
   (* CR-someday gyorsh: for successor labels that are not fallthrough, order of
      branch instructions should depend on perf data and possibly the relative
@@ -321,10 +322,29 @@ let linearize_terminator cfg_with_layout (func : string) start
             None )
       | _ -> assert false)
   in
-  ( List.fold_left
-      (fun next desc -> to_linear_instr ~like:terminator desc ~next)
-      next.insn (List.rev desc_list),
-    tailrec_label )
+  let desc_list =
+    match has_epilogue with
+    | true ->
+      (* The corresponding [Lepilogue_open] was already added when converting
+         the body of the block, replacing a [Cfg.Epilogue] instruction. The
+         [Lepilogue_open] should be the last instruction in the block body,
+         immediately preceding the terminator. *)
+      desc_list @ [L.Lepilogue_close]
+    | false -> desc_list
+  in
+  let instr =
+    List.fold_left
+      (fun next desc ->
+        let instr = to_linear_instr desc ~next ~like:terminator in
+        match has_epilogue with
+        (* In order to match the debug info generated when the epilogue was not
+           a linear instruction, we need to explicitly remove debug info, as
+           they were already added to Lepilogue_open. *)
+        | true -> { instr with L.dbg = Debuginfo.none }
+        | false -> instr)
+      next.insn (List.rev desc_list)
+  in
+  instr, tailrec_label
 
 let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
     ~(prev_block : Cfg.basic_block) =
@@ -384,9 +404,15 @@ let run cfg_with_layout =
       let block = Label.Tbl.find cfg.blocks label in
       assert (Label.equal label block.start);
       let body =
+        let has_epilogue =
+          DLL.exists block.body ~f:(fun instr ->
+              match[@ocaml.warning "-4"] instr.Cfg.desc with
+              | Cfg.Epilogue -> true
+              | _ -> false)
+        in
         let terminator, terminator_tailrec_label =
           linearize_terminator cfg_with_layout cfg.fun_name block.start
-            block.terminator ~next:!next
+            block.terminator ~next:!next ~has_epilogue
         in
         (match !tailrec_label, terminator_tailrec_label with
         | (Some _ | None), None -> ()

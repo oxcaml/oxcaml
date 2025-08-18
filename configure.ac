@@ -98,7 +98,6 @@ AC_ARG_ENABLE([dev],
 
 AC_SUBST([prefix])
 AC_SUBST([middle_end])
-AC_SUBST([dune])
 
 coverage="$enable_coverage"
 AC_SUBST([coverage])
@@ -353,6 +352,7 @@ AC_SUBST([windows_unicode])
 AC_SUBST([flat_float_array])
 AC_SUBST([function_sections])
 AC_SUBST([oxcaml_dwarf_flags_for_compiler])
+AC_SUBST([assembly_flag_for_compiler])
 AC_SUBST([probes])
 AC_SUBST([oc_native_compflags])
 AC_SUBST([afl])
@@ -367,6 +367,7 @@ AC_SUBST([stack_allocation])
 AC_SUBST([poll_insertion])
 AC_SUBST([enable_multidomain])
 AC_SUBST([dune])
+AC_SUBST([objcopy])
 AC_SUBST([ocaml_bindir])
 AC_SUBST([ocaml_libdir])
 AC_SUBST([QS])
@@ -476,12 +477,6 @@ AC_ARG_VAR([ASPP], [which assembler (with preprocessor) to use])
 AC_ARG_VAR([PARTIALLD], [how to build partial (relocatable) object files])
 
 # Command-line arguments to configure
-
-AC_PATH_PROG([dune], [dune], [])
-AC_ARG_WITH([dune],
-  [AS_HELP_STRING([--with-dune],
-    [Path to dune executable (otherwise PATH is searched)])],
-  [dune=$with_dune])
 
 AC_ARG_ENABLE([debug-runtime],
   [AS_HELP_STRING([--disable-debug-runtime],
@@ -717,6 +712,12 @@ AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
     [Compile the compiler and standard library with OxCaml DWARF])],
   [],
   [enable_oxcaml_dwarf_on_compiler=no])
+
+AC_ARG_ENABLE([keep-compiler-asm],
+  [AS_HELP_STRING([--enable-keep-compiler-asm],
+    [Configure the compiler to use -S during bootstrapping, which will produce .s assembly files for the files in the compiler tree. The files can be found in _build/main when building with dune])],
+  [],
+  [enable_keep_compiler_asm=no])
 
 AC_ARG_ENABLE([multidomain],
   [AS_HELP_STRING([--enable-multidomain],
@@ -2252,6 +2253,14 @@ AC_CHECK_FUNC([gettimeofday],
 
 AC_CHECK_FUNC([mktime], [AC_DEFINE([HAS_MKTIME])])
 
+## gmtime_r
+
+AC_CHECK_FUNC([gmtime_r], [AC_DEFINE([HAS_GMTIME_R])])
+
+## localtime_r
+
+AC_CHECK_FUNC([localtime_r], [AC_DEFINE([HAS_LOCALTIME_R])])
+
 ## setsid
 
 AS_CASE([$host],
@@ -2378,6 +2387,26 @@ AX_FUNC_WHICH_GETHOSTBYADDR_R
 AS_CASE([$ac_cv_func_which_gethostbyaddr_r],
   [eight], [AC_DEFINE([HAS_GETHOSTBYADDR_R],[8])],
   [seven], [AC_DEFINE([HAS_GETHOSTBYADDR_R],[7])])
+
+## getlogin_r
+
+AC_CHECK_FUNC([getlogin_r], [AC_DEFINE([HAS_GETLOGIN_R])])
+
+## getpwnam_r
+
+AC_CHECK_FUNC([getpwnam_r], [AC_DEFINE([HAS_GETPWNAM_R])])
+
+## getgrnam_r
+
+AC_CHECK_FUNC([getgrnam_r], [AC_DEFINE([HAS_GETGRNAM_R])])
+
+## getpwuid_r
+
+AC_CHECK_FUNC([getpwuid_r], [AC_DEFINE([HAS_GETPWUID_R])])
+
+## getgrgid_r
+
+AC_CHECK_FUNC([getgrgid_r], [AC_DEFINE([HAS_GETGRGID_R])])
 
 ## mkstemp
 
@@ -2649,6 +2678,25 @@ AS_IF([$native_compiler],
     OCAML_CC_COMPRESSION_SUPPORT
     OCAML_OBJCOPY_COMPRESSION_SUPPORT])])
 
+dnl Prefer llvm-objcopy. If llvm-objcopy is not found, use objcopy.
+dnl GNU objcopy 2.35.2 sometimes modifies .relro_padding and .init_array
+dnl sections incorrectly, llvm-copy does not.
+default_objcopy="llvm-objcopy objcopy"
+
+AS_IF([$native_compiler],
+  [AS_CASE([$system],
+    [macosx],[],
+    [AC_PATH_PROGS([objcopy], [$default_objcopy], [])
+     AS_IF([test x"$objcopy" = "x"],
+       [AC_MSG_ERROR([objcopy not found on PATH; install, or use --with-objcopy])])
+     AC_MSG_NOTICE([Using objcopy executable: $objcopy])])])
+
+AC_ARG_WITH([objcopy],
+  [AS_HELP_STRING([--with-objcopy],
+    [Path to objcopy executable (otherwise PATH is searched for 'llvm-objcopy' or
+    'objcopy')])],
+  [objcopy=$with_objcopy])
+
 ## Frame pointers
 
 AS_IF([test x"$enable_frame_pointers" = "xyes" -o x"$enable_address_sanitizer" = "xyes"],
@@ -2852,6 +2900,11 @@ AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
 AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
   [AS_IF([test x"$enable_function_sections" != "xno"],
     [AC_MSG_ERROR([--enable-oxcaml-dwarf-on-compiler requires --disable-function-sections to be passed])])])
+
+# Configure assembly emission flag for compiler
+AS_IF([test x"$enable_keep_compiler_asm" = "xyes"],
+  [assembly_flag_for_compiler="-S"],
+  [assembly_flag_for_compiler=""])
 
 # Enable debugging support
 # TODO: add a --disable-debug-info configure option that disables debugging

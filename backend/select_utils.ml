@@ -537,7 +537,7 @@ module Stack_offset_and_exn = struct
         | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
         | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
         | Dls_get | Poll | Pause | Alloc _ )
-    | Reloadretaddr | Prologue ->
+    | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
       Misc.fatal_error

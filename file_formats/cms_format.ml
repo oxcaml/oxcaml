@@ -32,6 +32,7 @@ type cms_infos = {
   cms_initial_env : Env.t option;
   cms_uid_to_loc : string Location.loc Shape.Uid.Tbl.t;
   cms_uid_to_attributes : Parsetree.attributes Shape.Uid.Tbl.t;
+  cms_shape_format : Clflags.shape_format;
   cms_impl_shape : Shape.t option; (* None for mli *)
   cms_ident_occurrences :
     (Longident.t Location.loc * Shape_reduce.result) array;
@@ -137,6 +138,7 @@ let save_cms target modname binary_annots initial_env shape
             cms_initial_env;
             cms_uid_to_loc;
             cms_uid_to_attributes;
+            cms_shape_format = !Clflags.shape_format;
             cms_impl_shape = shape;
             cms_ident_occurrences;
             cms_declaration_dependencies;
@@ -147,3 +149,8 @@ let save_cms target modname binary_annots initial_env shape
   end
 
 let clear () = ()
+
+let shape_format_to_string =
+  function
+  | Clflags.Old_merlin -> "old-merlin"
+  | Clflags.Debugging_shapes -> "debugging-shapes"

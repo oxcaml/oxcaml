@@ -1090,6 +1090,11 @@ CAMLprim value caml_memprof_stop(value unit)
   return Val_unit;
 }
 
+CAMLprim value caml_memprof_participate(value profile)
+{
+  caml_failwith("Gc.Memprof.participate: not implemented in runtime4");
+}
+
 CAMLprim value caml_memprof_discard(value profile)
 {
   caml_failwith("Gc.Memprof.discard: not implemented in runtime4");

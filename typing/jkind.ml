@@ -2918,7 +2918,20 @@ let apply_modality_r modality jk =
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
-let apply_or_null jkind =
+let apply_or_null_l jkind =
+  match Mod_bounds.nullability jkind.jkind.mod_bounds with
+  | Non_null ->
+    let jkind = set_nullability_upper_bound jkind Maybe_null in
+    let jkind =
+      match Mod_bounds.separability jkind.jkind.mod_bounds with
+      | Maybe_separable | Separable ->
+        set_separability_upper_bound jkind Maybe_separable
+      | Non_float -> jkind
+    in
+    Ok jkind
+  | Maybe_null -> Error ()
+
+let apply_or_null_r jkind =
   match Mod_bounds.nullability jkind.jkind.mod_bounds with
   | Maybe_null ->
     let jkind = set_nullability_upper_bound jkind Non_null in

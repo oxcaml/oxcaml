@@ -52,5 +52,3 @@ let sum xs =
   List.iter xs ~f:(fun x -> total <- total + x);
   total
 ```
-
-Mutable variables may not contain unboxed products.

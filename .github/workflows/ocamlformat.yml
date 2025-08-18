@@ -4,6 +4,7 @@ on:
     branches:
       - main
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -19,6 +20,10 @@ jobs:
       uses: actions/checkout@master
       with:
         path: 'oxcaml'
+
+    - name: Checkout the parent branch
+      working-directory: oxcaml
+      run: git fetch origin HEAD --deepen 1
 
     - name: Setup OCaml ${{ matrix.ocaml-compiler }}
       uses: ocaml/setup-ocaml@v3
@@ -42,6 +47,10 @@ jobs:
           --prefix=$GITHUB_WORKSPACE/_install \
           --enable-middle-end=flambda2 \
           --with-dune=/bin/false
+
+    - name: 'Check for the "skip 80ch" PR tag'
+      if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
+      run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
     - name: Check formatting of Flambda 2 and Cfg code
       working-directory: oxcaml
