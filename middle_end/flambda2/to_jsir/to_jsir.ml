@@ -1,6 +1,6 @@
 open! Flambda.Import
 
-(* CR selee: we should eventually get rid of these *)
+(* CR selee: we should eventually get rid of this *)
 let unsupported_multiple_return_variables vars =
   match vars with
   | [var] -> var

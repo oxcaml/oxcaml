@@ -63,15 +63,11 @@ let bound_parameters ~env bound_params =
 
 let block ~env ~res ~tag ~mut ~fields :
     Jsir.expr * To_jsir_env.t * To_jsir_result.t =
-  (* CR selee: is it ok to ignore shape? *)
   let tag = Tag.to_int tag in
   let mutability : Jsir.mutability =
     match (mut : Mutability.t) with
     | Mutable -> Maybe_mutable
-    | Immutable -> Immutable
-    | Immutable_unique ->
-      (* CR selee: check *)
-      Immutable
+    | Immutable | Immutable_unique -> Immutable
   in
   let fields, res = simples ~env ~res fields in
   Block (tag, Array.of_list fields, NotArray, mutability), env, res

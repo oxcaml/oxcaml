@@ -5,11 +5,7 @@
     Values of type [t] store complete/archived blocks, as well as a stack of
     "current" blocks that is still being worked on. *)
 
-(* CR selee: improve documentation *)
-
 type t
-
-(* CR selee: probably we will end up needing to store more info *)
 
 (** Create a new result structure. It is not initialised with any blocks. *)
 val create : unit -> t
