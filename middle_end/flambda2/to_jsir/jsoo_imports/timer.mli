@@ -1,5 +1,3 @@
-(* CR selee: clarify licensing permissions *)
-
 (* Js_of_ocaml compiler
  * http://www.ocsigen.org/js_of_ocaml/
  *
@@ -18,14 +16,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-open! Jsoo_stdlib
+type t
 
-type t = float
+val make : unit -> t
 
-let timer = Sys.time
+val get : t -> float
 
-let make () = timer ()
-
-let get t = timer () -. t
-
-let print f t = Format.fprintf f "%.2f" (get t)
+val print : Format.formatter -> t -> unit

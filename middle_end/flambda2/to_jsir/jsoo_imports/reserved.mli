@@ -1,7 +1,6 @@
-(* CR selee: clarify licensing permissions *)
-
 (* Js_of_ocaml compiler
  * http://www.ocsigen.org/js_of_ocaml/
+ * Copyright (C) 2013 Hugo Heuzard
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -17,11 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
+open Stdlib
 
-type t
+val keyword : StringSet.t
 
-val make : unit -> t
-
-val get : t -> float
-
-val print : Format.formatter -> t -> unit
+val provided : StringSet.t

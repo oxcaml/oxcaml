@@ -1,5 +1,3 @@
-(* CR selee: clarify licensing permissions *)
-
 (* Js_of_ocaml compiler
  * http://www.ocsigen.org/js_of_ocaml/
  *
@@ -17,14 +15,15 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
-val available : unit -> string list
 
-val find : ?even_if_quiet:bool -> string -> unit -> bool
+open! Stdlib
 
-val enable : string -> unit
+type t = float
 
-val disable : string -> unit
+let timer = Sys.time
 
-val stop_profiling : unit -> unit
+let make () = timer ()
 
-val start_profiling : string -> unit
+let get t = timer () -. t
+
+let print f t = Format.fprintf f "%.2f" (get t)

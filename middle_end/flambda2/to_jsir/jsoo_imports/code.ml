@@ -1,5 +1,3 @@
-(* CR selee: clarify licensing permissions *)
-
 (* Js_of_ocaml compiler
  * http://www.ocsigen.org/js_of_ocaml/
  * Copyright (C) 2010 Jérôme Vouillon
@@ -22,7 +20,7 @@
 
 [@@@warning "-4-18-44"]
 
-open! Jsoo_stdlib
+open! Stdlib
 
 let stats = Debug.find "stats"
 
