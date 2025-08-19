@@ -75,8 +75,11 @@ block access is immutable (immutable record fields, immutable arrays, and
 immutable block indices), then an `idx_imm` is created.
 
 **Using indices.** Naturally, block indices can be used to read and write
-within blocks. This can be done via the `Idx_imm.unsafe_get`,
-`Idx_mut.unsafe_get`, and `Idx_mut.unsafe_set` functions in `Stdlib_beta`.
+within blocks. This can be done via the `[Idx_imm](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_beta/idx_imm.mli
+).unsafe_get`,
+`[Idx_mut](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_beta/idx_mut.mli
+).unsafe_get`, and `[Idx_mut](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_beta/idx_mut.mli
+).unsafe_set` functions in `Stdlib_beta`.
 (These functions are unsafe only for array indices, which may be out of range.
 Uses of block indices built without the use of an array-indexing operation are
 always safe.)
