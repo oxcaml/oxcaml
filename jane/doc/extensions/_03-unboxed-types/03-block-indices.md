@@ -77,6 +77,9 @@ immutable block indices), then an `idx_imm` is created.
 **Using indices.** Naturally, block indices can be used to read and write
 within blocks. This can be done via the `Idx_imm.unsafe_get`,
 `Idx_mut.unsafe_get`, and `Idx_mut.unsafe_set` functions in `Stdlib_beta`.
+(These functions are unsafe only for array indices, which may be out of range.
+Uses of block indices built without the use of an array-indexing operation are
+always safe.)
 
 _A key advantage of block indices is that these accessor functions are
 polymorphic in both the base type and element type._ Index reading roughly
