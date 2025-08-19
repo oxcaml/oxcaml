@@ -1,5 +1,3 @@
-(* CR selee: clarify licensing permissions *)
-
 (* Js_of_ocaml compiler
  * http://www.ocsigen.org/js_of_ocaml/
  * Copyright (C) 2013 Hugo Heuzard
@@ -20,7 +18,7 @@
  *)
 [@@@warning "-18"]
 
-open! Jsoo_stdlib
+open! Stdlib
 
 type t =
   { src : string option;

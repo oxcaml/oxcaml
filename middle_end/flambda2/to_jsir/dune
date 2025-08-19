@@ -33,6 +33,7 @@
  (libraries
   ocamlcommon
   ocamloptcomp
+  jsoo_imports
   flambda2_bound_identifiers
   flambda2_cmx
   flambda2_identifiers
