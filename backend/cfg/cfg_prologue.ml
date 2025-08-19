@@ -70,6 +70,9 @@ module Instruction_requirements = struct
       match instr.desc with
       | Prologue -> Prologue
       | Epilogue -> Epilogue
+      (* [Stackoffset] instructions are only added after [Call]s, so any
+         [Stackoffset] instructions should already only occur after a prologue,
+         but adding a requirement for completeness. *)
       | Op (Stackoffset _) -> Requirements Requires_prologue
       | Op
           ( Move | Spill | Reload | Const_int _ | Const_float32 _
