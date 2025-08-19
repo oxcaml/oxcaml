@@ -1598,7 +1598,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       Misc.fatal_errorf
         "unboxed record field mismatch, shape %a has %d fields, but layout %a \
          expects %d"
-        Shape.print type_shape (List.length fields) Layout.format type_layout (List.length prod_shapes)
+        Shape.print type_shape (List.length fields) Layout.format type_layout
+        (List.length prod_shapes)
     | Layout.Base _ ->
       Misc.fatal_errorf
         "unboxed record must have product layout, but has layout %a"

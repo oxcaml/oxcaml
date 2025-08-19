@@ -103,6 +103,7 @@ module Type_shape = struct
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
       Numbers.Int.Map.mem (Types.get_id expr) visited || depth > 10
+      (* CR sspies: Make the depth a command line flag. *)
     in
     if cannot_proceed ()
     then
