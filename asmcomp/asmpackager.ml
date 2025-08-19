@@ -119,7 +119,7 @@ let make_package_object unix ~ppf_dump members target coercion
     let prefixname = Filename.remove_extension objtemp in
     let required_globals = Compilation_unit.Set.empty in
     let main_module_block_size, code =
-      Translmod.transl_package components compilation_unit coercion
+      Translmod.transl_package components coercion
     in
     let code = Simplif.simplify_lambda code in
     let main_module_block_format : Lambda.main_module_block_format =

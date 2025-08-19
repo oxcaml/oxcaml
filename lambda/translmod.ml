@@ -994,7 +994,6 @@ let wrap_toplevel_functor_in_struct code =
 
 (* Compile an implementation *)
 
-
 let has_parameters () =
   Env.parameters () <> []
 
@@ -1253,7 +1252,7 @@ let get_component = function
     None -> Lconst const_unit
   | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
 
-let transl_package component_names _target_name coercion =
+let transl_package component_names coercion =
   let size =
     match coercion with
     | Tcoerce_none -> List.length component_names

@@ -218,7 +218,7 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
       members
   in
   let main_module_block_size, lam =
-    Translmod.transl_package components packed_compilation_unit coercion
+    Translmod.transl_package components coercion
   in
   if !Clflags.dump_rawlambda then
     Format.fprintf ppf_dump "%a@." Printlambda.lambda lam;
