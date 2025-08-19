@@ -17,7 +17,7 @@ module Type_decl_shape : sig
     Ident.t -> Types.type_declaration -> path_lookup -> Shape.t
 end
 
-type shape_with_layout =
+type shape_with_layout = private
   { type_shape : Shape.t;
     type_layout : Layout.t;
     type_name : string

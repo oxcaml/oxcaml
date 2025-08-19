@@ -117,7 +117,7 @@ module Type_shape = struct
       (* CR sspies: Physical equality is also how printing in [printtyp.ml]
          works. It seems to be the way to substitute type parameters (after
          type inference has already made them more precise). *)
-      | Some (_, s) -> s
+      | Some (_, replace_by) -> replace_by
       | None ->
         let visited = Numbers.Int.Map.add (Types.get_id expr) () visited in
         let depth = depth + 1 in
@@ -161,16 +161,16 @@ module Type_shape = struct
               List.concat_map
                 (fun (name, desc) ->
                   match Types.row_field_repr desc with
-                  | Types.Rpresent (Some ty) ->
+                  | Rpresent (Some ty) ->
                     [ { pv_constr_name = name;
                         pv_constr_args =
                           [ of_type_expr_go ~depth ~visited ty subst
                               shape_for_constr ]
                       } ]
-                  | Types.Rpresent None ->
+                  | Rpresent None ->
                     [{ pv_constr_name = name; pv_constr_args = [] }]
-                  | Types.Rabsent -> [] (* we filter out absent constructors *)
-                  | Types.Reither (_, args, _) ->
+                  | Rabsent -> [] (* we filter out absent constructors *)
+                  | Reither (_, args, _) ->
                     [ { pv_constr_name = name;
                         pv_constr_args = of_expr_list args
                       } ])
@@ -403,12 +403,12 @@ module Type_decl_shape = struct
 
   let shape_for_constr_with_declarations
       (decl_lookup_map : Types.type_declaration Ident.Map.t) shape_for_constr
-      ~id:_ ~decl_args:_ path ~args:inner_args =
+      ~id:_ ~decl_args:_ (path : Path.t) ~args:inner_args =
     match shape_for_constr path ~args:inner_args with
     | Some s -> Some s
     | None -> (
       match path with
-      | Path.Pident id' -> (
+      | Pident id' -> (
         match Ident.Map.find_opt id' decl_lookup_map with
         | None -> None
         | Some _ ->
@@ -416,7 +416,7 @@ module Type_decl_shape = struct
           (* CR sspies: We can use this in a future to deal with recursive
              declarations.  For now, we simply leave the identifier there,
              which will be emitted as an unknown value. *))
-      | _ -> None)
+      | Pdot _ | Papply _ | Pextra_ty _ -> None)
 
   let of_type_declaration_with_variables (id : Ident.t)
       (type_declaration : Types.type_declaration) shape_for_constr =
@@ -443,10 +443,11 @@ module Type_decl_shape = struct
       shape_for_constr =
     let decl_lookup_map = Ident.Map.of_list type_declarations in
     (* We unbind all declarations, to avoid accidental recursive cycles. *)
-    let shape_for_constr' path ~args =
+    let shape_for_constr' (path : Path.t) ~args =
       match path with
-      | Path.Pident id when Ident.Map.mem id decl_lookup_map -> None
-      | _ -> shape_for_constr path ~args
+      | Pident id when Ident.Map.mem id decl_lookup_map -> None
+      | Pident _ | Pdot _ | Papply _ | Pextra_ty _ ->
+        shape_for_constr path ~args
     in
     let shape_for_constr' =
       Type_shape.Predef.shape_for_constr_with_predefs shape_for_constr'

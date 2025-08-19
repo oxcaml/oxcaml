@@ -1528,11 +1528,11 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   match type_shape.desc, type_layout with
   | Leaf, _ -> unknown_base_layouts type_layout
   | Tuple _, Base Value ->
-    known_value (* tuples are only a single base layout wide *)
+    known_value (* boxed tuples are only a single base layout wide *)
   | Tuple _, _ -> Misc.fatal_error "tuple must have value layout"
   | Unboxed_tuple shapes, _ -> (
     match type_layout with
-    | Layout.Product layouts when List.length layouts = List.length shapes ->
+    | Layout.Product layouts when List.compare_lengths layouts shapes = 0 ->
       let shapes_with_layout = List.combine shapes layouts in
       List.concat_map (fun (sh, ly) -> flatten_shape sh ly) shapes_with_layout
     | Layout.Product _ -> Misc.fatal_error "unboxed tuple field mismatch"
@@ -1573,12 +1573,10 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       (List.map (fun (name, _, _) -> name) fields)
   | Record { fields; kind = Record_unboxed_product }, _ -> (
     match type_layout with
-    | Layout.Product prod_shapes
-      when List.length prod_shapes = List.length fields ->
+    | Product prod_shapes when List.compare_lengths prod_shapes fields = 0 ->
       List.concat_map (fun (_, sh, ly) -> flatten_shape sh ly) fields
-    | Layout.Product _ -> Misc.fatal_error "unboxed record field mismatch"
-    | Layout.Base _ ->
-      Misc.fatal_error "unboxed record must have product layout")
+    | Product _ -> Misc.fatal_error "unboxed record field mismatch"
+    | Base _ -> Misc.fatal_error "unboxed record must have product layout")
   | Variant _, Base Value -> known_value
   | Variant _, _ -> Misc.fatal_error "variant must have value layout"
   | ( Variant_unboxed { name = _; arg_name = _; arg_layout; arg_shape = _ },
