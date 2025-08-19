@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Jsoo_imports.Import
+
 (** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in the
     environment. *)
 val bind_expr_to_var :

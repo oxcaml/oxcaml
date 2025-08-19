@@ -20,7 +20,7 @@
 
 [@@@warning "-4-18-44"]
 
-open! Jsoo_stdlib
+open! Stdlib
 
 let stats = Debug.find "stats"
 

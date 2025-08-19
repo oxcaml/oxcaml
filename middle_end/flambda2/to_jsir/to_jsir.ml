@@ -27,6 +27,7 @@
  ******************************************************************************)
 
 open! Flambda.Import
+open! Jsoo_imports.Import
 
 (* CR selee: we should eventually get rid of these *)
 let unsupported_multiple_return_variables vars =

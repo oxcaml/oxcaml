@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Jsoo_imports.Import
+
 let bind_expr_to_var' ~env ~res fvar expr =
   let jvar = Jsir.Var.fresh () in
   ( jvar,

@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Jsoo_imports.Import
+
 let primitive_not_supported () =
   Misc.fatal_error
     "This primitive is not supported for JavaScript/WASM compilation."

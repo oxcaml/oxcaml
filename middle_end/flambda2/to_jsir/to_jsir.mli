@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Jsoo_imports.Import
+
 (** Translate a compilation unit. *)
 val unit :
   offsets:Exported_offsets.t ->

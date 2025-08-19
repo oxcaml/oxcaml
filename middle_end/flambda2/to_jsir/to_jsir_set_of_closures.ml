@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Jsoo_imports.Import
+
 let set_of_closures ~env ~res ~bindings ~add_to_env soc =
   let fun_decls = Set_of_closures.function_decls soc in
   let decls =

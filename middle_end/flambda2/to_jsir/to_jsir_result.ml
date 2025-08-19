@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Jsoo_imports.Import
+
 (** Blocks with the continuation potentially not yet defined.
 
     For efficiency reasons, [body] will be inserted head-first,

@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Jsoo_imports.Import
+
 type exn_handler =
   { addr : Jsir.Addr.t;
     exn_param : Jsir.Var.t;

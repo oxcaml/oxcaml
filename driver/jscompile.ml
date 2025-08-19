@@ -65,7 +65,7 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
              ~reachable_names:flambda_result.reachable_names
              flambda_result.flambda
            |> print_if i.ppf_dump Clflags.dump_jsir (fun ppf jsir ->
-                  Jsoo_imports.Jsir.Print.program ppf (fun _ _ -> "") jsir)
+                  Jsoo_imports.Code.Print.program ppf (fun _ _ -> "") jsir)
          in
          jsir, program.main_module_block_format, arg_descr)
 
@@ -83,9 +83,9 @@ let emit_jsir i jsir_program =
       output_string oc Config.cmj_magic_number;
       (* We include the highest used variable in the translation, so that Js_of_ocaml
          can read this number and update its own state accordingly. *)
-      let cmj_body : Jsoo_imports.Jsir.cmj_body =
+      let cmj_body : Jsoo_imports.Code.cmj_body =
         { program = jsir_program;
-          last_var = Jsoo_imports.Jsir.Var.idx (Jsoo_imports.Jsir.Var.last ())
+          last_var = Jsoo_imports.Code.Var.idx (Jsoo_imports.Code.Var.last ())
         }
       in
       output_value oc cmj_body)

@@ -43,4 +43,4 @@ val to_jsir :
   Compile_common.info ->
   Typedtree.implementation ->
   as_arg_for:Global_module.Parameter_name.t option ->
-  Jsoo_imports.Jsir.program
+  Jsoo_imports.Code.program
