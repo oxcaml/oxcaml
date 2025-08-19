@@ -1,8 +1,5 @@
-(* CR selee: clarify licensing permissions *)
-
 (* Js_of_ocaml compiler
  * http://www.ocsigen.org/js_of_ocaml/
- * Copyright (C) 2013 Hugo Heuzard
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -19,22 +16,14 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-type t =
-  { src : string option;
-    name : string option;
-    col : int;
-    line : int;
-    idx : int
-  }
+open! Jsoo_stdlib
 
-val zero : t
+type t = float
 
-val t_of_lexbuf : Lexing.lexbuf -> t
+let timer = Sys.time
 
-val t_of_pos : Lexing.position -> t
+let make () = timer ()
 
-val start_position : t -> Lexing.position
+let get t = timer () -. t
 
-val t_of_position : src:string option -> Lexing.position -> t
-
-val to_string : t -> string
+let print f t = Format.fprintf f "%.2f" (get t)

@@ -27,12 +27,15 @@
    -open
    Flambda2_simplify_shared
    -open
-   Flambda2_ui))
+   Flambda2_ui
+   -open
+   Jsoo_imports))
  (ocamlopt_flags
   (:standard -O3))
  (libraries
   ocamlcommon
   ocamloptcomp
+  jsoo_imports
   flambda2_bound_identifiers
   flambda2_cmx
   flambda2_identifiers
