@@ -68,8 +68,16 @@ let add_instr_exn t instr =
   in
   { t with current_blocks = top_current_block :: rest_current_blocks }
 
-let add_debuginfo_exn t dbg ~pos =
-  add_instr_exn t (Event (Parse_info.t_of_debuginfo dbg ~pos))
+let maybe_add_debuginfo_exn t dbg ~pos =
+  match Parse_info.t_of_debuginfo dbg ~pos with
+  | None -> t
+  | Some parse_info -> add_instr_exn t (Event parse_info)
+
+let with_debuginfo_exn t dbg ~f =
+  let t = maybe_add_debuginfo_exn t dbg ~pos:`Start in
+  let x, t = f t in
+  let t = maybe_add_debuginfo_exn t dbg ~pos:`End in
+  x, t
 
 let new_block t ~params =
   let new_block = { params; body = []; addr = t.next_addr } in
