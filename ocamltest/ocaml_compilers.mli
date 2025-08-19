@@ -44,3 +44,5 @@ val ocamlc_opt : compiler
 val ocamlopt_byte : compiler
 
 val ocamlopt_opt : compiler
+
+val ocamlj_opt : compiler

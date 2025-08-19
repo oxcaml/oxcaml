@@ -27,10 +27,11 @@ let native_action a =
   if Ocamltest_config.native_compiler then a
   else (Actions.update a no_native_compilers)
 
-let get_backend_value_from_env env bytecode_var native_var =
+let get_backend_value_from_env env bytecode_var native_var js_var =
   Ocaml_backends.make_backend_function
     (Environments.safe_lookup bytecode_var env)
     (Environments.safe_lookup native_var env)
+    (Environments.safe_lookup js_var env)
 
 let modules env =
   Actions_helpers.words_of_variable env Ocaml_variables.modules
@@ -74,11 +75,13 @@ let backend_default_flags env =
   get_backend_value_from_env env
     Ocaml_variables.ocamlc_default_flags
     Ocaml_variables.ocamlopt_default_flags
+    Ocaml_variables.ocamlj_default_flags
 
 let backend_flags env =
   get_backend_value_from_env env
     Ocaml_variables.ocamlc_flags
     Ocaml_variables.ocamlopt_flags
+    Ocaml_variables.ocamlj_flags
 
 let env_setting env_reader default_setting =
   Printf.sprintf "%s=%s"
@@ -466,6 +469,12 @@ let setup_ocamlopt_opt_build_env =
       "setup-ocamlopt.opt-build-env"
       Ocaml_compilers.ocamlopt_opt)
 
+let setup_ocamlj_opt_build_env =
+  native_action
+    (mk_compiler_env_setup
+       "setup-ocamlj.opt-build-env"
+       Ocaml_compilers.ocamlj_opt)
+
 let setup_ocaml_build_env =
   mk_toplevel_env_setup
     "setup-ocaml-build-env"
@@ -542,6 +551,15 @@ let ocamlopt_opt =
       ~description:"Compile the program using ocamlopt.opt"
       ~does_something:true
       (compile Ocaml_compilers.ocamlopt_opt))
+
+(* CR selee: hack. also it's not right when we're using upstream jsoo *)
+let ocamlj_opt =
+  native_action
+    (Actions.make
+       ~name:"ocamlj.opt"
+       ~description:"Compile the program using ocamlj.opt"
+       ~does_something:true
+       (compile Ocaml_compilers.ocamlj_opt))
 
 let env_with_lib_unix env =
   let libunixdir = Ocaml_directories.libunix in
@@ -905,7 +923,12 @@ let check_ocamlopt_byte_output =
 let check_ocamlopt_opt_output =
   native_action
     (make_check_compiler_output
-      "check-ocamlopt.opt-output" Ocaml_compilers.ocamlopt_opt)
+       "check-ocamlopt.opt-output" Ocaml_compilers.ocamlopt_opt)
+
+let check_ocamlj_opt_output =
+  native_action
+    (make_check_compiler_output
+       "check-ocamlj.opt-output" Ocaml_compilers.ocamlj_opt)
 
 let really_compare_programs backend comparison_tool log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
@@ -1562,6 +1585,9 @@ let init () =
     setup_ocamlopt_opt_build_env;
     ocamlopt_opt;
     check_ocamlopt_opt_output;
+    setup_ocamlj_opt_build_env;
+    ocamlj_opt;
+    check_ocamlj_opt_output;
     run_expect;
     compare_bytecode_programs;
     compare_binary_files;

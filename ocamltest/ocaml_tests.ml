@@ -88,6 +88,22 @@ let native =
       (if Ocamltest_config.native_compiler then opt_actions else [skip])
   }
 
+let javascript =
+  let opt_build =
+  [
+    setup_ocamlj_opt_build_env;
+    ocamlj_opt;
+    check_ocamlj_opt_output;
+  ] in
+  let opt_actions =
+    opt_build @ [run; check_program_output] in
+  {
+    test_name = "javascript";
+    test_run_by_default = true;
+    test_description = "Build javascript program, run it and check its output";
+    test_actions = opt_actions
+  }
+
 let toplevel = {
   test_name = "toplevel";
   test_run_by_default = false;
@@ -182,6 +198,7 @@ let init () =
   [
     bytecode;
     native;
+    javascript;
     toplevel;
     nattoplevel;
     expect;

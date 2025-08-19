@@ -60,12 +60,22 @@ let main argv ppf =
   with
   | exception Compenv.Exit_with_status n -> n
   | () ->
+    Compenv.readenv ppf Before_link;
     if !Clflags.make_archive
     then (
       Compmisc.init_path ();
       Jslibrarian.create_archive
         (Compenv.get_objfiles ~with_ocamlparam:false)
         (Compenv.extract_output !Clflags.output_name);
+      Warnings.check_fatal ())
+    else if (not !Compenv.stop_early)
+            && Compenv.get_objfiles ~with_ocamlparam:false <> []
+    then (
+      let target = Compenv.default_output !Clflags.output_name in
+      Compmisc.init_path ();
+      Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
+          let objs = Compenv.get_objfiles ~with_ocamlparam:true in
+          Jslink.link ~ppf_dump objs target);
       Warnings.check_fatal ());
     (* Prevents outputting when using make install to dump CSVs for whole compiler.
        Example use case: scripts/profile-compiler-build.sh *)

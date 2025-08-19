@@ -107,3 +107,14 @@ let ocamlopt_opt = compiler
   ~output_variable: Ocaml_variables.compiler_output2
   ~host: Ocaml_backends.Native
   ~target: Ocaml_backends.Native
+
+(* CR selee: hack *)
+let ocamlj_opt = compiler
+  ~name: Ocaml_files.ocamlj_dot_opt
+  ~flags: ""
+  ~directory: "ocamlj.opt"
+  ~exit_status_variable: Ocaml_variables.ocamlj_opt_exit_status
+  ~reference_variable: Ocaml_variables.compiler_reference2
+  ~output_variable: Ocaml_variables.compiler_output2
+  ~host: Ocaml_backends.Native
+  ~target: Ocaml_backends.JavaScript
