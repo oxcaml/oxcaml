@@ -1181,6 +1181,47 @@ module F = struct
     in
     ins_store_into_reg t res i.res.(0)
 
+  (* CF yusumez: add a generic Cfg instruction for bswap *)
+  let specific t (i : Cfg.basic Cfg.instruction) (op : Arch.specific_operation)
+      =
+    match[@warning "-fragile-match"] op with
+    | Ibswap { bitwidth } ->
+      let typ =
+        match bitwidth with
+        | Sixteen -> Llvm_typ.i16
+        | Thirtytwo -> Llvm_typ.i32
+        | Sixtyfour -> Llvm_typ.i64
+      in
+      let do_trunc ident =
+        if Llvm_typ.(equal typ i64)
+        then ident
+        else
+          let res = fresh_ident t in
+          ins_conv t "trunc" ~src:ident ~dst:res ~src_typ:Llvm_typ.i64
+            ~dst_typ:typ;
+          res
+      in
+      let do_zext ident =
+        if Llvm_typ.(equal typ i64)
+        then ident
+        else
+          let res = fresh_ident t in
+          ins_conv t "zext" ~src:ident ~dst:res ~src_typ:typ
+            ~dst_typ:Llvm_typ.i64;
+          res
+      in
+      let arg = load_reg_to_temp t i.arg.(0) in
+      let trunced = do_trunc arg in
+      let bswapped = fresh_ident t in
+      let bswap_fun_name = "llvm.bswap." ^ Llvm_typ.to_string typ in
+      add_called_fun t bswap_fun_name ~cc:Default ~args:[typ] ~res:(Some typ);
+      ins_call ~cc:Default ~pp_name:pp_global t bswap_fun_name
+        [typ, trunced]
+        (Some (typ, bswapped));
+      let zexted = do_zext bswapped in
+      ins_store_into_reg t zexted i.res.(0)
+    | _ -> not_implemented_basic ~msg:"specific" i
+
   let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     match op with
     | Move | Opaque ->
@@ -1381,7 +1422,8 @@ module F = struct
       | Int_of_float width ->
         do_conv "fptosi" ~src:(Llvm_typ.of_float_width width) ~dst:Llvm_typ.i64
       | _ -> not_implemented_basic ~msg:"static cast" i)
-    | Intop_atomic _ | Reinterpret_cast _ | Probe_is_enabled _ | Specific _
+    | Specific op -> specific t i op
+    | Intop_atomic _ | Reinterpret_cast _ | Probe_is_enabled _
     | Name_for_debugger _ | Dls_get | Poll | Pause ->
       not_implemented_basic i
 
@@ -1991,6 +2033,7 @@ let end_assembly () =
    the asm file. *)
 (* CR gyorsh: assume 64-bit architecture *)
 (* CR yusumez: We ignore whether symbols are local/global. *)
+(* CR yusumez: Move all arch-specific things to an arch-specific file. *)
 
 (* Error report *)
 
