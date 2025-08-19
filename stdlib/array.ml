@@ -23,11 +23,16 @@ type 'a t = 'a array
 
 (* Array operations *)
 
-external length : 'a array -> int @@ portable = "%array_length"
-external get: 'a array -> int -> 'a @@ portable = "%array_safe_get"
-external set: 'a array -> int -> 'a -> unit @@ portable = "%array_safe_set"
-external unsafe_get: 'a array -> int -> 'a @@ portable = "%array_unsafe_get"
-external unsafe_set: 'a array -> int -> 'a -> unit @@ portable = "%array_unsafe_set"
+external length : ('a array[@local_opt]) @ contended -> int @@ portable
+  = "%array_length"
+external get : ('a array[@local_opt]) -> int -> 'a @@ portable
+  = "%array_safe_get"
+external set: ('a array[@local_opt]) -> int -> 'a -> unit @@ portable
+  = "%array_safe_set"
+external unsafe_get: ('a array[@local_opt]) -> int -> 'a @@ portable
+  = "%array_unsafe_get"
+external unsafe_set: ('a array[@local_opt]) -> int -> 'a -> unit @@ portable
+  = "%array_unsafe_set"
 external make: int -> 'a -> 'a array @@ portable = "caml_make_vect"
 external create: int -> 'a -> 'a array @@ portable = "caml_make_vect"
 external unsafe_sub : 'a array -> int -> int -> 'a array @@ portable = "caml_array_sub"
@@ -41,12 +46,22 @@ external create_float: int -> float array @@ portable = "caml_make_float_vect"
 
 module Floatarray = struct
   external create : int -> floatarray @@ portable = "caml_floatarray_create"
-  external length : floatarray -> int @@ portable = "%floatarray_length"
-  external get : floatarray -> int -> float @@ portable = "%floatarray_safe_get"
-  external set : floatarray -> int -> float -> unit @@ portable = "%floatarray_safe_set"
-  external unsafe_get : floatarray -> int -> float @@ portable = "%floatarray_unsafe_get"
-  external unsafe_set : floatarray -> int -> float -> unit @@ portable
-      = "%floatarray_unsafe_set"
+  external length : (floatarray[@local_opt]) @ contended -> int @@ portable
+    = "%floatarray_length"
+  external get
+    : (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])
+    @@ portable
+    = "%floatarray_safe_get"
+  external set
+    : (floatarray[@local_opt]) -> int -> (float[@local_opt]) -> unit @@ portable
+    = "%floatarray_safe_set"
+  external unsafe_get
+    : (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])
+    @@ portable
+    = "%floatarray_unsafe_get"
+  external unsafe_set
+    : (floatarray[@local_opt]) -> int -> (float[@local_opt]) -> unit @@ portable
+    = "%floatarray_unsafe_set"
 end
 
 let init l f =

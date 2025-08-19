@@ -35,10 +35,10 @@ open! Stdlib
 type 'a t = 'a array
 (** An alias for the type of arrays. *)
 
-external length : 'a array -> int = "%array_length"
+external length : ('a array[@local_opt]) @ contended -> int = "%array_length"
 (** Return the length (number of elements) of the given array. *)
 
-external get : 'a array -> int -> 'a = "%array_safe_get"
+external get : ('a array[@local_opt]) -> int -> 'a = "%array_safe_get"
 (** [get a n] returns the element number [n] of array [a].
    The first element has number 0.
    The last element has number [length a - 1].
@@ -47,7 +47,7 @@ external get : 'a array -> int -> 'a = "%array_safe_get"
    @raise Invalid_argument
    if [n] is outside the range 0 to [(length a - 1)]. *)
 
-external set : 'a array -> int -> 'a -> unit = "%array_safe_set"
+external set : ('a array[@local_opt]) -> int -> 'a -> unit = "%array_safe_set"
 (** [set a n x] modifies array [a] in place, replacing
    element number [n] with [x].
    You can also write [a.(n) <- x] instead of [set a n x].
@@ -455,15 +455,22 @@ let () = Domain.join d1; Domain.join d2
 
 (* The following is for system use only. Do not call directly. *)
 
-external unsafe_get : 'a array -> int -> 'a = "%array_unsafe_get"
-external unsafe_set : 'a array -> int -> 'a -> unit = "%array_unsafe_set"
+external unsafe_get : ('a array[@local_opt]) -> int -> 'a = "%array_unsafe_get"
+external unsafe_set : ('a array[@local_opt]) -> int -> 'a -> unit
+  = "%array_unsafe_set"
 
 module Floatarray : sig
   external create : int -> floatarray = "caml_floatarray_create"
-  external length : floatarray -> int = "%floatarray_length"
-  external get : floatarray -> int -> float = "%floatarray_safe_get"
-  external set : floatarray -> int -> float -> unit = "%floatarray_safe_set"
-  external unsafe_get : floatarray -> int -> float = "%floatarray_unsafe_get"
-  external unsafe_set : floatarray -> int -> float -> unit
-      = "%floatarray_unsafe_set"
+  external length : (floatarray[@local_opt]) @ contended -> int
+    = "%floatarray_length"
+  external get : (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])
+    = "%floatarray_safe_get"
+  external set : (floatarray[@local_opt]) -> int -> (float[@local_opt]) -> unit
+    = "%floatarray_safe_set"
+  external unsafe_get
+    : (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])
+    = "%floatarray_unsafe_get"
+  external unsafe_set
+    : (floatarray[@local_opt]) -> int -> (float[@local_opt]) -> unit
+    = "%floatarray_unsafe_set"
 end
