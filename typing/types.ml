@@ -954,6 +954,11 @@ let rec compare_mixed_block_element e1 e2 =
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
 
+let equal_module_representation r1 r2 = match r1, r2 with
+  | Module_value_only s1, Module_value_only s2 -> s1 = s2
+  | Module_mixed p1, Module_mixed p2 -> equal_mixed_product_shape p1 p2
+  | (Module_value_only _ | Module_mixed _), _ -> false
+
 let equal_constructor_representation r1 r2 = r1 == r2 || match r1, r2 with
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
