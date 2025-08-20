@@ -1875,7 +1875,8 @@ let reset () =
   raise_count := 0
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
-  | Module_value_only _ -> Pfield(pos, Pointer, read_semantics)
+  | Module_value_only _ ->
+    Pfield(pos, Pointer, read_semantics)
   | Module_mixed (_, shape_for_read) ->
     Pmixedfield([pos], shape_for_read, read_semantics)
 

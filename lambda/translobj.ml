@@ -88,7 +88,7 @@ let prim_makearray =
 
 (* Also use it for required globals *)
 let transl_label_init_general f =
-  let expr, size = f () in
+  let expr, repr = f () in
   let expr =
     Hashtbl.fold
       (fun c id expr ->
@@ -110,7 +110,7 @@ let transl_label_init_general f =
   in
   Env.reset_required_globals ();*)
   reset_labels ();
-  expr, size
+  expr, repr
 
 let transl_label_init_flambda f =
   assert(Config.flambda || Config.flambda2);

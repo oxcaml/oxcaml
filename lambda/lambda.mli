@@ -589,7 +589,6 @@ val generic_value : value_kind
 *)
 val layout_of_extern_repr : extern_repr -> layout
 
-(* Used to alias module fields in [Translmod] *)
 val layout_of_const_sort : Jkind.Sort.Const.t -> layout
 val layout_of_mixed_block_element : 'a. 'a mixed_block_element -> layout
 
