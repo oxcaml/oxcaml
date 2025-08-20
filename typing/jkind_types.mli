@@ -109,4 +109,16 @@ module Layout : sig
       | Base of Sort.base
       | Product of t list
   end
+
+  val value : Sort.t t
+
+  val for_object : Sort.t t
+
+  val for_type_extension : Sort.t t
+
+  val for_class : Sort.t t
+
+  val for_module : Sort.t t
+
+  val for_instance_var : Sort.t t
 end

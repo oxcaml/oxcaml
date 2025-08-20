@@ -118,9 +118,9 @@ let module_substitution sub ms =
 
 let include_kind sub = function
   | Tincl_structure -> ()
-  | Tincl_functor ccs ->
+  | Tincl_functor (ccs, _) ->
       List.iter (fun (_, cc) -> sub.module_coercion sub cc) ccs
-  | Tincl_gen_functor ccs ->
+  | Tincl_gen_functor (ccs, _) ->
       List.iter (fun (_, cc) -> sub.module_coercion sub cc) ccs
 
 let str_include_infos sub {incl_loc; incl_mod; incl_attributes; incl_kind; _} =
