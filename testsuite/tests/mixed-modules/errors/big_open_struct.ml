@@ -1,147 +1,32 @@
 (* TEST
  include stdlib_upstream_compatible;
- reference = "${test_source_directory}/open.reference";
  flambda2;
  {
-   native;
+   setup-ocamlc.opt-build-env;
+   ocamlc_opt_exit_status = "2";
+   ocamlc.opt;
+   check-ocamlc.opt-output;
  }{
-   bytecode;
+   setup-ocamlopt.opt-build-env;
+   ocamlopt_opt_exit_status = "2";
+   ocamlopt.opt;
+   check-ocamlopt.opt-output;
  }
 *)
 
-open Stdlib_upstream_compatible
-external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
-
-
-let _ = print_endline "Test 1: [let open] with module ident"
-
-module M = struct let foo = #42.0 let bar = "hello" end
-
-let _ =
-  let open M in
-  print_float (Float_u.to_float (id foo));
-  print_string " ";
-  print_endline (id bar)
-
-
-let _ = print_endline "Test 2: [let open] with inline struct"
-
-let _ =
-  let open struct let foo = #42.0 let bar = "hello" end in
-  print_float (Float_u.to_float (id foo));
-  print_string " ";
-  print_endline (id bar)
-
-
-let _ = print_endline "Test 3: [let open] with functor"
-
-module Functor (X : sig end) = struct let foo = #42.0 let bar = "hello" end
-
-let _ =
-  let open Functor(struct end) in
-  print_float (Float_u.to_float (id foo));
-  print_string " ";
-  print_endline (id bar)
-
-
-let _ = print_endline "Test 4: Tests 1-3 with [open] instead of [let open]"
-
-module M_4_1 = struct
-  open M
-  let _ = print_float (Float_u.to_float (id foo))
-  let _ = print_string " "
-  let _ = print_endline (id bar)
-end
-
-module M_4_2 = struct
-  open struct let foo = #42.0 let bar = "hello" end
-  let _ = print_float (Float_u.to_float (id foo))
-  let _ = print_string " "
-  let _ = print_endline (id bar)
-end
-
-module M_4_3 = struct
-  open Functor(struct end)
-  let _ = print_float (Float_u.to_float (id foo))
-  let _ = print_string " "
-  let _ = print_endline (id bar)
-end
-
-
-let _ = print_endline "Test 5: open shadowing open"
-
-module Base = struct
-  let x = #10.0
-  let y = "original"
-  let z = 100
-end
-
-module Override = struct
-  let x = #20.0
-  let y = "overridden"
-end
-
-module M_5 = struct
-  open Base
-  open Override
-
-  let _ =
-    print_float (Float_u.to_float (id x));
-    print_string " ";
-    print_string (id y);
-    print_string " ";
-    print_int (id z);
-    print_newline ()
-end
-
-
-let _ = print_endline "Test 6: open shadowing a val"
-
-module M_6 = struct
-  let a = #5.0
-  let b = "before open"
-
+(* CR jrayman: location info is misleading *)
+module Big_module = struct
   open struct
-    let b = "from open"
-    let c = #7.0
+    let a_248 = "a"
+    let a_249 = "a"
+    let a_250 = "a"
+    let a_251 = "a"
+    let a_252 = "a"
+    let a_253 = "a"
+    let a_254 = "a"
+    let a_255 = "a"
+    let a_256 = "a"
   end
-
-  let _ =
-    print_float (Float_u.to_float (id a));
-    print_string " ";
-    print_string (id b);
-    print_string " ";
-    print_float (Float_u.to_float (id c));
-    print_newline ()
-end
-
-
-let _ = print_endline "Test 7: val shadowing an open"
-
-module M_7 = struct
-  open struct
-    let p = #8.0
-    let q = "from open"
-  end
-
-  let p = #9.0
-  let r = "after open"
-
-  let _ =
-    print_float (Float_u.to_float (id p));
-    print_string " ";
-    print_string (id q);
-    print_string " ";
-    print_string (id r);
-    print_newline ()
-end
-
-let _ =
-  print_endline
-    "Test 8: open Ident can be used to circumvent the scannable tag \
-             size restriction"
-
-module M_8 = struct
   let f_0 = #42.0
   let a_0 = "a"
   let a_1 = "a"
@@ -324,7 +209,7 @@ module M_8 = struct
   let a_178 = "a"
   let a_179 = "a"
   let a_180 = "a"
-  let a_181 = "[a_181]"
+  let a_181 = "a"
   let a_182 = "a"
   let a_183 = "a"
   let a_184 = "a"
@@ -385,40 +270,10 @@ module M_8 = struct
   let a_239 = "a"
   let a_240 = "a"
   let a_241 = "a"
-  module Inner = struct
-    let f_1 = #43.0
-    let a_242 = "a"
-    let a_243 = "a"
-    let a_244 = "a"
-    let a_245 = "a"
-    let a_246 = "a"
-    let a_247 = "a"
-    let a_248 = "a"
-    let a_249 = "a"
-    let a_250 = "[a_250]"
-    let a_251 = "a"
-    let a_252 = "a"
-    let a_253 = "a"
-    let a_254 = "a"
-    let a_255 = "a"
-    let a_256 = "a"
-    let a_257 = "a"
-    let a_258 = "a"
-    let a_259 = "a"
-    let a_260 = "a"
-    let a_261 = "a"
-    let a_262 = "a"
-    let a_263 = "a"
-    let a_264 = "a"
-    let a_265 = "a"
-  end
-  open Inner
-
-  let _ = print_float (Float_u.to_float (id f_0))
-  let _ = print_string " "
-  let _ = print_float (Float_u.to_float (id f_1))
-  let _ = print_string " "
-  let _ = print_string (id a_181)
-  let _ = print_string " "
-  let _ = print_endline (id a_250)
+  let a_242 = "a"
+  let a_243 = "a"
+  let a_244 = "a"
+  let a_245 = "a"
+  let a_246 = "a"
+  let a_247 = "a"
 end

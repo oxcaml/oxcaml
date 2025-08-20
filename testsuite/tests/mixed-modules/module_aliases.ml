@@ -1,6 +1,6 @@
 (* TEST
  include stdlib_upstream_compatible;
- reference = "${test_source_directory}/aliases.reference";
+ reference = "${test_source_directory}/module_aliases.reference";
  flambda2;
  {
    native;
