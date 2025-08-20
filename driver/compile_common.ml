@@ -61,10 +61,8 @@ module Parse_result = struct
   type 'a t = { ast : 'a; info : info }
 
   let of_pparse_ast_result ~info ({ ast; source_file } : _ Pparse.ast_result) =
-    {
-      ast;
-      info = { info with target = Unit_info.set_source_file_name info.target source_file }
-    }
+    let new_target = Unit_info.set_source_file_name info.target source_file in
+    { ast; info = { info with target = new_target } }
 
   let map_ast { ast; info } ~f = { ast = f ast; info }
 end
@@ -144,7 +142,8 @@ let interface ~hook_parse_tree ~hook_typed_tree info =
 (** Frontend for a .ml file *)
 
 let parse_impl i =
-  Pparse.parse_implementation ~tool_name:i.tool_name (Unit_info.source_file i.target)
+  Pparse.parse_implementation
+    ~tool_name:i.tool_name (Unit_info.source_file i.target)
     |> Parse_result.of_pparse_ast_result ~info:i
     |> Parse_result.map_ast
          ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.implementation)

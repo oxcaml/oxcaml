@@ -216,7 +216,8 @@ let file_aux ~tool_name ~source_file inputfile (type a) parse_fun invariant_fun
         set_input_lexbuf ic
       in
       Location.init lexbuf source_file;
-      Profile.record_call "parser" (fun () -> { ast = parse_fun lexbuf ; source_file })
+      Profile.record_call "parser" (fun () ->
+        { ast = parse_fun lexbuf ; source_file })
     end
   in
   Profile.record_call "-ppx" (fun () ->
@@ -225,7 +226,13 @@ let file_aux ~tool_name ~source_file inputfile (type a) parse_fun invariant_fun
 
 let file ~tool_name inputfile parse_fun ast_kind =
   let { ast; source_file = _ } =
-    file_aux ~tool_name ~source_file:inputfile inputfile parse_fun ignore ast_kind
+    file_aux
+      ~tool_name
+      ~source_file:inputfile
+      inputfile
+      parse_fun
+      ignore
+      ast_kind
   in
   ast
 

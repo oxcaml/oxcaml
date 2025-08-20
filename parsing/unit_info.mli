@@ -59,9 +59,9 @@ type t
     - the module name is [Y]
     - the prefix is [target/y]
 
-    When calling, for example, [ocamlopt foo.ml._.preprocess] (where foo.ml._.preprocess
-    is a serialized, ppx-expanded AST of foo.ml), the raw source file is
-    foo.ml._.preprocess, while foo.ml is the source file.
+    When calling, for example, [ocamlopt foo.ml._.preprocess] (where
+    foo.ml._.preprocess is a serialized, ppx-expanded AST of foo.ml), the raw
+    source file is foo.ml._.preprocess, while foo.ml is the source file.
 *)
 
 (** [source_file u] is the source file of [u]. *)

@@ -79,7 +79,9 @@ let check_unit_name file =
 
 let make ?(check_modname=true) ~source_file ~for_pack_prefix kind prefix =
   let modname = compilation_unit_from_source ~for_pack_prefix prefix in
-  let p = { modname; prefix; source_file; raw_source_file = source_file; kind } in
+  let p =
+    { modname; prefix; source_file; raw_source_file = source_file; kind }
+  in
   if check_modname then check_unit_name p;
   p
 
