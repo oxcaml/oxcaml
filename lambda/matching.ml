@@ -1682,7 +1682,7 @@ and precompile_or ~arg ~arg_sort (cls : Simple.clause list) ors args def k =
             let patbound_action_vars =
               (* variables bound in the or-pattern
                  that are used in the orpm actions *)
-              Typedtree.pat_bound_idents_full arg_sort orp
+              Typedtree.pat_bound_idents_full orp
               |> List.filter (fun (id, _, _, _, _) -> Ident.Set.mem id pm_fv)
               |> List.map (fun (id, _, ty, uid, id_sort) ->
                   (id, uid, Typeopt.layout orp.pat_env orp.pat_loc id_sort ty))
@@ -4300,7 +4300,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
   | _ ->
       let opt = ref false in
       let nraise = next_raise_count () in
-      let catch_ids = pat_bound_idents_full arg_sort pat in
+      let catch_ids = pat_bound_idents_full pat in
       let ids_with_kinds =
         List.map
           (fun (id, _, typ, uid, sort) ->

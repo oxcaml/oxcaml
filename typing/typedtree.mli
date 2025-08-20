@@ -1325,7 +1325,7 @@ val mkloc: 'a -> Location.t -> 'a Asttypes.loc
 
 val pat_bound_idents: 'k general_pattern -> Ident.t list
 val pat_bound_idents_full:
-  Jkind.Sort.Const.t -> 'k general_pattern
+  'k general_pattern
   -> (Ident.t * string loc * Types.type_expr * Types.Uid.t * Jkind.Sort.Const.t) list
 
 (** Splits an or pattern into its value (left) and exception (right) parts. *)
