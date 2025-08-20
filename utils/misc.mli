@@ -434,6 +434,10 @@ val remove_file: string -> unit
            Does nothing for other kinds of files.
            Never raises an error. *)
 
+val remove_dir: string -> unit
+       (** Delete the given directory if it exists and is a directory.
+           Never raises an error. *)
+
 val expand_directory: string -> string -> string
        (** [expand_directory alt file] eventually expands a [+] at the
            beginning of file into [alt] (an alternate root directory) *)
@@ -476,6 +480,10 @@ val protect_writing_to_file
           the [out_channel] to the given function, then close the
           channel. If the function raises an exception then [filename]
           will be removed. *)
+
+
+val mk_temp_dir : ?perms: int -> string -> string -> string
+       (** Create a temporary directory with a random number in the name. *)
 
 val concat_null_terminated : string list -> string
 (** [concat_null_terminated [x1;x2; ... xn]] is

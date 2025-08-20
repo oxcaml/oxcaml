@@ -815,15 +815,21 @@ let link objfiles output_name =
     link_bytecode tolink output_name true
   else if not !Clflags.output_c_object then begin
     let bytecode_name = Filename.temp_file "camlcode" "" in
-    let prim_name =
+    let tmp_dir, prim_name =
       if !Clflags.keep_camlprimc_file then
-        output_name ^ ".camlprim.c"
+        None, output_name ^ ".camlprim.c"
       else
-        Filename.temp_file "camlprim" ".c" in
+        let tmp_dir = Misc.mk_temp_dir "caml" "" in
+        if not (Sys.is_directory tmp_dir) then
+          Misc.fatal_error "Failed to create temporary directory for camlprim.c";
+        let file = Filename.concat tmp_dir "camlprim.c" in
+        Some tmp_dir, file in
     Misc.try_finally
       ~always:(fun () ->
           remove_file bytecode_name;
-          if not !Clflags.keep_camlprimc_file then remove_file prim_name)
+          if not !Clflags.keep_camlprimc_file then
+            (remove_file prim_name;
+             Option.iter Misc.remove_dir tmp_dir))
       (fun () ->
          link_bytecode ~final_name:output_name tolink bytecode_name false;
          let poc = open_out prim_name in

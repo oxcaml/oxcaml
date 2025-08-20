@@ -703,6 +703,13 @@ let remove_file filename =
   with Sys_error _msg ->
     ()
 
+let remove_dir dirname =
+  try
+    if Sys.is_directory dirname
+    then Sys.rmdir dirname
+  with Sys_error _msg ->
+    ()
+
 (* Expand a -I option: if it starts with +, make it relative to the standard
    library directory *)
 
@@ -785,6 +792,26 @@ let protect_writing_to_file ~filename ~f =
   try_finally ~always:(fun () -> close_out outchan)
     ~exceptionally:(fun () -> remove_file filename)
     (fun () -> f outchan)
+
+
+let prng = lazy(Random.State.make_self_init ())
+
+let temp_file_name temp_dir prefix suffix =
+  let rnd = (Random.State.bits (Lazy.force prng)) land 0xFFFFFF in
+  Filename.concat temp_dir (Printf.sprintf "%s%06x%s" prefix rnd suffix)
+
+let mk_temp_dir ?(perms = 0o700) prefix suffix =
+  let temp_dir = Filename.get_temp_dir_name () in
+  let rec try_name counter =
+    let name = temp_file_name temp_dir prefix suffix in
+    try
+      Sys.mkdir name perms;
+      name
+    with Sys_error _ as e ->
+      if counter >= 20 then raise e else try_name (counter + 1)
+  in try_name 0
+
+
 
 (* Integer operations *)
 
