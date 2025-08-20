@@ -66,3 +66,72 @@ module M_4_3 = struct
   let _ = print_string " "
   let _ = print_endline (id bar)
 end
+
+
+let _ = print_endline "Test 5: open shadowing open"
+
+module Base = struct
+  let x = #10.0
+  let y = "original"
+  let z = 100
+end
+
+module Override = struct
+  let x = #20.0
+  let y = "overridden"
+end
+
+module M5 = struct
+  open Base
+  open Override
+
+  let _ =
+    print_float (Float_u.to_float (id x));
+    print_string " ";
+    print_string (id y);
+    print_string " ";
+    print_int (id z);
+    print_newline ()
+end
+
+
+let _ = print_endline "Test 6: open shadowing a val"
+
+module M6 = struct
+  let a = #5.0
+  let b = "before open"
+
+  open struct
+    let b = "from open"
+    let c = #7.0
+  end
+
+  let _ =
+    print_float (Float_u.to_float (id a));
+    print_string " ";
+    print_string (id b);
+    print_string " ";
+    print_float (Float_u.to_float (id c));
+    print_newline ()
+end
+
+
+let _ = print_endline "Test 7: val shadowing an open"
+
+module M7 = struct
+  open struct
+    let p = #8.0
+    let q = "from open"
+  end
+
+  let p = #9.0
+  let r = "after open"
+
+  let _ =
+    print_float (Float_u.to_float (id p));
+    print_string " ";
+    print_string (id q);
+    print_string " ";
+    print_string (id r);
+    print_newline ()
+end
