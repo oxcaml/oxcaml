@@ -27,7 +27,7 @@ let compute_back_edges cfg dominators =
 
 type loop = Label.Set.t
 
-let compute_loop_of_back_edge cfg { Cfg_edge.src; dst } =
+let compute_loop_of_back_edge cfg dominators { Cfg_edge.src; dst } =
   let rec visit stack acc =
     match stack with
     | [] -> acc
@@ -37,20 +37,23 @@ let compute_loop_of_back_edge cfg { Cfg_edge.src; dst } =
       let stack, acc =
         List.fold_left predecessor_labels ~init:(tl, acc)
           ~f:(fun (stack, acc) predecessor_label ->
-            if not (Label.Set.mem predecessor_label acc)
+            if (not (Label.Set.mem predecessor_label acc))
+               && Cfg_dominators.is_dominating dominators dst predecessor_label
             then predecessor_label :: stack, Label.Set.add predecessor_label acc
             else stack, acc)
       in
       visit stack acc
   in
-  visit [src] (Label.Set.add src (Label.Set.singleton dst))
+  if Label.equal src dst
+  then Label.Set.singleton src
+  else visit [src] (Label.Set.add src (Label.Set.singleton dst))
 
 type loops = loop Cfg_edge.Map.t
 
-let compute_loops_of_back_edges cfg back_edges =
+let compute_loops_of_back_edges cfg dominators back_edges =
   Cfg_edge.Set.fold
     (fun edge acc ->
-      Cfg_edge.Map.add edge (compute_loop_of_back_edge cfg edge) acc)
+      Cfg_edge.Map.add edge (compute_loop_of_back_edge cfg dominators edge) acc)
     back_edges Cfg_edge.Map.empty
 
 type header_map = loop list Label.Map.t
@@ -135,7 +138,7 @@ type t =
 let build : Cfg.t -> Cfg_dominators.t -> t =
  fun cfg doms ->
   let back_edges = compute_back_edges cfg doms in
-  let loops = compute_loops_of_back_edges cfg back_edges in
+  let loops = compute_loops_of_back_edges cfg doms back_edges in
   let header_map = compute_header_map loops in
   if debug then invariant_header_map doms header_map;
   let loop_depths = compute_loop_depths cfg header_map in
