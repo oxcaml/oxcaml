@@ -19,7 +19,7 @@
  module = "bits_u_monoid_utils.mli bits_u_monoid_utils.ml";
  ocamlopt.byte;
 
- flags = "-I +stdlib_upstream_compatible -instantiate";
+ flags = "-dlambda -I +stdlib_upstream_compatible -instantiate";
  module = "";
  program = "bits_u_monoid_utils-Float_u_monoid.cmx";
  all_modules = "bits_u_monoid_utils.cmx float_u_monoid.cmx";
