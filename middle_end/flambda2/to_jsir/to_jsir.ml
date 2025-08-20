@@ -334,12 +334,20 @@ and apply_expr ~env ~res e =
   let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
     | None, _ | _, Effect _ -> failwith "effects not implemented yet"
-    | Some callee, (Function _ | Method _) ->
+    | Some callee, Function _ ->
       let args, res = To_jsir_shared.simples ~env ~res args in
       let f, res = To_jsir_shared.simple ~env ~res callee in
       (* CR selee: assume exact = false for now, JSIR seems to assume false in
          the case that we don't know *)
       apply_fn ~res ~f ~args ~exact:false
+    | Some callee, Method { obj; kind = _; alloc_mode = _ } ->
+      let args, res = To_jsir_shared.simples ~env ~res args in
+      let obj, res = To_jsir_shared.simple ~env ~res obj in
+      let field, res = To_jsir_shared.simple ~env ~res callee in
+      let res, f = To_jsir_result.get_public_method res ~obj ~field in
+      (* CR selee: assume exact = false for now, JSIR seems to assume false in
+         the case that we don't know *)
+      apply_fn ~res ~f ~args:(obj :: args) ~exact:false
     | Some callee, C_call _ ->
       let symbol =
         match Simple.must_be_symbol callee with
@@ -446,12 +454,10 @@ and apply_cont0 ~env ~res apply_cont =
       let res, addr = To_jsir_result.new_block res ~params:[] in
       let res = To_jsir_result.end_block_with_last_exn res last in
       Jsir.Pushtrap ((addr, []), handler_var, (handler_addr, [])), res)
-  | Some (Pop { exn_handler; raise_kind }) -> (
+  | Some (Pop { exn_handler = _; raise_kind }) -> (
     let last, res = get_last ~raise_kind in
-    if Continuation.equal exn_handler (To_jsir_env.exn_continuation env)
-    then (
-      assert (Option.is_some raise_kind);
-      last, res)
+    if Option.is_some raise_kind
+    then last, res
     else
       (* [Jsir.Poptrap] always jumps to a block after popping the exception
          handler. If we want to do anything than just [Branch], we should jump
