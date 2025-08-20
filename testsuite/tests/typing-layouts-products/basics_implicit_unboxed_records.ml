@@ -54,11 +54,7 @@ val unboxed_product : t# = #{i = 1; j = 2}
 ;;
 #{ i = 1; j = 2 };;
 [%%expect{|
-Line 1, characters 0-17:
-1 | #{ i = 1; j = 2 };;
-    ^^^^^^^^^^^^^^^^^
-Error: Types of unnamed expressions must have layout value when using
-       the toplevel, but this expression has layout "value & value".
+- : t# = #{i = 1; j = 2}
 |}]
 
 (* However, we can have a top-level unboxed record if its kind is value *)

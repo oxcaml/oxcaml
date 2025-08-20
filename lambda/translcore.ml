@@ -26,8 +26,6 @@ open Lambda
 open Translmode
 open Debuginfo.Scoped_location
 
-let module_representation_of_signature _ = assert false
-
 type error =
     Free_super_var
   | Unreachable_reached
@@ -1154,7 +1152,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           let oid = Ident.create_local "open" in
           let oid_duid = Lambda.debug_uid_none in
           let open_repr =
-            module_representation_of_signature od.open_bound_items
+            transl_module_representation od.open_bound_repr
           in
           let body, _ =
             List.fold_left (fun (body, pos) id ->
