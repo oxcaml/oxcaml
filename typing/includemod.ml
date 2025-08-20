@@ -590,6 +590,30 @@ module Sign_diff = struct
     }
 end
 
+let module_representation_of_layouts ~loc layouts =
+  layouts
+  |> List.map
+    (fun layout ->
+      layout
+      |> Jkind.Layout.to_sort
+          (* we should've already checked that [sg] is representable
+            in [transl_value_decl] *)
+      |> Misc.Stdlib.Option.get_or_fatal_error
+            ~error:"Includemod.module_representation_of_layouts: \
+                      unexpected unrepresentable layout"
+      |> Jkind.Sort.default_for_transl_and_get
+      |> mixed_block_element_of_const_sort)
+  |> Array.of_list
+  |> Typedecl.module_representation_of_mixed_product_shape ~loc
+
+let module_representation_of_signature ~loc sg =
+  sg |> List.filter_map Env.layout_of_signature_item
+     |> module_representation_of_layouts ~loc
+
+let module_representation_of_lazy_signature ~loc sg =
+  sg |> List.filter_map Env.layout_of_lazy_signature_item
+     |> module_representation_of_layouts ~loc
+
 (* Quickly compare module types without expanding them, succeeding only if mty1
   is a subtype of mty2 with no coercion  *)
 let rec shallow_modtypes env subst mty1 mty2 =
@@ -882,23 +906,6 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
             ((id,pos,Tcoerce_none)::l , pos+1)
         | item -> (l, if is_runtime_component item then pos+1 else pos))
       ([], 0) sig1 in
-  (* CR jrayman: refactor *)
-  let module_representation_of_signature sig_ =
-    sig_ |> List.filter_map Env.layout_of_lazy_signature_item
-         |> List.map
-           (fun layout ->
-              layout
-              |> Jkind.Layout.to_sort
-                 (* we already checked that [sig_] is representable
-                    in [transl_decl_value] *)
-              |> Misc.Stdlib.Option.get_or_fatal_error
-                   ~error:"Includemod.signatures: \
-                             unexpected unrepresentable sig item"
-              |> Jkind.Sort.default_for_transl_and_get
-              |> mixed_block_element_of_const_sort)
-         |> Array.of_list
-         |> Typedecl.module_representation_of_mixed_product_shape ~loc
-  in
   let exported_len1, runtime_len1, comps1 =
     build_component_table (fun pos _name -> pos) sig1
   in
@@ -924,8 +931,8 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        let input_repr = module_representation_of_signature sig1 in
-        let output_repr = module_representation_of_signature sig2 in
+        let input_repr = module_representation_of_lazy_signature ~loc sig1 in
+        let output_repr = module_representation_of_lazy_signature ~loc sig2 in
         let coercion =
           if runtime_len1 = runtime_len2 then (* see PR#5098 *)
             simplify_structure_coercion input_repr output_repr cc id_pos_list

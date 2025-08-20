@@ -773,16 +773,16 @@ and transl_structure ~scopes loc
           let mk_lam_let =
             transl_let ~scopes ~return_layout:Lambda.layout_module_field
               ~in_structure:true rec_flag pat_expr_list
-              (* CR jrayman: change [layout_module_field] *)
+              (* CR jrayman for reviewer: change [layout_module_field]? *)
           in
           let ext_fields =
             List.rev_append
               (pat_expr_list
-              (* CR jrayman: is this right? *)
+              (* CR jrayman: write [let_bound_idents_with_sorts] after
+                 refactor *)
                 |> let_bound_idents_with_modes_sorts_and_checks
                 |> List.map
                     (fun (id, l, _) ->
-                      (* CR jrayman: [List.hd] is odd here *)
                       let _, _, sort = List.hd l in
                       let shape =
                         sort |> Jkind.Sort.default_for_transl_and_get
