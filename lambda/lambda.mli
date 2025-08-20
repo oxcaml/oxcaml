@@ -1157,6 +1157,7 @@ val of_bool : bool -> lambda
 val split_vectors : bool
 
 val layout_unit : layout
+val layout_bool : layout
 val layout_unboxed_unit : layout
 val layout_int : layout
 val layout_array : array_kind -> layout
@@ -1165,6 +1166,7 @@ val layout_list : layout
 val layout_exception : layout
 val layout_function : layout
 val layout_object : layout
+val layout_poly_variant : layout
 val layout_class : layout
 val layout_module : layout
 val layout_functor : layout
@@ -1196,6 +1198,7 @@ val layout_any_value : layout
 val layout_letrec : layout
 (* The probe hack: Free vars in probes must have layout value. *)
 val layout_probe_arg : layout
+val layout_block_idx : layout
 
 val layout_unboxed_product : layout list -> layout
 
