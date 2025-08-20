@@ -57,25 +57,25 @@ let length_scannable (x : #(int * string) iarray) = len x
 [%%expect{|
 external len : ('a : any mod separable). 'a iarray -> int = "%array_length"
   [@@layout_poly]
-Line 4, characters 52-57:
+Line 4, characters 56-57:
 4 | let length_scannable (x : #(int * string) iarray) = len x
-                                                        ^^^^^
+                                                            ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let length_ignorable (x : #(int * float#) iarray) = len x
 [%%expect{|
-Line 1, characters 52-57:
+Line 1, characters 56-57:
 1 | let length_ignorable (x : #(int * float#) iarray) = len x
-                                                        ^^^^^
+                                                            ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let length_bad (x : #(string * float#) iarray) = len x
 [%%expect{|
-Line 1, characters 49-54:
+Line 1, characters 53-54:
 1 | let length_bad (x : #(string * float#) iarray) = len x
-                                                     ^^^^^
+                                                         ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -94,25 +94,25 @@ let get_scannable (x : #(int * string) iarray) = get x 42
 [%%expect{|
 external get : ('a : any mod separable). 'a iarray -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
-Line 4, characters 49-57:
+Line 4, characters 53-54:
 4 | let get_scannable (x : #(int * string) iarray) = get x 42
-                                                     ^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_ignorable (x : #(int * float#) iarray) = get x 42
 [%%expect{|
-Line 1, characters 49-57:
+Line 1, characters 53-54:
 1 | let get_ignorable (x : #(int * float#) iarray) = get x 42
-                                                     ^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_bad (x : #(string * float#) iarray) = get x 42
 [%%expect{|
-Line 1, characters 46-54:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x 42
-                                                  ^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -131,25 +131,25 @@ let get_scannable (x : #(int * string) iarray) = get x 42
 [%%expect{|
 external get : ('a : any mod separable). 'a iarray -> int -> 'a
   = "%array_unsafe_get" [@@layout_poly]
-Line 4, characters 49-57:
+Line 4, characters 53-54:
 4 | let get_scannable (x : #(int * string) iarray) = get x 42
-                                                     ^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_ignorable (x : #(int * float#) iarray) = get x 42
 [%%expect{|
-Line 1, characters 49-57:
+Line 1, characters 53-54:
 1 | let get_ignorable (x : #(int * float#) iarray) = get x 42
-                                                     ^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_bad (x : #(string * float#) iarray) = get x 42
 [%%expect{|
-Line 1, characters 46-54:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x 42
-                                                  ^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -168,25 +168,25 @@ let get_scannable (x : #(int * string) iarray) = get x #42L
 [%%expect{|
 external get : ('a : any mod separable). 'a iarray -> int64# -> 'a
   = "%array_safe_get_indexed_by_int64#" [@@layout_poly]
-Line 4, characters 49-59:
+Line 4, characters 53-54:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42L
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_ignorable (x : #(int * float#) iarray) = get x #42L
 [%%expect{|
-Line 1, characters 49-59:
+Line 1, characters 53-54:
 1 | let get_ignorable (x : #(int * float#) iarray) = get x #42L
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_bad (x : #(string * float#) iarray) = get x #42L
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42L
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -205,25 +205,25 @@ let get_scannable (x : #(int * string) iarray) = get x #42L
 [%%expect{|
 external get : ('a : any mod separable). 'a iarray -> int64# -> 'a
   = "%array_unsafe_get_indexed_by_int64#" [@@layout_poly]
-Line 4, characters 49-59:
+Line 4, characters 53-54:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42L
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_ignorable (x : #(int * float#) iarray) = get x #42L
 [%%expect{|
-Line 1, characters 49-59:
+Line 1, characters 53-54:
 1 | let get_ignorable (x : #(int * float#) iarray) = get x #42L
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_bad (x : #(string * float#) iarray) = get x #42L
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42L
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -242,25 +242,25 @@ let get_scannable (x : #(int * string) iarray) = get x #42l
 [%%expect{|
 external get : ('a : any mod separable). 'a iarray -> int32# -> 'a
   = "%array_safe_get_indexed_by_int32#" [@@layout_poly]
-Line 4, characters 49-59:
+Line 4, characters 53-54:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42l
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_ignorable (x : #(int * float#) iarray) = get x #42l
 [%%expect{|
-Line 1, characters 49-59:
+Line 1, characters 53-54:
 1 | let get_ignorable (x : #(int * float#) iarray) = get x #42l
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_bad (x : #(string * float#) iarray) = get x #42l
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42l
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -279,25 +279,25 @@ let get_scannable (x : #(int * string) iarray) = get x #42l
 [%%expect{|
 external get : ('a : any mod separable). 'a iarray -> int32# -> 'a
   = "%array_unsafe_get_indexed_by_int32#" [@@layout_poly]
-Line 4, characters 49-59:
+Line 4, characters 53-54:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42l
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_ignorable (x : #(int * float#) iarray) = get x #42l
 [%%expect{|
-Line 1, characters 49-59:
+Line 1, characters 53-54:
 1 | let get_ignorable (x : #(int * float#) iarray) = get x #42l
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_bad (x : #(string * float#) iarray) = get x #42l
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42l
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -317,25 +317,25 @@ let get_scannable (x : #(int * string) iarray) = get x #42n
 [%%expect{|
 external get : ('a : any mod separable). 'a iarray -> nativeint# -> 'a
   = "%array_safe_get_indexed_by_nativeint#" [@@layout_poly]
-Line 5, characters 49-59:
+Line 5, characters 53-54:
 5 | let get_scannable (x : #(int * string) iarray) = get x #42n
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_ignorable (x : #(int * float#) iarray) = get x #42n
 [%%expect{|
-Line 1, characters 49-59:
+Line 1, characters 53-54:
 1 | let get_ignorable (x : #(int * float#) iarray) = get x #42n
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_bad (x : #(string * float#) iarray) = get x #42n
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42n
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -355,25 +355,25 @@ let get_scannable (x : #(int * string) iarray) = get x #42n
 [%%expect{|
 external get : ('a : any mod separable). 'a iarray -> nativeint# -> 'a
   = "%array_unsafe_get_indexed_by_nativeint#" [@@layout_poly]
-Line 5, characters 49-59:
+Line 5, characters 53-54:
 5 | let get_scannable (x : #(int * string) iarray) = get x #42n
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_ignorable (x : #(int * float#) iarray) = get x #42n
 [%%expect{|
-Line 1, characters 49-59:
+Line 1, characters 53-54:
 1 | let get_ignorable (x : #(int * float#) iarray) = get x #42n
-                                                     ^^^^^^^^^^
+                                                         ^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 let get_bad (x : #(string * float#) iarray) = get x #42n
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42n
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
