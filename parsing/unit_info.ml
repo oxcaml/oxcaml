@@ -20,12 +20,14 @@ type file_prefix = string
 
 type t = {
   source_file: filename;
+  raw_source_file: filename;
   prefix: file_prefix;
   modname: Compilation_unit.t;
   kind: intf_or_impl;
 }
 
 let source_file (x: t) = x.source_file
+let raw_source_file (x: t) = x.raw_source_file
 let modname (x: t) = x.modname
 let kind (x: t) = x.kind
 let prefix (x: t) = x.prefix
@@ -77,18 +79,20 @@ let check_unit_name file =
 
 let make ?(check_modname=true) ~source_file ~for_pack_prefix kind prefix =
   let modname = compilation_unit_from_source ~for_pack_prefix prefix in
-  let p = { modname; prefix; source_file; kind } in
+  let p = { modname; prefix; source_file; raw_source_file = source_file; kind } in
   if check_modname then check_unit_name p;
   p
 
 (* CR lmaurer: This is something of a wart: some refactoring of `Compile_common`
    could probably eliminate the need for it *)
 let make_with_known_compilation_unit ~source_file kind prefix modname =
- { modname; prefix; source_file; kind }
+ { modname; prefix; source_file; raw_source_file = source_file; kind }
 
 let make_dummy ~input_name modname =
   make_with_known_compilation_unit ~source_file:input_name
     Impl input_name modname
+
+let set_source_file_name x source_file = { x with source_file }
 
 module Artifact = struct
   type t =
@@ -113,7 +117,7 @@ let of_artifact ~dummy_source_file kind (a : Artifact.t) =
   let modname = Artifact.modname a in
   let prefix = Artifact.prefix a in
   let source_file = Option.value a.source_file ~default:dummy_source_file in
-  { modname; prefix; source_file; kind }
+  { modname; prefix; source_file; raw_source_file = a.filename; kind }
 
 let mk_artifact ext u =
   {

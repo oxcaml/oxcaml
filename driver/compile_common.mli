@@ -50,9 +50,13 @@ val with_info :
    calling [with_info] several times.
 *)
 
+module Parse_result : sig
+  type 'a t = { ast : 'a; info : info }
+end
+
 (** {2 Interfaces} *)
 
-val parse_intf : info -> Parsetree.signature
+val parse_intf : info -> Parsetree.signature Parse_result.t
 (** [parse_intf info] parses an interface (usually an [.mli] file). *)
 
 val typecheck_intf :
@@ -74,7 +78,7 @@ val interface :
 
 (** {2 Implementations} *)
 
-val parse_impl : info -> Parsetree.structure
+val parse_impl : info -> Parsetree.structure Parse_result.t
 (** [parse_impl info] parses an implementation (usually an [.ml] file). *)
 
 val typecheck_impl : info -> Parsetree.structure -> Typedtree.implementation

@@ -58,10 +58,17 @@ type t
     - the input source file is [dir/x.mli]
     - the module name is [Y]
     - the prefix is [target/y]
+
+    When calling, for example, [ocamlopt foo.ml._.preprocess] (where foo.ml._.preprocess
+    is a serialized, ppx-expanded AST of foo.ml), the raw source file is
+    foo.ml._.preprocess, while foo.ml is the source file.
 *)
 
 (** [source_file u] is the source file of [u]. *)
 val source_file: t -> filename
+
+(** [raw_source_file u] is the raw source file of [u]. *)
+val raw_source_file: t -> filename
 
 (** [prefix u] is the filename prefix of the unit. *)
 val prefix: t -> file_prefix
@@ -103,6 +110,8 @@ val make_with_known_compilation_unit:
     [input_name] is a string like "startup", suitable as the value for
     [Location.input_name] as well. *)
 val make_dummy: input_name:string -> Compilation_unit.t -> t
+
+val set_source_file_name : t -> filename -> t
 
 (** {1:artifact_function Build artifacts }*)
 module Artifact: sig

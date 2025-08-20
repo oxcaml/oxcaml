@@ -57,12 +57,27 @@ let with_info ~native ~tool_name ~source_file ~output_prefix
     native;
   })
 
+module Parse_result = struct
+  type 'a t = { ast : 'a; info : info }
+
+  let of_pparse_ast_result ~info ({ ast; source_file } : _ Pparse.ast_result) =
+    {
+      ast;
+      info = { info with target = Unit_info.set_source_file_name info.target source_file }
+    }
+
+  let map_ast { ast; info } ~f = { ast = f ast; info }
+end
+
 (** Compile a .mli file *)
 
 let parse_intf i =
   Pparse.parse_interface ~tool_name:i.tool_name (Unit_info.source_file i.target)
-  |> print_if i.ppf_dump Clflags.dump_parsetree Printast.interface
-  |> print_if i.ppf_dump Clflags.dump_source Pprintast.signature
+    |> Parse_result.of_pparse_ast_result ~info:i
+    |> Parse_result.map_ast
+         ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.interface)
+    |> Parse_result.map_ast
+         ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.signature)
 
 let typecheck_intf info ast =
   Profile.(
@@ -114,8 +129,8 @@ let emit_signature info alerts tsg =
 
 let interface ~hook_parse_tree ~hook_typed_tree info =
   Profile.(record_call (annotate_file_name (
-    Unit_info.source_file info.target))) @@ fun () ->
-  let ast = parse_intf info in
+    Unit_info.raw_source_file info.target))) @@ fun () ->
+  let { ast; info } : _ Parse_result.t = parse_intf info in
   hook_parse_tree ast;
   if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
     let alerts, tsg = typecheck_intf info ast in
@@ -129,10 +144,12 @@ let interface ~hook_parse_tree ~hook_typed_tree info =
 (** Frontend for a .ml file *)
 
 let parse_impl i =
-  let sourcefile = Unit_info.source_file i.target in
-  Pparse.parse_implementation ~tool_name:i.tool_name sourcefile
-  |> print_if i.ppf_dump Clflags.dump_parsetree Printast.implementation
-  |> print_if i.ppf_dump Clflags.dump_source Pprintast.structure
+  Pparse.parse_implementation ~tool_name:i.tool_name (Unit_info.source_file i.target)
+    |> Parse_result.of_pparse_ast_result ~info:i
+    |> Parse_result.map_ast
+         ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.implementation)
+    |> Parse_result.map_ast
+         ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.structure)
 
 let typecheck_impl i parsetree =
   parsetree
@@ -151,7 +168,7 @@ let typecheck_impl i parsetree =
 
 let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
   Profile.(record_call (annotate_file_name (
-    Unit_info.source_file info.target))) @@ fun () ->
+    Unit_info.raw_source_file info.target))) @@ fun () ->
   let exceptionally () =
     let sufs =
       if info.native then Unit_info.[ cmx; obj ]
@@ -161,7 +178,7 @@ let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
       sufs;
   in
   Misc.try_finally ?always:None ~exceptionally (fun () ->
-    let parsed = parse_impl info in
+    let { ast = parsed; info } : _ Parse_result.t = parse_impl info in
     hook_parse_tree parsed;
     if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
       let typed = typecheck_impl info parsed in
