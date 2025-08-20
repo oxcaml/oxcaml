@@ -3149,7 +3149,7 @@ and type_pat_aux
           Some sp, [ty] ->
           Some
             (type_pat tps Value sp ty
-              Jkind.Sort.(of_const Const.for_boxed_variant))
+              Jkind.Sort.(of_const Const.for_variant_arg))
         | _ -> None
       in
       rvp {
