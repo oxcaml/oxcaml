@@ -51,17 +51,32 @@ module Instruction_requirements = struct
     in
     regs_use_stack_slots instr.Cfg.arg || regs_use_stack_slots instr.Cfg.res
 
+  (* CR-soon cfalas: this has a lot of overlap with
+     [Cfg.basic_block_contains_calls], but as soon as shrink wrapping is
+     implemented and enabled, we can remove [Cfg.basic_block_contains_calls]. *)
   let terminator (instr : Cfg.terminator Cfg.instruction) fun_name =
     if instr_uses_stack_slots instr
     then Requires_prologue
     else
-      match[@ocaml.warning "-4"] instr.desc with
+      match instr.desc with
+      (* These will cause the function to return, and therefore the stack should
+         be unwound. *)
       | Cfg.Return | Tailcall_func Indirect -> Requires_no_prologue
       | Tailcall_func (Direct func)
         when not (String.equal func.sym_name fun_name) ->
         Requires_no_prologue
-      | desc when Cfg.is_nontail_call_terminator desc -> Requires_prologue
-      | _ -> No_requirements
+      (* These are implemented by calling a function when emitted and therefore
+         need a prologue. *)
+      | Call _ | Call_no_return _
+      | Raise (Raise_regular | Raise_reraise)
+      | Prim { op = External _ | Probe _; _ } ->
+        Requires_prologue
+      | Tailcall_func (Direct _)
+      | Tailcall_self _
+      | Raise Raise_notrace
+      | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+      | Int_test _ | Switch _ ->
+        No_requirements
 
   let basic (instr : Cfg.basic Cfg.instruction) =
     if instr_uses_stack_slots instr
