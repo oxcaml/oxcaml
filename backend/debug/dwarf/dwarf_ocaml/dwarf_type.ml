@@ -349,13 +349,7 @@ let flatten_fields_in_mixed_record ~(mixed_block_shapes : Layout.t array)
   let reordering =
     Mixed_block_shape.of_mixed_block_elements
       ~print_locality:(fun _ _ -> ())
-      (Lambda.transl_mixed_product_shape
-         ~get_value_kind:(fun _ -> Lambda.generic_value)
-         (* We don't care about the value kind of values, because it is dropped
-            again immediately afterwards. We only care about the layout
-            remapping: we only need the reordering to get the fields right
-            below. *)
-         mixed_block_shapes)
+      (Lambda.transl_mixed_product_shape mixed_block_shapes)
   in
   let fields =
     Array.init (Mixed_block_shape.new_block_length reordering) (fun i ->

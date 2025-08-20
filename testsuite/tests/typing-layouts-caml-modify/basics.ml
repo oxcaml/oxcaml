@@ -143,18 +143,12 @@ let () =
   test ~expect_caml_modifies (fun () -> f External_variant.make);
   test ~expect_caml_modifies (fun () -> f (Unboxed 10))
 
-(* Bug: Unboxed product updates in records result in one modify per product
-   element, even if that element is external.
-
-   To be fixed in a later commit.
-*)
-
 (* Record modification with shallow external product *)
 let () =
   let open struct
     type outer = { mutable x : #(int * int) }
   end in
-  test ~expect_caml_modifies:2 (* should be 0 *)
+  test ~expect_caml_modifies:0
   (fun () ->
     let outer = { x = #(1, 2) } in
     outer.x <- #(3, 4);
@@ -167,7 +161,7 @@ let () =
     type inner = #{ a : int; b : int }
     type outer = { mutable x : inner }
   end in
-  test ~expect_caml_modifies:2 (* should be 0 *)
+  test ~expect_caml_modifies:0
   (fun () ->
     let outer = { x = #{ a = 1; b = 2 } } in
     outer.x <- #{ a = 3; b = 4 };
@@ -179,7 +173,7 @@ let () =
     type inner = { a : int; b : int }
     type outer = { mutable x : inner# }
   end in
-  test ~expect_caml_modifies:2 (* should be 0 *)
+  test ~expect_caml_modifies:0
   (fun () ->
     let outer = { x = #{ a = 1; b = 2 } } in
     outer.x <- #{ a = 3; b = 4 };
@@ -191,7 +185,7 @@ let () =
   let open struct
     type outer = { mutable x : #(int * #(int * bool)) }
   end in
-  test ~expect_caml_modifies:3 (* should be 0 *)
+  test ~expect_caml_modifies:0
   (fun () ->
     let outer = { x = #(1, #(2, true)) } in
     outer.x <- #(3, #(4, false));
@@ -204,7 +198,7 @@ let () =
     type inner2 = #{ c : int; d : inner1 }
     type outer = { mutable x : inner2 }
   end in
-  test ~expect_caml_modifies:3 (* should be 0 *)
+  test ~expect_caml_modifies:0
   (fun () ->
     let outer = { x = #{ c = 1; d = #{ a = 2; b = 3 } } } in
     outer.x <- #{ c = 4; d = #{ a = 5; b = 6 } };
@@ -217,7 +211,7 @@ let () =
     type inner2 = { c : int; d : inner1# }
     type outer = { mutable x : inner2#}
   end in
-  test ~expect_caml_modifies:3 (* should be 0 *)
+  test ~expect_caml_modifies:0
   (fun () ->
     let outer = { x = #{ c = 1; d = #{ a = 2; b = 3 } } } in
     outer.x <- #{ c = 4; d = #{ a = 5; b = 6 } };
@@ -230,7 +224,7 @@ let () =
     type outer =
       { mutable x : #(int * #(int * #(string * bool) * #(bool option * char))) }
   end in
-  test ~expect_caml_modifies:6 (* should be 2 *)
+  test ~expect_caml_modifies:2
   (fun () ->
     let outer = { x = #(1, #(2, #("a", true), #(Some true, 'a'))) } in
     outer.x <- #(3, #(4, #("b", false), #(None, 'b')));
@@ -245,7 +239,7 @@ let () =
     type inner4 = #{ h : int; i : inner3 }
     type outer = { mutable x : inner4 }
   end in
-  test ~expect_caml_modifies:6 (* should be 2 *)
+  test ~expect_caml_modifies:2
   (fun () ->
     let outer =
       { x = #{ h = 1; i = #{ e = 2;
@@ -266,7 +260,7 @@ let () =
     type inner4 = { h : int; i : inner3# }
     type outer = { mutable x : inner4# }
   end in
-  test ~expect_caml_modifies:6 (* should be 2 *)
+  test ~expect_caml_modifies:2
   (fun () ->
     let outer =
       { x = #{ h = 1; i = #{ e = 2;

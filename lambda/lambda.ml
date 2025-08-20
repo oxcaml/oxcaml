@@ -1440,10 +1440,10 @@ let transl_prim mod_name name =
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
 
-let rec transl_mixed_product_shape ~get_value_kind shape =
-  Array.mapi (fun i (elt : Types.mixed_block_element) ->
+let rec transl_mixed_product_shape shape =
+  Array.map (fun (elt : Types.mixed_block_element) ->
     match elt with
-    | Value -> Value (get_value_kind i)
+    | Value -> Value generic_value
     | Float_boxed -> Float_boxed ()
     | Float64 -> Float64
     | Float32 -> Float32
@@ -1457,10 +1457,7 @@ let rec transl_mixed_product_shape ~get_value_kind shape =
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
     | Product shapes ->
-      (* CR mshinwell: This [get_value_kind] override is a bit odd, maybe this
-         could be improved in the future (same below). *)
-      let get_value_kind _ = generic_value in
-      Product (transl_mixed_product_shape ~get_value_kind shapes)
+      Product (transl_mixed_product_shape shapes)
     | Void -> Product [||]
   ) shape
 

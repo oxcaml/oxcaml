@@ -552,11 +552,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                      constructors with all-void inline records, which are stored
                      as immediates *)
                   if !Clflags.native_code then
-                    let shape =
-                      Lambda.transl_mixed_product_shape
-                        ~get_value_kind:(fun _i -> Lambda.generic_value)
-                        shape
-                    in
+                    let shape = Lambda.transl_mixed_product_shape shape in
                     Some (Const_mixed_block(runtime_tag, shape, constants))
                   else
                     (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -583,11 +579,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                     (* CR layouts v5: once all-void records are allowed, handle
                        constructors with all-void inline records, which are
                        stored as immediates *)
-                    let shape =
-                      Lambda.transl_mixed_product_shape
-                        ~get_value_kind:(fun _i -> Lambda.generic_value)
-                        shape
-                    in
+                    let shape = Lambda.transl_mixed_product_shape shape in
                     Pmakemixedblock(runtime_tag, Immutable, shape, alloc_mode)
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
@@ -621,11 +613,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
                      as immediates *)
-                  let shape =
-                    Lambda.transl_mixed_product_shape
-                      ~get_value_kind:(fun _i -> Lambda.generic_value)
-                      shape
-                  in
+                  let shape = Lambda.transl_mixed_product_shape shape in
                   let shape =
                     (* This corresponds to the poly variant hash.  This will
                        always stay in the same place because the reordering
@@ -822,23 +810,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
              constructors with all-void inline records, which are stored as
              immediates *)
         | Record_mixed shape ->
-          let shape =
-            Lambda.transl_mixed_product_shape
-              ~get_value_kind:(fun i ->
-                if i <> lbl.lbl_pos then Lambda.generic_value
-                else
-                  let pointerness, nullable =
-                    maybe_pointer newval
-                  in
-                  let raw_kind = match pointerness with
-                    | Pointer -> Pgenval
-                    | Immediate -> Pintval
-                  in
-                  Lambda.{ raw_kind; nullable })
-              shape
-            in
-            Psetmixedfield([lbl.lbl_pos], shape, mode),
-            [arg_lambda; newval_lambda]
+          let field_shape =
+            Typeopt.transl_mixed_block_element newval.exp_env newval.exp_loc
+              newval.exp_type shape.(lbl.lbl_pos)
+          in
+          let shape = Lambda.transl_mixed_product_shape shape in
+          (* Update the shape with details for the modified field. *)
+          shape.(lbl.lbl_pos) <- field_shape;
+          Psetmixedfield([lbl.lbl_pos], shape, mode),
+          [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
       Lprim(prim, args, of_location ~scopes e.exp_loc)
@@ -2098,23 +2078,13 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                   constructors with all-void inline records, which are stored as
                   immediates *)
             | Record_mixed shape ->
-                let shape =
-                  Lambda.transl_mixed_product_shape
-                    ~get_value_kind:(fun i ->
-                      if i <> lbl.lbl_pos then Lambda.generic_value
-                      else
-                        let pointerness, nullable =
-                          maybe_pointer expr
-                        in
-                        let raw_kind = match pointerness with
-                          | Pointer -> Pgenval
-                          | Immediate -> Pintval
-                        in
-                        Lambda.{ raw_kind; nullable })
-                    shape
-                  in
-
-
+                let field_shape =
+                  Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
+                    expr.exp_type shape.(lbl.lbl_pos)
+                in
+                let shape = Lambda.transl_mixed_product_shape shape in
+                (* Update the shape with details for the modified field. *)
+                shape.(lbl.lbl_pos) <- field_shape;
                 Psetmixedfield
                   ([lbl.lbl_pos], shape, Assignment modify_heap)
             | Record_inlined (_, _, Variant_with_null) -> assert false
@@ -2228,11 +2198,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lconst(Const_float_block(List.map extract_float cl))
         | Record_mixed shape ->
             if !Clflags.native_code then
-              let shape =
-                Lambda.transl_mixed_product_shape
-                  ~get_value_kind:(fun _i -> Lambda.generic_value)
-                  shape
-              in
+              let shape = Lambda.transl_mixed_product_shape shape in
               Lconst(Const_mixed_block(0, shape, cl))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -2283,22 +2249,14 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (Ordinary _, _, Variant_extensible) ->
             assert false
         | Record_mixed shape ->
-            let shape =
-              Lambda.transl_mixed_product_shape
-                ~get_value_kind:(fun _i -> Lambda.generic_value)
-                shape
-            in
+            let shape = Lambda.transl_mixed_product_shape shape in
             Lprim (Pmakemixedblock (0, mut, shape, Option.get mode), ll, loc)
         | Record_inlined (Ordinary { runtime_tag },
                           Constructor_mixed shape, Variant_boxed _) ->
             (* CR layouts v5: once all-void records are allowed, handle
               constructors with all-void inline records, which are stored as
               immediates *)
-            let shape =
-              Lambda.transl_mixed_product_shape
-                ~get_value_kind:(fun _i -> Lambda.generic_value)
-                shape
-            in
+            let shape = Lambda.transl_mixed_product_shape shape in
             Lprim (Pmakemixedblock (runtime_tag, mut, shape, Option.get mode),
                    ll, loc)
         | Record_inlined (_, _, Variant_with_null) -> assert false
@@ -2409,10 +2367,7 @@ and transl_idx ~scopes loc env ba uas =
     | Record_inlined _ | Record_unboxed ->
       Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
     | Record_mixed shape ->
-      let shape =
-        Lambda.transl_mixed_product_shape
-          ~get_value_kind:(fun _ -> Lambda.generic_value) shape
-      in
+      let shape = Lambda.transl_mixed_product_shape shape in
       (* Check to make sure the gap never overflows.
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
       let cts =

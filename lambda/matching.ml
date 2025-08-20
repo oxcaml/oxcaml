@@ -1932,13 +1932,7 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
       fatal_error
         "Matching.get_exr_args_constr: constant Constructor_uniform_value"
     | Constructor_mixed shape ->
-      let shape =
-        transl_mixed_product_shape
-          ~get_value_kind:
-            (fun _ ->
-                fatal_error "Matching.get_expr_args_constr: get_value_kind")
-          shape
-      in
+      let shape = transl_mixed_product_shape shape in
       let e, layout = lambda_void_of_el shape.(pos) in
       (e, binding_kind, sort, layout)
   in
