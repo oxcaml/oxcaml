@@ -883,6 +883,18 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
             ((id,pos,Tcoerce_none)::l , pos+1)
         | item -> (l, if is_runtime_component item then pos+1 else pos))
       ([], 0) sig1 in
+  let module_repr_of_sig sig_ =
+    sig_ |> List.filter_map Env.field_layout_of_signature_item
+         |> List.rev_map
+           (fun layout -> layout |> Jkind.Layout.to_sort
+                                 |> Option.get (* CR jrayman *)
+                                 |> Jkind.Sort.default_for_transl_and_get
+                                 |> mixed_block_element_of_const_sort)
+         |> Array.of_list
+         |> module_representation_of_mixed_product_shape
+  in
+  let repr1 = module_repr_of_sig sig1 in
+  let repr2 = module_repr_of_sig sig2 in
   let exported_len1, runtime_len1, comps1 =
     build_component_table (fun pos _name -> pos) sig1
   in
@@ -928,7 +940,6 @@ and signature_components :
   | [] -> Sign_diff.{ empty with shape_map }
   | (sigi1, sigi2, pos) :: rem ->
       let shape_modified = ref false in
-      (* CR jrayman: replace all [Some Value]s *)
       let id, item, paired_uids, shape_map, runtime_repr =
         match sigi1, sigi2 with
         | Sig_value(id1, valdecl1, _) ,Sig_value(_id2, valdecl2, _) ->
@@ -944,13 +955,14 @@ and signature_components :
                 Some (layout |> Jkind.Layout.to_sort
                              |> Option.get (* CR jrayman *)
                              |> Jkind.Sort.default_for_transl_and_get
-                             |> Lambda.mixed_block_element_of_const_sort)
-              | Val_mut _
-              | Val_ivar _ (* CR jrayman: is this correct? *)
-              | Val_self _
-              | Val_anc _ ->
+                             |> mixed_block_element_of_const_sort)
+              | Val_mut _ ->
                 Misc.fatal_error
-                  "Includemod.signature_components: unsupported val_kind"
+                  "Includemod.signature_components: mutable var in signature"
+              (* CR jrayman: replace all [Some Value]s *)
+              | Val_ivar _ -> Some Value
+              | Val_self _ -> Some Value
+              | Val_anc _ -> Some Value
             in
             let shape_map = Shape.Map.add_value_proj shape_map id1 orig_shape in
             let paired_uids = (valdecl1.val_uid, valdecl2.val_uid) in
@@ -972,7 +984,11 @@ and signature_components :
             let shape_map =
               Shape.Map.add_extcons_proj shape_map id1 orig_shape
             in
-            id1, item, (ext1.ext_uid, ext2.ext_uid), shape_map, Some Value
+            ( id1,
+              item,
+              (ext1.ext_uid, ext2.ext_uid),
+              shape_map,
+              Some mixed_block_element_for_type_extension )
         | Sig_module(id1, pres1, mty1, _, _), Sig_module(_, pres2, mty2, _, _)
           -> begin
               let orig_shape =
@@ -997,10 +1013,11 @@ and signature_components :
               in
               let runtime_repr, item =
                 match pres1, pres2, mty1.md_type with
-                | Mp_present, Mp_present, _ -> Some Value, item
+                | Mp_present, Mp_present, _ ->
+                  Some mixed_block_element_for_module, item
                 | _, Mp_absent, _ -> None, item
                 | Mp_absent, Mp_present, Mty_alias p1 ->
-                  ( Some Value,
+                  ( Some mixed_block_element_for_module,
                     Result.map (fun i -> Tcoerce_alias (env, p1, i)) item )
                 | Mp_absent, Mp_present, _ -> assert false
               in
@@ -1025,7 +1042,11 @@ and signature_components :
               Shape.Map.add_class_proj shape_map id1 orig_shape
             in
             let item = mark_error_as_unrecoverable item in
-            id1, item, (decl1.cty_uid, decl2.cty_uid), shape_map, Some Value
+            ( id1,
+              item,
+              (decl1.cty_uid, decl2.cty_uid),
+              shape_map,
+              Some mixed_block_element_for_class )
         | Sig_class_type(id1, info1, _, _), Sig_class_type(_id2, info2, _, _) ->
             let item =
               class_type_declarations ~loc env subst info1 info2

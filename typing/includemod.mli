@@ -207,8 +207,7 @@ val signatures: Env.t -> mark:bool -> modes:modes ->
   signature -> signature -> module_coercion
 
 val include_functor_signatures : Env.t -> mark:bool ->
-  signature -> signature ->
-  (Ident.t * mixed_block_element * module_coercion) list
+  signature -> signature -> (Ident.t * module_coercion) list
 
 val check_implementation: Env.t -> modes:modes -> signature -> signature -> unit
 (** Check an implementation against an interface *)
