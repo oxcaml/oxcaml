@@ -258,7 +258,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | Naked_nativeint, Naked_float32 -> caml_of "float32" "nativeint"
     | Naked_nativeint, Naked_float -> caml_to "nativeint" "float"
     | Naked_nativeint, Naked_int32 -> caml_to "nativeint" "int32"
-    | Naked_nativeint, Naked_int64 -> caml_to "nativeint" "int64")
+    | Naked_nativeint, Naked_int64 -> caml_of "int64" "nativeint")
   | Boolean_not -> use_prim' Not
   | Reinterpret_64_bit_word reinterpret ->
     let extern_name =
@@ -390,12 +390,24 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   | Int_comp (kind, behaviour) -> (
     match behaviour with
     | Yielding_bool comparison -> (
+      let eq, neq, lt, ult, le =
+        let open Jsir in
+        match kind with
+        | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_nativeint ->
+          Eq, Neq, Lt, Ult, Le
+        | Naked_int64 ->
+          ( Extern "caml_equal",
+            Extern "caml_notequal",
+            Extern "caml_lessthan",
+            Extern "caml_int64_ult",
+            Extern "caml_lessequal" )
+      in
       let unsigned_le x y =
         let var_ule = Jsir.Var.fresh () in
         let var_eq = Jsir.Var.fresh () in
         let var_or = Jsir.Var.fresh () in
-        let expr_ule : Jsir.expr = Prim (Ult, [x; y]) in
-        let expr_eq : Jsir.expr = Prim (Eq, [x; y]) in
+        let expr_ule : Jsir.expr = Prim (ult, [x; y]) in
+        let expr_eq : Jsir.expr = Prim (eq, [x; y]) in
         let res =
           To_jsir_result.add_instr_exn res (Jsir.Let (var_ule, expr_ule))
         in
@@ -412,15 +424,15 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       let x, res = prim_arg ~env ~res x in
       let y, res = prim_arg ~env ~res y in
       match comparison with
-      | Eq -> use_prim ~env ~res Eq [x; y]
-      | Neq -> use_prim ~env ~res Neq [x; y]
-      | Lt Signed -> use_prim ~env ~res Lt [x; y]
-      | Lt Unsigned -> use_prim ~env ~res Ult [x; y]
-      | Gt Signed -> use_prim ~env ~res Lt [y; x]
-      | Gt Unsigned -> use_prim ~env ~res Ult [y; x]
-      | Le Signed -> use_prim ~env ~res Le [x; y]
+      | Eq -> use_prim ~env ~res eq [x; y]
+      | Neq -> use_prim ~env ~res neq [x; y]
+      | Lt Signed -> use_prim ~env ~res lt [x; y]
+      | Lt Unsigned -> use_prim ~env ~res ult [x; y]
+      | Gt Signed -> use_prim ~env ~res lt [y; x]
+      | Gt Unsigned -> use_prim ~env ~res ult [y; x]
+      | Le Signed -> use_prim ~env ~res le [x; y]
       | Le Unsigned -> unsigned_le x y
-      | Ge Signed -> use_prim ~env ~res Le [y; x]
+      | Ge Signed -> use_prim ~env ~res le [y; x]
       | Ge Unsigned -> unsigned_le y x)
     | Yielding_int_like_compare_functions signed_or_unsigned -> (
       match signed_or_unsigned with

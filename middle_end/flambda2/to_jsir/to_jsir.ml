@@ -472,12 +472,10 @@ and apply_cont0 ~env ~res apply_cont =
       let res, addr = To_jsir_result.new_block res ~params:[] in
       let res = To_jsir_result.end_block_with_last_exn res last in
       Jsir.Pushtrap ((addr, []), handler_var, (handler_addr, [])), res)
-  | Some (Pop { exn_handler; raise_kind }) -> (
+  | Some (Pop { exn_handler = _; raise_kind }) -> (
     let last, res = get_last ~raise_kind in
-    if Continuation.equal exn_handler (To_jsir_env.exn_continuation env)
-    then (
-      assert (Option.is_some raise_kind);
-      last, res)
+    if Option.is_some raise_kind
+    then last, res
     else
       (* [Jsir.Poptrap] always jumps to a block after popping the exception
          handler. If we want to do anything than just [Branch], we should jump
