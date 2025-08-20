@@ -98,10 +98,10 @@ module Illegal_permutation = struct
   (** We extract a lone transposition from a full tree of permutations. *)
   let rec transposition_under path (coerc:Typedtree.module_coercion) =
     match coerc with
-    | Tcoerce_structure(c,_) ->
+    | Tcoerce_structure { pos_cc_list; _ } ->
         either
-          (not_fixpoint path 0) c
-          (first_non_id path 0) c
+          (not_fixpoint path 0) pos_cc_list
+          (first_non_id path 0) pos_cc_list
     | Tcoerce_functor(arg,res) ->
         either
           (transposition_under (InArg::path)) arg
@@ -114,7 +114,7 @@ module Illegal_permutation = struct
   (* we search the first point which is not invariant at the current level *)
   and not_fixpoint path pos = function
     | [] -> None
-    | (n, _, _) :: q ->
+    | (n, _) :: q ->
         if n = pos then
           not_fixpoint path (pos+1) q
         else
@@ -122,8 +122,8 @@ module Illegal_permutation = struct
   (* we search the first item with a non-identity inner coercion *)
   and first_non_id path pos = function
     | [] -> None
-    | (_, _, Typedtree.Tcoerce_none) :: q -> first_non_id path (pos + 1) q
-    | (_, _, c) :: q ->
+    | (_, Typedtree.Tcoerce_none) :: q -> first_non_id path (pos + 1) q
+    | (_,c) :: q ->
         either
           (transposition_under (Item pos :: path)) c
           (first_non_id path (pos + 1)) q

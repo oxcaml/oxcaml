@@ -57,7 +57,10 @@ type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
   | Adot of address * Jkind.Sort.t Jkind.Layout.t array * int
-  (* CR jrayman: would it be better for this to be a [module_representation]? *)
+
+(* CR jrayman: this shouldn't have to be exposed *)
+val field_layout_of_signature_item :
+  Subst.Lazy.signature_item -> Jkind_types.Sort.t Jkind_types.Layout.t option
 
 type t
 
