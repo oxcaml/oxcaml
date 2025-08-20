@@ -28,7 +28,6 @@ module Raise_kind : sig
     | Reraise
     | No_trace
 
-
   val from_lambda : Lambda.raise_kind -> t
 
   (** Providing [None] is the same as providing [Some No_trace]. *)
