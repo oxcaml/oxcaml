@@ -469,13 +469,6 @@ let is_return_terminator desc =
   | Call _ | Prim _ ->
     false
 
-let is_nontail_call_terminator desc =
-  match (desc : terminator) with
-  | Call_no_return _ | Call _ -> true
-  | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Prim _ ->
-    false
-
 let is_pure_basic : basic -> bool = function
   | Op op -> Operation.is_pure op
   | Reloadretaddr ->

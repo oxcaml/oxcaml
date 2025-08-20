@@ -31,12 +31,27 @@
 open! Int_replace_polymorphic_compare
 module DLL = Oxcaml_utils.Doubly_linked_list
 
+let is_nontail_call : Cfg.terminator -> bool =
+ fun term_desc ->
+  (* CR-soon xclerc for xclerc: reconsider whether this predicate is generic and
+     well-defined enough to be moved to `Cfg` once the transitive checks are
+     implemented. *)
+  match term_desc with
+  | Call_no_return _ | Call _ -> true
+  | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
+  | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Prim _ ->
+    false
+
 (* Returns the stack check info, and the max of seen instruction ids. *)
 let block_preproc_stack_check_result :
     Cfg.basic_block -> frame_size:int -> Emitaux.preproc_stack_check_result =
  fun block ~frame_size ->
   let contains_nontail_calls =
-    Cfg.is_nontail_call_terminator block.terminator.desc
+    (* XCR mshinwell: move to a method in Cfg somewhere?
+
+       xclerc: I have extracted the match to a dedicated function, but I don't
+       think the predicate is generic enough to be moved to `Cfg`. *)
+    is_nontail_call block.terminator.desc
   in
   let max_frame_size =
     DLL.fold_left block.body ~init:block.terminator.stack_offset

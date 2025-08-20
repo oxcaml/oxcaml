@@ -202,8 +202,6 @@ val is_never_terminator : terminator -> bool
 
 val is_return_terminator : terminator -> bool
 
-val is_nontail_call_terminator : terminator -> bool
-
 val is_pure_basic : basic -> bool
 
 val is_noop_move : basic instruction -> bool
