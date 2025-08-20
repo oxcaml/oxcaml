@@ -277,6 +277,16 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
         ~init:(Validator.State_set.singleton No_prologue_on_stack)
         ~handlers_are_entry_points:false { fun_name }
     with
-    | Ok _ -> cfg_with_layout
+    | Ok block_states ->
+      Label.Tbl.iter
+        (fun label state ->
+          let block = Cfg.get_block_exn cfg label in
+          if block.is_trap_handler
+             && Validator.State_set.mem No_prologue_on_stack state
+          then
+            Misc.fatal_error
+              "Cfg_prologue: can reach trap handler with no prologue")
+        block_states;
+      cfg_with_layout
     | Error () -> Misc.fatal_error "Cfg_prologue: dataflow analysis failed")
   | false -> cfg_with_layout
