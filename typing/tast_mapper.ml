@@ -133,12 +133,12 @@ let module_substitution sub x =
 
 let include_kind sub = function
   | Tincl_structure -> Tincl_structure
-  | Tincl_functor ccs ->
+  | Tincl_functor (ccs, repr) ->
       Tincl_functor
-        (List.map (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) ccs)
-  | Tincl_gen_functor ccs ->
+        (List.map (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) ccs, repr)
+  | Tincl_gen_functor (ccs, repr) ->
       Tincl_gen_functor
-        (List.map (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) ccs)
+        (List.map (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) ccs, repr)
 
 let str_include_infos sub x =
   let incl_loc = sub.location sub x.incl_loc in
