@@ -568,6 +568,10 @@ and mixed_block_element =
 
 and mixed_product_shape = mixed_block_element array
 
+and module_representation =
+  | Module_value_only of int
+  | Module_mixed of mixed_product_shape
+
 and record_representation =
   | Record_unboxed
   | Record_inlined of tag * constructor_representation * variant_representation
@@ -1032,6 +1036,33 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
   match record_form with
   | Legacy -> "record"
   | Unboxed_product -> "unboxed record"
+
+let module_representation_of_mixed_product_shape shape =
+  if Array.for_all (equal_mixed_block_element Value) shape
+  then Module_value_only (Array.length shape)
+  else Module_mixed shape
+
+let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
+  match sort with
+  | Base Value -> Value
+  | Base Bits8 -> Bits8
+  | Base Bits16 -> Bits16
+  | Base Bits32 -> Bits32
+  | Base Bits64 -> Bits64
+  | Base Float32 -> Float32
+  | Base Float64 -> Float64
+  | Base Vec128 -> Vec128
+  | Base Vec256 -> Vec256
+  | Base Vec512 -> Vec512
+  | Base Word -> Word
+  | Product sorts ->
+    Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
+  | Base Void -> Product [||]
+
+let mixed_block_element_for_type_extension = Value
+let mixed_block_element_for_exception = Value
+let mixed_block_element_for_module = Value
+let mixed_block_element_for_class = Value
 
 let find_unboxed_type decl =
   match decl.type_kind with

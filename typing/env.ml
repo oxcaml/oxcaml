@@ -2146,6 +2146,29 @@ let is_identchar c =
   | _ ->
     false
 
+let field_layout_of_signature_item (item : Subst.Lazy.signature_item) =
+  match item with
+  | Sig_value(_, decl, _) ->
+    begin match decl.val_kind with
+    | Val_reg layout -> Some layout
+    | Val_ivar _ | Val_self _ | Val_anc _ ->
+      Some (Jkind.Layout.Sort Jkind.Sort.value)
+    | Val_prim _ | Val_mut _ -> None (* error will be thrown later *)
+    end
+  | Sig_typext _ -> Some (Jkind.Layout.Sort Jkind.Sort.value)
+  | Sig_module(_, pres, _, _, _) ->
+    begin match pres with
+    | Mp_present ->
+      Some Jkind.(Layout.of_const
+                   (Layout.Const.of_sort_const Sort.Const.for_module))
+    | Mp_absent -> None
+    end
+  | Sig_class _ ->
+      Some Jkind.(Layout.of_const
+                   (Layout.Const.of_sort_const Sort.Const.for_object))
+          (* CR jrayman: is [for_object] correct? *)
+  | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
+
 let rec components_of_module_maker
           {cm_env; cm_prefixing_subst;
            cm_path; cm_addr; cm_mty; cm_mode; cm_shape} : _ result =
@@ -2165,35 +2188,9 @@ let rec components_of_module_maker
       let env = ref cm_env in
       let pos = ref 0 in
       let field_layouts =
-        List.fold_left (fun layouts ((item : Subst.Lazy.signature_item), _) ->
-          match item with
-          | Sig_value(_, decl, _) ->
-            begin match decl.val_kind with
-            | Val_reg layout -> layout :: layouts
-            | Val_ivar _ | Val_self _ | Val_anc _ ->
-              (Jkind.Layout.Sort Jkind.Sort.value) :: layouts
-            | Val_prim _ | Val_mut _ -> layouts (* will throw error later *)
-            end
-          | Sig_typext _ -> (Jkind.Layout.Sort Jkind.Sort.value) :: layouts
-          | Sig_module(_, pres, _, _, _) ->
-            begin match pres with
-            | Mp_present ->
-              let layout =
-                Jkind.(Layout.of_const
-                        (Layout.Const.of_sort_const Sort.Const.for_module))
-              in
-              layout :: layouts
-            | Mp_absent -> layouts
-            end
-          | Sig_class _ ->
-              let layout =
-                Jkind.(Layout.of_const
-                        (Layout.Const.of_sort_const Sort.Const.for_object))
-                  (* CR jrayman: is [for_object] correct? *)
-              in
-              layout :: layouts
-          | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> layouts)
-          [] items_and_paths
+        List.filter_map
+          (fun (item, _) -> field_layout_of_signature_item item)
+          items_and_paths
         |> List.rev
       in
       let next_address () =

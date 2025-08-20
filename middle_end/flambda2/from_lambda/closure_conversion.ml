@@ -3814,20 +3814,20 @@ let bind_static_consts_and_code acc body =
 
 let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
     ~return_cont ~module_symbol =
-  let open struct
-    type module_representation =
-      | Module_value_only of int
-      | Module_mixed of
-          unit K.Mixed_block_lambda_shape.Singleton_mixed_block_element.t array
-          * K.Mixed_block_shape.t
-  end in
   let module_block_var = Variable.create "module_block" K.value in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
-  let module_repr, block_shape, field_count =
+  let block_shape, field_count, block_access =
     match module_repr with
     | Lambda.Module_value_only size ->
-      Module_value_only size, K.Scannable_block_shape.Value_only, size
+      let block_access _pos : P.Block_access_kind.t =
+        Values
+          { tag = Known Tag.Scannable.zero;
+            size = Known (Targetint_31_63.of_int size);
+            field_kind = Any_value
+          }
+      in
+      K.Scannable_block_shape.Value_only, size, block_access
     | Lambda.Module_mixed shape ->
       let shape =
         K.Mixed_block_lambda_shape.of_mixed_block_elements shape
@@ -3836,11 +3836,31 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       let flattened_reordered_shape =
         K.Mixed_block_lambda_shape.flattened_reordered_shape shape
       in
+      let field_count = Array.length flattened_reordered_shape in
       let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
       let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
-      ( Module_mixed (flattened_reordered_shape, kind_shape),
-        block_shape,
-        Array.length flattened_reordered_shape )
+      let block_access pos : P.Block_access_kind.t =
+        let field_kind : P.Mixed_block_access_field_kind.t =
+          match flattened_reordered_shape.(pos) with
+          | Value _ -> Value_prefix Any_value
+          | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
+            | Vec256 | Vec512 | Word ) as mixed_block_element ->
+            Flat_suffix
+              (K.Flat_suffix_element.from_singleton_mixed_block_element
+                 mixed_block_element)
+          | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float
+        in
+        Mixed
+          { tag = Known Tag.Scannable.zero;
+            (* CR jrayman: Is this the right tag? *)
+            size = Known (Targetint_31_63.of_int field_count);
+            (* CR jrayman: Is this size in words or number of fields? *)
+            field_kind;
+            (* CR jrayman: is field_kind correct? *)
+            shape = kind_shape
+          }
+      in
+      block_shape, field_count, block_access
   in
   let load_fields_body acc =
     let env =
@@ -3893,38 +3913,6 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       Let_with_acc.create acc
         (Bound_pattern.static bound_static)
         named ~body:return
-    in
-    let block_access : int -> P.Block_access_kind.t =
-      match module_repr with
-      | Module_value_only size ->
-        fun _pos ->
-          Values
-            { tag = Known Tag.Scannable.zero;
-              size = Known (Targetint_31_63.of_int size);
-              field_kind = Any_value
-            }
-      | Module_mixed (flattened_reordered_shape, kind_shape) ->
-        fun pos ->
-          Format.printf "pos: %d\n" pos;
-          let field_kind : P.Mixed_block_access_field_kind.t =
-            match flattened_reordered_shape.(pos) with
-            | Value _ -> Value_prefix Any_value
-            | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-              | Vec256 | Vec512 | Word ) as mixed_block_element ->
-              Flat_suffix
-                (K.Flat_suffix_element.from_singleton_mixed_block_element
-                   mixed_block_element)
-            | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float
-          in
-          Mixed
-            { tag = Known Tag.Scannable.zero;
-              (* CR jrayman: Is this the right tag? *)
-              size = Known (Targetint_31_63.of_int field_count);
-              (* CR jrayman: Is this size in words or number of fields? *)
-              field_kind;
-              (* CR jrayman: is field_kind correct? *)
-              shape = kind_shape
-            }
     in
     List.fold_left
       (fun (acc, body) (pos, var, var_duid) ->
