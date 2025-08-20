@@ -1126,9 +1126,9 @@ val transl_mixed_block_element :
   unit mixed_block_element
 
 val transl_mixed_product_shape_for_read :
-  get_value_kind:(int -> value_kind) -> get_mode:(int -> locality_mode)
+  get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
   -> Types.mixed_product_shape
-  -> mixed_block_shape_with_locality_mode
+  -> 'a mixed_block_element array
 
 val transl_module_representation :
   Types.module_representation -> module_representation
@@ -1243,8 +1243,8 @@ val reset: unit -> unit
 val mod_field:
   ?read_semantics: field_read_semantics -> int ->
   module_representation -> primitive
-(* CR jrayman: [mod_setfield] needs module repr *)
-val mod_setfield: int -> primitive
+
+val mod_setfield: int -> module_representation -> primitive
 
 val structured_constant_layout : structured_constant -> layout
 

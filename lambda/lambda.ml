@@ -1525,9 +1525,14 @@ let transl_module_representation = function
   | Types.Module_value_only size -> Module_value_only size
   | Types.Module_mixed shape ->
     Module_mixed
-      (transl_mixed_product_shape
-        ~get_value_kind:(fun _ -> generic_value) shape)
-        (* CR jrayman: disallow [Float_boxed] *)
+      (* CR jrayman for reviewer: [transl_mixed_product_shape_for_read] is a
+         little misleading. Should it be renamed to
+         [transl_mixed_product_shape_with_mode]? *)
+      (transl_mixed_product_shape_for_read
+        ~get_value_kind:(fun _ -> generic_value)
+        ~get_mode:(fun _ ->
+           fatal_error "Lambda.transl_module_representation: \
+                          unexpected [Float_boxed].") shape)
 
 let block_of_module_representation = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
@@ -1876,8 +1881,10 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
     in
     Pmixedfield([pos], for_read shape, read_semantics)
 
-let mod_setfield pos =
-  Psetfield (pos, Pointer, Root_initialization)
+let mod_setfield pos = function
+  | Module_value_only _ -> Psetfield (pos, Pointer, Root_initialization)
+  | Module_mixed shape ->
+    Psetmixedfield([pos], shape, Root_initialization)
 
 let locality_mode_of_primitive_description (p : external_call_description) =
   if not Config.stack_allocation then

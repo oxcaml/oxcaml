@@ -1094,7 +1094,6 @@ let layout env loc sort ty =
                                                    Some ty)))
     )
 
-(* CR jrayman: why is this here when [layout_of_const_sort] exists? *)
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)
     ~error:(function
