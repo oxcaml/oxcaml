@@ -1,2 +1,5 @@
+Test 1: basic mixed module
 5
 10
+Test 2: shadowing within a module
+10. 20.

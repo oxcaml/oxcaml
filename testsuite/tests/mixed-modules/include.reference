@@ -1,0 +1,14 @@
+Test 1: include with module ident
+42. hello 123 3.14
+Test 2: include with inline struct
+42. hello 123 3.14
+Test 3: include with functor
+42. hello 123 3.14
+Test 4: multiple includes
+1. from A 2. from B 3.
+Test 5: include shadowing include
+20. overridden 100
+Test 6: include shadowing a val
+5. from include 7.
+Test 7: val shadowing an include
+9. from include after include
