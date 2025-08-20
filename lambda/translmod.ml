@@ -1435,6 +1435,7 @@ type runtime_arg =
   | Argument_block of {
       ra_unit : Compilation_unit.t;
       ra_field_idx : int;
+      ra_main_repr : module_representation;
     }
   | Main_module_block of Compilation_unit.t
   | Unit
@@ -1444,10 +1445,10 @@ let unit_of_runtime_arg arg =
   | Argument_block { ra_unit = cu; _ } | Main_module_block cu -> Some cu
   | Unit -> None
 
-let transl_runtime_arg repr arg =
+let transl_runtime_arg arg =
   match arg with
-  | Argument_block { ra_unit; ra_field_idx; } ->
-      Lprim (mod_field ra_field_idx repr,
+  | Argument_block { ra_unit; ra_field_idx; ra_main_repr } ->
+      Lprim (mod_field ra_field_idx ra_main_repr,
              [Lprim (Pgetglobal ra_unit, [], Loc_unknown)],
              Loc_unknown)
   | Main_module_block cu ->
@@ -1470,7 +1471,7 @@ let transl_instance_impl
            Loc_unknown)
   in
   let runtime_args_lam =
-    List.map (transl_runtime_arg main_module_block_repr) runtime_args
+    List.map transl_runtime_arg runtime_args
   in
   let code =
     Lapply {
