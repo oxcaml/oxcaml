@@ -1950,6 +1950,8 @@ let llvmir_to_assembly t =
             Filename.quote asm_filename;
             "-O3";
             "-S";
+            "-march=haswell";
+            "-mtune=skylake";
             "-Wno-override-module" ]
          @ fp_flags
          @ ["-x ir"; Filename.quote t.llvmir_filename]))
