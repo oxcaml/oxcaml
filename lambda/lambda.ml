@@ -2402,6 +2402,12 @@ let layout_of_mixed_block_shape
     = fun shape ~path ->
   layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
 
+let layout_of_module_field repr pos =
+  match repr with
+  | Module_value_only _ -> layout_value_field
+  | Module_mixed (shape, _) ->
+    layout_of_mixed_block_element shape.(pos)
+
 let rec mixed_block_element_of_layout (layout : layout) :
     unit mixed_block_element =
   match layout with
