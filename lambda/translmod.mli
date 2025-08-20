@@ -25,8 +25,11 @@ open Lambda
    [argument_interface.ai_coercion_from_primary] fields from
    [Typedtree.implementation].)*)
 (* CR lmaurer: This should just be taking [Typedtree.implementation]. But it
-   can't, because [Opttoploop] calls it and doesn't have a
-   full implementation. *)
+   can't, because [Opttoploop] calls it and doesn't have a full implementation.
+   But [Opttoploop] _shouldn't_ be calling it, it should be calling
+   [transl_store_phrases], because it's only storing phrases. But [Opttoploop]
+   _should not exist anymore_, since upstream refactored the toplevel code.
+   mshinwell: PR4527 has now removed transl_store* *)
 val transl_implementation:
       Compilation_unit.t -> structure * module_coercion * module_coercion option
         -> Lambda.program

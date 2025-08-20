@@ -1409,7 +1409,6 @@ let () =
         None
     )
 
-
 let reset () =
   primitive_declarations := [];
   aliased_idents := Ident.empty;
