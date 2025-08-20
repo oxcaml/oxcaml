@@ -364,7 +364,8 @@ let package_files ~ppf_dump initial_env files targetfile =
         Typemod.package_units initial_env files (Unit_info.companion_cmi target)
           comp_unit
       in
-      package_object_files ~ppf_dump files target coercion repr
+      package_object_files ~ppf_dump files target coercion
+        (Lambda.transl_module_representation repr)
     )
     ~exceptionally:(fun () -> remove_file targetfile)
 
