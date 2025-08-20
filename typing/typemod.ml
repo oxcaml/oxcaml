@@ -193,6 +193,9 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
         with Includemod.Error msg ->
           raise (Error(loc, env, Not_included_functor msg))
       in
+      let param_repr =
+        Includemod.module_representation_of_signature ~loc sg_param
+      in
       (* We must scrape the result type in an environment expanded with the
          parameter type (to avoid `Not_found` exceptions when it is referenced).
          Because we don't have an actual parameter, we create definitions for
@@ -211,12 +214,14 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
            and
               sig..end -> () -> sig..end *)
         match Mtype.scrape extended_env mty_result with
-        | Mty_signature sg_result -> Tincl_functor coercion, sg_result
+        | Mty_signature sg_result ->
+            Tincl_functor (coercion, param_repr), sg_result
         | Mty_functor (Unit,_) when funct_body && Mtype.contains_type env mty ->
             raise (Error (loc, env, Not_includable_in_functor_body))
         | Mty_functor (Unit,mty_result) -> begin
             match Mtype.scrape extended_env mty_result with
-            | Mty_signature sg_result -> Tincl_gen_functor coercion, sg_result
+            | Mty_signature sg_result ->
+                Tincl_gen_functor (coercion, param_repr), sg_result
             | sg -> raise (Error (loc,env,Signature_result_expected
                                             (Mty_functor (Unit,sg))))
           end
