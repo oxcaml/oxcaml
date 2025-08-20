@@ -945,7 +945,6 @@ type runtime_param =
 (* The structure of a module block. This is distinct from
    [Types.record_representation] since, e.g., modules don't support the float
    block optimization. *)
-(* CR jrayman: make this generic? *)
 type module_representation =
   | Module_value_only of int
   (* All module fields are boxed. The [int] is the number of fields *)
@@ -1041,8 +1040,8 @@ val layout_exception : layout
 val layout_function : layout
 val layout_object : layout
 val layout_class : layout
-val layout_module : layout
-val layout_functor : layout
+val layout_module : layout (* CR jrayman: this should not be changed, right? *)
+val layout_functor : layout (* CR jrayman: this should not be changed, right? *)
 val layout_module_field : layout (* CR jrayman: delete? *)
 val layout_string : layout
 val layout_boxed_float : boxed_float -> layout
@@ -1248,6 +1247,7 @@ val reset: unit -> unit
     Module accesses are always immutable, except in translobj where the
     method cache is stored in a mutable module field.
 *)
+(* CR jrayman: [mod_field] and [mod_setfield] assume non-mixed blocks *)
 val mod_field: ?read_semantics: field_read_semantics -> int -> primitive
 val mod_setfield: int -> primitive
 
