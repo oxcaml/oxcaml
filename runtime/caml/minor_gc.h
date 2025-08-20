@@ -85,6 +85,8 @@ struct caml_minor_tables {
 CAMLextern void caml_minor_collection (void);
 
 #ifdef CAML_INTERNALS
+#include <stdbool.h>
+
 extern void caml_set_minor_heap_size (asize_t); /* size in bytes */
 extern void caml_empty_minor_heap_no_major_slice_from_stw
   (caml_domain_state* domain, void* unused, int participating_count,
@@ -102,6 +104,11 @@ extern void caml_realloc_dependent_table (struct caml_dependent_table *);
 struct caml_minor_tables* caml_alloc_minor_tables(void);
 void caml_free_minor_tables(struct caml_minor_tables*);
 void caml_empty_minor_heap_setup(caml_domain_state* domain, void*);
+
+/* We are about to write `count` fields on the major heap, with values
+ * currently on the minor heap. We may wish to do a minor GC
+ * first. Returns `true` if a minor GC was done. */
+bool caml_maybe_minor_gc_before_writes(mlsize_t count);
 
 #ifdef DEBUG
 extern int caml_debug_is_minor(value val);
