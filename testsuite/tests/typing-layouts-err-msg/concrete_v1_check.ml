@@ -4,4 +4,6 @@
 *)
 
 type t_void : void;;
-(assert false : t_void);;
+external unbox_unit : unit -> t_void = "%unbox_unit";;
+
+(unbox_unit () : t_void);;

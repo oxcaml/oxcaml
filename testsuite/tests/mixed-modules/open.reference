@@ -14,3 +14,5 @@ Test 6: open shadowing a val
 5. from open 7.
 Test 7: val shadowing an open
 9. from open after open
+Test 8: open Ident can be used to circumvent the scannable tag size restriction
+42. 43. [a_181] [a_250]
