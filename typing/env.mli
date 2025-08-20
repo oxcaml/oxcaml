@@ -60,7 +60,9 @@ type address = Persistent_env.address =
 
 (* CR jrayman for reviewer: Is there a better place to put these functions?
    Both are used in Env and Includemod, and depend on Subst and Jkind (not just
-   Jkind_types) *)
+   Jkind_types)
+
+   Move to types *)
 val layout_of_lazy_signature_item :
   Subst.Lazy.signature_item -> Jkind_types.Sort.t Jkind_types.Layout.t option
 val layout_of_signature_item :

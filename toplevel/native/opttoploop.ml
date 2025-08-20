@@ -115,7 +115,7 @@ let close_phrase lam =
   Ident.Set.fold (fun id l ->
     let glb, pos = toplevel_value id in
     let glob =
-      Lprim (mod_field pos (Module_value_only (-1)),
+      Lprim (mod_field pos (Module_value_only (-1)), (* CR jrayman: wrong *)
              [Lprim (Pgetglobal glb, [], Loc_unknown)],
              Loc_unknown)
     in
