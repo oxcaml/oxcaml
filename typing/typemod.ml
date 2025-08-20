@@ -159,24 +159,6 @@ let rec path_concat head p =
   | Papply _ -> assert false
   | Pextra_ty (p, extra) -> Pextra_ty (path_concat head p, extra)
 
-(* CR jrayman: refactor. This is duplicated in Includemod *)
-let module_representation_of_signature ~loc sg =
-  sg
-  |> List.filter_map Env.layout_of_signature_item
-  |> List.map
-       (fun layout ->
-          layout
-          |> Jkind.Layout.to_sort
-            (* we already checked that [sig_] is representable
-               in [transl_decl_value] *)
-          |> Misc.Stdlib.Option.get_or_fatal_error
-               ~error:"Typemod.module_representation_of_signature: \
-                       unexpected unrepresentable sig item"
-          |> Jkind.Sort.default_for_transl_and_get
-          |> mixed_block_element_of_const_sort)
-  |> Array.of_list
-  |> Typedecl.module_representation_of_mixed_product_shape ~loc
-
 (* Extract a signature from a module type *)
 
 let extract_sig env loc mty =
@@ -2022,7 +2004,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     let incl =
       { incl_mod = tmty;
         incl_type = sg;
-        incl_repr = module_representation_of_signature ~loc sg;
+        incl_repr = Includemod.module_representation_of_signature ~loc sg;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -3344,7 +3326,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
-      open_bound_repr = module_representation_of_signature ~loc sg;
+      open_bound_repr = Includemod.module_representation_of_signature ~loc sg;
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3389,7 +3371,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
     let incl =
       { incl_mod = modl;
         incl_type = sg;
-        incl_repr = module_representation_of_signature ~loc sg;
+        incl_repr = Includemod.module_representation_of_signature ~loc sg;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;

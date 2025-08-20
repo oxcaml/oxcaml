@@ -857,8 +857,8 @@ and value_binding =
 and module_coercion =
     Tcoerce_none
   | Tcoerce_structure of
-      (* CR jrayman: [input_repr] and [output_repr] are translated into
-         [Lambda.module_representations] as soon as they are projected.
+      (* CR jrayman for reviewer: [input_repr] and [output_repr] are translated
+         into [Lambda.module_representations] as soon as they are projected.
          Should they instead somehow be translated when constructed? *)
       { input_repr : Types.module_representation
       ; output_repr : Types.module_representation
