@@ -987,7 +987,7 @@ type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
                                         (* The parameter implemented (the [P] in
                                            [-as-argument-for P]) *)
-    arg_block_idx: int; }               (* The index within the main module
+    arg_block_idx: int;                 (* The index within the main module
                                            block of the _argument block_. If
                                            this compilation unit is used as an
                                            argument when instantiating,
@@ -998,6 +998,10 @@ type arg_descr =
                                            that of the parameter, which is in
                                            general a supertype of this
                                            compilation unit's signature. *)
+    main_repr: module_representation;   (* The representation of the main
+                                           module, which is required to index
+                                           into it *)
+  }
 
 (* Sharing key *)
 val make_key: lambda -> lambda option
