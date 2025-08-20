@@ -1331,8 +1331,6 @@ let foo y =
   mut
 [%%expect{|
 val foo : 'a -> 'a = <fun>
-|}, Principal{|
-val foo : '_weak1 -> '_weak1 = <fun>
 |}]
 let foo (local_ #{ gbl }) = gbl
 [%%expect{|
@@ -1343,8 +1341,6 @@ let foo y =
   gbl
 [%%expect{|
 val foo : 'a -> 'a = <fun>
-|}, Principal{|
-val foo : '_weak2 -> '_weak2 = <fun>
 |}]
 
 let foo (local_ imm) =
@@ -1423,11 +1419,8 @@ val foo : local_ 'a gbl -> 'a = <fun>
 let foo y =
   let #{ gbl } = local_ #{ gbl = y } in
   gbl
-(* CR layouts v2.8: Fix principal case, or convince ourselves that it's expected *)
 [%%expect{|
 val foo : 'a -> 'a = <fun>
-|}, Principal{|
-val foo : '_weak3 -> '_weak3 = <fun>
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in
