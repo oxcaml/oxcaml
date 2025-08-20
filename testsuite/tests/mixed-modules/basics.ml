@@ -9,6 +9,9 @@
  }
 *)
 
+open Stdlib_upstream_compatible
+external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
+
 module My_module = struct
   let foo = "a"
   let bar = #5L
@@ -16,7 +19,7 @@ module My_module = struct
   let qux = 10
 end
 
-let _ = print_int (Stdlib_upstream_compatible.Int64_u.to_int My_module.bar)
+let _ = print_int (Int64_u.to_int (id My_module.bar))
 let _ = print_endline ""
-let _ = print_int My_module.qux
+let _ = print_int (id My_module.qux)
 let _ = print_endline ""
