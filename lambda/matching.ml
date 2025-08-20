@@ -210,8 +210,7 @@ module Half_simple : sig
 
   type nonrec clause = pattern Non_empty_row.t clause
 
-  val of_clause :
-    arg:lambda -> arg_sort:Jkind.Sort.Const.t -> General.clause -> clause
+  val of_clause : arg:lambda -> General.clause -> clause
 end = struct
   include Patterns.Half_simple
 
@@ -240,7 +239,7 @@ end = struct
     | _ -> p
 
   (* Explode or-patterns and turn aliases into bindings in actions *)
-  let of_clause ~arg ~arg_sort cl =
+  let of_clause ~arg cl =
     let rec aux (((p, patl), action) : General.clause) : clause =
       let continue p (view : General.view) : clause =
         aux (({ p with pat_desc = view }, patl), action)
@@ -252,10 +251,11 @@ end = struct
       | `Any -> stop p `Any
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
-      | `Alias (p, id, _, duid, _, _, _) ->
+      | `Alias (p, id, _, duid, sort, _, _) ->
           aux
             ( (General.view p, patl),
-              bind_alias p id duid ~arg ~arg_sort ~action )
+              bind_alias p id duid ~arg
+                ~arg_sort:(Jkind.Sort.default_for_transl_and_get sort) ~action )
       | `Record ([], _) as view -> stop p view
       | `Record (lbls, closed) ->
           let full_view = `Record (all_record_args lbls, closed) in
@@ -1197,16 +1197,16 @@ let safe_before ((p, ps), act_p) l =
       || not (may_compats (General.erase p :: ps) (General.erase q :: qs)))
     l
 
-let half_simplify_nonempty ~arg ~arg_sort
+let half_simplify_nonempty ~arg
       (cls : Typedtree.pattern Non_empty_row.t clause) : Half_simple.clause =
   cls
   |> map_on_row (Non_empty_row.map_first General.view)
-  |> Half_simple.of_clause ~arg ~arg_sort
+  |> Half_simple.of_clause ~arg
 
-let half_simplify_clause ~arg ~arg_sort (cls : Typedtree.pattern list clause) =
+let half_simplify_clause ~arg (cls : Typedtree.pattern list clause) =
   cls
   |> map_on_row Non_empty_row.of_initial
-  |> half_simplify_nonempty ~arg ~arg_sort
+  |> half_simplify_nonempty ~arg
 
 (* Once matchings are *fully* simplified, one can easily find
    their nature. *)
@@ -1560,7 +1560,7 @@ and precompile_var args cls def k =
                 (* we learned by pattern-matching on [args]
                    that [p::ps] has at least two arguments,
                    so [ps] must be non-empty *)
-                half_simplify_clause ~arg:(Lvar v) ~arg_sort (ps, act))
+                half_simplify_clause ~arg:(Lvar v) (ps, act))
               cls
           and var_def = Default_environment.pop_column def in
           let { me = first; matrix }, nexts =
@@ -3786,7 +3786,7 @@ and compile_match_nonempty ~scopes value_kind repr partial ctx
       let v, v_duid, newarg = arg_to_var arg m.cases in
       let args = (newarg, Alias, arg_sort, layout) :: argl in
       let cases =
-        List.map (half_simplify_nonempty ~arg:newarg ~arg_sort)
+        List.map (half_simplify_nonempty ~arg:newarg)
           m.cases
       in
       let m = { m with args; cases } in
@@ -4436,7 +4436,7 @@ let do_for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list pa
   handler (fun partial pm1 ->
     let pm1_half =
       { pm1 with
-        cases = List.map (half_simplify_nonempty ~arg ~arg_sort) pm1.cases }
+        cases = List.map (half_simplify_nonempty ~arg) pm1.cases }
     in
     let next, nexts = split_and_precompile_half_simplified ~arg ~arg_sort pm1_half in
     let size = List.length paraml in
