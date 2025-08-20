@@ -3841,7 +3841,6 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
       let block_access pos : P.Block_access_kind.t =
         let field_kind : P.Mixed_block_access_field_kind.t =
-          (* CR jrayman: Maybe refactor? *)
           match flattened_reordered_shape.(pos) with
           | Value _ -> Value_prefix Any_value
           | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
