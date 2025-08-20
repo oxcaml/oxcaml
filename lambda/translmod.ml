@@ -126,6 +126,7 @@ let rec apply_coercion loc strict restr arg =
         in
         let get_layout _pos = Lambda.layout_module_field in
         let lam =
+          (* CR jrayman: should sometimes be [Pmakemixedblock] *)
           Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
                 List.map (apply_coercion_field loc get_field)
                 pos_cc_list, loc)
@@ -807,6 +808,7 @@ and transl_structure ~scopes loc
           repr
       | Tstr_module ({mb_presence=Mp_present} as mb) ->
           let id = mb.mb_id in
+          (* CR jrayman: use [Types.mixed_block_element_for_*] *)
           let field = Option.map (fun id -> id, Types.Value) id in
           let id_duid = mb.mb_uid in
           (* Translate module first *)

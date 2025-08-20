@@ -944,10 +944,6 @@ type module_representation =
   | Module_value_only of int
   | Module_mixed of mixed_block_shape
 
-let module_field_count = function
-  | Module_value_only size -> size
-  | Module_mixed shape -> Array.length shape
-
 type main_module_block_format =
   | Mb_struct of { mb_repr : module_representation }
   | Mb_instantiating_functor of
