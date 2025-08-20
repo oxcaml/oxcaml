@@ -1248,7 +1248,7 @@ val reset: unit -> unit
 *)
 val mod_field:
   ?read_semantics: field_read_semantics -> int ->
-  module_representation -> primitive
+  Types.module_representation -> primitive
 (* CR jrayman: check if [mod_setfield] needs module repr *)
 val mod_setfield: int -> primitive
 

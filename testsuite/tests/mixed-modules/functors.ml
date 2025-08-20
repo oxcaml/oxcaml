@@ -10,7 +10,7 @@
 *)
 
 open Stdlib_upstream_compatible
-
+external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 let _ = print_endline "Test 1: no coercion in or out"
 
@@ -24,35 +24,60 @@ module Incr (M : Number) : Number = struct
   let as_string = M.as_string ^ "+1"
 end
 
-module Zero = struct
-  let as_float_u = #0.0
-  let as_string = "0"
+module One = struct
+  let as_float_u = #1.0
+  let as_string = "1"
 end
 
-module One = Incr (Zero)
+module Two = Incr (One)
 
-let _ = print_float (Float_u.to_float One.as_float_u)
+let _ = print_float (Float_u.to_float (id One.as_float_u))
 let _ = print_endline ""
-let _ = print_endline One.as_string
+let _ = print_endline (id One.as_string)
+
+
+let _ = print_endline "Test 2: coercion in, no coercion out"
+
+module Ten = struct
+  let as_int = 10
+  let as_float_u = #10.0
+  let as_string = "10"
+  let as_int64_u = #10L
+end
+
+module Eleven = Incr (Ten)
+
+let _ = print_float (Float_u.to_float (id Eleven.as_float_u))
+let _ = print_endline ""
+let _ = print_endline (id Eleven.as_string)
+
+
+let _ = print_endline "Test 3: coercion out, no coercion in"
+
+module Double (M : Number) : Number = struct
+  let undoubled_float = M.as_float_u
+  let as_string = "(" ^ M.as_string ^ ")*2"
+  let as_float_u = Float_u.add undoubled_float undoubled_float
+end
+
+module Four = Double(Two)
+
+let _ = print_float (Float_u.to_float (id Four.as_float_u))
+let _ = print_endline ""
+let _ = print_endline (id Four.as_string)
 
 
 let _ = print_endline "Test 4: coercion in and out"
 
-module Double (M : Number) : Number = struct
-  let undoubled_float = M.as_float_u
-  let as_string = M.as_string ^ "*2"
-  let as_float_u = Float_u.add undoubled_float undoubled_float
+module Three = struct
+  let as_int = 3
+  let as_float_u = #3.0
+  let as_string = "3"
+  let as_int64_u = #3L
 end
 
-module Two = struct
-  let as_int = 2
-  let as_float_u = #2.0
-  let as_string = "2"
-  let as_int64_u = #2L
-end
+module Six = Double (Three)
 
-module Four = Double (Two)
-
-let _ = print_float (Float_u.to_float Four.as_float_u)
+let _ = print_float (Float_u.to_float (id Six.as_float_u))
 let _ = print_endline ""
-let _ = print_endline Four.as_string
+let _ = print_endline (id Six.as_string)

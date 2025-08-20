@@ -10,6 +10,7 @@
 *)
 
 open Stdlib_upstream_compatible
+external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 
 let _ = print_endline "Test 1: mixed to mixed"
@@ -27,9 +28,9 @@ module Coerced_module_1 : sig
   val qux : int
 end = Module_1
 
-let _ = print_int (Int64_u.to_int Coerced_module_1.bar)
+let _ = print_int (Int64_u.to_int (id Coerced_module_1.bar))
 let _ = print_endline ""
-let _ = print_int Coerced_module_1.qux
+let _ = print_int (id Coerced_module_1.qux)
 let _ = print_endline ""
 
 
@@ -40,9 +41,9 @@ module Coerced_module_2 : sig
   val foo : string
 end = Module_1
 
-let _ = print_int Coerced_module_2.qux
+let _ = print_int (id Coerced_module_2.qux)
 let _ = print_endline ""
-let _ = print_endline Coerced_module_2.foo
+let _ = print_endline (id Coerced_module_2.foo)
 
 
 let _ = print_endline "Test 3: nested modules"
@@ -83,12 +84,13 @@ module Coerced_module_3 : sig
   end
 end = Module_3
 
-let _ = print_float Coerced_module_3.Numbers.One.as_float
+let _ = print_float (id Coerced_module_3.Numbers.One.as_float)
 let _ = print_string " "
-let _ = print_float Coerced_module_3.Numbers.Zero.as_float
-let _ = print_string " "
-let _ = print_float (Float_u.to_float Coerced_module_3.Numbers.Zero.as_float_u)
+let _ = print_float (id Coerced_module_3.Numbers.Zero.as_float)
 let _ = print_string " "
 let _ =
-  print_float (Float_u.to_float Coerced_module_3.Numbers.smallest_float_u)
+  print_float (Float_u.to_float (id Coerced_module_3.Numbers.Zero.as_float_u))
+let _ = print_string " "
+let _ =
+  print_float (Float_u.to_float (id Coerced_module_3.Numbers.smallest_float_u))
 let _ = print_endline ""
