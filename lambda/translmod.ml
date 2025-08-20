@@ -902,7 +902,7 @@ and transl_structure ~scopes loc
                 let id_duid = Lambda.debug_uid_none in
                 (* CR sspies: Can we find a better [debug_uid] here? *)
                 Llet(Alias, lambda_layout, id, id_duid,
-                     Lprim(mod_field pos, [Lvar mid],
+                     Lprim(mod_field pos (Module_value_only (-1)), [Lvar mid],
           (* CR jrayman: [mod_field] returns [Pfield(_,Pointer,_)]. Should
            * it sometimes return [Pfield(_,Immediate,_)] or [Pmixedfield]? *)
                            of_location ~scopes incl.incl_loc), body),
@@ -966,7 +966,7 @@ and transl_structure ~scopes loc
                   (* CR sspies: Can we find a better [debug_uid] here? *)
                   (* CR jrayman: [mod_field] is wrong *)
                   Llet(Alias, lambda_layout, id, id_duid,
-                      Lprim(mod_field pos, [Lvar mid],
+                      Lprim(mod_field pos (Module_value_only (-1)), [Lvar mid],
                             of_location ~scopes od.open_loc), body),
                   repr
               in
@@ -1055,7 +1055,10 @@ let add_arg_block_to_module_block primary_block_lam size restr =
   let arg_block_lam =
     apply_coercion Loc_unknown Strict restr (Lvar primary_block_id)
   in
-  let get_field i = Lprim (mod_field i, [Lvar primary_block_id], Loc_unknown) in
+  let get_field i =
+    Lprim (mod_field i (Module_value_only (-1)),
+      [Lvar primary_block_id], Loc_unknown)
+  in
   let all_fields = List.init size get_field @ [Lvar arg_block_id] in
   let arg_block_field = size in
   let new_size = size + 1 in
@@ -1104,10 +1107,10 @@ let transl_implementation_module ~scopes module_id (str, cc, cc2) =
   match cc2 with
   | None -> lam, repr, None
   | Some cc2 ->
-    let _ = add_arg_block_to_module_block in
     let _ = cc2 in
+    let _ = add_arg_block_to_module_block in
     failwith "CR jrayman"
-    (* add_arg_block_to_module_block lam size cc2 *)
+    (* add_arg_block_to_module_block lam repr cc2 *)
 
 let wrap_toplevel_functor_in_struct code =
   Lprim(Pmakeblock(0, Immutable, None, Lambda.alloc_heap),
@@ -1193,7 +1196,7 @@ let toplevel_name id =
 let toploop_getvalue id =
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(mod_field toploop_getvalue_pos,
+    ap_func=Lprim(mod_field toploop_getvalue_pos (Module_value_only (-1)),
                   [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
@@ -1210,7 +1213,7 @@ let toploop_getvalue id =
 let toploop_setvalue id lam =
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(mod_field toploop_setvalue_pos,
+    ap_func=Lprim(mod_field toploop_setvalue_pos (Module_value_only (-1)),
                   [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
                   Loc_unknown);
     ap_args=
@@ -1316,7 +1319,8 @@ let transl_toplevel_item ~scopes item =
           lambda_unit
       | id :: ids ->
           Lsequence(toploop_setvalue id
-                      (Lprim(mod_field pos, [Lvar mid], Loc_unknown)),
+                      (Lprim(mod_field pos (Module_value_only (-1)),
+                        [Lvar mid], Loc_unknown)),
                     set_idents (pos + 1) ids) in
       Llet(Strict, Lambda.layout_module, mid, mid_duid, modl, set_idents 0 ids)
   | Tstr_primitive descr ->
@@ -1339,7 +1343,8 @@ let transl_toplevel_item ~scopes item =
                 lambda_unit
             | id :: ids ->
                 Lsequence(toploop_setvalue id
-                            (Lprim(mod_field pos, [Lvar mid], Loc_unknown)),
+                            (Lprim(mod_field pos (Module_value_only (-1)),
+                              [Lvar mid], Loc_unknown)),
                           set_idents (pos + 1) ids)
           in
           Llet(pure, Lambda.layout_module, mid, mid_duid,
@@ -1407,7 +1412,7 @@ let unit_of_runtime_arg arg =
 let transl_runtime_arg arg =
   match arg with
   | Argument_block { ra_unit; ra_field_idx; } ->
-      Lprim (mod_field ra_field_idx,
+      Lprim (mod_field ra_field_idx (Module_value_only (-1)),
              [Lprim (Pgetglobal ra_unit, [], Loc_unknown)],
              Loc_unknown)
   | Main_module_block cu ->
@@ -1425,7 +1430,7 @@ let transl_instance_impl
   let instantiating_functor_lam =
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
-    Lprim (mod_field 0,
+    Lprim (mod_field 0 (Module_value_only (-1)),
            [Lprim (Pgetglobal base_compilation_unit, [], Loc_unknown)],
            Loc_unknown)
   in

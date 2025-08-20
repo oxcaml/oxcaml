@@ -1911,9 +1911,12 @@ let reset () =
   Static_label.reset static_label_sequence
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
-  | Module_value_only _ -> Pfield(pos, Pointer, read_semantics)
-  | Module_mixed shape ->
+  | Types.Module_value_only _ -> Pfield(pos, Pointer, read_semantics)
+  | Types.Module_mixed shape ->
     let shape =
+      (* CR jrayman: translating for every field access seems inefficient *)
+      (* CR jrayman: do we want [value_kind] or [mode] to vary with the
+         expression *)
       transl_mixed_product_shape_for_read shape
         ~get_value_kind:(fun _ -> generic_value)
         ~get_mode:(fun _ -> alloc_heap)
