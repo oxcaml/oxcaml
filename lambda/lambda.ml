@@ -1405,6 +1405,7 @@ let rec patch_guarded patch = function
 
 (* Translate an access path *)
 
+(* CR jrayman: maybe delete this *)
 let rec transl_mixed_product_element_for_read
   (elt : Types.mixed_block_element) =
   match elt with
@@ -1557,6 +1558,7 @@ let transl_module_representation = function
     Module_mixed
       (transl_mixed_product_shape
         ~get_value_kind:(fun _ -> generic_value) shape)
+    (* CR jrayman: worth considering if this is correct *)
 
 let block_of_module_representation = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)

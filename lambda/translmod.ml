@@ -99,38 +99,37 @@ let rec apply_coercion loc strict restr arg =
   match restr with
     Tcoerce_none ->
       arg
-  | Tcoerce_structure(pos_mbe_cc_list, id_pos_list) ->
+  | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
       name_lambda strict arg Lambda.layout_module (fun id ->
+        let output_repr = transl_module_representation output_repr in
         let get_field pos =
-          (* CR jrayman: delete comment
-            [(pos, _, _)] is an element of in [pos_mbe_cc_list] *)
           if pos < 0 then lambda_unit
           else
-            (* CR jrayman: this is sometimes wrong *)
-            Lprim(Pfield(pos, Pointer, Reads_agree), [Lvar id], loc)
+            let field_access =
+              match input_repr with
+              | Module_value_only _ -> Pfield(pos, Pointer, Reads_agree)
+              | Module_mixed shape ->
+                let shape =
+                  transl_mixed_product_shape_for_read shape
+                    ~get_value_kind:(fun _ -> generic_value)
+                    ~get_mode:(fun _ -> alloc_heap)
+                in
+                Pmixedfield([pos], shape, Reads_agree)
+            in
+            Lprim(field_access, [Lvar id], loc)
         in
-        let shape =
-          pos_mbe_cc_list
-          |> List.rev_map (fun (_, mbe, _) -> transl_mixed_block_element mbe)
-          |> Array.of_list
-        in
-        let repr =
-          if Array.for_all (* CR jrayman: this should be deleted *)
-            (function
-            | Value _ -> true
-            | Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32
-            | Bits64 | Vec128 | Vec256 | Vec512 | Word | Product _ -> false)
-            shape
-          then Module_value_only (Array.length shape)
-          else Module_mixed shape
-        in
-        let get_layout _pos =
-          (* CR jrayman: this should be combined with [get_field] *)
-          layout_module_field
+        let get_layout pos =
+          if pos < 0 then layout_module_field
+          else
+            match input_repr with
+            | Module_value_only _ -> layout_module_field
+            | Module_mixed shape ->
+              shape.(pos) |> transl_mixed_block_element
+                          |> layout_of_mixed_block_element
         in
         let lam =
-          Lprim(block_of_module_representation repr,
-                List.map (apply_coercion_field loc get_field) pos_mbe_cc_list,
+          Lprim(block_of_module_representation output_repr,
+                List.map (apply_coercion_field loc get_field) pos_cc_list,
                 loc)
         in
         wrap_id_pos_list loc id_pos_list get_field get_layout lam)
@@ -152,7 +151,7 @@ let rec apply_coercion loc strict restr arg =
       name_lambda strict arg Lambda.layout_module
         (fun _ -> apply_coercion loc Alias cc lam)
 
-and apply_coercion_field loc get_field (pos, _mbe, cc) =
+and apply_coercion_field loc get_field (pos, cc) =
   apply_coercion loc Alias cc (get_field pos)
 
 and apply_coercion_result loc strict funct params args cc_res =
@@ -228,32 +227,43 @@ let rec compose_coercions c1 c2 =
   match (c1, c2) with
     (Tcoerce_none, c2) -> c2
   | (c1, Tcoerce_none) -> c1
-  | (Tcoerce_structure (pmc1, ids1), Tcoerce_structure (pmc2, ids2)) ->
-      let v2 = Array.of_list pmc2 in
+  | ( Tcoerce_structure { input_repr = ir1; output_repr = or1;
+                          pos_cc_list = pc1; id_pos_list = ids1 },
+      Tcoerce_structure { input_repr = ir2; output_repr = or2;
+                          pos_cc_list = pc2; id_pos_list = ids2 }
+    ) ->
+      let v2 = Array.of_list pc2 in
       let ids1 =
         List.map (fun (id,pos1,c1) ->
             if pos1 < 0 then (id, pos1, c1)
             else
-              let (pos2,_,c2) = v2.(pos1) in
+              let (pos2,c2) = v2.(pos1) in
               (id, pos2, compose_coercions c1 c2))
           ids1
       in
-      Tcoerce_structure
-        (List.map
-           (fun pmc ->
-              match pmc with
-              | _, _, (Tcoerce_primitive _ | Tcoerce_alias _) ->
+      begin if not (equal_module_representation or2 ir1) then
+        fatal_error
+          "Translmod.compose_coercions: module representations do not align"
+      end;
+      let pos_cc_list =
+        List.map
+           (fun pc ->
+              match pc with
+              | _, (Tcoerce_primitive _ | Tcoerce_alias _) ->
                 (* These cases do not take an argument (the position is -1),
                    so they do not need adjusting. *)
-                pmc
-              | (p1, m1, c1) ->
-                let (p2, m2, c2) = v2.(p1) in
-                if Types.equal_mixed_block_element m1 m2
-                then (p2, m1, compose_coercions c1 c2)
-                else fatal_error
-                  "Translmod.compose_coercions: layouts don't match")
-          pmc1,
-         ids1 @ ids2)
+                pc
+              | (p1, c1) ->
+                let (p2, c2) = v2.(p1) in
+                (p2, compose_coercions c1 c2))
+          pc1
+      in
+      Tcoerce_structure
+        { input_repr = ir2
+        ; output_repr = or1
+        ; pos_cc_list
+        ; id_pos_list = ids1 @ ids2
+        }
   | (Tcoerce_functor(arg1, res1), Tcoerce_functor(arg2, res2)) ->
       Tcoerce_functor(compose_coercions arg2 arg1,
                       compose_coercions res1 res2)
@@ -677,14 +687,14 @@ and transl_structure ~scopes loc
             Lprim(block_of_module_representation repr,
                   List.map (fun (id, _) -> Lvar id) (List.rev fields), loc),
               repr
-        | Tcoerce_structure(pos_mbe_cc_list, id_pos_list) ->
+        | Tcoerce_structure
+          { input_repr=_; output_repr; pos_cc_list; id_pos_list; } ->
                 (* Do not ignore id_pos_list ! *)
             (*Format.eprintf "%a@.@[" Includemod.print_coercion cc;
             List.iter (fun l -> Format.eprintf "%a@ " Ident.print l)
               fields;
             Format.eprintf "@]@.";*)
             let v = Array.of_list (List.rev fields) in
-            (* CR jrayman: combine [get_field] and [get_layout] *)
             let get_field pos =
               if pos < 0 then lambda_unit
               else let id, _ = v.(pos) in Lvar id
@@ -697,26 +707,11 @@ and transl_structure ~scopes loc
             in
             let ids = List.fold_right (fun (id, _) s -> Ident.Set.add id s)
               fields Ident.Set.empty in
-            let new_shape =
-              pos_mbe_cc_list
-              |> List.rev_map
-                (fun (_, mbe, _) -> transl_mixed_block_element mbe)
-              |> Array.of_list
-            in
-            let new_repr =
-              if Array.for_all
-                (function
-                | Value _ -> true
-                | Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32
-                | Bits64 | Vec128 | Vec256 | Vec512 | Word | Product _ -> false)
-                new_shape
-              then Module_value_only (Array.length new_shape)
-              else Module_mixed new_shape
-            in
+            let output_repr = transl_module_representation output_repr in
             let lam =
-              Lprim(block_of_module_representation new_repr,
+              Lprim(block_of_module_representation output_repr,
                   List.map
-                    (fun (pos, _mbe, cc) ->
+                    (fun (pos, cc) ->
                       match cc with
                       | Tcoerce_primitive p ->
                           let loc = of_location ~scopes p.pc_loc in
@@ -726,12 +721,13 @@ and transl_structure ~scopes loc
                             ~poly_sort:p.pc_poly_sort
                             None
                       | _ -> apply_coercion loc Strict cc (get_field pos))
-                    pos_mbe_cc_list, loc)
+                    pos_cc_list, loc)
             and id_pos_list =
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
                 id_pos_list
             in
-            wrap_id_pos_list loc id_pos_list get_field get_layout lam, new_repr
+            ( wrap_id_pos_list loc id_pos_list get_field get_layout lam,
+              output_repr )
         | _ ->
             fatal_error "Translmod.transl_structure"
       in
@@ -998,7 +994,7 @@ and transl_include_functor ~generative modl params scopes loc =
   let params = if generative then [params;[]] else [params] in
   let params = List.map (fun coercion ->
     Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
-          List.map (fun (name, _mbe, cc) ->
+          List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
             coercion,
           loc))
@@ -1386,7 +1382,7 @@ let transl_package component_names coercion =
   let size =
     match coercion with
     | Tcoerce_none -> List.length component_names
-    | Tcoerce_structure (l, _) -> List.length l
+    | Tcoerce_structure { pos_cc_list; _ } -> List.length pos_cc_list
     | Tcoerce_functor _
     | Tcoerce_primitive _
     | Tcoerce_alias _ -> assert false
