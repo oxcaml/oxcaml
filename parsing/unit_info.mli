@@ -60,14 +60,21 @@ type t
     - the prefix is [target/y]
 
     When calling, for example, [ocamlopt foo.ml._.preprocess] (where
-    foo.ml._.preprocess is a serialized, ppx-expanded AST of foo.ml), the raw
-    source file is foo.ml._.preprocess, while foo.ml is the source file.
+    foo.ml._.preprocess is a serialized, ppx-expanded AST of foo.ml), the "raw"
+    source file is foo.ml._.preprocess, while foo.ml is the "original" source
+    file.
 *)
 
-(** [source_file u] is the source file of [u]. *)
-val source_file: t -> filename
+(** [original_source_file u] is the original source file of [u]. When calling,
+    for example, [ocamlopt foo.ml._.preprocess] (where foo.ml._.preprocess is a
+    serialized, ppx-expanded AST of foo.ml), foo.ml is the "original" source
+    file. *)
+val original_source_file: t -> filename
 
-(** [raw_source_file u] is the raw source file of [u]. *)
+(** [raw_source_file u] is the raw source file of [u]. When calling, for
+    example, [ocamlopt foo.ml._.preprocess] (where foo.ml._.preprocess is a
+    serialized, ppx-expanded AST of foo.ml), foo.ml._.preprocess is the "raw"
+    source file.) *)
 val raw_source_file: t -> filename
 
 (** [prefix u] is the filename prefix of the unit. *)
@@ -111,7 +118,7 @@ val make_with_known_compilation_unit:
     [Location.input_name] as well. *)
 val make_dummy: input_name:string -> Compilation_unit.t -> t
 
-val set_source_file_name : t -> filename -> t
+val set_original_source_file_name : t -> filename -> t
 
 (** {1:artifact_function Build artifacts }*)
 module Artifact: sig

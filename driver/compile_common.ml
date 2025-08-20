@@ -61,7 +61,9 @@ module Parse_result = struct
   type 'a t = { ast : 'a; info : info }
 
   let of_pparse_ast_result ~info ({ ast; source_file } : _ Pparse.ast_result) =
-    let new_target = Unit_info.set_source_file_name info.target source_file in
+    let new_target =
+      Unit_info.set_original_source_file_name info.target source_file
+    in
     { ast; info = { info with target = new_target } }
 
   let map_ast { ast; info } ~f = { ast = f ast; info }
@@ -70,12 +72,14 @@ end
 (** Compile a .mli file *)
 
 let parse_intf i =
-  Pparse.parse_interface ~tool_name:i.tool_name (Unit_info.source_file i.target)
-    |> Parse_result.of_pparse_ast_result ~info:i
-    |> Parse_result.map_ast
-         ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.interface)
-    |> Parse_result.map_ast
-         ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.signature)
+  Pparse.parse_interface
+    ~tool_name:i.tool_name
+    (Unit_info.original_source_file i.target)
+  |> Parse_result.of_pparse_ast_result ~info:i
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.interface)
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.signature)
 
 let typecheck_intf info ast =
   Profile.(
@@ -88,7 +92,7 @@ let typecheck_intf info ast =
   let tsg =
     ast
     |> Typemod.type_interface
-         ~sourcefile:(Unit_info.source_file info.target)
+         ~sourcefile:(Unit_info.original_source_file info.target)
          info.module_name info.env
     |> print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
   in
@@ -97,7 +101,8 @@ let typecheck_intf info ast =
   if !Clflags.print_types then
     Printtyp.wrap_printing_env ~error:false info.env (fun () ->
         Format.(fprintf std_formatter) "%a@."
-          (Printtyp.printed_signature (Unit_info.source_file info.target))
+          (Printtyp.printed_signature
+             (Unit_info.original_source_file info.target))
           sg);
   ignore (Includemod.signatures info.env ~mark:true
     ~modes:Includemod.modes_unit sg sg);
@@ -143,12 +148,13 @@ let interface ~hook_parse_tree ~hook_typed_tree info =
 
 let parse_impl i =
   Pparse.parse_implementation
-    ~tool_name:i.tool_name (Unit_info.source_file i.target)
-    |> Parse_result.of_pparse_ast_result ~info:i
-    |> Parse_result.map_ast
-         ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.implementation)
-    |> Parse_result.map_ast
-         ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.structure)
+    ~tool_name:i.tool_name
+    (Unit_info.original_source_file i.target)
+  |> Parse_result.of_pparse_ast_result ~info:i
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.implementation)
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.structure)
 
 let typecheck_impl i parsetree =
   parsetree
