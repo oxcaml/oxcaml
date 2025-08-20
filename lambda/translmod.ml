@@ -110,11 +110,7 @@ let rec apply_coercion loc strict restr arg =
         in
         let get_layout pos =
           if pos < 0 then layout_value_field
-          else
-            match input_repr with
-            | Module_value_only _ -> layout_value_field
-            | Module_mixed (shape, _) ->
-              layout_of_mixed_block_element shape.(pos)
+          else layout_of_module_field input_repr pos
         in
         let lam =
           Lprim(block_of_module_representation output_repr,
@@ -772,9 +768,8 @@ and transl_structure ~scopes loc
       | Tstr_value(rec_flag, pat_expr_list) ->
           (* Translate bindings first *)
           let mk_lam_let =
-            transl_let ~scopes ~return_layout:Lambda.layout_module_field
+            transl_let ~scopes ~return_layout:Lambda.layout_unit
               ~in_structure:true rec_flag pat_expr_list
-              (* CR jrayman for reviewer: change [layout_module_field]? *)
           in
           let ext_fields =
             List.rev_append
