@@ -28,10 +28,13 @@ module Raise_kind : sig
     | Reraise
     | No_trace
 
+
   val from_lambda : Lambda.raise_kind -> t
 
   (** Providing [None] is the same as providing [Some No_trace]. *)
   val option_to_lambda : t option -> Lambda.raise_kind
+
+  val option_to_string : t option -> string
 end
 
 type t =
