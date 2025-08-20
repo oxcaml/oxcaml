@@ -101,15 +101,9 @@ let rec apply_coercion loc strict restr arg =
       arg
   | Tcoerce_structure(pos_mbe_cc_list, id_pos_list) ->
       name_lambda strict arg Lambda.layout_module (fun id ->
-        (* CR jrayman: duplicated below *)
-        let block_of ~repr =
-          match repr with
-          | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
-          | Module_mixed shape ->
-            Pmakemixedblock(0, Immutable, shape, alloc_heap)
-        in
         let get_field pos =
-          (* [(pos, _, _)] is an element of in [pos_mbe_cc_list] *)
+          (* CR jrayman: delete comment
+            [(pos, _, _)] is an element of in [pos_mbe_cc_list] *)
           if pos < 0 then lambda_unit
           else
             (* CR jrayman: this is sometimes wrong *)
@@ -121,7 +115,7 @@ let rec apply_coercion loc strict restr arg =
           |> Array.of_list
         in
         let repr =
-          if Array.for_all
+          if Array.for_all (* CR jrayman: this should be deleted *)
             (function
             | Value _ -> true
             | Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32
@@ -135,7 +129,7 @@ let rec apply_coercion loc strict restr arg =
           layout_module_field
         in
         let lam =
-          Lprim(block_of ~repr,
+          Lprim(block_of_module_representation repr,
                 List.map (apply_coercion_field loc get_field) pos_mbe_cc_list,
                 loc)
         in
@@ -673,27 +667,14 @@ and transl_structure ~scopes loc
   function
     [] ->
       let body, repr =
-        let module_representation_of ~shape =
-          if Array.for_all (equal_mixed_block_element Value) shape
-          then Module_value_only (Array.length shape)
-          else Module_mixed
-            (Lambda.transl_mixed_product_shape
-              ~get_value_kind:(fun _i -> Lambda.generic_value)
-              shape)
-        in
-        let block_of ~repr =
-          match repr with
-          | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
-          | Module_mixed shape ->
-            Pmakemixedblock(0, Immutable, shape, alloc_heap)
-        in
         let repr =
-          module_representation_of ~shape:(
-            fields |> List.rev_map (fun (_, mbe) -> mbe) |> Array.of_list)
+          module_representation_of_mixed_product_shape
+            (fields |> List.rev_map (fun (_, mbe) -> mbe) |> Array.of_list)
+          |> transl_module_representation
         in
         match cc with
           Tcoerce_none ->
-            Lprim(block_of ~repr,
+            Lprim(block_of_module_representation repr,
                   List.map (fun (id, _) -> Lvar id) (List.rev fields), loc),
               repr
         | Tcoerce_structure(pos_mbe_cc_list, id_pos_list) ->
@@ -703,6 +684,7 @@ and transl_structure ~scopes loc
               fields;
             Format.eprintf "@]@.";*)
             let v = Array.of_list (List.rev fields) in
+            (* CR jrayman: combine [get_field] and [get_layout] *)
             let get_field pos =
               if pos < 0 then lambda_unit
               else let id, _ = v.(pos) in Lvar id
@@ -732,7 +714,7 @@ and transl_structure ~scopes loc
               else Module_mixed new_shape
             in
             let lam =
-              Lprim(block_of ~repr:new_repr,
+              Lprim(block_of_module_representation new_repr,
                   List.map
                     (fun (pos, _mbe, cc) ->
                       match cc with
@@ -807,7 +789,9 @@ and transl_structure ~scopes loc
           transl_structure ~scopes loc fields cc rootpath final_env rem
       | Tstr_typext(tyext) ->
           let newfields =
-            List.map (fun ext -> ext.ext_id, Types.Value)
+            List.map
+              (fun ext ->
+                ext.ext_id, Types.mixed_block_element_for_type_extension)
               tyext.tyext_constructors
           in
           let body, repr =
@@ -821,8 +805,9 @@ and transl_structure ~scopes loc
           (* CR sspies: Can we find a better [debug_uid] here? *)
           let path = field_path rootpath id in
           let body, repr =
-            transl_structure ~scopes loc ((id, Types.Value) :: fields) cc
-              rootpath final_env rem
+            transl_structure ~scopes loc
+              ((id, Types.mixed_block_element_for_exception) :: fields)
+              cc rootpath final_env rem
           in
           Llet(Strict, Lambda.layout_block, id, id_duid,
                transl_extension_constructor ~scopes
@@ -832,8 +817,9 @@ and transl_structure ~scopes loc
           repr
       | Tstr_module ({mb_presence=Mp_present} as mb) ->
           let id = mb.mb_id in
-          (* CR jrayman: use [Types.mixed_block_element_for_*] *)
-          let field = Option.map (fun id -> id, Types.Value) id in
+          let field =
+            Option.map (fun id -> id, Types.mixed_block_element_for_module) id
+          in
           let id_duid = mb.mb_uid in
           (* Translate module first *)
           let subscopes = match id with
@@ -866,7 +852,8 @@ and transl_structure ~scopes loc
       | Tstr_recmodule bindings ->
           let newfields =
             List.filter_map
-              (fun mb -> Option.map (fun id -> id, Types.Value) mb.mb_id)
+              (fun mb -> Option.map
+                (fun id -> id, Types.mixed_block_element_for_module) mb.mb_id)
               bindings
           in
           let body, repr =
@@ -886,7 +873,9 @@ and transl_structure ~scopes loc
           lam, repr
       | Tstr_class cl_list ->
           let (ids, class_bindings) = transl_class_bindings ~scopes cl_list in
-          let newfields = List.map (fun id -> id, Types.Value) ids in
+          let newfields =
+            List.map (fun id -> id, Types.mixed_block_element_for_class) ids
+          in
           let body, repr =
             transl_structure ~scopes loc (List.rev_append newfields fields)
               cc rootpath final_env rem
