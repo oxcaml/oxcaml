@@ -942,11 +942,11 @@ type runtime_param =
 
 type module_representation =
   | Module_value_only of int
-  | Module_mixed of mixed_block_shape
+  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
 
 let module_representation_field_count = function
   | Module_value_only field_count -> field_count
-  | Module_mixed shape -> Array.length shape
+  | Module_mixed (shape, _) -> Array.length shape
 
 type main_module_block_format =
   | Mb_struct of { mb_repr : module_representation }
@@ -1085,6 +1085,7 @@ let layout_top = layout_any_value
 let layout_bottom = Pbottom
 
 let mixed_block_element_for_module = Value generic_value
+let mixed_block_element_with_locality_mode_for_module = Value generic_value
 
 let default_function_attribute = {
   inline = Default_inline;
@@ -1525,10 +1526,9 @@ let transl_module_representation = function
   | Types.Module_value_only size -> Module_value_only size
   | Types.Module_mixed shape ->
     Module_mixed
-      (* CR jrayman for reviewer: [transl_mixed_product_shape_for_read] is a
-         little misleading. Should it be renamed to
-         [transl_mixed_product_shape_with_mode]? *)
-      (transl_mixed_product_shape_for_read
+      ( transl_mixed_product_shape
+        ~get_value_kind:(fun _ -> generic_value) shape,
+        transl_mixed_product_shape_for_read
         ~get_value_kind:(fun _ -> generic_value)
         ~get_mode:(fun _ ->
            fatal_error "Lambda.transl_module_representation: \
@@ -1536,7 +1536,7 @@ let transl_module_representation = function
 
 let block_of_module_representation = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
-  | Module_mixed shape -> Pmakemixedblock(0, Immutable, shape, alloc_heap)
+  | Module_mixed (shape, _) -> Pmakemixedblock(0, Immutable, shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 
@@ -1872,18 +1872,12 @@ let reset () =
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ -> Pfield(pos, Pointer, read_semantics)
-  | Module_mixed shape ->
-    let for_read :
-      (* This is safe since [transl_module_representation] ensures
-         [Float_boxed] does not appear in [shape]. *)
-      unit mixed_block_element array -> locality_mode mixed_block_element array
-      = Obj.magic
-    in
-    Pmixedfield([pos], for_read shape, read_semantics)
+  | Module_mixed (_, shape_for_read) ->
+    Pmixedfield([pos], shape_for_read, read_semantics)
 
 let mod_setfield pos = function
   | Module_value_only _ -> Psetfield (pos, Pointer, Root_initialization)
-  | Module_mixed shape ->
+  | Module_mixed (shape, _) ->
     Psetmixedfield([pos], shape, Root_initialization)
 
 let locality_mode_of_primitive_description (p : external_call_description) =
