@@ -948,6 +948,8 @@ type module_representation =
 
 val module_representation_field_count : module_representation -> int
 
+val layout_of_module_field : module_representation -> int -> layout
+
 (* The structure of the main module block. A module with no parameters will be
    compiled to an [Mb_struct] and a module with at least one parameter will be
    compiled to an [Mb_instantiating_functor]. *)

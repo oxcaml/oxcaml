@@ -81,8 +81,8 @@ let rec eval_address = function
     | Some obj -> obj
     end
   | Env.Alocal _ -> assert false
-  | Env.Adot(addr, _, pos) -> Obj.field (eval_address addr) pos
-    (* CR jrayman: fix *)
+  | Env.Adot(addr, _field_layouts, pos) -> Obj.field (eval_address addr) pos
+    (* We can ignore [_field_layouts] the debugger runs only bytecode *)
 
 let eval_value_path env path =
   match Env.find_value_address path env with
