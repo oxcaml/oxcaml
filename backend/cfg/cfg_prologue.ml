@@ -284,8 +284,10 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
           if block.is_trap_handler
              && Validator.State_set.mem No_prologue_on_stack state
           then
-            Misc.fatal_error
-              "Cfg_prologue: can reach trap handler with no prologue")
+            Misc.fatal_errorf
+              "Cfg_prologue: can reach trap handler with no prologue at block \
+               %s"
+              (Label.to_string label))
         block_states;
       cfg_with_layout
     | Error () -> Misc.fatal_error "Cfg_prologue: dataflow analysis failed")
