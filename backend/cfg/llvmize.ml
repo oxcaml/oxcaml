@@ -194,6 +194,12 @@ type fun_sig =
     res : Llvm_typ.t option
   }
 
+type c_call_wrapper =
+  { args : Llvm_typ.t list;
+    res : Llvm_typ.t list;
+    c_fun_name : string
+  }
+
 type trap_block_info =
   { trap_block : Ident.t;
     stacksave_ptr : Ident.t;
@@ -229,9 +235,10 @@ type t =
         (* Global symbols referenced so far *)
     mutable called_functions : fun_sig String.Map.t;
         (* Names + signatures (args, ret) of functions called so far *)
-    mutable emit_exn_intrinsic_decls : bool
+    mutable emit_exn_intrinsic_decls : bool;
         (* Whether to emit declarations / definitions for intrinsics / wrapper
            functions involved in generating try blocks *)
+    mutable c_call_wrappers : c_call_wrapper String.Map.t
   }
 
 let create_fun_info ~fun_name ~fun_has_try ~fun_ret_type =
@@ -260,7 +267,8 @@ let create ~llvmir_filename ~ppf_dump =
     defined_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty;
     called_functions = String.Map.empty;
-    emit_exn_intrinsic_decls = false
+    emit_exn_intrinsic_decls = false;
+    c_call_wrappers = String.Map.empty
   }
 
 let reset_fun_info t ~fun_name ~fun_has_try ~fun_ret_type =
@@ -307,6 +315,24 @@ let add_called_fun t name ~cc ~args ~res =
         "Llvmize: Same function referenced with incompatible signatures");
   t.called_functions <- String.Map.add name { cc; args; res } t.called_functions
 
+let add_c_call_wrapper t c_fun_name ~args ~res =
+  let wrapper_name = ".wrapper." ^ c_fun_name in
+  (match String.Map.find_opt wrapper_name t.c_call_wrappers with
+  | None -> ()
+  | Some { c_fun_name = c_fun_name'; args = args'; res = res' } ->
+    let all_equal =
+      String.equal c_fun_name c_fun_name'
+      && List.equal Llvm_typ.equal args args'
+      && List.equal Llvm_typ.equal res res'
+    in
+    if not all_equal
+    then
+      Misc.fatal_error
+        "Llvmize: Same C function referenced with incompatible signatures");
+  t.c_call_wrappers
+    <- String.Map.add wrapper_name { c_fun_name; args; res } t.c_call_wrappers;
+  wrapper_name
+
 let add_referenced_symbol t sym_name =
   t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
 
@@ -322,6 +348,10 @@ let make_ret_type ret_types =
   let runtime_reg_types = List.map (fun _ -> Llvm_typ.ptr) runtime_regs in
   let actual_ret_types = List.map Llvm_typ.of_machtyp_component ret_types in
   Llvm_typ.(Struct [Struct runtime_reg_types; Struct actual_ret_types])
+
+let make_ret_type_of_llvm ret_types =
+  let runtime_reg_types = List.map (fun _ -> Llvm_typ.ptr) runtime_regs in
+  Llvm_typ.(Struct [Struct runtime_reg_types; Struct ret_types])
 
 (* Regs in domainstate are already stored in the appropriate address as
    arguments or when returned, so we don't touch them while doing a call /
@@ -424,11 +454,13 @@ module F = struct
       (pp_print_list ~pp_sep:pp_print_space pp_print_string)
       attrs
 
-  let define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body =
+  let define t ?(private_ = false) ~cc ~fun_name ~fun_args ~fun_ret_type
+      ~fun_dbg ~fun_attrs pp_body =
     pp_dbg_comment t.ppf fun_name fun_dbg;
-    let cc_str = Calling_conventions.(to_llvmir_string Ocaml) in
-    line t.ppf "define %s %a %a(%a) %a {" cc_str Llvm_typ.pp_t fun_ret_type
-      pp_global fun_name pp_fun_args fun_args pp_attrs fun_attrs;
+    let cc_str = Calling_conventions.to_llvmir_string cc in
+    let private_str = if private_ then "private " else " " in
+    line t.ppf "define %s%s %a %a(%a) %a {" private_str cc_str Llvm_typ.pp_t
+      fun_ret_type pp_global fun_name pp_fun_args fun_args pp_attrs fun_attrs;
     pp_body ();
     line t.ppf "}";
     line t.ppf ""
@@ -874,12 +906,6 @@ module F = struct
 
   let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
       ~stack_ofs ~stack_align =
-    let get_c_stack () =
-      let c_stack_addr = load_domainstate_addr t Domain_c_stack in
-      let res = fresh_ident t in
-      ins_load t ~src:c_stack_addr ~dst:res Llvm_typ.i64;
-      res
-    in
     let make_ocaml_c_call caml_c_call_symbol args res_types =
       add_referenced_symbol t caml_c_call_symbol;
       add_referenced_symbol t func_symbol;
@@ -909,9 +935,7 @@ module F = struct
           | Align_64 -> "_avx512"
         in
         make_ocaml_c_call caml_c_call_stack_args args res_types
-      else if alloc || true
-              (* ...LLVM sometimes reloads stuff from the stack AFTER we set
-                 rsp, so we always need to use the wrapper. *)
+      else if alloc
       then
         (* [caml_c_call] doesn't use the second argument since nothing is passed
            on the stack *)
@@ -924,24 +948,16 @@ module F = struct
         in
         make_ocaml_c_call "caml_c_call" args res_types
       else
-        (* Prepare stack pointer *)
-        let c_sp = get_c_stack () in
-        let ocaml_sp = read_rsp t in
-        write_rsp t c_sp;
-        (* Do the thing (omitting cc defaults to C calling convention) *)
-        let res_ident = fresh_ident t in
-        let res_type = Llvm_typ.Struct res_types in
-        add_called_fun t func_symbol ~cc:Default ~args:(List.map fst args)
-          ~res:(Some res_type);
-        ins_call ~cc:Default ~pp_name:pp_global t func_symbol args
-          (Some (res_type, res_ident));
-        (* Recover stack pointer *)
-        write_rsp t ocaml_sp;
-        List.mapi
-          (fun idx _ ->
-            let temp = fresh_ident t in
-            ins_extractvalue t ~arg:res_ident ~res:temp res_type [idx];
-            temp)
+        (* Wrap C calls to avoid reloading from the stack after overwriting the
+           stack pointer *)
+        let wrapper_symbol =
+          add_c_call_wrapper t func_symbol ~args:(List.map fst args)
+            ~res:res_types
+        in
+        call_simple ~cc:Ocaml ~pp_name:pp_global t wrapper_symbol
+          (List.map
+             (fun (typ, ident) -> typ, Llvm_value.Local_ident ident)
+             args)
           res_types
     in
     (* Prepare arguments + return type *)
@@ -1795,7 +1811,8 @@ let cfg (cl : CL.t) =
         fun_args_with_idents
   in
   let fun_ret_type = make_ret_type (Array.to_list fun_ret_type) in
-  F.define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body
+  F.define t ~cc:Ocaml ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs
+    pp_body
 
 (* CR yusumez: We make some assumptions about the structure of the data items we
    receive and decode it manually here. Ideally, [data_item]s would be
@@ -1922,7 +1939,75 @@ let declare_exn_intrinsics t =
   ret {ptr, ptr, i32} %t4
 }|})
 
+(* CR yusumez: same as [call_simple] - lots of copy-paste we could avoid if this
+   weren't bad code. *)
+let declare_c_call_wrappers t =
+  String.Map.iter
+    (fun wrapper_name { c_fun_name; args; res } ->
+      reset_fun_info t ~fun_name:wrapper_name ~fun_has_try:false
+        ~fun_ret_type:Cmm.typ_void;
+      let c_fun_res_type = Llvm_typ.Struct res in
+      let c_fun_args = List.map (fun typ -> typ, fresh_ident t) args in
+      let wrapper_res_type = make_ret_type_of_llvm res in
+      let wrapper_args =
+        List.map (fun ident -> Llvm_typ.ptr, ident) runtime_regs @ c_fun_args
+      in
+      fresh_ident t |> ignore;
+      let pp_body () =
+        let c_sp =
+          let offset = Domainstate.idx_of_field Domain_c_stack * 8 in
+          let c_sp_addr =
+            F.do_offset ~arg_is_ptr:true ~res_is_ptr:true t domainstate_ident
+              offset
+          in
+          let res = fresh_ident t in
+          F.ins_load t ~src:c_sp_addr ~dst:res Llvm_typ.i64;
+          res
+        in
+        let ocaml_sp = F.read_rsp t in
+        F.write_rsp t c_sp;
+        let res_ident = fresh_ident t in
+        add_called_fun t c_fun_name ~cc:Default ~args ~res:(Some c_fun_res_type);
+        F.ins_call ~cc:Default ~pp_name:F.pp_global t c_fun_name c_fun_args
+          (Some (c_fun_res_type, res_ident));
+        F.write_rsp t ocaml_sp;
+        let insert ~outer_idx types_and_idents into_where =
+          let _, res =
+            List.fold_left
+              (fun (idx, cur) (typ, ident) ->
+                let inserted = fresh_ident t in
+                F.ins_insertvalue t ~res:inserted ~src:ident ~dst:cur
+                  ~src_typ:typ ~dst_typ:wrapper_res_type [outer_idx; idx];
+                idx + 1, inserted)
+              (0, into_where) types_and_idents
+          in
+          res
+        in
+        (* Start from poison... *)
+        let poison_ident = fresh_ident t in
+        F.ins t "%a = extractvalue { %a } poison, 0" F.pp_ident poison_ident
+          Llvm_typ.pp_t wrapper_res_type;
+        let filled_runtime_regs =
+          insert ~outer_idx:0 (* Runtime regs *)
+            (List.map (fun ident -> Llvm_typ.ptr, ident) runtime_regs)
+            poison_ident
+        in
+        let filled_all =
+          let inserted = fresh_ident t in
+          F.ins_insertvalue t ~res:inserted ~src:res_ident
+            ~dst:filled_runtime_regs ~src_typ:c_fun_res_type
+            ~dst_typ:wrapper_res_type [1];
+          inserted
+        in
+        F.ins t "ret %a %a" Llvm_typ.pp_t wrapper_res_type F.pp_ident filled_all
+      in
+      F.define t ~private_:true ~cc:Ocaml ~fun_name:wrapper_name
+        ~fun_args:wrapper_args ~fun_ret_type:wrapper_res_type
+        ~fun_dbg:Debuginfo.none ~fun_attrs:["noinline"] pp_body)
+    t.c_call_wrappers
+
 let declare_functions t =
+  declare_c_call_wrappers t;
   String.Map.iter
     (fun sym fun_sig ->
       if not (String.Set.mem sym t.defined_symbols)
