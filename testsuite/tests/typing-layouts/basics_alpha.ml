@@ -4,7 +4,7 @@
 *)
 
 
-(* CR mixed-modules: remember to test coalescing(?) functors.
+(* CR jrayman: remember to test coalescing(?) functors.
    The language feature that swizzles module fields. (the location of this
    comment is arbitrary) *)
 
