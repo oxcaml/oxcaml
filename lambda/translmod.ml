@@ -1412,6 +1412,15 @@ let get_component = function
   | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
 
 let transl_package component_names coercion repr =
+  let repr =
+    match coercion with
+    | Tcoerce_none -> repr
+    | Tcoerce_structure { output_repr; _ } ->
+      transl_module_representation output_repr
+    | Tcoerce_functor _
+    | Tcoerce_primitive _
+    | Tcoerce_alias _ -> assert false
+  in
   repr,
   apply_coercion Loc_unknown Strict coercion
     (Lprim(block_of_module_representation repr,
