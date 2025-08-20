@@ -46,10 +46,10 @@ let build_runtime output_runtime =
 
 let link_js_files runtime_js js_files output_js =
   let stdlib_js = Filename.concat stdlib_js_dir "stdlib.js" in
-  (* let testing_js = Filename.concat stdlib_js_dir "testing.js" in *)
+  let testing_js = Filename.concat stdlib_js_dir "testing.js" in
   let std_exit_js = Filename.concat stdlib_js_dir "std_exit.js" in
   let all_files =
-    (runtime_js :: stdlib_js :: (* testing_js ::  *) js_files) @ [std_exit_js]
+    (runtime_js :: stdlib_js :: testing_js :: js_files) @ [std_exit_js]
   in
   let cmd =
     Printf.sprintf "%s link %s -o %s --source-map --empty-source-map"
