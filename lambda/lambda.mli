@@ -589,12 +589,13 @@ val generic_value : value_kind
 *)
 val layout_of_extern_repr : extern_repr -> layout
 
-(* CR mixed-modules: finish comment: Used for ... *)
+(* CR jrayman: finish comment: Used for ... *)
+val layout_of_const_sort : Jkind.Sort.Const.t -> layout
 val layout_of_mixed_block_element : 'a. 'a mixed_block_element -> layout
-val layout_of_mixed_block_shape
-    : 'a. 'a mixed_block_element array -> path:int list -> layout
 
-val mixed_block_of_sort : Jkind.Sort.Const.t -> Types.mixed_block_element
+(* CR jrayman: should this be moved? *)
+val mixed_block_element_of_const_sort :
+  Jkind.Sort.Const.t -> Types.mixed_block_element
 
 type structured_constant =
     Const_base of constant
@@ -1025,7 +1026,7 @@ val layout_object : layout
 val layout_class : layout
 val layout_module : layout
 val layout_functor : layout
-val layout_module_field : layout
+val layout_module_field : layout (* CR jrayman: delete *)
 val layout_string : layout
 val layout_boxed_float : boxed_float -> layout
 val layout_unboxed_float : unboxed_float -> layout
