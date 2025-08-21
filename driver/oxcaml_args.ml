@@ -813,10 +813,13 @@ let mk_restrict_to_upstream_dwarf f =
     Arg.Unit f,
     " Only emit the same DWARF information as the upstream compiler" )
 
+(* CR sspies: This helper text must be updated when -shape-format is eventually
+   removed. *)
 let mk_no_restrict_to_upstream_dwarf f =
   ( "-gno-upstream-dwarf",
     Arg.Unit f,
-    " Emit potentially more DWARF information than the upstream compiler" )
+    " Emit potentially more DWARF information than the upstream compiler \
+     (implies -shape-format debugging-shapes)" )
 
 let mk_dwarf_inlined_frames f =
   ("-gdwarf-inlined-frames", Arg.Unit f, " Emit DWARF inlined frame information")
@@ -872,6 +875,12 @@ let mk_gdwarf_fission f =
     " Set the DWARF fission method: none, objcopy, or dsymutil.\n\
     \     Default: none (dsymutil on macOS with --enable-oxcaml-dwarf).\n\
     \     Only takes effect with -gno-upstream-dwarf or --enable-oxcaml-dwarf"
+  )
+
+let mk_gdwarf_pedantic f =
+  ( "-gdwarf-pedantic",
+    Arg.Unit f,
+    " Enable pedantic DWARF error checking (fatal errors instead of silent fallbacks)"
   )
 
 let mk_use_cached_generic_functions f =
@@ -1505,6 +1514,7 @@ module type Debugging_options = sig
   val gdwarf_max_function_complexity : int -> unit
   val gdwarf_compression : string -> unit
   val gdwarf_fission : string -> unit
+  val gdwarf_pedantic : unit -> unit
 end
 
 module Make_debugging_options (F : Debugging_options) = struct
@@ -1521,6 +1531,7 @@ module Make_debugging_options (F : Debugging_options) = struct
       mk_gdwarf_max_function_complexity F.gdwarf_max_function_complexity;
       mk_gdwarf_compression F.gdwarf_compression;
       mk_gdwarf_fission F.gdwarf_fission;
+      mk_gdwarf_pedantic F.gdwarf_pedantic;
     ]
 end
 
@@ -1529,7 +1540,13 @@ module Debugging_options_impl = struct
     Debugging.restrict_to_upstream_dwarf := true
 
   let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false
+    Debugging.restrict_to_upstream_dwarf := false;
+    Clflags.shape_format := Clflags.Debugging_shapes
+  (* CR sspies: We have to be careful here. We can only enable new DWARF on the
+     compiler once we have fixed the Merlin support. Otherwise, we will have
+     different kinds of shape information between the compiler and the code.
+     This would likely break Merlin lookups for code in the compiler, but
+     otherwise probably has limited effect. *)
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
@@ -1557,6 +1574,9 @@ module Debugging_options_impl = struct
              (Printf.sprintf
                 "Invalid value for -gdwarf-fission: %s\n\
                  Valid values are: none, objcopy, dsymutil" value))
+
+  let gdwarf_pedantic () =
+    Clflags.dwarf_pedantic := true
 end
 
 module Extra_params = struct

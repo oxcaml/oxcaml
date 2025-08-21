@@ -75,6 +75,7 @@ val debug : bool ref
 val debug_full : bool ref
 val dwarf_c_toolchain_flag : string ref
 val dwarf_fission : dwarf_fission ref
+val dwarf_pedantic : bool ref
 val unsafe : bool ref
 val use_linscan : bool ref
 val link_everything : bool ref
