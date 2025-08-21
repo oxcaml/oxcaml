@@ -26,7 +26,7 @@ module String = Misc.Stdlib.String
 
 type base_layout = Sort.base
 
-let dwarf_pedantic = false
+let dwarf_pedantic () = !Clflags.dwarf_pedantic
 
 module Debugging_the_compiler = struct
   let enabled () = !Dwarf_flags.ddwarf_types
@@ -309,7 +309,7 @@ let rec project_layout (layout : Layout.t) path =
   | Base b, [] -> b
   | Product p, i :: path -> project_layout (List.nth p i) path
   | _, _ ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf "project_layout: unexpected layout/path combination: layout=%a path=%a"
         Layout.format layout
@@ -327,7 +327,7 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
     base_layout projected_field =
   match path with
   | [] ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_error
         "Empty path provided to [field_project_path]" (* field should exist *)
@@ -336,7 +336,7 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
     match Array.get fields i with
     | name, sh, Base ly -> name, sh, ly
     | name, sh, Product prod_layouts ->
-      if dwarf_pedantic
+      if dwarf_pedantic ()
       then
         Misc.fatal_errorf
           "Product type found: record field flattening has failed for field %a with layout %a"
@@ -1215,7 +1215,7 @@ module Shape_with_layout = struct
         ({ type_shape = x2; type_layout = y2 } : t) =
       Shape.equal x1 x2 && Layout.equal y1 y2
 
-    let output _oc _t = if dwarf_pedantic then Misc.fatal_error "unimplemented"
+    let output _oc _t = if dwarf_pedantic () then Misc.fatal_error "unimplemented"
   end)
 end
 
@@ -1267,7 +1267,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
          this to a louder error. For now, we are consdervative and allow it via
          a fallback. *)
     | Unboxed_tuple _ ->
-      if dwarf_pedantic
+      if dwarf_pedantic ()
       then
         Misc.fatal_errorf "unboxed tuples cannot have base layout %a:@ %a"
           Layout.format (Layout.Base type_layout) S.print type_shape
@@ -1294,7 +1294,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
               match type_layout with
               | Base base_layout -> base_layout
               | Product _ ->
-                if dwarf_pedantic
+                if dwarf_pedantic ()
                 then
                   Misc.fatal_errorf
                     "[Record_boxed] and [Record_floats] records must only have \
@@ -1338,7 +1338,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
     | Record { fields = _; kind = Record_unboxed_product }
     | Record { fields = [(_, _, Product _)]; kind = Record_unboxed } ->
-      if dwarf_pedantic
+      if dwarf_pedantic ()
       then
         Misc.fatal_errorf
           "This form of record shape should have been flattened by \
@@ -1348,7 +1348,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
         create_base_layout_type ~reference type_layout ?name ~parent_proto_die
           ~fallback_value_die ()
     | Record { fields = [] | _ :: _ :: _; kind = Record_unboxed } ->
-      if dwarf_pedantic
+      if dwarf_pedantic ()
       then
         Misc.fatal_errorf
           "Records with [@unboxed] attributes must have exactly one field:@ %a"
@@ -1394,7 +1394,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
         match arg_layout with
         | Base base_layout -> base_layout
         | Product _ ->
-          if dwarf_pedantic
+          if dwarf_pedantic ()
           then
             Misc.fatal_errorf
               "[Product] layout in [Variant_unboxed] constructor is not \
@@ -1413,7 +1413,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       | Some reference' ->
         create_typedef_die ~reference ~parent_proto_die ?name reference'
       | None ->
-        if dwarf_pedantic
+        if dwarf_pedantic ()
         then
           Misc.fatal_errorf
             "Recursive variable environment lookup failed: rec_env returned \
@@ -1447,7 +1447,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Proj_decl _ ->
       (* CR sspies: This case should have been ruled out by the recursive
          unfolding. Consider demoting that to a more silent error. *)
-      if dwarf_pedantic
+      if dwarf_pedantic ()
       then
         Misc.fatal_errorf
           "Projections from mutually recursive definitions should have been \
@@ -1523,7 +1523,7 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
       in
       create_array_die ~reference ~parent_proto_die ~child_die ?name ())
   | Array, _ ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf
         "[Array] predef shape must have exactly one argument:@ %a applied to %a"
@@ -1610,7 +1610,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   | Tuple _, Base Value ->
     known_value (* tuples are only a single base layout wide *)
   | Tuple _, _ ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf "tuple must have value layout, but got: %a"
         Layout.format type_layout
@@ -1621,7 +1621,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       let shapes_with_layout = List.combine shapes layouts in
       List.concat_map (fun (sh, ly) -> flatten_shape sh ly) shapes_with_layout
     | Layout.Product layouts ->
-      if dwarf_pedantic
+      if dwarf_pedantic ()
       then
         Misc.fatal_errorf
           "unboxed tuple field mismatch, shape %a has %d fields, but layout %a \
@@ -1630,7 +1630,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
           (List.length layouts)
       else unknown_base_layouts type_layout
     | Layout.Base _ ->
-      if dwarf_pedantic
+      if dwarf_pedantic ()
       then
         Misc.fatal_errorf "unboxed tuple must have product layout, but got: %a"
           Layout.format type_layout
@@ -1641,21 +1641,21 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
      conservatively give back defaults. *)
   | Predef _, Base base_layout -> [Known (type_shape, base_layout)]
   | Predef _, _ ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf "predefined type must have base layout, but got: %a"
         Layout.format type_layout
     else unknown_base_layouts type_layout
   | Arrow _, Base Value -> known_value
   | Arrow _, _ ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf "arrow must have value layout, but got: %a"
         Layout.format type_layout
     else unknown_base_layouts type_layout
   | Poly_variant _, Base Value -> known_value
   | Poly_variant _, _ ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf "poly_variant must have value layout, but got: %a"
         Layout.format type_layout
@@ -1665,7 +1665,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     known_value
   | ( Record { fields = _; kind = Record_boxed | Record_mixed _ | Record_floats },
       _ ) ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf "record must have value layout, but got: %a"
         Layout.format type_layout
@@ -1681,7 +1681,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
        Otherwise, we will create an additional DWARF entry for it. *)
     | Base b -> [Known (type_shape, b)])
   | Record { fields = [(_, _, ly)]; kind = Record_unboxed }, _ ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf
         "unboxed record at different layout than its field, record layout: %a, \
@@ -1690,7 +1690,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     else unknown_base_layouts type_layout
   | Record { fields = ([] | _ :: _ :: _) as fields; kind = Record_unboxed }, _
     ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf "unboxed record must have exactly one field, found %a"
         (Format.pp_print_list ~pp_sep:Format.pp_print_space
@@ -1703,7 +1703,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       when List.length prod_shapes = List.length fields ->
       List.concat_map (fun (_, sh, ly) -> flatten_shape sh ly) fields
     | Layout.Product prod_shapes ->
-      if dwarf_pedantic
+      if dwarf_pedantic ()
       then
         Misc.fatal_errorf
           "unboxed record field mismatch, shape %a has %d fields, but layout \
@@ -1712,7 +1712,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
           (List.length prod_shapes)
       else unknown_base_layouts type_layout
     | Layout.Base _ ->
-      if dwarf_pedantic
+      if dwarf_pedantic ()
       then
         Misc.fatal_errorf
           "unboxed record must have product layout, but has layout %a"
@@ -1720,7 +1720,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       else unknown_base_layouts type_layout)
   | Variant _, Base Value -> known_value
   | Variant _, _ ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf "variant must have value layout, but has layout %a"
         Layout.format type_layout
@@ -1730,7 +1730,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     when Layout.equal arg_layout type_layout ->
     known_value
   | Variant_unboxed { name = _; arg_name = _; arg_layout; arg_shape = _ }, _ ->
-    if dwarf_pedantic
+    if dwarf_pedantic ()
     then
       Misc.fatal_errorf
         "unboxed variant must have value layout, and must have same layout as \
@@ -1865,7 +1865,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
       match unboxed_projection, type_layout with
       | None, Base b -> Known (type_shape, b)
       | None, Product _ ->
-        if dwarf_pedantic
+        if dwarf_pedantic ()
         then
           Misc.fatal_errorf
             "uid %a: product layout not flattened by unarization for type \
@@ -1877,7 +1877,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
         let flattened_length = List.length flattened in
         if i < 0 || i >= flattened_length
         then
-          if dwarf_pedantic
+          if dwarf_pedantic ()
           then
             Misc.fatal_errorf
               "uid %a: unboxed projection index %d out of bounds 0...%d:@ %a"
