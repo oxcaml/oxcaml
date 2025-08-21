@@ -1363,9 +1363,9 @@ let datalog_rules =
        coaccessor_rel usage relation _v;
        filter
          (fun [f] ->
-           match[@ocaml.warning "-4"] CoField.decode f with
+           match CoField.decode f with
            | Param (Indirect_code_pointer, _) -> true
-           | _ -> false)
+           | Param (Direct_code_pointer, _) -> false)
          [relation] ]
      ==> cannot_unbox0 allocation_id);
     (let$ [alias; allocation_id; relation; to_] =
