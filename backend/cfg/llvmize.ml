@@ -604,6 +604,15 @@ module F = struct
       (List.map (fun (typ, arg) -> typ, Llvm_value.Local_ident arg) args)
       res
 
+  let ins_atomicrmw t op ~ptr ~arg ~res typ =
+    ins t "%a = atomicrmw %s ptr %a, %a %a acq_rel" pp_ident res op pp_ident ptr
+      Llvm_typ.pp_t typ pp_ident arg
+
+  let ins_cmpxchg t ~ptr ~compare_with ~set_if_eq ~res typ =
+    ins t "%a = cmpxchg ptr %a, %a %a, %a %a acq_rel monotonic" pp_ident res
+      pp_ident ptr Llvm_typ.pp_t typ pp_ident compare_with Llvm_typ.pp_t typ
+      pp_ident set_if_eq
+
   (* Calculate offset of identifier and handle conversions. *)
   let do_offset ~arg_is_ptr ~res_is_ptr t ident offset =
     let int_ident =
@@ -1240,6 +1249,59 @@ module F = struct
       ins_store_into_reg t zexted i.res.(0)
     | _ -> not_implemented_basic ~msg:"specific" i
 
+  let atomic t (i : Cfg.basic Cfg.instruction) (op : Cmm.atomic_op) ~size ~addr
+      =
+    let first_memory_arg_index =
+      match op with
+      | Compare_set -> 2
+      | Fetch_and_add -> 1
+      | Add | Sub | Land | Lor | Lxor -> 1
+      | Exchange -> 1
+      | Compare_exchange -> 2
+    in
+    let arg = load_reg_to_temp t i.arg.(first_memory_arg_index - 1) in
+    let typ =
+      match (size : Cmm.atomic_bitwidth) with
+      | Thirtytwo -> Llvm_typ.i32
+      | Sixtyfour | Word -> Llvm_typ.i64
+    in
+    let ptr = load_addr t addr i first_memory_arg_index in
+    let do_atomicrmw ?(set_res = false) op =
+      let res = fresh_ident t in
+      ins_atomicrmw t op ~ptr ~arg ~res typ;
+      if set_res then ins_store_into_reg t res i.res.(0)
+    in
+    let do_cmpxchg () =
+      let compare_with = load_reg_to_temp t i.arg.(0) in
+      let res = fresh_ident t in
+      ins_cmpxchg t ~ptr ~compare_with ~set_if_eq:arg ~res typ;
+      let loaded = fresh_ident t in
+      let success = fresh_ident t in
+      ins_extractvalue t ~arg:res ~res:loaded Llvm_typ.(Struct [typ; bool]) [0];
+      ins_extractvalue t ~arg:res ~res:success Llvm_typ.(Struct [typ; bool]) [1];
+      loaded, success
+    in
+    match op with
+    | Fetch_and_add -> do_atomicrmw ~set_res:true "add"
+    | Add -> do_atomicrmw "add"
+    | Sub -> do_atomicrmw "sub"
+    | Land -> do_atomicrmw "and"
+    | Lor -> do_atomicrmw "or"
+    | Lxor -> do_atomicrmw "xor"
+    | Exchange -> do_atomicrmw ~set_res:true "xchg"
+    | Compare_set ->
+      let _, success = do_cmpxchg () in
+      let res = fresh_ident t in
+      ins_conv t "zext" ~src:success ~dst:res ~src_typ:Llvm_typ.bool
+        ~dst_typ:(Llvm_typ.of_machtyp_component i.res.(0).typ);
+      ins_store_into_reg t res i.res.(0)
+    | Compare_exchange ->
+      let loaded, success = do_cmpxchg () in
+      let orig = load_reg_to_temp t i.res.(0) in
+      let selected = fresh_ident t in
+      ins_select t ~cond:success ~ifso:orig ~ifnot:loaded ~dst:selected typ;
+      ins_store_into_reg t selected i.res.(0)
+
   let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     match op with
     | Move | Opaque ->
@@ -1458,8 +1520,8 @@ module F = struct
       | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ->
         not_implemented_basic ~msg:"vector reinterpret cast" i)
     | Specific op -> specific t i op
-    | Intop_atomic _ | Probe_is_enabled _ | Name_for_debugger _ | Dls_get | Poll
-    | Pause ->
+    | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
+    | Probe_is_enabled _ | Name_for_debugger _ | Dls_get | Poll | Pause ->
       not_implemented_basic i
 
   let basic t (i : Cfg.basic Cfg.instruction) =
