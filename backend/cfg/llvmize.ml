@@ -566,14 +566,14 @@ module F = struct
       Llvm_typ.pp_t typ pp_ident ifso Llvm_typ.pp_t typ pp_ident ifnot
 
   let ins_extractvalue t ~arg ~res typ idxs =
-    ins t "%a = extractvalue %a %a, %a" pp_ident res Llvm_typ.pp_t typ pp_ident
-      arg
+    ins t "%a = extractvalue %a %a, %a" pp_ident res Llvm_typ.pp_t typ
+      Llvm_value.pp_t arg
       (pp_print_list ~pp_sep:pp_comma pp_print_int)
       idxs
 
   let ins_insertvalue t ~res ~src ~dst ~src_typ ~dst_typ idxs =
     ins t "%a = insertvalue %a %a, %a %a, %a" pp_ident res Llvm_typ.pp_t dst_typ
-      pp_ident dst Llvm_typ.pp_t src_typ pp_ident src
+      Llvm_value.pp_t dst Llvm_typ.pp_t src_typ Llvm_value.pp_t src
       (pp_print_list ~pp_sep:pp_comma pp_print_int)
       idxs
 
@@ -612,6 +612,30 @@ module F = struct
     ins t "%a = cmpxchg ptr %a, %a %a, %a %a acq_rel monotonic" pp_ident res
       pp_ident ptr Llvm_typ.pp_t typ pp_ident compare_with Llvm_typ.pp_t typ
       pp_ident set_if_eq
+
+  let make_poison t typ =
+    let res = fresh_ident t in
+    ins_extractvalue t ~arg:Llvm_value.poison ~res Llvm_typ.(Struct [typ]) [0];
+    res
+
+  let assemble_struct t root_typ get_val_at_idx =
+    let rec aux idxs cur_struct typ =
+      match get_val_at_idx idxs with
+      | Some value ->
+        let res = fresh_ident t in
+        ins_insertvalue t ~res ~src:value ~dst:(Local_ident cur_struct)
+          ~src_typ:typ ~dst_typ:root_typ idxs;
+        res
+      | None -> (
+        match (typ : Llvm_typ.t) with
+        | Struct typs ->
+          List.fold_lefti
+            (fun idx cur_struct typ -> aux (idxs @ [idx]) cur_struct typ)
+            cur_struct typs
+        | Int _ | Ptr | Float | Double | Array _ ->
+          Misc.fatal_error "Llvmize.assemble_struct: unfilled struct slot")
+    in
+    aux [] (make_poison t root_typ) root_typ
 
   (* Calculate offset of identifier and handle conversions. *)
   let do_offset ~arg_is_ptr ~res_is_ptr t ident offset =
@@ -783,13 +807,14 @@ module F = struct
     List.iteri
       (fun idx reg ->
         let temp = fresh_ident t in
-        ins_extractvalue t ~arg:res_ident ~res:temp res_type [0; idx];
+        ins_extractvalue t ~arg:(Local_ident res_ident) ~res:temp res_type
+          [0; idx];
         ins_store t ~src:temp ~dst:reg Llvm_typ.ptr)
       runtime_regs;
     List.mapi
       (fun idx _ ->
         let res = fresh_ident t in
-        ins_extractvalue t ~arg:res_ident ~res res_type [1; idx];
+        ins_extractvalue t ~arg:(Local_ident res_ident) ~res res_type [1; idx];
         res)
       res_types
 
@@ -868,13 +893,15 @@ module F = struct
       List.iteri
         (fun idx reg ->
           let temp = fresh_ident t in
-          ins_extractvalue t ~arg:res_ident ~res:temp res_type [0; idx];
+          ins_extractvalue t ~arg:(Local_ident res_ident) ~res:temp res_type
+            [0; idx];
           ins_store t ~src:temp ~dst:reg Llvm_typ.ptr)
         runtime_regs;
       List.iteri
         (fun idx reg ->
           let temp = fresh_ident t in
-          ins_extractvalue t ~arg:res_ident ~res:temp res_type [1; idx];
+          ins_extractvalue t ~arg:(Local_ident res_ident) ~res:temp res_type
+            [1; idx];
           ins_store_into_reg t temp reg)
         res_regs)
 
@@ -884,36 +911,36 @@ module F = struct
       Array.to_list i.arg
       |> List.filter (fun reg -> not (Reg.is_domainstate reg))
     in
-    let res_type = make_ret_type (List.map (fun reg -> reg.Reg.typ) res_regs) in
-    let insert ~outer_idx idents_and_types into_where =
-      let _, res =
-        List.fold_left
-          (fun (idx, cur) (ident, typ) ->
-            let loaded = fresh_ident t in
-            let inserted = fresh_ident t in
-            ins_load t ~src:ident ~dst:loaded typ;
-            ins_insertvalue t ~res:inserted ~src:loaded ~dst:cur ~src_typ:typ
-              ~dst_typ:res_type [outer_idx; idx];
-            idx + 1, inserted)
-          (0, into_where) idents_and_types
-      in
-      res
+    let res_type =
+      make_ret_type (Array.to_list t.current_fun_info.fun_ret_type)
     in
-    (* Start from poison... *)
-    let poison_ident = fresh_ident t in
-    ins t "%a = extractvalue { %a } poison, 0" pp_ident poison_ident
-      Llvm_typ.pp_t res_type;
-    let filled =
-      poison_ident
-      |> insert ~outer_idx:0 (* Runtime regs *)
-           (List.map (fun ident -> ident, Llvm_typ.ptr) runtime_regs)
-      |> insert ~outer_idx:1 (* Return regs *)
-           (List.map
-              (fun (reg : Reg.t) ->
-                get_ident_for_reg t reg, Llvm_typ.of_machtyp_component reg.typ)
-              res_regs)
+    let get_ident = function[@warning "-fragile-match"]
+      | [0; i] ->
+        let ptr = List.nth runtime_regs i in
+        let res = fresh_ident t in
+        ins_load t ~src:ptr ~dst:res Llvm_typ.ptr;
+        Some (Llvm_value.Local_ident res)
+      | [1; i] -> (
+        (* A mild amount of hacks here. *)
+        match List.nth_opt res_regs i with
+        | None -> Some Llvm_value.poison
+        | Some reg ->
+          let reg_typ = Llvm_typ.of_machtyp_component reg.typ in
+          let actual_typ =
+            t.current_fun_info.fun_ret_type.(i) |> Llvm_typ.of_machtyp_component
+          in
+          let temp = load_reg_to_temp t reg in
+          if Llvm_typ.equal actual_typ reg_typ
+          then Some (Llvm_value.Local_ident temp)
+          else
+            let res = fresh_ident t in
+            ins_conv t "bitcast" ~src:temp ~dst:res ~src_typ:reg_typ
+              ~dst_typ:actual_typ;
+            Some (Llvm_value.Local_ident res))
+      | _ -> None
     in
-    ins t "ret %a %a" Llvm_typ.pp_t res_type pp_ident filled
+    let res = assemble_struct t res_type get_ident in
+    ins t "ret %a %a" Llvm_typ.pp_t res_type pp_ident res
 
   let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
       ~stack_ofs ~stack_align =
@@ -1270,8 +1297,12 @@ module F = struct
       ins_cmpxchg t ~ptr ~compare_with ~set_if_eq:arg ~res typ;
       let loaded = fresh_ident t in
       let success = fresh_ident t in
-      ins_extractvalue t ~arg:res ~res:loaded Llvm_typ.(Struct [typ; bool]) [0];
-      ins_extractvalue t ~arg:res ~res:success Llvm_typ.(Struct [typ; bool]) [1];
+      ins_extractvalue t ~arg:(Local_ident res) ~res:loaded
+        Llvm_typ.(Struct [typ; bool])
+        [0];
+      ins_extractvalue t ~arg:(Local_ident res) ~res:success
+        Llvm_typ.(Struct [typ; bool])
+        [1];
       loaded, success
     in
     match op with
@@ -2050,35 +2081,13 @@ let declare_c_call_wrappers t =
         F.ins_call ~cc:Default ~pp_name:F.pp_global t c_fun_name c_fun_args
           (Some (c_fun_res_type, res_ident));
         F.write_rsp t ocaml_sp;
-        let insert ~outer_idx types_and_idents into_where =
-          let _, res =
-            List.fold_left
-              (fun (idx, cur) (typ, ident) ->
-                let inserted = fresh_ident t in
-                F.ins_insertvalue t ~res:inserted ~src:ident ~dst:cur
-                  ~src_typ:typ ~dst_typ:wrapper_res_type [outer_idx; idx];
-                idx + 1, inserted)
-              (0, into_where) types_and_idents
-          in
-          res
+        let get_ident = function[@warning "-fragile-match"]
+          | [0; i] -> Some (Llvm_value.Local_ident (List.nth runtime_regs i))
+          | [1] -> Some (Llvm_value.Local_ident res_ident)
+          | _ -> None
         in
-        (* Start from poison... *)
-        let poison_ident = fresh_ident t in
-        F.ins t "%a = extractvalue { %a } poison, 0" F.pp_ident poison_ident
-          Llvm_typ.pp_t wrapper_res_type;
-        let filled_runtime_regs =
-          insert ~outer_idx:0 (* Runtime regs *)
-            (List.map (fun ident -> Llvm_typ.ptr, ident) runtime_regs)
-            poison_ident
-        in
-        let filled_all =
-          let inserted = fresh_ident t in
-          F.ins_insertvalue t ~res:inserted ~src:res_ident
-            ~dst:filled_runtime_regs ~src_typ:c_fun_res_type
-            ~dst_typ:wrapper_res_type [1];
-          inserted
-        in
-        F.ins t "ret %a %a" Llvm_typ.pp_t wrapper_res_type F.pp_ident filled_all
+        let res = F.assemble_struct t wrapper_res_type get_ident in
+        F.ins t "ret %a %a" Llvm_typ.pp_t wrapper_res_type F.pp_ident res
       in
       F.define t ~private_:true ~cc:Ocaml ~fun_name:wrapper_name
         ~fun_args:wrapper_args ~fun_ret_type:wrapper_res_type
