@@ -14,7 +14,6 @@
  }
 *)
 
-(* CR jrayman: location info is misleading *)
 module Big_module = struct
   open struct
     let a_248 = "a"

@@ -32,7 +32,7 @@ open Lambda
    mshinwell: PR4527 has now removed transl_store* *)
 val transl_implementation:
       Compilation_unit.t -> structure * module_coercion * module_coercion option
-        -> Lambda.program
+      -> loc:Location.t -> Lambda.program
 
 val transl_toplevel_definition: structure -> lambda
 

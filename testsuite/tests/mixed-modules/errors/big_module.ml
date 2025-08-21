@@ -14,7 +14,6 @@
  }
 *)
 
-(* CR jrayman: the error message does not have helpful location info *)
 module Big_module = struct
   (* Won't compile on native because the scannable prefix is too big *)
   let f_0 = #42.0
