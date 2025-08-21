@@ -2163,11 +2163,13 @@ let layout_of_lazy_signature_item (item : Subst.Lazy.signature_item) =
     begin match decl.val_kind with
     | Val_reg layout -> Some layout
     | Val_ivar _ | Val_self _ | Val_anc _ ->
-      Some (Jkind.Layout.Sort Jkind.Sort.value)
+      Some Jkind.(Layout.of_const
+                   (Layout.Const.of_sort_const Sort.Const.for_object))
     | Val_prim _ | Val_mut _ -> None (* error will be thrown later *)
     end
-  | Sig_typext _ -> Some (Jkind.Layout.Sort Jkind.Sort.value)
-      (* CR jrayman: add [for_type_extension] *)
+  | Sig_typext _ ->
+      Some Jkind.(Layout.of_const
+                   (Layout.Const.of_sort_const Sort.Const.for_type_extension))
   | Sig_module(_, pres, _, _, _) ->
     begin match pres with
     | Mp_present ->
@@ -2177,8 +2179,7 @@ let layout_of_lazy_signature_item (item : Subst.Lazy.signature_item) =
     end
   | Sig_class _ ->
       Some Jkind.(Layout.of_const
-                   (Layout.Const.of_sort_const Sort.Const.for_object))
-          (* CR jrayman: is [for_object] correct? *)
+                   (Layout.Const.of_sort_const Sort.Const.for_class))
   | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
 
 let layout_of_signature_item item =
