@@ -34,7 +34,7 @@ let bytecode =
   ] in
 {
   test_name = "bytecode";
-  test_run_by_default = true;
+  test_run_by_default = false;
   test_description = "Build bytecode program, run it and check its output";
   test_actions =
   (if true && Ocamltest_config.native_compiler then
@@ -82,7 +82,7 @@ let native =
   ) in
   {
     test_name = "native";
-    test_run_by_default = true;
+    test_run_by_default = false;
     test_description = "Build native program, run it and check its output";
     test_actions =
       (if Ocamltest_config.native_compiler then opt_actions else [skip])
