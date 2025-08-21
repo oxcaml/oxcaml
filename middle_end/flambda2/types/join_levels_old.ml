@@ -100,7 +100,24 @@ let join_types ~env_at_fork envs_with_levels =
             (Name.compilation_unit name)
             (Compilation_unit.get_current_exn ())
         in
-        if same_unit && not (TE.mem base_env name)
+        (* CR bclement: This assertion not holding for variables would be a
+           serious bug, because the [base_env] is created by adding in all the
+           variables that are defined in any of the joined environments.
+
+           However, it could fail for symbols if some of the lifted constants
+           from one of the joined environments are not inserted into the base
+           environment by [Simplify_expr]. This would normally be a bug in
+           [Simplify_expr], but it can currently happen in the presence of
+           (continuation) specialization where constants from the
+           not-specialized case can sometimes leak into the wrong environments.
+
+           The bug is tricky to fix, but otherwise harmless, as we can just
+           leave the equation for the symbol alone, so we restrict the assertion
+           to variables only for now.
+
+           Once the issue in [Simplify_expr] is fixed, we can drop the
+           [Name.is_var name] part of the check below again. *)
+        if same_unit && Name.is_var name && not (TE.mem base_env name)
         then
           Misc.fatal_errorf "Name %a not defined in [base_env]:@ %a" Name.print
             name TE.print base_env;
