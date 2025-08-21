@@ -590,29 +590,29 @@ module Sign_diff = struct
     }
 end
 
-let module_representation_of_layouts ~loc layouts =
+let module_representation_of_layouts layouts =
   layouts
   |> List.map
     (fun layout ->
       layout
       |> Jkind.Layout.to_sort
           (* we should've already checked that [sg] is representable
-            in [transl_value_decl] *)
+             in [transl_value_decl] *)
       |> Misc.Stdlib.Option.get_or_fatal_error
-            ~error:"Includemod.module_representation_of_layouts: \
+            ~error:"Types.module_representation_of_layouts: \
                       unexpected unrepresentable layout"
       |> Jkind.Sort.default_for_transl_and_get
       |> mixed_block_element_of_const_sort)
   |> Array.of_list
-  |> Typedecl.module_representation_of_mixed_product_shape ~loc
+  |> module_representation_of_mixed_product_shape
 
-let module_representation_of_signature ~loc sg =
+let module_representation_of_signature sg =
   sg |> List.filter_map Env.layout_of_signature_item
-     |> module_representation_of_layouts ~loc
+     |> module_representation_of_layouts
 
-let module_representation_of_lazy_signature ~loc sg =
+let module_representation_of_lazy_signature sg =
   sg |> List.filter_map Env.layout_of_lazy_signature_item
-     |> module_representation_of_layouts ~loc
+     |> module_representation_of_layouts
 
 (* Quickly compare module types without expanding them, succeeding only if mty1
   is a subtype of mty2 with no coercion  *)
@@ -931,8 +931,8 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        let input_repr = module_representation_of_lazy_signature ~loc sig1 in
-        let output_repr = module_representation_of_lazy_signature ~loc sig2 in
+        let input_repr = module_representation_of_lazy_signature sig1 in
+        let output_repr = module_representation_of_lazy_signature sig2 in
         let coercion =
           if runtime_len1 = runtime_len2 then (* see PR#5098 *)
             simplify_structure_coercion input_repr output_repr cc id_pos_list

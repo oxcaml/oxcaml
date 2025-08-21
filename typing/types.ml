@@ -681,8 +681,8 @@ and mixed_block_element =
 and mixed_product_shape = mixed_block_element array
 
 and module_representation =
-  | Module_value_only of int
-  | Module_mixed of mixed_product_shape
+  | Module_value_only of { size : int }
+  | Module_mixed of { shape : mixed_product_shape; value_count : int }
 
 and record_representation =
   | Record_unboxed
@@ -1063,8 +1063,10 @@ let equal_mixed_product_shape r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
 
 let equal_module_representation r1 r2 = match r1, r2 with
-  | Module_value_only s1, Module_value_only s2 -> s1 = s2
-  | Module_mixed p1, Module_mixed p2 -> equal_mixed_product_shape p1 p2
+  | Module_value_only { size = s1 }, Module_value_only { size = s2 } -> s1 = s2
+  | Module_mixed { shape = p1; value_count = _ },
+    Module_mixed { shape = p2; value_count = _ } ->
+    equal_mixed_product_shape p1 p2
   | (Module_value_only _ | Module_mixed _), _ -> false
 
 let equal_constructor_representation r1 r2 = r1 == r2 || match r1, r2 with
@@ -1172,6 +1174,18 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Product [||]
 
+let module_representation_of_mixed_product_shape shape =
+  let value_count = ref 0 in
+  Array.iter
+    (function Value -> incr value_count
+      | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
+      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+      | Product _ | Void -> ())
+    shape;
+  if !value_count = Array.length shape
+  then Module_value_only { size = Array.length shape }
+  else Module_mixed { shape; value_count = !value_count }
+
 let mixed_block_element_for_type_extension = Value
 let mixed_block_element_for_exception = Value
 let mixed_block_element_for_module = Value
@@ -1214,6 +1228,25 @@ let rec bound_value_identifiers = function
       id :: bound_value_identifiers rem
   | Sig_class(id, _, _, _) :: rem -> id :: bound_value_identifiers rem
   | _ :: rem -> bound_value_identifiers rem
+
+let rec bound_value_identifiers_and_layouts = function
+    [] -> []
+  | Sig_value(id, {val_kind = Val_reg layout}, _) :: rem ->
+      (id, layout) :: bound_value_identifiers_and_layouts rem
+  | Sig_typext(id, _, _, _) :: rem ->
+      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_type_extension)))
+        :: bound_value_identifiers_and_layouts rem
+  | Sig_module(id, Mp_present, _, _, _) :: rem ->
+      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_module))) ::
+        bound_value_identifiers_and_layouts rem
+  | Sig_class(id, _, _, _) :: rem ->
+      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_class))) ::
+        bound_value_identifiers_and_layouts rem
+  | Sig_value(_, {val_kind = (Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _
+                              | Val_anc _)}, _) :: rem
+  | Sig_module(_, Mp_absent, _, _, _) :: rem
+  | (Sig_type _ | Sig_modtype _ | Sig_class_type _) :: rem ->
+      bound_value_identifiers_and_layouts rem
 
 let signature_item_id = function
   | Sig_value (id, _, _)
