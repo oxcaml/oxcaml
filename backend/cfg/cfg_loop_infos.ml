@@ -44,9 +44,7 @@ let compute_loop_of_back_edge cfg dominators { Cfg_edge.src; dst } =
       in
       visit stack acc
   in
-  if Label.equal src dst
-  then Label.Set.singleton src
-  else visit [src] (Label.Set.add src (Label.Set.singleton dst))
+  visit [src] (Label.Set.add src (Label.Set.singleton dst))
 
 type loops = loop Cfg_edge.Map.t
 
