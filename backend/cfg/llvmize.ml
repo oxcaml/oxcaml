@@ -1515,7 +1515,11 @@ module F = struct
         not_implemented_basic ~msg:"vector reinterpret cast" i)
     | Specific op -> specific t i op
     | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
-    | Probe_is_enabled _ | Name_for_debugger _ | Dls_get | Poll | Pause ->
+    | Pause ->
+      add_called_fun t "llvm.x86.sse2.pause" ~cc:Default ~args:[] ~res:None;
+      ins_call ~cc:Default ~pp_name:pp_global t "llvm.x86.sse2.pause" [] None
+    | Poll -> () (* CR yusumez: insert poll call *)
+    | Probe_is_enabled _ | Name_for_debugger _ | Dls_get ->
       not_implemented_basic i
 
   let basic t (i : Cfg.basic Cfg.instruction) =
