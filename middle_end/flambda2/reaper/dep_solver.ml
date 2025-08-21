@@ -1354,13 +1354,10 @@ let datalog_rules =
        constructor_rel call_witness code_id_of_witness codeid;
        cannot_change_calling_convention codeid ]
      ==> cannot_unbox0 allocation_id);
-    (* Cannot unbox parameters of [Indirect_unknown_arity] calls, even if they do not escape. *)
-    (let$ [ usage; allocation_id;
-            relation;
-            _v] =
-       [ "usage"; "allocation_id";
-         "relation";
-         "_v" ]
+    (* Cannot unbox parameters of [Indirect_unknown_arity] calls, even if they
+       do not escape. *)
+    (let$ [usage; allocation_id; relation; _v] =
+       ["usage"; "allocation_id"; "relation"; "_v"]
      in
      [ sources_rel usage allocation_id;
        coaccessor_rel usage relation _v;
