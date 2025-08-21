@@ -94,7 +94,6 @@ module Mixed_product_kind : sig
     | Module
 end
 
-(* CR jrayman: maybe this can be refactored so it is not exposed *)
 val module_representation_of_mixed_product_shape :
   loc:Warnings.loc -> mixed_product_shape -> module_representation
 
