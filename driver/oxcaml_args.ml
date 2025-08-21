@@ -872,8 +872,8 @@ let mk_gdwarf_fission f =
 let mk_gdwarf_pedantic f =
   ( "-gdwarf-pedantic",
     Arg.Unit f,
-    " Enable pedantic DWARF error checking (fatal errors instead of silent fallbacks)"
-  )
+    " Enable pedantic DWARF error checking (fatal errors instead of silent \
+     fallbacks)" )
 
 let mk_use_cached_generic_functions f =
   ( "-use-cached-generic-functions",
@@ -1560,8 +1560,7 @@ module Debugging_options_impl = struct
                 "Invalid value for -gdwarf-fission: %s\n\
                  Valid values are: none, objcopy, dsymutil" value))
 
-  let gdwarf_pedantic () =
-    Clflags.dwarf_pedantic := true
+  let gdwarf_pedantic () = Clflags.dwarf_pedantic := true
 end
 
 module Extra_params = struct
