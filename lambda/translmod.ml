@@ -57,6 +57,8 @@ let rec to_layout : Jkind.Layout.Const.t -> layout = function
   | Base Bits32 -> Punboxed_int Unboxed_int32
   | Base Bits64 -> Punboxed_int Unboxed_int64
   | Base Vec128 -> Punboxed_vector Unboxed_vec128
+  | Base Vec256 -> Punboxed_vector Unboxed_vec256
+  | Base Vec512 -> Punboxed_vector Unboxed_vec512
   | Product layouts ->
     Punboxed_product (List.map to_layout layouts)
 
@@ -673,6 +675,8 @@ and transl_structure ~scopes loc fields sorts cc rootpath final_env = function
           | Base Float32 -> Float32
           | Base Float64 -> Float64
           | Base Vec128 -> Vec128
+          | Base Vec256 -> Vec256
+          | Base Vec512 -> Vec512
           | Base Word -> Word
           | Product sorts ->
             Product (Array.map shape_of_sort (Array.of_list sorts))
