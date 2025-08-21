@@ -91,10 +91,10 @@ let print_exception ppf obj =
   let t = Printer.outval_of_untyped_exception obj in
   !Oprint.out_value ppf t
 
-let print_value max_depth env obj (ppf : Format.formatter) ty =
+let print_value max_depth env obj (ppf : Format.formatter) (ty, layout) =
   let t =
     Printer.outval_of_value !max_printer_steps max_depth
-      check_depth env obj ty in
+      check_depth env obj ty layout in
   !Oprint.out_value ppf t
 
 let print_named_value max_depth exp env obj ppf ty =
@@ -109,4 +109,4 @@ let print_named_value max_depth exp env obj ppf ty =
   fprintf ppf "@[<2>%a:@ %a@ =@ %a@]@."
   print_value_name exp
   Printtyp.type_expr ty
-  (print_value max_depth env obj) ty
+  (print_value max_depth env obj) (ty, failwith "CR jrayman")
