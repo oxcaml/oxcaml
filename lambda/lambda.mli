@@ -591,6 +591,8 @@ val layout_of_extern_repr : extern_repr -> layout
 
 (* CR mixed-modules: finish comment: Used for ... *)
 val layout_of_mixed_block_element : 'a. 'a mixed_block_element -> layout
+val layout_of_mixed_block_shape
+    : 'a. 'a mixed_block_element array -> path:int list -> layout
 
 type structured_constant =
     Const_base of constant
