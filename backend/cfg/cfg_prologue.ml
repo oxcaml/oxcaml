@@ -183,8 +183,6 @@ let rec find_prologue_and_epilogue_blocks (tree : Cfg_dominators.dominator_tree)
         (fun tree -> find_prologue_and_epilogue_blocks tree cfg doms loop_infos)
         tree.children
     in
-    (* let children_prologue_block = List.filter (fun x -> Option.is_some x)
-       children_prologue_block in *)
     match children_prologue_block with
     | [] -> None
     | [(child, child_epilogue_blocks)] ->
