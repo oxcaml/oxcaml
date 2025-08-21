@@ -481,7 +481,6 @@ val protect_writing_to_file
           channel. If the function raises an exception then [filename]
           will be removed. *)
 
-
 val mk_temp_dir : ?perms: int -> string -> string -> string
        (** Create a temporary directory with a random number in the name. *)
 

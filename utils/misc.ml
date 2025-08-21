@@ -705,8 +705,7 @@ let remove_file filename =
 
 let remove_dir dirname =
   try
-    if Sys.is_directory dirname
-    then Sys.rmdir dirname
+    Sys.rmdir dirname
   with Sys_error _msg ->
     ()
 
@@ -793,7 +792,6 @@ let protect_writing_to_file ~filename ~f =
     ~exceptionally:(fun () -> remove_file filename)
     (fun () -> f outchan)
 
-
 let prng = lazy(Random.State.make_self_init ())
 
 let temp_file_name temp_dir prefix suffix =
@@ -810,8 +808,6 @@ let mk_temp_dir ?(perms = 0o700) prefix suffix =
     with Sys_error _ as e ->
       if counter >= 20 then raise e else try_name (counter + 1)
   in try_name 0
-
-
 
 (* Integer operations *)
 
