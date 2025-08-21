@@ -3385,6 +3385,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
          value for the same reason (see the special case in
          [Opttoploop.execute_phrase]).
     *)
+    (* CR jrayman: above comment *)
     Option.is_some toplevel
   in
 
