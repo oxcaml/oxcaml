@@ -821,7 +821,8 @@ let link objfiles output_name =
       else
         let tmp_dir = Misc.mk_temp_dir "caml" "" in
         if not (Sys.is_directory tmp_dir) then
-          Misc.fatal_error "Failed to create temporary directory for camlprim.c";
+          Misc.fatal_error
+            "Failed to create temporary directory for camlprim.c";
         let file = Filename.concat tmp_dir "camlprim.c" in
         Some tmp_dir, file in
     Misc.try_finally
