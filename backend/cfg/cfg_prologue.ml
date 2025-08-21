@@ -168,12 +168,10 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
        If we try to place the prologue in block B, the prologue would not
        dominate the epilogue in block C, so in some cases the epilogue would be
        executed without a prologue on the stack, which would be illegal. *)
-    Label.Set.fold
-      (fun epilogue_label acc ->
-        if Cfg_dominators.is_dominating doms prologue_label epilogue_label
-        then acc
-        else false)
-      epilogue_blocks true
+    Label.Set.for_all
+      (fun epilogue_label ->
+        Cfg_dominators.is_dominating doms prologue_label epilogue_label)
+      epilogue_blocks
 
 let rec find_prologue_block (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
     (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
