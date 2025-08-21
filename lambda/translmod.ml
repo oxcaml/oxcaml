@@ -653,26 +653,6 @@ and transl_struct ~scopes loc fields cc rootpath
       {str_final_env; str_items; _} =
   transl_structure ~scopes loc fields cc rootpath str_final_env str_items
 
-(* CR jrayman: move to Types? *)
-and bound_value_identifiers_and_layouts = function
-    [] -> []
-  | Sig_value(id, {val_kind = Val_reg layout}, _) :: rem ->
-      (id, layout) :: bound_value_identifiers_and_layouts rem
-  | Sig_typext(id, _, _, _) :: rem ->
-      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_type_extension)))
-        :: bound_value_identifiers_and_layouts rem
-  | Sig_module(id, Mp_present, _, _, _) :: rem ->
-      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_module))) ::
-        bound_value_identifiers_and_layouts rem
-  | Sig_class(id, _, _, _) :: rem ->
-      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_class))) ::
-        bound_value_identifiers_and_layouts rem
-  | Sig_value(_, {val_kind = (Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _
-                              | Val_anc _)}, _) :: rem
-  | Sig_module(_, Mp_absent, _, _, _) :: rem
-  | (Sig_type _ | Sig_modtype _ | Sig_class_type _) :: rem ->
-      bound_value_identifiers_and_layouts rem
-
 (* The function  transl_structure is called by  the bytecode compiler.
    Some effort is made to compile in top to bottom order, in order to display
    warning by increasing locations. *)
@@ -683,10 +663,15 @@ and transl_structure ~scopes loc
     [] ->
       let body, repr =
         let repr =
-          Typedecl.module_representation_of_mixed_product_shape
-            ~loc:(to_location loc)
+          Types.module_representation_of_mixed_product_shape
             (List.rev_map (fun (_, mbe) -> mbe) fields |> Array.of_list)
         in
+        begin match repr with
+        | Module_value_only _ -> ()
+        | Module_mixed { value_count; shape = _ } ->
+          Typedecl.assert_mixed_product_support (to_location loc) Module
+            ~value_prefix_len:value_count
+        end;
         match cc with
           Tcoerce_none ->
             let repr = transl_module_representation repr in
@@ -771,12 +756,9 @@ and transl_structure ~scopes loc
           let ext_fields =
             List.rev_append
               (pat_expr_list
-              (* CR jrayman: write [let_bound_idents_with_sorts] after
-                 refactor *)
-                |> let_bound_idents_with_modes_sorts_and_checks
+                |> let_bound_idents_with_sorts
                 |> List.map
-                    (fun (id, l, _) ->
-                      let _, _, sort = List.hd l in
+                    (fun (id, sort) ->
                       let shape =
                         sort |> Jkind.Sort.default_for_transl_and_get
                              |> mixed_block_element_of_const_sort
@@ -1120,10 +1102,10 @@ let add_runtime_parameters lam params =
     ~mode:alloc_heap
     ~ret_mode:alloc_heap
 
-let transl_implementation_module ~scopes module_id (str, cc, cc2) =
+let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
   let path = global_path module_id in
   let lam, repr =
-    transl_struct ~scopes Loc_unknown [] cc path str
+    transl_struct ~scopes (of_location ~scopes loc) [] cc path str
   in
   match cc2 with
   | None -> lam, repr, None
@@ -1141,7 +1123,7 @@ let wrap_toplevel_functor_in_struct code repr =
 let has_parameters () =
   Env.parameters () <> []
 
-let transl_implementation compilation_unit impl =
+let transl_implementation compilation_unit impl ~loc =
   reset_labels ();
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
@@ -1150,7 +1132,7 @@ let transl_implementation compilation_unit impl =
   let body, (repr, arg_block_idx) =
     Translobj.transl_label_init (fun () ->
       let body, repr, arg_block_idx =
-        transl_implementation_module ~scopes compilation_unit
+        transl_implementation_module ~loc ~scopes compilation_unit
           impl
       in
       Translcore.declare_probe_handlers body, (repr, arg_block_idx))

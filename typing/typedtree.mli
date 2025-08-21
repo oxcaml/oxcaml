@@ -857,9 +857,6 @@ and value_binding =
 and module_coercion =
     Tcoerce_none
   | Tcoerce_structure of
-      (* CR jrayman for reviewer: [input_repr] and [output_repr] are translated
-         into [Lambda.module_representation]s as soon as they are projected.
-         Should they instead somehow be translated when constructed? *)
       { input_repr : Types.module_representation
       ; output_repr : Types.module_representation
       ; pos_cc_list : (int * module_coercion) list
@@ -1308,8 +1305,11 @@ val exists_general_pattern: pattern_predicate -> 'k general_pattern -> bool
 val exists_pattern: (pattern -> bool) -> pattern -> bool
 
 val let_bound_idents: value_binding list -> Ident.t list
+val let_bound_idents_with_sorts:
+    value_binding list -> (Ident.t * Jkind.Sort.t) list
 val let_bound_idents_full:
-    value_binding list -> (Ident.t * string loc * Types.type_expr * Uid.t) list
+    value_binding list ->
+    (Ident.t * string loc * Types.type_expr * Jkind.Sort.t * Uid.t) list
 
 (* [let_bound_idents_with_modes_sorts_and_checks] finds all the idents in the
    let bindings and computes their modes, sorts, and whether they have any check

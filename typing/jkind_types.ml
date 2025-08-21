@@ -200,8 +200,6 @@ module Sort = struct
 
     let for_constructor = value
 
-    let for_module_field = value
-
     let for_boxed_variant = value
 
     let for_exception = value
@@ -628,16 +626,4 @@ module Layout = struct
       | Base of Sort.base
       | Product of t list
   end
-
-  let value = Sort Sort.value
-
-  let for_object = value
-
-  let for_type_extension = value
-
-  let for_class = value
-
-  let for_module = value
-
-  let for_instance_var = value
 end

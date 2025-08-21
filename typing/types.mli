@@ -863,10 +863,12 @@ and type_origin =
    [Types.record_representation] since, e.g., modules don't support the float
    block optimization. *)
 and module_representation =
-  | Module_value_only of int
-  (* All module fields are boxed. The [int] is the number of fields *)
-  | Module_mixed of mixed_product_shape
-  (* The module contains both values and unboxed elements *)
+  | Module_value_only of { size : int }
+  (* All module fields are boxed *)
+  | Module_mixed of { shape : mixed_product_shape; value_count : int }
+  (* The module contains both values and unboxed elements. We store
+     [value_count] so we get more control over when the "scannable prefix
+     too large" error is thrown. *)
 
 and record_representation =
   | Record_unboxed
@@ -1211,6 +1213,9 @@ val record_form_to_string : _ record_form -> string
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
+val module_representation_of_mixed_product_shape :
+  mixed_block_element array -> module_representation
+
 val mixed_block_element_for_type_extension : mixed_block_element
 val mixed_block_element_for_exception : mixed_block_element
 val mixed_block_element_for_module : mixed_block_element
@@ -1221,6 +1226,10 @@ val mixed_block_element_for_class : mixed_block_element
     correspond to a run-time value: values, extensions, modules, classes.
     Note: manifest primitives do not correspond to a run-time value! *)
 val bound_value_identifiers: signature -> Ident.t list
+
+(** Like [bound_value_identifiers] *)
+val bound_value_identifiers_and_layouts :
+  signature -> (Ident.t * Jkind_types.Sort.t Jkind_types.Layout.t) list
 
 val signature_item_id : signature_item -> Ident.t
 

@@ -1673,19 +1673,6 @@ let assert_mixed_product_support =
                      { value_prefix_len; max_value_prefix_len;
                        mixed_product_kind })))
 
-let module_representation_of_mixed_product_shape ~loc shape =
-  let value_count = ref 0 in
-  Array.iter
-    (fun elt -> if equal_mixed_block_element elt Value then incr value_count)
-    shape;
-  let value_count = !value_count in
-  if value_count = Array.length shape
-  then Module_value_only (Array.length shape)
-  else begin
-    assert_mixed_product_support loc Module ~value_prefix_len:value_count;
-    Module_mixed shape
-  end
-
 (* [Element_repr] is used to classify whether something is a "mixed product"
    (a mixed record or mixed variant constructor), meaning that some of the
    fields are unboxed in a way that isnt encoded in the usual short numeric tag.

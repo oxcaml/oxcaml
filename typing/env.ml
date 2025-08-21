@@ -2161,21 +2161,21 @@ let layout_of_lazy_signature_item (item : Subst.Lazy.signature_item) =
     begin match decl.val_kind with
     | Val_reg layout -> Some layout
     | Val_ivar _ ->
-      Some Jkind_types.Layout.for_instance_var
-    (* CR jrayman: follow the style of [bound_value_identifiers_and_layouts] *)
+      Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_instance_var))
     | Val_self _ | Val_anc _ ->
-      Some Jkind_types.Layout.for_object
+      Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_object))
     | Val_prim _ | Val_mut _ -> None (* error will be thrown later *)
     end
-  | Sig_typext _ -> Some Jkind_types.Layout.for_type_extension
+  | Sig_typext _ ->
+    Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_type_extension))
   | Sig_module(_, pres, _, _, _) ->
     begin match pres with
     | Mp_present ->
-      Some Jkind_types.Layout.for_module
+      Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_module))
     | Mp_absent -> None
     end
   | Sig_class _ ->
-      Some Jkind_types.Layout.for_class
+      Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_class))
   | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
 
 (* CR jrayman: remove duplication *)
@@ -2185,20 +2185,21 @@ let layout_of_signature_item item =
     begin match decl.val_kind with
     | Val_reg layout -> Some layout
     | Val_ivar _ ->
-      Some Jkind_types.Layout.for_instance_var
+      Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_instance_var))
     | Val_self _ | Val_anc _ ->
-      Some Jkind_types.Layout.for_object
+      Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_object))
     | Val_prim _ | Val_mut _ -> None (* error will be thrown later *)
     end
-  | Sig_typext _ -> Some Jkind_types.Layout.for_type_extension
+  | Sig_typext _ ->
+    Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_type_extension))
   | Sig_module(_, pres, _, _, _) ->
     begin match pres with
     | Mp_present ->
-      Some Jkind_types.Layout.for_module
+      Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_module))
     | Mp_absent -> None
     end
   | Sig_class _ ->
-      Some Jkind_types.Layout.for_class
+      Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_class))
   | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
 
 let rec components_of_module_maker
