@@ -134,8 +134,7 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
     (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
   let prologue_block = Cfg.get_block_exn cfg prologue_label in
   (* Moving a prologue to a loop might cause it to execute multiple times, which
-     is both inefficient as well as makes handling the epilogue tricky to handle
-     (as we would have to know how many times the prologue was added).
+     is both inefficient as well as possibly incorrect.
 
      Having a non-zero stack offset means that the prologue is added after a
      [Pushtrap] or [Stackoffset] which shouldn't be allowed. *)
