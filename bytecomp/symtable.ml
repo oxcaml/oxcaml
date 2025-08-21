@@ -221,7 +221,6 @@ let init () =
     set_prim_table_from_file !Clflags.use_prims
   else if String.length !Clflags.use_runtime > 0 then begin
     let primfile = Filename.temp_file "camlprims" "" in
-    (* CR sspies: Does this one also have to change? *)
     Misc.try_finally
       ~always:(fun () -> remove_file primfile)
       (fun () ->
