@@ -850,8 +850,8 @@ let rec shape_with_layout ~(layout : Layout.t) (sh : without_layout ts) :
       | Base
           ( Void | Untagged_immediate | Bits8 | Bits16 | Bits32 | Bits64 |
             Float64 | Float32 | Word | Vec128 | Vec256 | Vec512 ) ) ) ->
-    Misc.fatal_errorf "tuple shape must have layout value, but has layout %a"
-      Layout.format layout
+    (* CR sspies: silenced error, should be handled properly instead *)
+    Ts_other layout
   | Ts_unboxed_tuple shapes, Product lys
     when List.length shapes = List.length lys ->
     let shapes_and_layouts = List.combine shapes lys in
@@ -861,28 +861,26 @@ let rec shape_with_layout ~(layout : Layout.t) (sh : without_layout ts) :
         shapes_and_layouts
     in
     Ts_unboxed_tuple shapes_with_layout
-  | Ts_unboxed_tuple shapes, Product lys ->
-    Misc.fatal_errorf "unboxed tuple shape has %d shapes, but %d layouts"
-      (List.length shapes) (List.length lys)
+  | Ts_unboxed_tuple _, Product _ ->
+    (* CR sspies: silenced error, should be handled properly instead *)
+    Ts_other layout
   | ( Ts_unboxed_tuple _,
       Base
         ( Void | Value | Untagged_immediate | Float32 | Float64 | Word |
           Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ) ->
-    Misc.fatal_errorf
-      "unboxed tuple must have unboxed product layout, but has layout %a"
-      Layout.format layout
+    (* CR sspies: silenced error, should be handled properly instead *)
+    Ts_other layout
   | Ts_var (name, Layout_to_be_determined), _ -> Ts_var (name, layout)
   | Ts_arrow (arg, ret), Base Value -> Ts_arrow (arg, ret)
   | Ts_arrow _, _ ->
-    Misc.fatal_errorf "function type shape must have layout value"
+    (* CR sspies: silenced error, should be handled properly instead *)
+    Ts_other layout
   | Ts_predef (predef, shapes), _
     when Layout.equal (Predef.to_layout predef) layout ->
     Ts_predef (predef, shapes)
-  | Ts_predef (predef, _), _ ->
-    Misc.fatal_errorf
-      "predef %s has layout %a, but is expected to have layout %a"
-      (Predef.to_string predef) Layout.format (Predef.to_layout predef)
-      Layout.format layout
+  | Ts_predef (_, _), _ ->
+    (* CR sspies: silenced error, should be handled properly instead *)
+    Ts_other layout
   | Ts_variant fields, Base Value ->
     let fields =
       poly_variant_constructors_map
@@ -891,7 +889,8 @@ let rec shape_with_layout ~(layout : Layout.t) (sh : without_layout ts) :
     in
     Ts_variant fields
   | Ts_variant _, _ ->
-    Misc.fatal_errorf "polymorphic variant must have layout value"
+    (* CR sspies: silenced error, should be handled properly instead *)
+    Ts_other layout
   | Ts_other Layout_to_be_determined, _ -> Ts_other layout
 
 (* CR sspies: This is a hacky "solution" to do type variable substitution in

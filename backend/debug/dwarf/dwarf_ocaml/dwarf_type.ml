@@ -306,7 +306,9 @@ let rec project_layout (layout : Layout.t) path =
   match layout, path with
   | Base b, [] -> b
   | Product p, i :: path -> project_layout (List.nth p i) path
-  | _, _ -> assert false
+  | _, _ ->
+    (* CR sspies: silenced error, should be handled properly instead *)
+    Sort.Value
 
 let rec field_name_with_path base path =
   match path with
@@ -319,13 +321,14 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
     base_layout projected_field =
   match path with
   | [] ->
-    Misc.fatal_error
-      "Empty path provided to [field_project_path]" (* field should exist *)
+    (* CR sspies: silenced error, should be handled properly instead *)
+    None, Ts_other Layout_to_be_determined, Sort.Value
   | [i] -> (
     match Array.get fields i with
     | name, sh, Base ly -> name, sh, ly
     | name, sh, Product _ ->
-      assert false
+      (* CR sspies: silenced error, should be handled properly instead *)
+      name, sh, Sort.Value
       (* If this is a product type, then the flattening of the record fields has
          failed. *))
   | i :: subpath ->
@@ -376,7 +379,9 @@ let create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
   let base_layout =
     match arg_layout with
     | Base base_layout -> base_layout
-    | Product _ -> Misc.fatal_error "Not a base layout"
+    | Product _ ->
+      (* CR sspies: silenced error, should be handled properly instead *)
+      Sort.Value
   in
   let width = base_layout_to_byte_size base_layout in
   let structure_ref = reference in
@@ -1192,7 +1197,9 @@ module Shape_with_layout = struct
 
     let equal (x : t) y = x = y
 
-    let output _oc _t = Misc.fatal_error "unimplemented"
+    let output _oc _t =
+      (* CR sspies: silenced error, should be handled properly instead *)
+      ()
   end)
 end
 
@@ -1233,12 +1240,13 @@ let rec type_shape_to_dwarf_die ~visited (type_shape : Layout.t S.ts)
         create_base_layout_type ~reference b ?name ~parent_proto_die
           ~fallback_value_die ()
       | Product _ ->
-        Misc.fatal_errorf
-          "only base layouts supported, but found unboxed product layout %a"
-          Layout.format type_layout)
+        (* CR sspies: silenced error, should be handled properly instead *)
+        create_base_layout_type ~reference Value ?name ~parent_proto_die
+          ~fallback_value_die ())
     | Ts_unboxed_tuple _ ->
-      Misc.fatal_errorf "unboxed tuple %a should have been flatted"
-        S.print_type_shape type_shape
+      (* CR sspies: silenced error, should be handled properly instead *)
+      create_base_layout_type ~reference Value ?name ~parent_proto_die
+        ~fallback_value_die ()
     | Ts_tuple fields ->
       type_shape_to_dwarf_die_tuple ~visited ~reference ~parent_proto_die
         ~fallback_value_die ~name fields
@@ -1259,8 +1267,9 @@ let rec type_shape_to_dwarf_die ~visited (type_shape : Layout.t S.ts)
           create_base_layout_type ~reference b ?name ~parent_proto_die
             ~fallback_value_die ()
         | Product _ ->
-          Misc.fatal_errorf "cycle detected with product layout %a"
-            S.print_type_shape type_shape
+          (* CR sspies: silenced error, should be handled properly instead *)
+          create_base_layout_type ~reference Value ?name ~parent_proto_die
+            ~fallback_value_die ()
       else
         let visited' = PathSet.add type_path visited in
         match type_layout with
@@ -1269,9 +1278,9 @@ let rec type_shape_to_dwarf_die ~visited (type_shape : Layout.t S.ts)
             ?name ~parent_proto_die ~fallback_value_die ~type_uid type_path b
             shapes
         | Product _ ->
-          Misc.fatal_errorf
-            "only base layouts supported, but found product layout %a"
-            Layout.format type_layout)
+          (* CR sspies: silenced error, should be handled properly instead *)
+          create_base_layout_type ~reference Value ?name ~parent_proto_die
+            ~fallback_value_die ())
     | Ts_variant fields ->
       type_shape_to_dwarf_die_poly_variant ~visited ~reference ~parent_proto_die
         ~fallback_value_die ?name ~constructors:fields ()
@@ -1333,9 +1342,9 @@ and type_shape_to_dwarf_die_predef ~visited ?name ~reference ~parent_proto_die
       in
       create_array_die ~reference ~parent_proto_die ~child_die ?name ())
   | Array, args ->
-    Misc.fatal_errorf
-      "[Array] shapes must be applied to exactly one type shape (found %d)"
-      (List.length args)
+    (* CR sspies: silenced error, should be handled properly instead *)
+    create_base_layout_type ~reference Value ?name ~parent_proto_die
+      ~fallback_value_die ()
   | Char, _ -> create_char_die ~reference ~parent_proto_die ?name ()
   | Unboxed b, _ ->
     let type_layout = S.Predef.unboxed_type_to_layout b in
@@ -1409,9 +1418,9 @@ and type_shape_to_dwarf_die_type_constructor ~visited ~reference ?name
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
     | Tds_record { fields = _; kind = Record_unboxed_product } ->
-      Misc.fatal_error
-        "Unboxed records should not reach this stage. They are deconstructed \
-         by unarization in earlier stages of the compiler."
+      (* CR sspies: silenced error, should be handled properly instead *)
+      create_base_layout_type ~reference Value ?name ~parent_proto_die
+        ~fallback_value_die ()
     | Tds_record
         { fields = [(field_name, sh, Base base_layout)]; kind = Record_unboxed }
       ->
@@ -1423,12 +1432,15 @@ and type_shape_to_dwarf_die_type_constructor ~visited ~reference ?name
       let field_size = base_layout_to_byte_size base_layout in
       create_attribute_unboxed_record_die ~reference ~parent_proto_die ?name
         ~field_die ~field_name ~field_size ()
-      (* The two cases below are filtered out by the flattening of shapes in
-         [flatten_shape]. *)
     | Tds_record { fields = [] | _ :: _ :: _; kind = Record_unboxed } ->
       assert false
+      (* [@@unboxed] records must have exactly one field; this should have been
+         detected by earlier transformations such as at the point where the
+         shape was created. *)
     | Tds_record { fields = [(_, _, Product _)]; kind = Record_unboxed } ->
-      assert false
+      (* CR sspies: silenced error, should be handled properly instead *)
+      create_base_layout_type ~reference Value ?name ~parent_proto_die
+        ~fallback_value_die ()
     | Tds_record { fields; kind = Record_mixed mixed_block_shapes } ->
       let fields = List.map (fun (name, sh, ly) -> Some name, sh, ly) fields in
       let fields = flatten_fields_in_mixed_record ~mixed_block_shapes fields in
@@ -1444,7 +1456,10 @@ and type_shape_to_dwarf_die_type_constructor ~visited ~reference ?name
                 base_layout_to_byte_size_in_mixed_block base_layout,
                 type_shape_to_dwarf_die ~visited ~parent_proto_die
                   ~fallback_value_die type_shape' )
-            | _ -> assert false)
+            | _ ->
+              (* CR sspies: silenced error, should be handled properly
+                 instead *)
+              "_unknown", 0, fallback_value_die)
           fields
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
@@ -1564,7 +1579,9 @@ let rec flatten_shape (type_shape : Layout.t S.ts) =
         -> (
         match layout with
         | Base Value -> [Known type_shape]
-        | _ -> Misc.fatal_error "record must have value layout")
+        | _ ->
+          (* CR sspies: silenced error, should be handled properly instead *)
+          unknown_base_layouts layout)
       | Tds_record { fields = [(_, sh, ly)]; kind = Record_unboxed }
         when Layout.equal ly layout -> (
         match layout with
@@ -1574,7 +1591,8 @@ let rec flatten_shape (type_shape : Layout.t S.ts) =
            Otherwise, we will create an additional DWARF entry for it. *)
         | Base _ -> [Known type_shape])
       | Tds_record { fields = [_]; kind = Record_unboxed } ->
-        Misc.fatal_error "unboxed record at different layout from its field"
+        (* CR sspies: silenced error, should be handled properly instead *)
+        unknown_base_layouts layout
       | Tds_record
           { fields = ([] | _ :: _ :: _) as fields; kind = Record_unboxed } ->
         Misc.fatal_errorf "unboxed record must have exactly one field, found %a"
@@ -1591,19 +1609,25 @@ let rec flatten_shape (type_shape : Layout.t S.ts) =
               fields
           in
           List.concat_map flatten_shape shapes
-        | Product _ -> Misc.fatal_error "unboxed record field mismatch"
-        | Base _ -> Misc.fatal_error "unboxed record must have product layout")
+        | Product _ ->
+          (* CR sspies: silenced error, should be handled properly instead *)
+          unknown_base_layouts layout
+        | Base _ ->
+          (* CR sspies: silenced error, should be handled properly instead *)
+          unknown_base_layouts layout)
       | Tds_variant _ -> (
         match layout with
         | Base Value -> [Known type_shape]
-        | _ -> Misc.fatal_error "variant must have value layout")
+        | _ ->
+          (* CR sspies: silenced error, should be handled properly instead *)
+          unknown_base_layouts layout)
       | Tds_variant_unboxed
           { name = _; arg_name = _; arg_layout; arg_shape = _ } ->
         if Layout.equal arg_layout layout
         then [Known type_shape]
         else
-          Misc.fatal_error
-            "unboxed variant must have same layout as its contents"))
+          (* CR sspies: silenced error, should be handled properly instead *)
+          unknown_base_layouts layout))
 
 (* Search for the first unused suffix-numbered version of [name] in the
    [name_cache] cache. If we come along a type of the same name and type shape,
@@ -1682,9 +1706,9 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
         let flattened_length = List.length flattened in
         if i < 0 || i >= flattened_length
         then
-          Misc.fatal_errorf "unboxed projection index %d out of bounds 0...%d" i
-            (flattened_length - 1);
-        List.nth flattened i
+          (* CR sspies: silenced error, should be handled properly instead *)
+          Unknown Sort.Value
+        else List.nth flattened i
     in
     let type_name =
       match unboxed_projection with
