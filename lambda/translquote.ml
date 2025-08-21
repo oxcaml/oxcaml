@@ -3062,7 +3062,7 @@ and quote_expression_desc transl stage e =
       fatal_error "Cannot quote Texp_atomic_loc constructs yet."
     | Texp_idx _ -> fatal_error "Cannot quote Texp_idx constructs yet."
     | Texp_eval_quotation (typ, _) ->
-      Exp_desc.eval_quote loc (quote_core_type ~in_constraint:true typ)
+      Exp_desc.eval_quote loc (quote_core_type typ)
   in
   List.iter update_env_without_extra e.exp_extra;
   List.fold_right

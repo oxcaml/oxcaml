@@ -11822,8 +11822,8 @@ let report_error ~loc env =
         "This quotation construct is not presently supported."
   | Eval_quote_format ->
       Location.errorf ~loc
-        "The eval extension takes a single type as its argument, \
-         for example [%%eval: int]."
+        "The eval extension takes a single type as its argument, for example %a."
+         Style.inline_code "[%eval: int]"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env_error env
