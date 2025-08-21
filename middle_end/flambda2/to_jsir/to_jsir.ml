@@ -353,13 +353,31 @@ and apply_expr ~env ~res e =
       (* CR selee: assume exact = false for now, JSIR seems to assume false in
          the case that we don't know *)
       apply_fn ~res ~f ~args ~exact:false
-    | Some callee, Method { obj; kind = _; alloc_mode = _ } ->
+    | Some callee, Method { obj; kind; alloc_mode = _ } ->
       let args, res = To_jsir_shared.simples ~env ~res args in
       let obj, res = To_jsir_shared.simple ~env ~res obj in
       let field, res = To_jsir_shared.simple ~env ~res callee in
-      let res, f = To_jsir_result.get_public_method res ~obj ~field in
-      (* CR selee: assume exact = false for now, JSIR seems to assume false in
-         the case that we don't know *)
+      let res, f =
+        match kind with
+        | Public -> To_jsir_result.get_public_method res ~obj ~field
+        | Self ->
+          let methods = Jsir.Var.fresh () in
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let (methods, Field (obj, 0, Non_float)))
+          in
+          let f = Jsir.Var.fresh () in
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let (f, Prim (Array_get, [Pv methods; Pv field])))
+          in
+          res, f
+        | Cached ->
+          (* [meth_kind = Cached] generation in Lambda is disabled for
+             non-native backends *)
+          Misc.fatal_errorf "Found cached method invocation for Apply_expr %a"
+            Apply_expr.print e
+      in
       apply_fn ~res ~f ~args:(obj :: args) ~exact:false
     | Some callee, C_call _ ->
       let symbol =
