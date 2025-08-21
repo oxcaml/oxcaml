@@ -435,8 +435,8 @@ val remove_file: string -> unit
            Never raises an error. *)
 
 val remove_dir: string -> unit
-       (** Delete the given directory if it exists and is a directory.
-           Never raises an error. *)
+       (** Delete the given directory if it exists, is a directory, and is
+           empty. Never raises an error. *)
 
 val expand_directory: string -> string -> string
        (** [expand_directory alt file] eventually expands a [+] at the
