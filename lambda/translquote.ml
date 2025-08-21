@@ -3042,7 +3042,7 @@ and quote_expression_desc transl stage e =
     | Texp_mutvar _ | Texp_letmutable _ | Texp_setmutvar _ ->
       fatal_error "Cannot quote constructs related to mutable variables."
     | Texp_eval_quotation (typ, _) ->
-      Exp_desc.eval_quote loc (quote_core_type ~in_constraint:true typ)
+      Exp_desc.eval_quote loc (quote_core_type typ)
   in
   List.iter update_env_without_extra e.exp_extra;
   List.fold_right
