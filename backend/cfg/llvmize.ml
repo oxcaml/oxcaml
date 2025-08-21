@@ -736,7 +736,9 @@ module F = struct
   let not_implemented_aux print_ins ?msg i =
     Misc.fatal_error
       (asprintf "Llvmize: unimplemented instruction: %a %a" print_ins i
-         (Format.pp_print_option (fun ppf msg -> fprintf ppf "(%s)" msg))
+         (Format.pp_print_option
+            ~none:(fun ppf () -> fprintf ppf "(no msg)")
+            (fun ppf msg -> fprintf ppf "(%s)" msg))
          msg)
 
   let not_implemented_basic = not_implemented_aux Cfg.print_basic
@@ -1425,15 +1427,32 @@ module F = struct
         ins_conv t op ~src:src_temp ~dst:converted ~src_typ:src ~dst_typ:dst;
         ins_store_into_reg t converted i.res.(0)
       in
-      match[@warning "-4"] cast_op with
+      match cast_op with
       | Float_of_int width ->
         do_conv "sitofp" ~src:Llvm_typ.i64 ~dst:(Llvm_typ.of_float_width width)
       | Int_of_float width ->
         do_conv "fptosi" ~src:(Llvm_typ.of_float_width width) ~dst:Llvm_typ.i64
-      | _ -> not_implemented_basic ~msg:"static cast" i)
+      | Float_of_float32 | Float32_of_float | V128_of_scalar _
+      | Scalar_of_v128 _ | V256_of_scalar _ | Scalar_of_v256 _
+      | V512_of_scalar _ | Scalar_of_v512 _ ->
+        not_implemented_basic ~msg:"static cast" i)
+    | Reinterpret_cast cast_op -> (
+      match cast_op with
+      | Int_of_value | Value_of_int | Float_of_int64 | Int64_of_float
+      | Float32_of_int32 | Int32_of_float32 ->
+        let temp = load_reg_to_temp t i.arg.(0) in
+        let res = fresh_ident t in
+        ins_conv t "bitcast" ~src:temp ~dst:res
+          ~src_typ:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
+          ~dst_typ:(Llvm_typ.of_machtyp_component i.res.(0).typ);
+        ins_store_into_reg t res i.res.(0)
+      | Float_of_float32 | Float32_of_float ->
+        not_implemented_basic ~msg:"float reinterpret cast" i
+      | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ->
+        not_implemented_basic ~msg:"vector reinterpret cast" i)
     | Specific op -> specific t i op
-    | Intop_atomic _ | Reinterpret_cast _ | Probe_is_enabled _
-    | Name_for_debugger _ | Dls_get | Poll | Pause ->
+    | Intop_atomic _ | Probe_is_enabled _ | Name_for_debugger _ | Dls_get | Poll
+    | Pause ->
       not_implemented_basic i
 
   let basic t (i : Cfg.basic Cfg.instruction) =
