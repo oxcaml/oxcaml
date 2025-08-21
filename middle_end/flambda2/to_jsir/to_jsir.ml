@@ -334,12 +334,37 @@ and apply_expr ~env ~res e =
   let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
     | None, _ | _, Effect _ -> failwith "effects not implemented yet"
-    | Some callee, (Function _ | Method _) ->
+    | Some callee, Function _ ->
       let args, res = To_jsir_shared.simples ~env ~res args in
       let f, res = To_jsir_shared.simple ~env ~res callee in
       (* CR selee: assume exact = false for now, JSIR seems to assume false in
          the case that we don't know *)
       apply_fn ~res ~f ~args ~exact:false
+    | Some callee, Method { obj; kind = Public; alloc_mode = _ } ->
+      let args, res = To_jsir_shared.simples ~env ~res args in
+      let obj, res = To_jsir_shared.simple ~env ~res obj in
+      let field, res = To_jsir_shared.simple ~env ~res callee in
+      let res, f = To_jsir_result.get_public_method res ~obj ~field in
+      (* CR selee: assume exact = false for now, JSIR seems to assume false in
+         the case that we don't know *)
+      apply_fn ~res ~f ~args:(obj :: args) ~exact:false
+    | Some callee, Method { obj; kind = Self; alloc_mode = _ } ->
+      let args, res = To_jsir_shared.simples ~env ~res args in
+      let obj, res = To_jsir_shared.simple ~env ~res obj in
+      let field, res = To_jsir_shared.simple ~env ~res callee in
+      let methods = Jsir.Var.fresh () in
+      let res =
+        To_jsir_result.add_instr_exn res
+          (Let (methods, Field (obj, 0, Non_float)))
+      in
+      let f = Jsir.Var.fresh () in
+      let res =
+        To_jsir_result.add_instr_exn res
+          (Let (f, Prim (Array_get, [Pv methods; Pv field])))
+      in
+      (* CR selee: assume exact = false for now, JSIR seems to assume false in
+         the case that we don't know *)
+      apply_fn ~res ~f ~args:(obj :: args) ~exact:false
     | Some callee, C_call _ ->
       let symbol =
         match Simple.must_be_symbol callee with
@@ -350,6 +375,11 @@ and apply_expr ~env ~res e =
             Simple.print callee
       in
       To_jsir_primitive.extern ~env ~res symbol args
+    | _, Method { kind = Cached; obj = _; alloc_mode = _ } ->
+      (* [meth_kind = Cached] generation in Lambda is disabled for non-native
+         backends *)
+      Misc.fatal_errorf "Found cached method invocation for Apply_expr %a"
+        Apply_expr.print e
   in
   match Apply_expr.continuation e with
   | Never_returns ->
