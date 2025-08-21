@@ -1309,13 +1309,14 @@ module F = struct
       add_referenced_symbol t sym_name;
       ins_store_global t sym_name i.res.(0)
     | Const_float32 bits ->
+      (* Note that "%#x" formats 0 as "0", not "0x0"... *)
       ins_store_value t
-        ~src:Llvm_value.(Immediate (sprintf "%#lx" bits))
+        ~src:Llvm_value.(Immediate (sprintf "0x%lx" bits))
         ~dst:(get_ident_for_reg t i.res.(0))
         Llvm_typ.float
     | Const_float bits ->
       ins_store_value t
-        ~src:Llvm_value.(Immediate (sprintf "%#Lx" bits))
+        ~src:Llvm_value.(Immediate (sprintf "0x%Lx" bits))
         ~dst:(get_ident_for_reg t i.res.(0))
         Llvm_typ.double
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
