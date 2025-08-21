@@ -1407,7 +1407,7 @@ let rec transl_address loc = function
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
-  | Env.Adot(addr, bsorts, pos) ->
+  | Env.Adot(addr, _bsorts, pos) ->
       Lprim(Pfield(pos, Pointer, Reads_agree),
                    [transl_address loc addr], loc)
 
@@ -1471,6 +1471,8 @@ let transl_mixed_block_element :
   | Bits32 -> Bits32
   | Bits64 -> Bits64
   | Vec128 -> Vec128
+  | Vec256 -> Vec256
+  | Vec512 -> Vec256
   | Word -> Word
   | Product shapes ->
     let get_value_kind _ = generic_value in
@@ -2301,6 +2303,22 @@ let array_ref_kind_result_layout = function
   | Punboxedvectorarray_ref bv -> layout_unboxed_vector bv
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
   | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
+
+let rec layout_of_mixed_block_element element =
+  match element with
+  | Value value_kind -> Pvalue value_kind
+  | Float_boxed _ -> layout_boxed_float Boxed_float64
+  | Float64 -> layout_unboxed_float Unboxed_float64
+  | Float32 -> layout_unboxed_float Unboxed_float32
+  | Bits32 -> layout_unboxed_int32
+  | Bits64 -> layout_unboxed_int64
+  | Word -> layout_unboxed_nativeint
+  | Vec128 -> layout_unboxed_vector Unboxed_vec128
+  | Vec256 -> layout_unboxed_vector Unboxed_vec256
+  | Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Product shape ->
+    Punboxed_product
+      (Array.to_list (Array.map layout_of_mixed_block_element shape))
 
 let layout_of_mixed_block_shape
     : 'a. 'a mixed_block_element array -> path:int list -> layout
