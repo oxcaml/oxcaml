@@ -189,16 +189,24 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Bigarray_length { dimension } ->
     let x, res = prim_arg ~env ~res x in
     use_prim ~env ~res (Extern "caml_ba_dim")
-      [x; Pc (Int (Targetint.of_int dimension))]
+      [x; Pc (Int (Targetint.of_int (dimension - 1)))]
   | String_length _ -> use_prim' (Extern "caml_ml_string_length")
   | Int_as_pointer _ -> use_prim' (Extern "caml_int_as_pointer")
   | Opaque_identity { middle_end_only = true; kind = _ } -> identity ~env ~res x
   | Opaque_identity { middle_end_only = false; kind : Flambda_kind.t = _ } ->
     (* CR selee: treating these as the identity for now *)
     identity ~env ~res x
-  | Int_arith (kind, op) ->
-    let op_name = match op with Swap_byte_endianness -> "bswap" in
-    let extern_name = with_int_prefix ~kind op_name ~percent_for_imms:false in
+  | Int_arith (kind, Swap_byte_endianness) ->
+    let extern_name =
+      match kind with
+      | Naked_immediate -> "caml_bswap16"
+      | Naked_int32 -> "caml_int32_bswap"
+      | Naked_int64 -> "caml_int64_bswap"
+      | Naked_nativeint -> "caml_nativeint_bswap"
+      | Tagged_immediate ->
+        (* [Lambda_to_flambda_primitives will never produce this *)
+        Misc.fatal_error "Found Int_arith with Tagged_immediate"
+    in
     use_prim' (Extern extern_name)
   | Float_arith (bitwidth, op) ->
     let op_name = match op with Abs -> "abs" | Neg -> "neg" in

@@ -2341,11 +2341,16 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       in
       [Simple (Simple.const_int (Targetint_31_63.of_int bits))]
     | Max_wosize ->
-      [ Simple
-          (Simple.const_int
-             (Targetint_31_63.of_int
-                ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
-                - 1))) ]
+      let max =
+        match !Clflags.jsir with
+        | true ->
+          Targetint_31_63.div Targetint_31_63.max_value
+            (Targetint_31_63.of_int 4)
+        | false ->
+          Targetint_31_63.of_int
+            ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits))) - 1)
+      in
+      [Simple (Simple.const_int max)]
     | Ostype_unix ->
       [Simple (Simple.const_bool (String.equal Sys.os_type "Unix"))]
     | Ostype_win32 ->
