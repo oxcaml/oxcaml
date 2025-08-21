@@ -345,8 +345,6 @@ and apply_expr ~env ~res e =
       let obj, res = To_jsir_shared.simple ~env ~res obj in
       let field, res = To_jsir_shared.simple ~env ~res callee in
       let res, f = To_jsir_result.get_public_method res ~obj ~field in
-      (* CR selee: assume exact = false for now, JSIR seems to assume false in
-         the case that we don't know *)
       apply_fn ~res ~f ~args:(obj :: args) ~exact:false
     | Some callee, Method { obj; kind = Self; alloc_mode = _ } ->
       let args, res = To_jsir_shared.simples ~env ~res args in
@@ -362,8 +360,6 @@ and apply_expr ~env ~res e =
         To_jsir_result.add_instr_exn res
           (Let (f, Prim (Array_get, [Pv methods; Pv field])))
       in
-      (* CR selee: assume exact = false for now, JSIR seems to assume false in
-         the case that we don't know *)
       apply_fn ~res ~f ~args:(obj :: args) ~exact:false
     | Some callee, C_call _ ->
       let symbol =
