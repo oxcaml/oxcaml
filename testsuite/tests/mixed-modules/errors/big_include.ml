@@ -14,7 +14,6 @@
  }
 *)
 
-(* CR jrayman: location info is misleading *)
 module Big_module = struct
   module To_be_included = struct
     let a_248 = "a"
@@ -27,7 +26,7 @@ module Big_module = struct
     let a_255 = "a"
     let a_256 = "a"
   end
-  include M
+  include To_be_included
   let f_0 = #42.0
   let a_0 = "a"
   let a_1 = "a"

@@ -110,12 +110,12 @@ let toplevel_value id =
   try Ident.find_same id !remembered
   with _ -> failwith ("Unknown ident: " ^ Ident.unique_name id)
 
-let close_phrase lam =
+let close_phrase lam repr =
   let open Lambda in
   Ident.Set.fold (fun id l ->
     let glb, pos = toplevel_value id in
     let glob =
-      Lprim (mod_field pos (Module_value_only (-1)), (* CR jrayman: wrong *)
+      Lprim (mod_field pos repr,
              [Lprim (Pgetglobal glb, [], Loc_unknown)],
              Loc_unknown)
     in
@@ -356,8 +356,7 @@ let name_expression ~loc ~attrs sort exp =
   let sg = [Sig_value(id, vd, Exported)] in
   let pat =
     { pat_desc =
-        Tpat_var(id, mknoloc name, vd.val_uid,
-          Jkind.Sort.(of_const Const.for_module_field),
+        Tpat_var(id, mknoloc name, vd.val_uid, sort,
           Mode.Value.disallow_right Mode.Value.legacy);
       pat_loc = loc;
       pat_extra = [];
@@ -435,7 +434,7 @@ let execute_phrase print_outcome ppf phr =
         let { Lambda.compilation_unit; main_module_block_format;
               required_globals; code = res } =
           Translmod.transl_implementation compilation_unit
-            (str, coercion, None)
+            (str, coercion, None) ~loc:Location.none
         in
         remember compilation_unit sg';
         let repr =
@@ -444,7 +443,7 @@ let execute_phrase print_outcome ppf phr =
           | Mb_instantiating_functor _ ->
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
-        compilation_unit, close_phrase res, required_globals, repr
+        compilation_unit, close_phrase res repr, required_globals, repr
       in
       Warnings.check_fatal ();
       begin try

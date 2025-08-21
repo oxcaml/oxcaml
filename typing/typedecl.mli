@@ -94,8 +94,8 @@ module Mixed_product_kind : sig
     | Module
 end
 
-val module_representation_of_mixed_product_shape :
-  loc:Warnings.loc -> mixed_product_shape -> module_representation
+val assert_mixed_product_support :
+  Warnings.loc -> Mixed_product_kind.t -> value_prefix_len:int -> unit
 
 type mixed_product_violation =
   | Runtime_support_not_enabled of Mixed_product_kind.t
