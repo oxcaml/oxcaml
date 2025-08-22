@@ -931,6 +931,8 @@ type module_representation =
   (* The module contains both values and unboxed elements.
      N.B.: [Float_boxed] should not occur in the shape *)
 
+val module_representation_field_count : module_representation -> int
+
 (* The structure of the main module block. A module with no parameters will be
    compiled to an [Mb_struct] and a module with at least one parameter will be
    compiled to an [Mb_instantiating_functor]. *)
@@ -970,10 +972,12 @@ type program =
    [main_module_block_format] field.
    * In the closure case the code is a sequence of assignments to a
      preallocated block of size [main_module_block_size mbf] using
+     (* CR jrayman: comment *)
      (Setfield(Getpredef(compilation_unit))). The size is used to preallocate
      the block.
    * In the flambda case the code is an expression returning a block
      value of size [main_module_block_size mbf]. The size is used to build
+     (* CR jrayman: comment *)
      the module root as an initialize_symbol
      Initialize_symbol(module_name, 0,
        [getfield 0; ...; getfield (main_module_block_size mbf - 1)])
@@ -1053,6 +1057,8 @@ val layout_unboxed_product : layout list -> layout
 val layout_top : layout
 val layout_bottom : layout
 
+val mixed_block_element_for_module : unit mixed_block_element
+
 
 (** [dummy_constant] produces a placeholder value with a recognizable
     bit pattern (currently 0xBBBB in its tagged form) *)
@@ -1115,8 +1121,11 @@ val transl_address : scoped_location -> Persistent_env.address -> lambda
 
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
+(* [~value_kind] is lazy since some callers want to throw
+   an error when encountering a [Value] *)
 val transl_mixed_block_element :
-  Types.mixed_block_element -> value_kind:value_kind -> unit mixed_block_element
+  Types.mixed_block_element -> value_kind:(value_kind Lazy.t) ->
+  unit mixed_block_element
 
 val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> locality_mode)
@@ -1125,9 +1134,6 @@ val transl_mixed_product_shape_for_read :
 
 val transl_module_representation :
   Types.module_representation -> module_representation
-
-val module_representation_of_signature :
-  Types.signature -> module_representation
 
 val block_of_module_representation :
   module_representation -> primitive
@@ -1239,7 +1245,7 @@ val reset: unit -> unit
 val mod_field:
   ?read_semantics: field_read_semantics -> int ->
   module_representation -> primitive
-(* CR jrayman: check if [mod_setfield] needs module repr *)
+(* CR jrayman: [mod_setfield] needs module repr *)
 val mod_setfield: int -> primitive
 
 val structured_constant_layout : structured_constant -> layout
