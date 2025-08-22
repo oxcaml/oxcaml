@@ -55,22 +55,22 @@ let toplevel_value id =
   try Ident.find_same id !remembered
   with _ -> Misc.fatal_error @@ "Unknown ident: " ^ Ident.unique_name id
 
-let close_phrase lam =
+let close_phrase lam repr =
   let open Lambda in
   Ident.Set.fold (fun id l ->
     let glb, pos = toplevel_value id in
+    let layout = Lambda.layout_of_module_field repr pos in
     let glob =
-      (* CR jrayman: [Pfield] *)
-      Lprim (Pfield (pos, Pointer, Reads_agree),
+      Lprim (mod_field pos repr,
              [Lprim (Pgetglobal glb, [], Loc_unknown)],
              Loc_unknown)
     in
-    Llet(Strict, Lambda.layout_module_field, id, glob, l)
+    Llet(Strict, layout, id, glob, l)
   ) (free_variables lam) lam
 
 let toplevel_value id =
   let glob, pos = toplevel_value id in
-  (Obj.magic (global_symbol glob)).(pos)
+  (Obj.magic (global_symbol glob)).(pos) (* CR jrayman: wrong *)
 
 (* Return the value referred to by a path *)
 
@@ -216,7 +216,7 @@ let execute_phrase print_outcome ppf phr =
             (str, Tcoerce_none, None)
         in
         remember compilation_unit sg';
-        compilation_unit, close_phrase res, required_globals, repr
+        compilation_unit, close_phrase res repr, required_globals, repr
       in
       Warnings.check_fatal ();
       begin try

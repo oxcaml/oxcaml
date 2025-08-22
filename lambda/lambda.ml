@@ -1068,7 +1068,6 @@ let layout_function = non_null_value Pgenval
 let layout_object = non_null_value Pgenval
 let layout_class = non_null_value Pgenval
 let layout_module = non_null_value Pgenval
-let layout_module_field = nullable_value Pgenval
 let layout_functor = non_null_value Pgenval
 let layout_boxed_float f = non_null_value (Pboxedfloatval f)
 let layout_unboxed_float f = Punboxed_float f
