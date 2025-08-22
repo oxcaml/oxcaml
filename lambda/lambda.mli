@@ -1140,11 +1140,8 @@ val transl_address : scoped_location -> Persistent_env.address -> lambda
 
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
-(* [~value_kind] is lazy since some callers want to throw
-   an error when encountering a [Value] *)
 val transl_mixed_block_element :
-  Types.mixed_block_element -> value_kind:(value_kind Lazy.t) ->
-  unit mixed_block_element
+  Types.mixed_block_element -> unit mixed_block_element
 
 val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
