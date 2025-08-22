@@ -52,18 +52,7 @@ type loops = loop Cfg_edge.Map.t
 let compute_loops_of_back_edges cfg back_edges =
   Cfg_edge.Set.fold
     (fun edge acc ->
-      let loop = compute_loop_of_back_edge cfg edge in
-      Label.Set.iter
-        (fun loop_label ->
-          match Label.equal loop_label edge.dst with
-          | true -> ()
-          | false ->
-            let loop_block = Cfg.get_block_exn cfg loop_label in
-            List.iter (Cfg.predecessor_labels loop_block)
-              ~f:(fun loop_predecessor ->
-                if not (Label.Set.mem loop_predecessor loop) then fatal "XXX"))
-        loop;
-      Cfg_edge.Map.add edge loop acc)
+      Cfg_edge.Map.add edge (compute_loop_of_back_edge cfg edge) acc)
     back_edges Cfg_edge.Map.empty
 
 type header_map = loop list Label.Map.t
