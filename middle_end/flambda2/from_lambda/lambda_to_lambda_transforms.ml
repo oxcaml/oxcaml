@@ -802,7 +802,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
           "Lambda_to_flambda.transform_primitive: Pbigarrayset with unknown \
            layout and elements should only have dimensions between 1 and 3 \
            (see translprim).")
-  | Pctconst const, args when !Clflags.jsir ->
+  | Pctconst const, _ when !Clflags.jsir ->
     let name =
       match const with
       | Big_endian -> "big_endian"
@@ -817,7 +817,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     in
     let name = Format.sprintf "caml_sys_const_%s" name in
     let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in
-    Primitive (L.Pccall desc, args, loc)
+    Primitive (L.Pccall desc, [L.lambda_unit], loc)
   | _, _ -> Primitive (prim, args, loc)
   [@@ocaml.warning "-fragile-match"]
 
