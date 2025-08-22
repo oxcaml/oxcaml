@@ -7,49 +7,51 @@
 
  setup-ocamlopt.byte-build-env;
 
- flags = "-as-parameter -I +stdlib_upstream_compatible";
+ flags = "-as-parameter";
  module = "bits_u_monoid.mli";
  ocamlopt.byte;
 
- flags = "-as-argument-for Bits_u_monoid -I +stdlib_upstream_compatible";
+ flags = "-as-argument-for Bits_u_monoid";
  module = "float_u_monoid.mli float_u_monoid.ml";
  ocamlopt.byte;
 
- flags = "-parameter Bits_u_monoid -I +stdlib_upstream_compatible";
+ flags = "-parameter Bits_u_monoid";
  module = "bits_u_monoid_utils.mli bits_u_monoid_utils.ml";
  ocamlopt.byte;
 
- flags = "-I +stdlib_upstream_compatible -instantiate";
+ flags = "-instantiate";
  module = "";
  program = "bits_u_monoid_utils-Float_u_monoid.cmx";
  all_modules = "bits_u_monoid_utils.cmx float_u_monoid.cmx";
  ocamlopt.byte;
 
- flags = "-w -misplaced-attribute -I +stdlib_upstream_compatible";
- module = "float_u_monoid_test.ml";
+ flags = "-w -misplaced-attribute";
+ module = "test_float_u_monoid.ml";
  program = "";
  all_modules = "";
  ocamlopt.byte;
 
- flags = "-I +stdlib_upstream_compatible stdlib_upstream_compatible.cmxa";
+ flags = "";
  module = "";
- program = "float_u_monoid_test.exe";
+ program = "test_float_u_monoid.exe";
  all_modules = "\
    float_u_monoid.cmx \
    bits_u_monoid_utils.cmx \
    bits_u_monoid_utils-Float_u_monoid.cmx \
-   float_u_monoid_test.cmx \
+   test_float_u_monoid.cmx \
  ";
  ocamlopt.byte;
 
- program = "${test_build_directory}/float_u_monoid_test.exe";
+ program = "${test_build_directory}/test_float_u_monoid.exe";
  run;
 
  check-program-output;
 *)
 
+external to_float : float# -> float = "%float_of_float#"
+
 module M =
   Bits_u_monoid_utils(Bits_u_monoid)(Float_u_monoid) [@jane.non_erasable.instances]
 
-let _ = print_float (Stdlib_upstream_compatible.Float_u.to_float (M.pow #2.0 10))
+let _ = print_float (to_float (M.pow #2.0 10))
 let _ = print_endline ""
