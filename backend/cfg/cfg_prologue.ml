@@ -216,7 +216,20 @@ let find_prologue_and_epilogues_shrink_wrapped
     let epilogue_blocks =
       Reachable_epilogues.from_block reachable_epilogues tree.label
     in
+    (* If the current block needs a prologue, we can't propagate the prologue
+       downwards. If it's cold or all paths lead to an exception, there's no
+       reason to do so, as performance is not important. *)
+    let all_exceptional_paths =
+      Label.Set.for_all
+        (fun label ->
+          let block = Cfg.get_block_exn cfg label in
+          match[@ocaml.warning "-4"] block.terminator.desc with
+          | Raise _ -> true
+          | _ -> false)
+        epilogue_blocks
+    in
     if prologue_needed_block block ~fun_name:cfg.fun_name
+       || block.cold || all_exceptional_paths
     then Some (Label.Set.singleton tree.label, epilogue_blocks)
     else
       let children_prologue_block =
