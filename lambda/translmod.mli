@@ -37,7 +37,8 @@ val transl_implementation:
 val transl_toplevel_definition: structure -> lambda
 
 val transl_package:
-      Compilation_unit.t option list -> module_coercion -> int * lambda
+      Compilation_unit.t option list -> module_coercion
+        -> int * module_representation
 
 type runtime_arg =
   | (* A module from which we need to project out the argument block *)
@@ -53,7 +54,8 @@ type runtime_arg =
 
 val transl_instance:
       Compilation_unit.t -> runtime_args:runtime_arg list
-        -> main_module_block_size:int -> arg_block_idx:int option
+        -> main_module_block_repr:module_representation
+        -> arg_block_idx:int option
         -> Lambda.program
 
 val toplevel_name: Ident.t -> string

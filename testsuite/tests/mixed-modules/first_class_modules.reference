@@ -30,11 +30,11 @@ Test 8: first-class functors
 5.0 (doubled) (+1.5) = 11.5
 20 (*2) (+3) = 43
 1 [+100] [*2] [+3] = 205
-Test 9: coercing by forgetting abstract types
+Test 9: subtype by forgetting abstract types
 42
 3.14
-Test 10: coercion with type equalities preserved
+Test 10: subtype by forgetting type alias
 1
 2.718
-Test 11: coercion with unboxed types in forgotten types
+Test 11: subtype with unboxed type in forgotten types
 99.9
