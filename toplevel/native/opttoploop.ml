@@ -134,8 +134,9 @@ let rec eval_address = function
       global_symbol cu
   | Env.Alocal id ->
       toplevel_value id
-  | Env.Adot(a, _, pos) -> (* CR jrayman: fix *)
+  | Env.Adot(a, _, pos) ->
       Obj.field (eval_address a) pos
+    (* CR layouts v5: this is not correct if the fields have been reordered. *)
 
 let eval_path find env path =
   match find path env with
