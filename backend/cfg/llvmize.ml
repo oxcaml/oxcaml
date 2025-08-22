@@ -604,6 +604,8 @@ module F = struct
       (List.map (fun (typ, arg) -> typ, Llvm_value.Local_ident arg) args)
       res
 
+  let ins_ret t ident typ = ins t "ret %a %a" Llvm_typ.pp_t typ pp_ident ident
+
   let ins_atomicrmw t op ~ptr ~arg ~res typ =
     ins t "%a = atomicrmw %s ptr %a, %a %a acq_rel" pp_ident res op pp_ident ptr
       Llvm_typ.pp_t typ pp_ident arg
@@ -885,9 +887,8 @@ module F = struct
         do_call ~pp_name:pp_ident fun_ptr_temp
     in
     if tail
-    then
-      (* Return as is *)
-      ins t "ret %a %a" Llvm_typ.pp_t res_type pp_ident res_ident
+    then (* Return as is *)
+      ins_ret t res_ident res_type
     else (
       (* Unpack return value *)
       List.iteri
@@ -911,36 +912,33 @@ module F = struct
       Array.to_list i.arg
       |> List.filter (fun reg -> not (Reg.is_domainstate reg))
     in
-    let res_type =
+    let instr_res_type =
+      make_ret_type (List.map (fun reg -> reg.Reg.typ) res_regs)
+    in
+    let expected_res_type =
       make_ret_type (Array.to_list t.current_fun_info.fun_ret_type)
     in
-    let get_ident = function[@warning "-fragile-match"]
-      | [0; i] ->
-        let ptr = List.nth runtime_regs i in
-        let res = fresh_ident t in
-        ins_load t ~src:ptr ~dst:res Llvm_typ.ptr;
-        Some (Llvm_value.Local_ident res)
-      | [1; i] -> (
-        (* A mild amount of hacks here. *)
-        match List.nth_opt res_regs i with
-        | None -> Some Llvm_value.poison
-        | Some reg ->
-          let reg_typ = Llvm_typ.of_machtyp_component reg.typ in
-          let actual_typ =
-            t.current_fun_info.fun_ret_type.(i) |> Llvm_typ.of_machtyp_component
-          in
+    if not (Llvm_typ.equal instr_res_type expected_res_type)
+    then
+      ins_unreachable t
+      (* Some functions (like [raise]) never return, but this information is not
+         propagated to the backend as of now. The type mismatch can only happen
+         if this location is unreachable. *)
+    else
+      let get_ident = function[@warning "-fragile-match"]
+        | [0; i] when i < List.length runtime_regs ->
+          let ptr = List.nth runtime_regs i in
+          let res = fresh_ident t in
+          ins_load t ~src:ptr ~dst:res Llvm_typ.ptr;
+          Some (Llvm_value.Local_ident res)
+        | [1; i] when i < List.length res_regs ->
+          let reg = List.nth res_regs i in
           let temp = load_reg_to_temp t reg in
-          if Llvm_typ.equal actual_typ reg_typ
-          then Some (Llvm_value.Local_ident temp)
-          else
-            let res = fresh_ident t in
-            ins_conv t "bitcast" ~src:temp ~dst:res ~src_typ:reg_typ
-              ~dst_typ:actual_typ;
-            Some (Llvm_value.Local_ident res))
-      | _ -> None
-    in
-    let res = assemble_struct t res_type get_ident in
-    ins t "ret %a %a" Llvm_typ.pp_t res_type pp_ident res
+          Some (Llvm_value.Local_ident temp)
+        | _ -> None
+      in
+      let res_ident = assemble_struct t expected_res_type get_ident in
+      ins_ret t res_ident expected_res_type
 
   let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
       ~stack_ofs ~stack_align =
@@ -1100,7 +1098,7 @@ module F = struct
     | Tailcall_func op -> call ~tail:true t i op
     | Call_no_return { func_symbol; alloc; stack_ofs; stack_align; _ } ->
       extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
-      ins t "unreachable"
+      ins_unreachable t
     | Switch labels ->
       let arg = get_ident_for_reg t i.arg.(0) in
       ins_switch t Llvm_typ.i64 arg labels
@@ -2086,8 +2084,8 @@ let declare_c_call_wrappers t =
           | [1] -> Some (Llvm_value.Local_ident res_ident)
           | _ -> None
         in
-        let res = F.assemble_struct t wrapper_res_type get_ident in
-        F.ins t "ret %a %a" Llvm_typ.pp_t wrapper_res_type F.pp_ident res
+        let res_ident = F.assemble_struct t wrapper_res_type get_ident in
+        F.ins_ret t res_ident wrapper_res_type
       in
       F.define t ~private_:true ~cc:Ocaml ~fun_name:wrapper_name
         ~fun_args:wrapper_args ~fun_ret_type:wrapper_res_type
