@@ -992,7 +992,6 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               (Simple new_value) ~body)
           body new_ids_with_kinds new_values acc ccenv)
       k_exn
-
   | Levent (body, _event) -> cps acc env ccenv body k k_exn
   | Lifused _ ->
     (* [Lifused] is used to mark that this expression should be alive only if an
