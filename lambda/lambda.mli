@@ -1028,7 +1028,6 @@ val layout_object : layout
 val layout_class : layout
 val layout_module : layout
 val layout_functor : layout
-val layout_module_field : layout (* CR jrayman: delete? *)
 val layout_string : layout
 val layout_boxed_float : boxed_float -> layout
 val layout_unboxed_float : unboxed_float -> layout

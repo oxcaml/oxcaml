@@ -954,6 +954,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
         To.Sig_class (id,cd,rs,vis)
     | Sig_class_type (id,ctd,rs,vis) ->
         To.Sig_class_type (id,ctd,rs,vis)
+
+  (* CR jrayman: move stuff here *)
 end
 
 include Make_wrapped(struct type 'a t = 'a end)
