@@ -951,6 +951,7 @@ type main_module_block_format =
         mb_returned_repr : module_representation;
       }
 
+
 let main_module_representation = function
   | Mb_struct { mb_repr } -> mb_repr
   | Mb_instantiating_functor _ -> Module_value_only 1
@@ -1405,26 +1406,27 @@ let rec patch_guarded patch = function
 
 (* Translate an access path *)
 
-(* CR jrayman: maybe delete this *)
-let rec transl_mixed_product_element_for_read
-  (elt : Types.mixed_block_element) =
-  match elt with
-  | Value -> Value generic_value
-    (* CR jrayman: is [alloc_heap] correct? *)
-  | Float_boxed -> Float_boxed alloc_heap
-  | Float64 -> Float64
-  | Float32 -> Float32
-  | Bits8 -> Bits8
-  | Bits16 -> Bits16
-  | Bits32 -> Bits32
-  | Bits64 -> Bits64
-  | Vec128 -> Vec128
-  | Vec256 -> Vec256
-  | Vec512 -> Vec512
-  | Word -> Word
-  | Product shapes ->
-    Product (Array.map transl_mixed_product_element_for_read shapes)
-  | Void -> Product [||]
+let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  Array.mapi (fun i (elt : Types.mixed_block_element) ->
+    match elt with
+    | Value -> Value (get_value_kind i)
+    | Float_boxed -> Float_boxed (get_mode i)
+    | Float64 -> Float64
+    | Float32 -> Float32
+    | Bits8 -> Bits8
+    | Bits16 -> Bits16
+    | Bits32 -> Bits32
+    | Bits64 -> Bits64
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Word -> Word
+    | Product shapes ->
+      let get_value_kind _ = generic_value in
+      Product
+        (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+    | Void -> Product [||]
+  ) shape
 
 let rec transl_address loc = function
   | Env.Aunit cu -> Lprim(Pgetglobal cu, [], loc)
@@ -1438,12 +1440,16 @@ let rec transl_address loc = function
         | Some sort ->
           sort |> Jkind.Sort.default_for_transl_and_get
                |> Types.mixed_block_element_of_const_sort
-               |> transl_mixed_product_element_for_read
         | None ->
           fatal_error
             "Lambda.transl_address: could not determine layout of field"
       in
-      let mixed_blocks = Array.map layout_to_mixed_block field_layouts in
+      let mixed_blocks =
+        Array.map layout_to_mixed_block field_layouts
+        |> transl_mixed_product_shape_for_read
+            ~get_value_kind:(fun _ -> generic_value)
+            ~get_mode:(fun _ -> alloc_heap)
+      in
       if Array.for_all
         (function
           | Value _ -> true
@@ -1485,55 +1491,8 @@ let transl_prim mod_name name =
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
 
-let rec transl_mixed_product_shape shape =
-  Array.map (fun (elt : Types.mixed_block_element) ->
-    match elt with
-    | Value -> Value generic_value
-    | Float_boxed -> Float_boxed ()
-    | Float64 -> Float64
-    | Float32 -> Float32
-    | Bits8 -> Bits8
-    | Bits16 -> Bits16
-    | Bits32 -> Bits32
-    | Bits64 -> Bits64
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Word -> Word
-    | Untagged_immediate -> Untagged_immediate
-    | Product shapes ->
-      Product (transl_mixed_product_shape shapes)
-    | Void -> Product [||]
-  ) shape
-
-let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Array.mapi (fun i (elt : Types.mixed_block_element) ->
-    match elt with
-    | Value -> Value (get_value_kind i)
-    | Float_boxed -> Float_boxed (get_mode i)
-    | Float64 -> Float64
-    | Float32 -> Float32
-    | Bits8 -> Bits8
-    | Bits16 -> Bits16
-    | Bits32 -> Bits32
-    | Bits64 -> Bits64
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Word -> Word
-    | Untagged_immediate -> Untagged_immediate
-    | Product shapes ->
-      let get_value_kind _ = generic_value in
-      Product
-        (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
-    | Void -> Product [||]
-  ) shape
-
-(* CR jrayman: is this redundant?
-   Can it be combined with [transl_mixed_product_shape]?
-   Can it be deleted? *)
-let transl_mixed_block_element (mixed_block : Types.mixed_block_element) =
-  match mixed_block with
+let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
+  match elt with
   | Value -> Value generic_value
   | Float_boxed -> Float_boxed ()
   | Float64 -> Float64
@@ -1544,13 +1503,17 @@ let transl_mixed_block_element (mixed_block : Types.mixed_block_element) =
   | Bits64 -> Bits64
   | Vec128 -> Vec128
   | Vec256 -> Vec256
-  | Vec512 -> Vec256
+  | Vec512 -> Vec512
   | Word -> Word
+  | Untagged_immediate -> Untagged_immediate
   | Product shapes ->
-    let get_value_kind _ = generic_value in
-    Product (transl_mixed_product_shape ~get_value_kind shapes)
+    Product (transl_mixed_product_shape shapes)
   | Void -> Product [||]
 
+and transl_mixed_product_shape ~get_value_kind shape =
+  Array.mapi
+    (fun i elt -> transl_mixed_block_element elt ~value_kind:(get_value_kind i))
+    shape
 
 let transl_module_representation = function
   | Types.Module_value_only size -> Module_value_only size
@@ -1558,7 +1521,20 @@ let transl_module_representation = function
     Module_mixed
       (transl_mixed_product_shape
         ~get_value_kind:(fun _ -> generic_value) shape)
-    (* CR jrayman: worth considering if this is correct *)
+        (* CR jrayman: disallow [Float_boxed] *)
+
+let module_representation_of_signature sig_ =
+  sig_
+  |> List.filter_map Env.layout_of_signature_item
+  |> List.map
+       (fun layout -> layout
+                      |> Jkind.Layout.to_sort
+                      |> Option.get (* CR jrayman *)
+                      |> Jkind.Sort.default_for_transl_and_get
+                      |> Types.mixed_block_element_of_const_sort)
+  |> Array.of_list
+  |> Types.module_representation_of_mixed_product_shape
+  |> transl_module_representation
 
 let block_of_module_representation = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
@@ -1897,17 +1873,15 @@ let reset () =
   raise_count := 0
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
-  | Types.Module_value_only _ -> Pfield(pos, Pointer, read_semantics)
-  | Types.Module_mixed shape ->
-    let shape =
-      (* CR jrayman: translating for every field access seems inefficient *)
-      (* CR jrayman: do we want [value_kind] or [mode] to vary with the
-         expression *)
-      transl_mixed_product_shape_for_read shape
-        ~get_value_kind:(fun _ -> generic_value)
-        ~get_mode:(fun _ -> alloc_heap)
+  | Module_value_only _ -> Pfield(pos, Pointer, read_semantics)
+  | Module_mixed shape ->
+    let for_read :
+      (* This is safe since [transl_module_representation] ensures
+         [Float_boxed] does not appear in [shape]. *)
+      unit mixed_block_element array -> locality_mode mixed_block_element array
+      = Obj.magic
     in
-    Pmixedfield([pos], shape, read_semantics)
+    Pmixedfield([pos], for_read shape, read_semantics)
 
 let mod_setfield pos =
   Psetfield (pos, Pointer, Root_initialization)
@@ -2388,6 +2362,7 @@ let rec layout_of_mixed_block_element element =
   | Bits32 -> layout_unboxed_int32
   | Bits64 -> layout_unboxed_int64
   | Word -> layout_unboxed_nativeint
+  | Untagged_immediate -> layout_unboxed_int Untagged_int
   | Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
@@ -2398,25 +2373,6 @@ let rec layout_of_mixed_block_element element =
 let layout_of_mixed_block_shape
     : 'a. 'a mixed_block_element array -> path:int list -> layout
     = fun shape ~path ->
-  let rec layout_of_mixed_block_element element =
-    match element with
-    | Value value_kind -> Pvalue value_kind
-    | Float_boxed _ -> layout_boxed_float Boxed_float64
-    | Float64 -> layout_unboxed_float Unboxed_float64
-    | Float32 -> layout_unboxed_float Unboxed_float32
-    | Bits8 -> layout_unboxed_int8
-    | Bits16 -> layout_unboxed_int16
-    | Bits32 -> layout_unboxed_int32
-    | Bits64 -> layout_unboxed_int64
-    | Word -> layout_unboxed_nativeint
-    | Untagged_immediate -> layout_unboxed_int Untagged_int
-    | Vec128 -> layout_unboxed_vector Unboxed_vec128
-    | Vec256 -> layout_unboxed_vector Unboxed_vec256
-    | Vec512 -> layout_unboxed_vector Unboxed_vec512
-    | Product shape ->
-      Punboxed_product
-        (Array.to_list (Array.map layout_of_mixed_block_element shape))
-  in
   layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
 
 let rec mixed_block_element_of_layout (layout : layout) :
