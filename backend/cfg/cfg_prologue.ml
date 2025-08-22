@@ -162,59 +162,81 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
         Cfg_dominators.is_dominating doms prologue_label epilogue_label)
       epilogue_blocks
 
-let rec find_prologue_and_epilogue_blocks (tree : Cfg_dominators.dominator_tree)
-    (cfg : Cfg.t) (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
-  let block = Cfg.get_block_exn cfg tree.label in
-  let epilogue_blocks =
-    Label.Set.filter
-      (fun label ->
-        let block = Cfg.get_block_exn cfg label in
-        let fun_name = Cfg.fun_name cfg in
-        match Instruction_requirements.terminator block.terminator fun_name with
-        | Requires_no_prologue -> true
-        | No_requirements | Requires_prologue -> false)
-      (descendants cfg block)
-  in
-  if prologue_needed_block block ~fun_name:cfg.fun_name
-  then Some (tree.label, epilogue_blocks)
-  else
-    let children_prologue_block =
-      List.filter_map
-        (fun tree -> find_prologue_and_epilogue_blocks tree cfg doms loop_infos)
-        tree.children
+let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
+  let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
+      (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
+    let block = Cfg.get_block_exn cfg tree.label in
+    let epilogue_blocks =
+      Label.Set.filter
+        (fun label ->
+          let block = Cfg.get_block_exn cfg label in
+          let fun_name = Cfg.fun_name cfg in
+          match
+            Instruction_requirements.terminator block.terminator fun_name
+          with
+          | Requires_no_prologue -> true
+          | No_requirements | Requires_prologue -> false)
+        (descendants cfg block)
     in
-    match children_prologue_block with
-    | [] -> None
-    | [(child, child_epilogue_blocks)] ->
-      (* Only a single child needs a prologue, so will consider moving the
-         prologue to that child *)
-      if can_place_prologue child cfg doms loop_infos child_epilogue_blocks
-      then Some (child, child_epilogue_blocks)
-      else Some (tree.label, epilogue_blocks)
-    | _ ->
-      (* Multiple children need a prologue. We keep the prologue at the parent
-         to avoid duplication of the prologue. *)
-      Some (tree.label, epilogue_blocks)
-
-let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
- fun cfg_with_layout ->
-  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+    if prologue_needed_block block ~fun_name:cfg.fun_name
+    then Some (tree.label, epilogue_blocks)
+    else
+      let children_prologue_block =
+        List.filter_map
+          (fun tree -> visit tree cfg doms loop_infos)
+          tree.children
+      in
+      match children_prologue_block with
+      | [] -> None
+      | [(child, child_epilogue_blocks)] ->
+        (* Only a single child needs a prologue, so will consider moving the
+           prologue to that child *)
+        if can_place_prologue child cfg doms loop_infos child_epilogue_blocks
+        then Some (child, child_epilogue_blocks)
+        else Some (tree.label, epilogue_blocks)
+      | _ ->
+        (* Multiple children need a prologue. We keep the prologue at the parent
+           to avoid duplication of the prologue. *)
+        Some (tree.label, epilogue_blocks)
+  in
   let doms = Cfg_dominators.build cfg in
   (* note: the other entries in the forest are dead code *)
   let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
   let loop_infos = Cfg_loop_infos.build cfg doms in
-  let prologue_and_epilogue_blocks =
-    find_prologue_and_epilogue_blocks tree cfg doms loop_infos
-  in
-  match prologue_and_epilogue_blocks with
-  | None -> cfg_with_layout
-  | Some (prologue_block, epilogue_blocks) ->
+  let prologue_required = visit tree cfg doms loop_infos in
+  (match prologue_required with
+  | None -> ()
+  | Some (prologue_label, epilogue_blocks) ->
     assert (
-      can_place_prologue prologue_block cfg doms loop_infos epilogue_blocks);
+      can_place_prologue prologue_label cfg doms loop_infos epilogue_blocks));
+  prologue_required
+
+let find_prologue_and_epilogues_at_entry (cfg : Cfg.t) =
+  if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
+       ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  then
+    let epilogue_blocks =
+      Cfg.fold_blocks cfg
+        ~f:(fun label block acc ->
+          match
+            Instruction_requirements.terminator block.terminator cfg.fun_name
+          with
+          | Requires_no_prologue -> Label.Set.add label acc
+          | No_requirements | Requires_prologue -> acc)
+        ~init:Label.Set.empty
+    in
+    Some (cfg.entry_label, epilogue_blocks)
+  else None
+
+let add_prologue_if_required (cfg : Cfg.t) ~f =
+  let prologue_and_epilogue_blocks = f cfg in
+  match prologue_and_epilogue_blocks with
+  | None -> ()
+  | Some (prologue_label, epilogue_blocks) ->
     let terminator_as_basic terminator =
       { terminator with Cfg.desc = Cfg.Prologue }
     in
-    let prologue_block = Cfg.get_block_exn cfg prologue_block in
+    let prologue_block = Cfg.get_block_exn cfg prologue_label in
     let next_instr =
       Option.value
         (DLL.hd prologue_block.body)
@@ -224,55 +246,15 @@ let add_prologue_if_required : Cfg_with_layout.t -> Cfg_with_layout.t =
       (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
          ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
          ());
-    let add_epilogue (block : Cfg.basic_block) =
-      let terminator = terminator_as_basic block.terminator in
-      DLL.add_end block.body
-        (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
-           ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
-           ())
-    in
     Label.Set.iter
       (fun label ->
         let block = Cfg.get_block_exn cfg label in
-        add_epilogue block)
-      epilogue_blocks;
-    cfg_with_layout
-
-let add_prologue_if_required_old : Cfg_with_layout.t -> Cfg_with_layout.t =
- fun cfg_with_layout ->
-  let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  let prologue_required =
-    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-      ~fun_num_stack_slots:cfg.fun_num_stack_slots
-  in
-  if prologue_required
-  then (
-    let terminator_as_basic terminator =
-      { terminator with Cfg.desc = Cfg.Prologue }
-    in
-    let entry_block = Cfg.get_block_exn cfg cfg.entry_label in
-    let next_instr =
-      Option.value (DLL.hd entry_block.body)
-        ~default:(terminator_as_basic entry_block.terminator)
-    in
-    DLL.add_begin entry_block.body
-      (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
-         ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
-         ());
-    let add_epilogue (block : Cfg.basic_block) =
-      let terminator = terminator_as_basic block.terminator in
-      DLL.add_end block.body
-        (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
-           ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
-           ())
-    in
-    Cfg.iter_blocks cfg ~f:(fun _label block ->
-        match
-          Instruction_requirements.terminator block.terminator cfg.fun_name
-        with
-        | Requires_no_prologue -> add_epilogue block
-        | No_requirements | Requires_prologue -> ()));
-  cfg_with_layout
+        let terminator = terminator_as_basic block.terminator in
+        DLL.add_end block.body
+          (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
+             ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+             ()))
+      epilogue_blocks
 
 module Validator = struct
   type state =
@@ -402,13 +384,14 @@ end
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   validate_no_prologue cfg_with_layout;
-  let fun_name = Cfg.fun_name (Cfg_with_layout.cfg cfg_with_layout) in
-  let cfg_with_layout =
-    match !Oxcaml_flags.cfg_prologue_shrink_wrap with
-    | true -> add_prologue_if_required cfg_with_layout
-    | false -> add_prologue_if_required_old cfg_with_layout
-  in
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let fun_name = Cfg.fun_name cfg in
+  (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
+  | true
+    when Label.Tbl.length cfg.blocks
+         <= !Oxcaml_flags.cfg_prologue_shrink_wrap_threshold ->
+    add_prologue_if_required cfg ~f:find_prologue_and_epilogues_shrink_wrapped
+  | _ -> add_prologue_if_required cfg ~f:find_prologue_and_epilogues_at_entry);
   match !Oxcaml_flags.cfg_prologue_validate with
   | true -> (
     match
