@@ -1,6 +1,10 @@
-Test 1: Open with module ident
+Test 1: [let open] with module ident
 42. hello
-Test 2: Open with inline struct
+Test 2: [let open] with inline struct
 42. hello
-Test 3: Open with functor
+Test 3: [let open] with functor
+42. hello
+Test 4: Tests 1-3 with [open] instead of [let open]
+42. hello
+42. hello
 42. hello
