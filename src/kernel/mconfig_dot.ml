@@ -129,6 +129,34 @@ end = struct
     | Dot_merlin -> "dot-merlin-reader"
     | Dune -> "dune"
 
+  let find_exe = function
+    | Dot_merlin ->
+      (* 1. If DOT_MERLIN_READER_EXE is defined, then use its value for the
+            dot-merlin-reader exe
+         2. If not, look in the same directory as the merlin executable for a
+            dot-merlin-reader.
+         3. If not, fallback to using whatever one is on the PATH. *)
+      let get_from_env_var = lazy (Sys.getenv_opt "DOT_MERLIN_READER_EXE") in
+      let get_from_same_dir_as_merlin_exe =
+        lazy
+          (let merlin_exe = Unix.realpath Sys.executable_name in
+           let merlin_bin = Filename.dirname merlin_exe in
+           let dot_merlin_reader_exe =
+             Filename.concat merlin_bin "dot-merlin-reader"
+           in
+           match Sys.file_exists dot_merlin_reader_exe with
+           | true -> Some dot_merlin_reader_exe
+           | false -> None)
+      in
+      List.find_map_opt
+        [ get_from_env_var; get_from_same_dir_as_merlin_exe ]
+        ~f:Lazy.force
+      |> Option.value ~default:"dot-merlin-reader"
+    | Dune ->
+      (* Always use the dune on the PATH *)
+      (* CR-someday: consider doing something better here *)
+      "dune"
+
   exception Process_exited
 
   module Process = struct
@@ -148,10 +176,10 @@ end = struct
       let prog, args =
         match cfg with
         | Dot_merlin ->
-          let prog = "dot-merlin-reader" in
+          let prog = find_exe Dot_merlin in
           (prog, [| prog |])
         | Dune ->
-          let prog = "dune" in
+          let prog = find_exe Dune in
           (prog, [| prog; "ocaml-merlin"; "--no-print-directory" |])
       in
       let cwd = Sys.getcwd () in
@@ -393,8 +421,11 @@ let get_config { workdir; process_dir; configurator } path_abs =
   | Unix.Unix_error (ENOENT, "create_process", "dot-merlin-reader") ->
     let error =
       Printf.sprintf
-        "%s could not find `dot-merlin-reader` in the PATH. Please make sure \
-         that `dot-merlin-reader` is installed and in the PATH."
+        "%s could not find `dot-merlin-reader`. Please make sure that \
+         `dot-merlin-reader` is installed. `dot-merlin-reader` is expected to \
+         be in the same directory as the merlin executable or on the PATH. You \
+         may also specify the path to `dot-merlin-reader` via the \
+         `DOT_MERLIN_READER_EXE` environment variable."
         (Lib_config.program_name ())
     in
     (empty_config, [ error ])
