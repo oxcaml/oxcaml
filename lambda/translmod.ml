@@ -698,7 +698,6 @@ and transl_structure ~scopes loc
               if pos < 0 then layout_value_field
               else let _, shape = v.(pos) in
                 shape |> transl_mixed_block_element
-                           ~value_kind:(lazy generic_value)
                       |> layout_of_mixed_block_element
             in
             let ids = List.fold_right (fun (id, _) s -> Ident.Set.add id s)
