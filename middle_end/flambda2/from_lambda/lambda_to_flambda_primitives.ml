@@ -2342,7 +2342,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Max_wosize ->
         [ Simple
             (Simple.const_int
-               (Target_ocaml_int.of_int
+               (Targetint_31_63.of_int
                   ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
                   - 1))) ]
       | Ostype_unix ->
