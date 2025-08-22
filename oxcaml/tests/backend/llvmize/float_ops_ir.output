@@ -22,305 +22,337 @@ define void @camlFloat_ops__code_begin() { ret void }
 @camlFloat_ops__sub_8 = global { ptr, i64, ptr } { ptr @caml_curryF_F_RF, i64 180143985094819847, ptr @camlFloat_ops__sub_HIDE_STAMP }, align 8
 @.header.camlFloat_ops__add_7 = global { i64 } { i64 4087 }, align 8
 @camlFloat_ops__add_7 = global { ptr, i64, ptr } { ptr @caml_curryF_F_RF, i64 180143985094819847, ptr @camlFloat_ops__add_HIDE_STAMP }, align 8
-define cc 104 { { ptr }, { double } } @camlFloat_ops__add_HIDE_STAMP(ptr %0, double %1, double %2)  {
+define cc 104 { { ptr, ptr }, { double } } @camlFloat_ops__add_HIDE_STAMP(ptr %0, ptr %1, double %2, double %3)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %4 = alloca double
-  store double %1, ptr %4
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %5 = alloca double
   store double %2, ptr %5
   %6 = alloca double
+  store double %3, ptr %6
   %7 = alloca double
   %8 = alloca double
+  %9 = alloca double
   br label %L1
 L1:
   br label %L101
 L101:                                                ; preds = %L1
-  %9 = load double, ptr %4
-  store double %9, ptr %6
   %10 = load double, ptr %5
   store double %10, ptr %7
   %11 = load double, ptr %6
+  store double %11, ptr %8
   %12 = load double, ptr %7
-  %13 = fadd double %11, %12
-  store double %13, ptr %8
-  %14 = load double, ptr %8
-  store double %14, ptr %4
-  %15 = extractvalue { { { ptr }, { double } } } poison, 0
-  %16 = load ptr, ptr %ds
-  %17 = insertvalue { { ptr }, { double } } %15, ptr %16, 0, 0
-  %18 = load double, ptr %4
-  %19 = insertvalue { { ptr }, { double } } %17, double %18, 1, 0
-  ret { { ptr }, { double } } %19
+  %13 = load double, ptr %8
+  %14 = fadd double %12, %13
+  store double %14, ptr %9
+  %15 = load double, ptr %9
+  store double %15, ptr %5
+  %16 = extractvalue { { { ptr, ptr }, { double } } } poison, 0
+  %17 = load ptr, ptr %ds
+  %18 = insertvalue { { ptr, ptr }, { double } } %16, ptr %17, 0, 0
+  %19 = load ptr, ptr %alloc
+  %20 = insertvalue { { ptr, ptr }, { double } } %18, ptr %19, 0, 1
+  %21 = load double, ptr %5
+  %22 = insertvalue { { ptr, ptr }, { double } } %20, double %21, 1, 0
+  ret { { ptr, ptr }, { double } } %22
 }
 
-define cc 104 { { ptr }, { double } } @camlFloat_ops__sub_HIDE_STAMP(ptr %0, double %1, double %2)  {
+define cc 104 { { ptr, ptr }, { double } } @camlFloat_ops__sub_HIDE_STAMP(ptr %0, ptr %1, double %2, double %3)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %4 = alloca double
-  store double %1, ptr %4
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %5 = alloca double
   store double %2, ptr %5
   %6 = alloca double
+  store double %3, ptr %6
   %7 = alloca double
   %8 = alloca double
+  %9 = alloca double
   br label %L1
 L1:
   br label %L105
 L105:                                                ; preds = %L1
-  %9 = load double, ptr %4
-  store double %9, ptr %6
   %10 = load double, ptr %5
   store double %10, ptr %7
   %11 = load double, ptr %6
+  store double %11, ptr %8
   %12 = load double, ptr %7
-  %13 = fsub double %11, %12
-  store double %13, ptr %8
-  %14 = load double, ptr %8
-  store double %14, ptr %4
-  %15 = extractvalue { { { ptr }, { double } } } poison, 0
-  %16 = load ptr, ptr %ds
-  %17 = insertvalue { { ptr }, { double } } %15, ptr %16, 0, 0
-  %18 = load double, ptr %4
-  %19 = insertvalue { { ptr }, { double } } %17, double %18, 1, 0
-  ret { { ptr }, { double } } %19
+  %13 = load double, ptr %8
+  %14 = fsub double %12, %13
+  store double %14, ptr %9
+  %15 = load double, ptr %9
+  store double %15, ptr %5
+  %16 = extractvalue { { { ptr, ptr }, { double } } } poison, 0
+  %17 = load ptr, ptr %ds
+  %18 = insertvalue { { ptr, ptr }, { double } } %16, ptr %17, 0, 0
+  %19 = load ptr, ptr %alloc
+  %20 = insertvalue { { ptr, ptr }, { double } } %18, ptr %19, 0, 1
+  %21 = load double, ptr %5
+  %22 = insertvalue { { ptr, ptr }, { double } } %20, double %21, 1, 0
+  ret { { ptr, ptr }, { double } } %22
 }
 
-define cc 104 { { ptr }, { double } } @camlFloat_ops__mul_HIDE_STAMP(ptr %0, double %1, double %2)  {
+define cc 104 { { ptr, ptr }, { double } } @camlFloat_ops__mul_HIDE_STAMP(ptr %0, ptr %1, double %2, double %3)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %4 = alloca double
-  store double %1, ptr %4
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %5 = alloca double
   store double %2, ptr %5
   %6 = alloca double
+  store double %3, ptr %6
   %7 = alloca double
   %8 = alloca double
+  %9 = alloca double
   br label %L1
 L1:
   br label %L109
 L109:                                                ; preds = %L1
-  %9 = load double, ptr %4
-  store double %9, ptr %6
   %10 = load double, ptr %5
   store double %10, ptr %7
   %11 = load double, ptr %6
+  store double %11, ptr %8
   %12 = load double, ptr %7
-  %13 = fmul double %11, %12
-  store double %13, ptr %8
-  %14 = load double, ptr %8
-  store double %14, ptr %4
-  %15 = extractvalue { { { ptr }, { double } } } poison, 0
-  %16 = load ptr, ptr %ds
-  %17 = insertvalue { { ptr }, { double } } %15, ptr %16, 0, 0
-  %18 = load double, ptr %4
-  %19 = insertvalue { { ptr }, { double } } %17, double %18, 1, 0
-  ret { { ptr }, { double } } %19
+  %13 = load double, ptr %8
+  %14 = fmul double %12, %13
+  store double %14, ptr %9
+  %15 = load double, ptr %9
+  store double %15, ptr %5
+  %16 = extractvalue { { { ptr, ptr }, { double } } } poison, 0
+  %17 = load ptr, ptr %ds
+  %18 = insertvalue { { ptr, ptr }, { double } } %16, ptr %17, 0, 0
+  %19 = load ptr, ptr %alloc
+  %20 = insertvalue { { ptr, ptr }, { double } } %18, ptr %19, 0, 1
+  %21 = load double, ptr %5
+  %22 = insertvalue { { ptr, ptr }, { double } } %20, double %21, 1, 0
+  ret { { ptr, ptr }, { double } } %22
 }
 
-define cc 104 { { ptr }, { double } } @camlFloat_ops__div_HIDE_STAMP(ptr %0, double %1, double %2)  {
+define cc 104 { { ptr, ptr }, { double } } @camlFloat_ops__div_HIDE_STAMP(ptr %0, ptr %1, double %2, double %3)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %4 = alloca double
-  store double %1, ptr %4
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %5 = alloca double
   store double %2, ptr %5
   %6 = alloca double
+  store double %3, ptr %6
   %7 = alloca double
   %8 = alloca double
+  %9 = alloca double
   br label %L1
 L1:
   br label %L113
 L113:                                                ; preds = %L1
-  %9 = load double, ptr %4
-  store double %9, ptr %6
   %10 = load double, ptr %5
   store double %10, ptr %7
   %11 = load double, ptr %6
+  store double %11, ptr %8
   %12 = load double, ptr %7
-  %13 = fdiv double %11, %12
-  store double %13, ptr %8
-  %14 = load double, ptr %8
-  store double %14, ptr %4
-  %15 = extractvalue { { { ptr }, { double } } } poison, 0
-  %16 = load ptr, ptr %ds
-  %17 = insertvalue { { ptr }, { double } } %15, ptr %16, 0, 0
-  %18 = load double, ptr %4
-  %19 = insertvalue { { ptr }, { double } } %17, double %18, 1, 0
-  ret { { ptr }, { double } } %19
+  %13 = load double, ptr %8
+  %14 = fdiv double %12, %13
+  store double %14, ptr %9
+  %15 = load double, ptr %9
+  store double %15, ptr %5
+  %16 = extractvalue { { { ptr, ptr }, { double } } } poison, 0
+  %17 = load ptr, ptr %ds
+  %18 = insertvalue { { ptr, ptr }, { double } } %16, ptr %17, 0, 0
+  %19 = load ptr, ptr %alloc
+  %20 = insertvalue { { ptr, ptr }, { double } } %18, ptr %19, 0, 1
+  %21 = load double, ptr %5
+  %22 = insertvalue { { ptr, ptr }, { double } } %20, double %21, 1, 0
+  ret { { ptr, ptr }, { double } } %22
 }
 
-define cc 104 { { ptr }, { double } } @camlFloat_ops__neg_HIDE_STAMP(ptr %0, double %1)  {
+define cc 104 { { ptr, ptr }, { double } } @camlFloat_ops__neg_HIDE_STAMP(ptr %0, ptr %1, double %2)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca double
-  store double %1, ptr %3
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %4 = alloca double
+  store double %2, ptr %4
   %5 = alloca double
+  %6 = alloca double
   br label %L1
 L1:
   br label %L117
 L117:                                                ; preds = %L1
-  %6 = load double, ptr %3
-  store double %6, ptr %4
   %7 = load double, ptr %4
   store double %7, ptr %5
   %8 = load double, ptr %5
-  %9 = fneg double %8
-  store double %9, ptr %5
-  %10 = load double, ptr %5
-  store double %10, ptr %3
-  %11 = extractvalue { { { ptr }, { double } } } poison, 0
-  %12 = load ptr, ptr %ds
-  %13 = insertvalue { { ptr }, { double } } %11, ptr %12, 0, 0
-  %14 = load double, ptr %3
-  %15 = insertvalue { { ptr }, { double } } %13, double %14, 1, 0
-  ret { { ptr }, { double } } %15
+  store double %8, ptr %6
+  %9 = load double, ptr %6
+  %10 = fneg double %9
+  store double %10, ptr %6
+  %11 = load double, ptr %6
+  store double %11, ptr %4
+  %12 = extractvalue { { { ptr, ptr }, { double } } } poison, 0
+  %13 = load ptr, ptr %ds
+  %14 = insertvalue { { ptr, ptr }, { double } } %12, ptr %13, 0, 0
+  %15 = load ptr, ptr %alloc
+  %16 = insertvalue { { ptr, ptr }, { double } } %14, ptr %15, 0, 1
+  %17 = load double, ptr %4
+  %18 = insertvalue { { ptr, ptr }, { double } } %16, double %17, 1, 0
+  ret { { ptr, ptr }, { double } } %18
 }
 
-define cc 104 { { ptr }, { double } } @camlFloat_ops__abs_HIDE_STAMP(ptr %0, double %1)  {
+define cc 104 { { ptr, ptr }, { double } } @camlFloat_ops__abs_HIDE_STAMP(ptr %0, ptr %1, double %2)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca double
-  store double %1, ptr %3
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %4 = alloca double
+  store double %2, ptr %4
   %5 = alloca double
+  %6 = alloca double
   br label %L1
 L1:
   br label %L121
 L121:                                                ; preds = %L1
-  %6 = load double, ptr %3
-  store double %6, ptr %4
   %7 = load double, ptr %4
   store double %7, ptr %5
   %8 = load double, ptr %5
-  %9 = call  double @llvm.fabs.f64(double %8)
-  store double %9, ptr %5
-  %10 = load double, ptr %5
-  store double %10, ptr %3
-  %11 = extractvalue { { { ptr }, { double } } } poison, 0
-  %12 = load ptr, ptr %ds
-  %13 = insertvalue { { ptr }, { double } } %11, ptr %12, 0, 0
-  %14 = load double, ptr %3
-  %15 = insertvalue { { ptr }, { double } } %13, double %14, 1, 0
-  ret { { ptr }, { double } } %15
+  store double %8, ptr %6
+  %9 = load double, ptr %6
+  %10 = call  double @llvm.fabs.f64(double %9)
+  store double %10, ptr %6
+  %11 = load double, ptr %6
+  store double %11, ptr %4
+  %12 = extractvalue { { { ptr, ptr }, { double } } } poison, 0
+  %13 = load ptr, ptr %ds
+  %14 = insertvalue { { ptr, ptr }, { double } } %12, ptr %13, 0, 0
+  %15 = load ptr, ptr %alloc
+  %16 = insertvalue { { ptr, ptr }, { double } } %14, ptr %15, 0, 1
+  %17 = load double, ptr %4
+  %18 = insertvalue { { ptr, ptr }, { double } } %16, double %17, 1, 0
+  ret { { ptr, ptr }, { double } } %18
 }
 
-define cc 104 { { ptr }, { i64 } } @camlFloat_ops__compare_HIDE_STAMP(ptr %0, double %1, double %2)  {
+define cc 104 { { ptr, ptr }, { i64 } } @camlFloat_ops__compare_HIDE_STAMP(ptr %0, ptr %1, double %2, double %3)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %4 = alloca double
-  store double %1, ptr %4
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %5 = alloca double
   store double %2, ptr %5
-  %6 = alloca i64
-  %7 = alloca double
+  %6 = alloca double
+  store double %3, ptr %6
+  %7 = alloca i64
   %8 = alloca double
-  %9 = alloca i64
-  %10 = alloca double
-  %11 = alloca i64
-  %12 = alloca double
-  %13 = alloca i64
+  %9 = alloca double
+  %10 = alloca i64
+  %11 = alloca double
+  %12 = alloca i64
+  %13 = alloca double
   %14 = alloca i64
-  %15 = alloca double
-  %16 = alloca i64
-  %17 = alloca double
-  %18 = alloca i64
+  %15 = alloca i64
+  %16 = alloca double
+  %17 = alloca i64
+  %18 = alloca double
   %19 = alloca i64
   %20 = alloca i64
   %21 = alloca i64
+  %22 = alloca i64
   br label %L1
 L1:
   br label %L125
 L125:                                                ; preds = %L1
-  %22 = load double, ptr %4
-  store double %22, ptr %7
   %23 = load double, ptr %5
   store double %23, ptr %8
-  %24 = load double, ptr %8
-  %25 = load double, ptr %8
-  %26 = fcmp oeq double %24, %25
-  %27 = zext i1 %26 to i64
-  store i64 %27, ptr %9
-  %28 = load double, ptr %7
-  %29 = load double, ptr %7
-  %30 = fcmp oeq double %28, %29
-  %31 = zext i1 %30 to i64
-  store i64 %31, ptr %11
-  %32 = load i64, ptr %11
-  store i64 %32, ptr %13
-  %33 = load i64, ptr %13
-  %34 = load i64, ptr %9
-  %35 = sub i64 %33, %34
-  store i64 %35, ptr %13
-  %36 = load double, ptr %7
+  %24 = load double, ptr %6
+  store double %24, ptr %9
+  %25 = load double, ptr %9
+  %26 = load double, ptr %9
+  %27 = fcmp oeq double %25, %26
+  %28 = zext i1 %27 to i64
+  store i64 %28, ptr %10
+  %29 = load double, ptr %8
+  %30 = load double, ptr %8
+  %31 = fcmp oeq double %29, %30
+  %32 = zext i1 %31 to i64
+  store i64 %32, ptr %12
+  %33 = load i64, ptr %12
+  store i64 %33, ptr %14
+  %34 = load i64, ptr %14
+  %35 = load i64, ptr %10
+  %36 = sub i64 %34, %35
+  store i64 %36, ptr %14
   %37 = load double, ptr %8
-  %38 = fcmp olt double %36, %37
-  %39 = zext i1 %38 to i64
-  store i64 %39, ptr %14
-  %40 = load double, ptr %7
+  %38 = load double, ptr %9
+  %39 = fcmp olt double %37, %38
+  %40 = zext i1 %39 to i64
+  store i64 %40, ptr %15
   %41 = load double, ptr %8
-  %42 = fcmp ogt double %40, %41
-  %43 = zext i1 %42 to i64
-  store i64 %43, ptr %16
-  %44 = load i64, ptr %16
-  store i64 %44, ptr %18
-  %45 = load i64, ptr %18
-  %46 = load i64, ptr %14
-  %47 = sub i64 %45, %46
-  store i64 %47, ptr %18
-  %48 = load i64, ptr %18
+  %42 = load double, ptr %9
+  %43 = fcmp ogt double %41, %42
+  %44 = zext i1 %43 to i64
+  store i64 %44, ptr %17
+  %45 = load i64, ptr %17
+  store i64 %45, ptr %19
+  %46 = load i64, ptr %19
+  %47 = load i64, ptr %15
+  %48 = sub i64 %46, %47
   store i64 %48, ptr %19
   %49 = load i64, ptr %19
-  %50 = load i64, ptr %13
-  %51 = add i64 %49, %50
-  store i64 %51, ptr %19
-  %52 = load i64, ptr %19
+  store i64 %49, ptr %20
+  %50 = load i64, ptr %20
+  %51 = load i64, ptr %14
+  %52 = add i64 %50, %51
   store i64 %52, ptr %20
   %53 = load i64, ptr %20
-  %54 = shl i64 %53, 1
-  store i64 %54, ptr %20
-  %55 = load i64, ptr %20
+  store i64 %53, ptr %21
+  %54 = load i64, ptr %21
+  %55 = shl i64 %54, 1
   store i64 %55, ptr %21
   %56 = load i64, ptr %21
-  %57 = add i64 %56, 1
-  store i64 %57, ptr %21
-  %58 = load i64, ptr %21
-  store i64 %58, ptr %6
-  %59 = extractvalue { { { ptr }, { i64 } } } poison, 0
-  %60 = load ptr, ptr %ds
-  %61 = insertvalue { { ptr }, { i64 } } %59, ptr %60, 0, 0
-  %62 = load i64, ptr %6
-  %63 = insertvalue { { ptr }, { i64 } } %61, i64 %62, 1, 0
-  ret { { ptr }, { i64 } } %63
+  store i64 %56, ptr %22
+  %57 = load i64, ptr %22
+  %58 = add i64 %57, 1
+  store i64 %58, ptr %22
+  %59 = load i64, ptr %22
+  store i64 %59, ptr %7
+  %60 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %61 = load ptr, ptr %ds
+  %62 = insertvalue { { ptr, ptr }, { i64 } } %60, ptr %61, 0, 0
+  %63 = load ptr, ptr %alloc
+  %64 = insertvalue { { ptr, ptr }, { i64 } } %62, ptr %63, 0, 1
+  %65 = load i64, ptr %7
+  %66 = insertvalue { { ptr, ptr }, { i64 } } %64, i64 %65, 1, 0
+  ret { { ptr, ptr }, { i64 } } %66
 }
 
-define cc 104 { { ptr }, { i64 } } @camlFloat_ops__entry(ptr %0)  {
+define cc 104 { { ptr, ptr }, { i64 } } @camlFloat_ops__entry(ptr %0, ptr %1)  {
   %ds = alloca ptr
   store ptr %0, ptr %ds
-  %2 = alloca i64
+  %alloc = alloca ptr
+  store ptr %1, ptr %alloc
   %3 = alloca i64
   %4 = alloca i64
   %5 = alloca i64
   %6 = alloca i64
+  %7 = alloca i64
   br label %L1
 L1:
   br label %L140
 L140:                                                ; preds = %L1
-  store ptr @camlFloat_ops, ptr %4
-  %7 = load i64, ptr %4
-  store i64 %7, ptr %5
+  store ptr @camlFloat_ops, ptr %5
   %8 = load i64, ptr %5
-  store i64 %8, ptr %3
-  store i64 1, ptr %6
+  store i64 %8, ptr %6
   %9 = load i64, ptr %6
-  store i64 %9, ptr %2
-  %10 = extractvalue { { { ptr }, { i64 } } } poison, 0
-  %11 = load ptr, ptr %ds
-  %12 = insertvalue { { ptr }, { i64 } } %10, ptr %11, 0, 0
-  %13 = load i64, ptr %2
-  %14 = insertvalue { { ptr }, { i64 } } %12, i64 %13, 1, 0
-  ret { { ptr }, { i64 } } %14
+  store i64 %9, ptr %4
+  store i64 1, ptr %7
+  %10 = load i64, ptr %7
+  store i64 %10, ptr %3
+  %11 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %12 = load ptr, ptr %ds
+  %13 = insertvalue { { ptr, ptr }, { i64 } } %11, ptr %12, 0, 0
+  %14 = load ptr, ptr %alloc
+  %15 = insertvalue { { ptr, ptr }, { i64 } } %13, ptr %14, 0, 1
+  %16 = load i64, ptr %3
+  %17 = insertvalue { { ptr, ptr }, { i64 } } %15, i64 %16, 1, 0
+  ret { { ptr, ptr }, { i64 } } %17
 }
 
 declare  double @llvm.fabs.f64(double)
