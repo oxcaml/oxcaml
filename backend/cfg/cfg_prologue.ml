@@ -104,7 +104,7 @@ module Instruction_requirements = struct
 end
 
 let prologue_needed_block (block : Cfg.basic_block) ~fun_name =
-  block.is_trap_handler
+  Config.with_frame_pointers || block.is_trap_handler
   || DLL.exists block.Cfg.body ~f:(fun instr ->
          match Instruction_requirements.basic instr with
          | Requirements Requires_prologue -> true
