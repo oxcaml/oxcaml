@@ -342,7 +342,7 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
   match desc with
   | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_variant (_, None, _) ->
     id_fold
-  | Tpat_alias (p, _, _, _, _, _)
+  | Tpat_alias (p, _, _, _, _, _, _)
   | Tpat_variant (_, Some p, _)
   | Tpat_lazy p
   | Tpat_exception p -> of_pattern p
@@ -806,9 +806,9 @@ let pattern_paths (type k) { Typedtree.pat_desc; pat_extra; _ } =
     match (pat_desc : k pattern_desc) with
     | Tpat_construct (lid_loc, { Types.cstr_name; cstr_res; _ }, _, _) ->
       fake_path lid_loc cstr_res cstr_name
-    | Tpat_var (id, { Location.loc; txt }, _, _) ->
+    | Tpat_var (id, { Location.loc; txt }, _, _, _) ->
       [ (mkloc (Path.Pident id) loc, Some (Longident.Lident txt)) ]
-    | Tpat_alias (_, id, loc, _, _, _) ->
+    | Tpat_alias (_, id, loc, _, _, _, _) ->
       [ (reloc (Path.Pident id) loc, Some (Longident.Lident loc.txt)) ]
     | _ -> []
   in

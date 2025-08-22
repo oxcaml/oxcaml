@@ -47,6 +47,11 @@ val bigarray_specialize_kind_and_layout :
   Types.type_expr -> Lambda.bigarray_kind * Lambda.bigarray_layout
 
 val value_kind : Env.t -> Types.type_expr -> Lambda.value_kind
+
+val transl_mixed_block_element :
+  Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
+  -> unit Lambda.mixed_block_element
+
 *)
 
 val classify_lazy_argument : Typedtree.expression ->

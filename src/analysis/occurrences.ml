@@ -121,7 +121,7 @@ let uid_and_loc_of_node env node =
     Some (md.md_uid, mb_name.loc)
   | Pattern
       { pat_desc =
-          Tpat_var (_, name, uid, _) | Tpat_alias (_, _, name, uid, _, _);
+          Tpat_var (_, name, uid, _, _) | Tpat_alias (_, _, name, uid, _, _, _);
         _
       } -> Some (uid, name.loc)
   | Type_declaration { typ_type; typ_name; _ } ->

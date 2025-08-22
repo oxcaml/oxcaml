@@ -97,8 +97,8 @@ type out_mode =
 type out_arg_mode = out_mode list
 
 type out_ret_mode =
-  | Orm_not_arrow of out_mode list
-  (** The ret type is not arrow, with modes annotating. *)
+  | Orm_any of out_mode list
+  (** The ret type could be anything, with modes annotating. *)
   | Orm_no_parens
   (** The ret type is arrow, and no need to print parens around the arrow *)
   | Orm_parens of out_mode list
@@ -134,9 +134,8 @@ and out_type =
   | Otyp_abstract
   | Otyp_open
   | Otyp_alias of {non_gen:bool; aliased:out_type; alias:string}
-  | Otyp_arrow of arg_label * out_arg_mode * out_type * out_ret_mode * out_type
-  (* INVARIANT: the [out_ret_mode] is [Orm_not_arrow] unless the RHS [out_type]
-    is [Otyp_arrow] *)
+  | Otyp_arrow of arg_label * out_arg_mode * out_type * out_type
+  (** INVARIANT: the [out_type] for the return must be [Otyp_ret]. *)
   | Otyp_class of out_ident * out_type list
   | Otyp_constr of out_ident * out_type list
   | Otyp_manifest of out_type * out_type
@@ -159,6 +158,8 @@ and out_type =
       (* Currently only introduced with very explicit code in [Printtyp] and not
          synthesized directly from the [Typedtree] *)
   | Otyp_of_kind of out_jkind
+  | Otyp_ret of out_ret_mode * out_type
+  (** INVARIANT: See [out_ret_mode]. *)
 
 and out_constructor = {
   ocstr_name: string;

@@ -94,6 +94,7 @@
         <def>
           pattern (test.ml[2,15+4]..test.ml[2,15+5])
             Tpat_var \"f/284\"
+            sort value
             value_mode meet(local,once,nonportable,yielding,stateful)(modevar#4[global,many,portable,unyielding,stateless .. global,once,nonportable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#5[aliased,contended,immutable .. unique,uncontended,read_write])
           expression (test.ml[2,15+6]..test.ml[6,69+12]) ghost
             Texp_function
@@ -108,6 +109,7 @@
                       Ttyp_constr \"t/281\"
                       []
                   Tpat_var \"x/286\"
+                  sort value
                   value_mode global,many,portable,unyielding,stateless;unique,uncontended,read_write
             ]
             Tfunction_body
@@ -254,6 +256,7 @@
         <def>
           pattern (test2.ml[2,15+4]..test2.ml[2,15+5])
             Tpat_var \"f/284\"
+            sort value
             value_mode meet(local,once,nonportable,yielding,stateful)(modevar#4[global,many,portable,unyielding,stateless .. global,once,nonportable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#5[aliased,contended,immutable .. unique,uncontended,read_write])
           expression (test2.ml[2,15+6]..test2.ml[2,15+24]) ghost
             Texp_function
@@ -561,6 +564,7 @@ make sure we also handle that correctly in structures:
                 Ttyp_constr \"int/1!\"
                 []
             Tpat_var \"foo1/281\"
+            sort value
             value_mode global,many,portable,unyielding,stateless;unique,uncontended,read_write
           expression (test_ct.ml[1,0+17]..test_ct.ml[1,0+18])
             extra
@@ -592,6 +596,7 @@ make sure we also handle that correctly in structures:
                     None
                 ]
             Tpat_var \"foo2/282\"
+            sort value
             value_mode meet(local,once,nonportable,yielding,stateful)(modevar#9[global,many,portable,unyielding,stateless .. global,once,nonportable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#a[aliased,contended,immutable .. unique,uncontended,read_write])
           expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+28])
             extra
@@ -641,6 +646,7 @@ make sure we also handle that correctly in structures:
                     []
                 ]
             Tpat_var \"foo3/283\"
+            sort value
             value_mode global,many,portable,unyielding,stateless;imply(unique,contended,immutable)(modevar#11[aliased,contended,immutable .. unique,uncontended,read_write])
           expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+27])
             extra

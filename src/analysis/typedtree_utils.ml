@@ -25,9 +25,9 @@ let let_bound_vars bindings =
   List.filter_map
     ~f:(fun value_binding ->
       match value_binding.Typedtree.vb_pat.pat_desc with
-      | Tpat_var (id, loc, _, _) -> Some (id, loc)
+      | Tpat_var (id, loc, _, _, _) -> Some (id, loc)
       | Typedtree.Tpat_any
-      | Typedtree.Tpat_alias (_, _, _, _, _, _)
+      | Typedtree.Tpat_alias (_, _, _, _, _, _, _)
       | Typedtree.Tpat_constant _
       | Typedtree.Tpat_tuple _
       | Typedtree.Tpat_unboxed_tuple _
@@ -66,10 +66,10 @@ let location_of_declaration ~uid =
   | Class_type ctd -> Some ctd.ci_id_name
 
 let pat_var_id_and_loc = function
-  | Typedtree.{ pat_desc = Tpat_var (id, loc, _, _); _ } -> Some (id, loc)
+  | Typedtree.{ pat_desc = Tpat_var (id, loc, _, _, _); _ } -> Some (id, loc)
   | _ -> None
 
 let pat_alias_pat_id_and_loc = function
-  | Typedtree.{ pat_desc = Tpat_alias (pat, id, loc, _, _, _); _ } ->
+  | Typedtree.{ pat_desc = Tpat_alias (pat, id, loc, _, _, _, _); _ } ->
     Some (pat, id, loc)
   | _ -> None

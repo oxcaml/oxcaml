@@ -301,7 +301,8 @@ let pat
     match x.pat_desc with
     | Tpat_any
     | Tpat_constant _ -> x.pat_desc
-    | Tpat_var (id, s, uid, m) -> Tpat_var (id, map_loc sub s, uid, m)
+    | Tpat_var (id, s, uid, sort, m) ->
+      Tpat_var (id, map_loc sub s, uid, sort, m)
     | Tpat_tuple l ->
         Tpat_tuple (List.map (fun (label, p) -> label, sub.pat sub p) l)
     | Tpat_unboxed_tuple l ->
@@ -323,8 +324,8 @@ let pat
         Tpat_record_unboxed_product
           (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
     | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
-    | Tpat_alias (p, id, s, uid, m, ty) ->
-        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, m, ty)
+    | Tpat_alias (p, id, s, uid, sort, m, ty) ->
+        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc

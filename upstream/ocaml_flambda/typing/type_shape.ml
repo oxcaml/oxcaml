@@ -128,7 +128,8 @@ module Type_shape = struct
         Shape.Ts_other Layout_to_be_determined
         (* Objects are currently not supported in the debugger. *)
       | Tlink _ | Tsubst _ ->
-        Misc.fatal_error "linking and substitution should not reach this stage."
+        (* CR sspies: silenced error, should be handled properly instead *)
+        Shape.Ts_other Layout_to_be_determined
       | Tvariant rd ->
         let row_fields = Types.row_fields rd in
         let row_fields =
@@ -216,10 +217,8 @@ module Type_decl_shape = struct
             let ly2 = mixed_block_shape_to_layout mix_shape in
             if not (Layout.equal ly ly2)
             then
-              Misc.fatal_errorf
-                "Type_shape: variant constructor with mismatched layout, has \
-                 %a but expected %a"
-                Layout.format ly Layout.format ly2)
+              (* CR sspies: silenced error, should be handled properly instead *)
+              ())
           (Array.to_list shapes) args;
         Array.map mixed_block_shape_to_layout shapes
       | Constructor_uniform_value ->
@@ -230,10 +229,8 @@ module Type_decl_shape = struct
                    (Layout.equal ly (Layout.Base Value)
                    || Layout.equal ly (Layout.Base Void))
               then
-                Misc.fatal_errorf
-                  "Type_shape: variant constructor with mismatched layout, has \
-                   %a but expected value or void."
-                  Layout.format ly
+                (* CR sspies: silenced error, should be handled properly instead *)
+                Layout.Base Value
               else ly)
             args
         in
@@ -338,7 +335,8 @@ module Type_decl_shape = struct
             in
             record_of_labels ~uid_of_path Record_floats lbl_list
           | Record_inlined _ ->
-            Misc.fatal_error "inlined records not allowed here"
+            (* CR sspies: silenced error, should be handled properly instead *)
+            Tds_other
             (* Inline records of this form should not occur as part of type
                declarations. They do not exist for top-level declarations, but
                they do exist temporarily such as inside of a match (e.g., [t] is

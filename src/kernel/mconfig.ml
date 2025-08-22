@@ -626,7 +626,11 @@ let ocaml_ignored_flags =
     "-keep-llvmir";
     "-llvm-path";
     "-ddwarf-types";
-    "-ocamlcfg"
+    "-ocamlcfg";
+    "-cfg-prologue-validate";
+    "-no-cfg-prologue-validate";
+    "-cfg-prologue-shrink-wrap";
+    "-no-cfg-prologue-shrink-wrap"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -705,7 +709,8 @@ let ocaml_ignored_parametrized_flags =
     "-save-ir-before";
     "-shape-format";
     "-gdwarf-compression";
-    "-gdwarf-fission"
+    "-gdwarf-fission";
+    "-cfg-prologue-shrink-wrap-threshold"
   ]
 
 let ocaml_warnings_spec ~error =

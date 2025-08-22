@@ -21,9 +21,10 @@ module Pat = struct
       | None -> str.Asttypes.loc
       | Some loc -> loc
     in
+    let sort = Jkind.Sort.new_var () in
     let mode = Mode.Value.newvar () in
     let pat_desc =
-      Tpat_var (Ident.create_local str.Asttypes.txt, str, uid, mode)
+      Tpat_var (Ident.create_local str.Asttypes.txt, str, uid, sort, mode)
     in
     { pat_desc;
       pat_loc;
