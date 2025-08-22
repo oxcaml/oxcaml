@@ -44,7 +44,7 @@ let class_of_operation (op : Operation.t)
     | Isimd_mem (op,_addr) ->
       Class (of_simd_class (Simd.Mem.class_of_operation op))
     | Icldemote _
-    | Iprefetch _ -> Class Op_other
+    | Iprefetch _ | Illvm_intrinsic _ -> Class Op_other
     end
   | Move | Spill | Reload
   | Floatop _
