@@ -1520,18 +1520,14 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
     Product (transl_mixed_product_shape shapes)
   | Void -> Product [||]
 
-and transl_mixed_product_shape ~get_value_kind shape =
-  Array.mapi
-    (fun i elt -> transl_mixed_block_element elt
-      ~value_kind:(lazy (get_value_kind i)))
-    shape
+and transl_mixed_product_shape shape =
+  Array.map transl_mixed_block_element shape
 
 let transl_module_representation = function
   | Types.Module_value_only { size } -> Module_value_only size
   | Types.Module_mixed { shape; value_count = _ } ->
     Module_mixed
-      ( transl_mixed_product_shape
-        ~get_value_kind:(fun _ -> generic_value) shape,
+      ( transl_mixed_product_shape shape,
         transl_mixed_product_shape_for_read
         ~get_value_kind:(fun _ -> generic_value)
         ~get_mode:(fun _ ->
