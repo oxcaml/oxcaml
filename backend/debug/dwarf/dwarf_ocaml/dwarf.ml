@@ -144,7 +144,9 @@ let format_variable_json (variable : DS.Diagnostics.variable_reduction) =
       Json.field "evaluation_steps" (Json.int variable.evaluation_steps);
       Json.field "dwarf_die_size" (Json.int variable.dwarf_die_size);
       Json.field "cms_files_loaded" (Json.int variable.cms_files_loaded);
-      Json.field "cms_files_cached" (Json.int variable.cms_files_cached) ]
+      Json.field "cms_files_cached" (Json.int variable.cms_files_cached);
+      Json.field "cms_files_missing" (Json.array (List.map Json.string variable.cms_files_missing));
+      Json.field "cms_files_unreadable" (Json.array (List.map Json.string variable.cms_files_unreadable)) ]
 
 let emit_stats_file t =
   let sourcefile = DS.sourcefile t.state in

@@ -47,6 +47,8 @@ module Diagnostics = struct
     mutable computation_unit_lookups: int;
     mutable cms_files_loaded: int;
     mutable cms_files_cached: int;
+    mutable cms_files_missing: string list;
+    mutable cms_files_unreadable: string list;
   }
 
   type t = diagnostics option
@@ -58,6 +60,8 @@ module Diagnostics = struct
     computation_unit_lookups = 0;
     cms_files_loaded = 0;
     cms_files_cached = 0;
+    cms_files_missing = [];
+    cms_files_unreadable = [];
   }
 
   let count_reduction_step d =
@@ -99,6 +103,26 @@ module Diagnostics = struct
     match d with
     | None -> 0
     | Some d -> d.cms_files_cached
+
+  let add_cms_file_missing d filename =
+    match d with
+    | None -> ()
+    | Some d -> d.cms_files_missing <- filename :: d.cms_files_missing
+
+  let cms_files_missing d =
+    match d with
+    | None -> []
+    | Some d -> List.rev d.cms_files_missing
+
+  let add_cms_file_unreadable d filename =
+    match d with
+    | None -> ()
+    | Some d -> d.cms_files_unreadable <- filename :: d.cms_files_unreadable
+
+  let cms_files_unreadable d =
+    match d with
+    | None -> []
+    | Some d -> List.rev d.cms_files_unreadable
 
 end
 

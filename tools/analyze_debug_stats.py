@@ -65,7 +65,8 @@ from io import BytesIO
 class StatEntry:
     def __init__(self, type_name, initial_size_memory, reduced_size_memory, evaluated_size_memory,
                  initial_size, reduced_size, evaluated_size, reduction_steps,
-                 evaluation_steps, dwarf_die_size, cms_files_loaded, cms_files_cached, file_path):
+                 evaluation_steps, dwarf_die_size, cms_files_loaded, cms_files_cached, 
+                 cms_files_missing, cms_files_unreadable, file_path):
         self.type_name = type_name
         self.initial_size_memory = initial_size_memory
         self.reduced_size_memory = reduced_size_memory
@@ -78,6 +79,8 @@ class StatEntry:
         self.dwarf_die_size = dwarf_die_size
         self.cms_files_loaded = cms_files_loaded
         self.cms_files_cached = cms_files_cached
+        self.cms_files_missing = cms_files_missing
+        self.cms_files_unreadable = cms_files_unreadable
         self.file_path = file_path
 
 class FileMeasurement:
@@ -115,6 +118,8 @@ def parse_json_file(file_path):
                     dwarf_die_size=int(var_data['dwarf_die_size']),
                     cms_files_loaded=int(var_data['cms_files_loaded']),
                     cms_files_cached=int(var_data['cms_files_cached']),
+                    cms_files_missing=var_data.get('cms_files_missing', []),
+                    cms_files_unreadable=var_data.get('cms_files_unreadable', []),
                     file_path=file_path
                 )
                 entries.append(entry)
@@ -352,6 +357,8 @@ def analyze_stats(search_dir="."):
     # Parse all files
     all_entries = []
     all_file_metadata = []
+    all_missing_files = set()
+    all_unreadable_files = set()
     file_count = 0
     for json_file in json_files:
         entries, file_metadata = parse_json_file(json_file)
@@ -359,6 +366,10 @@ def analyze_stats(search_dir="."):
             all_entries.extend(entries)
             all_file_metadata.append((json_file, file_metadata))
             file_count += 1
+            # Collect missing/unreadable files from all variables in this file
+            for entry in entries:
+                all_missing_files.update(entry.cms_files_missing)
+                all_unreadable_files.update(entry.cms_files_unreadable)
 
     if not all_entries:
         print("No valid entries found.")
@@ -533,6 +544,26 @@ def analyze_stats(search_dir="."):
             source_filename, stats['count'], stats['total_initial_memory'],
             stats['total_reduced_memory'], stats['total_initial'], stats['total_reduced'],
             stats['total_dwarf_dies'], stats['cms_files_loaded'], stats['cms_files_cached']))
+    
+    # Add missing/unreadable files section at the end
+    if all_missing_files or all_unreadable_files:
+        print()
+        print("## CMS File Issues")
+        print()
+        
+        if all_missing_files:
+            print("### Files Not Found ({:,} total)".format(len(all_missing_files)))
+            print()
+            for missing_file in sorted(all_missing_files):
+                print("- `{}`".format(missing_file))
+            print()
+        
+        if all_unreadable_files:
+            print("### Files Unreadable ({:,} total)".format(len(all_unreadable_files)))
+            print()
+            for unreadable_file in sorted(all_unreadable_files):
+                print("- `{}`".format(unreadable_file))
+            print()
 
 if __name__ == "__main__":
     # Parse command line arguments

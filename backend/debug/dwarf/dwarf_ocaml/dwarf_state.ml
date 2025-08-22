@@ -31,7 +31,9 @@ module Diagnostics = struct
       type_layout : Jkind_types.Sort.Const.t;
       dwarf_die_size : int;
       cms_files_loaded : int;
-      cms_files_cached : int
+      cms_files_cached : int;
+      cms_files_missing : string list;
+      cms_files_unreadable : string list
     }
 
   type t =

@@ -48,6 +48,14 @@ module Diagnostics : sig
 
   val count_cms_file_cached : t -> unit
 
+  val add_cms_file_missing : t -> string -> unit
+
+  val cms_files_missing : t -> string list
+
+  val add_cms_file_unreadable : t -> string -> unit
+
+  val cms_files_unreadable : t -> string list
+
 end
 
 
