@@ -2328,9 +2328,10 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
   | Pctconst const, _ -> (
     match !Clflags.jsir with
     | true ->
-      Misc.fatal_error
-        "Saw [Pctconst] in JSIR mode, but they should've been simplified away \
-         in [Lambda_to_lambda_transforms]"
+      Misc.fatal_errorf
+        "Saw %a in JSIR mode, but it should've been simplified away in \
+         [Lambda_to_lambda_transforms]:@ %a"
+        Printlambda.primitive prim Debuginfo.print_compact dbg
     | false -> (
       match const with
       | Big_endian -> [Simple (Simple.const_bool big_endian)]
@@ -2339,11 +2340,11 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Int_size ->
         [Simple (Simple.const_int (Targetint_31_63.of_int ((8 * size_int) - 1)))]
       | Max_wosize ->
-        let max =
-          Targetint_31_63.of_int
-            ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits))) - 1)
-        in
-        [Simple (Simple.const_int max)]
+        [ Simple
+            (Simple.const_int
+               (Target_ocaml_int.of_int
+                  ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
+                  - 1))) ]
       | Ostype_unix ->
         [Simple (Simple.const_bool (String.equal Sys.os_type "Unix"))]
       | Ostype_win32 ->
