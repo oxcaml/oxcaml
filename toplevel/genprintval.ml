@@ -368,6 +368,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | Ttuple(labeled_tys) ->
               Oval_tuple (tree_of_labeled_val_list 0 depth obj labeled_tys)
           | Tunboxed_tuple(labeled_tys) ->
+              (* CR jrayman for reviewer: here we are passing an unboxed tuple
+                 around as an obj. Is that right? *)
               Oval_unboxed_tuple
                 (tree_of_labeled_val_list 0 depth obj labeled_tys)
           | Tconstr(path, [ty_arg], _)
