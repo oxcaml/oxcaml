@@ -70,7 +70,8 @@ let close_phrase lam repr =
 
 let toplevel_value id =
   let glob, pos = toplevel_value id in
-  (Obj.magic (global_symbol glob)).(pos) (* CR jrayman: wrong *)
+  (Obj.magic (global_symbol glob)).(pos)
+  (* CR layouts v5: this is not correct if the fields have been reordered. *)
 
 (* Return the value referred to by a path *)
 
@@ -130,7 +131,7 @@ let name_expression ~loc ~attrs sort exp =
   let id = Ident.create_local name in
   let vd =
     { val_type = exp.exp_type;
-      val_kind = Val_reg; (* CR jrayman: is this file even compiled? *)
+      val_kind = Val_reg (Jkind.Layout.Sort sort);
       val_loc = loc;
       val_attributes = attrs;
       val_uid = Uid.internal_not_actually_unique;
