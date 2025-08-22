@@ -2326,35 +2326,35 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           block,
           new_ref_value ) ]
   | Pctconst const, _ -> (
-    match const with
-    | Big_endian -> [Simple (Simple.const_bool big_endian)]
-    | Word_size ->
-      [Simple (Simple.const_int (Targetint_31_63.of_int (8 * size_int)))]
-    | Int_size ->
-      let bits =
-        match !Clflags.jsir with
-        | false -> (8 * size_int) - 1
-        | true ->
-          (* Integers are not tagged in JavaScript, so they are 32 bits wide
-             rather than 31 *)
-          8 * size_int
-      in
-      [Simple (Simple.const_int (Targetint_31_63.of_int bits))]
-    | Max_wosize ->
-      [ Simple
-          (Simple.const_int
-             (Targetint_31_63.of_int
-                ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
-                - 1))) ]
-    | Ostype_unix ->
-      [Simple (Simple.const_bool (String.equal Sys.os_type "Unix"))]
-    | Ostype_win32 ->
-      [Simple (Simple.const_bool (String.equal Sys.os_type "Win32"))]
-    | Ostype_cygwin ->
-      [Simple (Simple.const_bool (String.equal Sys.os_type "Cygwin"))]
-    | Backend_type ->
-      [Simple Simple.const_zero] (* constructor 0 is the same as Native here *)
-    | Runtime5 -> [Simple (Simple.const_bool Config.runtime5)])
+    match !Clflags.jsir with
+    | true ->
+      Misc.fatal_errorf
+        "Saw %a in JSIR mode, but it should've been simplified away in \
+         [Lambda_to_lambda_transforms]:@ %a"
+        Printlambda.primitive prim Debuginfo.print_compact dbg
+    | false -> (
+      match const with
+      | Big_endian -> [Simple (Simple.const_bool big_endian)]
+      | Word_size ->
+        [Simple (Simple.const_int (Targetint_31_63.of_int (8 * size_int)))]
+      | Int_size ->
+        [Simple (Simple.const_int (Targetint_31_63.of_int ((8 * size_int) - 1)))]
+      | Max_wosize ->
+        [ Simple
+            (Simple.const_int
+               (Targetint_31_63.of_int
+                  ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
+                  - 1))) ]
+      | Ostype_unix ->
+        [Simple (Simple.const_bool (String.equal Sys.os_type "Unix"))]
+      | Ostype_win32 ->
+        [Simple (Simple.const_bool (String.equal Sys.os_type "Win32"))]
+      | Ostype_cygwin ->
+        [Simple (Simple.const_bool (String.equal Sys.os_type "Cygwin"))]
+      | Backend_type ->
+        [Simple Simple.const_zero]
+        (* constructor 0 is the same as Native here *)
+      | Runtime5 -> [Simple (Simple.const_bool Config.runtime5)]))
   | Pbswap16, [[arg]] ->
     [ tag_int
         (Unary (Int_arith (Naked_immediate, Swap_byte_endianness), untag_int arg))
