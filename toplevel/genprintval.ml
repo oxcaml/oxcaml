@@ -285,27 +285,60 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
       let printer_steps = ref max_steps in
 
-      let is_value _ty =
-        true
-        (* CR jrayman: pass [layout] to [outval_of_value] to figure this out *)
+      let is_value ty =
+        match get_desc ty with
+        | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tvariant _ | Tunivar _
+        | Tpoly _ | Tpackage _ -> true
+        | Tunboxed_tuple _ -> false
+        | Tsubst _ | Tfield _ | Tnil | Tlink _ | Tof_kind _
+          -> true (* error will be thrown later *)
+        | Tconstr (path, _, _)
+               (* CR jrayman: make this a function in predef *)
+          when Path.same path Predef.path_unboxed_float
+            || Path.same path Predef.path_unboxed_float32
+            || Path.same path Predef.path_unboxed_nativeint
+            || Path.same path Predef.path_unboxed_char
+            || Path.same path Predef.path_unboxed_int
+            || Path.same path Predef.path_unboxed_int8
+            || Path.same path Predef.path_unboxed_int16
+            || Path.same path Predef.path_unboxed_int32
+            || Path.same path Predef.path_unboxed_int64
+            || Path.same path Predef.path_unboxed_int8x16
+            || Path.same path Predef.path_unboxed_int16x8
+            || Path.same path Predef.path_unboxed_int32x4
+            || Path.same path Predef.path_unboxed_int64x2
+            || Path.same path Predef.path_unboxed_int8x32
+            || Path.same path Predef.path_unboxed_int16x16
+            || Path.same path Predef.path_unboxed_int32x8
+            || Path.same path Predef.path_unboxed_int64x4
+            || Path.same path Predef.path_unboxed_float32x8
+            || Path.same path Predef.path_unboxed_float64x4
+            || Path.same path Predef.path_unboxed_float32x4
+            || Path.same path Predef.path_unboxed_float64x2
+            || Path.same path Predef.path_unboxed_int8x64
+            || Path.same path Predef.path_unboxed_int16x32
+            || Path.same path Predef.path_unboxed_int32x16
+            || Path.same path Predef.path_unboxed_int64x8
+            || Path.same path Predef.path_unboxed_float32x16
+            || Path.same path Predef.path_unboxed_float64x8
+          -> false
+        | Tconstr (path, _, _) ->
+          begin try
+            let decl = Env.find_type path env in
+            match decl with
+            | { type_kind =
+                  Type_abstract _ | Type_record _ | Type_variant _ | Type_open
+              ; _ } -> true
+            | { type_kind = Type_record_unboxed_product _; _ } -> false
+          with
+            Not_found -> true (* raised by Env.find_type *)
+          end
       in
 
       let nested_values = ObjTbl.create 8 in
-      let nest_gen err abstr f depth obj ty =
+      let nest_gen err f depth obj ty =
         let repr = obj in
-        (* if (match *)
-        (*     Jkind.Layout.to_sort layout *)
-        (*     |> Option.map Jkind.Sort.default_for_transl_and_get *)
-        (*   with *)
-        (*   | Some Jkind.Sort.Const.(Base Value) -> false *)
-        (*   | _ -> true) *)
-        (*   (1* CR jrayman: this is ugly *1) *)
-        (* then *)
-        (*   abstr *)
-        (* else *)
-        if not (is_value ty) then
-          abstr
-        else if not (is_real_block repr) then
+        if not (is_value ty) || not (is_real_block repr) then
           f depth obj ty
         else
           if ObjTbl.mem nested_values repr then
@@ -318,7 +351,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           end
       in
 
-      let nest f = nest_gen (Oval_stuff "<cycle>") (Oval_stuff "<abstr>") f in
+      let nest f = nest_gen (Oval_stuff "<cycle>") f in
 
       let rec tree_of_val depth obj ty =
         decr printer_steps;
@@ -351,9 +384,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                           nest tree_of_val (depth - 1) (O.field obj 0) ty_arg
                         in
                         let next_obj = O.field obj 1 in
-                        nest_gen
-                          (Oval_stuff "<cycle>" :: tree :: tree_list)
-                          (Oval_stuff "<abstr>" :: tree :: tree_list)
+                        nest_gen (Oval_stuff "<cycle>" :: tree :: tree_list)
                           (tree_of_conses (tree :: tree_list))
                           depth next_obj ty_arg
                       else tree_list
@@ -688,7 +719,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   match lbl_list with
                   | [_] ->
                     (* singleton unboxed records are erased *)
-                    tree_of_val (depth - 1) obj ty_arg
+                    nest tree_of_val (depth - 1) obj ty_arg
                   | _ -> nest tree_of_val (depth - 1) (O.field obj pos) ty_arg
               in
               (lid, v) :: tree_of_fields false (pos + 1) remainder
