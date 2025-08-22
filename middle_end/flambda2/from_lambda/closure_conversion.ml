@@ -850,7 +850,7 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
         prim_c_builtin;
         prim_effects;
         prim_coeffects;
-        prim_native_name;
+        prim_native_name = _;
         prim_native_repr_args;
         prim_native_repr_res = _;
         prim_is_layout_poly
