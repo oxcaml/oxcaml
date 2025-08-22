@@ -272,3 +272,57 @@ let () =
                                 g = #{ c = None; d = 'b' } } };
     ignore (Sys.opaque_identity outer)
   )
+
+(* Hiding the product in an [@@unboxed] record *)
+type ('a : value & value) not_a_box_record_1 = { u : 'a } [@@unboxed]
+type ('a : value & value) not_a_box_variant_1 = U of 'a [@@unboxed]
+
+let () =
+  let open struct
+    type outer = { mutable x : #(int * int) not_a_box_record_1;
+                   mutable y : #(int * int) not_a_box_variant_1; }
+  end in
+  test ~expect_caml_modifies:0
+  (fun () ->
+    let outer =
+      { x = { u = #(1, 2) };
+        y = U #(1, 2) }
+    in
+    outer.x <- { u = #(3, 4) };
+    outer.y <- U #(3, 4);
+    ignore (Sys.opaque_identity outer)
+  )
+
+type ('a : value & (value & (value & value) & (value & value)))
+       not_a_box_record_2 = { u : 'a } [@@unboxed]
+type ('a : value & (value & (value & value) & (value & value)))
+       not_a_box_variant_2 = U of 'a [@@unboxed]
+
+let () =
+  let open struct
+    type inner1 = { a : string; b : bool }
+    type inner2 = { c : bool option; d : char }
+    type inner3 = { e : int; f : inner1#; g : inner2# }
+    type inner4 = { h : int; i : inner3# }
+    type outer = { mutable x : inner4# not_a_box_record_2;
+                   mutable y : inner4# not_a_box_variant_2; }
+  end in
+  test ~expect_caml_modifies:4
+  (fun () ->
+    let inner4_1 =
+      #{ h = 1; i = #{ e = 2;
+                       f = #{ a = "a"; b = true };
+                       g = #{ c = Some true; d = 'a' } } }
+    in
+    let inner4_2 =
+      #{ h = 3; i = #{ e = 4;
+                       f = #{ a = "b"; b = false };
+                       g = #{ c = None; d = 'b' } } }
+    in
+    let outer =
+      { x = { u = inner4_1 }; y = U inner4_1 }
+    in
+    outer.x <- { u = inner4_2 };
+    outer.y <- U inner4_2;
+    ignore (Sys.opaque_identity outer)
+  )

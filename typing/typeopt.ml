@@ -756,6 +756,8 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
             Misc.Stdlib.Array.of_list_map (fun {Types.ld_type} -> Some ld_type)
               lbls
           | Type_variant _ | Type_record _ | Type_abstract _ | Type_open ->
+            (* We don't need to handle [@@unboxed] records/variants here,
+               because [scrape_ty] looks though them. *)
             unknown ()
           end
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
