@@ -698,15 +698,12 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       ~effects ~coeffects alloc_mode_app
   in
   let call_symbol =
-    let prim_name =
-      match !Clflags.jsir with
-      | true -> prim_name
-      | false ->
-        if String.equal prim_native_name "" then prim_name else prim_native_name
-    in
-    Symbol.create
-      (Symbol.external_symbols_compilation_unit ())
-      (Linkage_name.of_string prim_name)
+    if String.equal prim_native_name ""
+    then prim_name
+    else
+      prim_native_name Symbol.create
+        (Symbol.external_symbols_compilation_unit ())
+        (Linkage_name.of_string prim_name)
   in
   let call args acc =
     (* Some C primitives have implementations within Flambda itself. *)
@@ -864,6 +861,9 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
     match !Clflags.jsir with
     | false -> prim_desc
     | true ->
+      (* [close_c_call0] checks [prim_native_name] to see whether we should
+         invoke the bytecode name or native name. *)
+      let prim_native_name = "" in
       (* We should override [prim_native_repr_args] and [prim_native_repr_res]
          so that no special transformations happen to the args and result, as
          JavaScript functions won't support them.*)
