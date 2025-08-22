@@ -698,12 +698,12 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       ~effects ~coeffects alloc_mode_app
   in
   let call_symbol =
-    if String.equal prim_native_name ""
-    then prim_name
-    else
-      prim_native_name Symbol.create
-        (Symbol.external_symbols_compilation_unit ())
-        (Linkage_name.of_string prim_name)
+    let prim_name =
+      if String.equal prim_native_name "" then prim_name else prim_native_name
+    in
+    Symbol.create
+      (Symbol.external_symbols_compilation_unit ())
+      (Linkage_name.of_string prim_name)
   in
   let call args acc =
     (* Some C primitives have implementations within Flambda itself. *)
