@@ -3387,15 +3387,11 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
   in
 
   let force_toplevel =
-    (* A couple special cases are needed for the toplevel:
+    (* A special case is needed for the toplevel:
 
        - Expressions bound by '_' still escape in the toplevel, because they may
          be printed even though they are not named, and therefore can't be local
-       - Those expressions and also all [Pstr_eval]s must have types of layout
-         value for the same reason (see the special case in
-         [Opttoploop.execute_phrase]).
     *)
-    (* CR jrayman: above comment *)
     Option.is_some toplevel
   in
 
