@@ -114,12 +114,13 @@ let close_phrase lam repr =
   let open Lambda in
   Ident.Set.fold (fun id l ->
     let glb, pos = toplevel_value id in
+    let layout = Lambda.layout_of_module_field repr pos in
     let glob =
       Lprim (mod_field pos repr,
              [Lprim (Pgetglobal glb, [], Loc_unknown)],
              Loc_unknown)
     in
-    Llet(Strict, Lambda.layout_module_field, id, Lambda.debug_uid_none, glob, l)
+    Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)
   ) (free_variables lam) lam
 
 let toplevel_value id =
