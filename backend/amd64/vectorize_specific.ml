@@ -58,7 +58,7 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
   | Isimd_mem _ ->
     Misc.fatal_errorf
       "Unexpected simd instruction with memory operands before vectorization"
-  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 -> None
+  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Illvm_intrinsic _ -> None
 
 let is_seed_store :
     Arch.specific_operation -> Vectorize_utils.Width_in_bits.t option =
@@ -67,5 +67,5 @@ let is_seed_store :
   | Istore_int _ -> Some W64
   | Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _ | Irdtsc
   | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32 | Isimd _ | Isimd_mem _
-  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 ->
+  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Illvm_intrinsic _ ->
     None

@@ -589,6 +589,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_by_simd_op op
   | Op (Specific (Isimd_mem (op,_))) ->
     destroyed_by_simd_mem_op op
+  | Op (Specific (Illvm_intrinsic _)) ->
+    assert false
   | Op (Move | Spill | Reload
        | Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _

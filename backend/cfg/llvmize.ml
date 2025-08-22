@@ -86,6 +86,10 @@ module Llvm_typ = struct
         { size : int;
           elem_typ : t
         }
+    | Vector of
+        { size : int;
+          elem_typ : t
+        }
 
   let i128 = Int { width_in_bits = 128 }
 
@@ -104,6 +108,8 @@ module Llvm_typ = struct
   let ptr = Ptr
 
   let bool = Int { width_in_bits = 1 }
+
+  let doublex2 = Vector { size = 2; elem_typ = double }
 
   let of_machtyp_component (c : Cmm.machtype_component) =
     match c with
@@ -131,6 +137,7 @@ module Llvm_typ = struct
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ", ") pp_t)
         typs
     | Array { size; elem_typ } -> fprintf ppf "[ %d x %a ]" size pp_t elem_typ
+    | Vector { size; elem_typ } -> fprintf ppf "< %d x %a >" size pp_t elem_typ
 
   let to_string t = Format.asprintf "%a" pp_t t
 
@@ -142,8 +149,10 @@ module Llvm_typ = struct
     | ( Array { size = size1; elem_typ = typ1 },
         Array { size = size2; elem_typ = typ2 } ) ->
       size1 = size2 && equal typ1 typ2
-    | Int _, _ | Float, _ | Double, _ | Ptr, _ | Struct _, _ | Array _, _ ->
-      false
+    | ( Vector { size = size1; elem_typ = typ1 },
+        Vector { size = size2; elem_typ = typ2 } ) ->
+      size1 = size2 && equal typ1 typ2
+    | (Int _ | Float | Double | Ptr | Struct _ | Array _ | Vector _), _ -> false
 end
 
 module Calling_conventions = struct
@@ -577,6 +586,15 @@ module F = struct
       (pp_print_list ~pp_sep:pp_comma pp_print_int)
       idxs
 
+  let ins_extractelement t ~src ~dst ~src_typ ~idx_typ ~idx =
+    ins t "%a = extractelement %a %a, %a %a" pp_ident dst Llvm_typ.pp_t src_typ
+      Llvm_value.pp_t src Llvm_typ.pp_t idx_typ Llvm_value.pp_t idx
+
+  let ins_insertelement t ~src ~dst ~res ~src_typ ~dst_typ ~idx_typ ~idx =
+    ins t "%a = insertelement %a %a, %a %a, %a %a" pp_ident res Llvm_typ.pp_t
+      dst_typ Llvm_value.pp_t dst Llvm_typ.pp_t src_typ Llvm_value.pp_t src
+      Llvm_typ.pp_t idx_typ Llvm_value.pp_t idx
+
   (* Auxiliary function to passing non-local-identifier arguments (like poison
      or global idents). *)
   let ins_call_custom_arg ~attrs ~tail ~cc ~pp_name t name args res =
@@ -634,7 +652,7 @@ module F = struct
           List.fold_lefti
             (fun idx cur_struct typ -> aux (idxs @ [idx]) cur_struct typ)
             cur_struct typs
-        | Int _ | Ptr | Float | Double | Array _ ->
+        | Int _ | Ptr | Float | Double | Array _ | Vector _ ->
           Misc.fatal_error "Llvmize.assemble_struct: unfilled struct slot")
     in
     aux [] (make_poison t root_typ) root_typ
@@ -753,8 +771,8 @@ module F = struct
   (* Returns an i1 for whether [op] holds given the arguments of [i] *)
   let test t (op : Operation.test) (i : 'a Cfg.instruction) =
     match op with
-    | Itruetest -> int_comp t (Iunsigned Cne) i ~imm:(Some 0)
-    | Ifalsetest -> int_comp t (Iunsigned Ceq) i ~imm:(Some 0)
+    | Itruetest -> int_comp t Cne i ~imm:(Some 0)
+    | Ifalsetest -> int_comp t Ceq i ~imm:(Some 0)
     | Iinttest int_comp_op -> int_comp t int_comp_op i ~imm:None
     | Iinttest_imm (int_comp_op, imm) ->
       int_comp t int_comp_op i ~imm:(Some imm)
@@ -1272,6 +1290,55 @@ module F = struct
         (Some (typ, bswapped));
       let zexted = do_zext bswapped in
       ins_store_into_reg t zexted i.res.(0)
+    | Illvm_intrinsic func_symbol -> (
+      let do_conv ident ~(src : Llvm_typ.t) ~(dst : Llvm_typ.t) =
+        match[@warning "-fragile-match"] src, dst with
+        | _ when Llvm_typ.equal src dst -> ident
+        | Double, Vector { size = _; elem_typ = Double } ->
+          let poison = make_poison t dst in
+          let res = fresh_ident t in
+          ins_insertelement t ~src:(Local_ident ident) ~dst:(Local_ident poison)
+            ~src_typ:src ~dst_typ:dst ~res ~idx:(Immediate "0")
+            ~idx_typ:Llvm_typ.i64;
+          res
+        | Vector { size = _; elem_typ = Double }, Double ->
+          let res = fresh_ident t in
+          ins_extractelement t ~src:(Local_ident ident) ~dst:res ~src_typ:src
+            ~idx:(Immediate "0") ~idx_typ:Llvm_typ.i64;
+          res
+        | _ -> Misc.fatal_error "Llvmize: unexpected reg types in intrinsic"
+      in
+      let do_intrinsic_call name arg_typs res_typ =
+        let args =
+          Array.to_list i.arg
+          |> List.map2
+               (fun arg_typ reg ->
+                 let reg_typ = Llvm_typ.of_machtyp_component reg.Reg.typ in
+                 ( arg_typ,
+                   do_conv (load_reg_to_temp t reg) ~src:reg_typ ~dst:arg_typ ))
+               arg_typs
+        in
+        let res_ident = fresh_ident t in
+        let res = Some (res_typ, res_ident) in
+        add_called_fun t name ~cc:Default ~args:(List.map fst args)
+          ~res:(Option.map fst res);
+        ins_call ~cc:Default ~pp_name:pp_global t name args res;
+        let conved_res =
+          do_conv res_ident ~src:res_typ
+            ~dst:(Llvm_typ.of_machtyp_component i.res.(0).typ)
+        in
+        ins_store_into_reg t conved_res i.res.(0)
+      in
+      match func_symbol with
+      | "caml_sse2_float64_min" ->
+        do_intrinsic_call "llvm.x86.sse2.min.sd"
+          [Llvm_typ.doublex2; Llvm_typ.doublex2]
+          Llvm_typ.doublex2
+      | "caml_sse2_float64_max" ->
+        do_intrinsic_call "llvm.x86.sse2.max.sd"
+          [Llvm_typ.doublex2; Llvm_typ.doublex2]
+          Llvm_typ.doublex2
+      | _ -> not_implemented_basic ~msg:"specific intrinsic" i)
     | _ -> not_implemented_basic ~msg:"specific" i
 
   let atomic t (i : Cfg.basic Cfg.instruction) (op : Cmm.atomic_op) ~size ~addr

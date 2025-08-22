@@ -2246,6 +2246,7 @@ let emit_instr ~first ~fallthrough i =
       ~dependencies:[| res i 0 |]
       ~instr:i ~address Onetwentyeight_unaligned Store_modify;
     emit_simd_instr_with_memory_arg op i address
+  | Lop (Specific (Illvm_intrinsic _)) -> assert false
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
   | Lop (Specific (Icldemote addr)) ->
