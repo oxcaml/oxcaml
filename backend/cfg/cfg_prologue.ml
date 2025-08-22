@@ -104,6 +104,8 @@ module Instruction_requirements = struct
 end
 
 let prologue_needed_block (block : Cfg.basic_block) ~fun_name =
+  (* CR-soon cfalas: Move to [Proc] so that it's arch-dependent and
+     frame_pointers only affects the output for amd64. *)
   Config.with_frame_pointers || block.is_trap_handler
   || DLL.exists block.Cfg.body ~f:(fun instr ->
          match Instruction_requirements.basic instr with
