@@ -90,7 +90,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
         pattern (test_locations.ml[17,534+8]..test_locations.ml[17,534+11])
           Tpat_var "fib"
           sort value
-          value_mode global,many,portable,unyielding,stateful;imply(unique,uncontended,read_write)(modevar#3[aliased,contended,immutable .. unique,uncontended,read_write])
+          value_mode global,many,portable,unyielding,stateful;imply(unique,uncontended,read_write)(modevar#3[aliased,contended,immutable .. unique,uncontended,read_write]) (_none_[0,0+-1].._none_[0,0+-1]) ghost
         expression (test_locations.ml[17,534+14]..test_locations.ml[19,572+34])
           Texp_function
           alloc_mode global,many,portable,unyielding,stateful;id(modevar#9[aliased,contended,immutable .. unique,uncontended,read_write])
@@ -112,7 +112,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                 pattern (test_locations.ml[19,572+4]..test_locations.ml[19,572+5])
                   Tpat_var "n"
                   sort value
-                  value_mode global,many,portable,unyielding,stateless;unique,uncontended,read_write
+                  value_mode global,many,portable,unyielding,stateless;unique,uncontended,read_write (_none_[0,0+-1].._none_[0,0+-1]) ghost
                 expression (test_locations.ml[19,572+9]..test_locations.ml[19,572+34])
                   Texp_apply
                   apply_mode Tail

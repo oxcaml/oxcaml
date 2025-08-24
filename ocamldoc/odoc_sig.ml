@@ -495,7 +495,8 @@ module Analyser =
       let record comments
           { Typedtree.ld_id; ld_mutable; ld_type; ld_loc; ld_attributes } =
         get_field env comments @@
-        {Types.ld_id; ld_mutable; ld_modalities = Mode.Modality.Value.Const.id;
+        {Types.ld_id; ld_mutable;
+         ld_modalities = Location.mknoloc Mode.Modality.Value.Const.id;
          ld_sort=Jkind.Sort.Const.void (* ignored *);
          ld_type=ld_type.Typedtree.ctyp_type;
          ld_loc; ld_attributes; ld_uid=Types.Uid.internal_not_actually_unique} in

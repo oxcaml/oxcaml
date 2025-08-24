@@ -568,7 +568,7 @@ let remove_mode_and_jkind_variables ty =
       match get_desc ty with
       | Tvar { jkind } -> Jkind.default_to_value jkind
       | Tunivar { jkind } -> Jkind.default_to_value jkind
-      | Tarrow ((_,marg,mret),targ,tret,_) ->
+      | Tarrow ((_, {txt = marg; _}, {txt = mret; _}),targ,tret,_) ->
          let _ = Alloc.zap_to_legacy marg in
          let _ = Alloc.zap_to_legacy mret in
          go targ; go tret
@@ -1736,7 +1736,8 @@ let curry_mode alloc arg : Alloc.Const.t =
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
-  | l :: locals, Tarrow ((lbl,marg,mret),arg,ret,commu) ->
+  | l :: locals, Tarrow ((lbl, {txt = marg; loc = marg_loc}, 
+                               {txt = mret; loc = mret_loc}),arg,ret,commu) ->
      let marg = with_locality_and_yielding
       (prim_mode' (Some (mvar_l, mvar_y)) l) marg
      in
@@ -1755,7 +1756,9 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
           mret'
      in
      let ret = instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ret in
-     newty2 ~level:(get_level ty) (Tarrow ((lbl,marg,mret),arg,ret, commu))
+     newty2 ~level:(get_level ty)
+       (Tarrow ((lbl, {txt = marg; loc = marg_loc}, 
+                      {txt = mret; loc = mret_loc}),arg,ret, commu))
   | _ :: _, _ -> assert false
   | [], _ ->
      ty
@@ -2204,7 +2207,7 @@ let unbox_once env ty =
           Stepped_record_unboxed_product
             (List.map (fun ld -> { ty = apply ld.ld_type;
                                    is_open = false;
-                                   modality = ld.ld_modalities }) lbls)
+                                   modality = ld.ld_modalities.txt }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
         | Type_variant ([_; cd2], Variant_with_null, _) ->
@@ -2214,7 +2217,7 @@ let unbox_once env ty =
                when we let users define custom or-null-like types. *)
             Stepped_or_null { ty = apply arg.ca_type;
                               is_open = false;
-                              modality = arg.ca_modalities }
+                              modality = arg.ca_modalities.txt }
           | _ -> Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
@@ -4013,8 +4016,8 @@ and unify3 uenv t1 t1' t2 t2' =
              (l1 = l2 ||
               (!Clflags.classic || in_pattern_mode uenv) &&
                equivalent_with_nolabels l1 l2) ->
-          unify_alloc_mode_for Unify a1 a2;
-          unify_alloc_mode_for Unify r1 r2;
+          unify_alloc_mode_for Unify a1.txt a2.txt;
+          unify_alloc_mode_for Unify r1.txt r2.txt;
           unify  uenv t1 t2; unify uenv  u1 u2;
           begin match is_commu_ok c1, is_commu_ok c2 with
           | false, true -> set_commu_ok c1
@@ -4586,7 +4589,9 @@ let filter_arrow env t l ~force_tpoly =
     let arg_mode = Alloc.newvar () in
     let ret_mode = Alloc.newvar () in
     let t' =
-      newty2 ~level (Tarrow ((l, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok))
+      newty2 ~level (Tarrow ((l, Location.mknoloc arg_mode, 
+                                 Location.mknoloc ret_mode), 
+                             ty_arg, ty_ret, commu_ok))
     in
     t', { ty_arg; arg_mode; ty_ret; ret_mode }
   in
@@ -4618,7 +4623,7 @@ let filter_arrow env t l ~force_tpoly =
       if l = l' || !Clflags.classic && l = Nolabel &&
         equivalent_with_nolabels l l'
       then
-        { ty_arg; arg_mode; ty_ret; ret_mode }
+        { ty_arg; arg_mode = arg_mode.txt; ty_ret; ret_mode = ret_mode.txt }
       else raise (Filter_arrow_failed
                     (Label_mismatch
                        { got = l; expected = l'; expected_type = t }))
@@ -5237,8 +5242,9 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                  [typing-modes/crossing.ml]. *)
               (* CR zqian: should use the meet of [t1] and [t2] for mode
               crossing. Similar for [u1] and [u2]. *)
-              moregen_alloc_mode env t2 ~is_ret:false (neg_variance variance) a1 a2;
-              moregen_alloc_mode env u2 ~is_ret:true variance r1 r2
+              moregen_alloc_mode env t2 ~is_ret:false (neg_variance variance) 
+                a1.txt a2.txt;
+              moregen_alloc_mode env u2 ~is_ret:true variance r1.txt r2.txt
           | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
               moregen_labeled_list inst_nongen variance type_pairs env
                 labeled_tl1 labeled_tl2
@@ -5698,8 +5704,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
                 || !Clflags.classic && equivalent_with_nolabels l1 l2) ->
               eqtype rename type_pairs subst env t1 t2 ~do_jkind_check:true;
               eqtype rename type_pairs subst env u1 u2 ~do_jkind_check:true;
-              eqtype_alloc_mode a1 a2;
-              eqtype_alloc_mode r1 r2
+              eqtype_alloc_mode a1.txt a2.txt;
+              eqtype_alloc_mode r1.txt r2.txt
           | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
               eqtype_labeled_list rename type_pairs subst env labeled_tl1
                 labeled_tl2
@@ -6293,20 +6299,22 @@ let rec build_subtype env (visited : transient_expr list)
           let t1 = if posi then t1 else t1' in
           let posi_arg = not posi in
           if posi_arg then begin
-            let a = cross_right_alloc env t1 a in
+            let a = cross_right_alloc env t1 a.txt in
             build_submode_pos a
           end else begin
-            let a = cross_left_alloc env t1 a in
+            let a = cross_left_alloc env t1 a.txt in
             build_submode_neg a
           end
-        end else a, Unchanged
+        end else a.txt, Unchanged
       in
       let (r', c4) =
-        if level > 2 then build_submode posi r else r, Unchanged
+        if level > 2 then build_submode posi r.txt else r.txt, Unchanged
       in
       let c = max_change c1 (max_change c2 (max_change c3 c4)) in
       if c > Unchanged
-      then (newty (Tarrow((l,a',r'), t1', t2', commu_ok)), c)
+      then (newty (Tarrow((l, {txt = a'; loc = a.loc}, 
+                             {txt = r'; loc = r.loc}), 
+                          t1', t2', commu_ok)), c)
       else (t, Unchanged)
   | Ttuple labeled_tlist ->
       build_subtype_tuple env visited loops posi level t labeled_tlist
@@ -6525,11 +6533,11 @@ let rec subtype_rec env trace t1 t2 cstrs =
             t2 t1
             cstrs
         in
-        let a2 = cross_left_alloc env t2 a2 in
-         subtype_alloc_mode env trace a2 a1;
+        let a2 = cross_left_alloc env t2 a2.txt in
+         subtype_alloc_mode env trace a2 a1.txt;
         (* RHS mode of arrow types indicates allocation in the parent region
            and is not subject to mode crossing *)
-        subtype_alloc_mode env trace r1 r2;
+        subtype_alloc_mode env trace r1.txt r2.txt;
         subtype_rec
           env
           (Subtype.Diff {got = u1; expected = u2} :: trace)
@@ -7366,7 +7374,7 @@ let check_decl_jkind env decl jkind =
               Cstr_record [{ ld_type = inner_ty;
                              ld_modalities = modality }]) }],
         Variant_unboxed, None), _ ->
-      Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
+      Jkind.for_abbreviation ~type_jkind_purely ~modality:modality.txt inner_ty
     | _ -> decl.type_jkind
   in
   match Jkind.sub_jkind_l ~type_equal ~context decl_jkind jkind with
@@ -7420,7 +7428,7 @@ let exn_constructor_crossing env lid ~args locks =
   let mode_crossing =
     List.map (
       fun ({ca_type; ca_modalities; _} : Types.constructor_argument) ->
-        crossing_of_ty env ~modalities:ca_modalities ca_type
+        crossing_of_ty env ~modalities:ca_modalities.txt ca_type
     ) args
     |> List.fold_left Mode.Crossing.join Mode.Crossing.min
   in

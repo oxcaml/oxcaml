@@ -1017,7 +1017,8 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
-let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
+let apply_mode_annots ~loc ~env ({ txt = m; _ } : Alloc.Const.Option.t loc) 
+    mode =
   let error axis =
     raise (Error(loc, env, Param_mode_mismatch axis))
   in
@@ -1053,7 +1054,7 @@ let mutvar_mode ~loc ~env m0 exp_mode =
   let modalities = Typemode.let_mutable_modalities in
   submode ~loc ~env exp_mode (mode_modality modalities mode);
   check_construct_mutability ~loc ~env
-    (Mutable { mode = m0; atomic = Nonatomic}) ~modalities mode;
+    (Mutable { mode = m0; atomic = Nonatomic }) ~modalities mode;
   m |> Value.disallow_right
 
 (** The [expected_mode] of the record when projecting a mutable field. *)
@@ -1307,7 +1308,8 @@ let add_pattern_variables ?check ?check_as env pv =
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
          {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
-          val_attributes = pv_attributes; val_modalities = Modality.Value.id;
+          val_attributes = pv_attributes;
+          val_modalities = Location.mknoloc Modality.Value.id;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
          } env
@@ -1344,7 +1346,7 @@ let add_module_variables env module_variables =
       in
       let md =
         { md_type = modl.mod_type; md_attributes = [];
-          md_modalities = Mode.Modality.Value.id;
+          md_modalities = Location.mkloc Mode.Modality.Value.id mv_name.loc;
           md_loc = mv_name.loc;
           md_uid = mv_uid; }
       in
@@ -2749,7 +2751,9 @@ and type_pat_aux
       Typemode.transl_modalities ~maturity:Stable mutability []
     in
     check_project_mutability ~loc ~env:!!penv mutability alloc_mode.mode;
-    let alloc_mode = Modality.Value.Const.apply modalities alloc_mode.mode in
+    let alloc_mode =
+      Modality.Value.Const.apply modalities.txt alloc_mode.mode
+    in
     let alloc_mode = simple_pat_mode alloc_mode in
     let pl =
       List.map (fun p -> type_pat ~alloc_mode tps Value p ty_elt arg_sort) spl
@@ -2867,7 +2871,7 @@ and type_pat_aux
             record_ty record_form in
         check_project_mutability ~loc ~env:!!penv label.lbl_mut alloc_mode.mode;
         let mode =
-          Modality.Value.Const.apply label.lbl_modalities alloc_mode.mode
+          Modality.Value.Const.apply label.lbl_modalities.txt alloc_mode.mode
         in
         let alloc_mode = simple_pat_mode mode in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg
@@ -2943,7 +2947,7 @@ and type_pat_aux
         enter_variable tps loc name mode ~kind ty sp.ppat_attributes sort
       in
       rvp {
-        pat_desc = Tpat_var (id, name, uid, sort, alloc_mode);
+        pat_desc = Tpat_var (id, name, uid, sort, Location.mknoloc alloc_mode);
         pat_loc = loc; pat_extra=[];
         pat_type = ty;
         pat_attributes = sp.ppat_attributes;
@@ -2972,7 +2976,7 @@ and type_pat_aux
             ~kind:Val_reg sp.ppat_attributes sort
           in
           rvp {
-            pat_desc = Tpat_var (id, v, uid, sort, alloc_mode.mode);
+            pat_desc = Tpat_var (id, v, uid, sort, Location.mknoloc alloc_mode.mode);
             pat_loc = sp.ppat_loc;
             pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
             pat_type = t;
@@ -2988,7 +2992,8 @@ and type_pat_aux
         enter_variable ~is_as_variable:true ~kind:Val_reg tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
-      rvp { pat_desc = Tpat_alias(q, id, name, uid, sort, mode, ty_var);
+      rvp { pat_desc = Tpat_alias(q, id, name, uid, sort, 
+                                      { txt = mode; loc }, ty_var);
             pat_loc = loc; pat_extra=[];
             pat_type = q.pat_type;
             pat_attributes = sp.ppat_attributes;
@@ -3125,7 +3130,7 @@ and type_pat_aux
         List.map2
           (fun p (arg : Types.constructor_argument) ->
              let alloc_mode =
-              Modality.Value.Const.apply arg.ca_modalities alloc_mode.mode
+              Modality.Value.Const.apply arg.ca_modalities.txt alloc_mode.mode
              in
              let alloc_mode =
               Mode.Value.join [ alloc_mode; constructor_mode ]
@@ -3254,7 +3259,7 @@ and type_pat_aux
       begin match sty with
       | Some sty ->
         let cty, ty, expected_ty' =
-          let type_modes = Typemode.transl_alloc_mode ms in
+          let { txt = type_modes; _ } = Typemode.transl_alloc_mode ms in
           solve_Ppat_constraint tps loc !!penv type_modes sty expected_ty
         in
         let p =
@@ -3385,7 +3390,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_kind = Val_reg
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
-            ; val_modalities = Modality.Value.id
+            ; val_modalities = Location.mknoloc Modality.Value.id
             ; val_loc = pv_loc
             ; val_uid = pv_uid
             }
@@ -3397,7 +3402,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_kind = Val_ivar (Immutable, cl_num)
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
-            ; val_modalities = Modality.Value.id
+            ; val_modalities = Location.mknoloc Modality.Value.id
             ; val_loc = pv_loc
             ; val_uid = pv_uid
             }
@@ -3946,7 +3951,8 @@ let remaining_function_type ty_ret mode_ret rev_args =
          | Arg (Eliminated_optional_arg
                   { mode_fun; ty_arg; mode_arg; level; _ })
          | Omitted { mode_fun; ty_arg; mode_arg; level } ->
-             let arrow_desc = lbl, mode_arg, mode_ret in
+             let arrow_desc = lbl, Location.mknoloc mode_arg, 
+                              Location.mknoloc mode_ret in
              let ty_ret =
                newty2 ~level
                  (Tarrow (arrow_desc, ty_arg, ty_ret, commu_ok))
@@ -4112,7 +4118,8 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
                   Warnings.Ignored_extra_argument;
               let mode_arg = Alloc.newvar () in
               let mode_ret = Alloc.newvar () in
-              let kind = (lbl, mode_arg, mode_ret) in
+              let kind = (lbl, Location.mknoloc mode_arg, 
+                          Location.mknoloc mode_ret) in
               begin try
                 unify env ty_fun
                   (newty (Tarrow(kind,ty_arg,ty_res,commu_var ())));
@@ -4139,7 +4146,8 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
               | Error err -> raise(Error(funct.exp_loc, env,
                                          Function_type_not_rep (ty_arg,err)))
             in
-            (sort_arg, mode_arg, tpoly_get_mono ty_arg, mode_ret, ty_res)
+            (sort_arg, mode_arg.txt, tpoly_get_mono ty_arg, 
+             mode_ret.txt, ty_res)
         | td ->
             let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
             let ty_res = remaining_function_type ty_fun mode_fun rev_args in
@@ -4196,7 +4204,9 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
       (_, sarg1) :: _
       when is_commu_ok com ->
         let lv = get_level ty_fun' in
-        let (l, mode_arg, mode_ret) = ad in
+        let (l, mode_arg_loc, mode_ret_loc) = ad in
+        let mode_arg = mode_arg_loc.txt in
+        let mode_ret = mode_ret_loc.txt in
         let may_warn loc w =
           if not !warned && !Clflags.principal && lv <> generic_level
           then begin
@@ -4301,7 +4311,8 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
              let args = (lbl, Arg (exp, sort)) :: args in
              (ty_ret, mode_ret, open_args, closed_args, args)
          | Omitted { mode_fun; ty_arg; mode_arg; level; sort_arg } ->
-             let arrow_desc = (lbl, mode_arg, mode_ret) in
+             let arrow_desc = (lbl, Location.mknoloc mode_arg, 
+                               Location.mknoloc mode_ret) in
              let sort_ret =
                match type_sort ~why:Function_result ~fixed:false env ty_ret with
                | Ok sort -> sort
@@ -4596,7 +4607,8 @@ let rec approx_type env sty =
       (* CR layouts v5: value requirement here to be relaxed *)
       if is_optional p then newvar Predef.option_argument_jkind
       else begin
-        let arg_mode = Typemode.transl_alloc_mode arg_mode in
+        let { txt = arg_mode; loc = arg_mode_loc } = 
+          Typemode.transl_alloc_mode arg_mode in
         let arg_ty =
           (* Polymorphic types will only unify with types that match all of their
            polymorphic parts, so we need to fully translate the type here
@@ -4606,10 +4618,13 @@ let rec approx_type env sty =
         let ret = approx_type env sty in
         let marg = Alloc.of_const arg_mode in
         let mret = Alloc.newvar () in
-        newty (Tarrow ((p,marg,mret), arg_ty.ctyp_type, ret, commu_ok))
+        newty (Tarrow ((p, { txt = marg; loc = arg_mode_loc }, 
+                           Location.mknoloc mret), 
+                       arg_ty.ctyp_type, ret, commu_ok))
       end
   | Ptyp_arrow (p, arg_sty, sty, arg_mode, _) ->
-      let arg_mode = Typemode.transl_alloc_mode arg_mode in
+      let { txt = arg_mode; loc = arg_mode_loc } = 
+        Typemode.transl_alloc_mode arg_mode in
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
         if is_optional p
@@ -4619,7 +4634,9 @@ let rec approx_type env sty =
       let ret = approx_type env sty in
       let marg = Alloc.of_const arg_mode in
       let mret = Alloc.newvar () in
-      newty (Tarrow ((p,marg,mret), newmono arg, ret, commu_ok))
+      newty (Tarrow ((p, { txt = marg; loc = arg_mode_loc }, 
+                         Location.mknoloc mret), 
+                     newmono arg, ret, commu_ok))
   | Ptyp_tuple args ->
       newty (Ttuple (List.map (fun (label, t) -> label, approx_type env t) args))
   | Ptyp_constr (lid, ctl) ->
@@ -4638,7 +4655,8 @@ let type_pattern_approx env spat ty_expected =
       let inferred_ty =
         match sty with
         | {ptyp_desc=Ptyp_poly _} ->
-          let arg_type_mode = Typemode.transl_alloc_mode arg_type_mode in
+          let { txt = arg_type_mode; _ } = 
+            Typemode.transl_alloc_mode arg_type_mode in
           let inferred_ty =
             Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false
               arg_type_mode sty
@@ -5465,7 +5483,7 @@ type type_function_result =
 
 and type_function_ret_info =
   { (* The mode the function returns at. *)
-    ret_mode: Mode.Alloc.l;
+    ret_mode: Mode.Alloc.l loc;
     (* The sort returned by the function. *)
     ret_sort: Jkind.sort;
   }
@@ -5759,15 +5777,19 @@ and type_expect_
       in
       let type_label_exp overwrite ((_, label, _) as x) =
         check_construct_mutability ~loc ~env label.lbl_mut ~ty:label.lbl_arg
-          ~modalities:label.lbl_modalities record_mode;
-        let argument_mode = mode_modality label.lbl_modalities record_mode in
+          ~modalities:label.lbl_modalities.txt record_mode;
+        let argument_mode =
+          mode_modality label.lbl_modalities.txt record_mode
+        in
         type_label_exp ~overwrite true env argument_mode loc ty_record x record_form
       in
       let overwrites =
         assign_label_children (List.length lbl_a_list)
           (fun _loc ty mode -> (* only change mode here, see type_label_exp *)
              List.map (fun (_, label, _) ->
-               let mode = Modality.Value.Const.apply label.lbl_modalities mode in
+               let mode =
+                Modality.Value.Const.apply label.lbl_modalities.txt mode
+               in
                Overwrite_label(ty, mode))
                lbl_a_list)
           overwrite
@@ -5805,11 +5827,13 @@ and type_expect_
               with_explanation (fun () ->
                 unify_exp_types record_loc env (instance ty_expected) ty_res2);
               check_project_mutability ~loc:extended_expr_loc ~env lbl.lbl_mut mode;
-              let mode = Modality.Value.Const.apply lbl.lbl_modalities mode in
+              let mode =
+                Modality.Value.Const.apply lbl.lbl_modalities.txt mode
+              in
               check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
-                ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode;
+                ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities.txt record_mode;
               let argument_mode =
-                mode_modality lbl.lbl_modalities record_mode
+                mode_modality lbl.lbl_modalities.txt record_mode
               in
               submode ~loc:extended_expr_loc ~env mode argument_mode;
               Kept (ty_arg1, lbl.lbl_mut,
@@ -6363,7 +6387,7 @@ and type_expect_
         end ~post:generalize_structure
       in
       check_project_mutability ~loc:record.exp_loc ~env label.lbl_mut rmode;
-      let mode = Modality.Value.Const.apply label.lbl_modalities rmode in
+      let mode = Modality.Value.Const.apply label.lbl_modalities.txt rmode in
       let boxing : texp_field_boxing =
         let is_float_boxing =
           match label.lbl_repres with
@@ -6419,7 +6443,7 @@ and type_expect_
       if Types.is_mutable label.lbl_mut then
         fatal_error
           "Typecore.type_expect_: unboxed record labels are never mutable";
-      let mode = Modality.Value.Const.apply label.lbl_modalities rmode in
+      let mode = Modality.Value.Const.apply label.lbl_modalities.txt rmode in
       let mode = cross_left env ty_arg mode in
       submode ~loc ~env mode expected_mode;
       let uu = unique_use ~loc ~env mode (as_single_mode expected_mode) in
@@ -6443,7 +6467,7 @@ and type_expect_
           ignore atomic;  (* CR aspsmith: TODO *)
           submode ~loc:record.exp_loc ~env rmode mode_mutate_mutable;
           let mode = mutable_mode m0 |> mode_default in
-          let mode = mode_modality label.lbl_modalities mode in
+          let mode = mode_modality label.lbl_modalities.txt mode in
           type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
             (lid, label, snewval) Legacy
         | Immutable ->
@@ -6668,7 +6692,8 @@ and type_expect_
       let modes = Typemode.transl_mode_annots modes in
       let (ty, extra_cty) =
         let alloc_mode =
-          Mode.Alloc.Const.Option.value modes ~default:Mode.Alloc.Const.legacy
+          Mode.Alloc.Const.Option.value modes.txt 
+            ~default:Mode.Alloc.Const.legacy
         in
         type_constraint env sty alloc_mode
       in
@@ -6847,7 +6872,7 @@ and type_expect_
               let md_shape = Shape.set_uid_if_none md_shape md_uid in
               let md =
                 { md_type = modl.mod_type; md_attributes = [];
-                  md_modalities = Modality.Value.id;
+                  md_modalities = Location.mknoloc Modality.Value.id;
                   md_loc = name.loc;
                   md_uid; }
               in
@@ -7072,7 +7097,8 @@ and type_expect_
             loop slet.pbop_pat (newvar initial_jkind) initial_sort sands
           in
           let ty_func_result, body_sort = new_rep_var ~why:Function_result () in
-          let arrow_desc = Nolabel, Alloc.legacy, Alloc.legacy in
+          let arrow_desc = Nolabel, Location.mknoloc Alloc.legacy, 
+                           Location.mknoloc Alloc.legacy in
           let ty_func =
             newty (Tarrow(arrow_desc, newmono ty_params, ty_func_result,
                           commu_ok))
@@ -7217,7 +7243,7 @@ and type_expect_
           let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
           unify_exp env record ty_res;
           let alloc_mode, argument_mode = register_allocation expected_mode in
-          begin match Mode.Modality.Value.Const.equate label.lbl_modalities
+          begin match Mode.Modality.Value.Const.equate label.lbl_modalities.txt
                         (Typemode.atomic_mutable_modalities)
           with
           | Ok () -> ()
@@ -7423,7 +7449,7 @@ and type_block_access env expected_base_ty principal
       | Private ->
         raise (Error (lid.loc, env, Block_access_private_record))
     in
-    let modality = label.lbl_modalities in
+    let modality = label.lbl_modalities.txt in
     { ba; base_ty = ty_res; el_ty = ty_arg; flat_float; modality }
   | Baccess_array (mut, index_kind, index) ->
     let elt_jkind, elt_sort =
@@ -7492,7 +7518,7 @@ and type_unboxed_access env loc el_ty ua =
         let err = Invalid_unboxed_access { prev_el_type = el_ty; ua } in
         raise (Error (lid.loc, env, err))
     end;
-    (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label)
+    (ty_arg, label.lbl_modalities.txt), Uaccess_unboxed_field (lid, label)
 
 and expression_constraint pexp =
   { type_without_constraint = (fun env expected_mode ->
@@ -7613,9 +7639,12 @@ and type_constraint env sty type_mode =
     @param loc_arg the location of the thing being constrained
 *)
 and type_constraint_expect
-  : type a. a constraint_arg -> _ -> _ -> _ -> loc_arg:_ -> _ -> _ -> _ -> a * _ * _
+  : type a. a constraint_arg -> _ -> _ -> _ -> loc_arg:_ -> 
+    Alloc.Const.Option.t loc -> _ -> _ -> a * _ * _
   =
-  fun constraint_arg env expected_mode loc ~loc_arg type_mode constraint_ ty_expected ->
+  fun constraint_arg env expected_mode loc ~loc_arg 
+      ({ txt = type_mode; _ } : Alloc.Const.Option.t loc) 
+      constraint_ ty_expected ->
   let ret, ty, exp_extra =
     let type_mode = Alloc.Const.Option.value ~default:Alloc.Const.legacy type_mode in
     match constraint_ with
@@ -7817,7 +7846,7 @@ and type_function
             enters new region. *)
           let annots = Typemode.transl_mode_annots body_constraint.ret_mode_annotations in
           annots
-        | _ :: _ -> Alloc.Const.Option.none
+        | _ :: _ -> Location.mknoloc Alloc.Const.Option.none
       in
       let env,
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
@@ -7937,7 +7966,9 @@ and type_function
         instance
           (newgenty
              (Tarrow
-                ((typed_arg_label, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
+                ((typed_arg_label, Location.mknoloc arg_mode, 
+                                   Location.mknoloc ret_mode), 
+                 ty_arg, ty_ret, commu_ok)))
       in
       (* This is quadratic, as it operates over the entire tail of the
          type for each new parameter. Now that functions are n-ary, we
@@ -7983,7 +8014,8 @@ and type_function
               fp_partial = partial;
               fp_newtypes = newtypes;
               fp_sort = arg_sort;
-              fp_mode = Alloc.disallow_right arg_mode;
+              fp_mode = Location.mkloc (Alloc.disallow_right arg_mode) 
+                          mode_annots.loc;
               fp_curry = curry;
               fp_loc = pparam_loc;
             };
@@ -7992,7 +8024,9 @@ and type_function
       let ret_info =
         match ret_info with
         | Some _ as x -> x
-        | None -> Some { ret_sort; ret_mode = Alloc.disallow_right ret_mode }
+        | None -> Some { ret_sort; 
+                         ret_mode = Location.mknoloc 
+                                      (Alloc.disallow_right ret_mode) }
       in
       { function_ = exp_type, param :: params, body;
         newtypes = []; params_contain_gadt = contains_gadt;
@@ -8491,15 +8525,19 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
     let lv = get_level expty in
     let lv' = get_level expty' in
     match get_desc expty', get_desc expty with
-    | Tarrow((l, marg, mret), ty_arg', ty_res', _),
+    | Tarrow((l, {txt = marg; _}, {txt = mret; _}), ty_arg', ty_res', _),
       Tarrow(_, ty_arg,  ty_res,  _)
       when lv' = generic_level || not !Clflags.principal ->
       let ty_res', ty_res, changed = loosen_arrow_modes ty_res' ty_res in
       let mret, changed' = Alloc.newvar_below mret in
       let marg, changed'' = Alloc.newvar_above marg in
       if changed || changed' || changed'' then
-        newty2 ~level:lv' (Tarrow((l, marg, mret), ty_arg', ty_res', commu_ok)),
-        newty2 ~level:lv  (Tarrow((l, marg, mret), ty_arg,  ty_res,  commu_ok)),
+        newty2 ~level:lv' (Tarrow((l, Location.mknoloc marg, 
+                                      Location.mknoloc mret), 
+                                  ty_arg', ty_res', commu_ok)),
+        newty2 ~level:lv  (Tarrow((l, Location.mknoloc marg, 
+                                      Location.mknoloc mret), 
+                                  ty_arg,  ty_res,  commu_ok)),
         true
       else
         ty', ty, false
@@ -8552,7 +8590,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       in
       let rec make_args args ty_fun =
         match get_desc (expand_head env ty_fun) with
-        | Tarrow ((l,_marg,_mret),ty_arg,ty_fun,_) when is_optional l ->
+        | Tarrow ((l, _, _),ty_arg,ty_fun,_) when is_optional l ->
             let ty =
               type_option_none env (instance (tpoly_get_mono ty_arg))
                 sarg.pexp_loc
@@ -8560,7 +8598,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
             (* CR layouts v5: change value assumption below when we allow
                non-values in structures. *)
             make_args ((l, Arg (ty, Jkind.Sort.value)) :: args) ty_fun
-        | Tarrow ((l,_marg,_mret),_,ty_fun,_) when is_position l ->
+        | Tarrow ((l, _, _),_,ty_fun,_) when is_position l ->
             let arg = src_pos (Location.ghostify sarg.pexp_loc) [] env in
             make_args ((l, Arg (arg, Jkind.Sort.value)) :: args) ty_fun
         | Tarrow ((l,_,_),_,ty_res',_) when l = Nolabel || !Clflags.classic ->
@@ -8580,7 +8618,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       and ty_fun = instance ty_fun' in
       let marg, ty_arg, mret, ty_res =
         match get_desc (expand_head env ty_expected) with
-          Tarrow((Nolabel,marg,mret),ty_arg,ty_res,_) ->
+          Tarrow((Nolabel, {txt = marg; _}, {txt = mret; _}),ty_arg,ty_res,_) ->
            marg, ty_arg, mret, ty_res
         | _ -> assert false
       in
@@ -8596,7 +8634,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
           { val_type = ty; val_kind = Val_reg;
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
-            val_modalities = Modality.Value.id;
+            val_modalities = Location.mknoloc Modality.Value.id;
             val_loc = Location.none;
             val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
           }
@@ -8604,7 +8642,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         let exp_env = Env.add_value ~mode id desc env in
         let uu = unique_use ~loc:sarg.pexp_loc ~env mode mode in
         {pat_desc = Tpat_var (id, mknoloc name, desc.val_uid, sort,
-          Value.disallow_right mode);
+          Location.mknoloc (Value.disallow_right mode));
          pat_type = ty;
          pat_extra=[];
          pat_attributes = [];
@@ -8661,7 +8699,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                     fc_arg_mode = Alloc.disallow_right marg;
                     fc_arg_sort = arg_sort;
                   };
-              ret_mode = Alloc.disallow_right mret;
+              ret_mode = Location.mknoloc (Alloc.disallow_right mret);
               ret_sort;
               alloc_mode;
               zero_alloc = Zero_alloc.default
@@ -9127,7 +9165,8 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       (fun loc ty mode ->
          let ty_args, _, _ = unify_as_construct ty in
          List.map (fun ty_arg ->
-           let mode = Modality.Value.Const.apply ty_arg.Types.ca_modalities mode in
+           let mode =
+             Modality.Value.Const.apply ty_arg.Types.ca_modalities.txt mode in
            match recarg with
            | Required -> Overwriting(loc, ty_arg.Types.ca_type, mode)
            | Allowed | Rejected -> Assigning(ty_arg.Types.ca_type, mode)
@@ -9138,7 +9177,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
   let args =
     Misc.Stdlib.List.map3
       (fun e ({Types.ca_type=ty; ca_modalities=gf; _},t0) overwrite ->
-         let argument_mode = mode_modality gf argument_mode in
+         let argument_mode = mode_modality gf.txt argument_mode in
          type_argument ~recarg ~overwrite env argument_mode e ty t0)
       sargs (List.combine ty_args ty_args0) overwrites
   in
@@ -9598,8 +9637,9 @@ and type_function_cases_expect
           ty_arg_mono; expected_pat_mode; expected_inner_mode; alloc_mode;
         } =
       split_function_ty env expected_mode ty_expected loc ~arg_label:Nolabel
-        ~in_function ~has_poly:false ~mode_annots:Mode.Alloc.Const.Option.none
-        ~ret_mode_annots:Mode.Alloc.Const.Option.none
+        ~in_function ~has_poly:false
+        ~mode_annots:(Location.mknoloc Mode.Alloc.Const.Option.none)
+        ~ret_mode_annots:(Location.mknoloc Mode.Alloc.Const.Option.none)
         ~is_first_val_param:first ~is_final_val_param:true
     in
     let cases, partial =
@@ -9610,7 +9650,9 @@ and type_function_cases_expect
     let ty_fun =
       instance
         (newgenty
-           (Tarrow ((Nolabel, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
+           (Tarrow ((Nolabel, Location.mknoloc arg_mode, 
+                                     Location.mknoloc ret_mode), 
+                     ty_arg, ty_ret, commu_ok)))
     in
     unify_exp_types loc env ty_fun (instance ty_expected);
     let param , param_uid = name_cases "param" cases in
@@ -9630,7 +9672,7 @@ and type_function_cases_expect
     in
     cases, ty_fun, alloc_mode,
       { ret_sort;
-        ret_mode = Alloc.disallow_right ret_mode }
+        ret_mode = Location.mknoloc (Alloc.disallow_right ret_mode) }
   end
 
 (* Typing of let bindings *)
@@ -10038,7 +10080,8 @@ and type_andops env sarg sands expected_sort expected_ty =
             let ty_result, op_result_sort =
               new_rep_var ~why:Function_result ()
             in
-            let arrow_desc = (Nolabel, Alloc.legacy, Alloc.legacy) in
+            let arrow_desc = (Nolabel, Location.mknoloc Alloc.legacy, 
+                              Location.mknoloc Alloc.legacy) in
             let ty_rest_fun =
               newty (Tarrow(arrow_desc, newmono ty_arg, ty_result, commu_ok)) in
             let ty_op =
@@ -10097,13 +10140,14 @@ and type_generic_array
     else Predef.type_iarray
   in
   let modalities = Typemode.transl_modalities ~maturity:Stable mutability [] in
-  let argument_mode = mode_modality modalities array_mode in
+  let argument_mode = mode_modality modalities.txt array_mode in
   let jkind, elt_sort = Jkind.for_array_element_sort () in
   let ty = newgenvar jkind in
   let to_unify = type_ ty in
   with_explanation explanation (fun () ->
     unify_exp_types loc env to_unify (generic_instance ty_expected));
-  check_construct_mutability ~loc ~env mutability ~ty array_mode;
+  check_construct_mutability ~loc ~env mutability ~ty
+    ~modalities:modalities.txt array_mode;
   let argument_mode = expect_mode_cross env ty argument_mode in
   let argl =
     List.map
@@ -10117,7 +10161,8 @@ and type_generic_array
     exp_attributes = attributes;
     exp_env = env }
 
-and type_expect_mode ~loc ~env ~(modes : Alloc.Const.Option.t) expected_mode =
+and type_expect_mode ~loc ~env 
+    ~modes:({ txt = modes; _ } : Alloc.Const.Option.t loc) expected_mode =
     let min = Alloc.Const.Option.value ~default:Alloc.Const.min modes |> Const.alloc_as_value in
     let max = Alloc.Const.Option.value ~default:Alloc.Const.max modes |> Const.alloc_as_value in
     submode ~loc ~env ~reason:Other (Value.of_const min) expected_mode;
@@ -10180,7 +10225,8 @@ and type_n_ary_function
                       let new_mode_var () = Mode.Alloc.newvar () in
                       (newty
                          (Tarrow
-                            ( (arg_label, new_mode_var (), new_mode_var ())
+                            ( (arg_label, Location.mknoloc (new_mode_var ()), 
+                                          Location.mknoloc (new_mode_var ()))
                             , new_ty_var Function_argument
                             , new_ty_var Function_result
                             , commu_ok )));
@@ -10875,7 +10921,8 @@ let escaping_hint (failure_reason : Value.error) submode_reason
         match get_desc ty with
         | Tarrow ((_, _, res_mode), _, res_ty, _) ->
           begin match
-            Locality.Guts.check_const (Alloc.proj_comonadic Areality res_mode)
+            Locality.Guts.check_const 
+              (Alloc.proj_comonadic Areality res_mode.txt)
           with
           | Some Global ->
             Some (n+1, true)

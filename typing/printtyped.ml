@@ -480,10 +480,12 @@ and locality_mode i ppf m =
     (Mode.Locality.print ()) m
 
 and value_mode i ppf m =
-  line i ppf "value_mode %a\n" (Mode.Value.print ()) m
+  line i ppf "value_mode %a %a\n" (Mode.Value.print ())
+    m.txt fmt_location m.loc
 
 and alloc_const_option_mode i ppf m =
-  line i ppf "alloc_const_option_mode %a\n" Mode.Alloc.Const.Option.print m
+  line i ppf "alloc_const_option_mode %a %a\n" Mode.Alloc.Const.Option.print
+    m.txt fmt_location m.loc
 
 and expression_alloc_mode i ppf (expr, am) =
   alloc_mode i ppf am;

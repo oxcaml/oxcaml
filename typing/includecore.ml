@@ -158,7 +158,7 @@ let value_descriptions ~loc env name
   | Error e -> raise (Dont_match (Zero_alloc e))
   end;
   let crossing = Ctype.crossing_of_ty env vd2.val_type in
-  let modalities = vd1.val_modalities, vd2.val_modalities in
+  let modalities = vd1.val_modalities.txt, vd2.val_modalities.txt in
   let modes =
     match child_modes_with_modalities name ~modalities mmodes with
     | Ok modes -> modes
@@ -744,7 +744,8 @@ module Record_diffing = struct
         | Some err -> Some err
         | None ->
           match
-            Modality.Value.Const.equate ld1.ld_modalities ld2.ld_modalities
+            Modality.Value.Const.equate ld1.ld_modalities.txt
+              ld2.ld_modalities.txt
           with
           | Ok () ->
             let tl1 = params1 @ [ld1.ld_type] in
@@ -943,7 +944,8 @@ module Variant_diffing = struct
         if List.length arg1 <> List.length arg2 then
           Some (Arity : constructor_mismatch)
         else begin
-          let type_and_mode (ca : Types.constructor_argument) = ca.ca_type, ca.ca_modalities in
+          let type_and_mode (ca : Types.constructor_argument) =
+            ca.ca_type, ca.ca_modalities.txt in
           let arg1_tys, arg1_gfs = List.split (List.map type_and_mode arg1)
           and arg2_tys, arg2_gfs = List.split (List.map type_and_mode arg2)
           in

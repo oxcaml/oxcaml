@@ -64,7 +64,7 @@ let extra_pat =
     (Tpat_var (Ident.create_local "+", mknoloc "+",
       Uid.internal_not_actually_unique,
       Jkind.Sort.(of_const Const.for_boxed_variant),
-      Mode.Value.disallow_right Mode.Value.max))
+      Location.mknoloc (Mode.Value.disallow_right Mode.Value.max)))
     Ctype.none Env.empty
 
 
@@ -1063,7 +1063,8 @@ let build_other ext env =
                        {txt="*extension*"; loc = d.pat_loc},
                        Uid.internal_not_actually_unique,
                        Jkind.Sort.(of_const Const.for_constructor),
-                       Mode.Value.disallow_right Mode.Value.max))
+                       Location.mknoloc 
+                         (Mode.Value.disallow_right Mode.Value.max)))
             Ctype.none Env.empty
       | Construct _ ->
           begin match ext with

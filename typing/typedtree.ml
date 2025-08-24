@@ -148,11 +148,11 @@ and 'k pattern_desc =
   (* value patterns *)
   | Tpat_any : value pattern_desc
   | Tpat_var :
-    Ident.t * string loc * Uid.t * Jkind_types.Sort.t * Mode.Value.l ->
+    Ident.t * string loc * Uid.t * Jkind_types.Sort.t * Mode.Value.l loc ->
     value pattern_desc
   | Tpat_alias :
       value general_pattern * Ident.t * string loc * Uid.t * Jkind_types.Sort.t
-      * Mode.Value.l * Types.type_expr -> value pattern_desc
+      * Mode.Value.l loc * Types.type_expr -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
   | Tpat_unboxed_tuple :
@@ -204,7 +204,7 @@ and exp_extra =
   | Texp_newtype of Ident.t * string loc *
                     Parsetree.jkind_annotation option * Uid.t
   | Texp_stack
-  | Texp_mode of Mode.Alloc.Const.Option.t
+  | Texp_mode of Mode.Alloc.Const.Option.t loc
 
 and arg_label = Types.arg_label =
   | Nolabel
@@ -221,7 +221,7 @@ and expression_desc =
   | Texp_function of
       { params : function_param list;
         body : function_body;
-        ret_mode : Mode.Alloc.l;
+        ret_mode : Mode.Alloc.l loc;
         ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
         zero_alloc : Zero_alloc.t;
@@ -387,7 +387,7 @@ and function_param =
     fp_partial: partial;
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
-    fp_mode: Mode.Alloc.l;
+    fp_mode: Mode.Alloc.l loc;
     fp_curry: function_curry;
     fp_newtypes: (Ident.t * string loc *
                   Parsetree.jkind_annotation option * Uid.t) list;
@@ -625,7 +625,7 @@ and primitive_coercion =
 
 and signature = {
   sig_items : signature_item list;
-  sig_modalities : Mode.Modality.Value.Const.t;
+  sig_modalities : Mode.Modality.Value.Const.t loc;
   sig_type : Types.signature;
   sig_final_env : Env.t;
   sig_sloc : Location.t;
@@ -648,7 +648,7 @@ and signature_item_desc =
   | Tsig_modtype of module_type_declaration
   | Tsig_modtypesubst of module_type_declaration
   | Tsig_open of open_description
-  | Tsig_include of include_description * Mode.Modality.Value.Const.t
+  | Tsig_include of include_description * Mode.Modality.Value.Const.t loc
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
@@ -660,7 +660,7 @@ and module_declaration =
      md_uid: Uid.t;
      md_presence: module_presence;
      md_type: module_type;
-     md_modalities: Mode.Modality.Value.t;
+     md_modalities: Mode.Modality.Value.t loc;
      md_attributes: attribute list;
      md_loc: Location.t;
     }
@@ -817,7 +817,7 @@ and label_declaration =
      ld_name: string loc;
      ld_uid: Uid.t;
      ld_mutable: mutability;
-     ld_modalities: Modality.Value.Const.t;
+     ld_modalities: Modality.Value.Const.t loc;
      ld_type: core_type;
      ld_loc: Location.t;
      ld_attributes: attribute list;
@@ -837,7 +837,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    ca_modalities: Modality.Value.Const.t;
+    ca_modalities: Modality.Value.Const.t loc;
     ca_type: core_type;
     ca_loc: Location.t;
   }
@@ -1146,10 +1146,10 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
       (* [Tpat_var] and [Tpat_alias] are the only cases that directly
          bind an ident *)
       | Tpat_var (id, s, uid, sort, mode) ->
-          f id s pat.pat_type uid mode (of_sort sort)
+          f id s pat.pat_type uid mode.txt (of_sort sort)
       | Tpat_alias(p, id, s, uid, sort, mode, ty) ->
           loop f p;
-          f id s ty uid mode (of_sort sort)
+          f id s ty uid mode.txt (of_sort sort)
       | Tpat_or (p1, p2, _) ->
         if both_sides_of_or then (loop f p1; loop f p2)
         else loop f p1

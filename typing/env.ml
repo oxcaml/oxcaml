@@ -1025,14 +1025,17 @@ let scrape_alias =
         t -> Subst.Lazy.module_type -> Subst.Lazy.module_type)
 
 let md md_type =
-  {md_type; md_modalities = Mode.Modality.Value.id; md_attributes=[];
+  {md_type;
+   md_modalities = Location.mknoloc Mode.Modality.Value.id;
+   md_attributes=[];
    md_loc=Location.none; md_uid = Uid.internal_not_actually_unique}
 
 (** The caller is not interested in modes, and thus [val_modalities] is
 invalidated. *)
 let vda_description vda =
   let vda_description = vda.vda_description in
-  {vda_description with val_modalities = Mode.Modality.Value.undefined}
+  {vda_description with
+   val_modalities = Location.mknoloc Mode.Modality.Value.undefined}
 
 let normalize_mode modality mode =
   let vda_mode = Mode.Modality.Value.apply modality mode in
@@ -1041,14 +1044,18 @@ let normalize_mode modality mode =
 let normalize_vda_mode vda =
   let vda_description = vda.vda_description in
   let val_modalities, vda_mode =
-    normalize_mode vda_description.val_modalities vda.vda_mode
+    normalize_mode vda_description.val_modalities.txt vda.vda_mode
   in
-  let vda_description = {vda_description with val_modalities} in
+  let vda_description =
+    {vda_description with
+     val_modalities = { txt = val_modalities;
+                        loc = vda_description.val_modalities.loc }} in
   vda_description, vda_mode
 
 let normalize_md_mode (md : Subst.Lazy.module_declaration) mode =
-  let md_modalities, mode = normalize_mode md.md_modalities mode in
-  let md = {md with md_modalities} in
+  let md_modalities, mode = normalize_mode md.md_modalities.txt mode in
+  let md = {md with md_modalities = { txt = md_modalities;
+                                       loc = md.md_modalities.loc }} in
   md, mode
 
 let normalize_mda_mode mda =
@@ -1177,7 +1184,7 @@ let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   in
   let md =
     { Subst.Lazy.md_type = Mty_signature sign;
-      md_modalities = Mode.Modality.Value.id;
+      md_modalities = Location.mknoloc Mode.Modality.Value.id;
       md_loc = Location.none;
       md_attributes = [];
       md_uid = uid;
@@ -2767,7 +2774,7 @@ and add_cltype ?shape id ty env =
 
 let add_module_lazy ~update_summary id presence mty ?mode env =
   let md = Subst.Lazy.{md_type = mty;
-                       md_modalities = Mode.Modality.Value.id;
+                       md_modalities = Location.mknoloc Mode.Modality.Value.id;
                        md_attributes = [];
                        md_loc = Location.none;
                        md_uid = Uid.internal_not_actually_unique}

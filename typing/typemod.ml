@@ -621,13 +621,15 @@ let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
   let sg_item = function
     | Sig_value (id, desc, vis) ->
         let val_modalities =
-          desc.val_modalities
+          desc.val_modalities.txt
           |> zap_modality |> Mode.Modality.Value.of_const
         in
         let val_zero_alloc =
           Zero_alloc.create_const (Zero_alloc.get desc.val_zero_alloc)
         in
-        let desc = {desc with val_modalities; val_zero_alloc} in
+        let desc = {desc with val_modalities = 
+                      { desc.val_modalities with txt = val_modalities }; 
+                    val_zero_alloc} in
         Sig_value (id, desc, vis)
     | Sig_module (id, pres, md, re, vis) ->
         let md_type =
@@ -635,9 +637,12 @@ let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
             md.md_type
         in
         let md_modalities =
-          md.md_modalities |> zap_modality |> Mode.Modality.Value.of_const
+          md.md_modalities.txt |> zap_modality 
+          |> Mode.Modality.Value.of_const
         in
-        let md = {md with md_type; md_modalities} in
+        let md = {md with md_type; 
+                  md_modalities = { md.md_modalities with 
+                                    txt = md_modalities }} in
         Sig_module (id, pres, md, re, vis)
     | item -> item
   in
@@ -1172,12 +1177,13 @@ let rec apply_modalities_signature ~recursive env modalities sg =
   List.map (function
   | Sig_value (id, vd, vis) ->
       let val_modalities =
-        vd.val_modalities
+        vd.val_modalities.txt
         |> Mode.Modality.Value.to_const_exn
         |> (fun then_ -> Mode.Modality.Value.Const.concat ~then_ modalities)
         |> Mode.Modality.Value.of_const
       in
-      let vd = {vd with val_modalities} in
+      let vd = {vd with val_modalities = { vd.val_modalities with 
+                                           txt = val_modalities }} in
       Sig_value (id, vd, vis)
   | Sig_module (id, pres, md, rec_, vis) when recursive ->
       let md_type = apply_modalities_module_type env modalities md.md_type in
@@ -1222,7 +1228,7 @@ let check_unsupported_modal_module ~env reason modes =
 let transl_modalities ?(default_modalities = Mode.Modality.Value.Const.id)
   modalities =
   match modalities with
-  | [] -> default_modalities
+  | [] -> Location.mknoloc default_modalities
   | _ :: _ ->
     Typemode.transl_modalities ~maturity:Stable Immutable modalities
 
@@ -1248,10 +1254,11 @@ let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
 
   We still don't support [pmd_modalities] on functors.
   *)
-  match Mode.Modality.Value.Const.is_id modalities with
+  match Mode.Modality.Value.Const.is_id modalities.txt with
   | true -> mty, Mode.Modality.Value.id
   | false ->
-      apply_modalities_module_type env modalities mty, Mode.Modality.Value.id
+      apply_modalities_module_type env modalities.txt mty, 
+      Mode.Modality.Value.id
 
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
@@ -1334,7 +1341,7 @@ let rec approx_modtype env smty =
 and approx_module_declaration env pmd =
   {
     Types.md_type = approx_modtype env pmd.pmd_type;
-    md_modalities = Mode.Modality.Value.id;
+    md_modalities = Location.mknoloc Mode.Modality.Value.id;
     md_attributes = pmd.pmd_attributes;
     md_loc = pmd.pmd_loc;
     md_uid = Uid.internal_not_actually_unique;
@@ -1447,7 +1454,7 @@ and approx_sig_items env ssg=
                   let recursive =
                     not @@ Builtin_attributes.has_attribute "no_recursive_modalities" attrs
                   in
-                  apply_modalities_signature ~recursive env modalities sg
+                  apply_modalities_signature ~recursive env modalities.txt sg
               in
               let sg, newenv = Env.enter_signature ~scope sg env in
               sg @ approx_sig_items newenv srem
@@ -1865,7 +1872,7 @@ and transl_modtype_aux env smty =
               let id, newenv =
                 let arg_md =
                   { md_type = arg.mty_type;
-                    md_modalities = Mode.Modality.Value.id;
+                    md_modalities = Location.mknoloc Mode.Modality.Value.id;
                     md_attributes = [];
                     md_loc = param.loc;
                     md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -1986,16 +1993,16 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         Tincl_structure, extract_sig env smty.pmty_loc mty
     in
     let modalities =
-      transl_modalities ~default_modalities:sig_modalities modalities
+      transl_modalities ~default_modalities:sig_modalities.txt modalities
     in
     let recursive =
       not @@ Builtin_attributes.has_attribute "no_recursive_modalities"
         sincl.pincl_attributes
     in
     let sg =
-      match Mode.Modality.Value.Const.is_id modalities with
+      match Mode.Modality.Value.Const.is_id modalities.txt with
       | true -> sg
-      | false -> apply_modalities_signature ~recursive env modalities sg
+      | false -> apply_modalities_signature ~recursive env modalities.txt sg
     in
     (* Assume the structure is legacy, for backward compatibility *)
     let sg, newenv = Env.enter_signature ~scope sg ~mode:Value.legacy env in
@@ -2020,11 +2027,14 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         let modalities =
           match sdesc.pval_modalities with
           | [] -> sig_modalities
-          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
+          | l -> Typemode.transl_modalities ~maturity:Stable 
+                   Immutable l
         in
-        let modalities = Mode.Modality.Value.of_const modalities in
         let (tdesc, newenv) =
-          Typedecl.transl_value_decl env ~modalities item.psig_loc sdesc
+          Typedecl.transl_value_decl env 
+            ~modalities:({ modalities with txt = 
+                           Mode.Modality.Value.of_const modalities.txt }) 
+            item.psig_loc sdesc
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
         mksig (Tsig_value tdesc) env loc,
@@ -2099,7 +2109,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
             (fun () -> transl_modtype env pmd.pmd_type)
         in
         let mty_type, md_modalities =
-          apply_pmd_modalities env ~default_modalities:sig_modalities
+          apply_pmd_modalities env 
+            ~default_modalities:sig_modalities.txt
             pmd.pmd_modalities tmty.mty_type
         in
         let tmty = {tmty with mty_type} in
@@ -2110,7 +2121,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         in
         let md = {
           md_type=tmty.mty_type;
-          md_modalities;
+          md_modalities = { txt = md_modalities; loc = pmd.pmd_loc };
           md_attributes=pmd.pmd_attributes;
           md_loc=pmd.pmd_loc;
           md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -2155,7 +2166,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
             md
           else
             { md_type = Mty_alias path;
-              md_modalities = Mode.Modality.Value.id;
+              md_modalities = Location.mknoloc Mode.Modality.Value.id;
               md_attributes = pms.pms_attributes;
               md_loc = pms.pms_loc;
               md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -2372,11 +2383,14 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
             (fun () -> transl_modtype env_c pmd.pmd_type)
         in
         let mty_type, md_modalities =
-          apply_pmd_modalities env ~default_modalities:sig_modalities
+          apply_pmd_modalities env 
+            ~default_modalities:sig_modalities.txt
             pmd.pmd_modalities tmty.mty_type
         in
         let tmty = {tmty with mty_type} in
-        let md = { md with Types.md_type = tmty.mty_type; md_modalities } in
+        let md = { md with Types.md_type = tmty.mty_type; 
+                   md_modalities = { txt = md_modalities; 
+                                     loc = pmd.pmd_loc } } in
         (id_shape, id_loc, md, mmode, tmty))
       sdecls curr in
   let map_mtys curr =
@@ -2408,12 +2422,12 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
          let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
          let md_type, md_modalities =
           approx_modtype (approx_env pmd.pmd_name.txt) pmd.pmd_type
-          |> apply_pmd_modalities env ~default_modalities:sig_modalities
+          |> apply_pmd_modalities env ~default_modalities:sig_modalities.txt
               pmd.pmd_modalities
          in
          let md =
            { md_type;
-             md_modalities;
+             md_modalities = { txt = md_modalities; loc = pmd.pmd_loc };
              md_loc = pmd.pmd_loc;
              md_attributes = pmd.pmd_attributes;
              md_uid }
@@ -2425,6 +2439,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
            Option.map (fun smmode ->
             smmode
             |> Typemode.transl_mode_annots
+            |> (fun {txt; _} -> txt)
             (* CR zqian: mode annotations on rec modules default to legacy for
             now. We can remove this workaround once [module type of] doesn't
             require zapping. *)
@@ -2865,14 +2880,14 @@ let infer_modalities ~loc ~env ~md_mode ~mode =
 let rebase_modalities ~loc ~env ~md_mode ~mode sg =
   List.map (function
     | Sig_value (id, vd, vis) ->
-        let mode = Mode.Modality.Value.apply vd.val_modalities mode in
+        let mode = Mode.Modality.Value.apply vd.val_modalities.txt mode in
         let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
-        let vd = {vd with val_modalities} in
+        let vd = {vd with val_modalities = { txt = val_modalities; loc }} in
         Sig_value (id, vd, vis)
     | Sig_module (id, pres, md, rec_, vis) ->
-        let mode = Mode.Modality.Value.apply md.md_modalities mode in
+        let mode = Mode.Modality.Value.apply md.md_modalities.txt mode in
         let md_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
-        let md = {md with md_modalities} in
+        let md = {md with md_modalities = { txt = md_modalities; loc }} in
         Sig_module (id, pres, md, rec_, vis)
     | item -> item
     ) sg
@@ -2942,7 +2957,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
               let md_uid =  Uid.mk ~current_unit:(Env.get_unit_name ()) in
               let arg_md =
                 { md_type = mty.mty_type;
-                  md_modalities = Modality.Value.id;
+                  md_modalities = Location.mknoloc Modality.Value.id;
                   md_attributes = [];
                   md_loc = param.loc;
                   md_uid;
@@ -2985,6 +3000,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       let hold_locks = Option.is_some smty in
       let mode = smode
         |> Typemode.transl_mode_annots
+        |> (fun {txt; _} -> txt)
         |> new_mode_var_from_annots
       in
       let arg, arg_shape =
@@ -3473,7 +3489,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
               let vd =
                 { vd with
                   val_zero_alloc = zero_alloc;
-                  val_modalities = modalities }
+                  val_modalities = { txt = modalities; loc = first_loc } }
               in
               Sig_value(id, vd, Exported) :: acc,
               Shape.Map.add_value shape_map id vd.val_uid
@@ -3494,10 +3510,12 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         let mode =
           modes
           |> Typemode.transl_alloc_mode
+          |> (fun {txt; _} -> txt)
           |> Alloc.of_const
           |> alloc_as_value
         in
         let modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        let modalities = { txt = modalities; loc } in
         let (desc, newenv) =
           Typedecl.transl_value_decl env ~modalities loc sdesc
         in
@@ -3580,7 +3598,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         let md_modalities = infer_modalities ~loc:pmb_loc ~env ~md_mode ~mode in
         let md =
           { md_type = enrich_module_type anchor name.txt modl.mod_type env;
-            md_modalities;
+            md_modalities = { txt = md_modalities; loc = pmb_loc };
             md_attributes = attrs;
             md_loc = pmb_loc;
             md_uid;
@@ -3600,7 +3618,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
             Some id, e,
             [Sig_module(id, pres,
                         {md_type = modl.mod_type;
-                         md_modalities;
+                         md_modalities = { txt = md_modalities; loc = pmb_loc };
                          md_attributes = attrs;
                          md_loc = pmb_loc;
                          md_uid;
@@ -3634,7 +3652,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         in
         let (decls, newenv) =
           transl_recmodule_modtypes env
-            ~sig_modalities:Mode.Modality.Value.Const.id
+            ~sig_modalities:(Location.mknoloc Mode.Modality.Value.Const.id)
             (List.map (fun (name, smty, smode, _smodl, attrs, loc) ->
                  ({pmd_name=name; pmd_type=smty;
                    pmd_attributes=attrs; pmd_loc=loc; pmd_modalities=[]}
@@ -3670,7 +3688,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                    let mdecl =
                      {
                        md_type = mty.mty_type;
-                       md_modalities = Modality.Value.id;
+                       md_modalities = Location.mknoloc Modality.Value.id;
                        md_attributes = attrs;
                        md_loc = loc;
                        md_uid = uid;
@@ -3701,7 +3719,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
             in
             Sig_module(id, Mp_present, {
                 md_type=mb.mb_expr.mod_type;
-                md_modalities;
+                md_modalities = { txt = md_modalities; loc = mb.mb_loc };
                 md_attributes=mb.mb_attributes;
                 md_loc=mb.mb_loc;
                 md_uid = uid;
@@ -4391,7 +4409,7 @@ let package_signatures units =
       let sg = Subst.signature Make_local subst sg in
       let md =
         { md_type=Mty_signature sg;
-          md_modalities=Modality.Value.id;
+          md_modalities= Location.mknoloc Modality.Value.id;
           md_attributes=[];
           md_loc=Location.none;
           md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());

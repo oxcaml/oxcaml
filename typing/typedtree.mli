@@ -158,12 +158,13 @@ and 'k pattern_desc =
   | Tpat_any : value pattern_desc
         (** _ *)
   | Tpat_var :
-      Ident.t * string loc * Uid.t * Jkind_types.Sort.t * Mode.Value.l ->
+      Ident.t * string loc * Uid.t * Jkind_types.Sort.t * Mode.Value.l loc ->
       value pattern_desc
         (** x *)
   | Tpat_alias :
       value general_pattern * Ident.t * string loc * Uid.t * Jkind_types.Sort.t
-      * Mode.Value.l * Types.type_expr
+      * Mode.Value.l loc
+      * Types.type_expr
         -> value pattern_desc
         (** P as a *)
   | Tpat_constant : constant -> value pattern_desc
@@ -289,7 +290,7 @@ and exp_extra =
         them here, as the cost of tracking this additional information is minimal. *)
   | Texp_stack
         (** stack_ E *)
-  | Texp_mode of Mode.Alloc.Const.Option.t
+  | Texp_mode of Mode.Alloc.Const.Option.t loc
         (** E : _ @@ M  *)
 
 and arg_label = Types.arg_label =
@@ -329,7 +330,7 @@ and expression_desc =
   | Texp_function of
       { params : function_param list;
         body : function_body;
-        ret_mode : Mode.Alloc.l;
+        ret_mode : Mode.Alloc.l loc;
         (* Mode where the function allocates, ie local for a function of
            type 'a -> local_ 'b, and heap for a function of type 'a -> 'b *)
         ret_sort : Jkind.sort;
@@ -545,7 +546,7 @@ and function_param =
     *)
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
-    fp_mode: Mode.Alloc.l;
+    fp_mode: Mode.Alloc.l loc;
     fp_curry: function_curry;
     fp_newtypes: (Ident.t * string loc *
                   Parsetree.jkind_annotation option * Uid.t) list;
@@ -903,7 +904,7 @@ and primitive_coercion =
 
 and signature = {
   sig_items : signature_item list;
-  sig_modalities : Mode.Modality.Value.Const.t;
+  sig_modalities : Mode.Modality.Value.Const.t loc;
   sig_type : Types.signature;
   sig_final_env : Env.t;
   sig_sloc : Location.t;
@@ -926,7 +927,7 @@ and signature_item_desc =
   | Tsig_modtype of module_type_declaration
   | Tsig_modtypesubst of module_type_declaration
   | Tsig_open of open_description
-  | Tsig_include of include_description * Mode.Modality.Value.Const.t
+  | Tsig_include of include_description * Mode.Modality.Value.Const.t loc
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
@@ -938,7 +939,7 @@ and module_declaration =
      md_uid: Uid.t;
      md_presence: Types.module_presence;
      md_type: module_type;
-     md_modalities: Mode.Modality.Value.t;
+     md_modalities: Mode.Modality.Value.t loc;
      md_attributes: attributes;
      md_loc: Location.t;
     }
@@ -1100,7 +1101,7 @@ and label_declaration =
      ld_name: string loc;
      ld_uid: Uid.t;
      ld_mutable: Types.mutability;
-     ld_modalities: Mode.Modality.Value.Const.t;
+     ld_modalities: Mode.Modality.Value.Const.t loc;
      ld_type: core_type;
      ld_loc: Location.t;
      ld_attributes: attributes;
@@ -1120,7 +1121,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    ca_modalities: Mode.Modality.Value.Const.t;
+    ca_modalities: Mode.Modality.Value.Const.t loc;
     ca_type: core_type;
     ca_loc: Location.t;
   }

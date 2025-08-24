@@ -1086,7 +1086,7 @@ and module_declarations ~direction ~loc env subst id1 ~mmodes md1 md2 orig_shape
   let p1 = Path.Pident id1 in
   if Directionality.mark_as_used direction then
     Env.mark_module_used md1.md_uid;
-  let modalities = md1.md_modalities, md2.md_modalities in
+  let modalities = md1.md_modalities.txt, md2.md_modalities.txt in
   let id = Ident.name id1 in
   let* modes =
     Includecore.child_modes_with_modalities id ~modalities mmodes

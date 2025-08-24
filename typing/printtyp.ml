@@ -685,8 +685,8 @@ and raw_type_desc ppf = function
   | Tarrow((l,arg,ret),t1,t2,c) ->
       fprintf ppf "@[<hov1>Tarrow((\"%s\",%a,%a),@,%a,@,%a,@,%s)@]"
         (string_of_label l)
-        (Alloc.print ~verbose:true ()) arg
-        (Alloc.print ~verbose:true ()) ret
+        (Alloc.print ~verbose:true ()) arg.txt
+        (Alloc.print ~verbose:true ()) ret.txt
         raw_type t1 raw_type t2
         (if is_commu_ok c then "Cok" else "Cunknown")
   | Ttuple tl ->
@@ -1466,7 +1466,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
 
   let diff = {diff with yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
-  let l = Typemode.untransl_mode_annots diff in
+  let l = Typemode.untransl_mode_annots (Location.mknoloc diff) in
   match all_or_none tree_of_mode_old l with
   | Some l -> l
   | None -> List.map tree_of_mode_new l
@@ -1518,7 +1518,7 @@ let rec tree_of_modal_typexp mode modal ty =
         let non_gen = is_non_gen mode ty in
         let name_gen = Names.new_var_name ~non_gen ty in
         Otyp_var (non_gen, Names.name_of_type name_gen tty)
-    | Tarrow ((l, marg, mret), ty1, ty2, _) ->
+    | Tarrow ((l, {txt = marg; _}, {txt = mret; _}), ty1, ty2, _) ->
         let lab =
           if !print_labels || is_omittable l then outcome_label l
           else Nolabel
@@ -1813,7 +1813,8 @@ let () =
   Jkind.set_outcometree_of_type (fun ty ->
     prepare_for_printing [ty];
     tree_of_typexp Type ty);
-  Jkind.set_outcometree_of_modalities_new tree_of_modalities_new;
+  Jkind.set_outcometree_of_modalities_new
+    (fun mut t -> tree_of_modalities_new mut (Location.mknoloc t));
   Jkind.set_print_type_expr type_expr;
   Jkind.set_raw_type_expr raw_type_expr
 
@@ -2272,7 +2273,8 @@ let tree_of_value_description id decl =
      resets the naming context *)
   let snap = Btype.snapshot () in
   let moda =
-    Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha decl.val_modalities
+    Ctype.zap_modalities_to_floor_if_modes_enabled_at
+      Alpha decl.val_modalities.txt
   in
   let qtvs = extract_qtvs [decl.val_type] in
   let apparent_arity =
@@ -2312,7 +2314,8 @@ let tree_of_value_description id decl =
   let vd =
     { oval_name = id;
       oval_type = Otyp_poly(qtvs, ty);
-      oval_modalities = tree_of_modalities_new Immutable moda;
+      oval_modalities =
+        tree_of_modalities_new Immutable (Location.mknoloc moda);
       oval_prims = [];
       oval_attributes = attrs
     }
@@ -2776,10 +2779,12 @@ and tree_of_modtype_declaration ?abbrev id decl =
 
 and tree_of_module ?abbrev id md rs =
   let snap = Btype.snapshot () in
-  let moda = Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities in
+  let moda =
+    Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities.txt
+  in
   let r =
     Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
-    tree_of_modalities_new Immutable moda,
+    tree_of_modalities_new Immutable (Location.mknoloc moda),
     tree_of_rec rs)
   in
   Btype.backtrack snap;
