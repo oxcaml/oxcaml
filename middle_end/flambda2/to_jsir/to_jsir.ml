@@ -396,13 +396,16 @@ and apply_cont0 ~env ~res apply_cont =
   let continuation = Apply_cont.continuation apply_cont in
   let get_last ~raise_kind : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
-    | Toplevel_return ->
+    | (Toplevel_return | Define_root_symbol) as sort ->
       let module_symbol =
         match args with
         | [arg] -> arg
-        | [] -> Misc.fatal_error "Found a Toplevel_return with no arguments"
+        | [] ->
+          Misc.fatal_errorf "Found %a with no arguments" Continuation.Sort.print
+            sort
         | _ :: _ ->
-          Misc.fatal_error "Found a Toplevel_return with multiple arguments"
+          Misc.fatal_errorf "Found %a with multiple arguments"
+            Continuation.Sort.print sort
       in
       (* CR selee: This is a hack, but I can't find a way to trigger any
          behaviour that isn't calling [caml_register_global] on the toplevel
@@ -456,7 +459,6 @@ and apply_cont0 ~env ~res apply_cont =
               Continuation.print continuation (List.length args)
         in
         Raise (exn, raise_kind), res)
-    | Define_root_symbol -> failwith "unimplemented"
   in
   match Apply_cont.trap_action apply_cont with
   | None -> get_last ~raise_kind:None
