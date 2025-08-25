@@ -44,7 +44,10 @@ type t =
     current_blocks : partial_block list;
     next_addr : Jsir.Addr.t;
     reserved_addrs : Jsir.Addr.Set.t;
-    invalid_switch_block : Jsir.Addr.t option
+    invalid_switch_block : Jsir.Addr.t option;
+    next_method_cache_id : int
+        (** JSOO has a similar variable which is incremented for every method call;
+            we mimic this here. *)
   }
 
 let create () =
@@ -52,7 +55,8 @@ let create () =
     current_blocks = [];
     next_addr = Jsir.Addr.zero;
     reserved_addrs = Jsir.Addr.Set.empty;
-    invalid_switch_block = None
+    invalid_switch_block = None;
+    next_method_cache_id = 1
   }
 
 let add_instr_exn t instr =
@@ -127,7 +131,8 @@ let to_program_exn
       current_blocks;
       next_addr = _;
       reserved_addrs;
-      invalid_switch_block = _
+      invalid_switch_block = _;
+      next_method_cache_id = _
     } =
   if List.length current_blocks <> 0
   then
@@ -154,3 +159,18 @@ let invalid_switch_block t =
     in
     let t = end_block_with_last_exn t Stop in
     { t with invalid_switch_block = Some addr }, addr
+
+let get_public_method t ~obj ~field =
+  let method_cache_id = t.next_method_cache_id in
+  let f = Jsir.Var.fresh () in
+  let t =
+    add_instr_exn t
+      (Let
+         ( f,
+           Prim
+             ( Extern "caml_get_public_method",
+               [ Pv obj;
+                 Pv field;
+                 Pc (Int (Targetint.of_int_exn method_cache_id)) ] ) ))
+  in
+  { t with next_method_cache_id = method_cache_id + 1 }, f
