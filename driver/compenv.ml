@@ -367,6 +367,8 @@ let read_one_param ppf position name v =
     int_setter ppf "gdwarf-config-max-cms-files-per-unit" gdwarf_config_max_cms_files_per_unit v
   | "gdwarf-config-max-cms-files-per-variable" ->
     int_setter ppf "gdwarf-config-max-cms-files-per-variable" gdwarf_config_max_cms_files_per_variable v
+  | "gdwarf-config-max-type-to-shape-depth" ->
+    int_setter ppf "gdwarf-config-max-type-to-shape-depth" gdwarf_config_max_type_to_shape_depth v
   | "Oclassic" -> if check_bool ppf "Oclassic" v then Clflags.set_oclassic ()
   | "O2" -> if check_bool ppf "O2" v then Clflags.set_o2 ()
   | "O3" -> if check_bool ppf "O3" v then Clflags.set_o3 ()

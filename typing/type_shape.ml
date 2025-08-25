@@ -206,7 +206,8 @@ module Type_shape = struct
     let unknown_shape = Shape.leaf' None in
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
-      Numbers.Int.Map.mem (Types.get_id expr) visited || depth > 10
+      Numbers.Int.Map.mem (Types.get_id expr) visited
+      || depth > !Clflags.gdwarf_config_max_type_to_shape_depth
     in
     if cannot_proceed ()
     then

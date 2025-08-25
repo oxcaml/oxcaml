@@ -912,6 +912,11 @@ let mk_gdwarf_config_max_cms_files_per_variable f =
   "-gdwarf-config-max-cms-files-per-variable", Arg.Int f,
   "<n>  Maximum CMS files per variable in DWARF debug info (default: 0)"
 
+let mk_gdwarf_config_max_type_to_shape_depth f =
+  "-gdwarf-config-max-type-to-shape-depth", Arg.Int f,
+  "<n>  Maximum type-to-shape depth for generating DWARF debug info \
+  (default: 10)"
+
 let mk_gdwarf_fidelity f =
   "-gdwarf-fidelity", Arg.String f,
   "<level>  Set DWARF debug info fidelity level (low|medium|high|very-high|ultra-high)"
@@ -1209,6 +1214,7 @@ module type Optcomp_options = sig
   val _gdwarf_config_shape_eval_depth : int -> unit
   val _gdwarf_config_max_cms_files_per_unit : int -> unit
   val _gdwarf_config_max_cms_files_per_variable : int -> unit
+  val _gdwarf_config_max_type_to_shape_depth : int -> unit
   val _gdwarf_fidelity : string -> unit
 end;;
 
@@ -1653,6 +1659,7 @@ struct
     mk_gdwarf_config_shape_eval_depth F._gdwarf_config_shape_eval_depth;
     mk_gdwarf_config_max_cms_files_per_unit F._gdwarf_config_max_cms_files_per_unit;
     mk_gdwarf_config_max_cms_files_per_variable F._gdwarf_config_max_cms_files_per_variable;
+    mk_gdwarf_config_max_type_to_shape_depth F._gdwarf_config_max_type_to_shape_depth;
     mk_gdwarf_fidelity F._gdwarf_fidelity;
     mk_use_debugging_shapes F._use_debugging_shapes;
     mk_use_old_merlin_shapes F._use_old_merlin_shapes;
@@ -2200,14 +2207,16 @@ module Default = struct
     let _v () = Compenv.print_version_and_library "native-code compiler"
     let _no_probes = clear probes
     let _probes = set probes
-    let _gdwarf_config_shape_reduce_depth n = 
+    let _gdwarf_config_shape_reduce_depth n =
       gdwarf_config_shape_reduce_depth := n
-    let _gdwarf_config_shape_eval_depth n = 
+    let _gdwarf_config_shape_eval_depth n =
       gdwarf_config_shape_eval_depth := n
-    let _gdwarf_config_max_cms_files_per_unit n = 
+    let _gdwarf_config_max_cms_files_per_unit n =
       gdwarf_config_max_cms_files_per_unit := n
-    let _gdwarf_config_max_cms_files_per_variable n = 
+    let _gdwarf_config_max_cms_files_per_variable n =
       gdwarf_config_max_cms_files_per_variable := n
+    let _gdwarf_config_max_type_to_shape_depth n =
+      gdwarf_config_max_type_to_shape_depth := n
     let _gdwarf_fidelity s =
       match Clflags.gdwarf_fidelity_of_string s with
       | Some fidelity -> Clflags.set_gdwarf_fidelity fidelity
