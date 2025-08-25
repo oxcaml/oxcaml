@@ -581,7 +581,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     [| rax |]
   | Op (Specific (Irdtsc | Irdpmc)) ->
     [| rax; rdx |]
-  | Op Poll -> destroyed_at_alloc_or_poll
+  | Op (Poll _) -> destroyed_at_alloc_or_poll
   | Op (Alloc _) ->
     destroyed_at_alloc_or_poll
   | Op (Specific Ipackf32) -> [||]

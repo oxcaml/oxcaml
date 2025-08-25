@@ -2043,21 +2043,23 @@ let emit_instr ~first ~fallthrough i =
            lr_save_simd = must_save_simd_regs i.live
          }
          :: !local_realloc_sites
-  | Lop Poll ->
-    I.cmp (domain_field Domainstate.Domain_young_limit) r15;
-    let gc_call_label = L.create Text in
-    let lbl_after_poll = L.create Text in
-    let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
-    I.jbe (emit_asm_label_arg gc_call_label);
-    call_gc_sites
-      := { gc_lbl = gc_call_label;
-           gc_return_lbl = lbl_after_poll;
-           gc_dbg = i.dbg;
-           gc_frame = lbl_frame;
-           gc_save_simd = must_save_simd_regs i.live
-         }
-         :: !call_gc_sites;
-    D.define_label lbl_after_poll
+  | Lop (Poll { enabled }) ->
+    if enabled
+    then (
+      I.cmp (domain_field Domainstate.Domain_young_limit) r15;
+      let gc_call_label = L.create Text in
+      let lbl_after_poll = L.create Text in
+      let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
+      I.jbe (emit_asm_label_arg gc_call_label);
+      call_gc_sites
+        := { gc_lbl = gc_call_label;
+             gc_return_lbl = lbl_after_poll;
+             gc_dbg = i.dbg;
+             gc_frame = lbl_frame;
+             gc_save_simd = must_save_simd_regs i.live
+           }
+           :: !call_gc_sites;
+      D.define_label lbl_after_poll)
   | Lop Pause -> I.pause ()
   | Lop (Intop (Icomp cmp)) ->
     I.cmp (arg i 1) (arg i 0);

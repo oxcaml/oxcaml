@@ -90,7 +90,7 @@ module Instruction_requirements = struct
       | Op (Stackoffset _) -> Requirements Requires_prologue
       (* Allocations and polls are implemented by calling a function when
          emitted, and therefore need a prologue for the function call. *)
-      | Op (Alloc _ | Poll) -> Requirements Requires_prologue
+      | Op (Alloc _ | Poll _) -> Requirements Requires_prologue
       | Op
           ( Move | Spill | Reload | Const_int _ | Const_float32 _
           | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _

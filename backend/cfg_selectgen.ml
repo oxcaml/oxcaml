@@ -335,7 +335,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (Alloc
              { bytes = 0; dbginfo = [placeholder_for_alloc_block_kind]; mode }),
         args )
-    | Cpoll -> SU.basic_op Poll, args
+    | Cpoll -> SU.basic_op (Poll { enabled = true }), args
     | Cpause -> SU.basic_op Pause, args
     | Caddi -> select_arith_comm Iadd args
     | Csubi -> select_arith Isub args
@@ -1263,7 +1263,23 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         if String.equal func.sym_name !SU.current_function_name
            && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_self { destination = env.SU.tailrec_label } in
+          (* Check if poll insertion is enabled *)
+          let associated_poll_id =
+            if not (Cfg_polling.is_disabled ~fun_name:!SU.current_function_name)
+            then
+              (* Insert poll instruction before the tailcall *)
+              Some
+                (SU.insert_op_debug_returning_id env sub_cfg
+                   (Poll { enabled = true })
+                   dbg [||] [||])
+            else None
+          in
+          let call =
+            Cfg.Tailcall_self
+              { destination = env.SU.tailrec_label;
+                associated_poll = associated_poll_id
+              }
+          in
           let loc_arg' =
             assert (stack_ofs >= 0);
             if stack_ofs = 0 then loc_arg else Proc.loc_parameters (Reg.typv r1)
@@ -1494,8 +1510,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let body = Sub_cfg.make_empty () in
     SU.insert_moves env body loc_arg rarg;
     let prologue_poll_instr_id =
-      insert_op_debug_returning_id env body Operation.Poll Debuginfo.none [||]
-        [||]
+      insert_op_debug_returning_id env body
+        (Operation.Poll { enabled = true })
+        Debuginfo.none [||] [||]
     in
     emit_tail env body f.Cmm.fun_body;
     let cfg =

@@ -38,8 +38,8 @@ let rec find_next_allocation : cell option -> allocation option =
         | Stackoffset _ | Load _ | Store _ | Intop _ | Intop_imm _
         | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
         | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region
-        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll | Pause
-          )
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll _
+        | Pause )
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
       find_next_allocation (DLL.next cell))
@@ -81,7 +81,7 @@ let find_compatible_allocations :
         match curr_mode with
         | Local -> return ()
         | Heap -> loop allocations (DLL.next cell) ~curr_mode ~curr_size)
-      | Op Poll -> return ()
+      | Op (Poll _) -> return ()
       | Reloadretaddr | Poptrap _ | Prologue | Epilogue | Pushtrap _
       | Stack_check _ ->
         (* CR-soon xclerc for xclerc: is it too conservative? (note: only the

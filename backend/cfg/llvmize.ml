@@ -1004,7 +1004,7 @@ module F = struct
     | Spill | Reload | Const_float32 _ | Const_float _ | Const_vec128 _
     | Const_vec256 _ | Const_vec512 _ | Intop_atomic _ | Csel _
     | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Begin_region
-    | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll | Pause
+    | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll _ | Pause
     | Alloc _ ->
       not_implemented_basic i
 

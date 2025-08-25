@@ -113,7 +113,8 @@ let mem_block t label = Label.Tbl.mem t.blocks label
 
 let successor_labels_normal ti =
   match ti.desc with
-  | Tailcall_self { destination } -> Label.Set.singleton destination
+  | Tailcall_self { destination; associated_poll = _ } ->
+    Label.Set.singleton destination
   | Switch labels -> Array.to_seq labels |> Label.Set.of_seq
   | Return | Raise _ | Tailcall_func _ -> Label.Set.empty
   | Call_no_return _ -> Label.Set.empty
@@ -172,8 +173,8 @@ let replace_successor_labels t ~normal ~exn block ~f =
       | Float_test { width; lt; eq; gt; uo } ->
         Float_test { width; lt = f lt; eq = f eq; gt = f gt; uo = f uo }
       | Switch labels -> Switch (Array.map f labels)
-      | Tailcall_self { destination } ->
-        Tailcall_self { destination = f destination }
+      | Tailcall_self { destination; associated_poll } ->
+        Tailcall_self { destination = f destination; associated_poll }
       | Tailcall_func Indirect
       | Tailcall_func (Direct _)
       | Return | Raise _ | Call_no_return _ ->
@@ -343,7 +344,7 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
     fprintf ppf "Call_no_return %s%a" func_symbol print_args args
   | Return -> fprintf ppf "Return%a" print_args args
   | Raise _ -> fprintf ppf "Raise%a" print_args args
-  | Tailcall_self { destination } ->
+  | Tailcall_self { destination; associated_poll = _ } ->
     dump_linear_call_op ppf
       (Linear.Ltailcall_imm
          { func =
@@ -512,7 +513,7 @@ let is_noop_move instr =
       | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
       | Opaque | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
       | Specific _ | Name_for_debugger _ | Begin_region | End_region | Dls_get
-      | Poll | Alloc _ | Pause )
+      | Poll _ | Alloc _ | Pause )
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->
     false
@@ -595,7 +596,7 @@ let make_empty_block ?label terminator : basic_block =
 
 let is_poll (instr : basic instruction) =
   match instr.desc with
-  | Op Poll -> true
+  | Op (Poll _) -> true
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Alloc _ | Move | Spill | Reload | Opaque | Pause | Begin_region
@@ -616,7 +617,7 @@ let is_alloc (instr : basic instruction) =
   | Op (Alloc _) -> true
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
-      ( Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
+      ( Poll _ | Move | Spill | Reload | Opaque | Begin_region | End_region
       | Dls_get | Pause | Const_int _ | Const_float32 _ | Const_float _
       | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
       | Stackoffset _ | Load _
@@ -634,10 +635,10 @@ let is_end_region (b : basic) =
   | Op End_region -> true
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
-      ( Alloc _ | Poll | Move | Spill | Reload | Opaque | Begin_region | Dls_get
-      | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-      | Load _
+      ( Alloc _ | Poll _ | Move | Spill | Reload | Opaque | Begin_region
+      | Dls_get | Pause | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _
       | Intop_imm (_, _)
@@ -722,7 +723,7 @@ let remove_trap_instructions t removed_trap_handlers =
         | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
         | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
         | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
-        | Dls_get | Poll | Alloc _ | Pause )
+        | Dls_get | Poll _ | Alloc _ | Pause )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =
