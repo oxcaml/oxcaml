@@ -1426,7 +1426,27 @@ let rec patch_guarded patch = function
       Levent (patch_guarded patch lam, ev)
   | _ -> fatal_error "Lambda.patch_guarded"
 
-(* Translate an access path *)
+let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
+  match elt with
+  | Value -> Value generic_value
+  | Float_boxed -> Float_boxed ()
+  | Float64 -> Float64
+  | Float32 -> Float32
+  | Bits8 -> Bits8
+  | Bits16 -> Bits16
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Vec128 -> Vec128
+  | Vec256 -> Vec256
+  | Vec512 -> Vec512
+  | Word -> Word
+  | Untagged_immediate -> Untagged_immediate
+  | Product shapes ->
+    Product (transl_mixed_product_shape shapes)
+  | Void -> Product [||]
+
+and transl_mixed_product_shape shape =
+  Array.map transl_mixed_block_element shape
 
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (fun i (elt : Types.mixed_block_element) ->
@@ -1439,17 +1459,41 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
     | Bits16 -> Bits16
     | Bits32 -> Bits32
     | Bits64 -> Bits64
-    | Untagged_immediate -> Untagged_immediate
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
     | Word -> Word
+    | Untagged_immediate -> Untagged_immediate
     | Product shapes ->
       let get_value_kind _ = generic_value in
       Product
         (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
     | Void -> Product [||]
   ) shape
+
+let mod_field ?(read_semantics=Reads_agree) pos = function
+  | Module_value_only _ ->
+    Pfield(pos, Pointer, read_semantics)
+  | Module_mixed (_, shape_for_read) ->
+    Pmixedfield([pos], shape_for_read, read_semantics)
+
+let mod_setfield pos = function
+  | Module_value_only _ -> Psetfield (pos, Pointer, Root_initialization)
+  | Module_mixed (shape, _) ->
+    Psetmixedfield([pos], shape, Root_initialization)
+
+let transl_module_representation = function
+  | Types.Module_value_only { size } -> Module_value_only size
+  | Types.Module_mixed { shape; value_count = _ } ->
+    Module_mixed
+      ( transl_mixed_product_shape shape,
+        transl_mixed_product_shape_for_read
+        ~get_value_kind:(fun _ -> generic_value)
+        ~get_mode:(fun _ ->
+           fatal_error "Lambda.transl_module_representation: \
+                          unexpected [Float_boxed].") shape)
+
+(* Translate an access path *)
 
 let rec transl_address loc = function
   | Env.Aunit cu -> Lprim(Pgetglobal cu, [], loc)
@@ -1458,33 +1502,19 @@ let rec transl_address loc = function
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
   | Env.Adot(addr, field_layouts, pos) ->
-      let layout_to_mixed_block layout =
-        match Jkind.Layout.to_sort layout with
-        | Some sort ->
-          sort |> Jkind.Sort.default_for_transl_and_get
-               |> Types.mixed_block_element_of_const_sort
-        | None ->
-          fatal_error
-            "Lambda.transl_address: could not determine layout of field"
+      let module_repr =
+        field_layouts
+        |> Array.map
+            (fun layout ->
+              layout
+              |> Jkind.Layout.to_mixed_block_element
+              |> Misc.Stdlib.Option.get_or_fatal_error
+                  ~error:"Lambda.transl_address: \
+                            could not determine layout of field")
+        |> Types.module_representation_of_mixed_product_shape
+        |> transl_module_representation
       in
-      let mixed_blocks =
-        Array.map layout_to_mixed_block field_layouts
-        |> transl_mixed_product_shape_for_read
-            ~get_value_kind:(fun _ -> generic_value)
-            ~get_mode:(fun _ -> alloc_heap)
-      in
-      if Array.for_all
-        (function
-          | Value _ -> true
-          | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
-          | Product _ -> false)
-        mixed_blocks
-      then
-        Lprim(Pfield(pos, Pointer, Reads_agree), [transl_address loc addr], loc)
-      else
-        Lprim(Pmixedfield([pos], mixed_blocks, Reads_agree),
-                   [transl_address loc addr], loc)
+      Lprim(mod_field pos module_repr, [transl_address loc addr], loc)
 
 let transl_path find loc env path =
   match find path env with
@@ -1514,39 +1544,6 @@ let transl_prim mod_name name =
   | path, _ -> transl_value_path Loc_unknown env path
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
-
-let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
-  match elt with
-  | Value -> Value generic_value
-  | Float_boxed -> Float_boxed ()
-  | Float64 -> Float64
-  | Float32 -> Float32
-  | Bits8 -> Bits8
-  | Bits16 -> Bits16
-  | Bits32 -> Bits32
-  | Bits64 -> Bits64
-  | Vec128 -> Vec128
-  | Vec256 -> Vec256
-  | Vec512 -> Vec512
-  | Word -> Word
-  | Untagged_immediate -> Untagged_immediate
-  | Product shapes ->
-    Product (transl_mixed_product_shape shapes)
-  | Void -> Product [||]
-
-and transl_mixed_product_shape shape =
-  Array.map transl_mixed_block_element shape
-
-let transl_module_representation = function
-  | Types.Module_value_only { size } -> Module_value_only size
-  | Types.Module_mixed { shape; value_count = _ } ->
-    Module_mixed
-      ( transl_mixed_product_shape shape,
-        transl_mixed_product_shape_for_read
-        ~get_value_kind:(fun _ -> generic_value)
-        ~get_mode:(fun _ ->
-           fatal_error "Lambda.transl_module_representation: \
-                          unexpected [Float_boxed].") shape)
 
 let block_of_module_representation = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
@@ -1883,17 +1880,6 @@ let find_exact_application kind ~arity args =
 
 let reset () =
   Static_label.reset static_label_sequence
-
-let mod_field ?(read_semantics=Reads_agree) pos = function
-  | Module_value_only _ ->
-    Pfield(pos, Pointer, read_semantics)
-  | Module_mixed (_, shape_for_read) ->
-    Pmixedfield([pos], shape_for_read, read_semantics)
-
-let mod_setfield pos = function
-  | Module_value_only _ -> Psetfield (pos, Pointer, Root_initialization)
-  | Module_mixed (shape, _) ->
-    Psetmixedfield([pos], shape, Root_initialization)
 
 let locality_mode_of_primitive_description (p : external_call_description) =
   if not Config.stack_allocation then

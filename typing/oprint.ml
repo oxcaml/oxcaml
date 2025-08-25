@@ -253,11 +253,6 @@ let print_out_value ppf tree =
     | Oval_nativeint i -> fprintf ppf "%nin" i
     | Oval_float f -> pp_print_string ppf (float_repres f)
     | Oval_float32 f -> fprintf ppf "%ss" (float32_to_string f)
-    | Oval_int32_u i -> fprintf ppf "#%lil" i
-    | Oval_int64_u i -> fprintf ppf "#%LiL" i
-    | Oval_nativeint_u i -> fprintf ppf "#%nin" i
-    | Oval_float_u f -> fprintf ppf "#%s" (float_repres f)
-    | Oval_float32_u f -> fprintf ppf "#%ss" (float32_to_string f)
     | Oval_char c -> fprintf ppf "%C" c
     | Oval_string (s, maxlen, kind) ->
        begin try
