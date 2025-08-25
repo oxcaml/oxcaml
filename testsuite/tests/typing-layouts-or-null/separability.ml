@@ -1088,7 +1088,10 @@ type 'a void : void
 
 type packed_void = P : 'a void -> packed_void [@@unboxed]
 
-[%%expect{||}]
+[%%expect{|
+type 'a void : void
+type packed_void = P : 'a void -> packed_void [@@unboxed]
+|}]
 
 type exists_word = W : ('a : word) . 'a -> exists_word [@@unboxed]
 
