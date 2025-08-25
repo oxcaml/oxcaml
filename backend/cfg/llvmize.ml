@@ -1967,6 +1967,10 @@ let make_temps_for_regs t cfg args_and_signature_idents runtime_arg_idents =
     | Unknown | Reg _ | Stack (Outgoing _) -> (
       (* This will reserve a fresh ident *)
       F.ins_alloca
+        ~is_gcroot:
+          (match reg.typ with
+          | Val | Valx2 -> true
+          | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> false)
         ~comment:(Format.asprintf "%a" Printreg.reg reg)
         t (get_ident_for_reg t reg)
         (Llvm_typ.of_machtyp_component reg.typ);
