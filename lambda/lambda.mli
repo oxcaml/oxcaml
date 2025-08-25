@@ -1136,8 +1136,6 @@ val transl_mixed_product_shape_for_read :
 val transl_module_representation :
   Types.module_representation -> module_representation
 
-(* CR jrayman: Make sure the correct module representation is being passed 
-   everywhere this is used *)
 val block_of_module_representation :
   module_representation -> primitive
 
@@ -1245,8 +1243,6 @@ val reset: unit -> unit
     Module accesses are always immutable, except in translobj where the
     method cache is stored in a mutable module field.
 *)
-(* CR jrayman: Make sure the correct module representation is being passed
-   everywhere this is used *)
 val mod_field:
   ?read_semantics: field_read_semantics -> int ->
   module_representation -> primitive

@@ -120,7 +120,7 @@ let transl_label_init_flambda f =
   (* Calling f (usually Translmod.transl_struct) requires the
      method_cache variable to be initialised to be able to generate
      method accesses. *)
-  let expr, size = f () in
+  let expr, repr = f () in
   let expr =
     if !method_count = 0 then expr
     else
@@ -131,7 +131,7 @@ let transl_label_init_flambda f =
                Loc_unknown),
         expr)
   in
-  transl_label_init_general (fun () -> expr, size)
+  transl_label_init_general (fun () -> expr, repr)
 
 let add_label_to_module_representation = function
     (* NB: this assumes [label] has layout value *)

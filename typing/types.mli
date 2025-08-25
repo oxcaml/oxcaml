@@ -1096,6 +1096,9 @@ module type Wrapped = sig
     mtd_loc: Location.t;
     mtd_uid: Uid.t;
   }
+
+  val layout_of_signature_item :
+    signature_item -> Jkind_types.Sort.t Jkind_types.Layout.t option
 end
 
 module Make_wrapped(Wrap : Wrap) : Wrapped with type 'a wrapped = 'a Wrap.t
