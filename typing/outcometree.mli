@@ -50,11 +50,6 @@ type out_value =
   | Oval_int32 of int32
   | Oval_int64 of int64
   | Oval_nativeint of nativeint
-  | Oval_float_u of float
-  | Oval_float32_u of Obj.t
-  | Oval_int32_u of int32
-  | Oval_int64_u of int64
-  | Oval_nativeint_u of nativeint
   | Oval_list of out_value list
   | Oval_printer of (Format.formatter -> unit)
   | Oval_record of (out_ident * out_value) list
