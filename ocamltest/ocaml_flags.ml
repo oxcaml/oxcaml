@@ -48,7 +48,9 @@ let runtime_flags env backend c_files =
           then ""
           else "-use-runtime " ^ Ocaml_files.ocamlrun
         end
-      end in
+      end
+    | Ocaml_backends.JavaScript -> "-nostdlib -I /usr/local/home/selee/workspaces/fe-1604431/+share+/app/selee/tests/stdlib"
+  in
   rt_flags ^ " " ^ runtime_library_flags
 
 let toplevel_default_flags = "-noinit -no-version -noprompt"

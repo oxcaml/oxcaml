@@ -153,8 +153,6 @@ let ocamlc_flags = make ("ocamlc_flags",
 let ocamlc_default_flags = make ("ocamlc_default_flags",
   "Flags passed by default to ocamlc.byte and ocamlc.opt")
 
-
-
 let ocamllex_flags = make ("ocamllex_flags",
   "Flags passed to ocamllex")
 
@@ -163,6 +161,13 @@ let ocamlopt_flags = make ("ocamlopt_flags",
 
 let ocamlopt_default_flags = make ("ocamlopt_default_flags",
   "Flags passed by default to ocamlopt.byte and ocamlopt.opt")
+
+let ocamlj_flags = make ("ocamlj_flags",
+  "Flags passed to ocamlj.opt")
+
+let ocamlj_default_flags = make ("ocamlj_default_flags",
+  "Flags passed by default to ocamlj.opt")
+
 
 let ocamlyacc_flags = make ("ocamlyacc_flags",
   "Flags passed to ocamlyacc")
@@ -187,6 +192,9 @@ let ocamlc_opt_exit_status = make ("ocamlc_opt_exit_status",
 
 let ocamlopt_opt_exit_status = make ("ocamlopt_opt_exit_status",
   "Expected exit status of ocamlopt.opt")
+
+let ocamlj_opt_exit_status = make ("ocamlj_opt_exit_status",
+  "Expected exit status of ocamlj.opt")
 
 let export_ocamlrunparam value =
   ("OCAMLRUNPARAM", value)

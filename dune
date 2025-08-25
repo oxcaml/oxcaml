@@ -349,7 +349,8 @@
  (modules
    jsmaindriver
    jscompile
-   jslibrarian))
+   jslibrarian
+   jslink))
 
 (executable
  (name boot_ocamlj)

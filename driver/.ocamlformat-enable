@@ -6,3 +6,5 @@ jsmaindriver.ml
 jsmaindriver.mli
 jslibrarian.ml
 jslibrarian.mli
+jslink.ml
+jslink.mli
