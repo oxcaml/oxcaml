@@ -15,11 +15,11 @@
  module = "float_u_monoid.mli float_u_monoid.ml";
  ocamlopt.byte;
 
- flags = "-parameter Bits_u_monoid";
+ flags = "-drawflambda -parameter Bits_u_monoid";
  module = "bits_u_monoid_utils.mli bits_u_monoid_utils.ml";
  ocamlopt.byte;
 
- flags = "-instantiate";
+ flags = "-drawflambda -instantiate";
  module = "";
  program = "bits_u_monoid_utils-Float_u_monoid.cmx";
  all_modules = "bits_u_monoid_utils.cmx float_u_monoid.cmx";

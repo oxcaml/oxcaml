@@ -3817,7 +3817,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
   let module_block_var = Variable.create "module_block" K.value in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
-  let block_shape, field_count, block_access =
+  let block_shape, field_count, block_access, kind_of_field =
     match module_repr with
     | Lambda.Module_value_only size ->
       let block_access _pos : P.Block_access_kind.t =
@@ -3827,7 +3827,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
             field_kind = Any_value
           }
       in
-      K.Scannable_block_shape.Value_only, size, block_access
+      K.Scannable_block_shape.Value_only, size, block_access, fun _ -> K.value
     | Lambda.Module_mixed (shape, _) ->
       let shape =
         K.Mixed_block_lambda_shape.of_mixed_block_elements shape
@@ -3838,6 +3838,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       in
       let field_count = Array.length flattened_reordered_shape in
       let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+      let field_kinds = K.Mixed_block_shape.field_kinds kind_shape in
       let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
       let block_access pos : P.Block_access_kind.t =
         let field_kind : P.Mixed_block_access_field_kind.t =
@@ -3858,7 +3859,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
             shape = kind_shape
           }
       in
-      block_shape, field_count, block_access
+      block_shape, field_count, block_access, fun pos -> field_kinds.(pos)
   in
   let load_fields_body acc =
     let env =
@@ -3876,9 +3877,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       List.init field_count (fun pos ->
           let pos_str = string_of_int pos in
           ( pos,
-            Variable.create ("field_" ^ pos_str) K.value
-            (* CR mixed-modules: Find the right kind from the module block
-               shape *),
+            Variable.create ("field_" ^ pos_str) (kind_of_field pos),
             Flambda_debug_uid.none ))
     in
     let acc, body =
