@@ -127,8 +127,8 @@ let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ ->
     false
-  | Raise _ -> false
-  | Tailcall_self _ | Tailcall_func _ | Return -> true
+  | Raise _ | Tailcall_self _ -> false
+  | Tailcall_func _ | Return -> true
   | Call_no_return _ | Call _ | Prim _ -> false
 
 let is_safe_block : Cfg.basic_block -> bool =
