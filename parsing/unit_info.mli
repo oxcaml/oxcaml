@@ -53,7 +53,8 @@ type t
     - the module name associated to the unit
     - the filename prefix (dirname + basename with all extensions stripped)
       for compilation artifacts
-    - the input source file
+    - the original input source file
+    - the raw input source file
     For instance, when calling [ocamlopt dir/x.mli -o target/y.cmi],
     - the input source file is [dir/x.mli]
     - the module name is [Y]
