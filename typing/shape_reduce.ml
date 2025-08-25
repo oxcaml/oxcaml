@@ -135,7 +135,7 @@ let find_shape env id =
 module Make(Params : sig
   val fuel : unit -> int
   val fuel_for_compilation_units : unit -> int
-
+  val max_shape_reduce_steps_per_variable : unit -> Misc.Maybe_bounded.t
   val max_compilation_unit_depth : unit -> int
   val read_unit_shape : diagnostics:Diagnostics.t -> unit_name:string -> t option
 end) = struct
@@ -458,6 +458,7 @@ end) = struct
   type env = {
     fuel: int ref;
     fuel_for_compilation_units: int ref;
+    max_steps_per_variable: Misc.Maybe_bounded.t;
     diagnostics: Diagnostics.t;
     global_env: Env.t;
     local_env: local_env;
@@ -516,7 +517,7 @@ end) = struct
     reduce_ { env with local_env } t
 
   and reduce__
-    ({fuel; fuel_for_compilation_units; global_env; local_env; _} as env) (t : t) =
+    ({fuel; fuel_for_compilation_units; max_steps_per_variable; global_env; local_env; _} as env) (t : t) =
     let reduce env t = reduce_ env t in
     let reduce_with_increased_depth env t =
       let local_env = { env.local_env with depth = env.local_env.depth + 1 } in
@@ -536,7 +537,9 @@ end) = struct
       | Some _ as uid -> { t' with uid }
     in
     if !fuel < 0 then approx_nf (return (NError "NoFuelLeft"))
-    else
+    else if Misc.Maybe_bounded.is_depleted max_steps_per_variable then return NLeaf
+    else (
+      Misc.Maybe_bounded.decr max_steps_per_variable;
       match t.desc with
       | Comp_unit unit_name ->
           if !fuel_for_compilation_units < 0
@@ -649,6 +652,7 @@ end) = struct
           let dnf_fields = List.map (fun (name, t, ly) ->
             (name, delay_reduce env t, ly)) fields in
           return (NRecord { fields = dnf_fields; kind })
+    )
 
   and read_back env (nf : nf) : t =
   in_read_back_memo_table env.read_back_memo_table nf (read_back_ env) nf
@@ -732,10 +736,12 @@ end) = struct
   let reduce ?(diagnostics = Diagnostics.no_diagnostics) global_env t =
     let fuel = ref (Params.fuel ()) in
     let fuel_for_compilation_units = ref (Params.fuel_for_compilation_units ()) in
+    let max_steps_per_variable = Params.max_shape_reduce_steps_per_variable () in
     let local_env = { subst = Ident.Map.empty; depth = 0 } in
     let env = {
       fuel;
       fuel_for_compilation_units;
+      max_steps_per_variable;
       global_env;
       diagnostics;
       reduce_memo_table = !reduce_memo_table;
@@ -782,6 +788,7 @@ end) = struct
     let env = {
       fuel;
       fuel_for_compilation_units = ref (Params.fuel_for_compilation_units ());
+      max_steps_per_variable = Params.max_shape_reduce_steps_per_variable ();
       global_env;
       diagnostics = Diagnostics.no_diagnostics;
       reduce_memo_table = !reduce_memo_table;
@@ -799,6 +806,7 @@ module Local_reduce =
   Make(struct
     let fuel () = 10
     let fuel_for_compilation_units () = 0
+    let max_shape_reduce_steps_per_variable () = Misc.Maybe_bounded.Unbounded
     let max_compilation_unit_depth () = 0
       (* Local reduction never needs to load a compilation unit. *)
     let read_unit_shape ~diagnostics:_ ~unit_name:_ = None

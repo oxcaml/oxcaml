@@ -1761,6 +1761,10 @@ module With_cms_reduce = Shape_reduce.Make (struct
     !Clflags.gdwarf_config_max_cms_files_per_variable
   (* Every variable gets to look up at most N compilation units. *)
 
+  let max_shape_reduce_steps_per_variable () =
+    Misc.Maybe_bounded.of_option
+      !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable
+
   let max_compilation_unit_depth () = !Clflags.gdwarf_config_shape_reduce_depth
   (* CR sspies: Loading compilation units is expensive. We should avoid going
      too deep into the *)

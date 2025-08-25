@@ -267,6 +267,8 @@ module type Optcomp_options = sig
   val _gdwarf_config_max_cms_files_per_unit : int -> unit
   val _gdwarf_config_max_cms_files_per_variable : int -> unit
   val _gdwarf_config_max_type_to_shape_depth : int -> unit
+  val _gdwarf_config_max_shape_reduce_steps_per_variable : string -> unit
+  val _gdwarf_config_max_evaluation_steps_per_variable : string -> unit
   val _gdwarf_fidelity : string -> unit
 end
 
