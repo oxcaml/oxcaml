@@ -29,7 +29,7 @@
 open! Flambda.Import
 open! Jsoo_imports.Import
 
-(* CR selee: we should eventually get rid of these *)
+(* CR selee: we should eventually get rid of this *)
 let unsupported_multiple_return_variables vars =
   match vars with
   | [var] -> var
@@ -350,8 +350,9 @@ and apply_expr ~env ~res e =
     | Some callee, Function _ ->
       let args, res = To_jsir_shared.simples ~env ~res args in
       let f, res = To_jsir_shared.simple ~env ~res callee in
-      (* CR selee: assume exact = false for now, JSIR seems to assume false in
-         the case that we don't know *)
+      (* Setting [exact = false] here is ok - it's more general, and the JSOO
+         simplifier also knows how to change this to [true] if it knows that the
+         argument numbers match up *)
       apply_fn ~res ~f ~args ~exact:false
     | Some callee, Method { obj; kind; alloc_mode = _ } ->
       let args, res = To_jsir_shared.simples ~env ~res args in
@@ -417,10 +418,6 @@ and apply_cont0 ~env ~res apply_cont =
         | _ :: _ ->
           Misc.fatal_error "Found a Toplevel_return with multiple arguments"
       in
-      (* CR selee: This is a hack, but I can't find a way to trigger any
-         behaviour that isn't calling [caml_register_global] on the toplevel
-         module. I suspect for single-file compilation this is always fine. Will
-         come back and review later. *)
       let compilation_unit =
         To_jsir_env.module_symbol env |> Symbol.compilation_unit
       in

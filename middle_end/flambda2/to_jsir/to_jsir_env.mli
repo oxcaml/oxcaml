@@ -31,8 +31,6 @@ open! Jsoo_imports.Import
 (** Translation environment for Flambda to Js_of_ocaml IR translation. *)
 type t
 
-(* CR selee: probably we will end up needing to store more info *)
-
 (** Create a new environment.
 
     [return_continuation] and [exn_continuation] refer to the top-level
