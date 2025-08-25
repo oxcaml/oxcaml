@@ -590,29 +590,18 @@ module Sign_diff = struct
     }
 end
 
-let module_representation_of_layouts layouts =
-  layouts
-  |> List.map
-    (fun layout ->
+(* similar to [Typemod.module_representation_of_signature] *)
+let module_representation_of_lazy_signature sg =
+  sg
+  |> List.filter_map Subst.Lazy.layout_of_signature_item
+  |> List.map (fun layout ->
       layout
-      |> Jkind.Layout.to_sort
-          (* we should've already checked that [sg] is representable
-             in [transl_value_decl] *)
+      |> Jkind.Layout.to_mixed_block_element
       |> Misc.Stdlib.Option.get_or_fatal_error
-            ~error:"Types.module_representation_of_layouts: \
-                      unexpected unrepresentable layout"
-      |> Jkind.Sort.default_for_transl_and_get
-      |> mixed_block_element_of_const_sort)
+           ~error:"Includemod.module_representation_of_lazy_signature: \
+                     unexpected unrepresentable layout")
   |> Array.of_list
   |> module_representation_of_mixed_product_shape
-
-let module_representation_of_signature sg =
-  sg |> List.filter_map Env.layout_of_signature_item
-     |> module_representation_of_layouts
-
-let module_representation_of_lazy_signature sg =
-  sg |> List.filter_map Env.layout_of_lazy_signature_item
-     |> module_representation_of_layouts
 
 (* Quickly compare module types without expanding them, succeeding only if mty1
   is a subtype of mty2 with no coercion  *)
