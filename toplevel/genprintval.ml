@@ -293,34 +293,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         | Tsubst _ | Tfield _ | Tnil | Tlink _ | Tof_kind _
           -> true (* error will be thrown later *)
         | Tconstr (path, _, _)
-               (* CR jrayman: make this a function in predef *)
-          when Path.same path Predef.path_unboxed_float
-            || Path.same path Predef.path_unboxed_float32
-            || Path.same path Predef.path_unboxed_nativeint
-            || Path.same path Predef.path_unboxed_char
-            || Path.same path Predef.path_unboxed_int
-            || Path.same path Predef.path_unboxed_int8
-            || Path.same path Predef.path_unboxed_int16
-            || Path.same path Predef.path_unboxed_int32
-            || Path.same path Predef.path_unboxed_int64
-            || Path.same path Predef.path_unboxed_int8x16
-            || Path.same path Predef.path_unboxed_int16x8
-            || Path.same path Predef.path_unboxed_int32x4
-            || Path.same path Predef.path_unboxed_int64x2
-            || Path.same path Predef.path_unboxed_int8x32
-            || Path.same path Predef.path_unboxed_int16x16
-            || Path.same path Predef.path_unboxed_int32x8
-            || Path.same path Predef.path_unboxed_int64x4
-            || Path.same path Predef.path_unboxed_float32x8
-            || Path.same path Predef.path_unboxed_float64x4
-            || Path.same path Predef.path_unboxed_float32x4
-            || Path.same path Predef.path_unboxed_float64x2
-            || Path.same path Predef.path_unboxed_int8x64
-            || Path.same path Predef.path_unboxed_int16x32
-            || Path.same path Predef.path_unboxed_int32x16
-            || Path.same path Predef.path_unboxed_int64x8
-            || Path.same path Predef.path_unboxed_float32x16
-            || Path.same path Predef.path_unboxed_float64x8
+          when Predef.is_unboxed_predef_path path
           -> false
         | Tconstr (path, _, _) ->
           begin try
@@ -368,8 +341,6 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | Ttuple(labeled_tys) ->
               Oval_tuple (tree_of_labeled_val_list 0 depth obj labeled_tys)
           | Tunboxed_tuple(labeled_tys) ->
-              (* CR jrayman for reviewer: here we are passing an unboxed tuple
-                 around as an obj. Is that right? *)
               Oval_unboxed_tuple
                 (tree_of_labeled_val_list 0 depth obj labeled_tys)
           | Tconstr(path, [ty_arg], _)

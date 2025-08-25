@@ -1196,6 +1196,11 @@ let toplevel_name id =
   with Not_found -> Ident.name id
 
 let toploop_getvalue id =
+  if !Clflags.native_code then
+    (* [toploop_getvalue] and [toploop_setvalue] are only used by bytecode, so
+       we can hardcode the module representations passed to [mod_field] as
+       [Module_value_only]. *)
+    fatal_error "Translmod.toploop_getvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(mod_field toploop_getvalue_pos (Module_value_only (-1)),
@@ -1213,6 +1218,9 @@ let toploop_getvalue id =
   }
 
 let toploop_setvalue id lam =
+  if !Clflags.native_code then
+    (* See comment under [toploop_getvalue] *)
+    fatal_error "Translmod.toploop_setvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(mod_field toploop_setvalue_pos (Module_value_only (-1)),

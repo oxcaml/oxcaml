@@ -770,12 +770,37 @@ module type Wrapped = sig
     mtd_loc: Location.t;
     mtd_uid: Uid.t;
   }
+
+  val layout_of_signature_item :
+    signature_item -> Jkind_types.Sort.t Jkind_types.Layout.t option
 end
 
 module Make_wrapped(Wrap : Wrap) = struct
   (* Avoid repeating everything in Wrapped *)
   module rec M : Wrapped with type 'a wrapped = 'a Wrap.t = M
   include M
+
+  let layout_of_signature_item = function
+    | Sig_value(_, decl, _) ->
+      begin match decl.val_kind with
+      | Val_reg layout -> Some layout
+      | Val_ivar _ ->
+        Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_instance_var))
+      | Val_self _ | Val_anc _ ->
+        Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_object))
+      | Val_prim _ | Val_mut _ -> None (* error will be thrown later in Env *)
+      end
+    | Sig_typext _ ->
+      Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_type_extension))
+    | Sig_module(_, pres, _, _, _) ->
+      begin match pres with
+      | Mp_present ->
+        Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_module))
+      | Mp_absent -> None
+      end
+    | Sig_class _ ->
+        Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_class))
+    | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
 end
 
 module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
@@ -846,8 +871,6 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
         To.Sig_class (id,cd,rs,vis)
     | Sig_class_type (id,ctd,rs,vis) ->
         To.Sig_class_type (id,ctd,rs,vis)
-
-  (* CR jrayman: move stuff here *)
 end
 
 include Make_wrapped(struct type 'a t = 'a end)

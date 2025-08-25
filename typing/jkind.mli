@@ -105,6 +105,8 @@ module Layout : sig
 
   val to_sort : Sort.t t -> Sort.t option
 
+  val to_mixed_block_element : Sort.t t -> Types.mixed_block_element option
+
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
 
   module Debug_printers : sig
