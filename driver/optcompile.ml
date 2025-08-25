@@ -77,7 +77,7 @@ let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
            end))
 
 let compile_from_typed i typed ~unix ~pipeline ~as_arg_for =
-  let loc = Location.in_file (Unit_info.source_file i.target) in
+  let loc = Location.in_file (Unit_info.original_source_file i.target) in
   typed
   |> Profile.(record transl)
     (Translmod.transl_implementation ~loc i.module_name)
