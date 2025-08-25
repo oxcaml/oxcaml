@@ -112,9 +112,7 @@ module Type_shape = struct
         unknown_shape (* CR sspies: We can use this for recursive cycles. *)
       | None -> unknown_shape
     else
-      match
-        List.find_opt (fun (p, _) -> p == expr) subst
-      with
+      match List.find_opt (fun (p, _) -> Types.eq_type p expr) subst with
       | Some (_, s) -> s
       | None ->
         let visited = Numbers.Int.Map.add (Types.get_id expr) () visited in
