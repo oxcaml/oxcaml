@@ -159,21 +159,24 @@ end = struct
     match d with
     | None -> ()
     | Some d ->
-      d.shape_size_before_reduction_memory <- Obj.reachable_words (Obj.repr shape);
+      d.shape_size_before_reduction_memory
+        <- Obj.reachable_words (Obj.repr shape);
       d.shape_size_before_reduction_tree <- Shape.size shape
 
   let record_after_reduction d shape =
     match d with
     | None -> ()
     | Some d ->
-      d.shape_size_after_reduction_memory <- Obj.reachable_words (Obj.repr shape);
+      d.shape_size_after_reduction_memory
+        <- Obj.reachable_words (Obj.repr shape);
       d.shape_size_after_reduction_tree <- Shape.size shape
 
   let record_after_evaluation d shape =
     match d with
     | None -> ()
     | Some d ->
-      d.shape_size_after_evaluation_memory <- Obj.reachable_words (Obj.repr shape);
+      d.shape_size_after_evaluation_memory
+        <- Obj.reachable_words (Obj.repr shape);
       d.shape_size_after_evaluation_tree <- Shape.size shape
 
   let compute_die_size die =
@@ -1762,9 +1765,9 @@ module With_cms_reduce = Shape_reduce.Make (struct
      different variables. *)
 
   let read_unit_shape ~diagnostics ~unit_name =
-    (* CR sspies: We could consider throwing a louder error here, since
-    there must be something like a [.cms] version mismatch here. For
-    now, since it's only debugging information, we fail silently. *)
+    (* CR sspies: We could consider throwing a louder error here, since there
+       must be something like a [.cms] version mismatch here. For now, since
+       it's only debugging information, we fail silently. *)
     match StringTable.find_opt cms_file_cache unit_name with
     | Some shape ->
       Shape_reduce.Diagnostics.count_cms_file_cached diagnostics;
@@ -1781,26 +1784,29 @@ module With_cms_reduce = Shape_reduce.Make (struct
           | exception Not_found -> (
             match Load_path.find_normalized (filename ^ ".cmt") with
             | exception Not_found ->
-              Shape_reduce.Diagnostics.add_cms_file_missing diagnostics (filename ^ ".cms");
+              Shape_reduce.Diagnostics.add_cms_file_missing diagnostics
+                (filename ^ ".cms");
               None
             | cmt_path -> (
               match Cmt_format.read cmt_path with
               | exception Cmt_format.Error _ ->
-                Shape_reduce.Diagnostics.add_cms_file_unreadable diagnostics (filename ^ ".cmt");
+                Shape_reduce.Diagnostics.add_cms_file_unreadable diagnostics
+                  (filename ^ ".cmt");
                 None
-              | (_, Some cmt_infos) -> cmt_infos.cmt_impl_shape
+              | _, Some cmt_infos -> cmt_infos.cmt_impl_shape
               | _ -> None))
           | cms_path -> (
             match Cms_format.read cms_path with
             | exception Cms_format.Error _ ->
-              Shape_reduce.Diagnostics.add_cms_file_unreadable diagnostics (filename ^ ".cms");
+              Shape_reduce.Diagnostics.add_cms_file_unreadable diagnostics
+                (filename ^ ".cms");
               None
             | cms_infos -> cms_infos.cms_impl_shape)
         in
-        (StringTable.add cms_file_cache unit_name shape;
+        StringTable.add cms_file_cache unit_name shape;
         Shape_reduce.Diagnostics.count_cms_file_loaded diagnostics;
-        shape) (* Note: This is an option, and we are also caching the None case. *)
-        )
+        shape
+        (* Note: This is an option, and we are also caching the None case. *))
 end)
 
 module D = Shape_reduction_diagnostics

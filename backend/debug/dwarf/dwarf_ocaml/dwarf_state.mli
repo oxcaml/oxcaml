@@ -37,9 +37,7 @@ module Diagnostics : sig
       cms_files_unreadable : string list
     }
 
-  type t =
-    { mutable variables : variable_reduction list
-    }
+  type t = { mutable variables : variable_reduction list }
 end
 
 type t
@@ -86,7 +84,6 @@ val diagnostics : t -> Diagnostics.t
 
 val add_variable_reduction_diagnostic :
   t -> Diagnostics.variable_reduction -> unit
-
 
 module Debug : sig
   val log : ('a, Format.formatter, unit) format -> 'a

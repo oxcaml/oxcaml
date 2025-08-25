@@ -36,9 +36,7 @@ module Diagnostics = struct
       cms_files_unreadable : string list
     }
 
-  type t =
-    { mutable variables : variable_reduction list
-    }
+  type t = { mutable variables : variable_reduction list }
 end
 
 type t =
@@ -102,7 +100,6 @@ let diagnostics t = t.diagnostics
 
 let add_variable_reduction_diagnostic t diagnostic =
   t.diagnostics.variables <- diagnostic :: t.diagnostics.variables
-
 
 module Debug = struct
   let log f =

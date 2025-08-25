@@ -145,8 +145,10 @@ let format_variable_json (variable : DS.Diagnostics.variable_reduction) =
       Json.field "dwarf_die_size" (Json.int variable.dwarf_die_size);
       Json.field "cms_files_loaded" (Json.int variable.cms_files_loaded);
       Json.field "cms_files_cached" (Json.int variable.cms_files_cached);
-      Json.field "cms_files_missing" (Json.array (List.map Json.string variable.cms_files_missing));
-      Json.field "cms_files_unreadable" (Json.array (List.map Json.string variable.cms_files_unreadable)) ]
+      Json.field "cms_files_missing"
+        (Json.array (List.map Json.string variable.cms_files_missing));
+      Json.field "cms_files_unreadable"
+        (Json.array (List.map Json.string variable.cms_files_unreadable)) ]
 
 let emit_stats_file t =
   let sourcefile = DS.sourcefile t.state in
@@ -165,7 +167,7 @@ let emit_stats_file t =
     Json.object_
       [ Json.field "compilation_parameters" (Json.object_ []);
         (* CR sspies: Add the configuration parameters here once they are
-            there. *)
+           there. *)
         Json.field "variables" (Json.array variable_jsons) ]
   in
   Printf.fprintf oc "%s\n" main_object;
