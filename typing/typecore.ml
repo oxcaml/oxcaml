@@ -2976,7 +2976,8 @@ and type_pat_aux
             ~kind:Val_reg sp.ppat_attributes sort
           in
           rvp {
-            pat_desc = Tpat_var (id, v, uid, sort, Location.mknoloc alloc_mode.mode);
+            pat_desc = Tpat_var
+              (id, v, uid, sort, Location.mknoloc alloc_mode.mode);
             pat_loc = sp.ppat_loc;
             pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
             pat_type = t;
