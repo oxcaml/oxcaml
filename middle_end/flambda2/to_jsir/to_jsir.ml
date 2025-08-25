@@ -424,13 +424,16 @@ and apply_cont0 ~env ~res apply_cont =
   let continuation = Apply_cont.continuation apply_cont in
   let get_last ~raise_kind_and_exn_handler : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
-    | Toplevel_return ->
+    | (Toplevel_return | Define_root_symbol) as sort ->
       let module_symbol =
         match args with
         | [arg] -> arg
-        | [] -> Misc.fatal_error "Found a Toplevel_return with no arguments"
+        | [] ->
+          Misc.fatal_errorf "Found %a with no arguments" Continuation.Sort.print
+            sort
         | _ :: _ ->
-          Misc.fatal_error "Found a Toplevel_return with multiple arguments"
+          Misc.fatal_errorf "Found %a with multiple arguments"
+            Continuation.Sort.print sort
       in
       let compilation_unit =
         To_jsir_env.module_symbol env |> Symbol.compilation_unit
@@ -484,7 +487,6 @@ and apply_cont0 ~env ~res apply_cont =
             (List.map Option.some extra_args)
         in
         Raise (exn, raise_kind), res)
-    | Define_root_symbol -> failwith "unimplemented"
   in
   match Apply_cont.trap_action apply_cont with
   | None -> get_last ~raise_kind_and_exn_handler:None
