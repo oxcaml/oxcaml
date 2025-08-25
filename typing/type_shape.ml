@@ -659,6 +659,21 @@ module Type_decl_shape = struct
   let of_type_declaration id decl shape_for_constr =
     let decls = of_type_declarations [id, decl] shape_for_constr in
     match decls with [decl] -> decl | _ -> assert false
+
+  let of_extension_constructor_merlin_only (ext : Types.extension_constructor) =
+    match ext.ext_args with
+    | Types.Cstr_record lbls ->
+      let record =
+        record_of_labels
+          ~shape_for_constr:(fun _ ~args:_ -> None)
+          ~type_subst:[] Record_boxed lbls
+        (* CR sspies: Instead of [Record_boxed], it would be nicer to mark
+           these as virtual, because they only exist for Merlin. This saves
+           us from trouble when shapes that are intended for Merlin end up
+           in the DWARF emission, because they will at least be labeled. *)
+      in
+      Shape.set_uid_if_none record ext.ext_uid
+    | _ -> Shape.leaf ext.ext_uid
 end
 
 let rec decompose_application (t : Shape.t) =

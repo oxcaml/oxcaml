@@ -15,6 +15,16 @@ module Type_decl_shape : sig
 
   val of_type_declaration :
     Ident.t -> Types.type_declaration -> path_lookup -> Shape.t
+
+  (* CR sspies: The treatment of extension constructors for the debugger would
+     need to be revisited, since the extension constructor declarations declare
+     new runtime objects that we would then have to find and display differently
+     in the debugger. The flow there is very different than for the regular type
+     shapes. For now, we only support constructing shapes that Merlin
+     understands. They should not end up in the shape reduction for DWARF
+     emission at the moment. *)
+  val of_extension_constructor_merlin_only :
+    Types.extension_constructor -> Shape.t
 end
 
 (** When producing a type shape with [of_type_expr], the resulting shape is

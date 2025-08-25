@@ -822,17 +822,12 @@ let shape_declarations env decls =
     Type_shape.Type_decl_shape.of_type_declarations
       decls (Env.shape_for_constr env)
 
-let shape_extension_constructor ext uid =
+
+let shape_extension_constructor ext =
   if !Clflags.use_old_merlin_shapes then
-    (old_merlin_shape_extension_constructor ext uid)
+    (old_merlin_shape_extension_constructor ext.ext_args ext.ext_uid)
   else
-    Shape.leaf uid
-    (* CR sspies: The debugging shapes currently lose information in this case.
-       Specifcally, we lose the information about the arguments of the extension
-       constructor. To properly support this, we need to extend the shape type
-       and keep track of this UID. Doing so will require additional changes to
-       the DWARF emission in the backend due to the representation of extension
-       constructors at runtime. *)
+    Type_shape.Type_decl_shape.of_extension_constructor_merlin_only ext
 
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
@@ -3196,7 +3191,7 @@ let transl_extension_constructor ~scope env type_path type_params
       Typedtree.ext_loc = sext.pext_loc;
       Typedtree.ext_attributes = sext.pext_attributes; }
   in
-  let shape = shape_extension_constructor args ext_cstrs.ext_type.ext_uid in
+  let shape = shape_extension_constructor ext in
   ext_cstrs, shape
 
 let transl_extension_constructor ~scope env type_path type_params
