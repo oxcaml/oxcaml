@@ -682,6 +682,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~first_complex_local_param ~result_arity ~result_types:Unknown
               ~result_mode ~stub:true ~inline:Default_inline
               ~poll_attribute:Default
+              ~regalloc_attribute:Regalloc_attribute.Default
               ~zero_alloc_attribute:Zero_alloc_attribute.Default_zero_alloc
               ~is_a_functor:false ~is_opaque:false ~recursive
               ~cost_metrics:cost_metrics_of_body
