@@ -118,19 +118,37 @@ let prologue_needed_block (block : Cfg.basic_block) ~fun_name =
   | Requires_prologue -> true
   | No_requirements | Requires_no_prologue -> false
 
-let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
-  let visited = ref Label.Set.empty in
-  let rec collect label =
-    if not (Label.Set.mem label !visited)
-    then (
-      visited := Label.Set.add label !visited;
-      let block = Cfg.get_block_exn cfg label in
-      Label.Set.iter
-        (fun succ_label -> collect succ_label)
-        (Cfg.successor_labels ~normal:true ~exn:true block))
-  in
-  Profile.record ~accumulate:true "descendants" collect block.start;
-  !visited
+module Reachable_epilogues = struct
+  type t = Label.Set.t Label.Tbl.t
+
+  let build (cfg : Cfg.t) : t =
+    let t = Label.Tbl.map cfg.blocks (fun _ -> Label.Set.empty) in
+    let visited = ref Label.Set.empty in
+    let rec collect label =
+      if not (Label.Set.mem label !visited)
+      then (
+        visited := Label.Set.add label !visited;
+        let block = Cfg.get_block_exn cfg label in
+        (match
+           Instruction_requirements.terminator block.terminator cfg.fun_name
+         with
+        | Requires_no_prologue ->
+          Label.Tbl.replace t label (Label.Set.singleton label)
+        | No_requirements | Requires_prologue -> ());
+        Label.Set.iter
+          (fun succ_label ->
+            collect succ_label;
+            Label.Tbl.replace t label
+              (Label.Set.union (Label.Tbl.find t label)
+                 (Label.Tbl.find t succ_label)))
+          (Cfg.successor_labels ~normal:true ~exn:true block))
+    in
+    Profile.record ~accumulate:true "reachable_epilogues" collect
+      cfg.entry_label;
+    t
+
+  let from_block (t : t) (label : Label.t) = Label.Tbl.find t label
+end
 
 let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
     (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
@@ -140,7 +158,9 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
      is both inefficient as well as possibly incorrect.
 
      Having a non-zero stack offset means that the prologue is added after a
-     [Pushtrap] or [Stackoffset] which shouldn't be allowed. *)
+     [Pushtrap] or [Stackoffset] which shouldn't be allowed. This is because the
+     prologue is added at the stack pointer, which would overlap with the
+     handler pushed by a [Pushtrap]. *)
   if Cfg_loop_infos.is_in_loop loop_infos prologue_label
      || prologue_block.stack_offset <> 0
   then false
@@ -154,7 +174,8 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
      *  Block C: Return
 
        We have the choice of putting the prologue in Block A or B, and we would
-       place an epilogue in Block C.
+       place an epilogue in Block C (or we could create a new block with the
+       epilogue).
 
        If we try to place the prologue in block B, the prologue would not
        dominate the epilogue in block C, so in some cases the epilogue would be
@@ -169,26 +190,18 @@ let can_place_prologue =
 
 let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
   let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
-      (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
+      (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
+      (reachable_epilogues : Reachable_epilogues.t) =
     let block = Cfg.get_block_exn cfg tree.label in
     let epilogue_blocks =
-      Label.Set.filter
-        (fun label ->
-          let block = Cfg.get_block_exn cfg label in
-          let fun_name = Cfg.fun_name cfg in
-          match
-            Instruction_requirements.terminator block.terminator fun_name
-          with
-          | Requires_no_prologue -> true
-          | No_requirements | Requires_prologue -> false)
-        (descendants cfg block)
+      Reachable_epilogues.from_block reachable_epilogues tree.label
     in
     if prologue_needed_block block ~fun_name:cfg.fun_name
     then Some (tree.label, epilogue_blocks)
     else
       let children_prologue_block =
         List.filter_map
-          (fun tree -> visit tree cfg doms loop_infos)
+          (fun tree -> visit tree cfg doms loop_infos reachable_epilogues)
           tree.children
       in
       match children_prologue_block with
@@ -204,23 +217,32 @@ let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
            to avoid duplication of the prologue. *)
         Some (tree.label, epilogue_blocks)
   in
-  let doms, tree, loop_infos =
-    Profile.record ~accumulate:true "build_doms_and_loops"
-      (fun () ->
-        let doms = Cfg_dominators.build cfg in
-        (* note: the other entries in the forest are dead code *)
-        let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
-        let loop_infos = Cfg_loop_infos.build cfg doms in
-        doms, tree, loop_infos)
-      ()
-  in
-  let prologue_required = visit tree cfg doms loop_infos in
-  (match prologue_required with
-  | None -> ()
-  | Some (prologue_label, epilogue_blocks) ->
-    assert (
-      can_place_prologue prologue_label cfg doms loop_infos epilogue_blocks));
-  prologue_required
+  (* [Proc.prologue_required] is cheap and should provide an over-estimate of
+     when we would need a prologue (in some cases [Proc.prologue_required] will
+     return [true] because it uses the value of [cfg.fun_contains_calls] which
+     was computed before CFG simplification, which can remove calls if they are
+     dead, making the prologue unnecessary). *)
+  if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
+       ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  then (
+    let doms, tree, loop_infos, reachable_epilogues =
+      Profile.record ~accumulate:true "build_doms_and_loops"
+        (fun () ->
+          let doms = Cfg_dominators.build cfg in
+          (* note: the other entries in the forest are dead code *)
+          let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
+          let loop_infos = Cfg_loop_infos.build cfg doms in
+          let reachable_epilogues = Reachable_epilogues.build cfg in
+          doms, tree, loop_infos, reachable_epilogues)
+        ()
+    in
+    match visit tree cfg doms loop_infos reachable_epilogues with
+    | None -> None
+    | Some (prologue_label, epilogue_blocks) ->
+      assert (
+        can_place_prologue prologue_label cfg doms loop_infos epilogue_blocks);
+      Some (prologue_label, epilogue_blocks))
+  else None
 
 let find_prologue_and_epilogues_shrink_wrapped =
   Profile.record ~accumulate:true "find_in_body"
