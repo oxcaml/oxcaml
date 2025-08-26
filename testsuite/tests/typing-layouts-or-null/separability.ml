@@ -1098,3 +1098,14 @@ type exists_word = W : ('a : word) . 'a -> exists_word [@@unboxed]
 [%%expect{|
 type exists_word = W : ('a : word). 'a -> exists_word [@@unboxed]
 |}]
+
+(* With-bounds don't affect separability here: *)
+
+type 'a abs1 : value mod non_float with 'a
+
+type packed = P : 'a abs1 -> packed [@@unboxed]
+
+[%%expect{|
+type 'a abs1 : value mod non_float
+type packed = P : 'a abs1 -> packed [@@unboxed]
+|}]
