@@ -16,7 +16,7 @@ let d_1 = #0l;;
 let e_1 = #0n;;
 
 (* CR layouts v5: Printing toplevel unboxed products usually causes a segfault
-   in the toplevel. Fix that. *)
+   on native. Fix that. *)
 (* Test 2: Unboxed products *)
 type t_2 = #{ x : int; y : int64# };;
 (* let a_2 = #(0, 0);; *)
