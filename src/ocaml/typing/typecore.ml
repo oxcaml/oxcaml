@@ -7429,10 +7429,15 @@ and type_expect_
                        _ } ,
                       _)}]) ->
         check_probe_name name name_loc env;
-        add_delayed_check
+        (* CR-someday: (Merlin-only) This check is commented out because Merlin is
+           spuriously raising it when it shouldn't. This is possibly due to probes
+           interacting poorly with the typer cache. Until this problem is fixed,
+           commenting out this error seems good enough - incorrectly reporting this error
+           is far more costly than failing to report it. *)
+        (* add_delayed_check
           (fun () ->
              if not (Env.has_probe name) then
-               raise(error(name_loc, env, (Probe_name_undefined name))));
+               raise(error(name_loc, env, (Probe_name_undefined name)))); *)
         rue {
           exp_desc = Texp_probe_is_enabled {name};
           exp_loc = loc; exp_extra = [];
