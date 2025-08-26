@@ -18,6 +18,157 @@
 open Allowance
 open Solver
 open Mode_intf
+module Hint = Mode_hint
+
+module Hint_for_solver (* : Solver_intf.Hint *) = struct
+  open Hint
+
+  type nonrec 'd const = 'd const
+
+  type nonrec 'd morph = 'd morph
+
+  (* CR-someday zqian: the [min] should be [Min_comonadic] or [Max_monadic]. To know which
+     to use, [min] can take [obj] and return accordingly. For simplicity, we can also just
+     add another two constructors [Min] and [Max] just for the solver. *)
+  let max = Nil
+
+  let min = Nil
+
+  let nil = Nil
+
+  let id = Skip
+
+  let gap = Gap
+
+  let left_adjoint : type l. (l * allowed) morph -> (allowed * disallowed) morph
+      = function
+    | Skip -> Skip
+    | Gap -> Gap
+    | Is_closed_by x -> Close_over x
+    | Captured_by_partial_application -> Adj_captured_by_partial_application
+    | Crossing -> Crossing
+
+  let right_adjoint :
+      type r. (allowed * r) morph -> (disallowed * allowed) morph = function
+    | Skip -> Skip
+    | Gap -> Gap
+    | Close_over x -> Is_closed_by x
+    | Adj_captured_by_partial_application -> Captured_by_partial_application
+    | Crossing -> Crossing
+
+  module Morph = Magic_allow_disallow (struct
+    type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
+
+    let allow_left : type l r. (allowed * r) morph -> (l * r) morph =
+      fun (type l r) (h : (allowed * r) morph) : (l * r) morph ->
+       match h with
+       | Skip -> Skip
+       | Gap -> Gap
+       | Close_over x -> Close_over x
+       | Adj_captured_by_partial_application ->
+         Adj_captured_by_partial_application
+       | Crossing -> Crossing
+
+    let allow_right : type l r. (l * allowed) morph -> (l * r) morph =
+      fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
+       match h with
+       | Skip -> Skip
+       | Gap -> Gap
+       | Is_closed_by x -> Is_closed_by x
+       | Captured_by_partial_application -> Captured_by_partial_application
+       | Crossing -> Crossing
+
+    let disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
+      fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
+       match h with
+       | Skip -> Skip
+       | Gap -> Gap
+       | Close_over x -> Close_over x
+       | Is_closed_by x -> Is_closed_by x
+       | Captured_by_partial_application -> Captured_by_partial_application
+       | Adj_captured_by_partial_application ->
+         Adj_captured_by_partial_application
+       | Crossing -> Crossing
+
+    let disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
+      fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
+       match h with
+       | Skip -> Skip
+       | Gap -> Gap
+       | Close_over x -> Close_over x
+       | Is_closed_by x -> Is_closed_by x
+       | Captured_by_partial_application -> Captured_by_partial_application
+       | Adj_captured_by_partial_application ->
+         Adj_captured_by_partial_application
+       | Crossing -> Crossing
+  end)
+
+  module Const = Magic_allow_disallow (struct
+    type (_, _, 'd) sided = 'd const constraint 'd = 'l * 'r
+
+    let allow_left : type l r. (allowed * r) const -> (l * r) const =
+      fun (type l r) (h : (allowed * r) const) : (l * r) const ->
+       match h with
+       | Nil -> Nil
+       | Min_comonadic -> Min_comonadic
+       | Max_monadic -> Max_monadic
+       | Class_comonadic -> Class_comonadic
+       | Stack_expression -> Stack_expression
+       | Mutable_read -> Mutable_read
+       | Mutable_write -> Mutable_write
+       | Forced_lazy_expression -> Forced_lazy_expression
+
+    let allow_right : type l r. (l * allowed) const -> (l * r) const =
+      fun (type l r) (h : (l * allowed) const) : (l * r) const ->
+       match h with
+       | Nil -> Nil
+       | Min_monadic -> Min_monadic
+       | Max_comonadic -> Max_comonadic
+       | Class_monadic -> Class_monadic
+       | Lazy -> Lazy
+       | Tailcall_function -> Tailcall_function
+       | Tailcall_argument -> Tailcall_argument
+       | Is_function_return -> Is_function_return
+
+    let disallow_left : type l r. (l * r) const -> (disallowed * r) const =
+      fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
+       match h with
+       | Nil -> Nil
+       | Min_comonadic -> Min_comonadic
+       | Min_monadic -> Min_monadic
+       | Max_comonadic -> Max_comonadic
+       | Max_monadic -> Max_monadic
+       | Lazy -> Lazy
+       | Class_comonadic -> Class_comonadic
+       | Class_monadic -> Class_monadic
+       | Tailcall_function -> Tailcall_function
+       | Tailcall_argument -> Tailcall_argument
+       | Mutable_read -> Mutable_read
+       | Mutable_write -> Mutable_write
+       | Forced_lazy_expression -> Forced_lazy_expression
+       | Is_function_return -> Is_function_return
+       | Stack_expression -> Stack_expression
+
+    let disallow_right : type l r. (l * r) const -> (l * disallowed) const =
+      fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
+       match h with
+       | Nil -> Nil
+       | Min_comonadic -> Min_comonadic
+       | Min_monadic -> Min_monadic
+       | Max_comonadic -> Max_comonadic
+       | Max_monadic -> Max_monadic
+       | Lazy -> Lazy
+       | Class_comonadic -> Class_comonadic
+       | Class_monadic -> Class_monadic
+       | Tailcall_function -> Tailcall_function
+       | Tailcall_argument -> Tailcall_argument
+       | Mutable_read -> Mutable_read
+       | Mutable_write -> Mutable_write
+       | Forced_lazy_expression -> Forced_lazy_expression
+       | Is_function_return -> Is_function_return
+       | Stack_expression -> Stack_expression
+  end)
+end
 
 type nonrec allowed = allowed
 
@@ -747,6 +898,20 @@ module Lattices = struct
     | Comonadic_with_regionality : Comonadic_with_regionality.t obj
     | Comonadic_with_locality : Comonadic_with_locality.t obj
 
+  let is_opposite : type a. a obj -> bool = function
+    | Locality -> false
+    | Regionality -> false
+    | Uniqueness_op -> true
+    | Linearity -> false
+    | Portability -> false
+    | Yielding -> false
+    | Statefulness -> false
+    | Contention_op -> true
+    | Visibility_op -> true
+    | Monadic_op -> true
+    | Comonadic_with_locality -> false
+    | Comonadic_with_regionality -> false
+
   let print_obj : type a. _ -> a obj -> unit =
    fun ppf -> function
     | Locality -> Format.fprintf ppf "Locality"
@@ -1371,6 +1536,94 @@ module Lattices_mono = struct
       let a0 = Axis.proj Areality a in
       set_areality (apply dst0 f a0) a
 
+  module For_hint = struct
+    (** Describes the portion of the input that's responsible for a portion of the output
+        of a morphism *)
+    type 'a responsible_axis =
+      | NoneResponsible : 'a responsible_axis
+          (** The input is not responsible for the output; instead, the morphism is solely
+          responsible for the output. *)
+      | SourceIsSingle : 'a responsible_axis
+          (** The input of the morphism is single axis, and is responsible for the output. *)
+      | Axis : ('a, 'a_x) Axis.t -> 'a responsible_axis
+          (** The specified axis of the input object is responsible for the output. *)
+
+    (** Given a morphism either from a single axis to a single axis, or from a product
+     object to a single axis, return the portion of the input that's responsible for the
+     output. *)
+    let rec find_responsible_axis_single :
+        type a b l r. (a, b, l * r) morph -> a responsible_axis = function
+      | Proj (_a_obj, ax) -> Axis ax
+      | Compose (g, f) -> (
+        match find_responsible_axis_single g with
+        | NoneResponsible -> NoneResponsible
+        | SourceIsSingle -> find_responsible_axis_single f
+        | Axis c_ax -> find_responsible_axis_prod f c_ax)
+      | Id | Meet_with _ | Imply _ -> SourceIsSingle
+      | Max_with _ | Min_with _ | Map_comonadic _ | Monadic_to_comonadic_min
+      | Comonadic_to_monadic _ | Monadic_to_comonadic_max ->
+        assert false
+      | Local_to_regional | Regional_to_local | Locality_as_regionality
+      | Regional_to_global | Global_to_regional ->
+        SourceIsSingle
+
+    (** Given a morphism either from a single axis to a product, or from a product to a
+     product, return the portion of the input that's responsible for the specified axis of
+     the output. *)
+    and find_responsible_axis_prod :
+        type a b b_ax l r.
+        (a, b, l * r) morph -> (b, b_ax) Axis.t -> a responsible_axis =
+     fun m ax ->
+      let handle_monadic_to_comonadic (type x y)
+          (ax : (x comonadic_with, y) Axis.t) =
+        (* See [Lattices_mono.monadic_to_comonadic_min] for why these are as they are *)
+        match ax with
+        | Areality -> NoneResponsible
+        | Linearity -> Axis Uniqueness
+        | Portability -> Axis Contention
+        | Yielding -> NoneResponsible
+        | Statefulness -> Axis Visibility
+      in
+      match m, ax with
+      | Compose (g, f), ax -> (
+        (* Operates similarly to the equivalent branch in [find_responsible_axis_single] *)
+        match find_responsible_axis_prod g ax with
+        | NoneResponsible -> NoneResponsible
+        | SourceIsSingle -> find_responsible_axis_single f
+        | Axis c_ax -> find_responsible_axis_prod f c_ax)
+      | Id, ax -> Axis ax
+      | Meet_with _, ax -> Axis ax
+      | Imply _, ax -> Axis ax
+      | Map_comonadic _, ax -> (
+        (* The [Map_comonadic] morphism applies a morphsim to the areality axis and
+           the result is put back into the areality axis. See [Lattices_mono.apply] *)
+        match ax with
+        | Areality -> Axis Areality
+        | Yielding -> Axis Yielding
+        | Linearity -> Axis Linearity
+        | Statefulness -> Axis Statefulness
+        | Portability -> Axis Portability)
+      | Max_with m_ax, ax | Min_with m_ax, ax -> (
+        match Axis.eq m_ax ax with
+        | None -> NoneResponsible
+        | Some Refl -> SourceIsSingle)
+      | Monadic_to_comonadic_min, ax -> handle_monadic_to_comonadic ax
+      | Monadic_to_comonadic_max, ax -> handle_monadic_to_comonadic ax
+      | Comonadic_to_monadic _, ax -> (
+        (* See [Lattices_mono.monadic_to_comonadic_min] for why these are as they are *)
+        match ax with
+        | Uniqueness -> Axis Linearity
+        | Contention -> Axis Portability
+        | Visibility -> Axis Statefulness)
+      | Proj _, _
+      | Local_to_regional, _
+      | Regional_to_local, _
+      | Locality_as_regionality, _
+      | Regional_to_global, _
+      | Global_to_regional, _ ->
+        .
+  end
+
   (** Compose m0 after m1. Returns [Some f] if the composition can be
     represented by [f] instead of [Compose m0 m1]. [None] otherwise. *)
   let rec maybe_compose :
@@ -1551,7 +1804,7 @@ module Lattices_mono = struct
 end
 
 module C = Lattices_mono
-module Solver = Solver_mono (C)
+module Solver = Solver_mono (Hint_for_solver) (C)
 module S = Solver
 
 type monadic = C.monadic =
@@ -1570,6 +1823,322 @@ type 'a comonadic_with = 'a C.comonadic_with =
 
 module Axis = C.Axis
 
+type 'a error = 'a S.error_raw
+
+type nonrec 'a simple_error = 'a simple_error
+
+let to_simple_error ({ left; right; _ } : _ error) : _ simple_error =
+  { left; right }
+
+let print_longident =
+  ref (fun _ _ -> assert false : Format.formatter -> Longident.t -> unit)
+
+module Report = struct
+  open Hint
+
+  (** Human-readable mode error hints. Compared to [S.error]:
+  - This doesn't contain branch, and thus forms a chain.
+  - Each node on the chain talks about a single axis, instead of potentially on a product
+  lattice. *)
+  type 'd hint =
+    | Apply : 'd morph * 'b C.obj * ('b, 'd) ahint -> 'd hint
+    | Const : 'd const -> 'd hint
+    constraint 'd = 'l * 'r
+  [@@ocaml.warning "-62"]
+
+  and ('a, 'd) ahint = 'a * 'd hint constraint 'd = 'l * 'r
+
+  (** Human-readible mode error report. *)
+  type 'a t =
+    { left : ('a, left_only) ahint;
+      right : ('a, right_only) ahint
+    }
+
+  (** Convert Solver error to report. *)
+  module Of_solver = struct
+    (** Given a branch of two constant bounds on a single axis, choose the the one that's
+        responsible for the branch. *)
+    let choose_branch_axis :
+        type a l r.
+        (l * r) Solver_intf.branch -> a C.obj -> a -> a -> [`First | `Second] =
+     fun b a_obj x y ->
+      match b with
+      | Join ->
+        if C.le a_obj x y
+        then `Second
+        else if C.le a_obj y x
+        then `First
+        else Misc.fatal_error "A single axis should be a total ordering."
+      | Meet ->
+        if C.le a_obj x y
+        then `First
+        else if C.le a_obj y x
+        then `Second
+        else Misc.fatal_error "A single axis should be a total ordering."
+
+    (** Given a solver hint on a product lattice, and an axis in that product that we are
+    interested in, returns a human-readible hint.*)
+    let rec hint_prod :
+        type t a l r.
+        t C.obj -> (t, a) Axis.t -> (t, l * r) S.hint -> (l * r) hint =
+     fun obj ax -> function
+      | Apply (morph_hint, morph, ahint) -> (
+        let obj = C.src obj morph in
+        match C.For_hint.find_responsible_axis_prod morph ax with
+        | NoneResponsible -> Const Nil
+        | SourceIsSingle ->
+          let ahint = ahint_axis obj ahint in
+          Apply (morph_hint, obj, ahint)
+        | Axis ax ->
+          let ahint = ahint_prod obj ax ahint in
+          let obj = C.proj_obj ax obj in
+          Apply (morph_hint, obj, ahint))
+      | Const c -> Const c
+      | Branch (b, (a0, hint0), (a1, hint1)) ->
+        let chosen_hint =
+          let proj0 = Axis.proj ax a0 in
+          let proj1 = Axis.proj ax a1 in
+          let obj = C.proj_obj ax obj in
+          match choose_branch_axis b obj proj0 proj1 with
+          | `First -> hint0
+          | `Second -> hint1
+        in
+        hint_prod obj ax chosen_hint
+
+    and ahint_prod :
+        type t a l r.
+        t C.obj -> (t, a) Axis.t -> (t, l * r) S.ahint -> (a, l * r) ahint =
+     fun obj ax (t, hint) ->
+      let a = Axis.proj ax t in
+      let hint = hint_prod obj ax hint in
+      a, hint
+
+    (** Given a solver hint on a single axis lattice, returns a human-readible hint. *)
+    and hint_axis : type a l r. a C.obj -> (a, l * r) S.hint -> (l * r) hint =
+     fun obj -> function
+      | Apply (morph_hint, morph, ahint) -> (
+        let obj = C.src obj morph in
+        match C.For_hint.find_responsible_axis_single morph with
+        | NoneResponsible -> Const Nil
+        | SourceIsSingle ->
+          let ahint = ahint_axis obj ahint in
+          Apply (morph_hint, obj, ahint)
+        | Axis ax ->
+          let ahint = ahint_prod obj ax ahint in
+          let obj = C.proj_obj ax obj in
+          Apply (morph_hint, obj, ahint))
+      | Const c -> Const c
+      | Branch (b, (a0, hint0), (a1, hint1)) ->
+        let chosen_hint =
+          match choose_branch_axis b obj a0 a1 with
+          | `First -> hint0
+          | `Second -> hint1
+        in
+        hint_axis obj chosen_hint
+
+    and ahint_axis :
+        type a l r.
+        a Lattices_mono.obj -> (a, l * r) S.ahint -> (a, l * r) ahint =
+     fun obj (a, hint) -> a, hint_axis obj hint
+
+    let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
+     fun obj axis { left; right } ->
+      let left = ahint_prod obj axis left in
+      let right = ahint_prod obj axis right in
+      { left; right }
+  end
+
+  open Format
+
+  let print_const (type l r) ppf : (l * r) const -> unit = function
+    | Nil -> Misc.fatal_error "Nil hint should not be printed"
+    | Min_comonadic | Max_comonadic | Min_monadic | Max_monadic ->
+      Misc.fatal_error "Min/Max hint should not be printed"
+    | Lazy -> pp_print_string ppf "is a lazy expression"
+    | Class_monadic | Class_comonadic ->
+      pp_print_string ppf "is a class and thus always"
+    | Tailcall_function -> pp_print_string ppf "is the function in a tail call"
+    | Tailcall_argument -> pp_print_string ppf "is an argument in a tail call"
+    | Mutable_read -> pp_print_string ppf "has a mutable field read from"
+    | Mutable_write -> pp_print_string ppf "has a mutable field written to"
+    | Forced_lazy_expression ->
+      pp_print_string ppf "is a lazy expression that is forced"
+    | Is_function_return ->
+      fprintf ppf
+        "is a function return value.@\n\
+         Hint: Use exclave_ to return a local value."
+    | Stack_expression -> pp_print_string ppf "is a stack expression"
+
+  let print_lock_item ppf = function
+    | Module -> fprintf ppf "module"
+    | Class -> fprintf ppf "class"
+    | Value -> fprintf ppf "value"
+    | Constructor -> fprintf ppf "constructor"
+
+  let print_closure_context ppf = function
+    | Function -> fprintf ppf "function"
+    | Functor -> fprintf ppf "functor"
+    | Lazy -> fprintf ppf "lazy expression"
+
+  let print_morph : type l r. formatter -> (l * r) morph -> unit =
+   fun ppf hint ->
+    match hint with
+    | Skip -> Misc.fatal_error "Skip hint should not be printed"
+    | Gap -> Misc.fatal_error "Gap hint should not be printed"
+    | Close_over closure ->
+      (* CR-someday pdsouza: in the future, we should print out the code at the mentioned
+         location, instead of just the location *)
+      fprintf ppf "closes over the %a %a (at %a)" print_lock_item
+        closure.value_item
+        (Misc.Style.as_inline_code !print_longident)
+        closure.value_lid Location.print_loc closure.value_loc
+    | Is_closed_by closure ->
+      fprintf ppf "is used inside a %a" print_closure_context
+        closure.closure_context
+    | Captured_by_partial_application ->
+      fprintf ppf "is captured by a partial application"
+    | Adj_captured_by_partial_application ->
+      fprintf ppf "has a partial application capturing a value"
+    | Crossing -> fprintf ppf "crosses with something"
+
+  let print_mode :
+      type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
+   fun side obj ppf x ->
+    let mode_printer = Misc.Style.as_inline_code (C.print obj) in
+    match side, obj, x with
+    | `Actual, Regionality, Regional ->
+      (* In the special case where the actual mode is regional (and thus the
+         expected is global), it's more user friendly to say "local" than
+         "regional" or "local to the parent region" etc. *)
+      mode_printer ppf C.Regionality.Local
+    | `Expected, Contention_op, Shared ->
+      (* When printing the "shared" mode on the "expected" side (noting that expected
+         modes only appear on the right side of inequalities (on the "greater" side)),
+         we print that it was expected to be either shared or uncontended, to help
+         the user. We don't do anything similar when printing on the "actual" side
+         as this is confusing to put in an error message. *)
+      fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
+        C.Contention.Uncontended
+    | `Expected, Regionality, Regional ->
+      fprintf ppf "in the parent region or %a" mode_printer C.Regionality.Global
+    | _ -> mode_printer ppf x
+   [@@ocaml.warning "-4"]
+
+  let print_mode_with_side :
+      type a.
+      sub:bool ->
+      [`Actual | `Expected] ->
+      a C.obj ->
+      Format.formatter ->
+      a ->
+      unit =
+   fun ~sub side obj ppf a ->
+    if sub then Format.pp_print_string ppf "which ";
+    (match side with
+    | `Actual -> pp_print_string ppf "is "
+    | `Expected -> pp_print_string ppf "is expected to be ");
+    print_mode side obj ppf a
+
+  (** Some morph hints are said to be "non-rigid", because they should be printed only
+      when they change modes. *)
+  let is_rigid : type l r. (l * r) morph -> bool = function
+    | Gap ->
+      Misc.fatal_error "Gap morph hint should not be checked for rigidity"
+    | Close_over _ | Is_closed_by _ | Captured_by_partial_application
+    | Adj_captured_by_partial_application ->
+      true
+    | Skip | Crossing -> false
+
+  let eq_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
+   fun a_obj b_obj a b ->
+    match C.eq_obj a_obj b_obj with
+    | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
+    | None -> false
+
+  type print_ahint_result =
+    | Mode_with_hint
+    | Mode
+    | Nothing
+
+  let rec print_ahint :
+      type a l r.
+      ?sub:bool ->
+      [`Actual | `Expected] ->
+      a C.obj ->
+      Format.formatter ->
+      (a, l * r) ahint ->
+      print_ahint_result =
+   fun ?(sub = false) side (obj : a C.obj) ppf (a, hint) ->
+    match hint with
+    | Apply (Gap, _, _) ->
+      print_mode_with_side ~sub side obj ppf a;
+      Mode
+    | Apply (morph_hint, src, ahint)
+      when (not (is_rigid morph_hint)) && eq_mode obj src a (fst ahint) ->
+      print_ahint ~sub side src ppf ahint
+    | Apply (morph_hint, src, ahint) ->
+      fprintf ppf "%a@ because it %a@ "
+        (print_mode_with_side ~sub side obj)
+        a print_morph morph_hint;
+      ignore (print_ahint ~sub:true side src ppf ahint);
+      Mode_with_hint
+    | Const Nil ->
+      print_mode_with_side ~sub side obj ppf a;
+      Mode
+    | Const (Min_comonadic | Min_monadic | Max_comonadic | Max_monadic) ->
+      if not sub
+      then Misc.fatal_error "Min/Max hints must only occur under morphisms";
+      (* We don't print the mode, since it's not responsible for the error. *)
+      Nothing
+    | Const c ->
+      fprintf ppf "%a@ because it %a"
+        (print_mode_with_side ~sub side obj)
+        a print_const c;
+      Mode_with_hint
+   [@@ocaml.warning "-4"]
+
+  type 'a ahint_sided =
+    | Left of ('a, left_only) ahint
+    | Right of ('a, right_only) ahint
+
+  let print_ahint_sided :
+      type a.
+      ?sub:bool ->
+      a C.obj ->
+      Format.formatter ->
+      a ahint_sided ->
+      print_ahint_result =
+   fun ?sub obj ppf ahint_sided ->
+    match C.is_opposite obj, ahint_sided with
+    | true, Left ahint -> print_ahint ?sub `Expected obj ppf ahint
+    | true, Right ahint -> print_ahint ?sub `Actual obj ppf ahint
+    | false, Left ahint -> print_ahint ?sub `Actual obj ppf ahint
+    | false, Right ahint -> print_ahint ?sub `Expected obj ppf ahint
+
+  let print :
+      type a.
+      ?target:_ -> a Lattices_mono.obj -> Format.formatter -> a t -> unit =
+   fun ?target obj ppf { left; right } ->
+    let actual, expected =
+      if C.is_opposite obj
+      then Right right, Left left
+      else Left left, Right right
+    in
+    let open Format in
+    (match target with
+    | None -> fprintf ppf "This value "
+    | Some (target_item, target_lid) ->
+      fprintf ppf "The %a %a " print_lock_item target_item
+        (Misc.Style.as_inline_code !print_longident)
+        target_lid);
+    (match print_ahint_sided obj ppf actual with
+    | Mode_with_hint -> fprintf ppf ".@\nHowever, it "
+    | Mode -> fprintf ppf "@ but "
+    | Nothing -> assert false);
+    ignore (print_ahint_sided obj ppf expected);
+    fprintf ppf "."
+end
+
 type changes = S.changes
 
 let undo_changes = S.undo_changes
@@ -1580,6 +2149,28 @@ let append_changes : (changes ref -> unit) ref = ref (fun _ -> assert false)
 let set_append_changes f = append_changes := f
 
 type ('a, 'd) mode = ('a, 'd) S.mode
+
+module type Common_axis_pos = sig
+  module Const : Lattice
+
+  include
+    Common_axis
+      with module Const := Const
+       and type 'd t = (Const.t, 'd pos) mode
+       and type error := Const.t error
+       and type 'd hint_const := 'd Hint.pos_const
+end
+
+module type Common_axis_neg = sig
+  module Const : Lattice
+
+  include
+    Common_axis
+      with module Const := Const
+       and type 'd t = (Const.t, 'd neg) mode
+       and type error := Const.t error
+       and type 'd hint_const := 'd Hint.neg_const
+end
 
 (** Representing a single object *)
 module type Obj = sig
@@ -1663,6 +2254,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let submode_log a b ~log = Solver.submode obj a b ~log
 
+  let to_simple_error e = to_simple_error e
+
   let submode a b = try_with_log (submode_log a b)
 
   let join l = Solver.join obj l
@@ -1681,11 +2274,24 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let zap_to_floor m = with_log (Solver.zap_to_floor obj m)
 
-  let of_const : type l r. const -> (l * r) t = fun a -> Solver.of_const obj a
+  let of_const : type l r. ?hint:(l * r) Hint.pos_const -> const -> (l * r) t =
+   fun ?hint a -> Solver.of_const ?hint obj a
 
-  let meet_const c m = Solver.apply obj (Meet_with c) m
+  let unhint = Solver.Unhint.unhint
 
-  let imply c m = Solver.apply obj (Imply c) (Solver.disallow_left m)
+  let hint ?hint = Solver.Unhint.hint obj ?hint
+
+  let wrap ?hint:h f m = m |> unhint |> f |> hint ?hint:h
+
+  let apply_hint hint m = wrap ~hint Fun.id m
+
+  let meet_const_unhint c m = Solver.Unhint.apply obj (Meet_with c) m
+
+  let meet_const c m = wrap (meet_const_unhint c) m
+
+  let imply_unhint c m = Solver.Unhint.apply obj (Imply c) m
+
+  let imply c m = m |> disallow_left |> wrap (imply_unhint c)
 
   module Guts = struct
     let get_floor m = Solver.get_floor obj m
@@ -1717,9 +2323,8 @@ module Monadic_gen (Obj : Obj) = struct
 
   type (_, _, 'd) sided = 'd t
 
-  let flip_error = function
-    | Ok _ as r -> r
-    | Error { left; right } -> Error { left = right; right = left }
+  let flip_simple_error = function
+    | { left; right } -> { left = right; right = left }
 
   let disallow_right m = Solver.disallow_left m
 
@@ -1739,7 +2344,9 @@ module Monadic_gen (Obj : Obj) = struct
 
   let newvar_below m = Solver.newvar_above obj m
 
-  let submode_log a b ~log = Solver.submode obj b a ~log |> flip_error
+  let submode_log a b ~log = Solver.submode obj b a ~log
+
+  let to_simple_error e = to_simple_error e |> flip_simple_error
 
   let submode a b = try_with_log (submode_log a b)
 
@@ -1759,11 +2366,24 @@ module Monadic_gen (Obj : Obj) = struct
 
   let zap_to_floor m = with_log (Solver.zap_to_ceil obj m)
 
-  let of_const : type l r. const -> (l * r) t = fun a -> Solver.of_const obj a
+  let of_const : type l r. ?hint:(l * r) Hint.neg_const -> const -> (l * r) t =
+   fun ?hint a -> Solver.of_const ?hint obj a
 
-  let join_const c m = Solver.apply Obj.obj (Meet_with c) m
+  let unhint = Solver.Unhint.unhint
 
-  let subtract c m = Solver.apply obj (Imply c) (Solver.disallow_left m)
+  let hint ?hint = Solver.Unhint.hint obj ?hint
+
+  let wrap ?hint:h f m = m |> unhint |> f |> hint ?hint:h
+
+  let apply_hint hint m = wrap ~hint Fun.id m
+
+  let join_const_unhint c m = Solver.Unhint.apply Obj.obj (Meet_with c) m
+
+  let join_const c m = wrap (join_const_unhint c) m
+
+  let subtract_unhint c m = Solver.Unhint.apply obj (Imply c) m
+
+  let subtract c m = m |> disallow_right |> wrap (subtract_unhint c)
 
   module Guts = struct
     let get_ceil m = Solver.get_floor obj m
@@ -2020,10 +2640,6 @@ module Comonadic_with (Areality : Areality) = struct
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
-  type error = Error : 'a Axis.t * 'a Solver.error -> error
-
-  type equate_error = equate_step * error
-
   let proj_obj ax = C.proj_obj ax Obj.obj
 
   module Const = struct
@@ -2075,7 +2691,7 @@ module Comonadic_with (Areality : Areality) = struct
       | Statefulness -> (module Statefulness.Const)
   end
 
-  let proj ax m = Solver.apply (proj_obj ax) (Proj (Obj.obj, ax)) m
+  let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   let min_with ax m =
     Solver.apply Obj.obj (Min_with ax) (Solver.disallow_right m)
@@ -2098,23 +2714,26 @@ module Comonadic_with (Areality : Areality) = struct
 
   let legacy = of_const Const.legacy
 
-  let axis_of_error (err : Obj.const Solver.error) : error =
-    let { left =
-            { areality = areality1;
-              linearity = linearity1;
-              portability = portability1;
-              yielding = yielding1;
-              statefulness = statefulness1
-            };
-          right =
-            { areality = areality2;
-              linearity = linearity2;
-              portability = portability2;
-              yielding = yielding2;
-              statefulness = statefulness2
-            }
+  type 'a simple_axerror = 'a simple_error
+
+  type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
+
+  let axis_of_error (left : Obj.const) (right : Obj.const) : simple_error =
+    let { areality = areality1;
+          linearity = linearity1;
+          portability = portability1;
+          yielding = yielding1;
+          statefulness = statefulness1
         } =
-      err
+      left
+    in
+    let { areality = areality2;
+          linearity = linearity2;
+          portability = portability2;
+          yielding = yielding2;
+          statefulness = statefulness2
+        } =
+      right
     in
     if Areality.Const.le areality1 areality2
     then
@@ -2128,34 +2747,21 @@ module Comonadic_with (Areality : Areality) = struct
             then assert false
             else
               Error
-                ( Statefulness,
-                  { left = err.left.statefulness;
-                    right = err.right.statefulness
-                  } )
-          else
-            Error
-              ( Yielding,
-                { left = err.left.yielding; right = err.right.yielding } )
-        else
-          Error
-            ( Portability,
-              { left = err.left.portability; right = err.right.portability } )
-      else
-        Error
-          (Linearity, { left = err.left.linearity; right = err.right.linearity })
-    else
-      Error (Areality, { left = err.left.areality; right = err.right.areality })
+                (Statefulness, { left = statefulness1; right = statefulness2 })
+          else Error (Yielding, { left = yielding1; right = yielding2 })
+        else Error (Portability, { left = portability1; right = portability2 })
+      else Error (Linearity, { left = linearity1; right = linearity2 })
+    else Error (Areality, { left = areality1; right = areality2 })
 
   (* overriding to report the offending axis *)
-  let submode_log m0 m1 ~log : _ result =
-    match submode_log m0 m1 ~log with
-    | Ok () -> Ok ()
-    | Error e -> Error (axis_of_error e)
+  let to_simple_error ({ left; right; _ } : error) = axis_of_error left right
 
-  let submode a b = try_with_log (submode_log a b)
-
-  (* override to report the offending axis *)
-  let equate a b = try_with_log (equate_from_submode submode_log a b)
+  let report_error ?target ppf err =
+    let (Error (ax, _)) = to_simple_error err in
+    let err = S.populate_error Obj.obj err in
+    let err = Report.Of_solver.error_prod Obj.obj ax err in
+    let obj = proj_obj ax in
+    Report.print ?target obj ppf err
 end
 [@@inline]
 
@@ -2182,10 +2788,6 @@ module Monadic = struct
       [P Uniqueness; P Contention; P Visibility]
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
-
-  type error = Error : 'a Axis.t * 'a Solver.error -> error
-
-  type equate_error = equate_step * error
 
   let proj_obj ax = C.proj_obj ax Obj.obj
 
@@ -2238,7 +2840,7 @@ module Monadic = struct
 
   module Const_op = C.Monadic_op
 
-  let proj ax m = Solver.apply (proj_obj ax) (Proj (Obj.obj, ax)) m
+  let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   (* The monadic fragment is inverted. *)
 
@@ -2257,19 +2859,21 @@ module Monadic = struct
 
   let legacy = of_const Const.legacy
 
-  let axis_of_error (err : Obj.const Solver.error) : error =
-    let { left =
-            { uniqueness = uniqueness1;
-              contention = contention1;
-              visibility = visibility1
-            };
-          right =
-            { uniqueness = uniqueness2;
-              contention = contention2;
-              visibility = visibility2
-            }
+  type simple_error =
+    | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error
+
+  let axis_of_error (left : Obj.const) (right : Obj.const) : simple_error =
+    let { uniqueness = uniqueness1;
+          contention = contention1;
+          visibility = visibility1
         } =
-      err
+      left
+    in
+    let { uniqueness = uniqueness2;
+          contention = contention2;
+          visibility = visibility2
+        } =
+      right
     in
     if Uniqueness.Const.le uniqueness1 uniqueness2
     then
@@ -2277,29 +2881,20 @@ module Monadic = struct
       then
         if Visibility.Const.le visibility1 visibility2
         then assert false
-        else
-          Error
-            ( Visibility,
-              { left = err.left.visibility; right = err.right.visibility } )
-      else
-        Error
-          ( Contention,
-            { left = err.left.contention; right = err.right.contention } )
-    else
-      Error
-        ( Uniqueness,
-          { left = err.left.uniqueness; right = err.right.uniqueness } )
+        else Error (Visibility, { left = visibility1; right = visibility2 })
+      else Error (Contention, { left = contention1; right = contention2 })
+    else Error (Uniqueness, { left = uniqueness1; right = uniqueness2 })
 
-  (* overriding to report the offending axis *)
-  let submode_log m0 m1 ~log : _ result =
-    match submode_log m0 m1 ~log with
-    | Ok () -> Ok ()
-    | Error e -> Error (axis_of_error e)
+  let to_simple_error ({ left; right; _ } : error) =
+    (* monadic fragment is flipped *)
+    axis_of_error right left
 
-  let submode a b = try_with_log (submode_log a b)
-
-  (* override to report the offending axis *)
-  let equate a b = try_with_log (equate_from_submode submode_log a b)
+  let report_error ?target ppf err =
+    let (Error (ax, _)) = to_simple_error err in
+    let err = S.populate_error Obj.obj err in
+    let err = Report.Of_solver.error_prod Obj.obj ax err in
+    let obj = proj_obj ax in
+    Report.print ?target obj ppf err
 end
 
 type ('mo, 'como) monadic_comonadic =
@@ -2401,11 +2996,24 @@ module Value_with (Areality : Areality) = struct
       (Monadic.print ?verbose ())
       monadic
 
-  let of_const c =
+  let of_const ?hint_monadic ?hint_comonadic c =
     let { monadic; comonadic } = split c in
-    let comonadic = Comonadic.of_const comonadic in
-    let monadic = Monadic.of_const monadic in
+    let comonadic = Comonadic.of_const ?hint:hint_comonadic comonadic in
+    let monadic = Monadic.of_const ?hint:hint_monadic monadic in
     { comonadic; monadic }
+
+  let unhint { monadic; comonadic } =
+    let comonadic = Comonadic.unhint comonadic in
+    let monadic = Monadic.unhint monadic in
+    { monadic; comonadic }
+
+  let hint ?monadic ?comonadic t =
+    let comonadic = Comonadic.hint ?hint:comonadic t.comonadic in
+    let monadic = Monadic.hint ?hint:monadic t.monadic in
+    { monadic; comonadic }
+
+  let wrap ?monadic ?comonadic f t =
+    t |> unhint |> f |> hint ?monadic ?comonadic
 
   module Const = struct
     module Monadic = Monadic.Const
@@ -2696,19 +3304,37 @@ module Value_with (Areality : Areality) = struct
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
 
-  type error = Error : 'a Axis.t * 'a Solver.error -> error
+  type error =
+    | Monadic of Monadic.error
+    | Comonadic of Comonadic.error
 
   type equate_error = equate_step * error
+
+  type 'a simple_axerror = 'a simple_error
+
+  type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
+
+  let to_simple_error = function
+    | Monadic e ->
+      let (Error (ax, e)) = Monadic.to_simple_error e in
+      Error (Monadic ax, e)
+    | Comonadic e ->
+      let (Error (ax, e)) = Comonadic.to_simple_error e in
+      Error (Comonadic ax, e)
+
+  let report_error ppf = function
+    | Monadic e -> Monadic.report_error ppf e
+    | Comonadic e -> Comonadic.report_error ppf e
 
   let submode_log { monadic = monadic0; comonadic = comonadic0 }
       { monadic = monadic1; comonadic = comonadic1 } ~log : (_, error) result =
     (* comonadic before monadic, so that locality errors dominate
        (error message backward compatibility) *)
     match Comonadic.submode_log comonadic0 comonadic1 ~log with
-    | Error (Error (ax, e)) -> Error (Error (Comonadic ax, e))
+    | Error e -> Error (Comonadic e)
     | Ok () -> (
       match Monadic.submode_log monadic0 monadic1 ~log with
-      | Error (Error (ax, e)) -> Error (Error (Monadic ax, e))
+      | Error e -> Error (Monadic e)
       | Ok () -> Ok ())
 
   let submode a b = try_with_log (submode_log a b)
@@ -2772,8 +3398,8 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.meet mo in
     { comonadic; monadic }
 
-  let comonadic_to_monadic m =
-    S.apply Monadic.Obj.obj (Comonadic_to_monadic Comonadic.Obj.obj) m
+  let comonadic_to_monadic ?hint m =
+    S.apply ?hint Monadic.Obj.obj (Comonadic_to_monadic Comonadic.Obj.obj) m
 
   let monadic_to_comonadic_min m =
     S.apply Comonadic.Obj.obj Monadic_to_comonadic_min (Monadic.disallow_left m)
@@ -2894,37 +3520,59 @@ module Const = struct
   let locality_as_regionality = C.locality_as_regionality
 end
 
+(* CR-someday zqian: all the function that converts between [Alloc] and [Value] should
+   operate on [Unhint] so they can be composed and assigned hint as a whole. *)
+
 let comonadic_locality_as_regionality comonadic =
-  S.apply Value.Comonadic.Obj.obj (Map_comonadic Locality_as_regionality)
+  S.Unhint.apply Value.Comonadic.Obj.obj (Map_comonadic Locality_as_regionality)
     comonadic
 
 let comonadic_regional_to_local comonadic =
-  S.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local) comonadic
+  S.Unhint.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local)
+    comonadic
 
-let alloc_as_value m =
+let alloc_as_value_unhint m =
   let { comonadic; monadic } = m in
   let comonadic = comonadic_locality_as_regionality comonadic in
   { comonadic; monadic }
 
-let alloc_to_value_l2r m =
-  let { comonadic; monadic } = Alloc.disallow_right m in
-  let comonadic =
-    S.apply Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional) comonadic
-  in
-  { comonadic; monadic }
+let alloc_as_value m = m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint
 
-let value_to_alloc_r2g : type l r. (l * r) Value.t -> (l * r) Alloc.t =
- fun m ->
+let alloc_to_value_l2r_unhint m =
   let { comonadic; monadic } = m in
   let comonadic =
-    S.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global) comonadic
+    S.Unhint.apply Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional)
+      comonadic
   in
   { comonadic; monadic }
 
-let value_to_alloc_r2l m =
+let alloc_to_value_l2r m =
+  m |> Alloc.disallow_right |> Alloc.unhint |> alloc_to_value_l2r_unhint
+  |> Value.hint
+
+let value_to_alloc_r2g_unhint m =
+  let { comonadic; monadic } = m in
+  let comonadic =
+    S.Unhint.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
+      comonadic
+  in
+  { comonadic; monadic }
+
+let value_to_alloc_r2g m =
+  m |> Value.unhint |> value_to_alloc_r2g_unhint |> Alloc.hint
+
+let value_r2g ?hint m =
+  Value.wrap ~monadic:Skip ?comonadic:hint
+    (fun m -> m |> value_to_alloc_r2g_unhint |> alloc_as_value_unhint)
+    m
+
+let value_to_alloc_r2l_unhint m =
   let { comonadic; monadic } = m in
   let comonadic = comonadic_regional_to_local comonadic in
   { comonadic; monadic }
+
+let value_to_alloc_r2l m =
+  m |> Value.unhint |> value_to_alloc_r2l_unhint |> Alloc.hint
 
 module Modality = struct
   (* Inferred modalities
@@ -2999,7 +3647,7 @@ module Modality = struct
         Format.fprintf ppf "join_with(%a)" (C.print (Mode.proj_obj ax)) c
     end
 
-    type error = Error : 'a axis * 'a Atom.t Solver.error -> error
+    type error = Error : 'a axis * 'a Atom.t simple_error -> error
 
     module Const = struct
       type t = Join_const of Mode.Const.t [@@unboxed]
@@ -3016,9 +3664,7 @@ module Modality = struct
           if Mode.Const.le c0 c1
           then Ok ()
           else
-            let (Error (ax, { left; right })) =
-              Mode.axis_of_error { left = c0; right = c1 }
-            in
+            let (Error (ax, { left; right })) = Mode.axis_of_error c0 c1 in
             Error
               (Error (ax, { left = Join_with left; right = Join_with right }))
 
@@ -3052,7 +3698,8 @@ module Modality = struct
            hold for all x >= mm, so we check m <= join(mm, c). *)
         match Mode.submode_log m (Mode.join_const c mm) ~log with
         | Ok () -> Ok ()
-        | Error (Error (ax, { left; _ })) ->
+        | Error err ->
+          let (Error (ax, { left; _ })) = Mode.to_simple_error err in
           Error
             (Error
                ( ax,
@@ -3140,7 +3787,7 @@ module Modality = struct
         Format.fprintf ppf "meet_with(%a)" (C.print (Mode.proj_obj ax)) c
     end
 
-    type error = Error : 'a axis * 'a Atom.t Solver.error -> error
+    type error = Error : 'a axis * 'a Atom.t simple_error -> error
 
     module Const = struct
       type t = Meet_const of Mode.Const.t [@@unboxed]
@@ -3157,9 +3804,7 @@ module Modality = struct
           if Mode.Const.le c0 c1
           then Ok ()
           else
-            let (Error (ax, { left; right })) =
-              Mode.axis_of_error { left = c0; right = c1 }
-            in
+            let (Error (ax, { left; right })) = Mode.axis_of_error c0 c1 in
             Error
               (Error (ax, { left = Meet_with left; right = Meet_with right }))
 
@@ -3197,7 +3842,8 @@ module Modality = struct
            comments), which amounts to [m <= c]. *)
         match Mode.submode_log m (Mode.of_const c) ~log with
         | Ok () -> Ok ()
-        | Error (Error (ax, { left; _ })) ->
+        | Error err ->
+          let (Error (ax, { left; _ })) = Mode.to_simple_error err in
           Error
             (Error
                ( ax,
@@ -3319,7 +3965,7 @@ module Modality = struct
   end
 
   module Value = struct
-    type error = Error : 'a Atom.t Solver.error -> error
+    type error = Error : 'a Atom.t simple_error -> error
 
     type equate_error = equate_step * error
 
@@ -3495,13 +4141,14 @@ module Crossing = struct
     let modality m t = Modality.concat ~then_:t m
 
     let apply_left : t -> _ -> _ = function
-      | Join_const c -> fun m -> Mode.subtract c (Mode.join_const c m)
+      | Join_const c ->
+        fun m -> Mode.subtract_unhint c (Mode.join_const_unhint c m)
 
     let apply_right : t -> _ -> _ = function
       | Join_const c ->
         fun m ->
           (* The right adjoint of join is a restriction of identity *)
-          Mode.join_const c m
+          Mode.join_const_unhint c m
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Join_const c0, Join_const c1 -> Mode.Const.le c1 c0
@@ -3531,10 +4178,11 @@ module Crossing = struct
       | Meet_const c ->
         fun m ->
           (* The left adjoint of meet is a restriction of identity *)
-          Mode.meet_const c m
+          Mode.meet_const_unhint c m
 
     let apply_right : t -> _ -> _ = function
-      | Meet_const c -> fun m -> Mode.imply c (Mode.meet_const c m)
+      | Meet_const c ->
+        fun m -> Mode.imply_unhint c (Mode.meet_const_unhint c m)
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Meet_const c0, Meet_const c1 -> Mode.Const.le c0 c1
@@ -3562,15 +4210,23 @@ module Crossing = struct
     let comonadic = Comonadic.modality m.comonadic comonadic in
     { monadic; comonadic }
 
-  let apply_left t { monadic; comonadic } =
+  let apply_left_unhint t { monadic; comonadic } =
     let monadic = Monadic.apply_left t.monadic monadic in
     let comonadic = Comonadic.apply_left t.comonadic comonadic in
     { monadic; comonadic }
 
-  let apply_right t { monadic; comonadic } =
+  let apply_left t m =
+    m |> Value.unhint |> apply_left_unhint t
+    |> Value.hint ~monadic:Crossing ~comonadic:Crossing
+
+  let apply_right_unhint t { monadic; comonadic } =
     let monadic = Monadic.apply_right t.monadic monadic in
     let comonadic = Comonadic.apply_right t.comonadic comonadic in
     { monadic; comonadic }
+
+  let apply_right t m =
+    m |> Value.unhint |> apply_right_unhint t
+    |> Value.hint ~monadic:Crossing ~comonadic:Crossing
 
   (* Our mode crossing is for [Value] modes, but can be extended to [Alloc]
      modes via [alloc_as_value], defined as follows:
@@ -3586,12 +4242,17 @@ module Crossing = struct
      [regional_to_local] the left adjoint. *)
 
   let apply_left_alloc t m =
-    m |> alloc_as_value |> apply_left t |> value_to_alloc_r2l
+    m |> Alloc.unhint |> alloc_as_value_unhint |> apply_left_unhint t
+    |> value_to_alloc_r2l_unhint
+    |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_right_alloc t m =
-    m |> alloc_as_value |> apply_right t |> value_to_alloc_r2g
+    m |> Alloc.unhint |> alloc_as_value_unhint |> apply_right_unhint t
+    |> value_to_alloc_r2g_unhint
+    |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
 
-  let apply_left_right_alloc t { monadic; comonadic } =
+  let apply_left_right_alloc t m =
+    let { monadic; comonadic } = Alloc.unhint m in
     let monadic = Monadic.apply_right t.monadic monadic in
     let comonadic =
       comonadic |> comonadic_locality_as_regionality
@@ -3599,7 +4260,7 @@ module Crossing = struct
       |> comonadic_regional_to_local
       (* the left adjoint of [locality_as_regionality]*)
     in
-    { monadic; comonadic }
+    Alloc.hint ~monadic:Crossing ~comonadic:Crossing { monadic; comonadic }
 
   let le t0 t1 =
     Monadic.le t0.monadic t1.monadic && Comonadic.le t0.comonadic t1.comonadic

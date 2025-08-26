@@ -26,7 +26,7 @@ let () =
         | "diffing_with_keys" | "errortrace" | "file_sections" | "global_module"
         | "import_info" | "includemod_errorprinter"
         | "language_extension_kernel" | "lazy_backtrack" | "lru" | "main"
-        | "main_native" | "maindriver" | "mode_intf" | "optmain" | "parser.pp"
+        | "main_native" | "maindriver" | "mode_hint" | "mode_intf" | "optmain" | "parser.pp"
         | "parser_types" | "shape" | "shape_reduce" | "signature_group"
         | "solver_intf" | "tmc" | "transl_array_comprehension"
         | "transl_comprehension_utils" | "transl_list_comprehension"
