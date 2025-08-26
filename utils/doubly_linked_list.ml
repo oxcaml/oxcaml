@@ -198,10 +198,11 @@ let remove t curr =
     | Node node -> node.next <- curr.next);
     match curr.next with
     | Empty -> t.last <- curr.prev
-    | Node node -> node.prev <- curr.prev;
-    (* Completely detach the removed node *)
-    curr.prev <- Empty;
-    curr.next <- Empty)
+    | Node node ->
+      node.prev <- curr.prev;
+      (* Completely detach the removed node *)
+      curr.prev <- Empty;
+      curr.next <- Empty)
 
 let delete_curr cell = remove cell.t cell.node
 
@@ -423,15 +424,11 @@ module Cursor = struct
 
   let delete_and_next (t : _ t) =
     let next_node =
-      match t.node with
-      | Empty -> Empty
-      | Node node -> node.next
+      match t.node with Empty -> Empty | Node node -> node.next
     in
     remove t.t t.node;
     t.node <- next_node;
-    match next_node with
-    | Empty -> Error `End_of_list
-    | Node _ -> Ok ()
+    match next_node with Empty -> Error `End_of_list | Node _ -> Ok ()
 end
 
 let create_hd_cursor t : (_ Cursor.t, [`Empty]) result =
