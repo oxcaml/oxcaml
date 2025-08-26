@@ -198,7 +198,10 @@ let remove t curr =
     | Node node -> node.next <- curr.next);
     match curr.next with
     | Empty -> t.last <- curr.prev
-    | Node node -> node.prev <- curr.prev)
+    | Node node -> node.prev <- curr.prev;
+    (* Completely detach the removed node *)
+    curr.prev <- Empty;
+    curr.next <- Empty)
 
 let delete_curr cell = remove cell.t cell.node
 
@@ -240,8 +243,9 @@ let filter_left t ~f =
     match curr with
     | Empty -> ()
     | Node node ->
+      let next_node = node.next in
       if not (f node.value) then remove t curr;
-      aux t f node.next
+      aux t f next_node
   in
   aux t f t.first
 
@@ -250,8 +254,9 @@ let filter_right t ~f =
     match curr with
     | Empty -> ()
     | Node node ->
+      let prev_node = node.prev in
       if not (f node.value) then remove t curr;
-      aux t f node.prev
+      aux t f prev_node
   in
   aux t f t.last
 
@@ -417,8 +422,16 @@ module Cursor = struct
         Ok ())
 
   let delete_and_next (t : _ t) =
+    let next_node =
+      match t.node with
+      | Empty -> Empty
+      | Node node -> node.next
+    in
     remove t.t t.node;
-    next t
+    t.node <- next_node;
+    match next_node with
+    | Empty -> Error `End_of_list
+    | Node _ -> Ok ()
 end
 
 let create_hd_cursor t : (_ Cursor.t, [`Empty]) result =
