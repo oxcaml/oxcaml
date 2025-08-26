@@ -13,7 +13,7 @@ type r = { mutable s : string; }
 Line 2, characters 31-32:
 2 | let foo (local_ s) = exclave_ {s}
                                    ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* you can override those implied modalities *)
@@ -82,7 +82,7 @@ let foo (local_ r) =
 Line 2, characters 9-25:
 2 |   r.s <- (local_ "hello")
              ^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (local_ r) = ref r.s
@@ -90,7 +90,7 @@ let foo (local_ r) = ref r.s
 Line 1, characters 25-28:
 1 | let foo (local_ r) = ref r.s
                              ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (local_ r) =
@@ -111,7 +111,7 @@ let foo (local_ s') = exclave_ {s'}
 Line 1, characters 32-34:
 1 | let foo (local_ s') = exclave_ {s'}
                                     ^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* mutable defaults to mutable(legacy = nonportable), so currently we can't construct a

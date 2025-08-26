@@ -331,7 +331,7 @@ let bug4 : local_ (string -> foo:string -> unit) -> (string -> unit) =
 Line 2, characters 11-25:
 2 |   fun f -> f ~foo:"hello"
                ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]

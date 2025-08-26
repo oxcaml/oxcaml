@@ -324,7 +324,7 @@ let broken_local =
 Line 2, characters 10-30:
 2 |   [ 5 for local_ n in [ 1; 2 ] ];;
               ^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* User-written attributes *)
@@ -634,7 +634,7 @@ let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 Line 1, characters 48-49:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
                                                     ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }

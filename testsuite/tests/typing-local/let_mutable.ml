@@ -217,7 +217,7 @@ let foo4_5 y =
 Line 5, characters 11-30:
 5 |       x <- local_ ((i*j) :: x)
                ^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo4_6 y =
@@ -352,7 +352,7 @@ let disallowed_6_2 =
 Line 6, characters 11-12:
 6 |       x <- z
                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* 6.3: The mode system doesn't distinguish higher levels of regionality from
@@ -369,7 +369,7 @@ let disallowed_6_3 =
 Line 6, characters 11-12:
 6 |       x <- y
                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* Test 11: binding a mutable variable shouldn't be simplified away *)

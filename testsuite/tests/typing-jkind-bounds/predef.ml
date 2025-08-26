@@ -148,7 +148,7 @@ let foo (t : int option @ local) = use_global t [@nontail]
 Line 1, characters 46-47:
 1 | let foo (t : int option @ local) = use_global t [@nontail]
                                                   ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* ref *)
@@ -366,7 +366,7 @@ let foo (t : int list @ local) = use_global t [@nontail]
 Line 1, characters 44-45:
 1 | let foo (t : int list @ local) = use_global t [@nontail]
                                                 ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* array *)
@@ -577,5 +577,5 @@ let foo (t : int iarray @ local) = use_global t [@nontail]
 Line 1, characters 46-47:
 1 | let foo (t : int iarray @ local) = use_global t [@nontail]
                                                   ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
