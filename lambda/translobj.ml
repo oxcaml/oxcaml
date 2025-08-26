@@ -157,7 +157,7 @@ let transl_store_label_init glob size f arg =
   size, lam
 
 let transl_label_init f =
-  if !Clflags.native_code then
+  if !Clflags.native_code || Clflags.is_flambda2 () then
     transl_label_init_flambda f
   else
     transl_label_init_general f
