@@ -2064,15 +2064,6 @@ module Comonadic_with (Areality : Areality) = struct
         let obj = proj_obj ax in
         C.print_obj ppf obj
     end
-
-    let lattice_of_axis (type a) (axis : a Axis.t) :
-        (module Lattice with type t = a) =
-      match axis with
-      | Areality -> (module Areality.Const)
-      | Linearity -> (module Linearity.Const)
-      | Portability -> (module Portability.Const)
-      | Yielding -> (module Yielding.Const)
-      | Statefulness -> (module Statefulness.Const)
   end
 
   let proj ax m = Solver.apply (proj_obj ax) (Proj (Obj.obj, ax)) m
@@ -2227,13 +2218,6 @@ module Monadic = struct
         let obj = proj_obj ax in
         C.print_obj ppf obj
     end
-
-    let lattice_of_axis (type a) (axis : a Axis.t) :
-        (module Lattice with type t = a) =
-      match axis with
-      | Uniqueness -> (module Uniqueness.Const_op)
-      | Contention -> (module Contention.Const_op)
-      | Visibility -> (module Visibility.Const_op)
   end
 
   module Const_op = C.Monadic_op
@@ -2345,6 +2329,14 @@ module Value_with (Areality : Areality) = struct
           (fun (Comonadic.Axis.P ax) -> P (Comonadic ax))
           Comonadic.Axis.all
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
+
+    let eq : type a b. a t -> b t -> (a, b) Misc.eq option =
+     fun ax0 ax1 ->
+      match ax0, ax1 with
+      | Monadic ax0, Monadic ax1 -> Axis.eq ax0 ax1
+      | Comonadic ax0, Comonadic ax1 -> Axis.eq ax0 ax1
+      | Monadic _, Comonadic _ -> None
+      | Comonadic _, Monadic _ -> None
   end
 
   let proj_obj : type a. a Axis.t -> a C.obj = function
@@ -2457,12 +2449,6 @@ module Value_with (Areality : Areality) = struct
       let monadic = Monadic.join m0.monadic m1.monadic in
       let comonadic = Comonadic.join m0.comonadic m1.comonadic in
       merge { monadic; comonadic }
-
-    let lattice_of_axis (type a) (axis : a Axis.t) :
-        (module Lattice with type t = a) =
-      match axis with
-      | Comonadic ax -> Comonadic.lattice_of_axis ax
-      | Monadic ax -> Monadic.lattice_of_axis ax
 
     module Option = struct
       type some = t
@@ -2623,30 +2609,38 @@ module Value_with (Areality : Areality) = struct
       let monadic = Monadic.min in
       merge { comonadic; monadic }
 
-    let print_axis : type a. a Axis.t -> _ -> a -> unit =
-     fun ax ppf a ->
-      let obj = proj_obj ax in
-      C.print obj ppf a
+    module Per_axis = struct
+      let print : type a. a Axis.t -> _ -> a -> unit =
+       fun ax ppf a ->
+        let obj = proj_obj ax in
+        C.print obj ppf a
 
-    let le_axis : type a. a Axis.t -> a -> a -> bool =
-     fun ax m0 m1 ->
-      match ax with
-      | Comonadic ax -> Comonadic.Per_axis.le ax m0 m1
-      | Monadic ax -> Monadic.Per_axis.le ax m0 m1
+      let le : type a. a Axis.t -> a -> a -> bool =
+       fun ax m0 m1 ->
+        match ax with
+        | Comonadic ax -> Comonadic.Per_axis.le ax m0 m1
+        | Monadic ax -> Monadic.Per_axis.le ax m0 m1
 
-    let min_axis : type a. a Axis.t -> a = function
-      | Comonadic ax -> Comonadic.Per_axis.min ax
-      | Monadic ax -> Monadic.Per_axis.min ax
+      let min : type a. a Axis.t -> a = function
+        | Comonadic ax -> Comonadic.Per_axis.min ax
+        | Monadic ax -> Monadic.Per_axis.min ax
 
-    let max_axis : type a. a Axis.t -> a = function
-      | Comonadic ax -> Comonadic.Per_axis.max ax
-      | Monadic ax -> Monadic.Per_axis.max ax
+      let max : type a. a Axis.t -> a = function
+        | Comonadic ax -> Comonadic.Per_axis.max ax
+        | Monadic ax -> Monadic.Per_axis.max ax
 
-    let is_max : type a. a Axis.t -> a -> bool =
-     fun ax m -> le_axis ax (max_axis ax) m
+      let meet : type a. a Axis.t -> a -> a -> a = function
+        | Comonadic ax -> Comonadic.Per_axis.meet ax
+        | Monadic ax -> Monadic.Per_axis.meet ax
 
-    let is_min : type a. a Axis.t -> a -> bool =
-     fun ax m -> le_axis ax m (min_axis ax)
+      let join : type a. a Axis.t -> a -> a -> a = function
+        | Comonadic ax -> Comonadic.Per_axis.join ax
+        | Monadic ax -> Monadic.Per_axis.join ax
+
+      let eq_obj = Axis.eq
+
+      let print_obj = Axis.print
+    end
 
     let split = split
 
