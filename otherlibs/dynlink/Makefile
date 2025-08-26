@@ -67,6 +67,7 @@ COMPILERLIBS_INTFS=\
   parsing/asttypes.mli \
   parsing/parsetree.mli \
   typing/solver_intf.mli \
+  typing/mode_hint.mli \
   typing/mode_intf.mli \
   typing/outcometree.mli \
   typing/value_rec_types.mli \

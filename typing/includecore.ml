@@ -344,7 +344,7 @@ let report_modality_sub_error first second ppf e =
     (print_modality "not") left
 
 let report_mode_sub_error got expected ppf e =
-  let Mode.Value.Error(ax, {left; right}) = e in
+  let Mode.Value.Error(ax, {left; right}) = Mode.Value.to_simple_error e in
   match ax with
   | Comonadic Areality -> Format.fprintf ppf "This escapes its region."
   | _ ->

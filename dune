@@ -123,6 +123,7 @@
   parsetree
   debug_event
   solver_intf
+  mode_hint
   mode_intf)
  (modules
   ;; UTILS
@@ -203,7 +204,6 @@
   persistent_env
   env
   errortrace
-  mode
   jkind_types
   jkind_intf
   signature_with_global_bindings
@@ -237,6 +237,7 @@
   typecore
   solver_intf
   solver
+  mode_hint
   mode_intf
   mode
   uniqueness_analysis

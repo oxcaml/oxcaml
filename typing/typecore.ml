@@ -124,15 +124,6 @@ type submode_reason =
   | Constructor of Longident.t
   | Other
 
-type contention_context =
-  | Read_mutable
-  | Write_mutable
-  | Force_lazy
-
-type visibility_context =
-  | Read_mutable
-  | Write_mutable
-
 type unsupported_stack_allocation =
   | Lazy
   | Module
@@ -276,12 +267,8 @@ type error =
   | Block_access_private_record
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
-  | Submode_failed of
-      Value.error * submode_reason *
-      Env.locality_context option *
-      contention_context option *
-      visibility_context option *
-      Env.shared_context option
+  | Submode_failed of Value.error * submode_reason * Env.shared_context option
+  | Submode_failed_alloc of Alloc.error
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Param_mode_mismatch of Alloc.equate_error
@@ -300,7 +287,6 @@ type error =
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
-  | Cannot_stack_allocate of Env.locality_context option
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
   | Impossible_function_jkind of
@@ -412,15 +398,6 @@ type position_in_region =
 type expected_mode =
   { position : position_in_region;
 
-    locality_context : Env.locality_context option;
-    (** Explains why regionality axis of [mode] is low. *)
-
-    contention_context : contention_context option;
-    (** Explains why contention axis of [mode] is low. *)
-
-    visibility_context : visibility_context option;
-    (** Explains why visibility axis of [mode] is low. *)
-
     mode : Value.r;
     (** The upper bound, hence r (right) *)
 
@@ -497,15 +474,15 @@ let check_tail_call_local_returning loc env ap_mode {region_mode; _} =
     end
   | None -> ()
 
-let meet_regional mode =
+let meet_regional ?hint:h mode =
   let mode = Value.disallow_left mode in
-  Value.meet_with Areality Regionality.Const.Regional mode
+  Value.meet [Value.(of_const ?hint_comonadic:h ~hint_monadic:Max_monadic {
+    Const.max with
+    areality = Regional
+  }); mode]
 
 let mode_default mode =
   { position = RNontail;
-    locality_context = None;
-    contention_context = None;
-    visibility_context = None;
     mode = Value.disallow_left mode;
     strictly_local = false;
     tuple_modes = None }
@@ -536,10 +513,9 @@ let mode_modality modality expected_mode =
 (* used when entering a function;
 mode is the mode of the function region *)
 let mode_return mode =
-  { (mode_default (meet_regional mode)) with
+  { (mode_default (meet_regional ~hint:Is_function_return mode)) with
     position = RTail (Regionality.disallow_left
       (Value.proj_comonadic Areality mode), FTail);
-    locality_context = Some Return;
   }
 
 (* used when entering a region.*)
@@ -548,7 +524,6 @@ let mode_region mode =
     position =
       RTail (Regionality.disallow_left
         (Value.proj_comonadic Areality mode), FNontail);
-    locality_context = None;
   }
 
 let mode_max =
@@ -583,11 +558,14 @@ let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
 
 let mode_lazy expected_mode =
+  let mode =
+    Value.{
+      Const.max with
+      areality = Regionality.Const.Global;
+      yielding = Yielding.Const.Unyielding }
+  in
   let expected_mode =
-    mode_coerce (
-      Value.max_with_comonadic Areality Regionality.global
-      |> Value.meet_with Yielding Yielding.Const.Unyielding)
-      expected_mode
+    mode_coerce (Value.of_const ~hint_comonadic:Lazy mode ~hint_monadic:Max_monadic) expected_mode
   in
   let mode_crossing =
     Crossing.of_bounds {
@@ -605,23 +583,10 @@ let mode_lazy expected_mode =
   let closure_mode =
     expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing
   in
-  {expected_mode with locality_context = Some Lazy }, closure_mode
-
-let mode_tailcall_function mode =
-  { (mode_default mode) with
-    locality_context = Some Tailcall_function }
-
-let mode_tailcall_argument mode =
-  { (mode_default mode) with
-    locality_context = Some Tailcall_argument }
+  expected_mode, closure_mode
 
 let mode_partial_application expected_mode =
-  let expected_mode =
-    mode_morph (fun mode -> alloc_as_value (value_to_alloc_r2g mode))
-      expected_mode
-  in
-  { expected_mode with
-    locality_context = Some Partial_application }
+  mode_morph (value_r2g ~hint:Captured_by_partial_application) expected_mode
 
 let mode_trywith expected_mode =
   { expected_mode with position = RNontail }
@@ -653,9 +618,8 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   | _, _, (Nontail | Default) ->
      mode_default vmode, vmode
   | _, _, Tail -> begin
-    Regionality.submode_exn (Value.proj_comonadic Areality vmode)
-      Regionality.regional;
-    mode_tailcall_argument vmode, vmode
+    Value.submode_exn vmode Value.(of_const ~hint_comonadic:Tailcall_argument ~hint_monadic:Max_monadic { Const.max with areality = Regional});
+    mode_default vmode, vmode
   end
 
 (* expected_mode.locality_context explains why expected_mode.mode is low;
@@ -665,12 +629,8 @@ let submode ~loc ~env ?(reason = Other) ?shared_context mode expected_mode =
   match res with
   | Ok () -> ()
   | Error failure_reason ->
-      let locality_context = expected_mode.locality_context in
-      let contention_context = expected_mode.contention_context in
-      let visibility_context = expected_mode.visibility_context in
       let error =
-        Submode_failed(failure_reason, reason, locality_context,
-          contention_context, visibility_context, shared_context)
+        Submode_failed(failure_reason, reason, shared_context)
       in
       raise (Error(loc, env, error))
 
@@ -727,10 +687,6 @@ let register_allocation_value_mode mode =
 let register_allocation (expected_mode : expected_mode) =
   let alloc_mode, mode =
     register_allocation_value_mode (as_single_mode expected_mode)
-  in
-  let alloc_mode : alloc_mode =
-    { mode = alloc_mode;
-      locality_context = expected_mode.locality_context }
   in
   alloc_mode, mode_default mode
 
@@ -1062,11 +1018,9 @@ let mode_project_mutable =
     { Value.Const.max with
       visibility = Visibility.Const.Read;
       contention = Contention.Const.Shared }
-    |> Value.of_const
+    |> Value.of_const ~hint_monadic:Mutable_read ~hint_comonadic:Max_comonadic
   in
-  { (mode_default mode) with
-    contention_context = Some Read_mutable;
-    visibility_context = Some Read_mutable }
+  mode_default mode
 
 (** The [expected_mode] of the record when mutating a mutable field. *)
 let mode_mutate_mutable =
@@ -1074,21 +1028,18 @@ let mode_mutate_mutable =
     { Value.Const.max with
       visibility = Read_write;
       contention = Uncontended }
-    |> Value.of_const
+    |> Value.of_const ~hint_monadic:Mutable_write ~hint_comonadic:Max_comonadic
   in
-  { (mode_default mode) with
-    contention_context = Some Write_mutable;
-    visibility_context = Some Write_mutable }
+  mode_default mode
 
 (** The [expected_mode] of the lazy expression when forcing it. *)
 let mode_force_lazy =
   let mode =
     { Value.Const.max with
       contention = Uncontended }
-    |> Value.of_const
+    |> Value.of_const ~hint_monadic:Forced_lazy_expression ~hint_comonadic:Max_comonadic
   in
-  { (mode_default mode) with
-    contention_context = Some Force_lazy }
+  mode_default mode
 
 let check_project_mutability ~loc ~env mutability mode =
   if Types.is_mutable mutability then
@@ -3117,7 +3068,7 @@ and type_pat_aux
           lid constr.cstr_tag ~res:expected_ty ~args locks with
         | Ok mode -> mode
         | Error e -> raise (Error (lid.loc, !!penv,
-          Submode_failed (e, Constructor lid.txt, None, None, None, None)))
+          Submode_failed (e, Constructor lid.txt, None)))
       in
       let args =
         List.map2
@@ -5234,33 +5185,24 @@ let with_explanation explanation f =
         raise (Error (loc', env', err))
 
 let unique_use ~loc ~env mode_l mode_r  =
-  let uniqueness =
-    Uniqueness.disallow_left (Value.proj_monadic Uniqueness mode_r)
-  in
-  let linearity =
-    Linearity.disallow_right (Value.proj_comonadic Linearity mode_l)
-  in
   if not (Language_extension.is_at_least Unique
             Language_extension.maturity_of_unique_for_drf) then begin
     (* if unique extension is not enabled, we will not run uniqueness analysis;
        instead, we force all uses to be aliased and many. This is equivalent to
        running a UA which forces everything *)
-    (match Uniqueness.submode Uniqueness.aliased uniqueness with
-    | Ok () -> ()
-    | Error e ->
-        let e : Mode.Value.error = Error (Monadic Uniqueness, e) in
-        raise (Error(loc, env, Submode_failed(e, Other, None, None, None, None)))
-    );
-    (match Linearity.submode linearity Linearity.many with
-    | Ok () -> ()
-    | Error e ->
-        let e : Mode.Value.error = Error (Comonadic Linearity, e) in
-        raise (Error (loc, env, Submode_failed(e, Other, None, None, None, None)))
-    );
+    submode ~loc ~env Value.(of_const {Const.min with uniqueness = Aliased}) (mode_default mode_r);
+    submode ~loc ~env mode_l (mode_default Value.(of_const {Const.max with linearity = Many}));
     (Uniqueness.disallow_left Uniqueness.aliased,
      Linearity.disallow_right Linearity.many)
   end
-  else (uniqueness, linearity)
+  else
+    let uniqueness =
+      Uniqueness.disallow_left (Value.proj_monadic Uniqueness mode_r)
+    in
+    let linearity =
+      Linearity.disallow_right (Value.proj_comonadic Linearity mode_l)
+    in
+    (uniqueness, linearity)
 
 (** The body of a constraint or coercion. The "body" may be either an expression
     or a list of function cases. This type is polymorphic in the data returned
@@ -5387,7 +5329,7 @@ let split_function_ty
     | true ->
         let env =
           Env.add_closure_lock
-            (Function expected_mode.locality_context)
+            Function
             (alloc_as_value alloc_mode).comonadic
             env
         in
@@ -6134,18 +6076,18 @@ and type_expect_
       (* See Note [Type-checking applications] *)
       assert (sargs <> []);
       let pm = position_and_mode env expected_mode sexp in
-      let funct_mode, funct_expected_mode =
+      let funct_mode =
         match pm.apply_position with
         | Tail ->
           let mode, _ =
-            Value.newvar_below
-              (Value.max_with_comonadic Areality Regionality.regional)
+            Value.(newvar_below
+              (of_const ~hint_comonadic:Tailcall_function ~hint_monadic:Max_monadic
+                { Const.max with areality = Regional }))
           in
-          mode, mode_tailcall_function mode
-        | Nontail | Default ->
-          let mode = Value.newvar () in
-          mode, mode_default mode
+          mode
+        | Nontail | Default -> Value.newvar ()
       in
+      let funct_expected_mode = mode_default funct_mode in
       (* does the function return a tvar which is too generic? *)
       let rec ret_tvar seen ty_fun =
         let ty = expand_head env ty_fun in
@@ -7255,15 +7197,13 @@ and type_expect_
       | Texp_field (_, _, _, _, Boxing (alloc_mode, _), _) ->
         begin
           submode ~loc ~env
-            (Value.min_with_comonadic Areality Regionality.local)
+            Value.(of_const ~hint_comonadic:Stack_expression ~hint_monadic:Min_monadic { Const.min with areality = Local })
             expected_mode;
           match
-            Locality.submode Locality.local
-              (Alloc.proj_comonadic Areality alloc_mode.mode)
+            Alloc.submode Alloc.(of_const ~hint_comonadic:Stack_expression ~hint_monadic:Min_monadic { Const.min with areality = Local }) alloc_mode
           with
           | Ok () -> ()
-          | Error _ -> raise (Error (e.pexp_loc, env,
-              Cannot_stack_allocate alloc_mode.locality_context))
+          | Error err -> raise (Error (exp.exp_loc, exp.exp_env, Submode_failed_alloc err))
         end
       | Texp_list_comprehension _ -> unsupported List_comprehension
       | Texp_array_comprehension _ -> unsupported Array_comprehension
@@ -8881,10 +8821,6 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   let arity = List.length sexpl in
   assert (arity >= 2);
   let alloc_mode, argument_mode = register_allocation_value_mode expected_mode.mode in
-  let alloc_mode =
-    { mode = alloc_mode;
-      locality_context = expected_mode.locality_context }
-  in
   (* CR layouts v5: non-values in tuples *)
   let unify_as_tuple ty_expected =
     let labeled_subtypes =
@@ -9099,7 +9035,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       constr.cstr_tag ~res:ty_res ~args:ty_args locks with
     | Ok mode -> mode
     | Error e -> raise (Error (lid.loc, env,
-        Submode_failed (e, Constructor lid.txt, None, None, None, None)))
+        Submode_failed (e, Constructor lid.txt, None)))
   in
   let expected_mode =
     { expected_mode with mode =
@@ -10231,10 +10167,7 @@ and type_n_ary_function
       | (Check _ | Assume _ | Ignore_assert_all) ->
         Zero_alloc.create_const zero_alloc
     in
-    let alloc_mode =
-      { mode = Mode.Alloc.disallow_left fun_alloc_mode;
-        locality_context = expected_mode.locality_context }
-    in
+    let alloc_mode = Mode.Alloc.disallow_left fun_alloc_mode in
     re
       { exp_desc =
           Texp_function
@@ -10811,56 +10744,8 @@ let report_type_expected_explanation expl ppf =
   | Error_message_attr msg ->
       fprintf ppf "@\n@[%s@]" msg
 
-let stack_hint (context : Env.locality_context option) =
-  match context with
-  | Some Return -> []
-  | Some Tailcall_argument ->
-    [ Location.msg
-        "@[Hint: This argument cannot be stack-allocated,@ \
-         because it is an argument in a tail call.@]" ]
-  | Some Tailcall_function ->
-    [ Location.msg
-        "@[Hint: This function cannot be stack-allocated,@ \
-         because it is the function in a tail call.@]" ]
-  | Some Lazy ->
-    [ Location.msg
-        "@[Hint: This expression cannot be stack-allocated,@ \
-         because it is the result of a lazy expression.@]" ]
-  | Some Partial_application -> assert false
-  | None -> []
-
-let escaping_hint (failure_reason : Value.error) submode_reason
-      (context : Env.locality_context option) =
-  begin match failure_reason, context with
-  | Error (Comonadic Areality, e), Some h ->
-    begin match e, h with
-    | {left=Local; right=Regional}, Return ->
-      (* Only hint to use exclave_, when the user wants to return local, but
-         expected mode is regional. If the expected mode is as strict as
-         global, then exclave_ won't solve the problem. *)
-      [ Location.msg
-          "@[Hint: Cannot return a local value without an@ \
-           \"exclave_\" annotation.@]" ]
-    | _, Return -> []
-    | _, Tailcall_argument ->
-      [ Location.msg
-          "@[Hint: This argument cannot be local,@ \
-           because it is an argument in a tail call.@]" ]
-    | _, Tailcall_function ->
-      [ Location.msg
-          "@[Hint: This function cannot be local,@ \
-           because it is the function in a tail call.@]" ]
-    | _, Partial_application ->
-      [ Location.msg
-          "@[Hint: It is captured by a partial application.@]" ]
-    | _, Lazy ->
-      [ Location.msg
-          "@[Hint: It is the result of a lazy expression.@]" ]
-    end
-  | _, _ -> []
-  end
-  @
-  begin match submode_reason with
+let escaping_submode_reason_hint =
+  function
   (* TODO: generalize this to other axis as well *)
   | Application result_ty ->
     (* [get_non_local_arity ty] returns [Some (n_args, sureness)] iff [ty] is a
@@ -10897,36 +10782,6 @@ let escaping_hint (failure_reason : Value.error) submode_reason
     | None -> []
     end
   | Constructor _ | Other -> []
-  end
-
-
-let contention_hint _fail_reason _submode_reason context =
-  match (context : contention_context option) with
-  | Some Read_mutable ->
-      [Location.msg
-        "@[Hint: In order to read from its mutable fields,@ \
-        this record needs to be at least shared.@]"]
-  | Some Write_mutable ->
-      [Location.msg
-        "@[Hint: In order to write into its mutable fields,@ \
-        this record needs to be uncontended.@]"]
-  | Some Force_lazy ->
-      [Location.msg
-        "@[Hint: In order to force the lazy expression,@ \
-        the lazy needs to be uncontended.@]"]
-  | None -> []
-
-let visibility_hint _fail_reason _submode_reason context =
-  match (context : visibility_context option) with
-  | Some Read_mutable ->
-      [Location.msg
-        "@[Hint: In order to read from its mutable fields,@ \
-        this record needs to have read visibility.@]"]
-  | Some Write_mutable ->
-      [Location.msg
-        "@[Hint: In order to write into its mutable fields,@ \
-        this record needs to have read_write visibility.@]"]
-  | None -> []
 
 let report_type_expected_explanation_opt expl ppf =
   match expl with
@@ -11618,59 +11473,32 @@ let report_error ~loc env =
       (if mut then "mutable" else "immutable")
       what_element_must_do
       (print_modality "not") actual
-  | Submode_failed(fail_reason, submode_reason, locality_context,
-      contention_context, visibility_context, shared_context)
-     ->
-      let sub =
-        match fail_reason with
-        | Error (Comonadic Linearity, _) | Error (Monadic Uniqueness, _) ->
+  | Submode_failed(e, submode_reason, shared_context) ->
+    let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
+    let sub =
+      match ax with
+        | Comonadic Linearity | Monadic Uniqueness ->
             shared_context
           |> Option.map
               (fun context -> Location.mknoloc
                 (fun ppf -> Env.sharedness_hint ppf context))
           |> Option.to_list
-        | Error (Comonadic Areality, _) ->
-          escaping_hint fail_reason submode_reason locality_context
-        | Error (Monadic Contention, _ ) ->
-          contention_hint fail_reason submode_reason contention_context
-        | Error (Monadic Visibility, _) ->
-          visibility_hint fail_reason submode_reason visibility_context
-        | Error (Comonadic Portability, _ ) -> []
-        | Error (Comonadic Yielding, _) -> []
-        | Error (Comonadic Statefulness, _) -> []
-      in
-      let sub =
-        match submode_reason with
-        | Constructor name ->
-          assert (List.length sub = 0);
-          [ Location.msg "@[Hint: All arguments of the constructor %a@\n\
-            must cross this axis to use it in this position.@]"
-            (Style.as_inline_code longident) name ]
-        | Application _ | Other -> sub
-      in
-      Location.errorf ~loc ~sub "@[%t@]" begin
-        match fail_reason with
-        | Error (Comonadic Areality, _) ->
-            Format.dprintf "This value escapes its region."
-        | Error (ax, {left; right}) ->
-            let pp_expectation ppf () =
-              let open Contention.Const in
-              match ax, right with
-              | Monadic Contention, Shared ->
-                  (* Could generalize this to other error cases where we expect
-                     something besides bottom, but currently (besides areality,
-                     already covered above) there are no other such cases. *)
-                  Format.fprintf ppf "%a or %a"
-                    (Style.as_inline_code Contention.Const.print) Shared
-                    (Style.as_inline_code Contention.Const.print) Uncontended
-              | _, _ ->
-                  Style.as_inline_code (Value.Const.print_axis ax) ppf right
-            in
-            Format.dprintf "This value is %a but expected to be %a."
-              (Style.as_inline_code (Value.Const.print_axis ax)) left
-              pp_expectation ()
-        end
-  | Curried_application_complete (lbl, Error (ax, {left; _}), loc_kind) ->
+      | Comonadic Areality -> escaping_submode_reason_hint submode_reason
+      | _ -> []
+    in
+    let sub =
+      match submode_reason with
+      | Constructor name ->
+        assert (List.length sub = 0);
+        [ Location.msg "@[Hint: All arguments of the constructor %a@\n\
+          must cross this axis to use it in this position.@]"
+          (Style.as_inline_code longident) name ]
+      | Application _ | Other -> sub
+    in
+    Location.errorf ~loc ~sub "%a" Value.report_error e
+  | Submode_failed_alloc e -> Location.errorf ~loc "%a" Alloc.report_error e
+  | Curried_application_complete (lbl, e, loc_kind) ->
+      let Mode.Alloc.Error (ax, {left; _}) = Mode.Alloc.to_simple_error e in
       let sub =
         match loc_kind with
         | `Prefix ->
@@ -11694,7 +11522,8 @@ let report_error ~loc env =
         "@[This application is complete, but surplus arguments were provided afterwards.@ \
          When passing or calling %a values, extra arguments are passed in a separate application.@]"
          (Alloc.Const.print_axis ax) left
-  | Param_mode_mismatch (s, Error (ax, {left; right})) ->
+  | Param_mode_mismatch (s, e) ->
+      let Mode.Alloc.Error (ax, {left; right}) = Mode.Alloc.to_simple_error e in
       let actual, expected =
         match s with
         | Left_le_right -> left, right
@@ -11706,12 +11535,13 @@ let report_error ~loc env =
         (Style.as_inline_code (Alloc.Const.print_axis ax)) actual
         (Style.as_inline_code (Alloc.Const.print_axis ax)) expected
   | Uncurried_function_escapes e -> begin
-      match e with
-      | Error (Comonadic Areality, _) ->
+      let Mode.Alloc.Error (ax, {left; right}) = Mode.Alloc.to_simple_error e in
+      match ax with
+      | Comonadic Areality ->
           Location.errorf ~loc
             "This function or one of its parameters escape their region@ \
             when it is partially applied."
-      | Error (ax, {left; right}) ->
+      | _ ->
           Location.errorf ~loc
             "This function when partially applied returns a value which is %a,@ \
               but expected to be %a."
@@ -11781,9 +11611,6 @@ let report_error ~loc env =
          automatically if omitted. It cannot be passed with '?'.@]"
       Style.inline_code label
       Style.inline_code "[%call_pos]"
-  | Cannot_stack_allocate locality_context ->
-      let sub = stack_hint locality_context in
-      Location.errorf ~loc ~sub "@[This allocation cannot be on the stack.@]"
   | Unsupported_stack_allocation category ->
     Location.errorf ~loc "@[Stack allocating %a is unsupported yet.@]"
       print_unsupported_stack_allocation category

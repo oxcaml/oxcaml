@@ -58,12 +58,24 @@ type equate_step =
   | Left_le_right
   | Right_le_left
 
+(** Simple mode error specific to axis whose carrier type is ['a]. [left] is the lower
+bound of actual mode and [right] is the upper bound of expected mode. [left <= right] is
+false, which is why the submode failed. *)
+type 'a simple_error =
+  { left : 'a;
+    right : 'a
+  }
+
 module type Common = sig
   module Const : Lattice
 
   type error
 
   type equate_error = equate_step * error
+
+  type simple_error
+
+  val to_simple_error : error -> simple_error
 
   type 'd t constraint 'd = 'l * 'r
 
@@ -107,8 +119,6 @@ module type Common = sig
 
   val print : ?verbose:bool -> unit -> Format.formatter -> ('l * 'r) t -> unit
 
-  val of_const : Const.t -> ('l * 'r) t
-
   val zap_to_ceil : ('l * allowed) t -> Const.t
 
   val zap_to_floor : (allowed * 'r) t -> Const.t
@@ -118,7 +128,13 @@ module type Common_axis = sig
   module Const : Lattice
 
   include
-    Common with module Const := Const and type error = Const.t Solver.error
+    Common
+      with module Const := Const
+       and type simple_error := Const.t simple_error
+
+  type 'd hint_const constraint 'd = 'l * 'r
+
+  val of_const : ?hint:'d hint_const -> Const.t -> 'd t
 end
 
 module type Axis = sig
@@ -140,14 +156,42 @@ end
 module type Common_product = sig
   module Axis : Axis
 
+  type 'a simple_axerror := 'a simple_error
+
+  type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
+
   module Const : Lattice_product with type 'a axis := 'a Axis.t
 
-  type error = Error : 'a Axis.t * 'a Solver.error -> error
+  include
+    Common with type simple_error := simple_error and module Const := Const
 
-  include Common with type error := error and module Const := Const
+  (** Takes an optional [lock_item] and identifier of the offending value, and report the
+      submode error with hints. *)
+  val report_error :
+    ?target:Mode_hint.lock_item * Longident.t ->
+    Format.formatter ->
+    error ->
+    unit
+
+  type 'd hint_const constraint 'd = 'l * 'r
+
+  val of_const : ?hint:'d hint_const -> Const.t -> 'd t
+
+  type 'd hint_morph constraint 'd = 'l * 'r
+
+  val apply_hint : 'd hint_morph -> 'd t -> 'd t
 end
 
 module type S = sig
+  val print_longident : (Format.formatter -> Longident.t -> unit) ref
+
+  module Hint = Mode_hint
+
+  type nonrec 'a simple_error = 'a simple_error
+
+  (** Rich mode error specific to axis whose carrier type is ['a]. *)
+  type 'a error
+
   type changes
 
   val undo_changes : changes -> unit
@@ -167,6 +211,28 @@ module type S = sig
       comonadic : 'b
     }
 
+  module type Common_axis_pos = sig
+    module Const : Lattice
+
+    include
+      Common_axis
+        with module Const := Const
+         and type 'd t = (Const.t, 'd pos) mode
+         and type error := Const.t error
+         and type 'd hint_const := 'd Hint.pos_const
+  end
+
+  module type Common_axis_neg = sig
+    module Const : Lattice
+
+    include
+      Common_axis
+        with module Const := Const
+         and type 'd t = (Const.t, 'd neg) mode
+         and type error := Const.t error
+         and type 'd hint_const := 'd Hint.neg_const
+  end
+
   module Locality : sig
     module Const : sig
       type t =
@@ -176,10 +242,7 @@ module type S = sig
       include Lattice with type t := t
     end
 
-    include
-      Common_axis
-        with module Const := Const
-         and type 'd t = (Const.t, 'd pos) mode
+    include Common_axis_pos with module Const := Const
 
     val global : lr
 
@@ -212,10 +275,7 @@ module type S = sig
       include Lattice with type t := t
     end
 
-    include
-      Common_axis
-        with module Const := Const
-         and type 'd t = (Const.t, 'd pos) mode
+    include Common_axis_pos with module Const := Const
 
     val global : lr
 
@@ -233,10 +293,7 @@ module type S = sig
       include Lattice with type t := t
     end
 
-    include
-      Common_axis
-        with module Const := Const
-         and type 'd t = (Const.t, 'd pos) mode
+    include Common_axis_pos with module Const := Const
 
     val many : lr
 
@@ -252,10 +309,7 @@ module type S = sig
       include Lattice with type t := t
     end
 
-    include
-      Common_axis
-        with module Const := Const
-         and type 'd t = (Const.t, 'd pos) mode
+    include Common_axis_pos with module Const := Const
   end
 
   module Uniqueness : sig
@@ -269,10 +323,7 @@ module type S = sig
 
     module Const_op : Lattice with type t = Const.t
 
-    include
-      Common_axis
-        with module Const := Const
-         and type 'd t = (Const.t, 'd neg) mode
+    include Common_axis_neg with module Const := Const
 
     val aliased : lr
 
@@ -291,10 +342,7 @@ module type S = sig
 
     module Const_op : Lattice with type t = Const.t
 
-    include
-      Common_axis
-        with module Const := Const
-         and type 'd t = (Const.t, 'd neg) mode
+    include Common_axis_neg with module Const := Const
   end
 
   module Yielding : sig
@@ -306,10 +354,7 @@ module type S = sig
       include Lattice with type t := t
     end
 
-    include
-      Common_axis
-        with module Const := Const
-         and type 'd t = (Const.t, 'd pos) mode
+    include Common_axis_pos with module Const := Const
 
     val yielding : lr
 
@@ -326,10 +371,7 @@ module type S = sig
       include Lattice with type t := t
     end
 
-    include
-      Common_axis
-        with module Const := Const
-         and type 'd t = (Const.t, 'd pos) mode
+    include Common_axis_pos with module Const := Const
 
     val stateless : lr
 
@@ -350,10 +392,7 @@ module type S = sig
 
     module Const_op : Lattice with type t = Const.t
 
-    include
-      Common_axis
-        with module Const := Const
-         and type 'd t = (Const.t, 'd neg) mode
+    include Common_axis_neg with module Const := Const
 
     val immutable : lr
 
@@ -397,13 +436,16 @@ module type S = sig
   end
 
   module type Mode := sig
-    module Areality : Common
+    module Areality : Common_axis_pos
 
     module Monadic : sig
       include
         Common_product
           with type Const.t = monadic
+           and type error = monadic error
            and type 'a Axis.t = (monadic, 'a) Axis.t
+           and type 'd hint_morph := 'd Hint.neg_morph
+           and type 'd hint_const := 'd Hint.neg_const
 
       module Const_op : Lattice with type t = Const.t
 
@@ -416,7 +458,10 @@ module type S = sig
       include
         Common_product
           with type Const.t = Areality.Const.t comonadic_with
+           and type error = Areality.Const.t comonadic_with error
            and type 'a Axis.t = (Areality.Const.t comonadic_with, 'a) Axis.t
+           and type 'd hint_morph := 'd Hint.pos_morph
+           and type 'd hint_const := 'd Hint.pos_const
 
       val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) mode
 
@@ -509,7 +554,15 @@ module type S = sig
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
 
-    type error = Error : 'a Axis.t * 'a Solver.error -> error
+    type error =
+      | Monadic of Monadic.error
+      | Comonadic of Comonadic.error
+
+    val report_error : Format.formatter -> error -> unit
+
+    type 'a simple_axerror := 'a simple_error
+
+    type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
 
     type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
 
@@ -517,7 +570,14 @@ module type S = sig
       Common
         with module Const := Const
          and type error := error
+         and type simple_error := simple_error
          and type 'd t := 'd t
+
+    val of_const :
+      ?hint_monadic:('l * 'r) neg Hint.const ->
+      ?hint_comonadic:('l * 'r) pos Hint.const ->
+      Const.t ->
+      ('l * 'r) t
 
     module List : sig
       (* No new types exposed to avoid too many type names *)
@@ -547,7 +607,8 @@ module type S = sig
 
     val zap_to_legacy : lr -> Const.t
 
-    val comonadic_to_monadic : ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
+    val comonadic_to_monadic :
+      ?hint:('l * 'r) Hint.morph -> ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
 
     val monadic_to_comonadic_max :
       ('r * disallowed) Monadic.t -> (disallowed * 'r) Comonadic.t
@@ -609,6 +670,10 @@ module type S = sig
   (** Similar to [regional_to_global], behaves as identity on other axes *)
   val value_to_alloc_r2g : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
+  (** Similar to [value_to_alloc_r2g], but followed by [alloc_as_value]. *)
+  val value_r2g :
+    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Value.t
+
   module Modality : sig
     module Comonadic : sig
       module Atom : sig
@@ -650,7 +715,7 @@ module type S = sig
       val axis : 'a t -> 'a Value.Axis.t
     end
 
-    type error = Error : 'a Atom.t Solver.error -> error
+    type error = Error : 'a Atom.t simple_error -> error
 
     type nonrec equate_error = equate_step * error
 

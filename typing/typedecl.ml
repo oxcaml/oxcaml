@@ -4821,7 +4821,8 @@ let report_error ppf = function
       fprintf ppf
         "@[The label %a must be mutable to be declared atomic.@]"
         Style.inline_code name
-  | Constructor_submode_failed (Error (ax, {left; right})) ->
+  | Constructor_submode_failed e ->
+      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
       fprintf ppf "@[This constructor is at mode %a, \
         but expected to be at mode %a.@]"
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
