@@ -3183,6 +3183,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         local = Default_local;
         zero_alloc = Default_zero_alloc;
         loop = Default_loop;
+        regalloc = Default_regalloc;
         is_a_functor = false;
         is_opaque = false;
         stub = true;

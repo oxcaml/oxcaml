@@ -50,6 +50,9 @@ let is_poll_attribute =
 let is_loop_attribute =
   [ "loop", Return ]
 
+let is_regalloc_attribute =
+  [ "regalloc", Return ]
+
 let is_opaque_attribute =
   [ "opaque", Return ]
 
@@ -177,6 +180,21 @@ let parse_loop_attribute attr =
         ]
         payload
 
+let parse_regalloc_attribute attr =
+  match attr with
+  | None -> Default_regalloc
+  | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
+      parse_id_payload txt loc
+        ~default:Default_regalloc
+        ~empty:Default_regalloc
+        [
+          "cfg", Cfg_regalloc;
+          "irc", Irc_regalloc;
+          "ls", Ls_regalloc;
+          "gi", Gi_regalloc;
+        ]
+        payload
+
 let parse_opaque_attribute attr =
   match attr with
   | None -> false
@@ -210,6 +228,10 @@ let get_poll_attribute l =
 let get_loop_attribute l =
   let attr = find_attribute is_loop_attribute l in
   parse_loop_attribute attr
+
+let get_regalloc_attribute l =
+  let attr = find_attribute is_regalloc_attribute l in
+  parse_regalloc_attribute attr
 
 let check_local_inline loc attr =
   match attr.local, attr.inline with
@@ -329,6 +351,23 @@ let add_loop_attribute expr loc attributes =
             (Warnings.Duplicated_attribute "loop")
       end;
       let attr = { attr with loop } in
+      lfunction_with_attr ~attr funct
+    end
+  | _ -> expr
+
+let add_regalloc_attribute expr loc attributes =
+  match expr with
+  | Lfunction({ attr = { stub = false } as attr } as funct) ->
+    begin match get_regalloc_attribute attributes with
+    | Default_regalloc -> expr
+    | (Cfg_regalloc | Irc_regalloc | Ls_regalloc | Gi_regalloc) as regalloc ->
+      begin match attr.regalloc with
+      | Default_regalloc -> ()
+      | Cfg_regalloc | Irc_regalloc | Ls_regalloc | Gi_regalloc ->
+          Location.prerr_warning loc
+            (Warnings.Duplicated_attribute "regalloc")
+      end;
+      let attr = { attr with regalloc } in
       lfunction_with_attr ~attr funct
     end
   | _ -> expr
@@ -453,6 +492,9 @@ let add_function_attributes lam loc attr =
   in
   let lam =
     add_loop_attribute lam loc attr
+  in
+  let lam =
+    add_regalloc_attribute lam loc attr
   in
   let lam =
     add_tmc_attribute lam loc attr
