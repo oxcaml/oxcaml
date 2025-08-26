@@ -942,7 +942,9 @@ type module_representation =
   | Module_value_only of int
   (* All module fields are boxed. The [int] is the number of fields *)
   | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
-  (* The module contains both values and unboxed elements. *)
+  (* The module contains both values and unboxed elements. We have two shapes:
+     one for allocating (used by [block_of_module_representation]) and one for
+     reading (used by [mod_field]) *)
 
 val module_representation_field_count : module_representation -> int
 
