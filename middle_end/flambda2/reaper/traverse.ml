@@ -105,7 +105,7 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
      let param = Code_id_or_name.var param in Graph.add_propagate_dep (Acc.graph
      acc) ~if_used:indirect_call_witness ~from:le_monde_exterieur ~to_:param)
      params; *)
-  if has_unsafe_result_type
+  if has_unsafe_result_type || never_delete
   then (
     List.iter
       (fun var -> Acc.used ~denv (Simple.var var) acc)
