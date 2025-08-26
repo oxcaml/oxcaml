@@ -350,14 +350,14 @@ let register_allocator fd : register_allocator =
   | Some Cmm.Irc_regalloc -> IRC
   | Some Cmm.Ls_regalloc -> LS
   | Some Cmm.Gi_regalloc -> GI
-  | Some Cmm.Default_regalloc | None ->
+  | Some Cmm.Default_regalloc | None -> (
     (* Fall back to global regalloc flag *)
     match String.lowercase_ascii !Oxcaml_flags.regalloc with
     | "" | "cfg" -> if should_use_linscan fd then LS else IRC
     | "gi" -> GI
     | "irc" -> IRC
     | "ls" -> LS
-    | other -> Misc.fatal_errorf "unknown register allocator (%S)" other
+    | other -> Misc.fatal_errorf "unknown register allocator (%S)" other)
 
 let available_regs ~stack_slots ~f x =
   (* Skip DWARF variable range generation for complicated functions to avoid
