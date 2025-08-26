@@ -42,7 +42,7 @@ let u =
 Line 10, characters 17-20:
 10 |     portable_use foo
                       ^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let u =

@@ -36,7 +36,7 @@ let (foo @ portable) () =
 Line 3, characters 6-17:
 3 |     | Nonportable g -> g ()
           ^^^^^^^^^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
   Hint: All arguments of the constructor "Nonportable"
   must cross this axis to use it in this position.
 |}]
@@ -69,7 +69,7 @@ let (foo @ portable) (g @ nonportable) =
 Line 2, characters 23-24:
 2 |     raise (Nonportable g)
                            ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let (foo @ portable) () =
@@ -137,7 +137,7 @@ exception SemiPortable of string * (unit -> unit)
 Line 5, characters 4-16:
 5 |     SemiPortable (s, _) -> print_endline s
         ^^^^^^^^^^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
   Hint: All arguments of the constructor "SemiPortable"
   must cross this axis to use it in this position.
 |}]
@@ -183,7 +183,7 @@ let (foo @ portable) () =
 Line 3, characters 21-22:
 3 |     | Contended r -> r := 4
                          ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let (foo @ portable) () =
@@ -204,7 +204,7 @@ let (foo @ portable) () =
 Line 2, characters 11-20:
 2 |     raise (Contended (ref 42))
                ^^^^^^^^^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
   Hint: All arguments of the constructor "Contended"
   must cross this axis to use it in this position.
 |}]

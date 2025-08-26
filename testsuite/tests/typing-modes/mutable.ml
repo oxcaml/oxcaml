@@ -121,7 +121,7 @@ let foo (s @ portable) = ({s} : _ @ portable)
 Line 1, characters 26-29:
 1 | let foo (s @ portable) = ({s} : _ @ portable)
                               ^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* This attribute doesn't disable implied modalities on monadic axes. For
@@ -143,7 +143,7 @@ let foo (r @ unique) = (r.s : _ @ unique)
 Line 1, characters 24-27:
 1 | let foo (r @ unique) = (r.s : _ @ unique)
                             ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 module M : sig
@@ -257,5 +257,5 @@ type 'a r = { f : string -> string; mutable a : 'a; }
 Lines 6-7, characters 2-12:
 6 | ..{ f = (fun x -> x);
 7 |     a = 42 }
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]

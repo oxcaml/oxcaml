@@ -283,7 +283,7 @@ end
 Line 5, characters 26-29:
 5 |     let () = portable_use M.x
                               ^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 module Inclusion_fail = struct
@@ -353,7 +353,7 @@ end
 Line 7, characters 28-31:
 7 |     let _ = uncontended_use M.x
                                 ^^^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 module Inclusion_weakens_comonadic = struct
@@ -382,7 +382,7 @@ end
 Line 7, characters 23-26:
 7 |   let _ = portable_use M.x
                            ^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 module Inclusion_match = struct
@@ -439,7 +439,7 @@ end
 Line 7, characters 20-23:
 7 |     uncontended_use M.r
                         ^^^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 module Close_over_value_comonadic = struct
@@ -524,7 +524,7 @@ module M' = M
 Line 2, characters 22-31:
 2 | let () = portable_use M'.length
                           ^^^^^^^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* The example below demonstrates the need to zap modalities from [with module]

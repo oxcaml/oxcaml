@@ -354,7 +354,7 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type t = Foo of { mutable x : int }
@@ -379,7 +379,7 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let foo (t : t @ contended) = use_uncontended t
@@ -387,7 +387,7 @@ let foo (t : t @ contended) = use_uncontended t
 Line 1, characters 46-47:
 1 | let foo (t : t @ contended) = use_uncontended t
                                                   ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type 'a t = Foo of { x : 'a } | Bar
@@ -413,7 +413,7 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -424,7 +424,7 @@ type 'a t = { x : 'a; }
 Line 3, characters 47-48:
 3 | let foo (t : _ t @ nonportable) = use_portable t
                                                    ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
@@ -432,7 +432,7 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ once) = use_many t
@@ -440,7 +440,7 @@ let foo (t : _ t @ once) = use_many t
 Line 1, characters 36-37:
 1 | let foo (t : _ t @ once) = use_many t
                                         ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
@@ -456,7 +456,7 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type 'a t = Foo of { x : 'a }
@@ -473,7 +473,7 @@ type 'a t = Foo of { x : 'a; }
 Line 3, characters 15-16:
 3 |   use_portable t;
                    ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
@@ -489,7 +489,7 @@ let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
 Line 1, characters 61-62:
 1 | let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
                                                                  ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type ('a : immutable_data) t = Foo of { x : 'a } | Bar of 'a
@@ -506,7 +506,7 @@ type ('a : immutable_data) t = Foo of { x : 'a; } | Bar of 'a
 Line 3, characters 15-16:
 3 |   use_portable t;
                    ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
@@ -522,7 +522,7 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type 'a t = Foo of { x : 'a }
@@ -537,7 +537,7 @@ let foo (t : (unit -> unit) t @ nonportable) = use_portable t
 Line 1, characters 60-61:
 1 | let foo (t : (unit -> unit) t @ nonportable) = use_portable t
                                                                 ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (**** Test 4: Variant types satisfy type constraints when appropriate ****)

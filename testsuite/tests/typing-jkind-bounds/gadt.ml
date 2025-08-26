@@ -42,7 +42,7 @@ let foo (t : t @ nonportable) = use_portable t
 Line 1, characters 45-46:
 1 | let foo (t : t @ nonportable) = use_portable t
                                                  ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -50,7 +50,7 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -66,7 +66,7 @@ let foo (t : t @ contended) = use_uncontended t
 Line 1, characters 46-47:
 1 | let foo (t : t @ contended) = use_uncontended t
                                                   ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : t @ local) = use_global t [@nontail]
@@ -90,7 +90,7 @@ let foo (t : int t @ once) = use_many t
 Line 1, characters 38-39:
 1 | let foo (t : int t @ once) = use_many t
                                           ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -98,7 +98,7 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (***********************************************************************)
@@ -436,7 +436,7 @@ end
 Line 2, characters 49-50:
 2 |   let foo (x : M.t @ nonportable) = use_portable x
                                                      ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 module F2(M : S with type 'a b = int) = struct
@@ -477,7 +477,7 @@ end
 Line 2, characters 50-51:
 2 |   let foo (x : M.t @ contended) = use_uncontended x
                                                       ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* _ in parameters *)
@@ -498,7 +498,7 @@ let foo (x : int box @ contended) = use_uncontended x
 Line 1, characters 52-53:
 1 | let foo (x : int box @ contended) = use_uncontended x
                                                         ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let should_reject (x : int ref box @ contended) = use_uncontended x
@@ -506,7 +506,7 @@ let should_reject (x : int ref box @ contended) = use_uncontended x
 Line 1, characters 66-67:
 1 | let should_reject (x : int ref box @ contended) = use_uncontended x
                                                                       ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 
@@ -521,7 +521,7 @@ let foo (x : (int, int) box2 @ contended) = use_uncontended x
 Line 1, characters 60-61:
 1 | let foo (x : (int, int) box2 @ contended) = use_uncontended x
                                                                 ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
@@ -529,7 +529,7 @@ let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
 Line 1, characters 78-79:
 1 | let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
                                                                                   ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type show_me_the_kind : immediate = (int ref, int ref) box2
@@ -565,7 +565,7 @@ let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
 Line 1, characters 68-69:
 1 | let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
                                                                         ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
@@ -575,7 +575,7 @@ let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
 Line 1, characters 74-75:
 1 | let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
                                                                               ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* Constraints and existentials *)
@@ -634,7 +634,7 @@ let foo (x : exist_row1 @ nonportable) = use_portable x
 Line 1, characters 54-55:
 1 | let foo (x : exist_row1 @ nonportable) = use_portable x
                                                           ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let foo (x : exist_row1 @ contended) = use_uncontended x
@@ -642,7 +642,7 @@ let foo (x : exist_row1 @ contended) = use_uncontended x
 Line 1, characters 55-56:
 1 | let foo (x : exist_row1 @ contended) = use_uncontended x
                                                            ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type exist_row2 = Mk : ([> `A | `B of int ref] as 'a) -> exist_row2
@@ -666,7 +666,7 @@ let foo (x : exist_row2 @ nonportable) = use_portable x
 Line 1, characters 54-55:
 1 | let foo (x : exist_row2 @ nonportable) = use_portable x
                                                           ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let foo (x : exist_row2 @ contended) = use_uncontended x
@@ -674,7 +674,7 @@ let foo (x : exist_row2 @ contended) = use_uncontended x
 Line 1, characters 55-56:
 1 | let foo (x : exist_row2 @ contended) = use_uncontended x
                                                            ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type 'a exist_row3 = Mk : ([> `A | `B of int ref] as 'a) -> 'a option exist_row3
@@ -700,7 +700,7 @@ let foo (x : [`A | `B of int ref] option exist_row3 @ contended) = use_uncontend
 Line 1, characters 83-84:
 1 | let foo (x : [`A | `B of int ref] option exist_row3 @ contended) = use_uncontended x
                                                                                        ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* This would be lovely to accept, but it seems beyond the
@@ -712,7 +712,7 @@ let foo (x : [`A | `B of int ref] option exist_row3 @ nonportable) = use_portabl
 Line 1, characters 82-83:
 1 | let foo (x : [`A | `B of int ref] option exist_row3 @ nonportable) = use_portable x
                                                                                       ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* In the future, maybe local equations will let us figure out that something mode crosses
@@ -735,7 +735,7 @@ type exist = Exist : ('a : value mod portable). 'a * 'a idx -> exist
 Line 8, characters 24-29:
 8 |         use_uncontended exist;
                             ^^^^^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (*********************************************************)
