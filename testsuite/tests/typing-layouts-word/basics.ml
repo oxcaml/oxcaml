@@ -17,6 +17,7 @@
 
 type t_word : word
 type ('a : word) t_word_id = 'a
+external of_isize : nativeint# -> t_word = "%opaque"
 
 (*********************************)
 (* Test 1: The identity function *)
@@ -27,6 +28,7 @@ let f1_3 (x : nativeint#) = x;;
 [%%expect{|
 type t_word : word
 type ('a : word) t_word_id = 'a
+external of_isize : nativeint# -> t_word = "%opaque"
 val f1_1 : t_word -> t_word = <fun>
 val f1_2 : ('a : word). 'a t_word_id -> 'a t_word_id = <fun>
 val f1_3 : nativeint# -> nativeint# = <fun>
@@ -54,14 +56,16 @@ val f2_3 : nativeint# -> nativeint# = <fun>
 (**********************************)
 (* Test 3: Module-level bindings. *)
 
-let x3_1 : t_word = assert false;;
+let x3_1 : t_word = of_isize #42n;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 20).
+val x3_1 : t_word = <abstr>
 |}];;
 
-let x3_2 : 'a t_word_id = assert false;;
+let x3_2_1 : 'a t_word_id = #42n;;
+let x3_2_2 : 'a t_word_id = of_isize #42n;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 26).
+val x3_2_1 : nativeint# t_word_id = <abstr>
+val x3_2_2 : t_word t_word_id = <abstr>
 |}];;
 
 let x3_3 : nativeint# = #42n;;
@@ -70,10 +74,10 @@ val x3_3 : nativeint# = <abstr>
 |}];;
 
 module M3_4 = struct
-  let x : t_word = assert false
+  let x : t_word = of_isize #42n;;
 end
 [%%expect{|
-Exception: Assert_failure ("", 2, 19).
+module M3_4 : sig val x : t_word end
 |}];;
 
 module M3_5 = struct
