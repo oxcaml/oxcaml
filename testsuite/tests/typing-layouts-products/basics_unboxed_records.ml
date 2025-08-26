@@ -160,8 +160,10 @@ let f_boxed_record (local_ left) (local_ right) =
 Line 4, characters 2-7:
 4 |   left'
       ^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 (* Mutable fields are not allowed *)

@@ -256,7 +256,8 @@ val x : t = Foo 42
 Line 8, characters 12-13:
 8 |     ignore (x : _ @ portable)
                 ^
-Error: The value "x" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "x" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 module type S = sig

@@ -821,8 +821,10 @@ let f x = stack_ (ref x)
 Line 1, characters 10-24:
 1 | let f x = stack_ (ref x)
               ^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 type t = { a : int }
@@ -850,7 +852,9 @@ let make_tuple x y z = stack_ (x, y), z
 Line 1, characters 23-36:
 1 | let make_tuple x y z = stack_ (x, y), z
                            ^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is a stack expression.
+       However, it is expected to be "global".
 |}]
 
 type u = A of unit | C of int | B of int * int | D
