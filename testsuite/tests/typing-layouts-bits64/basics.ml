@@ -17,6 +17,7 @@
 
 type t_bits64 : bits64
 type ('a : bits64) t_bits64_id = 'a
+external of_i64 : int64# -> t_bits64 = "%opaque"
 
 (*********************************)
 (* Test 1: The identity function *)
@@ -27,6 +28,7 @@ let f1_3 (x : int64#) = x;;
 [%%expect{|
 type t_bits64 : bits64
 type ('a : bits64) t_bits64_id = 'a
+external of_i64 : int64# -> t_bits64 = "%opaque"
 val f1_1 : t_bits64 -> t_bits64 = <fun>
 val f1_2 : ('a : bits64). 'a t_bits64_id -> 'a t_bits64_id = <fun>
 val f1_3 : int64# -> int64# = <fun>
@@ -54,14 +56,16 @@ val f2_3 : int64# -> int64# = <fun>
 (**********************************)
 (* Test 3: Module-level bindings. *)
 
-let x3_1 : t_bits64 = assert false;;
+let x3_1 : t_bits64 = of_i64 #42L;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 22).
+val x3_1 : t_bits64 = <abstr>
 |}];;
 
-let x3_2 : 'a t_bits64_id = assert false;;
+let x3_2_1 : 'a t_bits64_id = #42L;;
+let x3_2_2 : 'a t_bits64_id = of_i64 #42L;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 28).
+val x3_2_1 : int64# t_bits64_id = <abstr>
+val x3_2_2 : t_bits64 t_bits64_id = <abstr>
 |}];;
 
 let x3_3 : int64# = #42L;;
@@ -70,10 +74,10 @@ val x3_3 : int64# = <abstr>
 |}];;
 
 module M3_4 = struct
-  let x : t_bits64 = assert false
+  let x : t_bits64 = of_i64 #42L
 end
 [%%expect{|
-Exception: Assert_failure ("", 2, 21).
+module M3_4 : sig val x : t_bits64 end
 |}];;
 
 module M3_5 = struct

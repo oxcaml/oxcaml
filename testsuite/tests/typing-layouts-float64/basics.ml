@@ -15,6 +15,7 @@
 
 type t_float64 : float64
 type ('a : float64) t_float64_id = 'a
+external of_f64 : float# -> t_float64 = "%opaque"
 
 (*********************************)
 (* Test 1: The identity function *)
@@ -25,6 +26,7 @@ let f1_3 (x : float#) = x;;
 [%%expect{|
 type t_float64 : float64
 type ('a : float64) t_float64_id = 'a
+external of_f64 : float# -> t_float64 = "%opaque"
 val f1_1 : t_float64 -> t_float64 = <fun>
 val f1_2 : ('a : float64). 'a t_float64_id -> 'a t_float64_id = <fun>
 val f1_3 : float# -> float# = <fun>
@@ -52,14 +54,16 @@ val f2_3 : float# -> float# = <fun>
 (**********************************)
 (* Test 3: Module-level bindings. *)
 
-let x3_1 : t_float64 = assert false;;
+let x3_1 : t_float64 = of_f64 #42.0;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 23).
+val x3_1 : t_float64 = <abstr>
 |}];;
 
-let x3_2 : 'a t_float64_id = assert false;;
+let x3_2_1 : 'a t_float64_id = #42.0;;
+let x3_2_2 : 'a t_float64_id = of_f64 #42.0;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 29).
+val x3_2_1 : float# t_float64_id = <abstr>
+val x3_2_2 : t_float64 t_float64_id = <abstr>
 |}];;
 
 let x3_3 : float# = #42.0;;
@@ -68,10 +72,10 @@ val x3_3 : float# = <abstr>
 |}];;
 
 module M3_4 = struct
-  let x : t_float64 = assert false
+  let x : t_float64 = of_f64 #42.0
 end
 [%%expect{|
-Exception: Assert_failure ("", 2, 22).
+module M3_4 : sig val x : t_float64 end
 |}];;
 
 module M3_5 = struct
