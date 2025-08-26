@@ -151,7 +151,8 @@ let foo4_1 y =
 Line 4, characters 9-24:
 4 |     x <- local_ (i :: x)
              ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       but is expected to be in the parent region or "global".
 |}]
 
 
@@ -187,7 +188,8 @@ let foo4_3 y = (* Can't sneak local out of non-local while loop body region *)
 Line 5, characters 9-26:
 5 |     x <- (local_ (x + !i));
              ^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       but is expected to be in the parent region or "global".
 |}]
 
 let foo4_4 y = (* Can't sneak local out of non-local while cond region *)
@@ -200,7 +202,8 @@ let foo4_4 y = (* Can't sneak local out of non-local while cond region *)
 Line 3, characters 13-29:
 3 |   while x <- (local_ (x + 1)); x <= 100 do
                  ^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       but is expected to be in the parent region or "global".
 |}]
 
 (* exclave_ closes one region, not two *)
@@ -233,7 +236,8 @@ let foo4_6 y =
 Line 5, characters 11-30:
 5 |       x <- local_ ((i*j) :: x)
                ^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       but is expected to be in the parent region or "global".
 |}]
 
 (* This is valid since both regions are closed *)
@@ -260,8 +264,10 @@ let foo4_8 () =
 Line 4, characters 2-3:
 4 |   x
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 (* Can't return [x] if it is local in some cases *)
@@ -274,8 +280,10 @@ let foo4_9 b =
 Line 4, characters 2-3:
 4 |   x
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 (* Test 5: Allowed interactions with locals. *)
@@ -624,8 +632,10 @@ let foo_20 y =
 Line 4, characters 2-3:
 4 |   x
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 (* Test 21: Unboxed products not supported yet *)

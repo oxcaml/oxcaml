@@ -25,8 +25,10 @@ let f x =
 Line 5, characters 4-5:
 5 |     x
         ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 let f x =
@@ -39,8 +41,10 @@ let f x =
 Line 5, characters 4-5:
 5 |     x
         ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 let f e0 (e1 @ local) =
@@ -127,8 +131,10 @@ let f e0 (e1 @ local) =
 Line 4, characters 44-46:
 4 |     | x -> use_local x; let (x0, x1) = x in x0
                                                 ^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]
 
 let f e0 (e1 @ local) =
@@ -212,6 +218,8 @@ let f_boxed_tuple (local_ a) (local_ b) =
 Line 4, characters 2-4:
 4 |   a'
       ^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value..
 |}]

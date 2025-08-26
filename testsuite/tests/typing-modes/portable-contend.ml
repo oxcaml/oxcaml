@@ -21,9 +21,8 @@ let foo (r @ contended) = r.a <- 42
 Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a <- 42
                               ^
-Error: This value is "contended" but is expected to be "uncontended".
-  Hint: In order to write into its mutable fields,
-  this record needs to be uncontended.
+Error: This value is "contended" but is expected to be "uncontended"
+       because it has a mutable field written to.
 |}]
 
 let foo (r @ contended) = r.a
@@ -31,9 +30,8 @@ let foo (r @ contended) = r.a
 Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a
                               ^
-Error: This value is "contended" but is expected to be "shared" or "uncontended".
-  Hint: In order to read from its mutable fields,
-  this record needs to be at least shared.
+Error: This value is "contended" but is expected to be "shared" or "uncontended"
+       because it has a mutable field read from.
 |}]
 
 let foo (r @ contended) = {r with a = best_bytes ()}
@@ -46,9 +44,8 @@ let foo (r @ contended) = {r with b = best_bytes ()}
 Line 1, characters 27-28:
 1 | let foo (r @ contended) = {r with b = best_bytes ()}
                                ^
-Error: This value is "contended" but is expected to be "shared" or "uncontended".
-  Hint: In order to read from its mutable fields,
-  this record needs to be at least shared.
+Error: This value is "contended" but is expected to be "shared" or "uncontended"
+       because it has a mutable field read from.
 |}]
 
 (* Writing to a mutable field in a shared record is rejected *)
@@ -57,9 +54,8 @@ let foo (r @ shared) = r.a <- 42
 Line 1, characters 23-24:
 1 | let foo (r @ shared) = r.a <- 42
                            ^
-Error: This value is "shared" but is expected to be "uncontended".
-  Hint: In order to write into its mutable fields,
-  this record needs to be uncontended.
+Error: This value is "shared" but is expected to be "uncontended"
+       because it has a mutable field written to.
 |}]
 
 (* reading mutable field from shared record is fine *)
@@ -190,9 +186,8 @@ let foo (r @ contended) =
 Line 3, characters 6-16:
 3 |     | [| x; y |] -> ()
           ^^^^^^^^^^
-Error: This value is "contended" but is expected to be "shared" or "uncontended".
-  Hint: In order to read from its mutable fields,
-  this record needs to be at least shared.
+Error: This value is "contended" but is expected to be "shared" or "uncontended"
+       because it has a mutable field read from.
 |}]
 (* CR modes: Error message should mention array, not record. *)
 
@@ -336,7 +331,8 @@ let foo : ('a @ contended portable -> (string -> string) @ portable) @ uncontend
 Line 1, characters 105-115:
 1 | let foo : ('a @ contended portable -> (string -> string) @ portable) @ uncontended portable = fun a b -> best_bytes ()
                                                                                                              ^^^^^^^^^^
-Error: The value "best_bytes" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "best_bytes" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 (* immediates crosses portability and contention *)

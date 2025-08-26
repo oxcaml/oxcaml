@@ -142,7 +142,8 @@ let disallowed_by_locality () x =
 Line 3, characters 13-14:
 3 |   overwrite_ r with { x }
                  ^
-Error: This value escapes its region.
+Error: This value is "local"
+       but is expected to be in the parent region or "global".
 |}]
 
 let returning_regional () x =

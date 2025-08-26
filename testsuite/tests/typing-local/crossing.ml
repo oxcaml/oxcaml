@@ -54,9 +54,7 @@ let f : local_ _ -> _ =
 Line 2, characters 14-15:
 2 |   fun x -> f' x
                   ^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* 2. constructor argument crosses mode at construction *)
@@ -158,13 +156,16 @@ Error: This value is "local" but is expected to be "global".
 (* after discussion with sdolan, we agree that
   the following cannot type check because of lock;
   lazy is not commonly used anyway. *)
+(* CR zqian: this should express that lazy expression are always global *)
 let f: local_ _ -> int lazy_t =
   fun n -> lazy n
 [%%expect{|
 Line 2, characters 16-17:
 2 |   fun n -> lazy n
                     ^
-Error: The value "n" is local, so cannot be used inside a lazy expression.
+Error: The value "n" is "local" but is expected to be "global"
+       because it is used inside a lazy expression
+       which is expected to be "global".
 |}]
 
 (* record field crosses mode at projection  *)
@@ -216,9 +217,7 @@ val g : string -> string = <fun>
 Line 6, characters 6-22:
 6 |     g (local_ "world")
           ^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* the result of function application crosses mode *)

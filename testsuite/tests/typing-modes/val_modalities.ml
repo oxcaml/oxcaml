@@ -454,7 +454,8 @@ end
 Line 6, characters 12-15:
 6 |     let _ = M.x in
                 ^^^
-Error: The value "M.x" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "M.x" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 (* Modalities on primitives are supported, but are interpreted differently in
@@ -1040,7 +1041,8 @@ let (foo @ portable) () =
 Line 3, characters 12-13:
 3 |     let _ = f in
                 ^
-Error: The value "f" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "f" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 let (_foo @ portable) () =
@@ -1063,7 +1065,8 @@ let () =
 Line 4, characters 12-13:
 4 |     let _ = f in
                 ^
-Error: The value "f" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "f" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 let () =
@@ -1199,7 +1202,8 @@ let (bar @ portable) () =
 Line 2, characters 18-19:
 2 |   let k = (module M : Func_nonportable) in
                       ^
-Error: The value "M.baz" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "M.baz" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 (* global function can't close over a local module, even though it's coerced
@@ -1214,7 +1218,24 @@ let _ =
 Line 4, characters 12-13:
 4 |     (module M : Empty)
                 ^
-Error: The module "M" is local, so cannot be used inside a function that might escape.
+Error: The module "M" is "local" but is expected to be "global"
+       because it is used inside a function which is expected to be "global".
+|}]
+
+(* similar test to above but checks that a mode error is given even when
+   the function isn't returned *)
+let bar () =
+  let module M @ local = struct end in
+  let (foo @ global) () =
+    (module M : Empty)
+  in
+  1
+[%%expect{|
+Line 4, characters 12-13:
+4 |     (module M : Empty)
+                ^
+Error: The module "M" is "local" but is expected to be "global"
+       because it is used inside a function which is expected to be "global".
 |}]
 
 (* Empty signature crosses linearity and portability *)
@@ -1271,7 +1292,9 @@ module M_Func_portable' = M_Func_portable
 Line 3, characters 18-34:
 3 |   let k = (module M_Func_portable' : Func_portable) in
                       ^^^^^^^^^^^^^^^^
-Error: The module "M_Func_portable'" is nonportable, so cannot be used inside a function that is portable.
+Error: The module "M_Func_portable'" is "nonportable"
+       but is expected to be "portable" because it is used inside a function
+       which is expected to be "portable".
 |}]
 
 (* Moreover, note that modules don't cross locality *)
@@ -1286,7 +1309,8 @@ let _ =
 Line 4, characters 20-36:
 4 |     let k = (module M_Func_portable' : Func_portable) in
                         ^^^^^^^^^^^^^^^^
-Error: The module "M_Func_portable'" is local, so cannot be used inside a function that might escape.
+Error: The module "M_Func_portable'" is "local" but is expected to be "global"
+       because it is used inside a function which is expected to be "global".
 |}]
 
 (* Closing over a module in a module. *)
@@ -1297,7 +1321,8 @@ let (bar @ portable) () =
 Line 2, characters 18-20:
 2 |   let k = (module M' : Module) in
                       ^^
-Error: The value "M'.M.baz" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "M'.M.baz" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 module type S'_Func_portable = sig module M : Func_portable end
@@ -1322,7 +1347,8 @@ module F : functor (X : sig end) -> sig end @@ stateless nonportable
 Line 4, characters 18-19:
 4 |   let k = (module F : F) in
                       ^
-Error: The module "F" is nonportable, so cannot be used inside a function that is portable.
+Error: The module "F" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 (* closing over a portable functor is fine *)
@@ -1341,11 +1367,14 @@ val bar : unit -> (module F) = <fun>
 let (bar @ portable) () =
   let k = (module M : Class) in
   k
+(* CR pdsouza: this test case should also say that the class is nonportable because
+               classes are always nonportable. Fixing this will take some work, though *)
 [%%expect{|
 Line 2, characters 18-19:
 2 |   let k = (module M : Class) in
                       ^
-Error: "M.cla" is a class, and classes are always nonportable, so cannot be used inside a function that is portable.
+Error: The class "M.cla" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 (* Pmod_unpack requires type equality instead of inclusion, so for a closing-over
@@ -1364,7 +1393,8 @@ let (bar @ portable) () =
 Line 2, characters 25-26:
 2 |     let module M' = (val m : Func_portable) in
                              ^
-Error: The value "m" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "m" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 (* closing over values from modules crosses modes *)
