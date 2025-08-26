@@ -302,6 +302,8 @@ end
 module Unary_int_arith_tagged_immediate =
   Unary_int_arith (A.For_tagged_immediates)
 module Unary_int_arith_naked_immediate = Unary_int_arith (A.For_naked_immediates)
+module Unary_int_arith_naked_int8 = Unary_int_arith (A.For_int8s)
+module Unary_int_arith_naked_int16 = Unary_int_arith (A.For_int16s)
 module Unary_int_arith_naked_int32 = Unary_int_arith (A.For_int32s)
 module Unary_int_arith_naked_int64 = Unary_int_arith (A.For_int64s)
 module Unary_int_arith_naked_nativeint = Unary_int_arith (A.For_nativeints)
@@ -375,6 +377,24 @@ module Make_simplify_int_conv (N : A.Number_kind) = struct
             let these = T.these_naked_floats
           end) in
           M.result
+        | Naked_int8 ->
+          let module M = For_kind [@inlined hint] (struct
+            module Result_num = Numeric_types.Int8
+
+            let num_to_result_num = Num.to_naked_int8
+
+            let these = T.these_naked_int8s
+          end) in
+          M.result
+        | Naked_int16 ->
+          let module M = For_kind [@inlined hint] (struct
+            module Result_num = Numeric_types.Int16
+
+            let num_to_result_num = Num.to_naked_int16
+
+            let these = T.these_naked_int16s
+          end) in
+          M.result
         | Naked_int32 ->
           let module M = For_kind [@inlined hint] (struct
             module Result_num = Int32
@@ -414,6 +434,8 @@ module Simplify_int_conv_naked_immediate =
   Make_simplify_int_conv (A.For_naked_immediates)
 module Simplify_int_conv_naked_float = Make_simplify_int_conv (A.For_floats)
 module Simplify_int_conv_naked_float32 = Make_simplify_int_conv (A.For_float32s)
+module Simplify_int_conv_naked_int8 = Make_simplify_int_conv (A.For_int8s)
+module Simplify_int_conv_naked_int16 = Make_simplify_int_conv (A.For_int16s)
 module Simplify_int_conv_naked_int32 = Make_simplify_int_conv (A.For_int32s)
 module Simplify_int_conv_naked_int64 = Make_simplify_int_conv (A.For_int64s)
 module Simplify_int_conv_naked_nativeint =
@@ -723,13 +745,17 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
            can become unused. This might have the effect of moving a projection
            earlier in the event that it already exists later, but this is
            probably fine: this operation isn't that common. *)
-        let contents_var = Variable.create "obj_dup_contents" in
+        let contents_var =
+          Variable.create "obj_dup_contents" (T.kind contents_ty)
+        in
+        let contents_var_duid = Flambda_debug_uid.none in
         let contents_expr =
           Named.create_prim (Unary (Unbox_number boxable_number, arg)) dbg
         in
         let bind_contents =
           { Expr_builder.let_bound =
-              Bound_pattern.singleton (Bound_var.create contents_var NM.normal);
+              Bound_pattern.singleton
+                (Bound_var.create contents_var contents_var_duid NM.normal);
             simplified_defining_expr = Simplified_named.create contents_expr;
             original_defining_expr = None
           }
@@ -737,7 +763,7 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
         let contents_simple = Simple.var contents_var in
         let dacc =
           DA.add_variable dacc
-            (Bound_var.create contents_var NM.normal)
+            (Bound_var.create contents_var contents_var_duid NM.normal)
             contents_ty
         in
         ( [bind_contents],
@@ -776,17 +802,6 @@ let simplify_get_header ~original_prim dacc ~original_term ~arg:_ ~arg_ty:_
   SPR.create_unknown dacc ~result_var
     (P.result_kind' original_prim)
     ~original_term
-
-let simplify_atomic_load (block_access_field_kind : P.Block_access_field_kind.t)
-    ~original_prim dacc ~original_term ~arg:_ ~arg_ty:_ ~result_var =
-  match block_access_field_kind with
-  | Immediate ->
-    let dacc = DA.add_variable dacc result_var T.any_tagged_immediate_or_null in
-    SPR.create original_term ~try_reify:false dacc
-  | Any_value ->
-    SPR.create_unknown dacc ~result_var
-      (P.result_kind' original_prim)
-      ~original_term
 
 let[@inline always] simplify_immutable_block_load0
     (access_kind : P.Block_access_kind.t) ~field ~min_name_mode dacc
@@ -959,6 +974,8 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
       match kind with
       | Tagged_immediate -> Unary_int_arith_tagged_immediate.simplify op
       | Naked_immediate -> Unary_int_arith_naked_immediate.simplify op
+      | Naked_int8 -> Unary_int_arith_naked_int8.simplify op
+      | Naked_int16 -> Unary_int_arith_naked_int16.simplify op
       | Naked_int32 -> Unary_int_arith_naked_int32.simplify op
       | Naked_int64 -> Unary_int_arith_naked_int64.simplify op
       | Naked_nativeint -> Unary_int_arith_naked_nativeint.simplify op)
@@ -970,6 +987,8 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
       | Naked_immediate -> Simplify_int_conv_naked_immediate.simplify ~dst
       | Naked_float32 -> Simplify_int_conv_naked_float32.simplify ~dst
       | Naked_float -> Simplify_int_conv_naked_float.simplify ~dst
+      | Naked_int8 -> Simplify_int_conv_naked_int8.simplify ~dst
+      | Naked_int16 -> Simplify_int_conv_naked_int16.simplify ~dst
       | Naked_int32 -> Simplify_int_conv_naked_int32.simplify ~dst
       | Naked_int64 -> Simplify_int_conv_naked_int64.simplify ~dst
       | Naked_nativeint -> Simplify_int_conv_naked_nativeint.simplify ~dst)
@@ -989,8 +1008,6 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | End_try_region { ghost = _ } -> simplify_end_try_region
     | Obj_dup -> simplify_obj_dup dbg
     | Get_header -> simplify_get_header ~original_prim
-    | Atomic_load block_access_field_kind ->
-      simplify_atomic_load block_access_field_kind ~original_prim
     | Peek _ -> simplify_peek ~original_prim
     | Make_lazy _ -> simplify_lazy ~original_prim
   in

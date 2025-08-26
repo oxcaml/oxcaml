@@ -217,11 +217,11 @@ let compute_static_size lam =
     | Pbigstring_set_f32 _
     | Pbigstring_set_64 _
     | Ppoll
-    | Patomic_add
-    | Patomic_sub
-    | Patomic_land
-    | Patomic_lor
-    | Patomic_lxor
+    | Patomic_add_field
+    | Patomic_sub_field
+    | Patomic_land_field
+    | Patomic_lor_field
+    | Patomic_lxor_field
     | Pcpu_relax ->
         (* Unit-returning primitives. Most of these are only generated from
            external declarations and not special-cased by [Value_rec_check],
@@ -349,12 +349,12 @@ let compute_static_size lam =
     | Pbswap16
     | Pbbswap _
     | Pint_as_pointer _
-    | Patomic_load _
-    | Patomic_set _
-    | Patomic_exchange _
-    | Patomic_compare_exchange _
-    | Patomic_compare_set _
-    | Patomic_fetch_add
+    | Patomic_load_field _
+    | Patomic_set_field _
+    | Patomic_exchange_field _
+    | Patomic_compare_exchange_field _
+    | Patomic_compare_set_field _
+    | Patomic_fetch_add_field
     | Popaque _
     | Pdls_get
     | Ppeek _
@@ -367,16 +367,16 @@ let compute_static_size lam =
         Block (Float_record size)
 
     | Psetufloatfield (_, _)
-    | Pbytes_set_128 _
-    | Pbigstring_set_128 _
-    | Pfloatarray_set_128 _
-    | Pfloat_array_set_128 _
-    | Pint_array_set_128 _
-    | Punboxed_float_array_set_128 _
-    | Punboxed_float32_array_set_128 _
-    | Punboxed_int32_array_set_128 _
-    | Punboxed_int64_array_set_128 _
-    | Punboxed_nativeint_array_set_128 _
+    | Pbytes_set_vec _
+    | Pbigstring_set_vec _
+    | Pfloatarray_set_vec _
+    | Pfloat_array_set_vec _
+    | Pint_array_set_vec _
+    | Punboxed_float_array_set_vec _
+    | Punboxed_float32_array_set_vec _
+    | Punboxed_int32_array_set_vec _
+    | Punboxed_int64_array_set_vec _
+    | Punboxed_nativeint_array_set_vec _
     | Parray_element_size_in_bytes _
     | Punbox_unit ->
         Constant
@@ -393,21 +393,23 @@ let compute_static_size lam =
     | Punboxed_product_field (_, _)
     | Punboxed_float_comp (_, _)
     | Punboxed_int_comp (_, _)
-    | Pstring_load_128 _
-    | Pbytes_load_128 _
-    | Pbigstring_load_128 _
-    | Pfloatarray_load_128 _
-    | Pfloat_array_load_128 _
-    | Pint_array_load_128 _
-    | Punboxed_float_array_load_128 _
-    | Punboxed_float32_array_load_128 _
-    | Punboxed_int32_array_load_128 _
-    | Punboxed_int64_array_load_128 _
-    | Punboxed_nativeint_array_load_128 _
+    | Pstring_load_vec _
+    | Pbytes_load_vec _
+    | Pbigstring_load_vec _
+    | Pfloatarray_load_vec _
+    | Pfloat_array_load_vec _
+    | Pint_array_load_vec _
+    | Punboxed_float_array_load_vec _
+    | Punboxed_float32_array_load_vec _
+    | Punboxed_int32_array_load_vec _
+    | Punboxed_int64_array_load_vec _
+    | Punboxed_nativeint_array_load_vec _
     | Pprobe_is_enabled _
     | Pobj_magic _
     | Punbox_float _
     | Pbox_float (_, _)
+    | Puntag_int _
+    | Ptag_int _
     | Punbox_int _
     | Pbox_int (_, _)
     | Punbox_vector _

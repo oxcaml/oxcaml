@@ -187,6 +187,8 @@ end = struct
                   match N.arg_kind with
                   | Tagged_immediate -> Tagged_immediate
                   | Naked_immediate -> Naked_immediate
+                  | Naked_int8 -> Naked_int8
+                  | Naked_int16 -> Naked_int16
                   | Naked_int32 -> Naked_int32
                   | Naked_int64 -> Naked_int64
                   | Naked_nativeint -> Naked_nativeint
@@ -276,6 +278,8 @@ end = struct
     | Naked_immediate -> T.any_naked_immediate
     | Naked_float32 -> T.any_naked_float32
     | Naked_float -> T.any_naked_float
+    | Naked_int8 -> T.any_naked_int8
+    | Naked_int16 -> T.any_naked_int16
     | Naked_int32 -> T.any_naked_int32
     | Naked_int64 -> T.any_naked_int64
     | Naked_nativeint -> T.any_naked_nativeint
@@ -399,6 +403,8 @@ module Int_ops_for_binary_arith_tagged_immediate =
   Int_ops_for_binary_arith (A.For_tagged_immediates)
 module Int_ops_for_binary_arith_naked_immediate =
   Int_ops_for_binary_arith (A.For_naked_immediates)
+module Int_ops_for_binary_arith_int8 = Int_ops_for_binary_arith (A.For_int8s)
+module Int_ops_for_binary_arith_int16 = Int_ops_for_binary_arith (A.For_int16s)
 module Int_ops_for_binary_arith_int32 = Int_ops_for_binary_arith (A.For_int32s)
 module Int_ops_for_binary_arith_int64 = Int_ops_for_binary_arith (A.For_int64s)
 module Int_ops_for_binary_arith_nativeint =
@@ -407,6 +413,9 @@ module Binary_int_arith_tagged_immediate =
   Binary_arith_like (Int_ops_for_binary_arith_tagged_immediate)
 module Binary_int_arith_naked_immediate =
   Binary_arith_like (Int_ops_for_binary_arith_naked_immediate)
+module Binary_int_arith_int8 = Binary_arith_like (Int_ops_for_binary_arith_int8)
+module Binary_int_arith_int16 =
+  Binary_arith_like (Int_ops_for_binary_arith_int16)
 module Binary_int_arith_int32 =
   Binary_arith_like (Int_ops_for_binary_arith_int32)
 module Binary_int_arith_int64 =
@@ -439,6 +448,8 @@ end = struct
     | Naked_immediate -> T.any_naked_immediate
     | Naked_float32 -> T.any_naked_float32
     | Naked_float -> T.any_naked_float
+    | Naked_int8 -> T.any_naked_int8
+    | Naked_int16 -> T.any_naked_int16
     | Naked_int32 -> T.any_naked_int32
     | Naked_int64 -> T.any_naked_int64
     | Naked_nativeint -> T.any_naked_nativeint
@@ -516,6 +527,8 @@ module Int_ops_for_binary_shift_tagged_immediate =
   Int_ops_for_binary_shift (A.For_tagged_immediates)
 module Int_ops_for_binary_shift_naked_immediate =
   Int_ops_for_binary_shift (A.For_naked_immediates)
+module Int_ops_for_binary_shift_int8 = Int_ops_for_binary_shift (A.For_int8s)
+module Int_ops_for_binary_shift_int16 = Int_ops_for_binary_shift (A.For_int16s)
 module Int_ops_for_binary_shift_int32 = Int_ops_for_binary_shift (A.For_int32s)
 module Int_ops_for_binary_shift_int64 = Int_ops_for_binary_shift (A.For_int64s)
 module Int_ops_for_binary_shift_nativeint =
@@ -524,6 +537,9 @@ module Binary_int_shift_tagged_immediate =
   Binary_arith_like (Int_ops_for_binary_shift_tagged_immediate)
 module Binary_int_shift_naked_immediate =
   Binary_arith_like (Int_ops_for_binary_shift_naked_immediate)
+module Binary_int_shift_int8 = Binary_arith_like (Int_ops_for_binary_shift_int8)
+module Binary_int_shift_int16 =
+  Binary_arith_like (Int_ops_for_binary_shift_int16)
 module Binary_int_shift_int32 =
   Binary_arith_like (Int_ops_for_binary_shift_int32)
 module Binary_int_shift_int64 =
@@ -620,6 +636,8 @@ module Int_ops_for_binary_comp_tagged_immediate =
   Int_ops_for_binary_comp (A.For_tagged_immediates)
 module Int_ops_for_binary_comp_naked_immediate =
   Int_ops_for_binary_comp (A.For_naked_immediates)
+module Int_ops_for_binary_comp_int8 = Int_ops_for_binary_comp (A.For_int8s)
+module Int_ops_for_binary_comp_int16 = Int_ops_for_binary_comp (A.For_int16s)
 module Int_ops_for_binary_comp_int32 = Int_ops_for_binary_comp (A.For_int32s)
 module Int_ops_for_binary_comp_int64 = Int_ops_for_binary_comp (A.For_int64s)
 module Int_ops_for_binary_comp_nativeint =
@@ -628,6 +646,8 @@ module Binary_int_comp_tagged_immediate =
   Binary_arith_like (Int_ops_for_binary_comp_tagged_immediate)
 module Binary_int_comp_naked_immediate =
   Binary_arith_like (Int_ops_for_binary_comp_naked_immediate)
+module Binary_int_comp_int8 = Binary_arith_like (Int_ops_for_binary_comp_int8)
+module Binary_int_comp_int16 = Binary_arith_like (Int_ops_for_binary_comp_int16)
 module Binary_int_comp_int32 = Binary_arith_like (Int_ops_for_binary_comp_int32)
 module Binary_int_comp_int64 = Binary_arith_like (Int_ops_for_binary_comp_int64)
 module Binary_int_comp_nativeint =
@@ -1018,20 +1038,8 @@ let simplify_bigarray_get_alignment _align ~original_prim dacc ~original_term
     (P.result_kind' original_prim)
     ~original_term
 
-let simplify_atomic_set ~original_prim dacc ~original_term _dbg ~arg1:_
+let simplify_atomic_load_field ~original_prim dacc ~original_term _dbg ~arg1:_
     ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~result_var =
-  SPR.create_unknown dacc ~result_var
-    (P.result_kind' original_prim)
-    ~original_term
-
-let simplify_atomic_exchange ~original_prim dacc ~original_term _dbg ~arg1:_
-    ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~result_var =
-  SPR.create_unknown dacc ~result_var
-    (P.result_kind' original_prim)
-    ~original_term
-
-let simplify_atomic_int_arith ~original_prim dacc ~original_term _dbg ~op:_
-    ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~result_var =
   SPR.create_unknown dacc ~result_var
     (P.result_kind' original_prim)
     ~original_term
@@ -1056,6 +1064,8 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
       match kind with
       | Tagged_immediate -> Binary_int_arith_tagged_immediate.simplify op
       | Naked_immediate -> Binary_int_arith_naked_immediate.simplify op
+      | Naked_int8 -> Binary_int_arith_int8.simplify op
+      | Naked_int16 -> Binary_int_arith_int16.simplify op
       | Naked_int32 -> Binary_int_arith_int32.simplify op
       | Naked_int64 -> Binary_int_arith_int64.simplify op
       | Naked_nativeint -> Binary_int_arith_nativeint.simplify op)
@@ -1063,6 +1073,8 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
       match kind with
       | Tagged_immediate -> Binary_int_shift_tagged_immediate.simplify op
       | Naked_immediate -> Binary_int_shift_naked_immediate.simplify op
+      | Naked_int8 -> Binary_int_shift_int8.simplify op
+      | Naked_int16 -> Binary_int_shift_int16.simplify op
       | Naked_int32 -> Binary_int_shift_int32.simplify op
       | Naked_int64 -> Binary_int_shift_int64.simplify op
       | Naked_nativeint -> Binary_int_shift_nativeint.simplify op)
@@ -1070,6 +1082,8 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
       match kind with
       | Tagged_immediate -> Binary_int_comp_tagged_immediate.simplify op
       | Naked_immediate -> Binary_int_comp_naked_immediate.simplify op
+      | Naked_int8 -> Binary_int_comp_int8.simplify op
+      | Naked_int16 -> Binary_int_comp_int16.simplify op
       | Naked_int32 -> Binary_int_comp_int32.simplify op
       | Naked_int64 -> Binary_int_comp_int64.simplify op
       | Naked_nativeint -> Binary_int_comp_nativeint.simplify op)
@@ -1090,9 +1104,7 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
         ~original_prim
     | Bigarray_get_alignment align ->
       simplify_bigarray_get_alignment align ~original_prim
-    | Atomic_set _ -> simplify_atomic_set ~original_prim
-    | Atomic_exchange _ -> simplify_atomic_exchange ~original_prim
-    | Atomic_int_arith op -> simplify_atomic_int_arith ~original_prim ~op
+    | Atomic_load_field _ -> simplify_atomic_load_field ~original_prim
     | Poke _ -> simplify_poke
   in
   simplifier dacc ~original_term dbg ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~result_var
@@ -1102,12 +1114,13 @@ let recover_comparison_primitive dacc (prim : P.binary_primitive) ~arg1 ~arg2 =
   | Block_set _ | Array_load _ | Int_arith _ | Int_shift _
   | Int_comp (_, Yielding_int_like_compare_functions _)
   | Float_arith _ | Float_comp _ | Phys_equal _ | String_or_bigstring_load _
-  | Bigarray_load _ | Bigarray_get_alignment _ | Atomic_exchange _
-  | Atomic_set _ | Atomic_int_arith _ | Poke _ ->
+  | Bigarray_load _ | Bigarray_get_alignment _ | Atomic_load_field _ | Poke _ ->
     None
   | Int_comp (kind, Yielding_bool op) -> (
     match kind with
-    | Naked_immediate | Naked_int32 | Naked_int64 | Naked_nativeint -> None
+    | Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
+    | Naked_nativeint ->
+      None
     | Tagged_immediate -> (
       let try_one_direction left right op =
         Simple.pattern_match right

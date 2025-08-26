@@ -141,6 +141,7 @@ COMPILERLIBS_SOURCES=\
   typing/persistent_env.ml \
   typing/env.ml \
   typing/shape_reduce.ml \
+  typing/type_shape.ml \
   typing/typedtree.ml \
   lambda/debuginfo.ml \
   lambda/lambda.ml \

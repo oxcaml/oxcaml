@@ -119,6 +119,10 @@ module Layout = struct
 
       let word = Base Sort.Word
 
+      let bits8 = Base Sort.Bits8
+
+      let bits16 = Base Sort.Bits16
+
       let bits32 = Base Sort.Bits32
 
       let bits64 = Base Sort.Bits64
@@ -135,6 +139,8 @@ module Layout = struct
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
@@ -1432,6 +1438,13 @@ module Const = struct
         name = "void"
       }
 
+    let void_mod_everything =
+      { jkind =
+          mk_jkind (Base Void) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "void mod everything"
+      }
+
     let immediate =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Non_null
@@ -1444,7 +1457,7 @@ module Const = struct
     let immediate_or_null =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+            ~separability:Non_float;
         name = "immediate_or_null"
       }
 
@@ -1552,6 +1565,42 @@ module Const = struct
 
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
+    let bits8 =
+      { jkind =
+          mk_jkind (Base Bits8) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits8"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_int8 =
+      { jkind =
+          mk_jkind (Base Bits8) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits8 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let bits16 =
+      { jkind =
+          mk_jkind (Base Bits16) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits16"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_int16 =
+      { jkind =
+          mk_jkind (Base Bits16) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits16 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let bits32 =
       { jkind =
           mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Non_null
@@ -1652,6 +1701,7 @@ module Const = struct
         sync_data;
         mutable_data;
         void;
+        void_mod_everything;
         immediate;
         immediate_or_null;
         immediate64;
@@ -1661,6 +1711,10 @@ module Const = struct
         kind_of_unboxed_float32;
         word;
         kind_of_unboxed_nativeint;
+        bits8;
+        kind_of_unboxed_int8;
+        bits16;
+        kind_of_unboxed_int16;
         bits32;
         kind_of_unboxed_int32;
         bits64;
@@ -1932,6 +1986,8 @@ module Const = struct
       | "float64" -> Builtin.float64.jkind
       | "float32" -> Builtin.float32.jkind
       | "word" -> Builtin.word.jkind
+      | "bits8" -> Builtin.bits8.jkind
+      | "bits16" -> Builtin.bits16.jkind
       | "bits32" -> Builtin.bits32.jkind
       | "bits64" -> Builtin.bits64.jkind
       | "vec128" -> Builtin.vec128.jkind
@@ -1993,7 +2049,8 @@ module Const = struct
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
-      | Base Void, _ -> Alpha
+      | Base (Bits8 | Bits16), (Non_null | Maybe_null) -> Beta
+      | Base Void, _ -> Stable
     in
     scan_layout jkind.layout
 
@@ -2377,7 +2434,7 @@ let has_mutable_label lbls =
 
 let all_void_labels lbls =
   List.for_all
-    (fun (lbl : Types.label_declaration) -> Sort.Const.(equal void lbl.ld_sort))
+    (fun (lbl : Types.label_declaration) -> Sort.Const.(all_void lbl.ld_sort))
     lbls
 
 let add_labels_as_with_bounds lbls jkind =
@@ -2423,6 +2480,24 @@ let for_non_float ~(why : History.value_creation_reason) =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation why)
 
+let for_or_null_argument ident =
+  let why =
+    History.Type_argument
+      { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  in
+  let mod_bounds =
+    Mod_bounds.create ~locality:Locality.Const.max
+      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
+      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
+      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
+      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~nullability:Nullability.Non_null
+      ~separability:Separability.Maybe_separable
+  in
+  fresh_jkind
+    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    ~annotation:None ~why:(Value_creation why)
+
 let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of *)
   let jkind = type_jkind_purely ty in
@@ -2439,50 +2514,76 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
     }
     ~annotation:None ~why:Abbreviation
 
-let for_boxed_variant cstrs =
+let for_boxed_variant ~loc cstrs =
   let open Types in
-  if List.for_all
-       (* CR layouts v12: This code assumes that all voids mode-cross. I
-          think that's probably not what we want. *)
-         (fun cstr ->
-         match cstr.cd_args with
-         | Cstr_tuple args ->
-           List.for_all (fun arg -> Sort.Const.(equal void arg.ca_sort)) args
-         | Cstr_record lbls -> all_void_labels lbls)
-       cstrs
-  then Builtin.immediate ~why:Enumeration
-  else
-    let is_mutable =
-      List.exists
+  let has_gadt_constructor =
+    List.exists
+      (fun cstr -> match cstr.cd_res with None -> false | Some _ -> true)
+      cstrs
+  in
+  if has_gadt_constructor
+  then
+    let no_args =
+      List.for_all
         (fun cstr ->
           match cstr.cd_args with
-          | Cstr_tuple _ -> false
-          | Cstr_record lbls -> has_mutable_label lbls)
+          | Cstr_tuple [] | Cstr_record [] -> true
+          | Cstr_tuple _ | Cstr_record _ -> false)
         cstrs
     in
-    let has_gadt_constructor =
-      List.exists
-        (fun cstr -> match cstr.cd_res with None -> false | Some _ -> true)
-        cstrs
+    if no_args
+    then Builtin.immediate ~why:Enumeration
+    else for_non_float ~why:Boxed_variant
+  else
+    let base =
+      let all_args_void =
+        List.for_all
+          (fun cstr ->
+            match cstr.cd_args with
+            | Cstr_tuple args ->
+              List.for_all (fun arg -> Sort.Const.(all_void arg.ca_sort)) args
+            | Cstr_record lbls -> all_void_labels lbls)
+          cstrs
+      in
+      if all_args_void
+      then (
+        let has_args =
+          List.exists
+            (fun cstr ->
+              match cstr.cd_args with
+              | Cstr_tuple (_ :: _) | Cstr_record (_ :: _) -> true
+              | Cstr_tuple [] | Cstr_record [] -> false)
+            cstrs
+        in
+        if has_args && Language_extension.erasable_extensions_only ()
+        then
+          Location.prerr_warning loc
+            (Warnings.Incompatible_with_upstream Warnings.Immediate_void_variant);
+        Builtin.immediate ~why:Enumeration)
+      else
+        let is_mutable =
+          List.exists
+            (fun cstr ->
+              match cstr.cd_args with
+              | Cstr_tuple _ -> false
+              | Cstr_record lbls -> has_mutable_label lbls)
+            cstrs
+        in
+        if is_mutable
+        then Builtin.mutable_data ~why:Boxed_variant
+        else Builtin.immutable_data ~why:Boxed_variant
     in
-    if has_gadt_constructor
-    then for_non_float ~why:Boxed_variant
-    else
-      let base =
-        (if is_mutable then Builtin.mutable_data else Builtin.immutable_data)
-          ~why:Boxed_variant
-        |> mark_best
-      in
-      let add_cstr_args cstr jkind =
-        match cstr.cd_args with
-        | Cstr_tuple args ->
-          List.fold_right
-            (fun arg ->
-              add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
-            args jkind
-        | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
-      in
-      List.fold_right add_cstr_args cstrs base
+    let base = mark_best base in
+    let add_cstr_args cstr jkind =
+      match cstr.cd_args with
+      | Cstr_tuple args ->
+        List.fold_right
+          (fun arg ->
+            add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
+          args jkind
+      | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
+    in
+    List.fold_right add_cstr_args cstrs base
 
 let for_boxed_tuple elts =
   List.fold_right
@@ -2736,6 +2837,18 @@ let apply_modality_r modality jk =
       (Axis_set.complement relevant_axes)
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
+
+let apply_or_null jkind =
+  match Mod_bounds.nullability jkind.jkind.mod_bounds with
+  | Maybe_null ->
+    let jkind = set_nullability_upper_bound jkind Non_null in
+    let jkind =
+      match Mod_bounds.separability jkind.jkind.mod_bounds with
+      | Maybe_separable -> jkind
+      | Separable | Non_float -> set_separability_upper_bound jkind Non_float
+    in
+    Ok jkind
+  | Non_null -> Error ()
 
 let get_annotation jk = jk.annotation
 

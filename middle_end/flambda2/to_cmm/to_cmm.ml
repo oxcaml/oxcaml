@@ -75,13 +75,15 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       ~return_continuation_arity:[] ~trans_prim:To_cmm_primitive.trans_prim
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
   in
+  let ret_var = Variable.create "*ret*" Flambda_kind.value in
+  let ret_var_duid = Flambda_debug_uid.none in
   let _env, return_cont_params =
     (* The environment is dropped because the handler for the dummy continuation
        (which just returns unit) doesn't use any of the parameters. *)
     C.continuation_bound_parameters env
       (Bound_parameters.create
-         [ Bound_parameter.create (Variable.create "*ret*")
-             Flambda_kind.With_subkind.any_value ])
+         [ Bound_parameter.create ret_var Flambda_kind.With_subkind.any_value
+             ret_var_duid ])
   in
   let return_cont, env =
     Env.add_jump_cont env
@@ -91,7 +93,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   (* See comment in [To_cmm_set_of_closures] about binding [my_region] *)
   let env, toplevel_region_var =
     Env.create_bound_parameter env
-      (Flambda_unit.toplevel_my_region flambda_unit)
+      (Flambda_unit.toplevel_my_region flambda_unit, Flambda_debug_uid.none)
   in
   let r =
     R.create ~reachable_names
@@ -132,7 +134,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       then fun_codegen
       else Cmm.No_CSE :: fun_codegen
     in
-    C.cfunction (C.fundecl entry_sym [] body fun_codegen dbg Default_poll)
+    C.cfunction
+      (C.fundecl entry_sym [] body fun_codegen dbg Default_poll Cmm.typ_val)
   in
   let { R.data_items; gc_roots; functions } = R.to_cmm res in
   let _res, cmm_helpers_data = flush_cmm_helpers_state res in

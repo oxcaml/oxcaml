@@ -42,27 +42,8 @@ exception Error of Location.t * error
 
 let use_dup_for_constant_mutable_arrays_bigger_than = 4
 
-(* CR layouts v7: In the places where this is used, we will want to allow
-   float#, but not void yet (e.g., the left of a semicolon and loop bodies).  we
-   still default to value before checking for void, to allow for sort variables
-   arising in situations like
-
-     let foo () = raise Foo; ()
-
-   When this sanity check is removed, consider whether we are still defaulting
-   appropriately.
-*)
-let sort_must_not_be_void loc ty sort =
-  if Jkind.Sort.Const.(equal void sort) then raise (Error (loc, Void_sort ty))
-
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
-
-let check_record_field_sort loc : Jkind.Sort.Const.t -> _ = function
-  | Base (Value | Float64 | Float32 | Bits32 | Bits64 |
-          Vec128 | Vec256 | Vec512 | Word)
-  | Product _ -> ()
-  | Base Void -> raise (Error (loc, Illegal_void_record_field))
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =
@@ -525,10 +506,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
         assert false
       | Ordinary {runtime_tag}, _ when cstr.cstr_constant ->
-          assert (args_with_sorts = []);
-          (* CR layouts v5: This could have void args, but for now we've ruled
-             that out by checking that the sort list is empty *)
-          Lconst(const_int runtime_tag)
+          assert (
+            List.for_all
+              (fun (_, s) -> Jkind.Sort.Const.all_void s) args_with_sorts);
+          List.fold_left
+            (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
+            (Lconst(const_int runtime_tag) : lambda)
+            ll
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
@@ -538,6 +522,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             | constants -> (
               match cstr.cstr_shape with
               | Constructor_mixed shape ->
+                  (* CR layouts v5: once all-void records are allowed, handle
+                     constructors with all-void inline records, which are stored
+                     as immediates *)
                   if !Clflags.native_code then
                     let shape =
                       Lambda.transl_mixed_product_shape
@@ -567,6 +554,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                     in
                     Pmakeblock(runtime_tag, Immutable, Some shape, alloc_mode)
                 | Constructor_mixed shape ->
+                    (* CR layouts v5: once all-void records are allowed, handle
+                       constructors with all-void inline records, which are
+                       stored as immediates *)
                     let shape =
                       Lambda.transl_mixed_product_shape
                         ~get_value_kind:(fun _i -> Lambda.generic_value)
@@ -582,8 +572,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           if cstr.cstr_constant
           then (
             assert (args_with_sorts = []);
-            (* CR layouts v5: This could have void args, but for now we've ruled
-               that out by checking that the sort list is empty *)
+            (* CR layouts v5: once non-values (namely voids) are allowed in
+               extensible variants, args_with_sorts could be non-empty in this
+               case, and we should assert that all sorts are void rather than
+               that the list is empty *)
             lam)
           else
             let alloc_mode = transl_alloc_mode (Option.get alloc_mode) in
@@ -600,6 +592,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Pmakeblock(0, Immutable, Some (Lambda.generic_value :: shape),
                             alloc_mode)
               | Constructor_mixed shape ->
+                  (* CR layouts v5: once all-void records are allowed, handle
+                     constructors with all-void inline records, which are stored
+                     as immediates *)
                   let shape =
                     Lambda.transl_mixed_product_shape
                       ~get_value_kind:(fun _i -> Lambda.generic_value)
@@ -643,14 +638,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         {fields; representation; extended_expression } ->
       transl_record_unboxed_product ~scopes e.exp_loc e.exp_env
         fields representation extended_expression
-  | Texp_field(arg, arg_sort, id, lbl, float, ubr) ->
+  | Texp_field(arg, arg_sort, _id, lbl, float, ubr) ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
       let sem =
         if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree
       in
       let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
-      check_record_field_sort id.loc lbl.lbl_sort;
       begin match lbl.lbl_repres with
           Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
@@ -679,6 +673,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             fatal_error
               "Mixed inlined records not supported for extensible variants"
         | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+          (* CR layouts v5: once all-void records are allowed, handle
+             constructors with all-void inline records, which are stored as
+             immediates *)
         | Record_mixed shape ->
           let shape =
             Lambda.transl_mixed_product_shape_for_read
@@ -720,12 +717,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
                of_location ~scopes e.exp_loc)
     end
-  | Texp_setfield(arg, arg_mode, id, lbl, newval) ->
+  | Texp_setfield(arg, arg_mode, _id, lbl, newval) ->
       (* CR layouts v2.5: When we allow `any` in record fields and check
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
          then. *)
-      check_record_field_sort id.loc lbl.lbl_sort;
       let mode =
         Assignment (transl_modify_mode arg_mode)
       in
@@ -747,6 +743,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             fatal_error
               "Mixed inlined records not supported for extensible variants"
         | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+          (* CR layouts v5: once all-void records are allowed, handle
+             constructors with all-void inline records, which are stored as
+             immediates *)
         | Record_mixed shape ->
           let shape =
             Lambda.transl_mixed_product_shape
@@ -877,12 +876,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Lambda.layout_unit)
   | Texp_sequence(expr1, sort', expr2) ->
       let sort' = Jkind.Sort.default_for_transl_and_get sort' in
-      sort_must_not_be_void expr1.exp_loc expr1.exp_type sort';
       Lsequence(transl_exp ~scopes sort' expr1,
                 event_before ~scopes expr2 (transl_exp ~scopes sort expr2))
   | Texp_while {wh_body; wh_body_sort; wh_cond} ->
       let wh_body_sort = Jkind.Sort.default_for_transl_and_get wh_body_sort in
-      sort_must_not_be_void wh_body.exp_loc wh_body.exp_type wh_body_sort;
       let cond = transl_exp ~scopes Jkind.Sort.Const.for_predef_value wh_cond in
       let body = transl_exp ~scopes wh_body_sort wh_body in
       Lwhile {
@@ -893,7 +890,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_for {for_id; for_debug_uid; for_from; for_to; for_dir; for_body;
               for_body_sort} ->
       let for_body_sort = Jkind.Sort.default_for_transl_and_get for_body_sort in
-      sort_must_not_be_void for_body.exp_loc for_body.exp_type for_body_sort;
       let body = transl_exp ~scopes for_body_sort for_body in
       Lfor {
         for_id;
@@ -1589,11 +1585,67 @@ and transl_tupled_function
             (transl_tupled_cases ~scopes return_sort pats_expr_list) partial
         in
         let region = region || not (may_allocate_in_region body) in
+        add_type_shapes_of_cases arg_sort cases;
         Some
           ((Tupled, tparams, return_layout, region, return_mode), body)
     with Matching.Cannot_flatten -> None
       end
   | _ -> None
+
+(* For the functions [add_type_shape_of_cases], [add_type_shapes_of_params], and
+   [add_type_shapes_of_patterns] to be correct, we must ensure that at the type
+   tree level, a [debug_uid] is never associated with more than one type
+   expression, because the type expressions determine the debug information we
+   emit for the bound variable associated with the debug uid.
+
+   For example, for:
+
+      let f (x: int list) = x
+
+   the functions below will associate the UID of [x] with [int list] as the type
+   expression.
+*)
+
+and add_type_shapes_of_pattern ~env sort pattern =
+  let var_list = Typedtree.pat_bound_idents_full sort pattern in
+  List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
+    Type_shape.add_to_type_shapes var_uid type_expr var_sort
+      (Env.find_uid_of_path env))
+  var_list
+
+(** [add_type_shapes_of_cases] iterates through a given list of cases and
+    associates for each case, the debugging UID of the variable with the type
+    expression of the variable and its sort. *)
+and add_type_shapes_of_cases sort cases =
+  let add_case (case : Typedtree.value Typedtree.case) =
+    add_type_shapes_of_pattern ~env:case.c_lhs.pat_env sort case.c_lhs
+  in
+  List.iter add_case cases
+
+(** [add_type_shapes_of_params] iterates through the variables in a function
+    parameter and, for each variable, associates the debugging UID of the
+    variable with the type expression of the variable. *)
+and add_type_shapes_of_params params =
+    let add_param (param : Typedtree.function_param) =
+      let pattern = match param.fp_kind with
+                    | Tparam_pat p -> p
+                    | Tparam_optional_default (p, _, _) -> p
+      in
+      let sort = Jkind.Sort.default_for_transl_and_get param.fp_sort in
+      add_type_shapes_of_pattern ~env:pattern.pat_env sort pattern
+    in
+    List.iter add_param params
+
+(** [add_type_shapes_of_patterns] iterates through the variables in a value
+    binding and, for each variable, associates the debugging UID of the variable
+    with the type expression of the variable. *)
+and add_type_shapes_of_patterns patterns =
+  let add_case (value_binding : Typedtree.value_binding) =
+    let sort = Jkind.Sort.default_for_transl_and_get value_binding.vb_sort in
+    add_type_shapes_of_pattern ~env:value_binding.vb_expr.exp_env sort
+      value_binding.vb_pat
+  in
+  List.iter add_case patterns
 
 and transl_curried_function ~scopes loc repr params body
     ~return_sort ~return_layout ~return_mode ~region ~mode
@@ -1607,6 +1659,7 @@ and transl_curried_function ~scopes loc repr params body
        | Tfunction_body _ -> param_curries
        | Tfunction_cases fc -> param_curries @ [ Final_arg, fc.fc_arg_mode ])
   in
+  add_type_shapes_of_params params;
   let cases_param, body =
     match body with
     | Tfunction_body body ->
@@ -1627,6 +1680,7 @@ and transl_curried_function ~scopes loc repr params body
               layout_of_sort fc_loc fc_arg_sort
         in
         let arg_mode = transl_alloc_mode_l fc_arg_mode in
+        add_type_shapes_of_cases fc_arg_sort fc_cases;
         let attributes =
           match fc_cases with
           | [ { c_lhs }] -> Translattribute.transl_param_attributes c_lhs
@@ -1870,6 +1924,7 @@ and transl_bound_exp ~scopes ~in_structure pat sort expr loc attrs =
 *)
 and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
                rec_flag pat_expr_list =
+  add_type_shapes_of_patterns pat_expr_list;
   match rec_flag with
     Nonrecursive ->
       let rec transl = function
@@ -1943,7 +1998,6 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     let copy_id_duid = Lambda.debug_uid_none in
     let update_field cont (lbl, definition) =
       (* CR layouts v5: allow more unboxed types here. *)
-      check_record_field_sort lbl.lbl_loc lbl.lbl_sort;
       match definition with
       | Kept _ -> cont
       | Overridden (_lid, expr) ->
@@ -1968,6 +2022,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 fatal_error
                   "Mixed inlined records not supported for extensible variants"
             | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+                (* CR layouts v5: once all-void records are allowed, handle
+                  constructors with all-void inline records, which are stored as
+                  immediates *)
             | Record_mixed shape ->
                 let shape =
                   Lambda.transl_mixed_product_shape
@@ -2045,6 +2102,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                     Pfloatfield (i, sem, alloc_heap)
                  | Record_ufloat -> Pufloatfield (i, sem)
                  | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+                   (* CR layouts v5: once all-void records are allowed, handle
+                      constructors with all-void inline records, which are
+                      stored as immediates *)
                  | Record_mixed shape ->
                    let shape =
                      Lambda.transl_mixed_product_shape_for_read
@@ -2159,6 +2219,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lprim (Pmakemixedblock (0, mut, shape, Option.get mode), ll, loc)
         | Record_inlined (Ordinary { runtime_tag },
                           Constructor_mixed shape, Variant_boxed _) ->
+            (* CR layouts v5: once all-void records are allowed, handle
+              constructors with all-void inline records, which are stored as
+              immediates *)
             let shape =
               Lambda.transl_mixed_product_shape
                 ~get_value_kind:(fun _i -> Lambda.generic_value)

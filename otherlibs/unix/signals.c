@@ -79,12 +79,11 @@ CAMLprim value caml_unix_sigprocmask(value vaction, value vset)
 CAMLprim value caml_unix_sigpending(value unit)
 {
   sigset_t pending;
-  uintnat curr;
   if (sigpending(&pending) == -1) caml_uerror("sigpending", Nothing);
 #ifdef CAML_RUNTIME_5
   /* Add signals which are "pending" in the runtime */
   for (int i = 0; i < NSIG_WORDS; i++) {
-    curr = atomic_load(&caml_pending_signals[i]);
+    uintnat curr = atomic_load(&caml_pending_signals[i]);
     if (curr == 0) continue;
     for (int j = 0; j < BITS_PER_WORD; j++) {
       if (curr & ((uintnat)1 << j)) {

@@ -193,6 +193,14 @@ let mk_zero_alloc_checker_details_cutoff f =
      | No_details -> 0
      | At_most n -> n)
 
+let mk_zero_alloc_checker_details_extra f =
+  "-zero-alloc-checker-details-extra", Arg.Unit f,
+  " Show extra details in error messages from zero_alloc checker"
+
+let mk_no_zero_alloc_checker_details_extra f =
+  "-no-zero-alloc-checker-details-extra", Arg.Unit f,
+  " Do not show extra details in error messages from zero_alloc checker"
+
 let mk_zero_alloc_checker_join f =
   "-zero-alloc-checker-join", Arg.Int f,
   Printf.sprintf " How many abstract paths before losing precision \
@@ -250,6 +258,15 @@ let mk_internal_assembler f =
 
 let mk_gc_timings f =
   "-dgc-timings", Arg.Unit f, "Output information about time spent in the GC"
+
+let mk_dllvmir f =
+  "-dllvmir", Arg.Unit f, " (undocumented)"
+
+let mk_keep_llvmir f =
+  "-keep-llvmir", Arg.Unit f, " Keep the LLVM IR file produced by -llvm-backend"
+
+let mk_llvm_path f =
+  "-llvm-path", Arg.String f, " Specify which LLVM compiler to use"
 
 module Flambda2 = Oxcaml_flags.Flambda2
 
@@ -790,6 +807,8 @@ module type Oxcaml_options = sig
   val disable_zero_alloc_checker : unit -> unit
   val disable_precise_zero_alloc_checker : unit -> unit
   val zero_alloc_checker_details_cutoff : int -> unit
+  val zero_alloc_checker_details_extra : unit -> unit
+  val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
 
   val function_layout : string -> unit
@@ -810,6 +829,10 @@ module type Oxcaml_options = sig
   val gc_timings : unit -> unit
 
   val no_mach_ir : unit -> unit
+
+  val dllvmir : unit -> unit
+  val keep_llvmir : unit -> unit
+  val llvm_path : string -> unit
 
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
@@ -930,6 +953,9 @@ struct
     mk_disable_zero_alloc_checker F.disable_zero_alloc_checker;
     mk_disable_precise_zero_alloc_checker F.disable_precise_zero_alloc_checker;
     mk_zero_alloc_checker_details_cutoff F.zero_alloc_checker_details_cutoff;
+    mk_zero_alloc_checker_details_extra F.zero_alloc_checker_details_extra;
+    mk_no_zero_alloc_checker_details_extra
+      F.no_zero_alloc_checker_details_extra;
     mk_zero_alloc_checker_join F.zero_alloc_checker_join;
 
     mk_function_layout F.function_layout;
@@ -951,6 +977,10 @@ struct
     mk_gc_timings F.gc_timings;
 
     mk_no_mach_ir F.no_mach_ir;
+
+    mk_dllvmir F.dllvmir;
+    mk_keep_llvmir F.keep_llvmir;
+    mk_llvm_path F.llvm_path;
 
     mk_flambda2_debug F.flambda2_debug;
     mk_no_flambda2_debug F.no_flambda2_debug;
@@ -1135,6 +1165,12 @@ module Oxcaml_options_impl = struct
     in
     Oxcaml_flags.zero_alloc_checker_details_cutoff := c
 
+  let zero_alloc_checker_details_extra =
+    set' Oxcaml_flags.zero_alloc_checker_details_extra
+
+  let no_zero_alloc_checker_details_extra =
+    clear' Oxcaml_flags.zero_alloc_checker_details_extra
+
   let zero_alloc_checker_join n =
     let c : Oxcaml_flags.zero_alloc_checker_join =
       if n < 0 then Error (-n)
@@ -1168,6 +1204,10 @@ module Oxcaml_options_impl = struct
   let gc_timings = set' Oxcaml_flags.gc_timings
 
   let no_mach_ir () = ()
+
+  let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
+  let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
+  let llvm_path s = Oxcaml_flags.llvm_path := Some s
 
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
@@ -1464,6 +1504,8 @@ module Extra_params = struct
     | "dump-zero-alloc" -> set' Oxcaml_flags.dump_zero_alloc
     | "disable-zero-alloc-checker" -> set' Oxcaml_flags.disable_zero_alloc_checker
     | "disable-precise-zero-alloc-checker" -> set' Oxcaml_flags.disable_precise_zero_alloc_checker
+    | "zero_alloc_checker_details_extra" ->
+      set' Oxcaml_flags.zero_alloc_checker_details_extra
     | "zero-alloc-checker-details-cutoff" ->
       begin match Compenv.check_int ppf name v with
       | Some i ->
@@ -1507,6 +1549,8 @@ module Extra_params = struct
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
     | "gdwarf-max-function-complexity" ->
       set_int' Debugging.dwarf_max_function_complexity
+    | "llvm-path" -> Oxcaml_flags.llvm_path := Some v; true
+    | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->

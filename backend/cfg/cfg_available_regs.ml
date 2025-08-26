@@ -237,6 +237,10 @@ module Transfer = struct
              to be available. *)
           for part_of_value = 0 to num_parts_of_value - 1 do
             let reg = regs.(part_of_value) in
+            (* CR sspies: In the previous version of this PR, this conditional
+               has prevented DWARF information from being generated for local
+               variables. It currently seems to work reasonably well even with
+               this conditional, but further investigation is needed. *)
             if RD.Set.mem_reg forgetting_ident reg
             then
               let regd =

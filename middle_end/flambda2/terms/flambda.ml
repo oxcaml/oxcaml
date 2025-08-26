@@ -585,6 +585,7 @@ and print_function_params_and_body ppf t =
     let my_closure =
       Bound_parameter.create my_closure
         (K.With_subkind.create K.value Anything Non_nullable)
+        Flambda_debug_uid.none
     in
     fprintf ppf
       "@[<hov 1>(%t@<1>\u{03bb}%t@[<hov \
@@ -1403,6 +1404,10 @@ module Named = struct
         Simple.const
           (Reg_width_const.naked_float32
              Numeric_types.Float32_by_bit_pattern.zero)
+      | Naked_number Naked_int8 ->
+        Simple.const (Reg_width_const.naked_int8 Numeric_types.Int8.zero)
+      | Naked_number Naked_int16 ->
+        Simple.const (Reg_width_const.naked_int16 Numeric_types.Int16.zero)
       | Naked_number Naked_int32 ->
         Simple.const (Reg_width_const.naked_int32 Int32.zero)
       | Naked_number Naked_int64 ->
@@ -1422,6 +1427,14 @@ module Named = struct
       | Rec_info -> Misc.fatal_error "[Rec_info] kind not expected here"
     in
     Simple simple
+
+  let kind t =
+    match t with
+    | Simple s -> Simple.kind s
+    | Prim (p, _dbg) -> Flambda_primitive.result_kind' p
+    | Rec_info _ -> K.rec_info
+    | Set_of_closures _ | Static_consts _ ->
+      Misc.fatal_errorf "No valid kind for non-singleton named %a" print t
 
   let is_dynamically_allocated_set_of_closures t =
     match t with

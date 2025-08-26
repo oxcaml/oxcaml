@@ -270,6 +270,9 @@ module Const : sig
     (** This is the jkind of normal ocaml values or null pointers *)
     val value_or_null : t
 
+    (** Same kind mod everything. *)
+    val value_or_null_mod_everything : t
+
     (** This is the jkind of normal ocaml values *)
     val value : t
 
@@ -309,6 +312,18 @@ module Const : sig
 
     (** The jkind of unboxed 32-bit native-sized integers with mode crossing. *)
     val kind_of_unboxed_nativeint : t
+
+    (** The jkind of unboxed 8-bit integers with no mode crossing. *)
+    val bits8 : t
+
+    (** The jkind of unboxed 8-bit integers with mode crossing. *)
+    val kind_of_unboxed_int8 : t
+
+    (** The jkind of unboxed 16-bit integers with no mode crossing. *)
+    val bits16 : t
+
+    (** The jkind of unboxed 16-bit integers with mode crossing. *)
+    val kind_of_unboxed_int16 : t
 
     (** The jkind of unboxed 32-bit integers with no mode crossing. *)
     val bits32 : t
@@ -510,7 +525,8 @@ val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 val for_unboxed_record : Types.label_declaration list -> Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed variant type. *)
-val for_boxed_variant : Types.constructor_declaration list -> Types.jkind_l
+val for_boxed_variant :
+  loc:Location.t -> Types.constructor_declaration list -> Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l
@@ -529,6 +545,9 @@ val for_float : Ident.t -> Types.jkind_l
 
 (** The jkind for values that are not floats. *)
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
+
+(** The jkind for [or_null] type arguments. *)
+val for_or_null_argument : Ident.t -> 'd Types.jkind
 
 (** The jkind for an abbreviation declaration. This implements the design
     in rule FIND_ABBREV in kind-inference.md, where we consider a definition
@@ -623,7 +642,7 @@ val set_externality_upper_bound :
 (** Gets the nullability from a jkind. *)
 val get_nullability :
   jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
-  'd Types.jkind ->
+  Types.jkind_l ->
   Jkind_axis.Nullability.t
 
 (** Computes a jkind that is the same as the input but with an updated maximum
@@ -651,6 +670,12 @@ val apply_modality_l :
     will all be top. The with-bounds are left unchanged. *)
 val apply_modality_r :
   Mode.Modality.Value.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
+
+(** Change a jkind to be appropriate for an expectation of a type passed to
+    the [or_null] constructor. Adjusts nullability to be [Non_null], and
+    separability to be [Non_float] if it is demanded to be [Separable].
+    If the jkind is already [Non_null], fails. *)
+val apply_or_null : Types.jkind_r -> (Types.jkind_r, unit) result
 
 (** Extract out component jkinds from the product. Because there are no product
     jkinds, this is a bit of a lie: instead, this decomposes the layout but just

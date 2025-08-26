@@ -88,17 +88,9 @@ let switch_for_if_then_else ~loc ~cond ~ifso ~ifnot ~kind =
         L.Lprim (Pnot, [cond], loc)
       | _ -> mk_switch ~cond ~ifso ~ifnot ~kind)
   in
-  let res =
-    share_expr ~kind ~expr:ifso (fun ifso ->
-        share_expr ~kind ~expr:ifnot (fun ifnot ->
-            aux ~loc ~kind ~cond ~ifso ~ifnot))
-  in
-  if Flambda_features.debug_flambda2 ()
-  then
-    Format.eprintf "SWITCH:@\n%a@\n->@\n%a@\n@." Printlambda.lambda
-      (L.Lifthenelse (cond, ifso, ifnot, kind))
-      Printlambda.lambda res;
-  res
+  share_expr ~kind ~expr:ifso (fun ifso ->
+      share_expr ~kind ~expr:ifnot (fun ifnot ->
+          aux ~loc ~kind ~cond ~ifso ~ifnot))
 
 let rec_catch_for_while_loop env cond body =
   let cont = L.next_raise_count () in
@@ -506,6 +498,8 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
          (Thirty_two
             { zero_init = Lconst (Const_base (Const_unboxed_int32 0l)) })
          ~init
+  | Punboxedintarray (Unboxed_int8 | Unboxed_int16) ->
+    Misc.unboxed_small_int_arrays_are_not_implemented ()
   | Punboxedintarray Unboxed_int64 ->
     makearray_dynamic_singleton_uninitialized "unboxed_int64" ~length mode loc
     |> initialize_array env loc ~length (Punboxedintarray_set Unboxed_int64)

@@ -155,14 +155,17 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   match instr.desc with
   | Op (Floatop (_, (Iaddf | Isubf | Imulf | Idivf))) ->
     may_use_stack_operand_for_second_argument map instr ~num_args:2
-      ~res_is_fst:true
+      ~res_is_fst:(not (Proc.has_three_operand_float_ops ()))
   | Op (Specific Ipackf32) -> May_still_have_spilled_registers
   | Op (Specific (Isimd op)) -> (
     let simd =
       match op.instr with
       | Instruction instr -> instr
       | Sequence
-          { id = Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _;
+          { id =
+              ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
+              | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz_X
+              | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y );
             instr
           } ->
         instr
@@ -198,27 +201,35 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op
       (Specific
         (Isimd_mem
-          ( ( SSE2 Add_f64
-            | SSE2 Sub_f64
-            | SSE2 Mul_f64
-            | SSE2 Div_f64
-            | SSE Add_f32
-            | SSE Sub_f32
-            | SSE Mul_f32
-            | SSE Div_f32 ),
+          ( ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32
+            | Mul_f32 | Div_f32 ),
             _ ))) ->
     May_still_have_spilled_registers
-  | Op (Reinterpret_cast (Float_of_float32 | Float32_of_float | V128_of_v128))
+  | Op
+      (Reinterpret_cast
+        ( Float_of_float32 | Float32_of_float | V128_of_vec _ | V256_of_vec _
+        | V512_of_vec _ ))
   | Op (Static_cast (V128_of_scalar Float64x2 | Scalar_of_v128 Float64x2))
-  | Op (Static_cast (V128_of_scalar Float32x4 | Scalar_of_v128 Float32x4)) ->
+  | Op (Static_cast (V128_of_scalar Float32x4 | Scalar_of_v128 Float32x4))
+  | Op (Static_cast (V256_of_scalar Float64x4 | Scalar_of_v256 Float64x4))
+  | Op (Static_cast (V256_of_scalar Float32x8 | Scalar_of_v256 Float32x8))
+  | Op (Static_cast (V512_of_scalar Float64x8 | Scalar_of_v512 Float64x8))
+  | Op (Static_cast (V512_of_scalar Float32x16 | Scalar_of_v512 Float32x16)) ->
     unary_operation_argument_or_result_on_stack map instr
   | Op (Reinterpret_cast (Float_of_int64 | Float32_of_int32))
-  | Op (Static_cast (V128_of_scalar (Int64x2 | Int32x4 | Int16x8 | Int8x16))) ->
+  | Op (Static_cast (V128_of_scalar (Int64x2 | Int32x4 | Int16x8 | Int8x16)))
+  | Op (Static_cast (V256_of_scalar (Int64x4 | Int32x8 | Int16x16 | Int8x32)))
+  | Op (Static_cast (V512_of_scalar (Int64x8 | Int32x16 | Int16x32 | Int8x64)))
+    ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
   | Op (Reinterpret_cast (Int64_of_float | Int32_of_float32))
-  | Op (Static_cast (Scalar_of_v128 (Int64x2 | Int32x4))) ->
+  | Op (Static_cast (Scalar_of_v128 (Int64x2 | Int32x4)))
+  | Op (Static_cast (Scalar_of_v256 (Int64x4 | Int32x8)))
+  | Op (Static_cast (Scalar_of_v512 (Int64x8 | Int32x16))) ->
     may_use_stack_operand_for_result map instr ~num_args:1
-  | Op (Static_cast (Scalar_of_v128 (Int16x8 | Int8x16))) ->
+  | Op (Static_cast (Scalar_of_v128 (Int16x8 | Int8x16)))
+  | Op (Static_cast (Scalar_of_v256 (Int16x16 | Int8x32)))
+  | Op (Static_cast (Scalar_of_v512 (Int16x32 | Int8x64))) ->
     (* CR mslater: (SIMD) replace once we have unboxed int16/int8 *)
     May_still_have_spilled_registers
   | Op
@@ -270,7 +281,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         | Istore_int (_, _, _)
         | Ioffset_loc (_, _)
         | Ifloatarithmem (_, _, _)
-        | Ipause | Icldemote _ | Iprefetch _ | Ibswap _ ))
+        | Icldemote _ | Iprefetch _ | Ibswap _ ))
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue ->
     (* no rewrite *)
     May_still_have_spilled_registers

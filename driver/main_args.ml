@@ -334,6 +334,9 @@ let mk_linkall f =
 let mk_linscan f =
   "-linscan", Arg.Unit f, " Use the linear scan register allocator"
 
+let mk_llvm_backend f =
+  "-llvm-backend", Arg.Unit f, " Enable LLVM backend (experimental)"
+
 let mk_make_runtime f =
   "-make-runtime", Arg.Unit f,
   " Build a runtime system with given C objects and libraries"
@@ -574,6 +577,16 @@ let mk_unboxed_types f =
 let mk_no_unboxed_types f =
   "-no-unboxed-types", Arg.Unit f,
   " unannotated unboxable types will not be unboxed (default)"
+;;
+
+let mk_dump_debug_uids f =
+  "-ddebug-uids", Arg.Unit f,
+  " dump debug uids when printing variables"
+;;
+
+let mk_dump_debug_uid_tables f =
+  "-ddebug-uid-tables", Arg.Unit f,
+  " dump tables associating debug uids with shapes"
 ;;
 
 let mk_unsafe f =
@@ -958,6 +971,8 @@ module type Common_options = sig
   val _no_strict_formats : unit -> unit
   val _unboxed_types : unit -> unit
   val _no_unboxed_types : unit -> unit
+  val _dump_debug_uids : unit -> unit
+  val _dump_debug_uid_tables : unit -> unit
   val _verbose_types : unit -> unit
   val _no_verbose_types : unit -> unit
   val _version : unit -> unit
@@ -1017,6 +1032,7 @@ module type Compiler_options = sig
   val _intf : string -> unit
   val _intf_suffix : string -> unit
   val _keep_docs : unit -> unit
+  val _llvm_backend : unit -> unit
   val _no_keep_docs : unit -> unit
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit
@@ -1256,6 +1272,7 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
+    mk_llvm_backend F._llvm_backend;
     mk_make_runtime F._make_runtime;
     mk_make_runtime_2 F._make_runtime;
     mk_modern F._labels;
@@ -1300,6 +1317,8 @@ struct
     mk_thread F._thread;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
+    mk_dump_debug_uids F._dump_debug_uids;
+    mk_dump_debug_uid_tables F._dump_debug_uid_tables;
     mk_unsafe F._unsafe;
     mk_use_runtime F._use_runtime;
     mk_use_runtime_2 F._use_runtime;
@@ -1396,6 +1415,8 @@ struct
     mk_no_strict_formats F._no_strict_formats;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
+    mk_dump_debug_uids F._dump_debug_uids;
+    mk_dump_debug_uid_tables F._dump_debug_uid_tables;
     mk_unsafe F._unsafe;
     mk_verbose_types F._verbose_types;
     mk_no_verbose_types F._no_verbose_types;
@@ -1499,6 +1520,7 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
+    mk_llvm_backend F._llvm_backend;
     mk_inline_max_depth F._inline_max_depth;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
@@ -1556,6 +1578,8 @@ struct
     mk_inline_max_unroll F._inline_max_unroll;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
+    mk_dump_debug_uids F._dump_debug_uids;
+    mk_dump_debug_uid_tables F._dump_debug_uid_tables;
     mk_unsafe F._unsafe;
     mk_v F._v;
     mk_verbose F._verbose;
@@ -1685,6 +1709,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_unbox_closures_factor F._unbox_closures_factor;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
+    mk_dump_debug_uids F._dump_debug_uids;
+    mk_dump_debug_uid_tables F._dump_debug_uid_tables;
     mk_unsafe F._unsafe;
     mk_verbose F._verbose;
     mk_verbose_types F._verbose_types;
@@ -1913,6 +1939,8 @@ struct
     mk_thread F._thread;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
+    mk_dump_debug_uids F._dump_debug_uids;
+    mk_dump_debug_uid_tables F._dump_debug_uid_tables;
     mk_v F._v;
     mk_verbose F._verbose;
     mk_verbose_types F._verbose_types;
@@ -2016,6 +2044,8 @@ module Default = struct
     let _strict_formats = set strict_formats
     let _strict_sequence = set strict_sequence
     let _unboxed_types = set unboxed_types
+    let _dump_debug_uids = set dump_debug_uids
+    let _dump_debug_uid_tables = set dump_debug_uid_tables
     let _verbose_types = set verbose_types
     let _w s =
       Warnings.parse_options false s |> Option.iter Location.(prerr_alert none)
@@ -2181,6 +2211,7 @@ module Default = struct
     let _keep_docs = set keep_docs
     let _keep_locs = set keep_locs
     let _linkall = set link_everything
+    let _llvm_backend = set llvm_backend
     let _match_context_rows n = match_context_rows := n
     let _no_keep_docs = clear keep_docs
     let _no_keep_locs = clear keep_locs

@@ -40,6 +40,9 @@ let value_declarations  : unit usage_tbl ref = s_table Types.Uid.Tbl.create 16
 let type_declarations   : unit usage_tbl ref = s_table Types.Uid.Tbl.create 16
 let module_declarations : unit usage_tbl ref = s_table Types.Uid.Tbl.create 16
 
+let mutated_mutable_values : unit usage_tbl ref =
+  s_table Types.Uid.Tbl.create 16
+
 type constructor_usage = Positive | Pattern | Exported_private | Exported
 type constructor_usages =
   {
@@ -1208,6 +1211,7 @@ let reset_declaration_caches () =
   Types.Uid.Tbl.clear !value_declarations;
   Types.Uid.Tbl.clear !type_declarations;
   Types.Uid.Tbl.clear !module_declarations;
+  Types.Uid.Tbl.clear !mutated_mutable_values;
   Types.Uid.Tbl.clear !used_constructors;
   Types.Uid.Tbl.clear !used_labels;
   ()
@@ -1687,6 +1691,14 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
       (IdTbl.find_same_without_locks id env.classes).clda_shape
   | Class_type ->
       (IdTbl.find_same id env.cltypes).cltda_shape
+
+let find_uid_of_path env path =
+  (* We currently only support looking up debugging uids in the current
+     environment. Future versions will support looking up declarations in other
+     files via the shape mechanism in [shape.ml]. *)
+  match find_type path env with
+  | exception Not_found -> None
+  | type_ -> let uid = type_.type_uid in Some uid
 
 let shape_of_path ~namespace env =
   Shape.of_path ~namespace ~find_shape:(find_shape env)
@@ -2335,7 +2347,12 @@ and store_value ?check ~mode id addr decl shape env =
   check_value_name (Ident.name id) decl.val_loc;
   Builtin_attributes.mark_alerts_used decl.val_attributes;
   Option.iter
-    (fun f -> check_usage decl.val_loc id decl.val_uid f !value_declarations)
+    (fun f ->
+      check_usage decl.val_loc id decl.val_uid f !value_declarations;
+      match decl.val_kind with
+      | Val_mut _ ->
+        check_usage decl.val_loc id decl.val_uid f !mutated_mutable_values
+      | _ -> ())
     check;
   let vda =
     { vda_description = decl;
@@ -2974,10 +2991,23 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
 
 (* Make the initial environment, without language extensions *)
 let initial =
-  Predef.build_initial_env
-    (add_type ~check:false)
-    (add_extension ~check:false ~rebind:false)
-    empty
+  (* We collect all the type declarations that are added to the initial
+     environment in a table. *)
+  let added_types = Ident.Tbl.create 16 in
+  let add_type_and_remember_decl (type_ident : Ident.t) decl env =
+    Ident.Tbl.add added_types type_ident decl;
+    add_type type_ident decl env ~check:false
+  in
+  let initial_env =
+    Predef.build_initial_env add_type_and_remember_decl
+      (add_extension ~check:false ~rebind:false) empty
+  in
+  (* We record the type declarations for the type shapes. *)
+  Ident.Tbl.iter (fun type_ident decl ->
+    Type_shape.add_to_type_decls (Pident type_ident) decl
+      (find_uid_of_path initial_env)
+  ) added_types;
+  initial_env
 
 let add_language_extension_types env =
   let add ext lvl f env  =
@@ -3017,6 +3047,11 @@ let mark_modtype_used _uid = ()
 
 let mark_value_used uid =
   match Types.Uid.Tbl.find !value_declarations uid with
+  | mark -> mark ()
+  | exception Not_found -> ()
+
+let mark_value_mutated uid =
+  match Types.Uid.Tbl.find !mutated_mutable_values uid with
   | mark -> mark ()
   | exception Not_found -> ()
 
@@ -3082,6 +3117,9 @@ let mark_cltype_used uid =
 let set_value_used_callback vd callback =
   Types.Uid.Tbl.add !value_declarations vd.Subst.Lazy.val_uid callback
 
+let set_value_mutated_callback vd callback =
+  Types.Uid.Tbl.add !mutated_mutable_values vd.Subst.Lazy.val_uid callback
+
 let set_type_used_callback td callback =
   if Uid.for_actual_declaration td.type_uid then
     let old =
@@ -3140,6 +3178,14 @@ let use_value ~use ~loc path vda =
   if use then begin
     let desc = vda.vda_description in
     mark_value_used desc.val_uid;
+    Builtin_attributes.check_alerts loc desc.val_attributes
+      (Path.name path)
+  end
+
+let mutate_value ~use ~loc path vda =
+  if use then begin
+    let desc = vda.vda_description in
+    mark_value_mutated desc.val_uid;
     Builtin_attributes.check_alerts loc desc.val_attributes
       (Path.name path)
   end
@@ -3249,7 +3295,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
 let escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context =
   begin match
   Mode.Regionality.submode
-    (Mode.Value.proj (Comonadic Areality) vmode.mode)
+    (Mode.Value.proj_comonadic Areality vmode.mode)
     (Mode.Regionality.global)
   with
   | Ok () -> ()
@@ -3262,7 +3308,7 @@ let escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context =
 let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
   match
     Mode.Linearity.submode
-      (Mode.Value.proj (Comonadic Linearity) vmode.mode)
+      (Mode.Value.proj_comonadic Linearity vmode.mode)
       Mode.Linearity.many
   with
   | Error _ ->
@@ -3296,7 +3342,7 @@ let closure_mode ~errors ~env ~loc ~item ~lid
 let exclave_mode ~errors ~env ~loc ~item ~lid vmode =
   match
   Mode.Regionality.submode
-    (Mode.Value.proj (Comonadic Areality) vmode.mode)
+    (Mode.Value.proj_comonadic Areality vmode.mode)
     Mode.Regionality.regional
 with
 | Ok () ->
@@ -3372,7 +3418,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           let mode = mode |> Mode.value_to_alloc_r2g |> Mode.alloc_as_value in
           Mode.Value.meet
             [mode;
-             Mode.Value.max_with (Comonadic Areality)
+             Mode.Value.max_with_comonadic Areality
                                  (Mode.Regionality.regional)]
       | Exclave_lock ->
           (* If [m0] is [global], then inside the exclave we require new values
@@ -4174,7 +4220,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
             |> Mode.Modality.Value.Const.apply
                 (Typemode.let_mutable_modalities m0)
           in
-          use_value ~use ~loc path vda;
+          mutate_value ~use ~loc path vda;
           Mutable_variable (id, mode, val_type, sort)
       | Val_mut _, _ -> assert false
       (* Unreachable because only [type_pat] creates mutable variables

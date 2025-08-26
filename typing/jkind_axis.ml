@@ -177,7 +177,7 @@ module Axis = struct
   end
 
   type 'a t =
-    | Modal : ('a, _, _) Mode.Alloc.Axis.t -> 'a t
+    | Modal : 'a Mode.Alloc.Axis.t -> 'a t
     | Nonmodal : 'a Nonmodal.t -> 'a t
 
   type packed = Pack : 'a t -> packed [@@unboxed]

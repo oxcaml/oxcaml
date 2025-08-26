@@ -54,6 +54,8 @@ let machtype ppf mty =
 
 let exttype ppf = function
   | XInt -> fprintf ppf "int"
+  | XInt8 -> fprintf ppf "int8"
+  | XInt16 -> fprintf ppf "int16"
   | XInt32 -> fprintf ppf "int32"
   | XInt64 -> fprintf ppf "int64"
   | XFloat -> fprintf ppf "float"
@@ -98,6 +100,11 @@ let float_comparison = function
   | CFge -> ">="
   | CFnge -> "!>="
 
+let vector_width = function
+  | Vec128 -> "vec128"
+  | Vec256 -> "vec256"
+  | Vec512 -> "vec512"
+
 let vec128_name = function
   | Int8x16 -> "int8x16"
   | Int16x8 -> "int16x8"
@@ -105,6 +112,22 @@ let vec128_name = function
   | Int64x2 -> "int64x2"
   | Float32x4 -> "float32x4"
   | Float64x2 -> "float64x2"
+
+let vec256_name = function
+  | Int8x32 -> "int8x32"
+  | Int16x16 -> "int16x16"
+  | Int32x8 -> "int32x8"
+  | Int64x4 -> "int64x4"
+  | Float32x8 -> "float32x8"
+  | Float64x4 -> "float64x4"
+
+let vec512_name = function
+  | Int8x64 -> "int8x64"
+  | Int16x32 -> "int16x32"
+  | Int32x16 -> "int32x16"
+  | Int64x8 -> "int64x8"
+  | Float32x16 -> "float32x16"
+  | Float64x8 -> "float64x8"
 
 let chunk = function
   | Byte_unsigned -> "unsigned int8"
@@ -197,7 +220,9 @@ let to_string msg =
     ppf msg
 
 let reinterpret_cast : Cmm.reinterpret_cast -> string = function
-  | V128_of_v128 -> "vec128 as vec128"
+  | V128_of_vec w -> Printf.sprintf "%s as vec128" (vector_width w)
+  | V256_of_vec w -> Printf.sprintf "%s as vec256" (vector_width w)
+  | V512_of_vec w -> Printf.sprintf "%s as vec512" (vector_width w)
   | Value_of_int -> "int as value"
   | Int_of_value -> "value as int"
   | Float32_of_float -> "float as float32"
@@ -216,6 +241,10 @@ let static_cast : Cmm.static_cast -> string = function
   | Float_of_float32 -> "float32->float"
   | Scalar_of_v128 ty -> Printf.sprintf "%s->scalar" (vec128_name ty)
   | V128_of_scalar ty -> Printf.sprintf "scalar->%s" (vec128_name ty)
+  | Scalar_of_v256 ty -> Printf.sprintf "%s->scalar" (vec256_name ty)
+  | V256_of_scalar ty -> Printf.sprintf "scalar->%s" (vec256_name ty)
+  | Scalar_of_v512 ty -> Printf.sprintf "%s->scalar" (vec512_name ty)
+  | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
 let operation d = function
   | Capply (_ty, _) -> "app" ^ location d
@@ -451,9 +480,10 @@ let fundecl ppf f =
       cases
   in
   with_location_mapping ~label:"Function" ~dbg:f.fun_dbg ppf (fun () ->
-      fprintf ppf "@[<1>(function%s%a@ %s@;<1 4>@[<1>(%a)@]@ @[%a@])@]@."
+      fprintf ppf "@[<1>(function%s%a@ %s@;<1 4>@[<1>(%a) : %a@]@ @[%a@] )@]@."
         (location f.fun_dbg) print_codegen_options f.fun_codegen_options
-        f.fun_name.sym_name print_cases f.fun_args sequence f.fun_body)
+        f.fun_name.sym_name print_cases f.fun_args machtype f.fun_ret_type
+        sequence f.fun_body)
 
 let data_item ppf = function
   | Cdefine_symbol { sym_name; sym_global = Local } ->

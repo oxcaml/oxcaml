@@ -1603,7 +1603,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
           in
           let fields =
             mk_unboxed_fields ~has_to_be_unboxed
-              ~mk:(fun _kind name -> Variable.create name)
+              ~mk:(fun kind name -> Variable.create name kind)
               db
               (get_all_usages db (Code_id_or_name.Map.singleton to_patch ()))
               new_name

@@ -19,6 +19,8 @@ module Sort = struct
     | Float64
     | Float32
     | Word
+    | Bits8
+    | Bits16
     | Bits32
     | Bits64
     | Vec128
@@ -42,14 +44,16 @@ module Sort = struct
     | Float64, Float64
     | Float32, Float32
     | Word, Word
+    | Bits8, Bits8
+    | Bits16, Bits16
     | Bits32, Bits32
     | Bits64, Bits64
     | Vec128, Vec128
     | Vec256, Vec256
     | Vec512, Vec512 ->
       true
-    | ( ( Void | Value | Float64 | Float32 | Word | Bits32 | Bits64 | Vec128
-        | Vec256 | Vec512 ),
+    | ( ( Void | Value | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
+        | Bits64 | Vec128 | Vec256 | Vec512 ),
         _ ) ->
       false
 
@@ -59,6 +63,8 @@ module Sort = struct
     | Float64 -> "float64"
     | Float32 -> "float32"
     | Word -> "word"
+    | Bits8 -> "bits8"
+    | Bits16 -> "bits16"
     | Bits32 -> "bits32"
     | Bits64 -> "bits64"
     | Vec128 -> "vec128"
@@ -85,6 +91,14 @@ module Sort = struct
       in
       pp_element ~nested:false ppf c
 
+    let rec all_void = function
+      | Base Void -> true
+      | Base
+          ( Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
+          | Vec128 | Vec256 | Vec512 ) ->
+        false
+      | Product ts -> List.for_all all_void ts
+
     let value = Base Value
 
     let void = Base Void
@@ -94,6 +108,10 @@ module Sort = struct
     let float32 = Base Float32
 
     let word = Base Word
+
+    let bits8 = Base Bits8
+
+    let bits16 = Base Bits16
 
     let bits32 = Base Bits32
 
@@ -116,6 +134,8 @@ module Sort = struct
               | Float64 -> "Float64"
               | Float32 -> "Float32"
               | Word -> "Word"
+              | Bits8 -> "Bits8"
+              | Bits16 -> "Bits16"
               | Bits32 -> "Bits32"
               | Bits64 -> "Bits64"
               | Vec128 -> "Vec128"
@@ -204,6 +224,8 @@ module Sort = struct
         | Float64 -> "Float64"
         | Float32 -> "Float32"
         | Word -> "Word"
+        | Bits8 -> "Bits8"
+        | Bits16 -> "Bits16"
         | Bits32 -> "Bits32"
         | Bits64 -> "Bits64"
         | Vec128 -> "Vec128"
@@ -258,6 +280,10 @@ module Sort = struct
 
       let word = Base Word
 
+      let bits8 = Base Bits8
+
+      let bits16 = Base Bits16
+
       let bits32 = Base Bits32
 
       let bits64 = Base Bits64
@@ -274,6 +300,8 @@ module Sort = struct
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
@@ -296,6 +324,10 @@ module Sort = struct
 
       let word = Some T.word
 
+      let bits8 = Some T.bits8
+
+      let bits16 = Some T.bits16
+
       let bits32 = Some T.bits32
 
       let bits64 = Some T.bits64
@@ -312,6 +344,8 @@ module Sort = struct
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
@@ -339,6 +373,10 @@ module Sort = struct
 
       let word = Base Word
 
+      let bits8 = Base Bits8
+
+      let bits16 = Base Bits16
+
       let bits32 = Base Bits32
 
       let bits64 = Base Bits64
@@ -355,6 +393,8 @@ module Sort = struct
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
@@ -519,8 +559,8 @@ module Sort = struct
     match default_to_value_and_get t with
     | Base Void -> true
     | Base
-        ( Value | Float64 | Float32 | Word | Bits32 | Bits64 | Vec128 | Vec256
-        | Vec512 ) ->
+        ( Value | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32 | Bits64
+        | Vec128 | Vec256 | Vec512 ) ->
       false
     | Product _ -> false
 

@@ -26,10 +26,10 @@ module Extension : sig
     | SSE4_1
     | SSE4_2
     | CLMUL
-    | LZCNT
-    | BMI (* IMPORTANT: LZCNT/TZCNT are interpreted as BSR/BSF on architectures prior
-             to Haswell, i.e. they do not cause an illegal instruction fault.
-             That means code using LZCNT/TZCNT will silently produce wrong results. *)
+    | BMI (* IMPORTANT: LZCNT/TZCNT are interpreted as BSR/BSF on architectures
+             prior to Haswell (i.e. without BMI), and do not cause an illegal
+             instruction fault. That means code using LZCNT/TZCNT will silently
+             produce wrong results. *)
     | BMI2
     | AVX
     | AVX2
@@ -40,10 +40,9 @@ module Extension : sig
   val enabled : t -> bool
   val available : unit -> t list
 
-  val allow_vec256 : unit -> bool
-  val allow_vec512 : unit -> bool
-  val require_vec256 : unit -> unit
-  val require_vec512 : unit -> unit
+  val enabled_vec256 : unit -> bool
+  val enabled_vec512 : unit -> bool
+  val enabled_instruction : Amd64_simd_instrs.instr -> bool
 end
 
 val trap_notes : bool ref
@@ -93,7 +92,6 @@ type specific_operation =
   | Ilfence                            (* load fence *)
   | Isfence                            (* store fence *)
   | Imfence                            (* memory fence *)
-  | Ipause                             (* hint for spin-wait loops *)
   | Ipackf32                           (* UNPCKLPS on registers; see Cpackf32 *)
   | Isimd of Simd.operation            (* SIMD instruction set operations *)
   | Isimd_mem of Simd.Mem.operation * addressing_mode
@@ -137,6 +135,8 @@ val identity_addressing : addressing_mode
 val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
+
+val addressing_displacement_for_llvmize : addressing_mode -> int
 
 val print_addressing :
   (Format.formatter -> 'a -> unit) -> addressing_mode ->

@@ -1699,11 +1699,11 @@ let prim_mode mvar prim =
     from the given [m]. This function is too specific to be put in [mode.ml] *)
 let with_locality_and_yielding (locality, yielding) m =
   let m' = Alloc.newvar () in
-  Locality.equate_exn (Alloc.proj (Comonadic Areality) m') locality;
+  Locality.equate_exn (Alloc.proj_comonadic Areality m') locality;
   let yielding =
-    Option.value ~default:(Alloc.proj (Comonadic Yielding) m) yielding
+    Option.value ~default:(Alloc.proj_comonadic Yielding m) yielding
   in
-  Yielding.equate_exn (Alloc.proj (Comonadic Yielding) m') yielding;
+  Yielding.equate_exn (Alloc.proj_comonadic Yielding m') yielding;
   let c =
     { Alloc.Comonadic.Const.max with
       areality = Locality.Const.min;
@@ -2168,6 +2168,8 @@ type unbox_result =
   | Stepped of unwrapped_type_expr
   (* unboxing process unboxed a product. Invariant: length >= 2 *)
   | Stepped_record_unboxed_product of unwrapped_type_expr list
+  (* unboxing process unboxed an [or_null] type *)
+  | Stepped_or_null of unwrapped_type_expr
   (* no step to make; we're all done here *)
   | Final_result
   (* definition not in environment: missing cmi *)
@@ -2207,6 +2209,16 @@ let unbox_once env ty =
                                    modality = ld.ld_modalities }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
+        | Type_variant ([_; cd2], Variant_with_null, _) ->
+          begin match cd2.cd_args with
+          | Cstr_tuple [arg] ->
+            (* [arg.ca_modalities] is currently always empty, but won't be
+               when we let users define custom or-null-like types. *)
+            Stepped_or_null { ty = apply arg.ca_type;
+                              is_open = false;
+                              modality = arg.ca_modalities }
+          | _ -> Misc.fatal_error "Invalid constructor for Variant_with_null"
+          end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
           Final_result
         end
@@ -2223,6 +2235,7 @@ let contained_without_boxing env ty =
   | Tconstr _ ->
     begin match unbox_once env ty with
     | Stepped { ty; is_open = _; modality = _ } -> [ty]
+    | Stepped_or_null { ty; is_open = _; modality = _ } -> [ty]
     | Stepped_record_unboxed_product tys ->
       List.map (fun { ty; _ } -> ty) tys
     | Final_result | Missing _ -> []
@@ -2251,7 +2264,7 @@ let rec get_unboxed_type_representation
       in
       get_unboxed_type_representation
         ~is_open ~modality env ty ty2 (fuel - 1)
-    | Stepped_record_unboxed_product _ | Final_result ->
+    | Stepped_or_null _ | Stepped_record_unboxed_product _ | Final_result ->
       Ok { ty; is_open; modality }
     | Missing _ -> Ok { ty = ty_prev; is_open; modality }
 
@@ -2523,6 +2536,34 @@ let constrain_type_jkind ~fixed env ty jkind =
                   (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              end
           in
+          let or_null ~fuel ty is_open modality =
+            let error () =
+              Error (Jkind.Violation.of_ ~jkind_of_type
+                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+            in
+            let jkind = Jkind.apply_modality_r modality jkind in
+            match
+              Jkind.apply_or_null jkind
+            with
+            | Ok jkind ->
+              (match
+                loop ~fuel ~expanded:false ty ~is_open
+                  (estimate_type_jkind env ty) jkind
+              with
+              | Ok () -> Ok ()
+              | Error _ ->
+                (* CR or_null:
+                   Since [constrain_type_jkind] reports errors for the original
+                   type on the left, return the original error.
+                   We could do something smarter here, updating the [loop]-ed
+                   error to have correct jkinds. *)
+                error ())
+            | Error () ->
+              (* CR or_null:
+                 [_ or_null] fails against a non-null jkind.
+                 We could still estimate the kind on the left better. *)
+              error ()
+          in
           match get_desc ty with
           | Tconstr _ ->
              if not expanded
@@ -2545,6 +2586,8 @@ let constrain_type_jkind ~fixed env ty jkind =
                  let jkind = Jkind.apply_modality_r modality jkind in
                  loop ~fuel:(fuel - 1) ~expanded:false ty ~is_open
                    (estimate_type_jkind env ty) jkind
+               | Stepped_or_null { ty; is_open = is_open2; modality } ->
+                 or_null ~fuel:(fuel - 1) ty (is_open || is_open2) modality
                | Stepped_record_unboxed_product tys_modalities ->
                  product ~fuel:(fuel - 1) tys_modalities
                end
@@ -5100,7 +5143,9 @@ let submode_with_cross env ~is_ret ty l r =
       (* the locality axis of the return mode cannot cross modes, because a
          local-returning function might allocate in the caller's region, and
          this info must be preserved. *)
-      Alloc.meet [r'; Alloc.max_with (Comonadic Areality) (Alloc.proj (Comonadic Areality) r)]
+      Alloc.meet
+        [r';
+         Alloc.max_with_comonadic Areality (Alloc.proj_comonadic Areality r)]
     else
       r'
   in

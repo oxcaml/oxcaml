@@ -523,7 +523,7 @@ mode is the mode of the function region *)
 let mode_return mode =
   { (mode_default (meet_regional mode)) with
     position = RTail (Regionality.disallow_left
-      (Value.proj (Comonadic Areality) mode), FTail);
+      (Value.proj_comonadic Areality mode), FTail);
     locality_context = Some Return;
   }
 
@@ -532,7 +532,7 @@ let mode_region mode =
   { (mode_default (meet_regional mode)) with
     position =
       RTail (Regionality.disallow_left
-        (Value.proj (Comonadic Areality) mode), FNontail);
+        (Value.proj_comonadic Areality mode), FNontail);
     locality_context = None;
   }
 
@@ -570,7 +570,7 @@ let mode_coerce mode expected_mode =
 let mode_lazy expected_mode =
   let expected_mode =
     mode_coerce (
-      Value.max_with (Comonadic Areality) Regionality.global
+      Value.max_with_comonadic Areality Regionality.global
       |> Value.meet_with Yielding Yielding.Const.Unyielding)
       expected_mode
   in
@@ -638,7 +638,7 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   | _, _, (Nontail | Default) ->
      mode_default vmode, vmode
   | _, _, Tail -> begin
-    Regionality.submode_exn (Value.proj (Comonadic Areality) vmode)
+    Regionality.submode_exn (Value.proj_comonadic Areality vmode)
       Regionality.regional;
     mode_tailcall_argument vmode, vmode
   end
@@ -728,7 +728,7 @@ let optimise_allocations () =
   - Add it back when middle-end can really utilize this information. *)
   List.iter
     (fun mode ->
-      Locality.zap_to_ceil (Alloc.proj (Comonadic Areality) mode)
+      Locality.zap_to_ceil (Alloc.proj_comonadic Areality mode)
       |> ignore)
     !allocations;
   reset_allocations ()
@@ -1067,9 +1067,9 @@ let mode_mutate_mutable =
 (** The [expected_mode] of the lazy expression when forcing it. *)
 let mode_force_lazy =
   let mode =
-    Contention.Const.Uncontended
-    |> Contention.of_const
-    |> Value.max_with (Monadic Contention)
+    { Value.Const.max with
+      contention = Uncontended }
+    |> Value.of_const
   in
   { (mode_default mode) with
     contention_context = Some Force_lazy }
@@ -3299,8 +3299,8 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
       (fun {pv_id; pv_uid; pv_type; pv_loc; pv_as_var; pv_attributes}
         (pv, val_env, met_env) ->
          let check s =
-           if pv_as_var then Warnings.Unused_var s
-           else Warnings.Unused_var_strict s in
+           if pv_as_var then Warnings.Unused_var { name = s; mutated = false }
+           else Warnings.Unused_var_strict { name = s; mutated = false } in
          let id' = Ident.rename pv_id in
          let val_env =
           Env.add_value ~mode:Mode.Value.legacy pv_id
@@ -5138,8 +5138,12 @@ let with_explanation explanation f =
         raise (Error (loc', env', err))
 
 let unique_use ~loc ~env mode_l mode_r  =
-  let uniqueness = Uniqueness.disallow_left (Value.proj (Monadic Uniqueness) mode_r) in
-  let linearity = Linearity.disallow_right (Value.proj (Comonadic Linearity) mode_l) in
+  let uniqueness =
+    Uniqueness.disallow_left (Value.proj_monadic Uniqueness mode_r)
+  in
+  let linearity =
+    Linearity.disallow_right (Value.proj_comonadic Linearity mode_l)
+  in
   if not (Language_extension.is_at_least Unique
             Language_extension.maturity_of_unique_for_drf) then begin
     (* if unique extension is not enabled, we will not run uniqueness analysis;
@@ -5241,7 +5245,8 @@ let split_function_ty
       fst (register_allocation_value_mode mode)
   in
   if expected_mode.strictly_local then
-    Locality.submode_exn Locality.local (Alloc.proj (Comonadic Areality) alloc_mode);
+    Locality.submode_exn Locality.local
+      (Alloc.proj_comonadic Areality alloc_mode);
   let { ty = ty_fun; explanation }, loc_fun = in_function in
   let separate = !Clflags.principal || Env.has_local_constraints env in
   let { ty_arg; ty_ret; arg_mode; ret_mode } as filtered_arrow =
@@ -6003,7 +6008,8 @@ and type_expect_
             type_expect ~recarg new_env mode' sbody ty_expected_explained
           in
           submode ~loc ~env ~reason:Other
-            (Value.min_with (Comonadic Areality) Regionality.regional) expected_mode;
+            (Value.min_with_comonadic Areality Regionality.regional)
+            expected_mode;
           { exp_desc = Texp_exclave exp;
             exp_loc = loc;
             exp_extra = [];
@@ -6021,7 +6027,7 @@ and type_expect_
         | Tail ->
           let mode, _ =
             Value.newvar_below
-              (Value.max_with (Comonadic Areality) Regionality.regional)
+              (Value.max_with_comonadic Areality Regionality.regional)
           in
           mode, mode_tailcall_function mode
         | Nontail | Default ->
@@ -6248,8 +6254,8 @@ and type_expect_
           | Record_mixed mixed -> begin
               match mixed.(label.lbl_pos) with
               | Float_boxed -> true
-              | Float64 | Float32 | Value | Bits32 | Bits64
-              | Vec128 | Vec256 | Vec512 | Word
+              | Float64 | Float32 | Value | Bits8 | Bits16 | Bits32 | Bits64
+              | Vec128 | Vec256 | Vec512 | Word | Void
               | Product _ ->
                 false
             end
@@ -6329,7 +6335,7 @@ and type_expect_
       rue {
         exp_desc = Texp_setfield(record,
           Locality.disallow_right (regional_to_local
-            (Value.proj (Comonadic Areality) rmode)),
+            (Value.proj_comonadic Areality rmode)),
           label_loc, label, newval);
         exp_loc = loc; exp_extra = [];
         exp_type = instance Predef.type_unit;
@@ -7008,11 +7014,11 @@ and type_expect_
       | Texp_field (_, _, _, _, Boxing (alloc_mode, _), _) ->
         begin
           submode ~loc ~env
-            (Value.min_with (Comonadic Areality) Regionality.local)
+            (Value.min_with_comonadic Areality Regionality.local)
             expected_mode;
           match
             Locality.submode Locality.local
-              (Alloc.proj (Comonadic Areality) alloc_mode.mode)
+              (Alloc.proj_comonadic Areality alloc_mode.mode)
           with
           | Ok () -> ()
           | Error _ -> raise (Error (e.pexp_loc, env,
@@ -7032,7 +7038,7 @@ and type_expect_
           check primitive allocation here, and also improve the logic in [type_ident]. *)
           ->
           submode ~loc ~env
-            (Value.min_with (Comonadic Areality) Regionality.local)
+            (Value.min_with_comonadic Areality Regionality.local)
             expected_mode;
       | _ ->
         raise (Error (exp.exp_loc, env, Not_allocation))
@@ -7057,10 +7063,9 @@ and type_expect_
            and should have the areality expected here: *)
         Value.newvar_below
           (Value.meet [
-            Value.max_with (Monadic Uniqueness)
-              Uniqueness.(of_const Const.Unique);
-            Value.max_with (Comonadic Areality)
-              (Value.proj (Comonadic Areality) expected_mode.mode)])
+            Value.of_const {Value.Const.max with uniqueness = Unique};
+            Value.max_with_comonadic Areality
+              (Value.proj_comonadic Areality expected_mode.mode)])
       in
       let cell_type =
         (* CR uniqueness: this could be the jkind of exp2 *)
@@ -7331,7 +7336,7 @@ and type_ident env ?(recarg=Rejected) lid =
        (* if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           register_allocation_mode (Alloc.max_with (Comonadic Areality) mode)
+           register_allocation_mode (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
        end;
        ty, Id_prim (Option.map Locality.disallow_right mode, sort)
@@ -8244,7 +8249,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       in
       let eta_mode, _ = Value.newvar_below (alloc_as_value marg) in
       Regionality.submode_exn
-        (Value.proj (Comonadic Areality) eta_mode) Regionality.regional;
+        (Value.proj_comonadic Areality eta_mode) Regionality.regional;
       let eta_pat, eta_var = var_pair ~mode:eta_mode "eta" ty_arg in
       (* CR layouts v10: When we add abstract jkinds, the eta expansion here
          becomes impossible in some cases - we'll need better errors.  For test
@@ -8266,7 +8271,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
              (texp,
               args @ [Nolabel, Arg (eta_var, arg_sort)], Nontail,
               ret_mode
-              |> Value.proj (Comonadic Areality)
+              |> Value.proj_comonadic Areality
               |> regional_to_global
               |> Locality.disallow_right,
               None)}
@@ -8431,7 +8436,7 @@ and type_application env app_loc expected_mode position_and_mode
         | Error err -> raise (Error (app_loc, env, Function_type_not_rep (ty, err)))
       in
       let arg_sort = type_sort ~why:Function_argument ty_arg in
-      let ap_mode = Alloc.proj (Comonadic Areality) ret_mode in
+      let ap_mode = Alloc.proj_comonadic Areality ret_mode in
       let mode_res =
         cross_left env ty_ret (alloc_as_value ret_mode)
       in
@@ -8492,7 +8497,7 @@ and type_application env app_loc expected_mode position_and_mode
         end ~post:(fun (ty_ret, _, _, _) -> generalize_structure ty_ret)
       in
       let mode_ret = Alloc.disallow_right mode_ret in
-      let ap_mode = Alloc.proj (Comonadic Areality) mode_ret in
+      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret =
         cross_left env ty_ret (alloc_as_value mode_ret)
       in
@@ -8991,8 +8996,10 @@ and map_half_typed_cases
         *)
         let ext_env =
           add_pattern_variables ext_env pvs
-            ~check:(fun s -> Warnings.Unused_var_strict s)
-            ~check_as:(fun s -> Warnings.Unused_var s)
+            ~check:(fun s ->
+              Warnings.Unused_var_strict { name = s; mutated = false })
+            ~check_as:(fun s ->
+              Warnings.Unused_var { name = s; mutated = false})
         in
         let ext_env = add_module_variables ext_env mvs in
         let ty_expected =
@@ -9265,8 +9272,9 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
            heap-allocated. *)
         (* CR zqian: the multiple allocations should enjoy their own modes. *)
         let m, _ =
-          Value.newvar_below (Value.max_with (Comonadic Areality)
-            Regionality.global)
+          {Value.Const.max with areality = Global}
+          |> Value.of_const
+          |> Value.newvar_below
         in
         Some m
     | Nonrecursive -> None
@@ -9482,8 +9490,10 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   (l, new_env)
 
 and type_let_def_wrap_warnings
-    ?(check = fun s -> Warnings.Unused_var s)
-    ?(check_strict = fun s -> Warnings.Unused_var_strict s)
+    ?(check = fun name mutated -> Warnings.Unused_var { name; mutated })
+    ?(check_strict = fun name mutated ->
+      Warnings.Unused_var_strict { name; mutated } )
+    ?(check_mutable = fun name -> Warnings.Unmutated_mutable name)
     ~is_recursive ~entirely_functions ~exp_env ~new_env ~spat_sexp_list
     ~attrs_list ~mode_pat_typ_list ~pvs
     type_def =
@@ -9501,7 +9511,9 @@ and type_let_def_wrap_warnings
     List.exists
       (fun attrs ->
          Builtin_attributes.warning_scope ~ppwarning:false attrs (fun () ->
-           Warnings.is_active (check "") || Warnings.is_active (check_strict "")
+              Warnings.is_active (check "" false)
+           || Warnings.is_active (check_strict "" false)
+           || Warnings.is_active (check_mutable "")
            || (is_recursive && (Warnings.is_active Warnings.Unused_rec_flag))))
       attrs_list
   in
@@ -9558,12 +9570,27 @@ and type_let_def_wrap_warnings
                    event *)
                 let name = Ident.name id in
                 let used = ref false in
+                let mutable_ =
+                  (match vd.val_kind with
+                   | Val_mut _ -> true
+                   | Val_reg | Val_prim _ | Val_ivar _
+                   | Val_self _ | Val_anc _ -> false)
+                in
+                let mutated = ref false in
                 if not (name = "" || name.[0] = '_' || name.[0] = '#') then
                   add_delayed_check
                     (fun () ->
+                      let warn w =
+                        Location.prerr_warning vd.Subst.Lazy.val_loc w
+                      in
                       if not !used then
-                        Location.prerr_warning vd.Subst.Lazy.val_loc
-                          ((if !some_used then check_strict else check) name)
+                        warn
+                          ((if !some_used then check_strict else check)
+                            name !mutated)
+                      (* To reduce noise, don't issue an [unmutated-mutable]
+                         warning with [unused-var] *)
+                      else if mutable_ && not !mutated then
+                        warn (check_mutable name)
                     );
                 Env.set_value_used_callback
                   vd
@@ -9575,7 +9602,13 @@ and type_let_def_wrap_warnings
                         List.iter Env.mark_value_used (get_ref slot);
                         used := true;
                         some_used := true
-                  )
+                  );
+                match vd.val_kind with
+                | Val_mut _->
+                  Env.set_value_mutated_callback
+                    vd (fun () -> mutated := true)
+                | Val_reg | Val_prim _ | Val_ivar _
+                | Val_self _ | Val_anc _ -> ()
               )
               (Typedtree.pat_bound_idents pat);
             mode, expected_ty, Some slot
@@ -10004,7 +10037,7 @@ and type_comprehension_clause ~loc ~comprehension_type ~container_type env
           bindings
       in
       let env =
-        let check s = Warnings.Unused_var s in
+        let check s = Warnings.Unused_var { name = s; mutated = false } in
         let pvs = tps.tps_pattern_variables in
         add_pattern_variables ~check ~check_as:check env pvs
       in
@@ -10209,8 +10242,8 @@ let maybe_check_uniqueness_value_bindings vbl =
 let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
   let (pat_exp_list, new_env) =
     type_let
-      ~check:(fun s -> Warnings.Unused_value_declaration s)
-      ~check_strict:(fun s -> Warnings.Unused_value_declaration s)
+      ~check:(fun s _ -> Warnings.Unused_value_declaration s)
+      ~check_strict:(fun s _ -> Warnings.Unused_value_declaration s)
       ?force_toplevel
       At_toplevel
       env mutable_flag rec_flag spat_sexp_list Modules_rejected
@@ -10453,7 +10486,7 @@ let escaping_hint (failure_reason : Value.error) submode_reason
         match get_desc ty with
         | Tarrow ((_, _, res_mode), _, res_ty, _) ->
           begin match
-            Locality.Guts.check_const (Alloc.proj (Comonadic Areality) res_mode)
+            Locality.Guts.check_const (Alloc.proj_comonadic Areality res_mode)
           with
           | Some Global ->
             Some (n+1, true)

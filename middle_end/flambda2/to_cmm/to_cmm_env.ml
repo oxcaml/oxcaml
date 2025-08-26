@@ -68,6 +68,15 @@ type 'env trans_prim =
         P.ternary_primitive,
         Cmm.expression -> Cmm.expression -> Cmm.expression -> prim_res )
       prim_helper;
+    quaternary :
+      ( 'env,
+        P.quaternary_primitive,
+        Cmm.expression ->
+        Cmm.expression ->
+        Cmm.expression ->
+        Cmm.expression ->
+        prim_res )
+      prim_helper;
     variadic :
       ('env, P.variadic_primitive, Cmm.expression list -> prim_res) prim_helper
   }
@@ -298,7 +307,7 @@ let exported_offsets t = t.offsets
 
 (* Variables *)
 
-let gen_variable v =
+let gen_variable ~debug_uid v =
   let user_visible = Variable.user_visible v in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
@@ -312,7 +321,7 @@ let gen_variable v =
          be reworked soon *)
       Some
         (Backend_var.Provenance.create ~module_path:(Path.Pident v)
-           ~location:Debuginfo.none ~original_ident:v)
+           ~location:Debuginfo.none ~original_ident:v ~debug_uid)
   in
   Backend_var.With_provenance.create ?provenance v
 
@@ -322,12 +331,12 @@ let add_bound_param env v v' =
   let vars = Variable.Map.add v (C.var v'', free_vars) env.vars in
   { env with vars }
 
-let create_bound_parameter env v =
+let create_bound_parameter env (v, debug_uid) =
   if Variable.Map.mem v env.vars
   then
     Misc.fatal_errorf "Cannot rebind variable %a in To_cmm environment"
       Variable.print v;
-  let v' = gen_variable v in
+  let v' = gen_variable v ~debug_uid in
   let env = add_bound_param env v v' in
   env, v'
 
@@ -428,7 +437,7 @@ let is_cmm_simple cmm =
 
 (* Helper function to create bindings *)
 
-let create_binding_aux (type a) effs var ~(inline : a inline)
+let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
     (bound_expr : a bound_expr) =
   let order =
     let incr =
@@ -439,7 +448,9 @@ let create_binding_aux (type a) effs var ~(inline : a inline)
     next_order := !next_order + incr;
     !next_order
   in
-  let cmm_var = gen_variable var in
+  let cmm_var =
+    gen_variable ~debug_uid:(Bound_var.debug_uid var) (Bound_var.var var)
+  in
   let binding = Binding { order; inline; effs; cmm_var; bound_expr } in
   binding
 
@@ -524,9 +535,11 @@ let rebuild_prim ~dbg ~env ~res prim args =
     | Binary binary, [x; y] -> env.trans_prim.binary env res dbg binary x y
     | Ternary ternary, [x; y; z] ->
       env.trans_prim.ternary env res dbg ternary x y z
+    | Quaternary quaternary, [x; y; z; w] ->
+      env.trans_prim.quaternary env res dbg quaternary x y z w
     | Variadic variadic, args ->
       env.trans_prim.variadic env res dbg variadic args
-    | (Nullary _ | Unary _ | Binary _ | Ternary _), _ ->
+    | (Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _), _ ->
       Misc.fatal_errorf
         "Mismatched arity when splitting a binding in to_cmm_env:@\n%a@\n%a"
         Flambda_primitive.Without_args.print prim
@@ -666,7 +679,12 @@ and split_in_env env res var binding =
     let env, res =
       List.fold_left
         (fun (env, res) new_binding ->
-          let flambda_var = Variable.create "to_cmm_tmp" in
+          let flambda_var =
+            (* CR vlaviron/gbury: The kind is wrong, but it should never be
+               actually used. We could enforce this by using a dedicated invalid
+               kind, but for now we just use Value arbitrarily. *)
+            Variable.create "to_cmm_tmp" Flambda_kind.value
+          in
           add_binding_to_env env res flambda_var new_binding)
         (env, res) new_bindings
     in
@@ -676,13 +694,13 @@ let bind_variable_with_decision (type a) ?extra env res var ~inline
     ~(defining_expr : a bound_expr) ~effects_and_coeffects_of_defining_expr:effs
     =
   let binding = create_binding ~inline effs var defining_expr in
-  add_binding_to_env ?extra env res var binding
+  add_binding_to_env ?extra env res (Bound_var.var var) binding
 
 let bind_variable ?extra env res var ~defining_expr ~free_vars_of_defining_expr
     ~num_normal_occurrences_of_bound_vars
     ~effects_and_coeffects_of_defining_expr =
   let inline =
-    To_cmm_effects.classify_let_binding var
+    To_cmm_effects.classify_let_binding (Bound_var.var var)
       ~effects_and_coeffects_of_defining_expr
       ~num_normal_occurrences_of_bound_vars
   in
@@ -867,6 +885,7 @@ let split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of
 let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
   let alias_of = resolve_alias env alias_of in
   let num_occurrences_of_var : Num_occurrences.t =
+    let var = Bound_var.var var in
     match Variable.Map.find var num_normal_occurrences_of_bound_vars with
     | exception Not_found ->
       Misc.fatal_errorf
@@ -880,7 +899,7 @@ let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
     | Zero ->
       let env = remove_binding env alias_of in
       env, res
-    | One -> make_alias env res var alias_of
+    | One -> make_alias env res (Bound_var.var var) alias_of
     | More_than_one ->
       let env = remove_binding env alias_of in
       split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of b)

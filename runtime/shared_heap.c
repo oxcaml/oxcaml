@@ -81,6 +81,8 @@ static struct {
   uintnat current_chunk;   /* sequence number of most recent chunk */
   uintnat current_chunk_size; /* size of current chunk (in pools) */
 
+  uintnat chunk_words; /* total size of all chunks */
+  uintnat max_chunk_words; /* maximum of chunk_words over time */
   /* Count of all pools in use across all domains and the global lists below.
 
      Does not include unused pools ('free' above) or freshly allocated pools
@@ -97,6 +99,8 @@ static struct {
   NULL,
   0,
   NULL,
+  0,
+  0,
   0,
   0,
   0,
@@ -243,6 +247,10 @@ static pool* alloc_pool(struct caml_heap_state* local) {
       pool_freelist.next_fresh_pool = mem;
       ++ pool_freelist.current_chunk;
       pool_freelist.current_chunk_size = new_pools;
+      pool_freelist.chunk_words += Wsize_bsize(mapping_size);
+      if (pool_freelist.chunk_words > pool_freelist.max_chunk_words) {
+        pool_freelist.max_chunk_words = pool_freelist.chunk_words;
+      }
     }
   }
 
@@ -289,7 +297,7 @@ static void pool_release(struct caml_heap_state* local,
   pool->owner = NULL;
   CAMLassert(pool->sz == sz);
   local->stats.pool_words -= POOL_WSIZE;
-  local->stats.pool_frag_words -= POOL_HEADER_WSIZE + wastage_sizeclass[sz];
+  local->stats.pool_frag_words -= POOL_SLAB_WOFFSET(sz);
   caml_plat_lock_blocking(&pool_freelist.lock);
   pool->next = pool_freelist.free;
   pool_freelist.free = pool;
@@ -302,7 +310,7 @@ static void pool_free(struct caml_heap_state* local,
                       pool* pool)
 {
     local->stats.pool_words -= POOL_WSIZE;
-    local->stats.pool_frag_words -= POOL_HEADER_WSIZE + wastage_sizeclass[pool->sz];
+    local->stats.pool_frag_words -= POOL_SLAB_WOFFSET(pool->sz);
     caml_mem_unmap(pool, Bsize_wsize(POOL_WSIZE));
 }
 
@@ -436,7 +444,7 @@ static void update_pool_stats(struct caml_heap_state* local, sizeclass_t sz) {
   local->stats.pool_words += POOL_WSIZE;
   if (local->stats.pool_words > local->stats.pool_max_words)
     local->stats.pool_max_words = local->stats.pool_words;
-  local->stats.pool_frag_words += POOL_HEADER_WSIZE + wastage_sizeclass[sz];
+  local->stats.pool_frag_words += POOL_SLAB_WOFFSET(sz);
 }
 
 /* Allocating an object from a pool */
@@ -699,6 +707,14 @@ intnat caml_sweep(struct caml_heap_state* local, intnat work) {
     verify_swept(local);
   }
   return work;
+}
+
+void caml_get_global_heap_stats(struct global_heap_stats *stats)
+{
+  caml_plat_lock_blocking(&pool_freelist.lock);
+  stats->chunk_words = pool_freelist.chunk_words;
+  stats->max_chunk_words = pool_freelist.max_chunk_words;
+  caml_plat_unlock(&pool_freelist.lock);
 }
 
 uintnat caml_heap_size(struct caml_heap_state* local) {
@@ -1428,6 +1444,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
   if (caml_compact_unmap) {
     pool* cur_pool = evacuated_pools;
     uintnat freed_pools = 0;
+
     while (cur_pool) {
       pool* next_pool = cur_pool->next;
 
@@ -1442,7 +1459,9 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
       cur_pool = next_pool;
       ++ freed_pools;
     }
+
     caml_plat_lock_blocking(&pool_freelist.lock);
+    pool_freelist.chunk_words -= POOL_WSIZE * freed_pools;
     pool_freelist.active_pools -= freed_pools;
     caml_plat_unlock(&pool_freelist.lock);
     CAML_GC_MESSAGE(COMPACT, "Freed (and unmapped) %lu pools.\n", freed_pools);
@@ -1453,7 +1472,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
     while (cur_pool) {
       sizeclass_t sz = cur_pool->sz;
       heap->stats.pool_words -= POOL_WSIZE;
-      heap->stats.pool_frag_words -= POOL_HEADER_WSIZE + wastage_sizeclass[sz];
+      heap->stats.pool_frag_words -= POOL_SLAB_WOFFSET(sz);
       last = cur_pool;
       cur_pool->owner = NULL;
       cur_pool = cur_pool->next;
@@ -1487,6 +1506,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
         /* No stats to update so just unmap */
         caml_mem_unmap(cur_pool, Bsize_wsize(POOL_WSIZE));
         ++ unmapped;
+        pool_freelist.chunk_words -= POOL_WSIZE;
         cur_pool = next_pool;
       }
 
@@ -1829,6 +1849,7 @@ void compact_release_freelist(void)
                  (char*)free_pools[first] + chunk_bytes);
       unmapped += cur_pool->chunk_size;
       caml_mem_unmap(free_pools[first], chunk_bytes);
+      pool_freelist.chunk_words -= Wsize_bsize(chunk_bytes);
       i = first;
     } else { /* can't unmap this one; add to free list */
       cur_pool->next = new_free_list;

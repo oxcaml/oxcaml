@@ -202,20 +202,29 @@ let should_use_linscan fd =
 
 let if_emit_do f x = if should_emit () then f x else ()
 
-let emit_begin_assembly unix = if_emit_do Emit.begin_assembly unix
+let emit_begin_assembly ~sourcefile unix =
+  if !Clflags.llvm_backend
+  then Llvmize.begin_assembly ~sourcefile
+  else if_emit_do (fun () -> Emit.begin_assembly unix) ()
 
 let emit_end_assembly ~sourcefile () =
-  if_emit_do
-    (fun () ->
-      try Emit.end_assembly ()
-      with Emitaux.Error e ->
-        let sourcefile = Option.value ~default:"*none*" sourcefile in
-        raise (Error (Asm_generation (sourcefile, e))))
-    ()
+  if !Clflags.llvm_backend
+  then Llvmize.end_assembly ()
+  else
+    if_emit_do
+      (fun () ->
+        try Emit.end_assembly ()
+        with Emitaux.Error e ->
+          let sourcefile = Option.value ~default:"*none*" sourcefile in
+          raise (Error (Asm_generation (sourcefile, e))))
+      ()
 
-let emit_data dl = if_emit_do Emit.data dl
+let emit_data dl =
+  if !Clflags.llvm_backend then Llvmize.data dl else if_emit_do Emit.data dl
 
 let emit_fundecl f =
+  if !Clflags.llvm_backend
+  then Misc.fatal_error "Linear IR not supported with llvm backend";
   if_emit_do
     (fun (fundecl : Linear.fundecl) ->
       try Profile.record ~accumulate:true "emit" Emit.fundecl fundecl
@@ -413,6 +422,31 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg_to_linear" Cfg_to_linear.run
 
+let compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout =
+  (* missing pass: stack checks *)
+  cfg_with_layout
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
+       (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
+       (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc" Cfg_comballoc.run
+  ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_combine
+  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After comballoc"
+  ++ Profile.record ~accumulate:true "save_cfg" save_cfg
+  ++ Profile.record ~accumulate:true "llvmize" Llvmize.cfg
+
+let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
+  cfg_with_layout
+  ++ compile_cfg ppf_dump ~funcnames fd_cmm
+  ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
+  ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Linear
+  ++ Profile.record ~accumulate:true "save_linear" save_linear
+  ++ (fun (fd : Linear.fundecl) ->
+       match !Oxcaml_flags.cfg_stack_checks with
+       | false -> Stack_check.linear fd
+       | true -> fd)
+  ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
+
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
   Reg.clear_relocatable_regs ();
@@ -423,15 +457,9 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
        ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
-         compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout)
-  ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
-  ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Linear
-  ++ Profile.record ~accumulate:true "save_linear" save_linear
-  ++ (fun (fd : Linear.fundecl) ->
-       match !Oxcaml_flags.cfg_stack_checks with
-       | false -> Stack_check.linear fd
-       | true -> fd)
-  ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
+         if !Clflags.llvm_backend
+         then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
+         else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
 
 let compile_data dl = dl ++ save_data ++ emit_data
 
@@ -493,10 +521,43 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
        (empty) temporary file should be deleted. *)
     if (not create_asm) || not keep_asm then remove_file asm_filename
   in
+  if !Clflags.llvm_backend then Llvmize.init ~output_prefix ~ppf_dump;
+  let open_asm_file () =
+    if create_asm
+    then
+      if !Clflags.llvm_backend
+      then Llvmize.open_out ~asm_filename
+      else Emitaux.output_channel := open_out asm_filename
+  in
+  let close_asm_file () =
+    if create_asm
+    then
+      if !Clflags.llvm_backend
+      then Llvmize.close_out ()
+      else close_out !Emitaux.output_channel
+  in
+  let assemble_file () =
+    if !Clflags.llvm_backend
+    then Llvmize.assemble_file ~asm_filename ~obj_filename
+    else if not (should_emit ())
+    then 0
+    else (
+      if may_reduce_heap
+      then
+        Emitaux.reduce_heap_size ~reset:(fun () ->
+            reset ();
+            (* note: we need to preserve the persistent env, because it is used
+               to populate fields of the record written as the cmx file
+               afterwards. *)
+            Typemod.reset ~preserve_persistent_env:true;
+            Emitaux.reset ();
+            Reg.clear_relocatable_regs ());
+      Proc.assemble_file asm_filename obj_filename)
+  in
   Misc.try_finally
     ~exceptionally:(fun () -> remove_file obj_filename)
     (fun () ->
-      if create_asm then Emitaux.output_channel := open_out asm_filename;
+      open_asm_file ();
       Misc.try_finally
         (fun () ->
           gen ();
@@ -504,32 +565,15 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
           Compiler_hooks.execute Compiler_hooks.Check_allocations
             Zero_alloc_checker.iter_witnesses;
           write_ir output_prefix)
-        ~always:(fun () -> if create_asm then close_out !Emitaux.output_channel)
+        ~always:(fun () -> close_asm_file ())
         ~exceptionally:remove_asm_file;
-      if should_emit ()
-      then (
-        if may_reduce_heap
-        then
-          Emitaux.reduce_heap_size ~reset:(fun () ->
-              reset ();
-              (* note: we need to preserve the persistent env, because it is
-                 used to populate fields of the record written as the cmx file
-                 afterwards. *)
-              Typemod.reset ~preserve_persistent_env:true;
-              Emitaux.reset ();
-              Reg.clear_relocatable_regs ());
-        let assemble_result =
-          Profile.record "assemble"
-            (Proc.assemble_file asm_filename)
-            obj_filename
-        in
-        if assemble_result <> 0
-        then raise (Error (Assembler_error asm_filename)));
+      let assemble_result = Profile.record_call "assemble" assemble_file in
+      if assemble_result <> 0 then raise (Error (Assembler_error asm_filename));
       remove_asm_file ())
 
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
   Emitaux.Dwarf_helpers.init ~disable_dwarf:false ~sourcefile;
-  emit_begin_assembly unix;
+  emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
   ++ (fun x ->
        if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
@@ -594,7 +638,7 @@ let linear_gen_implementation unix filename =
   (* CR mshinwell: set [sourcefile] properly; [filename] isn't a .ml file *)
   let sourcefile = Some filename in
   Emitaux.Dwarf_helpers.init ~disable_dwarf:false ~sourcefile;
-  emit_begin_assembly unix;
+  emit_begin_assembly ~sourcefile unix;
   Profile.record "Emit" (List.iter emit_item) linear_unit_info.items;
   emit_end_assembly ~sourcefile ()
 

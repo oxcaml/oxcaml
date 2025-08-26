@@ -1,5 +1,6 @@
 SHELL = /usr/bin/env bash
-include Makefile.config
+ROOTDIR = .
+include Makefile.build_config
 export ARCH
 
 boot_ocamlc = main_native.exe

@@ -85,21 +85,9 @@ type should_work = int_or_null accept_immediate_or_null
 type should_work = int_or_null accept_immediate_or_null
 |}]
 
-(* CR layouts v2.8: this is a bug in principal inference with with-kinds. *)
-
 type should_work = int or_null accept_immediate_or_null
 [%%expect{|
 type should_work = int or_null accept_immediate_or_null
-|}, Principal{|
-Line 1, characters 19-30:
-1 | type should_work = int or_null accept_immediate_or_null
-                       ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type
-         "('a : immediate_or_null)"
-       The kind of int or_null is immediate_or_null with int
-         because it is the primitive immediate_or_null type or_null.
-       But the kind of int or_null must be a subkind of immediate_or_null
-         because of the definition of accept_immediate_or_null at line 1, characters 0-54.
 |}]
 
 (* Values. *)
@@ -118,8 +106,6 @@ external write_imm : ('a : immediate_or_null). 'a myref -> 'a -> unit
 external equal : ('a : immediate_or_null). 'a -> 'a -> bool = "%equal"
 |}]
 
-(* CR layouts v2.8: this is a bug in principal inference with with-kinds. *)
-
 let () =
   let r = { v = (Null : int or_null) } in
   let x = read_imm r in
@@ -129,14 +115,23 @@ let () =
 ;;
 
 [%%expect{|
+|}]
+
+type ('a : value_or_null mod non_float) accepts_nonfloat
+
+type succeeds = t_immediate_or_null accepts_nonfloat
+
+[%%expect{|
+type ('a : value_or_null mod non_float) accepts_nonfloat
+type succeeds = t_immediate_or_null accepts_nonfloat
+|}]
+
+(* Values of [int or_null] mode-cross: *)
+
+let f (x : int or_null @ local) (g : int or_null -> unit) = g x [@nontail]
+
+[%%expect{|
+val f : local_ int or_null -> ((int or_null -> unit) -> unit) = <fun>
 |}, Principal{|
-Line 2, characters 16-36:
-2 |   let r = { v = (Null : int or_null) } in
-                    ^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "int or_null"
-       but an expression was expected of type "('a : immediate_or_null)"
-       The kind of int or_null is immediate_or_null with int
-         because it is the primitive immediate_or_null type or_null.
-       But the kind of int or_null must be a subkind of immediate_or_null
-         because of the definition of myref at line 1, characters 0-56.
+val f : local_ int or_null -> (int or_null -> unit) -> unit = <fun>
 |}]

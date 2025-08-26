@@ -24,6 +24,7 @@ type number_decider =
 
 type unboxer =
   { var_name : string;
+    var_kind : Flambda_kind.t;
     poison_const : Const.t;
     unboxing_prim : Simple.t -> P.t;
     prove_simple :

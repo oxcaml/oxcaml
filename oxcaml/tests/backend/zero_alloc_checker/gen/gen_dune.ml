@@ -78,7 +78,7 @@ let () =
     (pipe-outputs
     (with-accepted-exit-codes ${exit_code}
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           ${extra_flags} -zero-alloc-checker-details-cutoff ${cutoff} -O3))
     (run "./${filter}")
    ))))
@@ -152,9 +152,9 @@ let () =
   print_test ~extra_flags:"-zero-alloc-check opt" "test_zero_alloc_opt1.ml";
   print_test ~extra_flags:"-zero-alloc-check opt" "test_zero_alloc_opt2.ml";
   print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_assume_fail";
+    "test_assume_fail" ~extra_flags:"-directory repo/root/relative/dir";
   print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_assume_on_call";
+    "test_assume_on_call" ~extra_flags:"-no-zero-alloc-checker-details-extra";
   print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
     "test_misplaced_assume";
   print_test_expected_output ~extra_flags:"-zero-alloc-check all"
@@ -290,4 +290,6 @@ let () =
     "test_custom_error_msg_sig";
   print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
     "test_arch_specific_witness";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
+    "test_sort_witnesses";
   ()

@@ -64,6 +64,8 @@ module type Oxcaml_options = sig
   val disable_zero_alloc_checker : unit -> unit
   val disable_precise_zero_alloc_checker : unit -> unit
   val zero_alloc_checker_details_cutoff : int -> unit
+  val zero_alloc_checker_details_extra : unit -> unit
+  val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
 
   val function_layout : string -> unit
@@ -84,6 +86,10 @@ module type Oxcaml_options = sig
   val gc_timings : unit -> unit
 
   val no_mach_ir : unit -> unit
+
+  val dllvmir : unit -> unit
+  val keep_llvmir : unit -> unit
+  val llvm_path : string -> unit
 
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit

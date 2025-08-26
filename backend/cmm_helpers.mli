@@ -17,6 +17,27 @@
 
 open Cmm
 
+(** Tags for unboxed arrays using mixed block headers with scannable_prefix = 0 *)
+module Unboxed_array_tags : sig
+  val unboxed_int64_array_tag : int
+
+  val unboxed_nativeint_array_tag : int
+
+  val unboxed_int32_array_even_tag : int
+
+  val unboxed_int32_array_odd_tag : int
+
+  val unboxed_float32_array_even_tag : int
+
+  val unboxed_float32_array_odd_tag : int
+
+  val unboxed_vec128_array_tag : int
+
+  val unboxed_vec256_array_tag : int
+
+  val unboxed_vec512_array_tag : int
+end
+
 val arch_bits : int
 
 type arity =
@@ -210,6 +231,12 @@ val get_field_computed :
   index:expression ->
   Debuginfo.t ->
   expression
+
+(** [field_address_computed ptr ofs dbg] returns an expression for the address
+    at offset [ofs] (in machine words) of the block pointed to by [ptr].
+    The resulting expression is a derived pointer of type [Addr]. *)
+val field_address_computed :
+  expression -> expression -> Debuginfo.t -> expression
 
 (** Load a block's header *)
 val get_header : expression -> Debuginfo.t -> expression
@@ -557,9 +584,6 @@ val addr_array_length : unary_primitive
 
 (** Byte swap primitive Operates on Cmm integers (unboxed values) *)
 val bbswap : Primitive.unboxed_integer -> unary_primitive
-
-(** 16-bit byte swap primitive Operates on Cmm integers (untagged integers) *)
-val bswap16 : unary_primitive
 
 type binary_primitive = expression -> expression -> Debuginfo.t -> expression
 
@@ -1042,6 +1066,7 @@ val fundecl :
   codegen_option list ->
   Debuginfo.t ->
   Lambda.poll_attribute ->
+  machtype ->
   fundecl
 
 (** Create a cmm phrase for a function declaration. *)
@@ -1088,41 +1113,53 @@ val fail_if_called_indirectly_function : unit -> Cmm.phrase list
 
 (* Atomics *)
 
-val atomic_load :
-  dbg:Debuginfo.t -> Lambda.immediate_or_pointer -> expression -> expression
-
-val atomic_exchange :
+val atomic_load_field :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   expression ->
+  field:expression ->
+  expression
+
+val atomic_exchange_field :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  expression ->
+  field:expression ->
   new_value:expression ->
   expression
 
-val atomic_fetch_and_add :
-  dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_fetch_and_add_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_add : dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_add_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_sub : dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_sub_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_land : dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_land_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_lor : dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_lor_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_lxor : dbg:Debuginfo.t -> expression -> expression -> expression
+val atomic_lxor_field :
+  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
 
-val atomic_compare_and_set :
+val atomic_compare_and_set_field :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   expression ->
+  field:expression ->
   old_value:expression ->
   new_value:expression ->
   expression
 
-val atomic_compare_exchange :
+val atomic_compare_exchange_field :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   expression ->
+  field:expression ->
   old_value:expression ->
   new_value:expression ->
   expression
@@ -1278,18 +1315,10 @@ val unboxed_mutable_int32_unboxed_product_array_set :
 (** Read from an unboxed int64 or unboxed nativeint array (without bounds
     check).
 
-    The [has_custom_ops] parameter should be set to [true] unless the array
-    in question is an unboxed product array: these are represented as mixed
-    blocks, not custom blocks.
-
     The zero-indexed element number is specified as a tagged immediate.
 *)
 val unboxed_int64_or_nativeint_array_ref :
-  has_custom_ops:bool ->
-  expression ->
-  array_index:expression ->
-  Debuginfo.t ->
-  expression
+  expression -> array_index:expression -> Debuginfo.t -> expression
 
 (** Update an unboxed float32 array (without bounds check). *)
 val unboxed_float32_array_set :
@@ -1309,13 +1338,8 @@ val unboxed_int32_array_set :
 
 (** Update an unboxed int64 or unboxed nativeint array (without bounds
     check).
-
-    The [has_custom_ops] parameter should be set to [true] unless the array
-    in question is an unboxed product array: these are represented as mixed
-    blocks, not custom blocks.
 *)
 val unboxed_int64_or_nativeint_array_set :
-  has_custom_ops:bool ->
   expression ->
   index:expression ->
   new_value:expression ->

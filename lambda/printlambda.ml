@@ -19,19 +19,31 @@ open Primitive
 open Types
 open Lambda
 
-let unboxed_integer = function
-  | Unboxed_nativeint -> "unboxed_nativeint"
-  | Unboxed_int32 -> "unboxed_int32"
-  | Unboxed_int64 -> "unboxed_int64"
+let unboxed_integer_suffix = function
+  | Unboxed_int8 -> "unboxed_int8"
+  | Unboxed_int16 -> "unboxed_int16"
+  | Unboxed_nativeint -> "nativeint"
+  | Unboxed_int32 -> "int32"
+  | Unboxed_int64 -> "int64"
 
-let unboxed_float = function
-  | Unboxed_float64 -> "unboxed_float"
-  | Unboxed_float32 -> "unboxed_float32"
+let unboxed_float_suffix = function
+  | Unboxed_float64 -> "float"
+  | Unboxed_float32 -> "float32"
 
-let unboxed_vector = function
-  | Unboxed_vec128 -> "unboxed_vec128"
-  | Unboxed_vec256 -> "unboxed_vec256"
-  | Unboxed_vec512 -> "unboxed_vec512"
+let unboxed_vector_suffix = function
+  | Unboxed_vec128 -> "vec128"
+  | Unboxed_vec256 -> "vec256"
+  | Unboxed_vec512 -> "vec512"
+
+(* Uses in most contexts get the "unboxed_" prefix *)
+let unboxed_integer ui = "unboxed_" ^ unboxed_integer_suffix ui
+let unboxed_float uf = "unboxed_" ^ unboxed_float_suffix uf
+let unboxed_vector uv = "unboxed_" ^ unboxed_vector_suffix uv
+
+(* As a layout it's just the name *)
+let unboxed_integer_layout = unboxed_integer_suffix
+let unboxed_float_layout = unboxed_float_suffix
+let unboxed_vector_layout = unboxed_vector_suffix
 
 let boxed_integer = function
   | Boxed_nativeint -> "nativeint"
@@ -46,6 +58,11 @@ let boxed_vector = function
   | Boxed_vec128 -> "vec128"
   | Boxed_vec256 -> "vec256"
   | Boxed_vec512 -> "vec512"
+
+let vector_width = function
+  | Boxed_vec128 -> "128"
+  | Boxed_vec256 -> "256"
+  | Boxed_vec512 -> "512"
 
 let rec scannable_product_element_kinds kinds =
   "[" ^ String.concat "; " (List.map scannable_product_element_kind kinds) ^ "]"
@@ -93,9 +110,7 @@ let array_ref_kind ppf k =
   | Pfloatarray_ref mode -> fprintf ppf "float%a" pp_mode mode
   | Punboxedfloatarray_ref Unboxed_float64 -> fprintf ppf "unboxed_float"
   | Punboxedfloatarray_ref Unboxed_float32 -> fprintf ppf "unboxed_float32"
-  | Punboxedintarray_ref Unboxed_int32 -> fprintf ppf "unboxed_int32"
-  | Punboxedintarray_ref Unboxed_int64 -> fprintf ppf "unboxed_int64"
-  | Punboxedintarray_ref Unboxed_nativeint -> fprintf ppf "unboxed_nativeint"
+  | Punboxedintarray_ref i -> pp_print_string ppf (unboxed_integer i)
   | Punboxedvectorarray_ref Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
   | Punboxedvectorarray_ref Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
   | Punboxedvectorarray_ref Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
@@ -107,9 +122,7 @@ let array_ref_kind ppf k =
 let array_index_kind ppf k =
   match k with
   | Ptagged_int_index -> fprintf ppf "int"
-  | Punboxed_int_index Unboxed_int32 -> fprintf ppf "unboxed_int32"
-  | Punboxed_int_index Unboxed_int64 -> fprintf ppf "unboxed_int64"
-  | Punboxed_int_index Unboxed_nativeint -> fprintf ppf "unboxed_nativeint"
+  | Punboxed_int_index i -> pp_print_string ppf (unboxed_integer i)
 
 let array_set_kind ppf k =
   let pp_mode ppf = function
@@ -123,9 +136,7 @@ let array_set_kind ppf k =
   | Pfloatarray_set -> fprintf ppf "float"
   | Punboxedfloatarray_set Unboxed_float64 -> fprintf ppf "unboxed_float"
   | Punboxedfloatarray_set Unboxed_float32 -> fprintf ppf "unboxed_float32"
-  | Punboxedintarray_set Unboxed_int32 -> fprintf ppf "unboxed_int32"
-  | Punboxedintarray_set Unboxed_int64 -> fprintf ppf "unboxed_int64"
-  | Punboxedintarray_set Unboxed_nativeint -> fprintf ppf "unboxed_nativeint"
+  | Punboxedintarray_set i -> pp_print_string ppf (unboxed_integer i)
   | Punboxedvectorarray_set Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
   | Punboxedvectorarray_set Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
   | Punboxedvectorarray_set Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
@@ -149,6 +160,8 @@ let rec mixed_block_element print_value_kind ppf el =
   | Float_boxed _ -> fprintf ppf "float"
   | Float32 -> fprintf ppf "float32"
   | Float64 -> fprintf ppf "float64"
+  | Bits8 -> fprintf ppf "bits8"
+  | Bits16 -> fprintf ppf "bits16"
   | Bits32 -> fprintf ppf "bits32"
   | Bits64 -> fprintf ppf "bits64"
   | Vec128 -> fprintf ppf "vec128"
@@ -176,70 +189,58 @@ let tag_and_constructor_shape print_value_kind ppf (tag, shape) =
     (constructor_shape print_value_kind)
     shape
 
-let variant_kind or_null_suffix print_value_kind ppf ~consts ~non_consts =
-  fprintf ppf "@[<hov 1>[(consts (%a))@ (non_consts (%a))%s]@]"
+let variant_kind print_value_kind ppf ~consts ~non_consts =
+  fprintf ppf "@[<hov 1>(consts (%a))@ (non_consts (%a))@]"
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_int)
     consts
     (Format.pp_print_list ~pp_sep:Format.pp_print_space
       (tag_and_constructor_shape print_value_kind))
     non_consts
-    or_null_suffix
 
-let value_kind print_value_kind_non_null ppf vk =
-  let or_null_suffix =
-    match vk.nullable with
-    | Non_nullable -> ""
-    | Nullable -> " or_null"
-  in
-  print_value_kind_non_null or_null_suffix ppf vk.raw_kind
+let or_null_suffix ppf nullable =
+  match nullable with
+  | Non_nullable -> ()
+  | Nullable -> fprintf ppf "_or_null"
 
-let rec value_kind_non_null or_null_suffix ppf = function
-  | Pgenval -> ()
-  | Pintval -> fprintf ppf "[int%s]" or_null_suffix
-  | Pboxedfloatval bf ->
-    fprintf ppf "[%s%s]" (boxed_float bf) or_null_suffix
-  | Parrayval elt_kind ->
-    fprintf ppf "[%sarray%s]" (array_kind elt_kind) or_null_suffix
-  | Pboxedintval bi ->
-    fprintf ppf "[%s%s]" (boxed_integer bi) or_null_suffix
-  | Pboxedvectorval bv ->
-    fprintf ppf "[%s%s]" (boxed_vector bv) or_null_suffix
+let rec raw_value_kind ppf rk =
+  match rk with
+  | Pgenval -> fprintf ppf "value"
+  | Pintval -> fprintf ppf "int"
+  | Pboxedfloatval bf -> fprintf ppf "%s" (boxed_float bf)
+  | Parrayval elt_kind -> fprintf ppf "%sarray" (array_kind elt_kind)
+  | Pboxedintval bi -> fprintf ppf "%s" (boxed_integer bi)
+  | Pboxedvectorval bv -> fprintf ppf "%s" (boxed_vector bv)
   | Pvariant { consts; non_consts; } ->
-    variant_kind or_null_suffix (value_kind value_kind_non_null')
-      ppf ~consts ~non_consts
+    variant_kind value_kind ppf ~consts ~non_consts
 
-and value_kind_non_null' or_null_suffix ppf = function
-  | Pgenval -> fprintf ppf "*"
-  | Pintval -> fprintf ppf "[int%s]" or_null_suffix
-  | Pboxedfloatval bf ->
-    fprintf ppf "[%s%s]" (boxed_float bf) or_null_suffix
-  | Parrayval elt_kind ->
-    fprintf ppf "[%sarray%s]" (array_kind elt_kind) or_null_suffix
-  | Pboxedintval bi ->
-    fprintf ppf "[%s%s]" (boxed_integer bi) or_null_suffix
-  | Pboxedvectorval bv ->
-    fprintf ppf "[%s%s]" (boxed_vector bv) or_null_suffix
-  | Pvariant { consts; non_consts; } ->
-    variant_kind or_null_suffix (value_kind value_kind_non_null')
-      ppf ~consts ~non_consts
+and value_kind ppf vk =
+  match vk with
+  | { raw_kind = Pgenval; nullable = Non_nullable } -> fprintf ppf "*"
+  | { raw_kind = Pgenval; nullable = Nullable } -> fprintf ppf "?"
+  | { raw_kind; nullable } ->
+    fprintf ppf "@[<hov 1>value%a<@,%a>@]"
+      or_null_suffix nullable
+      raw_value_kind raw_kind
 
-let rec layout' is_top ppf layout_ =
+let rec layout ppf layout_ =
   match layout_ with
-  | Pvalue k ->
-    (if is_top then value_kind value_kind_non_null
-     else value_kind value_kind_non_null')
-      ppf k
-  | Ptop -> fprintf ppf "[top]"
-  | Pbottom -> fprintf ppf "[bottom]"
-  | Punboxed_float bf -> fprintf ppf "[%s]" (unboxed_float bf)
-  | Punboxed_int bi -> fprintf ppf "[%s]" (unboxed_integer bi)
-  | Punboxed_vector bv -> fprintf ppf "[%s]" (unboxed_vector bv)
+  | Pvalue k -> value_kind ppf k
+  | Ptop -> fprintf ppf "top"
+  | Pbottom -> fprintf ppf "bottom"
+  | Punboxed_float bf -> fprintf ppf "%s" (unboxed_float_layout bf)
+  | Punboxed_int bi -> fprintf ppf "%s" (unboxed_integer_layout bi)
+  | Punboxed_vector bv -> fprintf ppf "%s" (unboxed_vector_layout bv)
   | Punboxed_product layouts ->
     fprintf ppf "@[<hov 1>#(%a)@]"
-      (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") (layout' false))
+      (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
       layouts
 
-let layout ppf layout_ = layout' true ppf layout_
+let layout_annotation ppf layout_ =
+  match layout_ with
+  | Pvalue { raw_kind = Pgenval; nullable = Non_nullable } -> ()
+  | Pvalue { raw_kind = Pgenval; nullable = Nullable } ->
+    fprintf ppf "?"
+  | _ -> fprintf ppf "[%a]" layout layout_
 
 let return_kind ppf (mode, kind) =
   let smode = locality_mode_if_local mode in
@@ -263,37 +264,17 @@ let return_kind ppf (mode, kind) =
     | Pboxedvectorval bv ->
       fprintf ppf ": %s%s%s@ " smode (boxed_vector bv) or_null_suffix
     | Pvariant { consts; non_consts; } ->
-      variant_kind or_null_suffix (value_kind value_kind_non_null')
-        ppf ~consts ~non_consts
+      fprintf ppf ": %a@ "
+        (fun ppf () -> variant_kind value_kind ppf ~consts ~non_consts) ()
   end
   | Punboxed_float bf -> fprintf ppf ": %s@ " (unboxed_float bf)
   | Punboxed_int bi -> fprintf ppf ": %s@ " (unboxed_integer bi)
   | Punboxed_vector bv -> fprintf ppf ": %s@ " (unboxed_vector bv)
-  | Punboxed_product _ -> fprintf ppf ": %a" layout kind
+  | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
 
-let field_kind_non_null or_null_suffix ppf = function
-  | Pgenval -> pp_print_string ppf "*"
-  | Pintval -> fprintf ppf "int%s" or_null_suffix
-  | Pboxedfloatval bf ->
-    fprintf ppf "%s%s" (boxed_float bf) or_null_suffix
-  | Parrayval elt_kind ->
-    fprintf ppf "%s-array%s" (array_kind elt_kind) or_null_suffix
-  | Pboxedintval bi ->
-    fprintf ppf "%s%s" (boxed_integer bi) or_null_suffix
-  | Pboxedvectorval bv ->
-    fprintf ppf "%s%s" (boxed_vector bv) or_null_suffix
-  | Pvariant { consts; non_consts; } ->
-    fprintf ppf "@[<hov 1>[(consts (%a))@ (non_consts (%a))%s]@]"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_int)
-      consts
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space
-        (tag_and_constructor_shape (value_kind value_kind_non_null')))
-      non_consts
-      or_null_suffix
-
-let field_kind = value_kind field_kind_non_null
+let field_kind = value_kind
 
 let locality_kind = function
   | Alloc_heap -> ""
@@ -315,6 +296,8 @@ let print_boxed_integer name ppf bi m =
 let unboxed_integer_mark name bi m =
   match bi with
   | Unboxed_nativeint -> Printf.sprintf "Nativeint_u.%s%s" name (locality_kind m)
+  | Unboxed_int8 -> Printf.sprintf "Int8_u.%s%s" name (locality_kind m)
+  | Unboxed_int16 -> Printf.sprintf "Int16_u.%s%s" name (locality_kind m)
   | Unboxed_int32 -> Printf.sprintf "Int32_u.%s%s" name (locality_kind m)
   | Unboxed_int64 -> Printf.sprintf "Int64_u.%s%s" name (locality_kind m)
 
@@ -385,10 +368,12 @@ let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
   fun print_mode ppf elt ->
   match elt with
-  | Value vk -> value_kind value_kind_non_null ppf vk
+  | Value vk -> value_kind ppf vk
   | Float_boxed param -> fprintf ppf "float_boxed(%a)" print_mode param
   | Float64 -> fprintf ppf "float64"
   | Float32 -> fprintf ppf "float32"
+  | Bits8 -> fprintf ppf "bits8"
+  | Bits16 -> fprintf ppf "bits16"
   | Bits32 -> fprintf ppf "bits32"
   | Bits64 -> fprintf ppf "bits64"
   | Vec128 -> fprintf ppf "vec128"
@@ -444,6 +429,8 @@ let peek_or_poke ppf (pp : peek_or_poke) =
   | Ppp_tagged_immediate -> fprintf ppf "tagged_immediate"
   | Ppp_unboxed_float32 -> fprintf ppf "unboxed_float32"
   | Ppp_unboxed_float -> fprintf ppf "unboxed_float"
+  | Ppp_unboxed_int8 -> fprintf ppf "unboxed_int8"
+  | Ppp_unboxed_int16 -> fprintf ppf "unboxed_int16"
   | Ppp_unboxed_int32 -> fprintf ppf "unboxed_int32"
   | Ppp_unboxed_int64 -> fprintf ppf "unboxed_int64"
   | Ppp_unboxed_nativeint -> fprintf ppf "unboxed_nativeint"
@@ -583,11 +570,11 @@ let primitive ppf = function
   | Preperform -> fprintf ppf "reperform"
   | Pmake_unboxed_product layouts ->
       fprintf ppf "make_unboxed_product #(%a)"
-        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ", ") (layout' false))
+        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ", ") layout)
         layouts
   | Punboxed_product_field (n, layouts) ->
       fprintf ppf "unboxed_product_field %d #(%a)" n
-        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ", ") (layout' false))
+        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ", ") layout)
         layouts
   | Parray_element_size_in_bytes ak ->
       fprintf ppf "array_element_size_in_bytes (%s)" (array_kind ak)
@@ -747,9 +734,10 @@ let primitive ppf = function
      fprintf ppf "string.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pstring_load_128 {unsafe; index_kind; mode; boxed} ->
-     fprintf ppf "string.%sunaligned_get128%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
+  | Pstring_load_vec {size; unsafe; index_kind; mode; boxed} ->
+     fprintf ppf "string.%sunaligned_get%s%s%s[indexed by %a]"
+       (if unsafe then "unsafe_" else "") (vector_width size)
+       (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
   | Pbytes_load_16 {unsafe; index_kind} ->
      fprintf ppf "bytes.%sget16[indexed by %a]" (if unsafe then "unsafe_" else "")
@@ -766,9 +754,10 @@ let primitive ppf = function
      fprintf ppf "bytes.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pbytes_load_128 {unsafe; index_kind; mode; boxed} ->
-     fprintf ppf "bytes.%sunaligned_get128%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
+  | Pbytes_load_vec {size; unsafe; index_kind; mode; boxed} ->
+     fprintf ppf "bytes.%sunaligned_get%s%s%s[indexed by %a]"
+       (if unsafe then "unsafe_" else "") (vector_width size)
+       (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
   | Pbytes_set_16 {unsafe; index_kind} ->
      fprintf ppf "bytes.%sset16[indexed by %a]" (if unsafe then "unsafe_" else "")
@@ -785,9 +774,9 @@ let primitive ppf = function
      fprintf ppf "bytes.%sset64%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        array_index_kind index_kind
-  | Pbytes_set_128 { unsafe; boxed; index_kind } ->
-     fprintf ppf "bytes.%sunaligned_get128%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "")
+  | Pbytes_set_vec { size; unsafe; boxed; index_kind } ->
+     fprintf ppf "bytes.%sunaligned_set%s%s[indexed by %a]"
+       (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
   | Pbigstring_load_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sget16[indexed by %a]"
@@ -804,10 +793,11 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pbigstring_load_128 { unsafe; aligned; mode; boxed; index_kind } ->
-     fprintf ppf "bigarray.array1.%s%sget128%s%s[indexed by %a]"
+  | Pbigstring_load_vec { size; unsafe; aligned; mode; boxed; index_kind } ->
+     fprintf ppf "bigarray.array1.%s%sget%s%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
+       (vector_width size)
        (if boxed then "" else "#") (locality_kind mode) array_index_kind index_kind
   | Pbigstring_set_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sset16[indexed by %a]"
@@ -824,88 +814,105 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sset64%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        array_index_kind index_kind
-  | Pbigstring_set_128 { unsafe; aligned; boxed; index_kind } ->
-     fprintf ppf "bigarray.array1.%s%sget128%s[indexed by %a]"
+  | Pbigstring_set_vec { size; unsafe; aligned; boxed; index_kind } ->
+     fprintf ppf "bigarray.array1.%s%sset%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
+       (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
-  | Pfloatarray_load_128 {unsafe; mode; boxed} ->
-     fprintf ppf "floatarray.%sget128%s%s"
-       (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Pfloat_array_load_128 {unsafe; mode; boxed} ->
-     fprintf ppf "float_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Pint_array_load_128 {unsafe; mode; boxed} ->
-     fprintf ppf "int_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_float_array_load_128 {unsafe; mode; boxed} ->
-     fprintf ppf "unboxed_float_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_float32_array_load_128 {unsafe; mode; boxed} ->
-     fprintf ppf "unboxed_float32_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_int32_array_load_128 {unsafe; mode; boxed} ->
-     fprintf ppf "unboxed_int32_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_int64_array_load_128 {unsafe; mode; boxed} ->
-     fprintf ppf "unboxed_int64_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_nativeint_array_load_128 {unsafe; mode; boxed} ->
-     fprintf ppf "unboxed_nativeint_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Pfloatarray_set_128 {unsafe; boxed} ->
-     fprintf ppf "floatarray.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Pfloat_array_set_128 {unsafe; boxed} ->
-     fprintf ppf "float_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Pint_array_set_128 {unsafe; boxed} ->
-     fprintf ppf "int_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_float_array_set_128 {unsafe; boxed} ->
-     fprintf ppf "unboxed_float_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_float32_array_set_128 {unsafe; boxed} ->
-     fprintf ppf "unboxed_float32_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_int32_array_set_128 {unsafe; boxed} ->
-     fprintf ppf "unboxed_int32_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_int64_array_set_128 {unsafe; boxed} ->
-     fprintf ppf "unboxed_int64_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_nativeint_array_set_128 {unsafe; boxed} ->
-     fprintf ppf "unboxed_nativeint_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
+  | Pfloatarray_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "floatarray.%sget%s%s%s"
+       (if unsafe then "unsafe_" else "") (vector_width size)
+       (if boxed then "" else "#") (locality_kind mode)
+  | Pfloat_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "float_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
+  | Pint_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "int_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
+  | Punboxed_float_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "unboxed_float_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
+  | Punboxed_float32_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "unboxed_float32_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
+  | Punboxed_int32_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "unboxed_int32_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
+  | Punboxed_int64_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "unboxed_int64_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
+  | Punboxed_nativeint_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "unboxed_nativeint_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
+  | Pfloatarray_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "floatarray.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Pfloat_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "float_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Pint_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "int_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Punboxed_float_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "unboxed_float_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Punboxed_float32_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "unboxed_float32_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Punboxed_int32_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "unboxed_int32_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Punboxed_int64_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "unboxed_int64_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Punboxed_nativeint_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "unboxed_nativeint_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
   | Pbswap16 -> fprintf ppf "bswap16"
   | Pbbswap(bi,m) -> print_boxed_integer "bswap" ppf bi m
   | Pint_as_pointer m -> fprintf ppf "int_as_pointer%s" (locality_kind m)
-  | Patomic_load {immediate_or_pointer} ->
+  | Patomic_load_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_load_imm"
-        | Pointer -> fprintf ppf "atomic_load_ptr")
-  | Patomic_set {immediate_or_pointer} ->
+        | Immediate -> fprintf ppf "atomic_load_field_imm"
+        | Pointer -> fprintf ppf "atomic_load_field_ptr")
+  | Patomic_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_set_imm"
-        | Pointer -> fprintf ppf "atomic_set_ptr")
-  | Patomic_exchange {immediate_or_pointer} ->
+        | Immediate -> fprintf ppf "atomic_set_field_imm"
+        | Pointer -> fprintf ppf "atomic_set_field_ptr")
+  | Patomic_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_exchange_imm"
-        | Pointer -> fprintf ppf "atomic_exchange_ptr")
-  | Patomic_compare_exchange {immediate_or_pointer} ->
+        | Immediate -> fprintf ppf "atomic_exchange_field_imm"
+        | Pointer -> fprintf ppf "atomic_exchange_field_ptr")
+  | Patomic_compare_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_compare_exchange_imm"
-        | Pointer -> fprintf ppf "atomic_compare_exchange_ptr")
-  | Patomic_compare_set {immediate_or_pointer} ->
+        | Immediate -> fprintf ppf "atomic_compare_exchange_field_imm"
+        | Pointer -> fprintf ppf "atomic_compare_exchange_field_ptr")
+  | Patomic_compare_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_compare_set_imm"
-        | Pointer -> fprintf ppf "atomic_compare_set_ptr")
-  | Patomic_fetch_add -> fprintf ppf "atomic_fetch_add"
-  | Patomic_add -> fprintf ppf "atomic_add"
-  | Patomic_sub -> fprintf ppf "atomic_sub"
-  | Patomic_land -> fprintf ppf "atomic_land"
-  | Patomic_lor -> fprintf ppf "atomic_lor"
-  | Patomic_lxor -> fprintf ppf "atomic_lxor"
+        | Immediate -> fprintf ppf "atomic_compare_set_field_imm"
+        | Pointer -> fprintf ppf "atomic_compare_set_field_ptr")
+  | Patomic_fetch_add_field -> fprintf ppf "atomic_fetch_add_field"
+  | Patomic_add_field -> fprintf ppf "atomic_add_field"
+  | Patomic_sub_field -> fprintf ppf "atomic_sub_field"
+  | Patomic_land_field -> fprintf ppf "atomic_land_field"
+  | Patomic_lor_field -> fprintf ppf "atomic_lor_field"
+  | Patomic_lxor_field -> fprintf ppf "atomic_lxor_field"
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
   | Ppoll -> fprintf ppf "poll"
@@ -920,6 +927,8 @@ let primitive ppf = function
   | Pbox_int (bi, m) ->
       fprintf ppf "box_%s%s" (boxed_integer bi) (locality_kind m)
   | Punbox_unit -> fprintf ppf "unbox_unit"
+  | Puntag_int i -> fprintf ppf "untag_%s" (unboxed_integer i)
+  | Ptag_int i -> fprintf ppf "tag_%s" (unboxed_integer i)
   | Punbox_vector bi -> fprintf ppf "unbox_%s" (boxed_vector bi)
   | Pbox_vector (bi, m) ->
       fprintf ppf "box_%s%s" (boxed_vector bi) (locality_kind m)
@@ -1043,72 +1052,72 @@ let name_of_primitive = function
   | Pstring_load_32 _ -> "Pstring_load_32"
   | Pstring_load_f32 _ -> "Pstring_load_f32"
   | Pstring_load_64 _ -> "Pstring_load_64"
-  | Pstring_load_128 _ -> "Pstring_load_128"
+  | Pstring_load_vec _ -> "Pstring_load_vec"
   | Pbytes_load_16 _ -> "Pbytes_load_16"
   | Pbytes_load_32 _ -> "Pbytes_load_32"
   | Pbytes_load_f32 _ -> "Pbytes_load_f32"
   | Pbytes_load_64 _ -> "Pbytes_load_64"
-  | Pbytes_load_128 _ -> "Pbytes_load_128"
+  | Pbytes_load_vec _ -> "Pbytes_load_vec"
   | Pbytes_set_16 _ -> "Pbytes_set_16"
   | Pbytes_set_32 _ -> "Pbytes_set_32"
   | Pbytes_set_f32 _ -> "Pbytes_set_f32"
   | Pbytes_set_64 _ -> "Pbytes_set_64"
-  | Pbytes_set_128 _ -> "Pbytes_set_128"
+  | Pbytes_set_vec _ -> "Pbytes_set_vec"
   | Pbigstring_load_16 _ -> "Pbigstring_load_16"
   | Pbigstring_load_32 _ -> "Pbigstring_load_32"
   | Pbigstring_load_f32 _ -> "Pbigstring_load_f32"
   | Pbigstring_load_64 _ -> "Pbigstring_load_64"
-  | Pbigstring_load_128 _ -> "Pbigstring_load_128"
+  | Pbigstring_load_vec _ -> "Pbigstring_load_vec"
   | Pbigstring_set_16 _ -> "Pbigstring_set_16"
   | Pbigstring_set_32 _ -> "Pbigstring_set_32"
   | Pbigstring_set_f32 _ -> "Pbigstring_set_f32"
   | Pbigstring_set_64 _ -> "Pbigstring_set_64"
-  | Pbigstring_set_128 _ -> "Pbigstring_set_128"
-  | Pfloatarray_load_128 _ -> "Pfloatarray_load_128"
-  | Pfloat_array_load_128 _ -> "Pfloat_array_load_128"
-  | Pint_array_load_128 _ -> "Pint_array_load_128"
-  | Punboxed_float_array_load_128 _ -> "Punboxed_float_array_load_128"
-  | Punboxed_float32_array_load_128 _ -> "Punboxed_float32_array_load_128"
-  | Punboxed_int32_array_load_128 _ -> "Punboxed_int32_array_load_128"
-  | Punboxed_int64_array_load_128 _ -> "Punboxed_int64_array_load_128"
-  | Punboxed_nativeint_array_load_128 _ -> "Punboxed_nativeint_array_load_128"
-  | Pfloatarray_set_128 _ -> "Pfloatarray_set_128"
-  | Pfloat_array_set_128 _ -> "Pfloat_array_set_128"
-  | Pint_array_set_128 _ -> "Pint_array_set_128"
-  | Punboxed_float_array_set_128 _ -> "Punboxed_float_array_set_128"
-  | Punboxed_float32_array_set_128 _ -> "Punboxed_float32_array_set_128"
-  | Punboxed_int32_array_set_128 _ -> "Punboxed_int32_array_set_128"
-  | Punboxed_int64_array_set_128 _ -> "Punboxed_int64_array_set_128"
-  | Punboxed_nativeint_array_set_128 _ -> "Punboxed_nativeint_array_set_128"
+  | Pbigstring_set_vec _ -> "Pbigstring_set_vec"
+  | Pfloatarray_load_vec _ -> "Pfloatarray_load_vec"
+  | Pfloat_array_load_vec _ -> "Pfloat_array_load_vec"
+  | Pint_array_load_vec _ -> "Pint_array_load_vec"
+  | Punboxed_float_array_load_vec _ -> "Punboxed_float_array_load_vec"
+  | Punboxed_float32_array_load_vec _ -> "Punboxed_float32_array_load_vec"
+  | Punboxed_int32_array_load_vec _ -> "Punboxed_int32_array_load_vec"
+  | Punboxed_int64_array_load_vec _ -> "Punboxed_int64_array_load_vec"
+  | Punboxed_nativeint_array_load_vec _ -> "Punboxed_nativeint_array_load_vec"
+  | Pfloatarray_set_vec _ -> "Pfloatarray_set_vec"
+  | Pfloat_array_set_vec _ -> "Pfloat_array_set_vec"
+  | Pint_array_set_vec _ -> "Pint_array_set_vec"
+  | Punboxed_float_array_set_vec _ -> "Punboxed_float_array_set_vec"
+  | Punboxed_float32_array_set_vec _ -> "Punboxed_float32_array_set_vec"
+  | Punboxed_int32_array_set_vec _ -> "Punboxed_int32_array_set_vec"
+  | Punboxed_int64_array_set_vec _ -> "Punboxed_int64_array_set_vec"
+  | Punboxed_nativeint_array_set_vec _ -> "Punboxed_nativeint_array_set_vec"
   | Pbswap16 -> "Pbswap16"
   | Pbbswap _ -> "Pbbswap"
   | Pint_as_pointer _ -> "Pint_as_pointer"
-  | Patomic_load {immediate_or_pointer} ->
+  | Patomic_load_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> "atomic_load_imm"
-        | Pointer -> "atomic_load_ptr")
-  | Patomic_set {immediate_or_pointer} ->
+        | Immediate -> "atomic_load_field_imm"
+        | Pointer -> "atomic_load_field_ptr")
+  | Patomic_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> "atomic_set_imm"
-        | Pointer -> "atomic_set_ptr")
-  | Patomic_exchange {immediate_or_pointer} ->
+        | Immediate -> "atomic_set_field_imm"
+        | Pointer -> "atomic_set_field_ptr")
+  | Patomic_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> "atomic_exchange_imm"
-        | Pointer -> "atomic_exchange_ptr")
-  | Patomic_compare_exchange {immediate_or_pointer} ->
+        | Immediate -> "atomic_exchange_field_imm"
+        | Pointer -> "atomic_exchange_field_ptr")
+  | Patomic_compare_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> "atomic_compare_exchange_imm"
-        | Pointer -> "atomic_compare_exchange_ptr")
-  | Patomic_compare_set {immediate_or_pointer} ->
+        | Immediate -> "atomic_compare_exchange_field_imm"
+        | Pointer -> "atomic_compare_exchange_field_ptr")
+  | Patomic_compare_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> "atomic_compare_set_imm"
-        | Pointer -> "atomic_compare_set_ptr")
-  | Patomic_fetch_add -> "Patomic_fetch_add"
-  | Patomic_add -> "Patomic_add"
-  | Patomic_sub -> "Patomic_sub"
-  | Patomic_land -> "Patomic_land"
-  | Patomic_lor -> "Patomic_lor"
-  | Patomic_lxor -> "Patomic_lxor"
+        | Immediate -> "atomic_compare_set_field_imm"
+        | Pointer -> "atomic_compare_set_field_ptr")
+  | Patomic_fetch_add_field -> "Patomic_fetch_add_field"
+  | Patomic_add_field -> "Patomic_add_field"
+  | Patomic_sub_field -> "Patomic_sub_field"
+  | Patomic_land_field -> "Patomic_land_field"
+  | Patomic_lor_field -> "Patomic_lor_field"
+  | Patomic_lxor_field -> "Patomic_lxor_field"
   | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
   | Prunstack -> "Prunstack"
@@ -1122,6 +1131,8 @@ let name_of_primitive = function
   | Pobj_magic _ -> "Pobj_magic"
   | Punbox_float _ -> "Punbox_float"
   | Pbox_float (_, _) -> "Pbox_float"
+  | Puntag_int _ -> "Puntag_int"
+  | Ptag_int _ -> "Ptag_int"
   | Punbox_int _ -> "Punbox_int"
   | Pbox_int _ -> "Pbox_int"
   | Punbox_unit -> "Punbox_unit"
@@ -1218,6 +1229,10 @@ let apply_kind name pos mode =
   in
   name ^ locality_kind mode
 
+let debug_uid ppf duid =
+  if !Clflags.dump_debug_uids then
+    fprintf ppf "%@{%a}" Shape.Uid.print duid
+
 let rec struct_const ppf = function
   | Const_base(Const_int n) -> fprintf ppf "%i" n
   | Const_base(Const_char c) -> fprintf ppf "%C" c
@@ -1297,11 +1312,12 @@ let rec lam ppf = function
         end
       in
       let rec letbody ~sp = function
-        | Llet(_, k, id, _duid, arg, body)
-        | Lmutlet(k, id, _duid, arg, body) as l ->
+        | Llet(_, k, id, duid, arg, body)
+        | Lmutlet(k, id, duid, arg, body) as l ->
            if sp then fprintf ppf "@ ";
-           fprintf ppf "@[<2>%a =%s%a@ %a@]"
-             Ident.print id (let_kind l) layout k lam arg;
+           fprintf ppf "@[<2>%a%a =%s%a@ %a@]"
+             Ident.print id debug_uid duid (let_kind l) layout_annotation k lam
+             arg;
            letbody ~sp:true body
         | expr -> expr in
       fprintf ppf "@[<2>(let@ @[<hv 1>(";
@@ -1311,9 +1327,12 @@ let rec lam ppf = function
       let bindings ppf id_arg_list =
         let spc = ref false in
         List.iter
-          (fun { id; debug_uid=_; def } ->
+          (fun { id; debug_uid=duid; def } ->
             if !spc then fprintf ppf "@ " else spc := true;
-            fprintf ppf "@[<2>%a@ %a@]" Ident.print id lfunction def)
+            fprintf ppf "@[<2>%a%a@ %a@]"
+              Ident.print id
+              debug_uid duid
+              lfunction def)
           id_arg_list in
       fprintf ppf
         "@[<2>(letrec@ (@[<hv 1>%a@])@ %a)@]" bindings id_arg_list lam body
@@ -1374,14 +1393,16 @@ let rec lam ppf = function
         lam lbody i
         (fun ppf vars ->
            List.iter
-             (fun (x, _duid, k) -> fprintf ppf " %a%a" Ident.print x layout k)
+             (fun (x, duid, k) ->
+                fprintf ppf " %a%a%a" Ident.print x debug_uid duid
+                  layout_annotation k)
              vars
         )
         vars
         excl lam lhandler
-  | Ltrywith(lbody, param, _duid, lhandler, _kind) ->
-      fprintf ppf "@[<2>(try@ %a@;<1 -1>with %a@ %a)@]"
-        lam lbody Ident.print param lam lhandler
+  | Ltrywith(lbody, param, duid, lhandler, _kind) ->
+      fprintf ppf "@[<2>(try@ %a@;<1 -1>with %a%a@ %a)@]"
+        lam lbody Ident.print param debug_uid duid lam lhandler
   | Lifthenelse(lcond, lif, lelse, _kind) ->
       fprintf ppf "@[<2>(if@ %a@ %a@ %a)@]" lam lcond lam lif lam lelse
   | Lsequence(l1, l2) ->
@@ -1389,9 +1410,10 @@ let rec lam ppf = function
   | Lwhile {wh_cond; wh_body} ->
       fprintf ppf "@[<2>(while@ %a@ %a)@]"
         lam wh_cond lam wh_body
-  | Lfor {for_id; for_loc = _; for_from; for_to; for_dir; for_body} ->
-      fprintf ppf "@[<2>(for %a@ %a@ %s@ %a@ %a)@]"
-       Ident.print for_id lam for_from
+  | Lfor {for_id; for_debug_uid; for_loc = _;
+          for_from; for_to; for_dir; for_body} ->
+      fprintf ppf "@[<2>(for %a%a@ %a@ %s@ %a@ %a)@]"
+       Ident.print for_id debug_uid for_debug_uid lam for_from
        (match for_dir with Upto -> "to" | Downto -> "downto")
        lam for_to lam for_body
   | Lassign(id, expr) ->
@@ -1450,8 +1472,9 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
         fprintf ppf "@ {nlocal = %d}" nlocal;
         List.iter (fun (p : Lambda.lparam) ->
             let { unbox_param } = p.attributes in
-            fprintf ppf "@ %a%s%a%s"
-              Ident.print p.name (locality_kind p.mode) layout p.layout
+            fprintf ppf "@ %a%a%s%a%s"
+              Ident.print p.name debug_uid p.debug_uid (locality_kind p.mode)
+              layout_annotation p.layout
               (if unbox_param then "[@unboxable]" else "")
           ) params
     | Tupled ->
@@ -1462,8 +1485,9 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
              let { unbox_param } = p.attributes in
              if !first then first := false else fprintf ppf ",@ ";
              Ident.print ppf p.name;
+             debug_uid ppf p.debug_uid;
              Format.fprintf ppf "%s" (locality_kind p.mode);
-             layout ppf p.layout;
+             layout_annotation ppf p.layout;
              if unbox_param then Format.fprintf ppf "[@unboxable]"
           )
           params;
@@ -1478,9 +1502,3 @@ let structured_constant = struct_const
 let lambda = lam
 
 let program ppf { code } = lambda ppf code
-
-let value_kind' = value_kind value_kind_non_null'
-
-let value_kind = value_kind value_kind_non_null
-
-let variant_kind = variant_kind ""

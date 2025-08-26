@@ -262,8 +262,11 @@ let create_coerced_singleton_let uacc var defining_expr
     | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> (
       let uncoerced_var =
         let name = "uncoerced_" ^ Variable.unique_name (VB.var var) in
-        Variable.create name
+        Variable.create name (Variable.kind (VB.var var))
       in
+      let uncoerced_var_duid = Flambda_debug_uid.none in
+      (* CR sspies: In the future, try propagating the debugging UID information
+         here if possible. *)
       (* Generate [let var = uncoerced_var @ <coercion>] *)
       let ((body, uacc, inner_result) as inner) =
         let defining_simple =
@@ -284,7 +287,8 @@ let create_coerced_singleton_let uacc var defining_expr
         (* Generate [let uncoerced_var = <defining_expr>] *)
         let ((_body, _uacc, outer_result) as outer) =
           let bound =
-            Bound_pattern.singleton (VB.create uncoerced_var name_mode)
+            Bound_pattern.singleton
+              (VB.create uncoerced_var uncoerced_var_duid name_mode)
           in
           create_let uacc bound defining_expr ~free_names_of_defining_expr ~body
             ~cost_metrics_of_defining_expr
@@ -536,8 +540,8 @@ let create_let_symbols uacc lifted_constant ~body =
                 | Naked_number Naked_float -> Naked_floats { size = Unknown }
                 | Naked_number
                     ( Naked_float32 | Naked_immediate | Naked_nativeint
-                    | Naked_int32 | Naked_vec128 | Naked_vec256 | Naked_vec512
-                    | Naked_int64 )
+                    | Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec128
+                    | Naked_vec256 | Naked_vec512 | Naked_int64 )
                 | Region | Rec_info ->
                   Misc.fatal_errorf
                     "Unexpected kind %a for symbol projection: %a"
@@ -569,7 +573,7 @@ let create_let_symbols uacc lifted_constant ~body =
       let free_names_of_defining_expr = Named.free_names defining_expr in
       let expr, uacc, _ =
         create_coerced_singleton_let uacc
-          (VB.create var Name_mode.normal)
+          (VB.create var Flambda_debug_uid.none Name_mode.normal)
           defining_expr ~coercion_from_defining_expr_to_var
           ~free_names_of_defining_expr ~body:expr ~cost_metrics_of_defining_expr
       in
@@ -817,11 +821,13 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
          binds [kinded_params]. *)
       let params =
         List.map
-          (fun _kind -> Variable.create "param")
+          (fun kind ->
+            let param_var =
+              Variable.create "param" (Flambda_kind.With_subkind.kind kind)
+            in
+            let param_var_duid = Flambda_debug_uid.none in
+            BP.create param_var kind param_var_duid)
           (Flambda_arity.unarized_components arity)
-      in
-      let params =
-        List.map2 BP.create params (Flambda_arity.unarized_components arity)
       in
       let args = List.map BP.simple params in
       let params = Bound_parameters.create params in

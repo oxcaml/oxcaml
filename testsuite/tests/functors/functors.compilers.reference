@@ -4,24 +4,28 @@
        (function {nlocal = 0} X is_a_functor always_inline never_loop
          (let
            (cow =
-              (function {nlocal = 0} x[int] : int (apply (field_imm 0 X) x))
-            sheep = (function {nlocal = 0} x[int] : int (+ 1 (apply cow x))))
+              (function {nlocal = 0} x[value<int>] : int
+                (apply (field_imm 0 X) x))
+            sheep =
+              (function {nlocal = 0} x[value<int>] : int (+ 1 (apply cow x))))
            (makeblock 0 cow sheep)))
      F =
        (function {nlocal = 0} X Y is_a_functor always_inline never_loop
          (let
            (cow =
-              (function {nlocal = 0} x[int] : int
+              (function {nlocal = 0} x[value<int>] : int
                 (apply (field_imm 0 Y) (apply (field_imm 0 X) x)))
-            sheep = (function {nlocal = 0} x[int] : int (+ 1 (apply cow x))))
+            sheep =
+              (function {nlocal = 0} x[value<int>] : int (+ 1 (apply cow x))))
            (makeblock 0 cow sheep)))
      F1 =
        (function {nlocal = 0} X Y is_a_functor always_inline never_loop
          (let
            (cow =
-              (function {nlocal = 0} x[int] : int
+              (function {nlocal = 0} x[value<int>] : int
                 (apply (field_imm 0 Y) (apply (field_imm 0 X) x)))
-            sheep = (function {nlocal = 0} x[int] : int (+ 1 (apply cow x))))
+            sheep =
+              (function {nlocal = 0} x[value<int>] : int (+ 1 (apply cow x))))
            (makeblock 0 sheep)))
      F2 =
        (function {nlocal = 0} X Y is_a_functor always_inline never_loop
@@ -29,9 +33,10 @@
            (X =a (makeblock 0 (field_imm 1 X))
             Y =a (makeblock 0 (field_imm 1 Y))
             cow =
-              (function {nlocal = 0} x[int] : int
+              (function {nlocal = 0} x[value<int>] : int
                 (apply (field_imm 0 Y) (apply (field_imm 0 X) x)))
-            sheep = (function {nlocal = 0} x[int] : int (+ 1 (apply cow x))))
+            sheep =
+              (function {nlocal = 0} x[value<int>] : int (+ 1 (apply cow x))))
            (makeblock 0 sheep)))
      M =
        (let
@@ -39,10 +44,11 @@
             (function {nlocal = 0} X Y is_a_functor always_inline never_loop
               (let
                 (cow =
-                   (function {nlocal = 0} x[int] : int
+                   (function {nlocal = 0} x[value<int>] : int
                      (apply (field_imm 0 Y) (apply (field_imm 0 X) x)))
                  sheep =
-                   (function {nlocal = 0} x[int] : int (+ 1 (apply cow x))))
+                   (function {nlocal = 0} x[value<int>] : int
+                     (+ 1 (apply cow x))))
                 (makeblock 0 cow sheep))))
          (makeblock 0
            (function {nlocal = 0} funarg funarg is_a_functor stub

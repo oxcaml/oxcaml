@@ -6,4 +6,4 @@ File "test_assume_on_call.ml", line 3, characters 5-15:
 Error: Annotation check for zero_alloc failed on function Test_assume_on_call.test1 (camlTest_assume_on_call.test1_HIDE_STAMP).
 
 File "test_assume_on_call.ml", line 3, characters 27-48:
-Error: allocation of 24 bytes (test_assume_on_call.ml:3,27--48;test_assume_on_call.ml:1,28--32)
+Error: allocation of 24 bytes (test_assume_on_call.ml:1,28--32;test_assume_on_call.ml:3,27--48)

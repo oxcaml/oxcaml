@@ -20,7 +20,13 @@ open Parsetree
 
 module String = Misc.Stdlib.String
 
-type unboxed_integer =  Unboxed_int64 | Unboxed_nativeint | Unboxed_int32
+type unboxed_integer =
+  | Unboxed_int64
+  | Unboxed_nativeint
+  | Unboxed_int32
+  | Unboxed_int16
+  | Unboxed_int8
+
 type unboxed_float = Unboxed_float64 | Unboxed_float32
 type unboxed_vector = Unboxed_vec128 | Unboxed_vec256 | Unboxed_vec512
 
@@ -33,7 +39,7 @@ type native_repr =
   | Same_as_ocaml_repr of Jkind_types.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
-  | Unboxed_integer of boxed_integer
+  | Unboxed_integer of unboxed_integer
   | Untagged_immediate
 
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
@@ -350,7 +356,10 @@ let unboxed_vector = function
    comparison at no performance loss. We still match on the variants to prove here that
    they are all constant constructors. *)
 let equal_unboxed_integer
-      ((Unboxed_int32 | Unboxed_nativeint | Unboxed_int64) as i1) i2 = i1 = i2
+      ((Unboxed_int8 | Unboxed_int16 | Unboxed_int32 | Unboxed_nativeint
+       | Unboxed_int64) as i1) i2
+  =
+  i1 = i2
 let equal_unboxed_float
       ((Unboxed_float32 | Unboxed_float64) as f1) f2 = f1 = f2
 let compare_unboxed_float
@@ -403,7 +412,7 @@ let equal_native_repr nr1 nr2 =
   | Unboxed_vector _,
     (Same_as_ocaml_repr _ | Unboxed_float _ | Untagged_immediate |
      Unboxed_integer _) -> false
-  | Unboxed_integer bi1, Unboxed_integer bi2 -> equal_boxed_integer bi1 bi2
+  | Unboxed_integer bi1, Unboxed_integer bi2 -> equal_unboxed_integer bi1 bi2
   | Unboxed_integer _,
     (Same_as_ocaml_repr _ | Unboxed_float _ | Untagged_immediate |
      Unboxed_vector _) -> false
@@ -524,6 +533,7 @@ let prim_has_valid_reprs ~loc prim =
   let module C = Jkind_types.Sort.Const in
 
   let check =
+    (* Corresponds to [indexing_primitives] in [translprim.ml]. *)
     let stringlike_indexing_primitives =
       let widths : (_ * _ * Jkind_types.Sort.Const.t) list =
         [
@@ -533,6 +543,10 @@ let prim_has_valid_reprs ~loc prim =
           ("64", "", C.value);
           ("a128", "", C.value);
           ("u128", "", C.value);
+          ("a256", "", C.value);
+          ("u256", "", C.value);
+          ("a512", "", C.value);
+          ("u512", "", C.value);
           ("32", "#", C.bits32);
           ("f32", "#", C.float32);
           ("64", "#", C.bits64);
@@ -582,6 +596,67 @@ let prim_has_valid_reprs ~loc prim =
            index_sigil
        in
        let reprs = combine_repr index_kind width_kind in
+       [ (string, reprs) ])
+      |> List.to_seq
+      |> fun seq -> String.Map.add_seq seq String.Map.empty
+    in
+    (* Corresponds to [array_vec_primitives] in [translprim.ml]. *)
+    let vector_array_indexing_primitives =
+      let vector_sizes = [
+        ("128", "", C.value);
+        ("128", "#", C.vec128);
+        ("256", "", C.value);
+        ("256", "#", C.vec256);
+        ("512", "", C.value);
+        ("512", "#", C.vec512);
+      ] in
+      let array_types = [
+        "float_array";
+        "floatarray";
+        "unboxed_float_array";
+        "unboxed_float32_array";
+        "int_array";
+        "unboxed_int64_array";
+        "unboxed_int32_array";
+        "unboxed_nativeint_array";
+      ] in
+      let safe_sigils = [""; "u"] in
+      let indices = [
+        ("", C.value);
+        ("_indexed_by_nativeint#", C.word);
+        ("_indexed_by_int32#", C.bits32);
+        ("_indexed_by_int64#", C.bits64);
+      ] in
+      let combiners =
+        [
+          ( Printf.sprintf "%%caml_%s_get%s%s%s%s",
+            fun index_kind vector_kind ->
+              [
+                Same_as_ocaml_repr C.value;
+                Same_as_ocaml_repr index_kind;
+                Same_as_ocaml_repr vector_kind;
+              ] );
+          ( Printf.sprintf "%%caml_%s_set%s%s%s%s",
+            fun index_kind vector_kind ->
+              [
+                Same_as_ocaml_repr C.value;
+                Same_as_ocaml_repr index_kind;
+                Same_as_ocaml_repr vector_kind;
+                Same_as_ocaml_repr C.value;
+              ] );
+        ]
+      in
+      (let ( let* ) x f = List.concat_map f x in
+       let* array_type = array_types in
+       let* safe_sigil = safe_sigils in
+       let* size_str, unboxed_sigil, vector_kind = vector_sizes in
+       let* index_suffix, index_kind = indices in
+       let* combine_string, combine_repr = combiners in
+       let string =
+         combine_string array_type size_str safe_sigil unboxed_sigil
+           index_suffix
+       in
+       let reprs = combine_repr index_kind vector_kind in
        [ (string, reprs) ])
       |> List.to_seq
       |> fun seq -> String.Map.add_seq seq String.Map.empty
@@ -734,6 +809,14 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.word; Same_as_ocaml_repr C.value]
     | "%unbox_nativeint" ->
       exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.word]
+    | "%tag_int8" ->
+      exactly [Same_as_ocaml_repr C.bits8; Same_as_ocaml_repr C.value]
+    | "%untag_int8" ->
+      exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.bits8]
+    | "%tag_int16" ->
+      exactly [Same_as_ocaml_repr C.bits16; Same_as_ocaml_repr C.value]
+    | "%untag_int16" ->
+      exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.bits16]
     | "%box_int32" ->
       exactly [Same_as_ocaml_repr C.bits32; Same_as_ocaml_repr C.value]
     | "%unbox_int32" ->
@@ -762,54 +845,23 @@ let prim_has_valid_reprs ~loc prim =
     | "%reinterpret_unboxed_int64_as_tagged_int63" ->
       exactly [Same_as_ocaml_repr C.bits64; Same_as_ocaml_repr C.value]
 
-    | "%caml_float_array_get128#"
-    | "%caml_float_array_get128u#"
-    | "%caml_floatarray_get128#"
-    | "%caml_floatarray_get128u#"
-    | "%caml_unboxed_float_array_get128#"
-    | "%caml_unboxed_float_array_get128u#"
-    | "%caml_unboxed_float32_array_get128#"
-    | "%caml_unboxed_float32_array_get128u#"
-    | "%caml_int_array_get128#"
-    | "%caml_int_array_get128u#"
-    | "%caml_unboxed_int64_array_get128#"
-    | "%caml_unboxed_int64_array_get128u#"
-    | "%caml_unboxed_int32_array_get128#"
-    | "%caml_unboxed_int32_array_get128u#"
-    | "%caml_unboxed_nativeint_array_get128#"
-    | "%caml_unboxed_nativeint_array_get128u#" ->
-      exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.vec128]
-    | "%caml_float_array_set128#"
-    | "%caml_float_array_set128u#"
-    | "%caml_floatarray_set128#"
-    | "%caml_floatarray_set128u#"
-    | "%caml_unboxed_float_array_set128#"
-    | "%caml_unboxed_float_array_set128u#"
-    | "%caml_unboxed_float32_array_set128#"
-    | "%caml_unboxed_float32_array_set128u#"
-    | "%caml_int_array_set128#"
-    | "%caml_int_array_set128u#"
-    | "%caml_unboxed_int64_array_set128#"
-    | "%caml_unboxed_int64_array_set128u#"
-    | "%caml_unboxed_int32_array_set128#"
-    | "%caml_unboxed_int32_array_set128u#"
-    | "%caml_unboxed_nativeint_array_set128#"
-    | "%caml_unboxed_nativeint_array_set128u#" ->
-      exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.vec128; Same_as_ocaml_repr C.value]
-
     | name -> (
         match String.Map.find_opt name stringlike_indexing_primitives with
         | Some reprs -> exactly reprs
         | None ->
-            if is_builtin_prim_name name then no_non_value_repr
-              (* These can probably support non-value reprs if the need arises:
-                 {|
-                   | "%send"
-                   | "%sendself"
-                   | "%sendcache"
-                 |}
-              *)
-            else check_c_stub)
+            match String.Map.find_opt name vector_array_indexing_primitives with
+            | Some reprs -> exactly reprs
+            | None ->
+                if is_builtin_prim_name name then no_non_value_repr
+                  (* These can probably support non-value reprs if the need
+                     arises:
+                     {|
+                       | "%send"
+                       | "%sendself"
+                       | "%sendcache"
+                     |}
+                  *)
+                else check_c_stub)
   in
   match check prim with
   | Success -> ()

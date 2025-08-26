@@ -22,6 +22,8 @@ end
 
 val of_descr : Descr.t -> t
 
+val is_null : t -> bool
+
 val is_naked_immediate : t -> Targetint_31_63.t option
 
 val is_tagged_immediate : t -> Targetint_31_63.t option

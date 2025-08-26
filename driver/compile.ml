@@ -46,6 +46,8 @@ let raw_lambda_to_bytecode i raw_lambda ~as_arg_for =
            arg_block_idx } ->
        Builtin_attributes.warn_unused ();
        lambda
+       |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
+          (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
        |> Simplif.simplify_lambda
        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda

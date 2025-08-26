@@ -88,11 +88,12 @@ type t =
     (* CR-someday gyorsh: compute locally. *)
     fun_num_stack_slots : int Stack_class.Tbl.t;
     fun_poll : Lambda.poll_attribute;
-    next_instruction_id : InstructionId.sequence
+    next_instruction_id : InstructionId.sequence;
+    fun_ret_type : Cmm.machtype
   }
 
 let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
-    ~fun_num_stack_slots ~fun_poll ~next_instruction_id =
+    ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type =
   { fun_name;
     fun_args;
     fun_codegen_options;
@@ -104,7 +105,8 @@ let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     fun_contains_calls;
     fun_num_stack_slots;
     fun_poll;
-    next_instruction_id
+    next_instruction_id;
+    fun_ret_type
   }
 
 let mem_block t label = Label.Tbl.mem t.blocks label

@@ -63,6 +63,7 @@ type zero_alloc_checker_join =
   | Widen of int  (* n > 0 *)
   | Error of int (* n > 0 *)
 
+let zero_alloc_checker_details_extra = ref false
 let default_zero_alloc_checker_join = Widen 100
 let zero_alloc_checker_join = ref default_zero_alloc_checker_join
                               (* -zero-alloc-checker-join n *)
@@ -123,6 +124,14 @@ let flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 =
   | Set Oclassic -> oclassic
   | Set O2 -> o2
   | Set O3 -> o3
+
+  (* -llvm-backend is at [Clflags.llvm_backend] *)
+
+let dump_llvmir = ref false (* -dllvmir *)
+
+let keep_llvmir = ref false (* -keep-llvmir *)
+
+let llvm_path = ref None (* -llvm-path *)
 
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
