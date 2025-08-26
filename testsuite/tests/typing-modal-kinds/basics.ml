@@ -298,7 +298,7 @@ let hidden_string_duplicate =
 Line 2, characters 71-72:
 2 |   let once_ x : Hidden_string.t = Hidden_string.hide "hello" in Fun.id x
                                                                            ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let hidden_int_duplicate =
@@ -317,7 +317,7 @@ let hidden_string_list_duplicate =
 Line 4, characters 12-13:
 4 |   in Fun.id x
                 ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let hidden_int_list_duplicate =
@@ -381,7 +381,7 @@ let function_duplicate = let once_ x : int -> int = fun y -> y in Fun.id x
 Line 1, characters 73-74:
 1 | let function_duplicate = let once_ x : int -> int = fun y -> y in Fun.id x
                                                                              ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let function_list_duplicate =
@@ -391,7 +391,7 @@ let function_list_duplicate =
 Line 2, characters 77-78:
 2 |   let once_ x : (int -> int) list = [(fun y -> y); fun z -> z + 1] in Fun.id x
                                                                                  ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let unique (unique_ x) = x
@@ -462,7 +462,7 @@ let hidden_string_unshare =
 Line 2, characters 75-76:
 2 |   let x : Hidden_string.t = Hidden_string.hide "hello" in ignore x; unique x
                                                                                ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let hidden_int_unshare =
@@ -489,7 +489,7 @@ let hidden_string_list_unshare =
 Line 4, characters 22-23:
 4 |   in ignore x; unique x
                           ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let hidden_int_list_unshare =
@@ -681,7 +681,7 @@ let ref_immutable_data_right x =
 Line 2, characters 30-53:
 2 |   take_strong_immutable_data (weaken_immutable_data x : float ref);
                                   ^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let ref_immutable_data_left x =
@@ -691,7 +691,7 @@ let ref_immutable_data_left x =
 Line 3, characters 29-30:
 3 |   take_strong_immutable_data x
                                  ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let float_immutable_data_right x =

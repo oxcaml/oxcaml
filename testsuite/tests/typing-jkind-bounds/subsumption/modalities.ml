@@ -473,5 +473,5 @@ val r' : int ref = {contents = 0}
 Line 2, characters 16-18:
 2 | fork (fun () -> r' := 1);;
                     ^^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
