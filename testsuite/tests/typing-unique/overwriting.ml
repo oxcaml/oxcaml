@@ -80,7 +80,7 @@ let gc_soundness_bug (local_ unique_ r) (local_ x) =
 Line 2, characters 31-32:
 2 |   exclave_ overwrite_ r with { x }
                                    ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let disallowed_by_locality (local_ unique_ r) (local_ x) =
@@ -89,7 +89,7 @@ let disallowed_by_locality (local_ unique_ r) (local_ x) =
 Line 2, characters 22-23:
 2 |   overwrite_ r with { x }
                           ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let gc_soundness_bug (unique_ r) (local_ x) =
@@ -98,7 +98,7 @@ let gc_soundness_bug (unique_ r) (local_ x) =
 Line 2, characters 31-32:
 2 |   exclave_ overwrite_ r with { x }
                                    ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let disallowed_by_locality (unique_ r) (local_ x) =
@@ -107,7 +107,7 @@ let disallowed_by_locality (unique_ r) (local_ x) =
 Line 2, characters 22-23:
 2 |   overwrite_ r with { x }
                           ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let gc_soundness_no_bug (local_ unique_ r) x =
@@ -176,7 +176,7 @@ let disallowed_by_regionality (local_ unique_ r) x =
 Line 3, characters 16-17:
 3 |   let ref = ref r in
                     ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let gc_soundness_no_bug (unique_ r) x =

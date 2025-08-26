@@ -55,7 +55,7 @@ end
 Line 2, characters 12-33:
 2 |     val x = ("world" : _ @ local)
                 ^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* instance variables are available as legacy to methods *)
@@ -81,7 +81,7 @@ end
 Line 4, characters 22-43:
 4 |     method foo = x <- ("world" : _ @ local)
                           ^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 class cla = object

@@ -64,7 +64,7 @@ let f e0 (e1 @ local) =
 Line 3, characters 42-44:
 3 |     | x0, x1 -> use_global x0; use_global x1; ()
                                               ^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f e0 (e1 @ local) =
@@ -74,7 +74,7 @@ let f e0 (e1 @ local) =
 Line 3, characters 45-47:
 3 |     | #(x0, x1) -> use_global x0; use_global x1; ()
                                                  ^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f e0 (e1 @ local) =
@@ -85,7 +85,7 @@ let f e0 (e1 @ local) =
 Line 4, characters 22-23:
 4 |     | x -> use_global x; ()
                           ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f e0 (e1 @ local) =
@@ -96,7 +96,7 @@ let f e0 (e1 @ local) =
 Line 4, characters 30-31:
 4 |     | x -> use_global_product x; ()
                                   ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 
@@ -148,7 +148,7 @@ let f b e0 (e1 @ local) (e @ local)=
 Line 3, characters 27-29:
 3 |     | x0, x1 -> use_global x0; use_local x1; ()
                                ^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f b e0 (e1 @ local) (e @ local)=
@@ -158,7 +158,7 @@ let f b e0 (e1 @ local) (e @ local)=
 Line 3, characters 30-32:
 3 |     | #(x0, x1) -> use_global x0; use_local x1; ()
                                   ^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f b e0 (e1 @ local) e2 e3 =
@@ -182,7 +182,7 @@ let f b e0 (e1 @ local) e2 e3 =
 Line 3, characters 42-44:
 3 |     | x0, x1 -> use_global x0; use_global x1; ()
                                               ^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f b e0 (e1 @ local) e2 e3 =
@@ -192,7 +192,7 @@ let f b e0 (e1 @ local) e2 e3 =
 Line 3, characters 45-47:
 3 |     | #(x0, x1) -> use_global x0; use_global x1; ()
                                                  ^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* An unboxed tuple is not an allocation, but a regular tuple is *)

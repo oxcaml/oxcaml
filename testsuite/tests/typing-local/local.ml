@@ -358,7 +358,7 @@ let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
 Line 1, characters 47-48:
 1 | let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
                                                    ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let etajoin p (f : ?b:bool -> unit -> int) (local_ g : unit -> int) =
@@ -386,7 +386,7 @@ let foo ?(local_ x = local_ "hello") () = x;;
 Line 1, characters 21-35:
 1 | let foo ?(local_ x = local_ "hello") () = x;;
                          ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo ?(local_ x = local_ "hello") () = local_ x;;
@@ -394,7 +394,7 @@ let foo ?(local_ x = local_ "hello") () = local_ x;;
 Line 1, characters 21-35:
 1 | let foo ?(local_ x = local_ "hello") () = local_ x;;
                          ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (*
@@ -418,7 +418,7 @@ let heap_closure () =
 Line 10, characters 24-26:
 10 |   let _force_heap = ref fn in
                              ^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let local_closure () =
@@ -446,7 +446,7 @@ let toplevel_stack = local_ {contents=42}
 Line 1, characters 21-41:
 1 | let toplevel_stack = local_ {contents=42}
                          ^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 module M = struct
@@ -461,7 +461,7 @@ let _ = local_ {contents=42}
 Line 1, characters 8-28:
 1 | let _ = local_ {contents=42}
             ^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 
@@ -528,7 +528,7 @@ let leak_id =
 Line 2, characters 24-25:
 2 |   use_locally (fun x -> x) 42
                             ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let leak_ref =
@@ -539,7 +539,7 @@ let leak_ref =
 Line 3, characters 43-44:
 3 |   use_locally (fun x -> r.contents <- Some x; x) 42
                                                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let leak_ref_2 =
@@ -559,7 +559,7 @@ let leak_ref_3 =
 Line 3, characters 64-65:
 3 |   use_locally' (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
                                                                     ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 
@@ -576,7 +576,7 @@ let do_leak_exn =
 Line 2, characters 66-67:
 2 |   use_locally (fun x -> let _exn = local_ raise (Invalid_argument x) in "bluh") "blah"
                                                                       ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* handled exceptions are known to be global *)
@@ -813,7 +813,7 @@ let foo (local_ x) =
 Line 4, characters 10-11:
 4 |       let y = x in
               ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -923,7 +923,7 @@ let foo (local_ x) =
 Line 3, characters 14-15:
 3 |   let rec g = x :: g in
                   ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* Cannot pass local values to tail calls *)
@@ -1239,7 +1239,7 @@ let foo (local_ mut) =
 Line 2, characters 12-15:
 2 |   let _ = { mut } in
                 ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1249,7 +1249,7 @@ let foo () =
 Line 3, characters 12-15:
 3 |   let _ = { mut } in
                 ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 let foo (local_ gbl) =
   let _ = { gbl } in
@@ -1258,7 +1258,7 @@ let foo (local_ gbl) =
 Line 2, characters 12-15:
 2 |   let _ = { gbl } in
                 ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1268,7 +1268,7 @@ let foo () =
 Line 3, characters 12-15:
 3 |   let _ = { gbl } in
                 ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* Implicit records version of the same test *)
@@ -1367,7 +1367,7 @@ let foo (local_ mut) =
 Line 2, characters 13-16:
 2 |   let _ = #{ mut } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1377,7 +1377,7 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ mut } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in
@@ -1386,7 +1386,7 @@ let foo (local_ gbl) =
 Line 2, characters 13-16:
 2 |   let _ = #{ gbl } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1396,7 +1396,7 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ gbl } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* Unboxed records version of the same test *)
@@ -1436,7 +1436,7 @@ let foo (local_ gbl) =
 Line 2, characters 13-16:
 2 |   let _ = #{ gbl } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1446,7 +1446,7 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ gbl } in
                  ^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* Global fields are preserved in module inclusion *)
@@ -1974,7 +1974,7 @@ external strange_and : bool -> 'a option -> 'a option = "%sequand"
 Line 5, characters 19-20:
 5 |   strange_and true x
                        ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* mode-crossing using unary + *)
@@ -2432,7 +2432,7 @@ let f (local_ s : string) =
 Line 2, characters 8-9:
 2 |   GFoo (s, "bar")
             ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f =
@@ -2442,7 +2442,7 @@ let f =
 Line 3, characters 8-9:
 3 |   GFoo (s, "bar")
             ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* s' extracted from x as global *)
@@ -2488,7 +2488,7 @@ let f (local_ x : gfoo) =
 Line 3, characters 24-26:
 3 |   | GFoo (_, s') -> ref s'
                             ^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* Test of array.*)
@@ -2503,7 +2503,7 @@ let f (local_ x : string) = ref [: x; "foo" :]
 Line 1, characters 35-36:
 1 | let f (local_ x : string) = ref [: x; "foo" :]
                                        ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* constructing local iarray from local elements is fine *)
@@ -2527,7 +2527,7 @@ let f (local_ a : string iarray) =
 Line 3, characters 22-23:
 3 |   | [: x; _ :] -> ref x
                           ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* a test that was passing type check *)
@@ -2569,7 +2569,7 @@ let f (local_ x : string) = exclave_ [| x |]
 Line 1, characters 40-41:
 1 | let f (local_ x : string) = exclave_ [| x |]
                                             ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* constructing local array from global elements is allowed *)

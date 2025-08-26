@@ -28,7 +28,7 @@ let foo () =
 Line 2, characters 13-27:
 2 |     let* a = local_ "hello" in
                  ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo () =
@@ -39,7 +39,7 @@ let foo () =
 Line 3, characters 13-27:
 3 |     and* b = local_ "hello" in
                  ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* Bindings are avialable as legacy *)
@@ -76,7 +76,7 @@ let foo () =
 Line 4, characters 8-22:
 4 |         local_ "hello"
             ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* The whole letop is available as legacy *)
