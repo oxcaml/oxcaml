@@ -500,6 +500,181 @@ let incr_int c dbg = add_const c 1 dbg
 
 let decr_int c dbg = add_const c (-1) dbg
 
+(* Bit windowing operations *)
+
+let make_bitwindow ~dbg ~input_low ~input_high ~output_low ~sign_extend
+    ~low_bits arg =
+  Cop
+    ( Cbitwindow { input_low; input_high; output_low; sign_extend; low_bits },
+      [arg],
+      dbg )
+
+(* Convert shifts to bit windows when possible *)
+let shift_to_bitwindow op _arg shift_amount =
+  match op with
+  | Clsl when shift_amount >= 0 && shift_amount < 64 ->
+    Some
+      (Cbitwindow
+         { input_low = 0;
+           input_high = 64 - shift_amount;
+           output_low = shift_amount;
+           sign_extend = 64;
+           low_bits = 0n
+         })
+  | Clsr when shift_amount >= 0 && shift_amount < 64 ->
+    Some
+      (Cbitwindow
+         { input_low = shift_amount;
+           input_high = 64;
+           output_low = 0;
+           sign_extend = 64 - shift_amount;
+           low_bits = 0n
+         })
+  | Casr when shift_amount >= 0 && shift_amount < 64 ->
+    Some
+      (Cbitwindow
+         { input_low = shift_amount;
+           input_high = 64;
+           output_low = 0;
+           sign_extend = 64;
+           low_bits = 0n
+         })
+  | _ -> None
+
+let bitwindow_of_shift = function
+  | Clsl ->
+    Some
+      (Cbitwindow
+         { input_low = 0;
+           input_high = 64;
+           output_low = 0;
+           (* Will be adjusted based on shift amount *)
+           sign_extend = 64;
+           low_bits = 0n
+         })
+  | Clsr ->
+    Some
+      (Cbitwindow
+         { input_low = 0;
+           (* Will be adjusted based on shift amount *)
+           input_high = 64;
+           output_low = 0;
+           sign_extend = 64;
+           (* No sign extension for logical shift *)
+           low_bits = 0n
+         })
+  | Casr ->
+    Some
+      (Cbitwindow
+         { input_low = 0;
+           (* Will be adjusted based on shift amount *)
+           input_high = 64;
+           output_low = 0;
+           sign_extend = 64;
+           (* Sign extension enabled *)
+           low_bits = 0n
+         })
+  | _ -> None
+
+let compose_bitwindow ~inner ~outer =
+  match inner, outer with
+  | Cbitwindow w1, Cbitwindow w2 ->
+    (* Compose two bit windows using the algorithm from the document *)
+    let d1 = w1.output_low - w1.input_low in
+    let d2 = w2.output_low - w2.input_low in
+    let i = max w1.input_low (w2.input_low - d1) in
+    let j = min w1.input_high (w2.input_high - d1) in
+    let k = max (w1.output_low + d2) w2.output_low in
+    let s =
+      if w2.input_high <= w1.sign_extend
+      then w2.sign_extend
+      else w1.sign_extend + d2
+    in
+    (* Evaluate w2 on w1's low_bits to get the composed low_bits *)
+    let eval_window ~input_low ~input_high ~output_low ~sign_extend ~low_bits
+        value =
+      (* Extract bits from [input_low:input_high) of value *)
+      let extracted =
+        if input_low = 0
+        then value
+        else Nativeint.shift_right_logical value input_low
+      in
+      let width = input_high - input_low in
+      let mask =
+        if width >= 64
+        then Nativeint.minus_one
+        else Nativeint.pred (Nativeint.shift_left Nativeint.one width)
+      in
+      let windowed = Nativeint.logand extracted mask in
+      (* Shift to output position *)
+      let positioned =
+        if output_low = 0
+        then windowed
+        else Nativeint.shift_left windowed output_low
+      in
+      (* Sign extend if needed *)
+      let sign_extended =
+        if sign_extend = output_low + width || width = 0
+        then positioned (* No sign extension *)
+        else
+          (* Check if the top bit of the window is set *)
+          let sign_bit = output_low + width - 1 in
+          if sign_bit < 63
+             && Nativeint.logand positioned
+                  (Nativeint.shift_left Nativeint.one sign_bit)
+                <> Nativeint.zero
+          then
+            (* Sign extend from sign_bit to sign_extend *)
+            let sign_mask =
+              if sign_extend >= 64
+              then Nativeint.minus_one
+              else
+                Nativeint.pred (Nativeint.shift_left Nativeint.one sign_extend)
+            in
+            let extend_mask =
+              Nativeint.logxor sign_mask
+                (Nativeint.pred (Nativeint.shift_left Nativeint.one sign_bit))
+            in
+            Nativeint.logor positioned extend_mask
+          else positioned
+      in
+      (* Add low_bits *)
+      Nativeint.logor sign_extended low_bits
+    in
+    let composed_low_bits =
+      eval_window ~input_low:w2.input_low ~input_high:w2.input_high
+        ~output_low:w2.output_low ~sign_extend:w2.sign_extend
+        ~low_bits:w2.low_bits w1.low_bits
+    in
+    (* Check if windows overlap *)
+    if i < j
+    then
+      Some
+        (Cbitwindow
+           { input_low = i;
+             input_high = j;
+             output_low = k;
+             sign_extend = s;
+             low_bits = composed_low_bits
+           })
+    else if w2.input_low < w1.sign_extend && w1.output_low < w2.input_high
+    then
+      (* Tricky case: windows don't overlap but result depends on sign-extended
+         bits *)
+      Some
+        (Cbitwindow
+           { input_low = j - 1;
+             (* Extract just the sign bit *)
+             input_high = j;
+             output_low = k;
+             sign_extend = s;
+             low_bits = composed_low_bits
+           })
+    else
+      (* Result is constant - we could return a constant operation here *)
+      None
+  | _ -> None
+
 let rec add_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match prefer_add c1, prefer_add c2 with

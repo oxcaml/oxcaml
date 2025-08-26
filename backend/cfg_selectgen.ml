@@ -72,10 +72,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (* avoid reordering *)
         (* The remaining operations are simple if their args are *)
       | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor
-      | Cxor | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz _
-      | Cctz _ | Cpopcnt | Cbswap _ | Ccsel _ | Cabsf _ | Caddf _ | Csubf _
-      | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _
-      | Ctuple_field _ | Ccmpf _ | Cdls_get ->
+      | Cxor | Clsl | Clsr | Casr | Cbitwindow _ | Ccmpi _ | Caddv | Cadda
+      | Cnegf _ | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccsel _ | Cabsf _
+      | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _
+      | Cstatic_cast _ | Ctuple_field _ | Ccmpf _ | Cdls_get ->
         List.for_all is_simple_expr args)
     | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ -> false
 
@@ -128,9 +128,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
         | Cand | Cor | Cxor | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cpopcnt
-        | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cabsf _
-        | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _
-        | Cstatic_cast _ | Ccmpf _ ->
+        | Clsl | Clsr | Casr | Cbitwindow _ | Ccmpi _ | Caddv | Cadda | Cnegf _
+        | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
+        | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
           EC.none
       in
       EC.join from_op (EC.join_list_map args effects_of)
@@ -253,7 +253,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   (* Default instruction selection for operators *)
 
-  let select_operation0 (op : Cmm.operation) (args : Cmm.expression list)
+  let rec select_operation0 (op : Cmm.operation) (args : Cmm.expression list)
       (dbg : Debuginfo.t) ~label_after :
       Cfg.basic_or_terminator * Cmm.expression list =
     let wrong_num_args n =
@@ -350,6 +350,73 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Clsl -> select_arith Ilsl args
     | Clsr -> select_arith Ilsr args
     | Casr -> select_arith Iasr args
+    | Cbitwindow { input_low; input_high; output_low; sign_extend; low_bits }
+      -> (
+      (* Decompose bit windowing into basic operations *)
+      let arg = single_arg () in
+      let width = input_high - input_low in
+      let output_high = output_low + width in
+      let dbg = Debuginfo.none in
+      
+      (* Step 1: Position the bits *)
+      let shift_amount = output_low - input_low in
+      let result =
+        if shift_amount = 0
+        then arg
+        else if shift_amount > 0
+        then Cmm.Cop (Clsl, [arg; Cmm.Cconst_int (shift_amount, dbg)], dbg)
+        else Cmm.Cop (Clsr, [arg; Cmm.Cconst_int (-shift_amount, dbg)], dbg)
+      in
+      
+      (* Step 2: Sign extend if needed *)
+      let result =
+        if output_high < sign_extend
+        then
+          (* Shift left to bit 63, then arithmetic right *)
+          let left_shift = 64 - output_high in
+          let result =
+            if left_shift > 0
+            then Cmm.Cop (Clsl, [result; Cmm.Cconst_int (left_shift, dbg)], dbg)
+            else result
+          in
+          let right_shift = 64 - sign_extend in
+          if right_shift > 0
+          then Cmm.Cop (Casr, [result; Cmm.Cconst_int (right_shift, dbg)], dbg)
+          else result
+        else result
+      in
+      
+      (* Step 3: Mask if needed *)
+      let result =
+        if (output_low > 0 || sign_extend < 64) && output_high = sign_extend
+        then
+          let mask =
+            let ones = Nativeint.minus_one in
+            let mask = Nativeint.shift_right_logical ones (64 - width) in
+            Nativeint.shift_left mask output_low
+          in
+          Cmm.Cop (Cand, [result; Cmm.Cconst_natint (mask, dbg)], dbg)
+        else result
+      in
+      
+      (* Step 4: OR with low_bits if non-zero *)
+      let result =
+        if not (Nativeint.equal low_bits Nativeint.zero)
+        then Cmm.Cop (Cor, [result; Cmm.Cconst_natint (low_bits, dbg)], dbg)
+        else result
+      in
+      
+      (* Recursively select the final operations *)
+      let final_result = result in
+      match[@ocaml.warning "-fragile-match"] final_result with
+      | arg when arg == single_arg () ->
+        (* Identity - just return the argument *)
+        SU.basic_op (Intop Ior), [arg; Cmm.Cconst_int (0, dbg)]
+      | Cmm.Cop (cop, args, _) ->
+        select_operation cop args dbg ~label_after
+      | _ ->
+        Misc.fatal_error "got an identity operation for Cbit_windowing"
+      )
     | Cclz { arg_is_non_zero } ->
       SU.basic_op (Intop (Iclz { arg_is_non_zero })), args
     | Cctz { arg_is_non_zero } ->
@@ -406,7 +473,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple_field (_, _) ->
       Misc.fatal_error "Selection.select_oper"
 
-  let rec select_operation (op : Cmm.operation) (args : Cmm.expression list)
+  and select_operation (op : Cmm.operation) (args : Cmm.expression list)
       (dbg : Debuginfo.t) ~label_after :
       Cfg.basic_or_terminator * Cmm.expression list =
     match

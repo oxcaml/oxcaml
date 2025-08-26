@@ -280,6 +280,11 @@ let operation d = function
   | Clsl -> "<<"
   | Clsr -> ">>u"
   | Casr -> ">>s"
+  | Cbitwindow { input_low; input_high; output_low; sign_extend; low_bits } ->
+    let output_high = output_low + (input_high - input_low) in
+    Printf.sprintf "bitwindow[%d:%d]→%d/[%d:%d]+%s" input_high input_low
+      sign_extend output_high output_low
+      (Nativeint.to_string low_bits)
   | Cbswap { bitwidth = Sixteen } -> "bswap_16"
   | Cbswap { bitwidth = Thirtytwo } -> "bswap_32"
   | Cbswap { bitwidth = Sixtyfour } -> "bswap_64"

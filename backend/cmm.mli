@@ -401,6 +401,13 @@ type operation =
   | Clsl
   | Clsr
   | Casr
+  | Cbitwindow of
+      { input_low : int; (* i: low bit of input window *)
+        input_high : int; (* j: high bit of input window *)
+        output_low : int; (* k: low bit of output window, width = j - i *)
+        sign_extend : int; (* s: sign extend to this bit position *)
+        low_bits : nativeint (* T: constant for low bits below output_low *)
+      }
   | Cbswap of { bitwidth : bswap_bitwidth }
   | Ccsel of machtype
   | Cclz of { arg_is_non_zero : bool }
