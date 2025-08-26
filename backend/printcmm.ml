@@ -457,6 +457,13 @@ let codegen_option = function
   | Reduce_code_size -> "reduce_code_size"
   | No_CSE -> "no_cse"
   | Use_linscan_regalloc -> "linscan"
+  | Use_regalloc regalloc_kind ->
+    (match regalloc_kind with
+     | Default_regalloc -> "regalloc_default"
+     | Cfg_regalloc -> "regalloc_cfg"
+     | Irc_regalloc -> "regalloc_irc"
+     | Ls_regalloc -> "regalloc_ls"
+     | Gi_regalloc -> "regalloc_gi")
   | Assume_zero_alloc { strict; never_returns_normally; never_raises; loc = _ }
     ->
     Printf.sprintf "assume_zero_alloc_%s%s%s"
