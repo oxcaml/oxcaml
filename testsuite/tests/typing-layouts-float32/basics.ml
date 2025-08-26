@@ -15,6 +15,7 @@
 
 type t_float32 : float32
 type ('a : float32) t_float32_id = 'a
+external of_f32 : float32# -> t_float32 = "%opaque"
 
 (*********************************)
 (* Test 1: The identity function *)
@@ -25,6 +26,7 @@ let f1_3 (x : float32#) = x;;
 [%%expect{|
 type t_float32 : float32
 type ('a : float32) t_float32_id = 'a
+external of_f32 : float32# -> t_float32 = "%opaque"
 val f1_1 : t_float32 -> t_float32 = <fun>
 val f1_2 : ('a : float32). 'a t_float32_id -> 'a t_float32_id = <fun>
 val f1_3 : float32# -> float32# = <fun>
@@ -52,35 +54,37 @@ val f2_3 : float32# -> float32# = <fun>
 (**********************************)
 (* Test 3: Module-level bindings. *)
 
-let x3_1 : t_float32 = assert false;;
+let x3_1 : t_float32 = of_f32 #42.0s;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 23).
+val x3_1 : t_float32 = <abstr>
 |}];;
 
-let x3_2 : 'a t_float32_id = assert false;;
+let x3_2_1 : 'a t_float32_id = #42.0s;;
+let x3_2_2 : 'a t_float32_id = of_f32 #42.0s;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 29).
+val x3_2_1 : float32# t_float32_id = <abstr>
+val x3_2_2 : t_float32 t_float32_id = <abstr>
 |}];;
 
-let x3_3 : float32# = assert false;;
+let x3_3 : float32# = #42.0s;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 22).
+val x3_3 : float32# = <abstr>
 |}];;
 
 module M3_4 = struct
-  let x : t_float32 = assert false
+  let x : t_float32 = of_f32 #42.0s
 end
 [%%expect{|
-Exception: Assert_failure ("", 2, 22).
+module M3_4 : sig val x : t_float32 end
 |}];;
 
 module M3_5 = struct
   let f (x : float32#) = x
 
-  let y = f (assert false)
+  let y = f #42.0s
 end
 [%%expect{|
-Exception: Assert_failure ("", 4, 12).
+module M3_5 : sig val f : float32# -> float32# val y : float32# end
 |}];;
 
 (*************************************)
