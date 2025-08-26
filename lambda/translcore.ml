@@ -1244,6 +1244,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           local = Never_local;
           zero_alloc = Default_zero_alloc;
           loop = Never_loop;
+          regalloc = Default_regalloc;
           is_a_functor = false;
           is_opaque = false;
           stub = false;

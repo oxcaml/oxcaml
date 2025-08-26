@@ -1062,6 +1062,13 @@ let function_attribute ppf t =
   begin match t.poll with
   | Default_poll -> ()
   | Error_poll -> fprintf ppf "error_poll@ "
+  end;
+  begin match t.regalloc with
+  | Default_regalloc -> ()
+  | Cfg_regalloc -> fprintf ppf "regalloc_cfg@ "
+  | Irc_regalloc -> fprintf ppf "regalloc_irc@ "
+  | Ls_regalloc -> fprintf ppf "regalloc_ls@ "
+  | Gi_regalloc -> fprintf ppf "regalloc_gi@ "
   end
 
 let apply_tailcall_attribute ppf = function
