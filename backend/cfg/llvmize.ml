@@ -1775,7 +1775,8 @@ module F = struct
     (* CR yusumez: If private global variables are not referenced anywhere
        directly, LLVM will delete them in the globaldce (dead global
        elimination) pass, so we don't mark anything as private for now. *)
-    line t.ppf "%a = global %a { %a }%s" pp_global sym Llvm_typ.pp_t
+    line t.ppf "%a = global %a { %a }%s, section \".data\"" pp_global sym
+      Llvm_typ.pp_t
       (Llvm_typ.Struct (List.map typ_of_data_item ds))
       (pp_print_list ~pp_sep:pp_comma pp_typ_and_const)
       ds
@@ -1788,6 +1789,9 @@ module F = struct
       Llvm_typ.ptr
 
   let empty_symbol_decl t sym = data_decl t (Cmm_helpers.make_symbol sym) []
+
+  let zero_symbol_decl t sym =
+    data_decl t (Cmm_helpers.make_symbol sym) [Cint 0n]
 
   let empty_fun_decl t sym =
     line t.ppf "define void %a() { ret void }" pp_global
@@ -2247,7 +2251,7 @@ let end_assembly () =
   Format.pp_print_newline t.ppf ();
   F.empty_symbol_decl t "data_end";
   F.empty_fun_decl t "code_end";
-  F.empty_symbol_decl t "frametable";
+  F.zero_symbol_decl t "frametable";
   (* Close channel to .ll file *)
   Out_channel.close t.oc;
   (* Call clang to compile .ll to .s *)
