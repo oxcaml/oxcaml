@@ -1114,8 +1114,8 @@ let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
   | Some cc2 ->
     add_arg_block_to_module_block lam repr cc2
 
-let wrap_toplevel_functor_in_struct code repr =
-  Lprim(block_of_module_representation repr,
+let wrap_toplevel_functor_in_struct code =
+  Lprim(Pmakeblock(0, Immutable, None, Lambda.alloc_heap),
         [ code ],
         Loc_unknown)
 
@@ -1165,7 +1165,7 @@ let transl_implementation compilation_unit impl ~loc =
               |> List.split
         in
         let body = add_runtime_parameters body runtime_param_idents in
-        let body = wrap_toplevel_functor_in_struct body repr in
+        let body = wrap_toplevel_functor_in_struct body in
         let format =
           Mb_instantiating_functor { mb_runtime_params;
                                      mb_returned_repr = repr }
@@ -1450,7 +1450,7 @@ let transl_instance_impl
   let instantiating_functor_lam =
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
-    Lprim (mod_field 0 main_module_block_repr,
+    Lprim (mod_field 0 (Module_value_only 1),
            [Lprim (Pgetglobal base_compilation_unit, [], Loc_unknown)],
            Loc_unknown)
   in
