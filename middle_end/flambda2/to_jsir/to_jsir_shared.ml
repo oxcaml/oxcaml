@@ -60,6 +60,9 @@ let reg_width_const const : Jsir.constant =
   | Null -> Jsir.Null
   | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ ->
     Misc.fatal_errorf "Unsupported constant %a" Int_ids.Const.print const
+  | Naked_int8 _ | Naked_int16 _ ->
+    Misc.fatal_errorf "JSIR conversion: int8/int16 constants not supported %a" 
+      Int_ids.Const.print const
 
 let simple ~env ~res simple =
   Simple.pattern_match' simple

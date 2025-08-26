@@ -112,6 +112,10 @@ module type S = sig
   val max : t -> t -> t
 
   val is_non_negative : t -> bool
+
+  val of_int8 : Numeric_types.Int8.t -> t
+
+  val of_int16 : Numeric_types.Int16.t -> t
 end
 
 module T0 = struct
