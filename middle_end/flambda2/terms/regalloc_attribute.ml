@@ -37,7 +37,7 @@ let equal t1 t2 =
 let is_default t = match t with Default -> true | Cfg | Irc | Ls | Gi -> false
 
 let from_lambda (attr : Lambda.regalloc_attribute) =
-  match attr with 
+  match attr with
   | Default_regalloc -> Default
   | Cfg_regalloc -> Cfg
   | Irc_regalloc -> Irc
@@ -45,7 +45,7 @@ let from_lambda (attr : Lambda.regalloc_attribute) =
   | Gi_regalloc -> Gi
 
 let to_lambda t : Lambda.regalloc_attribute =
-  match t with 
+  match t with
   | Default -> Default_regalloc
   | Cfg -> Cfg_regalloc
   | Irc -> Irc_regalloc

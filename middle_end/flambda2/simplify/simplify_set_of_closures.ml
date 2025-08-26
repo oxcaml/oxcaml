@@ -489,10 +489,12 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~result_arity ~result_types ~result_mode:(Code.result_mode code)
       ~stub:(Code.stub code) ~inline:(Code.inline code)
       ~zero_alloc_attribute:(Code.zero_alloc_attribute code)
-      ~poll_attribute:(Code.poll_attribute code) ~regalloc_attribute:(Code.regalloc_attribute code) ~is_a_functor ~is_opaque
-      ~recursive:(Code.recursive code) ~cost_metrics ~inlining_arguments
-      ~dbg:(Code.dbg code) ~is_tupled:(Code.is_tupled code) ~is_my_closure_used
-      ~inlining_decision ~absolute_history ~relative_history ~loopify
+      ~poll_attribute:(Code.poll_attribute code)
+      ~regalloc_attribute:(Code.regalloc_attribute code)
+      ~is_a_functor ~is_opaque ~recursive:(Code.recursive code) ~cost_metrics
+      ~inlining_arguments ~dbg:(Code.dbg code) ~is_tupled:(Code.is_tupled code)
+      ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
+      ~loopify
   in
   let code =
     let are_rebuilding = DA.are_rebuilding_terms dacc_after_body in
