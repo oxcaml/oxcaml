@@ -140,7 +140,9 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
      is both inefficient as well as possibly incorrect.
 
      Having a non-zero stack offset means that the prologue is added after a
-     [Pushtrap] or [Stackoffset] which shouldn't be allowed. *)
+     [Pushtrap] or [Stackoffset] which shouldn't be allowed. This is because the
+     prologue is added at the stack pointer, which would overlap with the
+     handler pushed by a [Pushtrap]. *)
   if Cfg_loop_infos.is_in_loop loop_infos prologue_label
      || prologue_block.stack_offset <> 0
   then false
@@ -154,7 +156,8 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
      *  Block C: Return
 
        We have the choice of putting the prologue in Block A or B, and we would
-       place an epilogue in Block C.
+       place an epilogue in Block C (or we could create a new block with the
+       epilogue).
 
        If we try to place the prologue in block B, the prologue would not
        dominate the epilogue in block C, so in some cases the epilogue would be
@@ -168,6 +171,9 @@ let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
   let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
       (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
     let block = Cfg.get_block_exn cfg tree.label in
+    (* CR-soon cfalas: Computing the epilogue blocks is possibly expensive for
+       large CFGs. We can benchmark to see if this is significant, and if so we
+       should cache and reuse its intermediate results. *)
     let epilogue_blocks =
       Label.Set.filter
         (fun label ->
@@ -205,13 +211,21 @@ let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
   (* note: the other entries in the forest are dead code *)
   let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
   let loop_infos = Cfg_loop_infos.build cfg doms in
-  let prologue_required = visit tree cfg doms loop_infos in
-  (match prologue_required with
-  | None -> ()
-  | Some (prologue_label, epilogue_blocks) ->
-    assert (
-      can_place_prologue prologue_label cfg doms loop_infos epilogue_blocks));
-  prologue_required
+  (* [Proc.prologue_required] is cheap and should provide an over-estimate of
+     when we would need a prologue (in some cases [Proc.prologue_required] will
+     return [true] because it uses the value of [cfg.fun_contains_calls] which
+     was computed before CFG simplification, which can remove calls if they are
+     dead, making the prologue unnecessary). *)
+  if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
+       ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  then (
+    match visit tree cfg doms loop_infos with
+    | None -> None
+    | Some (prologue_label, epilogue_blocks) ->
+      assert (
+        can_place_prologue prologue_label cfg doms loop_infos epilogue_blocks);
+      Some (prologue_label, epilogue_blocks))
+  else None
 
 let find_prologue_and_epilogues_at_entry (cfg : Cfg.t) =
   if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
