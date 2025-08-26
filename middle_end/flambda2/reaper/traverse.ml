@@ -669,9 +669,10 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
        calls_are_not_pure } in Acc.add_apply apply_dep acc; if Option.is_some
        (Apply.callee apply) then add_call_widget function_call) else default_acc
        acc *)
-    if Option.is_some (Apply.callee apply)
-    then add_call_widget function_call;
-    if Compilation_unit.is_current (Code_id.get_compilation_unit code_id) && (Option.is_none (Apply.callee apply) || denv.should_preserve_direct_calls)
+    if Option.is_some (Apply.callee apply) then add_call_widget function_call;
+    if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
+       && (Option.is_none (Apply.callee apply)
+          || denv.should_preserve_direct_calls)
     then
       let apply_dep =
         { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
@@ -684,7 +685,8 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         }
       in
       Acc.add_apply apply_dep acc
-    else if Option.is_none (Apply.callee apply) then default_acc acc
+    else if Option.is_none (Apply.callee apply)
+    then default_acc acc
   | Function
       { function_call =
           (Indirect_unknown_arity | Indirect_known_arity) as function_call;
