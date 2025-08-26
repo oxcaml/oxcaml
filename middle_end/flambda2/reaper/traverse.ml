@@ -105,18 +105,17 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
      let param = Code_id_or_name.var param in Graph.add_propagate_dep (Acc.graph
      acc) ~if_used:indirect_call_witness ~from:le_monde_exterieur ~to_:param)
      params; *)
-  if has_unsafe_result_type || never_delete
+  if has_unsafe_result_type
   then (
-    let opaque_params = if has_unsafe_result_type then my_closure :: params else params in
     List.iter
       (fun var -> Acc.used ~denv (Simple.var var) acc)
-      (opaque_params @ (exn :: return));
+      ((my_closure :: params) @ (exn :: return));
     let le_monde_exterieur = Code_id_or_name.name denv.le_monde_exterieur in
     List.iter
       (fun param ->
         let param = Code_id_or_name.var param in
         Graph.add_alias (Acc.graph acc) ~to_:param ~from:le_monde_exterieur)
-      opaque_params);
+      (my_closure :: params));
   if never_delete then Acc.used_code_id code_id acc;
   Acc.add_code code_id code_dep acc
 
