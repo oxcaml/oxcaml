@@ -3962,6 +3962,45 @@ let mod_int_caml arg1 arg2 dbg =
        (untag_int arg2 dbg) dbg)
     dbg
 
+let udiv_int c1 c2 dbg =
+  match get_const c1, get_const c2 with
+  | _, Some 0n -> divide_by_zero c1 ~dbg
+  | _, Some 1n -> c1
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_div n1 n2)
+  | _, Some divisor when is_power_of_2_or_zero divisor ->
+    (* divisor is a power of 2, use shift *)
+    let l = Misc.log2_nativeint divisor in
+    lsr_const c1 l dbg
+  | _, _ -> Cop (Cudivi, [c1; c2], dbg)
+
+let umod_int c1 c2 dbg =
+  match get_const c1, get_const c2 with
+  | _, Some 0n -> divide_by_zero c1 ~dbg
+  | _, Some 1n -> Cconst_int (0, dbg)
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_rem n1 n2)
+  | _, Some n ->
+    if is_power_of_2_or_zero n
+    then
+      (* divisor is a power of 2, use bitwise AND *)
+      let mask = Nativeint.pred n in
+      Cop (Cand, [c1; Cconst_natint (mask, dbg)], dbg)
+    else
+      (* Use unsigned modulo directly *)
+      Cop (Cumodi, [c1; c2], dbg)
+  | _, _ -> Cop (Cumodi, [c1; c2], dbg)
+
+let udiv_int_caml arg1 arg2 dbg =
+  (* For unsigned operations on tagged integers, we need to use logical right shift
+     to avoid sign extension of negative values *)
+  let untag_unsigned n = lsr_const n 1 dbg in
+  tag_int (udiv_int (untag_unsigned arg1) (untag_unsigned arg2) dbg) dbg
+
+let umod_int_caml arg1 arg2 dbg =
+  (* For unsigned operations on tagged integers, we need to use logical right shift
+     to avoid sign extension of negative values *)
+  let untag_unsigned n = lsr_const n 1 dbg in
+  tag_int (umod_int (untag_unsigned arg1) (untag_unsigned arg2) dbg) dbg
+
 let and_int_caml arg1 arg2 dbg = and_int arg1 arg2 dbg
 
 let or_int_caml arg1 arg2 dbg = or_int arg1 arg2 dbg

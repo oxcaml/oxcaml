@@ -45,9 +45,9 @@ module type Num_common = sig
 
   val mod_ : t -> t -> t option
 
-  val udiv : t -> t -> t option
+  val unsigned_div : t -> t -> t option
 
-  val umod : t -> t -> t option
+  val unsigned_rem : t -> t -> t option
 
   val to_const : t -> Reg_width_const.t
 

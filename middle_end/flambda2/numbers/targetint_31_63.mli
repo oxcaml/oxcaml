@@ -151,11 +151,11 @@ val div : t -> t -> t
 
 (** Unsigned integer division. Raise [Division_by_zero] if the second argument
     is zero. *)
-val udiv : t -> t -> t
+val unsigned_div : t -> t -> t
 
 (** Unsigned integer modulo. Raise [Division_by_zero] if the second argument
     is zero. *)
-val umod : t -> t -> t
+val unsigned_rem : t -> t -> t
 
 (** Bitwise logical and. *)
 val and_ : t -> t -> t

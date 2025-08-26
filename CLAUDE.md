@@ -6,6 +6,21 @@ It's a branch of the OCaml compiler with Jane Street extensions.
 Do not stage or commit your changes unless prompted to.
 Always check that your changes build with `make boot-compiler`.
 
+## Critical Implementation Guidelines
+- NEVER leave TODO comments in production code. Always complete implementations.
+- When implementing new features that should be used by existing code, ALWAYS:
+  1. Search for where the feature should be generated/used
+  2. Wire it up completely
+  3. Test that it's actually being used (not just that it compiles)
+- When adding new primitives or operations:
+  1. Ensure they're actually generated somewhere in the compiler
+  2. Verify the code path from source to backend
+  3. Check that optimizations/transformations handle them
+- Before saying "implementation complete", verify:
+  1. No TODO comments remain
+  2. The feature is actually reachable/usable
+  3. All relevant code paths have been updated
+
 Some style hints:
 - Make use of pattern-matching and other functional programming idioms.
 - Don't add comments unless prompted.

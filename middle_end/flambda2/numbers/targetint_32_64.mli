@@ -63,8 +63,6 @@ val div : t -> t -> t
     unsigned} integers. *)
 val unsigned_div : t -> t -> t
 
-(** Alias for unsigned_div for consistency with other modules. *)
-val udiv : t -> t -> t
 
 (** Integer remainder. If [y] is not zero, the result * of [Targetint_32_64.rem
     x y] satisfies the following properties: * [Targetint_32_64.zero <=
@@ -77,8 +75,6 @@ val rem : t -> t -> t
     unsigned} integers. *)
 val unsigned_rem : t -> t -> t
 
-(** Alias for unsigned_rem for consistency with other modules. *)
-val umod : t -> t -> t
 
 (** Successor. [Targetint_32_64.succ x] is [Targetint_32_64.add x
     Targetint_32_64.one]. *)

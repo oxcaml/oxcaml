@@ -1058,7 +1058,7 @@ and comp_unsigned_mod (size : Scalar.any_locality_mode Scalar.Integral.t) n d =
       (Scalar.Operation.Binary.Integral (size, op))
       x y
   in
-  binop Sub n (binop Mul (binop (Div Safe) n d) d)
+  binop Sub n (binop Mul (comp_unsigned_div size n d) d)
 
 and comp_unary_scalar_intrinsic :
     type a. a Scalar.Operation.Unary.t -> blambda -> blambda =

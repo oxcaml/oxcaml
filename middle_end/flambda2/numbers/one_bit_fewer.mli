@@ -79,10 +79,6 @@ module type S = sig
 
   val unsigned_rem : t -> t -> t
 
-  val udiv : t -> t -> t
-
-  val umod : t -> t -> t
-
   val and_ : t -> t -> t
 
   val or_ : t -> t -> t

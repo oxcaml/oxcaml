@@ -827,10 +827,8 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Mul -> wrap C.mul_int_caml
     | Div -> wrap C.div_int_caml
     | Mod -> wrap C.mod_int_caml
-    | Udiv ->
-      wrap C.div_int_caml (* TODO: Use unsigned version when available *)
-    | Umod ->
-      wrap C.mod_int_caml (* TODO: Use unsigned version when available *)
+    | Udiv -> wrap C.udiv_int_caml
+    | Umod -> wrap C.umod_int_caml
     | And -> wrap C.and_int_caml
     | Or -> wrap C.or_int_caml
     | Xor -> wrap C.xor_int_caml)
@@ -848,12 +846,8 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Mul -> wrap C.mul_int
     | Div -> wrap (C.div_int ~dividend_cannot_be_min_int)
     | Mod -> wrap (C.mod_int ~dividend_cannot_be_min_int)
-    | Udiv ->
-      wrap (C.div_int ~dividend_cannot_be_min_int)
-      (* TODO: Use unsigned version *)
-    | Umod ->
-      wrap (C.mod_int ~dividend_cannot_be_min_int)
-      (* TODO: Use unsigned version *)
+    | Udiv -> wrap C.udiv_int
+    | Umod -> wrap C.umod_int
     | And -> wrap C.and_int
     | Or -> wrap C.or_int
     | Xor -> wrap C.xor_int)

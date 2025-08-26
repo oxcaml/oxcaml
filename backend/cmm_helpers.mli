@@ -140,6 +140,20 @@ val mod_int :
   Debuginfo.t ->
   expression
 
+(** unsigned division of two register-width integers *)
+val udiv_int :
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+(** unsigned remainder of two register-width integers *)
+val umod_int :
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
 (** Boolean negation *)
 val mk_not : Debuginfo.t -> expression -> expression
 
@@ -612,6 +626,10 @@ val mul_int_caml : binary_primitive
 val div_int_caml : binary_primitive
 
 val mod_int_caml : binary_primitive
+
+val udiv_int_caml : binary_primitive
+
+val umod_int_caml : binary_primitive
 
 val and_int_caml : binary_primitive
 

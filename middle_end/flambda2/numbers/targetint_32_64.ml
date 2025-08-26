@@ -119,10 +119,6 @@ module type S = sig
 
   val unsigned_rem : t -> t -> t
 
-  val udiv : t -> t -> t
-
-  val umod : t -> t -> t
-
   val unsigned_compare : t -> t -> int
 
   module Targetint_set = Set
@@ -150,9 +146,6 @@ module Int32 = struct
 
   let num_bits = Thirty_two
 
-  let udiv = unsigned_div
-
-  let umod = unsigned_rem
 
   let of_int32 x = x
 
@@ -215,9 +208,6 @@ module Int64 = struct
 
   let num_bits = Sixty_four
 
-  let udiv = unsigned_div
-
-  let umod = unsigned_rem
 
   let of_int_exn = Int64.of_int
 

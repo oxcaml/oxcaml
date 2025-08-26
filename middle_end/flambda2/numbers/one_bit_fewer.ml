@@ -93,10 +93,6 @@ module type S = sig
 
   val unsigned_rem : t -> t -> t
 
-  val udiv : t -> t -> t
-
-  val umod : t -> t -> t
-
   val and_ : t -> t -> t
 
   val or_ : t -> t -> t
@@ -139,6 +135,8 @@ module Make (I : S) : S with type t = I.t = struct
      considering that arithmetic operation wrap-around (i.e. arithmetic is done
      modulo 2^{n-2} bits. *)
   let sign_extend t = I.shift_right (I.shift_left t 1) 1
+
+  let zero_extend t = I.shift_right_logical (I.shift_left t 1) 1
 
   let min_value = I.shift_right I.min_value 1
 
@@ -220,13 +218,11 @@ module Make (I : S) : S with type t = I.t = struct
 
   let div x y = sign_extend (I.div x y)
 
-  let unsigned_div = I.unsigned_div
+  let unsigned_div x y =
+    sign_extend (I.unsigned_div (zero_extend x) (zero_extend y))
 
-  let unsigned_rem = I.unsigned_rem
-
-  let udiv = I.unsigned_div
-
-  let umod = I.unsigned_rem
+  let unsigned_rem x y =
+    sign_extend (I.unsigned_rem (zero_extend x) (zero_extend y))
 
   let and_ = I.and_
 
