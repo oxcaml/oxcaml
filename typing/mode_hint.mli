@@ -58,14 +58,3 @@ type 'd morph =
   | Crossing : ('l * 'r) morph
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
-
-(* This is needed for the destructive substitutions in [Common_axis] for
-    the monadic axis modules, as we can't use [neg] within the substitution due
-    to type checker limitations *)
-type 'd neg_const = 'd neg const constraint 'd = _ * _
-
-type 'd pos_const = 'd pos const constraint 'd = _ * _
-
-type 'd neg_morph = 'd neg morph constraint 'd = _ * _
-
-type 'd pos_morph = 'd pos morph constraint 'd = _ * _

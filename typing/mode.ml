@@ -2157,8 +2157,8 @@ module type Common_axis_pos = sig
     Common_axis
       with module Const := Const
        and type 'd t = (Const.t, 'd pos) mode
-       and type error := Const.t error
-       and type 'd hint_const := 'd Hint.pos_const
+       and type error = Const.t error
+       and type 'd hint_const := 'd pos_hint_const
 end
 
 module type Common_axis_neg = sig
@@ -2168,8 +2168,8 @@ module type Common_axis_neg = sig
     Common_axis
       with module Const := Const
        and type 'd t = (Const.t, 'd neg) mode
-       and type error := Const.t error
-       and type 'd hint_const := 'd Hint.neg_const
+       and type error = Const.t error
+       and type 'd hint_const := 'd neg_hint_const
 end
 
 (** Representing a single object *)
@@ -2228,6 +2228,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   type lr = (allowed * allowed) t
 
+  type nonrec simple_error = const simple_error
+
   type nonrec error = const error
 
   type equate_error = equate_step * error
@@ -2274,7 +2276,7 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let zap_to_floor m = with_log (Solver.zap_to_floor obj m)
 
-  let of_const : type l r. ?hint:(l * r) Hint.pos_const -> const -> (l * r) t =
+  let of_const : type l r. ?hint:(l * r) pos Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
   let unhint = Solver.Unhint.unhint
@@ -2316,6 +2318,8 @@ module Monadic_gen (Obj : Obj) = struct
   type r = (disallowed * allowed) t
 
   type lr = (allowed * allowed) t
+
+  type nonrec simple_error = const simple_error
 
   type nonrec error = const error
 
@@ -2366,7 +2370,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   let zap_to_floor m = with_log (Solver.zap_to_ceil obj m)
 
-  let of_const : type l r. ?hint:(l * r) Hint.neg_const -> const -> (l * r) t =
+  let of_const : type l r. ?hint:(l * r) neg Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
   let unhint = Solver.Unhint.unhint
@@ -2714,9 +2718,8 @@ module Comonadic_with (Areality : Areality) = struct
 
   let legacy = of_const Const.legacy
 
-  type 'a simple_axerror = 'a simple_error
-
-  type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
+  type simple_error =
+    | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error
 
   let axis_of_error (left : Obj.const) (right : Obj.const) : simple_error =
     let { areality = areality1;
@@ -3310,9 +3313,8 @@ module Value_with (Areality : Areality) = struct
 
   type equate_error = equate_step * error
 
-  type 'a simple_axerror = 'a simple_error
-
-  type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
+  type simple_error =
+    | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error
 
   let to_simple_error = function
     | Monadic e ->
