@@ -1120,7 +1120,19 @@ let rec low_bits ~bits ~dbg x =
 let tag_int i dbg =
   match low_bits i ~bits:(arch_bits - 1) ~dbg with
   | Cconst_int (n, _) -> int_const dbg n
-  | c -> incr_int (lsl_const c 1 dbg) dbg
+  | c ->
+    (* Tag an integer: shift left by 1 and add 1 
+       Using bit windowing: take bits [0:63], place at [1:64], add 1 *)
+    Cop
+      ( Cbitwindow
+          { input_low = 0;
+            input_high = arch_bits - 1;
+            output_low = 1;
+            sign_extend = arch_bits;
+            low_bits = Nativeint.one  (* Set the tag bit *)
+          },
+        [c],
+        dbg )
 
 let untag_int i dbg =
   match i with
