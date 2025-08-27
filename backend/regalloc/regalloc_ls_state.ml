@@ -116,14 +116,13 @@ let[@inline] set_ls_order state ~instruction_id ~ls_order =
   InstructionId.Tbl.replace state.ls_order_tbl instruction_id ls_order
 
 let[@inline] get_ls_order state ~instruction_id =
-  try InstructionId.Tbl.find state.ls_order_tbl instruction_id with
-  | Not_found ->
+  try InstructionId.Tbl.find state.ls_order_tbl instruction_id
+  with Not_found ->
     fatal "Regalloc_ls_state.get_ls_order: instruction_id %a not found"
       InstructionId.print instruction_id
 
 let ls_order_mapping state : InstructionId.t -> int =
-  fun instruction_id -> get_ls_order state ~instruction_id
-
+ fun instruction_id -> get_ls_order state ~instruction_id
 
 let rec check_ranges (prev : Range.t) (cell : Range.t DLL.cell option) : int =
   if prev.begin_ > prev.end_
