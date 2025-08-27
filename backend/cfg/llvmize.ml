@@ -1251,7 +1251,7 @@ module F = struct
     in
     ins_store_into_reg t res i.res.(0)
 
-  (* CF yusumez: add a generic Cfg instruction for bswap *)
+  (* CR yusumez: add a generic Cfg instruction for bswap *)
   let specific t (i : Cfg.basic Cfg.instruction) (op : Arch.specific_operation)
       =
     match[@warning "-fragile-match"] op with
@@ -1567,7 +1567,8 @@ module F = struct
         add_called_fun t "caml_call_gc" ~cc:Ocaml
           ~args:[Llvm_typ.ptr; Llvm_typ.ptr]
           ~res:(Some (make_ret_type []));
-        call_simple ~cc:Ocaml ~pp_name:pp_global t "caml_call_gc" [] []
+        call_simple ~attrs:"cold" ~cc:Ocaml ~pp_name:pp_global t "caml_call_gc"
+          [] []
         |> ignore;
         ins_branch_ident t after_gc_call;
         line t.ppf "%a:" Ident.print after_gc_call;
