@@ -513,7 +513,7 @@ let mode_modality modality expected_mode =
 (* used when entering a function;
 mode is the mode of the function region *)
 let mode_return mode =
-  { (mode_default (meet_regional ~hint:Is_function_return mode)) with
+  { (mode_default (meet_regional ~hint:Function_return mode)) with
     position = RTail (Regionality.disallow_left
       (Value.proj_comonadic Areality mode), FTail);
   }
@@ -565,7 +565,7 @@ let mode_lazy expected_mode =
       yielding = Yielding.Const.Unyielding }
   in
   let expected_mode =
-    mode_coerce (Value.of_const ~hint_comonadic:Lazy mode ~hint_monadic:Max_monadic) expected_mode
+    mode_coerce (Value.of_const ~hint_comonadic:Lazy_allocated_on_heap mode ~hint_monadic:Max_monadic) expected_mode
   in
   let mode_crossing =
     Crossing.of_bounds {
@@ -1037,7 +1037,7 @@ let mode_force_lazy =
   let mode =
     { Value.Const.max with
       contention = Uncontended }
-    |> Value.of_const ~hint_monadic:Forced_lazy_expression ~hint_comonadic:Max_comonadic
+    |> Value.of_const ~hint_monadic:Lazy_forced ~hint_comonadic:Max_comonadic
   in
   mode_default mode
 

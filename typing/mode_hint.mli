@@ -11,17 +11,17 @@ type 'd const =
       (** Similiar to [Min_comonadic] but for monadic axes. *)
   | Max_monadic : (disallowed * 'r) neg const
       (** Similiar to [Max_comonadic] but for monadic axes. *)
-  | Lazy : (disallowed * 'r) pos const
-  | Class_monadic : ('l * disallowed) neg const
-  | Class_comonadic : ('l * disallowed) pos const
+  | Lazy_allocated_on_heap : (disallowed * 'r) pos const
+  | Class_legacy_monadic : ('l * disallowed) neg const
+  | Class_legacy_comonadic : ('l * disallowed) pos const
   | Tailcall_function : (disallowed * 'r) pos const
   | Tailcall_argument : (disallowed * 'r) pos const
   | Mutable_read : (disallowed * 'r) neg const
   | Mutable_write : (disallowed * 'r) neg const
-  | Forced_lazy_expression : (disallowed * 'r) neg const
-  | Is_function_return : (disallowed * 'r) pos const
+  | Lazy_forced : (disallowed * 'r) neg const
+  | Function_return : (disallowed * 'r) pos const
   | Stack_expression : ('l * disallowed) pos const
-  | Module_allocation : (disallowed * 'r) pos const
+  | Module_allocated_on_heap : (disallowed * 'r) pos const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 

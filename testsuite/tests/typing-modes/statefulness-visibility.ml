@@ -742,7 +742,7 @@ Line 3, characters 4-13:
 3 |   | lazy (-1) -> ()
         ^^^^^^^^^
 Error: This value is "contended" but is expected to be "uncontended"
-       because it is a lazy expression that is forced.
+       because it is a lazy value being forced.
 |}]
 
 (* But [immutable] lazy values can be, by design. *)

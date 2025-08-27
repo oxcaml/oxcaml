@@ -688,7 +688,8 @@ Line 2, characters 30-31:
                                   ^
 Error: The value "x" is "local" but is expected to be "global"
        because it is used inside a lazy expression
-       which is expected to be "global" because it is a lazy expression.
+       which is expected to be "global"
+       because it is a lazy expression and thus always allocated on the heap.
 |}]
 
 (* Don't escape through a functor *)
