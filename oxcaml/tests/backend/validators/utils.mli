@@ -52,6 +52,16 @@ end
 
 val entry_label : Label.t
 
+val move_param_label : Label.t
+
+val call_label : Label.t
+
+val move_tmp_res_label : Label.t
+
+val add_label : Label.t
+
+val return_label : Label.t
+
 val int : Reg.t array
 
 val check :
