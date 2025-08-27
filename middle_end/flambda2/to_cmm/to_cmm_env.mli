@@ -286,6 +286,10 @@ val add_alias :
 
 val add_symbol_init : t -> Backend_var.t -> Cmm.expression -> t
 
+(** Generate a backend variable with provenance for the given variable and debug_uid *)
+val gen_variable :
+  debug_uid:Flambda_debug_uid.t -> Variable.t -> Backend_var.With_provenance.t
+
 (** Try and inline an Flambda variable using the delayed let-bindings. *)
 val inline_variable :
   ?consider_inlining_effectful_expressions:bool ->

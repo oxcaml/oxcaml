@@ -155,7 +155,22 @@ module Phantom_vars = struct
     available_before insn
 end
 
-include Compute_ranges.Make (Phantom_vars)
+module Impl = Compute_ranges.Make (Phantom_vars)
+include Impl
+
+let create fundecl =
+  Format.eprintf "ARPV.create called for function %s@." fundecl.L.fun_name;
+  Format.eprintf "ARPV: fun_phantom_lets has %d entries@."
+    (V.Map.cardinal fundecl.L.fun_phantom_lets);
+  V.Map.iter
+    (fun v (prov, def_expr) ->
+      Format.eprintf "  - var: %a, has_provenance: %b@." V.print v
+        (Option.is_some prov))
+    fundecl.L.fun_phantom_lets;
+  let result = Impl.create fundecl in
+  Format.eprintf "ARPV.create done@.";
+  result
+
 module Key = Phantom_vars.Key
 module Subrange_state = Phantom_vars.Subrange_state
 module Subrange_info = Phantom_vars.Subrange_info

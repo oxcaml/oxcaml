@@ -745,45 +745,53 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
 
 and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
-  | Singleton bound_var, Prim (Variadic (Make_block (block_kind, _mut, _alloc_mode), args), _dbg) ->
+  | ( Singleton bound_var,
+      Prim (Variadic (Make_block (block_kind, _mut, _alloc_mode), args), _dbg) )
+    -> (
     (* Translate Make_block to Cphantom_block *)
     (* Extract tag from block_kind *)
-    let tag_opt = 
+    let tag_opt =
       match (block_kind : P.Block_kind.t) with
       | Values (tag, _) -> Some (Tag.Scannable.to_int tag)
       | Naked_floats -> Some (Tag.to_int Tag.double_array_tag)
       | Mixed (tag, _) -> Some (Tag.Scannable.to_int tag)
     in
-    (match tag_opt with
+    match tag_opt with
     | None -> expr env res body
-    | Some tag ->
+    | Some tag -> (
       let rec translate_args args =
         match args with
         | [] -> Some []
-        | arg :: rest ->
+        | arg :: rest -> (
           match Simple.must_be_var arg with
-          | Some (var, _coercion) ->
-            (* Look up the variable in the environment to see if it's bound to Cvar *)
-            let To_cmm_env.{ expr = { cmm; _ }; _ } = 
-              C.simple ~dbg:Debuginfo.none env res (Simple.var var) in
-            (match cmm with
-            | Cvar backend_var ->
-              (match translate_args rest with
+          | Some (var, _coercion) -> (
+            (* Look up the variable in the environment to see if it's bound to
+               Cvar *)
+            let To_cmm_env.{ expr = { cmm; _ }; _ } =
+              C.simple ~dbg:Debuginfo.none env res (Simple.var var)
+            in
+            match cmm with
+            | Cvar backend_var -> (
+              match translate_args rest with
               | Some rest_vars -> Some (backend_var :: rest_vars)
               | None -> None)
             | _ -> None)
-          | None -> None
+          | None -> None)
       in
-      (match translate_args args with
+      match translate_args args with
       | Some var_args ->
         let var = Bound_var.var bound_var in
-        (* Create a backend var for the phantom binding *)
-        let name = Variable.unique_name var in
-        let backend_var = Backend_var.create_local name in
-        let backend_var_with_prov = Backend_var.With_provenance.create backend_var in
-        let defining_expr = Some (Cmm.Cphantom_block { tag; fields = var_args }) in
+        let debug_uid = Bound_var.debug_uid bound_var in
+        (* Create a backend var with proper provenance for the phantom
+           binding *)
+        let backend_var_with_prov = To_cmm_env.gen_variable ~debug_uid var in
+        let defining_expr =
+          Some (Cmm.Cphantom_block { tag; fields = var_args })
+        in
         let body_cmm, free_vars, symbol_inits, res = expr env res body in
-        let cmm = C.make_phantom_let backend_var_with_prov defining_expr body_cmm in
+        let cmm =
+          C.make_phantom_let backend_var_with_prov defining_expr body_cmm
+        in
         cmm, free_vars, symbol_inits, res
       | None ->
         (* Cannot translate - just skip the phantom let *)

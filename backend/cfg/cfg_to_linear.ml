@@ -42,14 +42,30 @@ let phantom_defining_expr_to_linear (expr : Cfg.phantom_defining_expr) =
     L.lphantom_read_symbol_field ~sym ~field
   | Cphantom_block { tag; fields } -> L.lphantom_block ~tag ~fields
 
-let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next : L.instruction =
-  let arg, res, dbg, live, fdo, available_before, available_across, 
-      phantom_available_before =
+let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
+    L.instruction =
+  let ( arg,
+        res,
+        dbg,
+        live,
+        fdo,
+        available_before,
+        available_across,
+        phantom_available_before ) =
     match like with
     | None ->
       [||], [||], Debuginfo.none, Reg.Set.empty, Fdo_info.none, None, None, None
-    | Some { arg; res; dbg; live; fdo; available_before; available_across;
-             phantom_available_before; _ } ->
+    | Some
+        { arg;
+          res;
+          dbg;
+          live;
+          fdo;
+          available_before;
+          available_across;
+          phantom_available_before;
+          _
+        } ->
       ( arg,
         res,
         dbg,
@@ -403,9 +419,7 @@ let adjust_stack_offset body (block : Cfg.basic_block)
   then body
   else
     let delta_bytes = block_stack_offset - prev_stack_offset in
-    to_linear_instr
-      (Ladjust_stack_offset { delta_bytes })
-      ~next:body
+    to_linear_instr (Ladjust_stack_offset { delta_bytes }) ~next:body
 
 let make_Llabel cfg_with_layout label =
   Linear.Llabel
@@ -421,11 +435,6 @@ let make_Llabel cfg_with_layout label =
 let run cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
   let layout = CL.layout cfg_with_layout in
-  (* Printf.eprintf "cfg_to_linear: fun_phantom_lets has %d entries\n%!" 
-    (Backend_var.Map.cardinal (Cfg.fun_phantom_lets cfg));
-  Backend_var.Map.iter (fun var _ -> 
-    Printf.eprintf "  - phantom var: %s\n%!" (Backend_var.unique_name var)) 
-    (Cfg.fun_phantom_lets cfg); *)
   let next = ref Linear_utils.labelled_insn_end in
   let tailrec_label = ref None in
   DLL.iter_right_cell layout ~f:(fun cell ->

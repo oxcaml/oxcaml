@@ -39,8 +39,10 @@ exception Error of error * Debuginfo.t
    dependency cycles. *)
 module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* Global accumulator for phantom lets in the current function *)
-  let accumulated_phantom_lets : (V.t * Cmm.phantom_defining_expr option) list ref = ref []
-  
+  let accumulated_phantom_lets :
+      (V.With_provenance.t * Cmm.phantom_defining_expr option) list ref =
+    ref []
+
   (* Extract phantom variables currently available in the environment *)
   let phantom_vars_from_env (env : SU.environment) =
     if !Dwarf_flags.restrict_to_upstream_dwarf
@@ -781,10 +783,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Ok r1 -> emit_expr (bind_let env sub_cfg v r1) sub_cfg e2 ~bound_name)
     | Cphantom_let (var, defining_expr, body) ->
       (* Add to global accumulator for this function *)
-      let v = V.With_provenance.var var in
-      (* Printf.eprintf "CFG: Adding phantom let: %s, has defining_expr: %b\n%!" 
-        (V.unique_name v) (match defining_expr with None -> false | Some _ -> true); *)
-      accumulated_phantom_lets := (v, defining_expr) :: !accumulated_phantom_lets;
+      accumulated_phantom_lets
+        := (var, defining_expr) :: !accumulated_phantom_lets;
       let env =
         match defining_expr with
         | None -> env
@@ -841,10 +841,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
     | Cphantom_let (var, defining_expr, body) ->
       (* Add to global accumulator for this function *)
-      let v = V.With_provenance.var var in
-      (* Printf.eprintf "emit_tail: Adding phantom let: %s, has defining_expr: %b\n%!" 
-        (V.unique_name v) (match defining_expr with None -> false | Some _ -> true); *)
-      accumulated_phantom_lets := (v, defining_expr) :: !accumulated_phantom_lets;
+      accumulated_phantom_lets
+        := (var, defining_expr) :: !accumulated_phantom_lets;
       let env =
         match defining_expr with
         | None -> env
@@ -1539,19 +1537,17 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     (* Build the phantom_lets map from accumulated phantom lets *)
     let phantom_lets_map =
       List.fold_left
-        (fun acc (var, defining_expr) ->
+        (fun acc (var_with_prov, defining_expr) ->
           match defining_expr with
-          | None -> 
-            (* Printf.eprintf "CFG: Skipping phantom var %s (no defining expr)\n%!" (V.unique_name var); *)
-            acc  (* Skip phantom vars without defining expressions *)
-          | Some expr -> 
-            (* Printf.eprintf "CFG: Adding to fun_phantom_lets: %s\n%!" (V.unique_name var); *)
-            V.Map.add var (None, Cfg.phantom_defining_expr_of_cmm expr) acc)
+          | None -> acc (* Skip phantom vars without defining expressions *)
+          | Some expr ->
+            let var = V.With_provenance.var var_with_prov in
+            let provenance = V.With_provenance.provenance var_with_prov in
+            V.Map.add var
+              (provenance, Cfg.phantom_defining_expr_of_cmm expr)
+              acc)
         V.Map.empty !accumulated_phantom_lets
     in
-    (* Printf.eprintf "CFG: Total phantom_lets in map: %d\n%!" (V.Map.cardinal phantom_lets_map);
-    V.Map.iter (fun var _ -> 
-      Printf.eprintf "  - phantom var in map: %s\n%!" (V.unique_name var)) phantom_lets_map; *)
     let cfg =
       (* note: we set `fun_contains_calls` to `true` here, but will compute its
          proper value below, after possibly removing the prologue poll
