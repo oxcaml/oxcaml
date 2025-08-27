@@ -421,6 +421,11 @@ let make_Llabel cfg_with_layout label =
 let run cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
   let layout = CL.layout cfg_with_layout in
+  (* Printf.eprintf "cfg_to_linear: fun_phantom_lets has %d entries\n%!" 
+    (Backend_var.Map.cardinal (Cfg.fun_phantom_lets cfg));
+  Backend_var.Map.iter (fun var _ -> 
+    Printf.eprintf "  - phantom var: %s\n%!" (Backend_var.unique_name var)) 
+    (Cfg.fun_phantom_lets cfg); *)
   let next = ref Linear_utils.labelled_insn_end in
   let tailrec_label = ref None in
   DLL.iter_right_cell layout ~f:(fun cell ->

@@ -38,6 +38,9 @@ exception Error of error * Debuginfo.t
    twice with the same [Target] (see [Asmgen] and [Peephole_utils] to avoid
    dependency cycles. *)
 module Make (Target : Cfg_selectgen_target_intf.S) = struct
+  (* Global accumulator for phantom lets in the current function *)
+  let accumulated_phantom_lets : (V.t * Cmm.phantom_defining_expr option) list ref = ref []
+  
   (* Extract phantom variables currently available in the environment *)
   let phantom_vars_from_env (env : SU.environment) =
     if !Dwarf_flags.restrict_to_upstream_dwarf
@@ -777,6 +780,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> Never_returns
       | Ok r1 -> emit_expr (bind_let env sub_cfg v r1) sub_cfg e2 ~bound_name)
     | Cphantom_let (var, defining_expr, body) ->
+      (* Add to global accumulator for this function *)
+      let v = V.With_provenance.var var in
+      (* Printf.eprintf "CFG: Adding phantom let: %s, has defining_expr: %b\n%!" 
+        (V.unique_name v) (match defining_expr with None -> false | Some _ -> true); *)
+      accumulated_phantom_lets := (v, defining_expr) :: !accumulated_phantom_lets;
       let env =
         match defining_expr with
         | None -> env
@@ -832,6 +840,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> ()
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
     | Cphantom_let (var, defining_expr, body) ->
+      (* Add to global accumulator for this function *)
+      let v = V.With_provenance.var var in
+      (* Printf.eprintf "emit_tail: Adding phantom let: %s, has defining_expr: %b\n%!" 
+        (V.unique_name v) (match defining_expr with None -> false | Some _ -> true); *)
+      accumulated_phantom_lets := (v, defining_expr) :: !accumulated_phantom_lets;
       let env =
         match defining_expr with
         | None -> env
@@ -1466,6 +1479,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* Sequentialization of a function definition *)
 
   let emit_fundecl ~future_funcnames f =
+    (* Clear phantom lets accumulator for this function *)
+    accumulated_phantom_lets := [];
     SU.current_function_name := f.Cmm.fun_name.sym_name;
     SU.current_function_is_check_enabled
       := Zero_alloc_checker.is_check_enabled f.Cmm.fun_codegen_options
@@ -1521,6 +1536,22 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         [||]
     in
     emit_tail env body f.Cmm.fun_body;
+    (* Build the phantom_lets map from accumulated phantom lets *)
+    let phantom_lets_map =
+      List.fold_left
+        (fun acc (var, defining_expr) ->
+          match defining_expr with
+          | None -> 
+            (* Printf.eprintf "CFG: Skipping phantom var %s (no defining expr)\n%!" (V.unique_name var); *)
+            acc  (* Skip phantom vars without defining expressions *)
+          | Some expr -> 
+            (* Printf.eprintf "CFG: Adding to fun_phantom_lets: %s\n%!" (V.unique_name var); *)
+            V.Map.add var (None, Cfg.phantom_defining_expr_of_cmm expr) acc)
+        V.Map.empty !accumulated_phantom_lets
+    in
+    (* Printf.eprintf "CFG: Total phantom_lets in map: %d\n%!" (V.Map.cardinal phantom_lets_map);
+    V.Map.iter (fun var _ -> 
+      Printf.eprintf "  - phantom var in map: %s\n%!" (V.unique_name var)) phantom_lets_map; *)
     let cfg =
       (* note: we set `fun_contains_calls` to `true` here, but will compute its
          proper value below, after possibly removing the prologue poll
@@ -1532,7 +1563,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ~fun_dbg:f.Cmm.fun_dbg ~fun_contains_calls:true
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:f.Cmm.fun_poll
         ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:f.Cmm.fun_ret_type
-        ~fun_phantom_lets:env.phantom_lets
+        ~fun_phantom_lets:phantom_lets_map
     in
     let layout = DLL.make_empty () in
     let entry_block =
