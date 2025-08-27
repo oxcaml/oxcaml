@@ -1711,8 +1711,17 @@ let tag_offset = if big_endian then -1 else -size_int
 let get_tag ptr dbg =
   if Proc.word_addressed
   then
-    (* If byte loads are slow *)
-    Cop (Cand, [get_header ptr dbg; Cconst_int (255, dbg)], dbg)
+    (* If byte loads are slow - extract low 8 bits using bit windowing *)
+    Cop
+      ( Cbitwindow
+          { input_low = 0;
+            input_high = 8;
+            output_low = 0;
+            sign_extend = 8;  (* No sign extension needed for tag *)
+            low_bits = Nativeint.zero
+          },
+        [get_header ptr dbg],
+        dbg )
   else
     (* If byte loads are efficient *)
     (* Same comment as [get_header] above *)
