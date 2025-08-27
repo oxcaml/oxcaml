@@ -254,16 +254,13 @@ let print_dot ?(show_instr = true) ?(show_exn = true)
                   Label.format)
                (Label.Set.to_seq block.predecessors))))
         ppf;
-      let print_id :
-          type a. a Cfg.instruction -> Format.formatter -> unit =
-       fun i ppf ->
-          Format.dprintf "id:%a" InstructionId.format i.id ppf
+      let print_id : type a. a Cfg.instruction -> Format.formatter -> unit =
+       fun i ppf -> Format.dprintf "id:%a" InstructionId.format i.id ppf
       in
       DLL.iter
         ~f:(fun (i : _ Cfg.instruction) ->
           (print_row
-             (print_cell ~align:Right (print_id i)
-             ++ annotate_instr (`Basic i)))
+             (print_cell ~align:Right (print_id i) ++ annotate_instr (`Basic i)))
             ppf)
         block.body;
       let ti = block.terminator in

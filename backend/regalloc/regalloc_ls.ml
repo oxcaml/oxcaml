@@ -9,7 +9,6 @@ let snapshot_for_fatal = ref None
 
 module Utils = Regalloc_ls_utils
 
-
 let rewrite :
     State.t ->
     Cfg_with_infos.t ->

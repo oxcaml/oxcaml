@@ -29,7 +29,8 @@ val log_body_and_terminator_with_ls_order :
   liveness ->
   unit
 
-val log_cfg_with_infos_with_ls_order : (InstructionId.t -> int) -> Cfg_with_infos.t -> unit
+val log_cfg_with_infos_with_ls_order :
+  (InstructionId.t -> int) -> Cfg_with_infos.t -> unit
 
 (* The [trap_handler] parameter to the [instruction] and [terminator] functions
    is set to [true] iff the instruction is the first one of a block which is a
