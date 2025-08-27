@@ -125,7 +125,6 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
-  | No_cmjx_file of string                  (* 185 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
@@ -221,7 +220,6 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
-  | No_cmjx_file _ -> 185
   | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
   | Unerasable_position_argument -> 188
@@ -577,10 +575,6 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
-  { number = 185;
-    names = ["no-cmjx-file"];
-    description = "Missing cmjx file.";
-    since = since 5 2 };
   { number = 186;
     names = ["unmutated-mutable"];
     description =
@@ -1171,9 +1165,14 @@ let message = function
          %a"
         vars_explanation Misc.print_see_manual ref_manual
   | No_cmx_file name ->
+      let extension =
+        match !Clflags.jsir with
+        | false -> "cmx"
+        | true -> "cmjx"
+      in
       Printf.sprintf
-        "no cmx file was found in path for module %s, \
-         and its interface was not compiled with -opaque" name
+        "no %s file was found in path for module %s, \
+         and its interface was not compiled with -opaque" extension name
   | Flambda_assignment_to_non_mutable_value ->
       "A potential assignment to a non-mutable value was detected \n\
         in this source file.  Such assignments may generate incorrect code \n\
@@ -1235,10 +1234,6 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
-  | No_cmjx_file name ->
-    Printf.sprintf
-      "no cmjx file was found in path for module %s, \
-       and its interface was not compiled with -opaque" name
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf

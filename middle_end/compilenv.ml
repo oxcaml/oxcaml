@@ -171,7 +171,7 @@ let get_unit_info comp_unit =
         else begin
           try
             let extension =
-            match !Clflags.jsir with
+              match !Clflags.jsir with
               | false -> ".cmx"
               | true -> ".cmjx"
             in
@@ -185,11 +185,7 @@ let get_unit_info comp_unit =
             (Some ui, Some crc)
           with Not_found ->
             let warn =
-              match !Clflags.jsir with
-              | false ->
-                Warnings.No_cmx_file (Global_module.Name.to_string name)
-              | true ->
-                Warnings.No_cmjx_file (Global_module.Name.to_string name)
+              Warnings.No_cmx_file (Global_module.Name.to_string name)
             in
             Location.prerr_warning Location.none warn;
             (None, None)
