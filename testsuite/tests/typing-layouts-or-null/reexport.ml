@@ -86,15 +86,19 @@ let fail = Or_null.This (Or_null.This 5)
 
 [%%expect{|
 module Or_null :
-  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end
+  sig
+    type ('a : value_or_null mod non_null) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
+  end
 Line 4, characters 24-40:
 4 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
-       but an expression was expected of type "('b : value)"
+       but an expression was expected of type
+         "('b : value_or_null mod non_null)"
        The kind of 'a Or_null.t is value_or_null mod everything with 'a
          because it is the primitive type or_null.
-       But the kind of 'a Or_null.t must be a subkind of value
+       But the kind of 'a Or_null.t must be a subkind of
+           value_or_null mod non_null
          because of the definition of t at line 2, characters 2-45.
 |}]
 
@@ -235,7 +239,7 @@ type 'a t = 'a or_null [@@or_null_reexport]
 and t' = int or_null
 
 [%%expect{|
-type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport]
+type ('a : value_or_null mod non_null) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
 and t' = int or_null
 |}]
 
@@ -258,8 +262,8 @@ type 'a t1 = 'a or_null [@@or_null_reexport]
 type 'a t2 = 'a t1 [@@or_null_reexport]
 
 [%%expect{|
-type 'a t1 = 'a or_null = Null | This of 'a [@@or_null_reexport]
-type 'a t2 = 'a t1 = Null | This of 'a [@@or_null_reexport]
+type ('a : value_or_null mod non_null) t1 = 'a or_null = Null | This of 'a [@@or_null_reexport]
+type ('a : value_or_null mod non_null) t2 = 'a t1 = Null | This of 'a [@@or_null_reexport]
 |}]
 
 (* Correct injectivity and variance annotations are accepted. *)
@@ -269,8 +273,8 @@ type !'a t = 'a or_null [@@or_null_reexport]
 type +'a t = 'a or_null [@@or_null_reexport]
 
 [%%expect{|
-type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport]
-type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport]
+type ('a : value_or_null mod non_null) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
+type ('a : value_or_null mod non_null) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
 |}]
 
 (* Incorrect variance annotation fails. *)

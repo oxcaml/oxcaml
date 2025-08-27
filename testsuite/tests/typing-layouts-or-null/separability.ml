@@ -771,7 +771,9 @@ type 'a narrowed = 'a Or_null_reexport.t accepts_nonfloat
 
 [%%expect{|
 module Or_null_reexport :
-  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end
+  sig
+    type ('a : value_or_null mod non_null) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
+  end
 type ('a : value mod non_float) narrowed =
     'a Or_null_reexport.t accepts_nonfloat
 |}]
