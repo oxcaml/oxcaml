@@ -105,7 +105,7 @@ type t =
   | Inlining_impossible of string           (* 55 *)
   | Unreachable_case                        (* 56 *)
   | Ambiguous_var_in_pattern_guard of string list (* 57 *)
-  | No_cmx_file of string                   (* 58 *)
+  | No_cmx_file of string * string          (* 58 *)
   | Flambda_assignment_to_non_mutable_value (* 59 *)
   | Unused_module of string                 (* 60 *)
   | Unboxable_type_in_prim_decl of string   (* 61 *)
@@ -122,8 +122,6 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
-  | No_cmjx_file of string                  (* 185 *)
-  (* CR selee: 186 taken in main - will be filled in post-rebase *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
   | Unnecessarily_partial_tuple_pattern     (* 189 *)
@@ -218,7 +216,6 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
-  | No_cmjx_file _ -> 185
   | Incompatible_with_upstream _ -> 187
   | Unerasable_position_argument -> 188
   | Unnecessarily_partial_tuple_pattern -> 189
@@ -573,10 +570,6 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
-  { number = 185;
-    names = ["no-cmjx-file"];
-    description = "Missing cmjx file.";
-    since = since 5 2 };
   { number = 187;
     names = ["incompatible-with-upstream"];
     description = "Extension usage is incompatible with upstream.";
@@ -1155,10 +1148,10 @@ let message = function
          Only the first match will be used to evaluate the guard expression.\n\
          %a"
         vars_explanation Misc.print_see_manual ref_manual
-  | No_cmx_file name ->
+  | No_cmx_file (extension, name) ->
       Printf.sprintf
-        "no cmx file was found in path for module %s, \
-         and its interface was not compiled with -opaque" name
+        "no %s file was found in path for module %s, \
+         and its interface was not compiled with -opaque" extension name
   | Flambda_assignment_to_non_mutable_value ->
       "A potential assignment to a non-mutable value was detected \n\
         in this source file.  Such assignments may generate incorrect code \n\
@@ -1220,10 +1213,6 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
-  | No_cmjx_file name ->
-      Printf.sprintf
-        "no cmjx file was found in path for module %s, \
-         and its interface was not compiled with -opaque" name
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf
       "Usage of layout immediate/immediate64 in %s \n\
