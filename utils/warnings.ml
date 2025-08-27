@@ -122,6 +122,8 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
+  | No_cmjx_file of string                  (* 185 *)
+  (* CR selee: 186 taken in main - will be filled in post-rebase *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
   | Unnecessarily_partial_tuple_pattern     (* 189 *)
@@ -132,9 +134,9 @@ type t =
   | Mod_by_top of string                    (* 211 *)
   (* 212 taken *)
   | Modal_axis_specified_twice of
-    { axis : string;
-      overriden_by : string;
-    } (* 213 *)
+      { axis : string;
+        overriden_by : string;
+      } (* 213 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -216,6 +218,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | No_cmjx_file _ -> 185
   | Incompatible_with_upstream _ -> 187
   | Unerasable_position_argument -> 188
   | Unnecessarily_partial_tuple_pattern -> 189
@@ -569,6 +572,10 @@ let descriptions = [
     names = ["generative-application-expects-unit"];
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
+    since = since 5 1 };
+  { number = 185;
+    names = ["no-cmjx-file"];
+    description = "Missing cmjx file.";
     since = since 5 1 };
   { number = 187;
     names = ["incompatible-with-upstream"];
@@ -1150,7 +1157,7 @@ let message = function
         vars_explanation Misc.print_see_manual ref_manual
   | No_cmx_file name ->
       Printf.sprintf
-        "no cmx file was found in path for module %s, \
+        "no .cmx file was found in path for module %s, \
          and its interface was not compiled with -opaque" name
   | Flambda_assignment_to_non_mutable_value ->
       "A potential assignment to a non-mutable value was detected \n\
@@ -1213,6 +1220,10 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
+  | No_cmjx_file name ->
+      Printf.sprintf
+        "no .cmjx file was found in path for module %s, \
+         and its interface was not compiled with -opaque" name
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf
       "Usage of layout immediate/immediate64 in %s \n\
