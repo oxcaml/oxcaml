@@ -237,21 +237,17 @@ val make_instruction :
   ?live:Reg.Set.t ->
   stack_offset:int ->
   id:InstructionId.t ->
-  ?irc_work_list:irc_work_list ->
   ?available_before:Reg_availability_set.t option ->
   ?available_across:Reg_availability_set.t option ->
   unit ->
   'a instruction
 
-(** Make sure that the default parameter value of [irc_work_list] is
-    reasonable before using. *)
 val make_instruction_from_copy :
   'a instruction ->
   desc:'b ->
   id:InstructionId.t ->
   ?arg:Reg.t array ->
   ?res:Reg.t array ->
-  ?irc_work_list:irc_work_list ->
   unit ->
   'b instruction
 
