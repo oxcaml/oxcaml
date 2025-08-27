@@ -22,7 +22,7 @@ module DS = Dwarf_state
 module L = Linear
 
 let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
-    available_ranges_vars inlined_frame_ranges =
+    available_ranges_all_vars inlined_frame_ranges =
   let parent = Dwarf_state.compilation_unit_proto_die state in
   let fun_name = fundecl.fun_name in
   let loc = Debuginfo.to_location fundecl.fun_dbg in
@@ -83,7 +83,8 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
     Profile.record "dwarf_variables_and_parameters"
       (fun () ->
         Dwarf_variables_and_parameters.dwarf state
-          ~function_proto_die:concrete_instance_proto_die available_ranges_vars)
+          ~function_proto_die:concrete_instance_proto_die
+          available_ranges_all_vars)
       ~accumulate:true ();
   (* CR mshinwell: When cross-referencing of DIEs across files is necessary we
      need to be careful about symbol table size. let name = Printf.sprintf

@@ -30,8 +30,20 @@ module CL = Cfg_with_layout
 module L = Linear
 module DLL = Oxcaml_utils.Doubly_linked_list
 
-let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
-    L.instruction =
+let phantom_defining_expr_to_linear (expr : Cfg.phantom_defining_expr) =
+  match expr with
+  | Cphantom_const_int i -> L.lphantom_const_int i
+  | Cphantom_const_symbol s -> L.lphantom_const_symbol s
+  | Cphantom_var v -> L.lphantom_var v
+  | Cphantom_offset_var { var; offset_in_words } ->
+    L.lphantom_offset_var ~var ~offset_in_words
+  | Cphantom_read_field { var; field } -> L.lphantom_read_field ~var ~field
+  | Cphantom_read_symbol_field { sym; field } ->
+    L.lphantom_read_symbol_field ~sym ~field
+  | Cphantom_block { tag; fields } -> L.lphantom_block ~tag ~fields
+
+let to_linear_instr ?(like : _ Cfg.instruction option)
+    ~(phantom_vars : Backend_var.Set.t option) desc ~next : L.instruction =
   let arg, res, dbg, live, fdo, available_before, available_across =
     match like with
     | None ->
@@ -45,11 +57,22 @@ let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
         like.available_before,
         like.available_across )
   in
-  { desc; next; arg; res; dbg; live; fdo; available_before; available_across }
+  { desc;
+    next;
+    arg;
+    res;
+    dbg;
+    live;
+    fdo;
+    available_before;
+    available_across;
+    phantom_available_before = phantom_vars
+  }
 
-let basic_to_linear (i : _ Cfg.instruction) ~next =
+let basic_to_linear (i : _ Cfg.instruction)
+    ~(phantom_vars : Backend_var.Set.t option) ~next =
   let desc = Cfg_to_linear_desc.from_basic i.desc in
-  to_linear_instr ~like:i desc ~next
+  to_linear_instr ~like:i ~phantom_vars desc ~next
 
 (* Certain "unordered" outcomes of float comparisons are not expressible as a
    single Cmm.float_comparison operator, or a disjunction of disjoint
@@ -106,6 +129,7 @@ let cross_section cfg_with_layout src dst =
 
 let linearize_terminator cfg_with_layout (func : string) start
     (terminator : Cfg.terminator Cfg.instruction)
+    ~(phantom_vars : Backend_var.Set.t option)
     ~(next : Linear_utils.labelled_insn) ~has_epilogue :
     L.instruction * Label.t option =
   (* CR-someday gyorsh: refactor, a lot of redundant code for different cases *)
@@ -335,7 +359,7 @@ let linearize_terminator cfg_with_layout (func : string) start
   let instr =
     List.fold_left
       (fun next desc ->
-        let instr = to_linear_instr desc ~next ~like:terminator in
+        let instr = to_linear_instr ~like:terminator ~phantom_vars desc ~next in
         match has_epilogue with
         (* In order to match the debug info generated when the epilogue was not
            a linear instruction, we need to explicitly remove debug info, as
@@ -379,7 +403,9 @@ let adjust_stack_offset body (block : Cfg.basic_block)
   then body
   else
     let delta_bytes = block_stack_offset - prev_stack_offset in
-    to_linear_instr (Ladjust_stack_offset { delta_bytes }) ~next:body
+    to_linear_instr ~phantom_vars:None
+      (Ladjust_stack_offset { delta_bytes })
+      ~next:body
 
 let make_Llabel cfg_with_layout label =
   Linear.Llabel
@@ -397,6 +423,21 @@ let run cfg_with_layout =
   let layout = CL.layout cfg_with_layout in
   let next = ref Linear_utils.labelled_insn_end in
   let tailrec_label = ref None in
+  (* Compute the set of all phantom variables for this function. Phantom
+     variables represent optimized-away values that can be reconstructed from
+     other values for debugging purposes. Unlike regular variables that have
+     specific availability ranges, phantom variables are made available
+     throughout the entire function since they don't correspond to actual
+     runtime values that change. *)
+  let phantom_vars =
+    if Backend_var.Map.is_empty (Cfg.fun_phantom_lets cfg)
+    then None
+    else
+      Some
+        (Backend_var.Map.fold
+           (fun var _ acc -> Backend_var.Set.add var acc)
+           (Cfg.fun_phantom_lets cfg) Backend_var.Set.empty)
+  in
   DLL.iter_right_cell layout ~f:(fun cell ->
       let label = DLL.value cell in
       if not (Label.Tbl.mem cfg.blocks label)
@@ -412,14 +453,14 @@ let run cfg_with_layout =
         in
         let terminator, terminator_tailrec_label =
           linearize_terminator cfg_with_layout cfg.fun_name block.start
-            block.terminator ~next:!next ~has_epilogue
+            block.terminator ~phantom_vars ~next:!next ~has_epilogue
         in
         (match !tailrec_label, terminator_tailrec_label with
         | (Some _ | None), None -> ()
         | None, Some _ -> tailrec_label := terminator_tailrec_label
         | Some old_trl, Some new_trl -> assert (Label.equal old_trl new_trl));
         DLL.fold_right
-          ~f:(fun i next -> basic_to_linear i ~next)
+          ~f:(fun i next -> basic_to_linear i ~phantom_vars ~next)
           ~init:terminator block.body
       in
       let insn =
@@ -428,7 +469,7 @@ let run cfg_with_layout =
         | Some prev_cell ->
           let body =
             if block.is_trap_handler
-            then to_linear_instr Lentertrap ~next:body
+            then to_linear_instr ~phantom_vars:None Lentertrap ~next:body
             else body
           in
           let prev = DLL.value prev_cell in
@@ -436,7 +477,7 @@ let run cfg_with_layout =
           let body =
             if need_starting_label cfg_with_layout block ~prev_block
             then
-              to_linear_instr
+              to_linear_instr ~phantom_vars:None
                 (make_Llabel cfg_with_layout block.start)
                 ~next:body
             else body
@@ -467,5 +508,10 @@ let run cfg_with_layout =
     fun_num_stack_slots;
     fun_frame_required;
     fun_prologue_required;
-    fun_section_name
+    fun_section_name;
+    fun_phantom_lets =
+      Backend_var.Map.map
+        (fun (provenance, defining_expr) ->
+          provenance, phantom_defining_expr_to_linear defining_expr)
+        (Cfg.fun_phantom_lets cfg)
   }

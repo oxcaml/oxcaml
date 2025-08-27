@@ -93,6 +93,18 @@ let dwarf_for_fundecl t fundecl ~fun_end_label =
           ~accumulate:true fundecl
       else Available_ranges_vars.empty, fundecl
     in
+    let available_ranges_phantom_vars, fundecl =
+      if not !Dwarf_flags.restrict_to_upstream_dwarf
+      then
+        Profile.record "debug_available_ranges_phantom_vars"
+          (fun fundecl -> Available_ranges_phantom_vars.create fundecl)
+          ~accumulate:true fundecl
+      else Available_ranges_phantom_vars.empty, fundecl
+    in
+    let available_ranges_all_vars =
+      Available_ranges_all_vars.create ~available_ranges_vars
+        ~available_ranges_phantom_vars fundecl
+    in
     let inlined_frame_ranges, fundecl =
       Profile.record "debug_inlined_frame_ranges"
         (fun fundecl -> Inlined_frame_ranges.create fundecl)
@@ -101,7 +113,7 @@ let dwarf_for_fundecl t fundecl ~fun_end_label =
     Dwarf_concrete_instances.for_fundecl ~get_file_id:t.get_file_id t.state
       fundecl
       ~fun_end_label:(Asm_label.create_int Text (fun_end_label |> Label.to_int))
-      available_ranges_vars inlined_frame_ranges;
+      available_ranges_all_vars inlined_frame_ranges;
     { fun_end_label; fundecl }
 
 let emit t ~basic_block_sections ~binary_backend_available =

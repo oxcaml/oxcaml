@@ -114,7 +114,8 @@ module Instruction = struct
       irc_work_list = Unknown_list;
       ls_order = -1;
       available_before = None;
-      available_across = None
+      available_across = None;
+      phantom_available_before = None
     }
 
   let compare (left : t) (right : t) : int =

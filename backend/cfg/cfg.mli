@@ -65,6 +65,30 @@ type basic_block =
            trap stack. *)
   }
 
+type phantom_defining_expr = private
+  | Cphantom_const_int of Targetint.t
+  | Cphantom_const_symbol of string
+  | Cphantom_var of Backend_var.t
+  | Cphantom_offset_var of
+      { var : Backend_var.t;
+        offset_in_words : int
+      }
+  | Cphantom_read_field of
+      { var : Backend_var.t;
+        field : int
+      }
+  | Cphantom_read_symbol_field of
+      { sym : string;
+        field : int
+      }
+  | Cphantom_block of
+      { tag : int;
+        fields : Backend_var.t list
+      }
+
+val phantom_defining_expr_of_cmm :
+  Cmm.phantom_defining_expr -> phantom_defining_expr
+
 (* Subset of Cmm.codegen_option. *)
 type codegen_option =
   | Reduce_code_size
@@ -105,9 +129,13 @@ type t =
         (** Precomputed at register allocation time *)
     fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
     next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
-    fun_ret_type : Cmm.machtype
+    fun_ret_type : Cmm.machtype;
         (** Function return type. As in [fun_args], this value is not used when starting
             from Linear. *)
+    fun_phantom_lets :
+      (Backend_var.Provenance.t option * phantom_defining_expr)
+      Backend_var.Map.t
+        (** Phantom variables and their defining expressions *)
   }
 
 val create :
@@ -120,9 +148,15 @@ val create :
   fun_poll:Lambda.poll_attribute ->
   next_instruction_id:InstructionId.sequence ->
   fun_ret_type:Cmm.machtype ->
+  fun_phantom_lets:
+    (Backend_var.Provenance.t option * phantom_defining_expr) Backend_var.Map.t ->
   t
 
 val fun_name : t -> string
+
+val fun_phantom_lets :
+  t ->
+  (Backend_var.Provenance.t option * phantom_defining_expr) Backend_var.Map.t
 
 val entry_label : t -> Label.t
 
@@ -235,6 +269,7 @@ val make_instruction :
   ?ls_order:int ->
   ?available_before:Reg_availability_set.t option ->
   ?available_across:Reg_availability_set.t option ->
+  ?phantom_available_before:Backend_var.Set.t option ->
   unit ->
   'a instruction
 

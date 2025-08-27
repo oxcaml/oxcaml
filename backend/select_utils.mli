@@ -45,7 +45,9 @@ type environment =
       (Reg.t array * V.Provenance.t option * Asttypes.mutable_flag) V.Map.t;
     static_exceptions : static_handler Int.Map.t;
     trap_stack : Operation.trap_stack;
-    tailrec_label : Label.t
+    tailrec_label : Label.t;
+    phantom_lets :
+      (Backend_var.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t
   }
 
 val env_create : tailrec_label:Label.t -> environment
@@ -56,6 +58,9 @@ val env_add :
   Reg.t array ->
   environment ->
   environment
+
+val env_add_phantom_let :
+  VP.t -> Cmm.phantom_defining_expr -> environment -> environment
 
 val env_add_static_exception :
   Int.Map.key ->

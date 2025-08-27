@@ -1217,7 +1217,8 @@ let cfg (cl : CL.t) =
         fun_num_stack_slots = _ (* only available after regalloc *);
         fun_poll = _ (* not needed after poll insertion *);
         next_instruction_id = _;
-        fun_ret_type
+        fun_ret_type;
+        fun_phantom_lets = _ (* not used in llvmize *)
       } =
     cfg
   in

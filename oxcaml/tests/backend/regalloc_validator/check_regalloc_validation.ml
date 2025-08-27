@@ -32,7 +32,8 @@ module Instruction = struct
       stack_offset = 0;
       ls_order = -1;
       available_before = None;
-      available_across = None
+      available_across = None;
+      phantom_available_before = None
     }
 end
 

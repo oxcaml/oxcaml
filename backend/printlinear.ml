@@ -49,7 +49,7 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
   let regsetaddr = Printreg.regsetaddr' ~print_reg in
   let test = Operation.format_test ~print_reg in
   let operation = Printoperation.operation ~print_reg in
-  (if !Oxcaml_flags.davail
+  (if !Oxcaml_flags.davail || !Dwarf_flags.debug_avail_sets
   then
     let module RAS = Reg_availability_set in
     let ras_is_nonempty (set : RAS.t) =
@@ -78,6 +78,13 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
           (Misc.Stdlib.Option.print (RAS.print ~print_reg:reg))
           i.available_across;
         fprintf ppf "@]@,"));
+  (if !Oxcaml_flags.davail || !Dwarf_flags.debug_avail_sets
+  then
+    match i.phantom_available_before with
+    | None -> ()
+    | Some phantom_vars ->
+      if not (Backend_var.Set.is_empty phantom_vars)
+      then fprintf ppf "@[<1>PAB={%a}@]@," Backend_var.Set.print phantom_vars);
   (match i.desc with
   | Lend -> ()
   | Lprologue -> fprintf ppf "prologue"
