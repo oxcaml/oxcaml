@@ -19,7 +19,8 @@ type printer_type = Types.type_expr -> Types.type_expr
 
 let type_arrow ta tb =
   let arrow_desc =
-    Types.Nolabel,Mode.Alloc.legacy,Mode.Alloc.legacy
+    Types.Nolabel, Location.mknoloc Mode.Alloc.legacy,
+    Location.mknoloc Mode.Alloc.legacy
   in
   Ctype.newty
     (Tarrow (arrow_desc, Ctype.newmono ta, tb, Types.commu_var ()))

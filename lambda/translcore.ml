@@ -295,7 +295,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
       let return_sort = Jkind.Sort.default_for_transl_and_get method_.ret_sort in
       { params = self_param :: method_.params;
         body = method_.body;
-        return_mode = transl_alloc_mode_l method_.ret_mode;
+        return_mode = transl_alloc_mode_l method_.ret_mode.txt;
         return_sort;
         region = true;
       }
@@ -1583,7 +1583,7 @@ and transl_tupled_function
       Tfunction_body body ->
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let case = { c_lhs = pat; c_guard = None; c_rhs = body } in
-        Some ([ case ], fp_partial, pat, fp_mode, fp_sort)
+        Some ([ case ], fp_partial, pat, fp_mode.txt, fp_sort)
     | _ -> None
   in
   (* Cases can be eligible for flattening if they belong to the only param
@@ -1701,7 +1701,8 @@ and transl_curried_function ~scopes loc repr params body
     ~return_sort ~return_layout ~return_mode ~region ~mode
   =
   let { nlocal } =
-    let param_curries = List.map (fun fp -> fp.fp_curry, fp.fp_mode) params in
+    let param_curries = 
+      List.map (fun fp -> fp.fp_curry, fp.fp_mode.txt) params in
     curried_function_kind
       ~return_mode
       ~mode
@@ -1765,7 +1766,7 @@ and transl_curried_function ~scopes loc repr params body
         in
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let arg_layout = layout arg_env fp_loc fp_sort arg_type in
-        let arg_mode = transl_alloc_mode_l fp_mode in
+        let arg_mode = transl_alloc_mode_l fp_mode.txt in
         let param =
           { name = fp_param;
             debug_uid = fp_param_debug_uid;
@@ -1893,7 +1894,7 @@ and transl_function ~in_new_scope ~scopes e params body
       update_assume_zero_alloc ~scopes ~assume_zero_alloc
     else enter_anonymous_function ~scopes ~assume_zero_alloc
   in
-  let sreturn_mode = transl_alloc_mode_l sreturn_mode in
+  let sreturn_mode = transl_alloc_mode_l sreturn_mode.txt in
   let { params; body; return_sort; return_mode; region } =
     fuse_method_arity
       { params; body;

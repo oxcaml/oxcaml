@@ -757,13 +757,13 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           let arg_cty =
             if Btype.is_position l then
               ctyp Ttyp_call_pos (newconstr Predef.path_lexing_position [])
-            else transl_type env ~policy ~row_context arg_mode arg
+            else transl_type env ~policy ~row_context arg_mode.txt arg
           in
-          let acc_mode = curry_mode acc_mode arg_mode in
+          let acc_mode = curry_mode acc_mode arg_mode.txt in
           let ret_mode =
             match rest with
             | [] -> ret_mode
-            | _ :: _ -> acc_mode
+            | _ :: _ -> Location.mknoloc acc_mode
           in
           let ret_cty = loop acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
@@ -779,14 +779,15 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                 (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
             end
           in
-          let arg_mode = Alloc.of_const arg_mode in
-          let ret_mode = Alloc.of_const ret_mode in
-          let arrow_desc = (l, arg_mode, ret_mode) in
+          let arg_mode = Alloc.of_const arg_mode.txt in
+          let ret_mode = Alloc.of_const ret_mode.txt in
+          let arrow_desc = (l, Location.mknoloc arg_mode, 
+                            Location.mknoloc ret_mode) in
           let ty =
             newty (Tarrow(arrow_desc, arg_ty, ret_cty.ctyp_type, commu_ok))
           in
           ctyp (Ttyp_arrow (l, arg_cty, ret_cty)) ty
-        | [] -> transl_type env ~policy ~row_context ret_mode ret
+        | [] -> transl_type env ~policy ~row_context ret_mode.txt ret
       in
       loop mode args
   | Ptyp_tuple stl ->

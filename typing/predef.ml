@@ -463,7 +463,7 @@ let mk_add_extension add_extension id args =
               {
                 ca_type;
                 ca_sort;
-                ca_modalities=Mode.Modality.Value.Const.id;
+                ca_modalities=Location.mknoloc Mode.Modality.Value.Const.id;
                 ca_loc=Location.none
               })
             args);
@@ -496,7 +496,7 @@ let variant constrs =
 let unrestricted tvar ca_sort =
   {ca_type=tvar;
    ca_sort;
-   ca_modalities=Mode.Modality.Value.Const.id;
+   ca_modalities=Location.mknoloc Mode.Modality.Value.Const.id;
    ca_loc=Location.none}
 
 (* CR layouts: Changes will be needed here as we add support for the built-ins
@@ -619,7 +619,7 @@ let build_initial_env add_type add_extension empty_env =
              {
                ld_id=id;
                ld_mutable=Immutable;
-               ld_modalities=Mode.Modality.Value.Const.id;
+               ld_modalities=Location.mknoloc Mode.Modality.Value.Const.id;
                ld_type=field_type;
                ld_sort=Jkind.Sort.Const.value;
                ld_loc=Location.none;

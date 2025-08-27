@@ -347,7 +347,7 @@ let name_expression ~loc ~attrs sort exp =
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
-      val_modalities = Mode.Modality.Value.id;
+      val_modalities = Location.mknoloc Mode.Modality.Value.id;
       val_uid = Uid.internal_not_actually_unique; }
   in
   let sg = [Sig_value(id, vd, Exported)] in
@@ -355,7 +355,7 @@ let name_expression ~loc ~attrs sort exp =
     { pat_desc =
         Tpat_var(id, mknoloc name, vd.val_uid,
           Jkind.Sort.(of_const Const.for_module_field),
-          Mode.Value.disallow_right Mode.Value.legacy);
+          Location.mknoloc (Mode.Value.disallow_right Mode.Value.legacy));
       pat_loc = loc;
       pat_extra = [];
       pat_type = exp.exp_type;

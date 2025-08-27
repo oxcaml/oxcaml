@@ -2089,8 +2089,9 @@ module Const = struct
         { layout = base.layout;
           mod_bounds = base.mod_bounds;
           with_bounds =
-            With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
-              ~type_expr:type_ base.with_bounds
+            With_bounds.add_modality ~modality:modality.txt
+              ~relevant_for_shallow:`Irrelevant ~type_expr:type_
+              base.with_bounds
         })
     | Default | Kind_of _ -> raise ~loc:jkind.pjkind_loc Unimplemented_syntax
 
@@ -2503,7 +2504,7 @@ let all_void_labels lbls =
 let add_labels_as_with_bounds lbls jkind =
   List.fold_right
     (fun (lbl : Types.label_declaration) ->
-      add_with_bounds ~type_expr:lbl.ld_type ~modality:lbl.ld_modalities)
+      add_with_bounds ~type_expr:lbl.ld_type ~modality:lbl.ld_modalities.txt)
     lbls jkind
 
 let for_boxed_record lbls =
@@ -2521,7 +2522,7 @@ let for_boxed_record lbls =
 let for_unboxed_record lbls =
   let open Types in
   let tys_modalities =
-    List.map (fun lbl -> lbl.ld_type, lbl.ld_modalities) lbls
+    List.map (fun lbl -> lbl.ld_type, lbl.ld_modalities.txt) lbls
   in
   let layouts =
     List.map
@@ -2641,7 +2642,8 @@ let for_boxed_variant ~loc cstrs =
       | Cstr_tuple args ->
         List.fold_right
           (fun arg ->
-            add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
+            add_with_bounds ~modality:arg.ca_modalities.txt
+              ~type_expr:arg.ca_type)
           args jkind
       | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
     in

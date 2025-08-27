@@ -2,7 +2,10 @@ open Typedtree
 open Types
 
 let mkTvar name = Tvar name
-let mkTarrow (label, t1, t2, comm) = Tarrow (label, t1, t2, comm)
+
+let mkTarrow ((label, arg_mode, ret_mode), t1, t2, comm) =
+  Tarrow
+    ((label, Location.mknoloc arg_mode, Location.mknoloc ret_mode), t1, t2, comm)
 
 type texp_ident_identifier = unit
 

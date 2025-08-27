@@ -1593,7 +1593,7 @@ end = struct
 
   let array_index mut i t =
     let modality = Typemode.transl_modalities ~maturity:Stable mut [] in
-    modal_child modality (Projection.Array_index i) t
+    modal_child modality.txt (Projection.Array_index i) t
 
   let memory_address t = child Projection.Memory_address t
 
@@ -1978,7 +1978,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
         List.mapi
           (fun i (pat, { Types.ca_modalities = gf; _ }) ->
             let name = Longident.last lbl.txt in
-            let paths = Paths.construct_field gf name i paths in
+            let paths = Paths.construct_field gf.txt name i paths in
             pattern_match_single pat paths)
           pats_args
         |> conjuncts_pattern_match
@@ -1993,7 +1993,9 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
     | Tpat_record (pats, _) ->
       List.map
         (fun (_, l, pat) ->
-          let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
+          let paths =
+            Paths.record_field l.lbl_modalities.txt l.lbl_name paths
+          in
           pattern_match_single pat paths)
         pats
       |> conjuncts_pattern_match
@@ -2001,7 +2003,8 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       List.map
         (fun (_, l, pat) ->
           let paths =
-            Paths.record_unboxed_product_field l.lbl_modalities l.lbl_name paths
+            Paths.record_unboxed_product_field l.lbl_modalities.txt l.lbl_name
+              paths
           in
           pattern_match_single pat paths)
         pats
@@ -2288,7 +2291,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
           match field with
           | l, Kept (_, _, unique_use) ->
             let value =
-              Value.implicit_record_field l.lbl_modalities l.lbl_name value
+              Value.implicit_record_field l.lbl_modalities.txt l.lbl_name value
                 unique_use
             in
             Value.mark_maybe_unique value
@@ -2312,7 +2315,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
           match field with
           | l, Kept (_, _, unique_use) ->
             let value =
-              Value.implicit_record_unboxed_product_field l.lbl_modalities
+              Value.implicit_record_unboxed_product_field l.lbl_modalities.txt
                 l.lbl_name value unique_use
             in
             Value.mark_maybe_unique value
@@ -2522,7 +2525,7 @@ and check_uniqueness_exp_as_value ienv exp : Value.t * UF.t =
       in
       let uf_boxing, value =
         let occ = Occurrence.mk loc in
-        let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
+        let paths = Paths.record_field l.lbl_modalities.txt l.lbl_name paths in
         match float with
         | Non_boxing unique_use ->
           UF.unused, Value.existing paths unique_use occ
@@ -2540,7 +2543,7 @@ and check_uniqueness_exp_as_value ienv exp : Value.t * UF.t =
     | Some paths ->
       let occ = Occurrence.mk loc in
       let paths =
-        Paths.record_unboxed_product_field l.lbl_modalities l.lbl_name paths
+        Paths.record_unboxed_product_field l.lbl_modalities.txt l.lbl_name paths
       in
       let value = Value.existing paths unique_use occ in
       value, uf)

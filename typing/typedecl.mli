@@ -15,6 +15,7 @@
 
 (* Typing of type definitions and primitive definitions *)
 
+open Asttypes
 open Types
 open Format
 
@@ -35,7 +36,7 @@ val transl_type_extension:
     Typedtree.type_extension * Env.t * Shape.t list
 
 val transl_value_decl:
-    Env.t -> modalities:Mode.Modality.Value.t -> Location.t ->
+    Env.t -> modalities:Mode.Modality.Value.t loc -> Location.t ->
     Parsetree.value_description -> Typedtree.value_description * Env.t
 
 (* If the [fixed_row_path] optional argument is provided,
