@@ -21,6 +21,7 @@ type 'd const =
   | Forced_lazy_expression : (disallowed * 'r) neg const
   | Is_function_return : (disallowed * 'r) pos const
   | Stack_expression : ('l * disallowed) pos const
+  | Module_allocation : (disallowed * 'r) pos const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 

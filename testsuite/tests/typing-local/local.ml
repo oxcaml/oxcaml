@@ -679,7 +679,6 @@ Error: Signature mismatch:
 
 (* Don't escape through a lazy value *)
 
-(* CR zqian: should express that modules are always global. *)
 let foo (local_ x) =
   let _ = lazy (print_string !x) in
   ()
@@ -705,7 +704,8 @@ Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
 Error: The value "x" is "local" but is expected to be "global"
-       because it is used inside a functor which is expected to be "global".
+       because it is used inside a functor which is expected to be "global"
+       because it is a module and thus always allocated on the heap.
 |}]
 
 (* Don't escape through a functor with underscore parameter *)
@@ -721,7 +721,8 @@ Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
 Error: The value "x" is "local" but is expected to be "global"
-       because it is used inside a functor which is expected to be "global".
+       because it is used inside a functor which is expected to be "global"
+       because it is a module and thus always allocated on the heap.
 |}]
 
 (* Don't escape through a generative functor *)
@@ -737,7 +738,8 @@ Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
 Error: The value "x" is "local" but is expected to be "global"
-       because it is used inside a functor which is expected to be "global".
+       because it is used inside a functor which is expected to be "global"
+       because it is a module and thus always allocated on the heap.
 |}]
 
 (* Don't escape through a functor with underscore parameter *)
@@ -753,7 +755,8 @@ Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
 Error: The value "x" is "local" but is expected to be "global"
-       because it is used inside a functor which is expected to be "global".
+       because it is used inside a functor which is expected to be "global"
+       because it is a module and thus always allocated on the heap.
 |}]
 
 (* Don't escape through a generative functor *)
@@ -769,7 +772,8 @@ Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
 Error: The value "x" is "local" but is expected to be "global"
-       because it is used inside a functor which is expected to be "global".
+       because it is used inside a functor which is expected to be "global"
+       because it is a module and thus always allocated on the heap.
 |}]
 
 (* Don't escape through a class method *)
