@@ -490,7 +490,6 @@ let insert_block :
               live;
               stack_offset;
               id = next_instruction_id ();
-              irc_work_list = Unknown_list;
               available_before;
               available_across
             };

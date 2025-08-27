@@ -27,7 +27,6 @@ module Instruction = struct
       id;
       dbg = Debuginfo.none;
       fdo = None;
-      irc_work_list = Unknown_list;
       live = Reg.Set.empty;
       stack_offset = 0;
       available_before = None;
@@ -194,8 +193,7 @@ let entry_label =
                fdo = None;
                stack_offset = 0;
                id = 1;
-               live = Reg.Set.empty;
-               irc_work_list = Unknown_list
+               live = Reg.Set.empty
              }
          };
        let cfg =
