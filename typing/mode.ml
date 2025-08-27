@@ -1862,6 +1862,10 @@ module Report = struct
         type a l r.
         (l * r) Solver_intf.branch -> a C.obj -> a -> a -> [`First | `Second] =
      fun b a_obj x y ->
+      (* CR-someday zqian: in the case where [x = y], we currently arbitrarily choose from
+         [x] and [y], which are unordered anyway. In the future we might want to keep an
+         order for better error messages. For example, order them by occurrence in the
+         source code such that the more recent hint is returned. *)
       match b with
       | Join ->
         if C.le a_obj x y

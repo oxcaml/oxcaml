@@ -156,7 +156,6 @@ Error: This value is "local" but is expected to be "global".
 (* after discussion with sdolan, we agree that
   the following cannot type check because of lock;
   lazy is not commonly used anyway. *)
-(* CR zqian: this should express that lazy expression are always global *)
 let f: local_ _ -> int lazy_t =
   fun n -> lazy n
 [%%expect{|
