@@ -2026,15 +2026,20 @@ module Report = struct
     | _ -> mode_printer ppf x
    [@@ocaml.warning "-4"]
 
+  let adjust_side : type a. a C.obj -> [`Left | `Right] -> [`Actual | `Expected]
+      =
+   fun obj side ->
+    match C.is_opposite obj, side with
+    | true, `Left -> `Expected
+    | true, `Right -> `Actual
+    | false, `Left -> `Actual
+    | false, `Right -> `Expected
+
   let print_mode_with_side :
       type a.
-      sub:bool ->
-      [`Actual | `Expected] ->
-      a C.obj ->
-      Format.formatter ->
-      a ->
-      unit =
+      sub:bool -> [`Left | `Right] -> a C.obj -> Format.formatter -> a -> unit =
    fun ~sub side obj ppf a ->
+    let side = adjust_side obj side in
     if sub then Format.pp_print_string ppf "which ";
     (match side with
     | `Actual -> pp_print_string ppf "is "
@@ -2065,7 +2070,7 @@ module Report = struct
   let rec print_ahint :
       type a l r.
       ?sub:bool ->
-      [`Actual | `Expected] ->
+      [`Left | `Right] ->
       a C.obj ->
       Format.formatter ->
       (a, l * r) ahint ->
@@ -2111,11 +2116,9 @@ module Report = struct
       a ahint_sided ->
       print_ahint_result =
    fun ?sub obj ppf ahint_sided ->
-    match C.is_opposite obj, ahint_sided with
-    | true, Left ahint -> print_ahint ?sub `Expected obj ppf ahint
-    | true, Right ahint -> print_ahint ?sub `Actual obj ppf ahint
-    | false, Left ahint -> print_ahint ?sub `Actual obj ppf ahint
-    | false, Right ahint -> print_ahint ?sub `Expected obj ppf ahint
+    match ahint_sided with
+    | Left ahint -> print_ahint ?sub `Left obj ppf ahint
+    | Right ahint -> print_ahint ?sub `Right obj ppf ahint
 
   let print :
       type a.
