@@ -968,13 +968,20 @@ let rec lsr_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_right (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | _ -> Cop (Clsr, [c1; c2], dbg)))
+          | _ -> 
+            (* Replace Clsr with bit windowing *)
+            Cop (Cbitwindow
+                  { src = n; dst = 0; len = 64 - n;
+                    sign_extend = 0; low_bits = Nativeint.zero },
+                [c1], dbg)))
       | Cop (Clsr, [x; (Cconst_int (n', _) as y)], dbg'), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
            further peephole optimizations *)
         Cop (Clsr, [Cop (Clsr, [x; c2], dbg); y], dbg')
-      | c1, c2 -> Cop (Clsr, [c1; c2], dbg))
+      | c1, c2 -> 
+        (* For variable shift amounts, keep using Clsr for now *)
+        Cop (Clsr, [c1; c2], dbg))
 
 and asr_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -1017,13 +1024,20 @@ and asr_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_right (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | _ -> Cop (Casr, [c1; c2], dbg)))
+          | _ -> 
+            (* Replace Casr with bit windowing *)
+            Cop (Cbitwindow
+                  { src = n; dst = 0; len = 64 - n;
+                    sign_extend = 64; low_bits = Nativeint.zero },
+                [c1], dbg)))
       | Cop (Casr, [x; (Cconst_int (n', _) as y)], z), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
            further peephole optimizations *)
         Cop (Casr, [Cop (Casr, [x; c2], dbg); y], z)
-      | _ -> Cop (Casr, [c1; c2], dbg))
+      | _ -> 
+        (* For variable shift amounts, keep using Casr for now *)
+        Cop (Casr, [c1; c2], dbg))
 
 and lsl_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -1048,13 +1062,20 @@ and lsl_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_left (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | c1 -> Cop (Clsl, [c1; c2], dbg)))
+          | c1 -> 
+            (* Replace Clsl with bit windowing *)
+            Cop (Cbitwindow
+                  { src = 0; dst = n; len = 64 - n;
+                    sign_extend = 0; low_bits = Nativeint.zero },
+                [c1], dbg)))
       | Cop (Clsl, [x; (Cconst_int (n', _) as y)], dbg'), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
            further peephole optimizations *)
         Cop (Clsl, [Cop (Clsl, [x; c2], dbg); y], dbg')
-      | _, _ -> Cop (Clsl, [c1; c2], dbg))
+      | _, _ -> 
+        (* For variable shift amounts, keep using Clsl for now *)
+        Cop (Clsl, [c1; c2], dbg))
 
 and lsl_const c n dbg = lsl_int c (Cconst_int (n, dbg)) dbg
 
@@ -1062,7 +1083,34 @@ and asr_const c n dbg = asr_int c (Cconst_int (n, dbg)) dbg
 
 and lsr_const c n dbg = lsr_int c (Cconst_int (n, dbg)) dbg
 
-let lsl_const0 c n dbg = Cop (Clsl, [c; Cconst_int (n, dbg)], dbg)
+let lsl_const0 c n dbg = 
+  if is_defined_shift n then
+    Cop (Cbitwindow
+          { src = 0; dst = n; len = 64 - n;
+            sign_extend = 0; low_bits = Nativeint.zero },
+        [c], dbg)
+  else
+    Cop (Clsl, [c; Cconst_int (n, dbg)], dbg)
+
+(* Direct bit windowing operations for constant shifts - no Clsl/Clsr/Casr *)
+let lsr_const0 c n dbg =
+  if is_defined_shift n then
+    Cop (Cbitwindow
+          { src = n; dst = 0; len = 64 - n;
+            sign_extend = 0; low_bits = Nativeint.zero },
+        [c], dbg)
+  else
+    Cop (Clsr, [c; Cconst_int (n, dbg)], dbg)
+
+(* Not currently used, but kept for completeness *)
+let _asr_const0 c n dbg =
+  if is_defined_shift n then
+    Cop (Cbitwindow
+          { src = n; dst = 0; len = 64 - n;
+            sign_extend = 64; low_bits = Nativeint.zero },
+        [c], dbg)
+  else
+    Cop (Casr, [c; Cconst_int (n, dbg)], dbg)
 
 let is_power2 n = n = 1 lsl Misc.log2 n
 
@@ -2742,7 +2790,7 @@ let unaligned_set_16 ~ptr_out_of_heap ptr idx newval dbg =
   else
     let cconst_int i = Cconst_int (i, dbg) in
     let v1 =
-      Cop (Cand, [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF], dbg)
+      Cop (Cand, [lsr_const0 newval 8 dbg; cconst_int 0xFF], dbg)
     in
     let v2 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
     let b1, b2 = if Arch.big_endian then v1, v2 else v2, v1 in
@@ -2821,14 +2869,14 @@ let unaligned_set_32 ~ptr_out_of_heap ptr idx newval dbg =
     let cconst_int i = Cconst_int (i, dbg) in
     let v1 =
       Cop
-        (Cand, [Cop (Clsr, [newval; cconst_int 24], dbg); cconst_int 0xFF], dbg)
+        (Cand, [lsr_const0 newval 24 dbg; cconst_int 0xFF], dbg)
     in
     let v2 =
       Cop
-        (Cand, [Cop (Clsr, [newval; cconst_int 16], dbg); cconst_int 0xFF], dbg)
+        (Cand, [lsr_const0 newval 16 dbg; cconst_int 0xFF], dbg)
     in
     let v3 =
-      Cop (Cand, [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF], dbg)
+      Cop (Cand, [lsr_const0 newval 8 dbg; cconst_int 0xFF], dbg)
     in
     let v4 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
     let b1, b2, b3, b4 =
@@ -2974,41 +3022,41 @@ let unaligned_set_64 ~ptr_out_of_heap ptr idx newval dbg =
     let v1 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 7)], dbg); cconst_int 0xFF],
+          [lsr_const0 newval (8 * 7) dbg; cconst_int 0xFF],
           dbg )
     in
     let v2 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 6)], dbg); cconst_int 0xFF],
+          [lsr_const0 newval (8 * 6) dbg; cconst_int 0xFF],
           dbg )
     in
     let v3 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 5)], dbg); cconst_int 0xFF],
+          [lsr_const0 newval (8 * 5) dbg; cconst_int 0xFF],
           dbg )
     in
     let v4 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 4)], dbg); cconst_int 0xFF],
+          [lsr_const0 newval (8 * 4) dbg; cconst_int 0xFF],
           dbg )
     in
     let v5 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 3)], dbg); cconst_int 0xFF],
+          [lsr_const0 newval (8 * 3) dbg; cconst_int 0xFF],
           dbg )
     in
     let v6 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 2)], dbg); cconst_int 0xFF],
+          [lsr_const0 newval (8 * 2) dbg; cconst_int 0xFF],
           dbg )
     in
     let v7 =
-      Cop (Cand, [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF], dbg)
+      Cop (Cand, [lsr_const0 newval 8 dbg; cconst_int 0xFF], dbg)
     in
     let v8 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
     let b1, b2, b3, b4, b5, b6, b7, b8 =
@@ -5076,7 +5124,7 @@ let make_unboxed_int32_array_payload dbg unboxed_int32_list =
             [ (* [a] is sign-extended by default. We need to change it to be
                  zero-extended for the `or` operation to be correct. *)
               zero_extend ~bits:32 a ~dbg;
-              Cop (Clsl, [b; Cconst_int (32, dbg)], dbg) ],
+              lsl_const0 b 32 dbg ],
             dbg )
       in
       aux (i :: acc) r
