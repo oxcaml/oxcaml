@@ -34,6 +34,30 @@ let () = Format.printf "%d@." (get_y t)
 7
 |}]
 
+(* Accessing or mutating a contended atomic field is still an error *)
+
+let get_contended (t @ contended) = t.y
+[%%expect{|
+Line 1, characters 36-37:
+1 | let get_contended (t @ contended) = t.y
+                                        ^
+Error: This value is "contended" but expected to be "shared" or "uncontended".
+  Hint: This record field is atomic,
+  so can be read when the record is contended using [Atomic.Loc.get].
+|}]
+
+let set_contended (t @ contended) v = t.y <- v
+[%%expect{|
+Line 1, characters 38-39:
+1 | let set_contended (t @ contended) v = t.y <- v
+                                          ^
+Error: This value is "contended" but expected to be "uncontended".
+  Hint: This record field is atomic,
+  so can be writen to when the record is contended using
+  the functions in [Atomic.Loc].
+|}]
+
+
 (* Test with non-immediates too *)
 
 type u = {
