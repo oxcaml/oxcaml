@@ -669,6 +669,9 @@ let rewrite_apply_cont_expr env ac =
     in
     Some (Apply_cont_expr.with_continuation_and_args ac cont ~args)
 
+let reaper_produce_invalid_when_never_returns =
+  Sys.getenv_opt "REAPER_INVALIDS" <> None
+
 let make_apply_wrapper env
     (make_apply : continuation:Apply_expr.Result_continuation.t -> Apply_expr.t)
     apply_continuation return_decisions =
@@ -677,17 +680,14 @@ let make_apply_wrapper env
     let apply = make_apply ~continuation:Never_returns in
     RE.from_expr ~expr:(Expr.create_apply apply)
       ~free_names:(Apply.free_names apply)
-  | Return return_cont ->
+  | Return return_cont -> (
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
       Continuation.Map.find return_cont env.cont_params_to_keep
     in
     let return_cont_wrapper = Continuation.rename return_cont in
     let apply = make_apply ~continuation:(Return return_cont_wrapper) in
-    let apply_expr = Expr.create_apply apply in
     let rev_args_or_invalid =
-      (* TODO if the decisions are equal, don't introduce the wrapper. Not
-         really important but this will be simpler for debugging *)
       List.fold_left2
         (fun (rev_args_or_invalid : _ Or_invalid.t) apply_decision func_decision
              : _ Or_invalid.t ->
@@ -737,19 +737,77 @@ let make_apply_wrapper env
         (Or_invalid.Ok (0, []))
         apply_decisions return_decisions
     in
-    let cont_handler =
-      let return_parameters = get_parameters return_decisions in
-      let handler =
-        match rev_args_or_invalid with
-        | Ok (_, rev_args) ->
-          let args = List.rev rev_args in
+    let return_parameters = get_parameters return_decisions in
+    match rev_args_or_invalid with
+    | Ok (_, rev_args) ->
+      let args = List.rev rev_args in
+      if List.compare_lengths args return_parameters = 0
+         && List.for_all2
+              (fun arg param ->
+                Simple.pattern_match'
+                  ~const:(fun _ -> false)
+                  ~symbol:(fun _ ~coercion:_ -> false)
+                  ~var:(fun v ~coercion:_ ->
+                    Variable.equal v (Bound_parameter.var param))
+                  arg)
+              args return_parameters
+      then
+        (* If the decisions are equal, do not introduce the wrapper. The wrapper
+           can turn tail calls into non-tail ones, making it important to not
+           introduce them if not necessary. Fortunately, if there is a loop of
+           possible tail calls [f1 -> f2 -> ... -> fn -> f1] (including indirect
+           calls), then the uses of the results of these functions will all be
+           the same, guanranteeing that they get the same decisions. As such, no
+           wrappers will be needed in these cases, enforcing that tail calls
+           that get turned into non-tail calls can only happen outside of such
+           loops, and thus ensuring that the stack required during execution is
+           only O(1) larger. In pratice, this should not happen much in any
+           case, but a typical example would be:
+
+         * let f x y = #(x, y) in
+         * let g x y = f x y in
+         * fun x y ->
+         *   let #(a, b) = f x y in
+         *   let #(c, _) = g x y in
+         *   a + b + c
+
+           Here, [g] gets a wrapper to return a single value, while [f] does
+           not. As such, the tail call from [g] to [f] is lost. However, this
+           can only happen because the uses of [g] do not match those of [f],
+           which would be the case if there a loop of tail calls between them
+           existed. *)
+        let apply = make_apply ~continuation:(Return return_cont) in
+        RE.from_expr ~expr:(Expr.create_apply apply)
+          ~free_names:(Apply.free_names apply)
+      else
+        let apply_expr = Expr.create_apply apply in
+        let handler =
           let apply_cont =
             Apply_cont_expr.create return_cont ~args ~dbg:(Apply.dbg apply)
           in
           RE.from_expr
             ~expr:(Expr.create_apply_cont apply_cont)
             ~free_names:(Apply_cont_expr.free_names apply_cont)
-        | Invalid ->
+        in
+        let cont_handler =
+          RE.create_continuation_handler
+            (Bound_parameters.create return_parameters)
+            ~handler ~is_exn_handler:false ~is_cold:false
+          (* TODO: take the one from the original return cont *)
+        in
+        let body =
+          RE.from_expr ~expr:apply_expr ~free_names:(Apply.free_names apply)
+        in
+        RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
+    | Invalid ->
+      (* For the same reason as above, we need not to introduce a wrapper in
+         this case. However this makes it impossible to introduce a runtime
+         error if the function actually returns due to a bug in the reaper, so
+         we gate the [Invalid] wrapper behind an option which can be enabled
+         when debugging. *)
+      if reaper_produce_invalid_when_never_returns
+      then
+        let handler =
           RE.from_expr
             ~expr:
               (Expr.create_invalid
@@ -758,16 +816,21 @@ let make_apply_wrapper env
                        Simple.print
                        (Option.get (Apply.callee apply)))))
             ~free_names:Name_occurrences.empty
-      in
-      RE.create_continuation_handler
-        (Bound_parameters.create return_parameters)
-        ~handler ~is_exn_handler:false ~is_cold:false
-      (* TODO: take the one from the original return cont *)
-    in
-    let body =
-      RE.from_expr ~expr:apply_expr ~free_names:(Apply.free_names apply)
-    in
-    RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
+        in
+        let cont_handler =
+          RE.create_continuation_handler
+            (Bound_parameters.create return_parameters)
+            ~handler ~is_exn_handler:false ~is_cold:true
+        in
+        let body =
+          RE.from_expr ~expr:(Expr.create_apply apply)
+            ~free_names:(Apply.free_names apply)
+        in
+        RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
+      else
+        let apply = make_apply ~continuation:Never_returns in
+        RE.from_expr ~expr:(Expr.create_apply apply)
+          ~free_names:(Apply.free_names apply))
 
 let rewrite_call_kind env (call_kind : Call_kind.t) =
   let rewrite_simple = rewrite_simple env in
