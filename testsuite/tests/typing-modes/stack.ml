@@ -224,7 +224,7 @@ Error: This value is "local"
        because it is a stack expression.
        However, it is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let f () = exclave_ stack_ (3, 5)
@@ -403,7 +403,7 @@ Line 3, characters 2-5:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Testing primitives *)

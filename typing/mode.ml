@@ -1966,7 +1966,7 @@ module Report = struct
     | Is_function_return ->
       fprintf ppf
         "is a function return value.@\n\
-         Hint: Use exclave_ to return a local value."
+         Hint: Use exclave_ to return a local value"
     | Stack_expression -> pp_print_string ppf "is a stack expression"
 
   let print_lock_item ppf = function

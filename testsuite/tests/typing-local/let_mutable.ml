@@ -267,7 +267,7 @@ Line 4, characters 2-3:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Can't return [x] if it is local in some cases *)
@@ -283,7 +283,7 @@ Line 4, characters 2-3:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Test 5: Allowed interactions with locals. *)
@@ -635,7 +635,7 @@ Line 4, characters 2-3:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Test 21: Unboxed products not supported yet *)

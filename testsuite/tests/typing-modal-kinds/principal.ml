@@ -17,7 +17,7 @@ Line 1, characters 72-73:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let string_escape_r (local_ y) = let Pair (x, _) = Pair ("hello", y) in x
@@ -29,7 +29,7 @@ Line 1, characters 72-73:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let int_escape_l (local_ y) = let Pair (x, _) = Pair (y, 5) in x
@@ -43,7 +43,7 @@ Line 1, characters 63-64:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let int_escape_r (local_ y) = let Pair (x, _) = Pair (5, y) in x
@@ -57,7 +57,7 @@ Line 1, characters 63-64:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let string_escape_expected_l : local_ _ -> _ pair = fun x -> Pair (x, "hello")

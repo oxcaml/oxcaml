@@ -138,7 +138,7 @@ Line 4, characters 2-7:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Mutable fields cannot be read from
