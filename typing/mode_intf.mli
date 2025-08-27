@@ -165,6 +165,9 @@ module type Common_product = sig
   include
     Common with type simple_error := simple_error and module Const := Const
 
+  (* CR-soon zqian: Move [?target] into hints, and let [report_error] extract this
+     information. *)
+
   (** Takes an optional [lock_item] and identifier of the offending value, and report the
       submode error with hints. *)
   val report_error :
