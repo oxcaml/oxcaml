@@ -27,6 +27,8 @@ val set_ls_order : t -> instruction_id:InstructionId.t -> ls_order:int -> unit
 
 val get_ls_order : t -> instruction_id:InstructionId.t -> int
 
+val ls_order_mapping : t -> InstructionId.t -> int
+
 val invariant_intervals : t -> Cfg_with_infos.t -> unit
 
 val invariant_active : t -> unit
