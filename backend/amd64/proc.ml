@@ -128,7 +128,10 @@ let all_phys_regs =
 
 let phys_reg ty n =
   match (ty : machtype_component) with
-  | Int | Addr | Val -> hard_int_reg.(n)
+  | Int | Addr | Val ->
+    if !Clflags.llvm_backend
+    then { hard_int_reg.(n) with typ = ty }
+    else hard_int_reg.(n)
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)

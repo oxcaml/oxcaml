@@ -26,6 +26,7 @@ type error = Asm_generation of (string * int)
 
 exception Error of error
 
+(* CR yusumez: Maybe have the type of an identifier as part of this type?! *)
 module Ident : sig
   (** LLVM identifiers that start with "%".  This includes
       basic blocks, function parameters, and temporaries
@@ -330,8 +331,14 @@ let add_called_fun t name ~cc ~args ~res =
     in
     if not all_equal
     then
-      Misc.fatal_error
-        "Llvmize: Same function referenced with incompatible signatures");
+      Misc.fatal_errorf
+        "Llvmize: Same function referenced with incompatible signatures: %s \
+         (expected: [%a], got: [%a])"
+        name
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space Llvm_typ.pp_t)
+        args'
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space Llvm_typ.pp_t)
+        args);
   t.called_functions <- String.Map.add name { cc; args; res } t.called_functions
 
 let add_c_call_wrapper t c_fun_name ~args ~res =
@@ -491,6 +498,13 @@ module F = struct
 
   (* == LLVM instructions == *)
 
+  (* CR-soon yusumez: Functions named [ins_*] should not have any side effects
+     (apart from outputting the instruction). This is to make separating
+     printing logic from generating IR itself easier when the Big Refactor:tm:
+     happens in the near future. This is not the case at the moment (e.g.
+     creating identifiers for registers via [get_ident_for_reg] or creating
+     extra labels (as in [ins_switch])) *)
+
   let ins_load t ~src ~dst typ =
     ins t "%a = load %a, ptr %a" pp_ident dst Llvm_typ.pp_t typ pp_ident src
 
@@ -648,6 +662,8 @@ module F = struct
       pp_ident ptr Llvm_typ.pp_t typ pp_ident compare_with Llvm_typ.pp_t typ
       pp_ident set_if_eq
 
+  (* == Helper functions for IR generation == *)
+
   let make_poison t typ =
     let res = fresh_ident t in
     ins_extractvalue t ~arg:Llvm_value.poison ~res Llvm_typ.(Struct [typ]) [0];
@@ -672,38 +688,61 @@ module F = struct
     in
     aux [] (make_poison t root_typ) root_typ
 
-  (* Calculate offset of identifier and handle conversions. *)
-  let do_offset ~arg_is_ptr ~res_is_ptr t ident offset =
-    let int_ident =
-      match arg_is_ptr with
-      | false -> ident
-      | true ->
-        let ptr = fresh_ident t in
-        ins_conv t "ptrtoint" ~src:ident ~dst:ptr ~src_typ:Llvm_typ.ptr
-          ~dst_typ:Llvm_typ.i64;
-        ptr
+  (* Types aren't real anyways. *)
+  (* Note that this should only be used to do no-op casts (equivalent to
+     `bitcast`). *)
+  let cast ~(src : Llvm_typ.t) ~(dst : Llvm_typ.t) t ident =
+    let do_conv op =
+      let res = fresh_ident t in
+      ins_conv t op ~src:ident ~dst:res ~src_typ:src ~dst_typ:dst;
+      res
     in
+    match[@warning "-fragile-match"] src, dst with
+    | _ when Llvm_typ.equal src dst -> ident
+    (* Ptr <-> Int *)
+    | Int _, Ptr _ -> do_conv "inttoptr"
+    | Ptr _, Int _ -> do_conv "ptrtoint"
+    | Ptr _, Ptr _ -> do_conv "addrspacecast"
+    (* Vector <-> Double *)
+    | Double, Vector { size = _; elem_typ = Double } ->
+      let poison = make_poison t dst in
+      let res = fresh_ident t in
+      ins_insertelement t ~src:(Local_ident ident) ~dst:(Local_ident poison)
+        ~src_typ:src ~dst_typ:dst ~res ~idx:(Immediate "0")
+        ~idx_typ:Llvm_typ.i64;
+      res
+    | Vector { size = _; elem_typ = Double }, Double ->
+      let res = fresh_ident t in
+      ins_extractelement t ~src:(Local_ident ident) ~dst:res ~src_typ:src
+        ~idx:(Immediate "0") ~idx_typ:Llvm_typ.i64;
+      res
+    | _ ->
+      Misc.fatal_errorf "Llvmize.cast: unexpected types: %a, %a" Llvm_typ.pp_t
+        src Llvm_typ.pp_t dst
+
+  let do_offset ?(int_typ = Llvm_typ.i64) ~(src : Llvm_typ.t)
+      ~(dst : Llvm_typ.t) t ident offset =
+    let int_ident = cast ~src ~dst:int_typ t ident in
     let offset_ident = fresh_ident t in
-    ins_binop_imm t "add" int_ident (Int.to_string offset) offset_ident
-      Llvm_typ.i64;
-    match res_is_ptr with
-    | false -> offset_ident
-    | true ->
-      let ptr = fresh_ident t in
-      ins_conv t "inttoptr" ~src:offset_ident ~dst:ptr ~src_typ:Llvm_typ.i64
-        ~dst_typ:Llvm_typ.ptr;
-      ptr
+    ins_binop_imm t "add" int_ident (Int.to_string offset) offset_ident int_typ;
+    cast ~src:int_typ ~dst t offset_ident
 
   let load_reg_to_temp t reg =
     let temp = fresh_ident t in
     ins_load_from_reg t temp reg;
     temp
 
-  let load_domainstate_addr ?(as_ptr = true) ?(offset = 0) t ds_field =
+  let cast_and_store_into_reg t typ ident (reg : Reg.t) =
+    let casted =
+      cast ~src:typ ~dst:(Llvm_typ.of_machtyp_component reg.typ) t ident
+    in
+    ins_store_into_reg t casted reg
+
+  let load_domainstate_addr ?(typ = Llvm_typ.ptr) ?(offset = 0) t ds_field =
     let ds = fresh_ident t in
     let offset = offset + (Domainstate.idx_of_field ds_field * 8) in
     ins_load t ~src:domainstate_ident ~dst:ds Llvm_typ.i64;
-    do_offset ~arg_is_ptr:false ~res_is_ptr:as_ptr t ds offset
+    do_offset ~src:Llvm_typ.i64 ~dst:typ t ds offset
 
   let read_rsp t =
     let ident = fresh_ident t in
@@ -715,15 +754,11 @@ module F = struct
     ins t "call void @llvm.write_register.i64(metadata !{!\"rsp\\00\"}, i64 %a)"
       pp_ident ident
 
+  (* Load the address as an ident with type ptr *)
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
     let offset = Arch.addressing_displacement_for_llvmize addr in
     let arg = load_reg_to_temp t i.arg.(n) in
-    let temp = fresh_ident t in
-    let res = fresh_ident t in
-    ins_binop_imm t "add" arg (Int.to_string offset) temp Llvm_typ.i64;
-    ins_conv t "inttoptr" ~src:temp ~dst:res ~src_typ:Llvm_typ.i64
-      ~dst_typ:Llvm_typ.ptr;
-    res
+    do_offset ~src:Llvm_typ.i64 ~dst:Llvm_typ.ptr t arg offset
 
   let int_comp t (comp : Operation.integer_comparison) (i : 'a Cfg.instruction)
       ~imm =
@@ -921,11 +956,12 @@ module F = struct
         do_call ~pp_name:pp_global sym_name
       | Indirect ->
         let fun_temp = load_reg_to_temp t i.arg.(0) in
-        let fun_ptr_temp = fresh_ident t in
-        (* ...we need this since we treat OCaml values as i64 *)
-        ins_conv t "inttoptr" ~src:fun_temp ~dst:fun_ptr_temp
-          ~src_typ:Llvm_typ.i64 ~dst_typ:Llvm_typ.ptr;
-        do_call ~pp_name:pp_ident fun_ptr_temp
+        let fun_ptr =
+          cast
+            ~src:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
+            ~dst:Llvm_typ.ptr t fun_temp
+        in
+        do_call ~pp_name:pp_ident fun_ptr
     in
     if tail
     then (* Return as is *)
@@ -1104,7 +1140,7 @@ module F = struct
         in
         let exn_handler_addr =
           let ptr =
-            do_offset ~arg_is_ptr:false ~res_is_ptr:true t exn_handler_sp 8
+            do_offset ~src:Llvm_typ.i64 ~dst:Llvm_typ.ptr t exn_handler_sp 8
           in
           let res = fresh_ident t in
           ins_load t ~src:ptr ~dst:res Llvm_typ.ptr;
@@ -1112,7 +1148,7 @@ module F = struct
         in
         let exn_payload = load_reg_to_temp t i.arg.(0) in
         let new_sp =
-          do_offset ~arg_is_ptr:false ~res_is_ptr:false t exn_handler_sp 16
+          do_offset ~src:Llvm_typ.i64 ~dst:Llvm_typ.i64 t exn_handler_sp 16
         in
         ins_store t ~src:previous_exn_handler_sp ~dst:ds_exn_handler_sp
           Llvm_typ.i64;
@@ -1367,8 +1403,9 @@ module F = struct
         let res = Some (res_typ, res_ident) in
         call_llvm_intrinsic t name args res;
         let conved_res =
-          do_conv res_ident ~src:res_typ
+          cast ~src:res_typ
             ~dst:(Llvm_typ.of_machtyp_component i.res.(0).typ)
+            t res_ident
         in
         ins_store_into_reg t conved_res i.res.(0)
       in
@@ -1391,6 +1428,7 @@ module F = struct
   (* CR yusumez: check memory.c *)
   let atomic t (i : Cfg.basic Cfg.instruction) (op : Cmm.atomic_op) ~size ~addr
       =
+    (* CR yusumez: potential val mismatch? (test this) *)
     let first_memory_arg_index =
       match op with
       | Compare_set -> 2
@@ -1450,14 +1488,16 @@ module F = struct
     match op with
     | Move ->
       let temp = load_reg_to_temp t i.arg.(0) in
-      ins_store_into_reg t temp i.res.(0)
+      cast_and_store_into_reg t
+        (Llvm_typ.of_machtyp_component i.arg.(0).typ)
+        temp i.res.(0)
     | Opaque ->
       let temp = load_reg_to_temp t i.arg.(0) in
       let typ = Llvm_typ.of_machtyp_component i.res.(0).typ in
       let opaque_temp = fresh_ident t in
       ins t {|%a = call %a asm "", "=r,0"(%a %a)|} pp_ident opaque_temp
         Llvm_typ.pp_t typ Llvm_typ.pp_t typ pp_ident temp;
-      ins_store_into_reg t opaque_temp i.res.(0)
+      cast_and_store_into_reg t typ opaque_temp i.res.(0)
     | Const_int n ->
       ins_store_value t
         ~src:Llvm_value.(Immediate (Nativeint.to_string n))
@@ -1481,27 +1521,28 @@ module F = struct
       not_implemented_basic ~msg:"const" i
     | Load { memory_chunk; addressing_mode; mutability = _; is_atomic = _ } -> (
       (* Q: what do we do with mutability / is_atomic / is_modify? *)
+      (* CR yusumez: val mismatch *)
       let src = load_addr t addressing_mode i 0 in
       let basic typ =
         let temp = fresh_ident t in
         ins_load t ~src ~dst:temp typ;
-        ins_store_into_reg t temp i.res.(0)
+        cast_and_store_into_reg t typ temp i.res.(0)
       in
-      let extend op typ =
+      let extend_int op typ =
         let temp = fresh_ident t in
         let temp2 = fresh_ident t in
         ins_load t ~src ~dst:temp typ;
         ins_conv t op ~src:temp ~dst:temp2 ~src_typ:typ ~dst_typ:Llvm_typ.i64;
-        ins_store_into_reg t temp2 i.res.(0)
+        cast_and_store_into_reg t Llvm_typ.i64 temp i.res.(0)
       in
       match memory_chunk with
       | Word_int | Word_val -> basic Llvm_typ.i64
-      | Byte_unsigned -> extend "zext" Llvm_typ.i8
-      | Byte_signed -> extend "sext" Llvm_typ.i8
-      | Sixteen_unsigned -> extend "zext" Llvm_typ.i16
-      | Sixteen_signed -> extend "sext" Llvm_typ.i16
-      | Thirtytwo_unsigned -> extend "zext" Llvm_typ.i32
-      | Thirtytwo_signed -> extend "sext" Llvm_typ.i32
+      | Byte_unsigned -> extend_int "zext" Llvm_typ.i8
+      | Byte_signed -> extend_int "sext" Llvm_typ.i8
+      | Sixteen_unsigned -> extend_int "zext" Llvm_typ.i16
+      | Sixteen_signed -> extend_int "sext" Llvm_typ.i16
+      | Thirtytwo_unsigned -> extend_int "zext" Llvm_typ.i32
+      | Thirtytwo_signed -> extend_int "sext" Llvm_typ.i32
       | Single { reg = Float32 } -> basic Llvm_typ.float
       | Double -> basic Llvm_typ.double
       | Single { reg = Float64 } ->
@@ -1518,15 +1559,19 @@ module F = struct
     | Store (chunk, addr, _is_modify) -> (
       let dst = load_addr t addr i 1 in
       let basic typ =
-        let temp = fresh_ident t in
-        ins_load_from_reg t temp i.arg.(0);
-        ins_store t ~src:temp ~dst typ
+        let temp = load_reg_to_temp t i.arg.(0) in
+        let casted =
+          cast
+            ~src:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
+            ~dst:typ t temp
+        in
+        ins_store t ~src:casted ~dst typ
       in
       let trunc ?(trunc_op = "trunc") dst_typ =
         let reg_typ = i.arg.(0).typ |> Llvm_typ.of_machtyp_component in
-        let temp = fresh_ident t in
+        (* CR yusumez: do I need to do anything here? *)
+        let temp = load_reg_to_temp t i.arg.(0) in
         let truncated = fresh_ident t in
-        ins_load_from_reg t temp i.arg.(0);
         ins_conv t trunc_op ~src:temp ~dst:truncated ~src_typ:reg_typ ~dst_typ;
         ins_store t ~src:truncated ~dst dst_typ
       in
@@ -1595,12 +1640,13 @@ module F = struct
         let local_top_ptr = load_domainstate_addr t Domain_local_top in
         let local_top = fresh_ident t in
         let new_local_sp_addr = fresh_ident t in
-        let new_local_sp_addr_offset = fresh_ident t in
         ins_load t ~src:local_top_ptr ~dst:local_top Llvm_typ.i64;
         ins_binop t "add" new_local_sp local_top new_local_sp_addr Llvm_typ.i64;
-        ins_binop_imm t "add" new_local_sp_addr "8" new_local_sp_addr_offset
-          Llvm_typ.i64;
-        ins_store_into_reg t new_local_sp_addr_offset i.res.(0)
+        let res =
+          do_offset ~src:Llvm_typ.i64 ~dst:Llvm_typ.val_ptr t new_local_sp_addr
+            8
+        in
+        ins_store_into_reg t res i.res.(0)
       | Heap ->
         (* Make some space *)
         let alloc_ptr = fresh_ident t in
@@ -1643,9 +1689,11 @@ module F = struct
         ins_branch_ident t after_gc_call;
         line t.ppf "%a:" Ident.print after_gc_call;
         let alloc_ptr_after_gc = fresh_ident t in
-        let res = fresh_ident t in
         ins_load t ~src:allocation_ident ~dst:alloc_ptr_after_gc Llvm_typ.i64;
-        ins_binop_imm t "add" alloc_ptr_after_gc "8" res Llvm_typ.i64;
+        let res =
+          do_offset ~src:Llvm_typ.i64 ~dst:Llvm_typ.val_ptr t alloc_ptr_after_gc
+            8
+        in
         ins_store_into_reg t res i.res.(0))
     | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
     | Csel test_op ->
@@ -1775,13 +1823,13 @@ module F = struct
         res
       in
       let rbp_slot =
-        do_offset ~arg_is_ptr:true ~res_is_ptr:true t trap_block 16
+        do_offset ~src:Llvm_typ.ptr ~dst:Llvm_typ.ptr t trap_block 16
       in
       let handler_slot =
-        do_offset ~arg_is_ptr:true ~res_is_ptr:true t trap_block 8
+        do_offset ~src:Llvm_typ.ptr ~dst:Llvm_typ.ptr t trap_block 8
       in
       let prev_sp_slot =
-        do_offset ~arg_is_ptr:true ~res_is_ptr:true t trap_block 0
+        do_offset ~src:Llvm_typ.ptr ~dst:Llvm_typ.ptr t trap_block 0
       in
       ins t {|call void asm sideeffect "mov %%rbp, ($0)", "r"(ptr %a)|} pp_ident
         rbp_slot;
@@ -2234,7 +2282,7 @@ let declare_c_call_wrappers t =
         let c_sp =
           let offset = Domainstate.idx_of_field Domain_c_stack * 8 in
           let c_sp_addr =
-            F.do_offset ~arg_is_ptr:true ~res_is_ptr:true t domainstate_ident
+            F.do_offset ~src:Llvm_typ.ptr ~dst:Llvm_typ.ptr t domainstate_ident
               offset
           in
           let res = fresh_ident t in
@@ -2402,15 +2450,6 @@ let end_assembly () =
 (* CR gyorsh: assume 64-bit architecture *)
 (* CR yusumez: We ignore whether symbols are local/global. *)
 (* CR yusumez: Move all arch-specific things to an arch-specific file. *)
-(* CR yusumez: The structure of this file needs to be completely refactored:
-
-   - Separate IR generation from printing/emitting
-
-   - Make working with identifiers easy (make instructions with results return
-   the fresh identifier themselves, carry their types around, etc.)
-
-   - Factor out small common operations in a better way (eg. for function
-   calls) *)
 
 (* Error report *)
 
