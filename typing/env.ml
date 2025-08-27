@@ -778,7 +778,7 @@ and cltype_data =
 
 let clda_mode = Mode.Value.(
   Const.legacy
-  |> of_const ~hint_monadic:Class_monadic ~hint_comonadic:Class_comonadic)
+  |> of_const ~hint_monadic:Class_legacy_monadic ~hint_comonadic:Class_legacy_comonadic)
 
 let fcomp_res_mode = Types.functor_res_mode |> Mode.Alloc.disallow_right
 

@@ -112,11 +112,11 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Nil -> Nil
        | Min_comonadic -> Min_comonadic
        | Max_monadic -> Max_monadic
-       | Class_comonadic -> Class_comonadic
+       | Class_legacy_comonadic -> Class_legacy_comonadic
        | Stack_expression -> Stack_expression
        | Mutable_read -> Mutable_read
        | Mutable_write -> Mutable_write
-       | Forced_lazy_expression -> Forced_lazy_expression
+       | Lazy_forced -> Lazy_forced
 
     let allow_right : type l r. (l * allowed) const -> (l * r) const =
       fun (type l r) (h : (l * allowed) const) : (l * r) const ->
@@ -124,12 +124,12 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Nil -> Nil
        | Min_monadic -> Min_monadic
        | Max_comonadic -> Max_comonadic
-       | Class_monadic -> Class_monadic
-       | Lazy -> Lazy
+       | Class_legacy_monadic -> Class_legacy_monadic
+       | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
        | Tailcall_function -> Tailcall_function
        | Tailcall_argument -> Tailcall_argument
-       | Is_function_return -> Is_function_return
-       | Module_allocation -> Module_allocation
+       | Function_return -> Function_return
+       | Module_allocated_on_heap -> Module_allocated_on_heap
 
     let disallow_left : type l r. (l * r) const -> (disallowed * r) const =
       fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
@@ -139,17 +139,17 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Min_monadic -> Min_monadic
        | Max_comonadic -> Max_comonadic
        | Max_monadic -> Max_monadic
-       | Lazy -> Lazy
-       | Class_comonadic -> Class_comonadic
-       | Class_monadic -> Class_monadic
+       | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
+       | Class_legacy_comonadic -> Class_legacy_comonadic
+       | Class_legacy_monadic -> Class_legacy_monadic
        | Tailcall_function -> Tailcall_function
        | Tailcall_argument -> Tailcall_argument
        | Mutable_read -> Mutable_read
        | Mutable_write -> Mutable_write
-       | Forced_lazy_expression -> Forced_lazy_expression
-       | Is_function_return -> Is_function_return
+       | Lazy_forced -> Lazy_forced
+       | Function_return -> Function_return
        | Stack_expression -> Stack_expression
-       | Module_allocation -> Module_allocation
+       | Module_allocated_on_heap -> Module_allocated_on_heap
 
     let disallow_right : type l r. (l * r) const -> (l * disallowed) const =
       fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
@@ -159,17 +159,17 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Min_monadic -> Min_monadic
        | Max_comonadic -> Max_comonadic
        | Max_monadic -> Max_monadic
-       | Lazy -> Lazy
-       | Class_comonadic -> Class_comonadic
-       | Class_monadic -> Class_monadic
+       | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
+       | Class_legacy_comonadic -> Class_legacy_comonadic
+       | Class_legacy_monadic -> Class_legacy_monadic
        | Tailcall_function -> Tailcall_function
        | Tailcall_argument -> Tailcall_argument
        | Mutable_read -> Mutable_read
        | Mutable_write -> Mutable_write
-       | Forced_lazy_expression -> Forced_lazy_expression
-       | Is_function_return -> Is_function_return
+       | Lazy_forced -> Lazy_forced
+       | Function_return -> Function_return
        | Stack_expression -> Stack_expression
-       | Module_allocation -> Module_allocation
+       | Module_allocated_on_heap -> Module_allocated_on_heap
   end)
 end
 
@@ -1958,21 +1958,22 @@ module Report = struct
     | Nil -> Misc.fatal_error "Nil hint should not be printed"
     | Min_comonadic | Max_comonadic | Min_monadic | Max_monadic ->
       Misc.fatal_error "Min/Max hint should not be printed"
-    | Lazy -> pp_print_string ppf "is a lazy expression"
-    | Class_monadic | Class_comonadic ->
-      pp_print_string ppf "is a class and thus always"
+    | Lazy_allocated_on_heap ->
+      pp_print_string ppf
+        "is a lazy expression and thus always allocated on the heap"
+    | Class_legacy_monadic | Class_legacy_comonadic ->
+      pp_print_string ppf "is a class and thus always of legacy modes"
     | Tailcall_function -> pp_print_string ppf "is the function in a tail call"
     | Tailcall_argument -> pp_print_string ppf "is an argument in a tail call"
     | Mutable_read -> pp_print_string ppf "has a mutable field read from"
     | Mutable_write -> pp_print_string ppf "has a mutable field written to"
-    | Forced_lazy_expression ->
-      pp_print_string ppf "is a lazy expression that is forced"
-    | Is_function_return ->
+    | Lazy_forced -> pp_print_string ppf "is a lazy value being forced"
+    | Function_return ->
       fprintf ppf
         "is a function return value.@\n\
          Hint: Use exclave_ to return a local value"
     | Stack_expression -> pp_print_string ppf "is a stack expression"
-    | Module_allocation ->
+    | Module_allocated_on_heap ->
       pp_print_string ppf "is a module and thus always allocated on the heap"
 
   let print_lock_item ppf = function

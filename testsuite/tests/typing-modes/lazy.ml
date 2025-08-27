@@ -16,7 +16,7 @@ Line 2, characters 37-38:
 2 |     lazy (let x @ local = "hello" in x)
                                          ^
 Error: This value is "local" but is expected to be "global"
-       because it is a lazy expression.
+       because it is a lazy expression and thus always allocated on the heap.
 |}]
 
 let foo (local_ x) =
@@ -27,7 +27,8 @@ Line 2, characters 18-19:
                       ^
 Error: The value "x" is "local" but is expected to be "global"
        because it is used inside a lazy expression
-       which is expected to be "global" because it is a lazy expression.
+       which is expected to be "global"
+       because it is a lazy expression and thus always allocated on the heap.
 |}]
 
 (* For simplicity, we also require them to be [unyielding]. *)
@@ -39,7 +40,8 @@ Line 2, characters 18-19:
                       ^
 Error: The value "x" is "yielding" but is expected to be "unyielding"
        because it is used inside a lazy expression
-       which is expected to be "unyielding" because it is a lazy expression.
+       which is expected to be "unyielding"
+       because it is a lazy expression and thus always allocated on the heap.
 |}]
 
 (* lazy expression is constructed as global *)
@@ -114,7 +116,7 @@ Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
 Error: This value is "contended" but is expected to be "uncontended"
-       because it is a lazy expression that is forced.
+       because it is a lazy value being forced.
 |}]
 
 (* stdlib's [Lazy.force] is a special case of lazy pattern *)
