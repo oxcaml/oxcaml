@@ -121,6 +121,10 @@ let[@inline] get_ls_order state ~instruction_id =
     fatal "Regalloc_ls_state.get_ls_order: instruction_id %a not found"
       InstructionId.print instruction_id
 
+let ls_order_mapping state : InstructionId.t -> int =
+  fun instruction_id -> get_ls_order state ~instruction_id
+
+
 let rec check_ranges (prev : Range.t) (cell : Range.t DLL.cell option) : int =
   if prev.begin_ > prev.end_
   then fatal "Regalloc_ls_state.check_ranges: prev.begin_ > prev.end_";
@@ -190,17 +194,18 @@ let[@inline] invariant_intervals state cfg_with_infos =
                interval_map"
               Printreg.reg reg
           | Some interval ->
-            if instr.ls_order < interval.begin_
+            let ls_order = get_ls_order state ~instruction_id:instr.id in
+            if ls_order < interval.begin_
             then
               fatal
                 "Regalloc_ls_state.invariant_intervals: instr.ls_order < \
                  interval.begin_";
-            if instr.ls_order > interval.end_
+            if ls_order > interval.end_
             then
               fatal
                 "Regalloc_ls_state.invariant_intervals: instr.ls_order > \
                  interval.end_";
-            if not (is_in_a_range instr.ls_order (DLL.hd_cell interval.ranges))
+            if not (is_in_a_range ls_order (DLL.hd_cell interval.ranges))
             then
               fatal
                 "Regalloc_ls_state.invariant_intervals: not (is_in_a_range \
