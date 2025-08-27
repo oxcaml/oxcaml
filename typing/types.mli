@@ -860,8 +860,8 @@ and type_origin =
   | Existential of string
 
 (* The structure of a module block. This is distinct from
-   [Types.record_representation] since, e.g., modules don't support the float
-   block optimization. *)
+   [Types.record_representation] since, e.g., modules don't support the
+   flat float block optimization. *)
 and module_representation =
   | Module_value_only of { size : int }
   (* All module fields are boxed *)
