@@ -1,6 +1,7 @@
 open Cfg_intf.S
 open Utils
-(* CR xclerc for xclerc: that test relies on the use of the polymorphic
+
+(** CR xclerc for xclerc: that test relies on the use of the polymorphic
         comparison over CFG values, but that can no longer be used since instruction
         lists now contain circular values.
    let () =
@@ -56,7 +57,6 @@ open Utils
      assert (made_cfg = cfg);
      ()
 *)
-[@@ocamlformat "wrap-comments=false"]
 
 exception Break_test
 
