@@ -4,7 +4,8 @@ L.(::) ([1; 2],
  L.(::) ("2", L.(::) ([3; 4], L.(::) ("4", L.(::) ([5], L.[])))))
 - : (int, string) L.t =
 (::) (1, (::) ("2", (::) (3, (::) ("4", (::) (5, [])))))
-module L : sig type 'a t = 'a list = [] | (::) of 'a * 'a t end
+module L :
+  sig type ('a : value_or_null) t = 'a list = [] | (::) of 'a * 'a t end
 - : int L.t L.t =
 L.(::) (L.(::) (1, L.[]),
  L.(::) (L.(::) (2, L.[]),

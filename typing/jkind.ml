@@ -3091,6 +3091,11 @@ module Format_history = struct
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
          (idx or mut_idx)"
+    | Unannotated_type_parameter_on_reexport path ->
+      fprintf ppf
+        "it instantiates an unannotated type parameter of the re-exported type \
+         declaration %a"
+        !printtyp_path path
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3904,6 +3909,8 @@ module Debug_printers = struct
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
+    | Unannotated_type_parameter_on_reexport path ->
+      fprintf ppf "Unannotated_type_parameter_on_reexport %a" Path.print path
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function

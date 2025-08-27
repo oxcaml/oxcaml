@@ -157,20 +157,61 @@ let get_unboxed_from_attributes sdecl =
   | false, true -> Some true
   | false, false -> None
 
+(** [default_jkind_bound_for_type_params] determines what jkind bound to give to
+    any unannotated type parameters on the declaration.
+
+    If the type declaration both has a manifest and has a non-abstract kind,
+    then we can use [any] as the bound. Otherwise, we need to use [value] for
+    backwards-compatibility reasons. (But the user can still get [any] as the
+    bound by explicitly writing it.)
+
+    There's no inherent reason why we can't use [any] whenever there is a
+    manifest (dropping the requirement for a non-abstract kind). But doing so
+    would require work, as it would then be difficult to accept programs like:
+
+    {[
+    (* 'a being phantom is unimportant - any declaration that will infer a jkind
+       > value will work *)
+    type 'a foo = unit
+
+    module type T = sig
+      type 'a u
+      type 'a t = 'a u
+    end
+
+    (* this substitution is the hard part *)
+    module M : T with type 'a u = 'a foo = struct
+      type 'a u = 'a foo
+      type 'a t = 'a u
+    end
+
+    (* This inclusion check will fail if we don't get the substitution right *)
+    module _ : sig
+      type 'a t = 'a foo
+    end = M
+    ]}
+    *)
+let default_jkind_bound_for_type_params sdecl : Typetexp.Default_jkind_bound.t =
+  let has_manifest = Option.is_some sdecl.ptype_manifest in
+  let is_abstract =
+    match sdecl.ptype_kind with
+    | Ptype_abstract -> true
+    | Ptype_variant _
+    | Ptype_record _
+    | Ptype_record_unboxed_product _
+    | Ptype_open -> false
+  in
+  match has_manifest && not is_abstract with
+  | true -> Any
+  | false -> Legacy
+
 (* [make_params] creates sort variables - these can be defaulted away (as in
    transl_type_decl) or unified with existing sort-variable-free types (as in
    transl_with_constraint). *)
-let make_params env path params =
+let make_params env path params ~default_bound =
   TyVarEnv.reset (); (* [transl_type_param] binds type variables *)
   let make_param (sty, v) =
-    (* Our choice for now is that if you want a parameter of jkind any, you have
-       to ask for it with an annotation.  Some restriction here seems necessary
-       for backwards compatibility (e.g., we wouldn't want [type 'a id = 'a] to
-       have jkind any).  But it might be possible to infer [any] in some
-       cases. *)
-    let jkind =
-      Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path)
-    in
+    let jkind = Typetexp.Default_jkind_bound.fresh_jkind ~path default_bound in
     try
       (transl_type_param env path jkind sty, v)
     with Already_bound ->
@@ -295,7 +336,12 @@ in
   let type_params =
     List.map (fun (param, _) ->
         let name = get_type_param_name param in
-        let jkind = get_type_param_jkind path param in
+        let jkind =
+          get_type_param_jkind
+            path
+            param
+            ~default_bound:(default_jkind_bound_for_type_params sdecl)
+        in
         Btype.newgenvar ?name jkind)
       sdecl.ptype_params
   in
@@ -838,7 +884,13 @@ let transl_declaration env sdecl (id, uid) =
   Ctype.with_local_level begin fun () ->
   TyVarEnv.reset();
   let path = Path.Pident id in
-  let tparams = make_params env path sdecl.ptype_params in
+  let tparams =
+    make_params
+      env
+      path
+      sdecl.ptype_params
+      ~default_bound:(default_jkind_bound_for_type_params sdecl)
+  in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let cstrs = List.map
     (fun (sty, sty', loc) ->
@@ -3270,7 +3322,13 @@ let transl_type_extension extend env loc styext =
     let scope = Ctype.create_scope () in
     Ctype.with_local_level begin fun () ->
       TyVarEnv.reset();
-      let ttype_params = make_params env type_path styext.ptyext_params in
+      let ttype_params =
+        make_params
+          env
+          type_path
+          styext.ptyext_params
+          ~default_bound:Legacy
+      in
       let type_params = List.map (fun (cty, _) -> cty.ctyp_type) ttype_params in
       List.iter2 (Ctype.unify_var env)
         (Ctype.instance_list type_decl.type_params)
@@ -3923,7 +3981,12 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
      declaration [sdecl] in the outer environment [outer_env]. *)
   let env = outer_env in
   let loc = sdecl.ptype_loc in
-  let tparams = make_params env (Pident id) sdecl.ptype_params in
+  let tparams =
+    make_params
+      env
+      (Pident id)
+      sdecl.ptype_params
+      ~default_bound:(default_jkind_bound_for_type_params sdecl) in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let arity = List.length params in
   let constraints =
@@ -4212,7 +4275,11 @@ let approx_type_decl sdecl_list =
            sdecl
        in
        let params =
-         List.map (fun (param, _) -> get_type_param_jkind path param)
+         List.map (fun (param, _) ->
+             get_type_param_jkind
+               path
+               param
+               ~default_bound:(default_jkind_bound_for_type_params sdecl))
            sdecl.ptype_params
        in
        (id, abstract_type_decl ~injective ~jkind ~params))

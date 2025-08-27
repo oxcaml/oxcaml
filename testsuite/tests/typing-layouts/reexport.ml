@@ -3,6 +3,9 @@
 *)
 
 (* CR-soon: Make these actually error *)
+(* CR-soon: Don't print the jkind annotation on a re-export once these error
+   because in that world it is impossible for a re-export to change the jkind
+   bount on a param. Thus, the bound is always redundant. *)
 (* Part 1: Adding jkind constraints during re-exports is an error *)
 
 type 'a t = A of 'a
@@ -336,7 +339,6 @@ Error: This type "string or_null" should be an instance of type "('a : value)"
          because of the definition of u at line 2, characters 0-41.
 |}]
 
-(* CR: Fix these *)
 (* Part 3: Defaulted type parameters don't add constraints in a re-export *)
 
 type ('a : value_or_null) t1 = Foo of 'a
@@ -344,50 +346,15 @@ type 'a t2 = 'a t1 = Foo of 'a
 type t3 = int or_null t2
 [%%expect {|
 type ('a : value_or_null) t1 = Foo of 'a
-type 'a t2 = 'a t1 = Foo of 'a
-Line 3, characters 10-21:
-3 | type t3 = int or_null t2
-              ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is value_or_null mod everything
-         because it is the primitive type or_null.
-       But the kind of int or_null must be a subkind of value
-         because of the definition of t2 at line 2, characters 0-30.
-|}, Principal{|
-type ('a : value_or_null) t1 = Foo of 'a
-type 'a t2 = 'a t1 = Foo of 'a
-Line 3, characters 10-21:
-3 | type t3 = int or_null t2
-              ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is value_or_null mod everything with int
-         because it is the primitive type or_null.
-       But the kind of int or_null must be a subkind of value
-         because of the definition of t2 at line 2, characters 0-30.
+type ('a : value_or_null) t2 = 'a t1 = Foo of 'a
+type t3 = int or_null t2
 |}]
 
 type 'a my_list = 'a list = | [] | (::) of 'a * 'a my_list
 type t = int or_null my_list
 [%%expect {|
-type 'a my_list = 'a list = [] | (::) of 'a * 'a my_list
-Line 2, characters 9-20:
-2 | type t = int or_null my_list
-             ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is value_or_null mod everything
-         because it is the primitive type or_null.
-       But the kind of int or_null must be a subkind of value
-         because of the definition of my_list at line 1, characters 0-58.
-|}, Principal{|
-type 'a my_list = 'a list = [] | (::) of 'a * 'a my_list
-Line 2, characters 9-20:
-2 | type t = int or_null my_list
-             ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is value_or_null mod everything with int
-         because it is the primitive type or_null.
-       But the kind of int or_null must be a subkind of value
-         because of the definition of my_list at line 1, characters 0-58.
+type ('a : value_or_null) my_list = 'a list = [] | (::) of 'a * 'a my_list
+type t = int or_null my_list
 |}]
 
 module _ : sig
@@ -396,24 +363,6 @@ end = struct
   type 'a t = 'a option = None | Some of 'a
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type 'a t = 'a option = None | Some of 'a
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a option = None | Some of 'a end
-       is not included in
-         sig type ('a : value_or_null) t end
-       Type declarations do not match:
-         type 'a t = 'a option = None | Some of 'a
-       is not included in
-         type ('a : value_or_null) t
-       The problem is in the kinds of a parameter:
-       The kind of 'a is value_or_null
-         because of the definition of t at line 2, characters 2-29.
-       But the kind of 'a must be a subkind of value
-         because of the definition of t at line 4, characters 2-43.
 |}]
 
 type ('a : any) t1 = { foo : int }
@@ -422,26 +371,9 @@ type t3 = int or_null t2
 type t4 = int64# t2
 [%%expect {|
 type ('a : any) t1 = { foo : int; }
-type 'a t2 = 'a t1 = { foo : int; }
-Line 3, characters 10-21:
-3 | type t3 = int or_null t2
-              ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is value_or_null mod everything
-         because it is the primitive type or_null.
-       But the kind of int or_null must be a subkind of value
-         because of the definition of t2 at line 2, characters 0-34.
-|}, Principal{|
-type ('a : any) t1 = { foo : int; }
-type 'a t2 = 'a t1 = { foo : int; }
-Line 3, characters 10-21:
-3 | type t3 = int or_null t2
-              ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is value_or_null mod everything with int
-         because it is the primitive type or_null.
-       But the kind of int or_null must be a subkind of value
-         because of the definition of t2 at line 2, characters 0-34.
+type ('a : any) t2 = 'a t1 = { foo : int; }
+type t3 = int or_null t2
+type t4 = int64# t2
 |}]
 
 type ('a : any) t1 = #{ foo : int }
@@ -450,26 +382,9 @@ type t3 = int or_null t2
 type t4 = int64# t2
 [%%expect {|
 type ('a : any) t1 = #{ foo : int; }
-type 'a t2 = 'a t1 = #{ foo : int; }
-Line 3, characters 10-21:
-3 | type t3 = int or_null t2
-              ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is value_or_null mod everything
-         because it is the primitive type or_null.
-       But the kind of int or_null must be a subkind of value
-         because of the definition of t2 at line 2, characters 0-35.
-|}, Principal{|
-type ('a : any) t1 = #{ foo : int; }
-type 'a t2 = 'a t1 = #{ foo : int; }
-Line 3, characters 10-21:
-3 | type t3 = int or_null t2
-              ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is value_or_null mod everything with int
-         because it is the primitive type or_null.
-       But the kind of int or_null must be a subkind of value
-         because of the definition of t2 at line 2, characters 0-35.
+type ('a : any) t2 = 'a t1 = #{ foo : int; }
+type t3 = int or_null t2
+type t4 = int64# t2
 |}]
 
 type ('a : value_or_null) t1 = ..
@@ -477,24 +392,6 @@ type 'a t2 = 'a t1 = ..
 type t3 = int or_null t2
 [%%expect {|
 type ('a : value_or_null) t1 = ..
-type 'a t2 = 'a t1 = ..
-Line 3, characters 10-21:
-3 | type t3 = int or_null t2
-              ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is value_or_null mod everything
-         because it is the primitive type or_null.
-       But the kind of int or_null must be a subkind of value
-         because of the definition of t2 at line 2, characters 0-23.
-|}, Principal{|
-type ('a : value_or_null) t1 = ..
-type 'a t2 = 'a t1 = ..
-Line 3, characters 10-21:
-3 | type t3 = int or_null t2
-              ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is value_or_null mod everything with int
-         because it is the primitive type or_null.
-       But the kind of int or_null must be a subkind of value
-         because of the definition of t2 at line 2, characters 0-23.
+type ('a : value_or_null) t2 = 'a t1 = ..
+type t3 = int or_null t2
 |}]
