@@ -164,7 +164,8 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   in
   let unknown_instruction_work_list (iwl : InstructionWorkList.t) : unit =
     InstructionWorkList.iter iwl ~f:(fun instr ->
-        InstructionId.Tbl.replace state.irc_work_list_tbl instr.id Cfg.Unknown_list)
+        InstructionId.Tbl.replace state.irc_work_list_tbl instr.id
+          Cfg.Unknown_list)
   in
   List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
       Reg.Tbl.replace state.reg_color reg None;
@@ -214,8 +215,10 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   InstructionWorkList.clear state.active_moves;
   RegisterStamp.PairSet.clear state.adj_set;
   Reg.Tbl.clear state.move_list;
-  InstructionId.Tbl.iter (fun instruction_id _ ->
-    InstructionId.Tbl.replace state.irc_work_list_tbl instruction_id Cfg.Unknown_list)
+  InstructionId.Tbl.iter
+    (fun instruction_id _ ->
+      InstructionId.Tbl.replace state.irc_work_list_tbl instruction_id
+        Cfg.Unknown_list)
     state.irc_work_list_tbl
 
 let[@inline] work_list state reg =
@@ -357,40 +360,49 @@ let[@inline] iter_and_clear_select_stack state ~f =
   state.select_stack <- []
 
 let[@inline] add_coalesced_moves state instr =
-  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id ~irc_work_list:Coalesced;
+  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id
+    ~irc_work_list:Coalesced;
   InstructionWorkList.add state.coalesced_moves instr
 
 let[@inline] add_constrained_moves state instr =
-  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id ~irc_work_list:Constrained;
+  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id
+    ~irc_work_list:Constrained;
   InstructionWorkList.add state.constrained_moves instr
 
 let[@inline] add_frozen_moves state instr =
-  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id ~irc_work_list:Frozen;
+  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id
+    ~irc_work_list:Frozen;
   InstructionWorkList.add state.frozen_moves instr
 
 let[@inline] is_empty_work_list_moves state =
   InstructionWorkList.is_empty state.work_list_moves
 
 let[@inline] add_work_list_moves state instr =
-  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id ~irc_work_list:Work_list;
+  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id
+    ~irc_work_list:Work_list;
   InstructionWorkList.add state.work_list_moves instr
 
 let[@inline] choose_and_remove_work_list_moves state =
   match InstructionWorkList.choose_and_remove state.work_list_moves with
   | None -> fatal "work_list_moves is empty"
   | Some res ->
-    set_irc_work_list state ~instruction_id:(res : Instruction.t).id ~irc_work_list:Unknown_list;
+    set_irc_work_list state ~instruction_id:(res : Instruction.t).id
+      ~irc_work_list:Unknown_list;
     res
 
 let[@inline] mem_active_moves state instr =
-  Cfg.equal_irc_work_list (get_irc_work_list state ~instruction_id:(instr : Instruction.t).id) Cfg.Active
+  Cfg.equal_irc_work_list
+    (get_irc_work_list state ~instruction_id:(instr : Instruction.t).id)
+    Cfg.Active
 
 let[@inline] add_active_moves state instr =
-  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id ~irc_work_list:Active;
+  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id
+    ~irc_work_list:Active;
   InstructionWorkList.add state.active_moves instr
 
 let[@inline] remove_active_moves state instr =
-  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id ~irc_work_list:Unknown_list;
+  set_irc_work_list state ~instruction_id:(instr : Instruction.t).id
+    ~irc_work_list:Unknown_list;
   InstructionWorkList.remove state.active_moves instr
 
 let[@inline] mem_adj_set state reg1 reg2 =
@@ -455,7 +467,9 @@ let[@inline] is_empty_node_moves state reg =
     not
       (Instruction.Set.exists
          (fun instr ->
-           match get_irc_work_list state ~instruction_id:(instr : Instruction.t).id with
+           match
+             get_irc_work_list state ~instruction_id:(instr : Instruction.t).id
+           with
            | Active | Work_list -> true
            | Unknown_list | Coalesced | Constrained | Frozen -> false)
          move_list)
@@ -466,7 +480,9 @@ let[@inline] iter_node_moves state reg ~f =
   | Some move_list ->
     Instruction.Set.iter
       (fun instr ->
-        match get_irc_work_list state ~instruction_id:(instr : Instruction.t).id with
+        match
+          get_irc_work_list state ~instruction_id:(instr : Instruction.t).id
+        with
         | Active | Work_list -> f instr
         | Unknown_list | Coalesced | Constrained | Frozen -> ())
       move_list
@@ -477,7 +493,9 @@ let[@inline] is_move_related state reg =
   | Some move_list ->
     Instruction.Set.exists
       (fun instr ->
-        match get_irc_work_list state ~instruction_id:(instr : Instruction.t).id with
+        match
+          get_irc_work_list state ~instruction_id:(instr : Instruction.t).id
+        with
         | Active | Work_list -> true
         | Unknown_list | Coalesced | Constrained | Frozen -> false)
       move_list
@@ -487,7 +505,8 @@ let[@inline] enable_moves_one state reg =
   iter_node_moves state n ~f:(fun m ->
       match get_irc_work_list state ~instruction_id:(m : Instruction.t).id with
       | Active ->
-        set_irc_work_list state ~instruction_id:(m : Instruction.t).id ~irc_work_list:Work_list;
+        set_irc_work_list state ~instruction_id:(m : Instruction.t).id
+          ~irc_work_list:Work_list;
         InstructionWorkList.remove state.active_moves m;
         InstructionWorkList.add state.work_list_moves m
       | Unknown_list | Coalesced | Constrained | Frozen | Work_list -> ())
@@ -605,11 +624,13 @@ let[@inline] check_set_and_field_consistency_reg state
           (WorkList.to_string (work_list state reg)))
     set
 
-let[@inline] check_set_and_field_consistency_instr state (work_list, set, field_value)
-    =
+let[@inline] check_set_and_field_consistency_instr state
+    (work_list, set, field_value) =
   Instruction.Set.iter
     (fun instr ->
-      let irc_work_list = get_irc_work_list state ~instruction_id:(instr : Instruction.t).id in
+      let irc_work_list =
+        get_irc_work_list state ~instruction_id:(instr : Instruction.t).id
+      in
       if not (Cfg.equal_irc_work_list irc_work_list field_value)
       then
         fatal "instruction %a is in %s but its field equals %S"
@@ -683,7 +704,8 @@ let[@inline] invariant state =
           instruction_set_of_instruction_work_list state.work_list_moves );
         ( "active_moves",
           instruction_set_of_instruction_work_list state.active_moves ) ];
-    List.iter ~f:(check_set_and_field_consistency_instr state)
+    List.iter
+      ~f:(check_set_and_field_consistency_instr state)
       [ ( "coalesced_moves",
           instruction_set_of_instruction_work_list state.coalesced_moves,
           Cfg.Coalesced );
