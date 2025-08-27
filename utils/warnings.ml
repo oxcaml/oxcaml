@@ -134,9 +134,9 @@ type t =
   | Mod_by_top of string                    (* 211 *)
   (* 212 taken *)
   | Modal_axis_specified_twice of
-      { axis : string;
-        overriden_by : string;
-      } (* 213 *)
+    { axis : string;
+      overriden_by : string;
+    } (* 213 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -1157,7 +1157,7 @@ let message = function
         vars_explanation Misc.print_see_manual ref_manual
   | No_cmx_file name ->
       Printf.sprintf
-        "no .cmx file was found in path for module %s, \
+        "no cmx file was found in path for module %s, \
          and its interface was not compiled with -opaque" name
   | Flambda_assignment_to_non_mutable_value ->
       "A potential assignment to a non-mutable value was detected \n\
@@ -1222,7 +1222,7 @@ let message = function
        should be applied to '()'; using '(struct end)' is deprecated."
   | No_cmjx_file name ->
       Printf.sprintf
-        "no .cmjx file was found in path for module %s, \
+        "no cmjx file was found in path for module %s, \
          and its interface was not compiled with -opaque" name
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf
