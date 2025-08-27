@@ -39,8 +39,7 @@ type closure_context =
 
 (** Details of an item being closed by a context *)
 type closure_details =
-  { (* CR pdsouza: add a field, [closure_loc], here for the location of the closing context *)
-    closure_context : closure_context;
+  { closure_context : closure_context;
     value_loc : Location.t;  (** Location of the value being closed over *)
     value_lid : Longident.t;  (** Identifier for the value being closed over *)
     value_item : lock_item  (** The item type of the value being closed over *)
@@ -51,7 +50,7 @@ type closure_details =
 type 'd morph =
   | Gap : ('l * 'r) morph  (** The morphism is not explained.  *)
   | Skip : ('l * 'r) morph
-      (** The morphism hasn't changed the bound and should be skipped in printing. *)
+      (** The morphism doesn't change the bound and should be skipped in printing. *)
   | Close_over : closure_details -> ('l * disallowed) morph
   | Is_closed_by : closure_details -> (disallowed * 'r) morph
   | Captured_by_partial_application : (disallowed * 'r) morph
