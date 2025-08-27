@@ -145,10 +145,11 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
 
 let register_allocation () =
   let m, _ =
-    Alloc.(newvar_below
-      (max_with_comonadic Areality Locality.global))
+    Value.(newvar_below (of_const
+      ~hint_monadic:Max_monadic ~hint_comonadic:Module_allocation
+      { Const.max with areality = Global }))
   in
-  m, alloc_as_value m
+  value_to_alloc_r2g m, m
 
 open Typedtree
 

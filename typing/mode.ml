@@ -129,6 +129,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Tailcall_function -> Tailcall_function
        | Tailcall_argument -> Tailcall_argument
        | Is_function_return -> Is_function_return
+       | Module_allocation -> Module_allocation
 
     let disallow_left : type l r. (l * r) const -> (disallowed * r) const =
       fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
@@ -148,6 +149,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Forced_lazy_expression -> Forced_lazy_expression
        | Is_function_return -> Is_function_return
        | Stack_expression -> Stack_expression
+       | Module_allocation -> Module_allocation
 
     let disallow_right : type l r. (l * r) const -> (l * disallowed) const =
       fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
@@ -167,6 +169,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Forced_lazy_expression -> Forced_lazy_expression
        | Is_function_return -> Is_function_return
        | Stack_expression -> Stack_expression
+       | Module_allocation -> Module_allocation
   end)
 end
 
@@ -1965,6 +1968,8 @@ module Report = struct
         "is a function return value.@\n\
          Hint: Use exclave_ to return a local value"
     | Stack_expression -> pp_print_string ppf "is a stack expression"
+    | Module_allocation ->
+      pp_print_string ppf "is a module and thus always allocated on the heap"
 
   let print_lock_item ppf = function
     | Module -> fprintf ppf "module"
