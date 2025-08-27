@@ -70,7 +70,7 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
     then
       Array.iter Proc.destroyed_at_raise ~f:(fun reg ->
           update_range reg ~begin_:on ~end_:on);
-    instr.ls_order <- on;
+    State.set_ls_order state ~instruction_id:instr.id ~ls_order:on;
     Array.iter instr.arg ~f:(fun reg -> update_range reg ~begin_:on ~end_:on);
     Array.iter instr.res ~f:(fun reg -> update_range reg ~begin_:off ~end_:off);
     let live = InstructionId.Tbl.find liveness instr.id in
