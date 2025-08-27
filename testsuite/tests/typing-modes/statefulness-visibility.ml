@@ -683,7 +683,7 @@ Line 1, characters 42-43:
 1 | let foo (x : int ref) @ stateless = lazy (x.contents)
                                               ^
 Error: This value is "immutable" because it is used inside a lazy expression
-       which is "stateless".
+       which is expected to be "stateless".
        However, it is expected to be "read"
        because it has a mutable field read from.
 |}]
@@ -694,7 +694,7 @@ Line 1, characters 42-43:
 1 | let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
                                               ^
 Error: This value is "immutable" because it is used inside a lazy expression
-       which is "stateless".
+       which is expected to be "stateless".
        However, it is expected to be "read_write"
        because it has a mutable field written to.
 |}]
@@ -707,7 +707,7 @@ Line 1, characters 42-43:
 1 | let bat (x : int ref) @ observing = lazy (x.contents <- 4)
                                               ^
 Error: This value is "read" because it is used inside a lazy expression
-       which is "observing".
+       which is expected to be "observing".
        However, it is expected to be "read_write"
        because it has a mutable field written to.
 |}]
