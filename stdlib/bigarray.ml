@@ -135,10 +135,11 @@ module Genarray = struct
     | C_layout -> cloop arr (Array.make dlen 0) f 0 dims; arr
     | Fortran_layout -> floop arr (Array.make dlen 1) f (pred dlen) dims; arr
 
-  external num_dims: (('a, 'b, 'c) t[@local_opt]) @ contended -> int @@ portable
+  external num_dims
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "caml_ba_num_dims"
   external nth_dim
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> int -> int @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> int -> int @@ stateless
     = "caml_ba_dim"
   let dims a =
     let n = num_dims a in
@@ -147,10 +148,10 @@ module Genarray = struct
     d
 
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> ('a, 'b) kind @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> 'c layout @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ portable
      = "caml_ba_change_layout"
@@ -186,10 +187,10 @@ module Array0 = struct
   let get arr = Genarray.get arr [||]
   let set arr value = Genarray.set arr [||] value
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> ('a, 'b) kind @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> 'c layout @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
 
   external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ portable
@@ -233,13 +234,13 @@ module Array1 = struct
     : (('a, 'b, 'c) t[@local_opt]) -> int -> ('a[@local_opt]) -> unit
     @@ portable
     = "%caml_ba_unsafe_set_1"
-  external dim: (('a, 'b, 'c) t[@local_opt]) @ contended -> int @@ portable
+  external dim: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_1"
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> ('a, 'b) kind @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> 'c layout @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
 
   external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ portable
@@ -301,15 +302,15 @@ module Array2 = struct
     : (('a, 'b, 'c) t[@local_opt]) -> int -> int -> ('a[@local_opt]) -> unit
     @@ portable
     = "%caml_ba_unsafe_set_2"
-  external dim1: (('a, 'b, 'c) t[@local_opt]) @ contended -> int @@ portable
+  external dim1: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_1"
-  external dim2: (('a, 'b, 'c) t[@local_opt]) @ contended -> int @@ portable
+  external dim2: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_2"
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> ('a, 'b) kind @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> 'c layout @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
 
   external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ portable
@@ -394,17 +395,17 @@ module Array3 = struct
        unit
      @@ portable
      = "%caml_ba_unsafe_set_3"
-  external dim1: (('a, 'b, 'c) t[@local_opt]) @ contended -> int @@ portable
+  external dim1: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_1"
-  external dim2: (('a, 'b, 'c) t[@local_opt]) @ contended -> int @@ portable
+  external dim2: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_2"
-  external dim3: (('a, 'b, 'c) t[@local_opt]) @ contended -> int @@ portable
+  external dim3: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_3"
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> ('a, 'b) kind @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ contended -> 'c layout @@ portable
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
 
   external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ portable
