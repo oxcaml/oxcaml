@@ -186,8 +186,10 @@ let get_unit_info comp_unit =
           with Not_found ->
             let warn =
               match !Clflags.jsir with
-              | false -> Warnings.No_cmx_file (Global_module.Name.to_string name)
-              | true -> Warnings.No_cmjx_file (Global_module.Name.to_string name)
+              | false ->
+                Warnings.No_cmx_file (Global_module.Name.to_string name)
+              | true ->
+                Warnings.No_cmjx_file (Global_module.Name.to_string name)
             in
             Location.prerr_warning Location.none warn;
             (None, None)
