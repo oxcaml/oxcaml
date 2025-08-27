@@ -350,50 +350,62 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Clsl -> select_arith Ilsl args
     | Clsr -> select_arith Ilsr args
     | Casr -> select_arith Iasr args
-    | Cbitwindow { input_low; input_high; output_low; sign_extend; low_bits }
+    | Cbitwindow { src; dst; len; sign_extend; low_bits }
       -> (
       (* Decompose bit windowing into basic operations *)
       let arg = single_arg () in
-      let width = input_high - input_low in
-      let output_high = output_low + width in
       let dbg = Debuginfo.none in
       
+      (* Debug: print the parameters *)
+      if false then
+        Printf.eprintf "Cbitwindow: src=%d dst=%d len=%d sign_extend=%d low_bits=%s\n%!"
+          src dst len sign_extend (Nativeint.to_string low_bits);
+      
       (* Step 1: Position the bits *)
-      let shift_amount = output_low - input_low in
+      let shift_amount = dst - src in
+      let needs_sign_extension = sign_extend > 0 && (dst + len) < sign_extend in
       let result =
         if shift_amount = 0
         then arg
         else if shift_amount > 0
         then Cmm.Cop (Clsl, [arg; Cmm.Cconst_int (shift_amount, dbg)], dbg)
-        else Cmm.Cop (Clsr, [arg; Cmm.Cconst_int (-shift_amount, dbg)], dbg)
+        else if needs_sign_extension
+        then 
+          (* Use arithmetic shift right if we need sign extension *)
+          Cmm.Cop (Casr, [arg; Cmm.Cconst_int (-shift_amount, dbg)], dbg)
+        else 
+          (* Use logical shift right otherwise *)
+          Cmm.Cop (Clsr, [arg; Cmm.Cconst_int (-shift_amount, dbg)], dbg)
       in
       
-      (* Step 2: Sign extend if needed *)
+      (* Step 2: Additional sign extension if needed *)
+      let output_high = dst + len in
       let result =
-        if output_high < sign_extend
+        if needs_sign_extension && shift_amount >= 0
         then
-          (* Shift left to bit 63, then arithmetic right *)
+          (* We already positioned the bits, now extend the sign if we didn't
+             use an arithmetic shift *)
           let left_shift = 64 - output_high in
           let result =
             if left_shift > 0
             then Cmm.Cop (Clsl, [result; Cmm.Cconst_int (left_shift, dbg)], dbg)
             else result
           in
-          let right_shift = 64 - sign_extend in
-          if right_shift > 0
-          then Cmm.Cop (Casr, [result; Cmm.Cconst_int (right_shift, dbg)], dbg)
+          (* Now arithmetic shift right by the same amount to propagate the sign *)
+          if left_shift > 0
+          then Cmm.Cop (Casr, [result; Cmm.Cconst_int (left_shift, dbg)], dbg)
           else result
         else result
       in
       
       (* Step 3: Mask if needed *)
       let result =
-        if (output_low > 0 || sign_extend < 64) && output_high = sign_extend
+        if (dst > 0 || sign_extend < 64) && output_high = sign_extend
         then
           let mask =
             let ones = Nativeint.minus_one in
-            let mask = Nativeint.shift_right_logical ones (64 - width) in
-            Nativeint.shift_left mask output_low
+            let mask = Nativeint.shift_right_logical ones (64 - len) in
+            Nativeint.shift_left mask dst
           in
           Cmm.Cop (Cand, [result; Cmm.Cconst_natint (mask, dbg)], dbg)
         else result

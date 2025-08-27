@@ -951,9 +951,9 @@ val beginregion : dbg:Debuginfo.t -> expression
 
 val make_bitwindow :
   dbg:Debuginfo.t ->
-  input_low:int ->
-  input_high:int ->
-  output_low:int ->
+  src:int ->
+  len:int ->
+  dst:int ->
   sign_extend:int ->
   low_bits:nativeint ->
   expression ->

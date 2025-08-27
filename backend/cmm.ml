@@ -431,9 +431,9 @@ type operation =
   | Clsr
   | Casr
   | Cbitwindow of
-      { input_low : int;
-        input_high : int;
-        output_low : int;
+      { src : int;
+        dst : int;
+        len : int;
         sign_extend : int;
         low_bits : nativeint
       }

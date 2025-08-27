@@ -402,11 +402,11 @@ type operation =
   | Clsr
   | Casr
   | Cbitwindow of
-      { input_low : int; (* i: low bit of input window *)
-        input_high : int; (* j: high bit of input window *)
-        output_low : int; (* k: low bit of output window, width = j - i *)
-        sign_extend : int; (* s: sign extend to this bit position *)
-        low_bits : nativeint (* T: constant for low bits below output_low *)
+      { src : int; (* Source bit position (lowest bit to extract) *)
+        dst : int; (* Destination bit position (where to place extracted bits) *)
+        len : int; (* Number of bits to extract *)
+        sign_extend : int; (* Sign extend to this bit position (0 for no sign extension) *)
+        low_bits : nativeint (* Constant for low bits below dst *)
       }
   | Cbswap of { bitwidth : bswap_bitwidth }
   | Ccsel of machtype

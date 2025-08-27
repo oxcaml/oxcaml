@@ -502,10 +502,9 @@ let decr_int c dbg = add_const c (-1) dbg
 
 (* Bit windowing operations *)
 
-let make_bitwindow ~dbg ~input_low ~input_high ~output_low ~sign_extend
-    ~low_bits arg =
+let make_bitwindow ~dbg ~src ~len ~dst ~sign_extend ~low_bits arg =
   Cop
-    ( Cbitwindow { input_low; input_high; output_low; sign_extend; low_bits },
+    ( Cbitwindow { src; dst; len; sign_extend; low_bits },
       [arg],
       dbg )
 
@@ -515,28 +514,28 @@ let shift_to_bitwindow op _arg shift_amount =
   | Clsl when shift_amount >= 0 && shift_amount < 64 ->
     Some
       (Cbitwindow
-         { input_low = 0;
-           input_high = 64 - shift_amount;
-           output_low = shift_amount;
-           sign_extend = 64;
+         { src = 0;
+           len = 64 - shift_amount;
+           dst = shift_amount;
+           sign_extend = 0;  (* No sign extension for left shift *)
            low_bits = 0n
          })
   | Clsr when shift_amount >= 0 && shift_amount < 64 ->
     Some
       (Cbitwindow
-         { input_low = shift_amount;
-           input_high = 64;
-           output_low = 0;
-           sign_extend = 64 - shift_amount;
+         { src = shift_amount;
+           len = 64 - shift_amount;
+           dst = 0;
+           sign_extend = 0;  (* No sign extension for logical right shift *)
            low_bits = 0n
          })
   | Casr when shift_amount >= 0 && shift_amount < 64 ->
     Some
       (Cbitwindow
-         { input_low = shift_amount;
-           input_high = 64;
-           output_low = 0;
-           sign_extend = 64;
+         { src = shift_amount;
+           len = 64 - shift_amount;
+           dst = 0;
+           sign_extend = 64;  (* Sign extend for arithmetic shift *)
            low_bits = 0n
          })
   | _ -> None
@@ -545,33 +544,28 @@ let bitwindow_of_shift = function
   | Clsl ->
     Some
       (Cbitwindow
-         { input_low = 0;
-           input_high = 64;
-           output_low = 0;
-           (* Will be adjusted based on shift amount *)
-           sign_extend = 64;
+         { src = 0;
+           len = 64;  (* Will be adjusted based on shift amount *)
+           dst = 0;   (* Will be adjusted based on shift amount *)
+           sign_extend = 0;
            low_bits = 0n
          })
   | Clsr ->
     Some
       (Cbitwindow
-         { input_low = 0;
-           (* Will be adjusted based on shift amount *)
-           input_high = 64;
-           output_low = 0;
-           sign_extend = 64;
-           (* No sign extension for logical shift *)
+         { src = 0;   (* Will be adjusted based on shift amount *)
+           len = 64;  (* Will be adjusted based on shift amount *)
+           dst = 0;
+           sign_extend = 0;
            low_bits = 0n
          })
   | Casr ->
     Some
       (Cbitwindow
-         { input_low = 0;
-           (* Will be adjusted based on shift amount *)
-           input_high = 64;
-           output_low = 0;
+         { src = 0;   (* Will be adjusted based on shift amount *)
+           len = 64;  (* Will be adjusted based on shift amount *)
+           dst = 0;
            sign_extend = 64;
-           (* Sign extension enabled *)
            low_bits = 0n
          })
   | _ -> None
@@ -579,15 +573,30 @@ let bitwindow_of_shift = function
 let compose_bitwindow ~inner ~outer =
   match inner, outer with
   | Cbitwindow w1, Cbitwindow w2 ->
-    (* Compose two bit windows using the algorithm from the document *)
-    let d1 = w1.output_low - w1.input_low in
-    let d2 = w2.output_low - w2.input_low in
-    let i = max w1.input_low (w2.input_low - d1) in
-    let j = min w1.input_high (w2.input_high - d1) in
-    let k = max (w1.output_low + d2) w2.output_low in
+    (* Compose two bit windows using the algorithm from the document 
+       With new representation:
+       - src: source bit position (lowest bit to extract)
+       - dst: destination bit position 
+       - len: number of bits
+    *)
+    let w1_input_low = w1.src in
+    let w1_input_high = w1.src + w1.len in
+    let w1_output_low = w1.dst in
+    
+    let w2_input_low = w2.src in
+    let w2_input_high = w2.src + w2.len in
+    let w2_output_low = w2.dst in
+    
+    let d1 = w1_output_low - w1_input_low in
+    let d2 = w2_output_low - w2_input_low in
+    let i = max w1_input_low (w2_input_low - d1) in
+    let j = min w1_input_high (w2_input_high - d1) in
+    let k = max (w1_output_low + d2) w2_output_low in
     let s =
-      if w2.input_high <= w1.sign_extend
+      if w2_input_high <= w1.sign_extend
       then w2.sign_extend
+      else if w1.sign_extend = 0
+      then 0  (* No sign extension *)
       else w1.sign_extend + d2
     in
     (* Evaluate w2 on w1's low_bits to get the composed low_bits *)
@@ -642,8 +651,8 @@ let compose_bitwindow ~inner ~outer =
       Nativeint.logor sign_extended low_bits
     in
     let composed_low_bits =
-      eval_window ~input_low:w2.input_low ~input_high:w2.input_high
-        ~output_low:w2.output_low ~sign_extend:w2.sign_extend
+      eval_window ~input_low:w2_input_low ~input_high:w2_input_high
+        ~output_low:w2_output_low ~sign_extend:w2.sign_extend
         ~low_bits:w2.low_bits w1.low_bits
     in
     (* Check if windows overlap *)
@@ -651,22 +660,21 @@ let compose_bitwindow ~inner ~outer =
     then
       Some
         (Cbitwindow
-           { input_low = i;
-             input_high = j;
-             output_low = k;
+           { src = i;
+             len = j - i;
+             dst = k;
              sign_extend = s;
              low_bits = composed_low_bits
            })
-    else if w2.input_low < w1.sign_extend && w1.output_low < w2.input_high
+    else if w2_input_low < w1.sign_extend && w1_output_low < w2_input_high
     then
       (* Tricky case: windows don't overlap but result depends on sign-extended
          bits *)
       Some
         (Cbitwindow
-           { input_low = j - 1;
-             (* Extract just the sign bit *)
-             input_high = j;
-             output_low = k;
+           { src = j - 1;  (* Extract just the sign bit *)
+             len = 1;
+             dst = k;
              sign_extend = s;
              low_bits = composed_low_bits
            })
@@ -1122,13 +1130,13 @@ let tag_int i dbg =
   | Cconst_int (n, _) -> int_const dbg n
   | c ->
     (* Tag an integer: shift left by 1 and add 1 
-       Using bit windowing: take bits [0:63], place at [1:64], add 1 *)
+       Using bit windowing: take 63 bits from position 0, place at position 1, add 1 *)
     Cop
       ( Cbitwindow
-          { input_low = 0;
-            input_high = arch_bits - 1;
-            output_low = 1;
-            sign_extend = arch_bits;
+          { src = 0;
+            dst = 1;
+            len = arch_bits - 1;
+            sign_extend = 0;  (* No sign extension *)
             low_bits = Nativeint.one  (* Set the tag bit *)
           },
         [c],
@@ -1143,7 +1151,19 @@ let untag_int i dbg =
   | Cop (Cor, [Cop (Clsr, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
     when n > 0 && is_defined_shift (n + 1) ->
     lsr_const c (n + 1) dbg
-  | c -> asr_const c 1 dbg
+  | c ->
+    (* Untag an integer: arithmetic shift right by 1
+       Take all 64 bits starting from position 1, place at position 0, with sign extension *)
+    Cop
+      ( Cbitwindow
+          { src = 1;     (* Start from bit 1 (skip the tag bit) *)
+            dst = 0;     (* Place at bit 0 *)
+            len = 63;    (* Take 63 bits *)
+            sign_extend = 64;  (* Sign extend to full width *)
+            low_bits = Nativeint.zero
+          },
+        [c],
+        dbg )
 
 let mk_not dbg cmm =
   match cmm with
@@ -1714,10 +1734,10 @@ let get_tag ptr dbg =
     (* If byte loads are slow - extract low 8 bits using bit windowing *)
     Cop
       ( Cbitwindow
-          { input_low = 0;
-            input_high = 8;
-            output_low = 0;
-            sign_extend = 8;  (* No sign extension needed for tag *)
+          { src = 0;
+            dst = 0;
+            len = 8;
+            sign_extend = 0;  (* No sign extension needed for tag *)
             low_bits = Nativeint.zero
           },
         [get_header ptr dbg],
