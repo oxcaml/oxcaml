@@ -363,7 +363,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   match terminator with
   | Never -> assert false
-  | Call {op = Indirect | Direct _; _} ->
+  | Call {op = {callee = Indirect | Direct _; _}; _} ->
     all_phys_regs
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
@@ -381,7 +381,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
 let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_intf.S.terminator) =
   match terminator with
   | Never -> assert false
-  | Call {op = Indirect | Direct _; _} ->
+  | Call {op = {callee = Indirect | Direct _; _}; _} ->
     true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _

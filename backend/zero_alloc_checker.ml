@@ -2651,9 +2651,9 @@ end = struct
           (* CR gyorsh: show this be treated as a jump, without affecting the
              summary? *)
           transform_tailcall_imm t t.current_fun_name dbg
-        | Tailcall_func (Direct { sym_name; _ }) ->
+        | Tailcall_func { callee = Direct { sym_name; _ }; _ } ->
           transform_tailcall_imm t sym_name dbg
-        | Tailcall_func Indirect ->
+        | Tailcall_func { callee = Indirect; _ } ->
           (* Sound to ignore [next] and [exn] because the call never returns. *)
           let w = create_witnesses t Indirect_tailcall dbg in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
@@ -2683,10 +2683,10 @@ end = struct
           in
           let k = Witness.Probe { name; handler_code_sym } in
           transform_call t ~next ~exn handler_code_sym k ~desc dbg
-        | Call { op = Indirect; _ } ->
+        | Call { op = { callee = Indirect; _ }; _ } ->
           let w = create_witnesses t Indirect_call dbg in
           transform_top t ~next ~exn w "indirect call" dbg
-        | Call { op = Direct { sym_name = func; _ }; _ } ->
+        | Call { op = { callee = Direct { sym_name = func; _ }; _ }; _ } ->
           let k = Witness.Direct_call { callee = func } in
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
             dbg

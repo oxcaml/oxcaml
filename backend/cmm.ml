@@ -400,7 +400,8 @@ type alloc_dbginfo_item =
 type alloc_dbginfo = alloc_dbginfo_item list
 
 type operation =
-  | Capply of machtype * Lambda.region_close
+  | Capply of
+      machtype list * machtype * Lambda.region_close (* args_ty, ret_ty, pos *)
   | Cextcall of
       { func : string;
         ty : machtype;
@@ -643,7 +644,7 @@ let iter_shallow_tail f = function
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Cand | Cor | Cxor
         | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
         | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause
-        | Capply (_, _)
+        | Capply (_, _, _)
         | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
@@ -677,7 +678,7 @@ let map_shallow_tail f = function
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Cand | Cor | Cxor
           | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
           | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause
-          | Capply (_, _)
+          | Capply (_, _, _)
           | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _

@@ -2132,7 +2132,10 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     (Extended_machtype.change_tagged_int_to_val result)
     mode;
   Cop
-    ( Capply (Extended_machtype.to_machtype result, apos),
+    ( Capply
+        ( List.map Extended_machtype.to_machtype args_type,
+          Extended_machtype.to_machtype result,
+          apos ),
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
       Cconst_symbol
         ( send_function_name
@@ -3095,14 +3098,15 @@ let split_arity_for_apply arity args =
 let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
   (* Treat tagged int arguments and results as [typ_val], to avoid generating
      excessive numbers of caml_apply functions. *)
-  let ty = Extended_machtype.to_machtype extended_ty in
+  let res_ty = Extended_machtype.to_machtype extended_ty in
+  let args_ty = List.map Extended_machtype.to_machtype extended_args_type in
   let really_call_caml_apply clos args =
     let cargs =
       Cconst_symbol (apply_function_sym extended_args_type extended_ty mode, dbg)
       :: args
       @ [clos]
     in
-    Cop (Capply (ty, pos), cargs, dbg)
+    Cop (Capply (args_ty @ [typ_val], res_ty, pos), cargs, dbg)
   in
   if !Oxcaml_flags.caml_apply_inline_fast_path
   then
@@ -3127,7 +3131,7 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
                     dbg ),
                 dbg,
                 Cop
-                  ( Capply (ty, pos),
+                  ( Capply (args_ty @ [typ_val], res_ty, pos),
                     (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
                     dbg ),
                 dbg,
@@ -3153,10 +3157,13 @@ let maybe_reset_current_region ~dbg ~body_tail ~body_nontail old_region =
 
 let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
   match arity with
-  | [_] ->
+  | [arg_ty] ->
     bind "fun" clos (fun clos ->
         Cop
-          ( Capply (Extended_machtype.to_machtype result, pos),
+          ( Capply
+              ( [Extended_machtype.to_machtype arg_ty; typ_val],
+                Extended_machtype.to_machtype result,
+                pos ),
             (get_field_codepointer mut clos 0 dbg :: args) @ [clos],
             dbg ))
   | _ -> call_caml_apply result arity mut clos args pos mode dbg
@@ -3348,7 +3355,7 @@ let placeholder_fun_dbg ~human_name:_ = Debuginfo.none
 
 let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
   let dbg = placeholder_dbg in
-  let args = List.map (fun _ -> V.create_local "arg") arity in
+  let args = List.map (fun ty -> ty, V.create_local "arg") arity in
   let clos = V.create_local "clos" in
   (* In the slowpath, a region is necessary in case the initial applications do
      local allocations *)
@@ -3363,10 +3370,10 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
   let rec app_fun clos args =
     match args with
     | [] -> Misc.fatal_error "apply_function_body for empty arity"
-    | [arg] -> (
+    | [(arg_ty, arg)] -> (
       let app =
         Cop
-          ( Capply (result, Rc_normal),
+          ( Capply ([arg_ty; typ_val], result, Rc_normal),
             [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
               Cvar arg;
               Cvar clos ],
@@ -3380,12 +3387,12 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
            direct tail call without waiting to end the region afterwards. *)
         maybe_reset_current_region ~dbg ~body_tail:app ~body_nontail:app
           (Cvar region))
-    | arg :: args ->
+    | (arg_ty, arg) :: args ->
       let newclos = V.create_local "clos" in
       Clet
         ( VP.create newclos,
           Cop
-            ( Capply (typ_val, Rc_normal),
+            ( Capply ([arg_ty; typ_val], typ_val, Rc_normal),
               [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
                 Cvar clos ],
@@ -3398,6 +3405,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
     | Some reg ->
       Clet (VP.create reg, Cop (Cbeginregion, [], dbg ()), app_fun clos args)
   in
+  let args = List.map snd args in
   let all_args = args @ [clos] in
   ( args,
     clos,
@@ -3416,7 +3424,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
               dbg () ),
           dbg (),
           Cop
-            ( Capply (result, Rc_normal),
+            ( Capply (arity, result, Rc_normal),
               get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
@@ -3513,25 +3521,25 @@ let tuplify_function arity return =
   then
     Misc.fatal_error
       "tuplify_function is currently unsupported if arity contains non-values";
-  let arity = List.length arity in
+  let arity_len = List.length arity in
   let dbg = placeholder_dbg in
   let arg = V.create_local "arg" in
   let clos = V.create_local "clos" in
   let rec access_components i =
-    if i >= arity
+    if i >= arity_len
     then []
     else
       get_field_gen Asttypes.Mutable (Cvar arg) i (dbg ())
       :: access_components (i + 1)
   in
-  let fun_name = global_symbol (tuplify_function_name arity return) in
+  let fun_name = global_symbol (tuplify_function_name arity_len return) in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
   Cfunction
     { fun_name;
       fun_args = [VP.create arg, typ_val; VP.create clos, typ_val];
       fun_body =
         Cop
-          ( Capply (return, Rc_normal),
+          ( Capply (arity @ [typ_val], return, Rc_normal),
             get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
             :: access_components 0
             @ [Cvar clos],
@@ -3674,7 +3682,7 @@ let rec make_curry_apply result narity args_type args clos n =
   match args_type with
   | [] ->
     Cop
-      ( Capply (result, Rc_normal),
+      ( Capply (args_type @ [typ_val], result, Rc_normal),
         (get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ()) :: args)
         @ [Cvar clos],
         dbg () )
@@ -4144,7 +4152,7 @@ let entry_point namelist =
     in
     Csequence
       ( Cop
-          ( Capply (typ_void, Rc_normal),
+          ( Capply ([], typ_void, Rc_normal),
             [Cop (mk_load_immut Word_int, [f], dbg ())],
             dbg () ),
         incr_global_inited () )
@@ -4533,8 +4541,8 @@ let load ~dbg memory_chunk mutability ~addr =
 let store ~dbg kind init ~addr ~new_value =
   Cop (Cstore (kind, init), [addr; new_value], dbg)
 
-let direct_call ~dbg ty pos f_code_sym args =
-  Cop (Capply (ty, pos), f_code_sym :: args, dbg)
+let direct_call ~dbg res_ty pos f_code_sym args_ty args =
+  Cop (Capply (args_ty, res_ty, pos), f_code_sym :: args, dbg)
 
 let indirect_call ~dbg ty pos alloc_mode f args_type args =
   might_split_call_caml_apply ty args_type Asttypes.Mutable f args pos
@@ -4556,7 +4564,10 @@ let indirect_full_call ~dbg ty pos alloc_mode f args_type args =
     letin v' ~defining_expr:f
       ~body:
         (Cop
-           ( Capply (Extended_machtype.to_machtype ty, pos),
+           ( Capply
+               ( List.map Extended_machtype.to_machtype args_type @ [typ_val],
+                 Extended_machtype.to_machtype ty,
+                 pos ),
              (fun_ptr :: args) @ [Cvar v],
              dbg ))
 
@@ -4986,7 +4997,7 @@ let perform ~dbg eff =
   (* Rc_normal means "allow tailcalls". Preventing them here by using Rc_nontail
      improves backtraces of paused fibers. *)
   Cop
-    ( Capply (typ_val, Rc_nontail),
+    ( Capply ([typ_val; typ_val], typ_val, Rc_nontail),
       [Cconst_symbol (Cmm.global_symbol "caml_perform", dbg); eff; cont],
       dbg )
 
@@ -4995,7 +5006,7 @@ let run_stack ~dbg ~stack ~f ~arg =
      (usages of this primitive shouldn't be generated in tail position), so we
      use Rc_nontail for clarity. *)
   Cop
-    ( Capply (typ_val, Rc_nontail),
+    ( Capply ([typ_val; typ_val; typ_val], typ_val, Rc_nontail),
       [Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg); stack; f; arg],
       dbg )
 
@@ -5004,7 +5015,7 @@ let resume ~dbg ~stack ~f ~arg ~last_fiber =
      repeated resumes, and these should consume O(1) stack space by tail-calling
      caml_resume. *)
   Cop
-    ( Capply (typ_val, Rc_normal),
+    ( Capply ([typ_val; typ_val; typ_val; typ_val], typ_val, Rc_normal),
       [ Cconst_symbol (Cmm.global_symbol "caml_resume", dbg);
         stack;
         f;
@@ -5016,7 +5027,7 @@ let reperform ~dbg ~eff ~cont ~last_fiber =
   (* Rc_normal is required here, this is used in tail position and should tail
      call. *)
   Cop
-    ( Capply (typ_val, Rc_normal),
+    ( Capply ([typ_val; typ_val; typ_val], typ_val, Rc_normal),
       [ Cconst_symbol (Cmm.global_symbol "caml_reperform", dbg);
         eff;
         cont;

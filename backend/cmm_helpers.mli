@@ -986,6 +986,7 @@ val direct_call :
   machtype ->
   Lambda.region_close ->
   expression ->
+  machtype list ->
   expression list ->
   expression
 

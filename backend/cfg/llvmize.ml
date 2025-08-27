@@ -901,11 +901,36 @@ module F = struct
     (* Prepare arguments *)
     let args_begin, args_end =
       (* [Indirect] has the function in i.arg.(0) *)
-      match op with
+      match op.callee with
       | Direct _ -> 0, Array.length i.arg
       | Indirect -> 1, Array.length i.arg - 1
     in
     let arg_regs = Array.sub i.arg args_begin args_end |> reg_list_for_call in
+    let print_machtyp_comp ppf (typ : Cmm.machtype_component) =
+      let str =
+        match typ with
+        | Val -> "V"
+        | Addr -> "A"
+        | Int -> "I"
+        | Float -> "F"
+        | Vec128 -> "X"
+        | Vec256 -> "Y"
+        | Vec512 -> "Z"
+        | Valx2 -> "VV"
+        | Float32 -> "S"
+      in
+      fprintf ppf "%s" str
+    in
+    let print_machtyp ppf (mtyp : Cmm.machtype) =
+      fprintf ppf "[%a]"
+        (pp_print_list ~pp_sep:pp_comma print_machtyp_comp)
+        (Array.to_list mtyp)
+    in
+    ins t "; regs: [%a], ty_args: [%a]"
+      (pp_print_list ~pp_sep:pp_comma Printreg.reg)
+      arg_regs
+      (pp_print_list ~pp_sep:pp_comma print_machtyp)
+      op.ty_args;
     let args =
       List.map
         (fun ident ->
@@ -914,10 +939,18 @@ module F = struct
           ins_load t ~src:ident ~dst:loaded Llvm_typ.ptr;
           Llvm_typ.ptr, loaded)
         runtime_regs
-      @ List.map
-          (fun reg ->
-            Llvm_typ.of_machtyp_component reg.Reg.typ, load_reg_to_temp t reg)
-          arg_regs
+      @ List.map2
+          (fun reg typ ->
+            let temp = load_reg_to_temp t reg in
+            let typ =
+              Llvm_typ.of_machtyp_component typ.(0)
+              (* CR yusumez: ??? *)
+            in
+            ( typ,
+              cast
+                ~src:(Llvm_typ.of_machtyp_component reg.Reg.typ)
+                ~dst:typ t temp ))
+          arg_regs op.ty_args
     in
     let arg_types = List.map fst args in
     (* Prepare return *)
@@ -950,7 +983,7 @@ module F = struct
     in
     (* Do the call *)
     let res_ident =
-      match op with
+      match op.callee with
       | Direct { sym_name; sym_global = _ } ->
         add_called_fun t sym_name ~cc:Ocaml ~args:arg_types ~res:(Some res_type);
         do_call ~pp_name:pp_global sym_name
@@ -2450,6 +2483,18 @@ let end_assembly () =
 (* CR gyorsh: assume 64-bit architecture *)
 (* CR yusumez: We ignore whether symbols are local/global. *)
 (* CR yusumez: Move all arch-specific things to an arch-specific file. *)
+(* CR yusumez: The structure of this file needs to be completely refactored:
+
+   - Separate IR generation from printing/emitting
+
+   - Make working with identifiers easy (make instructions with results return
+   the fresh identifier themselves, carry their types around, etc.)
+
+   - Factor out small common operations in a better way (eg. for function
+   calls) *)
+(* CR yusumez: Exceptions might not work with statepoints since LLVM doesn't
+   seem to be able to statically determine the size of the stack in that
+   case. *)
 
 (* Error report *)
 

@@ -197,8 +197,8 @@ let replace_successor_labels t ~normal ~exn block ~f =
       | Switch labels -> Switch (Array.map f labels)
       | Tailcall_self { destination } ->
         Tailcall_self { destination = f destination }
-      | Tailcall_func Indirect
-      | Tailcall_func (Direct _)
+      | Tailcall_func { callee = Indirect; _ }
+      | Tailcall_func { callee = Direct _; _ }
       | Return | Raise _ | Call_no_return _ ->
         block.terminator.desc
       | Call { op; label_after } -> Call { op; label_after = f label_after }
@@ -377,12 +377,12 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
          })
   | Tailcall_func call ->
     dump_linear_call_op ppf
-      (match call with
+      (match call.callee with
       | Indirect -> Linear.Ltailcall_ind
       | Direct func -> Linear.Ltailcall_imm { func })
   | Call { op = call; label_after } ->
     Format.fprintf ppf "%t%a" print_res dump_linear_call_op
-      (match call with
+      (match call.callee with
       | Indirect -> Linear.Lcall_ind
       | Direct func -> Linear.Lcall_imm { func });
     Format.fprintf ppf "%sgoto %a" sep Label.format label_after

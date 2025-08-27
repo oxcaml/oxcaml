@@ -296,7 +296,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     | None ->
       ( C.direct_call ~dbg
           (C.Extended_machtype.to_machtype return_ty)
-          pos (C.symbol ~dbg code_sym) args,
+          pos (C.symbol ~dbg code_sym)
+          (List.map C.Extended_machtype.to_machtype args_ty)
+          args,
         free_vars,
         env,
         res,

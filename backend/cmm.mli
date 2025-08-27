@@ -367,7 +367,8 @@ type alloc_dbginfo_item =
 type alloc_dbginfo = alloc_dbginfo_item list
 
 type operation =
-  | Capply of machtype * Lambda.region_close
+  | Capply of
+      machtype list * machtype * Lambda.region_close (* args_ty, ret_ty, pos *)
   | Cextcall of
       { func : string;
         ty : machtype;
