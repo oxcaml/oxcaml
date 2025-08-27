@@ -28,7 +28,7 @@ Line 5, characters 4-5:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let f x =
@@ -44,7 +44,7 @@ Line 5, characters 4-5:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let f e0 (e1 @ local) =
@@ -134,7 +134,7 @@ Line 4, characters 44-46:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let f e0 (e1 @ local) =
@@ -221,5 +221,5 @@ Line 4, characters 2-4:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]

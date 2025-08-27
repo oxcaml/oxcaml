@@ -12,7 +12,7 @@ Line 3, characters 2-3:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 external idint : local_ int -> int = "%identity"
@@ -45,7 +45,7 @@ Line 3, characters 2-3:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let leak n =
@@ -58,7 +58,7 @@ Line 3, characters 2-3:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let leak n =
@@ -71,7 +71,7 @@ Line 3, characters 2-3:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let leak n =
@@ -84,7 +84,7 @@ Line 3, characters 2-3:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* If both type and mode are wrong, complain about type *)
@@ -281,7 +281,7 @@ Line 1, characters 15-21:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
   Hint: This is a partial application
         Adding 2 more arguments will make the value non-local
 |}]
@@ -293,7 +293,7 @@ Line 1, characters 15-23:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -336,7 +336,7 @@ Line 3, characters 2-5:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* In principle. it would be sound to allow this one:
@@ -351,7 +351,7 @@ Line 3, characters 2-5:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let optret1 (f : ?x:int -> local_ (y:unit -> unit -> int)) = f ()
@@ -362,7 +362,7 @@ Line 1, characters 61-65:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -1057,7 +1057,7 @@ Line 3, characters 2-3:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo x = exclave_
@@ -1194,7 +1194,7 @@ Line 3, characters 2-7:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 let foo (local_ x) = x.mut
 [%%expect{|
@@ -1231,7 +1231,7 @@ Line 3, characters 2-5:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 let foo (local_ { mut }) = mut
 [%%expect{|
@@ -1322,7 +1322,7 @@ Line 3, characters 2-8:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 let foo (local_ x) = x.#mut
 [%%expect{|
@@ -1359,7 +1359,7 @@ Line 3, characters 2-5:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 let foo (local_ #{ mut }) = mut
 [%%expect{|
@@ -2491,7 +2491,7 @@ Line 4, characters 20-22:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* and regional gives regional *)
@@ -2557,7 +2557,7 @@ Line 3, characters 14-16:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let f (local_ a : string iarray) =
@@ -2626,7 +2626,7 @@ Line 11, characters 13-59:
 Error: This value is "local"
        but is expected to be in the parent region or "global"
        because it is a function return value.
-       Hint: Use exclave_ to return a local value..
+       Hint: Use exclave_ to return a local value.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
