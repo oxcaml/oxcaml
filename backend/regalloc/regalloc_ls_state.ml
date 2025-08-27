@@ -8,7 +8,8 @@ module DLL = Oxcaml_utils.Doubly_linked_list
 type t =
   { interval_dll : Interval.t DLL.t;
     active : ClassIntervals.t Reg_class.Tbl.t;
-    stack_slots : Regalloc_stack_slots.t
+    stack_slots : Regalloc_stack_slots.t;
+    ls_order_tbl : int InstructionId.Tbl.t
   }
 
 let for_fatal t =
@@ -20,7 +21,8 @@ let[@inline] make ~stack_slots =
   let active =
     Reg_class.Tbl.init ~f:(fun _reg_class -> ClassIntervals.make ())
   in
-  { interval_dll; active; stack_slots }
+  let ls_order_tbl = InstructionId.Tbl.create 32 in
+  { interval_dll; active; stack_slots; ls_order_tbl }
 
 (* CR-someday xclerc: consider using Dynarray *)
 type class_interval_array =
@@ -109,6 +111,15 @@ let[@inline] active state ~reg_class = Reg_class.Tbl.find state.active reg_class
 let[@inline] active_classes state = state.active
 
 let[@inline] stack_slots state = state.stack_slots
+
+let[@inline] set_ls_order state ~instruction_id ~ls_order =
+  InstructionId.Tbl.replace state.ls_order_tbl instruction_id ls_order
+
+let[@inline] get_ls_order state ~instruction_id =
+  try InstructionId.Tbl.find state.ls_order_tbl instruction_id with
+  | Not_found ->
+    fatal "Regalloc_ls_state.get_ls_order: instruction_id %a not found"
+      InstructionId.print instruction_id
 
 let rec check_ranges (prev : Range.t) (cell : Range.t DLL.cell option) : int =
   if prev.begin_ > prev.end_
