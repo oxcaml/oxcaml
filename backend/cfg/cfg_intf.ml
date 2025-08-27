@@ -102,7 +102,6 @@ module S = struct
       mutable fdo : Fdo_info.t;
       mutable live : Reg.Set.t;
       mutable stack_offset : int;
-      mutable irc_work_list : irc_work_list;
       mutable available_before : Reg_availability_set.t option;
       mutable available_across : Reg_availability_set.t option
     }
