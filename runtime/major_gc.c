@@ -21,6 +21,7 @@
 #include <stdbool.h>
 
 #include "caml/addrmap.h"
+#include "caml/camlatomic.h"
 #include "caml/config.h"
 #include "caml/codefrag.h"
 #include "caml/domain.h"
