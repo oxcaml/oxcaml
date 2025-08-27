@@ -130,7 +130,7 @@ module type Common_axis = sig
   include
     Common
       with module Const := Const
-       and type simple_error := Const.t simple_error
+       and type simple_error = Const.t simple_error
 
   type 'd hint_const constraint 'd = 'l * 'r
 
@@ -185,6 +185,16 @@ module type Common_product = sig
   val apply_hint : 'd hint_morph -> 'd t -> 'd t
 end
 
+(* These are needed for the destructive substitutions in [Common_axis], as we can't use
+    [neg] within the substitution due to type checker limitations *)
+type 'd neg_hint_const = 'd neg Mode_hint.const constraint 'd = _ * _
+
+type 'd pos_hint_const = 'd pos Mode_hint.const constraint 'd = _ * _
+
+type 'd neg_hint_morph = 'd neg Mode_hint.morph constraint 'd = _ * _
+
+type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
+
 module type S = sig
   val print_longident : (Format.formatter -> Longident.t -> unit) ref
 
@@ -221,8 +231,8 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
-         and type error := Const.t error
-         and type 'd hint_const := 'd Hint.pos_const
+         and type error = Const.t error
+         and type 'd hint_const := 'd pos_hint_const
   end
 
   module type Common_axis_neg = sig
@@ -232,8 +242,8 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
-         and type error := Const.t error
-         and type 'd hint_const := 'd Hint.neg_const
+         and type error = Const.t error
+         and type 'd hint_const := 'd neg_hint_const
   end
 
   module Locality : sig
@@ -447,8 +457,8 @@ module type S = sig
           with type Const.t = monadic
            and type error = monadic error
            and type 'a Axis.t = (monadic, 'a) Axis.t
-           and type 'd hint_morph := 'd Hint.neg_morph
-           and type 'd hint_const := 'd Hint.neg_const
+           and type 'd hint_morph := 'd neg_hint_morph
+           and type 'd hint_const := 'd neg_hint_const
 
       module Const_op : Lattice with type t = Const.t
 
@@ -463,8 +473,8 @@ module type S = sig
           with type Const.t = Areality.Const.t comonadic_with
            and type error = Areality.Const.t comonadic_with error
            and type 'a Axis.t = (Areality.Const.t comonadic_with, 'a) Axis.t
-           and type 'd hint_morph := 'd Hint.pos_morph
-           and type 'd hint_const := 'd Hint.pos_const
+           and type 'd hint_morph := 'd pos_hint_morph
+           and type 'd hint_const := 'd pos_hint_const
 
       val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) mode
 
