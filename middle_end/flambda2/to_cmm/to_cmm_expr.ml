@@ -18,6 +18,7 @@ open! Flambda.Import
 module Env = To_cmm_env
 module Ece = Effects_and_coeffects
 module K = Flambda_kind
+module P = Flambda_primitive
 
 module C = struct
   include Cmm_helpers
@@ -742,6 +743,55 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     Misc.fatal_errorf "Mismatch between pattern and defining expression:@ %a"
       Let.print let_expr
 
+and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
+  match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
+  | Singleton bound_var, Prim (Variadic (Make_block (block_kind, _mut, _alloc_mode), args), _dbg) ->
+    (* Translate Make_block to Cphantom_block *)
+    (* Extract tag from block_kind *)
+    let tag_opt = 
+      match (block_kind : P.Block_kind.t) with
+      | Values (tag, _) -> Some (Tag.Scannable.to_int tag)
+      | Naked_floats -> Some (Tag.to_int Tag.double_array_tag)
+      | Mixed (tag, _) -> Some (Tag.Scannable.to_int tag)
+    in
+    (match tag_opt with
+    | None -> expr env res body
+    | Some tag ->
+      let rec translate_args args =
+        match args with
+        | [] -> Some []
+        | arg :: rest ->
+          match Simple.must_be_var arg with
+          | Some (var, _coercion) ->
+            (* Look up the variable in the environment to see if it's bound to Cvar *)
+            let To_cmm_env.{ expr = { cmm; _ }; _ } = 
+              C.simple ~dbg:Debuginfo.none env res (Simple.var var) in
+            (match cmm with
+            | Cvar backend_var ->
+              (match translate_args rest with
+              | Some rest_vars -> Some (backend_var :: rest_vars)
+              | None -> None)
+            | _ -> None)
+          | None -> None
+      in
+      (match translate_args args with
+      | Some var_args ->
+        let var = Bound_var.var bound_var in
+        (* Create a backend var for the phantom binding *)
+        let name = Variable.unique_name var in
+        let backend_var = Backend_var.create_local name in
+        let backend_var_with_prov = Backend_var.With_provenance.create backend_var in
+        let defining_expr = Some (Cmm.Cphantom_block { tag; fields = var_args }) in
+        let body_cmm, free_vars, symbol_inits, res = expr env res body in
+        let cmm = C.make_phantom_let backend_var_with_prov defining_expr body_cmm in
+        cmm, free_vars, symbol_inits, res
+      | None ->
+        (* Cannot translate - just skip the phantom let *)
+        expr env res body))
+  | _ ->
+    (* For now, only handle Make_block case *)
+    expr env res body
+
 and let_expr env res let_expr =
   Let.pattern_match' let_expr
     ~f:(fun bound_pattern ~num_normal_occurrences_of_bound_vars ~body ->
@@ -749,7 +799,7 @@ and let_expr env res let_expr =
       | Normal ->
         let_expr0 env res let_expr bound_pattern
           ~num_normal_occurrences_of_bound_vars ~body
-      | Phantom -> expr env res body
+      | Phantom -> let_expr_phantom env res let_expr bound_pattern ~body
       | In_types ->
         Misc.fatal_errorf "Cannot bind In_types variables in terms:@ %a"
           Let.print let_expr)

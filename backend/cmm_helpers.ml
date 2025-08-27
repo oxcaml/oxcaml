@@ -92,6 +92,8 @@ let bind name arg fn =
     let id = V.create_local name in
     Clet (VP.create id, arg, fn (Cvar id))
 
+let make_phantom_let var def body = Cphantom_let (var, def, body)
+
 let bind_list name args fn =
   let rec aux bound_args = function
     | [] -> fn bound_args
