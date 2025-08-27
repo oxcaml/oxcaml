@@ -80,7 +80,7 @@ module Llvm_typ = struct
     | Int of { width_in_bits : int }
     | Float (* 32-bit *)
     | Double (* 64 bit *)
-    | Ptr
+    | Ptr of { addrspace : string option }
     | Struct of t list
     | Array of
         { size : int;
@@ -105,7 +105,9 @@ module Llvm_typ = struct
 
   let double = Double
 
-  let ptr = Ptr
+  let ptr = Ptr { addrspace = None }
+
+  let val_ptr = Ptr { addrspace = Some "1" }
 
   let bool = Int { width_in_bits = 1 }
 
@@ -113,12 +115,15 @@ module Llvm_typ = struct
 
   let of_machtyp_component (c : Cmm.machtype_component) =
     match c with
-    | Val | Addr | Int ->
-      Int { width_in_bits = 64 }
+    | Addr | Int ->
+      i64
       (* Cfg allows vals to be assigned to ints and vice versa, so we do this to
-         make LLVM happy for now. *)
-    | Float -> Double
-    | Float32 -> Float
+         make LLVM happy for now.
+
+         Update: well,,,, about that. *)
+    | Val -> val_ptr
+    | Float -> double
+    | Float32 -> float
     | Vec128 | Vec256 | Vec512 | Valx2 ->
       Misc.fatal_error "Llvmize.Llvm_typ.of_machtyp_component: not implemented"
 
@@ -131,7 +136,11 @@ module Llvm_typ = struct
     | Int { width_in_bits } -> fprintf ppf "i%d" width_in_bits
     | Float -> fprintf ppf "float"
     | Double -> fprintf ppf "double"
-    | Ptr -> fprintf ppf "ptr"
+    | Ptr { addrspace } -> (
+      fprintf ppf "ptr";
+      match addrspace with
+      | Some addrspace -> fprintf ppf " addrspace(%s)" addrspace
+      | None -> ())
     | Struct typs ->
       fprintf ppf "{ %a }"
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ", ") pp_t)
@@ -144,7 +153,9 @@ module Llvm_typ = struct
   let rec equal t1 t2 =
     match t1, t2 with
     | Int { width_in_bits = x }, Int { width_in_bits = y } -> x = y
-    | Float, Float | Double, Double | Ptr, Ptr -> true
+    | Ptr { addrspace = x }, Ptr { addrspace = y } ->
+      Option.equal String.equal x y
+    | Float, Float | Double, Double -> true
     | Struct xs, Struct ys -> List.equal equal xs ys
     | ( Array { size = size1; elem_typ = typ1 },
         Array { size = size2; elem_typ = typ2 } ) ->
@@ -152,7 +163,8 @@ module Llvm_typ = struct
     | ( Vector { size = size1; elem_typ = typ1 },
         Vector { size = size2; elem_typ = typ2 } ) ->
       size1 = size2 && equal typ1 typ2
-    | (Int _ | Float | Double | Ptr | Struct _ | Array _ | Vector _), _ -> false
+    | (Int _ | Float | Double | Ptr _ | Struct _ | Array _ | Vector _), _ ->
+      false
 end
 
 module Calling_conventions = struct
@@ -351,6 +363,8 @@ let allocation_ident = Ident.named "alloc"
 
 let runtime_regs = [domainstate_ident; allocation_ident]
 
+let gc_name = "statepoint-example"
+
 let make_ret_type ret_types =
   let runtime_reg_types = List.map (fun _ -> Llvm_typ.ptr) runtime_regs in
   let actual_ret_types = List.map Llvm_typ.of_machtyp_component ret_types in
@@ -461,15 +475,16 @@ module F = struct
       (pp_print_list ~pp_sep:pp_print_space pp_print_string)
       attrs
 
+  let pp_gc ppf gc = if gc then fprintf ppf "gc \"%s\"" gc_name
+
   let define t ?(private_ = false) ~gc ~cc ~fun_name ~fun_args ~fun_ret_type
       ~fun_dbg ~fun_attrs pp_body =
     pp_dbg_comment t.ppf fun_name fun_dbg;
     let cc_str = Calling_conventions.to_llvmir_string cc in
     let private_str = if private_ then "private " else " " in
-    let gc_str = if gc then "gc \"ocaml\"" else "" in
-    line t.ppf "define %s%s %a %a(%a) %a %s {" private_str cc_str Llvm_typ.pp_t
+    line t.ppf "define %s%s %a %a(%a) %a %a {" private_str cc_str Llvm_typ.pp_t
       fun_ret_type pp_global fun_name pp_fun_args fun_args pp_attrs fun_attrs
-      gc_str;
+      pp_gc gc;
     pp_body ();
     line t.ppf "}";
     line t.ppf ""
@@ -507,13 +522,12 @@ module F = struct
 
   let ins_branch_ident t label = ins t "br label %a" pp_ident label
 
-  let ins_alloca ?comment ?(is_gcroot = false) t ident typ =
+  let ins_alloca ?comment t ident typ =
     let pp_regname ppf () =
       match comment with
       | None -> ()
       | Some comment -> pp_dbg_comment ~newline:false ppf comment Debuginfo.none
     in
-    let typ = if is_gcroot then Llvm_typ.ptr else typ in
     ins t "%a = alloca %a %a" pp_ident ident Llvm_typ.pp_t typ pp_regname ()
 
   let ins_branch_cond t cond ifso ifnot =
@@ -653,7 +667,7 @@ module F = struct
           List.fold_lefti
             (fun idx cur_struct typ -> aux (idxs @ [idx]) cur_struct typ)
             cur_struct typs
-        | Int _ | Ptr | Float | Double | Array _ | Vector _ ->
+        | Int _ | Ptr _ | Float | Double | Array _ | Vector _ ->
           Misc.fatal_error "Llvmize.assemble_struct: unfilled struct slot")
     in
     aux [] (make_poison t root_typ) root_typ
@@ -1799,7 +1813,7 @@ module F = struct
     | Cint8 _ -> Llvm_typ.i8
     | Cint16 _ -> Llvm_typ.i16
     | Cint32 _ -> Llvm_typ.i32
-    | Csymbol_address _ -> Llvm_typ.Ptr
+    | Csymbol_address _ -> Llvm_typ.ptr
     | Cstring s ->
       Llvm_typ.Array { size = String.length s; elem_typ = Llvm_typ.i8 }
     | Cskip size -> Llvm_typ.Array { size; elem_typ = Llvm_typ.i8 }
@@ -1866,12 +1880,10 @@ module F = struct
       match res with Some res -> Llvm_typ.to_string res | None -> "void"
     in
     let cc_str = Calling_conventions.to_llvmir_string cc in
-    let gc_str =
-      if Calling_conventions.equal cc Ocaml then "gc \"ocaml\"" else ""
-    in
-    line t.ppf "declare %s %s %a(%a) %s" cc_str res_str pp_global sym
+    line t.ppf "declare %s %s %a(%a) %a" cc_str res_str pp_global sym
       (pp_print_list ~pp_sep:pp_comma Llvm_typ.pp_t)
-      args gc_str
+      args pp_gc
+      (Calling_conventions.equal cc Ocaml)
 end
 
 let current_compilation_unit = ref None
@@ -1951,26 +1963,14 @@ let make_temps_for_regs t cfg args_and_signature_idents runtime_arg_idents =
       F.ins_alloca t new_ident Llvm_typ.ptr;
       F.ins_store t ~src:old_ident ~dst:new_ident Llvm_typ.ptr)
     runtime_arg_idents runtime_regs;
-  let mark_gcroot (reg : Reg.t) =
-    match reg.typ with
-    | Val ->
-      F.ins t "call void @llvm.gcroot(ptr %a, ptr null)" (F.pp_reg_ident t) reg;
-      F.ins t "store i64 1, ptr %a" (F.pp_reg_ident t) reg
-    | Valx2 -> Misc.fatal_error "Llvmize.mark_gcroot: Valx2 not implemented"
-    | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ()
-  in
   let make_temp (reg : Reg.t) ident_opt =
-    (match reg.loc with
+    match reg.loc with
     (* [Outgoing] is for extcalls only - these will get put on the stack by
        LLVM, so we treat them as normal temporaries. We don't expect OCaml calls
        to use the stack for us... *)
     | Unknown | Reg _ | Stack (Outgoing _) -> (
       (* This will reserve a fresh ident *)
       F.ins_alloca
-        ~is_gcroot:
-          (match reg.typ with
-          | Val | Valx2 -> true
-          | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> false)
         ~comment:(Format.asprintf "%a" Printreg.reg reg)
         t (get_ident_for_reg t reg)
         (Llvm_typ.of_machtyp_component reg.typ);
@@ -1984,8 +1984,7 @@ let make_temps_for_regs t cfg args_and_signature_idents runtime_arg_idents =
       (* Create entry in the [reg2ident] table *)
       Reg.Tbl.add t.current_fun_info.reg2ident reg res
     | Stack (Local _) | Stack (Incoming _) ->
-      Misc.fatal_error "Llvmize: unexpected register location");
-    mark_gcroot reg
+      Misc.fatal_error "Llvmize: unexpected register location"
   in
   let arg_regs = List.map fst args_and_signature_idents |> Reg.Set.of_list in
   let body_regs = collect_body_regs cfg in
@@ -2271,9 +2270,7 @@ let declare_functions t =
       t.defined_symbols <- String.Set.add sym t.defined_symbols)
     t.called_functions;
   declare_stack_intrinsics t;
-  declare_exn_intrinsics t;
-  Format.fprintf t.ppf
-    "declare void @llvm.gcroot(ptr %%ptrloc, ptr %%metadata)\n"
+  declare_exn_intrinsics t
 
 let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
