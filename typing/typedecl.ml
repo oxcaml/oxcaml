@@ -192,16 +192,23 @@ let get_unboxed_from_attributes sdecl =
     ]}
     *)
 let default_jkind_bound_for_type_params sdecl : Typetexp.Default_jkind_bound.t =
-  let has_manifest = Option.is_some sdecl.ptype_manifest in
-  let is_abstract =
-    match sdecl.ptype_kind with
-    | Ptype_abstract -> true
-    | Ptype_variant _
-    | Ptype_record _
-    | Ptype_record_unboxed_product _
-    | Ptype_open -> false
+  let is_reexport =
+    (* The declaration is a re-export if it has a manifest and the kind (not
+       jkind!) is not abstract. *)
+    match sdecl.ptype_manifest with
+    | Some _ -> (
+      match sdecl.ptype_kind with
+      | Ptype_abstract ->
+        (* If the declaration is re-exporting [or_null], it has an attribute
+           rather than having a non-abstract kind. *)
+        Builtin_attributes.has_or_null_reexport sdecl.ptype_attributes
+      | Ptype_variant _
+      | Ptype_record _
+      | Ptype_record_unboxed_product _
+      | Ptype_open -> true)
+    | None -> false
   in
-  match has_manifest && not is_abstract with
+  match is_reexport with
   | true -> Any
   | false -> Legacy
 

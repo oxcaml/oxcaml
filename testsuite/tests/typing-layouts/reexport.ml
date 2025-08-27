@@ -395,3 +395,15 @@ type ('a : value_or_null) t1 = ..
 type ('a : value_or_null) t2 = 'a t1 = ..
 type t3 = int or_null t2
 |}]
+
+type 'a my_or_null = 'a or_null [@@or_null_reexport]
+type t1 : value_or_null mod non_null
+type t2 = t1 my_or_null
+[%%expect {|
+type ('a : value_or_null mod non_null) my_or_null =
+  'a or_null =
+    Null
+  | This of 'a [@@or_null_reexport]
+type t1 : value_or_null mod non_null
+type t2 = t1 my_or_null
+|}]
