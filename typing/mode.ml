@@ -1827,9 +1827,6 @@ type 'a error = 'a S.error_raw
 
 type nonrec 'a simple_error = 'a simple_error
 
-let to_simple_error ({ left; right; _ } : _ error) : _ simple_error =
-  { left; right }
-
 let print_longident =
   ref (fun _ _ -> assert false : Format.formatter -> Longident.t -> unit)
 
@@ -2256,7 +2253,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let submode_log a b ~log = Solver.submode obj a b ~log
 
-  let to_simple_error e = to_simple_error e
+  let to_simple_error ({ left; right; _ } : error) : simple_error =
+    { left; right }
 
   let submode a b = try_with_log (submode_log a b)
 
@@ -2327,9 +2325,6 @@ module Monadic_gen (Obj : Obj) = struct
 
   type (_, _, 'd) sided = 'd t
 
-  let flip_simple_error = function
-    | { left; right } -> { left = right; right = left }
-
   let disallow_right m = Solver.disallow_left m
 
   let disallow_left m = Solver.disallow_right m
@@ -2350,7 +2345,8 @@ module Monadic_gen (Obj : Obj) = struct
 
   let submode_log a b ~log = Solver.submode obj b a ~log
 
-  let to_simple_error e = to_simple_error e |> flip_simple_error
+  let to_simple_error ({ left; right; _ } : error) : simple_error =
+    { left = right; right = left }
 
   let submode a b = try_with_log (submode_log a b)
 
@@ -2721,14 +2717,14 @@ module Comonadic_with (Areality : Areality) = struct
   type simple_error =
     | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error
 
-  let axis_of_error (left : Obj.const) (right : Obj.const) : simple_error =
+  let axis_of_error (actual : Obj.const) (expected : Obj.const) : simple_error =
     let { areality = areality1;
           linearity = linearity1;
           portability = portability1;
           yielding = yielding1;
           statefulness = statefulness1
         } =
-      left
+      actual
     in
     let { areality = areality2;
           linearity = linearity2;
@@ -2736,7 +2732,7 @@ module Comonadic_with (Areality : Areality) = struct
           yielding = yielding2;
           statefulness = statefulness2
         } =
-      right
+      expected
     in
     if Areality.Const.le areality1 areality2
     then
@@ -2865,18 +2861,18 @@ module Monadic = struct
   type simple_error =
     | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error
 
-  let axis_of_error (left : Obj.const) (right : Obj.const) : simple_error =
+  let axis_of_error (actual : Obj.const) (expected : Obj.const) : simple_error =
     let { uniqueness = uniqueness1;
           contention = contention1;
           visibility = visibility1
         } =
-      left
+      actual
     in
     let { uniqueness = uniqueness2;
           contention = contention2;
           visibility = visibility2
         } =
-      right
+      expected
     in
     if Uniqueness.Const.le uniqueness1 uniqueness2
     then
