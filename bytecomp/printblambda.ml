@@ -155,7 +155,8 @@ let rec blambda ppf = function
       (pp_print_list ~pp_sep:pp_print_space blambda)
       args
   | Staticcatch { id; args; handler; body } ->
-    fprintf ppf "@[<2>(catch@ %a@;<1 -1>with (%a%a)@ %a)@]" blambda body Static_label.format id
+    fprintf ppf "@[<2>(catch@ %a@;<1 -1>with (%a%a)@ %a)@]" blambda body
+      Static_label.format id
       (fun ppf vars ->
         List.iter (fun x -> fprintf ppf " %a" Ident.print x) vars)
       args blambda handler

@@ -68,7 +68,10 @@ let env_add ?(mut = Asttypes.Immutable) var regs env =
 let env_add_static_exception id v env label =
   let r = ref Unreachable in
   let s : static_handler = { regs = v; traps_ref = r; label } in
-  { env with static_exceptions = Static_label.Map.add id s env.static_exceptions }, r
+  ( { env with
+      static_exceptions = Static_label.Map.add id s env.static_exceptions
+    },
+    r )
 
 let env_find id env =
   let regs, _provenance, _mut = V.Map.find id env.vars in
@@ -90,11 +93,13 @@ let env_find_regs_for_exception_extra_args id env =
       Static_label.format id
   | exception Not_found ->
     Misc.fatal_errorf
-      "Could not find exception extra args registers for continuation %a" Static_label.format id
+      "Could not find exception extra args registers for continuation %a"
+      Static_label.format id
 
 let env_find_static_exception id env =
   try Static_label.Map.find id env.static_exceptions
-  with Not_found -> Misc.fatal_errorf "Not found static exception id=%a" Static_label.format id
+  with Not_found ->
+    Misc.fatal_errorf "Not found static exception id=%a" Static_label.format id
 
 let env_set_trap_stack env trap_stack = { env with trap_stack }
 
@@ -118,7 +123,8 @@ let set_traps nfail traps_ref base_traps exit_traps =
   let traps = combine_traps base_traps exit_traps in
   match !traps_ref with
   | Unreachable ->
-    (* Format.eprintf "Traps for %a set to %a@." Static_label.format nfail print_traps traps; *)
+    (* Format.eprintf "Traps for %a set to %a@." Static_label.format nfail
+       print_traps traps; *)
     traps_ref := Reachable traps
   | Reachable prev_traps ->
     if not (Operation.equal_trap_stack prev_traps traps)

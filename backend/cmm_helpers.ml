@@ -3042,9 +3042,7 @@ module StoreExpForSwitch = Switch.CtxStore (struct
 
   let make_key index expr =
     let continuation =
-      match expr with 
-      | Cexit (Lbl i, [], []) -> Some i
-      | _ -> None
+      match expr with Cexit (Lbl i, [], []) -> Some i | _ -> None
     in
     Some (continuation, index)
 

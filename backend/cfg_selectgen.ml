@@ -1058,8 +1058,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (fun (env, map) (nfail, ids, rs, e2, dbg, is_cold) ->
           let label = Cmm.new_label () in
           let env, r = SU.env_add_static_exception nfail rs env label in
-          env, Static_label.Map.add nfail (r, (ids, rs, e2, dbg, is_cold, label)) map)
-        (env, Static_label.Map.empty) handlers
+          ( env,
+            Static_label.Map.add nfail
+              (r, (ids, rs, e2, dbg, is_cold, label))
+              map ))
+        (env, Static_label.Map.empty)
+        handlers
     in
     let r_body, sub_body = emit_new_sub_cfg env body ~bound_name in
     let translate_one_handler _nfail
@@ -1163,7 +1167,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           with Not_found ->
             Misc.fatal_error
               ("Selection.emit_expr: unbound label "
-             ^ Static_label.to_string nfail)
+              ^ Static_label.to_string nfail)
         in
         (* Intermediate registers to handle cases where some registers from src
            are present in dest *)
@@ -1334,8 +1338,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (fun (env, map) (nfail, ids, rs, e2, dbg, is_cold) ->
           let label = Cmm.new_label () in
           let env, r = SU.env_add_static_exception nfail rs env label in
-          env, Static_label.Map.add nfail (r, (ids, rs, e2, dbg, is_cold, label)) map)
-        (env, Static_label.Map.empty) handlers
+          ( env,
+            Static_label.Map.add nfail
+              (r, (ids, rs, e2, dbg, is_cold, label))
+              map ))
+        (env, Static_label.Map.empty)
+        handlers
     in
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let s_body = emit_tail_new_sub_cfg env e1 in

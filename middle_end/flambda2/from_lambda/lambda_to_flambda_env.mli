@@ -86,7 +86,11 @@ val add_continuation :
   add_continuation_result
 
 val add_static_exn_continuation :
-  t -> Static_label.t -> pop_region:bool -> Continuation.t -> add_continuation_result
+  t ->
+  Static_label.t ->
+  pop_region:bool ->
+  Continuation.t ->
+  add_continuation_result
 
 val get_static_exn_continuation : t -> Static_label.t -> Continuation.t
 

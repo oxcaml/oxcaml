@@ -263,7 +263,8 @@ let add_static_exn_continuation t static_exn ~pop_region cont =
 let get_static_exn_continuation t static_exn =
   match Static_label.Map.find static_exn t.static_exn_continuation with
   | exception Not_found ->
-    Misc.fatal_errorf "Unbound static exception %a" Static_label.format static_exn
+    Misc.fatal_errorf "Unbound static exception %a" Static_label.format
+      static_exn
   | continuation -> continuation
 
 let mark_as_recursive_static_catch t static_exn =
@@ -272,8 +273,7 @@ let mark_as_recursive_static_catch t static_exn =
     Misc.fatal_errorf
       "Static catch with continuation %a already marked as recursive -- is it \
        being redefined?"
-      Static_label.format
-      static_exn;
+      Static_label.format static_exn;
   { t with
     recursive_static_catches =
       Static_label.Set.add static_exn t.recursive_static_catches
