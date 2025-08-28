@@ -248,7 +248,8 @@ module type Solver_mono = sig
       right_hint : ('a, right_only) hint_raw
     }
 
-  (** Try to constrain the first mode below the second mode. *)
+  (** Try to constrain the first mode below the second mode. There is NO morph hint [Gap]
+  inserted between the modes. *)
   val submode :
     'a obj ->
     ('a, allowed * 'r) mode ->

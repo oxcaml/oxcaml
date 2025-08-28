@@ -101,10 +101,48 @@ module type Common = sig
 
   val newvar : unit -> ('l * 'r) t
 
+  (* We provide three submode functions. Use [submode_exn] if the caller knows the
+    submode is guaranteed to succeed (for otherwise the compiler would crash). Use [submode]
+  or [submode_error] for most cases, and they differ in how they handle errors:
+
+  There are two kinds of submode requests:
+  - Most submode request has some context (such as a location in the source code) to
+  explain why the submode is needed. For example, for function application [f e], we check
+  that the mode of [e] is less than what's required by [f], with the context pointing to
+  the location of [e] in the application.
+  - Some submode request has no context as it's self-evident. For example, for a single
+  identifier, we check that its mode in the environment is less than the current expected
+  mode. There might be some hints in the two modes involved (which we will print), but the
+  submode itself doesn't need to be explained.
+
+  For context-free submode, use [submode_error], which would report error straightaway,
+  since it doesn't need more context from the caller than what's already included in the
+  modes.
+
+  For contextual submode, there are two approaches:
+  - (Prefered) Call [apply_hint] to apply a morph hint onto one of the two modes, which
+  makes the submode context-free, then call [submode_error].
+  - (Legacy) Call [submode] and get back error. The caller will combine that error with
+  the context of the submode, and print the combined error.
+
+  Note that if [submode] succeeds, the two modes will be linked, but with a morph hint
+  gap (since the mode system doesn't know the relation between the two). This is why we
+  dislike the second approach, since your context/hint is used only if that exact submode
+  fails. The first approach will carry the context/hint forward and print them in later
+  submode errors. *)
+
+  (** Constrains the first mode below the second mode. If succeeds, a morph hint [Gap] is
+  inserted between them. *)
   val submode : (allowed * 'r) t -> ('l * allowed) t -> (unit, error) result
+
+  (** Constrains the first mode below the second mode, and prints rich mode error messages
+  if fails. *)
+  val submode_error : (allowed * 'r) t -> ('l * allowed) t -> unit
 
   val equate : lr -> lr -> (unit, equate_error) result
 
+  (** Constrains the first mode below the second mode, and crashes the compiler if fails.
+      *)
   val submode_exn : (allowed * 'r) t -> ('l * allowed) t -> unit
 
   val equate_exn : lr -> lr -> unit
