@@ -110,7 +110,7 @@ val type_expr: formatter -> type_expr -> unit
 (** Prints a modality. If it is the identity modality, prints [id], which
     defaults to nothing. *)
 val modality :
-  ?id:(formatter -> unit) -> formatter -> 'a Mode.Modality.Atom.t -> unit
+  ?id:(formatter -> unit) -> 'a Mode.Modality.Axis.t -> formatter -> 'a -> unit
 
 (** Prints mode crossing over all axes; omits axes that does not cross. *)
 val crossing : formatter -> Mode.Crossing.t -> unit

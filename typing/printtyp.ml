@@ -1430,19 +1430,21 @@ let tree_of_modalities_new mut t =
   let l = Typemode.untransl_modalities mut t in
   List.map (fun ({txt = Parsetree.Modality s; _}) -> s) l
 
-let tree_of_crossing_atom : _ Mode.Crossing.Atom.t -> _ =
-  function
-  | Modality (Monadic (ax, Join_with c)) ->
+let tree_of_crossing_atom : type a. a Mode.Crossing.Axis.t -> a -> _ =
+  fun ax a ->
+  match ax, a with
+  | Monadic ax, Modality (Join_with c) ->
       Format.asprintf "%a" (Value.Monadic.Const.Per_axis.print ax) c
-  | Modality (Comonadic (ax, Meet_with c)) ->
+  | Comonadic ax, Modality (Meet_with  c) ->
       Format.asprintf "%a" (Value.Comonadic.Const.Per_axis.print ax) c
 
 let tree_of_crossing t =
   List.filter_map
-    (fun (Value.Axis.P ax) ->
+    (fun ax ->
       let open Mode.Crossing in
+      let (P ax) = Axis.of_value ax in
       let a = proj ax t in
-      if Atom.(le ax (max ax) a) then None else Some (tree_of_crossing_atom a))
+      if Per_axis.(le ax (max ax) a) then None else Some (tree_of_crossing_atom ax a))
     Value.Axis.all
 
 (** [tree_of_mode m l] finds the outcome node in [l] that corresponds to [m].
@@ -1780,10 +1782,10 @@ let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
 
 (* Only used for printing a single modality in error message *)
-let modality ?(id = fun _ppf -> ()) ppf modality =
-  if Mode.Modality.Atom.is_id modality then id ppf
+let modality ?(id = fun _ppf -> ()) ax ppf modality =
+  if Mode.Modality.Atom.is_id ax modality then id ppf
   else
-    modality
+    P (ax, modality)
     |> Typemode.untransl_modality
     |> tree_of_modality_new
     |> !Oprint.out_modality ppf

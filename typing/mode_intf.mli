@@ -630,27 +630,29 @@ module type S = sig
       end
     end
 
-    module Atom : sig
+    module Axis : sig
       type 'a t =
-        | Monadic of 'a Value.Monadic.Axis.t * 'a Monadic.Atom.t
-        | Comonadic of 'a Value.Comonadic.Axis.t * 'a Comonadic.Atom.t
+        | Monadic : 'a Value.Monadic.Axis.t -> 'a Monadic.Atom.t t
+        | Comonadic : 'a Value.Comonadic.Axis.t -> 'a Comonadic.Atom.t t
 
       type packed = P : 'a t -> packed
 
-      (** Test if the given modality is the identity modality. *)
-      val is_id : 'a t -> bool
+      val of_value : Value.Axis.packed -> packed
 
-      (** Test if the given modality is a constant modality. *)
-      val is_constant : 'a t -> bool
-
-      (** Printing for debugging *)
-      val print : Format.formatter -> 'a t -> unit
-
-      (** Returns the axis that the atom modality belongs to. *)
-      val axis : 'a t -> 'a Value.Axis.t
+      val to_value : packed -> Value.Axis.packed
     end
 
-    type error = Error : 'a Atom.t Solver.error -> error
+    module Atom : sig
+      type t = P : 'a Axis.t * 'a -> t
+
+      (** Test if the given modality is the identity modality. *)
+      val is_id : 'a Axis.t -> 'a -> bool
+
+      (** Test if the given modality is a constant modality. *)
+      val is_constant : 'a Axis.t -> 'a -> bool
+    end
+
+    type error = Error : 'a Axis.t * 'a Solver.error -> error
 
     type nonrec equate_error = equate_step * error
 
@@ -668,8 +670,8 @@ module type S = sig
        [zap_to_id], [zap_to_floor], etc.. *)
 
     module Const : sig
-      (** A modality that acts on [Value] modes. Conceptually it is a sequnce
-            of [atom] that acts on individual axes. *)
+      (** A modality that acts on [Value] axes. Conceptually it is a record where
+        individual fields can be [set] or [proj]. *)
       type t
 
       (** The identity modality. *)
@@ -685,14 +687,14 @@ module type S = sig
       val concat : then_:t -> t -> t
 
       (** [set a t] overwrites an axis of [t] to be [a]. *)
-      val set : 'a Atom.t -> t -> t
+      val set : 'a Axis.t -> 'a -> t -> t
 
       (** [proj ax t] projects out the axis [ax] of [t]. *)
-      val proj : 'a Value.Axis.t -> t -> 'a Atom.t
+      val proj : 'a Axis.t -> t -> 'a
 
       (** [diff t0 t1] returns a list of atoms in [t1] that are different than
         [t0]. *)
-      val diff : t -> t -> Atom.packed list
+      val diff : t -> t -> Atom.t list
 
       (** [equate t0 t1] checks that [t0 = t1].
             Definition: [t0 = t1] iff [t0 <= t1] and [t1 <= t0]. *)
@@ -779,39 +781,83 @@ module type S = sig
     case the actual/expected mode of values can be adjusted accordingly to make
     more programs mode-check. The adjustment is called mode crossing. *)
   module Crossing : sig
-    module Atom : sig
-      (** The mode crossing capability on an axis whose carrier type is ['a].
+    module Monadic : sig
+      module Atom : sig
+        (** The mode crossing capability on an axis whose carrier type is ['a].
       Currently it has only one constructor and is thus unboxed. *)
-      type 'a t =
-        | Modality of 'a Modality.Atom.t
-            (** The mode crossing caused by a modality atom on an axis whose
+        type 'a t =
+          | Modality of 'a Modality.Monadic.Atom.t
+              (** The mode crossing caused by a modality atom on an axis whose
       carrier type is ['a]. For a concrete example, consider:
 
       type 'x r = { x : 'x @@ portable } [@@unboxed]
 
       The type ['x r] can cross the portability axis. This is represented as
       [Modality (Meet_with Portable) : Portability.Const.t t]. *)
-      [@@unboxed]
+        [@@unboxed]
+      end
 
-      include
-        Solver_intf.Lattices
-          with type 'a elt := 'a t
-           and type 'a obj := 'a Value.Axis.t
+      type t
+
+      include Lattice with type t := t
+
+      val create :
+        uniqueness:Uniqueness.Const.t Atom.t ->
+        contention:Contention.Const.t Atom.t ->
+        visibility:Visibility.Const.t Atom.t ->
+        t
+    end
+
+    module Comonadic : sig
+      module Atom : sig
+        type 'a t = Modality of 'a Modality.Comonadic.Atom.t [@@unboxed]
+      end
+
+      type t
+
+      include Lattice with type t := t
+
+      val create :
+        regionality:Regionality.Const.t Atom.t ->
+        linearity:Linearity.Const.t Atom.t ->
+        portability:Portability.Const.t Atom.t ->
+        yielding:Yielding.Const.t Atom.t ->
+        statefulness:Statefulness.Const.t Atom.t ->
+        t
     end
 
     (** The mode crossing capability on all axes *)
-    type t
+    type t = (Monadic.t, Comonadic.t) monadic_comonadic
 
-    val proj : 'a Value.Axis.t -> t -> 'a Atom.t
+    module Axis : sig
+      type 'a t =
+        | Monadic : 'a Value.Monadic.Axis.t -> 'a Monadic.Atom.t t
+        | Comonadic : 'a Value.Comonadic.Axis.t -> 'a Comonadic.Atom.t t
+
+      type packed = P : 'a t -> packed
+
+      val of_value : Value.Axis.packed -> packed
+
+      val to_value : packed -> Value.Axis.packed
+    end
+
+    module Per_axis :
+      Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
+
+    val create :
+      regionality:bool ->
+      linearity:bool ->
+      uniqueness:bool ->
+      portability:bool ->
+      contention:bool ->
+      yielding:bool ->
+      statefulness:bool ->
+      visibility:bool ->
+      t
+
+    val proj : 'a Axis.t -> t -> 'a
 
     include Lattice with type t := t
-
-    (* CR zqian: jkind modal bounds should just be our [t], which should allow
-       us to remove [of_bounds]. *)
-
-    (** Convert from jkind modal bounds. *)
-    val of_bounds :
-      (Value.Monadic.Const.t, Value.Comonadic.Const.t) monadic_comonadic -> t
 
     (** [modality m t] gives the mode crossing of type [T] wrapped in modality
     [m] where [T] has mode crossing [t]. *)

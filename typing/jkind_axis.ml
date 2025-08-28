@@ -174,36 +174,13 @@ module Axis = struct
       | Externality : Externality.t t
       | Nullability : Nullability.t t
       | Separability : Separability.t t
-
-    let get (type a) : a t -> (module Axis_ops with type t = a) = function
-      | Externality -> (module Externality)
-      | Nullability -> (module Nullability)
-      | Separability -> (module Separability)
   end
 
   type 'a t =
-    | Modal : 'a Mode.Value.Axis.t -> 'a t
+    | Modal : 'a Mode.Crossing.Axis.t -> 'a t
     | Nonmodal : 'a Nonmodal.t -> 'a t
 
   type packed = Pack : 'a t -> packed [@@unboxed]
-
-  module Accent_lattice (M : Mode_intf.Lattice) = struct
-    (* A functor to add some convenient functions to modal axes *)
-    include M
-
-    let[@inline] less_or_equal a b : Misc.Le_result.t =
-      match le a b, le b a with
-      | true, true -> Equal
-      | true, false -> Less
-      | false, _ -> Not_le
-
-    let equal a b = Misc.Le_result.is_equal (less_or_equal a b)
-  end
-
-  let get (type a) : a t -> (module Axis_ops with type t = a) = function
-    | Modal axis ->
-      (module Accent_lattice ((val Mode.Value.Const.lattice_of_axis axis)))
-    | Nonmodal axis -> Nonmodal.get axis
 
   let all =
     [ Pack (Modal (Comonadic Areality));
@@ -219,10 +196,117 @@ module Axis = struct
       Pack (Nonmodal Separability) ]
 
   let name (type a) : a t -> string = function
-    | Modal axis -> Format.asprintf "%a" Mode.Value.Axis.print axis
+    | Modal (Monadic ax) ->
+      Format.asprintf "%a" Mode.Value.Monadic.Axis.print ax
+    | Modal (Comonadic ax) ->
+      Format.asprintf "%a" Mode.Value.Comonadic.Axis.print ax
     | Nonmodal Externality -> "externality"
     | Nonmodal Nullability -> "nullability"
     | Nonmodal Separability -> "separability"
+end
+
+module Per_axis = struct
+  open Axis
+
+  module Nonmodal = struct
+    open Axis.Nonmodal
+
+    let min : type a. a t -> a = function
+      | Externality -> Externality.min
+      | Nullability -> Nullability.min
+      | Separability -> Separability.min
+
+    let max : type a. a t -> a = function
+      | Externality -> Externality.max
+      | Nullability -> Nullability.max
+      | Separability -> Separability.max
+
+    let le : type a. a t -> a -> a -> bool =
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.le a b
+      | Nullability -> Nullability.le a b
+      | Separability -> Separability.le a b
+
+    let meet : type a. a t -> a -> a -> a =
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.meet a b
+      | Nullability -> Nullability.meet a b
+      | Separability -> Separability.meet a b
+
+    let join : type a. a t -> a -> a -> a =
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.join a b
+      | Nullability -> Nullability.join a b
+      | Separability -> Separability.join a b
+
+    let print : type a. a t -> Format.formatter -> a -> unit =
+     fun ax ppf a ->
+      match ax with
+      | Externality -> Externality.print ppf a
+      | Nullability -> Nullability.print ppf a
+      | Separability -> Separability.print ppf a
+
+    let eq_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
+     fun a b ->
+      match a, b with
+      | Externality, Externality -> Some Refl
+      | Nullability, Nullability -> Some Refl
+      | Separability, Separability -> Some Refl
+      | _ -> None
+
+    let print_obj : type a. Format.formatter -> a t -> unit =
+     fun ppf -> function
+      | Externality -> Format.fprintf ppf "externality"
+      | Nullability -> Format.fprintf ppf "nullability"
+      | Separability -> Format.fprintf ppf "separability"
+  end
+
+  let min : type a. a t -> a = function
+    | Modal ax -> Mode.Crossing.Per_axis.min ax
+    | Nonmodal ax -> Nonmodal.min ax
+
+  let max : type a. a t -> a = function
+    | Modal ax -> Mode.Crossing.Per_axis.max ax
+    | Nonmodal ax -> Nonmodal.max ax
+
+  let le : type a. a t -> a -> a -> bool =
+   fun ax a b ->
+    match ax with
+    | Modal ax -> Mode.Crossing.Per_axis.le ax a b
+    | Nonmodal ax -> Nonmodal.le ax a b
+
+  let meet : type a. a t -> a -> a -> a =
+   fun ax a b ->
+    match ax with
+    | Modal ax -> Mode.Crossing.Per_axis.meet ax a b
+    | Nonmodal ax -> Nonmodal.meet ax a b
+
+  let join : type a. a t -> a -> a -> a =
+   fun ax a b ->
+    match ax with
+    | Modal ax -> Mode.Crossing.Per_axis.join ax a b
+    | Nonmodal ax -> Nonmodal.join ax a b
+
+  let print : type a. a t -> Format.formatter -> a -> unit =
+   fun ax ppf a ->
+    match ax with
+    | Modal ax -> Mode.Crossing.Per_axis.print ax ppf a
+    | Nonmodal ax -> Nonmodal.print ax ppf a
+
+  let eq_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
+   fun a b ->
+    match a, b with
+    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.eq_obj ax0 ax1
+    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.eq_obj ax0 ax1
+    | _ -> None
+
+  let print_obj : type a. Format.formatter -> a t -> unit =
+   fun ppf -> function
+    | Modal ax -> Mode.Crossing.Per_axis.print_obj ppf ax
+    | Nonmodal ax -> Nonmodal.print_obj ppf ax
 end
 
 module Axis_set = struct
