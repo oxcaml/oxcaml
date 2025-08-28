@@ -276,7 +276,7 @@ let enter_type ?abstract_abbrevs rec_flag env sdecl (id, uid) =
          point. I think probably the solution will be to have
          [Jkind.of_type_decl_default] just return [max] every time it sees a
          [with]-kind... which basically just does this [type_exn] trick but much
-         more sanely. *)
+         more sanely. Internal ticket 5116. *)
       ~transl_type:(fun _ -> Predef.type_exn)
       ~default:(Jkind.disallow_right any)
       sdecl
@@ -858,12 +858,7 @@ let transl_declaration env sdecl (id, uid) =
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
   verify_unboxed_attr unboxed_attr sdecl;
-  (* CR layouts v2.8: This next call to [transl_simple_type] probably can loop
-     because it will do perhaps-circular jkind checks. But actually I think the
-     same problem exists in e.g. record fields. We should probably look into this. *)
   let transl_type sty =
-    (* CR layouts v2.8: The [~new_var_jkind:Any] is weird. The type is closed,
-       and so there shouldn't be any new vars. Investigate. *)
     let cty =
       Ctype.with_local_level begin fun () ->
         Typetexp.transl_simple_type env ~new_var_jkind:Any
@@ -876,7 +871,7 @@ let transl_declaration env sdecl (id, uid) =
       ~post:(fun cty -> Ctype.generalize_structure cty.ctyp_type)
     in
     cty.ctyp_type  (* CR layouts v2.8: Do this more efficiently. Or probably
-                      add with-kinds to Typedtree. *)
+                      add with-kinds to Typedtree. Internal ticekt 4435. *)
   in
   let jkind_from_annotation, jkind_annotation =
     match Jkind.of_type_decl ~context:(Type_declaration path) ~transl_type sdecl with
@@ -1492,7 +1487,7 @@ let narrow_to_manifest_jkind env loc decl =
        Do not try this (that is, removing the use of [type_jkind_purely]) before
        removing the "horrible hack" just below, as that horrible hack sometimes
        avoids calling [constrain_type_jkind], which is necessary for the plan
-       above to work.  *)
+       above to work.  Internal ticket 2912. *)
     let manifest_jkind = Ctype.type_jkind_purely env ty in
     (* CR layouts v2.8: Remove this horrible hack. In practice, this
        [try_allow_r] fails in the case of a record re-export, because the jkind
@@ -1501,7 +1496,7 @@ let narrow_to_manifest_jkind env loc decl =
        [sub_jkind_l] here. The right way forward is to parameterize
        [constrain_type_jkind] over the [l]-ness of its bound. But probably not
        until we have proper subsumption working, as this hack will likely hold
-       up for a little while. *)
+       up for a little while. Internal ticket 5115. *)
     begin match Jkind.try_allow_r decl.type_jkind with
     | None -> begin
         let type_equal = Ctype.type_equal env in
@@ -2758,10 +2753,10 @@ let normalize_decl_jkinds env decls =
         that we computed, either from a user-written annotation or as a dummy jkind.
 
          (see Note [Default jkinds in transl_declaration]) *)
-      (* CR layouts v2.8: it almost definitely has changed, but also we probably trust
+      (* CR layouts: it almost definitely has changed, but also we probably trust
          the new jkind (we really only want this check here to check against the
          user-written annotation). We might be able to do a better job here and save
-         some work. *)
+         some work. Internal ticket 5117. *)
       let context = Ctype.mk_jkind_context_always_principal env in
       let type_equal = Ctype.type_equal env in
       match

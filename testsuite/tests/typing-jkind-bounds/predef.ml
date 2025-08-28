@@ -69,7 +69,7 @@ type t_test = int option require_portable
 type t_test = int option require_many
 type t_test = int option require_contended
 type ('a : value mod portable) t_test = 'a option require_portable
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = int option require_portable
 type t_test = int option require_many
@@ -188,7 +188,7 @@ Error: The kind of type "'a ref" is mutable_data with 'a @@ unyielding many.
 type t_test = int ref require_portable
 type t_test = int ref require_many
 type ('a : value mod portable) t_test = 'a ref require_portable
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = int ref require_portable
 type t_test = int ref require_many
@@ -287,7 +287,7 @@ type t_test = int list require_portable
 type t_test = int list require_many
 type t_test = int list require_contended
 type ('a : value mod portable) t_test = 'a list require_portable
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = int list require_portable
 type t_test = int list require_many
@@ -404,7 +404,7 @@ Error: The kind of type "'a array" is mutable_data with 'a
 type t_test = int array require_portable
 type t_test = int array require_many
 type ('a : value mod portable) t_test = 'a array require_portable
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = int array require_portable
 type t_test = int array require_many
@@ -498,7 +498,7 @@ type t_test = int iarray require_portable
 type t_test = int iarray require_many
 type t_test = int iarray require_contended
 type ('a : value mod portable) t_test = 'a iarray require_portable
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = int iarray require_portable
 type t_test = int iarray require_many

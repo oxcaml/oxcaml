@@ -214,7 +214,7 @@ end = struct
   type a = [`a of string | `b]
   type t
 end
-(* CR layouts v2.8: this is fine to accept *)
+(* CR layouts v2.8: this is fine to accept. Internal ticket 4294. *)
 [%%expect {|
 Lines 4-7, characters 6-3:
 4 | ......struct
@@ -357,7 +357,7 @@ end = struct
   type a = < value : string >
   type t
 end
-(* CR layouts v2.8: this is fine to accept *)
+(* CR layouts v2.8: this is fine to accept. Internal ticket 5125. *)
 [%%expect {|
 Lines 4-7, characters 6-3:
 4 | ......struct
@@ -396,7 +396,7 @@ module M : sig
 end = struct
   type t
 end
-(* CR layouts v2.8: This should not be accepted *)
+(* CR layouts v2.8: This should not be accepted. Internal ticket 4973 *)
 [%%expect {|
 type gadt = Foo : int -> gadt
 module M : sig type t end
@@ -516,7 +516,7 @@ end = struct
   type t
 end
 (* CR layouts v2.8: this should be accepted because module types should be best
-   (once we start giving them proper kinds) *)
+   (once we start giving them proper kinds). Internal ticket 5126 *)
 [%%expect {|
 module type S = sig val nonportable_f : int -> int end
 type s = (module S)

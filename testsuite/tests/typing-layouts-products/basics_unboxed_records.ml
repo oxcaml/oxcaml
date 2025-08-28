@@ -776,4 +776,4 @@ Error: The kind of type "q" is
          because of the annotation on the declaration of the type q.
 |}]
 (* CR layouts v2.8: That error message is incomprehensible without
-   with-bounds. *)
+   with-bounds. Internal ticket 5096. *)

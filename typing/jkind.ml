@@ -1327,7 +1327,7 @@ end
 
 (* CR layouts v2.8: This should sometimes be for type schemes, not types
    (which print weak variables like ['_a] correctly), but this works better
-   for the common case. When we re-do printing, fix. *)
+   for the common case. When we re-do printing, fix. Internal ticket 4435. *)
 let outcometree_of_type = ref (fun _ -> assert false)
 
 let set_outcometree_of_type p = outcometree_of_type := p
@@ -1821,7 +1821,7 @@ module Const = struct
 
     let get_modal_bound (type a) ~(axis : a Axis.t) ~(base : a) (actual : a) =
       let (module A) = Axis.get axis in
-      (* CR layouts v2.8: Fix printing! *)
+      (* CR layouts v2.8: Fix printing! Internal ticket 5096. *)
       let less_or_equal a b =
         let (module Axis_ops) = Axis.get axis in
         Axis_ops.less_or_equal a b
@@ -1958,7 +1958,7 @@ module Const = struct
           (* CR layouts v2.8: sometimes there is no valid way to build a jkind
              from a built-in abbreviation. For now, we just pretend that the
              layout name is a valid jkind abbreviation whose modal bounds are
-             all max, even though this is a lie. *)
+             all max, even though this is a lie. Internal ticket 3284. *)
           let out_jkind_verbose =
             convert_with_base
               ~base:
@@ -2040,7 +2040,7 @@ module Const = struct
    fun context jkind ->
     match jkind.pjkind_desc with
     | Abbreviation name ->
-      (* CR layouts v2.8: move this to predef *)
+      (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
       (match name with
       | "any" -> Builtin.any.jkind
       | "value_or_null" -> Builtin.value_or_null.jkind
@@ -2137,7 +2137,7 @@ module Desc = struct
 
   (* CR layouts v2.8: This will probably need to be overhauled with
      [with]-types. See also [Printtyp.out_jkind_of_desc], which uses the same
-     algorithm. *)
+     algorithm. Internal ticket 5096. *)
   let format ppf t =
     let open Format in
     let rec format_desc ~nested ppf (desc : _ t) =
@@ -2561,7 +2561,7 @@ let for_or_null_argument ident =
     ~annotation:None ~why:(Value_creation why)
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
-  (* CR layouts v2.8: This should really use layout_of *)
+  (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
   let jkind = type_jkind_purely ty in
   let with_bounds_types =
     let relevant_axes =
@@ -2672,7 +2672,7 @@ let for_boxed_row row =
   then
     if not (Btype.static_row row)
     then
-      (* CR layouts v2.8: We can probably do a fair bit better here in most cases *)
+      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. Internal ticket 5097 and 5098. *)
       for_open_boxed_row
     else
       let base = Builtin.immutable_data ~why:Polymorphic_variant in
@@ -2971,7 +2971,7 @@ let decompose_product ({ jkind; _ } as jk) =
    the jkind, if there is one. But actually the output seems better without
    doing so, because it teaches the user that e.g. [value mod local] is better
    off spelled [value]. Possibly remove [jkind.annotation], but only after
-   we have a proper printing story. *)
+   we have a proper printing story. Internal ticket 5096. *)
 let format ppf jkind = Desc.format ppf (Jkind_desc.get jkind.jkind)
 
 let printtyp_path = ref (fun _ _ -> assert false)
@@ -3631,7 +3631,7 @@ let equate_or_equal ~allow_mutation
     } =
   Jkind_desc.equate_or_equal ~allow_mutation jkind1 jkind2
 
-(* CR layouts v2.8: Switch this back to ~allow_mutation:false *)
+(* CR layouts: Switch this back to ~allow_mutation:false. Internal ticket 5099. *)
 let equal t1 t2 = equate_or_equal ~allow_mutation:true t1 t2
 
 let equate t1 t2 = equate_or_equal ~allow_mutation:true t1 t2
@@ -3760,7 +3760,7 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
               overly complex. *)
            (* CR layouts v2.8: It would be useful report to the user why this
               violation occurred, specifically which axes the violation is
-              along. *)
+              along. Internal ticket 5100. *)
            let best_sub = normalize ~mode:Require_best ~context sub in
            Violation.of_ ~context
              (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
@@ -3818,7 +3818,7 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
                it on the right; if so, we union together the relevant axes. *)
             right_bounds_seq
             (* CR layouts v2.8: maybe it's worth memoizing using a best-effort
-               type map? *)
+               type map? Internal ticket 5086. *)
             |> Seq.fold_left
                  (fun acc (ty2, ti) ->
                    match type_equal ty ty2 with

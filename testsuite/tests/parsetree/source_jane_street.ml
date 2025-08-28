@@ -107,7 +107,7 @@ type t = ..
 type t += K : ('a : float64). 'a ignore -> t
 |}]
 
-(* CR layouts v2.8: re-enable this *)
+(* CR layouts v2.8: re-enable this. Internal ticket 5118. *)
 (*
 module M : sig
   kind_abbrev_ k = immediate
@@ -1286,7 +1286,7 @@ type 'a contended_with_int : immutable_data with 'a @@ contended
 type 'a abstract
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
   | Mk : ('a : value mod portable) abstract -> existential_abstract
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 type 'a abstract
 Lines 2-3, characters 0-67:
@@ -1317,7 +1317,7 @@ end = struct
 end
 
 (* CR layouts v2.8: Expect this output to change once modal kinds are
-   supported. *)
+   supported. Internal ticket 5118. *)
 
 [%%expect{|
 Line 9, characters 16-27:

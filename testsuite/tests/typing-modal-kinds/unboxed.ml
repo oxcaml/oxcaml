@@ -200,7 +200,7 @@ let f (x : (int -> int) t @ nonportable) = use_portable_vv x
 [%%expect{|
 val f : (int -> int) t -> unit = <fun>
 |}]
-(* CR layouts v2.8: fix principality *)
+(* CR layouts v2.8: fix principality. Internal ticket 5111 *)
 
 type ('a : value & value mod portable) require_portable_vv
 
@@ -213,7 +213,7 @@ type t2 = (int -> int) t require_portable_vv
 [%%expect{|
 type t2 = (int -> int) t require_portable_vv
 |}]
-(* CR layouts v2.8: fix principality *)
+(* CR layouts v2.8: fix principality. Internal ticket 5111 *)
 
 type 'a t : value & value mod portable =
   #{ x : 'a portable; y : 'a @@ portable }

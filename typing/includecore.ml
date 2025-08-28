@@ -639,7 +639,7 @@ let report_unsafe_mode_crossing_mismatch first second ppf e =
       (choose_other ord first second)
   | Bounds_not_equal (first_umc, second_umc) ->
     (* CR layouts v2.8: It'd be nice to specifically highlight the offending axis,
-       rather than printing all axes here. *)
+       rather than printing all axes here. Internal ticket 5094. *)
     pr "Both specify [%@%@unsafe_allow_any_mode_crossing], but their \
         bounds are not equal@,\
         @[%s has:@ %a@]@ \

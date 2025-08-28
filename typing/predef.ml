@@ -550,7 +550,7 @@ let build_initial_env add_type add_extension empty_env =
           It can at least cross locality, because it's always heap-allocated.
           It might also cross portability, linearity, uniqueness subject to its
           parameter. But I'm also fine not doing that for now (and wait until
-          users complains).  *)
+          users complains). Internal ticket 5103. *)
        ~jkind:(fun _ -> Jkind.for_non_float ~why:(Primitive ident_lazy_t))
   |> add_type1 ident_list
        ~variance:Variance.covariant
@@ -640,7 +640,7 @@ let build_initial_env add_type add_extension empty_env =
          )
        )
        (* CR layouts v2.8: Possibly remove this -- and simplify [mk_add_type] --
-          when we have a better jkind subsumption check. *)
+          when we have a better jkind subsumption check. Internal ticket 5104 *)
        ~jkind:Jkind.(
          of_builtin Const.Builtin.immutable_data
            ~why:(Primitive ident_lexing_position) |>
