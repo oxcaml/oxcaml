@@ -343,7 +343,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
                           Float32_of_int32 | Int32_of_float32 |
                           V128_of_vec Vec128))
     -> [||]
-  | Stack_check _ -> assert false (* not supported *)
+  | Stack_check _ -> [| |] (* XXX  assert false (* not supported *) *)
   | Op (Const_vec256 _ | Const_vec512 _)
   | Op (Load
           {memory_chunk=(Twofiftysix_aligned|Twofiftysix_unaligned|
