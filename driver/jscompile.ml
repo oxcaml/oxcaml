@@ -104,7 +104,7 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     raw_lambda_to_jsir i raw_lambda ~as_arg_for
   in
   Compilenv.save_unit_info
-    (Unit_info.Artifact.filename (Unit_info.cmx i.target))
+    (Unit_info.Artifact.filename (Unit_info.cmjx i.target))
     ~main_module_block_format ~arg_descr;
   jsir
 

@@ -145,6 +145,8 @@ val cmti: t -> Artifact.t
 val cms: t -> Artifact.t
 val cmsi: t -> Artifact.t
 val cmj: t -> Artifact.t
+val cmja : t -> Artifact.t
+val cmjx : t -> Artifact.t
 val annot: t -> Artifact.t
 
 (** The functions below change the type of an artifact by updating the

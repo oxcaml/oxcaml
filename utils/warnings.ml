@@ -1149,9 +1149,14 @@ let message = function
          %a"
         vars_explanation Misc.print_see_manual ref_manual
   | No_cmx_file name ->
+      let extension =
+        match !Clflags.jsir with
+        | false -> "cmx"
+        | true -> "cmjx"
+      in
       Printf.sprintf
-        "no cmx file was found in path for module %s, \
-         and its interface was not compiled with -opaque" name
+        "no %s file was found in path for module %s, \
+         and its interface was not compiled with -opaque" extension name
   | Flambda_assignment_to_non_mutable_value ->
       "A potential assignment to a non-mutable value was detected \n\
         in this source file.  Such assignments may generate incorrect code \n\
