@@ -215,12 +215,10 @@ let rec phantom_var_location_description state
     (* Create a Proto_die for the phantom block with the composite location,
        then return an implicit pointer to it *)
     let proto_die =
-      Proto_die.create ~parent
-        ~tag:Variable
-        ~attribute_values:[
-          DAH.create_composite_location_description
-            composite_location_description;
-        ]
+      Proto_die.create ~parent ~tag:Variable
+        ~attribute_values:
+          [ DAH.create_composite_location_description
+              composite_location_description ]
         ()
     in
     let offset_in_bytes = Targetint.zero in
@@ -230,11 +228,13 @@ let rec phantom_var_location_description state
       | Four -> Dwarf_version.four
       | Five -> Dwarf_version.five
     in
-    if need_rvalue then
+    if need_rvalue
+    then
       rvalue (SLDL.Rvalue.implicit_pointer ~offset_in_bytes ~die_label version)
     else
-      lvalue_without_address (SLDL.Lvalue_without_address.implicit_pointer
-        ~offset_in_bytes ~die_label version)
+      lvalue_without_address
+        (SLDL.Lvalue_without_address.implicit_pointer ~offset_in_bytes
+           ~die_label version)
 
 let single_location_description state ~parent ~subrange ~proto_dies_for_vars
     ~need_rvalue =

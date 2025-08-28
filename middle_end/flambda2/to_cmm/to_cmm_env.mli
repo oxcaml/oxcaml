@@ -291,7 +291,10 @@ val add_symbol_init : t -> Backend_var.t -> Cmm.expression -> t
     so it can be referenced later. Returns the updated environment and
     the created backend variable. *)
 val add_phantom_let_binding :
-  t -> Variable.t -> debug_uid:Flambda_debug_uid.t -> t * Backend_var.With_provenance.t
+  t ->
+  Variable.t ->
+  debug_uid:Flambda_debug_uid.t ->
+  t * Backend_var.With_provenance.t
 
 (** Try and inline an Flambda variable using the delayed let-bindings. *)
 val inline_variable :

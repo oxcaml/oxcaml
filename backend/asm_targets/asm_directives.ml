@@ -987,9 +987,9 @@ let between_labels_16_bit ?comment:_ ~upper:_ ~lower:_ () =
 
 let between_labels_32_bit ?comment:_comment ~upper ~lower () =
   let expr = const_sub (const_label upper) (const_label lower) in
-  (* On macOS, we need to force assembly time constants to avoid issues
-     with label differences, especially when one label is on a section boundary.
-     This is needed for proper DWARF emission with phantom variables. *)
+  (* On macOS, we need to force assembly time constants to avoid issues with
+     label differences, especially when one label is on a section boundary. This
+     is needed for proper DWARF emission with phantom variables. *)
   if TS.is_macos ()
   then const (force_assembly_time_constant expr) Thirty_two
   else const expr Thirty_two

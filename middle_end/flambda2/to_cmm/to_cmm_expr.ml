@@ -782,7 +782,8 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
       | Some var_args ->
         let var = Bound_var.var bound_var in
         let debug_uid = Bound_var.debug_uid bound_var in
-        (* Add the phantom let binding to the environment so it can be referenced *)
+        (* Add the phantom let binding to the environment so it can be
+           referenced *)
         let env, backend_var_with_prov =
           To_cmm_env.add_phantom_let_binding env var ~debug_uid
         in
