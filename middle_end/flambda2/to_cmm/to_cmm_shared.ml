@@ -15,6 +15,7 @@
 open! Cmm_helpers
 open! Cmm_builtins
 module Ece = Effects_and_coeffects
+module Extended_machtype = Cmm.Extended_machtype
 
 let remove_skipped_params params_with_types =
   List.filter_map

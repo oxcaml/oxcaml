@@ -275,7 +275,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | [] | _ :: _ -> wrong_num_args 3
     in
     match[@ocaml.warning "+fragile-match"] op with
-    | Capply (ty_args, ty_res, _pos) -> (
+    | Capply { ty_args; ty_res; pos = _ } -> (
       match[@ocaml.warning "-fragile-match"] args with
       | Cconst_symbol (func, _dbg) :: rem ->
         ( Terminator
@@ -814,8 +814,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> ()
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
     | Cphantom_let (_var, _defining_expr, body) -> emit_tail env sub_cfg body
-    | Cop ((Capply (_, ty, Rc_normal) as op), args, dbg) ->
-      emit_tail_apply env sub_cfg ty op args dbg
+    | Cop ((Capply { ty_args = _; ty_res; pos = Rc_normal } as op), args, dbg)
+      ->
+      emit_tail_apply env sub_cfg ty_res op args dbg
     | Csequence (e1, e2) -> (
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
@@ -1244,7 +1245,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
              { op = { callee = Indirect; ty_args; ty_res = ty }; label_after }
           as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
-        let rd = Reg.createv ty in
+        let rd = Reg.createv (Cmm.Extended_machtype.to_machtype ty) in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv rarg) in
         let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
@@ -1271,7 +1272,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (Call { op = { callee = Direct func; ty_args }; label_after } as term)
         ->
         let** r1 = emit_tuple env sub_cfg new_args in
-        let rd = Reg.createv ty in
+        let rd = Reg.createv (Cmm.Extended_machtype.to_machtype ty) in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
         let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in

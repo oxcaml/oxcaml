@@ -303,59 +303,8 @@ val string_length : expression -> Debuginfo.t -> expression
 val bigstring_get_alignment :
   expression -> expression -> int -> Debuginfo.t -> expression
 
-module Extended_machtype_component : sig
-  (** Like [Cmm.machtype_component] but has a case explicitly for tagged
-      integers.  This enables caml_apply functions to be insensitive to whether
-      a particular argument or return value is a tagged integer or a normal
-      value.  In turn this significantly reduces the number of caml_apply
-      functions that are generated. *)
-  type t =
-    | Val
-    | Addr
-    | Val_and_int
-    | Any_int
-    | Float
-    | Vec128
-    | Vec256
-    | Vec512
-    | Float32
-end
-
-module Extended_machtype : sig
-  type t = Extended_machtype_component.t array
-
-  val typ_val : t
-
-  val typ_tagged_int : t
-
-  val typ_any_int : t
-
-  val typ_float : t
-
-  val typ_float32 : t
-
-  val typ_void : t
-
-  val typ_vec128 : t
-
-  val typ_vec256 : t
-
-  val typ_vec512 : t
-
-  (** Conversion from a normal Cmm machtype. *)
-  val of_machtype : machtype -> t
-
-  (** Conversion from a Lambda layout. *)
-  val of_layout : Lambda.layout -> t
-
-  (** Conversion to a normal Cmm machtype. *)
-  val to_machtype : t -> machtype
-
-  (** Like [to_machtype] but tagged integer extended machtypes are mapped to
-      value machtypes.  This is used to avoid excessive numbers of generic
-      functions being generated (see comments in cmm_helpers.ml). *)
-  val change_tagged_int_to_val : t -> machtype
-end
+module Extended_machtype_component = Cmm.Extended_machtype_component
+module Extended_machtype = Cmm.Extended_machtype
 
 (** Allocations *)
 
@@ -983,10 +932,10 @@ val caml_modify_local :
     If a closure needs to be passed, it must be included in [args]. *)
 val direct_call :
   dbg:Debuginfo.t ->
-  machtype ->
+  Extended_machtype.t ->
   Lambda.region_close ->
   expression ->
-  machtype list ->
+  Extended_machtype.t list ->
   expression list ->
   expression
 

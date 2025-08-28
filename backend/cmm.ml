@@ -152,6 +152,108 @@ let machtype_of_exttype = function
 let machtype_of_exttype_list xtl =
   Array.concat (List.map machtype_of_exttype xtl)
 
+module Extended_machtype_component = struct
+  type t =
+    | Val
+    | Addr
+    | Val_and_int
+    | Any_int
+    | Float
+    | Vec128
+    | Vec256
+    | Vec512
+    | Float32
+
+  let of_machtype_component (component : machtype_component) =
+    match component with
+    | Val -> Val
+    | Addr -> Addr
+    | Int -> Any_int
+    | Float -> Float
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Float32 -> Float32
+    | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
+
+  let to_machtype_component t : machtype_component =
+    match t with
+    | Val -> Val
+    | Addr -> Addr
+    | Val_and_int | Any_int -> Int
+    | Float -> Float
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Float32 -> Float32
+
+  let change_tagged_int_to_val t : machtype_component =
+    match t with
+    | Val -> Val
+    | Addr -> Addr
+    | Val_and_int -> Val
+    | Any_int -> Int
+    | Float -> Float
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Float32 -> Float32
+end
+
+module Extended_machtype = struct
+  type t = Extended_machtype_component.t array
+
+  let typ_val = [| Extended_machtype_component.Val |]
+
+  let typ_tagged_int = [| Extended_machtype_component.Val_and_int |]
+
+  let typ_any_int = [| Extended_machtype_component.Any_int |]
+
+  let typ_float = [| Extended_machtype_component.Float |]
+
+  let typ_float32 = [| Extended_machtype_component.Float32 |]
+
+  let typ_vec128 = [| Extended_machtype_component.Vec128 |]
+
+  let typ_vec256 = [| Extended_machtype_component.Vec256 |]
+
+  let typ_vec512 = [| Extended_machtype_component.Vec512 |]
+
+  let typ_void = [||]
+
+  let of_machtype machtype =
+    Array.map Extended_machtype_component.of_machtype_component machtype
+
+  let to_machtype t =
+    Array.map Extended_machtype_component.to_machtype_component t
+
+  let change_tagged_int_to_val t =
+    Array.map Extended_machtype_component.change_tagged_int_to_val t
+
+  let rec of_layout (layout : Lambda.layout) =
+    match layout with
+    | Ptop -> Misc.fatal_error "No Extended_machtype for layout [Ptop]"
+    | Pbottom ->
+      Misc.fatal_error "No unique Extended_machtype for layout [Pbottom]"
+    | Punboxed_float Unboxed_float64 -> typ_float
+    | Punboxed_float Unboxed_float32 -> typ_float32
+    | Punboxed_vector Unboxed_vec128 -> typ_vec128
+    | Punboxed_vector Unboxed_vec256 -> typ_vec256
+    | Punboxed_vector Unboxed_vec512 -> typ_vec512
+    | Punboxed_or_untagged_integer _ ->
+      (* Only 64-bit architectures, so this is always [typ_int] *)
+      typ_any_int
+    | Pvalue { raw_kind = Pintval; _ } -> typ_tagged_int
+    | Pvalue
+        { raw_kind =
+            ( Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _
+            | Parrayval _ | Pboxedvectorval _ );
+          _
+        } ->
+      typ_val
+    | Punboxed_product fields -> Array.concat (List.map of_layout fields)
+end
+
 type stack_align =
   | Align_16
   | Align_32
@@ -401,7 +503,10 @@ type alloc_dbginfo = alloc_dbginfo_item list
 
 type operation =
   | Capply of
-      machtype list * machtype * Lambda.region_close (* args_ty, ret_ty, pos *)
+      { ty_args : Extended_machtype.t list;
+        ty_res : Extended_machtype.t;
+        pos : Lambda.region_close
+      }
   | Cextcall of
       { func : string;
         ty : machtype;
@@ -643,8 +748,7 @@ let iter_shallow_tail f = function
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Cand | Cor | Cxor
         | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
-        | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause
-        | Capply (_, _, _)
+        | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause | Capply _
         | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
@@ -677,8 +781,7 @@ let map_shallow_tail f = function
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Cand | Cor | Cxor
           | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
-          | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause
-          | Capply (_, _, _)
+          | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause | Capply _
           | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _

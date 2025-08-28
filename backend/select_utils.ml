@@ -164,7 +164,7 @@ let select_mutable_flag : Asttypes.mutable_flag -> Operation.mutable_flag =
 (* Infer the type of the result of an operation *)
 
 let oper_result_type = function
-  | Capply (_, ty, _) -> ty
+  | Capply { ty_res; _ } -> Extended_machtype.to_machtype ty_res
   | Cextcall { ty; ty_args = _; alloc = _; func = _; _ } -> ty
   | Cload { memory_chunk; _ } -> (
     match memory_chunk with

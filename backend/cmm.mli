@@ -100,6 +100,60 @@ val machtype_of_exttype : exttype -> machtype
 
 val machtype_of_exttype_list : exttype list -> machtype
 
+module Extended_machtype_component : sig
+  (** Like [Cmm.machtype_component] but has a case explicitly for tagged
+      integers.  This enables caml_apply functions to be insensitive to whether
+      a particular argument or return value is a tagged integer or a normal
+      value.  In turn this significantly reduces the number of caml_apply
+      functions that are generated. *)
+  type t =
+    | Val
+    | Addr
+    | Val_and_int
+    | Any_int
+    | Float
+    | Vec128
+    | Vec256
+    | Vec512
+    | Float32
+end
+
+module Extended_machtype : sig
+  type t = Extended_machtype_component.t array
+
+  val typ_val : t
+
+  val typ_tagged_int : t
+
+  val typ_any_int : t
+
+  val typ_float : t
+
+  val typ_float32 : t
+
+  val typ_void : t
+
+  val typ_vec128 : t
+
+  val typ_vec256 : t
+
+  val typ_vec512 : t
+
+  (** Conversion from a normal Cmm machtype. *)
+  val of_machtype : machtype -> t
+
+  (** Conversion from a Lambda layout. *)
+  val of_layout : Lambda.layout -> t
+
+  (** Conversion to a normal Cmm machtype. *)
+  val to_machtype : t -> machtype
+
+  (** Like [to_machtype] but tagged integer extended machtypes are mapped to
+      value machtypes.  This is used to avoid excessive numbers of generic
+      functions being generated (see comments in cmm_helpers.ml). *)
+  val change_tagged_int_to_val : t -> machtype
+end
+
 type stack_align =
   | Align_16
   | Align_32
@@ -368,7 +422,10 @@ type alloc_dbginfo = alloc_dbginfo_item list
 
 type operation =
   | Capply of
-      machtype list * machtype * Lambda.region_close (* args_ty, ret_ty, pos *)
+      { ty_args : Extended_machtype.t list;
+        ty_res : Extended_machtype.t;
+        pos : Lambda.region_close
+      }
   | Cextcall of
       { func : string;
         ty : machtype;

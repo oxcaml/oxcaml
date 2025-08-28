@@ -1992,101 +1992,8 @@ let lookup_label obj lab dbg =
       let table = Cop (mk_load_mut Word_val, [obj], dbg) in
       addr_array_ref table lab dbg)
 
-module Extended_machtype_component = struct
-  type t =
-    | Val
-    | Addr
-    | Val_and_int
-    | Any_int
-    | Float
-    | Vec128
-    | Vec256
-    | Vec512
-    | Float32
-
-  let of_machtype_component (component : machtype_component) =
-    match component with
-    | Val -> Val
-    | Addr -> Addr
-    | Int -> Any_int
-    | Float -> Float
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Float32 -> Float32
-    | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-
-  let to_machtype_component t : machtype_component =
-    match t with
-    | Val -> Val
-    | Addr -> Addr
-    | Val_and_int | Any_int -> Int
-    | Float -> Float
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Float32 -> Float32
-
-  let change_tagged_int_to_val t : machtype_component =
-    match t with
-    | Val -> Val
-    | Addr -> Addr
-    | Val_and_int -> Val
-    | Any_int -> Int
-    | Float -> Float
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Float32 -> Float32
-end
-
-module Extended_machtype = struct
-  type t = Extended_machtype_component.t array
-
-  let typ_val = [| Extended_machtype_component.Val |]
-
-  let typ_tagged_int = [| Extended_machtype_component.Val_and_int |]
-
-  let typ_any_int = [| Extended_machtype_component.Any_int |]
-
-  let typ_float = [| Extended_machtype_component.Float |]
-
-  let typ_float32 = [| Extended_machtype_component.Float32 |]
-
-  let typ_vec128 = [| Extended_machtype_component.Vec128 |]
-
-  let typ_vec256 = [| Extended_machtype_component.Vec256 |]
-
-  let typ_vec512 = [| Extended_machtype_component.Vec512 |]
-
-  let typ_void = [||]
-
-  let of_machtype machtype =
-    Array.map Extended_machtype_component.of_machtype_component machtype
-
-  let to_machtype t =
-    Array.map Extended_machtype_component.to_machtype_component t
-
-  let change_tagged_int_to_val t =
-    Array.map Extended_machtype_component.change_tagged_int_to_val t
-
-  let rec of_layout (layout : Lambda.layout) =
-    match layout with
-    | Ptop -> Misc.fatal_error "No Extended_machtype for layout [Ptop]"
-    | Pbottom ->
-      Misc.fatal_error "No unique Extended_machtype for layout [Pbottom]"
-    | Punboxed_float Unboxed_float64 -> typ_float
-    | Punboxed_float Unboxed_float32 -> typ_float32
-    | Punboxed_vector Unboxed_vec128 -> typ_vec128
-    | Punboxed_vector Unboxed_vec256 -> typ_vec256
-    | Punboxed_vector Unboxed_vec512 -> typ_vec512
-    | Punboxed_or_untagged_integer _ ->
-      (* Only 64-bit architectures, so this is always [typ_int] *)
-      typ_any_int
-    | Pvalue { raw_kind = Pintval; _ } -> typ_tagged_int
-    | Pvalue _ -> typ_val
-    | Punboxed_product fields -> Array.concat (List.map of_layout fields)
-end
+module Extended_machtype_component = Cmm.Extended_machtype_component
+module Extended_machtype = Cmm.Extended_machtype
 
 let machtype_of_layout layout =
   layout |> Extended_machtype.of_layout |> Extended_machtype.to_machtype
@@ -2132,10 +2039,7 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     (Extended_machtype.change_tagged_int_to_val result)
     mode;
   Cop
-    ( Capply
-        ( List.map Extended_machtype.to_machtype args_type,
-          Extended_machtype.to_machtype result,
-          apos ),
+    ( Capply { ty_args = args_type; ty_res = result; pos = apos },
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
       Cconst_symbol
         ( send_function_name
@@ -3098,15 +3002,20 @@ let split_arity_for_apply arity args =
 let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
   (* Treat tagged int arguments and results as [typ_val], to avoid generating
      excessive numbers of caml_apply functions. *)
-  let res_ty = Extended_machtype.to_machtype extended_ty in
-  let args_ty = List.map Extended_machtype.to_machtype extended_args_type in
   let really_call_caml_apply clos args =
     let cargs =
       Cconst_symbol (apply_function_sym extended_args_type extended_ty mode, dbg)
       :: args
       @ [clos]
     in
-    Cop (Capply (args_ty @ [typ_val], res_ty, pos), cargs, dbg)
+    Cop
+      ( Capply
+          { ty_args = extended_args_type @ [Extended_machtype.typ_val];
+            ty_res = extended_ty;
+            pos
+          },
+        cargs,
+        dbg )
   in
   if !Oxcaml_flags.caml_apply_inline_fast_path
   then
@@ -3131,7 +3040,12 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
                     dbg ),
                 dbg,
                 Cop
-                  ( Capply (args_ty @ [typ_val], res_ty, pos),
+                  ( Capply
+                      { ty_args =
+                          extended_args_type @ [Extended_machtype.typ_val];
+                        ty_res = extended_ty;
+                        pos
+                      },
                     (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
                     dbg ),
                 dbg,
@@ -3161,9 +3075,10 @@ let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
     bind "fun" clos (fun clos ->
         Cop
           ( Capply
-              ( [Extended_machtype.to_machtype arg_ty; typ_val],
-                Extended_machtype.to_machtype result,
-                pos ),
+              { ty_args = [arg_ty; Extended_machtype.typ_val];
+                ty_res = result;
+                pos
+              },
             (get_field_codepointer mut clos 0 dbg :: args) @ [clos],
             dbg ))
   | _ -> call_caml_apply result arity mut clos args pos mode dbg
@@ -3354,6 +3269,8 @@ let placeholder_fun_dbg ~human_name:_ = Debuginfo.none
  *)
 
 let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
+  let arity = List.map Extended_machtype.of_machtype arity in
+  let result = Extended_machtype.of_machtype result in
   let dbg = placeholder_dbg in
   let args = List.map (fun ty -> ty, V.create_local "arg") arity in
   let clos = V.create_local "clos" in
@@ -3373,7 +3290,11 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
     | [(arg_ty, arg)] -> (
       let app =
         Cop
-          ( Capply ([arg_ty; typ_val], result, Rc_normal),
+          ( Capply
+              { ty_args = [arg_ty; Extended_machtype.typ_val];
+                ty_res = result;
+                pos = Rc_normal
+              },
             [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
               Cvar arg;
               Cvar clos ],
@@ -3392,7 +3313,11 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
       Clet
         ( VP.create newclos,
           Cop
-            ( Capply ([arg_ty; typ_val], typ_val, Rc_normal),
+            ( Capply
+                { ty_args = [arg_ty; Extended_machtype.typ_val];
+                  ty_res = result;
+                  pos = Rc_normal
+                },
               [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
                 Cvar clos ],
@@ -3424,7 +3349,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
               dbg () ),
           dbg (),
           Cop
-            ( Capply (arity, result, Rc_normal),
+            ( Capply { ty_args = arity; ty_res = result; pos = Rc_normal },
               get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
@@ -3539,7 +3464,12 @@ let tuplify_function arity return =
       fun_args = [VP.create arg, typ_val; VP.create clos, typ_val];
       fun_body =
         Cop
-          ( Capply (arity @ [typ_val], return, Rc_normal),
+          ( Capply
+              { ty_args =
+                  List.map Extended_machtype.of_machtype (arity @ [typ_val]);
+                ty_res = Extended_machtype.of_machtype return;
+                pos = Rc_normal
+              },
             get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
             :: access_components 0
             @ [Cvar clos],
@@ -3682,7 +3612,12 @@ let rec make_curry_apply result narity args_type args clos n =
   match args_type with
   | [] ->
     Cop
-      ( Capply (args_type @ [typ_val], result, Rc_normal),
+      ( Capply
+          { ty_args =
+              List.map Extended_machtype.of_machtype (args_type @ [typ_val]);
+            ty_res = Extended_machtype.of_machtype result;
+            pos = Rc_normal
+          },
         (get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ()) :: args)
         @ [Cvar clos],
         dbg () )
@@ -4152,7 +4087,11 @@ let entry_point namelist =
     in
     Csequence
       ( Cop
-          ( Capply ([], typ_void, Rc_normal),
+          ( Capply
+              { ty_args = [];
+                ty_res = Extended_machtype.typ_void;
+                pos = Rc_normal
+              },
             [Cop (mk_load_immut Word_int, [f], dbg ())],
             dbg () ),
         incr_global_inited () )
@@ -4541,8 +4480,8 @@ let load ~dbg memory_chunk mutability ~addr =
 let store ~dbg kind init ~addr ~new_value =
   Cop (Cstore (kind, init), [addr; new_value], dbg)
 
-let direct_call ~dbg res_ty pos f_code_sym args_ty args =
-  Cop (Capply (args_ty, res_ty, pos), f_code_sym :: args, dbg)
+let direct_call ~dbg ty_res pos f_code_sym ty_args args =
+  Cop (Capply { ty_args; ty_res; pos }, f_code_sym :: args, dbg)
 
 let indirect_call ~dbg ty pos alloc_mode f args_type args =
   might_split_call_caml_apply ty args_type Asttypes.Mutable f args pos
@@ -4565,9 +4504,10 @@ let indirect_full_call ~dbg ty pos alloc_mode f args_type args =
       ~body:
         (Cop
            ( Capply
-               ( List.map Extended_machtype.to_machtype args_type @ [typ_val],
-                 Extended_machtype.to_machtype ty,
-                 pos ),
+               { ty_args = args_type @ [Extended_machtype.typ_val];
+                 ty_res = ty;
+                 pos
+               },
              (fun_ptr :: args) @ [Cvar v],
              dbg ))
 
@@ -4997,7 +4937,11 @@ let perform ~dbg eff =
   (* Rc_normal means "allow tailcalls". Preventing them here by using Rc_nontail
      improves backtraces of paused fibers. *)
   Cop
-    ( Capply ([typ_val; typ_val], typ_val, Rc_nontail),
+    ( Capply
+        { ty_args = Extended_machtype.[typ_val; typ_val];
+          ty_res = Extended_machtype.typ_val;
+          pos = Rc_nontail
+        },
       [Cconst_symbol (Cmm.global_symbol "caml_perform", dbg); eff; cont],
       dbg )
 
@@ -5006,7 +4950,11 @@ let run_stack ~dbg ~stack ~f ~arg =
      (usages of this primitive shouldn't be generated in tail position), so we
      use Rc_nontail for clarity. *)
   Cop
-    ( Capply ([typ_val; typ_val; typ_val], typ_val, Rc_nontail),
+    ( Capply
+        { ty_args = Extended_machtype.[typ_val; typ_val; typ_val];
+          ty_res = Extended_machtype.typ_val;
+          pos = Rc_nontail
+        },
       [Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg); stack; f; arg],
       dbg )
 
@@ -5015,7 +4963,11 @@ let resume ~dbg ~stack ~f ~arg ~last_fiber =
      repeated resumes, and these should consume O(1) stack space by tail-calling
      caml_resume. *)
   Cop
-    ( Capply ([typ_val; typ_val; typ_val; typ_val], typ_val, Rc_normal),
+    ( Capply
+        { ty_args = Extended_machtype.[typ_val; typ_val; typ_val; typ_val];
+          ty_res = Extended_machtype.typ_val;
+          pos = Rc_normal
+        },
       [ Cconst_symbol (Cmm.global_symbol "caml_resume", dbg);
         stack;
         f;
@@ -5027,7 +4979,11 @@ let reperform ~dbg ~eff ~cont ~last_fiber =
   (* Rc_normal is required here, this is used in tail position and should tail
      call. *)
   Cop
-    ( Capply ([typ_val; typ_val; typ_val], typ_val, Rc_normal),
+    ( Capply
+        { ty_args = Extended_machtype.[typ_val; typ_val; typ_val];
+          ty_res = Extended_machtype.typ_val;
+          pos = Rc_normal
+        },
       [ Cconst_symbol (Cmm.global_symbol "caml_reperform", dbg);
         eff;
         cont;

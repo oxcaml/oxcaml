@@ -906,30 +906,31 @@ module F = struct
       | Indirect -> 1, Array.length i.arg - 1
     in
     let arg_regs = Array.sub i.arg args_begin args_end |> reg_list_for_call in
-    let print_machtyp_comp ppf (typ : Cmm.machtype_component) =
+    let print_extended_machtyp_comp ppf
+        (typ : Cmm.Extended_machtype_component.t) =
       let str =
         match typ with
         | Val -> "V"
         | Addr -> "A"
-        | Int -> "I"
+        | Val_and_int -> "VI"
+        | Any_int -> "I"
         | Float -> "F"
         | Vec128 -> "X"
         | Vec256 -> "Y"
         | Vec512 -> "Z"
-        | Valx2 -> "VV"
         | Float32 -> "S"
       in
       fprintf ppf "%s" str
     in
-    let print_machtyp ppf (mtyp : Cmm.machtype) =
+    let print_extended_machtyp ppf (mtyp : Cmm.Extended_machtype.t) =
       fprintf ppf "[%a]"
-        (pp_print_list ~pp_sep:pp_comma print_machtyp_comp)
+        (pp_print_list ~pp_sep:pp_comma print_extended_machtyp_comp)
         (Array.to_list mtyp)
     in
     ins t "; regs: [%a], ty_args: [%a]"
       (pp_print_list ~pp_sep:pp_comma Printreg.reg)
       arg_regs
-      (pp_print_list ~pp_sep:pp_comma print_machtyp)
+      (pp_print_list ~pp_sep:pp_comma print_extended_machtyp)
       op.ty_args;
     let args =
       List.map
@@ -943,7 +944,8 @@ module F = struct
           (fun reg typ ->
             let temp = load_reg_to_temp t reg in
             let typ =
-              Llvm_typ.of_machtyp_component typ.(0)
+              (Cmm.Extended_machtype.to_machtype typ).(0)
+              |> Llvm_typ.of_machtyp_component
               (* CR yusumez: ??? *)
             in
             ( typ,
