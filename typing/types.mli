@@ -663,7 +663,7 @@ module Vars  : Map.S with type key = string
 (* Value descriptions *)
 
 type value_kind =
-    Val_reg of Jkind_types.Sort.t option (* Regular value *)
+    Val_reg of Jkind_types.Sort.t       (* Regular value *)
   | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -1097,13 +1097,8 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
-  (* The return type is odd because we represent layouts in value descriptions
-     as [Sort.t option]s. We also need to signal that a signature item has
-     no runtime representation. Thus [None] means no runtime representation and
-     [Some None] means non-representable at runtime (e.g.
-     [val] with layout [any]). *)
-  val sort_of_signature_item :
-    signature_item -> Jkind_types.Sort.t option option
+  (* Returns [None] for items that have no runtime representation *)
+  val sort_of_signature_item : signature_item -> Jkind_types.Sort.t option
 end
 
 module Make_wrapped(Wrap : Wrap) : Wrapped with type 'a wrapped = 'a Wrap.t
@@ -1235,9 +1230,9 @@ val mixed_block_element_for_class : mixed_block_element
     Note: manifest primitives do not correspond to a run-time value! *)
 val bound_value_identifiers: signature -> Ident.t list
 
-(** Like [bound_value_identifiers], but also return layouts *)
+(** Like [bound_value_identifiers], but also return sorts *)
 val bound_value_identifiers_and_sorts :
-  signature -> (Ident.t * Jkind_types.Sort.t option) list
+  signature -> (Ident.t * Jkind_types.Sort.t) list
 
 val signature_item_id : signature_item -> Ident.t
 
