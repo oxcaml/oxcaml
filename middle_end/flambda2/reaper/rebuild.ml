@@ -752,7 +752,10 @@ let make_apply_wrapper env
                   arg)
               args return_parameters
       then
-        (* If the decisions are equal, do not introduce the wrapper. The wrapper
+        (* If the decisions are equal, we are making the same transformation to the
+            arguments passed to the return continuation in the callee as to the parameters
+            of the return continuation in the caller. In this case, do not introduce the wrapper,
+            as it would just be a continuation alias. The wrapper
            can turn tail calls into non-tail ones, making it important to not
            introduce them if not necessary. Fortunately, if there is a loop of
            possible tail calls [f1 -> f2 -> ... -> fn -> f1] (including indirect
