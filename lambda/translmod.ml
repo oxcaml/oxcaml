@@ -886,11 +886,7 @@ and transl_structure ~scopes loc
               [] ->
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
             | (id, sort) :: ids_with_sorts ->
-                let sort =
-                  sort |> Misc.Stdlib.Option.get_or_fatal_error
-                            ~error:"Translmod.transl_struct: Tstr_include"
-                       |> Jkind.Sort.default_for_transl_and_get
-                in
+                let sort = Jkind.Sort.default_for_transl_and_get sort in
                 let shape = mixed_block_element_of_const_sort sort in
                 let lambda_layout = layout_of_const_sort sort in
                 let body, repr =
@@ -945,11 +941,7 @@ and transl_structure ~scopes loc
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
                 | (id, sort) :: ids_with_sorts ->
-                  let sort =
-                    sort |> Misc.Stdlib.Option.get_or_fatal_error
-                              ~error:"Translmod.transl_struct: Tstr_open"
-                         |> Jkind.Sort.default_for_transl_and_get
-                  in
+                  let sort = Jkind.Sort.default_for_transl_and_get sort in
                   let shape = mixed_block_element_of_const_sort sort in
                   let lambda_layout = layout_of_const_sort sort in
                   let body, repr =
