@@ -734,7 +734,7 @@ let operation_supported = function
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
-  | Cand | Cor | Cxor | Clsl | Clsr | Casr
+  | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cbitwindow _
   | Ccsel _
   | Cbswap _
   | Cclz _ | Cctz _
