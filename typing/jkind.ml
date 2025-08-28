@@ -236,10 +236,6 @@ module Layout = struct
       (fun x -> Sort.Product x)
       (Misc.Stdlib.List.map_option to_sort ts)
 
-  let sort_to_mixed_block_element sort =
-    sort |> Sort.default_for_transl_and_get
-    |> Types.mixed_block_element_of_const_sort
-
   let rec get : Sort.t t -> Sort.Flat.t t =
     let rec flatten_sort : Sort.t -> Sort.Flat.t t = function
       | Var v -> Sort (Var (Sort.Var.get_id v))
