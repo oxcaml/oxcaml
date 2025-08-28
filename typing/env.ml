@@ -204,7 +204,7 @@ let map_summary f = function
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * Jkind.Sort.t option array * int
+  | Adot of address * Jkind.Sort.t array * int
 
 module TycompTbl =
   struct
@@ -719,7 +719,7 @@ and functor_components = {
 and address_unforced =
   | Projection of
     { parent : address_lazy;
-      field_sorts: Jkind.Sort.t option array;
+      field_sorts: Jkind.Sort.t array;
       pos : int }
   | ModAlias of { env : t; path : Path.t; }
 

@@ -3785,15 +3785,16 @@ let check_for_hidden_arrow env loc ty =
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modalities valdecl =
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
-  begin match
-    Ctype.type_sort ~why:Structure_element ~fixed:false env cty.ctyp_type
-  with
-  | Ok _ -> ()
-  | Error err ->
-    raise(Error(cty.ctyp_loc,
-                Non_representable_in_sig
-                  (err,valdecl.pval_name.txt,cty.ctyp_type)))
-  end;
+  let sort =
+    match
+      Ctype.type_sort ~why:Structure_element ~fixed:false env cty.ctyp_type
+    with
+    | Ok sort -> sort
+    | Error err ->
+      raise(Error(cty.ctyp_loc,
+                  Non_representable_in_sig
+                    (err,valdecl.pval_name.txt,cty.ctyp_type)))
+  in
   let ty = cty.ctyp_type in
   let v =
   match valdecl.pval_prim with
@@ -3843,10 +3844,7 @@ let transl_value_decl env loc ~modalities valdecl =
           raise (Error(valdecl.pval_loc, Zero_alloc_attr_unsupported zero_alloc))
       in
       { val_type = ty;
-        val_kind =
-          Val_reg
-            (Jkind.Layout.to_sort
-              (Ctype.type_jkind_purely env cty.ctyp_type).jkind.layout);
+        val_kind = Val_reg sort;
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities = modalities;
         val_zero_alloc = zero_alloc;
