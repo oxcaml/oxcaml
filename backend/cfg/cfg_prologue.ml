@@ -267,7 +267,7 @@ let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
           (fun tree -> visit tree cfg doms loop_infos reachable_epilogues)
           tree.children
       in
-      let prologue_blocks, epilogue_blocks =
+      let child_prologue_blocks, child_epilogue_blocks =
         List.fold_left
           (fun (child_prologues, child_epilogues) (all_prologues, all_epilogues) ->
             ( Label.Set.union all_prologues child_prologues,
@@ -275,8 +275,9 @@ let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
           (Label.Set.empty, Label.Set.empty)
           children_prologue_block
       in
-      if can_place_prologues prologue_blocks cfg doms loop_infos epilogue_blocks
-      then Some (prologue_blocks, epilogue_blocks)
+      if can_place_prologues child_prologue_blocks cfg doms loop_infos
+           child_epilogue_blocks
+      then Some (child_prologue_blocks, child_epilogue_blocks)
       else Some (Label.Set.singleton tree.label, epilogue_blocks)
   in
   (* [Proc.prologue_required] is cheap and should provide an over-estimate of
