@@ -593,13 +593,13 @@ end
 (* similar to [Typemod.module_representation_of_signature] *)
 let module_representation_of_lazy_signature sg =
   sg
-  |> List.filter_map Subst.Lazy.layout_of_signature_item
-  |> List.map (fun layout ->
-      layout
-      |> Jkind.Layout.to_mixed_block_element
+  |> List.filter_map Subst.Lazy.sort_of_signature_item
+  |> List.map (fun sort ->
+      sort
       |> Misc.Stdlib.Option.get_or_fatal_error
            ~error:"Includemod.module_representation_of_lazy_signature: \
-                     unexpected unrepresentable layout")
+                     unexpected unrepresentable layout"
+      |> Jkind.Layout.sort_to_mixed_block_element)
   |> Array.of_list
   |> module_representation_of_mixed_product_shape
 

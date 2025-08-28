@@ -382,7 +382,7 @@ module Vars = Misc.Stdlib.String.Map
 (* Value descriptions *)
 
 type value_kind =
-    Val_reg of Jkind_types.Sort.t Jkind_types.Layout.t     (* Regular value *)
+    Val_reg of Jkind_types.Sort.t option (* Regular value *)
   | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -767,8 +767,8 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
-  val layout_of_signature_item :
-    signature_item -> Jkind_types.Sort.t Jkind_types.Layout.t option
+  val sort_of_signature_item :
+    signature_item -> Jkind_types.Sort.t option option
 end
 
 module Make_wrapped(Wrap : Wrap) = struct
@@ -776,26 +776,26 @@ module Make_wrapped(Wrap : Wrap) = struct
   module rec M : Wrapped with type 'a wrapped = 'a Wrap.t = M
   include M
 
-  let layout_of_signature_item = function
+  let sort_of_signature_item = function
     | Sig_value(_, decl, _) ->
       begin match decl.val_kind with
-      | Val_reg layout -> Some layout
+      | Val_reg sort_opt -> Some sort_opt
       | Val_ivar _ ->
-        Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_instance_var))
+        Some (Some Jkind_types.Sort.(of_const Const.for_instance_var))
       | Val_self _ | Val_anc _ ->
-        Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_object))
+        Some (Some Jkind_types.Sort.(of_const Const.for_object))
       | Val_prim _ | Val_mut _ -> None (* error will be thrown later in Env *)
       end
     | Sig_typext _ ->
-      Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_type_extension))
+      Some (Some Jkind_types.Sort.(of_const Const.for_type_extension))
     | Sig_module(_, pres, _, _, _) ->
       begin match pres with
       | Mp_present ->
-        Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_module))
+        Some (Some Jkind_types.Sort.(of_const Const.for_module))
       | Mp_absent -> None
       end
     | Sig_class _ ->
-        Some Jkind_types.(Layout.Sort Sort.(of_const Const.for_class))
+        Some (Some Jkind_types.Sort.(of_const Const.for_class))
     | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
 end
 
@@ -1142,24 +1142,24 @@ let rec bound_value_identifiers = function
   | Sig_class(id, _, _, _) :: rem -> id :: bound_value_identifiers rem
   | _ :: rem -> bound_value_identifiers rem
 
-let rec bound_value_identifiers_and_layouts = function
+let rec bound_value_identifiers_and_sorts = function
     [] -> []
-  | Sig_value(id, {val_kind = Val_reg layout}, _) :: rem ->
-      (id, layout) :: bound_value_identifiers_and_layouts rem
+  | Sig_value(id, {val_kind = Val_reg sort}, _) :: rem ->
+      (id, sort) :: bound_value_identifiers_and_sorts rem
   | Sig_typext(id, _, _, _) :: rem ->
-      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_type_extension)))
-        :: bound_value_identifiers_and_layouts rem
+      (id, Some Jkind_types.Sort.(of_const Const.for_type_extension))
+        :: bound_value_identifiers_and_sorts rem
   | Sig_module(id, Mp_present, _, _, _) :: rem ->
-      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_module))) ::
-        bound_value_identifiers_and_layouts rem
+      (id, Some Jkind_types.Sort.(of_const Const.for_module)) ::
+        bound_value_identifiers_and_sorts rem
   | Sig_class(id, _, _, _) :: rem ->
-      (id, Jkind_types.(Layout.Sort Sort.(of_const Const.for_class))) ::
-        bound_value_identifiers_and_layouts rem
+      (id, Some Jkind_types.Sort.(of_const Const.for_class)) ::
+        bound_value_identifiers_and_sorts rem
   | Sig_value(_, {val_kind = (Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _
                               | Val_anc _)}, _) :: rem
   | Sig_module(_, Mp_absent, _, _, _) :: rem
   | (Sig_type _ | Sig_modtype _ | Sig_class_type _) :: rem ->
-      bound_value_identifiers_and_layouts rem
+      bound_value_identifiers_and_sorts rem
 
 let signature_item_id = function
   | Sig_value (id, _, _)

@@ -1501,16 +1501,15 @@ let rec transl_address loc = function
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
-  | Env.Adot(addr, field_layouts, pos) ->
+  | Env.Adot(addr, field_sorts, pos) ->
       let module_repr =
-        field_layouts
+        field_sorts
         |> Array.map
-            (fun layout ->
-              layout
-              |> Jkind.Layout.to_mixed_block_element
+            (fun sort ->
+              sort
               |> Misc.Stdlib.Option.get_or_fatal_error
-                  ~error:"Lambda.transl_address: \
-                            could not determine layout of field")
+                  ~error:"Lambda.transl_address: got abstract field"
+              |> Jkind.Layout.sort_to_mixed_block_element)
         |> Types.module_representation_of_mixed_product_shape
         |> transl_module_representation
       in
