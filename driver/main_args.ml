@@ -1897,8 +1897,8 @@ module Default = struct
     let _no_extension s = Language_extension.(disable_of_string_exn s)
     let _extension_universe s =
       Language_extension.(set_universe_and_enable_all_of_string_exn s)
-    let _metaprogramming = set Lexer.syntax_mode.metaprogramming
-    let _no_metaprogramming = clear Lexer.syntax_mode.metaprogramming
+    let _metaprogramming = set Lexer.default_syntax_mode.metaprogramming
+    let _no_metaprogramming = clear Lexer.default_syntax_mode.metaprogramming
     let _noassert = set noassert
     let _nolabels = set classic
     let _nostdlib = set no_std_include

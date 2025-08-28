@@ -51,7 +51,9 @@ val token_with_comments : Lexing.lexbuf -> Parser.token
 (* Syntax mode configuration *)
 type syntax_mode = { metaprogramming : bool ref }
 
+val default_syntax_mode : syntax_mode
 val syntax_mode : syntax_mode
+val reset_syntax_mode : unit -> unit
 
 (*
   [set_preprocessor init preprocessor] registers [init] as the function

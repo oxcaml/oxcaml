@@ -166,7 +166,10 @@ type syntax_mode = {
   metaprogramming : bool ref;
 }
 
+let default_syntax_mode = { metaprogramming = ref false }
 let syntax_mode = { metaprogramming = ref false }
+let reset_syntax_mode () =
+  syntax_mode.metaprogramming := !(default_syntax_mode.metaprogramming)
 
 (* See the comment on the [directive] lexer. *)
 type directive_lexing_already_consumed =
