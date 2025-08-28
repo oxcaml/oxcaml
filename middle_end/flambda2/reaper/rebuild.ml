@@ -757,7 +757,7 @@ let make_apply_wrapper env
            introduce them if not necessary. Fortunately, if there is a loop of
            possible tail calls [f1 -> f2 -> ... -> fn -> f1] (including indirect
            calls), then the uses of the results of these functions will all be
-           the same, guanranteeing that they get the same decisions. As such, no
+           the same, guaranteeing that they get the same decisions. As such, no
            wrappers will be needed in these cases, enforcing that tail calls
            that get turned into non-tail calls can only happen outside of such
            loops, and thus ensuring that the stack required during execution is
