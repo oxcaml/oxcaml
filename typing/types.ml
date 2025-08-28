@@ -386,7 +386,7 @@ module Vars = Misc.Stdlib.String.Map
 (* Value descriptions *)
 
 type value_kind =
-    Val_reg of Jkind_types.Sort.t option (* Regular value *)
+    Val_reg of Jkind_types.Sort.t       (* Regular value *)
   | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -772,7 +772,7 @@ module type Wrapped = sig
   }
 
   val sort_of_signature_item :
-    signature_item -> Jkind_types.Sort.t option option
+    signature_item -> Jkind_types.Sort.t option
 end
 
 module Make_wrapped(Wrap : Wrap) = struct
@@ -783,23 +783,23 @@ module Make_wrapped(Wrap : Wrap) = struct
   let sort_of_signature_item = function
     | Sig_value(_, decl, _) ->
       begin match decl.val_kind with
-      | Val_reg sort_opt -> Some sort_opt
+      | Val_reg sort -> Some sort
       | Val_ivar _ ->
-        Some (Some Jkind_types.Sort.(of_const Const.for_instance_var))
+        Some Jkind_types.Sort.(of_const Const.for_instance_var)
       | Val_self _ | Val_anc _ ->
-        Some (Some Jkind_types.Sort.(of_const Const.for_object))
+        Some Jkind_types.Sort.(of_const Const.for_object)
       | Val_prim _ | Val_mut _ -> None (* error will be thrown later in Env *)
       end
     | Sig_typext _ ->
-      Some (Some Jkind_types.Sort.(of_const Const.for_type_extension))
+      Some Jkind_types.Sort.(of_const Const.for_type_extension)
     | Sig_module(_, pres, _, _, _) ->
       begin match pres with
       | Mp_present ->
-        Some (Some Jkind_types.Sort.(of_const Const.for_module))
+        Some Jkind_types.Sort.(of_const Const.for_module)
       | Mp_absent -> None
       end
     | Sig_class _ ->
-        Some (Some Jkind_types.Sort.(of_const Const.for_class))
+        Some Jkind_types.Sort.(of_const Const.for_class)
     | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
 end
 
@@ -1151,13 +1151,13 @@ let rec bound_value_identifiers_and_sorts = function
   | Sig_value(id, {val_kind = Val_reg sort}, _) :: rem ->
       (id, sort) :: bound_value_identifiers_and_sorts rem
   | Sig_typext(id, _, _, _) :: rem ->
-      (id, Some Jkind_types.Sort.(of_const Const.for_type_extension))
+      (id, Jkind_types.Sort.(of_const Const.for_type_extension))
         :: bound_value_identifiers_and_sorts rem
   | Sig_module(id, Mp_present, _, _, _) :: rem ->
-      (id, Some Jkind_types.Sort.(of_const Const.for_module)) ::
+      (id, Jkind_types.Sort.(of_const Const.for_module)) ::
         bound_value_identifiers_and_sorts rem
   | Sig_class(id, _, _, _) :: rem ->
-      (id, Some Jkind_types.Sort.(of_const Const.for_class)) ::
+      (id, Jkind_types.Sort.(of_const Const.for_class)) ::
         bound_value_identifiers_and_sorts rem
   | Sig_value(_, {val_kind = (Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _
                               | Val_anc _)}, _) :: rem
