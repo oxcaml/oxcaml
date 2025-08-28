@@ -775,7 +775,11 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
               match translate_args rest with
               | Some rest_vars -> Some (backend_var :: rest_vars)
               | None -> None)
-            | _ -> None)
+            | _ ->
+              (* XXX we need to do better here. For example if the variable we
+                 want is bound to the result of a function application, we'll
+                 hit this case... *)
+              None)
           | None -> None)
       in
       match translate_args args with
