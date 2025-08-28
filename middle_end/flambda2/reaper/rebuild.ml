@@ -774,7 +774,7 @@ let make_apply_wrapper env
            Here, [g] gets a wrapper to return a single value, while [f] does
            not. As such, the tail call from [g] to [f] is lost. However, this
            can only happen because the uses of [g] do not match those of [f],
-           which would be the case if there a loop of tail calls between them
+           which would be the case if a loop of tail calls between them
            existed. *)
         let apply = make_apply ~continuation:(Return return_cont) in
         RE.from_expr ~expr:(Expr.create_apply apply)
