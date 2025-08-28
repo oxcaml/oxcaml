@@ -870,8 +870,8 @@ and transl_structure ~scopes loc
           in
           Value_rec_compiler.compile_letrec class_bindings body, repr
       | Tstr_include incl ->
-          let ids_with_layouts =
-            bound_value_identifiers_and_layouts incl.incl_type
+          let ids_with_sorts =
+            bound_value_identifiers_and_sorts incl.incl_type
           in
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
@@ -882,18 +882,17 @@ and transl_structure ~scopes loc
           let rec rebind_idents pos newfields = function
               [] ->
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
-            | (id, layout) :: ids_with_layouts ->
+            | (id, sort) :: ids_with_sorts ->
                 let sort =
-                  layout |> Jkind.Layout.to_sort
-                         |> Misc.Stdlib.Option.get_or_fatal_error
-                              ~error:"Translmod.transl_struct"
-                         |> Jkind.Sort.default_for_transl_and_get
+                  sort |> Misc.Stdlib.Option.get_or_fatal_error
+                            ~error:"Translmod.transl_struct"
+                       |> Jkind.Sort.default_for_transl_and_get
                 in
                 let shape = mixed_block_element_of_const_sort sort in
                 let lambda_layout = layout_of_const_sort sort in
                 let body, repr =
                   rebind_idents (pos + 1) ((id, shape) :: newfields)
-                    ids_with_layouts
+                    ids_with_sorts
                 in
                 let id_duid = Lambda.debug_uid_none in
                 (* CR sspies: Can we find a better [debug_uid] here? *)
@@ -904,7 +903,7 @@ and transl_structure ~scopes loc
                 repr
           in
           let body, repr =
-            rebind_idents 0 fields ids_with_layouts
+            rebind_idents 0 fields ids_with_sorts
           in
           let loc = of_location ~scopes incl.incl_loc in
           let let_kind, modl =
@@ -931,8 +930,8 @@ and transl_structure ~scopes loc
           | [] when pure = Alias ->
               transl_structure ~scopes loc fields cc rootpath final_env rem
           | _ ->
-              let ids_with_layouts =
-                bound_value_identifiers_and_layouts od.open_bound_items
+              let ids_with_sorts =
+                bound_value_identifiers_and_sorts od.open_bound_items
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
@@ -942,18 +941,17 @@ and transl_structure ~scopes loc
               let rec rebind_idents pos newfields = function
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
-                | (id, layout) :: ids_with_layouts ->
+                | (id, sort) :: ids_with_sorts ->
                   let sort =
-                    layout |> Jkind.Layout.to_sort
-                           |> Misc.Stdlib.Option.get_or_fatal_error
-                                ~error:"Translmod.transl_struct"
-                           |> Jkind.Sort.default_for_transl_and_get
+                    sort |> Misc.Stdlib.Option.get_or_fatal_error
+                              ~error:"Translmod.transl_struct"
+                         |> Jkind.Sort.default_for_transl_and_get
                   in
                   let shape = mixed_block_element_of_const_sort sort in
                   let lambda_layout = layout_of_const_sort sort in
                   let body, repr =
                     rebind_idents (pos + 1) ((id, shape) :: newfields)
-                      ids_with_layouts
+                      ids_with_sorts
                   in
                   let id_duid = Lambda.debug_uid_none in
                   (* CR sspies: Can we find a better [debug_uid] here? *)
@@ -963,7 +961,7 @@ and transl_structure ~scopes loc
                   repr
               in
               let body, repr =
-                rebind_idents 0 fields ids_with_layouts
+                rebind_idents 0 fields ids_with_sorts
               in
               Llet(pure, Lambda.layout_module, mid, mid_duid,
                    transl_module ~scopes Tcoerce_none None od.open_expr, body),
