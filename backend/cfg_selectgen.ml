@@ -361,73 +361,88 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Printf.eprintf "Cbitwindow: src=%d dst=%d len=%d sign_extend=%d low_bits=%s\n%!"
           src dst len sign_extend (Nativeint.to_string low_bits);
       
-      (* Step 1: Position the bits *)
+      (* Special case: Simple shifts without masking or sign extension.
+         These are common in array indexing and should be vectorizable. *)
       let shift_amount = dst - src in
       let needs_sign_extension = sign_extend > 0 && (dst + len) < sign_extend in
-      let result =
-        if shift_amount = 0
-        then arg
-        else if shift_amount > 0
-        then Cmm.Cop (Clsl, [arg; Cmm.Cconst_int (shift_amount, dbg)], dbg)
-        else if needs_sign_extension
-        then 
-          (* Use arithmetic shift right if we need sign extension *)
-          Cmm.Cop (Casr, [arg; Cmm.Cconst_int (-shift_amount, dbg)], dbg)
-        else 
-          (* Use logical shift right otherwise *)
-          Cmm.Cop (Clsr, [arg; Cmm.Cconst_int (-shift_amount, dbg)], dbg)
-      in
-      
-      (* Step 2: Additional sign extension if needed *)
       let output_high = dst + len in
-      let result =
-        if needs_sign_extension && shift_amount >= 0
-        then
-          (* We already positioned the bits, now extend the sign if we didn't
-             use an arithmetic shift *)
-          let left_shift = 64 - output_high in
-          let result =
+      let needs_mask = (dst > 0 || sign_extend < 64) && output_high = sign_extend in
+      let has_low_bits = not (Nativeint.equal low_bits Nativeint.zero) in
+      
+      if not needs_sign_extension && not needs_mask && not has_low_bits then
+        (* Simple shift - generate it directly to preserve vectorization patterns *)
+        if shift_amount = 0 then
+          (* Identity - just return the argument *)
+          SU.basic_op (Intop Ior), [arg; Cmm.Cconst_int (0, dbg)]
+        else if shift_amount > 0 then
+          select_arith Ilsl [arg; Cmm.Cconst_int (shift_amount, dbg)]
+        else
+          select_arith Ilsr [arg; Cmm.Cconst_int (-shift_amount, dbg)]
+      else
+        (* Complex bit windowing - decompose as before *)
+        let result =
+          if shift_amount = 0
+          then arg
+          else if shift_amount > 0
+          then Cmm.Cop (Clsl, [arg; Cmm.Cconst_int (shift_amount, dbg)], dbg)
+          else if needs_sign_extension
+          then 
+            (* Use arithmetic shift right if we need sign extension *)
+            Cmm.Cop (Casr, [arg; Cmm.Cconst_int (-shift_amount, dbg)], dbg)
+          else 
+            (* Use logical shift right otherwise *)
+            Cmm.Cop (Clsr, [arg; Cmm.Cconst_int (-shift_amount, dbg)], dbg)
+        in
+        
+        (* Step 2: Additional sign extension if needed *)
+        let result =
+          if needs_sign_extension && shift_amount >= 0
+          then
+            (* We already positioned the bits, now extend the sign if we didn't
+               use an arithmetic shift *)
+            let left_shift = 64 - output_high in
+            let result =
+              if left_shift > 0
+              then Cmm.Cop (Clsl, [result; Cmm.Cconst_int (left_shift, dbg)], dbg)
+              else result
+            in
+            (* Now arithmetic shift right by the same amount to propagate the sign *)
             if left_shift > 0
-            then Cmm.Cop (Clsl, [result; Cmm.Cconst_int (left_shift, dbg)], dbg)
+            then Cmm.Cop (Casr, [result; Cmm.Cconst_int (left_shift, dbg)], dbg)
             else result
-          in
-          (* Now arithmetic shift right by the same amount to propagate the sign *)
-          if left_shift > 0
-          then Cmm.Cop (Casr, [result; Cmm.Cconst_int (left_shift, dbg)], dbg)
           else result
-        else result
-      in
-      
-      (* Step 3: Mask if needed *)
-      let result =
-        if (dst > 0 || sign_extend < 64) && output_high = sign_extend
-        then
-          let mask =
-            let ones = Nativeint.minus_one in
-            let mask = Nativeint.shift_right_logical ones (64 - len) in
-            Nativeint.shift_left mask dst
-          in
-          Cmm.Cop (Cand, [result; Cmm.Cconst_natint (mask, dbg)], dbg)
-        else result
-      in
-      
-      (* Step 4: OR with low_bits if non-zero *)
-      let result =
-        if not (Nativeint.equal low_bits Nativeint.zero)
-        then Cmm.Cop (Cor, [result; Cmm.Cconst_natint (low_bits, dbg)], dbg)
-        else result
-      in
-      
-      (* Recursively select the final operations *)
-      let final_result = result in
-      match[@ocaml.warning "-fragile-match"] final_result with
-      | arg when arg == single_arg () ->
-        (* Identity - just return the argument *)
-        SU.basic_op (Intop Ior), [arg; Cmm.Cconst_int (0, dbg)]
-      | Cmm.Cop (cop, args, _) ->
-        select_operation cop args dbg ~label_after
-      | _ ->
-        Misc.fatal_error "got an identity operation for Cbit_windowing"
+        in
+        
+        (* Step 3: Mask if needed *)
+        let result =
+          if needs_mask
+          then
+            let mask =
+              let ones = Nativeint.minus_one in
+              let mask = Nativeint.shift_right_logical ones (64 - len) in
+              Nativeint.shift_left mask dst
+            in
+            Cmm.Cop (Cand, [result; Cmm.Cconst_natint (mask, dbg)], dbg)
+          else result
+        in
+        
+        (* Step 4: OR with low_bits if non-zero *)
+        let result =
+          if has_low_bits
+          then Cmm.Cop (Cor, [result; Cmm.Cconst_natint (low_bits, dbg)], dbg)
+          else result
+        in
+        
+        (* Recursively select the final operations *)
+        let final_result = result in
+        match[@ocaml.warning "-fragile-match"] final_result with
+        | arg when arg == single_arg () ->
+          (* Identity - just return the argument *)
+          SU.basic_op (Intop Ior), [arg; Cmm.Cconst_int (0, dbg)]
+        | Cmm.Cop (cop, args, _) ->
+          select_operation cop args dbg ~label_after
+        | _ ->
+          Misc.fatal_error "got an identity operation for Cbit_windowing"
       )
     | Cclz { arg_is_non_zero } ->
       SU.basic_op (Intop (Iclz { arg_is_non_zero })), args
