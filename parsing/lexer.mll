@@ -161,6 +161,13 @@ let print_warnings = ref true
 
 let at_beginning_of_line pos = (pos.pos_cnum = pos.pos_bol)
 
+(* Syntax mode configuration for the #syntax directive *)
+type syntax_mode = {
+  metaprogramming : bool ref;
+}
+
+let syntax_mode = { metaprogramming = ref false }
+
 (* See the comment on the [directive] lexer. *)
 type directive_lexing_already_consumed =
    | Hash
@@ -732,7 +739,16 @@ rule token = parse
   | "#"
       { if not (at_beginning_of_line lexbuf.lex_start_p)
         then HASH
-        else try directive Hash lexbuf with Failure _ -> HASH
+        else
+          (* Try to parse as #syntax directive first *)
+          let pos = lexbuf.lex_curr_pos in
+          let curpos = lexbuf.lex_curr_p in
+          try syntax_directive Hash lexbuf
+          with Failure _ ->
+            (* Reset position and try normal directive *)
+            lexbuf.Lexing.lex_curr_pos <- pos;
+            lexbuf.lex_curr_p <- curpos;
+            try directive Hash lexbuf with Failure _ -> HASH
       }
   | "&"  { AMPERSAND }
   | "&&" { AMPERAMPER }
@@ -745,7 +761,12 @@ rule token = parse
   | "*"  { STAR }
   | ","  { COMMA }
   | "->" { MINUSGREATER }
-  | "$"  { DOLLAR }
+  | "$" {
+      if !(syntax_mode.metaprogramming) then
+        DOLLAR
+      else
+        INFIXOP0 "$"
+    }
   | "."  { DOT }
   | ".." { DOTDOT }
   | ".#" { DOTHASH }
@@ -757,7 +778,16 @@ rule token = parse
   | ";"  { SEMI }
   | ";;" { SEMISEMI }
   | "<"  { LESS }
-  | "<[" { LESSLBRACKET }
+  | "<[" {
+      if !(syntax_mode.metaprogramming) then
+        LESSLBRACKET
+      else
+        (* Put back the '[' and return just LESS *)
+        (lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos - 1;
+         let curpos = lexbuf.lex_curr_p in
+         lexbuf.lex_curr_p <- { curpos with pos_cnum = curpos.pos_cnum - 1 };
+         LESS)
+    }
   | "<-" { LESSMINUS }
   | "="  { EQUAL }
   | "["  { LBRACKET }
@@ -766,7 +796,16 @@ rule token = parse
   | "[<" { LBRACKETLESS }
   | "[>" { LBRACKETGREATER }
   | "]"  { RBRACKET }
-  | "]>" { RBRACKETGREATER }
+  | "]>" {
+      if !(syntax_mode.metaprogramming) then
+        RBRACKETGREATER
+      else
+        (* Put back the '>' and return just RBRACKET *)
+        (lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos - 1;
+         let curpos = lexbuf.lex_curr_p in
+         lexbuf.lex_curr_p <- { curpos with pos_cnum = curpos.pos_cnum - 1 };
+         RBRACKET)
+    }
   | "{"  { LBRACE }
   | "{<" { LBRACELESS }
   | "|"  { BAR }
@@ -861,6 +900,29 @@ and directive already_consumed = parse
             update_loc lexbuf (Some name) (line_num - 1) true 0;
             token lexbuf
       }
+(* Lexer rule for the #syntax directive *)
+and syntax_directive already_consumed = parse
+  | "syntax" [' ' '\t']+ (lowercase identchar* as mode) [' ' '\t']*
+    (lowercase identchar* as toggle) [^ '\010' '\013'] *
+      { let toggle =
+          match toggle with
+          | "on" -> true
+          | "off" -> false
+          | _ ->
+              directive_error lexbuf
+                ("syntax directive can only be toggled on or off; "
+                 ^ toggle ^ " not recognized")
+                ~already_consumed ~directive:"syntax"
+        in
+        match mode with
+        | "metaprogramming" ->
+            syntax_mode.metaprogramming := toggle;
+            token lexbuf
+        | _ ->
+            directive_error lexbuf ("unknown syntax mode " ^ mode)
+              ~already_consumed ~directive:"syntax"
+      }
+  | "" { raise (Failure "not a syntax directive") }
 and comment = parse
     "(*"
       { comment_start_loc := (Location.curr lexbuf) :: !comment_start_loc;
