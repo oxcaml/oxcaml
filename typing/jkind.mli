@@ -105,7 +105,7 @@ module Layout : sig
 
   val to_sort : Sort.t t -> Sort.t option
 
-  val to_mixed_block_element : Sort.t t -> Types.mixed_block_element option
+  val sort_to_mixed_block_element : Sort.t -> Types.mixed_block_element
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
 

@@ -162,13 +162,13 @@ let rec path_concat head p =
 (* similar to [Includemod.module_representation_of_lazy_signature] *)
 let module_representation_of_signature sg =
   sg
-  |> List.filter_map layout_of_signature_item
-  |> List.map (fun layout ->
-      layout
-      |> Jkind.Layout.to_mixed_block_element
+  |> List.filter_map sort_of_signature_item
+  |> List.map (fun sort ->
+      sort
       |> Misc.Stdlib.Option.get_or_fatal_error
            ~error:"Typemod.module_representation_of_signature: \
-                     unexpected unrepresentable layout")
+                     unexpected unrepresentable layout"
+      |> Jkind.Layout.sort_to_mixed_block_element)
   |> Array.of_list
   |> module_representation_of_mixed_product_shape
 

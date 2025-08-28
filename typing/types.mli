@@ -663,7 +663,7 @@ module Vars  : Map.S with type key = string
 (* Value descriptions *)
 
 type value_kind =
-    Val_reg of Jkind_types.Sort.t Jkind_types.Layout.t     (* Regular value *)
+    Val_reg of Jkind_types.Sort.t option (* Regular value *)
   | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -1097,8 +1097,8 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
-  val layout_of_signature_item :
-    signature_item -> Jkind_types.Sort.t Jkind_types.Layout.t option
+  val sort_of_signature_item :
+    signature_item -> Jkind_types.Sort.t option option
 end
 
 module Make_wrapped(Wrap : Wrap) : Wrapped with type 'a wrapped = 'a Wrap.t
@@ -1231,8 +1231,8 @@ val mixed_block_element_for_class : mixed_block_element
 val bound_value_identifiers: signature -> Ident.t list
 
 (** Like [bound_value_identifiers], but also return layouts *)
-val bound_value_identifiers_and_layouts :
-  signature -> (Ident.t * Jkind_types.Sort.t Jkind_types.Layout.t) list
+val bound_value_identifiers_and_sorts :
+  signature -> (Ident.t * Jkind_types.Sort.t option) list
 
 val signature_item_id : signature_item -> Ident.t
 
