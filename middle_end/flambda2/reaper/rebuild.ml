@@ -807,7 +807,14 @@ let make_apply_wrapper env
          this case. However this makes it impossible to introduce a runtime
          error if the function actually returns due to a bug in the reaper, so
          we gate the [Invalid] wrapper behind an option which can be enabled
-         when debugging. *)
+         when debugging. The typical example would be something like:
+       
+       * let rec loop () =
+       *   do_something ();
+       *   loop ()
+
+       where we don't want to degrade the tail call to a non-tail one as it would blow up the stack.
+       *)
       if reaper_produce_invalid_when_never_returns
       then
         let handler =
