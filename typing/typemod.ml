@@ -165,9 +165,6 @@ let module_representation_of_signature sg =
   |> List.filter_map sort_of_signature_item
   |> List.map (fun sort ->
       sort
-      |> Misc.Stdlib.Option.get_or_fatal_error
-           ~error:"Typemod.module_representation_of_signature: \
-                     unexpected unrepresentable layout"
       |> Jkind.Sort.default_for_transl_and_get
       |> Types.mixed_block_element_of_const_sort)
   |> Array.of_list
