@@ -2935,21 +2935,6 @@ and type_pat_aux
         | Mutable ->
             let m0 = Value.Comonadic.newvar () in
             let mode = mutvar_mode ~loc ~env:!!penv m0 alloc_mode in
-            (* CR jrayman: forgot do delete this in jra.pv_sort *)
-            (* Sort information is used when translating a [Texp_mutvar] into an
-               [Lassign]. We calculate [sort] here so we can store and reuse it.
-               However, since we already make sure pattern variables are
-               representable, we are already calculating [sort] elsewhere, but
-               that place is too far removed to easily pass it here. *)
-            let sort =
-              match
-                Ctype.type_sort ~why:Jkind.History.Mutable_var_assignment
-                  ~fixed:false !!penv ty
-              with
-              | Ok sort -> sort
-              | Error err -> raise(Error(loc, !!penv,
-                                          Mutable_var_not_rep(ty, err)))
-            in
             let kind = Val_mut (m0, sort) in
             mode, kind
       in
