@@ -38,7 +38,8 @@ module S = struct
 
   type func_call_operation =
     { callee : callee;
-      ty_args : Cmm.machtype list
+      ty_args : Cmm.machtype list;
+      ty_res : Cmm.machtype
     }
 
   type external_call_operation =

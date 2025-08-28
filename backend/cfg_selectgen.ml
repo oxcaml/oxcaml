@@ -275,15 +275,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | [] | _ :: _ -> wrong_num_args 3
     in
     match[@ocaml.warning "+fragile-match"] op with
-    | Capply (args_ty, _ret_ty, _pos) -> (
-      let ty_args = args_ty in
+    | Capply (ty_args, ty_res, _pos) -> (
       match[@ocaml.warning "-fragile-match"] args with
       | Cconst_symbol (func, _dbg) :: rem ->
         ( Terminator
-            (Call { op = { callee = Direct func; ty_args }; label_after }),
+            (Call
+               { op = { callee = Direct func; ty_args; ty_res }; label_after }),
           rem )
       | _ ->
-        ( Terminator (Call { op = { callee = Indirect; ty_args }; label_after }),
+        ( Terminator
+            (Call { op = { callee = Indirect; ty_args; ty_res }; label_after }),
           args ))
     | Cextcall { func; alloc; ty; ty_args; returns; builtin; effects } ->
       if builtin && not !Oxcaml_flags.disable_builtin_check
@@ -1239,7 +1240,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let new_op, new_args = select_operation op simple_args dbg ~label_after in
       match new_op with
       | Terminator
-          (Call { op = { callee = Indirect; ty_args }; label_after } as term) ->
+          (Call
+             { op = { callee = Indirect; ty_args; ty_res = ty }; label_after }
+          as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
@@ -1248,7 +1251,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
         if stack_ofs = 0 && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_func { callee = Indirect; ty_args } in
+          let call =
+            Cfg.Tailcall_func { callee = Indirect; ty_args; ty_res = ty }
+          in
           SU.insert_moves env sub_cfg rarg loc_arg;
           SU.insert_debug' env sub_cfg call dbg
             (Array.append [| r1.(0) |] loc_arg)
@@ -1282,7 +1287,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.insert_debug' env sub_cfg call dbg loc_arg' [||])
         else if stack_ofs = 0 && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_func { callee = Direct func; ty_args } in
+          let call =
+            Cfg.Tailcall_func { callee = Direct func; ty_args; ty_res = ty }
+          in
           SU.insert_moves env sub_cfg r1 loc_arg;
           SU.insert_debug' env sub_cfg call dbg loc_arg [||])
         else (
