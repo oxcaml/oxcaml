@@ -35,7 +35,7 @@ let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
 let cfg_eliminate_dead_trap_handlers = ref false  (* -cfg-eliminate-dead-trap-handlers *)
 
-let cfg_prologue_validate = ref false    (* -[no-]cfg-prologue-validate *)
+let cfg_prologue_validate = ref true    (* -[no-]cfg-prologue-validate *)
 let cfg_prologue_shrink_wrap = ref true    (* -[no-]cfg-prologue-shrink-wrap *)
 let cfg_prologue_shrink_wrap_threshold = ref 16384 
                                        (* -cfg-prologue-shrink-wrap-threshold *)
