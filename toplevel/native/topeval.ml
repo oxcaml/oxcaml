@@ -55,23 +55,21 @@ let toplevel_value id =
   try Ident.find_same id !remembered
   with _ -> Misc.fatal_error @@ "Unknown ident: " ^ Ident.unique_name id
 
-let close_phrase lam repr =
+let close_phrase lam =
   let open Lambda in
   Ident.Set.fold (fun id l ->
     let glb, pos = toplevel_value id in
-    let layout = Lambda.layout_of_module_field repr pos in
     let glob =
-      Lprim (mod_field pos repr,
+      Lprim (Pfield (pos, Pointer, Reads_agree),
              [Lprim (Pgetglobal glb, [], Loc_unknown)],
              Loc_unknown)
     in
-    Llet(Strict, layout, id, glob, l)
+    Llet(Strict, Lambda.layout_module_field, id, glob, l)
   ) (free_variables lam) lam
 
 let toplevel_value id =
   let glob, pos = toplevel_value id in
   (Obj.magic (global_symbol glob)).(pos)
-  (* CR layouts v5: this is not correct if the fields have been reordered. *)
 
 (* Return the value referred to by a path *)
 
@@ -95,7 +93,7 @@ include Topcommon.MakeEvalPrinter(EvalBase)
 
 let may_trace = ref false (* Global lock on tracing *)
 
-let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam repr =
+let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam size =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let slam = Simplif.simplify_lambda lam in
@@ -104,7 +102,7 @@ let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam repr =
   let program =
     { Lambda.
       code = slam;
-      main_module_block_repr = repr;
+      main_module_block_size = size;
       arg_block_field = None;
       compilation_unit;
       required_globals;
@@ -117,8 +115,8 @@ let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam repr =
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-      | Sig_value(id, {val_kind = Val_reg layout; val_type}, _) ->
-          Some (outval_of_value env (toplevel_value id) val_type layout)
+      | Sig_value(id, {val_kind = Val_reg; val_type}, _) ->
+          Some (outval_of_value env (toplevel_value id) val_type)
       | _ -> None
     )
 
@@ -131,7 +129,7 @@ let name_expression ~loc ~attrs sort exp =
   let id = Ident.create_local name in
   let vd =
     { val_type = exp.exp_type;
-      val_kind = Val_reg (Jkind.Layout.Sort sort);
+      val_kind = Val_reg;
       val_loc = loc;
       val_attributes = attrs;
       val_uid = Uid.internal_not_actually_unique;
@@ -210,22 +208,21 @@ let execute_phrase print_outcome ppf phr =
              str, sg', true
          | None -> str, sg', false
       in
-      let compilation_unit, res, required_globals, main_module_block_format =
-        let { Lambda.compilation_unit; main_module_block_format;
+      let compilation_unit, res, required_globals, size =
+        let { Lambda.compilation_unit; main_module_block_size = size;
               required_globals; code = res } =
           Translmod.transl_implementation phrase_comp_unit
             (str, Tcoerce_none, None)
         in
         remember compilation_unit sg';
-        compilation_unit, close_phrase res repr, required_globals, repr
+        compilation_unit, close_phrase res, required_globals, size
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_lambda ppf ~required_globals ~compilation_unit phrase_name res
-            main_module_block_format
+          load_lambda ppf ~required_globals ~compilation_unit phrase_name res size
         in
         let out_phr =
           match res with
