@@ -354,7 +354,8 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
             fdo = insn.fdo;
             live = insn.live;
             available_before = insn.available_before;
-            available_across = insn.available_across
+            available_across = insn.available_across;
+            phantom_available_before = insn.phantom_available_before
           }
         in
         used_label := Some (label, label_insn);

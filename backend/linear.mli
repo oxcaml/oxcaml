@@ -21,6 +21,45 @@
    in the assembly backends. *)
 type label = Cmm.label
 
+type phantom_defining_expr = private
+  | Lphantom_const_int of Targetint.t
+  | Lphantom_const_symbol of string
+  | Lphantom_var of Backend_var.t
+  | Lphantom_offset_var of
+      { var : Backend_var.t;
+        offset_in_words : int
+      }
+  | Lphantom_read_field of
+      { var : Backend_var.t;
+        field : int
+      }
+  | Lphantom_read_symbol_field of
+      { sym : string;
+        field : int
+      }
+  | Lphantom_block of
+      { tag : int;
+        fields : Backend_var.t list
+      }
+
+val lphantom_const_int : Targetint.t -> phantom_defining_expr
+
+val lphantom_const_symbol : string -> phantom_defining_expr
+
+val lphantom_var : Backend_var.t -> phantom_defining_expr
+
+val lphantom_offset_var :
+  var:Backend_var.t -> offset_in_words:int -> phantom_defining_expr
+
+val lphantom_read_field :
+  var:Backend_var.t -> field:int -> phantom_defining_expr
+
+val lphantom_read_symbol_field :
+  sym:string -> field:int -> phantom_defining_expr
+
+val lphantom_block :
+  tag:int -> fields:Backend_var.t list -> phantom_defining_expr
+
 type instruction =
   { mutable desc : instruction_desc;
     mutable next : instruction;
@@ -30,7 +69,8 @@ type instruction =
     fdo : Fdo_info.t;
     live : Reg.Set.t;
     available_before : Reg_availability_set.t option;
-    available_across : Reg_availability_set.t option
+    available_across : Reg_availability_set.t option;
+    phantom_available_before : Backend_var.Set.t option
   }
 
 and instruction_desc =
@@ -112,7 +152,10 @@ type fundecl =
     fun_num_stack_slots : int Stack_class.Tbl.t;
     fun_frame_required : bool;
     fun_prologue_required : bool;
-    fun_section_name : string option
+    fun_section_name : string option;
+    fun_phantom_lets :
+      (Backend_var.Provenance.t option * phantom_defining_expr)
+      Backend_var.Map.t
   }
 
 val traps_to_bytes : int -> int

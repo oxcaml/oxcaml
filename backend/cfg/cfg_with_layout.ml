@@ -499,7 +499,8 @@ let insert_block :
               irc_work_list = Unknown_list;
               ls_order = -1;
               available_before;
-              available_across
+              available_across;
+              phantom_available_before = None
             };
           (* The [predecessor_block] is the only predecessor. *)
           predecessors = Label.Set.singleton predecessor_block.start;
