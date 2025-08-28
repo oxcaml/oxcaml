@@ -1069,6 +1069,11 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
+  (* The return type is odd because we represent layouts in value descriptions
+     as [Sort.t option]s. We also need to signal that a signature item has
+     no runtime representation. Thus [None] means no runtime representation and
+     [Some None] means non-representable at runtime (e.g.
+     [val] with layout [any]). *)
   val sort_of_signature_item :
     signature_item -> Jkind_types.Sort.t option option
 end
