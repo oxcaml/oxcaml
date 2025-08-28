@@ -888,7 +888,7 @@ and transl_structure ~scopes loc
             | (id, sort) :: ids_with_sorts ->
                 let sort =
                   sort |> Misc.Stdlib.Option.get_or_fatal_error
-                            ~error:"Translmod.transl_struct"
+                            ~error:"Translmod.transl_struct: Tstr_include"
                        |> Jkind.Sort.default_for_transl_and_get
                 in
                 let shape = mixed_block_element_of_const_sort sort in
@@ -947,7 +947,7 @@ and transl_structure ~scopes loc
                 | (id, sort) :: ids_with_sorts ->
                   let sort =
                     sort |> Misc.Stdlib.Option.get_or_fatal_error
-                              ~error:"Translmod.transl_struct"
+                              ~error:"Translmod.transl_struct: Tstr_open"
                          |> Jkind.Sort.default_for_transl_and_get
                   in
                   let shape = mixed_block_element_of_const_sort sort in
