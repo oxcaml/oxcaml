@@ -147,6 +147,7 @@ COMPILERLIBS_SOURCES=\
   lambda/debuginfo.ml \
   lambda/lambda.ml \
   lambda/runtimedef.ml \
+  lambda/static_label.ml \
   middle_end/internal_variable_names.ml \
   middle_end/variable.ml \
   middle_end/flambda/base_types/closure_element.ml \
