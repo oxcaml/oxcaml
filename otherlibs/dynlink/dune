@@ -140,6 +140,7 @@
   persistent_env
   env
   debuginfo
+  static_label
   lambda
   runtimedef
   runtimetags
@@ -324,6 +325,8 @@
 
 (copy_files ../../lambda/debuginfo.ml)
 
+(copy_files ../../lambda/static_label.ml)
+
 (copy_files ../../lambda/lambda.ml)
 
 (copy_files ../../lambda/runtimedef.ml)
@@ -483,6 +486,8 @@
 (copy_files ../../typing/env.mli)
 
 (copy_files ../../lambda/debuginfo.mli)
+
+(copy_files ../../lambda/static_label.mli)
 
 (copy_files ../../lambda/lambda.mli)
 

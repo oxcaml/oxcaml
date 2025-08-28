@@ -3021,7 +3021,7 @@ module SArgBlocks = struct
       ( i,
         fun body ->
           match body with
-          | Cexit (j, _, _) -> if Lbl i = j then handler else body
+          | Cexit (j, _, _) -> if j = Lbl i then handler else body
           | _ -> ccatch (i, [], body, handler, dbg, false) ))
 
   let make_exit i = Cexit (Lbl i, [], [])
@@ -3036,19 +3036,21 @@ end
 module StoreExpForSwitch = Switch.CtxStore (struct
   type t = expression
 
-  type key = int option * int
+  type key = Static_label.t option * int
 
   type context = int
 
   let make_key index expr =
     let continuation =
-      match expr with Cexit (Lbl i, [], []) -> Some i | _ -> None
+      match expr with 
+      | Cexit (Lbl i, [], []) -> Some i
+      | _ -> None
     in
     Some (continuation, index)
 
   let compare_key (cont, index) (cont', index') =
     match cont, cont' with
-    | Some i, Some i' when i = i' -> 0
+    | Some i, Some i' when Static_label.equal i i' -> 0
     | _, _ -> Stdlib.compare index index'
 end)
 
@@ -4347,7 +4349,7 @@ let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
       body )
 
 type static_handler =
-  int
+  Static_label.t
   * (Backend_var.With_provenance.t * Cmm.machtype) list
   * Cmm.expression
   * Debuginfo.t

@@ -19,7 +19,7 @@ val bind_ident: string -> Backend_var.With_provenance.t
 val find_ident: string -> Backend_var.t
 val unbind_ident: Backend_var.With_provenance.t -> unit
 
-val find_label: string -> int
+val find_label: string -> Lambda.static_label
 
 val debuginfo: ?loc:Location.t -> unit -> Debuginfo.t
 

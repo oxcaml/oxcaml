@@ -802,7 +802,7 @@ let equal_meth_kind x y =
 
 type shared_code = (int * int) list
 
-type static_label = int
+type static_label = Static_label.t
 
 type function_attribute = {
   inline : inline_attribute;
@@ -1375,23 +1375,22 @@ and free_variables_list set exprs =
     set exprs
 
 (* Check if an action has a "when" guard *)
-let raise_count = ref 0
+let static_label_sequence = Static_label.make_sequence ()
 
 let next_raise_count () =
-  incr raise_count ;
-  !raise_count
+  Static_label.get_and_incr static_label_sequence
 
 (* Anticipated staticraise, for guards *)
-let staticfail = Lstaticraise (0,[])
+let staticfail = Lstaticraise (Static_label.fail,[])
 
 let rec is_guarded = function
-  | Lifthenelse(_cond, _body, Lstaticraise (0,[]),_) -> true
+  | Lifthenelse(_cond, _body, Lstaticraise (lbl,[]),_) when Static_label.equal lbl Static_label.fail -> true
   | Llet(_str, _k, _id, _duid, _lam, body) -> is_guarded body
   | Levent(lam, _ev) -> is_guarded lam
   | _ -> false
 
 let rec patch_guarded patch = function
-  | Lifthenelse (cond, body, Lstaticraise (0,[]), kind) ->
+  | Lifthenelse (cond, body, Lstaticraise (lbl,[]), kind) when Static_label.equal lbl Static_label.fail ->
       Lifthenelse (cond, body, patch, kind)
   | Llet(str, k, id, duid, lam, body) ->
       Llet (str, k, id, duid, lam, patch_guarded patch body)
@@ -1814,7 +1813,7 @@ let find_exact_application kind ~arity args =
       end
 
 let reset () =
-  raise_count := 0
+  Static_label.reset static_label_sequence
 
 let mod_field ?(read_semantics=Reads_agree) pos =
   Pfield (pos, Pointer, read_semantics)

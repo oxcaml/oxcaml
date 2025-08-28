@@ -319,7 +319,7 @@ module Cmm_comparator = struct
       let equal_handler (lbl1, params1, body1, _, is_cold1)
           (lbl2, params2, body2, _, is_cold2) =
         (* No alpha equivalence *)
-        Int.equal lbl1 lbl2
+        Static_label.equal lbl1 lbl2
         && List.equal
              (fun (var1, mtype1) (var2, mtype2) ->
                V.equal (VP.var var1) (VP.var var2)
