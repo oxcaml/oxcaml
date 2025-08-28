@@ -752,29 +752,29 @@ let make_apply_wrapper env
                   arg)
               args return_parameters
       then
-        (* If the decisions are equal, we are making the same transformation to the
-            arguments passed to the return continuation in the callee as to the parameters
-            of the return continuation in the caller. In this case, do not introduce the wrapper,
-            as it would just be a continuation alias. The wrapper
-           can turn tail calls into non-tail ones, making it important to not
-           introduce them if not necessary. Fortunately, if there is a loop of
-           possible tail calls [f1 -> f2 -> ... -> fn -> f1] (including indirect
-           calls), then the uses of the results of these functions will all be
-           the same, guaranteeing that they get the same decisions. As such, no
-           wrappers will be needed in these cases, enforcing that tail calls
-           that get turned into non-tail calls can only happen outside of such
-           loops, and thus ensuring that the stack required during execution is
-           only O(1) larger. In pratice, this should not happen much in any
-           case, but a typical example would be:
-
-         * let f x y = #(x, y) in
+        (* If the decisions are equal, we are making the same transformation to
+           the arguments passed to the return continuation in the callee as to
+           the parameters of the return continuation in the caller. In this
+           case, do not introduce the wrapper, as it would just be a
+           continuation alias. The wrapper can turn tail calls into non-tail
+           ones, making it important to not introduce them if not necessary.
+           Fortunately, if there is a loop of possible tail calls [f1 -> f2 ->
+           ... -> fn -> f1] (including indirect calls), then the uses of the
+           results of these functions will all be the same, guaranteeing that
+           they get the same decisions. As such, no wrappers will be needed in
+           these cases, enforcing that tail calls that get turned into non-tail
+           calls can only happen outside of such loops, and thus ensuring that
+           the stack required during execution is only O(1) larger. In pratice,
+           this should not happen much in any case, but a typical example would
+           be: *)
+        (* let f x y = #(x, y) in
          * let g x y = f x y in
          * fun x y ->
          *   let #(a, b) = f x y in
          *   let #(c, _) = g x y in
          *   a + b + c
-
-           Here, [g] gets a wrapper to return a single value, while [f] does
+         *)
+        (* Here, [g] gets a wrapper to return a single value, while [f] does
            not. As such, the tail call from [g] to [f] is lost. However, this
            can only happen because the uses of [g] do not match those of [f],
            which would be the case if a loop of tail calls between them
@@ -807,14 +807,13 @@ let make_apply_wrapper env
          this case. However this makes it impossible to introduce a runtime
          error if the function actually returns due to a bug in the reaper, so
          we gate the [Invalid] wrapper behind an option which can be enabled
-         when debugging. The typical example would be something like:
-       
-       * let rec loop () =
+         when debugging. The typical example would be something like: *)
+      (* let rec loop () =
        *   do_something ();
        *   loop ()
-
-       where we don't want to degrade the tail call to a non-tail one as it would blow up the stack.
        *)
+      (* where we don't want to degrade the tail call to a non-tail one as it
+         would blow up the stack. *)
       if reaper_produce_invalid_when_never_returns
       then
         let handler =
