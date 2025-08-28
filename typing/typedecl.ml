@@ -3844,7 +3844,9 @@ let transl_value_decl env loc ~modalities valdecl =
       in
       { val_type = ty;
         val_kind =
-          Val_reg (Ctype.type_jkind_purely env cty.ctyp_type).jkind.layout;
+          Val_reg
+            (Jkind.Layout.to_sort
+              (Ctype.type_jkind_purely env cty.ctyp_type).jkind.layout);
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities = modalities;
         val_zero_alloc = zero_alloc;

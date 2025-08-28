@@ -2018,8 +2018,8 @@ let type_for_loop_index ~loc ~env ~param =
             let pv_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
             let pv =
               { pv_id; pv_uid; pv_mode;
-                pv_kind=Val_reg Jkind.(Layout.of_const
-                  (Layout.Const.of_sort_const Sort.Const.for_loop_index))
+                pv_kind =
+                  Val_reg (Some Jkind.Sort.(of_const Const.for_loop_index))
                 ; pv_type; pv_loc; pv_as_var;
                 pv_attributes;
                 pv_sort = Jkind.Sort.(of_const Const.for_loop_index)
@@ -2040,8 +2040,7 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
     ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
           enter_variable
             ~is_as_variable:pv_as_var
-            ~kind:(Val_reg Jkind.(Layout.of_const
-                   (Layout.Const.of_sort_const Sort.Const.for_loop_index)))
+            ~kind:(Val_reg (Some Jkind.Sort.(of_const Const.for_loop_index)))
             tps
             pv_loc
             name
@@ -2925,17 +2924,18 @@ and type_pat_aux
       let alloc_mode =
         cross_left !!penv expected_ty alloc_mode.mode
       in
-      let layout =
+      let psort =
         match Ctype.type_sort !!penv ty ~why:Let_binding ~fixed:false with
         | Error _ -> assert false
-        | Ok sort -> Jkind.Layout.Sort sort
+        | Ok psort -> psort
       in
       let mode, kind =
         match mutable_flag with
-        | Immutable -> alloc_mode, Val_reg layout
+        | Immutable -> alloc_mode, Val_reg (Some psort)
         | Mutable ->
             let m0 = Value.Comonadic.newvar () in
             let mode = mutvar_mode ~loc ~env:!!penv m0 alloc_mode in
+            (* CR jrayman: forgot do delete this in jra.pv_sort *)
             (* Sort information is used when translating a [Texp_mutvar] into an
                [Lassign]. We calculate [sort] here so we can store and reuse it.
                However, since we already make sure pattern variables are
@@ -2983,7 +2983,7 @@ and type_pat_aux
           let sort = Jkind.Sort.(of_const Const.for_module) in
           let id, uid =
             enter_variable tps loc v alloc_mode.mode t ~is_module:true
-              ~kind:(Val_reg (Jkind.Layout.Sort sort)) sp.ppat_attributes sort
+              ~kind:(Val_reg (Some sort)) sp.ppat_attributes sort
           in
           rvp {
             pat_desc = Tpat_var (id, v, uid, sort, alloc_mode.mode);
@@ -3000,7 +3000,7 @@ and type_pat_aux
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
         enter_variable ~is_as_variable:true
-          ~kind:(Val_reg (Jkind.Layout.Sort sort)) tps name.loc name mode
+          ~kind:(Val_reg (Some sort)) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
       rvp { pat_desc = Tpat_alias(q, id, name, uid, sort, mode, ty_var);
@@ -3397,7 +3397,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
          let val_env =
           Env.add_value ~mode:Mode.Value.legacy pv_id
             { val_type = pv_type
-            ; val_kind = Val_reg (Jkind.Layout.Sort pv_sort)
+            ; val_kind = Val_reg (Some pv_sort)
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.id
@@ -8607,7 +8607,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let var_pair ~(mode : Value.lr) name ty sort =
         let id = Ident.create_local name in
         let desc =
-          { val_type = ty; val_kind = Val_reg (Jkind.Layout.Sort sort);
+          { val_type = ty; val_kind = Val_reg (Some sort);
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.id;
