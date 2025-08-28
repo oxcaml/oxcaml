@@ -790,10 +790,14 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
         let defining_expr =
           Some (Cmm.Cphantom_block { tag; fields = var_args })
         in
+        let wrap, env, res =
+          Env.flush_delayed_lets ~mode:Flush_everything env res
+        in
         let body_cmm, free_vars, symbol_inits, res = expr env res body in
         let cmm =
           C.make_phantom_let backend_var_with_prov defining_expr body_cmm
         in
+        let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
         cmm, free_vars, symbol_inits, res
       | None ->
         (* Cannot translate - just skip the phantom let *)
