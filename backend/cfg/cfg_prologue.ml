@@ -386,7 +386,10 @@ end
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   if !Oxcaml_flags.cfg_prologue_validate
-  then validate_no_prologue cfg_with_layout;
+  then
+    Profile.record "validate_no_prologue"
+      (fun () -> validate_no_prologue cfg_with_layout)
+      ();
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   let fun_name = Cfg.fun_name cfg in
   (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
@@ -398,22 +401,28 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
   match !Oxcaml_flags.cfg_prologue_validate with
   | true -> (
     match
-      Validator.run cfg
-        ~init:(Validator.State_set.singleton No_prologue_on_stack)
-        ~handlers_are_entry_points:false { fun_name }
+      Profile.record ~accumulate:true "validate_dataflow"
+        (fun () ->
+          Validator.run cfg
+            ~init:(Validator.State_set.singleton No_prologue_on_stack)
+            ~handlers_are_entry_points:false { fun_name })
+        ()
     with
     | Ok block_states ->
-      Label.Tbl.iter
-        (fun label state ->
-          let block = Cfg.get_block_exn cfg label in
-          if block.is_trap_handler
-             && Validator.State_set.mem No_prologue_on_stack state
-          then
-            Misc.fatal_errorf
-              "Cfg_prologue: can reach trap handler with no prologue at block \
-               %s"
-              (Label.to_string label))
-        block_states;
+      Profile.record ~accumulate:true "validate_traps"
+        (fun () ->
+          Label.Tbl.iter
+            (fun label state ->
+              let block = Cfg.get_block_exn cfg label in
+              if block.is_trap_handler
+                 && Validator.State_set.mem No_prologue_on_stack state
+              then
+                Misc.fatal_errorf
+                  "Cfg_prologue: can reach trap handler with no prologue at \
+                   block %s"
+                  (Label.to_string label))
+            block_states)
+        ();
       cfg_with_layout
     | Error () -> Misc.fatal_error "Cfg_prologue: dataflow analysis failed")
   | false -> cfg_with_layout
