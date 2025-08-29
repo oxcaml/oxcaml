@@ -271,8 +271,19 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   | Function { function_call = Direct code_id; alloc_mode = _ } -> (
     let code_metadata = Env.get_code_metadata env code_id in
     let params_arity = Code_metadata.params_arity code_metadata in
+    let result_arity = Code_metadata.result_arity code_metadata in
     if not (C.check_arity params_arity args)
     then Misc.fatal_errorf "Wrong arity for direct call";
+    let funcdef_types : Cmm.func_call_sig =
+      { args =
+          List.map C.extended_machtype_of_kind
+            (Flambda_arity.unarize params_arity);
+        res =
+          List.map C.extended_machtype_of_kind
+            (Flambda_arity.unarized_components result_arity)
+          |> Array.of_list |> Misc.Stdlib.Array.concat_arrays
+      }
+    in
     let args =
       if Code_metadata.is_my_closure_used code_metadata
       then
@@ -294,7 +305,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     match Apply.probe apply with
     | None ->
-      ( C.direct_call ~dbg return_ty pos (C.symbol ~dbg code_sym) args_ty args,
+      ( C.direct_call ~dbg ~funcdef_types return_ty pos (C.symbol ~dbg code_sym)
+          args_ty args,
         free_vars,
         env,
         res,

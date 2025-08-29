@@ -2031,6 +2031,11 @@ let send_function_name arity result (mode : Cmx_format.alloc_mode) =
   let suff = match mode with Alloc_heap -> "" | Alloc_local -> "L" in
   global_symbol ("caml_send" ^ unique_arity_identifier arity ^ res ^ suff)
 
+let func_call_sig_for_apply { args; res } =
+  { args = List.map Extended_machtype.change_tagged_int_to_val' args;
+    res = Extended_machtype.change_tagged_int_to_val' res
+  }
+
 let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     =
   let cache = array_indexing log2_size_addr cache pos dbg in
@@ -2038,8 +2043,10 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     (List.map Extended_machtype.change_tagged_int_to_val args_type)
     (Extended_machtype.change_tagged_int_to_val result)
     mode;
+  let callsite_types = { args = args_type; res = result } in
+  let funcdef_types = func_call_sig_for_apply callsite_types in
   Cop
-    ( Capply { ty_args = args_type; ty_res = result; pos = apos },
+    ( Capply { callsite_types; funcdef_types; pos = apos },
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
       Cconst_symbol
         ( send_function_name
@@ -3002,6 +3009,12 @@ let split_arity_for_apply arity args =
 let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
   (* Treat tagged int arguments and results as [typ_val], to avoid generating
      excessive numbers of caml_apply functions. *)
+  let callsite_types =
+    { args = extended_args_type @ [Extended_machtype.typ_val];
+      res = extended_ty
+    }
+  in
+  let apply_call_sig = func_call_sig_for_apply callsite_types in
   let really_call_caml_apply clos args =
     let cargs =
       Cconst_symbol (apply_function_sym extended_args_type extended_ty mode, dbg)
@@ -3009,11 +3022,7 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
       @ [clos]
     in
     Cop
-      ( Capply
-          { ty_args = extended_args_type @ [Extended_machtype.typ_val];
-            ty_res = extended_ty;
-            pos
-          },
+      ( Capply { callsite_types; funcdef_types = apply_call_sig; pos },
         cargs,
         dbg )
   in
@@ -3041,11 +3050,7 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
                 dbg,
                 Cop
                   ( Capply
-                      { ty_args =
-                          extended_args_type @ [Extended_machtype.typ_val];
-                        ty_res = extended_ty;
-                        pos
-                      },
+                      { callsite_types; funcdef_types = callsite_types; pos },
                     (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
                     dbg ),
                 dbg,
@@ -3072,11 +3077,14 @@ let maybe_reset_current_region ~dbg ~body_tail ~body_nontail old_region =
 let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
   match arity with
   | [arg_ty] ->
+    let func_call_sig =
+      { args = [arg_ty; Extended_machtype.typ_val]; res = result }
+    in
     bind "fun" clos (fun clos ->
         Cop
           ( Capply
-              { ty_args = [arg_ty; Extended_machtype.typ_val];
-                ty_res = result;
+              { funcdef_types = func_call_sig;
+                callsite_types = func_call_sig;
                 pos
               },
             (get_field_codepointer mut clos 0 dbg :: args) @ [clos],
@@ -3288,11 +3296,14 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
     match args with
     | [] -> Misc.fatal_error "apply_function_body for empty arity"
     | [(arg_ty, arg)] -> (
+      let callsite_types =
+        { args = [arg_ty; Extended_machtype.typ_val]; res = result }
+      in
       let app =
         Cop
           ( Capply
-              { ty_args = [arg_ty; Extended_machtype.typ_val];
-                ty_res = result;
+              { callsite_types;
+                funcdef_types = callsite_types;
                 pos = Rc_normal
               },
             [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
@@ -3310,12 +3321,15 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
           (Cvar region))
     | (arg_ty, arg) :: args ->
       let newclos = V.create_local "clos" in
+      let callsite_types =
+        { args = [arg_ty; Extended_machtype.typ_val]; res = result }
+      in
       Clet
         ( VP.create newclos,
           Cop
             ( Capply
-                { ty_args = [arg_ty; Extended_machtype.typ_val];
-                  ty_res = result;
+                { callsite_types;
+                  funcdef_types = callsite_types;
                   pos = Rc_normal
                 },
               [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
@@ -3332,6 +3346,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
   in
   let args = List.map snd args in
   let all_args = args @ [clos] in
+  let callsite_types_if_direct = { args = arity; res = result } in
   ( args,
     clos,
     if List.compare_length_with arity 1 = 0
@@ -3349,7 +3364,11 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
               dbg () ),
           dbg (),
           Cop
-            ( Capply { ty_args = arity; ty_res = result; pos = Rc_normal },
+            ( Capply
+                { callsite_types = callsite_types_if_direct;
+                  funcdef_types = callsite_types_if_direct;
+                  pos = Rc_normal
+                },
               get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
@@ -3457,6 +3476,11 @@ let tuplify_function arity return =
       get_field_gen Asttypes.Mutable (Cvar arg) i (dbg ())
       :: access_components (i + 1)
   in
+  let callsite_types =
+    { args = List.map Extended_machtype.of_machtype (arity @ [typ_val]);
+      res = Extended_machtype.of_machtype return
+    }
+  in
   let fun_name = global_symbol (tuplify_function_name arity_len return) in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
   Cfunction
@@ -3465,9 +3489,8 @@ let tuplify_function arity return =
       fun_body =
         Cop
           ( Capply
-              { ty_args =
-                  List.map Extended_machtype.of_machtype (arity @ [typ_val]);
-                ty_res = Extended_machtype.of_machtype return;
+              { callsite_types;
+                funcdef_types = callsite_types;
                 pos = Rc_normal
               },
             get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
@@ -3611,13 +3634,14 @@ let rec make_curry_apply result narity args_type args clos n =
   let dbg = placeholder_dbg in
   match args_type with
   | [] ->
+    let callsite_types =
+      { args = List.map Extended_machtype.of_machtype (args_type @ [typ_val]);
+        res = Extended_machtype.of_machtype result
+      }
+    in
     Cop
       ( Capply
-          { ty_args =
-              List.map Extended_machtype.of_machtype (args_type @ [typ_val]);
-            ty_res = Extended_machtype.of_machtype result;
-            pos = Rc_normal
-          },
+          { callsite_types; funcdef_types = callsite_types; pos = Rc_normal },
         (get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ()) :: args)
         @ [Cvar clos],
         dbg () )
@@ -4085,11 +4109,12 @@ let entry_point namelist =
             Cop (Cmuli, [Cconst_int (Arch.size_addr, dbg ()); i], dbg ()) ],
           dbg () )
     in
+    let callsite_types = { args = []; res = Extended_machtype.typ_void } in
     Csequence
       ( Cop
           ( Capply
-              { ty_args = [];
-                ty_res = Extended_machtype.typ_void;
+              { callsite_types;
+                funcdef_types = callsite_types;
                 pos = Rc_normal
               },
             [Cop (mk_load_immut Word_int, [f], dbg ())],
@@ -4480,8 +4505,15 @@ let load ~dbg memory_chunk mutability ~addr =
 let store ~dbg kind init ~addr ~new_value =
   Cop (Cstore (kind, init), [addr; new_value], dbg)
 
-let direct_call ~dbg ty_res pos f_code_sym ty_args args =
-  Cop (Capply { ty_args; ty_res; pos }, f_code_sym :: args, dbg)
+let direct_call ~dbg ~funcdef_types ty_res pos f_code_sym ty_args args =
+  Cop
+    ( Capply
+        { funcdef_types;
+          callsite_types = { args = ty_args; res = ty_res };
+          pos
+        },
+      f_code_sym :: args,
+      dbg )
 
 let indirect_call ~dbg ty pos alloc_mode f args_type args =
   might_split_call_caml_apply ty args_type Asttypes.Mutable f args pos
@@ -4500,14 +4532,13 @@ let indirect_full_call ~dbg ty pos alloc_mode f args_type args =
     let fun_ptr =
       load ~dbg Word_int Asttypes.Mutable ~addr:(field_address (Cvar v) 2 dbg)
     in
+    let callsite_types =
+      { args = args_type @ [Extended_machtype.typ_val]; res = ty }
+    in
     letin v' ~defining_expr:f
       ~body:
         (Cop
-           ( Capply
-               { ty_args = args_type @ [Extended_machtype.typ_val];
-                 ty_res = ty;
-                 pos
-               },
+           ( Capply { callsite_types; funcdef_types = callsite_types; pos },
              (fun_ptr :: args) @ [Cvar v],
              dbg ))
 
@@ -4928,6 +4959,14 @@ let block_header x y = block_header x y
 
 let dls_get ~dbg = Cop (Cdls_get, [], dbg)
 
+let make_capply ~num_args pos =
+  let callsite_types =
+    { args = List.init num_args (fun _ -> Extended_machtype.typ_val);
+      res = Extended_machtype.typ_val
+    }
+  in
+  Capply { callsite_types; funcdef_types = callsite_types; pos }
+
 let perform ~dbg eff =
   let cont =
     make_alloc dbg ~tag:Runtimetags.cont_tag
@@ -4937,11 +4976,7 @@ let perform ~dbg eff =
   (* Rc_normal means "allow tailcalls". Preventing them here by using Rc_nontail
      improves backtraces of paused fibers. *)
   Cop
-    ( Capply
-        { ty_args = Extended_machtype.[typ_val; typ_val];
-          ty_res = Extended_machtype.typ_val;
-          pos = Rc_nontail
-        },
+    ( make_capply ~num_args:2 Rc_normal,
       [Cconst_symbol (Cmm.global_symbol "caml_perform", dbg); eff; cont],
       dbg )
 
@@ -4950,11 +4985,7 @@ let run_stack ~dbg ~stack ~f ~arg =
      (usages of this primitive shouldn't be generated in tail position), so we
      use Rc_nontail for clarity. *)
   Cop
-    ( Capply
-        { ty_args = Extended_machtype.[typ_val; typ_val; typ_val];
-          ty_res = Extended_machtype.typ_val;
-          pos = Rc_nontail
-        },
+    ( make_capply ~num_args:3 Rc_nontail,
       [Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg); stack; f; arg],
       dbg )
 
@@ -4963,11 +4994,7 @@ let resume ~dbg ~stack ~f ~arg ~last_fiber =
      repeated resumes, and these should consume O(1) stack space by tail-calling
      caml_resume. *)
   Cop
-    ( Capply
-        { ty_args = Extended_machtype.[typ_val; typ_val; typ_val; typ_val];
-          ty_res = Extended_machtype.typ_val;
-          pos = Rc_normal
-        },
+    ( make_capply ~num_args:4 Rc_normal,
       [ Cconst_symbol (Cmm.global_symbol "caml_resume", dbg);
         stack;
         f;
@@ -4979,11 +5006,7 @@ let reperform ~dbg ~eff ~cont ~last_fiber =
   (* Rc_normal is required here, this is used in tail position and should tail
      call. *)
   Cop
-    ( Capply
-        { ty_args = Extended_machtype.[typ_val; typ_val; typ_val];
-          ty_res = Extended_machtype.typ_val;
-          pos = Rc_normal
-        },
+    ( make_capply ~num_args:3 Rc_normal,
       [ Cconst_symbol (Cmm.global_symbol "caml_reperform", dbg);
         eff;
         cont;

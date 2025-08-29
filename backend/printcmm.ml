@@ -388,8 +388,8 @@ let rec expr ppf = function
         fprintf ppf "@[<2>(%s" (operation dbg op);
         List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
         (match[@warning "-4"] op with
-        | Capply { ty_res; _ } ->
-          fprintf ppf "@ %a" machtype (Extended_machtype.to_machtype ty_res)
+        | Capply { callsite_types = { res; _ }; _ } ->
+          fprintf ppf "@ %a" machtype (Extended_machtype.to_machtype res)
         | Cextcall
             { ty;
               ty_args;

@@ -32,20 +32,14 @@
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
 module S = struct
-  (*= type func_ty_sig =
-    { ty_args : Cmm_helpers.Extended_machtype.t list;
-      ty_res : Cmm_helpers.Extended_machtype.t
-    } *)
-
   type callee =
     | Indirect
     | Direct of Cmm.symbol
 
   type func_call_operation =
     { callee : callee;
-      ty_args : Cmm.Extended_machtype.t list;
-      ty_res : Cmm.Extended_machtype.t
-          (* callsite_ty_sig : func_ty_sig; func_ty_sig : func_ty_sig *)
+      callsite_types : Cmm.func_call_sig;
+      funcdef_types : Cmm.func_call_sig
     }
 
   type external_call_operation =

@@ -128,6 +128,12 @@ module Llvm_typ = struct
     | Vec128 | Vec256 | Vec512 | Valx2 ->
       Misc.fatal_error "Llvmize.Llvm_typ.of_machtyp_component: not implemented"
 
+  let of_extended_machtype_component c =
+    (Cmm.Extended_machtype.to_machtype [| c |]).(0) |> of_machtyp_component
+
+  let of_extended_machtype emtyp =
+    (Cmm.Extended_machtype.to_machtype emtyp).(0) |> of_machtyp_component
+
   let of_float_width (width : Cmm.float_width) =
     match width with Float64 -> Double | Float32 -> Float
 
@@ -333,12 +339,20 @@ let add_called_fun t name ~cc ~args ~res =
     then
       Misc.fatal_errorf
         "Llvmize: Same function referenced with incompatible signatures: %s \
-         (expected: [%a], got: [%a])"
+         (expected: (%a) -> %a, got: (%a) -> %a)"
         name
         (Format.pp_print_list ~pp_sep:Format.pp_print_space Llvm_typ.pp_t)
         args'
+        (Format.pp_print_option
+           ~none:(fun ppf () -> Format.fprintf ppf "void")
+           Llvm_typ.pp_t)
+        res'
         (Format.pp_print_list ~pp_sep:Format.pp_print_space Llvm_typ.pp_t)
-        args);
+        args
+        (Format.pp_print_option
+           ~none:(fun ppf () -> Format.fprintf ppf "void")
+           Llvm_typ.pp_t)
+        res');
   t.called_functions <- String.Map.add name { cc; args; res } t.called_functions
 
 let add_c_call_wrapper t c_fun_name ~args ~res =
@@ -758,7 +772,9 @@ module F = struct
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
     let offset = Arch.addressing_displacement_for_llvmize addr in
     let arg = load_reg_to_temp t i.arg.(n) in
-    do_offset ~src:Llvm_typ.i64 ~dst:Llvm_typ.ptr t arg offset
+    do_offset
+      ~src:(Llvm_typ.of_machtyp_component i.arg.(n).Reg.typ)
+      ~dst:Llvm_typ.ptr t arg offset
 
   let int_comp t (comp : Operation.integer_comparison) (i : 'a Cfg.instruction)
       ~imm =
@@ -927,11 +943,41 @@ module F = struct
         (pp_print_list ~pp_sep:pp_comma print_extended_machtyp_comp)
         (Array.to_list mtyp)
     in
-    ins t "; regs: [%a], ty_args: [%a]"
+    ins t "; regs: [%a], callsite_types.args: [%a], funcdef_types.args: [%a]"
       (pp_print_list ~pp_sep:pp_comma Printreg.reg)
       arg_regs
       (pp_print_list ~pp_sep:pp_comma print_extended_machtyp)
-      op.ty_args;
+      op.callsite_types.args
+      (pp_print_list ~pp_sep:pp_comma print_extended_machtyp)
+      op.funcdef_types.args;
+    let safe_to_cast ~(src : Cmm.Extended_machtype_component.t)
+        ~(dst : Cmm.Extended_machtype_component.t) =
+      match src, dst with
+      | Val_and_int, Val -> true
+      | Val, Val_and_int -> true
+      | Any_int, Addr | Addr, Any_int -> true
+      | Val, Val
+      | Val_and_int, Val_and_int
+      | Any_int, Any_int
+      | Addr, Addr
+      | Float, Float
+      | Float32, Float32
+      | Vec128, Vec128
+      | Vec256, Vec256
+      | Vec512, Vec512 ->
+        true
+      | ( ( Val | Val_and_int | Any_int | Addr | Float | Float32 | Vec128
+          | Vec256 | Vec512 ),
+          _ ) ->
+        false
+    in
+    let check_safe_to_cast ~src ~dst =
+      if not (safe_to_cast ~src ~dst)
+      then
+        Misc.fatal_errorf
+          "Llvmize.call: incompatible types for call: cannot cast %a to %a"
+          print_extended_machtyp_comp src print_extended_machtyp_comp dst
+    in
     let args =
       List.map
         (fun ident ->
@@ -940,19 +986,17 @@ module F = struct
           ins_load t ~src:ident ~dst:loaded Llvm_typ.ptr;
           Llvm_typ.ptr, loaded)
         runtime_regs
-      @ List.map2
-          (fun reg typ ->
+      @ List.map3
+          (fun reg callsite_ty funcdef_ty ->
+            check_safe_to_cast ~src:callsite_ty.(0) ~dst:funcdef_ty.(0);
             let temp = load_reg_to_temp t reg in
-            let typ =
-              (Cmm.Extended_machtype.to_machtype typ).(0)
-              |> Llvm_typ.of_machtyp_component
-              (* CR yusumez: ??? *)
-            in
+            let typ = Llvm_typ.of_extended_machtype funcdef_ty in
+            (* assert reg typ = callsite_ty..? *)
             ( typ,
               cast
                 ~src:(Llvm_typ.of_machtyp_component reg.Reg.typ)
                 ~dst:typ t temp ))
-          arg_regs op.ty_args
+          arg_regs op.callsite_types.args op.funcdef_types.args
     in
     let arg_types = List.map fst args in
     (* Prepare return *)
@@ -964,7 +1008,10 @@ module F = struct
     let res_type =
       if tail
       then make_ret_type (Array.to_list t.current_fun_info.fun_ret_type)
-      else make_ret_type (List.map (fun reg -> reg.Reg.typ) res_regs)
+      else
+        make_ret_type
+          (Cmm.Extended_machtype.to_machtype op.funcdef_types.res
+          |> Array.to_list)
     in
     let do_call ~pp_name fn =
       let res_ident = fresh_ident t in
@@ -1010,13 +1057,19 @@ module F = struct
             [0; idx];
           ins_store t ~src:temp ~dst:reg Llvm_typ.ptr)
         runtime_regs;
-      List.iteri
-        (fun idx reg ->
+      List.iteri2
+        (fun idx reg (callsite_ty, funcdef_ty) ->
+          check_safe_to_cast ~src:funcdef_ty ~dst:callsite_ty;
           let temp = fresh_ident t in
           ins_extractvalue t ~arg:(Local_ident res_ident) ~res:temp res_type
             [1; idx];
-          ins_store_into_reg t temp reg)
-        res_regs)
+          cast_and_store_into_reg t
+            (Llvm_typ.of_extended_machtype_component funcdef_ty)
+            temp reg)
+        res_regs
+        (List.combine
+           (Array.to_list op.callsite_types.res)
+           (Array.to_list op.funcdef_types.res)))
 
   let return t (i : Cfg.terminator Cfg.instruction) =
     (* Build up return value on the stack and return it. *)

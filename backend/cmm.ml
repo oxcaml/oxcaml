@@ -198,6 +198,18 @@ module Extended_machtype_component = struct
     | Vec256 -> Vec256
     | Vec512 -> Vec512
     | Float32 -> Float32
+
+  let change_tagged_int_to_val' t : t =
+    match t with
+    | Val -> Val
+    | Addr -> Addr
+    | Val_and_int -> Val
+    | Any_int -> Any_int
+    | Float -> Float
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Float32 -> Float32
 end
 
 module Extended_machtype = struct
@@ -229,6 +241,9 @@ module Extended_machtype = struct
 
   let change_tagged_int_to_val t =
     Array.map Extended_machtype_component.change_tagged_int_to_val t
+
+  let change_tagged_int_to_val' t =
+    Array.map Extended_machtype_component.change_tagged_int_to_val' t
 
   let rec of_layout (layout : Lambda.layout) =
     match layout with
@@ -501,10 +516,15 @@ type alloc_dbginfo_item =
 
 type alloc_dbginfo = alloc_dbginfo_item list
 
+type func_call_sig =
+  { args : Extended_machtype.t list;
+    res : Extended_machtype.t
+  }
+
 type operation =
   | Capply of
-      { ty_args : Extended_machtype.t list;
-        ty_res : Extended_machtype.t;
+      { callsite_types : func_call_sig;
+        funcdef_types : func_call_sig;
         pos : Lambda.region_close
       }
   | Cextcall of

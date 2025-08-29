@@ -152,6 +152,8 @@ module Extended_machtype : sig
       value machtypes.  This is used to avoid excessive numbers of generic
       functions being generated (see comments in cmm_helpers.ml). *)
   val change_tagged_int_to_val : t -> machtype
+
+  val change_tagged_int_to_val' : t -> t
 end
 
 type stack_align =
@@ -420,10 +422,15 @@ type alloc_dbginfo_item =
 
 type alloc_dbginfo = alloc_dbginfo_item list
 
+type func_call_sig =
+  { args : Extended_machtype.t list;
+    res : Extended_machtype.t
+  }
+
 type operation =
   | Capply of
-      { ty_args : Extended_machtype.t list;
-        ty_res : Extended_machtype.t;
+      { callsite_types : func_call_sig;
+        funcdef_types : func_call_sig;
         pos : Lambda.region_close
       }
   | Cextcall of
