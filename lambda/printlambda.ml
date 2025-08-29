@@ -69,7 +69,7 @@ let rec scannable_product_element_kinds kinds =
   "[" ^ String.concat "; " (List.map scannable_product_element_kind kinds) ^ "]"
 
 and scannable_product_element_kind = function
-  | Pint_scannable -> "int"
+  | Pext_scannable -> "ext"
   | Paddr_scannable -> "addr"
   | Pproduct_scannable kinds -> scannable_product_element_kinds kinds
 
@@ -77,7 +77,7 @@ let rec ignorable_product_element_kinds kinds =
   "[" ^ String.concat "; " (List.map ignorable_product_element_kind kinds) ^ "]"
 
 and ignorable_product_element_kind = function
-  | Pint_ignorable -> "int"
+  | Pext_ignorable -> "ext"
   | Punboxedfloat_ignorable f -> unboxed_float f
   | Punboxedoruntaggedint_ignorable i -> unboxed_integer i
   | Pproduct_ignorable kinds -> ignorable_product_element_kinds kinds
@@ -85,7 +85,7 @@ and ignorable_product_element_kind = function
 let array_kind = function
   | Pgenarray -> "gen"
   | Paddrarray -> "addr"
-  | Pintarray -> "int"
+  | Pextarray -> "ext"
   | Pfloatarray -> "float"
   | Punboxedfloatarray f -> unboxed_float f
   | Punboxedoruntaggedintarray i -> unboxed_integer i
@@ -107,7 +107,7 @@ let array_ref_kind ppf k =
   match k with
   | Pgenarray_ref mode -> fprintf ppf "gen%a" pp_mode mode
   | Paddrarray_ref -> fprintf ppf "addr"
-  | Pintarray_ref -> fprintf ppf "int"
+  | Pextarray_ref -> fprintf ppf "ext"
   | Pfloatarray_ref mode -> fprintf ppf "float%a" pp_mode mode
   | Punboxedfloatarray_ref Unboxed_float64 -> fprintf ppf "unboxed_float"
   | Punboxedfloatarray_ref Unboxed_float32 -> fprintf ppf "unboxed_float32"
@@ -134,7 +134,7 @@ let array_set_kind ppf k =
   match k with
   | Pgenarray_set mode -> fprintf ppf "gen%a" pp_mode mode
   | Paddrarray_set mode -> fprintf ppf "addr%a" pp_mode mode
-  | Pintarray_set -> fprintf ppf "int"
+  | Pextarray_set -> fprintf ppf "ext"
   | Pfloatarray_set -> fprintf ppf "float"
   | Punboxedfloatarray_set Unboxed_float64 -> fprintf ppf "unboxed_float"
   | Punboxedfloatarray_set Unboxed_float32 -> fprintf ppf "unboxed_float32"
