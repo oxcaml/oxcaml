@@ -1765,10 +1765,10 @@ let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
 
 (* Only used for printing a single modality in error message *)
-let modality ?(id = fun _ppf -> ()) ppf modality =
-  if Mode.Modality.Atom.is_id modality then id ppf
+let modality ?(id = fun _ppf -> ()) ax ppf modality =
+  if Mode.Modality.Per_axis.is_id ax modality then id ppf
   else
-    modality
+    Atom (ax, modality)
     |> Typemode.untransl_modality
     |> tree_of_modality_new
     |> !Oprint.out_modality ppf
