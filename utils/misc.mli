@@ -538,10 +538,10 @@ module Int_literal_converter : sig
     (** Convert a string to an integer.  Unlike {!Stdlib.int_of_string},
         this function accepts the string representation of [max_int + 1]
         and returns [min_int] in this case. *)
-  
+
   val int8 : string -> int
     (** Likewise, but only accepts values which fit in an [int8] *)
-  
+
   val int16 : string -> int
     (** Likewise, but only accepts values which fit in an [int16] *)
 
