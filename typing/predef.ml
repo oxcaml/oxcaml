@@ -653,7 +653,7 @@ let build_initial_env add_type add_extension empty_env =
        ~param_jkind:(
          Jkind.Builtin.value_or_null ~why:(Primitive ident_atomic_loc))
        ~jkind:(fun param ->
-         Jkind.Builtin.mutable_data ~why:(Primitive ident_atomic_loc) |>
+         Jkind.Builtin.sync_data ~why:(Primitive ident_atomic_loc) |>
          Jkind.add_with_bounds
            ~modality:Mode.Modality.Const.id
            ~type_expr:param)
