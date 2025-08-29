@@ -118,6 +118,10 @@ let prologue_needed_block (block : Cfg.basic_block) ~fun_name =
   | Requires_prologue -> true
   | No_requirements | Requires_no_prologue -> false
 
+(* CR-someday cfalas: This implementation can take O(n^2) memory if there are
+   many blocks which need an epilogue. Ideally we should be able to re-use some
+   of the epilogues stored for the children instead of storing a fresh copy for
+   each block to bring this worst-case down. *)
 module Reachable_epilogues = struct
   type t = Label.Set.t Label.Tbl.t
 
