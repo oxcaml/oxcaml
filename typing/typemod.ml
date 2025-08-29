@@ -146,7 +146,7 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
 let register_allocation () =
   let m, _ =
     Value.(newvar_below (of_const
-      ~hint_monadic:Max_monadic ~hint_comonadic:Module_allocated_on_heap
+      ~hint_comonadic:Module_allocated_on_heap
       { Const.max with areality = Global }))
   in
   value_to_alloc_r2g m, m

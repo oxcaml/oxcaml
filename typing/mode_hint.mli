@@ -7,14 +7,6 @@ type mutable_part =
 (** Hint for a constant bound. See [Mode.Report.print_const] for what each non-trivial constructor means. *)
 type 'd const =
   | Nil : ('l * 'r) const  (** The constant bound is not explained. *)
-  | Min_comonadic : ('l * disallowed) pos const
-      (** Used for [min] on the LHS of [submode] for comonadic axes. *)
-  | Max_comonadic : (disallowed * 'r) pos const
-      (** Used for [max] on the RHS of [submode] for comonadic axes. *)
-  | Min_monadic : ('l * disallowed) neg const
-      (** Similiar to [Min_comonadic] but for monadic axes. *)
-  | Max_monadic : (disallowed * 'r) neg const
-      (** Similiar to [Max_comonadic] but for monadic axes. *)
   | Lazy_allocated_on_heap : (disallowed * 'r) pos const
   | Class_legacy_monadic : ('l * disallowed) neg const
   | Class_legacy_comonadic : ('l * disallowed) pos const

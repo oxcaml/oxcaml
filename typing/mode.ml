@@ -110,8 +110,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       fun (type l r) (h : (allowed * r) const) : (l * r) const ->
        match h with
        | Nil -> Nil
-       | Min_comonadic -> Min_comonadic
-       | Max_monadic -> Max_monadic
        | Class_legacy_comonadic -> Class_legacy_comonadic
        | Stack_expression -> Stack_expression
        | Mutable_read m -> Mutable_read m
@@ -122,8 +120,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       fun (type l r) (h : (l * allowed) const) : (l * r) const ->
        match h with
        | Nil -> Nil
-       | Min_monadic -> Min_monadic
-       | Max_comonadic -> Max_comonadic
        | Class_legacy_monadic -> Class_legacy_monadic
        | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
        | Tailcall_function -> Tailcall_function
@@ -135,10 +131,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
        match h with
        | Nil -> Nil
-       | Min_comonadic -> Min_comonadic
-       | Min_monadic -> Min_monadic
-       | Max_comonadic -> Max_comonadic
-       | Max_monadic -> Max_monadic
        | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
        | Class_legacy_comonadic -> Class_legacy_comonadic
        | Class_legacy_monadic -> Class_legacy_monadic
@@ -155,10 +147,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
        match h with
        | Nil -> Nil
-       | Min_comonadic -> Min_comonadic
-       | Min_monadic -> Min_monadic
-       | Max_comonadic -> Max_comonadic
-       | Max_monadic -> Max_monadic
        | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
        | Class_legacy_comonadic -> Class_legacy_comonadic
        | Class_legacy_monadic -> Class_legacy_monadic
@@ -1551,6 +1539,16 @@ module Lattices_mono = struct
       | Axis : ('a, 'a_x) Axis.t -> 'a responsible_axis
           (** The specified axis of the input object is responsible for the output. *)
 
+    (* CR zqian: the following functions are hard to write, and are redundant since all
+       the information are already in [apply]. A general and simpler apporach would work
+       like this: Say we have [b = f a] on RHS, and we want to figure out which axis of
+       [a] is responsible for a specific axis [ax] of [b] being low. We will iterate
+       through all axes; for each axis, set that to [max] and get [a'], and calculate [b'
+       = f a']. If [b'] is not strictly higher than [b] on [ax], then the current axis of
+       [a] is not responsible for the [ax] of [b] being low. The iteration might end with
+       no axis of [a] being responsible, in which case the morphism is solely
+       respoonsible. *)
+
     (** Given a morphism either from a single axis to a single axis, or from a product
      object to a single axis, return the portion of the input that's responsible for the
      output. *)
@@ -1967,8 +1965,6 @@ module Report = struct
 
   let print_const (type l r) ppf : (l * r) const -> unit = function
     | Nil -> Misc.fatal_error "Nil hint should not be printed"
-    | Min_comonadic | Max_comonadic | Min_monadic | Max_monadic ->
-      Misc.fatal_error "Min/Max hint should not be printed"
     | Lazy_allocated_on_heap ->
       pp_print_string ppf
         "it is a lazy expression and thus always allocated on the heap"
@@ -2111,13 +2107,12 @@ module Report = struct
     | Const Nil ->
       print_mode_with_side ~sub side obj ppf a;
       Mode
-    | Irrelevant
-    | Const (Min_comonadic | Min_monadic | Max_comonadic | Max_monadic) ->
+    | Irrelevant ->
       if not sub
       then
         Misc.fatal_error
-          "the current mode is not responsible for the error,so must be inside \
-           a responsible morphism";
+          "the current mode is not responsible for the error, so must be \
+           inside a responsible morphism";
       Nothing
     | Const c ->
       fprintf ppf "%a@ because %a"

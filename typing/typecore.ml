@@ -476,7 +476,7 @@ let check_tail_call_local_returning loc env ap_mode {region_mode; _} =
 
 let meet_regional ?hint:h mode =
   let mode = Value.disallow_left mode in
-  Value.meet [Value.(of_const ?hint_comonadic:h ~hint_monadic:Max_monadic {
+  Value.meet [Value.(of_const ?hint_comonadic:h {
     Const.max with
     areality = Regional
   }); mode]
@@ -565,7 +565,7 @@ let mode_lazy expected_mode =
       yielding = Yielding.Const.Unyielding }
   in
   let expected_mode =
-    mode_coerce (Value.of_const ~hint_comonadic:Lazy_allocated_on_heap mode ~hint_monadic:Max_monadic) expected_mode
+    mode_coerce (Value.of_const ~hint_comonadic:Lazy_allocated_on_heap mode) expected_mode
   in
   let mode_crossing =
     Crossing.of_bounds {
@@ -618,7 +618,7 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   | _, _, (Nontail | Default) ->
      mode_default vmode, vmode
   | _, _, Tail -> begin
-    Value.submode_exn vmode Value.(of_const ~hint_comonadic:Tailcall_argument ~hint_monadic:Max_monadic { Const.max with areality = Regional});
+    Value.submode_exn vmode Value.(of_const ~hint_comonadic:Tailcall_argument { Const.max with areality = Regional});
     mode_default vmode, vmode
   end
 
@@ -1018,7 +1018,7 @@ let mode_project_mutable mut_name =
     { Value.Const.max with
       visibility = Visibility.Const.Read;
       contention = Contention.Const.Shared }
-    |> Value.of_const ~hint_monadic:(Mutable_read mut_name) ~hint_comonadic:Max_comonadic
+    |> Value.of_const ~hint_monadic:(Mutable_read mut_name)
   in
   mode_default mode
 
@@ -1028,7 +1028,7 @@ let mode_mutate_mutable mut_name =
     { Value.Const.max with
       visibility = Read_write;
       contention = Uncontended }
-    |> Value.of_const ~hint_monadic:(Mutable_write mut_name) ~hint_comonadic:Max_comonadic
+    |> Value.of_const ~hint_monadic:(Mutable_write mut_name)
   in
   mode_default mode
 
@@ -1037,7 +1037,7 @@ let mode_force_lazy =
   let mode =
     { Value.Const.max with
       contention = Uncontended }
-    |> Value.of_const ~hint_monadic:Lazy_forced ~hint_comonadic:Max_comonadic
+    |> Value.of_const ~hint_monadic:Lazy_forced
   in
   mode_default mode
 
@@ -6081,7 +6081,7 @@ and type_expect_
         | Tail ->
           let mode, _ =
             Value.(newvar_below
-              (of_const ~hint_comonadic:Tailcall_function ~hint_monadic:Max_monadic
+              (of_const ~hint_comonadic:Tailcall_function
                 { Const.max with areality = Regional }))
           in
           mode
@@ -7197,10 +7197,10 @@ and type_expect_
       | Texp_field (_, _, _, _, Boxing (alloc_mode, _), _) ->
         begin
           submode ~loc ~env
-            Value.(of_const ~hint_comonadic:Stack_expression ~hint_monadic:Min_monadic { Const.min with areality = Local })
+            Value.(of_const ~hint_comonadic:Stack_expression { Const.min with areality = Local })
             expected_mode;
           match
-            Alloc.submode Alloc.(of_const ~hint_comonadic:Stack_expression ~hint_monadic:Min_monadic { Const.min with areality = Local }) alloc_mode
+            Alloc.submode Alloc.(of_const ~hint_comonadic:Stack_expression { Const.min with areality = Local }) alloc_mode
           with
           | Ok () -> ()
           | Error err -> raise (Error (exp.exp_loc, exp.exp_env, Submode_failed_alloc err))
