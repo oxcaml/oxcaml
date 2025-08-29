@@ -17,13 +17,7 @@ let make_sequence () = { next = 1 }
 
 let reset seq = seq.next <- 1
 
-let get seq = seq.next
-
 let get_and_incr seq =
   let res = seq.next in
   seq.next <- succ seq.next;
   res
-
-let to_int_unsafe t = t
-
-let of_int_unsafe i = i

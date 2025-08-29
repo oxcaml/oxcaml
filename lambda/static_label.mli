@@ -53,18 +53,5 @@ val make_sequence : unit -> sequence
 (** Reset a sequence to start from label 0. *)
 val reset : sequence -> unit
 
-(** Get the next label that would be generated without consuming it. *)
-val get : sequence -> t
-
 (** Generate and consume the next label from the sequence. *)
 val get_and_incr : sequence -> t
-
-(** Convert a static label to its underlying integer representation.
-    This function should only be used when interfacing with legacy code
-    that expects raw integers. *)
-val to_int_unsafe : t -> int
-
-(** Convert an integer to a static label.
-    This function should only be used when interfacing with legacy code
-    that provides raw integers. *)
-val of_int_unsafe : int -> t
