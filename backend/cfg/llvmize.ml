@@ -752,6 +752,10 @@ module F = struct
     in
     ins_store_into_reg t casted reg
 
+  let cast_and_load_reg_to_temp t typ (reg : Reg.t) =
+    let temp = load_reg_to_temp t reg in
+    cast ~src:(Llvm_typ.of_machtyp_component reg.typ) ~dst:typ t temp
+
   let load_domainstate_addr ?(typ = Llvm_typ.ptr) ?(offset = 0) t ds_field =
     let ds = fresh_ident t in
     let offset = offset + (Domainstate.idx_of_field ds_field * 8) in
@@ -1302,13 +1306,13 @@ module F = struct
     let do_binop op_name =
       match imm with
       | None ->
-        let arg1 = load_reg_to_temp t i.arg.(0) in
-        let arg2 = load_reg_to_temp t i.arg.(1) in
+        let arg1 = cast_and_load_reg_to_temp t typ i.arg.(0) in
+        let arg2 = cast_and_load_reg_to_temp t typ i.arg.(1) in
         let res = fresh_ident t in
         ins_binop t op_name arg1 arg2 res typ;
         res
       | Some n ->
-        let arg = load_reg_to_temp t i.arg.(0) in
+        let arg = cast_and_load_reg_to_temp t typ i.arg.(0) in
         let res = fresh_ident t in
         ins_binop_imm t op_name arg (string_of_int n) res typ;
         res
