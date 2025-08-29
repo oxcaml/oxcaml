@@ -194,8 +194,8 @@ val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allow
 val self_coercion : (Path.t * Location.t list ref) list ref
 
 type contention_context =
-  | Read_mutable
-  | Write_mutable
+  | Read_mutable of atomic
+  | Write_mutable of atomic
   | Force_lazy
 
 type visibility_context =

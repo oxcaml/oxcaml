@@ -125,8 +125,8 @@ type submode_reason =
   | Other
 
 type contention_context =
-  | Read_mutable
-  | Write_mutable
+  | Read_mutable of atomic
+  | Write_mutable of atomic
   | Force_lazy
 
 type visibility_context =
@@ -1057,7 +1057,7 @@ let mutvar_mode ~loc ~env m0 exp_mode =
   m |> Value.disallow_right
 
 (** The [expected_mode] of the record when projecting a mutable field. *)
-let mode_project_mutable =
+let mode_project_mutable atomic =
   let mode =
     { Value.Const.max with
       visibility = Visibility.Const.Read;
@@ -1065,11 +1065,11 @@ let mode_project_mutable =
     |> Value.of_const
   in
   { (mode_default mode) with
-    contention_context = Some Read_mutable;
+    contention_context = Some (Read_mutable atomic);
     visibility_context = Some Read_mutable }
 
 (** The [expected_mode] of the record when mutating a mutable field. *)
-let mode_mutate_mutable =
+let mode_mutate_mutable atomic =
   let mode =
     { Value.Const.max with
       visibility = Read_write;
@@ -1077,7 +1077,7 @@ let mode_mutate_mutable =
     |> Value.of_const
   in
   { (mode_default mode) with
-    contention_context = Some Write_mutable;
+    contention_context = Some (Write_mutable atomic);
     visibility_context = Some Write_mutable }
 
 (** The [expected_mode] of the lazy expression when forcing it. *)
@@ -1091,8 +1091,10 @@ let mode_force_lazy =
     contention_context = Some Force_lazy }
 
 let check_project_mutability ~loc ~env mutability mode =
-  if Types.is_mutable mutability then
-    submode ~loc ~env mode mode_project_mutable
+  match mutability with
+  | Mutable { atomic; _} ->
+    submode ~loc ~env mode (mode_project_mutable atomic)
+  | _ -> ()
 
 (* Typing of patterns *)
 
@@ -6436,8 +6438,7 @@ and type_expect_
       let (label_loc, label, newval) =
         match label.lbl_mut with
         | Mutable { mode = m0; atomic } ->
-          ignore atomic;  (* CR aspsmith: TODO *)
-          submode ~loc:record.exp_loc ~env rmode mode_mutate_mutable;
+          submode ~loc:record.exp_loc ~env rmode (mode_mutate_mutable atomic);
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
           type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
@@ -10902,13 +10903,23 @@ let escaping_hint (failure_reason : Value.error) submode_reason
 
 let contention_hint _fail_reason _submode_reason context =
   match (context : contention_context option) with
-  | Some Read_mutable ->
+  | Some (Read_mutable Atomic) ->
+    [Location.msg
+       "@[Hint: This record field is atomic,@ so can be \
+        read when the record is contended@ \
+        using [Atomic.Loc.get].@]"]
+  | Some (Read_mutable Nonatomic) ->
       [Location.msg
-        "@[Hint: In order to read from its mutable fields,@ \
-        this record needs to be at least shared.@]"]
-  | Some Write_mutable ->
+         "@[Hint: In order to read from its mutable fields,@ \
+          this record needs to be at least shared.@]"]
+  | Some (Write_mutable Atomic) ->
       [Location.msg
-        "@[Hint: In order to write into its mutable fields,@ \
+         "@[Hint: This record field is atomic,@ so can be \
+          writen to when the record is contended using@ the \
+          functions in [Atomic.Loc].@]"]
+  | Some (Write_mutable Nonatomic) ->
+    [Location.msg
+       "@[Hint: In order to write into its mutable fields,@ \
         this record needs to be uncontended.@]"]
   | Some Force_lazy ->
       [Location.msg
