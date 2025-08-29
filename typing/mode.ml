@@ -1843,6 +1843,9 @@ module Report = struct
   type 'd hint =
     | Apply : 'd morph * 'b C.obj * ('b, 'd) ahint -> 'd hint
     | Const : 'd const -> 'd hint
+    | Irrelevant : ('l * 'r) hint
+        (** The current mode is not responsible for the error (that is, the surrounding
+          morphism is solely responsible), and should not be printed. *)
     constraint 'd = 'l * 'r
   [@@ocaml.warning "-62"]
 
@@ -1889,7 +1892,7 @@ module Report = struct
       | Apply (morph_hint, morph, ahint) -> (
         let obj = C.src obj morph in
         match C.For_hint.find_responsible_axis_prod morph ax with
-        | NoneResponsible -> Const Nil
+        | NoneResponsible -> Irrelevant
         | SourceIsSingle ->
           let ahint = ahint_axis obj ahint in
           Apply (morph_hint, obj, ahint)
@@ -1923,7 +1926,7 @@ module Report = struct
       | Apply (morph_hint, morph, ahint) -> (
         let obj = C.src obj morph in
         match C.For_hint.find_responsible_axis_single morph with
-        | NoneResponsible -> Const Nil
+        | NoneResponsible -> Irrelevant
         | SourceIsSingle ->
           let ahint = ahint_axis obj ahint in
           Apply (morph_hint, obj, ahint)
@@ -2104,10 +2107,13 @@ module Report = struct
     | Const Nil ->
       print_mode_with_side ~sub side obj ppf a;
       Mode
+    | Irrelevant
     | Const (Min_comonadic | Min_monadic | Max_comonadic | Max_monadic) ->
       if not sub
-      then Misc.fatal_error "Min/Max hints must only occur under morphisms";
-      (* We don't print the mode, since it's not responsible for the error. *)
+      then
+        Misc.fatal_error
+          "the current mode is not responsible for the error,so must be inside \
+           a responsible morphism";
       Nothing
     | Const c ->
       fprintf ppf "%a@ because %a"
