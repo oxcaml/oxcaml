@@ -152,6 +152,20 @@ module Reachable_epilogues = struct
   let from_block (t : t) (label : Label.t) = Label.Tbl.find t label
 end
 
+let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
+  let visited = ref Label.Set.empty in
+  let rec collect label =
+    if not (Label.Set.mem label !visited)
+    then (
+      visited := Label.Set.add label !visited;
+      let block = Cfg.get_block_exn cfg label in
+      Label.Set.iter
+        (fun succ_label -> collect succ_label)
+        (Cfg.successor_labels ~normal:true ~exn:true block))
+  in
+  collect block.start;
+  !visited
+
 let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
     (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
     (epilogue_blocks : Label.Set.t) =
@@ -167,24 +181,40 @@ let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
          let block = Cfg.get_block_exn cfg label in
          Cfg_loop_infos.is_in_loop loop_infos label || block.stack_offset <> 0)
        prologue_labels
+  then
+    false
+    (* Check that there are no prologues which might execute after another
+       prologue has already executed.
+
+       This might happen when duplicating a prologue in the following CFG:
+
+     * Block A: Condition with branch to Block B / C
+     * Block B: Contains an instruction requiring a prologue, with terminator
+       that jumps to Block C
+     * Block C: Return
+
+       If we duplicate the prologue to both B and C (which are both children of
+       A), the prologue will execute twice on the A->B->C path. *)
+  else if Label.Set.exists
+            (fun prologue ->
+              let descendants =
+                descendants cfg (Cfg.get_block_exn cfg prologue)
+              in
+              let descendant_prologues =
+                Label.Set.inter prologue_labels descendants
+              in
+              let descendant_prologues =
+                Label.Set.remove prologue descendant_prologues
+              in
+              not (Label.Set.is_empty descendant_prologues))
+            prologue_labels
   then false
   else
     (* Check that the blocks requiring an epilogue are dominated by the prologue
-       block. Consider the following CFG:
-
-     *  Block A: Condition with branch to Block B / C
-     *  Block B: Contains an instruction requiring a prologue, with 
-        terminator that jumps to Block C
-     *  Block C: Return
-
-       We have the choice of putting the prologue in Block A or B, and we would
-       place an epilogue in Block C (or we could create a new block with the
-       epilogue).
-
-       If we try to place the prologue in block B, the prologue would not
-       dominate the epilogue in block C, so in some cases the epilogue would be
-       executed without a prologue on the stack, which would be illegal. *)
-
+       block. Consider the CFG from the example above. If we try to place the
+       prologue in block B, the prologue would not dominate the epilogue in
+       block C, so in some cases the epilogue would be executed without a
+       prologue on the stack, which would be illegal. *)
     (* CR-soon cfalas: This should be done using post-dominators (i.e. A->B is
        in the post-dominator tree if and only if executing A guarantees that we
        are also executing B). In cases where the prologue does not dominate one
