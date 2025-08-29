@@ -3323,7 +3323,12 @@ let cache_public_method meths tag cache dbg =
       [VP.create result_label_index, typ_int],
       Ccatch
         ( Recursive,
-          [{label = loop_cont; params = [li_vp, typ_int; hi_vp, typ_int]; body = loop_body; dbg; is_cold = false}],
+          [ { label = loop_cont;
+              params = [li_vp, typ_int; hi_vp, typ_int];
+              body = loop_body;
+              dbg;
+              is_cold = false
+            } ],
           (* Start the first iteration of the loop *)
           Cexit
             ( Lbl loop_cont,
@@ -4178,14 +4183,16 @@ let entry_point namelist =
         [],
         Ccatch
           ( Recursive,
-            [ {label = cont;
-               params = [VP.create id, typ_int];
-               body = Csequence
-                  ( exit_if_last_iteration id,
-                    Csequence (call (Cvar id), Cexit (Lbl cont, [incr_i id], []))
-                  );
+            [ { label = cont;
+                params = [VP.create id, typ_int];
+                body =
+                  Csequence
+                    ( exit_if_last_iteration id,
+                      Csequence
+                        (call (Cvar id), Cexit (Lbl cont, [incr_i id], [])) );
                 dbg;
-                is_cold = false } ],
+                is_cold = false
+              } ],
             Cexit (Lbl cont, [cconst_int 0], []) ),
         Ctuple [],
         dbg,
@@ -4339,14 +4346,16 @@ let ite ~dbg ~then_dbg ~then_ ~else_dbg ~else_ cond =
 let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
   Ccatch
     ( Exn_handler,
-      [ {label = handler_cont;
-         params = (exn_var, typ_val) :: extra_args;
-         body = handler;
-         dbg;
-         is_cold = false } ],
+      [ { label = handler_cont;
+          params = (exn_var, typ_val) :: extra_args;
+          body = handler;
+          dbg;
+          is_cold = false
+        } ],
       body )
 
-let handler ~dbg id vars body is_cold = Cmm.{label = id; params = vars; body; dbg; is_cold}
+let handler ~dbg id vars body is_cold =
+  Cmm.{ label = id; params = vars; body; dbg; is_cold }
 
 let cexit id args trap_actions = Cmm.Cexit (Cmm.Lbl id, args, trap_actions)
 

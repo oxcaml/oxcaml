@@ -500,13 +500,13 @@ type ccatch_flag =
 
 (** Every basic block should have a corresponding [Debuginfo.t] for its
     beginning. *)
-type static_handler = {
-  label : Lambda.static_label;
-  params : (Backend_var.With_provenance.t * machtype) list;
-  body : expression;
-  dbg : Debuginfo.t;
-  is_cold : bool;
-}
+type static_handler =
+  { label : Lambda.static_label;
+    params : (Backend_var.With_provenance.t * machtype) list;
+    body : expression;
+    dbg : Debuginfo.t;
+    is_cold : bool
+  }
 
 and expression =
   | Cconst_int of int * Debuginfo.t
