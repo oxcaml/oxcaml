@@ -571,6 +571,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
       local = Default_local;
       poll = Default_poll;
       loop = Never_loop;
+      regalloc = Default_regalloc;
       is_a_functor = true;
       is_opaque = false;
       zero_alloc = Default_zero_alloc;

@@ -536,10 +536,18 @@ type expression =
       * expression
   | Cexit of exit_label * expression list * trap_action list
 
+type regalloc_kind =
+  | Default_regalloc
+  | Cfg_regalloc
+  | Irc_regalloc
+  | Ls_regalloc
+  | Gi_regalloc
+
 type codegen_option =
   | Reduce_code_size
   | No_CSE
   | Use_linscan_regalloc
+  | Use_regalloc of regalloc_kind
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;

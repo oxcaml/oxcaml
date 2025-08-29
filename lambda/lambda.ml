@@ -759,6 +759,13 @@ type loop_attribute =
   | Never_loop (* [@loop never] *)
   | Default_loop (* no [@loop] attribute *)
 
+type regalloc_attribute =
+  | Cfg_regalloc (* [@regalloc cfg] *)
+  | Irc_regalloc (* [@regalloc irc] *)
+  | Ls_regalloc (* [@regalloc ls] *)
+  | Gi_regalloc (* [@regalloc gi] *)
+  | Default_regalloc (* no [@regalloc] attribute *)
+
 type curried_function_kind = { nlocal : int } [@@unboxed]
 
 type function_kind = Curried of curried_function_kind | Tupled
@@ -811,6 +818,7 @@ type function_attribute = {
   zero_alloc : zero_alloc_attribute;
   poll: poll_attribute;
   loop: loop_attribute;
+  regalloc: regalloc_attribute;
   is_a_functor: bool;
   is_opaque: bool;
   stub: bool;
@@ -1082,6 +1090,7 @@ let default_function_attribute = {
   zero_alloc = Default_zero_alloc ;
   poll = Default_poll;
   loop = Default_loop;
+  regalloc = Default_regalloc;
   is_a_functor = false;
   is_opaque = false;
   stub = false;

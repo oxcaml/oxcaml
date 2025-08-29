@@ -667,6 +667,13 @@ type loop_attribute =
   | Never_loop (* [@loop never] *)
   | Default_loop (* no [@loop] attribute *)
 
+type regalloc_attribute =
+  | Cfg_regalloc (* [@regalloc cfg] *)
+  | Irc_regalloc (* [@regalloc irc] *)
+  | Ls_regalloc (* [@regalloc ls] *)
+  | Gi_regalloc (* [@regalloc gi] *)
+  | Default_regalloc (* no [@regalloc] attribute *)
+
 type curried_function_kind = { nlocal: int } [@@unboxed]
 (** A well-formed function parameter list is of the form
      [G @ L @ [ Final_arg ]],
@@ -733,6 +740,7 @@ type function_attribute = {
   zero_alloc : zero_alloc_attribute;
   poll: poll_attribute;
   loop: loop_attribute;
+  regalloc: regalloc_attribute;
   is_a_functor: bool;
   is_opaque: bool;
   stub: bool;

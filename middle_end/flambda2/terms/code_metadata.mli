@@ -54,6 +54,8 @@ module type Code_metadata_accessors_result_type = sig
 
   val poll_attribute : 'a t -> Poll_attribute.t
 
+  val regalloc_attribute : 'a t -> Regalloc_attribute.t
+
   val is_a_functor : 'a t -> bool
 
   val is_opaque : 'a t -> bool
@@ -99,6 +101,7 @@ type 'a create_type =
   inline:Inline_attribute.t ->
   zero_alloc_attribute:Zero_alloc_attribute.t ->
   poll_attribute:Poll_attribute.t ->
+  regalloc_attribute:Regalloc_attribute.t ->
   is_a_functor:bool ->
   is_opaque:bool ->
   recursive:Recursive.t ->
