@@ -1,0 +1,12 @@
+File "big_include.ml", lines 17-279, characters 20-3:
+ 17 | ....................struct
+ 18 |   module To_be_included = struct
+ 19 |     let a_248 = "a"
+ 20 |     let a_249 = "a"
+ 21 |     let a_250 = "a"
+...
+276 |   let a_245 = "a"
+277 |   let a_246 = "a"
+278 |   let a_247 = "a"
+279 | end
+Error: Mixed modules may contain at most 254 value fields prior to the flat suffix, but this one contains 258.

@@ -285,10 +285,33 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
       let printer_steps = ref max_steps in
 
+      let is_value ty =
+        match get_desc ty with
+        | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tvariant _ | Tunivar _
+        | Tpoly _ | Tpackage _ -> true
+        | Tunboxed_tuple _ -> false
+        | Tsubst _ | Tfield _ | Tnil | Tlink _ | Tof_kind _
+          -> true (* error will be thrown later *)
+        | Tconstr (path, _, _)
+          when Predef.is_unboxed_predef_path path
+          -> false
+        | Tconstr (path, _, _) ->
+          begin try
+            let decl = Env.find_type path env in
+            match decl with
+            | { type_kind =
+                  Type_abstract _ | Type_record _ | Type_variant _ | Type_open
+              ; _ } -> true
+            | { type_kind = Type_record_unboxed_product _; _ } -> false
+          with
+            Not_found -> true (* raised by Env.find_type *)
+          end
+      in
+
       let nested_values = ObjTbl.create 8 in
       let nest_gen err f depth obj ty =
         let repr = obj in
-        if not (is_real_block repr) then
+        if not (is_value ty) || not (is_real_block repr) then
           f depth obj ty
         else
           if ObjTbl.mem nested_values repr then
@@ -669,7 +692,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   match lbl_list with
                   | [_] ->
                     (* singleton unboxed records are erased *)
-                    tree_of_val (depth - 1) obj ty_arg
+                    nest tree_of_val (depth - 1) obj ty_arg
                   | _ -> nest tree_of_val (depth - 1) (O.field obj pos) ty_arg
               in
               (lid, v) :: tree_of_fields false (pos + 1) remainder

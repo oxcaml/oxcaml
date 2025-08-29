@@ -1,0 +1,8 @@
+Test 1: basic mixed module
+5
+10
+25
+Test 2: shadowing within a module
+10. 20.
+Test 3: pattern aliases
+a 1. a 1.
