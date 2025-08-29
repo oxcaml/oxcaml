@@ -413,8 +413,9 @@ let relevant_axes_of_modality ~relevant_for_shallow ~modality =
   Axis_set.create ~f:(fun ~axis:(Pack axis) ->
       match axis with
       | Modal axis ->
+        let (P axis) = Mode.Modality.Axis.of_value (P axis) in
         let modality = Mode.Modality.Const.proj axis modality in
-        not (Mode.Modality.Atom.is_constant modality)
+        not (Mode.Modality.Per_axis.is_constant axis modality)
       (* The kind-inference.md document (in the repo) discusses both constant
          modalities and identity modalities. Of course, reality has modalities
          (such as [shared]) that are neither constants nor identities. Here, we
@@ -1887,16 +1888,17 @@ module Const = struct
         (fun acc (Axis.Pack axis) ->
           match axis with
           | Modal axis ->
-            let t : _ Modality.Atom.t =
+            let (P (type a) (axis : a Mode.Modality.Axis.t)) =
+              Mode.Modality.Axis.of_value (P axis)
+            in
+            let t : a =
               match axis with
               | Monadic ax ->
-                Monadic
-                  (ax, Join_with (Mode.Value.Monadic.Const.Per_axis.max ax))
+                Join_with (Mode.Value.Monadic.Const.Per_axis.max ax)
               | Comonadic ax ->
-                Comonadic
-                  (ax, Meet_with (Mode.Value.Comonadic.Const.Per_axis.min ax))
+                Meet_with (Mode.Value.Comonadic.Const.Per_axis.min ax)
             in
-            Modality.Const.set t acc
+            Modality.Const.set axis t acc
           | Nonmodal _ ->
             (* TODO: don't know how to print *)
             acc)

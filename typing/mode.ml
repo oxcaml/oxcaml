@@ -2994,9 +2994,6 @@ module Modality = struct
       let is_id ax (Join_with c) = Mode.Const.Per_axis.(le ax c (min ax))
 
       let is_constant ax (Join_with c) = Mode.Const.Per_axis.(le ax (max ax) c)
-
-      let print ax ppf (Join_with c) =
-        Format.fprintf ppf "join_with(%a)" (C.print (Mode.proj_obj ax)) c
     end
 
     type error = Error : 'a axis * 'a Atom.t Solver.error -> error
@@ -3135,9 +3132,6 @@ module Modality = struct
       let is_id ax (Meet_with c) = Mode.Const.Per_axis.(le ax (max ax) c)
 
       let is_constant ax (Meet_with c) = Mode.Const.Per_axis.(le ax c (min ax))
-
-      let print ax ppf (Meet_with c) =
-        Format.fprintf ppf "meet_with(%a)" (C.print (Mode.proj_obj ax)) c
     end
 
     type error = Error : 'a axis * 'a Atom.t Solver.error -> error
@@ -3289,36 +3283,40 @@ module Modality = struct
     let of_const c = Const c
   end
 
-  module Atom = struct
+  module Axis = struct
     type 'a t =
-      | Monadic of 'a Monadic.axis * 'a Monadic.Atom.t
-      | Comonadic of 'a Comonadic.axis * 'a Comonadic.Atom.t
+      | Monadic : 'a Monadic.axis -> 'a Monadic.Atom.t t
+      | Comonadic : 'a Comonadic.axis -> 'a Comonadic.Atom.t t
 
     type packed = P : 'a t -> packed
 
+    let of_value : Value.Axis.packed -> packed = function
+      | P (Monadic ax) -> P (Monadic ax)
+      | P (Comonadic ax) -> P (Comonadic ax)
+
+    let to_value : packed -> Value.Axis.packed = function
+      | P (Monadic ax) -> P (Monadic ax)
+      | P (Comonadic ax) -> P (Comonadic ax)
+  end
+
+  type atom = Atom : 'a Axis.t * 'a -> atom
+
+  module Per_axis = struct
     open struct
       module Monadic = Monadic.Atom
       module Comonadic = Comonadic.Atom
     end
 
-    let is_id = function
-      | Monadic (ax, a) -> Monadic.is_id ax a
-      | Comonadic (ax, a) -> Comonadic.is_id ax a
+    let is_id : type a. a Axis.t -> a -> bool = function
+      | Monadic ax -> Monadic.is_id ax
+      | Comonadic ax -> Comonadic.is_id ax
 
-    let is_constant = function
-      | Monadic (ax, a) -> Monadic.is_constant ax a
-      | Comonadic (ax, a) -> Comonadic.is_constant ax a
-
-    let axis : 'a t -> 'a Value.Axis.t = function
-      | Monadic (ax, _) -> Monadic ax
-      | Comonadic (ax, _) -> Comonadic ax
-
-    let print ppf = function
-      | Monadic (ax, a) -> Monadic.print ax ppf a
-      | Comonadic (ax, a) -> Comonadic.print ax ppf a
+    let is_constant : type a. a Axis.t -> a -> bool = function
+      | Monadic ax -> Monadic.is_constant ax
+      | Comonadic ax -> Comonadic.is_constant ax
   end
 
-  type error = Error : 'a Atom.t Solver.error -> error
+  type error = Error : 'a Axis.t * 'a Solver.error -> error
 
   type equate_error = equate_step * error
 
@@ -3335,15 +3333,11 @@ module Modality = struct
 
     let sub t0 t1 : (unit, error) Result.t =
       match Monadic.sub t0.monadic t1.monadic with
-      | Error (Error (ax, { left; right })) ->
-        Error (Error { left = Monadic (ax, left); right = Monadic (ax, right) })
+      | Error (Error (ax, e)) -> Error (Error (Monadic ax, e))
       | Ok () -> (
         match Comonadic.sub t0.comonadic t1.comonadic with
         | Ok () -> Ok ()
-        | Error (Error (ax, { left; right })) ->
-          Error
-            (Error
-               { left = Comonadic (ax, left); right = Comonadic (ax, right) }))
+        | Error (Error (ax, e)) -> Error (Error (Comonadic ax, e)))
 
     let equate = equate_from_submode' sub
 
@@ -3357,23 +3351,23 @@ module Modality = struct
       let comonadic = Comonadic.concat ~then_:then_.comonadic t.comonadic in
       { monadic; comonadic }
 
-    let proj (type a) (ax : a Value.Axis.t) { monadic; comonadic } : a Atom.t =
+    let proj (type a) (ax : a Axis.t) { monadic; comonadic } : a =
       match ax with
-      | Monadic ax -> Monadic (ax, Monadic.proj ax monadic)
-      | Comonadic ax -> Comonadic (ax, Comonadic.proj ax comonadic)
+      | Monadic ax -> Monadic.proj ax monadic
+      | Comonadic ax -> Comonadic.proj ax comonadic
 
-    let set (type a) (a : a Atom.t) { monadic; comonadic } : t =
-      match a with
-      | Monadic (ax, a) -> { monadic = Monadic.set ax a monadic; comonadic }
-      | Comonadic (ax, a) ->
-        { monadic; comonadic = Comonadic.set ax a comonadic }
+    let set (type a) (ax : a Axis.t) (a : a) { monadic; comonadic } : t =
+      match ax with
+      | Monadic ax -> { monadic = Monadic.set ax a monadic; comonadic }
+      | Comonadic ax -> { monadic; comonadic = Comonadic.set ax a comonadic }
 
     let diff t0 t1 =
       List.filter_map
-        (fun (P ax : Value.Axis.packed) : Atom.packed option ->
+        (fun ax : atom option ->
+          let (P ax) = Axis.of_value ax in
           let a0 = proj ax t0 in
           let a1 = proj ax t1 in
-          if a0 = a1 then None else Some (P a1))
+          if a0 = a1 then None else Some (Atom (ax, a1)))
         Value.Axis.all
 
     let print ppf { monadic; comonadic } =
@@ -3393,15 +3387,11 @@ module Modality = struct
 
   let sub_log t0 t1 ~log : (unit, error) Result.t =
     match Monadic.sub_log t0.monadic t1.monadic ~log with
-    | Error (Error (ax, { left; right })) ->
-      Error (Error { left = Monadic (ax, left); right = Monadic (ax, right) })
+    | Error (Error (ax, e)) -> Error (Error (Monadic ax, e))
     | Ok () -> (
       match Comonadic.sub_log t0.comonadic t1.comonadic ~log with
       | Ok () -> Ok ()
-      | Error (Error (ax, { left; right })) ->
-        Error
-          (Error { left = Comonadic (ax, left); right = Comonadic (ax, right) })
-      )
+      | Error (Error (ax, e)) -> Error (Error (Comonadic ax, e)))
 
   let sub l r = try_with_log (sub_log l r)
 
@@ -3617,17 +3607,20 @@ module Crossing = struct
   let equal t0 t1 = le t0 t1 && le t1 t0
 
   let print ppf t =
-    let print_atom ppf (Modality.Atom.P a) =
-      match a with
-      | Monadic (ax, Join_with c) -> Value.Monadic.Const.Per_axis.print ax ppf c
-      | Comonadic (ax, Meet_with c) ->
+    let print_atom ppf (Modality.Atom (ax, a)) =
+      match ax, a with
+      | Monadic ax, Join_with c -> Value.Monadic.Const.Per_axis.print ax ppf c
+      | Comonadic ax, Meet_with c ->
         Value.Comonadic.Const.Per_axis.print ax ppf c
     in
     let l =
       List.filter_map
-        (fun (Value.Axis.P ax) ->
+        (fun ax ->
+          let (P ax) = Modality.Axis.of_value ax in
           let a = Modality.Const.proj ax t in
-          if Modality.Atom.is_id a then None else Some (Modality.Atom.P a))
+          if Modality.Per_axis.is_id ax a
+          then None
+          else Some (Modality.Atom (ax, a)))
         Value.Axis.all
     in
     Format.(pp_print_list ~pp_sep:pp_print_space print_atom ppf l)

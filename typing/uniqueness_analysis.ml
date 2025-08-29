@@ -1576,7 +1576,7 @@ end = struct
     let uni = Modality.Const.proj (Monadic Uniqueness) modalities in
     let lin = Modality.Const.proj (Comonadic Linearity) modalities in
     match uni, lin with
-    | Monadic (_, Join_with Aliased), Comonadic (_, Meet_with Many) -> untracked
+    | Join_with Aliased, Meet_with Many -> untracked
     | _ -> child proj t
 
   let tuple_field i t = child (Projection.Tuple_field i) t
