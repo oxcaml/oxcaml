@@ -52,9 +52,6 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
            make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
          in
          lambda |> fun code ->
-         (* CR selee: Currently the flambda2 codebase assumes that the target integer
-            size is the same as the compiler integer size, which is a wrong assumption.
-            This will need to be fixed (see doc) *)
          Flambda2.lambda_to_flambda ~ppf_dump:i.ppf_dump
            ~prefixname:(Unit_info.prefix i.target)
            { program with code }
@@ -107,7 +104,7 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     raw_lambda_to_jsir i raw_lambda ~as_arg_for
   in
   Compilenv.save_unit_info
-    (Unit_info.Artifact.filename (Unit_info.cmx i.target))
+    (Unit_info.Artifact.filename (Unit_info.cmjx i.target))
     ~main_module_block_format ~arg_descr;
   jsir
 

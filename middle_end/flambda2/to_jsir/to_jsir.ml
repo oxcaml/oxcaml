@@ -29,7 +29,7 @@
 open! Flambda.Import
 open! Jsoo_imports.Import
 
-(* CR selee: we should eventually get rid of these *)
+(* CR selee: we should eventually get rid of this *)
 let unsupported_multiple_return_variables vars =
   match vars with
   | [var] -> var
@@ -68,6 +68,37 @@ let apply_fn ~res ~f ~args ~exact =
   let var = Jsir.Var.fresh () in
   let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
   var, res
+
+(** For exception continuations with multiple arguments. See comment in [let_cont]. *)
+let assign_extra_args ~env ~res exn_handler extra_args =
+  let extra_param_vars =
+    if Continuation.equal (To_jsir_env.exn_continuation env) exn_handler
+    then
+      (* This was passed in through a parameter, so has not been declared via a
+         [Let_cont] and expects zero [extra_args]. *)
+      []
+    else
+      let ({ addr = _; exn_param = _; extra_args = extra_params_vars }
+            : To_jsir_env.exn_handler) =
+        To_jsir_env.get_exn_handler_exn env exn_handler
+      in
+      extra_params_vars
+  in
+  match List.length extra_param_vars <> List.length extra_args with
+  | true ->
+    Misc.fatal_errorf "Exception handler %a expected %d extra_args, got %d"
+      Continuation.print exn_handler
+      (List.length extra_param_vars)
+      (List.length extra_args)
+  | false ->
+    List.fold_left2
+      (fun res param_var arg ->
+        match arg with
+        | None -> res
+        | Some arg ->
+          To_jsir_result.add_instr_exn res
+            (Set_field (param_var, 0, Non_float, arg)))
+      res extra_param_vars extra_args
 
 let rec expr ~env ~res e =
   match Expr.descr e with
@@ -297,38 +328,20 @@ and apply_expr ~env ~res e =
      parameter. *)
   let exn_continuation = Apply_expr.exn_continuation e in
   let extra_args = Exn_continuation.extra_args exn_continuation in
-  let extra_param_vars =
-    if Continuation.equal
-         (To_jsir_env.exn_continuation env)
-         (Exn_continuation.exn_handler exn_continuation)
-    then
-      (* This was passed in through a parameter, so has not been declared via a
-         [Let_cont] and expects zero [extra_args]. *)
-      []
-    else
-      let ({ addr = _; exn_param = _; extra_args = extra_params_vars }
-            : To_jsir_env.exn_handler) =
-        To_jsir_env.get_exn_handler_exn env
-          (Exn_continuation.exn_handler exn_continuation)
-      in
-      extra_params_vars
-  in
-  if List.length extra_param_vars <> List.length extra_args
-  then
-    Misc.fatal_errorf "Exception continuation %a expected %d extra_args, got %d"
-      Exn_continuation.print exn_continuation
-      (List.length extra_param_vars)
-      (List.length extra_args);
-  let res =
-    List.fold_left2
-      (fun res param_var (arg, kind) ->
+  let extra_args, res =
+    List.fold_right
+      (fun (arg, kind) (args, res) ->
         match Flambda_kind.With_subkind.kind kind with
-        | Region | Rec_info -> res
+        | Region | Rec_info -> None :: args, res
         | Value | Naked_number _ ->
-          let var_to_pass, res = To_jsir_shared.simple ~env ~res arg in
-          To_jsir_result.add_instr_exn res
-            (Set_field (param_var, 0, Non_float, var_to_pass)))
-      res extra_param_vars extra_args
+          let arg, res = To_jsir_shared.simple ~env ~res arg in
+          Some arg :: args, res)
+      extra_args ([], res)
+  in
+  let res =
+    assign_extra_args ~env ~res
+      (Exn_continuation.exn_handler exn_continuation)
+      extra_args
   in
   let args = Apply_expr.args e in
   let return_var, res =
@@ -337,8 +350,9 @@ and apply_expr ~env ~res e =
     | Some callee, Function _ ->
       let args, res = To_jsir_shared.simples ~env ~res args in
       let f, res = To_jsir_shared.simple ~env ~res callee in
-      (* CR selee: assume exact = false for now, JSIR seems to assume false in
-         the case that we don't know *)
+      (* Setting [exact = false] here is ok - it's more general, and the JSOO
+         simplifier also knows how to change this to [true] if it knows that the
+         argument numbers match up *)
       apply_fn ~res ~f ~args ~exact:false
     | Some callee, Method { obj; kind; alloc_mode = _ } ->
       let args, res = To_jsir_shared.simples ~env ~res args in
@@ -394,7 +408,7 @@ and apply_cont0 ~env ~res apply_cont =
     To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
   in
   let continuation = Apply_cont.continuation apply_cont in
-  let get_last ~raise_kind : Jsir.last * To_jsir_result.t =
+  let get_last ~raise_kind_and_exn_handler : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
     | (Toplevel_return | Define_root_symbol) as sort ->
       let module_symbol =
@@ -407,10 +421,6 @@ and apply_cont0 ~env ~res apply_cont =
           Misc.fatal_errorf "Found %a with multiple arguments"
             Continuation.Sort.print sort
       in
-      (* CR selee: This is a hack, but I can't find a way to trigger any
-         behaviour that isn't calling [caml_register_global] on the toplevel
-         module. I suspect for single-file compilation this is always fine. Will
-         come back and review later. *)
       let compilation_unit =
         To_jsir_env.module_symbol env |> Symbol.compilation_unit
       in
@@ -438,32 +448,36 @@ and apply_cont0 ~env ~res apply_cont =
       let arg = unsupported_multiple_return_variables args in
       Return arg, res
     | Normal_or_exn -> (
-      match raise_kind with
+      match raise_kind_and_exn_handler with
       | None ->
         let addr = To_jsir_env.get_continuation_exn env continuation in
         Jsir.Branch (addr, args), res
-      | Some (raise_kind : Trap_action.Raise_kind.t) ->
+      | Some (raise_kind, exn_handler) ->
         let raise_kind =
-          match raise_kind with
+          match (raise_kind : Trap_action.Raise_kind.t) with
           | Regular -> `Normal
           | Reraise -> `Reraise
           | No_trace -> `Notrace
         in
-        let exn =
+        let exn, extra_args =
           match args with
-          | [exn] -> exn
-          | ([] | _ :: _) as args ->
+          | hd :: tl -> hd, tl
+          | [] ->
             Misc.fatal_errorf
-              "Attempting to call the exception continuation %a with %d \
-               arguments (should be one)"
-              Continuation.print continuation (List.length args)
+              "Attempting to call the exception continuation %a with no \
+               arguments arguments (should be at least one)"
+              Continuation.print continuation
+        in
+        let res =
+          assign_extra_args ~env ~res exn_handler
+            (List.map Option.some extra_args)
         in
         Raise (exn, raise_kind), res)
   in
   match Apply_cont.trap_action apply_cont with
-  | None -> get_last ~raise_kind:None
+  | None -> get_last ~raise_kind_and_exn_handler:None
   | Some (Push { exn_handler }) -> (
-    let last, res = get_last ~raise_kind:None in
+    let last, res = get_last ~raise_kind_and_exn_handler:None in
     let ({ addr = handler_addr; exn_param = handler_var; extra_args = _ }
           : To_jsir_env.exn_handler) =
       To_jsir_env.get_exn_handler_exn env exn_handler
@@ -475,11 +489,12 @@ and apply_cont0 ~env ~res apply_cont =
       let res = To_jsir_result.end_block_with_last_exn res last in
       Jsir.Pushtrap ((addr, []), handler_var, (handler_addr, [])), res)
   | Some (Pop { exn_handler; raise_kind }) -> (
-    let last, res = get_last ~raise_kind in
-    if Continuation.equal exn_handler (To_jsir_env.exn_continuation env)
-    then (
-      assert (Option.is_some raise_kind);
-      last, res)
+    let raise_kind_and_exn_handler =
+      Option.map (fun r -> r, exn_handler) raise_kind
+    in
+    let last, res = get_last ~raise_kind_and_exn_handler in
+    if Option.is_some raise_kind
+    then last, res
     else
       (* [Jsir.Poptrap] always jumps to a block after popping the exception
          handler. If we want to do anything than just [Branch], we should jump
