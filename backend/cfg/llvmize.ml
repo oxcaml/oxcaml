@@ -1081,19 +1081,24 @@ module F = struct
       Array.to_list i.arg
       |> List.filter (fun reg -> not (Reg.is_domainstate reg))
     in
-    let instr_res_type =
-      make_ret_type (List.map (fun reg -> reg.Reg.typ) res_regs)
+    let instr_res_type = List.map (fun reg -> reg.Reg.typ) res_regs in
+    let expected_res_type = Array.to_list t.current_fun_info.fun_ret_type in
+    let safe_to_cast ~src ~dst =
+      let both_int_or_val =
+        Cmm.((is_int src || is_val src) && (is_int dst || is_val dst))
+      in
+      both_int_or_val || Cmm.equal_machtype_component src dst
     in
-    let expected_res_type =
-      make_ret_type (Array.to_list t.current_fun_info.fun_ret_type)
-    in
-    if not (Llvm_typ.equal instr_res_type expected_res_type)
+    if List.combine instr_res_type expected_res_type
+       |> List.exists (fun (instr_typ, expected_typ) ->
+              not (safe_to_cast ~src:instr_typ ~dst:expected_typ))
     then
       ins_unreachable t
       (* Some functions (like [raise]) never return, but this information is not
          propagated to the backend as of now. The type mismatch can only happen
          if this location is unreachable. *)
     else
+      let res_type = make_ret_type expected_res_type in
       let get_ident = function[@warning "-fragile-match"]
         | [0; i] when i < List.length runtime_regs ->
           let ptr = List.nth runtime_regs i in
@@ -1102,12 +1107,15 @@ module F = struct
           Some (Llvm_value.Local_ident res)
         | [1; i] when i < List.length res_regs ->
           let reg = List.nth res_regs i in
-          let temp = load_reg_to_temp t reg in
+          let typ =
+            t.current_fun_info.fun_ret_type.(i) |> Llvm_typ.of_machtyp_component
+          in
+          let temp = cast_and_load_reg_to_temp t typ reg in
           Some (Llvm_value.Local_ident temp)
         | _ -> None
       in
-      let res_ident = assemble_struct t expected_res_type get_ident in
-      ins_ret t res_ident expected_res_type
+      let res_ident = assemble_struct t res_type get_ident in
+      ins_ret t res_ident res_type
 
   let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
       ~stack_ofs ~stack_align =
@@ -1625,7 +1633,7 @@ module F = struct
         let temp2 = fresh_ident t in
         ins_load t ~src ~dst:temp typ;
         ins_conv t op ~src:temp ~dst:temp2 ~src_typ:typ ~dst_typ:Llvm_typ.i64;
-        cast_and_store_into_reg t Llvm_typ.i64 temp i.res.(0)
+        cast_and_store_into_reg t Llvm_typ.i64 temp2 i.res.(0)
       in
       match memory_chunk with
       | Word_int | Word_val -> basic Llvm_typ.i64
