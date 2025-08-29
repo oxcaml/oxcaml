@@ -1040,7 +1040,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       body =
     let handlers =
       List.map
-        (fun (nfail, ids, e2, dbg, is_cold) ->
+        (fun Cmm.{ label = nfail; params = ids; body = e2; dbg; is_cold } ->
           let rs =
             List.map
               (fun (id, typ) ->
@@ -1321,7 +1321,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   and emit_tail_catch env sub_cfg (flag : Cmm.ccatch_flag) handlers e1 =
     let handlers =
       List.map
-        (fun (nfail, ids, e2, dbg, is_cold) ->
+        (fun Cmm.{ label = nfail; params = ids; body = e2; dbg; is_cold } ->
           let rs =
             List.map
               (fun (id, typ) ->
