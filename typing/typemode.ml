@@ -392,10 +392,8 @@ let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
 let untransl_modality (a : Modality.Atom.t) : Parsetree.modality loc =
   let s =
     match a with
-    | P (Comonadic ax, Meet_with a) ->
-      Format.asprintf "%a" (Value.Comonadic.Const.Per_axis.print ax) a
-    | P (Monadic ax, Join_with a) ->
-      Format.asprintf "%a" (Value.Monadic.Const.Per_axis.print ax) a
+    | P (Comonadic ax, Meet_with a) -> Value.Comonadic.Const.Per_axis.print ax a
+    | P (Monadic ax, Join_with a) -> Value.Monadic.Const.Per_axis.print ax a
   in
   { txt = Modality s; loc = Location.none }
 
@@ -538,7 +536,7 @@ let sort_dedup_modalities ~warn l =
     if warn
     then
       let (P ax0) = Axis.to_value (P ax0) in
-      let axis = Format.asprintf "%a" Mode.Value.Axis.print ax0 in
+      let axis = Mode.Value.Axis.print ax0 in
       let { txt = Modality overriden_by; _ } =
         untransl_modality (P (ax1, a1))
       in
@@ -592,7 +590,7 @@ let report_error ppf =
   | Duplicated_axis axis ->
     fprintf ppf "The %s axis has already been specified." (Axis.name axis)
   | Duplicated_modal_axis ax ->
-    fprintf ppf "The %a axis has already been specified." Value.Axis.print ax
+    fprintf ppf "The %s axis has already been specified." (Value.Axis.print ax)
   | Unrecognized_modifier (annot_type, modifier) ->
     let annot_type_str =
       match annot_type with

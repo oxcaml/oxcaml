@@ -196,10 +196,7 @@ module Axis = struct
       Pack (Nonmodal Separability) ]
 
   let name (type a) : a t -> string = function
-    | Modal (Monadic ax) ->
-      Format.asprintf "%a" Mode.Value.Monadic.Axis.print ax
-    | Modal (Comonadic ax) ->
-      Format.asprintf "%a" Mode.Value.Comonadic.Axis.print ax
+    | Modal ax -> Mode.Crossing.Axis.print ax
     | Nonmodal Externality -> "externality"
     | Nonmodal Nullability -> "nullability"
     | Nonmodal Separability -> "separability"
@@ -249,6 +246,9 @@ module Per_axis = struct
       | Nullability -> Nullability.print ppf a
       | Separability -> Separability.print ppf a
 
+    let print : type a. a t -> a -> string =
+     fun ax a -> Format.asprintf "%a" (print ax) a
+
     let eq_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
      fun a b ->
       match a, b with
@@ -257,11 +257,10 @@ module Per_axis = struct
       | Separability, Separability -> Some Refl
       | _ -> None
 
-    let print_obj : type a. Format.formatter -> a t -> unit =
-     fun ppf -> function
-      | Externality -> Format.fprintf ppf "externality"
-      | Nullability -> Format.fprintf ppf "nullability"
-      | Separability -> Format.fprintf ppf "separability"
+    let print_obj : type a. a t -> string = function
+      | Externality -> "externality"
+      | Nullability -> "nullability"
+      | Separability -> "separability"
   end
 
   let min : type a. a t -> a = function
@@ -290,11 +289,9 @@ module Per_axis = struct
     | Modal ax -> Mode.Crossing.Per_axis.join ax a b
     | Nonmodal ax -> Nonmodal.join ax a b
 
-  let print : type a. a t -> Format.formatter -> a -> unit =
-   fun ax ppf a ->
-    match ax with
-    | Modal ax -> Mode.Crossing.Per_axis.print ax ppf a
-    | Nonmodal ax -> Nonmodal.print ax ppf a
+  let print : type a. a t -> a -> Outcometree.out_jkind_modifier = function
+    | Modal ax -> Mode.Crossing.Per_axis.print ax
+    | Nonmodal ax -> Nonmodal.print ax
 
   let eq_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
    fun a b ->
@@ -303,10 +300,9 @@ module Per_axis = struct
     | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.eq_obj ax0 ax1
     | _ -> None
 
-  let print_obj : type a. Format.formatter -> a t -> unit =
-   fun ppf -> function
-    | Modal ax -> Mode.Crossing.Per_axis.print_obj ppf ax
-    | Nonmodal ax -> Nonmodal.print_obj ppf ax
+  let print_obj : type a. a t -> string = function
+    | Modal ax -> Mode.Crossing.Per_axis.print_obj ax
+    | Nonmodal ax -> Nonmodal.print_obj ax
 end
 
 module Axis_set = struct

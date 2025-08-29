@@ -1434,9 +1434,9 @@ let tree_of_crossing_atom : type a. a Mode.Crossing.Axis.t -> a -> _ =
   fun ax a ->
   match ax, a with
   | Monadic ax, Modality (Join_with c) ->
-      Format.asprintf "%a" (Value.Monadic.Const.Per_axis.print ax) c
+      Value.Monadic.Const.Per_axis.print ax c
   | Comonadic ax, Modality (Meet_with  c) ->
-      Format.asprintf "%a" (Value.Comonadic.Const.Per_axis.print ax) c
+      Value.Comonadic.Const.Per_axis.print ax c
 
 let tree_of_crossing t =
   List.filter_map

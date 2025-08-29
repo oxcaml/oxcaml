@@ -1761,8 +1761,7 @@ module Const = struct
       | Less | Equal -> (
         match less_or_equal base actual with
         | Less | Equal -> `Valid None
-        | Not_le ->
-          `Valid (Some (Format.asprintf "%a" (Per_axis.print axis) actual)))
+        | Not_le -> `Valid (Some (Per_axis.print axis actual)))
       | Not_le -> `Invalid
 
     let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
@@ -3377,9 +3376,7 @@ module Violation = struct
                      (fun acc with_bound ->
                        Outcometree.Ojkind_const_with (acc, with_bound, []))
                      (Outcometree.Ojkind_const_mod
-                        ( None,
-                          [Format.asprintf "%a" (Per_axis.print axis) mod_bound]
-                        ))
+                        (None, [Per_axis.print axis mod_bound]))
                      with_bounds
                  in
                  !Oprint.out_jkind_const ppf ojkind

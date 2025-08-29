@@ -51,7 +51,11 @@ module type Lattice_product = sig
   val max_with : 'a axis -> 'a -> t
 
   module Per_axis :
-    Solver_intf.Lattices with type 'a obj := 'a axis and type 'a elt := 'a
+    Solver_intf.Lattices
+      with type 'a obj := 'a axis
+       and type 'a elt := 'a
+       and type print := Outcometree.out_mode_new
+       and type print_obj := string
 end
 
 type equate_step =
@@ -131,7 +135,7 @@ module type Axis = sig
 
   type packed = P : 'a t -> packed
 
-  val print : Format.formatter -> 'a t -> unit
+  val print : 'a t -> string
 
   (** List of all axes, ordered by [compare]. *)
   val all : packed list
@@ -391,7 +395,7 @@ module type S = sig
       | Visibility : (monadic, Visibility.Const.t) t
       | Contention : (monadic, Contention.Const.t) t
 
-    val print : Format.formatter -> ('p, 'r) t -> unit
+    val print : ('p, 'r) t -> string
 
     val eq : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
   end
@@ -839,10 +843,16 @@ module type S = sig
       val of_value : Value.Axis.packed -> packed
 
       val to_value : packed -> Value.Axis.packed
+
+      val print : 'a t -> string
     end
 
     module Per_axis :
-      Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
+      Solver_intf.Lattices
+        with type 'a elt := 'a
+         and type 'a obj := 'a Axis.t
+         and type print := string
+         and type print_obj := string
 
     val create :
       regionality:bool ->

@@ -70,7 +70,11 @@ module Axis : sig
 end
 
 module Per_axis :
-  Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
+  Solver_intf.Lattices
+    with type 'a elt := 'a
+     and type 'a obj := 'a Axis.t
+     and type print := Outcometree.out_jkind_modifier
+     and type print_obj := string
 
 module Axis_set : sig
   (** A set of [Axis.t], represented as a bitfield for efficiency. *)
