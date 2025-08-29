@@ -17,6 +17,7 @@ let check =
         Format.printf "Unexpected exception: %s" (Printexc.to_string exn);
         ())
     ~save:(fun cfg ->
+      (* CR cfalas: Fix how the files are saved. *)
       Cfg_with_layout.save_as_dot ~filename:"/tmp/test.dot" cfg "test-cfg";
       Format.printf "The failing cfg was put in /tmp/test.dot\n")
 

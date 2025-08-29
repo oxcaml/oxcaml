@@ -153,6 +153,7 @@ let entry_label =
 
 let label_add lbl k = Label.of_int_unsafe (Label.to_int lbl + k)
 
+(* CR cfalas: refactor the regalloc tests to not use these hardcoded labels. *)
 let move_param_label = label_add entry_label 1
 
 let call_label = label_add entry_label 2
