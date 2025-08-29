@@ -88,3 +88,6 @@ val add_symbol_projection : t -> Variable.t -> Symbol_projection.t -> t
 val cut : t -> cut_after:Scope.t -> Typing_env_level.t
 
 val cut_as_extension : t -> cut_after:Scope.t -> Typing_env_extension.t
+
+val add_variable_definition :
+  t -> Variable.t -> Flambda_kind.t -> Name_mode.t -> t
