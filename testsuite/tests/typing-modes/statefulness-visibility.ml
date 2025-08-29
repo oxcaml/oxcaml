@@ -24,7 +24,7 @@ Line 1, characters 35-36:
 1 | let foo (x @ read uncontended) a = x.a <- a
                                        ^
 Error: This value is "read" but is expected to be "read_write"
-       because it has a mutable field written to.
+       because its mutable field "a" is being written.
 |}]
 
 let foo (x @ immutable uncontended) a = x.a <- a
@@ -33,7 +33,7 @@ Line 1, characters 40-41:
 1 | let foo (x @ immutable uncontended) a = x.a <- a
                                             ^
 Error: This value is "immutable" but is expected to be "read_write"
-       because it has a mutable field written to.
+       because its mutable field "a" is being written.
 |}]
 
 let foo (x @ read uncontended) = x.a
@@ -47,7 +47,7 @@ Line 1, characters 38-39:
 1 | let foo (x @ immutable uncontended) = x.a
                                           ^
 Error: This value is "immutable" but is expected to be "read"
-       because it has a mutable field read from.
+       because its mutable field "a" is being read.
 |}]
 
 let foo (x @ read uncontended) upd = { x with a = upd }
@@ -68,7 +68,7 @@ Line 1, characters 44-45:
 1 | let foo (x @ immutable uncontended) upd = { x with b = upd }
                                                 ^
 Error: This value is "immutable" but is expected to be "read"
-       because it has a mutable field read from.
+       because its mutable field "a" is being read.
 |}]
 
 (* Errors when mutating a record field prints contention before visibility errors *)
@@ -79,7 +79,7 @@ Line 1, characters 33-34:
 1 | let foo (x @ read contended) a = x.a <- a
                                      ^
 Error: This value is "contended" but is expected to be "uncontended"
-       because it has a mutable field written to.
+       because its mutable field "a" is being written.
 |}]
 
 let foo (x @ contended read) a = x.a <- a
@@ -88,7 +88,7 @@ Line 1, characters 33-34:
 1 | let foo (x @ contended read) a = x.a <- a
                                      ^
 Error: This value is "contended" but is expected to be "uncontended"
-       because it has a mutable field written to.
+       because its mutable field "a" is being written.
 |}]
 
 let foo (x @ read shared) a = x.a <- a
@@ -97,7 +97,7 @@ Line 1, characters 30-31:
 1 | let foo (x @ read shared) a = x.a <- a
                                   ^
 Error: This value is "shared" but is expected to be "uncontended"
-       because it has a mutable field written to.
+       because its mutable field "a" is being written.
 |}]
 
 let foo (x @ immutable contended) a = x.a
@@ -106,7 +106,7 @@ Line 1, characters 38-39:
 1 | let foo (x @ immutable contended) a = x.a
                                           ^
 Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because it has a mutable field read from.
+       because its mutable field "a" is being read.
 |}]
 
 (* visibility requirements over refs *)
@@ -117,7 +117,7 @@ Line 1, characters 26-27:
 1 | let foo (x @ immutable) = x.contents
                               ^
 Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because it has a mutable field read from.
+       because its mutable field "contents" is being read.
 |}]
 
 let foo (x @ immutable shared) = x.contents
@@ -126,7 +126,7 @@ Line 1, characters 33-34:
 1 | let foo (x @ immutable shared) = x.contents
                                      ^
 Error: This value is "immutable" but is expected to be "read"
-       because it has a mutable field read from.
+       because its mutable field "contents" is being read.
 |}]
 
 let foo (x @ immutable uncontended) = x.contents
@@ -135,7 +135,7 @@ Line 1, characters 38-39:
 1 | let foo (x @ immutable uncontended) = x.contents
                                           ^
 Error: This value is "immutable" but is expected to be "read"
-       because it has a mutable field read from.
+       because its mutable field "contents" is being read.
 |}]
 
 let foo (x @ read) = x.contents
@@ -149,7 +149,7 @@ Line 1, characters 31-32:
 1 | let foo (x @ read contended) = x.contents
                                    ^
 Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because it has a mutable field read from.
+       because its mutable field "contents" is being read.
 |}]
 
 let foo (x @ read uncontended) = x.contents
@@ -168,7 +168,7 @@ Line 1, characters 37-38:
 1 | let foo (x @ read_write contended) = x.contents
                                          ^
 Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because it has a mutable field read from.
+       because its mutable field "contents" is being read.
 |}]
 
 let foo (x @ read_write shared) = x.contents
@@ -685,7 +685,7 @@ Line 1, characters 42-43:
 Error: This value is "immutable" because it is used inside a lazy expression
        which is expected to be "stateless".
        However, it is expected to be "read"
-       because it has a mutable field read from.
+       because its mutable field "contents" is being read.
 |}]
 
 let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
@@ -696,7 +696,7 @@ Line 1, characters 42-43:
 Error: This value is "immutable" because it is used inside a lazy expression
        which is expected to be "stateless".
        However, it is expected to be "read_write"
-       because it has a mutable field written to.
+       because its mutable field "contents" is being written.
 |}]
 
 (* [lazy_t @ observing] capture values at [read]. *)
@@ -709,7 +709,7 @@ Line 1, characters 42-43:
 Error: This value is "read" because it is used inside a lazy expression
        which is expected to be "observing".
        However, it is expected to be "read_write"
-       because it has a mutable field written to.
+       because its mutable field "contents" is being written.
 |}]
 
 let bar (x : int ref) @ observing = lazy (x.contents)
@@ -778,7 +778,7 @@ Line 4, characters 4-5:
 4 |     x.contents <- 42;
         ^
 Error: This value is "immutable" but is expected to be "read_write"
-       because it has a mutable field written to.
+       because its mutable field "contents" is being written.
 |}]
 
 (* Forcing a [read] lazy returns a [read] value.*)
@@ -799,5 +799,5 @@ Line 5, characters 4-5:
 5 |     y.contents <- 24
         ^
 Error: This value is "read" but is expected to be "read_write"
-       because it has a mutable field written to.
+       because its mutable field "contents" is being written.
 |}]

@@ -22,7 +22,7 @@ Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a <- 42
                               ^
 Error: This value is "contended" but is expected to be "uncontended"
-       because it has a mutable field written to.
+       because its mutable field "a" is being written.
 |}]
 
 let foo (r @ contended) = r.a
@@ -31,7 +31,7 @@ Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a
                               ^
 Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because it has a mutable field read from.
+       because its mutable field "a" is being read.
 |}]
 
 let foo (r @ contended) = {r with a = best_bytes ()}
@@ -45,7 +45,7 @@ Line 1, characters 27-28:
 1 | let foo (r @ contended) = {r with b = best_bytes ()}
                                ^
 Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because it has a mutable field read from.
+       because its mutable field "a" is being read.
 |}]
 
 (* Writing to a mutable field in a shared record is rejected *)
@@ -55,7 +55,7 @@ Line 1, characters 23-24:
 1 | let foo (r @ shared) = r.a <- 42
                            ^
 Error: This value is "shared" but is expected to be "uncontended"
-       because it has a mutable field written to.
+       because its mutable field "a" is being written.
 |}]
 
 (* reading mutable field from shared record is fine *)
@@ -187,7 +187,7 @@ Line 3, characters 6-16:
 3 |     | [| x; y |] -> ()
           ^^^^^^^^^^
 Error: This value is "contended" but is expected to be "shared" or "uncontended"
-       because it has a mutable field read from.
+       because its array elements is being read.
 |}]
 (* CR modes: Error message should mention array, not record. *)
 

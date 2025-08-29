@@ -114,8 +114,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Max_monadic -> Max_monadic
        | Class_legacy_comonadic -> Class_legacy_comonadic
        | Stack_expression -> Stack_expression
-       | Mutable_read -> Mutable_read
-       | Mutable_write -> Mutable_write
+       | Mutable_read m -> Mutable_read m
+       | Mutable_write m -> Mutable_write m
        | Lazy_forced -> Lazy_forced
 
     let allow_right : type l r. (l * allowed) const -> (l * r) const =
@@ -144,8 +144,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Class_legacy_monadic -> Class_legacy_monadic
        | Tailcall_function -> Tailcall_function
        | Tailcall_argument -> Tailcall_argument
-       | Mutable_read -> Mutable_read
-       | Mutable_write -> Mutable_write
+       | Mutable_read m -> Mutable_read m
+       | Mutable_write m -> Mutable_write m
        | Lazy_forced -> Lazy_forced
        | Function_return -> Function_return
        | Stack_expression -> Stack_expression
@@ -164,8 +164,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Class_legacy_monadic -> Class_legacy_monadic
        | Tailcall_function -> Tailcall_function
        | Tailcall_argument -> Tailcall_argument
-       | Mutable_read -> Mutable_read
-       | Mutable_write -> Mutable_write
+       | Mutable_read m -> Mutable_read m
+       | Mutable_write m -> Mutable_write m
        | Lazy_forced -> Lazy_forced
        | Function_return -> Function_return
        | Stack_expression -> Stack_expression
@@ -1954,27 +1954,34 @@ module Report = struct
 
   open Format
 
+  let print_mutable_part ppf = function
+    | Record_field s -> fprintf ppf "mutable field %a" Misc.Style.inline_code s
+    | Array_elements -> fprintf ppf "array elements"
+
   let print_const (type l r) ppf : (l * r) const -> unit = function
     | Nil -> Misc.fatal_error "Nil hint should not be printed"
     | Min_comonadic | Max_comonadic | Min_monadic | Max_monadic ->
       Misc.fatal_error "Min/Max hint should not be printed"
     | Lazy_allocated_on_heap ->
       pp_print_string ppf
-        "is a lazy expression and thus always allocated on the heap"
+        "it is a lazy expression and thus always allocated on the heap"
     | Class_legacy_monadic | Class_legacy_comonadic ->
-      pp_print_string ppf "is a class and thus always of legacy modes"
-    | Tailcall_function -> pp_print_string ppf "is the function in a tail call"
-    | Tailcall_argument -> pp_print_string ppf "is an argument in a tail call"
-    | Mutable_read -> pp_print_string ppf "has a mutable field read from"
-    | Mutable_write -> pp_print_string ppf "has a mutable field written to"
-    | Lazy_forced -> pp_print_string ppf "is a lazy value being forced"
+      pp_print_string ppf "it is a class and thus always of legacy modes"
+    | Tailcall_function ->
+      pp_print_string ppf "it is the function in a tail call"
+    | Tailcall_argument ->
+      pp_print_string ppf "it is an argument in a tail call"
+    | Mutable_read m -> fprintf ppf "its %a is being read" print_mutable_part m
+    | Mutable_write m ->
+      fprintf ppf "its %a is being written" print_mutable_part m
+    | Lazy_forced -> pp_print_string ppf "it is a lazy value being forced"
     | Function_return ->
       fprintf ppf
-        "is a function return value.@\n\
+        "it is a function return value.@\n\
          Hint: Use exclave_ to return a local value"
-    | Stack_expression -> pp_print_string ppf "is a stack expression"
+    | Stack_expression -> pp_print_string ppf "it is a stack expression"
     | Module_allocated_on_heap ->
-      pp_print_string ppf "is a module and thus always allocated on the heap"
+      pp_print_string ppf "it is a module and thus always allocated on the heap"
 
   let print_lock_item ppf = function
     | Module -> fprintf ppf "module"
@@ -2103,7 +2110,7 @@ module Report = struct
       (* We don't print the mode, since it's not responsible for the error. *)
       Nothing
     | Const c ->
-      fprintf ppf "%a@ because it %a"
+      fprintf ppf "%a@ because %a"
         (print_mode_with_side ~sub side obj)
         a print_const c;
       Mode_with_hint

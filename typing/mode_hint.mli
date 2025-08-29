@@ -1,5 +1,9 @@
 open Allowance
 
+type mutable_part =
+  | Record_field of string
+  | Array_elements
+
 (** Hint for a constant bound. See [Mode.Report.print_const] for what each non-trivial constructor means. *)
 type 'd const =
   | Nil : ('l * 'r) const  (** The constant bound is not explained. *)
@@ -16,8 +20,8 @@ type 'd const =
   | Class_legacy_comonadic : ('l * disallowed) pos const
   | Tailcall_function : (disallowed * 'r) pos const
   | Tailcall_argument : (disallowed * 'r) pos const
-  | Mutable_read : (disallowed * 'r) neg const
-  | Mutable_write : (disallowed * 'r) neg const
+  | Mutable_read : mutable_part -> (disallowed * 'r) neg const
+  | Mutable_write : mutable_part -> (disallowed * 'r) neg const
   | Lazy_forced : (disallowed * 'r) neg const
   | Function_return : (disallowed * 'r) pos const
   | Stack_expression : ('l * disallowed) pos const
