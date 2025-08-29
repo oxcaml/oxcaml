@@ -112,7 +112,6 @@ let rec expr ~env ~res e =
 and let_expr ~env ~res e =
   Let.pattern_match' e
     ~f:(fun bound_pattern ~num_normal_occurrences_of_bound_vars ~body ->
-      ignore num_normal_occurrences_of_bound_vars;
       match Bound_pattern.name_mode bound_pattern with
       | Normal ->
         let_expr_normal ~env ~res e ~bound_pattern
@@ -186,7 +185,7 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
           symbols res
       in
       env, res
-    | Singleton _, Rec_info _ -> expr ~env ~res body
+    | Singleton _, Rec_info _ -> env, res
     | Singleton _, (Set_of_closures _ | Static_consts _)
     | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
     | Static _, (Simple _ | Prim _ | Set_of_closures _ | Rec_info _) ->
@@ -346,7 +345,16 @@ and apply_expr ~env ~res e =
   let args = Apply_expr.args e in
   let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
-    | None, _ | _, Effect _ -> failwith "effects not implemented yet"
+    | _, Effect _ -> failwith "effects not implemented yet"
+    | ( None,
+        ( Function
+            { function_call = Indirect_unknown_arity | Indirect_known_arity;
+              alloc_mode = _
+            }
+        | Method _ | C_call _ ) ) ->
+      Misc.fatal_errorf
+        "Missing callee for indirect function, method or C call: %a"
+        Apply_expr.print e
     | Some callee, Function _ ->
       let args, res = To_jsir_shared.simples ~env ~res args in
       let f, res = To_jsir_shared.simple ~env ~res callee in
@@ -354,6 +362,12 @@ and apply_expr ~env ~res e =
          simplifier also knows how to change this to [true] if it knows that the
          argument numbers match up *)
       apply_fn ~res ~f ~args ~exact:false
+    | None, Function { function_call = Direct code_id; alloc_mode = _ } ->
+      let args, res = To_jsir_shared.simples ~env ~res args in
+      let ({ closure; addr = _; params = _ } : To_jsir_env.code_id) =
+        To_jsir_env.get_code_id_exn env code_id
+      in
+      apply_fn ~res ~f:closure ~args ~exact:false
     | Some callee, Method { obj; kind; alloc_mode = _ } ->
       let args, res = To_jsir_shared.simples ~env ~res args in
       let obj, res = To_jsir_shared.simple ~env ~res obj in
