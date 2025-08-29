@@ -1,0 +1,40 @@
+(lldb) b Test_simple_functor_dwarf.f_start
+(lldb) run
+(lldb) b Test_simple_functor_dwarf.f_int_set
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_string_set
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_float_set
+(lldb) c
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_int_store
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_string_store
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_set_operations
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_store_operations
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_int_compute_result
+(lldb) c
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_string_compute_result
+(lldb) c
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_int_string_pair
+(lldb) c
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_string_float_pair
+(lldb) c
+(lldb) b Test_simple_functor_dwarf.f_comparison_result
+(lldb) c
+(lldb) c
+(lldb) quit

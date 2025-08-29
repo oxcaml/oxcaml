@@ -1,0 +1,21 @@
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_start(param=0 : ocaml_value)
+=== Testing simple top-level backtrace ===
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_simple_backtrace(message="hello world" : string @ value, x=42 : int @ value)
+Backtrace for simple function:
+  * frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_simple_backtrace(message="hello world" : string @ value, x=42 : int @ value)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`camlTest_callstack_dwarf__entry
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`caml_program + 29
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`<Startup code ...>
+=== Testing recursive countdown with leaf function ===
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_leaf [inlined] Stdlib.(^)
+Backtrace at leaf function (depth 4 countdown):
+  * frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_leaf [inlined] Stdlib.(^)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_leaf(info={ name = "start>>>>"; value = 0; timestamp = 3.14159 } : debug_info @ value, extra="final" : string @ value)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_countdown(n=<unavailable>, msg=<unavailable>)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_countdown(n=1 : int @ value, msg=<unavailable>)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_countdown(n=2 : int @ value, msg=<unavailable>)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_countdown(n=3 : int @ value, msg=<unavailable>)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_countdown(n=4 : int @ value, msg=<unavailable>)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`camlTest_callstack_dwarf__entry
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`caml_program + 29
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`<Startup code ...>
