@@ -559,14 +559,6 @@ let mk_dgranularity f =
   " Specify granularity level for profile information (-dtimings, -dcounters, -dprofile)";
 ;;
 
-let mk_metaprogramming f =
-  "-metaprogramming", Arg.Unit f,
-  " Enable runtime metaprogramming."
-
-let mk_no_metaprogramming f =
-  "-no-metaprogramming", Arg.Unit f,
-  " Do not enable runtime metaprogramming"
-
 let mk_unbox_closures f =
   "-unbox-closures", Arg.Unit f,
   " Pass free variables via specialised arguments rather than closures"
@@ -964,8 +956,6 @@ module type Common_options = sig
   val _extension : string -> unit
   val _no_extension : string -> unit
   val _extension_universe : string -> unit
-  val _metaprogramming : unit -> unit
-  val _no_metaprogramming : unit -> unit
   val _noassert : unit -> unit
   val _nolabels : unit -> unit
   val _nostdlib : unit -> unit
@@ -1249,8 +1239,6 @@ struct
     mk_extension F._extension;
     mk_no_extension F._no_extension;
     mk_extension_universe F._extension_universe;
-    mk_metaprogramming F._metaprogramming;
-    mk_no_metaprogramming F._no_metaprogramming;
     mk_for_pack_byt F._for_pack;
     mk_g_byt F._g;
     mk_no_g F._no_g;
@@ -1389,8 +1377,6 @@ struct
     mk_extension F._extension;
     mk_no_extension F._no_extension;
     mk_extension_universe F._extension_universe;
-    mk_metaprogramming F._metaprogramming;
-    mk_no_metaprogramming F._no_metaprogramming;
     mk_noassert F._noassert;
     mk_noinit F._noinit;
     mk_nolabels F._nolabels;
@@ -1488,8 +1474,6 @@ struct
     mk_extension F._extension;
     mk_no_extension F._no_extension;
     mk_extension_universe F._extension_universe;
-    mk_metaprogramming F._metaprogramming;
-    mk_no_metaprogramming F._no_metaprogramming;
     mk_for_pack_opt F._for_pack;
     mk_g_opt F._g;
     mk_no_g F._no_g;
@@ -1679,8 +1663,6 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_extension F._extension;
     mk_no_extension F._no_extension;
     mk_extension_universe F._extension_universe;
-    mk_metaprogramming F._metaprogramming;
-    mk_no_metaprogramming F._no_metaprogramming;
     mk_no_float_const_prop F._no_float_const_prop;
     mk_noassert F._noassert;
     mk_noinit F._noinit;
@@ -1782,8 +1764,6 @@ struct
     mk_extension F._extension;
     mk_no_extension F._no_extension;
     mk_extension_universe F._extension_universe;
-    mk_metaprogramming F._metaprogramming;
-    mk_no_metaprogramming F._no_metaprogramming;
     mk_noassert F._noassert;
     mk_nolabels F._nolabels;
     mk_nostdlib F._nostdlib;
@@ -1897,8 +1877,6 @@ module Default = struct
     let _no_extension s = Language_extension.(disable_of_string_exn s)
     let _extension_universe s =
       Language_extension.(set_universe_and_enable_all_of_string_exn s)
-    let _metaprogramming = set Lexer.default_syntax_mode.metaprogramming
-    let _no_metaprogramming = clear Lexer.default_syntax_mode.metaprogramming
     let _noassert = set noassert
     let _nolabels = set classic
     let _nostdlib = set no_std_include
