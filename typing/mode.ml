@@ -1885,21 +1885,33 @@ module Report = struct
 
     (** Given a solver hint on a product lattice, and an axis in that product that we are
     interested in, returns a human-readible hint.*)
-    let rec hint_prod :
+    let rec hint_apply :
+        type a b l r.
+        a C.obj ->
+        (l * r) morph ->
+        (b, a, l * r) C.morph ->
+        (b, l * r) S.ahint ->
+        b C.For_hint.responsible_axis ->
+        (l * r) hint =
+     fun obj morph_hint morph ahint res ->
+      let obj = C.src obj morph in
+      match res with
+      | NoneResponsible -> Irrelevant
+      | SourceIsSingle ->
+        let ahint = ahint_axis obj ahint in
+        Apply (morph_hint, obj, ahint)
+      | Axis ax ->
+        let ahint = ahint_prod obj ax ahint in
+        let obj = C.proj_obj ax obj in
+        Apply (morph_hint, obj, ahint)
+
+    and hint_prod :
         type t a l r.
         t C.obj -> (t, a) Axis.t -> (t, l * r) S.hint -> (l * r) hint =
      fun obj ax -> function
-      | Apply (morph_hint, morph, ahint) -> (
-        let obj = C.src obj morph in
-        match C.For_hint.find_responsible_axis_prod morph ax with
-        | NoneResponsible -> Irrelevant
-        | SourceIsSingle ->
-          let ahint = ahint_axis obj ahint in
-          Apply (morph_hint, obj, ahint)
-        | Axis ax ->
-          let ahint = ahint_prod obj ax ahint in
-          let obj = C.proj_obj ax obj in
-          Apply (morph_hint, obj, ahint))
+      | Apply (morph_hint, morph, ahint) ->
+        hint_apply obj morph_hint morph ahint
+          (C.For_hint.find_responsible_axis_prod morph ax)
       | Const c -> Const c
       | Branch (b, (a0, hint0), (a1, hint1)) ->
         let chosen_hint =
@@ -1923,17 +1935,9 @@ module Report = struct
     (** Given a solver hint on a single axis lattice, returns a human-readible hint. *)
     and hint_axis : type a l r. a C.obj -> (a, l * r) S.hint -> (l * r) hint =
      fun obj -> function
-      | Apply (morph_hint, morph, ahint) -> (
-        let obj = C.src obj morph in
-        match C.For_hint.find_responsible_axis_single morph with
-        | NoneResponsible -> Irrelevant
-        | SourceIsSingle ->
-          let ahint = ahint_axis obj ahint in
-          Apply (morph_hint, obj, ahint)
-        | Axis ax ->
-          let ahint = ahint_prod obj ax ahint in
-          let obj = C.proj_obj ax obj in
-          Apply (morph_hint, obj, ahint))
+      | Apply (morph_hint, morph, ahint) ->
+        hint_apply obj morph_hint morph ahint
+          (C.For_hint.find_responsible_axis_single morph)
       | Const c -> Const c
       | Branch (b, (a0, hint0), (a1, hint1)) ->
         let chosen_hint =
