@@ -17,7 +17,7 @@ type t = int list my_list list my_list list
 |}]
 type t : immutable_data = int list list list list list
 (* CR layouts v2.8: The "because of the definition of t at line 1" part of the message
-   is not great. It should say something about the kind annotation on t. *)
+   is not great. It should say something about the kind annotation on t. Internal ticket 4770. *)
 [%%expect {|
 Line 1, characters 0-54:
 1 | type t : immutable_data = int list list list list list

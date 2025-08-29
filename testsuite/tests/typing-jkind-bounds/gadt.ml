@@ -61,7 +61,7 @@ type t = Foo : ('a : immutable_data). 'a -> t
 |}]
 
 let foo (t : t @ contended) = use_uncontended t
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect {|
 Line 1, characters 46-47:
 1 | let foo (t : t @ contended) = use_uncontended t
@@ -85,7 +85,7 @@ type 'a t = Foo : 'a -> 'a t
 |}]
 
 let foo (t : int t @ once) = use_many t
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect {|
 Line 1, characters 38-39:
 1 | let foo (t : int t @ once) = use_many t
@@ -106,7 +106,7 @@ type 'a t : value mod contended portable =
   | Shared : ('b : value mod contended portable). 'b  -> 'b t
   | Unshared : (unit -> 'c) @@ portable               -> 'c t
 ;;
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Lines 1-3, characters 0-61:
 1 | type 'a t : value mod contended portable =
@@ -155,7 +155,7 @@ let f (witness : (M1.t3, M1.t4) eq)
     use_portable t4
 
 (* CR layouts v2.8: This is obviously terrible. But at least it's not
-   a soundness problem. *)
+   a soundness problem. Internal ticket 4973. *)
 [%%expect{|
 module type S = sig type t1 type t2 end
 type (_ : any, _ : any) eq = Refl : ('a : any). ('a, 'a) eq
@@ -184,7 +184,7 @@ type ('a, 'b) t = { inner : 'a; }
 type 'a u : immutable_data with 'a =
 | P1 : ('a1, 'b) t -> 'a1 u
 | P2 : ('a2, 'b) t -> 'a2 u
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Lines 1-3, characters 0-27:
 1 | type 'a u : immutable_data with 'a =
@@ -224,7 +224,7 @@ Error: The kind of type "u" is value mod non_float
          because of the annotation on the declaration of the type u.
 |}]
 
-(* CR layouts v2.8: It'd also be OK to infer or accept [immutable_data with 'y] here. *)
+(* CR layouts v2.8: It'd also be OK to infer or accept [immutable_data with 'y] here. Internal ticket 4973. *)
 type ('x, 'y) t : immutable_data with 'x with 'y =
   | T : 'a -> ('a, 'a) t
   | U : 'c -> ('b,  'c) t
@@ -254,7 +254,7 @@ Error: The kind of type "t" is value mod non_float
 
 type 'a t : immutable_data =
   | A : ('b : immutable_data). 'b -> 'b option t
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Lines 1-2, characters 0-48:
 1 | type 'a t : immutable_data =
@@ -280,7 +280,7 @@ Error: The kind of type "t" is value mod non_float
 type 'a cell : mutable_data with 'a =
   | Nil : 'a cell
   | Cons of { value : 'a; mutable next: 'a cell }
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Lines 1-3, characters 0-49:
 1 | type 'a cell : mutable_data with 'a =
@@ -295,7 +295,7 @@ Error: The kind of type "cell" is value mod non_float
 type 'a cell : mutable_data with 'a =
   | Nil
   | Cons : { value : 'b; mutable next: 'b cell } -> 'b cell
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Lines 1-3, characters 0-59:
 1 | type 'a cell : mutable_data with 'a =
@@ -329,7 +329,7 @@ Error: The kind of type "existential_abstract" is value mod non_float
 
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Lines 1-2, characters 0-70:
 1 | type existential_abstract : immutable_data with (type : value mod portable) abstract =
@@ -343,7 +343,7 @@ Error: The kind of type "existential_abstract" is value mod non_float
 
 type existential_abstract : value mod portable =
   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Lines 1-2, characters 0-70:
 1 | type existential_abstract : value mod portable =
@@ -363,7 +363,7 @@ module M : sig
 end = struct
   type t = P : ('a : value mod portable). 'a abstract -> t
 end
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Line 1, characters 13-33:
 1 | let foo (x : existential_abstract @ nonportable) =
@@ -406,7 +406,7 @@ type existential_abstract : value mod portable with (type : value mod portable) 
   | P : ('a : value mod portable). 'a abstract t2 -> existential_abstract
 and 'a t2 = P : { contents : 'a; other : ('b : value mod portable) option } -> 'a t2
 and 'a abstract : value mod portable
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Lines 1-2, characters 0-73:
 1 | type existential_abstract : value mod portable with (type : value mod portable) abstract =
@@ -444,7 +444,7 @@ module F2(M : S with type 'a b = int) = struct
   let foo1 (x : M.t @ nonportable) = use_portable x
   let foo2 (x : M.t @ contended) = use_uncontended x
 end
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Line 2, characters 2-31:
 2 |   type t : immutable_data = M.t
@@ -459,7 +459,7 @@ module F3(M : S with type 'a b = 'a) = struct
   type t : value mod portable = M.t
   let foo (x : t @ nonportable) = use_portable x
 end
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Line 2, characters 2-35:
 2 |   type t : value mod portable = M.t
@@ -485,7 +485,7 @@ Error: This value is "contended" but expected to be "uncontended".
 (* CR layouts v2.8: Printing [_] here is not wrong (and in fact the overall inferred kind
    is correct), but it's a little strange and will probably be confusing to users.
    Probably the best thing to do is to number the distinct [_]s when printing and print
-   them as something like [_1], [_2], etc. *)
+   them as something like [_1], [_2], etc. Internal ticket 5123. *)
 
 type _ box = Box : 'a -> 'a box
 [%%expect{|
@@ -493,7 +493,7 @@ type _ box = Box : 'a -> 'a box
 |}]
 
 let foo (x : int box @ contended) = use_uncontended x
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Line 1, characters 52-53:
 1 | let foo (x : int box @ contended) = use_uncontended x
@@ -516,7 +516,7 @@ type (_, _) box2 = Box2 : 'a -> ('a, 'a) box2
 |}]
 
 let foo (x : (int, int) box2 @ contended) = use_uncontended x
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Line 1, characters 60-61:
 1 | let foo (x : (int, int) box2 @ contended) = use_uncontended x
@@ -560,7 +560,7 @@ Error: The kind of type "box" is value mod non_float
 (* Only the first type parameter matters *)
 
 let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Line 1, characters 68-69:
 1 | let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
@@ -570,7 +570,7 @@ Error: This value is "contended" but expected to be "uncontended".
 
 let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
 (* CR layouts v2.8: arguably this should be accepted if [crosses] is accepted (even though
-   x is uninhabited) *)
+   x is uninhabited). Internal ticket 4973. *)
 [%%expect{|
 Line 1, characters 74-75:
 1 | let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
@@ -583,7 +583,7 @@ Error: This value is "contended" but expected to be "uncontended".
 type 'a t constraint 'a = 'b option
 type 'c t2 : immutable_data with (type : value) option t =
   | K : 'd t -> 'd t2
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 type 'a t constraint 'a = 'b option
 Lines 2-3, characters 0-21:
@@ -629,7 +629,7 @@ Error: The kind of type "exist_row1" is value mod non_float
 |}]
 
 let foo (x : exist_row1 @ nonportable) = use_portable x
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 Line 1, characters 54-55:
 1 | let foo (x : exist_row1 @ nonportable) = use_portable x
@@ -728,7 +728,8 @@ let foo (exist : exist @ contended) eq =
         x
     | Br -> 0
   end
-(* CR layouts v2.8: Maybe this should be accepted? *)
+(* CR layouts v2.8: Maybe this should be accepted? Investigate as part of internal
+   ticket 4973. *)
 [%%expect{|
 type 'a idx = I : int idx | Br : bool ref idx
 type exist = Exist : ('a : value mod portable). 'a * 'a idx -> exist

@@ -73,7 +73,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       (* CR layouts v2.8: We could call [Jkind.normalize ~mode:Require_best] on this
          jkind, and plausibly gain some perf wins by building up smaller jkinds that are
          cheaper to deal with later. But doing so runs into some confusing mutual
-         recursion that's non-trivial to debug. Reinvestigate later *)
+         recursion that's non-trivial to debug. Reinvestigate later. Internal ticket 5102.  *)
       let jkind = Jkind.for_boxed_record lbls in
       let tdecl =
         {

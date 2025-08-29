@@ -149,7 +149,6 @@ module I : functor (X : sig end) -> sig type t = Priv(X).t end
 |}]
 
 module IndirectPriv = I(struct end);;
-(* CR layouts v2.8: normalize away [with int]. *)
 [%%expect{|
 module IndirectPriv : sig type t : value mod non_float end
 |}]

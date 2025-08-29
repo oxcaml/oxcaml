@@ -357,7 +357,7 @@ type ('a : void) void5 = Void5  of 'a
 let id5 : 'a void5 -> 'a void5 = function
   | Void5 x -> Void5 x
 
-(* CR layouts v2.8: At the moment, the code in the comment below does not work.
+(* CR layouts: At the moment, the code in the comment below does not work.
    Because we demand that constructor arguments have layout (Sort 'l), the type
    [any5] actually only works on values.
 

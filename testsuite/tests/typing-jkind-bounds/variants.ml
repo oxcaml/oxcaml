@@ -464,7 +464,7 @@ let foo (t : ('a : immutable_data) t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case *)
+(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
 [%%expect {|
 type 'a t = Foo of { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -497,7 +497,7 @@ let foo (t : _ t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case *)
+(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
 [%%expect {|
 type ('a : immutable_data) t = Foo of { x : 'a; } | Bar of 'a
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -584,7 +584,7 @@ let () =
 let () =
   cross_contended func;
   cross_nonnull func
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 |}, Principal{|
 Line 2, characters 13-16:
@@ -678,7 +678,7 @@ type t_test = int t require_contended
 type t_test = (unit -> unit) t require_contended
 type ('a : value mod contended) t_test = 'a t require_contended
 type 'a t_test = 'a t require_nonnull
-(* CR layouts v2.8: fix principal case *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type 'a t = Foo of 'a
 type t_test = int t require_many

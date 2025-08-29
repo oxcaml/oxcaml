@@ -1377,11 +1377,13 @@ let compare_type t1 t2 = compare (get_id t1) (get_id t2)
    Someday, it's probably desirable to merge this, and make it compatible, with
    [Ctype.eqtype], though that seems quite hard.
 *)
-(* CR layouts v2.8: this will likely loop infinitely on rectypes *)
-(* CR layouts v2.8: this whole approach is probably /quite/ wrong, since type_expr is
-   fundamentally mutable, and using mutable things in the keys of maps is a recipe for
-   disaster. We haven't found a way that this can break /yet/, but it is likely that one
-   exists. We should rethink this whole approach soon. *)
+(* CR layouts v2.8: this will likely loop infinitely on rectypes. Internal ticket
+   5086. *)
+(* CR layouts v2.8: this whole approach is probably /quite/ wrong, since
+   type_expr is fundamentally mutable, and using mutable things in the keys of
+   maps is a recipe for disaster. We haven't found a way that this can break
+   /yet/, but it is likely that one exists. We should rethink this whole
+   approach soon. Internal ticket 5086. *)
 let best_effort_compare_type_expr te1 te2 =
   let max_depth = 50 in
   let rank_by_id ty =
@@ -1411,7 +1413,7 @@ let best_effort_compare_type_expr te1 te2 =
            compare Tsubst structurally, because the Tsubsts that are created in
            Ctype.copy are cyclic (?). So the best we can do here is compare by id.
            this is almost definitely wrong, primarily because of the mutability - we
-           should fix that. *)
+           should fix that. Internal ticket 5086. *)
         | Tsubst (_, _)
           -> rank_by_id ty
         (* Types which we know how to compare structurally*)
@@ -1478,13 +1480,15 @@ module With_bounds_types : sig
   val exists : (type_expr -> info -> bool) -> t -> bool
 end = struct
   module M = Map.Make(struct
-      (* CR layouts v2.8: A [Map] with mutable values (of which [type_expr] is one) as
-         keys is deeply problematic. And in fact we never actually use this map structure
-         for anything other than deduplication (indeed we can't, because of its
-         best-effort nature). Instead of this structure, we should store the types inside
-         of with-bounds as a (morally immutable) array, and write a [deduplicate]
-         function, private to [Jkind], which uses this map structure to deduplicate the
-         with-bounds, but only during construction and after normalization. *)
+      (* CR layouts v2.8: A [Map] with mutable values (of which [type_expr] is
+         one) as keys is deeply problematic. And in fact we never actually use
+         this map structure for anything other than deduplication (indeed we
+         can't, because of its best-effort nature). Instead of this structure,
+         we should store the types inside of with-bounds as a (morally
+         immutable) array, and write a [deduplicate] function, private to
+         [Jkind], which uses this map structure to deduplicate the with-bounds,
+         but only during construction and after normalization. Internal ticket
+         5086.*)
       type t = type_expr
 
       let compare = best_effort_compare_type_expr

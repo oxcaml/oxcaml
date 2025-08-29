@@ -323,7 +323,7 @@ Error: This function when partially applied returns a value which is "nonportabl
    race), since a is never used *)
 
 let foo : ('a @ contended portable -> (string -> string) @ portable) @ nonportable contended = fun a b -> best_bytes ()
-(* CR layouts v2.8: arrows should cross contention. *)
+(* CR layouts v2.8: arrows should cross contention. Internal ticket 5121. *)
 [%%expect{|
 Line 1, characters 4-119:
 1 | let foo : ('a @ contended portable -> (string -> string) @ portable) @ nonportable contended = fun a b -> best_bytes ()

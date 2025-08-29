@@ -1369,7 +1369,7 @@ let f (x : t) : _ as (_ : immediate) = x
 type t = private int
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119. *)
 
 type t : immediate = private int
 let f (x : t) : _ as (_ : immediate) = x
@@ -1395,7 +1395,7 @@ type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since u is nominative *)
+(* CR layouts v2.8: This should fail since u is nominative. Internal ticket 5119. *)
 
 type t : bits64 mod portable aliased
 type u : bits64 mod portable aliased = private t

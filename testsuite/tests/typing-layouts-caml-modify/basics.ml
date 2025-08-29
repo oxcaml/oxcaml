@@ -103,21 +103,21 @@ let () =
     foo.(0) <- x
   in
   let expect_caml_modifies = 1 in
-  (* CR layouts v2.8: should have no caml_modify call *)
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
   test ~expect_caml_modifies (fun () -> f 10);
   test ~expect_caml_modifies (fun () -> f "hello");
-  (* CR layouts v2.8: should have no caml_modify call *)
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385.*)
   test ~expect_caml_modifies (fun () -> f true);
   test ~expect_caml_modifies (fun () -> f { boxed = 10 });
   test ~expect_caml_modifies (fun () -> f { boxed = "hello" });
-  (* CR layouts v2.8: should have no caml_modify call *)
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
   test ~expect_caml_modifies (fun () -> f { unboxed = 10 });
   test ~expect_caml_modifies (fun () -> f { unboxed = "hello" });
-  (* CR layouts v2.8: should have no caml_modify call *)
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
   test ~expect_caml_modifies (fun () -> f External_variant.make);
   test ~expect_caml_modifies (fun () -> f (Boxed 10));
   test ~expect_caml_modifies (fun () -> f (Boxed "hello"));
-  (* CR layouts v2.8: should have no caml_modify call *)
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
   test ~expect_caml_modifies (fun () -> f (Unboxed 10));
   test ~expect_caml_modifies (fun () -> f (Unboxed "hello"))
 

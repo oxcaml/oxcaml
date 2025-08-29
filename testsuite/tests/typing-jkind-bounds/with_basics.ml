@@ -244,7 +244,7 @@ val foo : ('a : value mod contended portable). 'a option @ contended -> unit =
   <fun>
 |}]
 
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 5111 *)
 let foo (t : ('a : value mod contended portable) option @ contended nonportable) =
   use_uncontended t;
   use_portable t
@@ -581,7 +581,6 @@ Error: The kind of type "t" is mutable_data
 |}]
 
 type ('a : mutable_data) t : immutable_data = { x : 'a }
-(* CR layouts v2.8: fix error message *)
 [%%expect {|
 Line 1, characters 0-56:
 1 | type ('a : mutable_data) t : immutable_data = { x : 'a }
@@ -762,7 +761,7 @@ type ('a : immutable_data) t : value mod contended with 'a
 |}]
 
 type 'a t_test = 'a t require_contended
-(* CR layouts v2.8: fix principal case *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type ('a : immutable_data) t_test = 'a t require_contended
 |}, Principal{|
@@ -783,7 +782,7 @@ val foo : int t @ contended -> unit = <fun>
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
-(* CR layouts v2.8: fix principal case *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 |}, Principal{|
@@ -808,7 +807,7 @@ type ('a, 'b) t : value mod contended with 'a with 'b
 |}]
 
 type t_test = (int, int) t require_contended
-(* CR layouts v2.8: fix principal case *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = (int, int) t require_contended
 |}, Principal{|
@@ -959,7 +958,7 @@ val foo : int t -> unit = <fun>
 |}]
 
 let foo (t : _ t @ nonportable) = use_portable t
-(* CR layouts v2.8: fix principal case *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t -> unit = <fun>
 |}, Principal{|
@@ -1072,7 +1071,7 @@ module M : S'
 (* TEST: private type *)
 
 (* a private type does not hide the kind *)
-(* CR layouts v2.8: but it should be able to *)
+(* CR layouts v2.8: but it should be able to. Internal ticket 5119 *)
 
 type 'a u = { x : 'a }
 type 'a t : value = private 'a u

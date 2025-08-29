@@ -22,7 +22,7 @@ let foo :
 = fun x -> x
 (* CR layouts v2.8: This got worse once we enabled with-kinds for tuples, because of
    Cannot_subst turning into Missing_cmi in estimate_type_jkind. When we fix that, this
-   should change back to a better error message. *)
+   should change back to a better error message. Internal ticket 5109. *)
 [%%expect{|
 Line 2, characters 4-53:
 2 |   < m : 'left 'right. <left:'left; right:'right> pair >

@@ -157,7 +157,7 @@ let transl_mod_bounds annots =
       then
         (* CR layouts v2.8: This warning is disabled for now because transl_type_decl
            results in 3 calls to transl_annots per user-written annotation. This results
-           in the warning being reported 3 times. *)
+           in the warning being reported 3 times. Internal ticket 2801. *)
         (* Location.prerr_warning new_raw.loc (Warnings.Mod_by_top new_raw.txt) *)
         ();
       let is_dup =
