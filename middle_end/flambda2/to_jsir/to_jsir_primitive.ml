@@ -210,8 +210,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
       | Tagged_immediate ->
         (* [Lambda_to_flambda_primitives will never produce this *)
         Misc.fatal_error "Found Int_arith with Tagged_immediate"
-      | Naked_int8 | Naked_int16 ->
-        primitive_not_supported ()
+      | Naked_int8 | Naked_int16 -> primitive_not_supported ()
     in
     use_prim' (Extern extern_name)
   | Float_arith (bitwidth, op) ->
@@ -273,8 +272,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | Naked_nativeint, Naked_float -> caml_to "nativeint" "float"
     | Naked_nativeint, Naked_int32 -> caml_to "nativeint" "int32"
     | Naked_nativeint, Naked_int64 -> caml_of "int64" "nativeint"
-    | (Naked_int8 | Naked_int16), _
-    | _, (Naked_int8 | Naked_int16) ->
+    | (Naked_int8 | Naked_int16), _ | _, (Naked_int8 | Naked_int16) ->
       primitive_not_supported ())
   | Boolean_not -> use_prim' Not
   | Reinterpret_64_bit_word reinterpret ->
@@ -351,7 +349,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Thirty_two -> "get32"
       | Single -> "getf32"
       | Sixty_four -> "get64"
-      | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ -> 
+      | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ ->
         primitive_not_supported ()
     in
     let extern_name =
@@ -361,8 +359,8 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Bigstring -> (
         match width with
         | Eight -> "caml_ba_get_1"
-        | Sixteen | Thirty_two | Single | Sixty_four 
-        | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ ->
+        | Sixteen | Thirty_two | Single | Sixty_four | One_twenty_eight _
+        | Two_fifty_six _ | Five_twelve _ ->
           "caml_ba_uint8_" ^ op_name)
     in
     use_prim' (Extern extern_name)
@@ -402,8 +400,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         "shift_right_unsigned"
       | (Tagged_immediate | Naked_immediate), Asr -> "asr"
       | (Naked_int32 | Naked_int64 | Naked_nativeint), Asr -> "shift_right"
-      | (Naked_int8 | Naked_int16), _ ->
-        primitive_not_supported ()
+      | (Naked_int8 | Naked_int16), _ -> primitive_not_supported ()
     in
     let extern_name = with_int_prefix ~kind op_name ~percent_for_imms:true in
     use_prim' (Extern extern_name)
@@ -498,7 +495,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   | Bigarray_get_alignment _ ->
     (* Only used for SIMD *)
     primitive_not_supported ()
-  | Atomic_load_field _ -> use_prim' (Extern "caml_atomic_load")
+  | Atomic_load_field _ -> use_prim' (Extern "caml_atomic_load_field")
   | Poke _ ->
     (* Unsupported in bytecode *)
     primitive_not_supported ()
@@ -610,9 +607,9 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
 let quaternary ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y z =
   let use_prim' prim = use_prim' ~env ~res prim [w; x; y; z] in
   match f with
-  | Atomic_compare_and_set_field _ -> use_prim' (Extern "caml_atomic_cas")
+  | Atomic_compare_and_set_field _ -> use_prim' (Extern "caml_atomic_cas_field")
   | Atomic_compare_exchange_field _ ->
-    use_prim' (Extern "caml_atomic_compare_exchange")
+    use_prim' (Extern "caml_atomic_compare_exchange_field")
 
 let primitive ~env ~res (prim : Flambda_primitive.t) =
   match prim with
