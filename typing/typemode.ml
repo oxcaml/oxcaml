@@ -373,19 +373,19 @@ let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
     with Not_found ->
       raise (Error (loc, Unrecognized_modifier (Modality, modality)))
   in
-  let atom : _ Modality.Atom.t =
-    match ax with
-    | Comonadic ax -> Comonadic (ax, Meet_with a)
-    | Monadic ax -> Monadic (ax, Join_with a)
+  let atom : Modality.atom =
+    match[@warning "-18"] ax with
+    | Comonadic ax -> Atom (Comonadic ax, Meet_with a)
+    | Monadic ax -> Atom (Monadic ax, Join_with a)
   in
-  Modality.Atom.P atom, loc
+  atom, loc
 
-let untransl_modality (a : _ Modality.Atom.t) : Parsetree.modality loc =
+let untransl_modality (a : Modality.atom) : Parsetree.modality loc =
   let s =
     match a with
-    | Comonadic (ax, Meet_with a) ->
+    | Atom (Comonadic ax, Meet_with a) ->
       Format.asprintf "%a" (Value.Comonadic.Const.Per_axis.print ax) a
-    | Monadic (ax, Join_with a) ->
+    | Atom (Monadic ax, Join_with a) ->
       Format.asprintf "%a" (Value.Monadic.Const.Per_axis.print ax) a
   in
   { txt = Modality s; loc = Location.none }
@@ -400,16 +400,16 @@ let untransl_modality (a : _ Modality.Atom.t) : Parsetree.modality loc =
 
    Implied modalities can be overriden. *)
 (* CR zqian: remove [1] and [2] *)
-let mutable_implied_modalities ~for_mutable_variable mut =
-  let comonadic : Modality.Atom.packed list =
-    [ P (Comonadic (Areality, Meet_with Regionality.Const.legacy));
-      P (Comonadic (Linearity, Meet_with Linearity.Const.legacy));
-      P (Comonadic (Yielding, Meet_with Yielding.Const.legacy)) ]
+let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
+  let comonadic : Modality.atom list =
+    [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
+      Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
+      Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy) ]
   in
-  let monadic : Modality.Atom.packed list =
-    [ P (Monadic (Uniqueness, Join_with Uniqueness.Const.legacy));
-      P (Monadic (Contention, Join_with Contention.Const.legacy));
-      P (Monadic (Visibility, Join_with Visibility.Const.legacy)) ]
+  let monadic : Modality.atom list =
+    [ Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy);
+      Atom (Monadic Contention, Join_with Contention.Const.legacy);
+      Atom (Monadic Visibility, Join_with Visibility.Const.legacy) ]
   in
   if mut
   then if for_mutable_variable then monadic else monadic @ comonadic
@@ -418,7 +418,7 @@ let mutable_implied_modalities ~for_mutable_variable mut =
 let mutable_implied_modalities ~for_mutable_variable mut =
   let l = mutable_implied_modalities ~for_mutable_variable mut in
   List.fold_left
-    (fun t (Modality.Atom.P a) -> Modality.Const.set a t)
+    (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
     Modality.Const.id l
 
 let idx_expected_modalities ~(mut : bool) =
@@ -431,7 +431,7 @@ let idx_expected_modalities ~(mut : bool) =
          primitives (see [idx_imm.mli] and [idx_mut.mli] in [Stdlib_beta]). *)
   let modality_of_list l =
     List.fold_left
-      (fun t (Modality.Atom.P a) -> Modality.Const.set a t)
+      (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
       Modality.Const.id l
   in
   let expected1 = mutable_implied_modalities mut ~for_mutable_variable:false in
@@ -441,10 +441,11 @@ let idx_expected_modalities ~(mut : bool) =
       (* If this list is updated, the external bindings in the [Idx_imm] and
          [Idx_mut] modules in [Stdlib_beta] may also have to be updated. *)
       modality_of_list
-        [ P (Comonadic (Areality, Meet_with Regionality.Const.legacy));
-          P (Comonadic (Linearity, Meet_with Linearity.Const.legacy));
-          P (Comonadic (Yielding, Meet_with Yielding.Const.legacy));
-          P (Monadic (Uniqueness, Join_with Uniqueness.Const.legacy)) ]
+        [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
+          Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
+          Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
+          Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy) ]
+      [@warning "-18"]
     else Mode.Modality.Const.id
   in
   (* CR layouts v8: only perform this check at most twice: for [mut = true] and
@@ -460,30 +461,29 @@ let idx_expected_modalities ~(mut : bool) =
    the [global] modality must also apply [unyielding] unless specified.
 
    Similarly for [visibility]/[contention] and [statefulness]/[portability]. *)
-let implied_modalities (P a : Modality.Atom.packed) : Modality.Atom.packed list
-    =
-  match a with
-  | Comonadic (Areality, Meet_with a) ->
+let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
+  match[@warning "-18"] ax, a with
+  | Comonadic Areality, Meet_with a ->
     let b : Yielding.Const.t =
       match a with
       | Global -> Unyielding
       | Local -> Yielding
       | Regional -> assert false
     in
-    [P (Comonadic (Yielding, Meet_with b))]
-  | Monadic (Visibility, Join_with a) ->
+    [Atom (Comonadic Yielding, Meet_with b)]
+  | Monadic Visibility, Join_with a ->
     let b : Contention.Const.t =
       match a with
       | Immutable -> Contended
       | Read -> Shared
       | Read_write -> Uncontended
     in
-    [P (Monadic (Contention, Join_with b))]
-  | Comonadic (Statefulness, Meet_with a) ->
+    [Atom (Monadic Contention, Join_with b)]
+  | Comonadic Statefulness, Meet_with a ->
     let b : Portability.Const.t =
       match a with Stateless -> Portable | Stateful | Observing -> Nonportable
     in
-    [P (Comonadic (Portability, Meet_with b))]
+    [Atom (Comonadic Portability, Meet_with b)]
   | _ -> []
 
 let least_modalities_implying mut (t : Modality.Const.t) =
@@ -498,22 +498,21 @@ let least_modalities_implying mut (t : Modality.Const.t) =
   in
   let overridden =
     List.filter_map
-      (fun (Modality.Atom.P m_implied) ->
-        let m_projected =
-          Modality.Const.proj (Modality.Atom.axis m_implied) t
-        in
+      (fun (Modality.Atom (ax, m_implied)) ->
+        let m_projected = Modality.Const.proj ax t in
         if m_projected <> m_implied
-        then Some (Modality.Atom.P m_projected)
+        then Some (Modality.Atom (ax, m_projected))
         else None)
       implied
   in
   exclude_implied @ overridden
 
 let sort_dedup_modalities ~warn l =
-  let compare (Modality.Atom.P a0, _) (Modality.Atom.P a1, _) =
-    let ax0 = Modality.Atom.axis a0 in
-    let ax1 = Modality.Atom.axis a1 in
-    Value.Axis.compare ax0 ax1
+  let open Modality in
+  let compare (Atom (ax0, _), _) (Atom (ax1, _), _) =
+    let (P ax0) = Axis.to_value (P ax0) in
+    let (P ax1) = Axis.to_value (P ax1) in
+    Mode.Value.Axis.compare ax0 ax1
   in
   let dedup ~on_dup =
     let rec loop x = function
@@ -527,12 +526,14 @@ let sort_dedup_modalities ~warn l =
     in
     function [] -> [] | x :: xs -> loop x xs
   in
-  let on_dup (Modality.Atom.P a0, loc0) (Modality.Atom.P a1, _) =
+  let on_dup (Atom (ax0, _), loc0) (Atom (ax1, a1), _) =
     if warn
     then
-      let ax0 = Modality.Atom.axis a0 in
-      let axis = Format.asprintf "%a" Value.Axis.print ax0 in
-      let { txt = Modality overriden_by; _ } = untransl_modality a1 in
+      let (P ax0) = Axis.to_value (P ax0) in
+      let axis = Format.asprintf "%a" Mode.Value.Axis.print ax0 in
+      let { txt = Modality overriden_by; _ } =
+        untransl_modality (Atom (ax1, a1))
+      in
       Location.prerr_warning loc0
         (Warnings.Modal_axis_specified_twice { axis; overriden_by })
   in
@@ -551,10 +552,10 @@ let transl_modalities ~maturity mut modalities =
      - explicit modalities can override mut_modalities.
      - For the same axis, later modalities overrides earlier modalities. *)
   List.fold_left
-    (fun m (Atom.P a as t) ->
-      let m = Const.set a m in
+    (fun m (Atom (ax, a) as t) ->
+      let m = Const.set ax a m in
       List.fold_left
-        (fun m (Atom.P a) -> Const.set a m)
+        (fun m (Atom (ax, a)) -> Const.set ax a m)
         m (implied_modalities t))
     mut_modalities modalities
 
@@ -569,7 +570,7 @@ let untransl_modalities mut t =
   |> least_modalities_implying mut
   |> List.map (fun x -> x, Location.none)
   |> sort_dedup_modalities ~warn:false
-  |> List.map (fun (Modality.Atom.P a) -> untransl_modality a)
+  |> List.map untransl_modality
 
 let transl_alloc_mode modes =
   let opt = transl_mode_annots modes in
