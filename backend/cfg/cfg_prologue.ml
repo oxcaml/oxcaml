@@ -385,7 +385,8 @@ end
 
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
-  validate_no_prologue cfg_with_layout;
+  if !Oxcaml_flags.cfg_prologue_validate
+  then validate_no_prologue cfg_with_layout;
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   let fun_name = Cfg.fun_name cfg in
   (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
