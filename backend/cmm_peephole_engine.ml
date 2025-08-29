@@ -316,8 +316,8 @@ module Cmm_comparator = struct
            (fun (act1, _) (act2, _) -> equivalent act1 act2)
            actions1 actions2
     | Ccatch (flag1, handlers1, body1), Ccatch (flag2, handlers2, body2) ->
-      let equal_handler (lbl1, params1, body1, _, is_cold1)
-          (lbl2, params2, body2, _, is_cold2) =
+      let equal_handler Cmm.{label = lbl1; params = params1; body = body1; is_cold = is_cold1; _}
+          Cmm.{label = lbl2; params = params2; body = body2; is_cold = is_cold2; _} =
         (* No alpha equivalence *)
         Static_label.equal lbl1 lbl2
         && List.equal

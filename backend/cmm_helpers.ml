@@ -3323,7 +3323,7 @@ let cache_public_method meths tag cache dbg =
       [VP.create result_label_index, typ_int],
       Ccatch
         ( Recursive,
-          [loop_cont, [li_vp, typ_int; hi_vp, typ_int], loop_body, dbg, false],
+          [{label = loop_cont; params = [li_vp, typ_int; hi_vp, typ_int]; body = loop_body; dbg; is_cold = false}],
           (* Start the first iteration of the loop *)
           Cexit
             ( Lbl loop_cont,
@@ -4178,14 +4178,14 @@ let entry_point namelist =
         [],
         Ccatch
           ( Recursive,
-            [ ( cont,
-                [VP.create id, typ_int],
-                Csequence
+            [ {label = cont;
+               params = [VP.create id, typ_int];
+               body = Csequence
                   ( exit_if_last_iteration id,
                     Csequence (call (Cvar id), Cexit (Lbl cont, [incr_i id], []))
-                  ),
-                dbg,
-                false ) ],
+                  );
+                dbg;
+                is_cold = false } ],
             Cexit (Lbl cont, [cconst_int 0], []) ),
         Ctuple [],
         dbg,
@@ -4339,21 +4339,14 @@ let ite ~dbg ~then_dbg ~then_ ~else_dbg ~else_ cond =
 let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
   Ccatch
     ( Exn_handler,
-      [ ( handler_cont,
-          (exn_var, typ_val) :: extra_args,
-          handler,
-          dbg,
-          false (* is_cold *) ) ],
+      [ {label = handler_cont;
+         params = (exn_var, typ_val) :: extra_args;
+         body = handler;
+         dbg;
+         is_cold = false } ],
       body )
 
-type static_handler =
-  Static_label.t
-  * (Backend_var.With_provenance.t * Cmm.machtype) list
-  * Cmm.expression
-  * Debuginfo.t
-  * bool
-
-let handler ~dbg id vars body is_cold = id, vars, body, dbg, is_cold
+let handler ~dbg id vars body is_cold = Cmm.{label = id; params = vars; body; dbg; is_cold}
 
 let cexit id args trap_actions = Cmm.Cexit (Cmm.Lbl id, args, trap_actions)
 

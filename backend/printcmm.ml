@@ -428,7 +428,7 @@ let rec expr ppf = function
         in
         fprintf ppf "@[<v 0>@[<2>(switch@ %a@ @]%t)@]" expr e1 print_cases)
   | Ccatch (flag, handlers, e1) ->
-    let print_handler ppf (i, ids, e2, dbg, is_cold) =
+    let print_handler ppf Cmm.{label = i; params = ids; body = e2; dbg; is_cold} =
       with_location_mapping ~label:"Ccatch-handler" ~dbg ppf (fun () ->
           fprintf ppf "(%a%a)%s@ %a" Static_label.format i
             (fun ppf ids ->

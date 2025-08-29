@@ -500,7 +500,15 @@ type ccatch_flag =
 
 (** Every basic block should have a corresponding [Debuginfo.t] for its
     beginning. *)
-type expression =
+type static_handler = {
+  label : Lambda.static_label;
+  params : (Backend_var.With_provenance.t * machtype) list;
+  body : expression;
+  dbg : Debuginfo.t;
+  is_cold : bool;
+}
+
+and expression =
   | Cconst_int of int * Debuginfo.t
   | Cconst_natint of nativeint * Debuginfo.t
   | Cconst_float32 of float * Debuginfo.t
@@ -525,15 +533,7 @@ type expression =
       * Debuginfo.t
   | Cswitch of
       expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
-  | Ccatch of
-      ccatch_flag
-      * (Lambda.static_label
-        * (Backend_var.With_provenance.t * machtype) list
-        * expression
-        * Debuginfo.t
-        * bool (* is_cold *))
-        list
-      * expression
+  | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
 
 type codegen_option =
