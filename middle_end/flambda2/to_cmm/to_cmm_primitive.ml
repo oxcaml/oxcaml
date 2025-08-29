@@ -239,7 +239,7 @@ let make_array ~dbg kind alloc_mode args =
   check_alloc_fields args;
   let mode = C.alloc_mode_for_allocations_to_cmm alloc_mode in
   match (kind : P.Array_kind.t) with
-  | Immediates | Values -> C.make_alloc ~mode dbg ~tag:0 args
+  | Externals | Values -> C.make_alloc ~mode dbg ~tag:0 args
   | Naked_floats ->
     C.make_float_alloc ~mode dbg ~tag:(Tag.to_int Tag.double_array_tag) args
   | Naked_float32s -> C.allocate_unboxed_float32_array ~elements:args mode dbg
@@ -257,7 +257,7 @@ let make_array ~dbg kind alloc_mode args =
 
 let array_length ~dbg arr (kind : P.Array_kind.t) =
   match kind with
-  | Immediates | Values | Naked_floats | Unboxed_product _ ->
+  | Externals | Values | Naked_floats | Unboxed_product _ ->
     (* [Paddrarray] may be a lie sometimes, but we know for certain that the bit
        width of floats is equal to the machine word width (see flambda2.ml).
 
@@ -314,13 +314,13 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
     (load_kind : P.Array_load_kind.t) ~arr ~index =
   (* CR mshinwell: refactor this function in the same way as [block_load] *)
   match array_kind, load_kind with
-  | (Values | Immediates | Unboxed_product _), Immediates ->
-    C.int_array_ref arr index dbg
+  | (Values | Externals | Unboxed_product _), Externals ->
+    C.ext_array_ref arr index dbg
   | (Naked_int64s | Naked_nativeints), (Naked_int64s | Naked_nativeints) ->
     C.unboxed_int64_or_nativeint_array_ref arr ~array_index:index dbg
   | Unboxed_product _, (Naked_int64s | Naked_nativeints) ->
     C.unboxed_int64_or_nativeint_array_ref arr ~array_index:index dbg
-  | (Values | Immediates | Unboxed_product _), Values ->
+  | (Values | Externals | Unboxed_product _), Values ->
     C.addr_array_ref arr index dbg
   | Naked_floats, Naked_floats | Unboxed_product _, Naked_floats ->
     C.unboxed_float_array_ref Mutable ~block:arr ~index dbg
@@ -331,7 +331,7 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   | Naked_int32s, Naked_int32s -> C.unboxed_int32_array_ref arr index dbg
   | Unboxed_product _, Naked_int32s ->
     C.unboxed_mutable_int32_unboxed_product_array_ref arr ~array_index:index dbg
-  | (Immediates | Naked_floats), Naked_vec128s ->
+  | (Externals | Naked_floats), Naked_vec128s ->
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int64s | Naked_nativeints), Naked_vec128s ->
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
@@ -343,7 +343,7 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | Naked_vec128s, Naked_vec512s ->
     array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
-  | (Immediates | Naked_floats), Naked_vec256s ->
+  | (Externals | Naked_floats), Naked_vec256s ->
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int64s | Naked_nativeints), Naked_vec256s ->
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
@@ -355,7 +355,7 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | Naked_vec256s, Naked_vec512s ->
     array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
-  | (Immediates | Naked_floats), Naked_vec512s ->
+  | (Externals | Naked_floats), Naked_vec512s ->
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int64s | Naked_nativeints), Naked_vec512s ->
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
@@ -375,21 +375,21 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
       Debuginfo.print_compact dbg
   | ( ( Naked_floats | Naked_int32s | Naked_float32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
-      Immediates )
-  | ( ( Values | Immediates | Naked_floats | Naked_int32s | Naked_float32s
+      Externals )
+  | ( ( Values | Externals | Naked_floats | Naked_int32s | Naked_float32s
       | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       (Naked_int64s | Naked_nativeints) )
-  | ( ( Values | Immediates | Naked_int32s | Naked_float32s | Naked_int64s
+  | ( ( Values | Externals | Naked_int32s | Naked_float32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_floats ) ->
     Misc.fatal_errorf
       "Array reinterpret load operation (array kind %a, array ref kind %a) not \
        yet supported"
       P.Array_kind.print array_kind P.Array_load_kind.print load_kind
-  | ( ( Values | Immediates | Naked_floats | Naked_int32s | Naked_int64s
+  | ( ( Values | Externals | Naked_floats | Naked_int32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_float32s )
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_int64s
+  | ( ( Values | Externals | Naked_floats | Naked_float32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_int32s ) ->
     Misc.fatal_errorf
@@ -413,9 +413,9 @@ let addr_array_store init ~arr ~index ~new_value dbg =
 let array_set0 ~dbg (array_kind : P.Array_kind.t)
     (set_kind : P.Array_set_kind.t) ~arr ~index ~new_value =
   match array_kind, set_kind with
-  | (Values | Immediates | Unboxed_product _), Immediates ->
-    C.int_array_set arr index new_value dbg
-  | (Values | Immediates | Unboxed_product _), Values init ->
+  | (Values | Externals | Unboxed_product _), Externals ->
+    C.ext_array_set arr index new_value dbg
+  | (Values | Externals | Unboxed_product _), Values init ->
     addr_array_store init ~arr ~index ~new_value dbg
   | (Naked_int64s | Naked_nativeints), (Naked_int64s | Naked_nativeints) ->
     C.unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg
@@ -433,7 +433,7 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
   | Unboxed_product _, Naked_int32s ->
     C.unboxed_mutable_int32_unboxed_product_array_set arr ~array_index:index
       ~new_value dbg
-  | (Immediates | Naked_floats), Naked_vec128s ->
+  | (Externals | Naked_floats), Naked_vec128s ->
     array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
       new_value
   | (Naked_int64s | Naked_nativeints), Naked_vec128s ->
@@ -451,7 +451,7 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
   | Naked_vec128s, Naked_vec512s ->
     array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
       new_value
-  | (Immediates | Naked_floats), Naked_vec256s ->
+  | (Externals | Naked_floats), Naked_vec256s ->
     array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
       new_value
   | (Naked_int64s | Naked_nativeints), Naked_vec256s ->
@@ -469,7 +469,7 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
   | Naked_vec256s, Naked_vec512s ->
     array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
       new_value
-  | (Immediates | Naked_floats), Naked_vec512s ->
+  | (Externals | Naked_floats), Naked_vec512s ->
     array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
       new_value
   | (Naked_int64s | Naked_nativeints), Naked_vec512s ->
@@ -495,21 +495,21 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
       Debuginfo.print_compact dbg
   | ( ( Naked_floats | Naked_int32s | Naked_float32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
-      Immediates )
-  | ( ( Values | Immediates | Naked_floats | Naked_int32s | Naked_float32s
+      Externals )
+  | ( ( Values | Externals | Naked_floats | Naked_int32s | Naked_float32s
       | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       (Naked_int64s | Naked_nativeints) )
-  | ( ( Values | Immediates | Naked_int32s | Naked_float32s | Naked_int64s
+  | ( ( Values | Externals | Naked_int32s | Naked_float32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_floats ) ->
     Misc.fatal_errorf
       "Array reinterpret set operation (array kind %a, array ref kind %a) not \
        yet supported"
       P.Array_kind.print array_kind P.Array_set_kind.print set_kind
-  | ( ( Values | Immediates | Naked_floats | Naked_int32s | Naked_int64s
+  | ( ( Values | Externals | Naked_floats | Naked_int32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_float32s )
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_int64s
+  | ( ( Values | Externals | Naked_floats | Naked_float32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_int32s ) ->
     Misc.fatal_errorf
