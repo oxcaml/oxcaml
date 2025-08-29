@@ -926,6 +926,7 @@ module F = struct
           ins_load t ~src:ptr ~dst:res Llvm_typ.ptr;
           res
         in
+        assert (Reg.same_loc i.arg.(0) Proc.loc_exn_bucket);
         let exn_payload = load_reg_to_temp t i.arg.(0) in
         let new_sp =
           do_offset ~arg_is_ptr:false ~res_is_ptr:false t exn_handler_sp 16
