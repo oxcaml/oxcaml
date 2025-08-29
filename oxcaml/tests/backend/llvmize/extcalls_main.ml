@@ -6,6 +6,5 @@ let () =
   let too_many_res = Extcalls.call_too_many () in
   Out_channel.flush stdout;
   Format.printf "too_many res: %d\n" too_many_res;
-  Out_channel.flush stdout
-(* CR yusumez: Add float constants for this to work *)
-(* Extcalls.call_int_and_float () *)
+  Out_channel.flush stdout;
+  Extcalls.call_int_and_float ()

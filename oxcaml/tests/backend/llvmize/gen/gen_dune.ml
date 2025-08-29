@@ -78,6 +78,7 @@ module F = struct
     asprintf "(run ${ocamlopt} %a -opaque -o %s.exe)" (pp_strings pp_space) deps
       output
 
+  (* CR yusumez: Make one rule per task to better use incremental tests. *)
   let pp_compile_rule ppf ~targets ~deps ~task_rules =
     fprintf ppf
       {|(rule
@@ -264,4 +265,17 @@ let () =
   print_test_ir_and_run "multi_ret";
   print_test_ir_and_run "indirect_call";
   print_test_c ~c_suffix:"defn" "extcalls";
-  print_test_run_no_main "data_decl"
+  print_test_run_no_main "data_decl";
+  print_test ~extra_subst:[] ~buf ~run:(Some "exn")
+    ~tasks:
+      [ Ocaml_default "exn_part1";
+        Ocaml_llvm { filename = "exn_part2"; stop_after_llvmize = false };
+        Output_ir { source = "exn_part2"; output = "exn_part2_ir" };
+        Ocaml_default "exn_part3" ];
+  print_test_run_no_main "alloc";
+  print_test ~extra_subst:[] ~buf ~run:(Some "tailcall")
+    ~tasks:
+      [ Ocaml_default "tailcall2";
+        Ocaml_llvm { filename = "tailcall"; stop_after_llvmize = false };
+        Output_ir { source = "tailcall"; output = "tailcall" ^ "_ir" } ];
+  ()
