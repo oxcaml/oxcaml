@@ -12,7 +12,7 @@ type 'a my_list = 'a list = [] | ( :: ) of 'a * 'a my_list
    to be true, and all instances of them in this file should also be updated. *)
 type t : immutable_data = int list my_list list my_list list
 [%%expect {|
-type 'a my_list = 'a list = [] | (::) of 'a * 'a my_list
+type ('a : value_or_null) my_list = 'a list = [] | (::) of 'a * 'a my_list
 type t = int list my_list list my_list list
 |}]
 type t : immutable_data = int list list list list list
