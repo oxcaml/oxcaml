@@ -167,6 +167,102 @@ let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
   collect block.start;
   !visited
 
+(* The dataflow analysis here is used to determine whether a block on any path
+   leading to a block in the CFG needs a prologue. This then allows us to check
+   whether we can stop shrink-wrapping if all descendant leaf blocks need a
+   prologue *)
+module Path_needs_prologue = struct
+  type state = bool
+
+  type context = { fun_name : string }
+
+  (* The domain represents whether the path leading to a specific block needs a
+     prologue or not. *)
+  module Domain : Cfg_dataflow.Domain_S with type t = state = struct
+    type t = bool
+
+    (* An empty block doesn't need a prologue. *)
+    let bot = false
+
+    (* If any of the predecessors of a block need a prologue, then we consider
+       the block to also need a prologue. *)
+    let join = ( || )
+
+    let less_equal a b = b || not a
+  end
+
+  module Transfer :
+    Cfg_dataflow.Forward_transfer
+      with type domain = bool
+       and type context = context = struct
+    type domain = bool
+
+    type nonrec context = context
+
+    type image =
+      { normal : domain;
+        exceptional : domain
+      }
+
+    let transfer : domain -> Instruction_requirements.t -> domain =
+     fun domain requirements ->
+      match domain, requirements with
+      | _, Requires_prologue -> true
+      | domain, (No_requirements | Requires_no_prologue) -> domain
+
+    let basic : domain -> Cfg.basic Cfg.instruction -> context -> domain =
+     fun domain instr _ ->
+      match domain, Instruction_requirements.basic instr with
+      | _, (Prologue | Epilogue) ->
+        Misc.fatal_error
+          "found prologue or epilogue instruction before prologue addition \
+           phase"
+      | domain, Requirements requirements -> transfer domain requirements
+
+    let terminator :
+        domain -> Cfg.terminator Cfg.instruction -> context -> image =
+     fun domain instr { fun_name } ->
+      let res =
+        transfer domain (Instruction_requirements.terminator instr fun_name)
+      in
+      { normal = res; exceptional = res }
+  end
+
+  module T = struct
+    include Cfg_dataflow.Forward (Domain) (Transfer)
+  end
+
+  include (T : module type of T with type context := context)
+
+  type t = bool Label.Tbl.t
+
+  let build (cfg : Cfg.t) : t =
+    match
+      run ~init:false ~handlers_are_entry_points:true cfg
+        { fun_name = cfg.fun_name }
+    with
+    | Ok res_at_entry ->
+      (* The result returned by the forward analysis is the state at the entry
+         of each block, but we want the state just before the terminator, i.e.
+         after the entire body of the block. *)
+      let res_at_exit = Label.Tbl.copy res_at_entry in
+      let context = { fun_name = cfg.fun_name } in
+      Label.Tbl.iter
+        (fun label at_entry ->
+          let block = Cfg.get_block_exn cfg label in
+          let at_exit =
+            DLL.fold_left
+              ~f:(fun acc instr -> Transfer.basic acc instr context)
+              ~init:at_entry block.body
+          in
+          Label.Tbl.replace res_at_exit label at_exit)
+        res_at_entry;
+      res_at_exit
+    | Error () -> Misc.fatal_error "Cfg_prologue: unreachable code"
+
+  let needs_prologue (t : t) (label : Label.t) = Label.Tbl.find t label
+end
+
 let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
     (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
     (epilogue_blocks : Label.Set.t) =
@@ -240,31 +336,38 @@ let find_prologue_and_epilogues_shrink_wrapped
     (cfg_with_infos : Cfg_with_infos.t) =
   let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
       (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
-      (reachable_epilogues : Reachable_epilogues.t) : Label.Set.t * Label.Set.t
+      (reachable_epilogues : Reachable_epilogues.t)
+      (path_needs_prologue : Path_needs_prologue.t) : Label.Set.t * Label.Set.t
       =
     let block = Cfg.get_block_exn cfg tree.label in
     let epilogue_blocks =
       Reachable_epilogues.from_block reachable_epilogues tree.label
     in
     (* If the current block needs a prologue, we can't propagate the prologue
-       downwards. If it's cold or all paths lead to an exception, there's no
-       reason to do so, as performance is not important. *)
-    let all_exceptional_paths =
+       downwards. If all paths eventually need a prologue (i.e. all reachable
+       blocks where we would add an epilogue require a prologue at some point on
+       any path to that block), we can place it here without any disadvantages.
+
+       This also covers the case where all paths lead to an exception and/or are
+       cold. *)
+    (* CR-soon cfalas: this assumes that all descendants of a cold block are
+       also cold.*)
+    let all_need_prologue =
       Label.Set.for_all
         (fun label ->
           let block = Cfg.get_block_exn cfg label in
-          match[@ocaml.warning "-4"] block.terminator.desc with
-          | Raise _ -> true
-          | _ -> false)
+          block.cold
+          || Path_needs_prologue.needs_prologue path_needs_prologue label)
         epilogue_blocks
     in
-    if prologue_needed_block block ~fun_name:cfg.fun_name
-       || block.cold || all_exceptional_paths
+    if prologue_needed_block block ~fun_name:cfg.fun_name || all_need_prologue
     then Label.Set.singleton tree.label, epilogue_blocks
     else
       let children_prologue_block =
         List.map
-          (fun tree -> visit tree cfg doms loop_infos reachable_epilogues)
+          (fun tree ->
+            visit tree cfg doms loop_infos reachable_epilogues
+              path_needs_prologue)
           tree.children
       in
       let child_prologue_blocks, child_epilogue_blocks =
@@ -294,8 +397,9 @@ let find_prologue_and_epilogues_shrink_wrapped
     let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
     let loop_infos = Cfg_with_infos.loop_infos cfg_with_infos in
     let reachable_epilogues = Reachable_epilogues.build cfg in
+    let path_needs_prologue = Path_needs_prologue.build cfg in
     let prologue_blocks, epilogue_blocks =
-      visit tree cfg doms loop_infos reachable_epilogues
+      visit tree cfg doms loop_infos reachable_epilogues path_needs_prologue
     in
     assert (
       can_place_prologues prologue_blocks cfg doms loop_infos epilogue_blocks);
