@@ -238,8 +238,8 @@ let push_static_raise stack_info i lbl_handler sz =
 let find_raise_label stack_info i =
   try List.assoc i stack_info.sz_static_raises
   with Not_found ->
-    Misc.fatal_error
-      ("exit(" ^ Static_label.to_string i ^ ") outside appropriated catch")
+    Misc.fatal_errorf "exit(%a) outside appropriated catch" Static_label.format
+      i
 
 (* Will the translation of l lead to a jump to label ? *)
 let code_as_jump stack_info l sz =

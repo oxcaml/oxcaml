@@ -1165,9 +1165,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let handler =
           try SU.env_find_static_exception nfail env
           with Not_found ->
-            Misc.fatal_error
-              ("Selection.emit_expr: unbound label "
-              ^ Static_label.to_string nfail)
+            Misc.fatal_errorf "Selection.emit_expr: unbound label %a"
+              Static_label.format nfail
         in
         (* Intermediate registers to handle cases where some registers from src
            are present in dest *)
