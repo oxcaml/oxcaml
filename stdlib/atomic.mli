@@ -24,7 +24,7 @@
   @since 4.12 *)
 
 (** An atomic (mutable) reference to a value of type ['a]. *)
-type (!'a : value_or_null) t : mutable_data with 'a =
+type (!'a : value_or_null) t : mutable_data mod contended with 'a =
   { mutable contents : 'a [@atomic] }
 
 (** Create an atomic reference. *)
@@ -79,28 +79,28 @@ external compare_exchange
 
 (** [fetch_and_add r n] atomically increments the value of [r] by [n], and
     returns the current value (before the increment). *)
-val fetch_and_add : int t @ contended local -> int -> int
+val fetch_and_add : int t @ local -> int -> int
 
 (** [add r i] atomically adds [i] onto [r]. *)
-val add : int t @ contended local -> int -> unit
+val add : int t @ local -> int -> unit
 
 (** [sub r i] atomically subtracts [i] onto [r]. *)
-val sub : int t @ contended local -> int -> unit
+val sub : int t @ local -> int -> unit
 
 (** [logand r i] atomically bitwise-ands [i] onto [r]. *)
-val logand : int t @ contended local -> int -> unit
+val logand : int t @ local -> int -> unit
 
 (** [logor r i] atomically bitwise-ors [i] onto [r]. *)
-val logor : int t @ contended local -> int -> unit
+val logor : int t @ local -> int -> unit
 
 (** [logxor r i] atomically bitwise-xors [i] onto [r]. *)
-val logxor : int t @ contended local -> int -> unit
+val logxor : int t @ local -> int -> unit
 
 (** [incr r] atomically increments the value of [r] by [1]. *)
-val incr : int t @ contended local -> unit
+val incr : int t @ local -> unit
 
 (** [decr r] atomically decrements the value of [r] by [1]. *)
-val decr : int t @ contended local -> unit
+val decr : int t @ local -> unit
 
 (** Operations that act over contended atomics. This imposes some extra mode
     constraints for safety. *)
@@ -149,7 +149,7 @@ module Loc : sig
 
       The API below mirrors the API to access {{!t}atomic references},
       see the documentation above for more information. *)
-  type ('a : value_or_null) t : mutable_data with 'a = 'a atomic_loc
+  type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
 
   external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load_loc"
 
@@ -166,25 +166,25 @@ module Loc : sig
     'a t @ local -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
 
   external fetch_and_add
-    : int t @ contended local -> int -> int = "%atomic_fetch_add_loc"
+    : int t @ local -> int -> int = "%atomic_fetch_add_loc"
 
   external add
-    : int t @ contended local -> int -> unit = "%atomic_add_loc"
+    : int t @ local -> int -> unit = "%atomic_add_loc"
 
   external sub
-    : int t @ contended local -> int -> unit = "%atomic_sub_loc"
+    : int t @ local -> int -> unit = "%atomic_sub_loc"
 
   external logand
-    : int t @ contended local -> int -> unit = "%atomic_land_loc"
+    : int t @ local -> int -> unit = "%atomic_land_loc"
 
   external logor
-    : int t @ contended local -> int -> unit = "%atomic_lor_loc"
+    : int t @ local -> int -> unit = "%atomic_lor_loc"
 
   external logxor
-    : int t @ contended local -> int -> unit = "%atomic_lxor_loc"
+    : int t @ local -> int -> unit = "%atomic_lxor_loc"
 
-  val incr : int t @ contended local -> unit
-  val decr : int t @ contended local -> unit
+  val incr : int t @ local -> unit
+  val decr : int t @ local -> unit
 
   module Contended : sig
     external get : ('a : value_or_null mod portable).

@@ -69,12 +69,31 @@ type t = { x : int option; }
 type ('a : immutable_data) t = { x : 'a option; }
 |}]
 
+(* atomic or immutable records annotated as sync *)
+type t : sync_data = { mutable x : int [@atomic] }
+type t : sync_data = { x : int; y : int; mutable z : int [@atomic] }
+type t : sync_data = { x : int; mutable y : int [@atomic]; mutable z : int [@atomic] }
+type nonrec t : sync_data = { t : t }
+type ('a : sync_data) t : sync_data = { x : 'a }
+type ('a : immutable_data) t : sync_data = { x : 'a }
+[%%expect {|
+type t = { mutable x : int [@atomic]; }
+type t = { x : int; y : int; mutable z : int [@atomic]; }
+type t = { x : int; mutable y : int [@atomic]; mutable z : int [@atomic]; }
+type nonrec t = { t : t; }
+type ('a : sync_data) t = { x : 'a; }
+type ('a : immutable_data) t = { x : 'a; }
+|}]
+
 (* mutable or immutable records annotated as mutable *)
 type t : mutable_data = { mutable x : int }
 type t : mutable_data = { x : int; y : int; mutable z : int }
 type t : mutable_data = { mutable x : int ref }
 type t : mutable_data = { x : int }
+type t : mutable_data = { mutable x : int [@atomic] }
+type t : mutable_data = { mutable x : int ref [@atomic] }
 type ('a : mutable_data) t : mutable_data = { x : 'a }
+type ('a : sync_data) t : mutable_data = { x : 'a }
 type ('a : immutable_data) t : mutable_data = { x : 'a }
 type t : mutable_data = { x : int ref; y : string }
 type ('a : mutable_data) t : mutable_data = { x : 'a option }
@@ -83,13 +102,16 @@ type t = { mutable x : int; }
 type t = { x : int; y : int; mutable z : int; }
 type t = { mutable x : int ref; }
 type t = { x : int; }
+type t = { mutable x : int [@atomic]; }
+type t = { mutable x : int ref [@atomic]; }
 type ('a : mutable_data) t = { x : 'a; }
+type ('a : sync_data) t = { x : 'a; }
 type ('a : immutable_data) t = { x : 'a; }
 type t = { x : int ref; y : string; }
 type ('a : mutable_data) t = { x : 'a option; }
 |}]
 
-(* annotations that aren't mutable_data or immutable_data *)
+(* annotations that aren't mutable_data, sync_data, or immutable_data *)
 type t : value mod contended = { x : unit -> unit }
 type 'a t : value mod contended = { x : 'a -> 'a }
 type ('a : value mod contended portable, 'b : value mod portable) t : value mod portable
@@ -239,9 +261,35 @@ Error: The kind of type "t" is immutable_data with 'a
          because of the annotation on the declaration of the type t.
 |}]
 
+type t : sync_data = { mutable x : int ref [@atomic] }
+[%%expect {|
+Line 1, characters 0-54:
+1 | type t : sync_data = { mutable x : int ref [@atomic] }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is mutable_data
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of sync_data
+         because of the annotation on the declaration of the type t.
+|}]
+
+type ('a : mutable_data) t : sync_data = { mutable x : 'a [@atomic] }
+[%%expect {|
+Line 1, characters 0-69:
+1 | type ('a : mutable_data) t : sync_data = { mutable x : 'a [@atomic] }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is sync_data with 'a @@ unyielding many
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of sync_data
+         because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with 'a ≰ mod contended
+|}]
+
 (**** Test 2: Annotations with "with" are accepted when appropriate ****)
 type 'a t : immutable_data with 'a = { x : int }
 type 'a t : immutable_data with 'a = { x : 'a }
+type 'a t : sync_data with 'a = { mutable x : 'a [@atomic] }
 type 'a t : mutable_data with 'a = { mutable x : 'a }
 type 'a t : mutable_data with 'a = { x : 'a ref }
 type ('a, 'b) t : immutable_data with 'a with 'b = { x : 'a; y : 'b; z : 'a }
@@ -254,6 +302,7 @@ type 'a t : immutable_data with 'a -> 'a = { x : 'a -> 'a }
 [%%expect {|
 type 'a t = { x : int; }
 type 'a t = { x : 'a; }
+type 'a t = { mutable x : 'a [@atomic]; }
 type 'a t = { mutable x : 'a; }
 type 'a t = { x : 'a ref; }
 type ('a, 'b) t = { x : 'a; y : 'b; z : 'a; }

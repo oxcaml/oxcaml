@@ -2489,11 +2489,20 @@ let of_type_decl_default ~context ~transl_type ~default
   | Some (t, _) -> t
   | None -> default
 
-let has_mutable_label lbls =
-  List.exists
-    (fun (lbl : Types.label_declaration) ->
-      match lbl.ld_mutable with Immutable -> false | Mutable _ -> true)
-    lbls
+let combine_mutability mut1 mut2 =
+  match mut1, mut2 with
+  | (Mutable { atomic = Nonatomic; mode = _ } as x), _
+  | _, (Mutable { atomic = Nonatomic; mode = _ } as x) -> x
+  | (Mutable { atomic = Atomic; mode = _ } as x), _
+  | _, (Mutable { atomic = Atomic; mode = _ } as x) -> x
+  | (Immutable as x), Immutable -> x
+
+let jkind_of_mutability mutability ~why =
+  (match mutability with
+   | Immutable -> Builtin.immutable_data
+   | Mutable { atomic = Atomic; _ } -> Builtin.sync_data
+   | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
+    ~why
 
 let all_void_labels lbls =
   List.for_all
@@ -2510,10 +2519,11 @@ let for_boxed_record lbls =
   if all_void_labels lbls
   then Builtin.immediate ~why:Empty_record
   else
-    let is_mutable = has_mutable_label lbls in
     let base =
-      (if is_mutable then Builtin.mutable_data else Builtin.immutable_data)
-        ~why:Boxed_record
+      lbls
+      |> List.map (fun (ld : Types.label_declaration) -> ld.ld_mutable)
+      |> List.fold_left combine_mutability Immutable
+      |> jkind_of_mutability ~why:Boxed_record
       |> mark_best
     in
     add_labels_as_with_bounds lbls base
@@ -2623,17 +2633,15 @@ let for_boxed_variant ~loc cstrs =
             (Warnings.Incompatible_with_upstream Warnings.Immediate_void_variant);
         Builtin.immediate ~why:Enumeration)
       else
-        let is_mutable =
-          List.exists
-            (fun cstr ->
-              match cstr.cd_args with
-              | Cstr_tuple _ -> false
-              | Cstr_record lbls -> has_mutable_label lbls)
-            cstrs
-        in
-        if is_mutable
-        then Builtin.mutable_data ~why:Boxed_variant
-        else Builtin.immutable_data ~why:Boxed_variant
+        List.concat_map
+          (fun cstr ->
+             match cstr.cd_args with
+             | Cstr_tuple _ -> [ Immutable ]
+             | Cstr_record lbls ->
+               List.map (fun (ld : Types.label_declaration) -> ld.ld_mutable) lbls)
+          cstrs
+        |> List.fold_left combine_mutability Immutable
+        |> jkind_of_mutability ~why:Boxed_variant
     in
     let base = mark_best base in
     let add_cstr_args cstr jkind =
