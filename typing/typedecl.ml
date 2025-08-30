@@ -4824,8 +4824,8 @@ let report_error ppf = function
   | Constructor_submode_failed (Error (ax, {left; right})) ->
       fprintf ppf "@[This constructor is at mode %a, \
         but expected to be at mode %a.@]"
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right;
+        Style.inline_code (Mode.Value.Const.print_axis ax left)
+        Style.inline_code (Mode.Value.Const.print_axis ax right);
       fprintf ppf "@[<hv>@[@{<hint>Hint@}: all argument types must \
         mode-cross for rebinding to succeed.@]"
 

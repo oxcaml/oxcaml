@@ -384,9 +384,8 @@ let untransl_modality (a : Modality.atom) : Parsetree.modality loc =
   let s =
     match a with
     | Atom (Comonadic ax, Meet_with a) ->
-      Format.asprintf "%a" (Value.Comonadic.Const.Per_axis.print ax) a
-    | Atom (Monadic ax, Join_with a) ->
-      Format.asprintf "%a" (Value.Monadic.Const.Per_axis.print ax) a
+      Value.Comonadic.Const.Per_axis.print ax a
+    | Atom (Monadic ax, Join_with a) -> Value.Monadic.Const.Per_axis.print ax a
   in
   { txt = Modality s; loc = Location.none }
 
@@ -530,7 +529,7 @@ let sort_dedup_modalities ~warn l =
     if warn
     then
       let (P ax0) = Axis.to_value (P ax0) in
-      let axis = Format.asprintf "%a" Mode.Value.Axis.print ax0 in
+      let axis = Mode.Value.Axis.print ax0 in
       let { txt = Modality overriden_by; _ } =
         untransl_modality (Atom (ax1, a1))
       in

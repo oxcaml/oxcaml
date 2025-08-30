@@ -14,7 +14,7 @@
 
 (** Re-export *)
 module type Axis_ops = sig
-  include Mode_intf.Lattice
+  include Mode_intf.Lattice_axis
 
   val less_or_equal : t -> t -> Misc.Le_result.t
 

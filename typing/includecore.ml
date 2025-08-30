@@ -350,9 +350,9 @@ let report_mode_sub_error got expected ppf e =
   | _ ->
     Format.fprintf ppf "%s %a but %s %a."
       (String.capitalize_ascii got)
-      (Misc.Style.as_inline_code (Value.Const.print_axis ax)) left
+      Misc.Style.inline_code (Value.Const.print_axis ax left)
       expected
-      (Misc.Style.as_inline_code (Value.Const.print_axis ax)) right
+      Misc.Style.inline_code (Value.Const.print_axis ax right)
 
 let report_modality_equate_error first second ppf
   ((equate_step, sub_error) : Modality.equate_error) =
@@ -628,7 +628,8 @@ let report_kind_mismatch first second ppf (kind1, kind2) =
 
 let print_unsafe_mode_crossing ppf umc =
   Format.fprintf ppf "mod %a@ %a"
-    Mode.Crossing.print umc.unsafe_mod_bounds
+    Format.(pp_print_list ~pp_sep:pp_print_space pp_print_string)
+    (Mode.Crossing.print umc.unsafe_mod_bounds)
     Jkind.With_bounds.format umc.unsafe_with_bounds
 
 let report_unsafe_mode_crossing_mismatch first second ppf e =

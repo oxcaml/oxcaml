@@ -32,6 +32,8 @@ module type Lattices = sig
   (** An element in a lattice whose carrier type is ['a]. *)
   type 'a elt
 
+  type print
+
   val min : 'a obj -> 'a elt
 
   val max : 'a obj -> 'a elt
@@ -42,18 +44,20 @@ module type Lattices = sig
 
   val meet : 'a obj -> 'a elt -> 'a elt -> 'a elt
 
-  val print : 'a obj -> Format.formatter -> 'a elt -> unit
+  val print : 'a obj -> 'a elt -> print
 
   val eq_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.eq option
 
-  val print_obj : Format.formatter -> 'a obj -> unit
+  type print_obj
+
+  val print_obj : 'a obj -> print_obj
 end
 
 (** Extend [Lattices] with monotone functions (including identity) to form a
    category. Among those monotone functions some will have left and right
    adjoints. *)
 module type Lattices_mono = sig
-  include Lattices with type 'a elt := 'a
+  include Lattices
 
   (** Morphism from object of base type ['a] to object of base type ['b] with
       allowance ['d]. See Note [Allowance] in allowance.mli.
@@ -145,7 +149,7 @@ module type Lattices_mono = sig
   include Allow_disallow with type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph
 
   (** Apply morphism on constant *)
-  val apply : 'b obj -> ('a, 'b, 'd) morph -> 'a -> 'b
+  val apply : 'b obj -> ('a, 'b, 'd) morph -> 'a elt -> 'b elt
 
   (** Checks if two morphisms are equal. If so, returns [Some Refl].
     Used for deduplication only; it is fine (but not recommended) to return
@@ -159,8 +163,10 @@ module type Lattices_mono = sig
     ('a1, 'b, 'l1 * 'r1) morph ->
     ('a0, 'a1) Misc.eq option
 
+  type print_morph
+
   (** Print morphism *)
-  val print_morph : 'b obj -> Format.formatter -> ('a, 'b, 'd) morph -> unit
+  val print_morph : 'b obj -> ('a, 'b, 'd) morph -> print_morph
 end
 
 module type Solver_mono = sig
@@ -279,6 +285,16 @@ module type Solver_mono = sig
     ('b, 'l * 'r) mode
 end
 
+type debug_print := Format.formatter -> unit
+
+(* The solver only deals with printing for debugging *)
+module type Lattices_mono_for_solver =
+  Lattices_mono
+    with type 'a elt := 'a
+     and type print := debug_print
+     and type print_obj := debug_print
+     and type print_morph := debug_print
+
 module type S = sig
   (** Error returned by failed [submode a b]. [left] will be the lowest mode [a]
    can be, and [right] will be the highest mode [b] can be. And [left <= right]
@@ -296,7 +312,7 @@ module type S = sig
     Equal with type ('a, 'b, 'c) t = ('a, 'b, 'c) X.t
 
   (** Solver that supports lattices with monotone morphisms between them. *)
-  module Solver_mono (C : Lattices_mono) :
+  module Solver_mono (C : Lattices_mono_for_solver) :
     Solver_mono
       with type ('a, 'b, 'd) morph := ('a, 'b, 'd) C.morph
        and type 'a obj := 'a C.obj

@@ -35,7 +35,12 @@ module type Lattice = sig
   val join : t -> t -> t
 
   val meet : t -> t -> t
+end
 
+module type Lattice_axis = sig
+  include Lattice
+
+  (* CR-someday zqian: simplify this to [t -> string]. *)
   val print : Format.formatter -> t -> unit
 end
 
@@ -51,7 +56,11 @@ module type Lattice_product = sig
   val max_with : 'a axis -> 'a -> t
 
   module Per_axis :
-    Solver_intf.Lattices with type 'a obj := 'a axis and type 'a elt := 'a
+    Solver_intf.Lattices
+      with type 'a obj := 'a axis
+       and type 'a elt := 'a
+       and type print := string
+       and type print_obj := string
 end
 
 type equate_step =
@@ -105,7 +114,8 @@ module type Common = sig
 
   val newvar_below : ('l * allowed) t -> ('l_ * 'r) t * bool
 
-  val print : ?verbose:bool -> unit -> Format.formatter -> ('l * 'r) t -> unit
+  val debug_print :
+    ?verbose:bool -> unit -> Format.formatter -> ('l * 'r) t -> unit
 
   val of_const : Const.t -> ('l * 'r) t
 
@@ -115,7 +125,7 @@ module type Common = sig
 end
 
 module type Common_axis = sig
-  module Const : Lattice
+  module Const : Lattice_axis
 
   include
     Common with module Const := Const and type error = Const.t Solver.error
@@ -131,7 +141,7 @@ module type Axis = sig
 
   type packed = P : 'a t -> packed
 
-  val print : Format.formatter -> 'a t -> unit
+  val print : 'a t -> string
 
   (** List of all axes, ordered by [compare]. *)
   val all : packed list
@@ -173,7 +183,7 @@ module type S = sig
         | Global
         | Local
 
-      include Lattice with type t := t
+      include Lattice_axis with type t := t
     end
 
     include
@@ -209,7 +219,7 @@ module type S = sig
         | Regional
         | Local
 
-      include Lattice with type t := t
+      include Lattice_axis with type t := t
     end
 
     include
@@ -230,7 +240,7 @@ module type S = sig
         | Many
         | Once
 
-      include Lattice with type t := t
+      include Lattice_axis with type t := t
     end
 
     include
@@ -249,7 +259,7 @@ module type S = sig
         | Portable
         | Nonportable
 
-      include Lattice with type t := t
+      include Lattice_axis with type t := t
     end
 
     include
@@ -264,10 +274,10 @@ module type S = sig
         | Unique
         | Aliased
 
-      include Lattice with type t := t
+      include Lattice_axis with type t := t
     end
 
-    module Const_op : Lattice with type t = Const.t
+    module Const_op : Lattice_axis with type t = Const.t
 
     include
       Common_axis
@@ -286,10 +296,10 @@ module type S = sig
         | Shared
         | Uncontended
 
-      include Lattice with type t := t
+      include Lattice_axis with type t := t
     end
 
-    module Const_op : Lattice with type t = Const.t
+    module Const_op : Lattice_axis with type t = Const.t
 
     include
       Common_axis
@@ -303,7 +313,7 @@ module type S = sig
         | Yielding
         | Unyielding
 
-      include Lattice with type t := t
+      include Lattice_axis with type t := t
     end
 
     include
@@ -323,7 +333,7 @@ module type S = sig
         | Observing
         | Stateful
 
-      include Lattice with type t := t
+      include Lattice_axis with type t := t
     end
 
     include
@@ -345,10 +355,10 @@ module type S = sig
         | Read
         | Read_write
 
-      include Lattice with type t := t
+      include Lattice_axis with type t := t
     end
 
-    module Const_op : Lattice with type t = Const.t
+    module Const_op : Lattice_axis with type t = Const.t
 
     include
       Common_axis
@@ -391,7 +401,7 @@ module type S = sig
       | Visibility : (monadic, Visibility.Const.t) t
       | Contention : (monadic, Contention.Const.t) t
 
-    val print : Format.formatter -> ('p, 'r) t -> unit
+    val print : ('p, 'r) t -> string
 
     val eq : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
   end
@@ -460,7 +470,7 @@ module type S = sig
 
       (** Gets the normal lattice for comonadic axes and the "op"ped lattice for
         monadic ones. *)
-      val lattice_of_axis : 'a Axis.t -> (module Lattice with type t = 'a)
+      val lattice_of_axis : 'a Axis.t -> (module Lattice_axis with type t = 'a)
 
       module Option : sig
         type some = t
@@ -480,7 +490,7 @@ module type S = sig
 
         val value : t -> default:some -> some
 
-        val print : Format.formatter -> t -> unit
+        val debug_print : Format.formatter -> t -> unit
 
         val proj : 'a Axis.t -> t -> 'a option
 
@@ -506,7 +516,7 @@ module type S = sig
       val partial_apply : t -> t
 
       (** Prints a constant on any axis. *)
-      val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
+      val print_axis : 'a Axis.t -> 'a -> string
     end
 
     type error = Error : 'a Axis.t * 'a Solver.error -> error
@@ -700,8 +710,7 @@ module type S = sig
             Definition: [t0 = t1] iff [t0 <= t1] and [t1 <= t0]. *)
       val equate : t -> t -> (unit, equate_error) Result.t
 
-      (** Printing for debugging. *)
-      val print : Format.formatter -> t -> unit
+      val debug_print : Format.formatter -> t -> unit
     end
 
     (** A modality that acts on [Value] modes. Conceptually it is a record where
@@ -735,8 +744,7 @@ module type S = sig
           Definition: [t0 = t1] iff [t0 <= t1] and [t1 <= t0]. *)
     val equate : t -> t -> (unit, equate_error) Result.t
 
-    (** Printing for debugging. *)
-    val print : Format.formatter -> t -> unit
+    val debug_print : Format.formatter -> t -> unit
 
     (** Given [md_mode] the mode of a module, and [mode] the mode of a value
       to be put in that module, return the inferred modality to be put on the
@@ -822,7 +830,9 @@ module type S = sig
       (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic ->
       (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic
 
+    (* CR-soon zqian: move this to [printtyp] *)
+
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
-    val print : Format.formatter -> t -> unit
+    val print : t -> string list
   end
 end

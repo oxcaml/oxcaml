@@ -13,7 +13,7 @@
 (**************************************************************************)
 
 module type Axis_ops = sig
-  include Mode_intf.Lattice
+  include Mode_intf.Lattice_axis
 
   val less_or_equal : t -> t -> Misc.Le_result.t
 
@@ -187,7 +187,7 @@ module Axis = struct
 
   type packed = Pack : 'a t -> packed [@@unboxed]
 
-  module Accent_lattice (M : Mode_intf.Lattice) = struct
+  module Accent_lattice (M : Mode_intf.Lattice_axis) = struct
     (* A functor to add some convenient functions to modal axes *)
     include M
 
@@ -219,7 +219,7 @@ module Axis = struct
       Pack (Nonmodal Separability) ]
 
   let name (type a) : a t -> string = function
-    | Modal axis -> Format.asprintf "%a" Mode.Value.Axis.print axis
+    | Modal axis -> Mode.Value.Axis.print axis
     | Nonmodal Externality -> "externality"
     | Nonmodal Nullability -> "nullability"
     | Nonmodal Separability -> "separability"

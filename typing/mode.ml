@@ -88,6 +88,8 @@ module Lattices = struct
   module type Areality = sig
     include Heyting
 
+    val print : Format.formatter -> t -> unit
+
     val _is_areality : unit
   end
 
@@ -122,11 +124,11 @@ module Lattices = struct
         match a, b with
         | Global, _ | _, Global -> Global
         | Local, Local -> Local
-
-      let print ppf = function
-        | Global -> Format.fprintf ppf "global"
-        | Local -> Format.fprintf ppf "local"
     end)
+
+    let print ppf = function
+      | Global -> Format.fprintf ppf "global"
+      | Local -> Format.fprintf ppf "local"
 
     let _is_areality = ()
   end
@@ -173,12 +175,12 @@ module Lattices = struct
         | Global, _ | _, Local -> true
         | _, Global | Local, _ -> false
         | Regional, Regional -> true
-
-      let print ppf = function
-        | Global -> Format.fprintf ppf "global"
-        | Regional -> Format.fprintf ppf "regional"
-        | Local -> Format.fprintf ppf "local"
     end)
+
+    let print ppf = function
+      | Global -> Format.fprintf ppf "global"
+      | Regional -> Format.fprintf ppf "regional"
+      | Local -> Format.fprintf ppf "local"
 
     let _is_areality = ()
   end
@@ -217,11 +219,11 @@ module Lattices = struct
         match a, b with
         | Unique, _ | _, Unique -> Unique
         | Aliased, Aliased -> Aliased
-
-      let print ppf = function
-        | Aliased -> Format.fprintf ppf "aliased"
-        | Unique -> Format.fprintf ppf "unique"
     end)
+
+    let print ppf = function
+      | Aliased -> Format.fprintf ppf "aliased"
+      | Unique -> Format.fprintf ppf "unique"
   end
 
   module Linearity = struct
@@ -252,11 +254,11 @@ module Lattices = struct
 
       let meet a b =
         match a, b with Many, _ | _, Many -> Many | Once, Once -> Once
-
-      let print ppf = function
-        | Once -> Format.fprintf ppf "once"
-        | Many -> Format.fprintf ppf "many"
     end)
+
+    let print ppf = function
+      | Once -> Format.fprintf ppf "once"
+      | Many -> Format.fprintf ppf "many"
   end
 
   module Portability = struct
@@ -293,11 +295,11 @@ module Lattices = struct
         match a, b with
         | Portable, _ | _, Portable -> Portable
         | Nonportable, Nonportable -> Nonportable
-
-      let print ppf = function
-        | Portable -> Format.fprintf ppf "portable"
-        | Nonportable -> Format.fprintf ppf "nonportable"
     end)
+
+    let print ppf = function
+      | Portable -> Format.fprintf ppf "portable"
+      | Nonportable -> Format.fprintf ppf "nonportable"
   end
 
   module Contention = struct
@@ -342,12 +344,12 @@ module Lattices = struct
         | Uncontended, _ | _, Uncontended -> Uncontended
         | Shared, _ | _, Shared -> Shared
         | Contended, Contended -> Contended
-
-      let print ppf = function
-        | Contended -> Format.fprintf ppf "contended"
-        | Shared -> Format.fprintf ppf "shared"
-        | Uncontended -> Format.fprintf ppf "uncontended"
     end)
+
+    let print ppf = function
+      | Contended -> Format.fprintf ppf "contended"
+      | Shared -> Format.fprintf ppf "shared"
+      | Uncontended -> Format.fprintf ppf "uncontended"
   end
 
   module Yielding = struct
@@ -384,11 +386,11 @@ module Lattices = struct
         match a, b with
         | Unyielding, _ | _, Unyielding -> Unyielding
         | Yielding, Yielding -> Yielding
-
-      let print ppf = function
-        | Yielding -> Format.fprintf ppf "yielding"
-        | Unyielding -> Format.fprintf ppf "unyielding"
     end)
+
+    let print ppf = function
+      | Yielding -> Format.fprintf ppf "yielding"
+      | Unyielding -> Format.fprintf ppf "unyielding"
   end
 
   module Statefulness = struct
@@ -433,12 +435,12 @@ module Lattices = struct
         | Stateless, _ | _, Stateless -> Stateless
         | Observing, _ | _, Observing -> Observing
         | Stateful, Stateful -> Stateful
-
-      let print ppf = function
-        | Stateless -> Format.fprintf ppf "stateless"
-        | Observing -> Format.fprintf ppf "observing"
-        | Stateful -> Format.fprintf ppf "stateful"
     end)
+
+    let print ppf = function
+      | Stateless -> Format.fprintf ppf "stateless"
+      | Observing -> Format.fprintf ppf "observing"
+      | Stateful -> Format.fprintf ppf "stateful"
   end
 
   module Visibility = struct
@@ -483,12 +485,12 @@ module Lattices = struct
         | Read_write, _ | _, Read_write -> Read_write
         | Read, _ | _, Read -> Read
         | Immutable, Immutable -> Immutable
-
-      let print ppf = function
-        | Immutable -> Format.fprintf ppf "immutable"
-        | Read -> Format.fprintf ppf "read"
-        | Read_write -> Format.fprintf ppf "read_write"
     end)
+
+    let print ppf = function
+      | Immutable -> Format.fprintf ppf "immutable"
+      | Read -> Format.fprintf ppf "read"
+      | Read_write -> Format.fprintf ppf "read_write"
   end
 
   type monadic =
@@ -570,7 +572,7 @@ module Lattices = struct
       let visibility = Visibility.subtract m1.visibility m2.visibility in
       { uniqueness; contention; visibility }
 
-    let print ppf m =
+    let debug_print ppf m =
       Format.fprintf ppf "%a,%a,%a" Uniqueness.print m.uniqueness
         Contention.print m.contention Visibility.print m.visibility
   end
@@ -680,7 +682,7 @@ module Lattices = struct
       let statefulness = Statefulness.imply m1.statefulness m2.statefulness in
       { areality; linearity; portability; yielding; statefulness }
 
-    let print ppf m =
+    let debug_print ppf m =
       Format.fprintf ppf "%a,%a,%a,%a,%a" Areality.print m.areality
         Linearity.print m.linearity Portability.print m.portability
         Yielding.print m.yielding Statefulness.print m.statefulness
@@ -704,8 +706,6 @@ module Lattices = struct
 
     let meet = L.join
 
-    let print = L.print
-
     let imply a b = L.subtract b a
   end
   [@@inline]
@@ -726,9 +726,24 @@ module Lattices = struct
      that and provide an interface to the user where monadic lattices are flipped back to
      its original ordering. See [module Monadic_gen] and [module Monadic].
   *)
-  module Uniqueness_op = Opposite (Uniqueness)
-  module Contention_op = Opposite (Contention)
-  module Visibility_op = Opposite (Visibility)
+  module Uniqueness_op = struct
+    include Opposite (Uniqueness)
+
+    let print = Uniqueness.print
+  end
+
+  module Contention_op = struct
+    include Opposite (Contention)
+
+    let print = Contention.print
+  end
+
+  module Visibility_op = struct
+    include Opposite (Visibility)
+
+    let print = Visibility.print
+  end
+
   module Monadic_op = Opposite (Monadic)
   module Comonadic_with_locality = Comonadic_with (Locality)
   module Comonadic_with_regionality = Comonadic_with (Regionality)
@@ -747,8 +762,9 @@ module Lattices = struct
     | Comonadic_with_regionality : Comonadic_with_regionality.t obj
     | Comonadic_with_locality : Comonadic_with_locality.t obj
 
-  let print_obj : type a. _ -> a obj -> unit =
-   fun ppf -> function
+  let print_obj : type a. a obj -> _ -> unit =
+   fun obj ppf ->
+    match obj with
     | Locality -> Format.fprintf ppf "Locality"
     | Regionality -> Format.fprintf ppf "Regionality"
     | Uniqueness_op -> Format.fprintf ppf "Uniqueness_op"
@@ -866,9 +882,11 @@ module Lattices = struct
     | Portability -> Portability.print
     | Yielding -> Yielding.print
     | Statefulness -> Statefulness.print
-    | Monadic_op -> Monadic_op.print
-    | Comonadic_with_locality -> Comonadic_with_locality.print
-    | Comonadic_with_regionality -> Comonadic_with_regionality.print
+    | Monadic_op -> Monadic.debug_print
+    | Comonadic_with_locality -> Comonadic_with_locality.debug_print
+    | Comonadic_with_regionality -> Comonadic_with_regionality.debug_print
+
+  let print obj a ppf = print obj ppf a
 
   module Equal_obj = Magic_equal (struct
     type ('a, _, 'd) t = 'a obj constraint 'd = 'l * 'r
@@ -924,16 +942,15 @@ module Lattices_mono = struct
 
     let compare a b = to_int a - to_int b
 
-    let print : type p r. _ -> (p, r) t -> unit =
-     fun ppf -> function
-      | Areality -> Format.fprintf ppf "locality"
-      | Linearity -> Format.fprintf ppf "linearity"
-      | Portability -> Format.fprintf ppf "portability"
-      | Uniqueness -> Format.fprintf ppf "uniqueness"
-      | Contention -> Format.fprintf ppf "contention"
-      | Yielding -> Format.fprintf ppf "yielding"
-      | Statefulness -> Format.fprintf ppf "statefulness"
-      | Visibility -> Format.fprintf ppf "visibility"
+    let print : type p r. (p, r) t -> string = function
+      | Areality -> "locality"
+      | Linearity -> "linearity"
+      | Portability -> "portability"
+      | Uniqueness -> "uniqueness"
+      | Contention -> "contention"
+      | Yielding -> "yielding"
+      | Statefulness -> "statefulness"
+      | Visibility -> "visibility"
 
     let eq : type p r0 r1. (p, r0) t -> (p, r1) t -> (r0, r1) Misc.eq option =
      fun ax0 ax1 ->
@@ -1230,17 +1247,18 @@ module Lattices_mono = struct
   let eq_morph = Equal_morph.equal
 
   let rec print_morph :
-      type a b l r. b obj -> Format.formatter -> (a, b, l * r) morph -> unit =
-   fun dst ppf -> function
+      type a b l r. b obj -> (a, b, l * r) morph -> Format.formatter -> unit =
+   fun dst morph ppf ->
+    match morph with
     | Id -> Format.fprintf ppf "id"
-    | Meet_with c -> Format.fprintf ppf "meet(%a)" (print dst) c
-    | Imply c -> Format.fprintf ppf "imply(%a)" (print dst) c
-    | Proj (_, ax) -> Format.fprintf ppf "proj_%a" Axis.print ax
-    | Max_with ax -> Format.fprintf ppf "max_with_%a" Axis.print ax
-    | Min_with ax -> Format.fprintf ppf "min_with_%a" Axis.print ax
+    | Meet_with c -> Format.fprintf ppf "meet(%t)" (print dst c)
+    | Imply c -> Format.fprintf ppf "imply(%t)" (print dst c)
+    | Proj (_, ax) -> Format.fprintf ppf "proj_%s" (Axis.print ax)
+    | Max_with ax -> Format.fprintf ppf "max_with_%s" (Axis.print ax)
+    | Min_with ax -> Format.fprintf ppf "min_with_%s" (Axis.print ax)
     | Map_comonadic f ->
       let dst0 = proj_obj Areality dst in
-      Format.fprintf ppf "map_comonadic(%a)" (print_morph dst0) f
+      Format.fprintf ppf "map_comonadic(%t)" (print_morph dst0 f)
     | Monadic_to_comonadic_min -> Format.fprintf ppf "monadic_to_comonadic_min"
     | Comonadic_to_monadic _ -> Format.fprintf ppf "comonadic_to_monadic"
     | Monadic_to_comonadic_max -> Format.fprintf ppf "monadic_to_comonadic_max"
@@ -1251,7 +1269,7 @@ module Lattices_mono = struct
     | Global_to_regional -> Format.fprintf ppf "global_to_regional"
     | Compose (f0, f1) ->
       let mid = src dst f0 in
-      Format.fprintf ppf "%a ∘ %a" (print_morph dst) f0 (print_morph mid) f1
+      Format.fprintf ppf "%t ∘ %t" (print_morph dst f0) (print_morph mid f1)
 
   let id = Id
 
@@ -1675,7 +1693,7 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let equate_exn m0 m1 = equate m0 m1 |> Result.get_ok
 
-  let print ?verbose () ppf m = Solver.print ?verbose obj ppf m
+  let debug_print ?verbose () ppf m = Solver.print ?verbose obj ppf m
 
   let zap_to_ceil m = with_log (Solver.zap_to_ceil obj m)
 
@@ -1753,7 +1771,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   let equate_exn m0 m1 = equate m0 m1 |> Result.get_ok
 
-  let print ?verbose () ppf m = Solver.print ?verbose obj ppf m
+  let debug_print ?verbose () ppf m = Solver.print ?verbose obj ppf m
 
   let zap_to_ceil m = with_log (Solver.zap_to_floor obj m)
 
@@ -2031,9 +2049,9 @@ module Comonadic_with (Areality : Areality) = struct
     include Lattice_Product (C.Comonadic_with (Areality.Const))
 
     module Per_axis = struct
-      let print ax ppf a =
+      let print ax a =
         let obj = proj_obj ax in
-        C.print obj ppf a
+        Format.asprintf "%t" (C.print obj a)
 
       let le ax a b =
         let obj = proj_obj ax in
@@ -2060,13 +2078,13 @@ module Comonadic_with (Areality : Areality) = struct
         let obj1 = proj_obj ax1 in
         C.eq_obj obj0 obj1
 
-      let print_obj ppf ax =
+      let print_obj ax =
         let obj = proj_obj ax in
-        C.print_obj ppf obj
+        Format.asprintf "%t" (C.print_obj obj)
     end
 
     let lattice_of_axis (type a) (axis : a Axis.t) :
-        (module Lattice with type t = a) =
+        (module Lattice_axis with type t = a) =
       match axis with
       | Areality -> (module Areality.Const)
       | Linearity -> (module Linearity.Const)
@@ -2194,9 +2212,9 @@ module Monadic = struct
     include Lattice_Product (C.Monadic)
 
     module Per_axis = struct
-      let print ax ppf a =
+      let print ax a =
         let obj = proj_obj ax in
-        C.print obj ppf a
+        Format.asprintf "%t" (C.print obj a)
 
       let le ax a b =
         let obj = proj_obj ax in
@@ -2223,13 +2241,13 @@ module Monadic = struct
         let obj1 = proj_obj ax1 in
         C.eq_obj obj0 obj1
 
-      let print_obj ppf ax =
+      let print_obj ax =
         let obj = proj_obj ax in
-        C.print_obj ppf obj
+        Format.asprintf "%t" (C.print_obj obj)
     end
 
     let lattice_of_axis (type a) (axis : a Axis.t) :
-        (module Lattice with type t = a) =
+        (module Lattice_axis with type t = a) =
       match axis with
       | Uniqueness -> (module Uniqueness.Const_op)
       | Contention -> (module Contention.Const_op)
@@ -2334,10 +2352,9 @@ module Value_with (Areality : Areality) = struct
 
     type packed = P : 'a t -> packed
 
-    let print (type a) ppf (t : a t) =
-      match t with
-      | Monadic ax -> Axis.print ppf ax
-      | Comonadic ax -> Axis.print ppf ax
+    let print = function
+      | Monadic ax -> Axis.print ax
+      | Comonadic ax -> Axis.print ax
 
     let all =
       List.map (fun (Monadic.Axis.P ax) -> P (Monadic ax)) Monadic.Axis.all
@@ -2394,11 +2411,11 @@ module Value_with (Areality : Areality) = struct
       visibility
     }
 
-  let print ?verbose () ppf { monadic; comonadic } =
+  let debug_print ?verbose () ppf { monadic; comonadic } =
     Format.fprintf ppf "%a;%a"
-      (Comonadic.print ?verbose ())
+      (Comonadic.debug_print ?verbose ())
       comonadic
-      (Monadic.print ?verbose ())
+      (Monadic.debug_print ?verbose ())
       monadic
 
   let of_const c =
@@ -2437,10 +2454,6 @@ module Value_with (Areality : Areality) = struct
       Comonadic.equal m0.comonadic m1.comonadic
       && Monadic.equal m0.monadic m1.monadic
 
-    let print ppf m =
-      let { monadic; comonadic } = split m in
-      Format.fprintf ppf "%a,%a" Comonadic.print comonadic Monadic.print monadic
-
     let legacy =
       merge { comonadic = Comonadic.legacy; monadic = Monadic.legacy }
 
@@ -2459,7 +2472,7 @@ module Value_with (Areality : Areality) = struct
       merge { monadic; comonadic }
 
     let lattice_of_axis (type a) (axis : a Axis.t) :
-        (module Lattice with type t = a) =
+        (module Lattice_axis with type t = a) =
       match axis with
       | Comonadic ax -> Comonadic.lattice_of_axis ax
       | Monadic ax -> Monadic.lattice_of_axis ax
@@ -2548,7 +2561,7 @@ module Value_with (Areality : Areality) = struct
           | Yielding -> { t with yielding = a }
           | Statefulness -> { t with statefulness = a })
 
-      let print ppf
+      let debug_print ppf
           { areality;
             uniqueness;
             linearity;
@@ -2623,10 +2636,10 @@ module Value_with (Areality : Areality) = struct
       let monadic = Monadic.min in
       merge { comonadic; monadic }
 
-    let print_axis : type a. a Axis.t -> _ -> a -> unit =
-     fun ax ppf a ->
+    let print_axis : type a. a Axis.t -> a -> string =
+     fun ax a ->
       let obj = proj_obj ax in
-      C.print obj ppf a
+      Format.asprintf "%t" (C.print obj a)
 
     let le_axis : type a. a Axis.t -> a -> a -> bool =
      fun ax m0 m1 ->
@@ -2994,6 +3007,9 @@ module Modality = struct
       let is_id ax (Join_with c) = Mode.Const.Per_axis.(le ax c (min ax))
 
       let is_constant ax (Join_with c) = Mode.Const.Per_axis.(le ax (max ax) c)
+
+      let print ax (Join_with c) =
+        Format.asprintf "%t" (C.print (Mode.proj_obj ax) c)
     end
 
     type error = Error : 'a axis * 'a Atom.t Solver.error -> error
@@ -3031,8 +3047,9 @@ module Modality = struct
       let set ax (Join_with a : _ Atom.t) (Join_const c) =
         Join_const (Axis.set ax a c)
 
-      let print ppf = function
-        | Join_const c -> Format.fprintf ppf "join_const(%a)" Mode.Const.print c
+      let debug_print ppf = function
+        | Join_const c ->
+          Format.fprintf ppf "join_const(%a)" Mode.Const.debug_print c
     end
 
     type t =
@@ -3078,8 +3095,8 @@ module Modality = struct
         Misc.fatal_error "modality Undefined should not be applied."
       | Diff (_, m) -> Mode.join [Mode.allow_right m; x]
 
-    let print ppf = function
-      | Const c -> Const.print ppf c
+    let debug_print ppf = function
+      | Const c -> Format.fprintf ppf "Const %a" Const.debug_print c
       | Undefined -> Format.fprintf ppf "undefined"
       | Diff _ -> Format.fprintf ppf "diff"
 
@@ -3132,6 +3149,9 @@ module Modality = struct
       let is_id ax (Meet_with c) = Mode.Const.Per_axis.(le ax (max ax) c)
 
       let is_constant ax (Meet_with c) = Mode.Const.Per_axis.(le ax c (min ax))
+
+      let print ax (Meet_with c) =
+        Format.asprintf "%t" (C.print (Mode.proj_obj ax) c)
     end
 
     type error = Error : 'a axis * 'a Atom.t Solver.error -> error
@@ -3169,8 +3189,9 @@ module Modality = struct
       let set ax (Meet_with a : _ Atom.t) (Meet_const c) =
         Meet_const (Axis.set ax a c)
 
-      let print ppf = function
-        | Meet_const c -> Format.fprintf ppf "meet_const(%a)" Mode.Const.print c
+      let debug_print ppf = function
+        | Meet_const c ->
+          Format.fprintf ppf "meet_const(%a)" Mode.Const.debug_print c
     end
 
     type t =
@@ -3224,8 +3245,8 @@ module Modality = struct
            equal to [m]. *)
         Mode.disallow_right m
 
-    let print ppf = function
-      | Const c -> Const.print ppf c
+    let debug_print ppf = function
+      | Const c -> Format.fprintf ppf "Const %a" Const.debug_print c
       | Undefined -> Format.fprintf ppf "undefined"
       | Exactly _ -> Format.fprintf ppf "exactly"
 
@@ -3314,6 +3335,10 @@ module Modality = struct
     let is_constant : type a. a Axis.t -> a -> bool = function
       | Monadic ax -> Monadic.is_constant ax
       | Comonadic ax -> Comonadic.is_constant ax
+
+    let print : type a. a Axis.t -> a -> string = function
+      | Monadic ax -> Monadic.print ax
+      | Comonadic ax -> Comonadic.print ax
   end
 
   type error = Error : 'a Axis.t * 'a Solver.error -> error
@@ -3370,8 +3395,9 @@ module Modality = struct
           if a0 = a1 then None else Some (Atom (ax, a1)))
         Value.Axis.all
 
-    let print ppf { monadic; comonadic } =
-      Format.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
+    let debug_print ppf { monadic; comonadic } =
+      Format.fprintf ppf "%a;%a" Monadic.debug_print monadic
+        Comonadic.debug_print comonadic
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
@@ -3397,8 +3423,9 @@ module Modality = struct
 
   let equate m0 m1 = try_with_log (equate_from_submode sub_log m0 m1)
 
-  let print ppf ({ monadic; comonadic } : t) =
-    Format.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
+  let debug_print ppf ({ monadic; comonadic } : t) =
+    Format.fprintf ppf "%a;%a" Monadic.debug_print monadic Comonadic.debug_print
+      comonadic
 
   let infer ~md_mode ~mode : t =
     let comonadic =
@@ -3606,22 +3633,13 @@ module Crossing = struct
 
   let equal t0 t1 = le t0 t1 && le t1 t0
 
-  let print ppf t =
-    let print_atom ppf (Modality.Atom (ax, a)) =
-      match ax, a with
-      | Monadic ax, Join_with c -> Value.Monadic.Const.Per_axis.print ax ppf c
-      | Comonadic ax, Meet_with c ->
-        Value.Comonadic.Const.Per_axis.print ax ppf c
-    in
-    let l =
-      List.filter_map
-        (fun ax ->
-          let (P ax) = Modality.Axis.of_value ax in
-          let a = Modality.Const.proj ax t in
-          if Modality.Per_axis.is_id ax a
-          then None
-          else Some (Modality.Atom (ax, a)))
-        Value.Axis.all
-    in
-    Format.(pp_print_list ~pp_sep:pp_print_space print_atom ppf l)
+  let print t =
+    List.filter_map
+      (fun ax ->
+        let (P ax) = Modality.Axis.of_value ax in
+        let a = Modality.Const.proj ax t in
+        if Modality.Per_axis.is_id ax a
+        then None
+        else Some (Modality.Per_axis.print ax a))
+      Value.Axis.all
 end

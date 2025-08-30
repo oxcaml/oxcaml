@@ -96,7 +96,8 @@ module Unique_barrier = struct
   let print ppf t =
     let open Format in
     let print = function
-      | Enabled u -> fprintf ppf "Enabled(%a)" (Mode.Uniqueness.print ()) u
+      | Enabled u ->
+          fprintf ppf "Enabled(%a)" (Mode.Uniqueness.debug_print ()) u
       | Resolved uc ->
         fprintf ppf "Resolved(%a)" Mode.Uniqueness.Const.print uc
       | Not_computed -> fprintf ppf "Not_computed"
@@ -109,8 +110,8 @@ type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 let print_unique_use ppf (u,l) =
   let open Format in
   fprintf ppf "@[(%a,@ %a)@]"
-    (Mode.Uniqueness.print ()) u
-    (Mode.Linearity.print ()) l
+    (Mode.Uniqueness.debug_print ()) u
+    (Mode.Linearity.debug_print ()) l
 
 type alloc_mode = {
   mode : Mode.Alloc.r;
