@@ -58,6 +58,9 @@ type equate_step =
   | Left_le_right
   | Right_le_left
 
+(* CR-soon zqian: remove [simple_error] such that all mode errors are printed
+   with hints. *)
+
 (** Simple mode error specific to axis whose carrier type is ['a]. [left] is the lower
 bound of actual mode and [right] is the upper bound of expected mode. [left <= right] is
 false, which is why the submode failed. *)
@@ -101,6 +104,13 @@ module type Common = sig
 
   val newvar : unit -> ('l * 'r) t
 
+  (* CR-soon zqian: The following [submode] is currently abused at callsites
+     where the two modes should be linked via some morph hint, instead of being
+     linked directly. *)
+
+  (** Constrain the first mode lower than the second mode. It also assumes the
+  submode is trivial and links the two modes directly, without inserting an
+  [Unknown] morph hint. *)
   val submode : (allowed * 'r) t -> ('l * allowed) t -> (unit, error) result
 
   val equate : lr -> lr -> (unit, equate_error) result
