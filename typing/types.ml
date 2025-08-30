@@ -323,21 +323,21 @@ module Jkind_mod_bounds = struct
           externality;
           nullability;
           separability } =
-    Format.fprintf ppf "@[{ areality = %a;@ linearity = %a;@ uniqueness = %a;@ \
-      portability = %a;@ contention = %a;@ yielding = %a;@ statefulness = %a;@ \
-      visibility = %a;@ externality = %a;@ \
-      nullability = %a;@ separability = %a }@]"
-      Areality.print areality
-      Linearity.print linearity
-      Uniqueness.print uniqueness
-      Portability.print portability
-      Contention.print contention
-      Yielding.print yielding
-      Statefulness.print statefulness
-      Visibility.print visibility
-      Externality.print externality
-      Nullability.print nullability
-      Separability.print separability
+    Format.fprintf ppf "@[{ areality = %s;@ linearity = %s;@ uniqueness = %s;@ \
+      portability = %s;@ contention = %s;@ yielding = %s;@ statefulness = %s;@ \
+      visibility = %s;@ externality = %s;@ \
+      nullability = %s;@ separability = %s }@]"
+      (Areality.print areality)
+      (Linearity.print linearity)
+      (Uniqueness.print uniqueness)
+      (Portability.print portability)
+      (Contention.print contention)
+      (Yielding.print yielding)
+      (Statefulness.print statefulness)
+      (Visibility.print visibility)
+      (Externality.print externality)
+      (Nullability.print nullability)
+      (Separability.print separability)
 end
 
 

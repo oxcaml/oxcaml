@@ -92,9 +92,9 @@ let fmt_mutable_mode_flag f (x : Types.mutability) =
   match x with
   | Immutable -> fprintf f "Immutable"
   | Mutable { mode; atomic = Nonatomic } ->
-    fprintf f "Mutable(%a)" (Mode.Value.Comonadic.print ()) mode
+      fprintf f "Mutable(%a)" (Mode.Value.Comonadic.debug_print ()) mode
   | Mutable { mode; atomic = Atomic } ->
-    fprintf f "Atomic(%a)" (Mode.Value.Comonadic.print ()) mode
+      fprintf f "Atomic(%a)" (Mode.Value.Comonadic.debug_print ()) mode
 
 let fmt_virtual_flag f x =
   match x with
@@ -469,7 +469,7 @@ and expression_extra i ppf x attrs =
       alloc_const_option_mode i ppf m
 
 and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
-  = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.print ()) m
+  = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.debug_print ()) m
 
 and alloc_mode i ppf (m : alloc_mode) = alloc_mode_raw i ppf m.mode
 
@@ -477,13 +477,14 @@ and alloc_mode_option i ppf m = Option.iter (alloc_mode i ppf) m
 
 and locality_mode i ppf m =
   line i ppf "locality_mode %a\n"
-    (Mode.Locality.print ()) m
+    (Mode.Locality.debug_print ()) m
 
 and value_mode i ppf m =
-  line i ppf "value_mode %a\n" (Mode.Value.print ()) m
+  line i ppf "value_mode %a\n" (Mode.Value.debug_print ()) m
 
 and alloc_const_option_mode i ppf m =
-  line i ppf "alloc_const_option_mode %a\n" Mode.Alloc.Const.Option.print m
+  line i ppf "alloc_const_option_mode %a\n"
+    Mode.Alloc.Const.Option.debug_print m
 
 and expression_alloc_mode i ppf (expr, am) =
   alloc_mode i ppf am;

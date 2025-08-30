@@ -4863,8 +4863,8 @@ let report_lookup_error _loc env ppf = function
         | Error (Portability, _) -> "nonportable", "is portable"
         | Error (Yielding, _) -> "yielding", "may not yield"
         | Error (Statefulness, {left; right}) ->
-          asprintf "%a" Mode.Statefulness.Const.print left,
-          asprintf "is %a" Mode.Statefulness.Const.print right
+          asprintf "%s" (Mode.Statefulness.Const.print left),
+          asprintf "is %s" (Mode.Statefulness.Const.print right)
       in
       let s, hint =
         match context with

@@ -291,9 +291,9 @@ let print_out_mode
 = fun ?(in_structure=true) ax mode ->
   let (module L) = Mode.Value.Const.lattice_of_axis ax in
   if in_structure then
-    Format.dprintf " (* in a structure at %a *)" L.print mode
+    Format.dprintf " (* in a structure at %s *)" (L.print mode)
   else
-    Format.dprintf " (* at %a *)" L.print mode
+    Format.dprintf " (* at %s *)" (L.print mode)
 
 let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
   match is_modal with

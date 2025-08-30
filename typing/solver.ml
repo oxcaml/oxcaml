@@ -33,7 +33,7 @@ type 'a error =
     right : 'a
   }
 
-module Solver_mono (C : Lattices_mono) = struct
+module Solver_mono (C : Lattices_mono_for_solver) = struct
   type nonrec 'a error = 'a error
 
   type any_morph = Any_morph : ('a, 'b, 'd) C.morph -> any_morph
@@ -161,8 +161,8 @@ module Solver_mono (C : Lattices_mono) = struct
   let rec print_var : type a. ?traversed:VarSet.t -> a C.obj -> _ -> a var -> _
       =
    fun ?traversed obj ppf v ->
-    Format.fprintf ppf "modevar#%x[%a .. %a]" v.id (C.print obj) v.lower
-      (C.print obj) v.upper;
+    Format.fprintf ppf "modevar#%x[%t .. %t]" v.id (C.print obj v.lower)
+      (C.print obj v.upper);
     match traversed with
     | None -> ()
     | Some traversed ->
@@ -179,7 +179,7 @@ module Solver_mono (C : Lattices_mono) = struct
       ?traversed:VarSet.t -> a C.obj -> _ -> (a, l * r) morphvar -> _ =
    fun ?traversed dst ppf (Amorphvar (v, f)) ->
     let src = C.src dst f in
-    Format.fprintf ppf "%a(%a)" (C.print_morph dst) f (print_var ?traversed src)
+    Format.fprintf ppf "%t(%a)" (C.print_morph dst f) (print_var ?traversed src)
       v
 
   let print_raw :
@@ -188,16 +188,16 @@ module Solver_mono (C : Lattices_mono) = struct
    fun ?(verbose = false) (obj : a C.obj) ppf m ->
     let traversed = if verbose then Some VarSet.empty else None in
     match m with
-    | Amode a -> C.print obj ppf a
+    | Amode a -> C.print obj a ppf
     | Amodevar mv -> print_morphvar ?traversed obj ppf mv
     | Amodejoin (a, mvs) ->
-      Format.fprintf ppf "join(%a,%a)" (C.print obj) a
+      Format.fprintf ppf "join(%t,%a)" (C.print obj a)
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.fprintf ppf ",")
            (print_morphvar ?traversed obj))
         (var_map_to_list mvs)
     | Amodemeet (a, mvs) ->
-      Format.fprintf ppf "meet(%a,%a)" (C.print obj) a
+      Format.fprintf ppf "meet(%t,%a)" (C.print obj a)
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.fprintf ppf ",")
            (print_morphvar ?traversed obj))
@@ -652,7 +652,7 @@ module Solver_mono (C : Lattices_mono) = struct
     let ceil = get_loose_ceil obj m in
     let floor = get_loose_floor obj m in
     if C.le obj ceil floor
-    then C.print obj ppf ceil
+    then C.print obj ceil ppf
     else print_raw ?verbose obj ppf m
 
   let newvar obj = Amodevar (Amorphvar (fresh obj, C.id))
