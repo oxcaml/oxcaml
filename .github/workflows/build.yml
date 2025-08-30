@@ -144,7 +144,7 @@ jobs:
             config: --enable-middle-end=flambda2 --enable-runtime5
             os: ubuntu-latest
             llvmize_tests_only: true
-            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus0
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus1
             oxcaml_llvm_source_branch: llvmize-oxcaml
 
     env:
