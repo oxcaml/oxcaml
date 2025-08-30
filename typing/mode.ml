@@ -30,11 +30,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
   (* CR-someday zqian: the [min] should be [Min_comonadic] or [Max_monadic]. To know which
      to use, [min] can take [obj] and return accordingly. For simplicity, we can also just
      add another two constructors [Min] and [Max] just for the solver. *)
-  let max = Nil
+  let max = Unknown
 
-  let min = Nil
-
-  let nil = Nil
+  let min = Unknown
 
   let id = Skip
 
@@ -103,62 +101,68 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
        | Crossing -> Crossing
   end)
 
-  module Const = Magic_allow_disallow (struct
-    type (_, _, 'd) sided = 'd const constraint 'd = 'l * 'r
+  module Const = struct
+    type 'd t = 'd const
 
-    let allow_left : type l r. (allowed * r) const -> (l * r) const =
-      fun (type l r) (h : (allowed * r) const) : (l * r) const ->
-       match h with
-       | Nil -> Nil
-       | Class_legacy_comonadic -> Class_legacy_comonadic
-       | Stack_expression -> Stack_expression
-       | Mutable_read m -> Mutable_read m
-       | Mutable_write m -> Mutable_write m
-       | Lazy_forced -> Lazy_forced
+    include Magic_allow_disallow (struct
+      type (_, _, 'd) sided = 'd const constraint 'd = 'l * 'r
 
-    let allow_right : type l r. (l * allowed) const -> (l * r) const =
-      fun (type l r) (h : (l * allowed) const) : (l * r) const ->
-       match h with
-       | Nil -> Nil
-       | Class_legacy_monadic -> Class_legacy_monadic
-       | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-       | Tailcall_function -> Tailcall_function
-       | Tailcall_argument -> Tailcall_argument
-       | Function_return -> Function_return
-       | Module_allocated_on_heap -> Module_allocated_on_heap
+      let allow_left : type l r. (allowed * r) const -> (l * r) const =
+        fun (type l r) (h : (allowed * r) const) : (l * r) const ->
+         match h with
+         | Unknown -> Unknown
+         | Class_legacy_comonadic -> Class_legacy_comonadic
+         | Stack_expression -> Stack_expression
+         | Mutable_read m -> Mutable_read m
+         | Mutable_write m -> Mutable_write m
+         | Lazy_forced -> Lazy_forced
 
-    let disallow_left : type l r. (l * r) const -> (disallowed * r) const =
-      fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
-       match h with
-       | Nil -> Nil
-       | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-       | Class_legacy_comonadic -> Class_legacy_comonadic
-       | Class_legacy_monadic -> Class_legacy_monadic
-       | Tailcall_function -> Tailcall_function
-       | Tailcall_argument -> Tailcall_argument
-       | Mutable_read m -> Mutable_read m
-       | Mutable_write m -> Mutable_write m
-       | Lazy_forced -> Lazy_forced
-       | Function_return -> Function_return
-       | Stack_expression -> Stack_expression
-       | Module_allocated_on_heap -> Module_allocated_on_heap
+      let allow_right : type l r. (l * allowed) const -> (l * r) const =
+        fun (type l r) (h : (l * allowed) const) : (l * r) const ->
+         match h with
+         | Unknown -> Unknown
+         | Class_legacy_monadic -> Class_legacy_monadic
+         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
+         | Tailcall_function -> Tailcall_function
+         | Tailcall_argument -> Tailcall_argument
+         | Function_return -> Function_return
+         | Module_allocated_on_heap -> Module_allocated_on_heap
 
-    let disallow_right : type l r. (l * r) const -> (l * disallowed) const =
-      fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
-       match h with
-       | Nil -> Nil
-       | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-       | Class_legacy_comonadic -> Class_legacy_comonadic
-       | Class_legacy_monadic -> Class_legacy_monadic
-       | Tailcall_function -> Tailcall_function
-       | Tailcall_argument -> Tailcall_argument
-       | Mutable_read m -> Mutable_read m
-       | Mutable_write m -> Mutable_write m
-       | Lazy_forced -> Lazy_forced
-       | Function_return -> Function_return
-       | Stack_expression -> Stack_expression
-       | Module_allocated_on_heap -> Module_allocated_on_heap
-  end)
+      let disallow_left : type l r. (l * r) const -> (disallowed * r) const =
+        fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
+         match h with
+         | Unknown -> Unknown
+         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
+         | Class_legacy_comonadic -> Class_legacy_comonadic
+         | Class_legacy_monadic -> Class_legacy_monadic
+         | Tailcall_function -> Tailcall_function
+         | Tailcall_argument -> Tailcall_argument
+         | Mutable_read m -> Mutable_read m
+         | Mutable_write m -> Mutable_write m
+         | Lazy_forced -> Lazy_forced
+         | Function_return -> Function_return
+         | Stack_expression -> Stack_expression
+         | Module_allocated_on_heap -> Module_allocated_on_heap
+
+      let disallow_right : type l r. (l * r) const -> (l * disallowed) const =
+        fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
+         match h with
+         | Unknown -> Unknown
+         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
+         | Class_legacy_comonadic -> Class_legacy_comonadic
+         | Class_legacy_monadic -> Class_legacy_monadic
+         | Tailcall_function -> Tailcall_function
+         | Tailcall_argument -> Tailcall_argument
+         | Mutable_read m -> Mutable_read m
+         | Mutable_write m -> Mutable_write m
+         | Lazy_forced -> Lazy_forced
+         | Function_return -> Function_return
+         | Stack_expression -> Stack_expression
+         | Module_allocated_on_heap -> Module_allocated_on_heap
+    end)
+
+    let unknown = Unknown
+  end
 end
 
 type nonrec allowed = allowed
@@ -1964,7 +1968,7 @@ module Report = struct
     | Array_elements -> fprintf ppf "array elements"
 
   let print_const (type l r) ppf : (l * r) const -> unit = function
-    | Nil -> Misc.fatal_error "Nil hint should not be printed"
+    | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
     | Lazy_allocated_on_heap ->
       pp_print_string ppf
         "it is a lazy expression and thus always allocated on the heap"
@@ -2105,7 +2109,7 @@ module Report = struct
         a print_morph morph_hint;
       ignore (print_ahint ~sub:true side src ppf ahint);
       Mode_with_hint
-    | Const Nil ->
+    | Const Unknown ->
       print_mode_with_side ~sub side obj ppf a;
       Mode
     | Irrelevant ->

@@ -6,7 +6,7 @@ type mutable_part =
 
 (** Hint for a constant bound. See [Mode.Report.print_const] for what each non-trivial constructor means. *)
 type 'd const =
-  | Nil : ('l * 'r) const  (** The constant bound is not explained. *)
+  | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
   | Lazy_allocated_on_heap : (disallowed * 'r) pos const
   | Class_legacy_monadic : ('l * disallowed) neg const
   | Class_legacy_comonadic : ('l * disallowed) pos const

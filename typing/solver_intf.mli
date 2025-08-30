@@ -374,9 +374,6 @@ module type Hint = sig
   (** The hint to explain using [min] on the LHS of [submode]. *)
   val min : ('l * disallowed) const
 
-  (** The hint for unexplained constants *)
-  val nil : ('l * 'r) const
-
   (** Hints that explain morphisms. The allowance ['d] describes if the morphism can be on
       the LHS or RHS of [submode]. *)
   type 'd morph constraint 'd = 'l * 'r
@@ -395,7 +392,14 @@ module type Hint = sig
 
   module Morph : Allow_disallow with type (_, _, 'd) sided = 'd morph
 
-  module Const : Allow_disallow with type (_, _, 'd) sided = 'd const
+  module Const : sig
+    type 'd t = 'd const
+
+    include Allow_disallow with type (_, _, 'd) sided = 'd t
+
+    (** The hint for unexplained constants *)
+    val unknown : ('l * 'r) t
+  end
 end
 
 module type S = sig
