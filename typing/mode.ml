@@ -2127,16 +2127,12 @@ module Report = struct
     | Right of ('a, right_only) ahint
 
   let print_ahint_sided :
-      type a.
-      ?sub:bool ->
-      a C.obj ->
-      Format.formatter ->
-      a ahint_sided ->
-      print_ahint_result =
-   fun ?sub obj ppf ahint_sided ->
+      type a. a C.obj -> Format.formatter -> a ahint_sided -> print_ahint_result
+      =
+   fun obj ppf ahint_sided ->
     match ahint_sided with
-    | Left ahint -> print_ahint ?sub `Left obj ppf ahint
-    | Right ahint -> print_ahint ?sub `Right obj ppf ahint
+    | Left ahint -> print_ahint `Left obj ppf ahint
+    | Right ahint -> print_ahint `Right obj ppf ahint
 
   let print :
       type a.
