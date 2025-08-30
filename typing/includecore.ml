@@ -333,10 +333,10 @@ type type_mismatch =
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
 let report_modality_sub_error first second ppf e =
+  let Modality.Error (ax, {left; right}) = e in
   let print_modality id ppf m =
-    Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ppf m
+    Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ax ppf m
   in
-  let Modality.Error {left; right} = e in
   Format.fprintf ppf "%s is %a and %s is %a."
     (String.capitalize_ascii second)
     (print_modality "empty") right
@@ -628,7 +628,7 @@ let report_kind_mismatch first second ppf (kind1, kind2) =
 
 let print_unsafe_mode_crossing ppf umc =
   Format.fprintf ppf "mod %a@ %a"
-    Mode.Crossing.print umc.unsafe_mod_bounds
+    Printtyp.crossing umc.unsafe_mod_bounds
     Jkind.With_bounds.format umc.unsafe_with_bounds
 
 let report_unsafe_mode_crossing_mismatch first second ppf e =

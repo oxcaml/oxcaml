@@ -590,17 +590,9 @@ let mode_lazy expected_mode =
       expected_mode
   in
   let mode_crossing =
-    Crossing.of_bounds {
-      comonadic = {
-        Value.Comonadic.Const.max with
-        (* The thunk is evaluated only once, so we only require it to be [once],
-          even if the [lazy] is [many]. *)
-        linearity = Many;
-        (* The thunk is evaluated only when the [lazy] is [uncontended], so we
-          only require it to be [nonportable], even if the [lazy] is [portable].
-          *)
-        portability = Portable };
-      monadic = Value.Monadic.Const.min }
+    Crossing.create ~linearity:true ~portability:true
+    ~regionality:false ~uniqueness:false ~contention:false ~statefulness:false
+    ~visibility:false ~yielding:false
   in
   let closure_mode =
     expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing
@@ -11598,16 +11590,16 @@ let report_error ~loc env =
     Location.error ~loc
       "Block indices do not support private records."
   | Block_index_modality_mismatch { mut; err } ->
-    let step, Modality.Error({ left; right }) = err in
+    let step, Modality.Error(ax, { left; right }) = err in
     let print_modality id ppf m =
-      Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ppf m
+      Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ax ppf m
     in
     let expected, actual = match step with
       | Left_le_right -> right, left
       | Right_le_left -> left, right
     in
     let what_element_must_do =
-      if Modality.Atom.is_id expected then
+      if Modality.Atom.is_id ax expected then
         "have the identity modality"
       else
         Format.asprintf "be %a" (print_modality "") expected
