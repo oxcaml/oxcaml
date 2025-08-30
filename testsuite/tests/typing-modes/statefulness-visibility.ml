@@ -46,7 +46,7 @@ let foo (x @ immutable uncontended) = x.a
 Line 1, characters 38-39:
 1 | let foo (x @ immutable uncontended) = x.a
                                           ^
-Error: This value is "immutable" but is expected to be "read"
+Error: This value is "immutable" but is expected to be "read" or "read_write"
        because its mutable field "a" is being read.
 |}]
 
@@ -67,7 +67,7 @@ let foo (x @ immutable uncontended) upd = { x with b = upd }
 Line 1, characters 44-45:
 1 | let foo (x @ immutable uncontended) upd = { x with b = upd }
                                                 ^
-Error: This value is "immutable" but is expected to be "read"
+Error: This value is "immutable" but is expected to be "read" or "read_write"
        because its mutable field "a" is being read.
 |}]
 
@@ -125,7 +125,7 @@ let foo (x @ immutable shared) = x.contents
 Line 1, characters 33-34:
 1 | let foo (x @ immutable shared) = x.contents
                                      ^
-Error: This value is "immutable" but is expected to be "read"
+Error: This value is "immutable" but is expected to be "read" or "read_write"
        because its mutable field "contents" is being read.
 |}]
 
@@ -134,7 +134,7 @@ let foo (x @ immutable uncontended) = x.contents
 Line 1, characters 38-39:
 1 | let foo (x @ immutable uncontended) = x.contents
                                           ^
-Error: This value is "immutable" but is expected to be "read"
+Error: This value is "immutable" but is expected to be "read" or "read_write"
        because its mutable field "contents" is being read.
 |}]
 
@@ -381,7 +381,7 @@ let foo (a @ immutable) = Atomic.get a
 Line 1, characters 37-38:
 1 | let foo (a @ immutable) = Atomic.get a
                                          ^
-Error: This value is "immutable" but is expected to be "read".
+Error: This value is "immutable" but is expected to be "read" or "read_write".
 |}]
 
 (* Closing over use of read_write gives stateful *)
@@ -684,7 +684,7 @@ Line 1, characters 42-43:
                                               ^
 Error: This value is "immutable" because it is used inside a lazy expression
        which is expected to be "stateless".
-       However, it is expected to be "read"
+       However, it is expected to be "read" or "read_write"
        because its mutable field "contents" is being read.
 |}]
 

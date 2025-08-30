@@ -2028,14 +2028,15 @@ module Report = struct
          expected is global), it's more user friendly to say "local" than
          "regional" or "local to the parent region" etc. *)
       mode_printer ppf C.Regionality.Local
+      (* CR-someday zqian: treat the following cases generally. *)
     | `Expected, Contention_op, Shared ->
-      (* When printing the "shared" mode on the "expected" side (noting that expected
-         modes only appear on the right side of inequalities (on the "greater" side)),
-         we print that it was expected to be either shared or uncontended, to help
-         the user. We don't do anything similar when printing on the "actual" side
-         as this is confusing to put in an error message. *)
+      (* When "shared" is expected, we tell the user that either shared or
+         uncontended is expected. *)
       fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
         C.Contention.Uncontended
+    | `Expected, Visibility_op, Read ->
+      fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
+        C.Visibility.Read_write
     | `Expected, Regionality, Regional ->
       fprintf ppf "in the parent region or %a" mode_printer C.Regionality.Global
     | _ -> mode_printer ppf x
