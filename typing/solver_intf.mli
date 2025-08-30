@@ -364,43 +364,39 @@ end
 
 (** Hint module to be provided by the user of the solver. *)
 module type Hint = sig
-  (** Hints that explain constants. The allowance describes if the constant can be on the
-    LHS or RHS of [submode]. *)
-  type 'd const constraint 'd = 'l * 'r
-
-  (** The hint to explain using [max] on the RHS of [submode]. *)
-  val max : (disallowed * 'r) const
-
-  (** The hint to explain using [min] on the LHS of [submode]. *)
-  val min : ('l * disallowed) const
-
-  (** Hints that explain morphisms. The allowance ['d] describes if the morphism can be on
-      the LHS or RHS of [submode]. *)
-  type 'd morph constraint 'd = 'l * 'r
-
-  (** The hint for the identity morphism *)
-  val id : 'd morph
-
-  (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
-  val left_adjoint : (_ * allowed) morph -> (allowed * disallowed) morph
-
-  (** Given a hint for a mode morphism, return a hint for the right adjoint of the morphism *)
-  val right_adjoint : (allowed * _) morph -> (disallowed * allowed) morph
-
   module Morph : sig
-    type 'd t = 'd morph
+    (** Hints that explain morphisms. The allowance ['d] describes if the morphism can be on
+      the LHS or RHS of [submode]. *)
+    type 'd t constraint 'd = 'l * 'r
+
+    (** The hint for the identity morphism *)
+    val id : 'd t
+
+    (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
+    val left_adjoint : (_ * allowed) t -> (allowed * disallowed) t
+
+    (** Given a hint for a mode morphism, return a hint for the right adjoint of the morphism *)
+    val right_adjoint : (allowed * _) t -> (disallowed * allowed) t
 
     (** The hint for unexplained morphs *)
-    val unknown : 'd morph
+    val unknown : 'd t
 
     include Allow_disallow with type (_, _, 'd) sided = 'd t
   end
 
   module Const : sig
-    type 'd t = 'd const
+    (** Hints that explain constants. The allowance describes if the constant can be on the
+      LHS or RHS of [submode]. *)
+    type 'd t constraint 'd = 'l * 'r
 
     (** The hint for unexplained constants *)
     val unknown : ('l * 'r) t
+
+    (** The hint to explain using [max] on the RHS of [submode]. *)
+    val max : (disallowed * 'r) t
+
+    (** The hint to explain using [min] on the LHS of [submode]. *)
+    val min : ('l * disallowed) t
 
     include Allow_disallow with type (_, _, 'd) sided = 'd t
   end
@@ -419,6 +415,6 @@ module type S = sig
     Solver_mono
       with type ('a, 'b, 'd) morph := ('a, 'b, 'd) C.morph
        and type 'a obj := 'a C.obj
-       and type 'd hint_morph := 'd Hint.morph
-       and type 'd hint_const := 'd Hint.const
+       and type 'd hint_morph := 'd Hint.Morph.t
+       and type 'd hint_const := 'd Hint.Const.t
 end

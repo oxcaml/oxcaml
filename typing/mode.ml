@@ -21,44 +21,34 @@ open Mode_intf
 module Hint = Mode_hint
 
 module Hint_for_solver (* : Solver_intf.Hint *) = struct
-  open Hint
-
-  type nonrec 'd const = 'd const
-
-  type nonrec 'd morph = 'd morph
-
-  let max : _ const = Unknown
-
-  let min : _ const = Unknown
-
-  let id = Skip
-
-  let left_adjoint : type l. (l * allowed) morph -> (allowed * disallowed) morph
-      = function
-    | Skip -> Skip
-    | Unknown -> Unknown
-    | Is_closed_by x -> Close_over x
-    | Captured_by_partial_application -> Adj_captured_by_partial_application
-    | Crossing -> Crossing
-
-  let right_adjoint :
-      type r. (allowed * r) morph -> (disallowed * allowed) morph = function
-    | Skip -> Skip
-    | Unknown -> Unknown
-    | Close_over x -> Is_closed_by x
-    | Adj_captured_by_partial_application -> Captured_by_partial_application
-    | Crossing -> Crossing
-
   module Morph = struct
-    type 'd t = 'd morph
+    type 'd t = 'd Hint.morph
 
-    let unknown = Unknown
+    let unknown : _ t = Unknown
+
+    let id : _ t = Skip
+
+    let left_adjoint : type l. (l * allowed) t -> (allowed * disallowed) t =
+      function
+      | Skip -> Skip
+      | Unknown -> Unknown
+      | Is_closed_by x -> Close_over x
+      | Captured_by_partial_application -> Adj_captured_by_partial_application
+      | Crossing -> Crossing
+
+    let right_adjoint : type r. (allowed * r) t -> (disallowed * allowed) t =
+      function
+      | Skip -> Skip
+      | Unknown -> Unknown
+      | Close_over x -> Is_closed_by x
+      | Adj_captured_by_partial_application -> Captured_by_partial_application
+      | Crossing -> Crossing
 
     include Magic_allow_disallow (struct
-      type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
+      type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
 
-      let allow_left : type l r. (allowed * r) morph -> (l * r) morph =
-        fun (type l r) (h : (allowed * r) morph) : (l * r) morph ->
+      let allow_left : type l r. (allowed * r) t -> (l * r) t =
+        fun (type l r) (h : (allowed * r) t) : (l * r) t ->
          match h with
          | Skip -> Skip
          | Unknown -> Unknown
@@ -67,8 +57,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
 
-      let allow_right : type l r. (l * allowed) morph -> (l * r) morph =
-        fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
+      let allow_right : type l r. (l * allowed) t -> (l * r) t =
+        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
          match h with
          | Skip -> Skip
          | Unknown -> Unknown
@@ -76,8 +66,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Captured_by_partial_application -> Captured_by_partial_application
          | Crossing -> Crossing
 
-      let disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
-        fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
+      let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
+        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
          match h with
          | Skip -> Skip
          | Unknown -> Unknown
@@ -88,8 +78,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
 
-      let disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
-        fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
+      let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
+        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
          match h with
          | Skip -> Skip
          | Unknown -> Unknown
@@ -103,15 +93,19 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
   end
 
   module Const = struct
-    type 'd t = 'd const
+    type 'd t = 'd Hint.const
 
     let unknown : _ t = Unknown
 
+    let max : _ t = Unknown
+
+    let min : _ t = Unknown
+
     include Magic_allow_disallow (struct
-      type (_, _, 'd) sided = 'd const constraint 'd = 'l * 'r
+      type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
 
-      let allow_left : type l r. (allowed * r) const -> (l * r) const =
-        fun (type l r) (h : (allowed * r) const) : (l * r) const ->
+      let allow_left : type l r. (allowed * r) t -> (l * r) t =
+        fun (type l r) (h : (allowed * r) t) : (l * r) t ->
          match h with
          | Unknown -> Unknown
          | Class_legacy_comonadic -> Class_legacy_comonadic
@@ -120,8 +114,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Mutable_write m -> Mutable_write m
          | Lazy_forced -> Lazy_forced
 
-      let allow_right : type l r. (l * allowed) const -> (l * r) const =
-        fun (type l r) (h : (l * allowed) const) : (l * r) const ->
+      let allow_right : type l r. (l * allowed) t -> (l * r) t =
+        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
          match h with
          | Unknown -> Unknown
          | Class_legacy_monadic -> Class_legacy_monadic
@@ -131,8 +125,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Function_return -> Function_return
          | Module_allocated_on_heap -> Module_allocated_on_heap
 
-      let disallow_left : type l r. (l * r) const -> (disallowed * r) const =
-        fun (type l r) (h : (l * r) const) : (disallowed * r) const ->
+      let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
+        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
          match h with
          | Unknown -> Unknown
          | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
@@ -147,8 +141,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Stack_expression -> Stack_expression
          | Module_allocated_on_heap -> Module_allocated_on_heap
 
-      let disallow_right : type l r. (l * r) const -> (l * disallowed) const =
-        fun (type l r) (h : (l * r) const) : (l * disallowed) const ->
+      let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
+        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
          match h with
          | Unknown -> Unknown
          | Lazy_allocated_on_heap -> Lazy_allocated_on_heap

@@ -31,9 +31,9 @@ end
 module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   type ('a, 'd) hint =
     | Apply :
-        'd H.morph * ('b, 'a, 'd) C.morph * ('b, 'd) ahint
+        'd H.Morph.t * ('b, 'a, 'd) C.morph * ('b, 'd) ahint
         -> ('a, 'd) hint
-    | Const : 'd H.const -> ('a, 'd) hint
+    | Const : 'd H.Const.t -> ('a, 'd) hint
     | Branch : 'd branch * ('a, 'd) ahint * ('a, 'd) ahint -> ('a, 'd) hint
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
@@ -52,7 +52,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (** [('a, 'b, 'd) t] is a hint for a morphism from ['a] to ['b] with allowance ['d]
       *)
       type ('a, 'b, 'd) t =
-        | Base : 'd H.morph * ('a, 'b, 'd) C.morph -> ('a, 'b, 'd) t
+        | Base : 'd H.Morph.t * ('a, 'b, 'd) C.morph -> ('a, 'b, 'd) t
         | Compose :
             ('b, 'c, 'l * 'r) t * ('a, 'b, 'l * 'r) t
             -> ('a, 'c, 'l * 'r) t
@@ -71,8 +71,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           | Id -> b_obj, Id
           | Base (small_morph_hint, morph) ->
             ( C.src b_obj morph,
-              Base (H.left_adjoint small_morph_hint, C.left_adjoint b_obj morph)
-            )
+              Base
+                ( H.Morph.left_adjoint small_morph_hint,
+                  C.left_adjoint b_obj morph ) )
           | Compose (f_morph_hint, g_morph_hint) ->
             let mid, f_morph_hint_adj = aux b_obj f_morph_hint in
             let src, g_morph_hint_adj = aux mid g_morph_hint in
@@ -91,8 +92,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           | Base (small_morph_hint, morph) ->
             ( C.src b_obj morph,
               Base
-                (H.right_adjoint small_morph_hint, C.right_adjoint b_obj morph)
-            )
+                ( H.Morph.right_adjoint small_morph_hint,
+                  C.right_adjoint b_obj morph ) )
           | Compose (f_morph_hint, g_morph_hint) ->
             let mid, f_morph_hint_adj = aux b_obj f_morph_hint in
             let src, g_morph_hint_adj = aux mid g_morph_hint in
@@ -164,12 +165,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
     type ('a, 'd) t =
       | Apply : ('b, 'a, 'd) Morph_hint.t * ('b, 'd) t -> ('a, 'd) t
-      | Const : 'd H.const * 'a -> ('a, 'd) t
+      | Const : 'd H.Const.t * 'a -> ('a, 'd) t
       | Branch : 'd branch * ('a, 'd) t * ('a, 'd) t -> ('a, 'd) t
       | Min : ('a, 'l * disallowed) t
-          (** Short-hand for [Const (H.min, C.min) to save memory] *)
+          (** Short-hand for [Const (H.Const.min, C.min) to save memory] *)
       | Max : ('a, disallowed * 'r) t
-          (** Short-hand for [Const (H.max, C.max) to save memory] *)
+          (** Short-hand for [Const (H.Const.max, C.max) to save memory] *)
       | Unknown : 'a -> ('a, 'l * 'r) t
           (** Short-hand for [Const (H.Const.unknown, a) to save memory] *)
       constraint 'd = _ * _
@@ -226,8 +227,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   as it is just for a straightforward transformation *)
     let rec populate : type a l r. a C.obj -> (a, l * r) t -> (a, l * r) ahint =
      fun obj_a -> function
-      | Min -> C.min obj_a, Const H.min
-      | Max -> C.max obj_a, Const H.max
+      | Min -> C.min obj_a, Const H.Const.min
+      | Max -> C.max obj_a, Const H.Const.max
       | Unknown c -> c, Const H.Const.unknown
       | Const (const_hint, const) -> const, Const const_hint
       | Apply (morph_hint, hint) ->
@@ -534,7 +535,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let apply :
       type a b l r.
       b C.obj ->
-      ?hint:(l * r) H.morph ->
+      ?hint:(l * r) H.Morph.t ->
       (a, b, l * r) C.morph ->
       (a, l * r) mode ->
       (b, l * r) mode =
@@ -575,7 +576,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
     let hint :
         type a l r.
-        a C.obj -> ?hint:(l * r) H.morph -> (a, l * r) t -> (a, l * r) mode =
+        a C.obj -> ?hint:(l * r) H.Morph.t -> (a, l * r) t -> (a, l * r) mode =
      fun dst ?hint (Unhint (morph, m)) -> apply dst ?hint morph m
 
     let apply :
