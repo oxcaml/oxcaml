@@ -45,7 +45,7 @@ type closure_details =
 (** Hint for a morphism on bounds. See [Mode.Report.print_morph] for what each non-trivial
     constructor means. *)
 type 'd morph =
-  | Gap : ('l * 'r) morph  (** The morphism is not explained.  *)
+  | Unknown : ('l * 'r) morph  (** The morphism is not explained.  *)
   | Skip : ('l * 'r) morph
       (** The morphism doesn't change the bound and should be skipped in printing. *)
   | Close_over : closure_details -> ('l * disallowed) morph

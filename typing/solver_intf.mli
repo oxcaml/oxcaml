@@ -381,24 +381,28 @@ module type Hint = sig
   (** The hint for the identity morphism *)
   val id : 'd morph
 
-  (** The hint for unexplained morphs *)
-  val gap : 'd morph
-
   (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
   val left_adjoint : (_ * allowed) morph -> (allowed * disallowed) morph
 
   (** Given a hint for a mode morphism, return a hint for the right adjoint of the morphism *)
   val right_adjoint : (allowed * _) morph -> (disallowed * allowed) morph
 
-  module Morph : Allow_disallow with type (_, _, 'd) sided = 'd morph
+  module Morph : sig
+    type 'd t = 'd morph
+
+    (** The hint for unexplained morphs *)
+    val unknown : 'd morph
+
+    include Allow_disallow with type (_, _, 'd) sided = 'd t
+  end
 
   module Const : sig
     type 'd t = 'd const
 
-    include Allow_disallow with type (_, _, 'd) sided = 'd t
-
     (** The hint for unexplained constants *)
     val unknown : ('l * 'r) t
+
+    include Allow_disallow with type (_, _, 'd) sided = 'd t
   end
 end
 

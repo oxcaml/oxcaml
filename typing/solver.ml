@@ -538,7 +538,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, b, l * r) C.morph ->
       (a, l * r) mode ->
       (b, l * r) mode =
-   fun dst ?(hint = H.gap) morph m ->
+   fun dst ?(hint = H.Morph.unknown) morph m ->
     let hint = Comp_hint.Morph_hint.Base (hint, morph) in
     match m with
     | Amode (a, a_hint_lower, a_hint_upper) ->

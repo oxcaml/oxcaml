@@ -27,21 +27,16 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
 
   type nonrec 'd morph = 'd morph
 
-  (* CR-someday zqian: the [min] should be [Min_comonadic] or [Max_monadic]. To know which
-     to use, [min] can take [obj] and return accordingly. For simplicity, we can also just
-     add another two constructors [Min] and [Max] just for the solver. *)
-  let max = Unknown
+  let max : _ const = Unknown
 
-  let min = Unknown
+  let min : _ const = Unknown
 
   let id = Skip
-
-  let gap = Gap
 
   let left_adjoint : type l. (l * allowed) morph -> (allowed * disallowed) morph
       = function
     | Skip -> Skip
-    | Gap -> Gap
+    | Unknown -> Unknown
     | Is_closed_by x -> Close_over x
     | Captured_by_partial_application -> Adj_captured_by_partial_application
     | Crossing -> Crossing
@@ -49,60 +44,68 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
   let right_adjoint :
       type r. (allowed * r) morph -> (disallowed * allowed) morph = function
     | Skip -> Skip
-    | Gap -> Gap
+    | Unknown -> Unknown
     | Close_over x -> Is_closed_by x
     | Adj_captured_by_partial_application -> Captured_by_partial_application
     | Crossing -> Crossing
 
-  module Morph = Magic_allow_disallow (struct
-    type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
+  module Morph = struct
+    type 'd t = 'd morph
 
-    let allow_left : type l r. (allowed * r) morph -> (l * r) morph =
-      fun (type l r) (h : (allowed * r) morph) : (l * r) morph ->
-       match h with
-       | Skip -> Skip
-       | Gap -> Gap
-       | Close_over x -> Close_over x
-       | Adj_captured_by_partial_application ->
-         Adj_captured_by_partial_application
-       | Crossing -> Crossing
+    let unknown = Unknown
 
-    let allow_right : type l r. (l * allowed) morph -> (l * r) morph =
-      fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
-       match h with
-       | Skip -> Skip
-       | Gap -> Gap
-       | Is_closed_by x -> Is_closed_by x
-       | Captured_by_partial_application -> Captured_by_partial_application
-       | Crossing -> Crossing
+    include Magic_allow_disallow (struct
+      type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
 
-    let disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
-      fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
-       match h with
-       | Skip -> Skip
-       | Gap -> Gap
-       | Close_over x -> Close_over x
-       | Is_closed_by x -> Is_closed_by x
-       | Captured_by_partial_application -> Captured_by_partial_application
-       | Adj_captured_by_partial_application ->
-         Adj_captured_by_partial_application
-       | Crossing -> Crossing
+      let allow_left : type l r. (allowed * r) morph -> (l * r) morph =
+        fun (type l r) (h : (allowed * r) morph) : (l * r) morph ->
+         match h with
+         | Skip -> Skip
+         | Unknown -> Unknown
+         | Close_over x -> Close_over x
+         | Adj_captured_by_partial_application ->
+           Adj_captured_by_partial_application
+         | Crossing -> Crossing
 
-    let disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
-      fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
-       match h with
-       | Skip -> Skip
-       | Gap -> Gap
-       | Close_over x -> Close_over x
-       | Is_closed_by x -> Is_closed_by x
-       | Captured_by_partial_application -> Captured_by_partial_application
-       | Adj_captured_by_partial_application ->
-         Adj_captured_by_partial_application
-       | Crossing -> Crossing
-  end)
+      let allow_right : type l r. (l * allowed) morph -> (l * r) morph =
+        fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
+         match h with
+         | Skip -> Skip
+         | Unknown -> Unknown
+         | Is_closed_by x -> Is_closed_by x
+         | Captured_by_partial_application -> Captured_by_partial_application
+         | Crossing -> Crossing
+
+      let disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
+        fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
+         match h with
+         | Skip -> Skip
+         | Unknown -> Unknown
+         | Close_over x -> Close_over x
+         | Is_closed_by x -> Is_closed_by x
+         | Captured_by_partial_application -> Captured_by_partial_application
+         | Adj_captured_by_partial_application ->
+           Adj_captured_by_partial_application
+         | Crossing -> Crossing
+
+      let disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
+        fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
+         match h with
+         | Skip -> Skip
+         | Unknown -> Unknown
+         | Close_over x -> Close_over x
+         | Is_closed_by x -> Is_closed_by x
+         | Captured_by_partial_application -> Captured_by_partial_application
+         | Adj_captured_by_partial_application ->
+           Adj_captured_by_partial_application
+         | Crossing -> Crossing
+    end)
+  end
 
   module Const = struct
     type 'd t = 'd const
+
+    let unknown : _ t = Unknown
 
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd const constraint 'd = 'l * 'r
@@ -160,8 +163,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Stack_expression -> Stack_expression
          | Module_allocated_on_heap -> Module_allocated_on_heap
     end)
-
-    let unknown = Unknown
   end
 end
 
@@ -2005,7 +2006,7 @@ module Report = struct
    fun ppf hint ->
     match hint with
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
-    | Gap -> Misc.fatal_error "Gap hint should not be printed"
+    | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
     | Close_over closure ->
       (* CR-someday pdsouza: in the future, we should print out the code at the mentioned
          location, instead of just the location *)
@@ -2069,8 +2070,8 @@ module Report = struct
   (** Some morph hints are said to be "non-rigid", because they should be printed only
       when they change modes. *)
   let is_rigid : type l r. (l * r) morph -> bool = function
-    | Gap ->
-      Misc.fatal_error "Gap morph hint should not be checked for rigidity"
+    | Unknown ->
+      Misc.fatal_error "Unknown morph hint should not be checked for rigidity"
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Adj_captured_by_partial_application ->
       true
@@ -2097,7 +2098,7 @@ module Report = struct
       print_ahint_result =
    fun ?(sub = false) side (obj : a C.obj) ppf (a, hint) ->
     match hint with
-    | Apply (Gap, _, _) ->
+    | Apply (Unknown, _, _) ->
       print_mode_with_side ~sub side obj ppf a;
       Mode
     | Apply (morph_hint, src, ahint)
