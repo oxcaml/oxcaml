@@ -565,7 +565,8 @@ let mode_lazy expected_mode =
       yielding = Yielding.Const.Unyielding }
   in
   let expected_mode =
-    mode_coerce (Value.of_const ~hint_comonadic:Lazy_allocated_on_heap mode) expected_mode
+    mode_coerce (Value.of_const ~hint_comonadic:Lazy_allocated_on_heap mode)
+      expected_mode
   in
   let mode_crossing =
     Crossing.of_bounds {
@@ -618,7 +619,8 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   | _, _, (Nontail | Default) ->
      mode_default vmode, vmode
   | _, _, Tail -> begin
-    Value.submode_exn vmode Value.(of_const ~hint_comonadic:Tailcall_argument { Const.max with areality = Regional});
+    Value.submode_exn vmode Value.(of_const ~hint_comonadic:Tailcall_argument
+      { Const.max with areality = Regional});
     mode_default vmode, vmode
   end
 
@@ -2699,7 +2701,8 @@ and type_pat_aux
     let modalities =
       Typemode.transl_modalities ~maturity:Stable mutability []
     in
-    check_project_mutability ~loc ~env:!!penv Array_elements mutability alloc_mode.mode;
+    check_project_mutability ~loc ~env:!!penv Array_elements mutability
+      alloc_mode.mode;
     let alloc_mode = Modality.Const.apply modalities alloc_mode.mode in
     let alloc_mode = simple_pat_mode alloc_mode in
     let pl =
@@ -2816,7 +2819,8 @@ and type_pat_aux
         let ty_arg =
           solve_Ppat_record_field ~refine:false loc penv label label_lid
             record_ty record_form in
-        check_project_mutability ~loc ~env:!!penv (Record_field label.lbl_name) label.lbl_mut alloc_mode.mode;
+        check_project_mutability ~loc ~env:!!penv (Record_field label.lbl_name)
+          label.lbl_mut alloc_mode.mode;
         let mode = Modality.Const.apply label.lbl_modalities alloc_mode.mode in
         let alloc_mode = simple_pat_mode mode in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg
@@ -5190,8 +5194,10 @@ let unique_use ~loc ~env mode_l mode_r  =
     (* if unique extension is not enabled, we will not run uniqueness analysis;
        instead, we force all uses to be aliased and many. This is equivalent to
        running a UA which forces everything *)
-    submode ~loc ~env Value.(of_const {Const.min with uniqueness = Aliased}) (mode_default mode_r);
-    submode ~loc ~env mode_l (mode_default Value.(of_const {Const.max with linearity = Many}));
+    submode ~loc ~env Value.(of_const {Const.min with uniqueness = Aliased})
+      (mode_default mode_r);
+    submode ~loc ~env mode_l (mode_default Value.(of_const
+      {Const.max with linearity = Many}));
     (Uniqueness.disallow_left Uniqueness.aliased,
      Linearity.disallow_right Linearity.many)
   end
@@ -5744,7 +5750,8 @@ and type_expect_
               unify_exp_types record_loc env ty_arg1 ty_arg2;
               with_explanation (fun () ->
                 unify_exp_types record_loc env (instance ty_expected) ty_res2);
-              check_project_mutability ~loc:extended_expr_loc ~env (Record_field lbl.lbl_name) lbl.lbl_mut mode;
+              check_project_mutability ~loc:extended_expr_loc ~env
+                (Record_field lbl.lbl_name) lbl.lbl_mut mode;
               let mode = Modality.Const.apply lbl.lbl_modalities mode in
               check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
                 ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode;
@@ -6300,7 +6307,8 @@ and type_expect_
           ty_arg
         end ~post:generalize_structure
       in
-      check_project_mutability ~loc:record.exp_loc ~env (Record_field label.lbl_name) label.lbl_mut rmode;
+      check_project_mutability ~loc:record.exp_loc ~env
+        (Record_field label.lbl_name) label.lbl_mut rmode;
       let mode = Modality.Const.apply label.lbl_modalities rmode in
       let boxing : texp_field_boxing =
         let is_float_boxing =
@@ -6379,7 +6387,8 @@ and type_expect_
         match label.lbl_mut with
         | Mutable { mode = m0; atomic } ->
           ignore atomic;  (* CR aspsmith: TODO *)
-          submode ~loc:record.exp_loc ~env rmode (mode_mutate_mutable (Record_field label.lbl_name));
+          submode ~loc:record.exp_loc ~env rmode (mode_mutate_mutable
+            (Record_field label.lbl_name));
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
           type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
@@ -7197,13 +7206,17 @@ and type_expect_
       | Texp_field (_, _, _, _, Boxing (alloc_mode, _), _) ->
         begin
           submode ~loc ~env
-            Value.(of_const ~hint_comonadic:Stack_expression { Const.min with areality = Local })
+            Value.(of_const ~hint_comonadic:Stack_expression
+              { Const.min with areality = Local })
             expected_mode;
           match
-            Alloc.submode Alloc.(of_const ~hint_comonadic:Stack_expression { Const.min with areality = Local }) alloc_mode
+            Alloc.submode Alloc.(of_const ~hint_comonadic:Stack_expression
+              { Const.min with areality = Local }) alloc_mode
           with
           | Ok () -> ()
-          | Error err -> raise (Error (exp.exp_loc, exp.exp_env, Submode_failed_alloc err))
+          | Error err ->
+              raise (Error (exp.exp_loc, exp.exp_env,
+                Submode_failed_alloc err))
         end
       | Texp_list_comprehension _ -> unsupported List_comprehension
       | Texp_array_comprehension _ -> unsupported Array_comprehension

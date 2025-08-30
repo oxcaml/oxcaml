@@ -312,7 +312,8 @@ type error =
   | Block_access_private_record
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
-  | Submode_failed of Mode.Value.error * submode_reason * Env.shared_context option
+  | Submode_failed of Mode.Value.error * submode_reason *
+      Env.shared_context option
   | Submode_failed_alloc of Mode.Alloc.error
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]

@@ -162,7 +162,8 @@ val child_modes_with_modalities:
   mmodes -> (mmodes, Mode.Modality.error) Result.t
 
 (** Claim the current item is included by the RHS and its mode checked. *)
-val check_modes : Env.t -> ?crossing:Mode.Crossing.t -> item:Mode.Hint.lock_item ->
+val check_modes : Env.t -> ?crossing:Mode.Crossing.t ->
+  item:Mode.Hint.lock_item ->
   ?typ:type_expr -> mmodes -> (unit, Mode.Value.error) Result.t
 
 val value_descriptions:

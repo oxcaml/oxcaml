@@ -778,7 +778,8 @@ and cltype_data =
 
 let clda_mode = Mode.Value.(
   Const.legacy
-  |> of_const ~hint_monadic:Class_legacy_monadic ~hint_comonadic:Class_legacy_comonadic)
+  |> of_const ~hint_monadic:Class_legacy_monadic
+      ~hint_comonadic:Class_legacy_comonadic)
 
 let fcomp_res_mode = Types.functor_res_mode |> Mode.Alloc.disallow_right
 
@@ -3351,7 +3352,8 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
 let closure_mode ~errors ~env ~loc ~item ~lid
   ({mode = {Mode.monadic; comonadic}; _} as vmode) closure_context comonadic0 =
   let hint : _ Mode.Hint.morph =
-    Is_closed_by { closure_context; value_loc = loc; value_lid = lid; value_item = item }
+    Is_closed_by {
+      closure_context; value_loc = loc; value_lid = lid; value_item = item }
   in
   begin
     match
@@ -3420,7 +3422,8 @@ let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
       | Share_lock shared_context ->
           share_mode ~errors ~env ~loc ~item ~lid vmode shared_context
       | Closure_lock (closure_context, comonadic) ->
-          closure_mode ~errors ~env ~loc ~item ~lid vmode closure_context comonadic
+          closure_mode ~errors ~env ~loc ~item ~lid vmode
+            closure_context comonadic
       | Exclave_lock ->
           exclave_mode ~errors ~env ~loc ~item ~lid vmode
       | Unboxed_lock ->
