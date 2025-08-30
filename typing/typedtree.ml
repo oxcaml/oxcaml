@@ -99,7 +99,7 @@ module Unique_barrier = struct
       | Enabled u ->
           fprintf ppf "Enabled(%a)" (Mode.Uniqueness.debug_print ()) u
       | Resolved uc ->
-        fprintf ppf "Resolved(%a)" Mode.Uniqueness.Const.print uc
+        fprintf ppf "Resolved(%s)" (Mode.Uniqueness.Const.print uc)
       | Not_computed -> fprintf ppf "Not_computed"
     in
     print !t

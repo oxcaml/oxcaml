@@ -11661,8 +11661,8 @@ let report_error ~loc env =
                      something besides bottom, but currently (besides areality,
                      already covered above) there are no other such cases. *)
                   Format.fprintf ppf "%a or %a"
-                    (Style.as_inline_code Contention.Const.print) Shared
-                    (Style.as_inline_code Contention.Const.print) Uncontended
+                    Style.inline_code (Contention.Const.print Shared)
+                    Style.inline_code (Contention.Const.print Uncontended)
               | _, _ ->
                   Style.inline_code ppf (Value.Const.print_axis ax right)
             in

@@ -40,8 +40,7 @@ end
 module type Lattice_axis = sig
   include Lattice
 
-  (* CR-someday zqian: simplify this to [t -> string]. *)
-  val print : Format.formatter -> t -> unit
+  val print : t -> string
 end
 
 module type Lattice_product = sig

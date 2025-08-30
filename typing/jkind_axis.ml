@@ -67,10 +67,10 @@ module Externality = struct
     | External64, (External64 | External) | External, External64 -> External64
     | External, External -> External
 
-  let print ppf = function
-    | External -> Format.fprintf ppf "external_"
-    | External64 -> Format.fprintf ppf "external64"
-    | Internal -> Format.fprintf ppf "internal"
+  let print = function
+    | External -> "external_"
+    | External64 -> "external64"
+    | Internal -> "internal"
 end
 
 module Nullability = struct
@@ -109,9 +109,7 @@ module Nullability = struct
     | Maybe_null, (Maybe_null | Non_null) | Non_null, Maybe_null -> Maybe_null
     | Non_null, Non_null -> Non_null
 
-  let print ppf = function
-    | Non_null -> Format.fprintf ppf "non_null"
-    | Maybe_null -> Format.fprintf ppf "maybe_null"
+  let print = function Non_null -> "non_null" | Maybe_null -> "maybe_null"
 end
 
 module Separability = struct
@@ -162,10 +160,10 @@ module Separability = struct
     | Separable, (Separable | Non_float) | Non_float, Separable -> Separable
     | Non_float, Non_float -> Non_float
 
-  let print ppf = function
-    | Non_float -> Format.fprintf ppf "non_float"
-    | Separable -> Format.fprintf ppf "separable"
-    | Maybe_separable -> Format.fprintf ppf "maybe_separable"
+  let print = function
+    | Non_float -> "non_float"
+    | Separable -> "separable"
+    | Maybe_separable -> "maybe_separable"
 end
 
 module Axis = struct

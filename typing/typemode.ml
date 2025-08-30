@@ -311,9 +311,8 @@ let transl_mode_annots annots : Alloc.Const.Option.t =
   List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
 
 let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
-  let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
   (* Untranslate [areality] and [yielding]. *)
-  let areality = print_to_string_opt Mode.Locality.Const.print modes.areality in
+  let areality = Option.map Mode.Locality.Const.print modes.areality in
   let yielding =
     (* Since [yielding] has non-standard defaults, we special-case
        whether we want to print it here. *)
@@ -321,23 +320,21 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
     | Some Yielding.Const.Yielding, Some Locality.Const.Local
     | Some Yielding.Const.Unyielding, Some Locality.Const.Global ->
       None
-    | _, _ -> print_to_string_opt Mode.Yielding.Const.print modes.yielding
+    | _, _ -> Option.map Mode.Yielding.Const.print modes.yielding
   in
   (* Untranslate [visibility] and [contention]. *)
-  let visibility =
-    print_to_string_opt Mode.Visibility.Const.print modes.visibility
-  in
+  let visibility = Option.map Mode.Visibility.Const.print modes.visibility in
   let contention =
     match modes.visibility, modes.contention with
     | Some Visibility.Const.Immutable, Some Contention.Const.Contended
     | Some Visibility.Const.Read, Some Contention.Const.Shared
     | Some Visibility.Const.Read_write, Some Contention.Const.Uncontended ->
       None
-    | _, _ -> print_to_string_opt Mode.Contention.Const.print modes.contention
+    | _, _ -> Option.map Mode.Contention.Const.print modes.contention
   in
   (* Untranslate [statefulness] and [portability]. *)
   let statefulness =
-    print_to_string_opt Mode.Statefulness.Const.print modes.statefulness
+    Option.map Mode.Statefulness.Const.print modes.statefulness
   in
   let portability =
     match modes.statefulness, modes.portability with
@@ -345,15 +342,11 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
     | ( Some Statefulness.Const.(Observing | Stateful),
         Some Portability.Const.Nonportable ) ->
       None
-    | _, _ -> print_to_string_opt Mode.Portability.Const.print modes.portability
+    | _, _ -> Option.map Mode.Portability.Const.print modes.portability
   in
   (* Untranslate remaining modes. *)
-  let uniqueness =
-    print_to_string_opt Mode.Uniqueness.Const.print modes.uniqueness
-  in
-  let linearity =
-    print_to_string_opt Mode.Linearity.Const.print modes.linearity
-  in
+  let uniqueness = Option.map Mode.Uniqueness.Const.print modes.uniqueness in
+  let linearity = Option.map Mode.Linearity.Const.print modes.linearity in
   List.filter_map
     (fun x ->
       Option.map (fun s -> { txt = Parsetree.Mode s; loc = Location.none }) x)

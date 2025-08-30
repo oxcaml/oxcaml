@@ -88,7 +88,7 @@ module Lattices = struct
   module type Areality = sig
     include Heyting
 
-    val print : Format.formatter -> t -> unit
+    val print : t -> string
 
     val _is_areality : unit
   end
@@ -126,9 +126,7 @@ module Lattices = struct
         | Local, Local -> Local
     end)
 
-    let print ppf = function
-      | Global -> Format.fprintf ppf "global"
-      | Local -> Format.fprintf ppf "local"
+    let print = function Global -> "global" | Local -> "local"
 
     let _is_areality = ()
   end
@@ -177,10 +175,10 @@ module Lattices = struct
         | Regional, Regional -> true
     end)
 
-    let print ppf = function
-      | Global -> Format.fprintf ppf "global"
-      | Regional -> Format.fprintf ppf "regional"
-      | Local -> Format.fprintf ppf "local"
+    let print = function
+      | Global -> "global"
+      | Regional -> "regional"
+      | Local -> "local"
 
     let _is_areality = ()
   end
@@ -221,9 +219,7 @@ module Lattices = struct
         | Aliased, Aliased -> Aliased
     end)
 
-    let print ppf = function
-      | Aliased -> Format.fprintf ppf "aliased"
-      | Unique -> Format.fprintf ppf "unique"
+    let print = function Aliased -> "aliased" | Unique -> "unique"
   end
 
   module Linearity = struct
@@ -256,9 +252,7 @@ module Lattices = struct
         match a, b with Many, _ | _, Many -> Many | Once, Once -> Once
     end)
 
-    let print ppf = function
-      | Once -> Format.fprintf ppf "once"
-      | Many -> Format.fprintf ppf "many"
+    let print = function Once -> "once" | Many -> "many"
   end
 
   module Portability = struct
@@ -297,9 +291,7 @@ module Lattices = struct
         | Nonportable, Nonportable -> Nonportable
     end)
 
-    let print ppf = function
-      | Portable -> Format.fprintf ppf "portable"
-      | Nonportable -> Format.fprintf ppf "nonportable"
+    let print = function Portable -> "portable" | Nonportable -> "nonportable"
   end
 
   module Contention = struct
@@ -346,10 +338,10 @@ module Lattices = struct
         | Contended, Contended -> Contended
     end)
 
-    let print ppf = function
-      | Contended -> Format.fprintf ppf "contended"
-      | Shared -> Format.fprintf ppf "shared"
-      | Uncontended -> Format.fprintf ppf "uncontended"
+    let print = function
+      | Contended -> "contended"
+      | Shared -> "shared"
+      | Uncontended -> "uncontended"
   end
 
   module Yielding = struct
@@ -388,9 +380,7 @@ module Lattices = struct
         | Yielding, Yielding -> Yielding
     end)
 
-    let print ppf = function
-      | Yielding -> Format.fprintf ppf "yielding"
-      | Unyielding -> Format.fprintf ppf "unyielding"
+    let print = function Yielding -> "yielding" | Unyielding -> "unyielding"
   end
 
   module Statefulness = struct
@@ -437,10 +427,10 @@ module Lattices = struct
         | Stateful, Stateful -> Stateful
     end)
 
-    let print ppf = function
-      | Stateless -> Format.fprintf ppf "stateless"
-      | Observing -> Format.fprintf ppf "observing"
-      | Stateful -> Format.fprintf ppf "stateful"
+    let print = function
+      | Stateless -> "stateless"
+      | Observing -> "observing"
+      | Stateful -> "stateful"
   end
 
   module Visibility = struct
@@ -487,10 +477,10 @@ module Lattices = struct
         | Immutable, Immutable -> Immutable
     end)
 
-    let print ppf = function
-      | Immutable -> Format.fprintf ppf "immutable"
-      | Read -> Format.fprintf ppf "read"
-      | Read_write -> Format.fprintf ppf "read_write"
+    let print = function
+      | Immutable -> "immutable"
+      | Read -> "read"
+      | Read_write -> "read_write"
   end
 
   type monadic =
@@ -573,8 +563,10 @@ module Lattices = struct
       { uniqueness; contention; visibility }
 
     let debug_print ppf m =
-      Format.fprintf ppf "%a,%a,%a" Uniqueness.print m.uniqueness
-        Contention.print m.contention Visibility.print m.visibility
+      Format.fprintf ppf "%s,%s,%s"
+        (Uniqueness.print m.uniqueness)
+        (Contention.print m.contention)
+        (Visibility.print m.visibility)
   end
 
   type 'areality comonadic_with =
@@ -683,9 +675,12 @@ module Lattices = struct
       { areality; linearity; portability; yielding; statefulness }
 
     let debug_print ppf m =
-      Format.fprintf ppf "%a,%a,%a,%a,%a" Areality.print m.areality
-        Linearity.print m.linearity Portability.print m.portability
-        Yielding.print m.yielding Statefulness.print m.statefulness
+      Format.fprintf ppf "%s,%s,%s,%s,%s"
+        (Areality.print m.areality)
+        (Linearity.print m.linearity)
+        (Portability.print m.portability)
+        (Yielding.print m.yielding)
+        (Statefulness.print m.statefulness)
   end
   [@@inline]
 
@@ -872,21 +867,21 @@ module Lattices = struct
     | Monadic_op -> Monadic_op.imply a b
 
   (* not hotpath, Ok to curry *)
-  let print : type a. a obj -> _ -> a -> unit = function
-    | Locality -> Locality.print
-    | Regionality -> Regionality.print
-    | Uniqueness_op -> Uniqueness_op.print
-    | Contention_op -> Contention_op.print
-    | Visibility_op -> Visibility_op.print
-    | Linearity -> Linearity.print
-    | Portability -> Portability.print
-    | Yielding -> Yielding.print
-    | Statefulness -> Statefulness.print
-    | Monadic_op -> Monadic.debug_print
-    | Comonadic_with_locality -> Comonadic_with_locality.debug_print
-    | Comonadic_with_regionality -> Comonadic_with_regionality.debug_print
-
-  let print obj a ppf = print obj ppf a
+  let print : type a. a obj -> a -> _ =
+   fun obj a ppf ->
+    match obj with
+    | Locality -> Format.pp_print_string ppf (Locality.print a)
+    | Regionality -> Format.pp_print_string ppf (Regionality.print a)
+    | Uniqueness_op -> Format.pp_print_string ppf (Uniqueness_op.print a)
+    | Contention_op -> Format.pp_print_string ppf (Contention_op.print a)
+    | Visibility_op -> Format.pp_print_string ppf (Visibility_op.print a)
+    | Linearity -> Format.pp_print_string ppf (Linearity.print a)
+    | Portability -> Format.pp_print_string ppf (Portability.print a)
+    | Yielding -> Format.pp_print_string ppf (Yielding.print a)
+    | Statefulness -> Format.pp_print_string ppf (Statefulness.print a)
+    | Monadic_op -> Monadic.debug_print ppf a
+    | Comonadic_with_locality -> Comonadic_with_locality.debug_print ppf a
+    | Comonadic_with_regionality -> Comonadic_with_regionality.debug_print ppf a
 
   module Equal_obj = Magic_equal (struct
     type ('a, _, 'd) t = 'a obj constraint 'd = 'l * 'r
@@ -2573,7 +2568,7 @@ module Value_with (Areality : Areality) = struct
           } =
         let option_print print ppf = function
           | None -> Format.fprintf ppf "None"
-          | Some a -> Format.fprintf ppf "Some %a" print a
+          | Some a -> Format.fprintf ppf "Some %s" (print a)
         in
         Format.fprintf ppf "%a,%a,%a,%a,%a,%a,%a,%a"
           (option_print Areality.Const.print)
