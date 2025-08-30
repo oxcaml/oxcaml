@@ -414,6 +414,7 @@ let loop ppf =
       Buffer.reset phrase_buffer;
       Location.reset();
       first_line := true;
+      Lexer.reset_syntax_mode();
       let phrs = get_phrases ppf lb [] in
       process_phrases ppf snap phrs
     with
