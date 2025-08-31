@@ -1,0 +1,3 @@
+big_local_alloc: 49995000
+big_heap_alloc: 199990000
+heap_ref_incr: 3
