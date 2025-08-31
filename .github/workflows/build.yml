@@ -11,75 +11,79 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      # Required for Magic Nix Cache authentication with GitHub's API
+      contents: read
+      id-token: write
 
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: flambda2_runtime5
-            config: --enable-middle-end=flambda2 --enable-runtime5
+            nix_args: --arg runtime5 true
             os: ubuntu-latest
 
           - name: flambda2_stack_checks
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks
+            nix_args: --arg runtime5 true --arg stackChecks true
             os: ubuntu-latest
 
           - name: flambda2_poll_insertion
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-poll-insertion
+            nix_args: --arg runtime5 true --arg pollInsertion true
             os: ubuntu-latest
 
           - name: flambda2_multidomain
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain
+            nix_args: --arg runtime5 true --arg stackChecks true --arg pollInsertion true --arg multidomain true
             os: ubuntu-latest
 
           - name: flambda2_dev
-            config: --enable-middle-end=flambda2 --enable-dev
+            nix_args: --arg dev true
             os: ubuntu-latest
 
           - name: flambda2_dev_runtime5
-            config: --enable-middle-end=flambda2 --enable-dev --enable-runtime5
+            nix_args: --arg runtime5 true --arg dev true
             os: ubuntu-latest
 
           - name: flambda2_debug_runtime5
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks
+            nix_args: --arg runtime5 true --arg stackChecks true
             os: ubuntu-latest
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
           - name: flambda2_debug_runtime
-            config: --enable-middle-end=flambda2
+            nix_args:
             os: ubuntu-latest
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
           - name: flambda2_o3
-            config: --enable-middle-end=flambda2
+            nix_args:
             os: ubuntu-latest
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
           - name: flambda2_frame_pointers_oclassic_polling
-            config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
+            nix_args: --arg framePointers true --arg pollInsertion true --arg flambdaInvariants true
             os: ubuntu-latest
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
             disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml'
 
           - name: flambda2_macos_arm64
-            config: --enable-middle-end=flambda2 --disable-warn-error
+            nix_args: --arg warnError false
             os: macos-latest
 
           - name: flambda2_macos_arm64_runtime5_regalloc
-            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
+            nix_args: --arg runtime5 true --arg warnError false
             os: macos-latest
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
           - name: flambda2_macos_arm64_debug_runtime5_regalloc
-            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
+            nix_args: --arg runtime5 true --arg warnError false
             os: macos-latest
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
@@ -88,14 +92,14 @@ jobs:
             run_regalloc_tool: true
 
           - name: flambda2_ubuntu_arm64_runtime5_regalloc
-            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
+            nix_args: --arg runtime5 true --arg warnError false
             os: ubuntu-24.04-arm
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
           - name: regalloc
-            config: --enable-middle-end=flambda2
+            nix_args:
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
@@ -103,290 +107,170 @@ jobs:
             run_regalloc_tool: true
 
           - name: irc_frame_pointers
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers
+            nix_args: --arg runtime5 true --arg framePointers true
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,regalloc=irc'
             ocamlparam: '_,w=-46,regalloc=irc'
             check_arch: true
 
           - name: cfg-invariants
-            config: --enable-middle-end=flambda2 --enable-runtime5
+            nix_args: --arg runtime5 true
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             check_arch: true
 
           - name: vectorizer
-            config: --enable-middle-end=flambda2 --enable-runtime5
+            nix_args: --arg runtime5 true
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             check_arch: true
 
           - name: address_sanitizer
-            config: --enable-middle-end=flambda2 --enable-address-sanitizer
+            nix_args: --arg addressSanitizer true
             os: ubuntu-latest
-            cc: clang
 
           - name: address_sanitizer_runtime5
-            config: --enable-middle-end=flambda2 --enable-address-sanitizer --enable-runtime5
+            nix_args: --arg addressSanitizer true --arg runtime5 true
             os: ubuntu-latest
-            cc: clang
 
           - name: dwarf_tests
-            config: --enable-middle-end=flambda2
+            nix_args: --arg oxcamlLldb true
             os: ubuntu-latest
             dwarf_tests_only: true
-            oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus0
-            oxcaml_llvm_source_branch: lldb
-          
+
           - name: llvmize_tests
-            config: --enable-middle-end=flambda2 --enable-runtime5
+            nix_args: --arg runtime5 true --arg oxcamlClang true
             os: ubuntu-latest
             llvmize_tests_only: true
-            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus0
-            oxcaml_llvm_source_branch: llvmize-oxcaml
 
     env:
       J: "3"
-      run_testsuite: "true"
 
     steps:
-    - name: Checkout the OxCaml repo
-      uses: actions/checkout@master
-      with:
-        path: 'oxcaml'
+      - name: Checkout the OxCaml repo
+        uses: actions/checkout@master
 
-    - name: Install AFL (for Linux workers)
-      if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get install afl++
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
 
-    - name: Install clang
-      if: matrix.os == 'ubuntu-latest' && matrix.cc == 'clang'
-      run: sudo apt-get install clang
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+        with:
+          use-flakehub: false
 
-    - name: Install AFL (for macOS workers)
-      # The "afl-fuzz" package is deprecated (2023-10) and can no longer be installed
-      if: matrix.os == 'macos-latest'
-      run: true
-      # run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install afl-fuzz
+      - name: Install Dependencies
+        run: nix-shell ${{ matrix.nix_args }} --command true
 
-    - name: Install autoconf (for macOS workers)
-      if: matrix.os == 'macos-latest'
-      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf
+      - name: Disable any testcases
+        run: |
+          disable_testcases="${{matrix.disable_testcases}}"
+          if [ -n "$disable_testcases" ]; then
+            rm -fv $disable_testcases
+          fi
 
-      # NB. The "rev" number in the cache key below must be updated each time
-      # the patch file is changed!
-    - name: Cache OCaml 4.14, dune and menhir
-      uses: actions/cache@v4
-      id: cache
-      with:
-        path: ${{ github.workspace }}/ocaml-414/_install
-        key: ${{ matrix.os }}-cache-ocaml-414-dune-3153-menhir-20231231-rev13
+      - name: Setup for saving core files (not for macOS)
+        if: matrix.os != 'macos-latest'
+        run: |
+          sudo mkdir /cores
+          sudo chmod 777 /cores
+          # Core filenames will be of the form executable.pid.timestamp:
+          sudo bash -c 'echo "/cores/%e.%p.%t" > /proc/sys/kernel/core_pattern'
 
-    - name: Checkout OCaml 4.14
-      uses: actions/checkout@master
-      if: steps.cache.outputs.cache-hit != 'true'
-      with:
-        repository: 'ocaml/ocaml'
-        path: 'ocaml-414'
-        ref: '4.14'
+      - name: Setup for saving core files (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          nix-shell ${{ matrix.nix_args }} --run "
+            set -euo pipefail
 
-    - name: Build OCaml 4.14
-      if: steps.cache.outputs.cache-hit != 'true'
-      working-directory: ocaml-414
-      run: |
-        ./configure --prefix=$GITHUB_WORKSPACE/ocaml-414/_install
-        make -j $J world.opt
-        make install
-        # Remove unneeded parts to shrink cache file
-        rm -rf $GITHUB_WORKSPACE/ocaml-414/_install/{lib/ocaml/expunge,bin/*.byte}
+            sudo chmod 1777 /cores
+            sudo sysctl kern.coredump=1
+          "
 
-    - name: Checkout dune github repo
-      uses: actions/checkout@master
-      if: steps.cache.outputs.cache-hit != 'true'
-      with:
-        repository: 'ocaml/dune'
-        ref: '3.15.3'
-        path: 'dune'
+      - name: Build, install and test OxCaml
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
+        run: |
+          nix-shell ${{ matrix.nix_args }} --run "
+            set -euo pipefail
+            ulimit -c unlimited
 
-    - name: Build dune
-      working-directory: dune
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: |
-        PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH make release
-        cp _boot/dune.exe $GITHUB_WORKSPACE/ocaml-414/_install/bin/dune
+            configurePhase
+            buildPhase
+            checkPhase
+          "
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
 
-    # CR mshinwell: This should use git@gitlab.inria.fr:fpottier/menhir.git
-    - name: Checkout menhir github repo
-      uses: actions/checkout@master
-      if: steps.cache.outputs.cache-hit != 'true'
-      with:
-        repository: 'LexiFi/menhir'
-        ref: '20231231'
-        path: 'menhir'
+      - name: Build and test OxCaml DWARF
+        if: matrix.dwarf_tests_only == true
+        run: |
+          nix-shell ${{ matrix.nix_args }} --run "
+            set -euo pipefail
+            ulimit -c unlimited
 
-    - name: Build menhir
-      working-directory: menhir
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: |
-        PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH dune build
-        cp _build/install/default/bin/menhir $GITHUB_WORKSPACE/ocaml-414/_install/bin/menhir
-        # Our dune rule uses `menhirLib.mli`, which we can't simply `cp`
-        # because it's a symbolic link to a relative path.
-        export SOURCE_DIR=_build/install/default/lib/menhirLib
-        export TARGET_DIR=$GITHUB_WORKSPACE/ocaml-414/_install/lib/menhirLib
-        mkdir -p $TARGET_DIR
-        cat $SOURCE_DIR/menhirLib.mli > $TARGET_DIR/menhirLib.mli
-        cat $SOURCE_DIR/menhirLib.ml > $TARGET_DIR/menhirLib.ml
+            configurePhase
+            buildPhase
+            make runtest-dwarf
+          "
 
-    - name: Install GNU parallel
-      if: matrix.os == 'macos-latest'
-      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install parallel
+      - name: Build and test OxCaml Llvmize
+        if: matrix.llvmize_tests_only == true && contains(matrix.os, 'ubuntu')
+        run: |
+          nix-shell ${{ matrix.nix_args }} --run "
+            set -euo pipefail
+            ulimit -c unlimited
 
-    - name: Disable any testcases
-      working-directory: oxcaml
-      run: |
-        disable_testcases="${{matrix.disable_testcases}}"
-        if [ -n "$disable_testcases" ]; then
-          rm -fv $disable_testcases
-        fi
+            configurePhase
+            buildPhase
+            make runtest-llvmize
+          "
 
-    - name: Configure OxCaml
-      working-directory: oxcaml
-      run: |
-        if [[ -n "${{matrix.cc}}" ]]; then
-          export CC="${{matrix.cc}}"
-        fi
-        autoconf
-        ./configure \
-          --prefix=$GITHUB_WORKSPACE/_install \
-          --with-dune=$GITHUB_WORKSPACE/ocaml-414/_install/bin/dune \
-          ${{ matrix.config }}
+      - name: Check other architectures
+        if: matrix.check_arch == true
+        run: |
+          nix-shell ${{ matrix.nix_args }} --run "make check_all_arches"
 
-    - name: Setup for saving core files (not for macOS)
-      if: matrix.os != 'macos-latest'
-      run: |
-        sudo mkdir /cores
-        sudo chmod 777 /cores
-        # Core filenames will be of the form executable.pid.timestamp:
-        sudo bash -c 'echo "/cores/%e.%p.%t" > /proc/sys/kernel/core_pattern'
+      - name: Run register allocation on artifacts
+        if: matrix.run_regalloc_tool == true
+        run: |
+          nix-shell ${{ matrix.nix_args }} --run "
+            for allocator in irc ls gi; do
+              ./_build/main/tools/regalloc/regalloc.exe _build \
+                -validate -summary -regalloc \$allocator || exit 1;
+            done
+            for allocator in irc ls gi; do
+              ./_build/main/tools/regalloc/regalloc.exe _build \
+                -validate -param SPLIT_AROUND_LOOPS:on -regalloc \$allocator || exit 1;
+            done
+          "
 
-    - name: Setup for saving core files (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        sudo chmod 1777 /cores
-        sudo sysctl kern.coredump=1
-        /usr/libexec/PlistBuddy -c "Add :com.apple.security.get-task-allow bool true" /tmp/core.entitlements
-        codesign -s - -f --entitlements /tmp/core.entitlements $GITHUB_WORKSPACE/ocaml-414/_install/bin/ocamlc.opt
-        codesign -s - -f --entitlements /tmp/core.entitlements $GITHUB_WORKSPACE/ocaml-414/_install/bin/ocamlopt.opt
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: cores-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
+          path: /cores
 
-    - name: Build, install and test OxCaml
-      working-directory: oxcaml
-      if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
-      run: |
-        if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
-        ulimit -c unlimited
-        make $target \
-          || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
-      env:
-        BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
-        OCAMLPARAM: ${{ matrix.ocamlparam }}
-        OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
-        USE_RUNTIME: ${{ matrix.use_runtime }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }} && matrix.os == 'macos-latest'
+        with:
+          name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
+          path: /Users/runner/Library/Logs/DiagnosticReports
 
-    - name: Install custom OxCaml LLVM
-      if: matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
-      run: |
-        # Determine architecture
-        if [[ "${{ runner.arch }}" == "X64" ]]; then
-          ARCH="x86_64"
-        elif [[ "${{ runner.arch }}" == "ARM64" ]]; then
-          ARCH="aarch64"
-        else
-          echo "Unsupported architecture: ${{ runner.arch }}"
-          exit 1
-        fi
+      # - uses: actions/upload-artifact@v4
+      #   if: ${{ failure() }}
+      #   with:
+      #     name: _build-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
+      #     path: ${{ github.workspace }}/oxcaml/_build
 
-        OXCAML_LLVM_TAG="${{ matrix.oxcaml_llvm_tag }}"
-        OXCAML_LLVM_SOURCE_BRANCH="${{ matrix.oxcaml_llvm_source_branch }}"
-        OXCAML_LLVM_URL="https://github.com/ocaml-flambda/llvm-project/releases/download/${OXCAML_LLVM_TAG}/${OXCAML_LLVM_TAG}-llvm-linux-${ARCH}-${OXCAML_LLVM_SOURCE_BRANCH}.tar.gz"
-
-        # Download and extract custom OxCaml LLVM (includes LLDB and other LLVM tools)
-        cd $GITHUB_WORKSPACE
-        wget -O oxcaml-llvm.tar.gz "$OXCAML_LLVM_URL"
-        mkdir -p oxcaml-llvm
-        tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
-
-    - name: Build and test OxCaml DWARF
-      working-directory: oxcaml
-      if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
-      run: |
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
-        ulimit -c unlimited
-        make runtest-dwarf
-      env:
-        OXCAML_LLDB: ${{ github.workspace }}/oxcaml-llvm/bin/lldb
-    
-    - name: Build and test OxCaml Llvmize
-      working-directory: oxcaml
-      if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
-      run: |
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
-        ulimit -c unlimited
-        make runtest-llvmize
-      env:
-        OXCAML_CLANG: ${{ github.workspace }}/oxcaml-llvm/bin/clang
-
-    - name: Check other architectures
-      working-directory: oxcaml
-      if: matrix.check_arch == true
-      run: |
-        PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH make check_all_arches
-
-    - name: Run register allocation on artifacts
-      working-directory: oxcaml
-      if: matrix.run_regalloc_tool == true
-      run: |
-        for allocator in irc ls gi; do \
-          ./_build/main/tools/regalloc/regalloc.exe _build \
-            -validate -summary -regalloc $allocator || exit 1; \
-        done
-        for allocator in irc ls gi; do \
-          ./_build/main/tools/regalloc/regalloc.exe _build \
-            -validate -param SPLIT_AROUND_LOOPS:on -regalloc $allocator || exit 1; \
-        done
-
-    - uses: actions/upload-artifact@v4
-      if: ${{ failure() }}
-      with:
-        name: cores-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-        path: /cores
-
-#     - uses: actions/upload-artifact@v4
-#       if: ${{ failure() }}
-#       with:
-#         name: ocaml-414-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/ocaml-414/_install
-
-    - uses: actions/upload-artifact@v4
-      if: ${{ failure() }} && matrix.os == 'macos-latest'
-      with:
-        name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-        path: /Users/runner/Library/Logs/DiagnosticReports
-
-#     - uses: actions/upload-artifact@v4
-#       if: ${{ failure() }}
-#       with:
-#         name: _build-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/oxcaml/_build
-#
-#     - uses: actions/upload-artifact@v4
-#       if: ${{ failure() }}
-#       with:
-#         name: _runtest-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/oxcaml/_runtest
+      # - uses: actions/upload-artifact@v4
+      #   if: ${{ failure() }}
+      #   with:
+      #     name: _runtest-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
+      #     path: ${{ github.workspace }}/oxcaml/_runtest
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
