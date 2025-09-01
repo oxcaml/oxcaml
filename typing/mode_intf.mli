@@ -344,8 +344,6 @@ module type S = sig
       include Lattice with type t := t
     end
 
-    module Const_op : Lattice with type t = Const.t
-
     include Common_axis_neg with module Const := Const
 
     val aliased : lr
@@ -362,8 +360,6 @@ module type S = sig
 
       include Lattice with type t := t
     end
-
-    module Const_op : Lattice with type t = Const.t
 
     include Common_axis_neg with module Const := Const
   end
@@ -412,8 +408,6 @@ module type S = sig
 
       include Lattice with type t := t
     end
-
-    module Const_op : Lattice with type t = Const.t
 
     include Common_axis_neg with module Const := Const
 
@@ -470,8 +464,6 @@ module type S = sig
            and type 'd hint_morph := 'd neg_hint_morph
            and type 'd hint_const := 'd neg_hint_const
 
-      module Const_op : Lattice with type t = Const.t
-
       val proj : 'a Axis.t -> ('r * 'l) t -> ('a, 'l * 'r) mode
 
       val min_with : 'a Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
@@ -525,10 +517,6 @@ module type S = sig
               Statefulness.Const.t,
               Visibility.Const.t )
             modes
-
-      (** Gets the normal lattice for comonadic axes and the "op"ped lattice for
-        monadic ones. *)
-      val lattice_of_axis : 'a Axis.t -> (module Lattice with type t = 'a)
 
       module Option : sig
         type some = t
