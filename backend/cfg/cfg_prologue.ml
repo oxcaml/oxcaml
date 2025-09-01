@@ -240,8 +240,8 @@ let find_prologue_and_epilogues_shrink_wrapped
     (cfg_with_infos : Cfg_with_infos.t) =
   let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
       (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
-      (reachable_epilogues : Reachable_epilogues.t) :
-      (Label.Set.t * Label.Set.t) option =
+      (reachable_epilogues : Reachable_epilogues.t) : Label.Set.t * Label.Set.t
+      =
     let block = Cfg.get_block_exn cfg tree.label in
     let epilogue_blocks =
       Reachable_epilogues.from_block reachable_epilogues tree.label
@@ -260,10 +260,10 @@ let find_prologue_and_epilogues_shrink_wrapped
     in
     if prologue_needed_block block ~fun_name:cfg.fun_name
        || block.cold || all_exceptional_paths
-    then Some (Label.Set.singleton tree.label, epilogue_blocks)
+    then Label.Set.singleton tree.label, epilogue_blocks
     else
       let children_prologue_block =
-        List.filter_map
+        List.map
           (fun tree -> visit tree cfg doms loop_infos reachable_epilogues)
           tree.children
       in
@@ -277,8 +277,8 @@ let find_prologue_and_epilogues_shrink_wrapped
       in
       if can_place_prologues child_prologue_blocks cfg doms loop_infos
            child_epilogue_blocks
-      then Some (child_prologue_blocks, child_epilogue_blocks)
-      else Some (Label.Set.singleton tree.label, epilogue_blocks)
+      then child_prologue_blocks, child_epilogue_blocks
+      else Label.Set.singleton tree.label, epilogue_blocks
   in
   (* [Proc.prologue_required] is cheap and should provide an over-estimate of
      when we would need a prologue (in some cases [Proc.prologue_required] will
@@ -294,13 +294,13 @@ let find_prologue_and_epilogues_shrink_wrapped
     let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
     let loop_infos = Cfg_with_infos.loop_infos cfg_with_infos in
     let reachable_epilogues = Reachable_epilogues.build cfg in
-    match visit tree cfg doms loop_infos reachable_epilogues with
-    | None -> None
-    | Some (prologue_label, epilogue_blocks) ->
-      assert (
-        can_place_prologues prologue_label cfg doms loop_infos epilogue_blocks);
-      Some (prologue_label, epilogue_blocks))
-  else None
+    let prologue_blocks, epilogue_blocks =
+      visit tree cfg doms loop_infos reachable_epilogues
+    in
+    assert (
+      can_place_prologues prologue_blocks cfg doms loop_infos epilogue_blocks);
+    prologue_blocks, epilogue_blocks)
+  else Label.Set.empty, Label.Set.empty
 
 let find_prologue_and_epilogues_at_entry (cfg_with_infos : Cfg_with_infos.t) =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
@@ -317,40 +317,37 @@ let find_prologue_and_epilogues_at_entry (cfg_with_infos : Cfg_with_infos.t) =
           | No_requirements | Requires_prologue -> acc)
         ~init:Label.Set.empty
     in
-    Some (Label.Set.singleton cfg.entry_label, epilogue_blocks)
-  else None
+    Label.Set.singleton cfg.entry_label, epilogue_blocks
+  else Label.Set.empty, Label.Set.empty
 
 let add_prologue_if_required (cfg_with_infos : Cfg_with_infos.t) ~f =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  let prologue_and_epilogue_blocks = f cfg_with_infos in
-  match prologue_and_epilogue_blocks with
-  | None -> ()
-  | Some (prologue_labels, epilogue_blocks) ->
-    let terminator_as_basic terminator =
-      { terminator with Cfg.desc = Cfg.Prologue }
-    in
-    Label.Set.iter
-      (fun prologue_label ->
-        let prologue_block = Cfg.get_block_exn cfg prologue_label in
-        let next_instr =
-          Option.value
-            (DLL.hd prologue_block.body)
-            ~default:(terminator_as_basic prologue_block.terminator)
-        in
-        DLL.add_begin prologue_block.body
-          (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
-             ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
-             ()))
-      prologue_labels;
-    Label.Set.iter
-      (fun label ->
-        let block = Cfg.get_block_exn cfg label in
-        let terminator = terminator_as_basic block.terminator in
-        DLL.add_end block.body
-          (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
-             ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
-             ()))
-      epilogue_blocks
+  let prologue_blocks, epilogue_blocks = f cfg_with_infos in
+  let terminator_as_basic terminator =
+    { terminator with Cfg.desc = Cfg.Prologue }
+  in
+  Label.Set.iter
+    (fun prologue_label ->
+      let prologue_block = Cfg.get_block_exn cfg prologue_label in
+      let next_instr =
+        Option.value
+          (DLL.hd prologue_block.body)
+          ~default:(terminator_as_basic prologue_block.terminator)
+      in
+      DLL.add_begin prologue_block.body
+        (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
+           ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+           ()))
+    prologue_blocks;
+  Label.Set.iter
+    (fun label ->
+      let block = Cfg.get_block_exn cfg label in
+      let terminator = terminator_as_basic block.terminator in
+      DLL.add_end block.body
+        (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
+           ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+           ()))
+    epilogue_blocks
 
 module Validator = struct
   type state =
