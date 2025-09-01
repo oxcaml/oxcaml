@@ -1247,7 +1247,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       (* CR sspies: The [Constr] case is a precaution. With proper recursive
          types, it should never trigger. For now, we simply use a fallback. *)
     | Unboxed_tuple _ ->
-      (* CR sspies: silenced error, should be handled properly instead:
+      (*= CR sspies: silenced error, should be handled properly instead:
 
          Misc.fatal_errorf "unboxed tuples cannot have base layout %a:@ %a"
          Layout.format (Layout.Base type_layout) S.print type_shape *)
@@ -1273,10 +1273,13 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
               match type_layout with
               | Base base_layout -> base_layout
               | Product _ ->
-                Misc.fatal_errorf
-                  "[Record_boxed] and [Record_floats] records must only have \
-                   fields of [Base] layout:@ %a"
-                  S.print type_shape
+                (*= CR sspies: silenced error, should be handled properly instead:
+
+                  Misc.fatal_errorf
+                    "[Record_boxed] and [Record_floats] records must only have \
+                    fields of [Base] layout:@ %a"
+                    S.print type_shape *)
+                Sort.Value
             in
             ( name,
               Arch.size_addr,
@@ -1371,10 +1374,13 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
         match arg_layout with
         | Base base_layout -> base_layout
         | Product _ ->
+          (*= CR sspies: silenced error, should be handled properly instead:
+
           Misc.fatal_errorf
             "[Product] layout in [Variant_unboxed] constructor is not \
              allowed:@ %a"
-            S.print type_shape
+            S.print type_shape *)
+          Sort.Value
       in
       let arg_die =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die arg_shape
@@ -1548,45 +1554,69 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   | Tuple _, Base Value ->
     known_value (* boxed tuples are only a single base layout wide *)
   | Tuple _, _ ->
-    Misc.fatal_errorf "tuple must have value layout, but got: %a" Layout.format
-      type_layout
+    (*= CR sspies: silenced error, should be handled properly instead:
+
+      Misc.fatal_errorf "tuple must have value layout, but got: %a" Layout.format
+        type_layout *)
+    unknown_base_layouts type_layout
   | Unboxed_tuple shapes, _ -> (
     match type_layout with
     | Layout.Product layouts when List.compare_lengths layouts shapes = 0 ->
       let shapes_with_layout = List.combine shapes layouts in
       List.concat_map (fun (sh, ly) -> flatten_shape sh ly) shapes_with_layout
     | Layout.Product layouts ->
+      (*= CR sspies: silenced error, should be handled properly instead:
+
       Misc.fatal_errorf
         "unboxed tuple field mismatch, shape %a has %d fields, but layout %a \
          expects %d"
         Shape.print type_shape (List.length shapes) Layout.format type_layout
-        (List.length layouts)
+        (List.length layouts) *)
+      unknown_base_layouts type_layout
     | Layout.Base _ ->
-      Misc.fatal_errorf "unboxed tuple must have product layout, but got: %a"
-        Layout.format type_layout)
+      (*= CR sspies: silenced error, should be handled properly instead:
+
+        Misc.fatal_errorf "unboxed tuple must have product layout, but got: %a"
+          Layout.format type_layout
+      *)
+      unknown_base_layouts type_layout)
   | Constr _, Base b -> [Known (type_shape, b)]
   | Constr _, _ -> unknown_base_layouts type_layout
   (* CR sspies: These should not happen with support for recursive types. For
      now, we conservatively give back defaults. *)
   | Predef _, Base base_layout -> [Known (type_shape, base_layout)]
   | Predef _, _ ->
+    (*= CR sspies: silenced error, should be handled properly instead:
     Misc.fatal_errorf "predefined type must have base layout, but got: %a"
       Layout.format type_layout
+    *)
+    unknown_base_layouts type_layout
   | Arrow _, Base Value -> known_value
   | Arrow _, _ ->
-    Misc.fatal_errorf "arrow must have value layout, but got: %a" Layout.format
-      type_layout
+    (*= CR sspies: silenced error, should be handled properly instead:
+
+      Misc.fatal_errorf "arrow must have value layout, but got: %a" Layout.format
+        type_layout
+    *)
+    unknown_base_layouts type_layout
   | Poly_variant _, Base Value -> known_value
   | Poly_variant _, _ ->
-    Misc.fatal_errorf "poly_variant must have value layout, but got: %a"
-      Layout.format type_layout
+    (*= CR sspies: silenced error, should be handled properly instead:
+
+      Misc.fatal_errorf "poly_variant must have value layout, but got: %a"
+        Layout.format type_layout
+    *)
+    unknown_base_layouts type_layout
   | ( Record { fields = _; kind = Record_boxed | Record_mixed _ | Record_floats },
       Base Value ) ->
     known_value
   | ( Record { fields = _; kind = Record_boxed | Record_mixed _ | Record_floats },
       _ ) ->
+    (*= CR sspies: silenced error, should be handled properly instead:
+
     Misc.fatal_errorf "record must have value layout, but got: %a" Layout.format
-      type_layout
+      type_layout *)
+    unknown_base_layouts type_layout
   | Record { fields = [(_, sh, ly)]; kind = Record_unboxed }, _
     when Layout.equal ly type_layout -> (
     match type_layout with
@@ -1779,10 +1809,13 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
       match unboxed_projection, type_layout with
       | None, Base b -> Known (type_shape, b)
       | None, Product _ ->
-        Misc.fatal_errorf
-          "uid %a: product layout not flattened by unarization for type '%s':@ \
-           %a"
-          Uid.print var_uid type_name S.print type_shape
+        (*= CR sspies: silenced error, should be handled properly instead:
+
+          Misc.fatal_errorf
+            "uid %a: product layout not flattened by unarization for type '%s':@ \
+            %a"
+            Uid.print var_uid type_name S.print type_shape *)
+        Unknown Sort.Value
       | Some i, _ ->
         let flattened = flatten_shape type_shape type_layout in
         let flattened_length = List.length flattened in
