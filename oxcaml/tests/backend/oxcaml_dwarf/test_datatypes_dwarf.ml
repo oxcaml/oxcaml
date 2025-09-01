@@ -217,3 +217,40 @@ let[@inline never] [@local never] f_exception_with_unboxed (x: exn) =
   | _ -> x
 let _ = f_exception_with_unboxed
     (Exception_with_unboxed_record { value = #1.41; flag = true })
+
+(* Regular tuples *)
+let[@inline never] [@local never] f_tuple_int_int (x: int * int) = x
+let _ = f_tuple_int_int (42, 123)
+let _ = f_tuple_int_int (0, -1)
+let _ = f_tuple_int_int (-999, 1000)
+
+let[@inline never] [@local never] f_tuple_mixed_two (x: float * string) = x
+let _ = f_tuple_mixed_two (3.14, "hello")
+let _ = f_tuple_mixed_two (0.0, "")
+let _ = f_tuple_mixed_two (-2.5, "world")
+
+let[@inline never] [@local never] f_tuple_three (x: int * bool * float) = x
+let _ = f_tuple_three (42, true, 3.14)
+let _ = f_tuple_three (0, false, 0.0)
+let _ = f_tuple_three (-123, true, -1.5)
+
+let[@inline never] [@local never] f_tuple_nested (x: (int * int) * (float * bool)) = x
+let _ = f_tuple_nested ((1, 2), (3.14, true))
+let _ = f_tuple_nested ((0, 0), (0.0, false))
+let _ = f_tuple_nested ((-5, 10), (-2.5, true))
+
+let[@inline never] [@local never] f_tuple_with_complex
+    (x: int list * char array * string option) = x
+let _ = f_tuple_with_complex ([1; 2; 3], [|'a'; 'b'|], Some "test")
+let _ = f_tuple_with_complex ([], [||], None)
+let _ = f_tuple_with_complex ([42], [|'x'|], Some "")
+
+let[@inline never] [@local never] f_tuple_large
+    (x: int * float * string * bool * char * int32) = x
+let _ = f_tuple_large (42, 3.14, "hello", true, 'A', 123l)
+let _ = f_tuple_large (0, 0.0, "", false, '\000', 0l)
+
+let[@inline never] [@local never] f_poly_tuple (x: 'a * 'b) = x
+let _ = f_poly_tuple (42, "test")
+let _ = f_poly_tuple (3.14, true)
+let _ = f_poly_tuple ("hello", [1; 2; 3])

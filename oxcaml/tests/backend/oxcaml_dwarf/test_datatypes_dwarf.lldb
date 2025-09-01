@@ -91,4 +91,31 @@
 (lldb) c
 (lldb) b Test_datatypes_dwarf.f_exception_with_unboxed
 (lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_int_int
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_mixed_two
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_three
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_nested
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_with_complex
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_large
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_poly_tuple
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) quit
