@@ -134,11 +134,8 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
           let greatest_name_mode = compute_greatest_name_mode bound_vars in
           let declared_name_mode = Bound_pattern.name_mode bound_vars in
           let mismatched_modes =
-            match
-              Name_mode.Or_absent.compare_total_order greatest_name_mode
-                (Name_mode.Or_absent.present declared_name_mode)
-            with
-            | c -> c > 0
+            Name_mode.Or_absent.compare_total_order greatest_name_mode
+              (Name_mode.Or_absent.present declared_name_mode) > 0
           in
           let { Simplified_named.named = defining_expr;
                 free_names = _;

@@ -168,9 +168,7 @@ end = struct
         match res_opt with
         | Some _ -> res_opt
         | None -> (
-          match Name_mode.compare_total_order order min_name_mode with
-          | result ->
-            if result >= 0
+            if Name_mode.compare_total_order order min_name_mode >= 0
             then
               let aliases = filter_by_scope order aliases in
               if Name.Map.is_empty aliases then None else Some aliases
@@ -906,8 +904,7 @@ let get_canonical_element_exn ~binding_time_resolver ~binding_times_and_modes t
   let canonical = canonical t element in
   match canonical with
   | Is_canonical
-    when match Name_mode.compare_total_order elt_name_mode min_name_mode with
-         | c -> c >= 0 ->
+    when (Name_mode.compare_total_order elt_name_mode min_name_mode >= 0) ->
     element
   | Is_canonical | Alias_of_canonical _ -> (
     let canonical_element, name_mode, coercion_from_canonical_to_element =
@@ -922,9 +919,7 @@ let get_canonical_element_exn ~binding_time_resolver ~binding_times_and_modes t
         canonical_element, name_mode, Coercion.inverse coercion_to_canonical
     in
     assert (not (Simple.has_coercion canonical_element));
-    match Name_mode.compare_total_order name_mode min_name_mode with
-    | c ->
-      if c >= 0
+      if Name_mode.compare_total_order name_mode min_name_mode >= 0
       then
         Simple.with_coercion canonical_element
           coercion_from_canonical_to_element
