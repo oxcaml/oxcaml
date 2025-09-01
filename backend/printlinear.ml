@@ -81,6 +81,8 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
   (match i.desc with
   | Lend -> ()
   | Lprologue -> fprintf ppf "prologue"
+  | Lepilogue_open -> fprintf ppf "epilogue_open"
+  | Lepilogue_close -> fprintf ppf "epilogue_close"
   | Lop op ->
     (match[@warning "-4"] op with
     | Alloc _ | Poll -> fprintf ppf "@[<1>{%a}@]@," regsetaddr i.live

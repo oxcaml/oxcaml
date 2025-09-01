@@ -20,7 +20,7 @@ let () =
       | "enabled_if_with_lldb" -> enabled_if_with_lldb
       | "enabled_if_without_lldb" -> enabled_if_without_lldb
       | "name" -> name
-      | "filter" -> "filter.sh"
+      | "filter" -> "filter_for_function_call_only.sh"
       | _ -> assert false
     in
     Buffer.clear buf;
@@ -31,7 +31,8 @@ let () =
  (modules ${name})
  ${enabled_if}
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms -extension simd_beta))
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+   -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 
 (rule

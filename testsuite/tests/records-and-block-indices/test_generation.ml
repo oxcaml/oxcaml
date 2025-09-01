@@ -21,10 +21,6 @@ type test =
         with_void : bool
       }
 
-let is_idx_test = function
-  | Array_idx_access _ | Record_idx_access _ -> true
-  | _ -> false
-
 let interesting_type_trees test : Type_structure.t Tree.t list =
   (* There are many possible type trees, exponential in the size of the tree and
      the number of types we consider.
@@ -125,12 +121,11 @@ let interesting_type_trees test : Type_structure.t Tree.t list =
     @ hardcoded_type_trees
   in
   let enumerated_type_trees =
-    if is_idx_test test && not patient
-    then
-      (* idx tests are expensive, so take a subset *)
+    if patient
+    then enumerated_type_trees
+    else
       let () = Random.init (Hashtbl.hash test) in
       List.filteri ~f:(fun i _ -> Random.int 5 = 0) enumerated_type_trees
-    else enumerated_type_trees
   in
   List.sort_uniq enumerated_type_trees ~cmp:(Tree.compare Type_structure.compare)
 
@@ -680,10 +675,6 @@ let toplevel_unit_block f =
   line ";;";
   line "let () = to_run ();;";
   line ""
-
-let is_idx_test = function
-  | Array_idx_access _ | Record_idx_access _ -> true
-  | _ -> false
 
 let main test ~bytecode =
   let types =

@@ -41,6 +41,37 @@ static value alloc_group_entry(struct group *entry)
   CAMLreturn(res);
 }
 
+#ifdef HAS_GETGRNAM_R
+CAMLprim value caml_unix_getgrnam(value name)
+{
+  struct group * entry, entry_val;
+  size_t len;
+  char *buf;
+  int error;
+  value result;
+  if (! caml_string_is_c_safe(name)) caml_raise_not_found();
+  len = 1024;
+  while (1) {
+    buf = malloc(len);
+    if (NULL == buf)
+      caml_unix_error(ENOMEM, "getgrnam", Nothing);
+    error = getgrnam_r(String_val(name), &entry_val, buf, len, &entry);
+    if (0 == error) {
+      if (NULL != entry) {
+        result = alloc_group_entry(entry);
+        free(buf);
+        return result;
+      }
+      free(buf);
+      caml_raise_not_found();
+    }
+    free(buf);
+    if (ERANGE != error)
+      caml_unix_error(error, "getgrnam", Nothing);
+    len = len * 2;
+  }
+}
+#else
 CAMLprim value caml_unix_getgrnam(value name)
 {
   struct group * entry;
@@ -56,7 +87,38 @@ CAMLprim value caml_unix_getgrnam(value name)
   }
   return alloc_group_entry(entry);
 }
+#endif
 
+#ifdef HAS_GETGRGID_R
+CAMLprim value caml_unix_getgrgid(value gid)
+{
+  struct group * entry, entry_val;
+  size_t len;
+  char *buf;
+  int error;
+  value result;
+  len = 1024;
+  while (1) {
+    buf = malloc(len);
+    if (NULL == buf)
+      caml_unix_error(ENOMEM, "getgrgid", Nothing);
+    error = getgrgid_r(Int_val(gid), &entry_val, buf, len, &entry);
+    if (0 == error) {
+      if (NULL != entry) {
+        result = alloc_group_entry(entry);
+        free(buf);
+        return result;
+      }
+      free(buf);
+      caml_raise_not_found();
+    }
+    free(buf);
+    if (ERANGE != error)
+      caml_unix_error(error, "getgrgid", Nothing);
+    len = len * 2;
+  }
+}
+#else
 CAMLprim value caml_unix_getgrgid(value gid)
 {
   struct group * entry;
@@ -71,3 +133,4 @@ CAMLprim value caml_unix_getgrgid(value gid)
   }
   return alloc_group_entry(entry);
 }
+#endif

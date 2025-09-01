@@ -679,11 +679,17 @@ val apply_modality_l :
 val apply_modality_r :
   Mode.Modality.Value.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 
+(** Change a jkind to be appropriate for ['a or_null] based on passed ['a].
+    Adjusts nullability to be [Maybe_null], and separability to be
+    [Maybe_separable] if it is already [Separable]. If the jkind is already
+    [Maybe_null], fails. *)
+val apply_or_null_l : Types.jkind_l -> (Types.jkind_l, unit) result
+
 (** Change a jkind to be appropriate for an expectation of a type passed to
     the [or_null] constructor. Adjusts nullability to be [Non_null], and
     separability to be [Non_float] if it is demanded to be [Separable].
     If the jkind is already [Non_null], fails. *)
-val apply_or_null : Types.jkind_r -> (Types.jkind_r, unit) result
+val apply_or_null_r : Types.jkind_r -> (Types.jkind_r, unit) result
 
 (** Extract out component jkinds from the product. Because there are no product
     jkinds, this is a bit of a lie: instead, this decomposes the layout but just

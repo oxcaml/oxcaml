@@ -1012,7 +1012,7 @@ module F = struct
     pp_dbg_instr_basic t.ppf i;
     match i.desc with
     | Op op -> basic_op t i op
-    | Prologue | Reloadretaddr -> ()
+    | Prologue | Epilogue | Reloadretaddr -> ()
     | Poptrap _ | Pushtrap _ | Stack_check _ -> not_implemented_basic i
 
   (* == Cfg data items == *)

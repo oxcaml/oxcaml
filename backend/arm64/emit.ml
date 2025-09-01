@@ -897,18 +897,6 @@ let emit_stack_adjustment n =
   if ml <> 0 then DSL.ins instr [| DSL.sp; DSL.sp; DSL.imm ml |];
   if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n)
 
-(* Deallocate the stack frame and reload the return address before a return or
-   tail call *)
-
-let output_epilogue f =
-  let n = frame_size () in
-  if !contains_calls
-  then DSL.ins I.LDR [| DSL.reg_x_30; DSL.emit_mem_sp_offset (n - 8) |];
-  if n > 0 then emit_stack_adjustment n;
-  f ();
-  (* reset CFA back because function body may continue *)
-  if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
-
 (* Output add-immediate / sub-immediate / cmp-immediate instructions *)
 
 let rec emit_addimm rd rs n =
@@ -1071,8 +1059,8 @@ let num_call_gc_points instr =
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
         | Name_for_debugger _ )
-    | Lprologue | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-    | Lcall_op _ | Llabel _ | Lbranch _
+    | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+    | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
     | Lcondbranch (_, _)
     | Lcondbranch3 (_, _, _)
     | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -1140,9 +1128,10 @@ module BR = Branch_relaxation.Make (struct
           | Floatop (_, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ )
-      | Lprologue | Lend | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-      | Lcall_op _ | Llabel _ | Lbranch _ | Lswitch _ | Ladjust_stack_offset _
-      | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
         None
       | Lop (Const_vec256 _ | Const_vec512 _) ->
         Misc.fatal_error "arm64: got 256/512 bit vector"
@@ -1171,6 +1160,8 @@ module BR = Branch_relaxation.Make (struct
   let instr_size = function
     | Lend -> 0
     | Lprologue -> prologue_size ()
+    | Lepilogue_open -> epilogue_size ()
+    | Lepilogue_close -> 0
     | Lop (Move | Spill | Reload) -> 1
     | Lop (Const_int n) -> num_instructions_for_intconst n
     | Lop (Const_float32 _) -> 2
@@ -1658,6 +1649,14 @@ let emit_instr i =
     then (
       D.cfi_offset ~reg:30 (* return address *) ~offset:(-8);
       DSL.ins I.STR [| DSL.reg_x_30; DSL.emit_mem_sp_offset (n - 8) |])
+  | Lepilogue_open ->
+    let n = frame_size () in
+    if !contains_calls
+    then DSL.ins I.LDR [| DSL.reg_x_30; DSL.emit_mem_sp_offset (n - 8) |];
+    if n > 0 then emit_stack_adjustment n
+  | Lepilogue_close ->
+    let n = frame_size () in
+    if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Intop_atomic _) ->
     (* Never generated; builtins are not yet translated to atomics *)
     assert false
@@ -1721,8 +1720,7 @@ let emit_instr i =
   | Lcall_op (Lcall_imm { func }) ->
     DSL.ins I.BL [| DSL.emit_symbol (S.create func.sym_name) |];
     record_frame i.live (Dbg_other i.dbg)
-  | Lcall_op Ltailcall_ind ->
-    output_epilogue (fun () -> DSL.ins I.BR [| DSL.emit_reg i.arg.(0) |])
+  | Lcall_op Ltailcall_ind -> DSL.ins I.BR [| DSL.emit_reg i.arg.(0) |]
   | Lcall_op (Ltailcall_imm { func }) ->
     if String.equal func.sym_name !function_name
     then
@@ -1730,9 +1728,7 @@ let emit_instr i =
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point ->
         DSL.ins I.B [| DSL.emit_label tailrec_entry_point |]
-    else
-      output_epilogue (fun () ->
-          DSL.ins I.B [| DSL.emit_symbol (S.create func.sym_name) |])
+    else DSL.ins I.B [| DSL.emit_symbol (S.create func.sym_name) |]
   | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
     if Config.runtime5 && stack_ofs > 0
     then (
@@ -2204,7 +2200,7 @@ let emit_instr i =
              DSL.cond EQ
           |])
   | Lreloadretaddr -> ()
-  | Lreturn -> output_epilogue (fun () -> DSL.ins I.RET [||])
+  | Lreturn -> DSL.ins I.RET [||]
   | Llabel { label = lbl; _ } ->
     let lbl = label_to_asm_label ~section:Text lbl in
     D.define_label lbl

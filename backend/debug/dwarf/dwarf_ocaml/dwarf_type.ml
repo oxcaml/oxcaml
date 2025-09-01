@@ -1529,31 +1529,46 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   | Leaf, _ -> unknown_base_layouts type_layout
   | Tuple _, Base Value ->
     known_value (* boxed tuples are only a single base layout wide *)
-  | Tuple _, _ -> Misc.fatal_error "tuple must have value layout"
+  | Tuple _, _ ->
+    Misc.fatal_errorf "tuple must have value layout, but got: %a" Layout.format
+      type_layout
   | Unboxed_tuple shapes, _ -> (
     match type_layout with
     | Layout.Product layouts when List.compare_lengths layouts shapes = 0 ->
       let shapes_with_layout = List.combine shapes layouts in
       List.concat_map (fun (sh, ly) -> flatten_shape sh ly) shapes_with_layout
-    | Layout.Product _ -> Misc.fatal_error "unboxed tuple field mismatch"
-    | Layout.Base _ -> Misc.fatal_error "unboxed tuple must have product layout"
-    )
+    | Layout.Product layouts ->
+      Misc.fatal_errorf
+        "unboxed tuple field mismatch, shape %a has %d fields, but layout %a \
+         expects %d"
+        Shape.print type_shape (List.length shapes) Layout.format type_layout
+        (List.length layouts)
+    | Layout.Base _ ->
+      Misc.fatal_errorf "unboxed tuple must have product layout, but got: %a"
+        Layout.format type_layout)
   | Constr _, Base b -> [Known (type_shape, b)]
   | Constr _, _ -> unknown_base_layouts type_layout
   (* CR sspies: These should not happen with support for recursive types. For
      now, we conservatively give back defaults. *)
   | Predef _, Base base_layout -> [Known (type_shape, base_layout)]
-  | Predef _, _ -> Misc.fatal_error "predefined type must have base layout"
+  | Predef _, _ ->
+    Misc.fatal_errorf "predefined type must have base layout, but got: %a"
+      Layout.format type_layout
   | Arrow _, Base Value -> known_value
-  | Arrow _, _ -> Misc.fatal_error "arrow must have value layout"
+  | Arrow _, _ ->
+    Misc.fatal_errorf "arrow must have value layout, but got: %a" Layout.format
+      type_layout
   | Poly_variant _, Base Value -> known_value
-  | Poly_variant _, _ -> Misc.fatal_error "poly_variant must have value layout"
+  | Poly_variant _, _ ->
+    Misc.fatal_errorf "poly_variant must have value layout, but got: %a"
+      Layout.format type_layout
   | ( Record { fields = _; kind = Record_boxed | Record_mixed _ | Record_floats },
       Base Value ) ->
     known_value
   | ( Record { fields = _; kind = Record_boxed | Record_mixed _ | Record_floats },
       _ ) ->
-    Misc.fatal_error "record must have value layout"
+    Misc.fatal_errorf "record must have value layout, but got: %a" Layout.format
+      type_layout
   | Record { fields = [(_, sh, ly)]; kind = Record_unboxed }, _
     when Layout.equal ly type_layout -> (
     match type_layout with
@@ -1564,8 +1579,11 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
        is of product sort, we simply look through the unboxed product.
        Otherwise, we will create an additional DWARF entry for it. *)
     | Base b -> [Known (type_shape, b)])
-  | Record { fields = [_]; kind = Record_unboxed }, _ ->
-    Misc.fatal_error "unboxed record at different layout than its field"
+  | Record { fields = [(_, _, ly)]; kind = Record_unboxed }, _ ->
+    Misc.fatal_errorf
+      "unboxed record at different layout than its field, record layout: %a, \
+       field_layout: %a"
+      Layout.format type_layout Layout.format ly
   | Record { fields = ([] | _ :: _ :: _) as fields; kind = Record_unboxed }, _
     ->
     Misc.fatal_errorf "unboxed record must have exactly one field, found %a"
@@ -1575,18 +1593,29 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     match type_layout with
     | Product prod_shapes when List.compare_lengths prod_shapes fields = 0 ->
       List.concat_map (fun (_, sh, ly) -> flatten_shape sh ly) fields
-    | Product _ -> Misc.fatal_error "unboxed record field mismatch"
-    | Base _ -> Misc.fatal_error "unboxed record must have product layout")
+    | Product prod_shapes ->
+      Misc.fatal_errorf
+        "unboxed record field mismatch, shape %a has %d fields, but layout %a \
+         expects %d"
+        Shape.print type_shape (List.length fields) Layout.format type_layout
+        (List.length prod_shapes)
+    | Base _ ->
+      Misc.fatal_errorf
+        "unboxed record must have product layout, but has layout %a"
+        Layout.format type_layout)
   | Variant _, Base Value -> known_value
-  | Variant _, _ -> Misc.fatal_error "variant must have value layout"
+  | Variant _, _ ->
+    Misc.fatal_errorf "variant must have value layout, but has layout %a"
+      Layout.format type_layout
   | ( Variant_unboxed { name = _; arg_name = _; arg_layout; arg_shape = _ },
       Base Value )
     when Layout.equal arg_layout type_layout ->
     known_value
-  | Variant_unboxed _, _ ->
-    Misc.fatal_error
+  | Variant_unboxed { name = _; arg_name = _; arg_layout; arg_shape = _ }, _ ->
+    Misc.fatal_errorf
       "unboxed variant must have value layout, and must have same layout as \
-       its contents"
+       its contents; got: %a and contents: %a"
+      Layout.format type_layout Layout.format arg_layout
   | Alias sh, _ -> flatten_shape sh type_layout
   | (App _ | Error _ | Proj _), _ ->
     (* In these cases, something has gone wrong during reduction, because we do
@@ -1605,7 +1634,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
 module With_cms_reduce = Shape_reduce.Make (struct
   let fuel = 10
 
-  let cms_file_cache = String.Tbl.create 10
+  let cms_file_cache = String.Tbl.create 264
 
   let max_number_of_cms_files = ref 20
   (* A single compilation may not read more than 20 .cms files. *)
@@ -1617,6 +1646,7 @@ module With_cms_reduce = Shape_reduce.Make (struct
     | Some shape -> shape
     | None ->
       if !max_number_of_cms_files <= 0
+         (* CR sspies: This needs a command line flag. *)
       then None
       else (
         decr max_number_of_cms_files;
@@ -1625,11 +1655,12 @@ module With_cms_reduce = Shape_reduce.Make (struct
         | exception Not_found -> None
         | fn -> (
           match Cms_format.read fn with
-          | exception Cms_format.Error _ ->
-            (* CR sspies: We could consider throwing a louder error here, since
-               there must be something like a [.cms] version mismatch here. For
-               now, since it's only debugging information, we fail silently. *)
+          | exception Cms_format.(Error (Not_a_shape _)) ->
+            Misc.fatal_errorf "Version mismatch loading .cms file %s" fn
+          | exception _ ->
             None
+            (* We fail silently if there was trouble reading the file or the
+               like. *)
           | cms_infos ->
             let shape = cms_infos.cms_impl_shape in
             String.Tbl.add cms_file_cache unit_name shape;

@@ -2350,6 +2350,10 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     let uf_write = Value.mark_implicit_borrow_memory_address Write value in
     let uf_tag = Value.invalidate_tag value in
     UF.pars [uf_rcd; uf_arg; uf_write; uf_tag]
+  | Texp_atomic_loc (rcd, _, _, _, _) ->
+    let value, uf_rcd = check_uniqueness_exp_as_value ienv rcd in
+    let uf = Value.mark_consumed_memory_address value in
+    UF.seq uf_rcd uf
   | Texp_array (_, _, es, _) ->
     UF.pars (List.map (fun e -> check_uniqueness_exp ~overwrite:None ienv e) es)
   | Texp_idx (ba, _uas) ->

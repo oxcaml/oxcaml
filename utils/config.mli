@@ -56,6 +56,10 @@ val cc_compress_debug_sections_flag : string
 val objcopy_compress_debug_sections_flag : string
 (** The flag to use for objcopy debug section compression ("" if none) *)
 
+val objcopy : string
+(** The objcopy command (and flags) to use for split debug enabled by
+    [Clflags.dwarf_fission]. *)
+
 val ocamlc_cflags : string
 (** The flags ocamlc should pass to the C compiler *)
 

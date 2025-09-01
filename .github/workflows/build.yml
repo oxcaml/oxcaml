@@ -139,6 +139,13 @@ jobs:
             dwarf_tests_only: true
             oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus0
             oxcaml_llvm_source_branch: lldb
+          
+          - name: llvmize_tests
+            config: --enable-middle-end=flambda2 --enable-runtime5
+            os: ubuntu-latest
+            llvmize_tests_only: true
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus0
+            oxcaml_llvm_source_branch: llvmize-oxcaml
 
     env:
       J: "3"
@@ -276,7 +283,7 @@ jobs:
 
     - name: Build, install and test OxCaml
       working-directory: oxcaml
-      if: matrix.dwarf_tests_only != true
+      if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
       run: |
         if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
         export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
@@ -321,6 +328,16 @@ jobs:
         make runtest-dwarf
       env:
         OXCAML_LLDB: ${{ github.workspace }}/oxcaml-llvm/bin/lldb
+    
+    - name: Build and test OxCaml Llvmize
+      working-directory: oxcaml
+      if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
+      run: |
+        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+        ulimit -c unlimited
+        make runtest-llvmize
+      env:
+        OXCAML_CLANG: ${{ github.workspace }}/oxcaml-llvm/bin/clang
 
     - name: Check other architectures
       working-directory: oxcaml

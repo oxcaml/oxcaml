@@ -103,6 +103,7 @@ module Type_shape = struct
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
       Numbers.Int.Map.mem (Types.get_id expr) visited || depth > 10
+      (* CR sspies: Make the depth a command line flag. *)
     in
     if cannot_proceed ()
     then
@@ -111,12 +112,7 @@ module Type_shape = struct
         unknown_shape (* CR sspies: We can use this for recursive cycles. *)
       | None -> unknown_shape
     else
-      match
-        List.find_opt (fun (p, _) -> Types.get_id p == Types.get_id expr) subst
-      with
-      (* CR sspies: Physical equality is also how printing in [printtyp.ml]
-         works. It seems to be the way to substitute type parameters (after
-         type inference has already made them more precise). *)
+      match List.find_opt (fun (p, _) -> Types.eq_type p expr) subst with
       | Some (_, replace_by) -> replace_by
       | None ->
         let visited = Numbers.Int.Map.add (Types.get_id expr) () visited in

@@ -2573,7 +2573,7 @@ let constrain_type_jkind ~fixed env ty jkind =
             in
             let jkind = Jkind.apply_modality_r modality jkind in
             match
-              Jkind.apply_or_null jkind
+              Jkind.apply_or_null_r jkind
             with
             | Ok jkind ->
               (match
@@ -7330,8 +7330,27 @@ let check_decl_jkind env decl jkind =
      so instead of trying to get to the bottom of it, I'm just punting. *)
   let decl_jkind = match decl.type_kind, decl.type_manifest with
     | Type_abstract _, Some inner_ty ->
-      Jkind.for_abbreviation ~type_jkind_purely
-        ~modality:Mode.Modality.Value.Const.id inner_ty
+      (* CR layouts v3.3: Ad-hoc solution, this time due to the magic
+         interaction of [or_null] with separability. Special-cases [or_null]
+         and other [Variant_with_null] types.
+
+         Normally, this would be handled in [constrain_type_jkind]. *)
+      begin match unbox_once env inner_ty with
+      | Stepped_or_null { ty; modality; is_open = _ } ->
+          begin match
+            Jkind.apply_modality_l modality (type_jkind_purely ty)
+            |> Jkind.apply_or_null_l with
+          | Ok decl_jkind -> decl_jkind
+          | Error () ->
+            Misc.fatal_error "Ctype.check_decl_jkind: \
+              the constructor argument inside a Variant_with_null \
+              is already maybe-null."
+          end
+      | Final_result | Stepped _ | Stepped_record_unboxed_product _
+      | Missing _ ->
+        Jkind.for_abbreviation ~type_jkind_purely
+          ~modality:Mode.Modality.Value.Const.id inner_ty
+      end
     (* These next cases are more properly rule TK_UNBOXED from kind-inference.md
        (not rule FIND_ABBREV, as documented with [Jkind.for_abbreviation]), but
        they should be fine here. This will all get fixed up later with the

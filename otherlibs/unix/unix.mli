@@ -133,7 +133,7 @@ exception Unix_error of error * string * string
 val error_message : error -> string
 (** Return a string describing the given error code. *)
 
-val handle_unix_error : ('a -> 'b) -> 'a -> 'b @@ nonportable
+val handle_unix_error : ('a -> 'b) @ local once -> 'a -> 'b @@ nonportable
 (** [handle_unix_error f x] applies [f] to [x] and returns the result.
    If the exception {!Unix_error} is raised, it prints a message
    describing the error and exits with code 2. *)
@@ -178,7 +178,9 @@ val unsafe_getenv : string -> string
    @raise Not_found if the variable is unbound.
    @since 4.06  *)
 
-val putenv : string -> string -> unit
+val putenv : string -> string -> unit @@ nonportable
+[@@alert unsafe_multidomain
+    "Mutating the environment makes reading the environment unsafe."]
 (** [putenv name value] sets the value associated to a
    variable in the process environment.
    [name] is the name of the environment variable,
@@ -244,7 +246,7 @@ val execvpe : string -> string array -> string array -> 'a
 (** Same as {!execve}, except that
    the program is searched in the path. *)
 
-val fork : unit -> int
+val fork : unit -> int @@ nonportable
 (** Fork a new process. The returned integer is 0 for the child
    process, the pid of the child process for the parent process. It
    fails if the OCaml process is multi-core (any domain has been
@@ -1687,7 +1689,7 @@ val shutdown_connection : in_channel -> unit
    connection is over. *)
 
 val establish_server :
-  (in_channel -> out_channel -> unit) -> sockaddr -> unit @@ nonportable
+  (in_channel -> out_channel -> unit) @ local -> sockaddr -> unit @@ nonportable
 (** Establish a server on the given address.
    The function given as first argument is called for each connection
    with two buffered channels connected to the client. A new process
@@ -1740,19 +1742,19 @@ val gethostbyaddr : inet_addr -> host_entry
 (** Find an entry in [hosts] with the given address.
     @raise Not_found if no such entry exists. *)
 
-val getprotobyname : string -> protocol_entry
+val getprotobyname : string -> protocol_entry @@ nonportable
 (** Find an entry in [protocols] with the given name.
     @raise Not_found if no such entry exists. *)
 
-val getprotobynumber : int -> protocol_entry
+val getprotobynumber : int -> protocol_entry @@ nonportable
 (** Find an entry in [protocols] with the given protocol number.
     @raise Not_found if no such entry exists. *)
 
-val getservbyname : string -> string -> service_entry
+val getservbyname : string -> string -> service_entry @@ nonportable
 (** Find an entry in [services] with the given name.
     @raise Not_found if no such entry exists. *)
 
-val getservbyport : int -> string -> service_entry
+val getservbyport : int -> string -> service_entry @@ nonportable
 (** Find an entry in [services] with the given service number.
     @raise Not_found if no such entry exists. *)
 
@@ -1777,8 +1779,7 @@ type getaddrinfo_option =
                                             for use with {!bind} *)
 (** Options to {!getaddrinfo}. *)
 
-val getaddrinfo:
-  string -> string -> getaddrinfo_option list -> addr_info list
+val getaddrinfo : string -> string -> getaddrinfo_option list -> addr_info list
 (** [getaddrinfo host service opts] returns a list of {!addr_info}
     records describing socket parameters and addresses suitable for
     communicating with the given host and service.  The empty list is

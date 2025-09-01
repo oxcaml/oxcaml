@@ -566,6 +566,7 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
 
 let unarize_extern_repr alloc_mode (extern_repr : Lambda.extern_repr) =
   match extern_repr with
+  | Same_as_ocaml_repr (Base Void) -> []
   | Same_as_ocaml_repr (Base _ as sort) ->
     let kind =
       Typeopt.layout_of_non_void_sort sort
@@ -693,6 +694,7 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
   let unarized_results =
     unarize_extern_repr alloc_mode (snd prim_native_repr_res)
   in
+  let args = List.flatten args in
   if List.compare_lengths unarized_params args <> 0
   then
     Misc.fatal_errorf
@@ -826,7 +828,7 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
             Let_with_acc.create acc
               (Bound_pattern.singleton unboxed_arg')
               named ~body)
-      call (List.flatten args) unarized_params []
+      call args unarized_params []
   in
   let wrap_c_call acc ~handler_params ~code_after_call c_call =
     let params =

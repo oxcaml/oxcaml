@@ -134,7 +134,8 @@ let is_last_instruction_const_int (body : C.basic C.instruction Dll.t) :
   | Some { desc = Op (Const_int const); res = [| reg |]; _ } -> Some (const, reg)
   | Some
       { desc =
-          ( Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
+          ( Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
+          | Stack_check _
           | Op
               ( Const_int _ | Move | Spill | Reload | Opaque | Begin_region
               | End_region | Dls_get | Poll | Pause | Const_float _

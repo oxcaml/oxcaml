@@ -135,3 +135,13 @@ val f : local_ int or_null -> ((int or_null -> unit) -> unit) = <fun>
 |}, Principal{|
 val f : local_ int or_null -> (int or_null -> unit) -> unit = <fun>
 |}]
+
+module M : sig
+  type t : immediate_or_null
+end = struct
+  type t = int or_null
+end
+
+[%%expect{|
+module M : sig type t : immediate_or_null end @@ stateless
+|}]

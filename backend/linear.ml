@@ -35,6 +35,8 @@ type instruction =
 
 and instruction_desc =
   | Lprologue
+  | Lepilogue_open
+  | Lepilogue_close
   | Lend
   | Lop of Operation.t
   | Lcall_op of call_operation
@@ -78,11 +80,12 @@ and call_operation =
 let has_fallthrough = function
   | Lreturn | Lbranch _ | Lswitch _ | Lraise _
   | Lcall_op Ltailcall_ind
-  | Lcall_op (Ltailcall_imm _) ->
+  | Lcall_op (Ltailcall_imm _)
+  | Lepilogue_close ->
     false
   | Lcall_op (Lcall_ind | Lcall_imm _ | Lextcall _ | Lprobe _)
-  | Lprologue | Lend | Lreloadretaddr | Lentertrap | Lpoptrap _ | Lop _
-  | Llabel _
+  | Lprologue | Lepilogue_open | Lend | Lreloadretaddr | Lentertrap | Lpoptrap _
+  | Lop _ | Llabel _
   | Lcondbranch (_, _)
   | Lcondbranch3 (_, _, _)
   | Ladjust_stack_offset _ | Lpushtrap _ | Lstackcheck _ ->

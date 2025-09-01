@@ -22,7 +22,9 @@ let precondition : Cfg_with_layout.t -> unit =
       | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
       | Dls_get | Poll | Pause | Alloc _ ->
         ())
-    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ -> ()
+    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+    | Stack_check _ ->
+      ()
   in
   let register_must_not_be_on_stack (id : InstructionId.t) (reg : Reg.t) : unit
       =
@@ -97,7 +99,8 @@ let postcondition_layout : Cfg_with_layout.t -> unit =
         then
           fatal "instruction %a is a move and refers to %d spilling slots"
             InstructionId.format id num_locals
-      | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
+      | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
+      | Stack_check _
       | Op
           ( Move | Opaque | Begin_region | End_region | Dls_get | Poll | Pause
           | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _

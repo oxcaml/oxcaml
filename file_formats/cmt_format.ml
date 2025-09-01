@@ -232,6 +232,8 @@ let iter_on_occurrences
       | Texp_idx (ba, uas) ->
           iter_block_access exp_env ba;
           List.iter (iter_unboxed_access exp_env) uas
+      | Texp_atomic_loc (_, _, lid, label_desc, _) ->
+          add_label ~namespace:Label exp_env lid label_desc
       | Texp_new (path, lid, _, _) ->
           f ~namespace:Class exp_env path lid
       | Texp_record { fields; _ } ->

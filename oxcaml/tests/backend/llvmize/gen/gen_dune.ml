@@ -55,6 +55,25 @@ module F = struct
 
   let pp_strings pp_sep = pp_print_list ~pp_sep pp_print_string
 
+  let check_env_rule =
+    let message =
+      "ERROR: OXCAML_CLANG environment variable not set.\n\
+       Llvmize tests require a custom LLVM build.\n\
+       Please set OXCAML_CLANG to the path of your custom Clang binary.\n\
+       Example: export OXCAML_CLANG=/path/to/custom/clang\n"
+    in
+    asprintf
+      {|(rule
+ ${enabled_if_without_llvm}
+ (alias runtest-llvmize)
+ (action
+  (progn
+   (echo %S)
+   (bash "exit 1"))))
+
+|}
+      message
+
   let exe_rule ~deps ~output =
     asprintf "(run ${ocamlopt} %a -opaque -o %s.exe)" (pp_strings pp_space) deps
       output
@@ -77,7 +96,7 @@ module F = struct
     fprintf ppf
       {|(rule
  ${enabled_if}
- (alias runtest-llvm)
+ (alias runtest-llvmize)
  (deps %a)
  (targets %s.corrected)
  (action
@@ -92,7 +111,7 @@ module F = struct
     fprintf ppf
       {|(rule
  ${enabled_if}
- (alias runtest-llvm)
+ (alias runtest-llvmize)
  (deps %s %s.corrected)
  (action
   (diff %s %s.corrected)))
@@ -134,40 +153,58 @@ module F = struct
       tasks
 end
 
-let print_test ~extra_subst ~run ~tasks ~buf =
+let print_rule ~extra_subst ~buf rule_template =
   let enabled_if =
-    {|(enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))|}
+    {|(enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))|}
   in
-  let subst = function
-    | "ocamlopt" -> "%{bin:ocamlopt.opt}"
-    | "enabled_if" -> enabled_if
-    | "filter" -> "filter.sh"
-    | "llvm_path" -> "${LLVM_PATH:-clang}"
-    | "llvm_flags" ->
-      (* We pass -dno-asm-comments to avoid printing flaky identifiers in Cfg
-         instructions *)
-      (* CR yusumez: remove -disable-poll-insertion once we can emit poll
-         insertions *)
-      (* CR yusumez: find a better way to detect LLVM_PATH *)
-      "-llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir \
-       -dno-asm-comments -disable-poll-insertion"
-    | "common_flags" -> "-g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear"
-    | "stop_after_llvm_flags" ->
-      "-g -O3 -opaque -dump-into-file -dcmm -dcfg -stop-after llvmize"
-    | "c_flags" -> "-c -g -O3 -I %{project_root}/runtime"
-    | label -> (
-      match
-        List.find_opt (fun (label', _) -> String.equal label label') extra_subst
-      with
-      | Some (_, res) -> res
-      | None -> assert false)
+  let enabled_if_without_llvm =
+    {|(enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{env:OXCAML_CLANG=} "")))|}
   in
-  let rule_template =
-    Format.asprintf "%a" (F.pp_rule_template ~run ~tasks) ()
+  (* Prioritise [extra_subst] *)
+  let subst label =
+    match
+      List.find_opt (fun (label', _) -> String.equal label label') extra_subst
+    with
+    | Some (_, res) -> res
+    | None -> (
+      match label with
+      | "ocamlopt" -> "%{bin:ocamlopt.opt}"
+      | "enabled_if" -> enabled_if
+      | "enabled_if_without_llvm" -> enabled_if_without_llvm
+      | "filter" -> "filter.sh"
+      | "llvm_path" -> "${OXCAML_CLANG}"
+      | "llvm_flags" ->
+        (* We pass -dno-asm-comments to avoid printing flaky identifiers in Cfg
+           instructions *)
+        (* CR yusumez: remove -disable-poll-insertion once we can emit poll
+           insertions *)
+        (* CR yusumez: find a better way to detect LLVM_PATH *)
+        "-llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir \
+         -dno-asm-comments -disable-poll-insertion"
+      | "common_flags" ->
+        "-g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear"
+      | "stop_after_llvm_flags" ->
+        "-g -O3 -opaque -dump-into-file -dcmm -dcfg -stop-after llvmize"
+      | "c_flags" -> "-c -g -O3 -I %{project_root}/runtime"
+      | _ -> assert false)
   in
   Buffer.clear buf;
   Buffer.add_substitute buf subst rule_template;
   Buffer.output_buffer Out_channel.stdout buf
+
+let print_test ~extra_subst ~run ~tasks ~buf =
+  let rule_template =
+    Format.asprintf "%a" (F.pp_rule_template ~run ~tasks) ()
+  in
+  print_rule ~extra_subst ~buf rule_template
 
 let () =
   let buf = Buffer.create 1000 in
@@ -215,6 +252,7 @@ let () =
         [ Ocaml_llvm { filename = name; stop_after_llvmize = false };
           Output_ir { source = name; output = name ^ "_ir" } ]
   in
+  print_rule ~extra_subst:[] ~buf F.check_env_rule;
   print_test_ir_only "id_fn";
   print_test_ir_and_run "const_val";
   print_test_ir_and_run_with_dep ~extra_dep_suffix:"data" "int_ops";

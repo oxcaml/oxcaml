@@ -593,6 +593,12 @@ and expression i ppf x =
       line i ppf "Texp_idx\n";
       block_access i ppf ba;
       List.iter (unboxed_access i ppf) uas;
+  | Texp_atomic_loc (e, sort, li, _, amode) ->
+      line i ppf "Texp_atomic_loc\n";
+      expression i ppf e;
+      line i ppf "%a\n" Jkind.Sort.format sort;
+      longident i ppf li;
+      alloc_mode i ppf amode
   | Texp_list_comprehension comp ->
       line i ppf "Texp_list_comprehension\n";
       comprehension i ppf comp
