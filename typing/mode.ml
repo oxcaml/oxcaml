@@ -1869,7 +1869,6 @@ end
 
 module Visibility = struct
   module Const = C.Visibility
-  module Const_op = C.Visibility_op
 
   module Obj = struct
     type const = Const.t
@@ -1911,7 +1910,6 @@ end
 
 module Uniqueness = struct
   module Const = C.Uniqueness
-  module Const_op = C.Uniqueness_op
 
   module Obj = struct
     type const = Const.t
@@ -1932,7 +1930,6 @@ end
 
 module Contention = struct
   module Const = C.Contention
-  module Const_op = C.Contention_op
 
   module Obj = struct
     type const = Const.t
@@ -2064,15 +2061,6 @@ module Comonadic_with (Areality : Areality) = struct
         let obj = proj_obj ax in
         C.print_obj ppf obj
     end
-
-    let lattice_of_axis (type a) (axis : a Axis.t) :
-        (module Lattice with type t = a) =
-      match axis with
-      | Areality -> (module Areality.Const)
-      | Linearity -> (module Linearity.Const)
-      | Portability -> (module Portability.Const)
-      | Yielding -> (module Yielding.Const)
-      | Statefulness -> (module Statefulness.Const)
   end
 
   let proj ax m = Solver.apply (proj_obj ax) (Proj (Obj.obj, ax)) m
@@ -2227,16 +2215,7 @@ module Monadic = struct
         let obj = proj_obj ax in
         C.print_obj ppf obj
     end
-
-    let lattice_of_axis (type a) (axis : a Axis.t) :
-        (module Lattice with type t = a) =
-      match axis with
-      | Uniqueness -> (module Uniqueness.Const_op)
-      | Contention -> (module Contention.Const_op)
-      | Visibility -> (module Visibility.Const_op)
   end
-
-  module Const_op = C.Monadic_op
 
   let proj ax m = Solver.apply (proj_obj ax) (Proj (Obj.obj, ax)) m
 
@@ -2457,12 +2436,6 @@ module Value_with (Areality : Areality) = struct
       let monadic = Monadic.join m0.monadic m1.monadic in
       let comonadic = Comonadic.join m0.comonadic m1.comonadic in
       merge { monadic; comonadic }
-
-    let lattice_of_axis (type a) (axis : a Axis.t) :
-        (module Lattice with type t = a) =
-      match axis with
-      | Comonadic ax -> Comonadic.lattice_of_axis ax
-      | Monadic ax -> Monadic.lattice_of_axis ax
 
     module Option = struct
       type some = t
