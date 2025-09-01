@@ -53,7 +53,7 @@ type environment =
   { vars :
       (Reg.t array * Backend_var.Provenance.t option * Asttypes.mutable_flag)
       V.Map.t;
-    static_exceptions : static_handler Int.Map.t;
+    static_exceptions : static_handler Static_label.Map.t;
         (** Which registers must be populated when jumping to the given
         handler. *)
     trap_stack : Operation.trap_stack;
@@ -68,7 +68,10 @@ let env_add ?(mut = Asttypes.Immutable) var regs env =
 let env_add_static_exception id v env label =
   let r = ref Unreachable in
   let s : static_handler = { regs = v; traps_ref = r; label } in
-  { env with static_exceptions = Int.Map.add id s env.static_exceptions }, r
+  ( { env with
+      static_exceptions = Static_label.Map.add id s env.static_exceptions
+    },
+    r )
 
 let env_find id env =
   let regs, _provenance, _mut = V.Map.find id env.vars in
@@ -83,18 +86,20 @@ let env_find_mut id env =
   regs, provenance
 
 let env_find_regs_for_exception_extra_args id env =
-  match Int.Map.find id env.static_exceptions with
+  match Static_label.Map.find id env.static_exceptions with
   | { regs = _exn :: extra_args; _ } -> extra_args
   | { regs = []; _ } ->
-    Misc.fatal_errorf "Exception handler for continuation %d has no parameters"
-      id
+    Misc.fatal_errorf "Exception handler for continuation %a has no parameters"
+      Static_label.format id
   | exception Not_found ->
     Misc.fatal_errorf
-      "Could not find exception extra args registers for continuation %d" id
+      "Could not find exception extra args registers for continuation %a"
+      Static_label.format id
 
 let env_find_static_exception id env =
-  try Int.Map.find id env.static_exceptions
-  with Not_found -> Misc.fatal_errorf "Not found static exception id=%d" id
+  try Static_label.Map.find id env.static_exceptions
+  with Not_found ->
+    Misc.fatal_errorf "Not found static exception id=%a" Static_label.format id
 
 let env_set_trap_stack env trap_stack = { env with trap_stack }
 
@@ -110,7 +115,7 @@ let print_traps ppf traps =
   let rec print_traps ppf = function
     | Operation.Uncaught -> Format.fprintf ppf "T"
     | Operation.Specific_trap (lbl, ts) ->
-      Format.fprintf ppf "%d::%a" lbl print_traps ts
+      Format.fprintf ppf "%a::%a" Static_label.format lbl print_traps ts
   in
   Format.fprintf ppf "(%a)" print_traps traps
 
@@ -118,15 +123,16 @@ let set_traps nfail traps_ref base_traps exit_traps =
   let traps = combine_traps base_traps exit_traps in
   match !traps_ref with
   | Unreachable ->
-    (* Format.eprintf "Traps for %d set to %a@." nfail print_traps traps; *)
+    (* Format.eprintf "Traps for %a set to %a@." Static_label.format nfail
+       print_traps traps; *)
     traps_ref := Reachable traps
   | Reachable prev_traps ->
     if not (Operation.equal_trap_stack prev_traps traps)
     then
       Misc.fatal_errorf
-        "Mismatching trap stacks for continuation %d@.Previous traps: %a@.New \
+        "Mismatching trap stacks for continuation %a@.Previous traps: %a@.New \
          traps: %a"
-        nfail print_traps prev_traps print_traps traps
+        Static_label.format nfail print_traps prev_traps print_traps traps
     else ()
 
 let set_traps_for_raise env =
@@ -137,7 +143,7 @@ let set_traps_for_raise env =
     match env_find_static_exception lbl env with
     | s -> set_traps lbl s.traps_ref ts [Pop lbl]
     | exception Not_found ->
-      Misc.fatal_errorf "Trap %d not registered in env" lbl)
+      Misc.fatal_errorf "Trap %a not registered in env" Static_label.format lbl)
 
 let trap_stack_is_empty env =
   match env.trap_stack with Uncaught -> true | Specific_trap _ -> false
@@ -151,7 +157,7 @@ let pop_all_traps env =
 
 let env_create ~tailrec_label =
   { vars = V.Map.empty;
-    static_exceptions = Int.Map.empty;
+    static_exceptions = Static_label.Map.empty;
     trap_stack = Uncaught;
     tailrec_label
   }

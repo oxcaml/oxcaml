@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # OxCaml Compiler Development Guide
 
 Do not stage or commit your changes unless prompted to.
-Always check that your changes build with both:
+Always check that your changes build with both (after configuration, see below):
 1. `make boot-compiler` - Quick build check
 2. `make test` - Full test suite (required before declaring success)
 
@@ -47,6 +47,8 @@ make test                                # Run all tests
 autoconf                  # Generate configure script
 ./configure               # Configure the compiler
 ```
+
+If the execution of `autoconf` fails because the version is too old, try with `autoconf27` instead.
 
 Configuration is needed after changing `.in` files or the autoconf script.
 

@@ -61,7 +61,7 @@ open! Stdlib
 
 [@@@ocaml.nolabels]
 
-external length : bytes -> int = "%bytes_length"
+external length : bytes @ immutable -> int = "%bytes_length"
 (** Return the length (number of bytes) of the argument. *)
 
 external get : bytes -> int -> char = "%bytes_safe_get"

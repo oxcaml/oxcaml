@@ -72,6 +72,7 @@ type register_behavior =
   | Rf32_to_Rf32
   | Rf64_to_Rf64
   | Rf32_to_Rs64
+  | Rf64_to_Rs64
   (* extract *)
   | Rs8x16_to_Rs8 of { lane : int }
   | Rs16x8_to_Rs16 of { lane : int }
@@ -96,6 +97,7 @@ let register_behavior (op : Simd.operation) =
   match op with
   (* unary *)
   | Round_f32_s64 -> Rf32_to_Rs64
+  | Round_f64_s64 -> Rf64_to_Rs64
   | Round_f32 _ -> Rf32_to_Rf32
   | Round_f64 _ -> Rf64_to_Rf64
   (* binary *)

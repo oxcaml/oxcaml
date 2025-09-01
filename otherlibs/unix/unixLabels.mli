@@ -393,7 +393,7 @@ val read_bigarray :
 (** Same as {!read}, but read the data into a bigarray.
     @since 5.2 *)
 
-val write : file_descr -> buf:bytes -> pos:int -> len:int -> int
+val write : file_descr -> buf:bytes @ shared -> pos:int -> len:int -> int
 (** [write fd ~buf ~pos ~len] writes [len] bytes to descriptor [fd],
     taking them from byte sequence [buf], starting at position [pos]
     in [buff]. Return the number of bytes actually written.  [write]
@@ -402,12 +402,13 @@ val write : file_descr -> buf:bytes -> pos:int -> len:int -> int
 
 val write_bigarray :
   file_descr ->
-  buf:(_, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t ->
+  buf:(_, Bigarray.int8_unsigned_elt, Bigarray.c_layout)
+    Bigarray.Array1.t @ shared ->
   pos:int -> len:int -> int
 (** Same as {!write}, but take the data from a bigarray.
     @since 5.2 *)
 
-val single_write : file_descr -> buf:bytes -> pos:int -> len:int -> int
+val single_write : file_descr -> buf:bytes @ shared -> pos:int -> len:int -> int
 (** Same as {!write}, but attempts to write only once.
    Thus, if an error occurs, [single_write] guarantees that no data
    has been written. *)
@@ -425,7 +426,8 @@ val single_write_substring :
 
 val single_write_bigarray :
   file_descr ->
-  buf:(_, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t ->
+  buf:(_, Bigarray.int8_unsigned_elt, Bigarray.c_layout)
+    Bigarray.Array1.t @ shared ->
   pos:int -> len:int -> int
 (** Same as {!single_write}, but take the data from a bigarray.
     @since 5.2 *)
@@ -1556,7 +1558,8 @@ val recvfrom :
 (** Receive data from an unconnected socket. *)
 
 val send :
-  file_descr -> buf:bytes -> pos:int -> len:int -> mode:msg_flag list -> int
+  file_descr -> buf:bytes @ shared -> pos:int -> len:int ->
+    mode:msg_flag list -> int
 (** Send data over a connected socket. *)
 
 val send_substring :
@@ -1566,8 +1569,8 @@ val send_substring :
     @since 4.02 *)
 
 val sendto :
-  file_descr -> buf:bytes -> pos:int -> len:int -> mode:msg_flag list ->
-    addr:sockaddr -> int
+  file_descr -> buf:bytes @ shared -> pos:int -> len:int ->
+    mode:msg_flag list -> addr:sockaddr -> int
 (** Send data over an unconnected socket. *)
 
 val sendto_substring :
@@ -1885,7 +1888,7 @@ type setattr_when = Unix.setattr_when =
   | TCSADRAIN
   | TCSAFLUSH
 
-val tcsetattr : file_descr -> mode:setattr_when -> terminal_io -> unit
+val tcsetattr : file_descr -> mode:setattr_when -> terminal_io @ shared -> unit
 (** Set the status of the terminal referred to by the given
    file descriptor. The second argument indicates when the
    status change takes place: immediately ([TCSANOW]),

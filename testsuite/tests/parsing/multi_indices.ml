@@ -18,7 +18,7 @@ let (.%{;..}<-) = A.set;;
 val ( .%{;..}<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit = <fun>
 
 let (.%{;..}) = A.get;;
-val ( .%{;..} ) : ('a, 'b, 'c) A.t -> int array -> 'a = <fun>
+val ( .%{;..} ) : ('a, 'b, 'c) A.t @ shared -> int array -> 'a = <fun>
 |}]
 
 let (.![;..]<-) = A.set
@@ -49,7 +49,7 @@ let (.?(;..)<-) = A.set;;
 val ( .?(;..)<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit = <fun>
 
 let (.?(;..)) = A.get;;
-val ( .?(;..) ) : ('a, 'b, 'c) A.t -> int array -> 'a = <fun>
+val ( .?(;..) ) : ('a, 'b, 'c) A.t @ shared -> int array -> 'a = <fun>
 |}]
 
 let a = A.create Bigarray.float64 Bigarray.c_layout [|3;3;3|]
@@ -137,11 +137,11 @@ module M =
   end;;
 module M :
   sig
-    val ( .%?(;..) ) : ('a, 'b, 'c) A.t -> int array -> 'a
+    val ( .%?(;..) ) : ('a, 'b, 'c) A.t @ shared -> int array -> 'a
     val ( .%?(;..)<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit
-    val ( .%![;..] ) : ('a, 'b, 'c) A.t -> int array -> 'a
+    val ( .%![;..] ) : ('a, 'b, 'c) A.t @ shared -> int array -> 'a
     val ( .%![;..]<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit
-    val ( .%%{;..} ) : ('a, 'b, 'c) A.t -> int array -> 'a
+    val ( .%%{;..} ) : ('a, 'b, 'c) A.t @ shared -> int array -> 'a
     val ( .%%{;..}<- ) : ('a, 'b, 'c) A.t -> int array -> 'a -> unit
   end
 

@@ -26,7 +26,7 @@ open! Stdlib
    These functions have a "duplicated" comment above their definition.
 *)
 
-external length : bytes -> int @@ portable = "%bytes_length"
+external length : bytes @ immutable -> int @@ portable = "%bytes_length"
 external string_length : string -> int @@ portable = "%string_length"
 external get : bytes -> int -> char @@ portable = "%bytes_safe_get"
 external set : bytes -> int -> char -> unit @@ portable = "%bytes_safe_set"

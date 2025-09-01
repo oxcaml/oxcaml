@@ -261,7 +261,7 @@ type phantom_defining_expr =
         fields : Backend_var.t list
       }
 
-type trywith_shared_label = int
+type trywith_shared_label = Lambda.static_label
 
 type trap_action =
   | Push of trywith_shared_label

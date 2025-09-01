@@ -217,7 +217,7 @@ let add_event ev = function
 type stack_info =
   { try_blocks : int list;
     (* list of stack size for each nested try block *)
-    sz_static_raises : (int * (int * int * int list)) list;
+    sz_static_raises : (Static_label.t * (int * int * int list)) list;
     (* association staticraise numbers -> (lbl,size of stack, try_blocks *)
     max_stack_used : int ref
         (* Maximal stack size reached during the current function body *)
@@ -238,7 +238,8 @@ let push_static_raise stack_info i lbl_handler sz =
 let find_raise_label stack_info i =
   try List.assoc i stack_info.sz_static_raises
   with Not_found ->
-    Misc.fatal_error ("exit(" ^ Int.to_string i ^ ") outside appropriated catch")
+    Misc.fatal_errorf "exit(%a) outside appropriated catch" Static_label.format
+      i
 
 (* Will the translation of l lead to a jump to label ? *)
 let code_as_jump stack_info l sz =

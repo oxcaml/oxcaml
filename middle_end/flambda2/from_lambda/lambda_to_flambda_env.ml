@@ -82,8 +82,8 @@ type t =
       Ident.Map.t;
     try_stack : Continuation.t list;
     try_stack_at_handler : Continuation.t list Continuation.Map.t;
-    static_exn_continuation : Continuation.t Numeric_types.Int.Map.t;
-    recursive_static_catches : Numeric_types.Int.Set.t;
+    static_exn_continuation : Continuation.t Static_label.Map.t;
+    recursive_static_catches : Static_label.Set.t;
     my_region : Region_stack_element.t option;
     region_stack : Region_stack_element.t list;
     region_stack_in_cont_scope : Region_stack_element.t list Continuation.Map.t;
@@ -105,8 +105,8 @@ let create ~current_unit ~return_continuation ~exn_continuation ~my_region =
     unboxed_product_components_in_scope = Ident.Map.empty;
     try_stack = [];
     try_stack_at_handler = Continuation.Map.empty;
-    static_exn_continuation = Numeric_types.Int.Map.empty;
-    recursive_static_catches = Numeric_types.Int.Set.empty;
+    static_exn_continuation = Static_label.Map.empty;
+    recursive_static_catches = Static_label.Set.empty;
     my_region;
     region_stack = [];
     region_stack_in_cont_scope =
@@ -250,36 +250,37 @@ let add_static_exn_continuation t static_exn ~pop_region cont =
       try_stack_at_handler =
         Continuation.Map.add cont t.try_stack t.try_stack_at_handler;
       static_exn_continuation =
-        Numeric_types.Int.Map.add static_exn cont t.static_exn_continuation
+        Static_label.Map.add static_exn cont t.static_exn_continuation
     }
   in
   let recursive : Asttypes.rec_flag =
-    if Numeric_types.Int.Set.mem static_exn t.recursive_static_catches
+    if Static_label.Set.mem static_exn t.recursive_static_catches
     then Recursive
     else Nonrecursive
   in
   add_continuation t cont ~push_to_try_stack:false ~pop_region recursive
 
 let get_static_exn_continuation t static_exn =
-  match Numeric_types.Int.Map.find static_exn t.static_exn_continuation with
+  match Static_label.Map.find static_exn t.static_exn_continuation with
   | exception Not_found ->
-    Misc.fatal_errorf "Unbound static exception %d" static_exn
+    Misc.fatal_errorf "Unbound static exception %a" Static_label.format
+      static_exn
   | continuation -> continuation
 
 let mark_as_recursive_static_catch t static_exn =
-  if Numeric_types.Int.Set.mem static_exn t.recursive_static_catches
+  if Static_label.Set.mem static_exn t.recursive_static_catches
   then
     Misc.fatal_errorf
-      "Static catch with continuation %d already marked as recursive -- is it \
+      "Static catch with continuation %a already marked as recursive -- is it \
        being redefined?"
-      static_exn;
+      Static_label.format static_exn;
   { t with
     recursive_static_catches =
-      Numeric_types.Int.Set.add static_exn t.recursive_static_catches
+      Static_label.Set.add static_exn t.recursive_static_catches
   }
 
 let is_static_exn_recursive t static_exn =
-  Numeric_types.Int.Set.mem static_exn t.recursive_static_catches
+  Static_label.Set.mem static_exn t.recursive_static_catches
 
 let get_try_stack t = t.try_stack
 

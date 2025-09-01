@@ -1272,18 +1272,11 @@ Error: This type cannot be unboxed because
        You should annotate it with "[@@ocaml.boxed]".
 |}]
 
-(* CR layouts 7.2: accept the following program. *)
 type ('a, 'b) t = { a : 'a }
 type ('a, 'b) s = ('a, 'b) t
 type packed = T : (int, 'b) s# -> packed [@@unboxed]
 [%%expect{|
 type ('a, 'b) t = { a : 'a; }
 type ('a, 'b) s = ('a, 'b) t
-Line 3, characters 0-52:
-3 | type packed = T : (int, 'b) s# -> packed [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type cannot be unboxed because
-       it might contain both float and non-float values,
-       depending on the instantiation of the existential variable "'b".
-       You should annotate it with "[@@ocaml.boxed]".
+type packed = T : (int, 'b) s# -> packed [@@unboxed]
 |}]

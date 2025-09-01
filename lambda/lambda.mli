@@ -724,7 +724,7 @@ val equal_meth_kind : meth_kind -> meth_kind -> bool
 
 type shared_code = (int * int) list     (* stack size -> code label *)
 
-type static_label = int
+type static_label = Static_label.t
 
 type function_attribute = {
   inline : inline_attribute;

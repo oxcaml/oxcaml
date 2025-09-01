@@ -42,7 +42,7 @@ type value_mismatch =
   | Not_a_primitive
   | Type of Errortrace.moregen_error
   | Zero_alloc of Zero_alloc.error
-  | Modality of Mode.Modality.Value.error
+  | Modality of Mode.Modality.error
   | Mode of Mode.Value.error
 
 exception Dont_match of value_mismatch
@@ -66,13 +66,13 @@ let child_modes id = function
 
 let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
   | All ->
-    begin match Mode.Modality.Value.sub moda0 moda1 with
+    begin match Mode.Modality.sub moda0 moda1 with
       | Ok () -> Ok All
       | Error e -> Error e
     end
   | Specific (m0, m1, c) ->
     let c = child_close_over_coercion_opt id c in
-    begin match Mode.Modality.Value.to_const_opt moda1 with
+    begin match Mode.Modality.to_const_opt moda1 with
     | None ->
       (* [wrap_constraint_with_shape] invokes inclusion check with
           identical modes and inferred modalities, which we workaround *)
@@ -81,8 +81,8 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
       (* For children, we only check modality inclusion *)
       Ok All
     | Some moda1 ->
-      let m0 = Mode.Modality.Value.apply moda0 m0 in
-      let m1 = Mode.Modality.Value.Const.apply moda1 m1 in
+      let m0 = Mode.Modality.apply moda0 m0 in
+      let m1 = Mode.Modality.Const.apply moda1 m1 in
       Ok (Specific (m0, m1, c))
     end
 
@@ -266,7 +266,7 @@ type label_mismatch =
   | Type of Errortrace.equality_error
   | Mutability of position
   | Atomicity of position
-  | Modality of Modality.Value.equate_error
+  | Modality of Modality.equate_error
 
 type record_change =
   (Types.label_declaration, Types.label_declaration, label_mismatch)
@@ -286,7 +286,7 @@ type constructor_mismatch =
   | Inline_record of record_change list
   | Kind of position
   | Explicit_return_type of position
-  | Modality of int * Modality.Value.equate_error
+  | Modality of int * Modality.equate_error
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -336,7 +336,7 @@ let report_modality_sub_error first second ppf e =
   let print_modality id ppf m =
     Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ppf m
   in
-  let Modality.Value.Error {left; right} = e in
+  let Modality.Error {left; right} = e in
   Format.fprintf ppf "%s is %a and %s is %a."
     (String.capitalize_ascii second)
     (print_modality "empty") right
@@ -344,7 +344,7 @@ let report_modality_sub_error first second ppf e =
     (print_modality "not") left
 
 let report_mode_sub_error got expected ppf e =
-  let Mode.Value.Error(ax, {left; right}) = e in
+  let Mode.Value.Error(ax, {left; right}) = Mode.Value.to_simple_error e in
   match ax with
   | Comonadic Areality -> Format.fprintf ppf "This escapes its region."
   | _ ->
@@ -354,7 +354,8 @@ let report_mode_sub_error got expected ppf e =
       expected
       (Misc.Style.as_inline_code (Value.Const.print_axis ax)) right
 
-let report_modality_equate_error first second ppf ((equate_step, sub_error) : Modality.Value.equate_error) =
+let report_modality_equate_error first second ppf
+  ((equate_step, sub_error) : Modality.equate_error) =
   match equate_step with
   | Left_le_right -> report_modality_sub_error first second ppf sub_error
   | Right_le_left -> report_modality_sub_error second first ppf sub_error
@@ -743,9 +744,7 @@ module Record_diffing = struct
         begin match err with
         | Some err -> Some err
         | None ->
-          match
-            Modality.Value.Const.equate ld1.ld_modalities ld2.ld_modalities
-          with
+          match Modality.Const.equate ld1.ld_modalities ld2.ld_modalities with
           | Ok () ->
             let tl1 = params1 @ [ld1.ld_type] in
             let tl2 = params2 @ [ld2.ld_type] in
@@ -955,7 +954,7 @@ module Variant_diffing = struct
           | exception Ctype.Equality err -> Some (Type err)
           | () -> List.combine arg1_gfs arg2_gfs
                   |> find_map_idx
-                    (fun (x,y) -> get_error @@ Modality.Value.Const.equate x y)
+                    (fun (x,y) -> get_error @@ Modality.Const.equate x y)
                   |> Option.map (fun (i, err) -> Modality (i, err))
         end
     | Types.Cstr_record l1, Types.Cstr_record l2 ->
