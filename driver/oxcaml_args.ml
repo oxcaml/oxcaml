@@ -890,6 +890,12 @@ let mk_gdwarf_fission f =
     \     Only takes effect with -gno-upstream-dwarf or --enable-oxcaml-dwarf"
   )
 
+let mk_gdwarf_pedantic f =
+  ( "-gdwarf-pedantic",
+    Arg.Unit f,
+    " Enable pedantic DWARF error checking (fatal errors instead of silent \
+     fallbacks)" )
+
 let mk_use_cached_generic_functions f =
   ( "-use-cached-generic-functions",
     Arg.Unit f,
@@ -1532,6 +1538,7 @@ module type Debugging_options = sig
   val gdwarf_max_function_complexity : int -> unit
   val gdwarf_compression : string -> unit
   val gdwarf_fission : string -> unit
+  val gdwarf_pedantic : unit -> unit
 end
 
 module Make_debugging_options (F : Debugging_options) = struct
@@ -1548,6 +1555,7 @@ module Make_debugging_options (F : Debugging_options) = struct
       mk_gdwarf_max_function_complexity F.gdwarf_max_function_complexity;
       mk_gdwarf_compression F.gdwarf_compression;
       mk_gdwarf_fission F.gdwarf_fission;
+      mk_gdwarf_pedantic F.gdwarf_pedantic;
     ]
 end
 
@@ -1588,6 +1596,8 @@ module Debugging_options_impl = struct
              (Printf.sprintf
                 "Invalid value for -gdwarf-fission: %s\n\
                  Valid values are: none, objcopy, dsymutil" value))
+
+  let gdwarf_pedantic () = Clflags.dwarf_pedantic := true
 end
 
 module Extra_params = struct

@@ -161,6 +161,7 @@ module type Debugging_options = sig
   val gdwarf_max_function_complexity : int -> unit
   val gdwarf_compression : string -> unit
   val gdwarf_fission : string -> unit
+  val gdwarf_pedantic : unit -> unit
 end
 
 (** Command line arguments required for ocamlopt. *)
