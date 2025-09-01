@@ -413,7 +413,7 @@ let relevant_axes_of_modality ~relevant_for_shallow ~modality =
   Axis_set.create ~f:(fun ~axis:(Pack axis) ->
       match axis with
       | Modal axis ->
-        let modality = Mode.Modality.Value.Const.proj axis modality in
+        let modality = Mode.Modality.Const.proj axis modality in
         not (Mode.Modality.Atom.is_constant modality)
       (* The kind-inference.md document (in the repo) discusses both constant
          modalities and identity modalities. Of course, reality has modalities
@@ -1896,11 +1896,11 @@ module Const = struct
                 Comonadic
                   (ax, Meet_with (Mode.Value.Comonadic.Const.Per_axis.min ax))
             in
-            Modality.Value.Const.set t acc
+            Modality.Const.set t acc
           | Nonmodal _ ->
             (* TODO: don't know how to print *)
             acc)
-        Modality.Value.Const.id
+        Modality.Const.id
         (Axis_set.to_list axes_to_ignore)
 
     (** Write [actual] in terms of [base] *)
@@ -2650,7 +2650,7 @@ let for_boxed_variant ~loc cstrs =
 let for_boxed_tuple elts =
   List.fold_right
     (fun (_, type_expr) ->
-      add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr)
+      add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr)
     elts
     (Builtin.immutable_data ~why:Tuple |> mark_best)
 
@@ -2678,8 +2678,7 @@ let for_boxed_row row =
       let base = Builtin.immutable_data ~why:Polymorphic_variant in
       Btype.fold_row
         (fun jkind type_expr ->
-          add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr
-            jkind)
+          add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr jkind)
         base row
       |> mark_best
   else Builtin.immediate ~why:Immediate_polymorphic_variant

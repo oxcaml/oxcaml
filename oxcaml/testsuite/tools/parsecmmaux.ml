@@ -21,7 +21,7 @@ type error =
 exception Error of error
 
 let tbl_ident = (Hashtbl.create 57 : (string, Backend_var.t) Hashtbl.t)
-let tbl_label = (Hashtbl.create 57 : (string, int) Hashtbl.t)
+let tbl_label = (Hashtbl.create 57 : (string, Lambda.static_label) Hashtbl.t)
 
 let ident_name s =
   match String.index s '/' with

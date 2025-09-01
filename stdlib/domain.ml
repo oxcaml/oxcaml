@@ -455,7 +455,8 @@ module type S = sig
     type 'a key : value mod portable contended
 
     val access
-      :  (Access.t -> 'a @ portable contended) @ local portable unyielding once
+      : ('a : value_or_null).
+          (Access.t -> 'a @ portable contended) @ local portable unyielding once
       -> 'a @ portable contended
       @@ portable
 

@@ -261,13 +261,16 @@ external unsafe_read : file_descr -> bytes -> int -> int -> int @@ portable
 external unsafe_read_bigarray :
   file_descr -> _ Bigarray.Array1.t -> int -> int -> int @@ portable
   = "caml_unix_read_bigarray"
-external unsafe_write : file_descr -> bytes -> int -> int -> int @@ portable
-                      = "caml_unix_write"
+external unsafe_write :
+  file_descr -> bytes @ shared -> int -> int -> int @@ portable
+  = "caml_unix_write"
 external unsafe_write_bigarray :
-  file_descr -> _ Bigarray.Array1.t -> int -> int -> single: bool -> int @@ portable
+  file_descr -> _ Bigarray.Array1.t @ shared -> int -> int -> single: bool
+  -> int @@ portable
   = "caml_unix_write_bigarray"
-external unsafe_single_write : file_descr -> bytes -> int -> int -> int @@ portable
-   = "caml_unix_single_write"
+external unsafe_single_write :
+  file_descr -> bytes @ shared -> int -> int -> int @@ portable
+  = "caml_unix_single_write"
 
 let read fd buf ofs len =
   if ofs < 0 || len < 0 || ofs > Bytes.length buf - len
@@ -629,10 +632,11 @@ external unsafe_recvfrom :
   file_descr -> bytes -> int -> int -> msg_flag list -> int * sockaddr @@ portable
                                   = "caml_unix_recvfrom"
 external unsafe_send :
-  file_descr -> bytes -> int -> int -> msg_flag list -> int @@ portable
+  file_descr -> bytes @ shared -> int -> int -> msg_flag list -> int @@ portable
                                   = "caml_unix_send"
 external unsafe_sendto :
-  file_descr -> bytes -> int -> int -> msg_flag list -> sockaddr -> int @@ portable
+  file_descr -> bytes @ shared -> int -> int -> msg_flag list -> sockaddr
+  -> int @@ portable
                                   = "caml_unix_sendto" "caml_unix_sendto_native"
 
 let recv fd buf ofs len flags =
@@ -1226,8 +1230,9 @@ type setattr_when = TCSANOW | TCSADRAIN | TCSAFLUSH
 
 external tcgetattr: file_descr -> terminal_io @@ portable = "caml_unix_tcgetattr"
 
-external tcsetattr: file_descr -> setattr_when -> terminal_io -> unit @@ portable
-               = "caml_unix_tcsetattr"
+external tcsetattr:
+  file_descr -> setattr_when -> terminal_io @ shared -> unit @@ portable
+  = "caml_unix_tcsetattr"
 external tcsendbreak: file_descr -> int -> unit @@ portable = "caml_unix_tcsendbreak"
 external tcdrain: file_descr -> unit @@ portable = "caml_unix_tcdrain"
 

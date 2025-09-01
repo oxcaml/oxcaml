@@ -99,7 +99,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
         {
           ca_type = newgenconstr path type_params;
           ca_sort = Jkind.Sort.Const.value;
-          ca_modalities = Mode.Modality.Value.Const.id;
+          ca_modalities = Mode.Modality.Const.id;
           ca_loc = Location.none
         }
       ],
@@ -242,7 +242,7 @@ let dummy_label (type rep) (record_form : rep record_form)
   | Unboxed_product -> Record_unboxed_product
   in
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
-    lbl_mut = Immutable; lbl_modalities = Mode.Modality.Value.Const.id;
+    lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
     lbl_sort = Jkind.Sort.Const.void;
     lbl_pos = -1; lbl_all = [||];
     lbl_repres = repres;

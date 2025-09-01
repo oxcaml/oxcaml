@@ -213,7 +213,9 @@ let space ppf () = Format.fprintf ppf "@ "
 module Is_modal = struct
   open Err
   let rec module_type_symptom = function
-    | Mode (Error (ax, _)) -> Some (Mode.Value.Axis.P ax)
+    | Mode e ->
+       let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
+        Some (Mode.Value.Axis.P ax)
     | Signature s -> signature_symptom s
     | Functor _ | Invalid_module_alias _ | After_alias_expansion _ | Mt_core _
       -> None
@@ -234,11 +236,15 @@ module Is_modal = struct
     | Modalities _ -> None
 
   and class_declaration_symptom = function
-    | Class_mode (Error (ax, _)) -> Some (Mode.Value.Axis.P ax)
+    | Class_mode e ->
+        let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
+        Some (Mode.Value.Axis.P ax)
     | Class_type _ -> None
 
   and value_mismatch : Includecore.value_mismatch -> _ = function
-    | Mode (Error (ax, _)) -> Some (Mode.Value.Axis.P ax)
+    | Mode e ->
+        let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
+        Some (Mode.Value.Axis.P ax)
     | _ -> None
 end
 

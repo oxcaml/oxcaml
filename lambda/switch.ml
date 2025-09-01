@@ -133,8 +133,8 @@ sig
   val make_if : layout -> test -> act -> act -> act
   val make_switch : loc -> layout -> arg -> int array -> act array -> act
 
-  val make_catch : layout -> act -> int * (act -> act)
-  val make_exit : int -> act
+  val make_catch : layout -> act -> Static_label.t * (act -> act)
+  val make_exit : Static_label.t -> act
 end
 
 (* The module will ``produce good code for the case statement''

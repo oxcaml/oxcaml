@@ -199,12 +199,12 @@ let location d = if not !Clflags.locations then "" else Debuginfo.to_string d
 
 let exit_label ppf = function
   | Return_lbl -> fprintf ppf "*return*"
-  | Lbl lbl -> fprintf ppf "%d" lbl
+  | Lbl lbl -> fprintf ppf "%a" Static_label.format lbl
 
 let trap_action ppf ta =
   match ta with
-  | Push i -> fprintf ppf "push(%d)" i
-  | Pop i -> fprintf ppf "pop(%d)" i
+  | Push i -> fprintf ppf "push(%a)" Static_label.format i
+  | Pop i -> fprintf ppf "pop(%a)" Static_label.format i
 
 let trap_action_list ppf traps =
   match traps with
@@ -430,7 +430,7 @@ let rec expr ppf = function
   | Ccatch (flag, handlers, e1) ->
     let print_handler ppf (i, ids, e2, dbg, is_cold) =
       with_location_mapping ~label:"Ccatch-handler" ~dbg ppf (fun () ->
-          fprintf ppf "(%d%a)%s@ %a" i
+          fprintf ppf "(%a%a)%s@ %a" Static_label.format i
             (fun ppf ids ->
               List.iter
                 (fun (id, ty) -> fprintf ppf "@ %a: %a" VP.print id machtype ty)
