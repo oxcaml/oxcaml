@@ -51,11 +51,6 @@ include Container_types.S with type t := t
 
 val compare_total_order : t -> t -> int
 
-val compare_partial_order : t -> t -> int option
-
-(** This shadows [compare] from the above [include]. *)
-val compare : t -> t -> [`Be_explicit_about_total_or_partial_ordering]
-
 module Or_absent : sig
   type t = private
     | Absent
@@ -71,10 +66,7 @@ module Or_absent : sig
 
   include Container_types.S with type t := t
 
-  val compare_partial_order : t -> t -> int option
-
-  (** This shadows [compare] from the above [include]. *)
-  val compare : t -> t -> [`Be_explicit_about_total_or_partial_ordering]
+  val compare_total_order : t -> t -> int
 
   val join_in_terms : t -> t -> t
 end
