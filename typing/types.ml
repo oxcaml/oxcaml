@@ -48,126 +48,67 @@ let mutable_mode m0 : _ Mode.Value.t =
 (* Type expressions for the core language *)
 
 module Jkind_mod_bounds = struct
-  module Areality = Mode.Regionality.Const
-  module Linearity = Mode.Linearity.Const
-  module Uniqueness = Mode.Uniqueness.Const_op
-  module Portability = Mode.Portability.Const
-  module Contention = Mode.Contention.Const_op
-  module Yielding = Mode.Yielding.Const
-  module Statefulness = Mode.Statefulness.Const
-  module Visibility = Mode.Visibility.Const_op
+  module Crossing = Mode.Crossing
   module Externality = Jkind_axis.Externality
   module Nullability = Jkind_axis.Nullability
   module Separability = Jkind_axis.Separability
 
   type t = {
-    areality: Areality.t;
-    linearity: Linearity.t;
-    uniqueness: Uniqueness.t;
-    portability: Portability.t;
-    contention: Contention.t;
-    yielding: Yielding.t;
-    statefulness: Statefulness.t;
-    visibility: Visibility.t;
+    crossing : Crossing.t;
     externality: Externality.t;
     nullability: Nullability.t;
     separability: Separability.t;
   }
 
-  let[@inline] areality t = t.areality
-  let[@inline] linearity t = t.linearity
-  let[@inline] uniqueness t = t.uniqueness
-  let[@inline] portability t = t.portability
-  let[@inline] contention t = t.contention
-  let[@inline] yielding t = t.yielding
-  let[@inline] statefulness t = t.statefulness
-  let[@inline] visibility t = t.visibility
+  let crossing t = t.crossing
+
+  let[@inline] modal ax t = t |> crossing |> Crossing.proj ax
+  let areality = Crossing.Axis.Comonadic Areality
+  let linearity = Crossing.Axis.Comonadic Linearity
+  let uniqueness = Crossing.Axis.Monadic Uniqueness
+  let portability = Crossing.Axis.Comonadic Portability
+  let contention = Crossing.Axis.Monadic Contention
+  let yielding = Crossing.Axis.Comonadic Yielding
+  let statefulness = Crossing.Axis.Comonadic Statefulness
+  let visibility = Crossing.Axis.Monadic Visibility
   let[@inline] externality t = t.externality
   let[@inline] nullability t = t.nullability
   let[@inline] separability t = t.separability
 
   let[@inline] create
-      ~areality
-      ~linearity
-      ~uniqueness
-      ~portability
-      ~contention
-      ~yielding
-      ~statefulness
-      ~visibility
+      crossing
       ~externality
       ~nullability
       ~separability =
     {
-      areality;
-      linearity;
-      uniqueness;
-      portability;
-      contention;
-      yielding;
-      statefulness;
-      visibility;
+      crossing;
       externality;
       nullability;
       separability;
     }
 
-  let[@inline] set_areality areality t = { t with areality }
-  let[@inline] set_linearity linearity t = { t with linearity }
-  let[@inline] set_uniqueness uniqueness t = { t with uniqueness }
-  let[@inline] set_portability portability t = { t with portability }
-  let[@inline] set_contention contention t = { t with contention }
-  let[@inline] set_yielding yielding t = { t with yielding }
-  let[@inline] set_statefulness statefulness t = { t with statefulness }
-  let[@inline] set_visibility visibility t = { t with visibility }
+  let[@inline] set_crossing crossing t = { t with crossing }
   let[@inline] set_externality externality t = { t with externality }
   let[@inline] set_nullability nullability t = { t with nullability }
   let[@inline] set_separability separability t = { t with separability }
 
   let[@inline] set_max_in_set t max_axes =
     let open Jkind_axis.Axis_set in
+    let modal ax =
+      if mem max_axes (Modal ax)
+      then Crossing.Per_axis.max ax
+      else modal ax t
+    in
     (* a little optimization *)
     if is_empty max_axes then t else
-    let areality =
-      if mem max_axes (Modal (Comonadic Areality))
-      then Areality.max
-      else t.areality
-    in
-    let linearity =
-      if mem max_axes (Modal (Comonadic Linearity))
-      then Linearity.max
-      else t.linearity
-    in
-    let uniqueness =
-      if mem max_axes (Modal (Monadic Uniqueness))
-      then Uniqueness.max
-      else t.uniqueness
-    in
-    let portability =
-      if mem max_axes (Modal (Comonadic Portability))
-      then Portability.max
-      else t.portability
-    in
-    let contention =
-      if mem max_axes (Modal (Monadic Contention))
-      then Contention.max
-      else t.contention
-    in
-    let yielding =
-      if mem max_axes (Modal (Comonadic Yielding))
-      then Yielding.max
-      else t.yielding
-    in
-    let statefulness =
-      if mem max_axes (Modal (Comonadic Statefulness))
-      then Statefulness.max
-      else t.statefulness
-    in
-    let visibility =
-      if mem max_axes (Modal (Monadic Visibility))
-      then Visibility.max
-      else t.visibility
-    in
+    let regionality = modal areality in
+    let linearity = modal linearity in
+    let uniqueness = modal uniqueness in
+    let portability = modal portability in
+    let contention = modal contention in
+    let yielding = modal yielding in
+    let statefulness = modal statefulness in
+    let visibility = modal visibility in
     let externality =
       if mem max_axes (Nonmodal Externality)
       then Externality.max
@@ -183,15 +124,16 @@ module Jkind_mod_bounds = struct
       then Separability.max
       else t.separability
     in
+    let monadic =
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility
+    in
+    let comonadic =
+      Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
+        ~statefulness
+    in
+    let crossing : Mode.Crossing.t = { monadic; comonadic } in
     {
-      areality;
-      linearity;
-      uniqueness;
-      portability;
-      contention;
-      yielding;
-      statefulness;
-      visibility;
+      crossing;
       externality;
       nullability;
       separability;
@@ -199,48 +141,21 @@ module Jkind_mod_bounds = struct
 
   let[@inline] set_min_in_set t min_axes =
     let open Jkind_axis.Axis_set in
+    let modal ax =
+      if mem min_axes (Modal ax)
+      then Crossing.Per_axis.min ax
+      else modal ax t
+    in
     (* a little optimization *)
     if is_empty min_axes then t else
-    let areality =
-      if mem min_axes (Modal (Comonadic Areality))
-      then Areality.min
-      else t.areality
-    in
-    let linearity =
-      if mem min_axes (Modal (Comonadic Linearity))
-      then Linearity.min
-      else t.linearity
-    in
-    let uniqueness =
-      if mem min_axes (Modal (Monadic Uniqueness))
-      then Uniqueness.min
-      else t.uniqueness
-    in
-    let portability =
-      if mem min_axes (Modal (Comonadic Portability))
-      then Portability.min
-      else t.portability
-    in
-    let contention =
-      if mem min_axes (Modal (Monadic Contention))
-      then Contention.min
-      else t.contention
-    in
-    let yielding =
-      if mem min_axes (Modal (Comonadic Yielding))
-      then Yielding.min
-      else t.yielding
-    in
-    let statefulness =
-      if mem min_axes (Modal (Comonadic Statefulness))
-      then Statefulness.min
-      else t.statefulness
-    in
-    let visibility =
-      if mem min_axes (Modal (Monadic Visibility))
-      then Visibility.min
-      else t.visibility
-    in
+    let regionality = modal areality in
+    let linearity = modal linearity in
+    let uniqueness = modal uniqueness in
+    let portability = modal portability in
+    let contention = modal contention in
+    let yielding = modal yielding in
+    let statefulness = modal statefulness in
+    let visibility = modal visibility in
     let externality =
       if mem min_axes (Nonmodal Externality)
       then Externality.min
@@ -256,15 +171,16 @@ module Jkind_mod_bounds = struct
       then Separability.min
       else t.separability
     in
+    let monadic =
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility
+    in
+    let comonadic =
+      Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
+        ~statefulness
+    in
+    let crossing : Mode.Crossing.t = { monadic; comonadic } in
     {
-      areality;
-      linearity;
-      uniqueness;
-      portability;
-      contention;
-      statefulness;
-      visibility;
-      yielding;
+      crossing;
       externality;
       nullability;
       separability;
@@ -272,22 +188,18 @@ module Jkind_mod_bounds = struct
 
   let[@inline] is_max_within_set t axes =
     let open Jkind_axis.Axis_set in
-    (not (mem axes (Modal (Comonadic Areality))) ||
-     Areality.(le max (areality t))) &&
-    (not (mem axes (Modal (Comonadic Linearity))) ||
-     Linearity.(le max (linearity t))) &&
-    (not (mem axes (Modal (Monadic Uniqueness))) ||
-     Uniqueness.(le max (uniqueness t))) &&
-    (not (mem axes (Modal (Comonadic Portability))) ||
-     Portability.(le max (portability t))) &&
-    (not (mem axes (Modal (Monadic Contention))) ||
-     Contention.(le max (contention t))) &&
-    (not (mem axes (Modal (Comonadic Yielding))) ||
-     Yielding.(le max (yielding t))) &&
-    (not (mem axes (Modal (Comonadic Statefulness))) ||
-     Statefulness.(le max (statefulness t))) &&
-    (not (mem axes (Modal (Monadic Visibility))) ||
-     Visibility.(le max (visibility t))) &&
+    let modal ax =
+      not (mem axes (Modal ax)) ||
+      Crossing.Per_axis.(le ax (max ax) (modal ax t))
+    in
+    modal areality &&
+    modal linearity &&
+    modal uniqueness &&
+    modal portability &&
+    modal contention &&
+    modal yielding &&
+    modal statefulness &&
+    modal visibility &&
     (not (mem axes (Nonmodal Externality)) ||
      Externality.(le max (externality t))) &&
     (not (mem axes (Nonmodal Nullability)) ||
@@ -296,45 +208,20 @@ module Jkind_mod_bounds = struct
      Separability.(le max (separability t)))
 
   let max =
-      { areality = Areality.max;
-        linearity = Linearity.max;
-        uniqueness = Uniqueness.max;
-        portability = Portability.max;
-        contention = Contention.max;
-        yielding = Yielding.max;
-        statefulness = Statefulness.max;
-        visibility = Visibility.max;
-        externality = Externality.max;
-        nullability = Nullability.max;
-        separability = Separability.max}
+    { crossing = Mode.Crossing.max;
+      externality = Externality.max;
+      nullability = Nullability.max;
+      separability = Separability.max }
 
   let[@inline] is_max m = m = max
-
-
   let debug_print ppf
-        { areality;
-          linearity;
-          uniqueness;
-          portability;
-          contention;
-          yielding;
-          statefulness;
-          visibility;
+        { crossing;
           externality;
           nullability;
           separability } =
-    Format.fprintf ppf "@[{ areality = %a;@ linearity = %a;@ uniqueness = %a;@ \
-      portability = %a;@ contention = %a;@ yielding = %a;@ statefulness = %a;@ \
-      visibility = %a;@ externality = %a;@ \
+    Format.fprintf ppf "@[{ crossing = %a;@ externality = %a;@ \
       nullability = %a;@ separability = %a }@]"
-      Areality.print areality
-      Linearity.print linearity
-      Uniqueness.print uniqueness
-      Portability.print portability
-      Contention.print contention
-      Yielding.print yielding
-      Statefulness.print statefulness
-      Visibility.print visibility
+      Crossing.print crossing
       Externality.print externality
       Nullability.print nullability
       Separability.print separability
