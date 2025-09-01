@@ -249,12 +249,6 @@ module Per_axis = struct
       | Nullability, Nullability -> Some Refl
       | Separability, Separability -> Some Refl
       | _ -> None
-
-    let print_obj : type a. Format.formatter -> a t -> unit =
-     fun ppf -> function
-      | Externality -> Format.fprintf ppf "externality"
-      | Nullability -> Format.fprintf ppf "nullability"
-      | Separability -> Format.fprintf ppf "separability"
   end
 
   let min : type a. a t -> a = function
@@ -289,9 +283,7 @@ module Per_axis = struct
     | _ -> None
 
   let print_obj : type a. Format.formatter -> a t -> unit =
-   fun ppf -> function
-    | Modal ax -> Mode.Crossing.Per_axis.print_obj ppf ax
-    | Nonmodal ax -> Nonmodal.print_obj ppf ax
+   fun ppf ax -> Format.pp_print_string ppf (name ax)
 end
 
 module Axis_set = struct
