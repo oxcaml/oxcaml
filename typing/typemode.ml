@@ -2,26 +2,26 @@ open Location
 open Mode
 open Jkind_axis
 
-(* CR zqian: kind modifier can be either a modaity or externality/nullability.
-   I.e., mode-like modifiers are just modalities and should be represented as
-   such. Therefore, [transl_modalities] (not dealing with
-   externality/nullability) will stay in this file, while [transl_modifiers]
-   should go into [typekind.ml] and calls [transl_modalities]. *)
+type 'ax annot_type =
+  | Modifier : 'a Axis.t annot_type
+  | Mode : 'a Alloc.Axis.t annot_type
+  | Modality : 'a Modality.Axis.t annot_type
 
-type annot_type =
-  | Modifier
-  | Mode
-  | Modality
+let print_annot_axis (type a) (annot_type : a annot_type) ppf (ax : a) =
+  match annot_type with
+  | Modifier -> Format.fprintf ppf "%s" (Axis.name ax)
+  | Mode -> Alloc.Axis.print ppf ax
+  | Modality ->
+    let (P ax) = Modality.Axis.to_value (P ax) in
+    Value.Axis.print ppf ax
 
 type error =
-  | Duplicated_axis : _ Axis.t -> error
-  | Unrecognized_modifier : annot_type * string -> error
+  | Duplicated_axis : 'a annot_type * 'a -> error
+  | Unrecognized_modifier : 'a annot_type * string -> error
 
 exception Error of Location.t * error
 
-module Modal_axis_pair = struct
-  [@@@warning "-18"]
-
+module Mode_axis_pair = struct
   type t = P : 'a Alloc.Axis.t * 'a -> t
 
   type t_value = P : 'a Value.Axis.t * 'a -> t_value
@@ -38,7 +38,7 @@ module Modal_axis_pair = struct
     let monadic (type a) (ax : a Alloc.Monadic.Axis.t) (a : a) : t =
       P (Monadic ax, a)
     in
-    match s with
+    match[@warning "-18"] s with
     | "local" -> comonadic Areality Local
     (* "regional" is not supported *)
     | "global" -> comonadic Areality Global
@@ -62,16 +62,24 @@ module Modal_axis_pair = struct
     | _ -> raise Not_found
 end
 
-module Axis_pair = struct
+module Modality_axis_pair = struct
+  type t = P : 'a Modality.Axis.t * 'a -> t
+
+  let of_string s : t =
+    match[@warning "-18"]
+      Mode_axis_pair.to_value (Mode_axis_pair.of_string s)
+    with
+    | P (Monadic ax, c) -> P (Monadic ax, Join_with c)
+    | P (Comonadic ax, c) -> P (Comonadic ax, Meet_with c)
+end
+
+module Modifier_axis_pair = struct
   type t = P : 'a Axis.t * 'a -> t
 
-  let of_string s =
-    match[@warning "-18"] Modal_axis_pair.of_string s with
-    | modal -> (
-      let (P (ax, a)) = Modal_axis_pair.to_value modal in
-      match ax with
-      | Monadic ax -> P (Modal (Monadic ax), Modality (Join_with a))
-      | Comonadic ax -> P (Modal (Comonadic ax), Modality (Meet_with a)))
+  let of_string s : t =
+    match[@warning "-18"] Modality_axis_pair.of_string s with
+    | P (Monadic ax, m) -> P (Modal (Monadic ax), Modality m)
+    | P (Comonadic ax, m) -> P (Modal (Comonadic ax), Modality m)
     | exception Not_found -> (
       let nonmodal (type a) (ax : a Axis.Nonmodal.t) (a : a) : t =
         P (Nonmodal ax, a)
@@ -154,7 +162,7 @@ end
 
 let transl_mod_bounds annots =
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
-    match Axis_pair.of_string txt with
+    match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
       let is_top = Per_axis.(le axis (max axis) mode) in
       if is_top
@@ -167,7 +175,7 @@ let transl_mod_bounds annots =
       let is_dup =
         Option.is_some (Transled_modifiers.get ~axis bounds_so_far)
       in
-      if is_dup then raise (Error (loc, Duplicated_axis axis));
+      if is_dup then raise (Error (loc, Duplicated_axis (Modifier, axis)));
       Transled_modifiers.set ~axis bounds_so_far (Some { txt = mode; loc })
     | exception Not_found -> (
       match txt with
@@ -309,16 +317,11 @@ let transl_mode_annots annots : Alloc.Const.Option.t =
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
     let (P (ax, a)) =
-      try Modal_axis_pair.of_string txt
+      try Mode_axis_pair.of_string txt
       with Not_found -> raise (Error (loc, Unrecognized_modifier (Mode, txt)))
     in
     if Option.is_some (Alloc.Const.Option.proj ax modes_so_far)
-    then
-      let (P ax) =
-        P ax |> Const.Axis.alloc_as_value |> Modality.Axis.of_value
-        |> Crossing.Axis.of_modality
-      in
-      raise (Error (loc, Duplicated_axis (Modal ax)))
+    then raise (Error (loc, Duplicated_axis (Mode, ax)))
     else Alloc.Const.Option.set ax (Some a) modes_so_far
   in
   List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
@@ -382,7 +385,7 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
   let (P (ax, a)) =
-    try Modal_axis_pair.(of_string modality |> to_value)
+    try Mode_axis_pair.(of_string modality |> to_value)
     with Not_found ->
       raise (Error (loc, Unrecognized_modifier (Modality, modality)))
   in
@@ -594,8 +597,10 @@ let transl_alloc_mode modes =
 let report_error ppf =
   let open Format in
   function
-  | Duplicated_axis axis ->
-    fprintf ppf "The %s axis has already been specified." (Axis.name axis)
+  | Duplicated_axis (annot_type, axis) ->
+    fprintf ppf "The %a axis has already been specified."
+      (print_annot_axis annot_type)
+      axis
   | Unrecognized_modifier (annot_type, modifier) ->
     let annot_type_str =
       match annot_type with
