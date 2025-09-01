@@ -27,6 +27,38 @@ type result =
 
 val print_result : Format.formatter -> result -> unit
 
+
+module Diagnostics : sig
+
+  type t
+
+  val no_diagnostics : t
+
+  val create_diagnostics : unit -> t
+
+  val reduction_steps : t -> int
+
+  val computation_unit_lookups : t -> int
+
+  val cms_files_loaded : t -> int
+
+  val count_cms_file_loaded : t -> unit
+
+  val cms_files_cached : t -> int
+
+  val count_cms_file_cached : t -> unit
+
+  val add_cms_file_missing : t -> string -> unit
+
+  val cms_files_missing : t -> string list
+
+  val add_cms_file_unreadable : t -> string -> unit
+
+  val cms_files_unreadable : t -> string list
+
+end
+
+
 (** The [Make] functor is used to generate a reduction function for
     shapes.
 
@@ -44,9 +76,9 @@ val print_result : Format.formatter -> result -> unit
 module Make(_ : sig
     val fuel : int
 
-    val read_unit_shape : unit_name:string -> Shape.t option
+    val read_unit_shape : diagnostics:Diagnostics.t -> unit_name:string -> Shape.t option
   end) : sig
-  val reduce : Env.t -> Shape.t -> Shape.t
+  val reduce : ?diagnostics: Diagnostics.t -> Env.t -> Shape.t -> Shape.t
 
   (** Perform weak reduction and return the head's uid if any. If reduction was
     incomplete the partially reduced shape is returned. *)
@@ -55,7 +87,7 @@ end
 
 (** [local_reduce] will not reduce shapes that require loading external
   compilation units. *)
-val local_reduce : Env.t -> Shape.t -> Shape.t
+val local_reduce :?diagnostics:Diagnostics.t -> Env.t -> Shape.t -> Shape.t
 
 (** [local_reduce_for_uid] will not reduce shapes that require loading external
   compilation units. *)

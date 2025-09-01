@@ -27,12 +27,23 @@ module Type_decl_shape : sig
     Types.extension_constructor -> Shape.t
 end
 
+module Evaluation_diagnostics : sig
+  type t
+
+  val no_diagnostics : t
+
+  val create_diagnostics : unit -> t
+
+  val get_reduction_steps : t -> int
+end
+
 (** When producing a type shape with [of_type_expr], the resulting shape is
       not in normal form. In particular, it can contain mutually recursive
       declarations from mutually recursive type declarations. This function
       should be applied after shape reduction. It unfoldes the mutually
       recursive types to result in one linearized form. *)
-val unfold_and_evaluate : Shape.t -> Shape.t
+val unfold_and_evaluate :
+  ?diagnostics:Evaluation_diagnostics.t -> Shape.t -> Shape.t
 
 type shape_with_layout = private
   { type_shape : Shape.t;
