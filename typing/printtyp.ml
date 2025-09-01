@@ -110,7 +110,7 @@ module Style = Misc.Style
 (* Print a long identifier *)
 let longident = Pprintast.longident
 
-let () = Env.print_longident := longident
+let () = Env.print_longident := longident; Mode.print_longident := longident
 
 (* Print an identifier avoiding name collisions *)
 

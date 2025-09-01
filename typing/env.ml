@@ -143,18 +143,6 @@ type module_unbound_reason =
   | Mod_unbound_illegal_recursion of
       { container : string option; unbound : string }
 
-type locality_context =
-  | Tailcall_function
-  | Tailcall_argument
-  | Partial_application
-  | Return
-  | Lazy
-
-type closure_context =
-  | Function of locality_context option
-  | Functor
-  | Lazy
-
 type escaping_context =
   | Letop
   | Probe
@@ -171,7 +159,7 @@ type shared_context =
 type lock =
   | Escape_lock of escaping_context
   | Share_lock of shared_context
-  | Closure_lock of closure_context * Mode.Value.Comonadic.r
+  | Closure_lock of Mode.Hint.closure_context * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
@@ -385,12 +373,6 @@ type mode_with_locks = Mode.Value.l * locks
 let locks_empty = []
 
 let locks_is_empty l = l = locks_empty
-
-type lock_item =
-  | Value
-  | Module
-  | Class
-  | Constructor
 
 module IdTbl =
   struct
@@ -794,7 +776,10 @@ and cltype_data =
   { cltda_declaration : class_type_declaration;
     cltda_shape : Shape.t }
 
-let clda_mode = Mode.Value.legacy |> Mode.Value.disallow_right
+let clda_mode = Mode.Value.(
+  Const.legacy
+  |> of_const ~hint_monadic:Class_legacy_monadic
+      ~hint_comonadic:Class_legacy_comonadic)
 
 let fcomp_res_mode = Types.functor_res_mode |> Mode.Alloc.disallow_right
 
@@ -849,11 +834,11 @@ type lookup_error =
         container_class_type : string;
       }
   | Cannot_scrape_alias of Longident.t * Path.t
-  | Local_value_escaping of lock_item * Longident.t * escaping_context
-  | Once_value_used_in of lock_item * Longident.t * shared_context
-  | Value_used_in_closure of lock_item * Longident.t *
-      Mode.Value.Comonadic.error * closure_context
-  | Local_value_used_in_exclave of lock_item * Longident.t
+  | Local_value_escaping of Mode.Hint.lock_item * Longident.t * escaping_context
+  | Once_value_used_in of Mode.Hint.lock_item * Longident.t * shared_context
+  | Value_used_in_closure of Mode.Hint.lock_item * Longident.t *
+      Mode.Value.Comonadic.error
+  | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
@@ -1025,18 +1010,18 @@ let scrape_alias =
         t -> Subst.Lazy.module_type -> Subst.Lazy.module_type)
 
 let md md_type =
-  {md_type; md_modalities = Mode.Modality.Value.id; md_attributes=[];
+  {md_type; md_modalities = Mode.Modality.id; md_attributes=[];
    md_loc=Location.none; md_uid = Uid.internal_not_actually_unique}
 
 (** The caller is not interested in modes, and thus [val_modalities] is
 invalidated. *)
 let vda_description vda =
   let vda_description = vda.vda_description in
-  {vda_description with val_modalities = Mode.Modality.Value.undefined}
+  {vda_description with val_modalities = Mode.Modality.undefined}
 
 let normalize_mode modality mode =
-  let vda_mode = Mode.Modality.Value.apply modality mode in
-  Mode.Modality.Value.id, vda_mode
+  let vda_mode = Mode.Modality.apply modality mode in
+  Mode.Modality.id, vda_mode
 
 let normalize_vda_mode vda =
   let vda_description = vda.vda_description in
@@ -1177,7 +1162,7 @@ let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   in
   let md =
     { Subst.Lazy.md_type = Mty_signature sign;
-      md_modalities = Mode.Modality.Value.id;
+      md_modalities = Mode.Modality.id;
       md_loc = Location.none;
       md_attributes = [];
       md_uid = uid;
@@ -2767,7 +2752,7 @@ and add_cltype ?shape id ty env =
 
 let add_module_lazy ~update_summary id presence mty ?mode env =
   let md = Subst.Lazy.{md_type = mty;
-                       md_modalities = Mode.Modality.Value.id;
+                       md_modalities = Mode.Modality.id;
                        md_attributes = [];
                        md_loc = Location.none;
                        md_uid = Uid.internal_not_actually_unique}
@@ -3365,20 +3350,25 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
     {mode; context = Some shared_context}
 
 let closure_mode ~errors ~env ~loc ~item ~lid
-  ({mode = {Mode.monadic; comonadic}; _} as vmode) locality_context comonadic0 =
+  ({mode = {Mode.monadic; comonadic}; _} as vmode) closure_context comonadic0 =
+  let hint : _ Mode.Hint.morph =
+    Is_closed_by {
+      closure_context; value_loc = loc; value_lid = lid; value_item = item }
+  in
   begin
     match
-      Mode.Value.Comonadic.submode comonadic comonadic0
+      Mode.Value.Comonadic.submode comonadic
+        (Mode.Value.Comonadic.apply_hint hint comonadic0)
     with
     | Error e ->
         may_lookup_error errors loc env
-          (Value_used_in_closure (item, lid, e, locality_context))
+          (Value_used_in_closure (item, lid, e))
     | Ok () -> ()
   end;
   let monadic =
     Mode.Value.Monadic.join
       [ monadic;
-        Mode.Value.comonadic_to_monadic comonadic0 ]
+        Mode.Value.comonadic_to_monadic ~hint comonadic0 ]
   in
   {vmode with mode = {monadic; comonadic}}
 
@@ -3431,8 +3421,9 @@ let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
           escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context
       | Share_lock shared_context ->
           share_mode ~errors ~env ~loc ~item ~lid vmode shared_context
-      | Closure_lock (locality_context, comonadic) ->
-          closure_mode ~errors ~env ~loc ~item ~lid vmode locality_context comonadic
+      | Closure_lock (closure_context, comonadic) ->
+          closure_mode ~errors ~env ~loc ~item ~lid vmode
+            closure_context comonadic
       | Exclave_lock ->
           exclave_mode ~errors ~env ~loc ~item ~lid vmode
       | Unboxed_lock ->
@@ -4266,7 +4257,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
           let mode =
             m0
             |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
-            |> Mode.Modality.Value.Const.apply
+            |> Mode.Modality.Const.apply
                 Typemode.let_mutable_modalities
           in
           mutate_value ~use ~loc path vda;
@@ -4632,7 +4623,7 @@ let sharedness_hint ppf : shared_context -> _ = function
           because it is defined outside of the probe.@]"
 
 let print_lock_item ppf (item, lid) =
-  match item with
+  match (item : Mode.Hint.lock_item) with
   | Module ->
       fprintf ppf "The module %a is"
         (Style.as_inline_code !print_longident) lid
@@ -4855,50 +4846,8 @@ let report_lookup_error _loc env ppf = function
             inside %s@]"
         print_lock_item (item, lid)
         (string_of_shared_context context)
-  | Value_used_in_closure (item, lid, error, context) ->
-      let e0, e1 =
-        match error with
-        | Error (Areality, _) -> "local", "might escape"
-        | Error (Linearity, _) -> "once", "is many"
-        | Error (Portability, _) -> "nonportable", "is portable"
-        | Error (Yielding, _) -> "yielding", "may not yield"
-        | Error (Statefulness, {left; right}) ->
-          asprintf "%a" Mode.Statefulness.Const.print left,
-          asprintf "is %a" Mode.Statefulness.Const.print right
-      in
-      let s, hint =
-        match context with
-        | Function context ->
-            let hint =
-              match error, context with
-              | Error (Areality, _), Some Tailcall_argument ->
-                  fun ppf ->
-                    fprintf ppf "@.@[Hint: The function might escape because it \
-                                is an argument to a tail call@]"
-              | _ -> fun _ppf -> ()
-            in
-            "function that " ^ e1, hint
-        | Functor ->
-            let s =
-              match error with
-              | Error (Areality, _) -> "functor"
-              | _ -> "functor that " ^ e1
-            in
-            s, fun _ppf -> ()
-        | Lazy ->
-            let s =
-              match error with
-              | Error (Areality, _) -> "lazy expression"
-              | _ -> "lazy expression that " ^ e1
-            in
-            s, fun _ppf -> ()
-      in
-      fprintf ppf
-      "@[%a %s, so cannot be used \
-            inside a %s.@]"
-      print_lock_item (item, lid)
-      e0 s;
-      hint ppf
+  | Value_used_in_closure (item, lid, err) ->
+      Mode.Value.Comonadic.report_error ppf ~target:(item, lid) err
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
                   inside an exclave_@]"

@@ -706,7 +706,7 @@ and label_declaration =
   {
     ld_id: Ident.t;
     ld_mutable: mutability;
-    ld_modalities: Mode.Modality.Value.Const.t;
+    ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t;
     ld_loc: Location.t;
@@ -726,7 +726,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    ca_modalities: Mode.Modality.Value.Const.t;
+    ca_modalities: Mode.Modality.Const.t;
     ca_type: type_expr;
     ca_sort: Jkind_types.Sort.Const.t;
     ca_loc: Location.t;
@@ -826,7 +826,7 @@ module type Wrapped = sig
 
   type value_description =
     { val_type: type_expr wrapped;                (* Type of the value *)
-      val_modalities : Mode.Modality.Value.t;     (* Modalities on the value *)
+      val_modalities : Mode.Modality.t;     (* Modalities on the value *)
       val_kind: value_kind;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
@@ -861,7 +861,7 @@ module type Wrapped = sig
   and module_declaration =
   {
     md_type: module_type;
-    md_modalities: Mode.Modality.Value.t;
+    md_modalities: Mode.Modality.t;
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
@@ -1117,7 +1117,7 @@ type 'a gen_label_description =
     lbl_res: type_expr;                 (* Type of the result *)
     lbl_arg: type_expr;                 (* Type of the argument *)
     lbl_mut: mutability;                (* Is this a mutable field? *)
-    lbl_modalities: Mode.Modality.Value.Const.t;(* Modalities on the field *)
+    lbl_modalities: Mode.Modality.Const.t;(* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
     lbl_pos: int;                       (* Position in type *)
     lbl_all: 'a gen_label_description array;   (* All the labels in this type *)

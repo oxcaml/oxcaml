@@ -647,8 +647,9 @@ let arrayblit_runtime env args loc =
   if List.compare_length_with args 5 <> 0 then wrong_arity_for_arrayblit loc;
   let external_call_desc =
     let name = "caml_array_blit" in
-    Primitive.make ~name ~alloc:false ~c_builtin:false
-      ~effects:Arbitrary_effects ~coeffects:Has_coeffects ~native_name:name
+    (* Note: [caml_array_blit] can enter the GC, so [alloc] must be [true]. *)
+    Primitive.make ~name ~alloc:true ~c_builtin:false ~effects:Arbitrary_effects
+      ~coeffects:Has_coeffects ~native_name:name
       ~native_repr_args:
         [ (* The arrays might be local *)
           Primitive.Prim_local, L.Same_as_ocaml_repr (Base Value);

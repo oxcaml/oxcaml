@@ -469,8 +469,6 @@ module Float64 = struct
             (Float64_reference.c_min_match_sse l r));
       check_floats (fun l _ ->
           eqf' (Builtins.Float64.sqrt l) (Float64_reference.c_sqrt l));
-      check_floats (fun l _ ->
-          eqf' (Builtins.Float64.round_near l) (Float64_reference.c_round l));
       failmsg := fun () -> Printf.printf "Something else!"
   end
 end

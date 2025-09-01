@@ -19,16 +19,15 @@ function create_link {
   local opam_name="$1"
   local jane_name="$2"
 
-  local opam_bin="$(which $opam_name 2>&- | xargs realpath)"
-  local status=$?
-
-  if [[ $status -ne 0 ]]; then
+  local opam_bin_unreal
+  if ! opam_bin_unreal="$(which $opam_name 2>&-)"; then
     echo "Unable to find $opam_name. \
 Did you install merlin and ocaml-lsp from opam? \
 And did you run \`eval \$(opam env)\`?" >&2
-    exit $status
+    exit 1
   fi
 
+  local opam_bin=$(realpath "$opam_bin_unreal")
   local jane_bin="$merlin_bin_dir/$jane_name"
 
   if test -e "$jane_bin"; then

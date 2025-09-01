@@ -75,7 +75,7 @@ let string_escape : local_ _ -> string * string = fun x -> x, x
 Line 1, characters 59-60:
 1 | let string_escape : local_ _ -> string * string = fun x -> x, x
                                                                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let int_escape : local_ _ -> int * int = fun x -> x, x
@@ -90,7 +90,7 @@ let string_list_escape : local_ _ -> string list * string list = fun x -> x, x
 Line 1, characters 74-75:
 1 | let string_list_escape : local_ _ -> string list * string list = fun x -> x, x
                                                                               ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let int_list_escape : local_ _ -> int list * int list = fun x -> x, x
@@ -99,7 +99,7 @@ let int_list_escape : local_ _ -> int list * int list = fun x -> x, x
 Line 1, characters 65-66:
 1 | let int_list_escape : local_ _ -> int list * int list = fun x -> x, x
                                                                      ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let hidden_string_escape : local_ _ -> Hidden_string.t * Hidden_string.t =
@@ -109,7 +109,7 @@ let hidden_string_escape : local_ _ -> Hidden_string.t * Hidden_string.t =
 Line 2, characters 11-12:
 2 |   fun x -> x, x
                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let hidden_int_escape : local_ _ -> Hidden_int.t * Hidden_int.t =
@@ -126,7 +126,7 @@ let float_escape : local_ _ -> float * float = fun x -> x, x
 Line 1, characters 56-57:
 1 | let float_escape : local_ _ -> float * float = fun x -> x, x
                                                             ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* CR layouts v2.8: The following should pass, even in principal mode. *)
@@ -139,7 +139,7 @@ val float_u_escape : local_ float# -> (float#, float#) Float_u.pair = <fun>
 Line 2, characters 27-28:
 2 |   fun x -> Float_u.mk_pair x x [@nontail]
                                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let hidden_float_u_escape :
@@ -154,7 +154,7 @@ val hidden_float_u_escape :
 Line 3, characters 27-28:
 3 |   fun x -> Float_u.mk_pair x x [@nontail]
                                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let float_u_record_escape : local_ _ -> float_u_record * float_u_record =
@@ -164,7 +164,7 @@ let float_u_record_escape : local_ _ -> float_u_record * float_u_record =
 Line 2, characters 11-12:
 2 |   fun x -> x, x
                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let float_u_record_list_escape :
@@ -175,7 +175,7 @@ let float_u_record_list_escape :
 Line 3, characters 11-12:
 3 |   fun x -> x, x
                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let function_escape : local_ _ -> (int -> int) * (int -> int) = fun x -> x, x
@@ -184,7 +184,7 @@ let function_escape : local_ _ -> (int -> int) * (int -> int) = fun x -> x, x
 Line 1, characters 73-74:
 1 | let function_escape : local_ _ -> (int -> int) * (int -> int) = fun x -> x, x
                                                                              ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let function_list_escape : local_ _ -> (int -> int) list * (int -> int) list =
@@ -194,7 +194,7 @@ let function_list_escape : local_ _ -> (int -> int) list * (int -> int) list =
 Line 2, characters 11-12:
 2 |   fun x -> x, x
                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 type t_value
@@ -205,7 +205,7 @@ type t_value
 Line 2, characters 52-53:
 2 | let value_duplicate : once_ _ -> t_value = fun x -> x
                                                         ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let int_duplicate : once_ _ -> int = fun x -> x
@@ -220,7 +220,7 @@ let value_list_duplicate : once_ _ -> t_value list = fun x -> x
 Line 1, characters 62-63:
 1 | let value_list_duplicate : once_ _ -> t_value list = fun x -> x
                                                                   ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let int_list_duplicate : once_ _ -> int list = fun x -> x
@@ -236,7 +236,7 @@ let hidden_string_duplicate : once_ _ -> Hidden_string.t =
 Line 2, characters 11-12:
 2 |   fun x -> x
                ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let hidden_int_duplicate : once_ _ -> Hidden_int.t =
@@ -288,7 +288,7 @@ let function_duplicate : once_ _ -> (int -> int) = fun x -> x
 Line 1, characters 60-61:
 1 | let function_duplicate : once_ _ -> (int -> int) = fun x -> x
                                                                 ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let function_list_duplicate : once_ _ -> (int -> int) list =
@@ -298,7 +298,7 @@ let function_list_duplicate : once_ _ -> (int -> int) list =
 Line 2, characters 11-12:
 2 |   fun x -> x
                ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let string_unshare : _ -> unique_ string = fun x -> x
@@ -307,7 +307,7 @@ let string_unshare : _ -> unique_ string = fun x -> x
 Line 1, characters 52-53:
 1 | let string_unshare : _ -> unique_ string = fun x -> x
                                                         ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let int_unshare : _ -> unique_ int = fun x -> x
@@ -322,7 +322,7 @@ let string_list_unshare : _ -> unique_ string list = fun x -> x
 Line 1, characters 62-63:
 1 | let string_list_unshare : _ -> unique_ string list = fun x -> x
                                                                   ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let int_list_unshare : _ -> unique_ int list = fun x -> x
@@ -331,7 +331,7 @@ let int_list_unshare : _ -> unique_ int list = fun x -> x
 Line 1, characters 56-57:
 1 | let int_list_unshare : _ -> unique_ int list = fun x -> x
                                                             ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let function_unshare : _ -> unique_ (int -> int) = fun x -> x
@@ -347,7 +347,7 @@ let hidden_string_unshare : _ -> unique_ Hidden_string.t =
 Line 2, characters 11-12:
 2 |   fun x -> x
                ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let hidden_int_unshare : _ -> unique_ Hidden_int.t =
@@ -363,7 +363,7 @@ let float_unshare : _ -> unique_ float = fun x -> x
 Line 1, characters 50-51:
 1 | let float_unshare : _ -> unique_ float = fun x -> x
                                                       ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let float_u_unshare : _ -> unique_ float# = fun x -> x
@@ -386,7 +386,7 @@ let float_u_record_unshare : _ -> unique_ float_u_record =
 Line 2, characters 11-12:
 2 |   fun x -> x
                ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let float_u_record_list_unshare :
@@ -397,7 +397,7 @@ let float_u_record_list_unshare :
 Line 3, characters 11-12:
 3 |   fun x -> x
                ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let hidden_function_unshare : _ -> unique_ (int, int) Hidden_function.t = fun x -> x
@@ -406,7 +406,7 @@ let hidden_function_unshare : _ -> unique_ (int, int) Hidden_function.t = fun x 
 Line 1, characters 83-84:
 1 | let hidden_function_unshare : _ -> unique_ (int, int) Hidden_function.t = fun x -> x
                                                                                        ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let function_list_unshare : _ -> unique_ (int -> int) list =
@@ -416,5 +416,5 @@ let function_list_unshare : _ -> unique_ (int -> int) list =
 Line 2, characters 11-12:
 2 |   fun x -> x
                ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
