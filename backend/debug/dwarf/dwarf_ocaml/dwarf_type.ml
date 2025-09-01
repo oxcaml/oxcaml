@@ -1364,8 +1364,11 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
          shape was created. *)
     | Variant constructors -> (
       let simple_constructors, complex_constructors =
-        List.partition_map (fun { S.name; constr_uid; kind; args } ->
-          if args = [] then Left name else Right { S.name; constr_uid; kind; args })
+        List.partition_map
+          (fun { S.name; constr_uid; kind; args } ->
+            if args = []
+            then Left name
+            else Right { S.name; constr_uid; kind; args })
           constructors
       in
       match complex_constructors with
@@ -1380,8 +1383,10 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
               ( name,
                 flatten_fields_in_mixed_record ~mixed_block_shapes
                   (List.map
-                     (fun { S.field_name = name; field_uid = _; field_value = sh, ly } ->
-                       name, sh, ly)
+                     (fun { S.field_name = name;
+                            field_uid = _;
+                            field_value = sh, ly
+                          } -> name, sh, ly)
                      args) ))
             complex_constructors
         in
