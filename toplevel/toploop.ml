@@ -406,6 +406,7 @@ let loop ppf =
   Sys.catch_break true;
   run_hooks After_setup;
   load_ocamlinit ppf;
+  Lexer.reset_syntax_mode();
   while true do
     let snap = ref (Btype.snapshot ()) in
     try
@@ -414,7 +415,6 @@ let loop ppf =
       Buffer.reset phrase_buffer;
       Location.reset();
       first_line := true;
-      Lexer.reset_syntax_mode();
       let phrs = get_phrases ppf lb [] in
       process_phrases ppf snap phrs
     with
