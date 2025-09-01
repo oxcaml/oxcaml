@@ -480,6 +480,8 @@ end) = struct
              needed for Merlin to work correctly. For DWARF emission, they
              should never be triggered, since we only evaluate shape for
              type expressions (e.g., t.field is not a type).  *)
+          (* CR sspies: Consider explicitly marking these as "virtual" in the
+             future, since they do not exist at runtime. *)
           | NVariant constrs when Shape.Item.is_constructor item ->
             let name = Shape.Item.name item in
             (match List.find_opt (fun c -> String.equal c.name name)
