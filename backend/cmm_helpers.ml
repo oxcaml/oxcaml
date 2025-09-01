@@ -4354,8 +4354,8 @@ let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
         } ],
       body )
 
-let handler ~dbg id vars body is_cold =
-  Cmm.{ label = id; params = vars; body; dbg; is_cold }
+let handler ~dbg label params body is_cold =
+  Cmm.{ label; params; body; dbg; is_cold }
 
 let cexit id args trap_actions = Cmm.Cexit (Cmm.Lbl id, args, trap_actions)
 
