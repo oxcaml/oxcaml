@@ -468,13 +468,6 @@ module RemoveDominatedSpillsForConstants : sig
     destructions_at_end:destructions_at_end ->
     destructions_at_end
 end = struct
-  (* CR-someday xclerc for xclerc: move to Cfg_loop_infos? *)
-  let is_in_loop : Cfg_loop_infos.t -> Label.t -> bool =
-   fun loops label ->
-    Cfg_edge.Map.exists
-      (fun _ (loop : Cfg_loop_infos.loop) -> Label.Set.mem label loop)
-      loops.loops
-
   type set =
     | At_most_once
     | Maybe_more_than_once
@@ -597,7 +590,7 @@ end = struct
     let num_sets =
       Cfg_with_infos.fold_blocks cfg_with_infos ~init:(Reg.Tbl.create 123)
         ~f:(fun label block acc ->
-          let in_loop : bool = is_in_loop loops label in
+          let in_loop : bool = Cfg_loop_infos.is_in_loop loops label in
           if debug then log "block %a in_loop? %B" Label.format label in_loop;
           incr_set acc block.terminator.res ~in_loop;
           DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->

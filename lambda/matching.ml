@@ -210,8 +210,7 @@ module Half_simple : sig
 
   type nonrec clause = pattern Non_empty_row.t clause
 
-  val of_clause :
-    arg:lambda -> arg_sort:Jkind.Sort.Const.t -> General.clause -> clause
+  val of_clause : arg:lambda -> General.clause -> clause
 end = struct
   include Patterns.Half_simple
 
@@ -222,9 +221,9 @@ end = struct
     | Tpat_any
     | Tpat_var _ ->
         p
-    | Tpat_alias (q, id, s, uid, mode, ty) ->
+    | Tpat_alias (q, id, s, uid, sort, mode, ty) ->
         { p with pat_desc =
-            Tpat_alias (simpl_under_orpat q, id, s, uid, mode, ty) }
+            Tpat_alias (simpl_under_orpat q, id, s, uid, sort, mode, ty) }
     | Tpat_or (p1, p2, o) ->
         let p1, p2 = (simpl_under_orpat p1, simpl_under_orpat p2) in
         if le_pat p1 p2 then
@@ -240,7 +239,7 @@ end = struct
     | _ -> p
 
   (* Explode or-patterns and turn aliases into bindings in actions *)
-  let of_clause ~arg ~arg_sort cl =
+  let of_clause ~arg cl =
     let rec aux (((p, patl), action) : General.clause) : clause =
       let continue p (view : General.view) : clause =
         aux (({ p with pat_desc = view }, patl), action)
@@ -250,12 +249,13 @@ end = struct
       in
       match p.pat_desc with
       | `Any -> stop p `Any
-      | `Var (id, s, uid, mode) ->
-        continue p (`Alias (Patterns.omega, id, s, uid, mode, p.pat_type))
-      | `Alias (p, id, _, duid, _, _) ->
+      | `Var (id, s, uid, sort, mode) ->
+        continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
+      | `Alias (p, id, _, duid, sort, _, _) ->
           aux
             ( (General.view p, patl),
-              bind_alias p id duid ~arg ~arg_sort ~action )
+              bind_alias p id duid ~arg
+                ~arg_sort:(Jkind.Sort.default_for_transl_and_get sort) ~action )
       | `Record ([], _) as view -> stop p view
       | `Record (lbls, closed) ->
           let full_view = `Record (all_record_args lbls, closed) in
@@ -359,11 +359,11 @@ end = struct
       match p.pat_desc with
       | `Or (p1, p2, _) ->
           split_explode p1 aliases (split_explode p2 aliases rem)
-      | `Alias (p, id, _, _, _, _) -> split_explode p (id :: aliases) rem
-      | `Var (id, str, uid, mode) ->
+      | `Alias (p, id, _, _, _, _, _) -> split_explode p (id :: aliases) rem
+      | `Var (id, str, uid, sort, mode) ->
           explode
             { p with pat_desc =
-                `Alias (Patterns.omega, id, str, uid, mode, p.pat_type) }
+                `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
             aliases rem
       | #view as view ->
           (* We are doing two things here:
@@ -611,7 +611,7 @@ end = struct
           match p.pat_desc with
           | `Or (p1, p2, _) ->
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
-          | `Alias (p, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
+          | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
           | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
@@ -661,7 +661,7 @@ let rec flatten_pat_line size p k =
   | Tpat_tuple args -> (List.map snd args) :: k
   | Tpat_or (p1, p2, _) ->
       flatten_pat_line size p1 (flatten_pat_line size p2 k)
-  | Tpat_alias (p, _, _, _, _, _) ->
+  | Tpat_alias (p, _, _, _, _, _, _) ->
       (* Note: we are only called from flatten_matrix,
          which is itself only ever used in places
          where variables do not matter (default environments,
@@ -739,7 +739,7 @@ end = struct
       | (p, ps) :: rem -> (
           let p = General.view p in
           match p.pat_desc with
-          | `Alias (p, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
+          | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
           | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (
@@ -1197,16 +1197,16 @@ let safe_before ((p, ps), act_p) l =
       || not (may_compats (General.erase p :: ps) (General.erase q :: qs)))
     l
 
-let half_simplify_nonempty ~arg ~arg_sort
+let half_simplify_nonempty ~arg
       (cls : Typedtree.pattern Non_empty_row.t clause) : Half_simple.clause =
   cls
   |> map_on_row (Non_empty_row.map_first General.view)
-  |> Half_simple.of_clause ~arg ~arg_sort
+  |> Half_simple.of_clause ~arg
 
-let half_simplify_clause ~arg ~arg_sort (cls : Typedtree.pattern list clause) =
+let half_simplify_clause ~arg (cls : Typedtree.pattern list clause) =
   cls
   |> map_on_row Non_empty_row.of_initial
-  |> half_simplify_nonempty ~arg ~arg_sort
+  |> half_simplify_nonempty ~arg
 
 (* Once matchings are *fully* simplified, one can easily find
    their nature. *)
@@ -1289,7 +1289,7 @@ let rec omega_like p =
   | Tpat_any
   | Tpat_var _ ->
       true
-  | Tpat_alias (p, _, _, _, _, _) -> omega_like p
+  | Tpat_alias (p, _, _, _, _, _, _) -> omega_like p
   | Tpat_or (p1, p2, _) -> omega_like p1 || omega_like p2
   | _ -> false
 
@@ -1560,7 +1560,7 @@ and precompile_var args cls def k =
                 (* we learned by pattern-matching on [args]
                    that [p::ps] has at least two arguments,
                    so [ps] must be non-empty *)
-                half_simplify_clause ~arg:(Lvar v) ~arg_sort (ps, act))
+                half_simplify_clause ~arg:(Lvar v) (ps, act))
               cls
           and var_def = Default_environment.pop_column def in
           let { me = first; matrix }, nexts =
@@ -1682,7 +1682,7 @@ and precompile_or ~arg ~arg_sort (cls : Simple.clause list) ors args def k =
             let patbound_action_vars =
               (* variables bound in the or-pattern
                  that are used in the orpm actions *)
-              Typedtree.pat_bound_idents_full arg_sort orp
+              Typedtree.pat_bound_idents_full orp
               |> List.filter (fun (id, _, _, _, _) -> Ident.Set.mem id pm_fv)
               |> List.map (fun (id, _, ty, uid, id_sort) ->
                   (id, uid, Typeopt.layout orp.pat_env orp.pat_loc id_sort ty))
@@ -1932,13 +1932,7 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
       fatal_error
         "Matching.get_exr_args_constr: constant Constructor_uniform_value"
     | Constructor_mixed shape ->
-      let shape =
-        transl_mixed_product_shape
-          ~get_value_kind:
-            (fun _ ->
-                fatal_error "Matching.get_expr_args_constr: get_value_kind")
-          shape
-      in
+      let shape = transl_mixed_product_shape shape in
       let e, layout = lambda_void_of_el shape.(pos) in
       (e, binding_kind, sort, layout)
   in
@@ -3733,8 +3727,8 @@ let rec comp_match_handlers layout comp_fun partial ctx first_match next_matches
 let rec name_pattern default = function
   | ((pat, _), _) :: rem -> (
       match pat.pat_desc with
-      | Tpat_var (id, _, uid, _) -> id, uid
-      | Tpat_alias (_, id, _, uid, _, _) -> id, uid
+      | Tpat_var (id, _, uid, _, _) -> id, uid
+      | Tpat_alias (_, id, _, uid, _, _, _) -> id, uid
       | _ -> name_pattern default rem
     )
   | _ -> Ident.create_local default, Lambda.debug_uid_none
@@ -3786,7 +3780,7 @@ and compile_match_nonempty ~scopes value_kind repr partial ctx
       let v, v_duid, newarg = arg_to_var arg m.cases in
       let args = (newarg, Alias, arg_sort, layout) :: argl in
       let cases =
-        List.map (half_simplify_nonempty ~arg:newarg ~arg_sort)
+        List.map (half_simplify_nonempty ~arg:newarg)
           m.cases
       in
       let m = { m with args; cases } in
@@ -4283,8 +4277,8 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-  | Tpat_var (id, _, duid, _)
-  | Tpat_alias ({ pat_desc = Tpat_any }, id, _, duid, _, _) ->
+  | Tpat_var (id, _, duid, _, _)
+  | Tpat_alias ({ pat_desc = Tpat_any }, id, _, duid, _, _, _) ->
       (* Fast path, and keep track of simple bindings to unboxable numbers.
 
          Note: the (Tpat_alias (Tpat_any, id)) case needs to be
@@ -4300,7 +4294,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
   | _ ->
       let opt = ref false in
       let nraise = next_raise_count () in
-      let catch_ids = pat_bound_idents_full arg_sort pat in
+      let catch_ids = pat_bound_idents_full pat in
       let ids_with_kinds =
         List.map
           (fun (id, _, typ, uid, sort) ->
@@ -4436,7 +4430,7 @@ let do_for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list pa
   handler (fun partial pm1 ->
     let pm1_half =
       { pm1 with
-        cases = List.map (half_simplify_nonempty ~arg ~arg_sort) pm1.cases }
+        cases = List.map (half_simplify_nonempty ~arg) pm1.cases }
     in
     let next, nexts = split_and_precompile_half_simplified ~arg ~arg_sort pm1_half in
     let size = List.length paraml in

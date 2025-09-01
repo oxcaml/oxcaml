@@ -227,24 +227,25 @@ let prove_is_null_generic env t : _ generic_proof =
 
 let meet_is_null env t = as_meet_shortcut (prove_is_null_generic env t)
 
-let prove_naked_immediates_generic env t : Targetint_31_63.Set.t generic_proof =
+let prove_naked_immediates_generic env t : Target_ocaml_int.Set.t generic_proof
+    =
   match expand_head env t with
   | Naked_immediate (Ok (Naked_immediates is)) ->
-    if Targetint_31_63.Set.is_empty is then Invalid else Proved is
+    if Target_ocaml_int.Set.is_empty is then Invalid else Proved is
   | Naked_immediate (Ok (Is_int scrutinee_ty)) -> (
     match prove_is_int_generic ~variant_only:true env scrutinee_ty with
     | Proved true ->
-      Proved (Targetint_31_63.Set.singleton Targetint_31_63.bool_true)
+      Proved (Target_ocaml_int.Set.singleton Target_ocaml_int.bool_true)
     | Proved false ->
-      Proved (Targetint_31_63.Set.singleton Targetint_31_63.bool_false)
+      Proved (Target_ocaml_int.Set.singleton Target_ocaml_int.bool_false)
     | Unknown -> Unknown
     | Invalid -> Invalid)
   | Naked_immediate (Ok (Is_null scrutinee_ty)) -> (
     match prove_is_null_generic env scrutinee_ty with
     | Proved true ->
-      Proved (Targetint_31_63.Set.singleton Targetint_31_63.bool_true)
+      Proved (Target_ocaml_int.Set.singleton Target_ocaml_int.bool_true)
     | Proved false ->
-      Proved (Targetint_31_63.Set.singleton Targetint_31_63.bool_false)
+      Proved (Target_ocaml_int.Set.singleton Target_ocaml_int.bool_false)
     | Unknown -> Unknown
     | Invalid -> Invalid)
   | Naked_immediate (Ok (Get_tag block_ty)) -> (
@@ -253,8 +254,8 @@ let prove_naked_immediates_generic env t : Targetint_31_63.Set.t generic_proof =
       let is =
         Tag.Set.fold
           (fun tag is ->
-            Targetint_31_63.Set.add (Tag.to_targetint_31_63 tag) is)
-          tags Targetint_31_63.Set.empty
+            Target_ocaml_int.Set.add (Tag.to_targetint_31_63 tag) is)
+          tags Target_ocaml_int.Set.empty
       in
       Proved is
     | Unknown -> Unknown
@@ -286,7 +287,7 @@ let prove_equals_tagged_immediates_value env
         | Known imms -> (
           match prove_naked_immediates_generic env imms with
           | Proved imms -> Proved imms
-          | Invalid -> Proved Targetint_31_63.Set.empty
+          | Invalid -> Proved Target_ocaml_int.Set.empty
           | Unknown -> Unknown)
       else Unknown)
   | Mutable_block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
@@ -315,7 +316,7 @@ let meet_equals_tagged_immediates env t =
 let meet_equals_single_tagged_immediate env t : _ meet_shortcut =
   match meet_equals_tagged_immediates env t with
   | Known_result imms -> (
-    match Targetint_31_63.Set.get_singleton imms with
+    match Target_ocaml_int.Set.get_singleton imms with
     | Some imm -> Known_result imm
     | None -> Need_meet)
   | Need_meet -> Need_meet
@@ -461,9 +462,9 @@ let meet_naked_vec256s = meet_naked_number Vec256
 let meet_naked_vec512s = meet_naked_number Vec512
 
 type variant_like_proof =
-  { const_ctors : Targetint_31_63.Set.t Or_unknown.t;
+  { const_ctors : Target_ocaml_int.Set.t Or_unknown.t;
     non_const_ctors_with_sizes :
-      (Targetint_31_63.t * K.Block_shape.t) Tag.Scannable.Map.t
+      (Target_ocaml_int.t * K.Block_shape.t) Tag.Scannable.Map.t
   }
 
 let prove_variant_like_generic_value env
@@ -500,7 +501,7 @@ let prove_variant_like_generic_value env
             | Known imms -> (
               match prove_naked_immediates_generic env imms with
               | Unknown -> Unknown
-              | Invalid -> Known Targetint_31_63.Set.empty
+              | Invalid -> Known Target_ocaml_int.Set.empty
               | Proved const_ctors -> Known const_ctors)
           in
           Proved { const_ctors; non_const_ctors_with_sizes })))
@@ -621,7 +622,7 @@ let prove_unique_tag_and_size_value env
     (value_head : TG.head_of_kind_value_non_null) :
     (Tag.t
     * K.Block_shape.t
-    * Targetint_31_63.t
+    * Target_ocaml_int.t
     * TG.Product.Int_indexed.t
     * Alloc_mode.For_types.t)
     generic_proof =
@@ -646,7 +647,7 @@ let prove_unique_tag_and_size_value env
     Unknown
 
 let prove_unique_tag_and_size env t :
-    (Tag.t * K.Block_shape.t * Targetint_31_63.t) proof_of_property =
+    (Tag.t * K.Block_shape.t * Target_ocaml_int.t) proof_of_property =
   match gen_value_to_proof prove_unique_tag_and_size_value env t with
   | Proved (tag, shape, size, _, _) -> Proved (tag, shape, size)
   | Unknown -> Unknown
@@ -843,7 +844,7 @@ let[@inline always] inspect_tagging_of_simple_value proof_kind ~min_name_mode
           | Need_meet -> Unknown
           | Invalid -> Invalid
           | Known_result imms -> (
-            match Targetint_31_63.Set.get_singleton imms with
+            match Target_ocaml_int.Set.get_singleton imms with
             | Some imm ->
               Proved (Simple.const (Reg_width_const.naked_immediate imm))
             | None -> Unknown)))
@@ -1294,7 +1295,7 @@ let prove_physical_equality env t1 t2 =
               | Invalid, _ | _, Invalid -> Proved false
               | Unknown, _ | _, Unknown -> Unknown
               | Proved imms1, Proved imms2 -> (
-                let module S = Targetint_31_63.Set in
+                let module S = Target_ocaml_int.Set in
                 if S.is_empty (S.inter imms1 imms2)
                 then Proved false
                 else
@@ -1303,7 +1304,7 @@ let prove_physical_equality env t1 t2 =
                   | Some imm1, Some imm2 ->
                     (* We've ruled out the empty intersection case, so the
                        numbers have to be equal *)
-                    assert (Targetint_31_63.equal imm1 imm2);
+                    assert (Target_ocaml_int.equal imm1 imm2);
                     Proved true)
             in
             let blocks_equality : _ generic_proof =
@@ -1323,7 +1324,7 @@ let prove_physical_equality env t1 t2 =
                 | ( Some (tag1, shape1, size1, _fields1, _alloc_mode1),
                     Some (tag2, shape2, size2, _fields2, _alloc_mode2) ) ->
                   if Tag.equal tag1 tag2
-                     && Targetint_31_63.equal size1 size2
+                     && Target_ocaml_int.equal size1 size2
                      && K.Block_shape.equal shape1 shape2
                   then
                     (* CR vlaviron and chambart: We could add a special case for

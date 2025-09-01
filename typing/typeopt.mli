@@ -78,6 +78,10 @@ val function_arg_layout :
 
 val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind
 
+val transl_mixed_block_element :
+  Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
+  -> unit Lambda.mixed_block_element
+
 val classify_lazy_argument : Typedtree.expression ->
                              [ `Constant_or_function
                              | `Float_that_cannot_be_shortcut

@@ -294,7 +294,7 @@ type unop =
   | Block_load of
       { kind : block_access_kind;
         mut : mutability;
-        field : Targetint_31_63.t
+        field : Target_ocaml_int.t
       }
   | Array_length of array_kind_for_length
   | Boolean_not
@@ -405,7 +405,7 @@ type binop =
   | Block_set of
       { kind : block_access_kind;
         init : init_or_assign;
-        field : Targetint_31_63.t
+        field : Target_ocaml_int.t
       }
   | Array_load of array_kind * array_load_kind * mutability
   | Phys_equal of equality_comparison

@@ -303,7 +303,7 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let block = Code_id_or_name.name (Acc.simple_to_name acc ~denv block) in
     default_bp (fun to_ ->
         Graph.add_accessor_dep (Acc.graph acc) ~to_
-          (Block (Targetint_31_63.to_int field, kind))
+          (Block (Target_ocaml_int.to_int field, kind))
           ~base:block);
     match mut with
     | Immutable | Immutable_unique -> ()
@@ -696,7 +696,7 @@ and traverse_apply_cont denv acc apply_cont : rev_expr =
 and traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
   Acc.used ~denv (Switch_expr.scrutinee switch) acc;
-  Targetint_31_63.Map.iter
+  Target_ocaml_int.Map.iter
     (fun _ apply_cont -> apply_cont_deps denv acc apply_cont)
     (Switch_expr.arms switch);
   { expr; holed_expr = denv.parent }

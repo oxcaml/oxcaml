@@ -304,9 +304,9 @@ module Duplicate_block_kind = struct
   type t =
     | Values of
         { tag : Tag.Scannable.t;
-          length : Targetint_31_63.t
+          length : Target_ocaml_int.t
         }
-    | Naked_floats of { length : Targetint_31_63.t }
+    | Naked_floats of { length : Target_ocaml_int.t }
     | Mixed
 
   let [@ocamlformat "disable"] print ppf t =
@@ -318,13 +318,13 @@ module Duplicate_block_kind = struct
           @[<hov 1>(length@ %a)@]\
           )@]"
         Tag.Scannable.print tag
-        Targetint_31_63.print length
+        Target_ocaml_int.print length
     | Naked_floats { length; } ->
       Format.fprintf ppf
         "@[<hov 1>(Block_of_naked_floats@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
-        Targetint_31_63.print length
+        Target_ocaml_int.print length
     | Mixed ->
       Format.fprintf ppf
         "@[<hov 1>(Mixed)@]"
@@ -334,9 +334,9 @@ module Duplicate_block_kind = struct
     | ( Values { tag = tag1; length = length1 },
         Values { tag = tag2; length = length2 } ) ->
       let c = Tag.Scannable.compare tag1 tag2 in
-      if c <> 0 then c else Targetint_31_63.compare length1 length2
+      if c <> 0 then c else Target_ocaml_int.compare length1 length2
     | Naked_floats { length = length1 }, Naked_floats { length = length2 } ->
-      Targetint_31_63.compare length1 length2
+      Target_ocaml_int.compare length1 length2
     | Mixed, Mixed -> 0
     | Naked_floats _, Mixed -> -1
     | Mixed, Naked_floats _ -> 1
@@ -348,14 +348,14 @@ module Duplicate_array_kind = struct
   type t =
     | Immediates
     | Values
-    | Naked_floats of { length : Targetint_31_63.t option }
-    | Naked_float32s of { length : Targetint_31_63.t option }
-    | Naked_int32s of { length : Targetint_31_63.t option }
-    | Naked_int64s of { length : Targetint_31_63.t option }
-    | Naked_nativeints of { length : Targetint_31_63.t option }
-    | Naked_vec128s of { length : Targetint_31_63.t option }
-    | Naked_vec256s of { length : Targetint_31_63.t option }
-    | Naked_vec512s of { length : Targetint_31_63.t option }
+    | Naked_floats of { length : Target_ocaml_int.t option }
+    | Naked_float32s of { length : Target_ocaml_int.t option }
+    | Naked_int32s of { length : Target_ocaml_int.t option }
+    | Naked_int64s of { length : Target_ocaml_int.t option }
+    | Naked_nativeints of { length : Target_ocaml_int.t option }
+    | Naked_vec128s of { length : Target_ocaml_int.t option }
+    | Naked_vec256s of { length : Target_ocaml_int.t option }
+    | Naked_vec512s of { length : Target_ocaml_int.t option }
 
   let [@ocamlformat "disable"] print ppf t =
     match t with
@@ -366,71 +366,71 @@ module Duplicate_array_kind = struct
         "@[<hov 1>(Naked_floats@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
-        (Misc.Stdlib.Option.print Targetint_31_63.print) length
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
     | Naked_float32s { length; } ->
       Format.fprintf ppf
         "@[<hov 1>(Naked_float32s@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
-        (Misc.Stdlib.Option.print Targetint_31_63.print) length
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
     | Naked_int32s { length; } ->
       Format.fprintf ppf
         "@[<hov 1>(Naked_int32s@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
-        (Misc.Stdlib.Option.print Targetint_31_63.print) length
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
     | Naked_int64s { length; } ->
       Format.fprintf ppf
         "@[<hov 1>(Naked_int64s@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
-        (Misc.Stdlib.Option.print Targetint_31_63.print) length
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
     | Naked_nativeints { length; } ->
       Format.fprintf ppf
         "@[<hov 1>(Naked_nativeints@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
-        (Misc.Stdlib.Option.print Targetint_31_63.print) length
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
     | Naked_vec128s { length; } ->
       Format.fprintf ppf
         "@[<hov 1>(Naked_vec128s@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
-        (Misc.Stdlib.Option.print Targetint_31_63.print) length
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
     | Naked_vec256s { length; } ->
       Format.fprintf ppf
         "@[<hov 1>(Naked_vec256s@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
-        (Misc.Stdlib.Option.print Targetint_31_63.print) length
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
     | Naked_vec512s { length; } ->
       Format.fprintf ppf
         "@[<hov 1>(Naked_vec512s@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
-        (Misc.Stdlib.Option.print Targetint_31_63.print) length
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
 
   let compare t1 t2 =
     match t1, t2 with
     | Immediates, Immediates | Values, Values -> 0
     | Naked_floats { length = length1 }, Naked_floats { length = length2 } ->
-      Option.compare Targetint_31_63.compare length1 length2
+      Option.compare Target_ocaml_int.compare length1 length2
     | Naked_float32s { length = length1 }, Naked_float32s { length = length2 }
       ->
-      Option.compare Targetint_31_63.compare length1 length2
+      Option.compare Target_ocaml_int.compare length1 length2
     | Naked_int32s { length = length1 }, Naked_int32s { length = length2 } ->
-      Option.compare Targetint_31_63.compare length1 length2
+      Option.compare Target_ocaml_int.compare length1 length2
     | Naked_int64s { length = length1 }, Naked_int64s { length = length2 } ->
-      Option.compare Targetint_31_63.compare length1 length2
+      Option.compare Target_ocaml_int.compare length1 length2
     | ( Naked_nativeints { length = length1 },
         Naked_nativeints { length = length2 } ) ->
-      Option.compare Targetint_31_63.compare length1 length2
+      Option.compare Target_ocaml_int.compare length1 length2
     | Naked_vec128s { length = length1 }, Naked_vec128s { length = length2 } ->
-      Option.compare Targetint_31_63.compare length1 length2
+      Option.compare Target_ocaml_int.compare length1 length2
     | Naked_vec256s { length = length1 }, Naked_vec256s { length = length2 } ->
-      Option.compare Targetint_31_63.compare length1 length2
+      Option.compare Target_ocaml_int.compare length1 length2
     | Naked_vec512s { length = length1 }, Naked_vec512s { length = length2 } ->
-      Option.compare Targetint_31_63.compare length1 length2
+      Option.compare Target_ocaml_int.compare length1 length2
     | Immediates, _ -> -1
     | _, Immediates -> 1
     | Values, _ -> -1
@@ -502,13 +502,13 @@ module Block_access_kind = struct
   type t =
     | Values of
         { tag : Tag.Scannable.t Or_unknown.t;
-          size : Targetint_31_63.t Or_unknown.t;
+          size : Target_ocaml_int.t Or_unknown.t;
           field_kind : Block_access_field_kind.t
         }
-    | Naked_floats of { size : Targetint_31_63.t Or_unknown.t }
+    | Naked_floats of { size : Target_ocaml_int.t Or_unknown.t }
     | Mixed of
         { tag : Tag.Scannable.t Or_unknown.t;
-          size : Targetint_31_63.t Or_unknown.t;
+          size : Target_ocaml_int.t Or_unknown.t;
           field_kind : Mixed_block_access_field_kind.t;
           shape : Flambda_kind.Mixed_block_shape.t
         }
@@ -523,14 +523,14 @@ module Block_access_kind = struct
           @[<hov 1>(field_kind@ %a)@]\
           )@]"
         (Or_unknown.print Tag.Scannable.print) tag
-        (Or_unknown.print Targetint_31_63.print) size
+        (Or_unknown.print Target_ocaml_int.print) size
         Block_access_field_kind.print field_kind
     | Naked_floats { size; } ->
       Format.fprintf ppf
         "@[<hov 1>(Naked_floats@ \
           @[<hov 1>(size@ %a)@]\
           )@]"
-        (Or_unknown.print Targetint_31_63.print) size
+        (Or_unknown.print Target_ocaml_int.print) size
     | Mixed { tag; size; field_kind; shape = _ } ->
       Format.fprintf ppf
         "@[<hov 1>(Mixed@ \
@@ -539,7 +539,7 @@ module Block_access_kind = struct
           @[<hov 1>(field_kind@ %a)@]\
           )@]"
         (Or_unknown.print Tag.Scannable.print) tag
-        (Or_unknown.print Targetint_31_63.print) size
+        (Or_unknown.print Target_ocaml_int.print) size
         Mixed_block_access_field_kind.print field_kind
 
   let element_kind_for_load t =
@@ -577,12 +577,12 @@ module Block_access_kind = struct
       if c <> 0
       then c
       else
-        let c = Or_unknown.compare Targetint_31_63.compare size1 size2 in
+        let c = Or_unknown.compare Target_ocaml_int.compare size1 size2 in
         if c <> 0
         then c
         else Block_access_field_kind.compare field_kind1 field_kind2
     | Naked_floats { size = size1 }, Naked_floats { size = size2 } ->
-      Or_unknown.compare Targetint_31_63.compare size1 size2
+      Or_unknown.compare Target_ocaml_int.compare size1 size2
     | ( Mixed
           { tag = tag1; size = size1; field_kind = field_kind1; shape = shape1 },
         Mixed
@@ -592,7 +592,7 @@ module Block_access_kind = struct
       if c <> 0
       then c
       else
-        let c = Or_unknown.compare Targetint_31_63.compare size1 size2 in
+        let c = Or_unknown.compare Target_ocaml_int.compare size1 size2 in
         if c <> 0
         then c
         else
@@ -1080,7 +1080,7 @@ type unary_primitive =
   | Block_load of
       { kind : Block_access_kind.t;
         mut : Mutability.t;
-        field : Targetint_31_63.t
+        field : Target_ocaml_int.t
       }
   | Duplicate_block of { kind : Duplicate_block_kind.t }
   | Duplicate_array of
@@ -1202,7 +1202,7 @@ let compare_unary_primitive p1 p2 =
     then c
     else
       let c = Mutability.compare mut1 mut2 in
-      if c <> 0 then c else Targetint_31_63.compare field1 field2
+      if c <> 0 then c else Target_ocaml_int.compare field1 field2
   | ( Duplicate_array
         { kind = kind1;
           source_mutability = source_mutability1;
@@ -1295,7 +1295,7 @@ let print_unary_primitive ppf p =
   match p with
   | Block_load { kind; mut; field } ->
     fprintf ppf "@[(Block_load@ %a@ %a@ %a)@]" Block_access_kind.print kind
-      Mutability.print mut Targetint_31_63.print field
+      Mutability.print mut Target_ocaml_int.print field
   | Duplicate_block { kind } ->
     fprintf ppf "@[<hov 1>(Duplicate_block %a)@]" Duplicate_block_kind.print
       kind
@@ -1652,7 +1652,7 @@ type binary_primitive =
   | Block_set of
       { kind : Block_access_kind.t;
         init : Init_or_assign.t;
-        field : Targetint_31_63.t
+        field : Target_ocaml_int.t
       }
   | Array_load of Array_kind.t * Array_load_kind.t * Mutability.t
   | String_or_bigstring_load of string_like_value * string_accessor_width
@@ -1713,7 +1713,7 @@ let compare_binary_primitive p1 p2 =
     then c
     else
       let c = Init_or_assign.compare init1 init2 in
-      if c <> 0 then c else Targetint_31_63.compare field1 field2
+      if c <> 0 then c else Target_ocaml_int.compare field1 field2
   | Array_load (kind1, load_kind1, mut1), Array_load (kind2, load_kind2, mut2)
     ->
     let c = Array_kind.compare kind1 kind2 in
@@ -1777,7 +1777,7 @@ let print_binary_primitive ppf p =
   match p with
   | Block_set { kind; init; field } ->
     fprintf ppf "@[(Block_set@ %a@ %a@ %a)@]" Block_access_kind.print kind
-      Init_or_assign.print init Targetint_31_63.print field
+      Init_or_assign.print init Target_ocaml_int.print field
   | Array_load (kind, load_kind, mut) ->
     fprintf ppf "@[(Array_load@ %a@ %a@ %a)@]" Array_kind.print kind
       Array_load_kind.print load_kind Mutability.print mut

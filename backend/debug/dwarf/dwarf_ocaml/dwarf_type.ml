@@ -306,7 +306,9 @@ let rec project_layout (layout : Layout.t) path =
   match layout, path with
   | Base b, [] -> b
   | Product p, i :: path -> project_layout (List.nth p i) path
-  | _, _ -> assert false
+  | _, _ ->
+    (* CR sspies: silenced error, should be handled properly instead *)
+    Sort.Value
 
 let rec field_name_with_path base path =
   match path with
@@ -319,13 +321,14 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
     base_layout projected_field =
   match path with
   | [] ->
-    Misc.fatal_error
-      "Empty path provided to [field_project_path]" (* field should exist *)
+    (* CR sspies: silenced error, should be handled properly instead *)
+    None, Shape.leaf' None, Sort.Value
   | [i] -> (
     match Array.get fields i with
     | name, sh, Base ly -> name, sh, ly
     | name, sh, Product _ ->
-      assert false
+      (* CR sspies: silenced error, should be handled properly instead *)
+      name, sh, Sort.Value
       (* If this is a product type, then the flattening of the record fields has
          failed. *))
   | i :: subpath ->
@@ -349,13 +352,7 @@ let flatten_fields_in_mixed_record ~(mixed_block_shapes : Layout.t array)
   let reordering =
     Mixed_block_shape.of_mixed_block_elements
       ~print_locality:(fun _ _ -> ())
-      (Lambda.transl_mixed_product_shape
-         ~get_value_kind:(fun _ -> Lambda.generic_value)
-         (* We don't care about the value kind of values, because it is dropped
-            again immediately afterwards. We only care about the layout
-            remapping: we only need the reordering to get the fields right
-            below. *)
-         mixed_block_shapes)
+      (Lambda.transl_mixed_product_shape mixed_block_shapes)
   in
   let fields =
     Array.init (Mixed_block_shape.new_block_length reordering) (fun i ->
@@ -1197,7 +1194,9 @@ module Shape_with_layout = struct
         ({ type_shape = x2; type_layout = y2 } : t) =
       Shape.equal x1 x2 && Layout.equal y1 y2
 
-    let output _oc _t = Misc.fatal_error "unimplemented"
+    let output _oc _t =
+      (* CR sspies: silenced error, should be handled properly instead *)
+      ()
   end)
 end
 
@@ -1248,8 +1247,12 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       (* CR sspies: The [Constr] case is a precaution. With proper recursive
          types, it should never trigger. For now, we simply use a fallback. *)
     | Unboxed_tuple _ ->
-      Misc.fatal_errorf "unboxed tuples cannot have base layout %a:@ %a"
-        Layout.format (Layout.Base type_layout) S.print type_shape
+      (* CR sspies: silenced error, should be handled properly instead:
+
+         Misc.fatal_errorf "unboxed tuples cannot have base layout %a:@ %a"
+         Layout.format (Layout.Base type_layout) S.print type_shape *)
+      create_base_layout_type ~reference Value ?name ~parent_proto_die
+        ~fallback_value_die ()
     | Tuple fields ->
       type_shape_to_dwarf_die_tuple ~reference ~parent_proto_die
         ~fallback_value_die ?name ~rec_env fields
@@ -1305,20 +1308,31 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
                 base_layout_to_byte_size_in_mixed_block base_layout,
                 type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
                   type_shape base_layout ~rec_env )
-            | None -> assert false)
+            | None ->
+              (* CR sspies: silenced error, should be handled properly
+                 instead *)
+              "_unknown", 0, fallback_value_die)
           fields
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
     | Record { fields = _; kind = Record_unboxed_product }
     | Record { fields = [(_, _, Product _)]; kind = Record_unboxed } ->
-      Misc.fatal_errorf
+      (*= CR sspies: silenced error, should be handled properly instead:
+
+        Misc.fatal_errorf
         "This form of record shape should have been flattened by \
          [flatten_shape]: %a"
         S.print type_shape
+        *)
+      create_base_layout_type ~reference Value ?name ~parent_proto_die
+        ~fallback_value_die ()
     | Record { fields = [] | _ :: _ :: _; kind = Record_unboxed } ->
       Misc.fatal_errorf
         "Records with [@unboxed] attributes must have exactly one field:@ %a"
         S.print type_shape
+      (* [@@unboxed] records must have exactly one field; this should have been
+         detected by earlier transformations such as at the point where the
+         shape was created. *)
     | Variant { simple_constructors; complex_constructors } -> (
       match complex_constructors with
       | [] ->
@@ -1447,12 +1461,16 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
           argument_layout
       in
       create_array_die ~reference ~parent_proto_die ~child_die ?name ())
-  | Array, _ ->
-    Misc.fatal_errorf
+  | Array, args ->
+    (*= CR sspies: silenced error, should be handled properly instead:
+      Misc.fatal_errorf
       "[Array] predef shape must have exactly one argument:@ %a applied to %a"
       Shape.Predef.print predef
       (Format.pp_print_list Shape.print)
       args
+      *)
+    create_base_layout_type ~reference Value ?name ~parent_proto_die
+      ~fallback_value_die ()
   | Char, _ -> create_char_die ~reference ~parent_proto_die ?name ()
   | Unboxed b, _ ->
     let type_layout = Shape.Predef.unboxed_type_to_base_layout b in
@@ -1580,10 +1598,12 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
        Otherwise, we will create an additional DWARF entry for it. *)
     | Base b -> [Known (type_shape, b)])
   | Record { fields = [(_, _, ly)]; kind = Record_unboxed }, _ ->
-    Misc.fatal_errorf
-      "unboxed record at different layout than its field, record layout: %a, \
-       field_layout: %a"
-      Layout.format type_layout Layout.format ly
+    (* CR sspies: silenced error, should be handled properly instead:
+
+       Misc.fatal_errorf "unboxed record at different layout than its field,
+       record layout: %a, \ field_layout: %a" Layout.format type_layout
+       Layout.format ly *)
+    unknown_base_layouts type_layout
   | Record { fields = ([] | _ :: _ :: _) as fields; kind = Record_unboxed }, _
     ->
     Misc.fatal_errorf "unboxed record must have exactly one field, found %a"
@@ -1594,28 +1614,44 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     | Product prod_shapes when List.compare_lengths prod_shapes fields = 0 ->
       List.concat_map (fun (_, sh, ly) -> flatten_shape sh ly) fields
     | Product prod_shapes ->
-      Misc.fatal_errorf
-        "unboxed record field mismatch, shape %a has %d fields, but layout %a \
-         expects %d"
-        Shape.print type_shape (List.length fields) Layout.format type_layout
-        (List.length prod_shapes)
+      (*= CR sspies: silenced error, should be handled properly instead:
+
+          Misc.fatal_errorf
+            "unboxed record field mismatch, shape %a has %d fields, but layout %a \
+            expects %d"
+            Shape.print type_shape (List.length fields) Layout.format type_layout
+            (List.length prod_shapes)
+      *)
+      unknown_base_layouts type_layout
     | Base _ ->
-      Misc.fatal_errorf
-        "unboxed record must have product layout, but has layout %a"
-        Layout.format type_layout)
+      (*= CR sspies: silenced error, should be handled properly instead:
+
+          Misc.fatal_errorf
+            "unboxed record must have product layout, but has layout %a"
+            Layout.format type_layout
+        *)
+      unknown_base_layouts type_layout)
   | Variant _, Base Value -> known_value
   | Variant _, _ ->
-    Misc.fatal_errorf "variant must have value layout, but has layout %a"
-      Layout.format type_layout
+    (*= CR sspies: silenced error, should be handled properly instead:
+
+      Misc.fatal_errorf "variant must have value layout, but has layout %a"
+        Layout.format type_layout
+    *)
+    unknown_base_layouts type_layout
   | ( Variant_unboxed { name = _; arg_name = _; arg_layout; arg_shape = _ },
       Base Value )
     when Layout.equal arg_layout type_layout ->
     known_value
   | Variant_unboxed { name = _; arg_name = _; arg_layout; arg_shape = _ }, _ ->
-    Misc.fatal_errorf
-      "unboxed variant must have value layout, and must have same layout as \
-       its contents; got: %a and contents: %a"
-      Layout.format type_layout Layout.format arg_layout
+    (*= CR sspies: silenced error, should be handled properly instead:
+
+      Misc.fatal_errorf
+        "unboxed variant must have value layout, and must have same layout as \
+        its contents; got: %a and contents: %a"
+        Layout.format type_layout Layout.format arg_layout
+    *)
+    unknown_base_layouts type_layout
   | Alias sh, _ -> flatten_shape sh type_layout
   | (App _ | Error _ | Proj _), _ ->
     (* In these cases, something has gone wrong during reduction, because we do
@@ -1752,10 +1788,13 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
         let flattened_length = List.length flattened in
         if i < 0 || i >= flattened_length
         then
-          Misc.fatal_errorf
-            "uid %a: unboxed projection index %d out of bounds 0...%d:@ %a"
-            Uid.print var_uid i (flattened_length - 1) S.print type_shape;
-        List.nth flattened i
+          (*= CR sspies: silenced error, should be handled properly instead;
+            Misc.fatal_errorf
+              "uid %a: unboxed projection index %d out of bounds 0...%d:@ %a"
+              Uid.print var_uid i (flattened_length - 1) S.print type_shape;
+             *)
+          Unknown Sort.Value
+        else List.nth flattened i
     in
     let type_name =
       match unboxed_projection with

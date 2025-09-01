@@ -113,7 +113,7 @@ let rec make_optimistic_decision ~depth ~recursive tenv ~param_type : U.decision
             in
             let const_ctors : U.const_ctors_decision =
               match const_ctors with
-              | Known set when Targetint_31_63.Set.is_empty set -> Zero
+              | Known set when Target_ocaml_int.Set.is_empty set -> Zero
               | Unknown | Known _ -> make_optimistic_const_ctor ()
             in
             let fields_by_tag =
@@ -163,7 +163,7 @@ and make_optimistic_fields ~add_tag_to_name ~depth ~recursive tenv param_type
     Format.asprintf "%s%a_%d" field_base_name (pp_tag add_tag_to_name) tag n
   in
   let field_vars =
-    List.init (Targetint_31_63.to_int size) (fun i ->
+    List.init (Target_ocaml_int.to_int size) (fun i ->
         Extra_param_and_args.create ~name:(field_name i)
           ~debug_uid:Flambda_debug_uid.none
           (K.Block_shape.element_kind shape i))

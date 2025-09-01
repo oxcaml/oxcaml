@@ -43,7 +43,9 @@ let compute_loop_of_back_edge cfg { Cfg_edge.src; dst } =
       in
       visit stack acc
   in
-  visit [src] (Label.Set.add src (Label.Set.singleton dst))
+  if Label.equal src dst
+  then Label.Set.singleton src
+  else visit [src] (Label.Set.add src (Label.Set.singleton dst))
 
 type loops = loop Cfg_edge.Map.t
 
@@ -171,3 +173,9 @@ let build : Cfg.t -> Cfg_dominators.t -> t =
             Format.eprintf "  \n"))
       header_map);
   { back_edges; loops; header_map; loop_depths }
+
+let is_in_loop : t -> Label.t -> bool =
+ fun loops label ->
+  Cfg_edge.Map.exists
+    (fun _ (loop : loop) -> Label.Set.mem label loop)
+    loops.loops

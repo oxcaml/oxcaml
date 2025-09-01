@@ -85,11 +85,11 @@ let project_tuple ~dbg ~size ~field tuple =
     Values
       { field_kind = Any_value;
         tag = Known Tag.Scannable.zero;
-        size = Known (Targetint_31_63.of_int size)
+        size = Known (Target_ocaml_int.of_int size)
       }
   in
   let mutability : Mutability.t = Immutable in
-  let field = Targetint_31_63.of_int field in
+  let field = Target_ocaml_int.of_int field in
   let prim =
     P.Unary (Block_load { kind = bak; mut = mutability; field }, tuple)
   in

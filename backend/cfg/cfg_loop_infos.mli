@@ -39,3 +39,5 @@ type t = private
   }
 
 val build : Cfg.t -> Cfg_dominators.t -> t
+
+val is_in_loop : t -> Label.t -> bool

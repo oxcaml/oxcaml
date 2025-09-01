@@ -352,7 +352,10 @@ let name_expression ~loc ~attrs sort exp =
   in
   let sg = [Sig_value(id, vd, Exported)] in
   let pat =
-    { pat_desc = Tpat_var(id, mknoloc name, vd.val_uid, Mode.Value.disallow_right Mode.Value.legacy);
+    { pat_desc =
+        Tpat_var(id, mknoloc name, vd.val_uid,
+          Jkind.Sort.(of_const Const.for_module_field),
+          Mode.Value.disallow_right Mode.Value.legacy);
       pat_loc = loc;
       pat_extra = [];
       pat_type = exp.exp_type;
@@ -430,7 +433,6 @@ let execute_phrase print_outcome ppf phr =
               required_globals; code = res } =
           Translmod.transl_implementation compilation_unit
             (str, coercion, None)
-            ~style:Plain_block
         in
         remember compilation_unit sg';
         let size =

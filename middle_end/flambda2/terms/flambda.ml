@@ -1396,7 +1396,7 @@ module Named = struct
       match kind with
       | Value -> Simple.const_zero
       | Naked_number Naked_immediate ->
-        Simple.const (Reg_width_const.naked_immediate Targetint_31_63.zero)
+        Simple.const (Reg_width_const.naked_immediate Target_ocaml_int.zero)
       | Naked_number Naked_float ->
         Simple.const
           (Reg_width_const.naked_float Numeric_types.Float_by_bit_pattern.zero)

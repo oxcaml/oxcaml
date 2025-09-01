@@ -85,7 +85,7 @@ and head_of_kind_value_non_null = private
       }
 
 and head_of_kind_naked_immediate = private
-  | Naked_immediates of Targetint_31_63.Set.t
+  | Naked_immediates of Target_ocaml_int.Set.t
   | Is_int of t  (** For variants only *)
   | Get_tag of t  (** For variants only *)
   | Is_null of t
@@ -277,11 +277,11 @@ val null : t
 
 val any_non_null_value : t
 
-val this_tagged_immediate : Targetint_31_63.t -> t
+val this_tagged_immediate : Target_ocaml_int.t -> t
 
 val this_rec_info : Rec_info_expr.t -> t
 
-val this_naked_immediate : Targetint_31_63.t -> t
+val this_naked_immediate : Target_ocaml_int.t -> t
 
 val this_naked_float32 : Numeric_types.Float32_by_bit_pattern.t -> t
 
@@ -303,7 +303,7 @@ val this_naked_vec256 : Vector_types.Vec256.Bit_pattern.t -> t
 
 val this_naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
 
-val these_naked_immediates : Targetint_31_63.Set.t -> t
+val these_naked_immediates : Target_ocaml_int.Set.t -> t
 
 val these_naked_float32s : Numeric_types.Float32_by_bit_pattern.Set.t -> t
 
@@ -433,7 +433,7 @@ module Product : sig
 
     val create : flambda_type Function_slot.Map.t -> t
 
-    val width : t -> Targetint_31_63.t
+    val width : t -> Target_ocaml_int.t
   end
 
   module Value_slot_indexed : sig
@@ -443,7 +443,7 @@ module Product : sig
 
     val create : flambda_type Value_slot.Map.t -> t
 
-    val width : t -> Targetint_31_63.t
+    val width : t -> Target_ocaml_int.t
   end
 
   module Int_indexed : sig
@@ -455,7 +455,7 @@ module Product : sig
 
     val create_from_array : flambda_type array -> t
 
-    val width : t -> Targetint_31_63.t
+    val width : t -> Target_ocaml_int.t
 
     val components : t -> flambda_type list
   end
@@ -550,7 +550,8 @@ module Row_like_for_blocks : sig
   val all_tags : t -> Tag.Set.t Or_unknown.t
 
   val all_tags_and_sizes :
-    t -> (Targetint_31_63.t * Flambda_kind.Block_shape.t) Tag.Map.t Or_unknown.t
+    t ->
+    (Target_ocaml_int.t * Flambda_kind.Block_shape.t) Tag.Map.t Or_unknown.t
 
   (** If the type corresponds to a single block of known size (as created by
       [create_exactly_multiple]) then return it. *)
@@ -558,7 +559,7 @@ module Row_like_for_blocks : sig
     t ->
     (Tag.t
     * Flambda_kind.Block_shape.t
-    * Targetint_31_63.t
+    * Target_ocaml_int.t
     * Product.Int_indexed.t
     * Alloc_mode.For_types.t)
     option
@@ -592,7 +593,7 @@ module Row_like_for_blocks : sig
       - There could be a distinction between the first three cases (where we
       expect that doing the actual meet could give us a better result) and the
       last case where we already know what the result of the meet will be. *)
-  val get_field : t -> Targetint_31_63.t -> flambda_type Or_unknown_or_bottom.t
+  val get_field : t -> Target_ocaml_int.t -> flambda_type Or_unknown_or_bottom.t
 
   val is_bottom : t -> bool
 
@@ -794,7 +795,7 @@ module Head_of_kind_value : sig
 
   val create_boxed_vec512 : flambda_type -> Alloc_mode.For_types.t -> t
 
-  val create_tagged_immediate : Targetint_31_63.t -> t
+  val create_tagged_immediate : Target_ocaml_int.t -> t
 
   val create_closures : Row_like_for_closures.t -> Alloc_mode.For_types.t -> t
 
@@ -840,7 +841,7 @@ module Head_of_kind_value_non_null : sig
 
   val create_boxed_vec512 : flambda_type -> Alloc_mode.For_types.t -> t
 
-  val create_tagged_immediate : Targetint_31_63.t -> t
+  val create_tagged_immediate : Target_ocaml_int.t -> t
 
   val create_closures : Row_like_for_closures.t -> Alloc_mode.For_types.t -> t
 
@@ -857,11 +858,11 @@ end
 module Head_of_kind_naked_immediate : sig
   type t = head_of_kind_naked_immediate
 
-  val create_naked_immediate : Targetint_31_63.t -> t
+  val create_naked_immediate : Target_ocaml_int.t -> t
 
-  val create_naked_immediates : Targetint_31_63.Set.t -> t Or_bottom.t
+  val create_naked_immediates : Target_ocaml_int.Set.t -> t Or_bottom.t
 
-  val create_naked_immediates_non_empty : Targetint_31_63.Set.t -> t
+  val create_naked_immediates_non_empty : Target_ocaml_int.Set.t -> t
 
   val create_is_int : flambda_type -> t
 

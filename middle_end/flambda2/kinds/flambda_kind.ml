@@ -569,7 +569,7 @@ module With_subkind = struct
       | Boxed_vec512
       | Tagged_immediate
       | Variant of
-          { consts : Targetint_31_63.Set.t;
+          { consts : Target_ocaml_int.Set.t;
             non_consts : (Block_shape.t * full_kind list) Tag.Scannable.Map.t
           }
       | Float_block of { num_fields : int }
@@ -624,7 +624,7 @@ module With_subkind = struct
         true
       | ( Variant { consts = consts1; non_consts = non_consts1 },
           Variant { consts = consts2; non_consts = non_consts2 } ) ->
-        if not (Targetint_31_63.Set.equal consts1 consts2)
+        if not (Target_ocaml_int.Set.equal consts1 consts2)
         then false
         else
           let tags1 = Tag.Scannable.Map.keys non_consts1 in
@@ -735,7 +735,7 @@ module With_subkind = struct
               assert false
           in
           Format.fprintf ppf "%t=Variant((consts (%a))@ (non_consts (%a)))%t"
-            colour Targetint_31_63.Set.print consts
+            colour Target_ocaml_int.Set.print consts
             (Tag.Scannable.Map.print (fun ppf (_shape, fields) ->
                  Format.fprintf ppf "[%a]"
                    (Format.pp_print_list ~pp_sep:Format.pp_print_space
@@ -900,7 +900,7 @@ module With_subkind = struct
     | Some tag ->
       create value
         (Variant
-           { consts = Targetint_31_63.Set.empty;
+           { consts = Target_ocaml_int.Set.empty;
              non_consts =
                Tag.Scannable.Map.singleton tag
                  (Block_shape.Scannable Value_only, fields)
@@ -975,8 +975,8 @@ module With_subkind = struct
           Float_block { num_fields }
         | [], _ :: _ | _ :: _, [] | _ :: _, _ :: _ ->
           let consts =
-            Targetint_31_63.Set.of_list
-              (List.map (fun const -> Targetint_31_63.of_int const) consts)
+            Target_ocaml_int.Set.of_list
+              (List.map (fun const -> Target_ocaml_int.of_int const) consts)
           in
           let non_consts =
             List.fold_left

@@ -639,10 +639,10 @@ let convert_index_to_naked_int64 ~index ~(index_kind : Lambda.array_index_kind)
   H.Prim (Unary (Num_conv { src; dst = Naked_int64 }, index))
 
 let check_non_negative_imm imm prim_name =
-  if not (Targetint_31_63.is_non_negative imm)
+  if not (Target_ocaml_int.is_non_negative imm)
   then
     Misc.fatal_errorf "%s with negative index %a" prim_name
-      Targetint_31_63.print imm
+      Target_ocaml_int.print imm
 
 (* Smart constructor for checked accesses *)
 let checked_access ~dbg ~primitive ~conditions : H.expr_primitive =
@@ -701,7 +701,7 @@ let max_with_zero ~size_int x =
     H.Simple
       (Simple.const
          (Reg_width_const.naked_immediate
-            (Targetint_31_63.of_int ((size_int * 8) - 1))))
+            (Target_ocaml_int.of_int ((size_int * 8) - 1))))
   in
   let sign =
     H.Prim
@@ -976,7 +976,7 @@ let multiple_word_array_access_validity_condition array ~size_int
                length_untagged,
                Simple
                  (Simple.untagged_const_int
-                    (Targetint_31_63.of_int
+                    (Target_ocaml_int.of_int
                        (num_consecutive_elements_being_accessed - 1))) ))
     in
     (* We need to convert the length into a naked_nativeint because the
@@ -1206,7 +1206,7 @@ let bigarray_indexing layout b args =
              (Binary
                 ( Int_arith (I.Tagged_immediate, Sub),
                   idx,
-                  H.Simple (Simple.const_int Targetint_31_63.one) )))
+                  H.Simple (Simple.const_int Target_ocaml_int.one) )))
          args)
 
 let bigarray_access ~dbg ~unsafe ~access layout b indexes =
@@ -1254,7 +1254,7 @@ let compute_array_indexes ~index ~num_elts =
           (Binary
              ( Int_arith (Tagged_immediate, Add),
                index,
-               Simple (Simple.const_int (Targetint_31_63.of_int offset)) )))
+               Simple (Simple.const_int (Target_ocaml_int.of_int offset)) )))
 
 let rec array_load_unsafe ~array ~index ~(mut : Lambda.mutable_flag) array_kind
     (array_ref_kind : Array_ref_kind.t) ~current_region : H.expr_primitive list
@@ -1289,7 +1289,7 @@ let rec array_load_unsafe ~array ~index ~(mut : Lambda.mutable_flag) array_kind
     let unarized = List.concat_map unarize_kind array_ref_kinds in
     let index : H.expr_primitive =
       let multiplier =
-        List.length unarized |> Targetint_31_63.of_int |> Simple.const_int
+        List.length unarized |> Target_ocaml_int.of_int |> Simple.const_int
       in
       Binary (Int_arith (Tagged_immediate, Mul), index, Simple multiplier)
     in
@@ -1362,7 +1362,7 @@ let rec array_set_unsafe dbg ~array ~index array_kind
     let unarized = List.concat_map unarize_kind array_set_kinds in
     let index : H.expr_primitive =
       let multiplier =
-        List.length unarized |> Targetint_31_63.of_int |> Simple.const_int
+        List.length unarized |> Target_ocaml_int.of_int |> Simple.const_int
       in
       Binary (Int_arith (Tagged_immediate, Mul), index, Simple multiplier)
     in
@@ -1714,7 +1714,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     (* This is implemented as a unary primitive, but from our point of view it's
        actually nullary. *)
     let num_bytes = L.array_element_size_in_bytes array_kind in
-    [Simple (Simple.const_int (Targetint_31_63.of_int num_bytes))]
+    [Simple (Simple.const_int (Target_ocaml_int.of_int num_bytes))]
   | Pmake_idx_field pos, [] ->
     needs_64_bit_target prim dbg;
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
@@ -1948,10 +1948,10 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Record_boxed _ ->
         Values
           { tag = Tag.Scannable.zero;
-            length = Targetint_31_63.of_int num_fields
+            length = Target_ocaml_int.of_int num_fields
           }
       | Record_float | Record_ufloat ->
-        Naked_floats { length = Targetint_31_63.of_int num_fields }
+        Naked_floats { length = Target_ocaml_int.of_int num_fields }
       | Record_inlined (_, Constructor_mixed _, _) | Record_mixed _ -> Mixed
       | Record_inlined
           ( Ordinary { runtime_tag; _ },
@@ -1959,7 +1959,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             Variant_boxed _ ) ->
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
-            length = Targetint_31_63.of_int num_fields
+            length = Target_ocaml_int.of_int num_fields
           }
       | Record_inlined (Extension _, shape, Variant_extensible) -> (
         match shape with
@@ -1968,7 +1968,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             { tag = Tag.Scannable.zero;
               (* The "+1" is because there is an extra field containing the
                  hashed constructor. *)
-              length = Targetint_31_63.of_int (num_fields + 1)
+              length = Target_ocaml_int.of_int (num_fields + 1)
             }
         | Constructor_mixed _ ->
           (* CR layouts v5.9: support this *)
@@ -2220,7 +2220,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
          flambda_primitive.mli). *)
       let divisor =
         P.Array_kind.width_in_scalars array_kind
-        |> Targetint_31_63.of_int |> Simple.const_int
+        |> Target_ocaml_int.of_int |> Simple.const_int
       in
       [Binary (Int_arith (Tagged_immediate, Div), Prim prim, Simple divisor)])
   | Pduparray (kind, mutability), [[arg]] -> (
@@ -2336,7 +2336,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
              arg2 )) ]
   | Pfield (index, _int_or_ptr, sem), [[arg]] ->
     (* CR mshinwell: make use of the int-or-ptr flag (new in OCaml 5)? *)
-    let imm = Targetint_31_63.of_int index in
+    let imm = Target_ocaml_int.of_int index in
     check_non_negative_imm imm "Pfield";
     let mutability = convert_field_read_semantics sem in
     let block_access : P.Block_access_kind.t =
@@ -2346,7 +2346,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
     ]
   | Pfloatfield (field, sem, mode), [[arg]] ->
-    let imm = Targetint_31_63.of_int field in
+    let imm = Target_ocaml_int.of_int field in
     check_non_negative_imm imm "Pfloatfield";
     let mutability = convert_field_read_semantics sem in
     let block_access : P.Block_access_kind.t =
@@ -2358,7 +2358,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
              arg ))
         ~current_region ]
   | Pufloatfield (field, sem), [[arg]] ->
-    let imm = Targetint_31_63.of_int field in
+    let imm = Target_ocaml_int.of_int field in
     check_non_negative_imm imm "Pufloatfield";
     let mutability = convert_field_read_semantics sem in
     let block_access : P.Block_access_kind.t =
@@ -2383,7 +2383,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     in
     List.map
       (fun new_index ->
-        let imm = Targetint_31_63.of_int new_index in
+        let imm = Target_ocaml_int.of_int new_index in
         check_non_negative_imm imm "Pmixedfield";
         let mutability = convert_field_read_semantics sem in
         let block_access : P.Block_access_kind.t =
@@ -2418,7 +2418,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
   | ( Psetfield (index, immediate_or_pointer, initialization_or_assignment),
       [[block]; [value]] ) ->
     let field_kind = convert_block_access_field_kind immediate_or_pointer in
-    let imm = Targetint_31_63.of_int index in
+    let imm = Target_ocaml_int.of_int index in
     check_non_negative_imm imm "Psetfield";
     let init_or_assign = convert_init_or_assign initialization_or_assignment in
     let block_access : P.Block_access_kind.t =
@@ -2429,7 +2429,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           block,
           value ) ]
   | Psetfloatfield (field, initialization_or_assignment), [[block]; [value]] ->
-    let imm = Targetint_31_63.of_int field in
+    let imm = Target_ocaml_int.of_int field in
     check_non_negative_imm imm "Psetfloatfield";
     let block_access : P.Block_access_kind.t =
       Naked_floats { size = Unknown }
@@ -2440,7 +2440,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           block,
           unbox_float value ) ]
   | Psetufloatfield (field, initialization_or_assignment), [[block]; [value]] ->
-    let imm = Targetint_31_63.of_int field in
+    let imm = Target_ocaml_int.of_int field in
     check_non_negative_imm imm "Psetufloatfield";
     let block_access : P.Block_access_kind.t =
       Naked_floats { size = Unknown }
@@ -2474,7 +2474,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     let exprs =
       List.map2
         (fun new_index value : H.expr_primitive ->
-          let imm = Targetint_31_63.of_int new_index in
+          let imm = Target_ocaml_int.of_int new_index in
           check_non_negative_imm imm "Psetmixedfield";
           let block_access : P.Block_access_kind.t =
             Mixed
@@ -2556,7 +2556,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     let block_access : P.Block_access_kind.t =
       Values
         { tag = Known Tag.Scannable.zero;
-          size = Known Targetint_31_63.one;
+          size = Known Target_ocaml_int.one;
           field_kind = Immediate
         }
     in
@@ -2566,7 +2566,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
            ( Block_load
                { kind = block_access;
                  mut = Mutable;
-                 field = Targetint_31_63.zero
+                 field = Target_ocaml_int.zero
                },
              block ))
     in
@@ -2574,14 +2574,14 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       H.Prim
         (Binary
            ( Int_arith (Tagged_immediate, Add),
-             Simple (Simple.const_int (Targetint_31_63.of_int n)),
+             Simple (Simple.const_int (Target_ocaml_int.of_int n)),
              old_ref_value ))
     in
     [ Binary
         ( Block_set
             { kind = block_access;
               init = Assignment (Alloc_mode.For_assignments.local ());
-              field = Targetint_31_63.zero
+              field = Target_ocaml_int.zero
             },
           block,
           new_ref_value ) ]
@@ -2589,13 +2589,13 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     match const with
     | Big_endian -> [Simple (Simple.const_bool big_endian)]
     | Word_size ->
-      [Simple (Simple.const_int (Targetint_31_63.of_int (8 * size_int)))]
+      [Simple (Simple.const_int (Target_ocaml_int.of_int (8 * size_int)))]
     | Int_size ->
-      [Simple (Simple.const_int (Targetint_31_63.of_int ((8 * size_int) - 1)))]
+      [Simple (Simple.const_int (Target_ocaml_int.of_int ((8 * size_int) - 1)))]
     | Max_wosize ->
       [ Simple
           (Simple.const_int
-             (Targetint_31_63.of_int
+             (Target_ocaml_int.of_int
                 ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
                 - 1))) ]
     | Ostype_unix ->
@@ -2909,7 +2909,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         kinds offsets new_values
     in
     [H.Sequence writes]
-  | (Psetglobal _ | Praise _ | Pccall _), _ ->
+  | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
        here, either a bug in [Closure_conversion] or the wrong number of \

@@ -740,11 +740,38 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   | Word -> num_nodes_visited, Word
   | Untagged_immediate -> num_nodes_visited, Untagged_immediate
   | Product fs ->
-    let num_nodes_visited, kinds =
-      Array.fold_left_map (fun num_nodes_visited field ->
-        value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
-          field None
-      ) num_nodes_visited fs
+    let unknown () = Array.init (Array.length fs) (fun _ -> None) in
+    let types =
+      match ty with
+      | None -> unknown ()
+      | Some ty ->
+        let ty = scrape_ty env ty in
+        match get_desc ty with
+        | Tunboxed_tuple fields ->
+          Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
+        | Tconstr(p, _, _) ->
+          begin match (Env.find_type p env).type_kind with
+          | exception Not_found -> unknown ()
+          | Type_record_unboxed_product (lbls, _, _) ->
+            Misc.Stdlib.Array.of_list_map (fun {Types.ld_type} -> Some ld_type)
+              lbls
+          | Type_variant _ | Type_record _ | Type_abstract _ | Type_open ->
+            (* We don't need to handle [@@unboxed] records/variants here,
+               because [scrape_ty] looks though them. *)
+            unknown ()
+          end
+        | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
+        | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
+        | Tof_kind _ -> unknown ()
+    in
+    let (_, num_nodes_visited), kinds =
+      Array.fold_left_map (fun (i, num_nodes_visited) field ->
+        let num_nodes_visited, kind =
+          value_kind_mixed_block_field env ~loc ~visited ~depth
+            ~num_nodes_visited field types.(i)
+        in
+        (i + 1, num_nodes_visited), kind
+      ) (0, num_nodes_visited) fs
     in
     num_nodes_visited, Product kinds
   | Void -> num_nodes_visited, Product [||]
@@ -981,6 +1008,16 @@ let value_kind env loc ty =
     let (_num_nodes_visited, value_kind) =
       value_kind env ~loc ~visited:Numbers.Int.Set.empty ~depth:0
         ~num_nodes_visited:0 ty
+    in
+    value_kind
+  with
+  | Missing_cmi_fallback -> raise (Error (loc, Non_value_layout (ty, None)))
+
+let transl_mixed_block_element env loc ty mbe =
+  try
+    let (_num_nodes_visited, value_kind) =
+      value_kind_mixed_block_field env ~loc ~visited:Numbers.Int.Set.empty
+        ~depth:0 ~num_nodes_visited:0 mbe (Some ty)
     in
     value_kind
   with

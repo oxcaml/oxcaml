@@ -398,11 +398,6 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
          ++ cfg_with_layout_profile ~accumulate:true "cfg_validate_description"
               (Regalloc_validate.run cfg_description))
   ++ cfg_with_layout_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
-  ++ Profile.record ~accumulate:true "cfg_available_regs"
-       (available_regs
-          ~stack_slots:(fun x ->
-            (Cfg_with_layout.cfg x).Cfg.fun_num_stack_slots)
-          ~f:Cfg_available_regs.run)
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_simplify"
        Regalloc_utils.simplify_cfg
@@ -421,6 +416,11 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
        (reorder_blocks_random ppf_dump)
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
+  ++ Profile.record ~accumulate:true "cfg_available_regs"
+       (available_regs
+          ~stack_slots:(fun x ->
+            (Cfg_with_layout.cfg x).Cfg.fun_num_stack_slots)
+          ~f:Cfg_available_regs.run)
   ++ Profile.record ~accumulate:true "cfg_to_linear" Cfg_to_linear.run
 
 let compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout =

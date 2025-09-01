@@ -27,7 +27,7 @@ val bottom : Flambda_kind.t -> Type_grammar.t
 
 val bottom_like : Type_grammar.t -> Type_grammar.t
 
-val these_naked_immediates : Targetint_31_63.Set.t -> Type_grammar.t
+val these_naked_immediates : Target_ocaml_int.Set.t -> Type_grammar.t
 
 val these_naked_floats :
   Numeric_types.Float_by_bit_pattern.Set.t -> Type_grammar.t
@@ -55,9 +55,9 @@ val any_tagged_immediate : Type_grammar.t
 
 val any_tagged_immediate_or_null : Type_grammar.t
 
-val these_tagged_immediates0 : Targetint_31_63.Set.t -> Type_grammar.t
+val these_tagged_immediates0 : Target_ocaml_int.Set.t -> Type_grammar.t
 
-val these_tagged_immediates : Targetint_31_63.Set.t -> Type_grammar.t
+val these_tagged_immediates : Target_ocaml_int.Set.t -> Type_grammar.t
 
 val any_tagged_bool : Type_grammar.t
 
@@ -134,7 +134,7 @@ val immutable_block :
 
 val immutable_block_with_size_at_least :
   tag:Tag.t Or_unknown.t ->
-  n:Targetint_31_63.t ->
+  n:Target_ocaml_int.t ->
   shape:Flambda_kind.Block_shape.t ->
   field_n_minus_one:Variable.t ->
   Type_grammar.t

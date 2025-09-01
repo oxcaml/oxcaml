@@ -16,7 +16,7 @@
 
 open! Simplify_import
 module TE = Flambda2_types.Typing_env
-module TI = Targetint_31_63
+module TI = Target_ocaml_int
 module Alias_set = TE.Alias_set
 
 type mergeable_arms =

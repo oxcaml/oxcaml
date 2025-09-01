@@ -233,7 +233,7 @@ let simplify_is_int ~variant_only dacc ~original_term ~arg:scrutinee
   else
     match T.prove_is_int (DA.typing_env dacc) scrutinee_ty with
     | Proved b ->
-      let ty = T.this_naked_immediate (Targetint_31_63.bool b) in
+      let ty = T.this_naked_immediate (Target_ocaml_int.bool b) in
       let dacc = DA.add_variable dacc result_var ty in
       SPR.create original_term ~try_reify:false dacc
     | Unknown ->
@@ -269,7 +269,7 @@ let simplify_string_length dacc ~original_term ~arg:_ ~arg_ty:str_ty ~result_var
     else
       let lengths =
         String_info.Set.elements str_infos
-        |> List.map String_info.size |> Targetint_31_63.Set.of_list
+        |> List.map String_info.size |> Target_ocaml_int.Set.of_list
       in
       let ty = T.these_naked_immediates lengths in
       let dacc = DA.add_variable dacc result_var ty in
@@ -343,7 +343,7 @@ module Make_simplify_int_conv (N : A.Number_kind) = struct
         match dst with
         | Tagged_immediate ->
           let module M = For_kind [@inlined hint] (struct
-            module Result_num = Targetint_31_63
+            module Result_num = Target_ocaml_int
 
             let num_to_result_num = Num.to_immediate
 
@@ -352,7 +352,7 @@ module Make_simplify_int_conv (N : A.Number_kind) = struct
           M.result
         | Naked_immediate ->
           let module M = For_kind [@inlined hint] (struct
-            module Result_num = Targetint_31_63
+            module Result_num = Target_ocaml_int
 
             let num_to_result_num = Num.to_immediate
 
@@ -448,16 +448,16 @@ let simplify_boolean_not dacc ~original_term ~arg:_ ~arg_ty ~result_var =
   match proof with
   | Known_result imms ->
     let imms =
-      Targetint_31_63.Set.filter_map
+      Target_ocaml_int.Set.filter_map
         (fun imm ->
-          if Targetint_31_63.equal imm Targetint_31_63.zero
-          then Some Targetint_31_63.one
-          else if Targetint_31_63.equal imm Targetint_31_63.one
-          then Some Targetint_31_63.zero
+          if Target_ocaml_int.equal imm Target_ocaml_int.zero
+          then Some Target_ocaml_int.one
+          else if Target_ocaml_int.equal imm Target_ocaml_int.one
+          then Some Target_ocaml_int.zero
           else None)
         imms
     in
-    if Targetint_31_63.Set.is_empty imms
+    if Target_ocaml_int.Set.is_empty imms
     then SPR.create_invalid dacc
     else
       let ty = T.these_tagged_immediates imms in
@@ -466,7 +466,7 @@ let simplify_boolean_not dacc ~original_term ~arg:_ ~arg_ty ~result_var =
   | Need_meet ->
     (* CR-someday mshinwell: This could say something like (in the type) "when
        the input is 0, the value is 1" and vice-versa. *)
-    let ty = T.these_tagged_immediates Targetint_31_63.all_bools in
+    let ty = T.these_tagged_immediates Target_ocaml_int.all_bools in
     let dacc = DA.add_variable dacc result_var ty in
     SPR.create original_term ~try_reify:false dacc
   | Invalid -> SPR.create_invalid dacc
@@ -535,14 +535,14 @@ end)
 module Simplify_reinterpret_unboxed_int64_as_tagged_int63 =
 Make_simplify_reinterpret_64_bit_word (struct
   module Src = Int64
-  module Dst = Targetint_31_63
+  module Dst = Target_ocaml_int
 
   let prover = T.meet_naked_int64s
 
   (* This primitive is logical OR with 1 on machine words, but here, we are
      working in the tagged world. As such a different computation is
      required. *)
-  let convert i = Targetint_31_63.of_int64 (Int64.shift_right_logical i 1)
+  let convert i = Target_ocaml_int.of_int64 (Int64.shift_right_logical i 1)
 
   let these = T.these_tagged_immediates
 
@@ -551,14 +551,14 @@ end)
 
 module Simplify_reinterpret_tagged_int63_as_unboxed_int64 =
 Make_simplify_reinterpret_64_bit_word (struct
-  module Src = Targetint_31_63
+  module Src = Target_ocaml_int
   module Dst = Int64
 
   let prover = T.meet_equals_tagged_immediates
 
   (* This primitive is the identity on machine words, but as above, we are
      working in the tagged world. *)
-  let convert i = Int64.add (Int64.mul (Targetint_31_63.to_int64 i) 2L) 1L
+  let convert i = Int64.add (Int64.mul (Target_ocaml_int.to_int64 i) 2L) 1L
 
   let these = T.these_naked_int64s
 
@@ -643,7 +643,7 @@ let simplify_is_boxed_float dacc ~original_term ~arg:_ ~arg_ty ~result_var =
      assert (Flambda_features.flat_float_array ()); *)
   match T.prove_is_or_is_not_a_boxed_float (DA.typing_env dacc) arg_ty with
   | Proved is_a_boxed_float ->
-    let imm = Targetint_31_63.bool is_a_boxed_float in
+    let imm = Target_ocaml_int.bool is_a_boxed_float in
     let ty = T.this_naked_immediate imm in
     let dacc = DA.add_variable dacc result_var ty in
     SPR.create original_term ~try_reify:true dacc
@@ -657,7 +657,7 @@ let simplify_is_flat_float_array dacc ~original_term ~arg:_ ~arg_ty ~result_var
      assert (Flambda_features.flat_float_array ()); *)
   match T.meet_is_flat_float_array (DA.typing_env dacc) arg_ty with
   | Known_result is_flat_float_array ->
-    let imm = Targetint_31_63.bool is_flat_float_array in
+    let imm = Target_ocaml_int.bool is_flat_float_array in
     let ty = T.this_naked_immediate imm in
     let dacc = DA.add_variable dacc result_var ty in
     SPR.create
@@ -672,12 +672,12 @@ let simplify_opaque_identity dacc ~kind ~original_term ~arg:_ ~arg_ty:_
   SPR.create_unknown dacc ~result_var kind ~original_term
 
 let simplify_end_region dacc ~original_term ~arg:_ ~arg_ty:_ ~result_var =
-  let ty = T.this_tagged_immediate Targetint_31_63.zero in
+  let ty = T.this_tagged_immediate Target_ocaml_int.zero in
   let dacc = DA.add_variable dacc result_var ty in
   SPR.create original_term ~try_reify:false dacc
 
 let simplify_end_try_region dacc ~original_term ~arg:_ ~arg_ty:_ ~result_var =
-  let ty = T.this_tagged_immediate Targetint_31_63.zero in
+  let ty = T.this_tagged_immediate Target_ocaml_int.zero in
   let dacc = DA.add_variable dacc result_var ty in
   SPR.create original_term ~try_reify:false dacc
 
@@ -702,7 +702,7 @@ let simplify_duplicate_array ~kind:_ ~(source_mutability : Mutability.t)
       SPR.create original_term ~try_reify:false dacc
     | Known_result (element_kind, fields, alloc_mode) ->
       let length =
-        T.this_tagged_immediate (Array.length fields |> Targetint_31_63.of_int)
+        T.this_tagged_immediate (Array.length fields |> Target_ocaml_int.of_int)
       in
       let ty = T.mutable_array ~element_kind ~length alloc_mode in
       let dacc = DA.add_variable dacc result_var ty in
@@ -820,7 +820,7 @@ let[@inline always] simplify_immutable_block_load0
     in
     SPR.create (Named.create_simple simple) ~try_reify:false dacc
   | Need_meet -> (
-    let n = Targetint_31_63.add field Targetint_31_63.one in
+    let n = Target_ocaml_int.add field Target_ocaml_int.one in
     (* CR-someday mshinwell: We should be able to use the size in the
        [access_kind] to constrain the type of the block *)
     let tag, shape =
@@ -835,7 +835,7 @@ let[@inline always] simplify_immutable_block_load0
                seem that the frontend currently emits code to create such
                blocks) and so it isn't clear whether such blocks should have tag
                zero (like zero-sized naked float arrays) or another tag. *)
-            if Targetint_31_63.equal size Targetint_31_63.zero
+            if Target_ocaml_int.equal size Target_ocaml_int.zero
             then Or_unknown.Unknown
             else Or_unknown.Known Tag.double_array_tag
           | Unknown -> Or_unknown.Unknown),

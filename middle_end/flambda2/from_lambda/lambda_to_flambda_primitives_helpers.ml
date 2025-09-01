@@ -59,7 +59,7 @@ and simple_or_prim =
 
 let simple_untagged_int x : simple_or_prim =
   Simple
-    (Simple.const (Reg_width_const.naked_immediate (Targetint_31_63.of_int x)))
+    (Simple.const (Reg_width_const.naked_immediate (Target_ocaml_int.of_int x)))
 
 let simple_i64 x : simple_or_prim =
   Simple (Simple.const (Reg_width_const.naked_int64 x))
@@ -326,9 +326,9 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
                 Expr_with_acc.create_switch acc
                   (Switch.create ~condition_dbg:dbg ~scrutinee:prim_result
                      ~arms:
-                       (Targetint_31_63.Map.of_list
-                          [ Targetint_31_63.bool_true, condition_passed;
-                            Targetint_31_63.bool_false, failure ])))
+                       (Target_ocaml_int.Map.of_list
+                          [ Target_ocaml_int.bool_true, condition_passed;
+                            Target_ocaml_int.bool_false, failure ])))
           in
           Let_cont_with_acc.build_non_recursive acc condition_passed_cont
             ~handler_params:Bound_parameters.empty
@@ -380,9 +380,9 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
         Expr_with_acc.create_switch acc
           (Switch.create ~condition_dbg:dbg ~scrutinee:(Simple.var cond_result)
              ~arms:
-               (Targetint_31_63.Map.of_list
-                  [ Targetint_31_63.bool_true, ifso_cont;
-                    Targetint_31_63.bool_false, ifnot_cont ]))
+               (Target_ocaml_int.Map.of_list
+                  [ Target_ocaml_int.bool_true, ifso_cont;
+                    Target_ocaml_int.bool_false, ifnot_cont ]))
       in
       Let_with_acc.create acc
         (Bound_pattern.singleton cond_result_pat)

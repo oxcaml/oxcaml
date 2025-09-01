@@ -149,7 +149,7 @@ let memory_chunk_of_flat_suffix_element :
 let block_load ~dbg (kind : P.Block_access_kind.t) (mutability : Mutability.t)
     ~block ~field =
   let mutability = Mutability.to_asttypes mutability in
-  let field = Targetint_31_63.to_int field in
+  let field = Target_ocaml_int.to_int field in
   let get_field_computed immediate_or_pointer =
     let index = C.int_const dbg field in
     C.get_field_computed immediate_or_pointer mutability ~block ~index dbg
@@ -176,7 +176,7 @@ let block_set ~dbg (kind : P.Block_access_kind.t) (init : P.Init_or_assign.t)
     ~block ~field ~new_value =
   C.return_unit dbg
     (let init_or_assign = P.Init_or_assign.to_lambda init in
-     let field = Targetint_31_63.to_int field in
+     let field = Target_ocaml_int.to_int field in
      let setfield_computed is_ptr =
        let index = C.int_const dbg field in
        C.setfield_computed is_ptr init_or_assign block index new_value dbg

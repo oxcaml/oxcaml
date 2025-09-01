@@ -368,10 +368,10 @@ let const c : Fexpr.const =
   match Reg_width_const.descr c with
   | Naked_immediate imm ->
     Naked_immediate
-      (imm |> Targetint_31_63.to_targetint |> Targetint_32_64.to_string)
+      (imm |> Target_ocaml_int.to_targetint |> Targetint_32_64.to_string)
   | Tagged_immediate imm ->
     Tagged_immediate
-      (imm |> Targetint_31_63.to_targetint |> Targetint_32_64.to_string)
+      (imm |> Target_ocaml_int.to_targetint |> Targetint_32_64.to_string)
   | Naked_float f -> Naked_float (f |> float)
   | Naked_float32 f -> Naked_float32 (f |> float32)
   | Naked_int32 i -> Naked_int32 i
@@ -459,7 +459,8 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
 
 and variant_subkind consts non_consts : Fexpr.subkind =
   let consts =
-    consts |> Targetint_31_63.Set.elements |> List.map Targetint_31_63.to_int64
+    consts |> Target_ocaml_int.Set.elements
+    |> List.map Target_ocaml_int.to_int64
   in
   let non_consts =
     non_consts |> Tag.Scannable.Map.bindings
@@ -503,8 +504,8 @@ let kinded_parameter env (kp : Bound_parameter.t) :
   let param, env = Env.bind_var env (Bound_parameter.var kp) in
   { param; kind = k }, env
 
-let targetint_ocaml (i : Targetint_31_63.t) : Fexpr.targetint =
-  i |> Targetint_31_63.to_int64
+let targetint_ocaml (i : Target_ocaml_int.t) : Fexpr.targetint =
+  i |> Target_ocaml_int.to_int64
 
 let recursive_flag (r : Recursive.t) : Fexpr.is_recursive =
   match r with Recursive -> Recursive | Non_recursive -> Nonrecursive
@@ -741,7 +742,7 @@ let field_of_block env field =
       match[@ocaml.warning "-fragile-match"] Reg_width_const.descr cst with
       | Tagged_immediate imm ->
         Tagged_immediate
-          (imm |> Targetint_31_63.to_targetint |> Targetint_32_64.to_string)
+          (imm |> Target_ocaml_int.to_targetint |> Targetint_32_64.to_string)
       | _ -> Misc.fatal_error "Mixed blocks not supported yet in fexpr")
 
 let or_variable f env (ov : _ Or_variable.t) : _ Fexpr.or_variable =
@@ -1194,11 +1195,11 @@ and switch_expr env switch : Fexpr.expr =
     List.map
       (fun (imm, app_cont) ->
         let tag =
-          imm |> Targetint_31_63.to_targetint |> Targetint_32_64.to_int
+          imm |> Target_ocaml_int.to_targetint |> Targetint_32_64.to_int
         in
         let app_cont = apply_cont env app_cont in
         tag, app_cont)
-      (Switch_expr.arms switch |> Targetint_31_63.Map.bindings)
+      (Switch_expr.arms switch |> Target_ocaml_int.Map.bindings)
   in
   Switch { scrutinee; cases }
 

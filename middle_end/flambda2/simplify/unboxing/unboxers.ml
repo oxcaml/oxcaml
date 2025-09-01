@@ -51,7 +51,7 @@ module Immediate = struct
   let unboxer =
     { var_name = "naked_immediate";
       var_kind = K.naked_immediate;
-      poison_const = Const.naked_immediate (Targetint_31_63.of_int 0xabcd);
+      poison_const = Const.naked_immediate (Target_ocaml_int.of_int 0xabcd);
       unboxing_prim;
       prove_simple = T.meet_tagging_of_simple
     }

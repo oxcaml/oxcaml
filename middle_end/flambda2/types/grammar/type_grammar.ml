@@ -30,16 +30,16 @@ open Or_bottom.Let_syntax
 open Or_unknown.Let_syntax
 
 module Block_size = struct
-  include Targetint_31_63
+  include Target_ocaml_int
 
   (** [subset t1 t2] is true if [t1] is a subset of [t2] *)
   let subset t1 t2 = Stdlib.( <= ) (compare t1 t2) 0
 
   (* An integer [i] represents all the values smaller than i, hence a smaller
      number is included in a bigger *)
-  let union t1 t2 = Targetint_31_63.max t1 t2
+  let union t1 t2 = Target_ocaml_int.max t1 t2
 
-  let inter t1 t2 = Targetint_31_63.min t1 t2
+  let inter t1 t2 = Target_ocaml_int.min t1 t2
 end
 
 type is_null =
@@ -128,7 +128,7 @@ and head_of_kind_value_non_null =
    if we don't actually use the extensions, while the second version would be
    particularly useful if we switch several times on the same scrutinee. *)
 and head_of_kind_naked_immediate =
-  | Naked_immediates of Targetint_31_63.Set.t
+  | Naked_immediates of Target_ocaml_int.Set.t
   | Is_int of t
   | Get_tag of t
   | Is_null of t
@@ -1154,7 +1154,7 @@ and print_head_of_kind_value_non_null ppf head =
 and print_head_of_kind_naked_immediate ppf head =
   match head with
   | Naked_immediates is ->
-    Format.fprintf ppf "@[<hov 1>(%a)@]" Targetint_31_63.Set.print is
+    Format.fprintf ppf "@[<hov 1>(%a)@]" Target_ocaml_int.Set.print is
   | Is_int ty -> Format.fprintf ppf "@[<hov 1>(Is_int@ %a)@]" print ty
   | Get_tag ty -> Format.fprintf ppf "@[<hov 1>(Get_tag@ %a)@]" print ty
   | Is_null ty -> Format.fprintf ppf "@[<hov 1>(Is_null@ %a)@]" print ty
@@ -3175,7 +3175,7 @@ module Product = struct
     let top = { function_slot_components_by_index = Function_slot.Map.empty }
 
     let width t =
-      Targetint_31_63.of_int
+      Target_ocaml_int.of_int
         (Function_slot.Map.cardinal t.function_slot_components_by_index)
   end
 
@@ -3188,7 +3188,7 @@ module Product = struct
     let top = { value_slot_components_by_index = Value_slot.Map.empty }
 
     let width t =
-      Targetint_31_63.of_int
+      Target_ocaml_int.of_int
         (Value_slot.Map.cardinal t.value_slot_components_by_index)
   end
 
@@ -3201,7 +3201,7 @@ module Product = struct
 
     let create_top () = [||]
 
-    let width t = Targetint_31_63.of_int (Array.length t)
+    let width t = Target_ocaml_int.of_int (Array.length t)
 
     let components t = Array.to_list t
   end
@@ -3336,7 +3336,7 @@ module Row_like_for_blocks = struct
           Known tag)
     in
     let product = Array.of_list field_tys in
-    let size = Targetint_31_63.of_int (List.length field_tys) in
+    let size = Target_ocaml_int.of_int (List.length field_tys) in
     match open_or_closed with
     | Open _ -> (
       match tag with
@@ -3354,7 +3354,7 @@ module Row_like_for_blocks = struct
       Or_unknown.map
         ~f:(fun shape ->
           { maps_to;
-            index = { domain = At_least Targetint_31_63.zero; shape };
+            index = { domain = At_least Target_ocaml_int.zero; shape };
             env_extension = { equations = Name.Map.empty }
           })
         shape
@@ -3367,7 +3367,7 @@ module Row_like_for_blocks = struct
         (fun (shape, field_tys) ->
           check_field_tys ~shape ~field_tys;
           let maps_to = Array.of_list field_tys in
-          let size = Targetint_31_63.of_int (List.length field_tys) in
+          let size = Target_ocaml_int.of_int (List.length field_tys) in
           Or_unknown.Known
             { maps_to;
               index = { domain = Known size; shape };
@@ -3382,7 +3382,7 @@ module Row_like_for_blocks = struct
     { known_tags; other_tags; alloc_mode }
 
   let all_tags_and_sizes t :
-      (Targetint_31_63.t * K.Block_shape.t) Tag.Map.t Or_unknown.t =
+      (Target_ocaml_int.t * K.Block_shape.t) Tag.Map.t Or_unknown.t =
     match t.other_tags with
     | Ok _ -> Unknown
     | Bottom ->
@@ -3394,7 +3394,7 @@ module Row_like_for_blocks = struct
             | Unknown ->
               any_unknown := true;
               (* result doesn't matter as it is unused *)
-              Targetint_31_63.zero, K.Block_shape.Scannable Value_only
+              Target_ocaml_int.zero, K.Block_shape.Scannable Value_only
             | Known { index = { domain; shape }; _ } -> (
               match domain with
               | Known size -> size, shape
@@ -3433,11 +3433,11 @@ module Row_like_for_blocks = struct
        exactly the same type: we could do a trivial join *)
     | None -> Unknown
     | Some (_tag, _shape, size, maps_to, _alloc_mode) -> (
-      if Targetint_31_63.( <= ) size index
+      if Target_ocaml_int.( <= ) size index
       then Bottom
       else
         match
-          project_int_indexed_product maps_to (Targetint_31_63.to_int index)
+          project_int_indexed_product maps_to (Target_ocaml_int.to_int index)
         with
         | Unknown -> Unknown
         | Known res -> Ok res)
@@ -3651,10 +3651,10 @@ let this_naked_vec512 i : t =
   Naked_vec512 (TD.create_equals (Simple.const (RWC.naked_vec512 i)))
 
 let these_naked_immediates is =
-  match Targetint_31_63.Set.get_singleton is with
+  match Target_ocaml_int.Set.get_singleton is with
   | Some i -> this_naked_immediate i
   | _ ->
-    if Targetint_31_63.Set.is_empty is
+    if Target_ocaml_int.Set.is_empty is
     then bottom_naked_immediate
     else Naked_immediate (TD.create (Naked_immediates is))
 
@@ -3770,8 +3770,9 @@ let tag_int8 (t : t) : t =
     | Ok (No_alias ints) ->
       let ints =
         Int8.Set.fold
-          (fun x acc -> Targetint_31_63.Set.add (Targetint_31_63.of_int8 x) acc)
-          ints Targetint_31_63.Set.empty
+          (fun x acc ->
+            Target_ocaml_int.Set.add (Target_ocaml_int.of_int8 x) acc)
+          ints Target_ocaml_int.Set.empty
       in
       non_null_value
         (Variant
@@ -3802,8 +3803,8 @@ let tag_int16 (t : t) : t =
       let ints =
         Int16.Set.fold
           (fun x acc ->
-            Targetint_31_63.Set.add (Targetint_31_63.of_int16 x) acc)
-          ints Targetint_31_63.Set.empty
+            Target_ocaml_int.Set.add (Target_ocaml_int.of_int16 x) acc)
+          ints Target_ocaml_int.Set.empty
       in
       non_null_value
         (Variant
@@ -3933,7 +3934,7 @@ let boxed_vec512_alias_to ~naked_vec512 =
   box_vec512 (Naked_vec512 (TD.create_equals (Simple.var naked_vec512)))
 
 let this_immutable_string str =
-  let size = Targetint_31_63.of_int (String.length str) in
+  let size = Target_ocaml_int.of_int (String.length str) in
   let string_info =
     String_info.Set.singleton
       (String_info.create ~contents:(Contents str) ~size)
@@ -3941,7 +3942,7 @@ let this_immutable_string str =
   non_null_value (String string_info)
 
 let mutable_string ~size =
-  let size = Targetint_31_63.of_int size in
+  let size = Target_ocaml_int.of_int size in
   let string_info =
     String_info.Set.singleton
       (String_info.create ~contents:Unknown_or_mutable ~size)
@@ -3961,7 +3962,7 @@ let immutable_array ~element_kind ~fields alloc_mode =
     (Array
        { element_kind;
          length =
-           this_tagged_immediate (Targetint_31_63.of_int (List.length fields));
+           this_tagged_immediate (Target_ocaml_int.of_int (List.length fields));
          contents = Known (Immutable { fields = Array.of_list fields });
          alloc_mode
        })
@@ -4158,15 +4159,15 @@ module Head_of_kind_naked_immediate = struct
   type t = head_of_kind_naked_immediate
 
   let create_naked_immediate imm =
-    Naked_immediates (Targetint_31_63.Set.singleton imm)
+    Naked_immediates (Target_ocaml_int.Set.singleton imm)
 
   let create_naked_immediates imms : _ Or_bottom.t =
-    if Targetint_31_63.Set.is_empty imms
+    if Target_ocaml_int.Set.is_empty imms
     then Bottom
     else Ok (Naked_immediates imms)
 
   let create_naked_immediates_non_empty imms =
-    if Targetint_31_63.Set.is_empty imms
+    if Target_ocaml_int.Set.is_empty imms
     then
       Misc.fatal_error
         "Head_of_kind_naked_immediates.create_naked_immediates_non_empty";
@@ -4271,7 +4272,7 @@ let rec must_be_singleton t : RWC.t option =
       None
     | Ok (Equals simple) -> Simple.must_be_const simple
     | Ok (No_alias (Naked_immediates is)) -> (
-      match Targetint_31_63.Set.get_singleton is with
+      match Target_ocaml_int.Set.get_singleton is with
       | Some i -> Some (RWC.naked_immediate i)
       | None -> None))
   | Naked_float32 ty -> (
@@ -4296,7 +4297,7 @@ let rec must_be_singleton t : RWC.t option =
     | Ok (Equals simple) -> Simple.must_be_const simple
     | Ok (No_alias is) -> (
       match Int8.Set.get_singleton is with
-      | Some i -> Some (RWC.naked_immediate (Targetint_31_63.of_int8 i))
+      | Some i -> Some (RWC.naked_immediate (Target_ocaml_int.of_int8 i))
       | None -> None))
   | Naked_int16 ty -> (
     match TD.descr ty with
@@ -4304,7 +4305,7 @@ let rec must_be_singleton t : RWC.t option =
     | Ok (Equals simple) -> Simple.must_be_const simple
     | Ok (No_alias is) -> (
       match Int16.Set.get_singleton is with
-      | Some i -> Some (RWC.naked_immediate (Targetint_31_63.of_int16 i))
+      | Some i -> Some (RWC.naked_immediate (Target_ocaml_int.of_int16 i))
       | None -> None))
   | Naked_int32 ty -> (
     match TD.descr ty with

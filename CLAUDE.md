@@ -58,6 +58,9 @@ Configuration is needed after changing `.in` files or the autoconf script.
 - Don't disable warnings or tests unless prompted
 - Use pattern-matching and functional programming idioms
 - Avoid `assert false` and other unreachable code
+- Rebuild the project often while using the LSP using `make boot-compiler`. When
+  you don't rebuild, the LSP may give you stale information from a previous
+  build.
 
 ## Important Notes
 
@@ -65,4 +68,3 @@ Configuration is needed after changing `.in` files or the autoconf script.
 - ALWAYS prefer editing existing files
 - NEVER proactively create documentation files (*.md) or README files
 - NEVER stage or commit changes unless explicitly requested
-

@@ -247,8 +247,8 @@ let find_code_id env code_id = fresh_or_existing_code_id env code_id
 let targetint (i : Fexpr.targetint) : Targetint_32_64.t =
   Targetint_32_64.of_int64 i
 
-let targetint_31_63 (i : Fexpr.targetint) : Targetint_31_63.t =
-  Targetint_31_63.of_int64 i
+let targetint_31_63 (i : Fexpr.targetint) : Target_ocaml_int.t =
+  Target_ocaml_int.of_int64 i
 
 let vec128 bits : Vector_types.Vec128.Bit_pattern.t =
   Vector_types.Vec128.Bit_pattern.of_bits bits
@@ -262,7 +262,8 @@ let vec512 bits : Vector_types.Vec512.Bit_pattern.t =
 let tag_scannable (tag : Fexpr.tag_scannable) : Tag.Scannable.t =
   Tag.Scannable.create_exn tag
 
-let immediate i = i |> Targetint_32_64.of_string |> Targetint_31_63.of_targetint
+let immediate i =
+  i |> Targetint_32_64.of_string |> Target_ocaml_int.of_targetint
 
 let float32 f = f |> Numeric_types.Float32_by_bit_pattern.create
 
@@ -283,7 +284,7 @@ let rec subkind :
   | Tagged_immediate -> Tagged_immediate
   | Variant { consts; non_consts } ->
     let consts =
-      consts |> List.map targetint_31_63 |> Targetint_31_63.Set.of_list
+      consts |> List.map targetint_31_63 |> Target_ocaml_int.Set.of_list
     in
     let non_consts =
       non_consts
@@ -370,7 +371,7 @@ let field_of_block env (v : Fexpr.field_of_block) =
     | Tagged_immediate i ->
       let i = Targetint_32_64.of_string i in
       Simple.const
-        (Reg_width_const.tagged_immediate (Targetint_31_63.of_targetint i))
+        (Reg_width_const.tagged_immediate (Target_ocaml_int.of_targetint i))
     | Dynamically_computed var ->
       let var = find_var env var in
       Simple.var var
@@ -414,7 +415,7 @@ let block_access_kind (ak : Fexpr.block_access_kind) :
   let size s : _ Or_unknown.t =
     match s with
     | None -> Unknown
-    | Some s -> Known (s |> Targetint_31_63.of_int64)
+    | Some s -> Known (s |> Target_ocaml_int.of_int64)
   in
   match ak with
   | Values { field_kind; tag; size = s } ->
@@ -728,9 +729,10 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
   | Switch { scrutinee; cases } ->
     let arms =
       List.map
-        (fun (case, apply) -> Targetint_31_63.of_int case, apply_cont env apply)
+        (fun (case, apply) ->
+          Target_ocaml_int.of_int case, apply_cont env apply)
         cases
-      |> Targetint_31_63.Map.of_list
+      |> Target_ocaml_int.Map.of_list
     in
     Flambda.Expr.create_switch
       (Flambda.Switch.create ~condition_dbg:Debuginfo.none

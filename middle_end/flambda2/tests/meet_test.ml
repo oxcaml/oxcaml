@@ -140,7 +140,7 @@ let meet_variants_don't_lose_aliases () =
       TE.add_get_tag_relation env (Name.var v_naked)
         ~scrutinee:(Simple.var v_variant)
     in
-    let t_tag_1 = T.this_naked_immediate Targetint_31_63.one in
+    let t_tag_1 = T.this_naked_immediate Target_ocaml_int.one in
     let env = TE.add_equation env (Name.var v_naked) t_tag_1 in
     let tag_meet_ty = TE.find env (Name.var v_naked) (Some K.naked_immediate) in
     assert (T.Equal_types_for_debug.equal_type env tag_meet_ty t_tag_1);
@@ -376,7 +376,7 @@ let test_meet_recover_alias () =
   let env = define env x in
   let existing_ty =
     T.variant Alloc_mode.For_types.heap
-      ~const_ctors:(T.this_naked_immediate Targetint_31_63.zero)
+      ~const_ctors:(T.this_naked_immediate Target_ocaml_int.zero)
       ~non_const_ctors:
         (Tag.Scannable.Map.of_list
            [Tag.Scannable.zero, (K.Block_shape.Scannable Value_only, [])])
@@ -413,7 +413,7 @@ let test_meet_bottom_after_alias () =
   let x = Variable.create "x" K.value in
   let env = define env x in
   let existing_ty =
-    T.these_tagged_immediates Targetint_31_63.zero_one_and_minus_one
+    T.these_tagged_immediates Target_ocaml_int.zero_one_and_minus_one
   in
   Format.eprintf "@[<hov 2>first type:@ %a@]@." T.print existing_ty;
   let env = TE.add_equation env (Name.var x) existing_ty in

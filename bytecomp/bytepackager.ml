@@ -218,15 +218,16 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
       members
   in
   let main_module_block_size, lam =
-    Translmod.transl_package components packed_compilation_unit coercion
-      ~style:Set_global_to_block
+    Translmod.transl_package components coercion
   in
   if !Clflags.dump_rawlambda then
     Format.fprintf ppf_dump "%a@." Printlambda.lambda lam;
   let lam = Simplif.simplify_lambda lam in
   if !Clflags.dump_lambda then
     Format.fprintf ppf_dump "%a@." Printlambda.lambda lam;
-  let blam = Blambda_of_lambda.blambda_of_lambda lam in
+  let blam =
+    Blambda_of_lambda.blambda_of_lambda
+      ~compilation_unit:(Some packed_compilation_unit) lam in
   if !Clflags.dump_blambda then
     Format.fprintf ppf_dump "%a@." Printblambda.blambda blam;
   let instrs = Bytegen.compile_implementation packed_compilation_unit blam in

@@ -250,7 +250,7 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
             try_canonical_simple ()
           | Some (tag, shape, size, field_types, alloc_mode) -> (
             assert (
-              Targetint_31_63.equal size
+              Target_ocaml_int.equal size
                 (TG.Product.Int_indexed.width field_types));
             let field_types = TG.Product.Int_indexed.components field_types in
             let field_types_and_expected_kinds =
@@ -289,7 +289,7 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
         then
           match Provers.meet_naked_immediates env imms with
           | Known_result imms -> (
-            match Targetint_31_63.Set.get_singleton imms with
+            match Target_ocaml_int.Set.get_singleton imms with
             | None -> try_canonical_simple ()
             | Some imm ->
               Simple (Simple.const (Reg_width_const.tagged_immediate imm)))
@@ -431,7 +431,7 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
           (TG.create_from_head_naked_immediate head)
       with
       | Known_result is -> (
-        match Targetint_31_63.Set.get_singleton is with
+        match Target_ocaml_int.Set.get_singleton is with
         | None -> try_canonical_simple ()
         | Some i -> Simple (Simple.const (Reg_width_const.naked_immediate i)))
       | Need_meet -> try_canonical_simple ()
@@ -605,7 +605,7 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
           }) -> (
       match Provers.meet_equals_single_tagged_immediate env length with
       | Known_result length -> (
-        if not (Targetint_31_63.equal length Targetint_31_63.zero)
+        if not (Target_ocaml_int.equal length Target_ocaml_int.zero)
         then try_canonical_simple ()
         else
           match element_kind with

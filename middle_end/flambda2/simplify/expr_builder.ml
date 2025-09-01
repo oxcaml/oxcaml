@@ -605,7 +605,7 @@ let place_lifted_constants uacc ~lifted_constants_from_defining_expr
   place_constants uacc ~around:body lifted_constants_from_defining_expr
 
 let create_switch uacc ~condition_dbg ~scrutinee ~arms =
-  if Targetint_31_63.Map.cardinal arms < 1
+  if Target_ocaml_int.Map.cardinal arms < 1
   then
     ( RE.create_invalid Zero_switch_arms,
       UA.notify_added ~code_size:Code_size.invalid uacc )
@@ -617,13 +617,13 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
       in
       RE.create_apply_cont action, uacc
     in
-    match Targetint_31_63.Map.get_singleton arms with
+    match Target_ocaml_int.Map.get_singleton arms with
     | Some (_discriminant, action) -> change_to_apply_cont action
     | None -> (
       (* At that point, we've already applied the apply cont rewrite to the
          action of the arms. *)
       let actions =
-        Apply_cont_expr.Set.of_list (Targetint_31_63.Map.data arms)
+        Apply_cont_expr.Set.of_list (Target_ocaml_int.Map.data arms)
       in
       match Apply_cont_expr.Set.get_singleton actions with
       | Some action ->

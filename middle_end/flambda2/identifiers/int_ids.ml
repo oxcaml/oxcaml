@@ -40,8 +40,8 @@ let code_id_flags = 4
 
 module Const_data = struct
   type t =
-    | Naked_immediate of Targetint_31_63.t
-    | Tagged_immediate of Targetint_31_63.t
+    | Naked_immediate of Target_ocaml_int.t
+    | Tagged_immediate of Target_ocaml_int.t
     | Naked_float32 of Numeric_types.Float32_by_bit_pattern.t
     | Naked_float of Numeric_types.Float_by_bit_pattern.t
     | Naked_int8 of Numeric_types.Int8.t
@@ -64,12 +64,12 @@ module Const_data = struct
       | Naked_immediate i ->
         Format.fprintf ppf "%t#%a%t"
           Flambda_colours.naked_number
-          Targetint_31_63.print i
+          Target_ocaml_int.print i
           Flambda_colours.pop
       | Tagged_immediate i ->
         Format.fprintf ppf "%t%a%t"
           Flambda_colours.tagged_immediate
-          Targetint_31_63.print i
+          Target_ocaml_int.print i
           Flambda_colours.pop
       | Naked_float32 f ->
         Format.fprintf ppf "%t#%as%t"
@@ -130,9 +130,9 @@ module Const_data = struct
 
     let compare t1 t2 =
       match t1, t2 with
-      | Naked_immediate i1, Naked_immediate i2 -> Targetint_31_63.compare i1 i2
+      | Naked_immediate i1, Naked_immediate i2 -> Target_ocaml_int.compare i1 i2
       | Tagged_immediate i1, Tagged_immediate i2 ->
-        Targetint_31_63.compare i1 i2
+        Target_ocaml_int.compare i1 i2
       | Naked_float32 f1, Naked_float32 f2 ->
         Numeric_types.Float32_by_bit_pattern.compare f1 f2
       | Naked_float f1, Naked_float f2 ->
@@ -179,9 +179,9 @@ module Const_data = struct
       then true
       else
         match t1, t2 with
-        | Naked_immediate i1, Naked_immediate i2 -> Targetint_31_63.equal i1 i2
+        | Naked_immediate i1, Naked_immediate i2 -> Target_ocaml_int.equal i1 i2
         | Tagged_immediate i1, Tagged_immediate i2 ->
-          Targetint_31_63.equal i1 i2
+          Target_ocaml_int.equal i1 i2
         | Naked_float32 f1, Naked_float32 f2 ->
           Numeric_types.Float32_by_bit_pattern.equal f1 f2
         | Naked_float f1, Naked_float f2 ->
@@ -207,8 +207,8 @@ module Const_data = struct
 
     let hash t =
       match t with
-      | Naked_immediate n -> Targetint_31_63.hash n
-      | Tagged_immediate n -> Targetint_31_63.hash n
+      | Naked_immediate n -> Target_ocaml_int.hash n
+      | Tagged_immediate n -> Target_ocaml_int.hash n
       | Naked_float32 n -> Numeric_types.Float32_by_bit_pattern.hash n
       | Naked_float n -> Numeric_types.Float_by_bit_pattern.hash n
       | Naked_int8 n -> Numeric_types.Int8.hash n
@@ -368,23 +368,23 @@ module Const = struct
 
   let naked_vec512 i = create (Naked_vec512 i)
 
-  let const_true = tagged_immediate Targetint_31_63.bool_true
+  let const_true = tagged_immediate Target_ocaml_int.bool_true
 
-  let const_false = tagged_immediate Targetint_31_63.bool_false
+  let const_false = tagged_immediate Target_ocaml_int.bool_false
 
-  let untagged_const_true = naked_immediate Targetint_31_63.bool_true
+  let untagged_const_true = naked_immediate Target_ocaml_int.bool_true
 
-  let untagged_const_false = naked_immediate Targetint_31_63.bool_false
+  let untagged_const_false = naked_immediate Target_ocaml_int.bool_false
 
-  let untagged_const_zero = naked_immediate Targetint_31_63.zero
+  let untagged_const_zero = naked_immediate Target_ocaml_int.zero
 
   let untagged_const_int i = naked_immediate i
 
   let const_int i = tagged_immediate i
 
-  let const_zero = tagged_immediate Targetint_31_63.zero
+  let const_zero = tagged_immediate Target_ocaml_int.zero
 
-  let const_one = tagged_immediate Targetint_31_63.one
+  let const_one = tagged_immediate Target_ocaml_int.one
 
   let const_unit = const_zero
 

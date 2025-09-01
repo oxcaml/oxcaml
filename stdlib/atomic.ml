@@ -12,7 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type (!'a : value_or_null) t : mutable_data with 'a
+type (!'a : value_or_null) t : mutable_data with 'a =
+  { mutable contents : 'a [@atomic] }
 
 external make
   : ('a : value_or_null).
