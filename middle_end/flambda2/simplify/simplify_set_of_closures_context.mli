@@ -59,4 +59,4 @@ val function_decl_type :
   ?new_code_id:Code_id.t ->
   rec_info:T.t ->
   Code_id.t ->
-  Function_type.t Or_unknown_or_bottom.t
+  Function_type.t Or_unknown.t

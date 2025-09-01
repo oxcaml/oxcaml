@@ -1568,21 +1568,21 @@ and meet_array_of_types env fields1 fields2 ~length =
   meet_mapping ~meet_data:meet ~fold2 ~env ~left:fields1 ~right:fields2 ~rebuild
 
 and meet_function_type (env : ME.t)
-    (func_type1 : TG.Function_type.t Or_unknown_or_bottom.t)
-    (func_type2 : TG.Function_type.t Or_unknown_or_bottom.t) :
-    TG.Function_type.t Or_unknown_or_bottom.t meet_result =
+    (func_type1 : TG.Function_type.t Or_unknown.t)
+    (func_type2 : TG.Function_type.t Or_unknown.t) :
+    TG.Function_type.t Or_unknown.t meet_result =
   match func_type1, func_type2 with
-  | Bottom, Bottom | Unknown, Unknown -> Ok (Both_inputs, env)
-  | Bottom, _ | _, Unknown -> Ok (Left_input, env)
-  | _, Bottom | Unknown, _ -> Ok (Right_input, env)
-  | ( Ok { code_id = code_id1; rec_info = rec_info1 },
-      Ok { code_id = code_id2; rec_info = rec_info2 } ) ->
+  | Unknown, Unknown -> Ok (Both_inputs, env)
+  | _, Unknown -> Ok (Left_input, env)
+  | Unknown, _ -> Ok (Right_input, env)
+  | ( Known { code_id = code_id1; rec_info = rec_info1 },
+      Known { code_id = code_id2; rec_info = rec_info2 } ) ->
     let rebuild code_id rec_info =
       (* It's possible that [code_id] corresponds to deleted code. In that case,
          any attempt to inline will fail, as the code will not be found in the
          simplifier's environment -- see
          [Simplify_apply_expr.simplify_direct_function_call]. *)
-      Or_unknown_or_bottom.Ok (TG.Function_type.create code_id ~rec_info)
+      Or_unknown.Known (TG.Function_type.create code_id ~rec_info)
     in
     combine_results2 env ~rebuild ~meet_a:meet_code_id ~left_a:code_id1
       ~right_a:code_id2 ~meet_b:meet ~left_b:rec_info1 ~right_b:rec_info2
@@ -2333,14 +2333,13 @@ and join_int_indexed_product env shape (fields1 : TG.Product.Int_indexed.t)
   TG.Product.Int_indexed.create_from_array fields
 
 and join_function_type (env : Join_env.t)
-    (func_type1 : TG.Function_type.t Or_unknown_or_bottom.t)
-    (func_type2 : TG.Function_type.t Or_unknown_or_bottom.t) :
-    TG.Function_type.t Or_unknown_or_bottom.t =
+    (func_type1 : TG.Function_type.t Or_unknown.t)
+    (func_type2 : TG.Function_type.t Or_unknown.t) :
+    TG.Function_type.t Or_unknown.t =
   match func_type1, func_type2 with
-  | Bottom, func_type | func_type, Bottom -> func_type
   | Unknown, _ | _, Unknown -> Unknown
-  | ( Ok { code_id = code_id1; rec_info = rec_info1 },
-      Ok { code_id = code_id2; rec_info = rec_info2 } ) -> (
+  | ( Known { code_id = code_id1; rec_info = rec_info1 },
+      Known { code_id = code_id2; rec_info = rec_info2 } ) -> (
     let target_typing_env = Join_env.target_join_env env in
     (* As a note, sometimes it might be preferable not to do the code age
        relation join, and take the hit of an indirect call in exchange for
@@ -2359,7 +2358,7 @@ and join_function_type (env : Join_env.t)
     | Unknown -> Unknown
     | Known code_id -> (
       match join env rec_info1 rec_info2 with
-      | Known rec_info -> Ok (TG.Function_type.create code_id ~rec_info)
+      | Known rec_info -> Known (TG.Function_type.create code_id ~rec_info)
       | Unknown -> Unknown))
 
 and join_env_extension env (ext1 : TEE.t) (ext2 : TEE.t) : TEE.t =
