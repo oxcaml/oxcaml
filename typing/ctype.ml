@@ -2156,10 +2156,10 @@ let is_principal ty =
 type unwrapped_type_expr =
   { ty : type_expr
   ; is_open : bool
-  ; modality : Mode.Modality.Value.Const.t }
+  ; modality : Mode.Modality.Const.t }
 
 let mk_unwrapped_type_expr ty =
-  { ty; is_open = false; modality = Mode.Modality.Value.Const.id }
+  { ty; is_open = false; modality = Mode.Modality.Const.id }
 
 type unbox_result =
   (* unboxing process made a step: either an unboxing or removal of a [Tpoly] *)
@@ -2225,7 +2225,7 @@ let unbox_once env ty =
   | Tpoly (ty, bound_vars) ->
     Stepped { ty;
               is_open = not (Misc.Stdlib.List.is_empty bound_vars);
-              modality = Mode.Modality.Value.Const.id }
+              modality = Mode.Modality.Const.id }
   | _ -> Final_result
 
 let contained_without_boxing env ty =
@@ -2257,9 +2257,7 @@ let rec get_unboxed_type_representation
     match unbox_once env ty with
     | Stepped { ty = ty2; is_open = is_open2; modality = modality2 } ->
       let is_open = is_open || is_open2 in
-      let modality =
-        Mode.Modality.Value.Const.concat modality ~then_:modality2
-      in
+      let modality = Mode.Modality.Const.concat modality ~then_:modality2 in
       get_unboxed_type_representation
         ~is_open ~modality env ty ty2 (fuel - 1)
     | Stepped_or_null _ | Stepped_record_unboxed_product _ | Final_result ->
@@ -2269,7 +2267,7 @@ let rec get_unboxed_type_representation
 let get_unboxed_type_representation env ty =
   (* Do not give too much fuel: PR#7424 *)
   get_unboxed_type_representation
-    ~is_open:false ~modality:Mode.Modality.Value.Const.id env ty ty 100
+    ~is_open:false ~modality:Mode.Modality.Const.id env ty ty 100
 
 let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
@@ -5082,8 +5080,8 @@ let relevant_pairs pairs v =
 
 let zap_modalities_to_floor_if_modes_enabled_at level =
   if Language_extension.(is_at_least Mode level)
-    then Mode.Modality.Value.zap_to_floor
-    else Mode.Modality.Value.zap_to_id
+    then Mode.Modality.zap_to_floor
+    else Mode.Modality.zap_to_id
 
 
 (** The mode crossing of the memory block of a structure. *)
@@ -5126,8 +5124,8 @@ let mode_crossing_module = Mode.Crossing.max
 
 let zap_modalities_to_floor_if_at_least level =
   if Language_extension.(is_at_least Mode level)
-    then Mode.Modality.Value.zap_to_floor
-    else Mode.Modality.Value.zap_to_id
+    then Mode.Modality.zap_to_floor
+    else Mode.Modality.zap_to_id
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
@@ -7349,7 +7347,7 @@ let check_decl_jkind env decl jkind =
       | Final_result | Stepped _ | Stepped_record_unboxed_product _
       | Missing _ ->
         Jkind.for_abbreviation ~type_jkind_purely
-          ~modality:Mode.Modality.Value.Const.id inner_ty
+        ~modality:Mode.Modality.Const.id inner_ty
       end
     (* These next cases are more properly rule TK_UNBOXED from kind-inference.md
        (not rule FIND_ABBREV, as documented with [Jkind.for_abbreviation]), but

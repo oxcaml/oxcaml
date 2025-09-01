@@ -5,10 +5,7 @@ open Mode
 let dummy_jkind = Jkind.Builtin.value ~why:(Unknown "dummy_layout")
 let dummy_value_mode = Value.disallow_right Value.legacy
 let dummy_value_sort = Jkind.Sort.value
-
-let dummy_alloc_mode =
-  { mode = Alloc.disallow_left Alloc.legacy; locality_context = None }
-
+let dummy_alloc_mode = Alloc.disallow_left Alloc.legacy
 let mkTvar name = Tvar { name; jkind = dummy_jkind }
 
 let mkTarrow (label, t1, t2, comm) =
@@ -417,7 +414,7 @@ let mk_value_description ~val_type ~val_kind ~val_attributes =
     val_type;
     val_kind;
     val_loc = Location.none;
-    val_modalities = Mode.Modality.Value.id;
+    val_modalities = Mode.Modality.id;
     val_attributes;
     val_uid = Uid.internal_not_actually_unique;
     val_zero_alloc = Zero_alloc.default;

@@ -72,7 +72,7 @@ module Error = struct
         (class_type_declaration, Ctype.class_match_failure list) diff
     | Class_declarations of
         (class_declaration, class_declaration_symptom) mdiff
-    | Modalities of Mode.Modality.Value.error
+    | Modalities of Mode.Modality.error
 
   type core_module_type_symptom =
     | Not_an_alias

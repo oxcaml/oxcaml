@@ -498,13 +498,18 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
       (fun () -> validate_no_prologue cfg_with_layout)
       ();
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  let fun_name = Cfg.fun_name cfg in
   (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
   | true
     when Label.Tbl.length cfg.blocks
          <= !Oxcaml_flags.cfg_prologue_shrink_wrap_threshold ->
     add_prologue_if_required cfg ~f:find_prologue_and_epilogues_shrink_wrapped
   | _ -> add_prologue_if_required cfg ~f:find_prologue_and_epilogues_at_entry);
+  cfg_with_layout
+
+let validate : Cfg_with_layout.t -> Cfg_with_layout.t =
+ fun cfg_with_layout ->
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let fun_name = Cfg.fun_name cfg in
   match !Oxcaml_flags.cfg_prologue_validate with
   | true -> (
     match

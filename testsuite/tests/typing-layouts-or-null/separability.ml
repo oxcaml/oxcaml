@@ -1043,3 +1043,69 @@ Error: Signature mismatch:
            value_or_null mod separable
          because of the definition of t at line 2, characters 2-38.
 |}]
+
+(* Separability and [@@unboxed] existential types. *)
+
+(* Some [@@unboxed] existentials are non-separable and thus forbidden. *)
+(* CR separability: mark them as non-separable instead. *)
+
+type 'a abstract
+
+type packed = P : 'a abstract -> packed [@@unboxed]
+[%%expect{|
+type 'a abstract
+Line 3, characters 0-51:
+3 | type packed = P : 'a abstract -> packed [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       it might contain both float and non-float values,
+       depending on the instantiation of the existential variable "'a".
+       You should annotate it with "[@@ocaml.boxed]".
+|}]
+
+(* [non_float] annotations allow us to bypass this check. *)
+
+type 'a non_float : value mod non_float
+
+type packed = P : 'a non_float -> packed [@@unboxed]
+
+[%%expect{|
+type 'a non_float : value mod non_float
+type packed = P : 'a non_float -> packed [@@unboxed]
+|}]
+
+(* [non_float] also works on existential variables. *)
+
+type exists = E : ('a : value mod non_float) . 'a -> exists [@@unboxed]
+
+[%%expect{|
+type exists = E : ('a : value mod non_float). 'a -> exists [@@unboxed]
+|}]
+
+(* Non-value layouts do not trigger the check. *)
+
+type 'a void : void
+
+type packed_void = P : 'a void -> packed_void [@@unboxed]
+
+[%%expect{|
+type 'a void : void
+type packed_void = P : 'a void -> packed_void [@@unboxed]
+|}]
+
+type exists_word = W : ('a : word) . 'a -> exists_word [@@unboxed]
+
+[%%expect{|
+type exists_word = W : ('a : word). 'a -> exists_word [@@unboxed]
+|}]
+
+(* With-bounds don't affect separability here: *)
+
+type 'a abs1 : value mod non_float with 'a
+
+type packed = P : 'a abs1 -> packed [@@unboxed]
+
+[%%expect{|
+type 'a abs1 : value mod non_float
+type packed = P : 'a abs1 -> packed [@@unboxed]
+|}]

@@ -32,7 +32,7 @@ let make_switch n selector caselist =
   let index = Array.make n 0 in
   let casev = Array.of_list caselist in
   let dbg = Debuginfo.none in
-  let actv = Array.make (Array.length casev) (Cexit(Cmm.Lbl 0,[],[]), dbg) in
+  let actv = Array.make (Array.length casev) (Cexit(Cmm.Lbl Static_label.fail,[],[]), dbg) in
   for i = 0 to Array.length casev - 1 do
     let (posl, e) = casev.(i) in
     List.iter (fun pos -> index.(pos) <- i) posl;
@@ -211,7 +211,7 @@ componentlist:
   | componentlist STAR component { $3 :: $1 }
 ;
 traps:
-    LPAREN INTCONST RPAREN       { List.init $2 (fun i -> Pop i) }
+    LPAREN INTCONST RPAREN       { List.init $2 (fun i -> Pop (Static_label.of_int_unsafe i)) }
   | /**/                         { [] }
 expr:
     INTCONST    { Cconst_int ($1, debuginfo ()) }
@@ -263,7 +263,7 @@ expr:
       List.iter (fun (_, l, _, _, _) ->
         List.iter (fun (x, _) -> unbind_ident x) l) handlers;
       Ccatch(Recursive, handlers, $3) }
-  | EXIT        { Cexit(Cmm.Lbl 0,[],[]) }
+  | EXIT        { Cexit(Cmm.Lbl Static_label.fail,[],[]) }
   | LPAREN TRY machtype sequence WITH bind_ident sequence RPAREN
       { let after_push_k = Lambda.next_raise_count () in
         let after_pop_k = Lambda.next_raise_count () in
@@ -459,7 +459,7 @@ catch_handlers:
 
 catch_handler:
   | sequence
-    { 0, [], $1, debuginfo (), false }
+    { Static_label.fail, [], $1, debuginfo (), false }
   | LPAREN IDENT params RPAREN sequence
     { find_label $2, $3, $5, debuginfo (), false }
 
