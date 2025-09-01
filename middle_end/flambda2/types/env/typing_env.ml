@@ -563,9 +563,8 @@ let mem ?min_name_mode t name =
       match name_mode, min_name_mode with
       | None, _ -> false
       | Some _, None -> true
-      | Some name_mode, Some min_name_mode -> (
-        Name_mode.compare_total_order min_name_mode name_mode <= 0
-        ))
+      | Some name_mode, Some min_name_mode ->
+        Name_mode.compare_total_order min_name_mode name_mode <= 0)
     ~symbol:(fun sym ->
       (* CR mshinwell: This might not take account of symbols in missing .cmx
          files *)
