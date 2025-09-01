@@ -1763,6 +1763,12 @@ module Extra_params = struct
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
     | "gdwarf-max-function-complexity" ->
         set_int' Debugging.dwarf_max_function_complexity
+    | "gdwarf-fidelity" -> (
+        match Clflags.gdwarf_fidelity_of_string v with
+        | Some fidelity ->
+            Clflags.set_gdwarf_fidelity fidelity;
+            true
+        | None -> Misc.fatal_error ("Invalid gdwarf-fidelity value: " ^ v))
     | "llvm-path" ->
         Oxcaml_flags.llvm_path := Some v;
         true

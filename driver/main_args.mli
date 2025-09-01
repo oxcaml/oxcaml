@@ -261,6 +261,14 @@ module type Optcomp_options = sig
   val _save_ir_before : string -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
+  val _gdwarf_config_shape_reduce_depth : int -> unit
+  val _gdwarf_config_shape_eval_depth : int -> unit
+  val _gdwarf_config_max_cms_files_per_unit : int -> unit
+  val _gdwarf_config_max_cms_files_per_variable : int -> unit
+  val _gdwarf_config_max_type_to_shape_depth : int -> unit
+  val _gdwarf_config_max_shape_reduce_steps_per_variable : string -> unit
+  val _gdwarf_config_max_evaluation_steps_per_variable : string -> unit
+  val _gdwarf_fidelity : string -> unit
 end
 
 module type Opttop_options = sig

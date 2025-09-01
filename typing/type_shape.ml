@@ -210,8 +210,8 @@ module Type_shape = struct
     let unknown_shape = Shape.leaf' None in
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
-      Numbers.Int.Map.mem (Types.get_id expr) visited || depth > 10
-      (* CR sspies: Make the depth a command line flag. *)
+      Numbers.Int.Map.mem (Types.get_id expr) visited
+      || depth > !Clflags.gdwarf_config_max_type_to_shape_depth
     in
     if cannot_proceed ()
     then
@@ -737,14 +737,17 @@ module D = Evaluation_diagnostics
 
 (* To unroll the mutually recursive declarations, we perform a simple call by
    value evaluation and catch cycles for ident binders. *)
-let rec unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-    (t : Shape.t) =
+let rec unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+    subst_constr (t : Shape.t) =
   D.count_evaluation_step diagnostics;
-  if depth >= 5
-     (* CR sspies: This depth limit can currently produce very large shapes, and
-        some additional caching would be appropriate. *)
+  if Misc.Maybe_bounded.is_depleted steps_remaining
   then Shape.leaf' None
-  else
+  else if depth >= !Clflags.gdwarf_config_shape_eval_depth
+          (* CR sspies: This depth limit can currently produce very large shapes, and
+             some additional caching would be appropriate. *)
+  then Shape.leaf' None
+  else (
+    Misc.Maybe_bounded.decr steps_remaining;
     (* we special case the case where the head is a projection, because of
        recursive unfolding *)
     let head, args = decompose_application t in
@@ -753,11 +756,13 @@ let rec unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
       | Proj_decl (str, i) -> (
         let args =
           List.map
-            (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr)
+            (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+               subst_constr)
             args
         in
         let str =
-          unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr str
+          unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+            subst_constr str
         in
         match str.Shape.desc with
         | Mutrec ts ->
@@ -770,8 +775,8 @@ let rec unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
             update_subst_with_id_arg_binder subst_constr i args rec_binder
           in
           let ts = Ident.Map.find i ts in
-          unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-            (Shape.app_list ts args)
+          unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+            subst_constr (Shape.app_list ts args)
           |> Recursive_binder.bind_recursive_binder ~preserve_uid:false
                rec_binder
           |> Option.some
@@ -791,7 +796,8 @@ let rec unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
       | Constr (id, constr_args) -> (
         let constr_args =
           List.map
-            (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr)
+            (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+               subst_constr)
             constr_args
         in
         match find_constr_id_with_args subst_constr id constr_args with
@@ -799,19 +805,22 @@ let rec unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
         | None -> (
           match find_mut_rec_shape subst_constr id with
           | Some t ->
-            unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
+            unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+              subst_constr
               (Shape.app_list t constr_args)
           | None -> Shape.leaf' None))
       | App (f, arg) -> (
         let f =
-          unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr f
+          unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+            subst_constr f
         in
         let arg =
-          unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr arg
+          unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+            subst_constr arg
         in
         match f.Shape.desc with
         | Abs (x, s') ->
-          unfold_and_evaluate ~diagnostics ~depth
+          unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
             (Ident.Map.add x arg subst_type)
             subst_constr s'
         | _ -> Shape.app f ~arg)
@@ -822,8 +831,8 @@ let rec unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
         let constructors =
           Shape.complex_constructors_map
             (fun ((sh, ly) : Shape.t * _) ->
-              ( unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-                  sh,
+              ( unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
+                  subst_type subst_constr sh,
                 ly ))
             constructors
         in
@@ -834,72 +843,79 @@ let rec unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
              (fun ((name, uid, sh, ly) : _ * _ * Shape.t * _) ->
                ( name,
                  uid,
-                 unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-                   sh,
+                 unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
+                   subst_type subst_constr sh,
                  ly ))
              fields)
       | Poly_variant constrs ->
         Shape.poly_variant
           (Shape.poly_variant_constructors_map
              (fun (sh : Shape.t) ->
-               unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-                 sh)
+               unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
+                 subst_type subst_constr sh)
              constrs)
       | Arrow -> Shape.arrow ()
       | Variant_unboxed
           { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout } ->
         Shape.variant_unboxed ~variant_uid ~arg_uid name arg_name
-          (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-             arg_shape)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+             subst_constr arg_shape)
           arg_layout
       | Proj (t, i) ->
         Shape.proj
-          (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr t)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+             subst_constr t)
           i
       | Tuple args ->
         Shape.tuple
           (List.map
              (fun (sh : Shape.t) ->
-               unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-                 sh)
+               unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
+                 subst_type subst_constr sh)
              args)
       | Unboxed_tuple args ->
         Shape.unboxed_tuple
           (List.map
              (fun (sh : Shape.t) ->
-               unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-                 sh)
+               unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
+                 subst_type subst_constr sh)
              args)
       | Predef (p, args) ->
         Shape.predef p
           (List.map
              (fun (sh : Shape.t) ->
-               unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-                 sh)
+               unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
+                 subst_type subst_constr sh)
              args)
       | Mu body ->
         Shape.mu
-          (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr body)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+             subst_constr body)
       | Alias t ->
         Shape.alias
-          (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr t)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+             subst_constr t)
       | Struct items ->
         Shape.str
           (Shape.Item.Map.map
              (fun (sh : Shape.t) ->
-               unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-                 sh)
+               unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
+                 subst_type subst_constr sh)
              items)
       (* normal forms for CBV evaluation *)
       | Mutrec _ | Abs _ | Error _ | Comp_unit _ | Rec_var _ | Leaf ->
-        t (* normal form in this CBV evaluation *))
+        t (* normal form in this CBV evaluation *)))
 
 (* CR sspies: The performance of this evaluation is quite poor, requiring us to
    limit the depth to about 5 at the moment. Improve it using caching to make it
    possible to have deeper shapes. *)
 let unfold_and_evaluate ?(diagnostics = Evaluation_diagnostics.no_diagnostics) t
     =
-  unfold_and_evaluate ~diagnostics ~depth:0 Ident.Map.empty
+  let steps_remaining =
+    Misc.Maybe_bounded.of_option
+      !Clflags.gdwarf_config_max_evaluation_steps_per_variable
+  in
+  unfold_and_evaluate ~diagnostics ~depth:0 ~steps_remaining Ident.Map.empty
     (Ident.Map.empty, Ident.Map.empty)
     t
 

@@ -1912,12 +1912,22 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     unknown_base_layouts type_layout
 
 module With_cms_reduce = Shape_reduce.Make (struct
-  let fuel = 10
+  let fuel () = 10
+
+  let fuel_for_compilation_units () =
+    !Clflags.gdwarf_config_max_cms_files_per_variable
+  (* Every variable gets to look up at most N compilation units. *)
+
+  let max_shape_reduce_steps_per_variable () =
+    Misc.Maybe_bounded.of_option
+      !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable
+
+  let max_compilation_unit_depth () = !Clflags.gdwarf_config_shape_reduce_depth
 
   let cms_file_cache = String.Tbl.create 264
 
-  let max_number_of_cms_files = ref 20
-  (* A single compilation may not read more than 20 .cms files. *)
+  let cms_files_read_counter = ref 0
+  (* Track the number of .cms files read during compilation. *)
   (* CR sspies: Investigate the performance some more and the balance between
      different variables. *)
 
@@ -1956,12 +1966,11 @@ module With_cms_reduce = Shape_reduce.Make (struct
       Shape_reduce.Diagnostics.count_cms_file_cached diagnostics;
       shape
     | None ->
-      if !max_number_of_cms_files <= 0
-         (* CR sspies: This needs a command line flag. *)
+      if !cms_files_read_counter
+         >= !Clflags.gdwarf_config_max_cms_files_per_unit
       then None
       else (
-        decr max_number_of_cms_files;
-        Shape_reduce.Diagnostics.count_cms_file_loaded diagnostics;
+        incr cms_files_read_counter;
         let filename = String.uncapitalize_ascii unit_name in
         let shape_opt_opt =
           match read_shape_from_cms ~diagnostics filename with

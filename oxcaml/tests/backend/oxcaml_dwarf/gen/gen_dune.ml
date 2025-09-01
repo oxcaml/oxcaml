@@ -31,7 +31,7 @@ let () =
  (modules ${name})
  ${enabled_if}
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity medium
    -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 
