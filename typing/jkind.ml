@@ -2492,16 +2492,18 @@ let of_type_decl_default ~context ~transl_type ~default
 let combine_mutability mut1 mut2 =
   match mut1, mut2 with
   | (Mutable { atomic = Nonatomic; mode = _ } as x), _
-  | _, (Mutable { atomic = Nonatomic; mode = _ } as x) -> x
+  | _, (Mutable { atomic = Nonatomic; mode = _ } as x) ->
+    x
   | (Mutable { atomic = Atomic; mode = _ } as x), _
-  | _, (Mutable { atomic = Atomic; mode = _ } as x) -> x
+  | _, (Mutable { atomic = Atomic; mode = _ } as x) ->
+    x
   | (Immutable as x), Immutable -> x
 
 let jkind_of_mutability mutability ~why =
   (match mutability with
-   | Immutable -> Builtin.immutable_data
-   | Mutable { atomic = Atomic; _ } -> Builtin.sync_data
-   | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
+  | Immutable -> Builtin.immutable_data
+  | Mutable { atomic = Atomic; _ } -> Builtin.sync_data
+  | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
     ~why
 
 let all_void_labels lbls =
@@ -2635,10 +2637,12 @@ let for_boxed_variant ~loc cstrs =
       else
         List.concat_map
           (fun cstr ->
-             match cstr.cd_args with
-             | Cstr_tuple _ -> [ Immutable ]
-             | Cstr_record lbls ->
-               List.map (fun (ld : Types.label_declaration) -> ld.ld_mutable) lbls)
+            match cstr.cd_args with
+            | Cstr_tuple _ -> [Immutable]
+            | Cstr_record lbls ->
+              List.map
+                (fun (ld : Types.label_declaration) -> ld.ld_mutable)
+                lbls)
           cstrs
         |> List.fold_left combine_mutability Immutable
         |> jkind_of_mutability ~why:Boxed_variant
