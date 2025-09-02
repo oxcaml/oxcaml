@@ -3609,7 +3609,7 @@ module CIS = Code_id_or_symbol
 module GroupMap = Numbers.Int.Map
 module SCC = Strongly_connected_components.Make (Numbers.Int)
 
-let bind_code_and_sets_of_closures all_code sets_of_closures acc body =
+let bind_code_and_static_consts all_code sets_of_closures acc body =
   let fresh_group_id =
     let i = ref 0 in
     fun () ->
@@ -3622,6 +3622,7 @@ let bind_code_and_sets_of_closures all_code sets_of_closures acc body =
      constraints in the [slot_offsets] field of the acc (which is only used in
      classic mode), and that should be benign. *)
   let acc, group_to_bound_consts, symbol_to_groups =
+    (* Record defining expressions for all code IDs *)
     Code_id.Lmap.fold
       (fun code_id code (acc, g2c, s2g) ->
         let id = fresh_group_id () in
@@ -3634,7 +3635,21 @@ let bind_code_and_sets_of_closures all_code sets_of_closures acc body =
       all_code
       (acc, GroupMap.empty, CIS.Map.empty)
   in
+  let acc, group_to_bound_consts, symbol_to_groups =
+    (* Record defining expressions for all symbols, except sets of closures *)
+    List.fold_left
+      (fun (acc, g2c, s2g) (symbol, const) ->
+        let id = fresh_group_id () in
+        let bound = Bound_static.Pattern.block_like symbol in
+        let const = Static_const_or_code.create_static_const const in
+        ( acc,
+          GroupMap.add id (bound, const) g2c,
+          CIS.Map.add (CIS.create_symbol symbol) id s2g ))
+      (acc, group_to_bound_consts, symbol_to_groups)
+      (Acc.declared_symbols acc)
+  in
   let group_to_bound_consts, symbol_to_groups =
+    (* Record defining expressions for sets of closures *)
     List.fold_left
       (fun (g2c, s2g) (symbols, set_of_closures) ->
         let id = fresh_group_id () in
@@ -3652,6 +3667,8 @@ let bind_code_and_sets_of_closures all_code sets_of_closures acc body =
       sets_of_closures
   in
   let graph =
+    (* Compute dependencies for all code IDs and symbols based on free names of
+       their defining expressions *)
     GroupMap.map
       (fun (_bound, const) ->
         let free_names = Static_const_or_code.free_names const in
@@ -3800,7 +3817,12 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
      with fields indexed from zero to [module_block_size_in_words]. The handler
      extracts the fields; the variables bound to such fields are then used to
      define the module block symbol. *)
-  let body acc = program acc env in
+  let body acc =
+    let acc, body = program acc env in
+    bind_code_and_static_consts (Acc.code acc)
+      (Acc.lifted_sets_of_closures acc)
+      acc body
+  in
   Let_cont_with_acc.build_non_recursive acc prog_return_cont
     ~handler_params:load_fields_handler_param ~handler:load_fields_body ~body
     ~is_exn_handler:false ~is_cold:false
@@ -3836,47 +3858,35 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode) ~big_endian
     | Some [approx] -> approx
     | _ -> Value_approximation.Value_unknown
   in
-  let acc, body =
-    bind_code_and_sets_of_closures (Acc.code acc)
-      (Acc.lifted_sets_of_closures acc)
-      acc body
-  in
   (* We must make sure there is always an outer [Let_symbol] binding so that
      lifted constants not in the scope of any other [Let_symbol] binding get put
      into the term and not dropped. Adding this extra binding, which will
      actually be removed by the simplifier, avoids a special case. *)
-  let acc =
+  let acc, body =
     match Acc.declared_symbols acc with
-    | _ :: _ -> acc
+    | _ :: _ -> acc, body
     | [] ->
       (* CR vlaviron/mshinwell: Maybe this could use an empty array.
          Furthermore, can this hack be removed? *)
-      let acc, (_sym : Symbol.t) =
-        register_const0 acc
-          (Static_const.block Tag.Scannable.zero Immutable Value_only [])
-          "first_const"
+      let acc, symbol = manufacture_symbol acc "first_const" in
+      let bound_static =
+        Bound_static.singleton (Bound_static.Pattern.block_like symbol)
       in
-      acc
+      let static_const =
+        Static_const.block Tag.Scannable.zero Immutable Value_only []
+      in
+      let defining_expr =
+        Static_const_group.create
+          [Static_const_or_code.create_static_const static_const]
+        |> Named.create_static_consts
+      in
+      Let_with_acc.create acc
+        (Bound_pattern.static bound_static)
+        defining_expr ~body
   in
   let symbols_approximations =
     Symbol.Map.add module_symbol module_block_approximation
       (Acc.symbol_approximations acc)
-  in
-  let acc, body =
-    List.fold_left
-      (fun (acc, body) (symbol, static_const) ->
-        let bound_static =
-          Bound_static.singleton (Bound_static.Pattern.block_like symbol)
-        in
-        let defining_expr =
-          Static_const_group.create
-            [Static_const_or_code.create_static_const static_const]
-          |> Named.create_static_consts
-        in
-        Let_with_acc.create acc
-          (Bound_pattern.static bound_static)
-          defining_expr ~body)
-      (acc, body) (Acc.declared_symbols acc)
   in
   if Option.is_some (Acc.top_closure_info acc)
   then
