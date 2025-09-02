@@ -574,7 +574,7 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
         (Let (var, Block (Tag.to_int tag, Array.of_list xs, Array, mutability)))
     )
 
-let primitive ~env ~res (prim : Flambda_primitive.t) _dbg =
+let primitive ~env ~res (prim : Flambda_primitive.t) =
   match prim with
   | Nullary f -> nullary ~env ~res f
   | Unary (f, x) -> unary ~env ~res f x

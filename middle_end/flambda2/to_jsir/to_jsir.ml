@@ -55,8 +55,8 @@ let create_let_simple ~env ~res fvar simple =
 
 (** Bind a fresh variable to the result of translating [prim] into JSIR, and
     map [fvar] to this new variable in the environment. *)
-let create_let_prim ~env ~res fvar prim dbg =
-  let jvar, env, res = To_jsir_primitive.primitive ~env ~res prim dbg in
+let create_let_prim ~env ~res fvar prim =
+  let jvar, env, res = To_jsir_primitive.primitive ~env ~res prim in
   match jvar with
   | None -> env, res
   | Some jvar -> To_jsir_env.add_var env fvar jvar, res
@@ -100,7 +100,8 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       create_let_simple ~env ~res fvar s
     | Singleton v, Prim (p, dbg) ->
       let fvar = Bound_var.var v in
-      create_let_prim ~env ~res fvar p dbg
+      To_jsir_result.with_debuginfo_exn res dbg ~f:(fun res ->
+          create_let_prim ~env ~res fvar p)
     | Set_of_closures bound_vars, Set_of_closures soc ->
       To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
     | Static bound_static, Static_consts consts ->

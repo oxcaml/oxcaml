@@ -36,3 +36,5 @@ val start_position : t -> Lexing.position
 val t_of_position : src:string option -> Lexing.position -> t
 
 val to_string : t -> string
+
+val t_of_debuginfo : Debuginfo.t -> pos:[`Start | `End] -> t option

@@ -41,7 +41,6 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
         with
         | Deleted _ -> env, res
         | Code_id { code_id; only_full_applications = _ } ->
-          (* CR selee: thread through debug information *)
           let ({ addr; params; closure = fn_var } : To_jsir_env.code_id) =
             To_jsir_env.get_code_id_exn env code_id
           in
