@@ -479,7 +479,7 @@ boot-_install: runtime-stdlib
 	mkdir -p _install/{bin,lib/ocaml}
 	$(cpl) _build/runtime_stdlib_install/bin/* _install/bin/
 	# can't use a hard link here because ocamllex comes from the system and
-	# is possibly on a difference device
+	# is possibly on a different device
 	ln -sf $(realpath _build/_bootinstall/bin/ocamllex.opt) _install/bin/ocamllex.opt
 	$(cpl) _build/_bootinstall/bin/ocaml{c,opt,mklib,dep,objinfo}.opt _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
