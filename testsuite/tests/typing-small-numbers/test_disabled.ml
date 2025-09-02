@@ -224,3 +224,5 @@ Line 1, characters 9-14:
 Error: Unbound type constructor "int16"
 Hint: Did you mean "int", "int16x8", "int32", "int64" or "int8x16"?
 |}];;
+
+(* CR jrayman: int8 literal, int16 literal *)
