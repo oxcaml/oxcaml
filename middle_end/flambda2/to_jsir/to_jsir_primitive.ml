@@ -3,12 +3,21 @@ let primitive_not_supported () =
     "This primitive is not supported for JavaScript/WASM compilation."
 
 (** Convert a [Simple.t] into a [Jsir.prim_arg]. *)
-let prim_arg ~env simple =
+let prim_arg ~env ~res simple =
   Simple.pattern_match' simple
-    ~var:(fun name ~coercion:_ -> Jsir.Pv (To_jsir_env.get_var_exn env name))
+    ~var:(fun name ~coercion:_ ->
+      Jsir.Pv (To_jsir_env.get_var_exn env name), res)
     ~symbol:(fun symbol ~coercion:_ ->
-      Jsir.Pv (To_jsir_env.get_symbol_exn env symbol))
-    ~const:(fun const -> Jsir.Pc (To_jsir_shared.reg_width_const const))
+      let var, res = To_jsir_env.get_symbol_exn env ~res symbol in
+      Jsir.Pv var, res)
+    ~const:(fun const -> Jsir.Pc (To_jsir_shared.reg_width_const const), res)
+
+let prim_args ~env ~res simples =
+  List.fold_right
+    (fun simple (args, res) ->
+      let arg, res = prim_arg ~env ~res simple in
+      arg :: args, res)
+    simples ([], res)
 
 let with_int_prefix ~(kind : Flambda_kind.Standard_int.t) ~percent_for_imms op =
   let prefix =
@@ -46,6 +55,10 @@ let use_prim ~env ~res prim args =
   let var, env, res = use_prim0 ~env ~res prim args in
   Some var, env, res
 
+let use_prim' ~env ~res prim simples =
+  let args, res = prim_args ~env ~res simples in
+  use_prim ~env ~res prim args
+
 let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
   let use_prim' prim = use_prim ~env ~res prim [] in
   match f with
@@ -65,7 +78,8 @@ let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
   | Cpu_relax -> use_prim' (Extern "caml_ml_domain_cpu_relax")
 
 let get_tag ~env ~res x =
-  use_prim0 ~env ~res (Extern "%direct_obj_tag") [prim_arg ~env x]
+  let x, res = prim_arg ~env ~res x in
+  use_prim0 ~env ~res (Extern "%direct_obj_tag") [x]
 
 let check_tag ~env ~res x ~tag =
   let tag_var, env, res = get_tag ~env ~res x in
@@ -97,39 +111,55 @@ let check_my_closure ~env x =
   (* It is not possible to project values out of other functions' closures in
      Jsoo, but certain inlining simplifications in Flambda may cause this. For
      now we disable inlining so this case should never occur. *)
-  match Simple.must_be_var x with
-  | None ->
-    Misc.fatal_error
-      "Expected to see [my_closure], instead found a non-variable"
-  | Some (v, _coercion) ->
-    if not (To_jsir_env.is_my_closure env v)
-    then
-      Misc.fatal_error
-        "Trying to project from a closure that doesn't belong to the body of \
-         the function being translated"
+  Simple.pattern_match' x
+    ~var:(fun name ~coercion:_ ->
+      if not (To_jsir_env.is_my_closure env name)
+      then
+        Misc.fatal_error
+          "Trying to project from a closure that doesn't belong to the body of \
+           the function being translated")
+    ~symbol:(fun _symbol ~coercion:_ ->
+      (* CR selee: We should check here that this is indeed the correct closure
+         symbol for the current function being translated, but we don't yet keep
+         track of this. We plan to refactor the handling of closures and pieces
+         of code so that we only translate the code once we see the
+         corresponding closure (treating each closure as a new instance of the
+         code), which should make this check much easier. For now, we assume
+         that we have the correct symbol. *)
+      ())
+    ~const:(fun const ->
+      Misc.fatal_errorf
+        "Trying to project from a closure, but found a constant %a (must be a \
+         closure variable or symbol)"
+        Reg_width_const.print const)
 
 let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
-  let use_prim' prim = use_prim ~env ~res prim [prim_arg ~env x] in
+  let use_prim' prim = use_prim' ~env ~res prim [x] in
   match f with
   | Block_load { kind; mut = _; field } ->
     let var = Jsir.Var.fresh () in
-    let expr : Jsir.expr =
-      match prim_arg ~env x with
-      | Pv v -> Field (v, Targetint_31_63.to_int field, block_access_kind kind)
-      | Pc _ -> Misc.fatal_error "Block_load on constant"
+    let expr, res =
+      match prim_arg ~env ~res x with
+      | Pv v, res ->
+        ( Jsir.Field (v, Targetint_31_63.to_int field, block_access_kind kind),
+          res )
+      | Pc _, _res -> Misc.fatal_error "Block_load on constant"
     in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Duplicate_block _ | Duplicate_array _ | Obj_dup ->
     use_prim' (Extern "caml_obj_dup")
   | Is_int _ -> use_prim' IsInt
-  | Is_null -> use_prim ~env ~res Eq [prim_arg ~env x; Pc Null]
+  | Is_null ->
+    let x, res = prim_arg ~env ~res x in
+    use_prim ~env ~res Eq [x; Pc Null]
   | Get_tag ->
     let var, env, res = get_tag ~env ~res x in
     Some var, env, res
   | Array_length _ -> use_prim' Vectlength
   | Bigarray_length { dimension } ->
+    let x, res = prim_arg ~env ~res x in
     use_prim ~env ~res (Extern "caml_ba_dim")
-      [prim_arg ~env x; Pc (Int (Targetint.of_int dimension))]
+      [x; Pc (Int (Targetint.of_int dimension))]
   | String_length _ -> use_prim' (Extern "caml_ml_string_length")
   | Int_as_pointer _ -> use_prim' (Extern "caml_int_as_pointer")
   | Opaque_identity { middle_end_only = true; kind = _ } -> identity ~env ~res x
@@ -240,15 +270,13 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
 
 let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
-  let use_prim' prim =
-    use_prim ~env ~res prim [prim_arg ~env x; prim_arg ~env y]
-  in
+  let use_prim' prim = use_prim' ~env ~res prim [x; y] in
   match f with
   | Block_set { kind; init = _; field } ->
-    let x =
-      match prim_arg ~env x with
-      | Pv x -> x
-      | Pc _ -> Misc.fatal_error "Block_set on constant"
+    let x, res =
+      match prim_arg ~env ~res x with
+      | Pv x, res -> x, res
+      | Pc _, _res -> Misc.fatal_error "Block_set on constant"
     in
     let y, res = To_jsir_shared.simple ~env ~res y in
     ( None,
@@ -351,8 +379,8 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
           env,
           To_jsir_result.add_instr_exn res (Jsir.Let (var_or, expr_or)) )
       in
-      let x = prim_arg ~env x in
-      let y = prim_arg ~env y in
+      let x, res = prim_arg ~env ~res x in
+      let y, res = prim_arg ~env ~res y in
       match comparison with
       | Eq -> use_prim ~env ~res Eq [x; y]
       | Neq -> use_prim ~env ~res Neq [x; y]
@@ -425,18 +453,16 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     primitive_not_supported ()
 
 let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
-  let use_prim' prim =
-    use_prim ~env ~res prim [prim_arg ~env x; prim_arg ~env y; prim_arg ~env z]
-  in
+  let use_prim' prim = use_prim' ~env ~res prim [x; y; z] in
   match f with
   | Array_set (kind, set_kind) -> (
     match kind, set_kind with
     | ( (Immediates | Values | Naked_floats | Naked_float32s),
         (Immediates | Values _ | Naked_floats | Naked_float32s) ) ->
-      let arr =
-        match prim_arg ~env x with
-        | Pv v -> v
-        | Pc _ -> Misc.fatal_error "Array_set on constant"
+      let arr, res =
+        match prim_arg ~env ~res x with
+        | Pv v, res -> v, res
+        | Pc _, _res -> Misc.fatal_error "Array_set on constant"
       in
       let index, res = To_jsir_shared.simple ~env ~res y in
       let new_value, res = To_jsir_shared.simple ~env ~res z in
@@ -525,3 +551,9 @@ let primitive ~env ~res (prim : Flambda_primitive.t) _dbg =
   | Binary (f, x, y) -> binary ~env ~res f x y
   | Ternary (f, x, y, z) -> ternary ~env ~res f x y z
   | Variadic (f, xs) -> variadic ~env ~res f xs
+
+let extern ~env ~res symbol args =
+  let args, res = prim_args ~env ~res args in
+  let name = Symbol.linkage_name_as_string symbol in
+  let var = Jsir.Var.fresh () in
+  var, To_jsir_result.add_instr_exn res (Let (var, Prim (Extern name, args)))

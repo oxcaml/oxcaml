@@ -56,9 +56,10 @@ let static_set_of_closures ~env ~res ~closure_symbols soc =
     (* We may have already encountered the symbol when translating the code, so
        we should check first whether a variable already exists; if so, we should
        make sure that the variable also points to the function variable *)
-    match To_jsir_env.get_symbol env symbol with
-    | Some var -> env, To_jsir_result.add_instr_exn res (Assign (var, fn_var))
-    | None -> To_jsir_env.add_symbol env symbol fn_var, res
+    match To_jsir_env.get_symbol env ~res symbol with
+    | Some (var, res) ->
+      env, To_jsir_result.add_instr_exn res (Assign (var, fn_var))
+    | None -> To_jsir_env.add_symbol env ~res symbol fn_var
   in
   let symbols = Function_slot.Lmap.data closure_symbols in
   set_of_closures ~env ~res ~bindings:symbols ~add_to_env soc

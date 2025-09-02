@@ -57,13 +57,40 @@ val add_var : t -> Variable.t -> Jsir.Var.t -> t
     in the environment. *)
 val add_var_alias_of_var_exn : t -> var:Variable.t -> alias_of:Variable.t -> t
 
+(** Map a Flambda2 symbol to a JSIR variable, and register it to the global symbol
+    table. *)
+val add_symbol :
+  t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t -> t * To_jsir_result.t
+
+(** Symbols added through this function must be registered to the global symbol table
+    after the definitions for them are added to the result, using [register_symbol_exn].
+    Otherwise, they will not be available to other compilation units. *)
+val add_symbol_without_registering : t -> Symbol.t -> Jsir.Var.t -> t
+
+(** Register the given symbol to the global symbol table. Raises if the symbol is not in
+    the environment.
+
+    Note that calling this function is usually a mistake, as most functions that
+    add symbols will automatically call this function. However, it is necessary for
+    [add_symbol_without_registering]. *)
+val register_symbol_exn :
+  t -> res:To_jsir_result.t -> Symbol.t -> To_jsir_result.t
+
+(** Set [var]/[symbol] to be an alias of [alias_of]. Raises if [alias_of] is from the current
+    compilation unit and is not found in the environment. *)
+val add_var_alias_of_symbol_exn :
+  t ->
+  res:To_jsir_result.t ->
+  var:Variable.t ->
+  alias_of:Symbol.t ->
+  t * To_jsir_result.t
+
 val add_symbol_alias_of_var_exn :
-  t -> symbol:Symbol.t -> alias_of:Variable.t -> t
-
-(** Map a Flambda2 symbol to a JSIR variable. *)
-val add_symbol : t -> Symbol.t -> Jsir.Var.t -> t
-
-val add_var_alias_of_symbol_exn : t -> var:Variable.t -> alias_of:Symbol.t -> t
+  t ->
+  res:To_jsir_result.t ->
+  symbol:Symbol.t ->
+  alias_of:Variable.t ->
+  t * To_jsir_result.t
 
 type code_id =
   { addr : Jsir.Addr.t;
@@ -99,10 +126,18 @@ val get_exn_handler_exn : t -> Continuation.t -> exn_handler
     an unbound variable. *)
 val get_var_exn : t -> Variable.t -> Jsir.Var.t
 
-(** Return the JSIR variable for the given Flambda symbol. *)
-val get_symbol : t -> Symbol.t -> Jsir.Var.t option
+(** Return the JSIR variable for the given Flambda symbol.
 
-val get_symbol_exn : t -> Symbol.t -> Jsir.Var.t
+    If the symbol is from the current compilation unit, we look it up in the environment;
+    otherwise, we fetch from the global symbol table. *)
+val get_symbol :
+  t ->
+  res:To_jsir_result.t ->
+  Symbol.t ->
+  (Jsir.Var.t * To_jsir_result.t) option
+
+val get_symbol_exn :
+  t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t * To_jsir_result.t
 
 (** Return the block address, parameter variables and closure variable corresponding to
     the given [Code_id.t]. *)
