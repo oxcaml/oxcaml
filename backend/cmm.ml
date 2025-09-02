@@ -515,7 +515,15 @@ type ccatch_flag =
   | Recursive
   | Exn_handler
 
-type expression =
+type static_handler =
+  { label : static_label;
+    params : (Backend_var.With_provenance.t * machtype) list;
+    body : expression;
+    dbg : Debuginfo.t;
+    is_cold : bool
+  }
+
+and expression =
   | Cconst_int of int * Debuginfo.t
   | Cconst_natint of nativeint * Debuginfo.t
   | Cconst_float32 of float * Debuginfo.t
@@ -540,15 +548,7 @@ type expression =
       * Debuginfo.t
   | Cswitch of
       expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
-  | Ccatch of
-      ccatch_flag
-      * (static_label
-        * (Backend_var.With_provenance.t * machtype) list
-        * expression
-        * Debuginfo.t
-        * bool (* is_cold *))
-        list
-      * expression
+  | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
 
 type codegen_option =
@@ -599,11 +599,18 @@ type phrase =
   | Cdata of data_item list
 
 let ccatch (i, ids, e1, e2, dbg, is_cold) =
-  Ccatch (Normal, [i, ids, e2, dbg, is_cold], e1)
+  Ccatch (Normal, [{ label = i; params = ids; body = e2; dbg; is_cold }], e1)
 
 let ctrywith (body, lbl, id, extra_args, handler, dbg) =
   Ccatch
-    (Exn_handler, [lbl, (id, typ_val) :: extra_args, handler, dbg, false], body)
+    ( Exn_handler,
+      [ { label = lbl;
+          params = (id, typ_val) :: extra_args;
+          body = handler;
+          dbg;
+          is_cold = false
+        } ],
+      body )
 
 let reset () = Label.reset ()
 
@@ -622,7 +629,7 @@ let iter_shallow_tail f = function
     Array.iter (fun (e, _dbg) -> f e) el;
     true
   | Ccatch (_flag, handlers, body) ->
-    List.iter (fun (_, _, h, _dbg, _) -> f h) handlers;
+    List.iter (fun { body = h; _ } -> f h) handlers;
     f body;
     true
   | Cexit _ | Cop (Craise _, _, _) -> true
@@ -655,8 +662,8 @@ let map_shallow_tail f = function
   | Cswitch (e, tbl, el, dbg') ->
     Cswitch (e, tbl, Array.map (fun (e, dbg) -> f e, dbg) el, dbg')
   | Ccatch (flag, handlers, body) ->
-    let map_h (n, ids, handler, dbg, is_cold) =
-      n, ids, f handler, dbg, is_cold
+    let map_h { label; params; body = handler; dbg; is_cold } =
+      { label; params; body = f handler; dbg; is_cold }
     in
     Ccatch (flag, List.map map_h handlers, f body)
   | (Cexit _ | Cop (Craise _, _, _)) as cmm -> cmm
@@ -713,7 +720,7 @@ let iter_shallow f = function
     f ifnot
   | Cswitch (_e, _ia, ea, _dbg) -> Array.iter (fun (e, _) -> f e) ea
   | Ccatch (_f, hl, body) ->
-    let iter_h (_n, _ids, handler, _dbg, _is_cold) = f handler in
+    let iter_h { body = handler; _ } = f handler in
     List.iter iter_h hl;
     f body
   | Cexit (_n, el, _traps) -> List.iter f el
@@ -733,8 +740,8 @@ let map_shallow f = function
   | Cswitch (e, ia, ea, dbg) ->
     Cswitch (e, ia, Array.map (fun (e, dbg) -> f e, dbg) ea, dbg)
   | Ccatch (flag, hl, body) ->
-    let map_h (n, ids, handler, dbg, is_cold) =
-      n, ids, f handler, dbg, is_cold
+    let map_h { label; params; body = handler; dbg; is_cold } =
+      { label; params; body = f handler; dbg; is_cold }
     in
     Ccatch (flag, List.map map_h hl, f body)
   | Cexit (n, el, traps) -> Cexit (n, List.map f el, traps)

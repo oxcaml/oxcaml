@@ -198,9 +198,7 @@ and row_like_for_closures =
   }
 
 and closures_entry =
-  { (* CR pchambart: Forbid the Bottom case in function types (propagate to the
-       whole environment *)
-    function_types : function_type Or_unknown_or_bottom.t Function_slot.Map.t;
+  { function_types : function_type Or_unknown.t Function_slot.Map.t;
     closure_types : function_slot_indexed_product;
     value_slot_types : value_slot_indexed_product
   }
@@ -548,10 +546,10 @@ and free_names_int_indexed_product ~follow_value_slots fields =
     Name_occurrences.empty fields
 
 and free_names_function_type ~follow_value_slots
-    (function_type : _ Or_unknown_or_bottom.t) =
+    (function_type : _ Or_unknown.t) =
   match function_type with
-  | Bottom | Unknown -> Name_occurrences.empty
-  | Ok { code_id; rec_info } ->
+  | Unknown -> Name_occurrences.empty
+  | Known { code_id; rec_info } ->
     Name_occurrences.add_code_id
       (free_names0 ~follow_value_slots rec_info)
       code_id Name_mode.normal
@@ -903,7 +901,7 @@ and apply_renaming_closures_entry
   { function_types =
       Function_slot.Map.map_sharing
         (fun function_type ->
-          Or_unknown_or_bottom.map function_type ~f:(fun function_type ->
+          Or_unknown.map function_type ~f:(fun function_type ->
               apply_renaming_function_type function_type renaming))
         function_types;
     closure_types =
@@ -1283,7 +1281,7 @@ and print_closures_entry ppf { function_types; closure_types; value_slot_types }
   Format.fprintf ppf
     "@[<hov 1>(@[<hov 1>(function_types@ %a)@]@ @[<hov 1>(closure_types@ \
      %a)@]@ @[<hov 1>(value_slot_types@ %a)@])@]"
-    (Function_slot.Map.print (Or_unknown_or_bottom.print print_function_type))
+    (Function_slot.Map.print (Or_unknown.print print_function_type))
     function_types print_function_slot_indexed_product closure_types
     print_value_slot_indexed_product value_slot_types
 
@@ -1496,10 +1494,10 @@ and ids_for_export_closures_entry
     { function_types; closure_types; value_slot_types } =
   let function_types_ids =
     Function_slot.Map.fold
-      (fun _function_slot (function_type : _ Or_unknown_or_bottom.t) ids ->
+      (fun _function_slot (function_type : _ Or_unknown.t) ids ->
         match function_type with
-        | Unknown | Bottom -> ids
-        | Ok function_type ->
+        | Unknown -> ids
+        | Known function_type ->
           Ids_for_export.union ids (ids_for_export_function_type function_type))
       function_types Ids_for_export.empty
   in
@@ -1906,22 +1904,21 @@ and apply_coercion_to_value_slot_types_in_set product _coercion : _ Or_bottom.t
      depth of [inner]. *)
   Ok product
 
-and apply_coercion_function_type
-    (function_type : function_type Or_unknown_or_bottom.t)
-    (coercion : Coercion.t) : _ Or_bottom.t =
+and apply_coercion_function_type (function_type : function_type Or_unknown.t)
+    (coercion : Coercion.t) : _ Or_unknown.t Or_bottom.t =
   match coercion with
   | Id -> Ok function_type
   | Change_depth { from; to_ } -> (
     match function_type with
-    | Unknown | Bottom -> Ok function_type
-    | Ok { code_id; rec_info } ->
+    | Unknown -> Ok function_type
+    | Known { code_id; rec_info } ->
       (* CR lmaurer: We should really be checking that [from] matches the
          current [rec_info], but that requires either passing in a typing
          environment or making absolutely sure that rec_infos get
          canonicalized. *)
       ignore (from, rec_info);
       let rec_info = Rec_info (TD.create to_) in
-      Ok (Or_unknown_or_bottom.Ok { code_id; rec_info }))
+      Ok (Known { code_id; rec_info }))
 
 and apply_coercion_env_extension { equations } coercion : _ Or_bottom.t =
   let<+ equations =
@@ -2384,7 +2381,7 @@ and remove_unused_value_slots_and_shortcut_aliases_closures_entry
   { function_types =
       Function_slot.Map.map_sharing
         (fun function_type ->
-          Or_unknown_or_bottom.map function_type ~f:(fun function_type ->
+          Or_unknown.map function_type ~f:(fun function_type ->
               remove_unused_value_slots_and_shortcut_aliases_function_type
                 function_type ~used_value_slots ~canonicalise))
         function_types;
@@ -2991,7 +2988,7 @@ and project_closures_entry ~to_project ~expand
   let function_types' =
     Function_slot.Map.map_sharing
       (fun function_type ->
-        Or_unknown_or_bottom.map_sharing function_type ~f:(fun function_type ->
+        Or_unknown.map_sharing function_type ~f:(fun function_type ->
             project_function_type ~to_project ~expand function_type))
       function_types
   in
@@ -3146,7 +3143,8 @@ module Closures_entry = struct
   let find_function_type t ~exact function_slot : _ Or_unknown_or_bottom.t =
     match Function_slot.Map.find function_slot t.function_types with
     | exception Not_found -> if exact then Bottom else Unknown
-    | func_decl -> func_decl
+    | Unknown -> Unknown
+    | Known func_decl -> Ok func_decl
 
   let value_slot_types { value_slot_types; _ } =
     value_slot_types.value_slot_components_by_index

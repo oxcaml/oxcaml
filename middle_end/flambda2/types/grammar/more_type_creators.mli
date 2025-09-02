@@ -149,7 +149,7 @@ val variant :
 val exactly_this_closure :
   Function_slot.t ->
   all_function_slots_in_set:
-    Type_grammar.function_type Or_unknown_or_bottom.t Function_slot.Map.t ->
+    Type_grammar.function_type Or_unknown.t Function_slot.Map.t ->
   all_closure_types_in_set:Type_grammar.t Function_slot.Map.t ->
   all_value_slots_in_set:Type_grammar.t Value_slot.Map.t ->
   Alloc_mode.For_types.t ->

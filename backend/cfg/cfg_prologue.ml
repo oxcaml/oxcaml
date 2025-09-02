@@ -140,7 +140,9 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
      is both inefficient as well as possibly incorrect.
 
      Having a non-zero stack offset means that the prologue is added after a
-     [Pushtrap] or [Stackoffset] which shouldn't be allowed. *)
+     [Pushtrap] or [Stackoffset] which shouldn't be allowed. This is because the
+     prologue is added at the stack pointer, which would overlap with the
+     handler pushed by a [Pushtrap]. *)
   if Cfg_loop_infos.is_in_loop loop_infos prologue_label
      || prologue_block.stack_offset <> 0
   then false
@@ -154,7 +156,8 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
      *  Block C: Return
 
        We have the choice of putting the prologue in Block A or B, and we would
-       place an epilogue in Block C.
+       place an epilogue in Block C (or we could create a new block with the
+       epilogue).
 
        If we try to place the prologue in block B, the prologue would not
        dominate the epilogue in block C, so in some cases the epilogue would be
@@ -169,26 +172,18 @@ let can_place_prologue =
 
 let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
   let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
-      (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
+      (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
+      (reachable_epilogues : Reachable_epilogues.t) =
     let block = Cfg.get_block_exn cfg tree.label in
     let epilogue_blocks =
-      Label.Set.filter
-        (fun label ->
-          let block = Cfg.get_block_exn cfg label in
-          let fun_name = Cfg.fun_name cfg in
-          match
-            Instruction_requirements.terminator block.terminator fun_name
-          with
-          | Requires_no_prologue -> true
-          | No_requirements | Requires_prologue -> false)
-        (descendants cfg block)
+      Reachable_epilogues.from_block reachable_epilogues tree.label
     in
     if prologue_needed_block block ~fun_name:cfg.fun_name
     then Some (tree.label, epilogue_blocks)
     else
       let children_prologue_block =
         List.filter_map
-          (fun tree -> visit tree cfg doms loop_infos)
+          (fun tree -> visit tree cfg doms loop_infos reachable_epilogues)
           tree.children
       in
       match children_prologue_block with

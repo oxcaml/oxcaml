@@ -529,8 +529,7 @@ val mutable_string : size:int -> t
 
 val exactly_this_closure :
   Function_slot.t ->
-  all_function_slots_in_set:
-    Function_type.t Or_unknown_or_bottom.t Function_slot.Map.t ->
+  all_function_slots_in_set:Function_type.t Or_unknown.t Function_slot.Map.t ->
   all_closure_types_in_set:t Function_slot.Map.t ->
   all_value_slots_in_set:flambda_type Value_slot.Map.t ->
   Alloc_mode.For_types.t ->
