@@ -1,0 +1,16 @@
+(lldb) b Test_stepping_dwarf.f_start
+(lldb) run
+(lldb) b Test_stepping_dwarf.f_step_through_mutations
+(lldb) c
+(lldb) script print("=== Stepping through mutations ===")
+(lldb) frame variable
+(lldb) n
+(lldb) frame variable counter
+(lldb) n
+(lldb) frame variable counter
+(lldb) n
+(lldb) frame variable counter
+(lldb) n
+(lldb) frame variable counter
+(lldb) c
+(lldb) quit
