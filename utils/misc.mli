@@ -29,9 +29,6 @@ val fatal_errorf: ('a, Format.formatter, unit, 'b) format4 -> 'a
   (** Format the arguments according to the given format string
       and raise [Fatal_error] with the resulting string. *)
 
-val unboxed_small_int_arrays_are_not_implemented : unit -> _
-  (** Unboxed small int arrays are not implemented. *)
-
 exception Fatal_error
 
 (** {1 Exceptions and finalization} *)
@@ -541,6 +538,12 @@ module Int_literal_converter : sig
     (** Convert a string to an integer.  Unlike {!Stdlib.int_of_string},
         this function accepts the string representation of [max_int + 1]
         and returns [min_int] in this case. *)
+  
+  val int8 : string -> int
+    (** Likewise, but only accepts values which fit in an [int8] *)
+  
+  val int16 : string -> int
+    (** Likewise, but only accepts values which fit in an [int16] *)
 
   val int32 : string -> int32
     (** Likewise, at type [int32] *)

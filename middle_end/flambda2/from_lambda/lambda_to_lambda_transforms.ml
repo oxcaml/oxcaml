@@ -176,21 +176,29 @@ let rec_catch_for_for_loop env loc ident duid start stop
   in
   env, lam
 
+type packed_array_element_width = Eight | Sixteen | Thirty_two
+
 type initialize_array_element_width =
-  | Thirty_two of { zero_init : L.lambda }
+  | Thirty_two_or_less of { width : packed_array_element_width; zero_init : L.lambda }
   | Sixty_four_or_more
 
 let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
     creation_expr =
   let array = Ident.create_local "array" in
   let array_duid = Lambda.debug_uid_none in
-  (* If the element size is 32-bit, zero-initialize the last 64-bit word, to
+  (* If the element size is 32-bit or less, zero-initialize the last 64-bit word, to
      ensure reproducibility. *)
   (* CR mshinwell: why does e.g. caml_make_unboxed_int32_vect not do this? *)
   let maybe_zero_init_last_field =
     match width with
     | Sixty_four_or_more -> L.lambda_unit
-    | Thirty_two { zero_init } ->
+    | Thirty_two_or_less { width; zero_init } ->
+      let elements_per_word =
+        match width with
+        | Eight -> 8
+        | Sixteen -> 4
+        | Thirty_two -> 2
+      in
       let zero_init_last_field =
         L.Lprim
           ( Parraysetu (array_set_kind, Ptagged_int_index),
@@ -198,17 +206,17 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
             [Lprim (Popaque L.layout_unit, [Lvar array], loc); length; zero_init],
             loc )
       in
-      let length_is_greater_than_zero_and_is_one_mod_two =
+      let length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word =
         L.Lprim
           ( Psequand,
             [ L.icmp ~loc Cgt L.int length (L.tagged_immediate 0);
               L.icmp ~loc Cne L.int
-                (L.and_ L.int length (L.tagged_immediate 1) ~loc)
+                (L.and_ L.int length (L.tagged_immediate (elements_per_word - 1)) ~loc)
                 (L.tagged_immediate 0) ],
             loc )
       in
       L.Lifthenelse
-        ( length_is_greater_than_zero_and_is_one_mod_two,
+        ( length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word,
           zero_init_last_field,
           L.lambda_unit,
           L.layout_unit )
@@ -482,23 +490,42 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
   | Punboxedfloatarray Unboxed_float32 ->
     makearray_dynamic_singleton_uninitialized "unboxed_float32" ~length mode loc
     |> initialize_array env loc ~length (Punboxedfloatarray_set Unboxed_float32)
-         (Thirty_two
-            { zero_init = Lconst (Const_base (Const_unboxed_float32 "0")) })
+         (Thirty_two_or_less
+            { width = Thirty_two
+            ; zero_init = Lconst (Const_base (Const_unboxed_float32 "0"))
+            })
          ~init
   | Punboxedfloatarray Unboxed_float64 ->
     makearray_dynamic_singleton_uninitialized "unboxed_float64" ~length mode loc
     |> initialize_array env loc ~length (Punboxedfloatarray_set Unboxed_float64)
          Sixty_four_or_more ~init
+  | Punboxedoruntaggedintarray Untagged_int ->
+    makearray_dynamic_singleton_uninitialized "untagged_int" ~length mode loc
+    |> initialize_array env loc ~length
+         (Punboxedoruntaggedintarray_set Untagged_int) Sixty_four_or_more ~init
+  | Punboxedoruntaggedintarray Untagged_int8 ->
+    makearray_dynamic_singleton_uninitialized "untagged_int8" ~length mode loc
+    |> initialize_array env loc ~length
+         (Punboxedoruntaggedintarray_set Untagged_int8)
+         (Thirty_two_or_less
+            { width = Eight; zero_init = Lconst (Const_base (Const_untagged_int8 0)) })
+         ~init
+  | Punboxedoruntaggedintarray Untagged_int16 ->
+    makearray_dynamic_singleton_uninitialized "untagged_int16" ~length mode loc
+    |> initialize_array env loc ~length
+         (Punboxedoruntaggedintarray_set Untagged_int16)
+         (Thirty_two_or_less
+            { width = Sixteen; zero_init = Lconst (Const_base (Const_untagged_int16 0)) })
+         ~init
   | Punboxedoruntaggedintarray Unboxed_int32 ->
     makearray_dynamic_singleton_uninitialized "unboxed_int32" ~length mode loc
     |> initialize_array env loc ~length
          (Punboxedoruntaggedintarray_set Unboxed_int32)
-         (Thirty_two
-            { zero_init = Lconst (Const_base (Const_unboxed_int32 0l)) })
+         (Thirty_two_or_less
+            { width = Thirty_two
+            ; zero_init = Lconst (Const_base (Const_unboxed_int32 0l)) 
+            })
          ~init
-  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
-    ->
-    Misc.unboxed_small_int_arrays_are_not_implemented ()
   | Punboxedoruntaggedintarray Unboxed_int64 ->
     makearray_dynamic_singleton_uninitialized "unboxed_int64" ~length mode loc
     |> initialize_array env loc ~length
