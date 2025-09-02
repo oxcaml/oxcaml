@@ -3548,7 +3548,7 @@ module CIS = Code_id_or_symbol
 module GroupMap = Numbers.Int.Map
 module SCC = Strongly_connected_components.Make (Numbers.Int)
 
-let bind_code_and_static_consts all_code sets_of_closures acc body =
+let bind_static_consts_and_code acc body =
   let fresh_group_id =
     let i = ref 0 in
     fun () ->
@@ -3571,7 +3571,7 @@ let bind_code_and_static_consts all_code sets_of_closures acc body =
         ( acc,
           GroupMap.add id (bound, const) g2c,
           CIS.Map.add (CIS.create_code_id code_id) id s2g ))
-      all_code
+      (Acc.code acc)
       (acc, GroupMap.empty, CIS.Map.empty)
   in
   let acc, group_to_bound_consts, symbol_to_groups =
@@ -3603,7 +3603,7 @@ let bind_code_and_static_consts all_code sets_of_closures acc body =
               CIS.Map.add (CIS.create_symbol symbol) id s2g)
             symbols s2g ))
       (group_to_bound_consts, symbol_to_groups)
-      sets_of_closures
+      (Acc.lifted_sets_of_closures acc)
   in
   let graph =
     (* Compute dependencies for all code IDs and symbols based on free names of
@@ -3758,9 +3758,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
      define the module block symbol. *)
   let body acc =
     let acc, body = program acc env in
-    bind_code_and_static_consts (Acc.code acc)
-      (Acc.lifted_sets_of_closures acc)
-      acc body
+    bind_static_consts_and_code acc body
   in
   Let_cont_with_acc.build_non_recursive acc prog_return_cont
     ~handler_params:load_fields_handler_param ~handler:load_fields_body ~body
@@ -3807,6 +3805,11 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode) ~big_endian
     | [] ->
       (* CR vlaviron/mshinwell: Maybe this could use an empty array.
          Furthermore, can this hack be removed? *)
+      (* This can't use [register_const] because:
+
+         - we have already called [bind_static_consts_and_code]; and
+
+         - this symbol definition must be the very first. *)
       let acc, symbol = manufacture_symbol acc "first_const" in
       let bound_static =
         Bound_static.singleton (Bound_static.Pattern.block_like symbol)
