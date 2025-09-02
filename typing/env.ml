@@ -204,7 +204,7 @@ let map_summary f = function
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * int
+  | Adot of address * Jkind.Sort.t array * int
 
 module TycompTbl =
   struct
@@ -717,7 +717,10 @@ and functor_components = {
 }
 
 and address_unforced =
-  | Projection of { parent : address_lazy; pos : int; }
+  | Projection of
+    { parent : address_lazy;
+      field_sorts: Jkind.Sort.t array;
+      pos : int }
   | ModAlias of { env : t; path : Path.t; }
 
 and address_lazy = (address_unforced, address) Lazy_backtrack.t
@@ -1044,7 +1047,7 @@ let normalize_mda_mode mda =
 let rec print_address ppf = function
   | Aunit cu -> Format.fprintf ppf "%s" (Compilation_unit.full_path_as_string cu)
   | Alocal id -> Format.fprintf ppf "%s" (Ident.name id)
-  | Adot(a, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
+  | Adot(a, _, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
 
 type address_head =
   | AHunit of Compilation_unit.t
@@ -1053,7 +1056,7 @@ type address_head =
 let rec address_head = function
   | Aunit cu -> AHunit cu
   | Alocal id -> AHlocal id
-  | Adot (a, _) -> address_head a
+  | Adot (a, _, _) -> address_head a
 
 (* The name of the compilation unit currently compiled. *)
 module Current_unit_name : sig
@@ -1607,7 +1610,8 @@ and find_ident_module_address id env =
   get_address (find_ident_module id env).mda_address
 
 and force_address = function
-  | Projection { parent; pos } -> Adot(get_address parent, pos)
+  | Projection { parent; field_sorts; pos } ->
+    Adot(get_address parent, field_sorts, pos)
   | ModAlias { env; path } -> find_module_address path env
 
 and get_address a =
@@ -2154,9 +2158,16 @@ let rec components_of_module_maker
       in
       let env = ref cm_env in
       let pos = ref 0 in
+      let field_sorts =
+        List.filter_map
+          (fun (item, _) -> Subst.Lazy.sort_of_signature_item item)
+          items_and_paths
+        |> Array.of_list
+      in
       let next_address () =
         let addr : address_unforced =
-          Projection { parent = cm_addr; pos = !pos }
+          Projection
+            { parent = cm_addr; field_sorts; pos = !pos }
         in
         incr pos;
         Lazy_backtrack.create addr
@@ -2168,7 +2179,11 @@ let rec components_of_module_maker
             let addr =
               match decl.val_kind with
               | Val_prim _ -> Lazy_backtrack.create_failed primitive_address_error
-              | _ -> next_address ()
+              | Val_reg _ -> next_address ()
+              | Val_ivar _ | Val_self _ | Val_anc _ ->
+                next_address ()
+              | Val_mut _ ->
+                Misc.fatal_error "Mutable variable found at the structure level"
             in
             let vda_shape = Shape.proj cm_shape (Shape.Item.value id) in
             let vda =
@@ -4265,7 +4280,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
       | Val_mut _, _ -> assert false
       (* Unreachable because only [type_pat] creates mutable variables
          and it checks that they are simple identifiers. *)
-      | ((Val_reg | Val_prim _ | Val_self _ | Val_anc _), _) ->
+      | ((Val_reg _ | Val_prim _ | Val_self _ | Val_anc _), _) ->
           lookup_error loc env (Not_a_settable_variable name)
     end
   | Ok (_, _, Val_unbound Val_unbound_instance_variable) ->
