@@ -1,5 +1,3 @@
-(* CR selee: clarify licensing permissions *)
-
 (* Js_of_ocaml compiler
  * http://www.ocsigen.org/js_of_ocaml/
  * Copyright (C) 2013 Hugo Heuzard
@@ -19,7 +17,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-open! Jsoo_stdlib
+open! Stdlib
 
 let keyword =
   List.fold_left
