@@ -209,3 +209,4 @@ let i16 = Stdlib_stable.Int16.minus_one;;
 val i16 : int16 = -1
 |}];;
 
+(* CR jrayman: int8 literal, int16 literal *)
