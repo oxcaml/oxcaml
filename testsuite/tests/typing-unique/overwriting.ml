@@ -144,6 +144,7 @@ Line 3, characters 13-14:
                  ^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be in the parent region or "global".
 |}]
 

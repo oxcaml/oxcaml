@@ -441,6 +441,7 @@ Line 10, characters 24-26:
 Error: This value is "local"
        because it closes over the value "foo" (at Line 5, characters 25-28)
        which is "local".
+
        However, it is expected to be "global".
 |}]
 

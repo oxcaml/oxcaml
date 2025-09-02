@@ -176,6 +176,7 @@ Error: This value is "nonportable"
        because it closes over the class "cla" (at Line 2, characters 21-24)
        which is "nonportable"
        because it is a class and thus always of legacy modes.
+
        However, it is expected to be "portable".
 |}]
 

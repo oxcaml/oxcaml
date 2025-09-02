@@ -16,6 +16,7 @@ Line 1, characters 12-31:
                 ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -26,6 +27,7 @@ Line 1, characters 12-29:
                 ^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -38,6 +40,7 @@ Line 2, characters 18-26:
                       ^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -50,6 +53,7 @@ Line 2, characters 14-47:
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -62,6 +66,7 @@ Line 2, characters 18-30:
                       ^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -74,6 +79,7 @@ Line 2, characters 14-54:
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -85,6 +91,7 @@ Line 1, characters 12-27:
                 ^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -111,6 +118,7 @@ Line 1, characters 12-29:
                 ^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -134,6 +142,7 @@ Line 1, characters 12-30:
                 ^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -163,6 +172,7 @@ Line 3, characters 12-34:
                 ^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -191,6 +201,7 @@ Line 2, characters 20-32:
                         ^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -206,6 +217,7 @@ Line 1, characters 12-33:
                 ^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -222,6 +234,7 @@ Line 1, characters 11-24:
                ^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
@@ -241,6 +254,7 @@ Line 3, characters 4-5:
         ^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be in the parent region or "global"
        because it is the function in a tail call.
 |}]
@@ -253,6 +267,7 @@ Line 2, characters 4-23:
         ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be in the parent region or "global"
        because it is the function in a tail call.
 |}]
@@ -265,6 +280,7 @@ Line 2, characters 16-34:
                     ^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -277,6 +293,7 @@ Line 2, characters 24-42:
                             ^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be "global".
 |}]
 
@@ -289,6 +306,7 @@ Line 3, characters 6-24:
           ^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be in the parent region or "global"
        because it is an argument in a tail call.
 |}]
@@ -403,6 +421,7 @@ Line 3, characters 2-5:
       ^^^
 Error: This value is "local"
        because it is a stack expression.
+
        However, it is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.

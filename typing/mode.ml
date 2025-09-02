@@ -2155,7 +2155,7 @@ module Report = struct
         (Misc.Style.as_inline_code !print_longident)
         target_lid);
     (match print_ahint_sided obj ppf actual with
-    | Mode_with_hint -> fprintf ppf ".@\nHowever, it "
+    | Mode_with_hint -> fprintf ppf ".@\n@\nHowever, it "
     | Mode -> fprintf ppf "@ but "
     | Nothing -> assert false);
     ignore (print_ahint_sided obj ppf expected);
