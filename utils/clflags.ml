@@ -258,16 +258,16 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_max_cms_files_per_unit := 20;
       gdwarf_config_max_cms_files_per_variable := 5;
       gdwarf_config_max_type_to_shape_depth := 10;
-      gdwarf_config_max_shape_reduce_steps_per_variable := None;
-      gdwarf_config_max_evaluation_steps_per_variable := None
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some (1000);
+      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000)
   | Fidelity_high ->
       gdwarf_config_shape_eval_depth := 3;
       gdwarf_config_shape_reduce_depth := 3;
       gdwarf_config_max_cms_files_per_unit := 50;
       gdwarf_config_max_cms_files_per_variable := 10;
       gdwarf_config_max_type_to_shape_depth := 10;
-      gdwarf_config_max_shape_reduce_steps_per_variable := None;
-      gdwarf_config_max_evaluation_steps_per_variable := None
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some (10_000);
+      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000_000)
   | Fidelity_very_high ->
       gdwarf_config_shape_eval_depth := 4;
       gdwarf_config_shape_reduce_depth := 3;
