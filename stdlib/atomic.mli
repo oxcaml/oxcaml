@@ -24,7 +24,7 @@
   @since 4.12 *)
 
 (** An atomic (mutable) reference to a value of type ['a]. *)
-type (!'a : value_or_null) t : mutable_data mod contended with 'a =
+type (!'a : value_or_null) t : sync_data with 'a =
   { mutable contents : 'a [@atomic] }
 
 (** Create an atomic reference. *)
