@@ -199,6 +199,8 @@ module Path_no_more_prologue = struct
     let cfg, tbl = t in
     let block = Cfg.get_block_exn cfg label in
     InstructionId.Tbl.find tbl block.terminator.id
+    || Instruction_requirements.terminator block.terminator cfg.fun_name
+       = Instruction_requirements.Requires_prologue
 end
 
 (* CR-someday cfalas: This implementation can take O(n^2) memory if there are
@@ -229,6 +231,7 @@ module Reachable_epilogues = struct
             let succ_epilogues = Label.Tbl.find t succ_label in
             let new_epilogue =
               if Path_no_more_prologue.needs_prologue prologues_needed label
+                 || block.terminator.stack_offset <> 0
               then Label.Set.union (Label.Tbl.find t label) succ_epilogues
               else Label.Set.singleton label
             in
@@ -647,6 +650,8 @@ module Validator = struct
           match domain, Instruction_requirements.basic instr with
           | No_prologue_on_stack, Prologue when instr.stack_offset <> 0 ->
             error_with_instruction "prologue has a non-zero stack offset" instr
+          | Prologue_on_stack, Epilogue when instr.stack_offset <> 0 ->
+            error_with_instruction "epilogue has a non-zero stack offset" instr
           | No_prologue_on_stack, Prologue -> Prologue_on_stack
           | No_prologue_on_stack, Epilogue ->
             error_with_instruction
