@@ -172,18 +172,26 @@ let can_place_prologue =
 
 let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
   let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
-      (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
-      (reachable_epilogues : Reachable_epilogues.t) =
+      (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
     let block = Cfg.get_block_exn cfg tree.label in
     let epilogue_blocks =
-      Reachable_epilogues.from_block reachable_epilogues tree.label
+      Label.Set.filter
+        (fun label ->
+          let block = Cfg.get_block_exn cfg label in
+          let fun_name = Cfg.fun_name cfg in
+          match
+            Instruction_requirements.terminator block.terminator fun_name
+          with
+          | Requires_no_prologue -> true
+          | No_requirements | Requires_prologue -> false)
+        (descendants cfg block)
     in
     if prologue_needed_block block ~fun_name:cfg.fun_name
     then Some (tree.label, epilogue_blocks)
     else
       let children_prologue_block =
         List.filter_map
-          (fun tree -> visit tree cfg doms loop_infos reachable_epilogues)
+          (fun tree -> visit tree cfg doms loop_infos)
           tree.children
       in
       match children_prologue_block with
