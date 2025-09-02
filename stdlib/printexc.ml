@@ -57,7 +57,7 @@ let use_printers x =
          | None | exception _ -> conv tl
          | Some s -> Some s)
     | [] -> None in
-  conv (Atomic.Contended.get printers)
+  conv (Atomic.get printers)
 
 let destruct_ext_constructor x =
   if Obj.tag x <> 0 then
@@ -297,9 +297,9 @@ external record_backtrace: bool -> unit @@ portable = "caml_record_backtrace"
 external backtrace_status: unit -> bool @@ portable = "caml_backtrace_status"
 
 let rec register_printer_safe fn =
-  let old_printers = Atomic.Contended.get printers in
+  let old_printers = Atomic.get printers in
   let new_printers = { Modes.Portable.portable = fn } :: old_printers in
-  let success = Atomic.Contended.compare_and_set printers old_printers new_printers in
+  let success = Atomic.compare_and_set printers old_printers new_printers in
   if not success then register_printer_safe fn
 
 let register_printer_unsafe fn = register_printer_safe (Obj.magic_portable fn)
@@ -353,7 +353,7 @@ let uncaught_exception_handler =
   Atomic.make { Modes.Portable.portable = default_uncaught_exception_handler }
 
 let set_uncaught_exception_handler_safe fn =
-  Atomic.Contended.set uncaught_exception_handler { Modes.Portable.portable = fn }
+  Atomic.set uncaught_exception_handler { Modes.Portable.portable = fn }
 
 let set_uncaught_exception_handler_unsafe fn =
   set_uncaught_exception_handler_safe (Obj.magic_portable fn)
@@ -378,7 +378,7 @@ let handle_uncaught_exception' exn debugger_in_use =
     in
     (try Stdlib.do_at_exit () with _ -> ());
     try
-      (Atomic.Contended.get uncaught_exception_handler).portable exn raw_backtrace
+      (Atomic.get uncaught_exception_handler).portable exn raw_backtrace
     with exn' ->
       let raw_backtrace' = try_get_raw_backtrace () in
       eprintf "Fatal error: exception %s\n" (to_string exn);

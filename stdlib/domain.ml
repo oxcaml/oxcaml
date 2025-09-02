@@ -101,7 +101,7 @@ module Runtime_4 = struct
   let first_spawn_function = ref (fun () -> ())
 
   let before_first_spawn f =
-    if Atomic.Contended.get first_domain_spawned then
+    if Atomic.get first_domain_spawned then
       raise (Invalid_argument "first domain already spawned")
     else begin
       let old_f = !first_spawn_function in
@@ -239,8 +239,8 @@ module Runtime_5 = struct
     let parent_keys = Atomic.make ([] : key_initializer_list)
 
     let rec add_parent_key ki =
-      let l = Atomic.Contended.get parent_keys in
-      if not (Atomic.Contended.compare_and_set parent_keys l (ki :: l))
+      let l = Atomic.get parent_keys in
+      if not (Atomic.compare_and_set parent_keys l (ki :: l))
       then add_parent_key ki
 
     let new_key' ?split_from_parent init_orphan =
@@ -334,7 +334,7 @@ module Runtime_5 = struct
     let get_initial_keys access : key_value list =
       List.map
         (fun (KI (k, split)) -> KV (k, (split (get access k))))
-        (Atomic.Contended.get parent_keys : key_initializer_list)
+        (Atomic.get parent_keys : key_initializer_list)
 
     let set_initial_keys access (l: key_value list) =
       List.iter (fun (KV (k, v)) -> set access k (v access)) l
@@ -356,7 +356,7 @@ module Runtime_5 = struct
   let first_spawn_function = Obj.magic_portable (ref (fun () -> ()))
 
   let before_first_spawn f =
-    if Atomic.Contended.get first_domain_spawned then
+    if Atomic.get first_domain_spawned then
       raise (Invalid_argument "first domain already spawned")
     else begin
       let old_f = !first_spawn_function in
@@ -365,8 +365,8 @@ module Runtime_5 = struct
     end
 
   let do_before_first_spawn () =
-    if not (Atomic.Contended.get first_domain_spawned) then begin
-      Atomic.Contended.set first_domain_spawned true;
+    if not (Atomic.get first_domain_spawned) then begin
+      Atomic.set first_domain_spawned true;
       let first_spawn_function = Obj.magic_uncontended first_spawn_function in
       !first_spawn_function();
       (* Release the old function *)

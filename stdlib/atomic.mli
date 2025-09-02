@@ -102,42 +102,11 @@ val incr : int t @ local -> unit
 (** [decr r] atomically decrements the value of [r] by [1]. *)
 val decr : int t @ local -> unit
 
-(** Operations that act over contended atomics. This imposes some extra mode
-    constraints for safety. *)
-module Contended : sig
-  (** Like {!get}, but can be called on an atomic that came from another domain. *)
-  external get
-    : ('a : value_or_null mod portable).
-    'a t @ contended local -> 'a @ contended
-    = "%atomic_load"
-
-  (** Like {!set}, but can be called on an atomic that came from another domain. *)
-  external set
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a @ portable -> unit
-    = "%atomic_set"
-
-  (** Like {!exchange}, but can be called on an atomic that came from another
-      domain. *)
-  external exchange
-    : ('a : value_or_null mod contended portable).
-    'a t @ contended local -> 'a -> 'a
-    = "%atomic_exchange"
-
-  (** Like {!compare_and_set}, but can be called on an atomic that came from
-      another domain. *)
-  external compare_and_set
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a -> 'a @ portable -> bool
-    = "%atomic_cas"
-
-  (** Like {!compare_exchange}, but can be called on an atomic that came from
-      another domain. *)
-  external compare_exchange
-    : ('a : value_or_null mod contended portable).
-    'a t @ contended local -> 'a -> 'a -> 'a
-    = "%atomic_compare_exchange"
-end
+(** Like {!get}, but can be called on an atomic that came from another domain. *)
+external get_contended
+  : ('a : value_or_null).
+  'a t @ contended local -> 'a @ contended
+  = "%atomic_load"
 
 (** Atomic "locations", such as record fields. *)
 module Loc : sig
@@ -152,6 +121,9 @@ module Loc : sig
   type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
 
   external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load_loc"
+
+  external get_contended : ('a : value_or_null).
+    'a t @ contended local -> 'a @ contended = "%atomic_load_loc"
 
   external set : ('a : value_or_null).
     'a t @ local -> 'a -> unit = "%atomic_set_loc"
@@ -185,23 +157,6 @@ module Loc : sig
 
   val incr : int t @ local -> unit
   val decr : int t @ local -> unit
-
-  module Contended : sig
-    external get : ('a : value_or_null mod portable).
-      'a t @ contended local -> 'a @ contended = "%atomic_load_loc"
-
-    external set : ('a : value_or_null mod contended).
-      'a t @ contended local -> 'a @ portable -> unit = "%atomic_set_loc"
-
-    external exchange : ('a : value_or_null mod contended portable).
-      'a t @ contended local -> 'a -> 'a = "%atomic_exchange_loc"
-
-    external compare_and_set : ('a : value_or_null mod contended).
-      'a t @ contended local -> 'a -> 'a @ portable -> bool = "%atomic_cas_loc"
-
-    external compare_exchange : ('a : value_or_null mod contended portable).
-      'a t @ contended local -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
-  end
 end
 
 (** {1:examples Examples}
