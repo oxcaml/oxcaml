@@ -39,21 +39,23 @@ exception Error of error * Debuginfo.t
    dependency cycles. *)
 module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* Global accumulator for phantom lets in the current function *)
+  (* CR mshinwell: work out how to remove this mutable state *)
   let accumulated_phantom_lets :
-      (V.With_provenance.t * Cmm.phantom_defining_expr option) list ref =
-    ref []
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref =
+    ref V.Map.empty
 
-  (* Extract phantom variables currently available in the environment *)
-  let phantom_vars_from_env (env : SU.environment) =
-    if !Dwarf_flags.restrict_to_upstream_dwarf
-    then None
-    else
-      let phantom_vars =
-        V.Map.fold
-          (fun var _ acc -> V.Set.add var acc)
-          env.phantom_lets V.Set.empty
-      in
-      if V.Set.is_empty phantom_vars then None else Some phantom_vars
+  let accumulate_phantom_let var defining_expr =
+    match defining_expr with
+    | None -> ()
+    | Some defining_expr ->
+      if V.Map.mem (VP.var var) !accumulated_phantom_lets
+      then
+        Misc.fatal_errorf "Duplicate phantom let for variable %a" V.print
+          (VP.var var);
+      accumulated_phantom_lets
+        := V.Map.add (VP.var var)
+             (VP.provenance var, Cfg.phantom_defining_expr_of_cmm defining_expr)
+             !accumulated_phantom_lets
 
   (* A syntactic criterion used in addition to judgements about (co)effects as
      to whether the evaluation of a given expression may be deferred by
@@ -456,7 +458,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               in
               Cfg.Poptrap { lbl_handler }
           in
-          let phantom_available_before = phantom_vars_from_env env in
+          let phantom_available_before = SU.phantom_vars_from_env env in
           Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
             ~phantom_available_before)
         traps;
@@ -467,11 +469,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* Buffering of instruction sequences *)
 
   let insert_debug env sub_cfg basic dbg arg res =
-    let phantom_available_before = phantom_vars_from_env env in
+    let phantom_available_before = SU.phantom_vars_from_env env in
     Sub_cfg.add_instruction sub_cfg basic arg res dbg ~phantom_available_before
 
   let insert_op_debug_returning_id env sub_cfg op dbg arg res =
-    let phantom_available_before = phantom_vars_from_env env in
+    let phantom_available_before = SU.phantom_vars_from_env env in
     let instr =
       Sub_cfg.make_instr (Cfg.Op op) arg res dbg ~phantom_available_before
     in
@@ -488,6 +490,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | [] -> Misc.fatal_error "Exception handler with no parameters"
         | r :: _ -> r
       in
+      (* CR mshinwell/gyorsh: fix Debuginfo.t + phantom_available_before *)
       Sub_cfg.add_instruction_at_start sub_cfg (Cfg.Op Move)
         [| Proc.loc_exn_bucket |] exn_bucket_in_handler Debuginfo.none
         ~phantom_available_before:None
@@ -783,13 +786,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Ok r1 -> emit_expr (bind_let env sub_cfg v r1) sub_cfg e2 ~bound_name)
     | Cphantom_let (var, defining_expr, body) ->
       (* Add to global accumulator for this function *)
-      accumulated_phantom_lets
-        := (var, defining_expr) :: !accumulated_phantom_lets;
-      let env =
-        match defining_expr with
-        | None -> env
-        | Some defining_expr -> SU.env_add_phantom_let var defining_expr env
-      in
+      accumulate_phantom_let var defining_expr;
+      let env = SU.env_add_phantom_let var env in
       emit_expr env sub_cfg body ~bound_name
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (
@@ -840,14 +838,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> ()
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
     | Cphantom_let (var, defining_expr, body) ->
-      (* Add to global accumulator for this function *)
-      accumulated_phantom_lets
-        := (var, defining_expr) :: !accumulated_phantom_lets;
-      let env =
-        match defining_expr with
-        | None -> env
-        | Some defining_expr -> SU.env_add_phantom_let var defining_expr env
-      in
+      accumulate_phantom_let var defining_expr;
+      let env = SU.env_add_phantom_let var env in
       emit_tail env sub_cfg body
     | Cop ((Capply (ty, Rc_normal) as op), args, dbg) ->
       emit_tail_apply env sub_cfg ty op args dbg
@@ -1236,7 +1228,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 in
                 Cfg.Poptrap { lbl_handler }
             in
-            let phantom_available_before = phantom_vars_from_env env in
+            let phantom_available_before = SU.phantom_vars_from_env env in
             Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
               ~phantom_available_before)
           traps;
@@ -1478,7 +1470,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   let emit_fundecl ~future_funcnames f =
     (* Clear phantom lets accumulator for this function *)
-    accumulated_phantom_lets := [];
+    accumulated_phantom_lets := V.Map.empty;
     SU.current_function_name := f.Cmm.fun_name.sym_name;
     SU.current_function_is_check_enabled
       := Zero_alloc_checker.is_check_enabled f.Cmm.fun_codegen_options
@@ -1534,20 +1526,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         [||]
     in
     emit_tail env body f.Cmm.fun_body;
-    (* Build the phantom_lets map from accumulated phantom lets *)
-    let phantom_lets_map =
-      List.fold_left
-        (fun acc (var_with_prov, defining_expr) ->
-          match defining_expr with
-          | None -> acc (* Skip phantom vars without defining expressions *)
-          | Some expr ->
-            let var = V.With_provenance.var var_with_prov in
-            let provenance = V.With_provenance.provenance var_with_prov in
-            V.Map.add var
-              (provenance, Cfg.phantom_defining_expr_of_cmm expr)
-              acc)
-        V.Map.empty !accumulated_phantom_lets
-    in
     let cfg =
       (* note: we set `fun_contains_calls` to `true` here, but will compute its
          proper value below, after possibly removing the prologue poll
@@ -1559,7 +1537,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ~fun_dbg:f.Cmm.fun_dbg ~fun_contains_calls:true
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:f.Cmm.fun_poll
         ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:f.Cmm.fun_ret_type
-        ~fun_phantom_lets:phantom_lets_map
+        ~fun_phantom_lets:!accumulated_phantom_lets
     in
     let layout = DLL.make_empty () in
     let entry_block =

@@ -570,6 +570,7 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
           (Lstackcheck { max_frame_size_bytes = max_frame_size })
           [||] [||] ~available_before:fundecl.fun_body.available_before
           ~available_across:fundecl.fun_body.available_across fundecl.fun_body
+          ~phantom_available_before:fundecl.fun_body.phantom_available_before
       in
       { fundecl with fun_body }
     else fundecl

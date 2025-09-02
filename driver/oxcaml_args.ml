@@ -1664,6 +1664,7 @@ module Extra_params = struct
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
+    | "ddebug-avail-sets" -> set' Debugging.debug_avail_sets
     | "dranges" -> set' Oxcaml_flags.dranges
     | "ddebug-invariants" -> set' Dwarf_flags.ddebug_invariants
     | "ddwarf-types" -> set' Dwarf_flags.ddwarf_types

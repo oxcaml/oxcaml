@@ -58,9 +58,7 @@ type environment =
         handler. *)
     trap_stack : Operation.trap_stack;
     tailrec_label : Label.t;
-    phantom_lets :
-      (Backend_var.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t
-        (** Phantom variables and their defining expressions *)
+    phantom_lets : V.Set.t
   }
 
 let env_add ?(mut = Asttypes.Immutable) var regs env =
@@ -100,6 +98,11 @@ let env_find_static_exception id env =
   with Not_found -> Misc.fatal_errorf "Not found static exception id=%d" id
 
 let env_set_trap_stack env trap_stack = { env with trap_stack }
+
+let phantom_vars_from_env env =
+  if !Dwarf_flags.restrict_to_upstream_dwarf
+  then None
+  else Some env.phantom_lets
 
 let rec combine_traps trap_stack = function
   | [] -> trap_stack
@@ -157,10 +160,10 @@ let env_create ~tailrec_label =
     static_exceptions = Int.Map.empty;
     trap_stack = Uncaught;
     tailrec_label;
-    phantom_lets = V.Map.empty
+    phantom_lets = V.Set.empty
   }
 
-let env_add_phantom_let var defining_expr env =
+let env_add_phantom_let var env =
   (* Information about phantom lets is split at this stage:
 
      1. The phantom variables in scope are recorded in the environment and
@@ -169,12 +172,8 @@ let env_add_phantom_let var defining_expr env =
 
      2. The defining expressions are recorded separately in the environment and
      eventually stored in the CFG's fun_phantom_lets field. *)
-  let provenance = VP.provenance var in
   let var = VP.var var in
-  let defining_expr = Cfg.phantom_defining_expr_of_cmm defining_expr in
-  { env with
-    phantom_lets = V.Map.add var (provenance, defining_expr) env.phantom_lets
-  }
+  { env with phantom_lets = V.Set.add var env.phantom_lets }
 
 let select_mutable_flag : Asttypes.mutable_flag -> Operation.mutable_flag =
   function
@@ -631,17 +630,6 @@ let make_const_vec512 x = Operation.Const_vec512 x
 let make_const_symbol x = Operation.Const_symbol x
 
 let make_opaque () = Operation.Opaque
-
-let phantom_vars_from_env (env : environment) =
-  if !Dwarf_flags.restrict_to_upstream_dwarf
-  then None
-  else
-    let phantom_vars =
-      V.Map.fold
-        (fun var _ acc -> V.Set.add var acc)
-        env.phantom_lets V.Set.empty
-    in
-    if V.Set.is_empty phantom_vars then None else Some phantom_vars
 
 let insert_debug (env : environment) sub_cfg basic dbg arg res =
   let phantom_available_before = phantom_vars_from_env env in

@@ -139,6 +139,7 @@ val instr_cons :
   instruction ->
   available_before:Reg_availability_set.t option ->
   available_across:Reg_availability_set.t option ->
+  phantom_available_before:Backend_var.Set.t option ->
   instruction
 
 type fundecl =

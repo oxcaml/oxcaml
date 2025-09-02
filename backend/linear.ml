@@ -165,7 +165,8 @@ let rec end_instr =
 
 (* Cons an instruction (live, debug empty) *)
 
-let instr_cons d a r n ~available_before ~available_across =
+let instr_cons d a r n ~available_before ~available_across
+    ~phantom_available_before =
   { desc = d;
     next = n;
     arg = a;
@@ -175,7 +176,7 @@ let instr_cons d a r n ~available_before ~available_across =
     live = Reg.Set.empty;
     available_before;
     available_across;
-    phantom_available_before = None
+    phantom_available_before
   }
 
 let traps_to_bytes traps = Proc.trap_size_in_bytes * traps

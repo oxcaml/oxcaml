@@ -375,7 +375,7 @@ let linearize_terminator cfg_with_layout (func : string) start
   let instr =
     List.fold_left
       (fun next desc ->
-        let instr = to_linear_instr ~like:terminator desc ~next in
+        let instr = to_linear_instr desc ~next ~like:terminator in
         match has_epilogue with
         (* In order to match the debug info generated when the epilogue was not
            a linear instruction, we need to explicitly remove debug info, as
