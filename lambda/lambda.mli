@@ -1040,6 +1040,7 @@ val layout_tmc_field : layout
 (* A layout that is Pgenval because it is an optional argument *)
 val layout_optional_arg : layout
 val layout_value_field : layout
+val layout_predef_value : layout
 val layout_lazy : layout
 val layout_lazy_contents : layout
 (* A layout that is Pgenval because we are missing layout polymorphism *)
