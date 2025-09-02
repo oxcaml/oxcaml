@@ -28,7 +28,7 @@ type t =
 
 let function_decl_type ?new_code_id ~rec_info old_code_id =
   let code_id = Option.value new_code_id ~default:old_code_id in
-  Or_unknown_or_bottom.Ok (T.Function_type.create code_id ~rec_info)
+  Or_unknown.Known (T.Function_type.create code_id ~rec_info)
 
 let create_for_stub dacc ~all_code ~simplify_function_body =
   let dacc_inside_functions =
@@ -113,7 +113,7 @@ let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
                  (old_code_id :
                    Function_declarations.code_id_in_function_declaration) ->
               match old_code_id with
-              | Deleted _ -> Or_unknown_or_bottom.Unknown
+              | Deleted _ -> Or_unknown.Unknown
               | Code_id { code_id = old_code_id; only_full_applications = _ } ->
                 let code_or_metadata = DE.find_code_exn denv old_code_id in
                 let new_code_id =

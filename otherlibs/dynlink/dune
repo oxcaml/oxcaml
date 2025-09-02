@@ -114,6 +114,7 @@
   allowance
   solver_intf
   solver
+  mode_hint
   mode_intf
   mode
   jkind_intf
@@ -140,6 +141,7 @@
   persistent_env
   env
   debuginfo
+  static_label
   lambda
   runtimedef
   runtimetags
@@ -168,6 +170,7 @@
   cmxs_format
   debug_event
   solver_intf
+  mode_hint
   mode_intf
   value_rec_types))
 
@@ -323,6 +326,8 @@
 (copy_files ../../typing/env.ml)
 
 (copy_files ../../lambda/debuginfo.ml)
+
+(copy_files ../../lambda/static_label.ml)
 
 (copy_files ../../lambda/lambda.ml)
 
@@ -484,6 +489,8 @@
 
 (copy_files ../../lambda/debuginfo.mli)
 
+(copy_files ../../lambda/static_label.mli)
+
 (copy_files ../../lambda/lambda.mli)
 
 (copy_files ../../lambda/runtimedef.mli)
@@ -509,6 +516,8 @@
 (copy_files ../../parsing/parsetree.mli)
 
 (copy_files ../../typing/solver_intf.mli)
+
+(copy_files ../../typing/mode_hint.mli)
 
 (copy_files ../../typing/mode_intf.mli)
 
@@ -630,6 +639,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Predef.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Static_label.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Dll.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Instruct.cmo
@@ -728,6 +738,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Predef.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Static_label.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Dll.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Instruct.cmx

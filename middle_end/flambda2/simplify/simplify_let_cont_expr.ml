@@ -86,10 +86,15 @@ type after_downwards_traversal_of_body_and_handlers_data =
     (* total cont uses env in body + handlers, including the uses of the
        continuations currently being bound *)
     at_unit_toplevel : bool;
+    consts_lifted_during_body : Lifted_constant_state.t;
     consts_lifted_after_fork : Lifted_constant_state.t;
-    (* this includes the constants lifted during the body, but also the ones
-       lifted during the handler. This is useful for continuation specialisation
-       (and mutually recursive continuations). *)
+    (* We need to keep a copy of the constants lifted during the body, separate
+       from the constants lifted after the fork (i.e. those from the body
+       **and** the handlers (there may be multiple handlers, e.g. during
+       specialization, or for recursive continuations)), because when
+       specializing a continuation, the consts lifted from the first downwards
+       pass on the handler must be dropped (but those from the body must be
+       kept), since we forget everything that happened during that pass. *)
     lifted_params : Lifted_cont_params.t;
     invariant_params : Bound_parameters.t;
     invariant_extra_params_and_args : EPA.t;
@@ -1186,11 +1191,15 @@ and specialize_continuation_if_needed ~simplify_expr dacc
         (* Remove the (generic) continuation uses from the CUE, since we will
            then add uses for each of the specialized continuation. *)
         let cont_uses_env = CUE.remove data.cont_uses_env_after_body cont in
+        (* We need to drop the constants lifted during the first downwards
+           traversal of the handler. *)
+        let consts_lifted_after_fork = data.consts_lifted_during_body in
         let data =
           { data with
             handlers = Continuation.Map.empty;
             cont_uses_env;
-            cont_uses_env_after_body = cont_uses_env
+            cont_uses_env_after_body = cont_uses_env;
+            consts_lifted_after_fork
           }
         in
         compute_specialized_continuation_handlers ~simplify_expr ~replay
@@ -1392,7 +1401,7 @@ and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
       k dacc rebuild_handler cont_uses_env_in_handler)
 
 and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
-    ~invariant_params consts_lifted_after_fork all_handlers_set denv_to_reset
+    ~invariant_params ~consts_lifted_after_fork all_handlers_set denv_to_reset
     dacc cont
     ({ params; handler; is_cold } as original : One_recursive_handler.t) k =
   (* Here we perform the downwards traversal on a single handler.
@@ -1472,6 +1481,7 @@ and simplify_recursive_handlers ~down_to_up ~data ~rebuild_body ~dacc_after_body
           invariant_extra_params_and_args = invariant_epa;
           handlers = simplified_handlers;
           at_unit_toplevel = false;
+          consts_lifted_during_body;
           consts_lifted_after_fork
         }
       in
@@ -1484,7 +1494,7 @@ and simplify_recursive_handlers ~down_to_up ~data ~rebuild_body ~dacc_after_body
       in
       let handler = Continuation.Lmap.find cont continuation_handlers in
       simplify_single_recursive_handler ~simplify_expr ~invariant_params
-        cont_uses_env_so_far consts_lifted_after_fork all_conts_set common_denv
+        cont_uses_env_so_far ~consts_lifted_after_fork all_conts_set common_denv
         dacc cont handler (fun dacc rebuild cont_uses_env_so_far ->
           let dacc, consts_lifted_in_handler =
             DA.get_and_clear_lifted_constants dacc
@@ -1543,6 +1553,7 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
           invariant_extra_params_and_args = EPA.empty;
           handlers = Continuation.Map.empty;
           at_unit_toplevel = false;
+          consts_lifted_during_body;
           consts_lifted_after_fork = consts_lifted_during_body
         }
       in
@@ -1615,6 +1626,7 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
               invariant_extra_params_and_args = EPA.empty;
               handlers = Continuation.Map.singleton cont rebuild;
               at_unit_toplevel;
+              consts_lifted_during_body;
               consts_lifted_after_fork
             }
           in

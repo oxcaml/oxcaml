@@ -1678,21 +1678,21 @@ and meet_array_of_types env fields1 fields2 ~length =
   meet_mapping ~meet_data:meet ~fold2 ~env ~left:fields1 ~right:fields2 ~rebuild
 
 and meet_function_type (env : ME.t)
-    (func_type1 : TG.Function_type.t Or_unknown_or_bottom.t)
-    (func_type2 : TG.Function_type.t Or_unknown_or_bottom.t) :
-    TG.Function_type.t Or_unknown_or_bottom.t meet_result =
+    (func_type1 : TG.Function_type.t Or_unknown.t)
+    (func_type2 : TG.Function_type.t Or_unknown.t) :
+    TG.Function_type.t Or_unknown.t meet_result =
   match func_type1, func_type2 with
-  | Bottom, Bottom | Unknown, Unknown -> Ok (Both_inputs, env)
-  | Bottom, _ | _, Unknown -> Ok (Left_input, env)
-  | _, Bottom | Unknown, _ -> Ok (Right_input, env)
-  | ( Ok { code_id = code_id1; rec_info = rec_info1 },
-      Ok { code_id = code_id2; rec_info = rec_info2 } ) ->
+  | Unknown, Unknown -> Ok (Both_inputs, env)
+  | _, Unknown -> Ok (Left_input, env)
+  | Unknown, _ -> Ok (Right_input, env)
+  | ( Known { code_id = code_id1; rec_info = rec_info1 },
+      Known { code_id = code_id2; rec_info = rec_info2 } ) ->
     let rebuild code_id rec_info =
       (* It's possible that [code_id] corresponds to deleted code. In that case,
          any attempt to inline will fail, as the code will not be found in the
          simplifier's environment -- see
          [Simplify_apply_expr.simplify_direct_function_call]. *)
-      Or_unknown_or_bottom.Ok (TG.Function_type.create code_id ~rec_info)
+      Or_unknown.Known (TG.Function_type.create code_id ~rec_info)
     in
     combine_results2 env ~rebuild ~meet_a:meet_code_id ~left_a:code_id1
       ~right_a:code_id2 ~meet_b:meet ~left_b:rec_info1 ~right_b:rec_info2
@@ -2807,22 +2807,23 @@ and n_way_join_int_indexed_product env shape
   TG.Product.Int_indexed.create_from_array fields, env
 
 and n_way_join_function_type (env : Join_env.t)
-    (func_types :
-      TG.Function_type.t Or_unknown_or_bottom.t Join_env.join_arg list) :
-    TG.Function_type.t Or_unknown_or_bottom.t * _ =
+    (func_types : TG.Function_type.t Or_unknown.t Join_env.join_arg list) :
+    TG.Function_type.t Or_unknown.t * _ =
   let exception Unknown_result in
   try
     let func_types =
       List.fold_left
         (fun func_types (id2, func_type2) ->
-          match (func_type2 : TG.Function_type.t Or_unknown_or_bottom.t) with
-          | Bottom -> func_types
+          match (func_type2 : TG.Function_type.t Or_unknown.t) with
           | Unknown -> raise Unknown_result
-          | Ok func_type2 -> (id2, func_type2) :: func_types)
+          | Known func_type2 -> (id2, func_type2) :: func_types)
         [] func_types
     in
     match func_types with
-    | [] -> Bottom, env
+    | [] ->
+      if Flambda_features.check_light_invariants ()
+      then Misc.fatal_error "Join of zero function types";
+      Unknown, env
     | (id1, { code_id = code_id1; rec_info = rec_info1 }) :: func_types -> (
       let target_code_age_relation = Join_env.code_age_relation env in
       let target_code_age_relation_resolver =
@@ -2855,7 +2856,7 @@ and n_way_join_function_type (env : Join_env.t)
       in
       match n_way_join env rec_infos with
       | Known rec_info, env ->
-        Ok (TG.Function_type.create code_id ~rec_info), env
+        Known (TG.Function_type.create code_id ~rec_info), env
       | Unknown, env -> Unknown, env)
   with Unknown_result -> Unknown, env
 

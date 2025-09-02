@@ -20,7 +20,7 @@ let f (x : #( (int -> int) list * int ref list ) @ nonportable contended) =
 Line 2, characters 15-16:
 2 |   use_portable x
                    ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let f (x : #( (int -> int) list * int ref list ) @ nonportable contended) =
@@ -30,7 +30,7 @@ let f (x : #( (int -> int) list * int ref list ) @ nonportable contended) =
 Line 2, characters 18-19:
 2 |   use_uncontended x
                       ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let f (x : #( unit list * string list ) @ nonportable contended) =

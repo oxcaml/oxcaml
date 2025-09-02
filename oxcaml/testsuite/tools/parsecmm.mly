@@ -32,7 +32,7 @@ let make_switch n selector caselist =
   let index = Array.make n 0 in
   let casev = Array.of_list caselist in
   let dbg = Debuginfo.none in
-  let actv = Array.make (Array.length casev) (Cexit(Cmm.Lbl 0,[],[]), dbg) in
+  let actv = Array.make (Array.length casev) (Cexit(Cmm.Lbl Static_label.fail,[],[]), dbg) in
   for i = 0 to Array.length casev - 1 do
     let (posl, e) = casev.(i) in
     List.iter (fun pos -> index.(pos) <- i) posl;
@@ -211,7 +211,7 @@ componentlist:
   | componentlist STAR component { $3 :: $1 }
 ;
 traps:
-    LPAREN INTCONST RPAREN       { List.init $2 (fun i -> Pop i) }
+    LPAREN INTCONST RPAREN       { List.init $2 (fun i -> Pop (Static_label.of_int_unsafe i)) }
   | /**/                         { [] }
 expr:
     INTCONST    { Cconst_int ($1, debuginfo ()) }
@@ -252,18 +252,18 @@ expr:
           | _ -> Cifthenelse($3, debuginfo (), $4, debuginfo (),
                              (Cexit(Cmm.Lbl lbl0,[],[])),
                              debuginfo ()) in
-        Ccatch(Normal, [lbl0, [], Ctuple [], debuginfo (), false],
+        Ccatch(Normal, [{ label = lbl0; params = []; body = Ctuple []; dbg = debuginfo (); is_cold =  false }],
           Ccatch(Recursive,
-            [lbl1, [], Csequence(body, Cexit(Cmm.Lbl lbl1, [], [])), debuginfo (), false],
+            [{ label = lbl1; params = []; body = Csequence(body, Cexit(Cmm.Lbl lbl1, [], [])); dbg = debuginfo (); is_cold = false }],
             Cexit(Cmm.Lbl lbl1, [], []))) }
   | LPAREN EXIT traps IDENT exprlist RPAREN
     { Cexit(Cmm.Lbl (find_label $4), List.rev $5, $3) }
   | LPAREN CATCH sequence WITH catch_handlers RPAREN
     { let handlers = $5 in
-      List.iter (fun (_, l, _, _, _) ->
+      List.iter (fun { label = _; params = l; body = _; dbg = _; is_cold = _; } ->
         List.iter (fun (x, _) -> unbind_ident x) l) handlers;
       Ccatch(Recursive, handlers, $3) }
-  | EXIT        { Cexit(Cmm.Lbl 0,[],[]) }
+  | EXIT        { Cexit(Cmm.Lbl Static_label.fail,[],[]) }
   | LPAREN TRY machtype sequence WITH bind_ident sequence RPAREN
       { let after_push_k = Lambda.next_raise_count () in
         let after_pop_k = Lambda.next_raise_count () in
@@ -273,14 +273,19 @@ expr:
         unbind_ident $6;
         ctrywith (
           Ccatch (Normal,
-            [after_push_k, [],
-             Ccatch (Normal,
-               [after_pop_k, [result', $3],
-                Cvar result, debuginfo (), false],
-               Cexit (Cmm.Lbl after_pop_k,
-                 [$4], (* original try body *)
-                 [Pop exn_k])),
-             debuginfo (), false],
+            [{ label = after_push_k;
+               params = [];
+               body = Ccatch (Normal,
+                 [{ label = after_pop_k;
+                    params = [result', $3];
+                    body = Cvar result;
+                    dbg = debuginfo ();
+                    is_cold = false }],
+                 Cexit (Cmm.Lbl after_pop_k,
+                   [$4], (* original try body *)
+                   [Pop exn_k]));
+               dbg = debuginfo ();
+               is_cold = false }],
             Cexit (Cmm.Lbl after_push_k, [], [Push exn_k])),
           exn_k,
           $6, (* exception parameter *)
@@ -459,9 +464,9 @@ catch_handlers:
 
 catch_handler:
   | sequence
-    { 0, [], $1, debuginfo (), false }
+    { { label = Static_label.fail; params = []; body = $1; dbg = debuginfo (); is_cold = false; } }
   | LPAREN IDENT params RPAREN sequence
-    { find_label $2, $3, $5, debuginfo (), false }
+    { { label = find_label $2; params = $3; body = $5; dbg = debuginfo (); is_cold = false; } }
 
 location:
     /**/                        { None }

@@ -43,7 +43,7 @@ type static_handler =
 type environment =
   { vars :
       (Reg.t array * V.Provenance.t option * Asttypes.mutable_flag) V.Map.t;
-    static_exceptions : static_handler Int.Map.t;
+    static_exceptions : static_handler Static_label.Map.t;
     trap_stack : Operation.trap_stack;
     tailrec_label : Label.t;
     phantom_lets : V.Set.t
@@ -61,7 +61,7 @@ val env_add :
 val env_add_phantom_let : VP.t -> environment -> environment
 
 val env_add_static_exception :
-  Int.Map.key ->
+  Static_label.t ->
   Reg.t array list ->
   environment ->
   Label.t ->
@@ -75,7 +75,7 @@ val env_find_mut :
 val env_find_regs_for_exception_extra_args :
   Cmm.trywith_shared_label -> environment -> Reg.t array list
 
-val env_find_static_exception : Int.Map.key -> environment -> static_handler
+val env_find_static_exception : Static_label.t -> environment -> static_handler
 
 val env_set_trap_stack : environment -> Operation.trap_stack -> environment
 
