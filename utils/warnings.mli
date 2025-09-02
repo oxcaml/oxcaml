@@ -111,7 +111,8 @@ type t =
   | Unreachable_case                        (* 56 *)
   | Ambiguous_var_in_pattern_guard of string list (* 57 *)
   | No_cmx_file of
-      { missing_extension : string; module_name : string } (* 58 *)
+      { missing_extension : string;
+        module_name : string }              (* 58 *)
   | Flambda_assignment_to_non_mutable_value (* 59 *)
   | Unused_module of string                 (* 60 *)
   | Unboxable_type_in_prim_decl of string   (* 61 *)
