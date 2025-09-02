@@ -1609,9 +1609,9 @@ module F = struct
       | Int_of_float width ->
         do_conv "fptosi" ~src:(Llvm_typ.of_float_width width) ~dst:Llvm_typ.i64
       | Float_of_float32 ->
-        do_conv "fptrunc" ~src:Llvm_typ.double ~dst:Llvm_typ.float
-      | Float32_of_float ->
         do_conv "fpext" ~src:Llvm_typ.float ~dst:Llvm_typ.double
+      | Float32_of_float ->
+        do_conv "fptrunc" ~src:Llvm_typ.double ~dst:Llvm_typ.float
       | V128_of_scalar _ | Scalar_of_v128 _ | V256_of_scalar _
       | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
         not_implemented_basic ~msg:"static cast" i)
