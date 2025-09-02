@@ -1306,12 +1306,16 @@ module F = struct
           ins_extractelement t ~src:(Local_ident ident) ~dst:res ~src_typ:src
             ~idx:(Immediate "0") ~idx_typ:Llvm_typ.i64;
           res
+        | Int { width_in_bits = 64 }, Int { width_in_bits = 32 } ->
+          let res = fresh_ident t in
+          ins_conv t "trunc" ~src:ident ~dst:res ~src_typ:src ~dst_typ:dst;
+          res
         | _ -> Misc.fatal_error "Llvmize: unexpected reg types in intrinsic"
       in
       let do_intrinsic_call name arg_typs res_typ =
-        let args =
+        let args, _ (* avoid random unit arguments *) =
           Array.to_list i.arg
-          |> List.map2
+          |> List.map2_prefix
                (fun arg_typ reg ->
                  let reg_typ = Llvm_typ.of_machtyp_component reg.Reg.typ in
                  ( arg_typ,
@@ -1338,9 +1342,14 @@ module F = struct
         do_intrinsic_call "llvm.x86.sse2.max.sd"
           [Llvm_typ.doublex2; Llvm_typ.doublex2]
           Llvm_typ.doublex2
+      | "caml_rdtsc_unboxed" ->
+        do_intrinsic_call "llvm.readcyclecounter" [] Llvm_typ.i64
+      | "caml_rdpmc_unboxed" ->
+        do_intrinsic_call "llvm.x86.rdpmc" [Llvm_typ.i32] Llvm_typ.i64
       | _ -> not_implemented_basic ~msg:"specific intrinsic" i)
     | _ -> not_implemented_basic ~msg:"specific" i
 
+  (* CR yusumez: check memory.c *)
   let atomic t (i : Cfg.basic Cfg.instruction) (op : Cmm.atomic_op) ~size ~addr
       =
     let first_memory_arg_index =
@@ -1599,9 +1608,12 @@ module F = struct
         do_conv "sitofp" ~src:Llvm_typ.i64 ~dst:(Llvm_typ.of_float_width width)
       | Int_of_float width ->
         do_conv "fptosi" ~src:(Llvm_typ.of_float_width width) ~dst:Llvm_typ.i64
-      | Float_of_float32 | Float32_of_float | V128_of_scalar _
-      | Scalar_of_v128 _ | V256_of_scalar _ | Scalar_of_v256 _
-      | V512_of_scalar _ | Scalar_of_v512 _ ->
+      | Float_of_float32 ->
+        do_conv "fptrunc" ~src:Llvm_typ.double ~dst:Llvm_typ.float
+      | Float32_of_float ->
+        do_conv "fpext" ~src:Llvm_typ.float ~dst:Llvm_typ.double
+      | V128_of_scalar _ | Scalar_of_v128 _ | V256_of_scalar _
+      | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
         not_implemented_basic ~msg:"static cast" i)
     | Reinterpret_cast cast_op -> (
       match cast_op with
@@ -1613,8 +1625,18 @@ module F = struct
           ~src_typ:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
           ~dst_typ:(Llvm_typ.of_machtyp_component i.res.(0).typ);
         ins_store_into_reg t res i.res.(0)
-      | Float_of_float32 | Float32_of_float ->
-        not_implemented_basic ~msg:"float reinterpret cast" i
+      | Float_of_float32 ->
+        let temp = fresh_ident t in
+        let res = fresh_ident t in
+        ins_load t ~src:(get_ident_for_reg t i.arg.(0)) ~dst:temp Llvm_typ.float;
+        ins_store_into_reg t res i.res.(0)
+      | Float32_of_float ->
+        let temp = fresh_ident t in
+        let res = fresh_ident t in
+        ins_load t
+          ~src:(get_ident_for_reg t i.arg.(0))
+          ~dst:temp Llvm_typ.double;
+        ins_store_into_reg t res i.res.(0)
       | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ->
         not_implemented_basic ~msg:"vector reinterpret cast" i)
     | Specific op -> specific t i op
