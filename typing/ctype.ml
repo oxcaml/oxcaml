@@ -7390,7 +7390,8 @@ let check_decl_jkind env decl jkind =
       | Error _ as err -> err
 
 let constrain_decl_jkind env decl jkind =
-  (* CR layouts v2.8: This will need to be deeply reimplemented. Internal ticket 5115. *)
+  (* CR layouts v2.8: This will need to be deeply reimplemented. Internal
+     ticket 5115. *)
   match Jkind.try_allow_r jkind with
   (* This case is sad, because it can't refine type variables. Hence
      the need for reimplementation. Hopefully no one hits this for

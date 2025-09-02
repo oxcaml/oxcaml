@@ -2753,10 +2753,10 @@ let normalize_decl_jkinds env decls =
         that we computed, either from a user-written annotation or as a dummy jkind.
 
          (see Note [Default jkinds in transl_declaration]) *)
-      (* CR layouts: it almost definitely has changed, but also we probably trust
-         the new jkind (we really only want this check here to check against the
-         user-written annotation). We might be able to do a better job here and save
-         some work. Internal ticket 5117. *)
+      (* CR layouts: it almost definitely has changed, but also we probably
+         trust the new jkind (we really only want this check here to check
+         against the user-written annotation). We might be able to do a better
+         job here and save some work. Internal ticket 5117. *)
       let context = Ctype.mk_jkind_context_always_principal env in
       let type_equal = Ctype.type_equal env in
       match

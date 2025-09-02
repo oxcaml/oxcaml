@@ -1377,8 +1377,8 @@ let compare_type t1 t2 = compare (get_id t1) (get_id t2)
    Someday, it's probably desirable to merge this, and make it compatible, with
    [Ctype.eqtype], though that seems quite hard.
 *)
-(* CR layouts v2.8: this will likely loop infinitely on rectypes. Internal ticket
-   5086. *)
+(* CR layouts v2.8: this will likely loop infinitely on rectypes. Internal
+   ticket 5086. *)
 (* CR layouts v2.8: this whole approach is probably /quite/ wrong, since
    type_expr is fundamentally mutable, and using mutable things in the keys of
    maps is a recipe for disaster. We haven't found a way that this can break
