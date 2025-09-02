@@ -316,7 +316,7 @@ let static_closure_with_this_code ~this_function_slot ~closure_symbol ~code_id =
         ~rec_info:(TG.this_rec_info Rec_info_expr.initial)
     in
     Function_slot.Map.singleton this_function_slot
-      (Or_unknown_or_bottom.Ok function_type)
+      (Or_unknown.Known function_type)
   in
   let closure_types =
     let closure_type =
@@ -351,7 +351,7 @@ let closure_with_at_least_these_function_slots ~this_function_slot
   in
   let function_types =
     Function_slot.Map.map
-      (fun _ -> Or_unknown_or_bottom.Unknown)
+      (fun _ -> Or_unknown.Unknown)
       function_slots_and_bindings
   in
   let closure_types =

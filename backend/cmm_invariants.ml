@@ -154,7 +154,7 @@ let rec check env (expr : Cmm.expression) =
   | Ccatch (flag, handlers, body) ->
     let env_extended =
       List.fold_left
-        (fun env (cont, args, _, _, _) ->
+        (fun env Cmm.{label = cont; params = args; _} ->
            Env.handler env ~cont:cont ~arg_num:(List.length args))
         env
         handlers
@@ -165,7 +165,7 @@ let rec check env (expr : Cmm.expression) =
       | Recursive -> env_extended
       | Normal | Exn_handler -> env
     in
-    List.iter (fun (_, _, handler, _, _) -> check env_handler handler) handlers
+    List.iter (fun Cmm.{body = handler; _} -> check env_handler handler) handlers
   | Cexit (exit_label, args, _trap_actions) ->
     Env.jump env ~exit_label ~arg_num:(List.length args)
 
