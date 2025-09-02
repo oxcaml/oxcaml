@@ -240,7 +240,8 @@ Line 3, characters 4-5:
 3 |     g 42
         ^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is a stack expression.
+       However, it is expected to be in the parent region or "global"
        because it is the function in a tail call.
 |}]
 
@@ -401,7 +402,8 @@ Line 3, characters 2-5:
 3 |   r.x
       ^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is a stack expression.
+       However, it is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]

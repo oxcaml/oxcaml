@@ -265,7 +265,8 @@ Line 4, characters 2-3:
 4 |   x
       ^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is a stack expression.
+       However, it is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -281,7 +282,8 @@ Line 4, characters 2-3:
 4 |   x
       ^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is a stack expression.
+       However, it is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -490,7 +492,10 @@ let disallowed_13_6 =
 Line 4, characters 19-20:
 4 |   require_portable f
                        ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+       because it closes over the value "x_13_3" (at Line 3, characters 17-23)
+       which is expected to be "uncontended".
+       However, it is expected to be "portable".
 |}]
 
 (* [f] remains non-portable even if a portable function is reassigned *)
@@ -503,7 +508,10 @@ let disallowed_13_7 =
 Line 5, characters 19-20:
 5 |   require_portable f
                        ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+       because it closes over the value "x_13_3" (at Line 3, characters 17-23)
+       which is expected to be "uncontended".
+       However, it is expected to be "portable".
 |}]
 
 
@@ -633,7 +641,8 @@ Line 4, characters 2-3:
 4 |   x
       ^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is a stack expression.
+       However, it is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]

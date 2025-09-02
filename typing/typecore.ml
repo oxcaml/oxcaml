@@ -680,7 +680,7 @@ let register_allocation_mode alloc_mode =
 let register_allocation_value_mode mode =
   let alloc_mode = value_to_alloc_r2g mode in
   register_allocation_mode alloc_mode;
-  let mode = alloc_as_value alloc_mode in
+  let mode = value_r2g ~hint:Unknown_non_rigid mode in
   alloc_mode, mode
 
 (** Register as allocation the expression constrained by the given
@@ -5278,7 +5278,7 @@ let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
-  let alloc_mode =
+  let alloc_mode, mode =
       (* Unlike most allocations which can be the highest mode allowed by
          [expected_mode] and their [alloc_mode] identical to [expected_mode] ,
          functions have more constraints. For example, an outer function needs
@@ -5286,7 +5286,7 @@ let split_function_ty
          function deserves a separate allocation mode.
       *)
       let mode, _ = Value.newvar_below (as_single_mode expected_mode) in
-      fst (register_allocation_value_mode mode)
+      register_allocation_value_mode mode
   in
   if expected_mode.strictly_local then
     Locality.submode_exn Locality.local
@@ -5336,7 +5336,7 @@ let split_function_ty
         let env =
           Env.add_closure_lock
             Function
-            (alloc_as_value alloc_mode).comonadic
+            mode.comonadic
             env
         in
         Env.add_region_lock env
