@@ -413,6 +413,8 @@ let add_cold_attribute expr loc attributes =
     if get_cold_attribute attributes then begin
       if attr.cold then Location.prerr_warning loc
             (Warnings.Duplicated_attribute "cold");
+      (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never][@local never]`
+         so we do the equivalent here. *)
       let attr = { attr with cold = true; inline = Never_inline; specialise = Never_specialise; local = Never_local; } in
       lfunction_with_attr ~attr funct
     end else
@@ -561,6 +563,17 @@ let add_function_attributes lam loc attr =
   in
   let lam =
     add_opaque_attribute lam loc attr
+  in
+  (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never][@local never]`
+     so if all three attributes are set to never, we set `cold` to `true`. *)
+  let lam =
+    match lam with
+    | Lfunction({
+      attr = { inline = Never_inline; specialise = Never_specialise; local = Never_local} as attr
+    } as funct) ->
+      let attr = { attr with cold = true; } in
+      lfunction_with_attr ~attr funct
+    | _ -> lam
   in
   lam
 
