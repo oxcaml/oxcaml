@@ -41,7 +41,6 @@ let bind_expr_to_var ~env ~res fvar expr =
 let reg_width_const const : Jsir.constant =
   match Reg_width_const.descr const with
   | Naked_immediate targetint | Tagged_immediate targetint ->
-    (* CR selee: check that we can treat naked/tagged as same *)
     let repr = Targetint_31_63.to_targetint targetint |> Targetint_32_64.repr in
     let targetint =
       match repr with
@@ -93,15 +92,12 @@ let bound_parameters ~env bound_params =
 
 let block ~env ~res ~tag ~mut ~fields :
     Jsir.expr * To_jsir_env.t * To_jsir_result.t =
-  (* CR selee: is it ok to ignore shape? *)
   let tag = Tag.to_int tag in
   let mutability : Jsir.mutability =
     match (mut : Mutability.t) with
     | Mutable -> Maybe_mutable
     | Immutable -> Immutable
-    | Immutable_unique ->
-      (* CR selee: check *)
-      Immutable
+    | Immutable_unique -> Immutable
   in
   let fields, res = simples ~env ~res fields in
   Block (tag, Array.of_list fields, NotArray, mutability), env, res
