@@ -1069,8 +1069,10 @@ val make_synchronized_formatter :
   (string -> int -> int -> unit) -> (unit -> unit) -> formatter Domain.Safe.DLS.key
   @@ nonportable
 [@@alert unstable][@@alert "-unstable"]
-[@@alert unsafe_multidomain "It is unsafe to store nonportable values or \
-                             values that do not cross contention in DLS."]
+[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
+                             contention in DLS."]
+[@@alert unsafe_multidomain "It is unsafe to inject nonportable values into \
+                             DLS."]
 (** [make_synchronized_formatter out flush] returns the key to the domain-local
     state that holds the domain-local formatter that outputs with function
     [out], and flushes with function [flush].
