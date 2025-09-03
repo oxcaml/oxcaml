@@ -344,7 +344,7 @@ L133:                                                ; preds = %L130
   store i64 %108, ptr %31
   store ptr @camlData_decl__const_block54, ptr %32
   store i64 1, ptr %33
-  store ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1448$2c4$2d$2d59$5d_528, ptr %34
+  store ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521, ptr %34
   %109 = load i64, ptr %34
   store i64 %109, ptr %2
   %110 = load i64, ptr %33
@@ -406,7 +406,7 @@ L136:                                                ; preds = %L135
   store i64 %140, ptr %42
   store ptr @camlData_decl__const_block67, ptr %43
   store i64 1, ptr %44
-  store ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1448$2c4$2d$2d59$5d_528, ptr %45
+  store ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521, ptr %45
   %141 = load i64, ptr %45
   store i64 %141, ptr %2
   %142 = load i64, ptr %44
@@ -475,7 +475,7 @@ declare cc 104 { { ptr }, { i64 } } @caml_apply2(ptr, i64, i64, i64)
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
 
-@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1448$2c4$2d$2d59$5d_528 = external global ptr
+@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 = external global ptr
 @camlStdlib__print_endline_138 = external global ptr
 @caml_c_call = external global ptr
 @caml_curry2 = external global ptr
