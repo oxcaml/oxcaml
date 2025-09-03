@@ -86,6 +86,8 @@ val import_compilation_unit : t -> Compilation_unit.t -> t
 (* CR selee: Eventually this should also be used for symbols too, so that we
    don't put unused symbols in the symbol table. *)
 
+val global_data_var : t -> t * Jsir.Var.t
+
 type program =
   { program : Jsir.program;
     imported_compilation_units : Compilation_unit.Set.t
