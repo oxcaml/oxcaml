@@ -1710,12 +1710,11 @@ module With_cms_reduce = Shape_reduce.Make (struct
   let read_unit_shape ~unit_name =
     match String.Tbl.find_opt cms_file_cache unit_name with
     | Some shape -> shape
-    | None ->
+    | None -> (
       if !max_number_of_cms_files <= 0
          (* CR sspies: This needs a command line flag. *)
       then None
-      else (
-        decr max_number_of_cms_files;
+      else
         let filename = String.uncapitalize_ascii unit_name in
         (* CR mshinwell: we should use [Compilation_unit.t] *)
         match Load_path.find_normalized (filename ^ ".cms") with
@@ -1729,6 +1728,7 @@ module With_cms_reduce = Shape_reduce.Make (struct
             (* We fail silently if there was trouble reading the file or the
                like. *)
           | cms_infos ->
+            decr max_number_of_cms_files;
             let shape = cms_infos.cms_impl_shape in
             String.Tbl.add cms_file_cache unit_name shape;
             shape))
