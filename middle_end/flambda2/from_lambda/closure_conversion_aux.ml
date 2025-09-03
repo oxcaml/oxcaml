@@ -876,6 +876,8 @@ module Function_decls = struct
 
     let regalloc_attribute t = t.attr.regalloc
 
+    let regalloc_param_attribute t = t.attr.regalloc_param
+
     let loop t = t.attr.loop
 
     let is_a_functor t = t.attr.is_a_functor
