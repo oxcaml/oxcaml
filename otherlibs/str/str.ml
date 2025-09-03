@@ -611,8 +611,8 @@ external iarray_length: 'a iarray -> int = "%array_length"
 external iarray_get : 'a iarray -> int -> 'a = "%array_safe_get"
 
 module DLS = Domain.Safe.DLS
-
-let last_search_result_key = DLS.new_key (fun () : int iarray -> [::])
+type result = int iarray
+let last_search_result_key = DLS.new_key (fun () : result -> [::])
 
 let string_match re s pos =
   let res = re_string_match re s pos in
