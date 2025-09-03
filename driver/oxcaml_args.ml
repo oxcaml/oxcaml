@@ -331,6 +331,12 @@ let mk_ddebug_invariants f =
 let mk_ddwarf_types f =
   ("-ddwarf-types", Arg.Unit f, " Enable debug output for DWARF type generation")
 
+let mk_ddwarf_shape_reduction_diags f =
+  ( "-ddwarf-shape-reduction-diags",
+    Arg.Unit f,
+    " Write DWARF shape reduction diagnostics to auxiliary JSON file \
+     .debug-stats.json" )
+
 let mk_internal_assembler f =
   ( "-internal-assembler",
     Arg.Unit f,
@@ -935,6 +941,7 @@ module type Oxcaml_options = sig
   val dranges : unit -> unit
   val ddebug_invariants : unit -> unit
   val ddwarf_types : unit -> unit
+  val ddwarf_shape_reduction_diags : unit -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : string -> unit
@@ -1064,6 +1071,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dranges F.dranges;
       mk_ddebug_invariants F.ddebug_invariants;
       mk_ddwarf_types F.ddwarf_types;
+      mk_ddwarf_shape_reduction_diags F.ddwarf_shape_reduction_diags;
       mk_ocamlcfg F.ocamlcfg;
       mk_no_ocamlcfg F.no_ocamlcfg;
       mk_dcfg F.dcfg;
@@ -1274,6 +1282,10 @@ module Oxcaml_options_impl = struct
   let dranges = set' Oxcaml_flags.dranges
   let ddebug_invariants = set' Dwarf_flags.ddebug_invariants
   let ddwarf_types = set' Dwarf_flags.ddwarf_types
+
+  let ddwarf_shape_reduction_diags =
+    set' Dwarf_flags.ddwarf_shape_reduction_diags
+
   let heap_reduction_threshold x = Oxcaml_flags.heap_reduction_threshold := x
 
   let zero_alloc_check s =
@@ -1673,6 +1685,8 @@ module Extra_params = struct
     | "dranges" -> set' Oxcaml_flags.dranges
     | "ddebug-invariants" -> set' Dwarf_flags.ddebug_invariants
     | "ddwarf-types" -> set' Dwarf_flags.ddwarf_types
+    | "ddwarf-shape-reduction-diags" ->
+        set' Dwarf_flags.ddwarf_shape_reduction_diags
     | "reorder-blocks-random" ->
         set_int_option' Oxcaml_flags.reorder_blocks_random
     | "basic-block-sections" -> set' Oxcaml_flags.basic_block_sections

@@ -45,6 +45,16 @@ module Type_decl_shape : sig
     Ident.t -> Types.type_declaration -> path_lookup -> Shape.t
 end
 
+module Evaluation_diagnostics : sig
+  type t
+
+  val no_diagnostics : t
+
+  val create_diagnostics : unit -> t
+
+  val get_reduction_steps : t -> int
+end
+
 (** [unfold_and_evaluate] performs call-by-value evaluation of shapes. It should
     be applied after [reduce] (from [shape_reduce.ml]) has already been used.
     More specifically, when producing a type shape with [of_type_expr], the
@@ -75,7 +85,8 @@ end
          applied to [int] becomes the type shape
            [Mu (Variant [] | :: of int * #0)].
   *)
-val unfold_and_evaluate : Shape.t -> Shape.t
+val unfold_and_evaluate :
+  ?diagnostics:Evaluation_diagnostics.t -> Shape.t -> Shape.t
 
 type shape_with_layout = private
   { type_shape : Shape.t;

@@ -40,6 +40,93 @@ let rec print_result fmt result =
   | Internal_error_missing_uid ->
       Format.fprintf fmt "@[Missing uid@]@;"
 
+module Diagnostics = struct
+
+  type diagnostics = {
+    mutable reduction_steps: int;
+    mutable computation_unit_lookups: int;
+    mutable cms_files_loaded: int;
+    mutable cms_files_cached: int;
+    mutable cms_files_missing: string list;
+    mutable cms_files_unreadable: string list;
+  }
+
+  type t = diagnostics option
+
+  let no_diagnostics = None
+
+  let create_diagnostics () = Some {
+    reduction_steps = 0;
+    computation_unit_lookups = 0;
+    cms_files_loaded = 0;
+    cms_files_cached = 0;
+    cms_files_missing = [];
+    cms_files_unreadable = [];
+  }
+
+  let count_reduction_step d =
+    match d with
+    | None -> ()
+    | Some d -> d.reduction_steps <- d.reduction_steps + 1
+
+  let count_computation_unit_lookup d =
+    match d with
+    | None -> ()
+    | Some d -> d.computation_unit_lookups <- d.computation_unit_lookups + 1
+
+  let reduction_steps d =
+    match d with
+    | None -> 0
+    | Some d -> d.reduction_steps
+
+  let computation_unit_lookups d =
+    match d with
+    | None -> 0
+    | Some d -> d.computation_unit_lookups
+
+  let count_cms_file_loaded d =
+    match d with
+    | None -> ()
+    | Some d -> d.cms_files_loaded <- d.cms_files_loaded + 1
+
+  let cms_files_loaded d =
+    match d with
+    | None -> 0
+    | Some d -> d.cms_files_loaded
+
+  let count_cms_file_cached d =
+    match d with
+    | None -> ()
+    | Some d -> d.cms_files_cached <- d.cms_files_cached + 1
+
+  let cms_files_cached d =
+    match d with
+    | None -> 0
+    | Some d -> d.cms_files_cached
+
+  let add_cms_file_missing d filename =
+    match d with
+    | None -> ()
+    | Some d -> d.cms_files_missing <- filename :: d.cms_files_missing
+
+  let cms_files_missing d =
+    match d with
+    | None -> []
+    | Some d -> List.rev d.cms_files_missing
+
+  let add_cms_file_unreadable d filename =
+    match d with
+    | None -> ()
+    | Some d -> d.cms_files_unreadable <- filename :: d.cms_files_unreadable
+
+  let cms_files_unreadable d =
+    match d with
+    | None -> []
+    | Some d -> List.rev d.cms_files_unreadable
+
+end
+
+
 
 let find_shape env id =
   let namespace = Shape.Sig_component_kind.Module in
@@ -47,7 +134,8 @@ let find_shape env id =
 
 module Make(Params : sig
   val fuel : int
-  val read_unit_shape : unit_name:string -> t option
+
+  val read_unit_shape : diagnostics:Diagnostics.t -> unit_name:string -> t option
 end) = struct
   (* We implement a strong call-by-need reduction, following an
      evaluator from Nathanaelle Courant. *)
@@ -242,6 +330,7 @@ end) = struct
 
   type env = {
     fuel: int ref;
+    diagnostics: Diagnostics.t;
     global_env: Env.t;
     local_env: local_env;
     reduce_memo_table: nf ReduceMemoTable.t;
@@ -252,6 +341,7 @@ end) = struct
     { env with local_env = Ident.Map.add var shape env.local_env }
 
   let rec reduce_ env t =
+    Diagnostics.count_reduction_step env.diagnostics;
     let local_env = env.local_env in
     let memo_key = (local_env, t) in
     in_reduce_memo_table env.reduce_memo_table memo_key (reduce__ env) t
@@ -316,7 +406,8 @@ end) = struct
     else
       match t.desc with
       | Comp_unit unit_name ->
-          begin match Params.read_unit_shape ~unit_name with
+          Diagnostics.count_computation_unit_lookup env.diagnostics;
+          begin match Params.read_unit_shape ~diagnostics:env.diagnostics ~unit_name with
           | Some t -> reduce env t
           | None -> return (NComp_unit unit_name)
           end
@@ -510,12 +601,13 @@ end) = struct
   let reduce_memo_table = Local_store.s_table ReduceMemoTable.create 42
   let read_back_memo_table = Local_store.s_table ReadBackMemoTable.create 42
 
-  let reduce global_env t =
+  let reduce ?(diagnostics = Diagnostics.no_diagnostics) global_env t =
     let fuel = ref Params.fuel in
     let local_env = Ident.Map.empty in
     let env = {
       fuel;
       global_env;
+      diagnostics;
       reduce_memo_table = !reduce_memo_table;
       read_back_memo_table = !read_back_memo_table;
       local_env;
@@ -560,6 +652,7 @@ end) = struct
     let env = {
       fuel;
       global_env;
+      diagnostics = Diagnostics.no_diagnostics;
       reduce_memo_table = !reduce_memo_table;
       read_back_memo_table = !read_back_memo_table;
       local_env;
@@ -574,7 +667,7 @@ end
 module Local_reduce =
   Make(struct
     let fuel = 10
-    let read_unit_shape ~unit_name:_ = None
+    let read_unit_shape ~diagnostics:_ ~unit_name:_ = None
   end)
 
 let local_reduce = Local_reduce.reduce
