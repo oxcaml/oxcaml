@@ -151,13 +151,11 @@ let () =
   (* We must set the value for the initial domain, because [current_domain]
      might be called before the manager thread for the initial domain has
      started. *)
-  Domain.Safe.DLS.access (fun access -> Domain.Safe.DLS.set access domain_key 0)
+  Domain.Safe.DLS.set domain_key 0
 ;;
 
 let current_domain () =
-  let i = Domain.Safe.DLS.access
-    (fun access : int -> Domain.Safe.DLS.get access domain_key)
-  in
+  let i = Domain.Safe.DLS.get domain_key in
   if 0 <= i
   then i
   else
@@ -279,8 +277,7 @@ let rec manager_loop t =
 
 let manager (t : t) =
   Await_atomic_bitset.set idle_domains t.index false;
-  Domain.Safe.DLS.access
-    (fun access -> Domain.Safe.DLS.set access domain_key t.index);
+  Domain.Safe.DLS.set domain_key t.index;
   manager_loop t
 ;;
 

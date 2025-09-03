@@ -292,7 +292,10 @@ module User = struct
        maximum number of threads that requested a buffer concurrently,
        and we never free those buffers. *)
     let create_buffer () = Bytes.create 1024 in
-    let write_buffer_cache = Domain.Safe.DLS.new_key (fun () -> ref []) in
+    (* CR-someday mslater: remove magic by switching to FLS *)
+    let write_buffer_cache = 
+      Domain.Safe.DLS.new_key (fun () -> {Modes.Contended.contended = ref []})
+    in
     let pop_or_create buffers =
       (* intended to be thread-safe *)
       (* begin atomic *)
@@ -319,7 +322,10 @@ module User = struct
       else push buffers buf
     in
     fun consumer ->
-      let buffers = Domain.DLS.get write_buffer_cache in
+      let buffers = 
+        (Domain.Safe.DLS.get write_buffer_cache).Modes.Contended.contended
+        |> Obj.magic_uncontended
+      in
       let buf = pop_or_create buffers in
       Fun.protect ~finally:(fun () -> push buffers buf)
         (fun () -> consumer buf)

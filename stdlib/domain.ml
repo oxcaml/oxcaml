@@ -18,6 +18,7 @@
 (**************************************************************************)
 
 open! Stdlib
+open Modes.Portable
 
 [@@@ocaml.flambda_o3]
 
@@ -25,38 +26,23 @@ external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 
 external runtime5 : unit -> bool @@ portable = "%runtime5"
 
-exception Encapsulated of string
-
 module Runtime_4 = struct
   module DLS = struct
-    module Access = struct
-      type t = Access
-      let for_initial_domain = Access
-    end
-
-    let[@inline] access f =
-      try (f [@inlined hint]) Access.Access with
-      | exn ->
-        let bt = Printexc.get_raw_backtrace () in
-        let exn_string = Printexc.to_string exn in
-        Printexc.raise_with_backtrace (Encapsulated exn_string) bt
 
     let unique_value = Obj.magic_portable (Obj.repr (ref 0))
     let state = Obj.magic_portable (ref (Array.make 8 unique_value))
 
     let init () = ()
 
-    type 'a key : value mod portable contended = Key of (int * (Access.t -> 'a))
-    [@@unboxed]
-    [@@unsafe_allow_any_mode_crossing "runtime4 only"]
+    type 'a key = int * (unit -> 'a) Modes.Portable.t
 
     let key_counter = Obj.magic_portable (ref 0)
 
-    let new_key' ?split_from_parent:_ init_orphan =
+    let new_key ?split_from_parent:_ init_orphan =
       let key_counter = Obj.magic_uncontended key_counter in
       let idx = !key_counter in
       key_counter := idx + 1;
-      Key (idx, init_orphan)
+      (idx, { portable = init_orphan })
 
     (* If necessary, grow the current domain's local state array such that [idx]
     * is a valid index in the array. *)
@@ -76,18 +62,18 @@ module Runtime_4 = struct
         new_st
       end
 
-    let set (_ : Access.t) (Key (idx, _init)) x =
+    let set (idx, _init) x =
       let st = maybe_grow idx in
       (* [Sys.opaque_identity] ensures that flambda does not look at the type of
       * [x], which may be a [float] and conclude that the [st] is a float array.
       * We do not want OCaml's float array optimisation kicking in here. *)
       st.(idx) <- Obj.repr (Sys.opaque_identity x)
 
-    let get access (Key (idx, init)) =
+    let get (idx, init) =
       let st = maybe_grow idx in
       let v = st.(idx) in
       if v == Obj.magic_uncontended unique_value then
-        let v' = Obj.repr (init access) in
+        let v' = Obj.repr (init.portable ()) in
         st.(idx) <- (Sys.opaque_identity v');
         Obj.magic v'
       else Obj.magic v
@@ -109,10 +95,10 @@ module Runtime_4 = struct
       first_spawn_function := new_f
     end
 
-  let at_exit_key = DLS.new_key' (fun (_ : DLS.Access.t) -> (fun () -> ()))
+  let at_exit_key = DLS.new_key (fun () -> { portable = (fun () -> ()) })
 
-  let at_exit' access f =
-    let old_exit : unit -> unit = DLS.get access at_exit_key in
+  let at_exit f =
+    let old_exit : unit -> unit = (DLS.get at_exit_key).portable in
     let new_exit () =
       (* The domain termination callbacks ([at_exit]) are run in
         last-in-first-out (LIFO) order in order to be symmetric with the domain
@@ -120,10 +106,10 @@ module Runtime_4 = struct
         (FIFO) order. *)
       f (); old_exit ()
     in
-    DLS.set access at_exit_key new_exit
+    DLS.set at_exit_key { portable = new_exit }
 
   let do_at_exit () =
-    let f : unit -> unit = DLS.get DLS.Access.for_initial_domain at_exit_key in
+    let f : unit -> unit = (DLS.get at_exit_key).portable in
     f ()
 
   (* Unimplemented functions *)
@@ -131,7 +117,7 @@ module Runtime_4 = struct
     failwith "Multi-domain functionality not supported in runtime4"
   type !'a t : value mod portable contended with 'a
   type id = int
-  let spawn' _ = not_implemented ()
+  let spawn _ = not_implemented ()
   let join _ = not_implemented ()
   let get_id _ = not_implemented ()
 
@@ -176,19 +162,6 @@ module Runtime_5 = struct
 
   module DLS = struct
 
-    module Access = struct
-      type t = Access
-
-      let for_initial_domain = Access
-    end
-
-    let[@inline] access (f : Access.t -> 'a @ portable contended) =
-      try (f [@inlined hint]) Access.Access with
-      | exn ->
-        let bt = Printexc.get_raw_backtrace () in
-        let exn_string = Printexc.to_string exn in
-        Printexc.raise_with_backtrace (Encapsulated exn_string) bt
-
     module Obj_opt : sig @@ portable
       type t
       val none : t
@@ -225,16 +198,16 @@ module Runtime_5 = struct
 
     let init () = create_dls ()
 
-    type 'a key = int * (Access.t -> 'a) Modes.Portable.t
+    type 'a key = int * (unit -> 'a) Modes.Portable.t
 
     let key_counter = Atomic.make 0
 
     type key_initializer : value mod contended portable =
-        KI: 'a key * ('a -> (Access.t -> 'a) @ portable) @@ portable -> key_initializer
+        KI : 'a key * ('a -> (unit -> 'a) @ portable once) @@ portable
+        -> key_initializer
     [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
 
-    type key_initializer_list : value mod contended portable =
-      key_initializer list
+    type key_initializer_list = key_initializer list
 
     let parent_keys = Atomic.make ([] : key_initializer_list)
 
@@ -243,12 +216,12 @@ module Runtime_5 = struct
       if not (Atomic.Contended.compare_and_set parent_keys l (ki :: l))
       then add_parent_key ki
 
-    let new_key' ?split_from_parent init_orphan =
+    let new_key ?split_from_parent init_orphan =
       let idx = Atomic.fetch_and_add key_counter 1 in
-      let k = idx, { Modes.Portable.portable = init_orphan } in
+      let k = idx, { portable = init_orphan } in
       begin match split_from_parent with
       | None -> ()
-      | Some split -> add_parent_key (KI(k, split))
+      | Some split -> add_parent_key (KI (k, split))
       end;
       k
 
@@ -280,7 +253,7 @@ module Runtime_5 = struct
         else maybe_grow idx
       end
 
-    let set (type a) (_ : Access.t) (idx, _init) (x : a) =
+    let set (type a) (idx, _init) (x : a) =
       let st = maybe_grow idx in
       (* [Sys.opaque_identity] ensures that flambda does not look at the type of
       * [x], which may be a [float] and conclude that the [st] is a float array.
@@ -297,13 +270,13 @@ module Runtime_5 = struct
         true
       ) else false
 
-    let get (type a) access ((idx, init) : a key) : a =
+    let get (type a) ((idx, init) : a key) : a =
       let st = maybe_grow idx in
       let obj = st.(idx) in
       if Obj_opt.is_some obj
       then (Obj_opt.unsafe_get obj : a)
       else begin
-        let v : a = init.portable access in
+        let v : a = init.portable () in
         let new_obj = Obj_opt.some (Sys.opaque_identity v) in
         (* At this point, [st] or [st.(idx)] may have been changed
           by another thread on the same domain.
@@ -328,16 +301,19 @@ module Runtime_5 = struct
       end
 
     type key_value : value mod portable contended =
-        KV : 'a key * (Access.t -> 'a) @@ portable -> key_value
+        KV : 'a key * (unit -> 'a) @@ portable -> key_value
     [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
 
-    let get_initial_keys access : key_value list =
+    let get_initial_keys () : key_value list =
       List.map
-        (fun (KI (k, split)) -> KV (k, (split (get access k))))
+        (* [v] is applied exactly once in [set_initial_keys] *)
+        (fun (KI (k, split)) -> 
+          let v = Obj.magic_many (split (get k)) |> Obj.magic_portable in
+          KV (k, v))
         (Atomic.Contended.get parent_keys : key_initializer_list)
 
-    let set_initial_keys access (l: key_value list) =
-      List.iter (fun (KV (k, v)) -> set access k (v access)) l
+    let set_initial_keys (l : key_value list) =
+      List.iter (fun (KV (k, v)) -> set k (v ())) l
   end
 
   (******** Identity **********)
@@ -368,31 +344,29 @@ module Runtime_5 = struct
     if not (Atomic.Contended.get first_domain_spawned) then begin
       Atomic.Contended.set first_domain_spawned true;
       let first_spawn_function = Obj.magic_uncontended first_spawn_function in
-      !first_spawn_function();
+      !first_spawn_function ();
       (* Release the old function *)
       first_spawn_function := (fun () -> ())
     end
 
-  let at_exit_key = DLS.new_key' (fun (_ : DLS.Access.t) -> (fun () -> ()))
+  let at_exit_key = DLS.new_key (fun () -> { portable = (fun () -> ()) })
 
-  let at_exit' access f =
-    let old_exit : unit -> unit = DLS.get access at_exit_key in
+  let at_exit f =
+    let old_exit : unit -> unit = (DLS.get at_exit_key).portable in
     let new_exit () =
       f (); old_exit ()
     in
-    DLS.set access at_exit_key new_exit
+    DLS.set at_exit_key { portable = new_exit }
 
   let do_at_exit () =
-    let f : unit -> unit = DLS.get DLS.Access.for_initial_domain at_exit_key in
+    let f : unit -> unit = (DLS.get at_exit_key).portable in
     f ()
-
-  let _ = Stdlib.do_domain_local_at_exit := do_at_exit
 
   (******* Creation and Termination ********)
 
-  let spawn' f =
+  let spawn f =
     do_before_first_spawn ();
-    let pk = DLS.access (fun access -> DLS.get_initial_keys access) in
+    let pk = DLS.get_initial_keys () in
 
     (* [term_sync] is used to synchronize with the joining domains *)
     let term_sync =
@@ -404,9 +378,8 @@ module Runtime_5 = struct
     let body () =
       match
         DLS.create_dls ();
-        let access = DLS.Access.Access in
-        DLS.set_initial_keys access pk;
-        let res = f access in
+        DLS.set_initial_keys pk;
+        let res = f () in
         res
       with
       (* Run the [at_exit] callbacks when the domain computation either
@@ -446,34 +419,26 @@ end
 
 module type S = sig
   module DLS : sig
-    module Access : sig
-      type t : value mod external_ global portable many unique
-
-      val for_initial_domain : t @@ nonportable
-    end
 
     type 'a key : value mod portable contended
 
-    val access
-      : ('a : value_or_null).
-          (Access.t -> 'a @ portable contended) @ local portable unyielding once
-      -> 'a @ portable contended
-      @@ portable
-
-    val new_key'
-      :  ?split_from_parent:('a -> (Access.t -> 'a) @ portable) @ portable
-      -> (Access.t -> 'a) @ portable
+    (** Systhreads can access DLS state concurrently, and borrowing makes it 
+        possible to give another domain [shared] access, so this function is 
+        only safe if ['a] crosses contention. *)
+    val new_key
+      : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
+      -> (unit -> 'a) @ portable
       -> 'a key
       @@ portable
 
-    val get : Access.t -> 'a key -> 'a @@ portable
-    val set : Access.t -> 'a key -> 'a -> unit @@ portable
+    val get : 'a key -> 'a @@ portable
+    val set : 'a key -> 'a -> unit @@ portable
 
     val init : unit -> unit
   end
 
   type !'a t : value mod portable contended with 'a
-  val spawn' : (DLS.Access.t -> 'a) @ portable once -> 'a t @@ portable
+  val spawn : (unit -> 'a) @ portable once -> 'a t @@ portable
   val join : 'a t -> 'a @@ portable
   type id = private int
   val get_id : 'a t -> id @@ portable
@@ -481,7 +446,7 @@ module type S = sig
   val is_main_domain : unit -> bool @@ portable
   val recommended_domain_count : unit -> int @@ portable
   val before_first_spawn : (unit -> unit) -> unit @@ nonportable
-  val at_exit' : DLS.Access.t -> (unit -> unit) -> unit @@ portable
+  val at_exit : (unit -> unit) @ portable -> unit @@ portable
   val do_at_exit : unit -> unit @@ nonportable
 end
 
@@ -494,29 +459,11 @@ module M : S = (val impl)
 include M
 
 module Safe = struct
-  module DLS = struct
-    include DLS
-
-    exception Encapsulated = Encapsulated
-
-    let new_key ?split_from_parent f =
-      let split_from_parent =
-        match split_from_parent with
-        | None -> None
-        | Some split_from_parent ->
-          Some (fun a ->
-            let f = split_from_parent a in
-            (fun (_ : Access.t) -> f ()))
-      in
-      let f = (fun (_ : Access.t) -> f ()) in
-      new_key' ?split_from_parent f
-    ;;
-  end
-
-  let spawn' = spawn'
-  let spawn f = spawn' (fun _ -> f ())
-  let at_exit' = at_exit'
-  let at_exit f = DLS.access (fun access -> at_exit' access f)
+  (* Note the exposed signature of [new_key] requires that ['a] crosses
+     contention, making it safe. *)
+  module DLS = DLS
+  let spawn = spawn
+  let at_exit = at_exit
 end
 
 module DLS = struct
@@ -527,15 +474,16 @@ module DLS = struct
       match split_from_parent with
       | None -> None
       | Some split_from_parent ->
-        Some (Obj.magic_portable (fun x -> Obj.magic_portable (fun () -> split_from_parent x)))
+        Some (Obj.magic_portable (fun x ->
+          Obj.magic_portable (fun () -> split_from_parent x)))
     in
-    Safe.DLS.new_key ?split_from_parent (Obj.magic_portable f)
+    DLS.new_key ?split_from_parent (Obj.magic_portable f)
   ;;
 
-  let get key = Safe.DLS.get (Obj.magic () : Safe.DLS.Access.t) key
-  let set key value = Safe.DLS.set (Obj.magic () : Safe.DLS.Access.t) key value
+  let get key = DLS.get key
+  let set key value = DLS.set key value
 
-  let init = Safe.DLS.init
+  let init = DLS.init
 end
 
 let spawn f = Safe.spawn (Obj.magic_portable f)

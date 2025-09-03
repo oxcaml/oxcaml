@@ -335,26 +335,27 @@ external close_desc: int -> unit @@ portable = "caml_sys_close"
 
 module DLS = Domain.Safe.DLS
 
-let prng_key = DLS.new_key Random.State.make_self_init
+module Rng : sig
+  val bits : unit -> int
+end = struct
+  open Modes.Contended
+  (* CR-someday mslater: remove magic by switching to FLS *)
+  let key = DLS.new_key (fun () -> {contended = Random.State.make_self_init ()})
+  let[@inline] bits () = Random.State.bits (Obj.magic_uncontended (DLS.get key).contended)
+end
 
 let temp_file_name temp_dir prefix suffix =
-  let rnd =
-    DLS.access (fun access ->
-      let random_state = DLS.get access prng_key in
-      (Random.State.bits random_state) land 0xFFFFFF)
-  in
+  let rnd = (Rng.bits ()) land 0xFFFFFF in
   concat temp_dir (Printf.sprintf "%s%06x%s" prefix rnd suffix)
 
 let current_temp_dir_name =
   DLS.new_key
-    ~split_from_parent:(fun (filename : string) -> (fun () -> filename))
+    ~split_from_parent:(fun (filename : string) () -> filename)
     (fun () -> temp_dir_name)
 
-let set_temp_dir_name (s : string) =
-  DLS.access (fun access -> DLS.set access current_temp_dir_name s)
+let set_temp_dir_name (s : string) = DLS.set current_temp_dir_name s
 
-let get_temp_dir_name () =
-  DLS.access (fun access : string -> DLS.get access current_temp_dir_name)
+let get_temp_dir_name () = DLS.get current_temp_dir_name
 
 let temp_file ?(temp_dir = get_temp_dir_name ()) prefix suffix =
   let rec try_name counter =

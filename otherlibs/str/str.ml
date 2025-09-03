@@ -607,30 +607,41 @@ external re_search_forward: regexp -> string -> int -> int array
 external re_search_backward: regexp -> string -> int -> int array
      = "re_search_backward"
 
-let last_search_result_key = Domain.Safe.DLS.new_key (fun () -> [||])
+module DLS = Domain.Safe.DLS
+
+(* CR-someday mslater: remove magic by switching to FLS *)
+let unsafe_dls_key (type a) (f : unit -> a) = 
+  let open struct 
+    type magic : value mod contended = T of a
+    [@@unboxed] [@@unsafe_allow_any_mode_crossing]
+  end in
+  DLS.new_key (fun () -> T (f ()))
+  |> (Obj.magic : magic DLS.key -> a DLS.key)
+
+let last_search_result_key = unsafe_dls_key (fun () -> [||])
 
 let string_match re s pos =
   let res = re_string_match re s pos in
-  Domain.DLS.set last_search_result_key res;
+  DLS.set last_search_result_key res;
   Array.length res > 0
 
 let string_partial_match re s pos =
   let res = re_partial_match re s pos in
-  Domain.DLS.set last_search_result_key res;
+  DLS.set last_search_result_key res;
   Array.length res > 0
 
 let search_forward re s pos =
   let res = re_search_forward re s pos in
-  Domain.DLS.set last_search_result_key res;
+  DLS.set last_search_result_key res;
   if Array.length res = 0 then raise Not_found else res.(0)
 
 let search_backward re s pos =
   let res = re_search_backward re s pos in
-  Domain.DLS.set last_search_result_key res;
+  DLS.set last_search_result_key res;
   if Array.length res = 0 then raise Not_found else res.(0)
 
 let group_beginning n =
-  let last_search_result = Domain.DLS.get last_search_result_key in
+  let last_search_result = DLS.get last_search_result_key in
   let n2 = n + n in
   if n < 0 || n2 >= Array.length last_search_result then
     invalid_arg "Str.group_beginning"
@@ -639,7 +650,7 @@ let group_beginning n =
     if pos = -1 then raise Not_found else pos
 
 let group_end n =
-  let last_search_result = Domain.DLS.get last_search_result_key in
+  let last_search_result = DLS.get last_search_result_key in
   let n2 = n + n in
   if n < 0 || n2 >= Array.length last_search_result then
     invalid_arg "Str.group_end"
@@ -648,7 +659,7 @@ let group_end n =
     if pos = -1 then raise Not_found else pos
 
 let matched_group n txt =
-  let last_search_result = Domain.DLS.get last_search_result_key in
+  let last_search_result = DLS.get last_search_result_key in
   let n2 = n + n in
   if n < 0 || n2 >= Array.length last_search_result then
     invalid_arg "Str.matched_group"
@@ -667,7 +678,7 @@ external re_replacement_text: string -> int array -> string -> string
     = "re_replacement_text"
 
 let replace_matched repl matched =
-  let last_search_result = Domain.DLS.get last_search_result_key in
+  let last_search_result = DLS.get last_search_result_key in
   re_replacement_text repl last_search_result matched
 
 let substitute_first expr repl_fun text =

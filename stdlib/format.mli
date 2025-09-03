@@ -984,6 +984,8 @@ val formatter_of_out_channel : out_channel -> formatter
 val synchronized_formatter_of_out_channel :
   out_channel -> formatter Domain.Safe.DLS.key
 [@@alert unstable][@@alert "-unstable"]
+[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
+                             contention in DLS."]
 (** [synchronized_formatter_of_out_channel oc] returns the key to the
     domain-local state that holds the domain-local formatter for writing to the
     corresponding output channel [oc].
@@ -999,7 +1001,9 @@ val std_formatter : formatter @@ nonportable
   It is defined as {!formatter_of_out_channel} {!Stdlib.stdout}.
 *)
 
-val get_std_formatter : unit -> formatter @@ nonportable
+val get_std_formatter : unit -> formatter
+[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
+                             contention in DLS."]
 (** [get_std_formatter ()] returns the current domain's standard formatter used
     to write to standard output.
     @since 5.0
@@ -1011,7 +1015,9 @@ val err_formatter : formatter @@ nonportable
   It is defined as {!formatter_of_out_channel} {!Stdlib.stderr}.
 *)
 
-val get_err_formatter : unit -> formatter @@ nonportable
+val get_err_formatter : unit -> formatter
+[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
+                             contention in DLS."]
 (** [get_err_formatter ()] returns the current domain's formatter used to write
    to standard error.
    @since 5.0
@@ -1027,7 +1033,9 @@ val formatter_of_buffer : Buffer.t -> formatter
 val stdbuf : Buffer.t @@ nonportable
 (** The initial domain's string buffer in which [str_formatter] writes. *)
 
-val get_stdbuf : unit -> Buffer.t @@ nonportable
+val get_stdbuf : unit -> Buffer.t
+[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
+                             contention in DLS."]
 (** [get_stdbuf ()] returns the current domain's string buffer in which the
     current domain's string formatter writes.
     @since 5.0 *)
@@ -1038,7 +1046,9 @@ val str_formatter : formatter @@ nonportable
   [str_formatter] is defined as {!formatter_of_buffer} {!stdbuf}.
 *)
 
-val get_str_formatter : unit -> formatter @@ nonportable
+val get_str_formatter : unit -> formatter
+[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
+                             contention in DLS."]
 (** The current domain's formatter to output to the current domains string
     buffer.
     @since 5.0
@@ -1066,7 +1076,9 @@ val make_formatter :
 val make_synchronized_formatter :
   (string -> int -> int -> unit) -> (unit -> unit) -> formatter Domain.Safe.DLS.key
   @@ nonportable
-[@@alert unstable][@@alert "-unstable"][@@alert unsafe_multidomain "Use [Format.Safe.make_synchronized_formatter]."]
+[@@alert unstable][@@alert "-unstable"]
+[@@alert unsafe_multidomain "It is unsafe to store nonportable values or \
+                             values that do not cross contention in DLS."]
 (** [make_synchronized_formatter out flush] returns the key to the domain-local
     state that holds the domain-local formatter that outputs with function
     [out], and flushes with function [flush].
@@ -1461,50 +1473,6 @@ val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
 
   @since 4.03
 *)
-
-(** Submodule containing non-backwards-compatible functions which enforce thread safety
-    via modes. *)
-module Safe : sig
-  (** Like {!get_std_formatter}, but can be called from any domain.
-
-      An additional [Domain.Safe.DLS.Access.t] argument is taken, which acts as a witness
-      that the returned [formatter] does not escape the current domain. This is necessary
-      as the [formatter] may contain functions which close over other data in the current
-      domain. *)
-  val get_std_formatter : Domain.Safe.DLS.Access.t -> formatter
-
-  (** Like {!get_err_formatter}, but can be called from any domain.
-
-      An additional [Domain.Safe.DLS.Access.t] argument is taken, which acts as a witness
-      that the returned [formatter] does not escape the current domain. This is necessary
-      as the [formatter] may contain functions which close over other data in the current
-      domain. *)
-  val get_err_formatter : Domain.Safe.DLS.Access.t -> formatter
-
-  (** Like {!get_str_formatter}, but can be called from any domain.
-
-      An additional [Domain.Safe.DLS.Access.t] argument is taken, which acts as a witness
-      that the returned [formatter] does not escape the current domain. This is necessary
-      as the [formatter] may contain functions which close over other data in the current
-      domain. *)
-  val get_str_formatter : Domain.Safe.DLS.Access.t -> formatter
-
-  (** Like {!get_stdbuf}, but can be called from any domain.
-
-      An additional [Domain.Safe.DLS.Access.t] argument is taken, which acts as a witness
-      that the returned [Buffer.t] does not escape the current domain. This is necessary
-      as the [Buffer.t] is mutable data which is not safe to share between domains. *)
-  val get_stdbuf : Domain.Safe.DLS.Access.t -> Buffer.t
-
-  (** Like {!make_synchronized_formatter}, but can be called from any domain.
-
-      The provided closures must be [portable] as they will be called from other domains
-      that access the returned [Domain.Safe.DLS.key]. *)
-  val make_synchronized_formatter :
-    (string -> int -> int -> unit) @ portable
-    -> (unit -> unit) @ portable
-    -> formatter Domain.Safe.DLS.key
-end
 
 (** {1:examples Examples}
 
