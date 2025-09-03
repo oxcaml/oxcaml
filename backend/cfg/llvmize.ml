@@ -1887,9 +1887,19 @@ let open_out ~asm_filename =
   let t = get_current_compilation_unit "open_out" in
   t.asm_filename <- Some asm_filename
 
-let fun_attrs _t _codegen_options : string list =
-  (* CR gyorsh: translate and communicate to llvm backend *)
-  []
+let fun_attrs _t codegen_options =
+  (* CR yusumez: We'd like to propagate [@inline never] or [@cold] attributes
+     through, but this should be fine now? *)
+  let default_attrs = ["noinline"] in
+  default_attrs
+  @ List.concat_map
+      (fun opt ->
+        match (opt : Cfg.codegen_option) with
+        | Cfg.Cold -> ["cold"]
+        | Reduce_code_size | No_CSE | Use_linscan_regalloc | Use_regalloc _
+        | Use_regalloc_param _ | Assume_zero_alloc _ | Check_zero_alloc _ ->
+          [] (* CR gyorsh: translate and communicate to llvm backend *))
+      codegen_options
 
 let collect_body_regs cfg =
   Cfg.fold_blocks cfg
@@ -2040,11 +2050,7 @@ let cfg (cl : CL.t) =
     F.ins_branch t entry_label;
     DLL.iter ~f:pp_block layout
   in
-  let fun_attrs =
-    fun_attrs t fun_codegen_options @ ["noinline"]
-    (* CR yusumez: We'd like to propagate [@inline never] or [@cold] attributes
-       through, but this should be fine now? *)
-  in
+  let fun_attrs = fun_attrs t fun_codegen_options in
   let fun_args =
     List.map (fun ident -> Llvm_typ.ptr, ident) runtime_arg_idents
     @ List.filter_map

@@ -557,7 +557,8 @@ let equal_specific_operation left right =
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
      Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
-      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ | Illvm_intrinsic _), _ ->
+     Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
+     Illvm_intrinsic _), _ ->
     false
 
 (* addressing mode functions *)
@@ -667,6 +668,7 @@ let isomorphic_specific_operation op1 op2 =
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
-    | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ | Illvm_intrinsic _), _ ->
+     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
+     Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
+     Illvm_intrinsic _), _ ->
     false

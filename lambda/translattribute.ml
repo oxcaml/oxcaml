@@ -414,7 +414,12 @@ let add_cold_attribute expr _loc attributes =
   match expr with
   | Lfunction({ attr } as funct) ->
     if get_cold_attribute attributes then
-      let attr = { attr with cold = true } in
+      let attr =
+        { attr with
+          cold = true;
+          inline = Never_inline;
+          local = Never_local;
+          specialise = Never_specialise } in
       lfunction_with_attr ~attr funct
     else
       expr
