@@ -2300,6 +2300,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         (Zero_alloc_attribute.from_lambda
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
+      ~cold:(Function_decl.cold decl)
       ~is_opaque:false ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
@@ -2702,6 +2703,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         (Zero_alloc_attribute.from_lambda
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
+      ~cold:(Function_decl.cold decl)
       ~is_opaque:(Function_decl.is_opaque decl)
       ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
@@ -2862,7 +2864,7 @@ let close_functions acc external_env ~current_region function_declarations =
             ~result_mode:(Function_decl.result_mode decl)
             ~stub:(Function_decl.stub decl) ~inline:Never_inline
             ~zero_alloc_attribute ~poll_attribute ~regalloc_attribute 
-            ~regalloc_param_attribute
+            ~regalloc_param_attribute ~cold:(Function_decl.cold decl)
             ~is_a_functor:(Function_decl.is_a_functor decl)
             ~is_opaque:(Function_decl.is_opaque decl)
             ~recursive:(Function_decl.recursive decl)
@@ -3200,6 +3202,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         loop = Default_loop;
         regalloc = Default_regalloc;
         regalloc_param = [];
+        cold = false;
         is_a_functor = false;
         is_opaque = false;
         stub = true;

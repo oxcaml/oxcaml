@@ -745,6 +745,7 @@ type function_attribute = {
   loop: loop_attribute;
   regalloc: regalloc_attribute;
   regalloc_param: regalloc_param_attribute;
+  cold: bool;  (* [@cold] attribute - hints that function is rarely called *)
   is_a_functor: bool;
   is_opaque: bool;
   stub: bool;

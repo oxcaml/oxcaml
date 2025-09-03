@@ -1074,7 +1074,8 @@ let function_attribute ppf t =
   | [] -> ()
   | params ->
       List.iter (fun param -> fprintf ppf "regalloc_param(%S)@ " param) params
-  end
+  end;
+  if t.cold then fprintf ppf "cold@ "
 
 let apply_tailcall_attribute ppf = function
   | Default_tailcall -> ()

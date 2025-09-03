@@ -1534,7 +1534,7 @@ end = struct
                 custom_error_msg = None
               }
           | Reduce_code_size | No_CSE | Use_linscan_regalloc | Use_regalloc _ 
-          | Use_regalloc_param _ ->
+          | Use_regalloc_param _ | Cold ->
             None)
         codegen_options
     in
@@ -1569,7 +1569,7 @@ end = struct
                 loc;
                 custom_error_msg = None
               }
-          | Reduce_code_size | No_CSE | Use_linscan_regalloc | Use_regalloc _ | Use_regalloc_param _ -> None)
+          | Reduce_code_size | No_CSE | Use_linscan_regalloc | Use_regalloc _ | Use_regalloc_param _ | Cold -> None)
         codegen_options
     in
     match a with

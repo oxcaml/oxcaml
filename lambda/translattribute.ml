@@ -56,6 +56,9 @@ let is_regalloc_attribute =
 let is_regalloc_param_attribute =
   [ "regalloc_param", Return ]
 
+let is_cold_attribute =
+  [ "cold", Return ]
+
 let is_opaque_attribute =
   [ "opaque", Return ]
 
@@ -253,6 +256,9 @@ let get_regalloc_param_attributes l =
   let attrs = select_attributes is_regalloc_param_attribute l in
   List.filter_map (fun attr -> parse_regalloc_param_attribute (Some attr)) attrs
 
+let get_cold_attribute l =
+  find_attribute is_cold_attribute l <> None
+
 let check_local_inline loc attr =
   match attr.local, attr.inline with
   | Always_local, (Always_inline | Available_inline | Unroll _) ->
@@ -404,6 +410,16 @@ let add_regalloc_param_attribute expr _loc attributes =
     end
   | _ -> expr
 
+let add_cold_attribute expr _loc attributes =
+  match expr with
+  | Lfunction({ attr } as funct) ->
+    if get_cold_attribute attributes then
+      let attr = { attr with cold = true } in
+      lfunction_with_attr ~attr funct
+    else
+      expr
+  | _ -> expr
+
 let add_tmc_attribute expr loc attributes =
   match expr with
   | Lfunction funct ->
@@ -530,6 +546,9 @@ let add_function_attributes lam loc attr =
   in
   let lam =
     add_regalloc_param_attribute lam loc attr
+  in
+  let lam =
+    add_cold_attribute lam loc attr
   in
   let lam =
     add_tmc_attribute lam loc attr
