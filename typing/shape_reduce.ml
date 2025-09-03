@@ -41,28 +41,28 @@ let rec print_result fmt result =
       Format.fprintf fmt "@[Missing uid@]@;"
 
 module Diagnostics = struct
-
-  type diagnostics = {
-    mutable reduction_steps: int;
-    mutable computation_unit_lookups: int;
-    mutable cms_files_loaded: int;
-    mutable cms_files_cached: int;
-    mutable cms_files_missing: string list;
-    mutable cms_files_unreadable: string list;
-  }
+  type diagnostics =
+    { mutable reduction_steps : int;
+      mutable computation_unit_lookups : int;
+      mutable cms_files_loaded : int;
+      mutable cms_files_cached : int;
+      mutable cms_files_missing : string list;
+      mutable cms_files_unreadable : string list
+    }
 
   type t = diagnostics option
 
   let no_diagnostics = None
 
-  let create_diagnostics () = Some {
-    reduction_steps = 0;
-    computation_unit_lookups = 0;
-    cms_files_loaded = 0;
-    cms_files_cached = 0;
-    cms_files_missing = [];
-    cms_files_unreadable = [];
-  }
+  let create_diagnostics () =
+    Some
+      { reduction_steps = 0;
+        computation_unit_lookups = 0;
+        cms_files_loaded = 0;
+        cms_files_cached = 0;
+        cms_files_missing = [];
+        cms_files_unreadable = []
+      }
 
   let count_reduction_step d =
     match d with
@@ -74,15 +74,10 @@ module Diagnostics = struct
     | None -> ()
     | Some d -> d.computation_unit_lookups <- d.computation_unit_lookups + 1
 
-  let reduction_steps d =
-    match d with
-    | None -> 0
-    | Some d -> d.reduction_steps
+  let reduction_steps d = match d with None -> 0 | Some d -> d.reduction_steps
 
   let computation_unit_lookups d =
-    match d with
-    | None -> 0
-    | Some d -> d.computation_unit_lookups
+    match d with None -> 0 | Some d -> d.computation_unit_lookups
 
   let count_cms_file_loaded d =
     match d with
@@ -90,9 +85,7 @@ module Diagnostics = struct
     | Some d -> d.cms_files_loaded <- d.cms_files_loaded + 1
 
   let cms_files_loaded d =
-    match d with
-    | None -> 0
-    | Some d -> d.cms_files_loaded
+    match d with None -> 0 | Some d -> d.cms_files_loaded
 
   let count_cms_file_cached d =
     match d with
@@ -100,9 +93,7 @@ module Diagnostics = struct
     | Some d -> d.cms_files_cached <- d.cms_files_cached + 1
 
   let cms_files_cached d =
-    match d with
-    | None -> 0
-    | Some d -> d.cms_files_cached
+    match d with None -> 0 | Some d -> d.cms_files_cached
 
   let add_cms_file_missing d filename =
     match d with
@@ -110,9 +101,7 @@ module Diagnostics = struct
     | Some d -> d.cms_files_missing <- filename :: d.cms_files_missing
 
   let cms_files_missing d =
-    match d with
-    | None -> []
-    | Some d -> List.rev d.cms_files_missing
+    match d with None -> [] | Some d -> List.rev d.cms_files_missing
 
   let add_cms_file_unreadable d filename =
     match d with
@@ -120,13 +109,8 @@ module Diagnostics = struct
     | Some d -> d.cms_files_unreadable <- filename :: d.cms_files_unreadable
 
   let cms_files_unreadable d =
-    match d with
-    | None -> []
-    | Some d -> List.rev d.cms_files_unreadable
-
+    match d with None -> [] | Some d -> List.rev d.cms_files_unreadable
 end
-
-
 
 let find_shape env id =
   let namespace = Shape.Sig_component_kind.Module in
@@ -135,7 +119,8 @@ let find_shape env id =
 module Make(Params : sig
   val fuel : int
 
-  val read_unit_shape : diagnostics:Diagnostics.t -> unit_name:string -> t option
+  val read_unit_shape :
+    diagnostics:Diagnostics.t -> unit_name:string -> t option
 end) = struct
   (* We implement a strong call-by-need reduction, following an
      evaluator from Nathanaelle Courant. *)
@@ -407,7 +392,9 @@ end) = struct
       match t.desc with
       | Comp_unit unit_name ->
           Diagnostics.count_computation_unit_lookup env.diagnostics;
-          begin match Params.read_unit_shape ~diagnostics:env.diagnostics ~unit_name with
+          begin match
+            Params.read_unit_shape ~diagnostics:env.diagnostics ~unit_name
+          with
           | Some t -> reduce env t
           | None -> return (NComp_unit unit_name)
           end
