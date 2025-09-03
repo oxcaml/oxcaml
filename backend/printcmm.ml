@@ -464,7 +464,7 @@ let codegen_option = function
     | Irc_regalloc -> "regalloc_irc"
     | Ls_regalloc -> "regalloc_ls"
     | Gi_regalloc -> "regalloc_gi")
-  | Use_regalloc_param params -> 
+  | Use_regalloc_param params ->
     Printf.sprintf "regalloc_param[%s]"
       (String.concat ";" (List.map (Printf.sprintf "%S") params))
   | Assume_zero_alloc { strict; never_returns_normally; never_raises; loc = _ }

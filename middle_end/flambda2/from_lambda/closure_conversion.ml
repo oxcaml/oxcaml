@@ -2295,7 +2295,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~regalloc_attribute:
         (Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl))
       ~regalloc_param_attribute:
-        (Regalloc_param_attribute.from_lambda (Function_decl.regalloc_param_attribute decl))
+        (Regalloc_param_attribute.from_lambda
+           (Function_decl.regalloc_param_attribute decl))
       ~zero_alloc_attribute:
         (Zero_alloc_attribute.from_lambda
            (Function_decl.zero_alloc_attribute decl))
@@ -2697,7 +2698,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~regalloc_attribute:
         (Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl))
       ~regalloc_param_attribute:
-        (Regalloc_param_attribute.from_lambda (Function_decl.regalloc_param_attribute decl))
+        (Regalloc_param_attribute.from_lambda
+           (Function_decl.regalloc_param_attribute decl))
       ~zero_alloc_attribute:
         (Zero_alloc_attribute.from_lambda
            (Function_decl.zero_alloc_attribute decl))
@@ -2841,7 +2843,8 @@ let close_functions acc external_env ~current_region function_declarations =
           Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl)
         in
         let regalloc_param_attribute =
-          Regalloc_param_attribute.from_lambda (Function_decl.regalloc_param_attribute decl)
+          Regalloc_param_attribute.from_lambda
+            (Function_decl.regalloc_param_attribute decl)
         in
         let zero_alloc_attribute =
           Zero_alloc_attribute.from_lambda
@@ -2861,7 +2864,7 @@ let close_functions acc external_env ~current_region function_declarations =
             ~param_modes ~result_arity ~result_types:Unknown
             ~result_mode:(Function_decl.result_mode decl)
             ~stub:(Function_decl.stub decl) ~inline:Never_inline
-            ~zero_alloc_attribute ~poll_attribute ~regalloc_attribute 
+            ~zero_alloc_attribute ~poll_attribute ~regalloc_attribute
             ~regalloc_param_attribute
             ~is_a_functor:(Function_decl.is_a_functor decl)
             ~is_opaque:(Function_decl.is_opaque decl)

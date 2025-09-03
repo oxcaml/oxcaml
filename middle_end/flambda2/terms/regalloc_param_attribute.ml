@@ -20,9 +20,11 @@ let print ppf t =
   match t with
   | [] -> Format.pp_print_string ppf "[]"
   | params ->
-      Format.fprintf ppf "[%a]"
-        (Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
-           (fun ppf s -> Format.fprintf ppf "%S" s)) params
+    Format.fprintf ppf "[%a]"
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+         (fun ppf s -> Format.fprintf ppf "%S" s))
+      params
 
 let equal t1 t2 = List.equal String.equal t1 t2
 
