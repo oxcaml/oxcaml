@@ -548,6 +548,7 @@ type codegen_option =
   | No_CSE
   | Use_linscan_regalloc
   | Use_regalloc of regalloc_kind
+  | Use_regalloc_param of string list
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
