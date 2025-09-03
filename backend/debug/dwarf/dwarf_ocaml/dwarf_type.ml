@@ -110,9 +110,9 @@ end = struct
   type d =
     { type_name : string;
       type_layout : Layout.t;
-      mutable shape_size_before_reduction_memory : int;
-      mutable shape_size_after_reduction_memory : int;
-      mutable shape_size_after_evaluation_memory : int;
+      mutable shape_size_before_reduction_in_bytes : int;
+      mutable shape_size_after_reduction_in_bytes : int;
+      mutable shape_size_after_evaluation_in_bytes : int;
       mutable dwarf_die_size_before : int;
       mutable dwarf_die_size_after : int;
       shape_reduction_diagnostics : Shape_reduce.Diagnostics.t;
@@ -127,9 +127,9 @@ end = struct
       Some
         { type_name;
           type_layout;
-          shape_size_before_reduction_memory = 0;
-          shape_size_after_reduction_memory = 0;
-          shape_size_after_evaluation_memory = 0;
+          shape_size_before_reduction_in_bytes = 0;
+          shape_size_after_reduction_in_bytes = 0;
+          shape_size_after_evaluation_in_bytes = 0;
           dwarf_die_size_before = 0;
           dwarf_die_size_after = 0;
           shape_reduction_diagnostics =
@@ -191,9 +191,9 @@ end = struct
       if !Dwarf_flags.ddwarf_shape_reduction_diags
       then
         let diagnostic : DS.Diagnostics.variable_reduction =
-          { initial_size_memory = d.shape_size_before_reduction_memory;
-            reduced_size_memory = d.shape_size_after_reduction_memory;
-            evaluated_size_memory = d.shape_size_after_evaluation_memory;
+          { shape_size_before_reduction_in_bytes = d.shape_size_before_reduction_in_bytes;
+            shape_size_after_reduction_in_bytes = d.shape_size_after_reduction_in_bytes;
+            shape_size_after_evaluation_in_bytes = d.shape_size_after_evaluation_in_bytes;
             reduction_steps =
               Shape_reduce.Diagnostics.reduction_steps
                 d.shape_reduction_diagnostics;
