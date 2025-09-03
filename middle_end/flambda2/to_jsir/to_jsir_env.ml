@@ -132,12 +132,7 @@ let get_var_exn t fvar = Variable.Map.find fvar t.vars
 
 let get_symbol_from_global_data ~compilation_unit ~symbol_name ~res =
   let res = To_jsir_result.import_compilation_unit res compilation_unit in
-  (* CR selee: only make this once *)
-  let global_data = Jsir.Var.fresh () in
-  let res =
-    To_jsir_result.add_instr_exn res
-      (Let (global_data, Prim (Extern "caml_get_global_data", [])))
-  in
+  let res, global_data = To_jsir_result.global_data_var res in
   let symbol_name = Jsir.Native_string.of_string symbol_name in
   let var = Jsir.Var.fresh () in
   let expr : Jsir.expr =
