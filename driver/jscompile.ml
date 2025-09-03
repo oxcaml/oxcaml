@@ -61,12 +61,17 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
              ~all_code:flambda_result.all_code
              ~reachable_names:flambda_result.reachable_names
              flambda_result.flambda
-           |> print_if i.ppf_dump Clflags.dump_jsir (fun ppf jsir ->
-                  Jsoo_imports.Code.Print.program ppf (fun _ _ -> "") jsir)
+           |> print_if i.ppf_dump Clflags.dump_jsir
+                (fun ppf (jsir : Flambda2_to_jsir.To_jsir_result.program) ->
+                  Jsoo_imports.Code.Print.program ppf
+                    (fun _ _ -> "")
+                    jsir.program)
          in
          jsir, program.main_module_block_format, arg_descr)
 
-let emit_jsir i jsir_program =
+let emit_jsir i
+    ({ program; imported_compilation_units } :
+      Flambda2_to_jsir.To_jsir_result.program) =
   let cmj = Unit_info.cmj i.target in
   let oc = open_out_bin (Unit_info.Artifact.filename cmj) in
   Misc.try_finally
@@ -74,15 +79,15 @@ let emit_jsir i jsir_program =
     ~exceptionally:(fun () ->
       Misc.remove_file (Unit_info.Artifact.filename cmj))
     (fun () ->
-      (* CR selee: it's fairly likely that we will have to include more metadata
-         - for example [Cmo_format] includes [Compilation_unit] to get the linkage
-         name etc. *)
       output_string oc Config.cmj_magic_number;
       (* We include the highest used variable in the translation, so that Js_of_ocaml
          can read this number and update its own state accordingly. *)
       let cmj_body : Jsoo_imports.Code.cmj_body =
-        { program = jsir_program;
-          last_var = Jsoo_imports.Code.Var.idx (Jsoo_imports.Code.Var.last ())
+        { program;
+          last_var = Jsoo_imports.Code.Var.idx (Jsoo_imports.Code.Var.last ());
+          imported_compilation_units =
+            Compilation_unit.Set.elements imported_compilation_units;
+          exported_compilation_unit = i.module_name
         }
       in
       output_value oc cmj_body)
