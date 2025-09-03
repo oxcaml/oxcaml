@@ -94,8 +94,10 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
       Check_zero_alloc { strict; loc; custom_error_msg }
       :: of_cmm_codegen_option tl
     | Use_linscan_regalloc -> Use_linscan_regalloc :: of_cmm_codegen_option tl
-    | Use_regalloc kind -> Use_regalloc (convert_regalloc_kind kind) :: of_cmm_codegen_option tl
-    | Use_regalloc_param params -> Use_regalloc_param params :: of_cmm_codegen_option tl
+    | Use_regalloc kind ->
+      Use_regalloc (convert_regalloc_kind kind) :: of_cmm_codegen_option tl
+    | Use_regalloc_param params ->
+      Use_regalloc_param params :: of_cmm_codegen_option tl
     | Cold -> Cold :: of_cmm_codegen_option tl)
 
 type t =
