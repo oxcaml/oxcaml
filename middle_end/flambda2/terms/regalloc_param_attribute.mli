@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = string list
+type t = Lambda.regalloc_param_attribute
 
 val print : Format.formatter -> t -> unit
 

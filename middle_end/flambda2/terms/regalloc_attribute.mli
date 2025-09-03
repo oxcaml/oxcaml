@@ -14,12 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t =
-  | Default
-  | Cfg
-  | Irc
-  | Ls
-  | Gi
+type t = Lambda.regalloc_attribute
 
 val print : Format.formatter -> t -> unit
 

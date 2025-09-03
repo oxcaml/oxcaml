@@ -342,22 +342,19 @@ let register_allocator fd : register_allocator =
   (* First check for per-function regalloc attribute in codegen_options *)
   let rec find_regalloc_option = function
     | [] -> None
-    | Cmm.Use_regalloc kind :: _ -> Some kind
+    | Cmm.Use_regalloc regalloc :: _ -> Some regalloc
     | _ :: rest -> find_regalloc_option rest
   in
-  match find_regalloc_option fd.fun_codegen_options with
-  | Some Cmm.Cfg_regalloc -> if should_use_linscan fd then LS else IRC
-  | Some Cmm.Irc_regalloc -> IRC
-  | Some Cmm.Ls_regalloc -> LS
-  | Some Cmm.Gi_regalloc -> GI
-  | Some Cmm.Default_regalloc | None -> (
-    (* Fall back to global regalloc flag *)
-    match String.lowercase_ascii !Oxcaml_flags.regalloc with
-    | "" | "cfg" -> if should_use_linscan fd then LS else IRC
-    | "gi" -> GI
-    | "irc" -> IRC
-    | "ls" -> LS
-    | other -> Misc.fatal_errorf "unknown register allocator (%S)" other)
+  let regalloc =
+    Option.value
+      (find_regalloc_option fd.fun_codegen_options)
+      ~default:!Oxcaml_flags.regalloc
+  in
+  match (regalloc : Clflags.Register_allocator.t) with
+  | Cfg -> if should_use_linscan fd then LS else IRC
+  | Irc -> IRC
+  | Ls -> LS
+  | Gi -> GI
 
 let available_regs ~stack_slots ~f x =
   (* Skip DWARF variable range generation for complicated functions to avoid

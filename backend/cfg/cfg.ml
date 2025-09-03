@@ -46,18 +46,11 @@ type basic_block =
     mutable cold : bool
   }
 
-type regalloc_kind =
-  | Default_regalloc
-  | Cfg_regalloc
-  | Irc_regalloc
-  | Ls_regalloc
-  | Gi_regalloc
-
 type codegen_option =
   | Reduce_code_size
   | No_CSE
   | Use_linscan_regalloc
-  | Use_regalloc of regalloc_kind
+  | Use_regalloc of Clflags.Register_allocator.t
   | Use_regalloc_param of string list
   | Cold
   | Assume_zero_alloc of
@@ -71,13 +64,6 @@ type codegen_option =
         loc : Location.t;
         custom_error_msg : string option
       }
-
-let convert_regalloc_kind : Cmm.regalloc_kind -> regalloc_kind = function
-  | Cmm.Default_regalloc -> Default_regalloc
-  | Cmm.Cfg_regalloc -> Cfg_regalloc
-  | Cmm.Irc_regalloc -> Irc_regalloc
-  | Cmm.Ls_regalloc -> Ls_regalloc
-  | Cmm.Gi_regalloc -> Gi_regalloc
 
 let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
  fun cmm_options ->
@@ -94,8 +80,7 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
       Check_zero_alloc { strict; loc; custom_error_msg }
       :: of_cmm_codegen_option tl
     | Use_linscan_regalloc -> Use_linscan_regalloc :: of_cmm_codegen_option tl
-    | Use_regalloc kind ->
-      Use_regalloc (convert_regalloc_kind kind) :: of_cmm_codegen_option tl
+    | Use_regalloc regalloc -> Use_regalloc regalloc :: of_cmm_codegen_option tl
     | Use_regalloc_param params ->
       Use_regalloc_param params :: of_cmm_codegen_option tl
     | Cold -> Cold :: of_cmm_codegen_option tl)

@@ -1064,11 +1064,8 @@ let function_attribute ppf t =
   | Error_poll -> fprintf ppf "error_poll@ "
   end;
   begin match t.regalloc with
-  | Default_regalloc -> ()
-  | Cfg_regalloc -> fprintf ppf "regalloc_cfg@ "
-  | Irc_regalloc -> fprintf ppf "regalloc_irc@ "
-  | Ls_regalloc -> fprintf ppf "regalloc_ls@ "
-  | Gi_regalloc -> fprintf ppf "regalloc_gi@ "
+  | None -> ()
+  | Some regalloc -> fprintf ppf "%a@ " Clflags.Register_allocator.format regalloc
   end;
   begin match t.regalloc_param with
   | [] -> ()
