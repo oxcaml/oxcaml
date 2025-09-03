@@ -65,10 +65,21 @@ type basic_block =
            trap stack. *)
   }
 
+(* Register allocator kind from Cmm *)
+type regalloc_kind =
+  | Default_regalloc
+  | Cfg_regalloc
+  | Irc_regalloc
+  | Ls_regalloc
+  | Gi_regalloc
+
 (* Subset of Cmm.codegen_option. *)
 type codegen_option =
   | Reduce_code_size
   | No_CSE
+  | Use_linscan_regalloc
+  | Use_regalloc of regalloc_kind
+  | Use_regalloc_param of string list
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
