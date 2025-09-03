@@ -300,7 +300,7 @@ def plot_histogram_on_axis(ax, values, bins, title, xlabel='Value', ylabel='Freq
     if log_scale:
         ax.set_yscale('log')
 
-def create_dual_histograms(values, title, num_buckets=10):
+def create_dual_histograms(values, title, num_buckets=10, xlabel='Value'):
     """Create side-by-side log scale and focused histograms and return as SVG."""
     min_val = min(values)
     max_val = max(values)
@@ -334,13 +334,13 @@ def create_dual_histograms(values, title, num_buckets=10):
 
     # Log scale histogram
     plot_histogram_on_axis(ax1, values, num_buckets, f"{title} (Log Scale)",
-                         xlabel=f"Value ({min_val:,}-{max_val:,})")
+                         xlabel=f"{xlabel} ({min_val:,}-{max_val:,})")
 
     # Focused histogram (even if it doesn't make much sense)
     focused_bins = min(10, len(set(focused_values))) if len(focused_values) > 1 else 1
     plot_histogram_on_axis(ax2, focused_values, focused_bins,
                          f"{title} (Focused Log Scale)",
-                         xlabel=f"Value ({focus_start:,}-{focus_end:,})")
+                         xlabel=f"{xlabel} ({focus_start:,}-{focus_end:,})")
 
     # Save to SVG in memory
     buf = BytesIO()
@@ -358,12 +358,12 @@ def create_dual_histograms(values, title, num_buckets=10):
 
     return svg_data
 
-def create_histogram(values, title, num_buckets=10):
+def create_histogram(values, title, num_buckets=10, xlabel='Value'):
     """Create histogram using matplotlib."""
     if not values:
         return f"{title}: No data\n\n"
 
-    svg_data = create_dual_histograms(values, title, num_buckets)
+    svg_data = create_dual_histograms(values, title, num_buckets, xlabel=xlabel)
     return f"\n{svg_data}\n"
 
 def display_file_measurements(file_measurements):
@@ -504,7 +504,7 @@ def analyze_stats(search_dir="."):
     types = [e.type_name for e in all_entries]
 
     # Top values analysis function
-    def print_top_values(values, labels, title, n=5):
+    def print_top_values(values, labels, title, n=5, unit=""):
         """Print top N values with their labels, deduplicated by (value, label) pairs."""
         if not values:
             return
@@ -515,49 +515,52 @@ def analyze_stats(search_dir="."):
         # Sort by value descending
         sorted_pairs = sorted(unique_pairs, key=lambda x: x[0], reverse=True)
 
-        print("#### Top {} {}".format(n, title))
+        print("#### {}".format(title))
         print()
         for i, (value, label) in enumerate(sorted_pairs[:n]):
-            print("{:2d}. **{:,}** - `{}`".format(i+1, value, label))
+            if unit:
+                print("{:2d}. **{:,} {}** - `{}`".format(i+1, value, unit, label))
+            else:
+                print("{:2d}. **{:,}** - `{}`".format(i+1, value, label))
         print()
 
-    print("### Initial Sizes (Bytes)")
-    print(create_histogram(initial_sizes_memory, "Initial Sizes (Bytes)"), end="")
-    print_top_values(initial_sizes_memory, types, "Initial Sizes (Bytes)")
+    print("### Initial Sizes")
+    print(create_histogram(initial_sizes_memory, "Initial Sizes", xlabel="Size (bytes)"), end="")
+    print_top_values(initial_sizes_memory, types, "Top 5 Initial Sizes", unit="bytes")
 
     # Reduced Sizes section
-    print("### Reduced Sizes (Bytes)")
-    print(create_histogram(reduced_sizes_memory, "Reduced Sizes (Bytes)"), end="")
-    print_top_values(reduced_sizes_memory, types, "Reduced Sizes (Bytes)")
+    print("### Reduced Sizes")
+    print(create_histogram(reduced_sizes_memory, "Reduced Sizes", xlabel="Size (bytes)"), end="")
+    print_top_values(reduced_sizes_memory, types, "Top 5 Reduced Sizes", unit="bytes")
 
-    print("### Evaluated Sizes (Bytes)")
-    print(create_histogram(evaluated_sizes_memory, "Evaluated Sizes (Bytes)"), end="")
-    print_top_values(evaluated_sizes_memory, types, "Evaluated Sizes (Bytes)")
+    print("### Evaluated Sizes")
+    print(create_histogram(evaluated_sizes_memory, "Evaluated Sizes", xlabel="Size (bytes)"), end="")
+    print_top_values(evaluated_sizes_memory, types, "Top 5 Evaluated Sizes", unit="bytes")
 
     # Reduction Steps section
     print("### Reduction Steps")
-    print(create_histogram(reduction_steps, "Reduction Steps"), end="")
-    print_top_values(reduction_steps, types, "Reduction Steps")
+    print(create_histogram(reduction_steps, "Reduction Steps", xlabel="Steps"), end="")
+    print_top_values(reduction_steps, types, "Top 5 Reduction Steps", unit="steps")
 
     # Evaluation Steps section
     print("### Evaluation Steps")
-    print(create_histogram(evaluation_steps, "Evaluation Steps"), end="")
-    print_top_values(evaluation_steps, types, "Evaluation Steps")
+    print(create_histogram(evaluation_steps, "Evaluation Steps", xlabel="Steps"), end="")
+    print_top_values(evaluation_steps, types, "Top 5 Evaluation Steps", unit="steps")
 
-    # DWARF DIE Sizes section
-    print("### DWARF DIE Sizes")
-    print(create_histogram(dwarf_die_sizes, "DWARF DIE Sizes"), end="")
-    print_top_values(dwarf_die_sizes, types, "DWARF DIE Sizes")
+    # DWARF Sizes section
+    print("### DWARF Sizes")
+    print(create_histogram(dwarf_die_sizes, "DWARF Sizes", xlabel="DWARF DIEs"), end="")
+    print_top_values(dwarf_die_sizes, types, "Top 5 DWARF Sizes", unit="DWARF DIEs")
 
     # CMS Files Loaded section
     print("### CMS Files Loaded")
-    print(create_histogram(cms_files_loaded, "CMS Files Loaded"), end="")
-    print_top_values(cms_files_loaded, types, "CMS Files Loaded")
+    print(create_histogram(cms_files_loaded, "CMS Files Loaded", xlabel="Files"), end="")
+    print_top_values(cms_files_loaded, types, "Top 5 CMS Files Loaded", unit="files")
 
-    # CMS Files Cached section
-    print("### CMS Files Cached")
-    print(create_histogram(cms_files_cached, "CMS Files Cached"), end="")
-    print_top_values(cms_files_cached, types, "CMS Files Cached")
+    # CMS Cache Hits section
+    print("### CMS Cache Hits")
+    print(create_histogram(cms_files_cached, "CMS Cache Hits", xlabel="Cache hits"), end="")
+    print_top_values(cms_files_cached, types, "Top 5 CMS Cache Hits", unit="cache hits")
 
     # File-level aggregation and statistics
     file_stats = defaultdict(lambda: {'count': 0, 'total_initial_memory': 0, 'total_reduced_memory': 0, 'total_evaluated_memory': 0, 'total_dwarf_dies': 0, 'cms_files_loaded': 0, 'cms_files_cached': 0})
@@ -576,8 +579,8 @@ def analyze_stats(search_dir="."):
     print()
     print("Top 20 files by DWARF DIE size:")
     print()
-    print("| File | Variables | Initial (Bytes) | Reduced (Bytes) | Evaluated (Bytes) | Total DIEs | CMS Loaded | CMS Cached |")
-    print("|------|-----------|-----------------|-----------------|-------------------|------------|------------|------------|")
+    print("| File | Variables | Initial (Bytes) | Reduced (Bytes) | Evaluated (Bytes) | Total DIEs | CMS Loaded | CMS Cache Hits |")
+    print("|------|-----------|-----------------|-----------------|-------------------|------------|------------|----------------|")
 
     # Sort by total DIEs descending
     sorted_files = sorted(file_stats.items(),
