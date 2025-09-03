@@ -186,19 +186,16 @@ let parse_loop_attribute attr =
         ]
         payload
 
-let parse_regalloc_attribute attr =
+let parse_regalloc_attribute attr : regalloc_attribute =
   match attr with
-  | None -> Default_regalloc
+  | None -> None
   | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
       parse_id_payload txt loc
-        ~default:Default_regalloc
-        ~empty:Default_regalloc
-        [
-          "cfg", Cfg_regalloc;
-          "irc", Irc_regalloc;
-          "ls", Ls_regalloc;
-          "gi", Gi_regalloc;
-        ]
+        ~default:None
+        ~empty:None
+        (List.map
+          (fun (name, regalloc) -> name, Some regalloc)
+          Clflags.Register_allocator.assoc_list)
         payload
 
 let parse_regalloc_param_attribute attr =
@@ -385,11 +382,11 @@ let add_regalloc_attribute expr loc attributes =
   match expr with
   | Lfunction({ attr = { stub = false } as attr } as funct) ->
     begin match get_regalloc_attribute attributes with
-    | Default_regalloc -> expr
-    | (Cfg_regalloc | Irc_regalloc | Ls_regalloc | Gi_regalloc) as regalloc ->
+    | None -> expr
+    | (Some _) as regalloc ->
       begin match attr.regalloc with
-      | Default_regalloc -> ()
-      | Cfg_regalloc | Irc_regalloc | Ls_regalloc | Gi_regalloc ->
+      | None -> ()
+      | Some _ ->
           Location.prerr_warning loc
             (Warnings.Duplicated_attribute "regalloc")
       end;
@@ -410,13 +407,15 @@ let add_regalloc_param_attribute expr _loc attributes =
     end
   | _ -> expr
 
-let add_cold_attribute expr _loc attributes =
+let add_cold_attribute expr loc attributes =
   match expr with
   | Lfunction({ attr } as funct) ->
-    if get_cold_attribute attributes then
+    if get_cold_attribute attributes then begin
+      if attr.cold then Location.prerr_warning loc
+            (Warnings.Duplicated_attribute "cold");
       let attr = { attr with cold = true } in
       lfunction_with_attr ~attr funct
-    else
+    end else
       expr
   | _ -> expr
 

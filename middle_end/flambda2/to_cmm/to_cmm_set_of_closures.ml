@@ -441,11 +441,8 @@ let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
 (* Translation of regalloc attributes on functions. *)
 let transl_regalloc_attrib : Regalloc_attribute.t -> Cmm.codegen_option list =
   function
-  | Default -> []
-  | Cfg -> [Use_regalloc Cfg_regalloc]
-  | Irc -> [Use_regalloc Irc_regalloc]
-  | Ls -> [Use_regalloc Ls_regalloc]
-  | Gi -> [Use_regalloc Gi_regalloc]
+  | None -> []
+  | Some regalloc -> [Use_regalloc regalloc]
 
 (* Translation of regalloc_param attributes on functions. *)
 let transl_regalloc_param_attrib :

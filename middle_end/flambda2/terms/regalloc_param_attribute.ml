@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = string list
+type t = Lambda.regalloc_param_attribute
 
 let print ppf t =
   match t with

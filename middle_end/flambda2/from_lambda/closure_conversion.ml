@@ -2429,8 +2429,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         (Zero_alloc_attribute.from_lambda
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
-      ~cold:(Function_decl.cold decl) ~is_opaque:false ~recursive
-      ~newer_version_of:None ~cost_metrics
+      ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
+      ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
       ~absolute_history ~relative_history ~loopify:Never_loopify
@@ -3331,7 +3331,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         local = Default_local;
         zero_alloc = Default_zero_alloc;
         loop = Default_loop;
-        regalloc = Default_regalloc;
+        regalloc = None;
         regalloc_param = [];
         cold = false;
         is_a_functor = false;

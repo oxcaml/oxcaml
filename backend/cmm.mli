@@ -536,18 +536,11 @@ and expression =
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
 
-type regalloc_kind =
-  | Default_regalloc
-  | Cfg_regalloc
-  | Irc_regalloc
-  | Ls_regalloc
-  | Gi_regalloc
-
 type codegen_option =
   | Reduce_code_size
   | No_CSE
   | Use_linscan_regalloc
-  | Use_regalloc of regalloc_kind
+  | Use_regalloc of Clflags.Register_allocator.t
   | Use_regalloc_param of string list
   | Cold
   | Assume_zero_alloc of

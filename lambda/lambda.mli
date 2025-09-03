@@ -669,13 +669,8 @@ type loop_attribute =
   | Never_loop (* [@loop never] *)
   | Default_loop (* no [@loop] attribute *)
 
-type regalloc_attribute =
-  | Cfg_regalloc (* [@regalloc cfg] *)
-  | Irc_regalloc (* [@regalloc irc] *)
-  | Ls_regalloc (* [@regalloc ls] *)
-  | Gi_regalloc (* [@regalloc gi] *)
-  | Default_regalloc (* no [@regalloc] attribute *)
-
+type regalloc_attribute = Clflags.Register_allocator.t option
+  
 type regalloc_param_attribute = string list
 (* [@regalloc_param] attributes - can have multiple with string payloads *)
 

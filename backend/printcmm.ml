@@ -458,13 +458,7 @@ let codegen_option = function
   | Reduce_code_size -> "reduce_code_size"
   | No_CSE -> "no_cse"
   | Use_linscan_regalloc -> "linscan"
-  | Use_regalloc regalloc_kind -> (
-    match regalloc_kind with
-    | Default_regalloc -> "regalloc_default"
-    | Cfg_regalloc -> "regalloc_cfg"
-    | Irc_regalloc -> "regalloc_irc"
-    | Ls_regalloc -> "regalloc_ls"
-    | Gi_regalloc -> "regalloc_gi")
+  | Use_regalloc regalloc -> Clflags.Register_allocator.to_string regalloc
   | Use_regalloc_param params ->
     Printf.sprintf "regalloc_param[%s]"
       (String.concat ";" (List.map (Printf.sprintf "%S") params))

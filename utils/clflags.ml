@@ -810,6 +810,39 @@ let set_save_ir_after pass enabled =
 let set_save_ir_before pass enabled =
   set_save_ir save_ir_before pass enabled
 
+module Register_allocator = struct
+  type t =
+    | Cfg
+    | Irc
+    | Ls
+    | Gi
+
+  let all = [
+    Cfg;
+    Irc;
+    Ls;
+    Gi;
+  ]
+
+  let equal left right =
+    match left, right with
+    | Cfg, Cfg | Irc, Irc | Ls, Ls | Gi, Gi -> true
+    | (Cfg | Irc | Ls | Gi), _ -> false
+  
+  let to_string = function
+    | Cfg -> "cfg"
+    | Irc -> "irc"
+    | Ls -> "ls"
+    | Gi -> "gi"
+
+  let assoc_list = List.map (fun regalloc -> to_string regalloc, regalloc) all
+
+  let of_string s = List.assoc_opt (String.lowercase_ascii s) assoc_list
+  
+  let format ppf regalloc =
+    Format.fprintf ppf "%s" (to_string regalloc)
+end
+
 module String = Misc.Stdlib.String
 
 let arg_spec = ref []
