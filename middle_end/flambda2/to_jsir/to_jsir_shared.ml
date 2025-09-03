@@ -41,7 +41,9 @@ let bind_expr_to_var ~env ~res fvar expr =
 let reg_width_const const : Jsir.constant =
   match Reg_width_const.descr const with
   | Naked_immediate targetint | Tagged_immediate targetint ->
-    let repr = Targetint_31_63.to_targetint targetint |> Targetint_32_64.repr in
+    let repr =
+      Target_ocaml_int.to_targetint targetint |> Targetint_32_64.repr
+    in
     let targetint =
       match repr with
       | Int32 int32 -> Targetint.of_int32 int32
@@ -58,7 +60,9 @@ let reg_width_const const : Jsir.constant =
   | Naked_nativeint nativeint ->
     Jsir.NativeInt (Targetint_32_64.to_int32 nativeint)
   | Null -> Jsir.Null
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ ->
+  | Naked_int8 _ | Naked_int16 _ | Naked_vec128 _ | Naked_vec256 _
+  | Naked_vec512 _ ->
+    (* CR selee: smallints and SIMD *)
     Misc.fatal_errorf "Unsupported constant %a" Int_ids.Const.print const
 
 let simple ~env ~res simple =

@@ -2753,7 +2753,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         ~vec_kind:(vec_kind size) Naked_float32s array ~index_kind index ]
   | ( Pint_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
-    if Target_ocaml_intint.size <> 64
+    if Targetint_32_64.size <> 64
     then Misc.fatal_error "[Pint_array_load_vec]: immediates must be 64 bits.";
     [ array_like_load_vec ~dbg ~size_int ~current_region ~unsafe ~mode ~boxed
         ~vec_kind:(vec_kind size) Immediates array ~index_kind index ]
@@ -2763,7 +2763,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         ~vec_kind:(vec_kind size) Naked_int64s array ~index_kind index ]
   | ( Punboxed_nativeint_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
-    if Target_ocaml_int.size <> 64
+    if Targetint_32_64.size <> 64
     then
       Misc.fatal_error
         "[Punboxed_nativeint_array_load_vec]: nativeint must be 64 bits.";
@@ -2790,7 +2790,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         Naked_float32s array ~index_kind index new_value ]
   | ( Pint_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
-    if Target_ocaml_int.size <> 64
+    if Targetint_32_64.size <> 64
     then Misc.fatal_error "[Pint_array_set_vec]: immediates must be 64 bits.";
     [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind size)
         Immediates array ~index_kind index new_value ]
