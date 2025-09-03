@@ -1,5 +1,6 @@
 (* TEST
  flags = "-extension layouts_beta";
+ include stdlib_stable;
  include stdlib_upstream_compatible;
  flambda2;
  {
@@ -16,6 +17,7 @@ module Float_u = Stdlib_upstream_compatible.Float_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
 
 let test_float s f =
   Format.printf "%s: %f\n" s (Float_u.to_float f); Format.print_flush ()
@@ -25,6 +27,8 @@ let test_int64 s f =
   Format.printf "%s: %Ld\n" s (Int64_u.to_int64 f); Format.print_flush ()
 let test_nativeint s f =
   Format.printf "%s: %s\n" s (Nativeint_u.to_string f); Format.print_flush ()
+let test_int s f =
+  Format.printf "%s: %d\n" s (Int_u.to_int f); Format.print_flush ()
 
 (*****************************************)
 (* Expressions *)
@@ -50,6 +54,7 @@ let () = test_int64 "negative_one" (- #1L)
 let () = test_nativeint "two_fifty_five_in_hex" (#0xFFn)
 let () = test_int32 "twenty_five_in_octal" (#0o31l)
 let () = test_int64 "forty_two_in_binary" (#0b101010L)
+let () = test_int "max_int + 1" (#4611686018427387904)
 
 (*****************************************)
 (* Patterns *)
@@ -111,3 +116,25 @@ let f x =
 ;;
 
 test_int64 "result" (f #7L);;
+
+
+let f x =
+  match x with
+  | #4 -> `Four
+  | #5 -> `Five
+  | _ -> `Other
+;;
+
+let () =
+  match f #4 with
+  | `Four -> ()
+  | _ -> assert false;;
+
+let f x =
+  match x with
+  | #4 -> #0
+  | #5 -> #1
+  | x ->  x
+;;
+
+test_int "result" (f #7);;
