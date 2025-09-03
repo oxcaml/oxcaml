@@ -76,7 +76,8 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
       Check_zero_alloc { strict; loc; custom_error_msg }
       :: of_cmm_codegen_option tl
     | Use_linscan_regalloc -> of_cmm_codegen_option tl
-    | Use_regalloc _ -> of_cmm_codegen_option tl)
+    | Use_regalloc _ -> of_cmm_codegen_option tl
+    | Use_regalloc_param _ -> of_cmm_codegen_option tl)
 
 type t =
   { blocks : basic_block Label.Tbl.t;
