@@ -409,7 +409,7 @@ let add_regalloc_param_attribute expr _loc attributes =
 
 let add_cold_attribute expr loc attributes =
   match expr with
-  | Lfunction({ attr } as funct) ->
+  | Lfunction({ attr = { stub = false } as attr } as funct) ->
     if get_cold_attribute attributes then begin
       if attr.cold then Location.prerr_warning loc
             (Warnings.Duplicated_attribute "cold");
