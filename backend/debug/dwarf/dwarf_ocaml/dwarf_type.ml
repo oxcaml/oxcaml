@@ -160,24 +160,21 @@ end = struct
     | None -> ()
     | Some d ->
       d.shape_size_before_reduction_memory
-        <- Obj.reachable_words (Obj.repr shape);
-      d.shape_size_before_reduction_tree <- Shape.size shape
+        <- Obj.reachable_words (Obj.repr shape)
 
   let record_after_reduction d shape =
     match d with
     | None -> ()
     | Some d ->
       d.shape_size_after_reduction_memory
-        <- Obj.reachable_words (Obj.repr shape);
-      d.shape_size_after_reduction_tree <- Shape.size shape
+        <- Obj.reachable_words (Obj.repr shape)
 
   let record_after_evaluation d shape =
     match d with
     | None -> ()
     | Some d ->
       d.shape_size_after_evaluation_memory
-        <- Obj.reachable_words (Obj.repr shape);
-      d.shape_size_after_evaluation_tree <- Shape.size shape
+        <- Obj.reachable_words (Obj.repr shape)
 
   let compute_die_size die =
     Proto_die.depth_first_fold die ~init:0 ~f:(fun acc d ->
@@ -1370,9 +1367,37 @@ module Cache = Shape_with_layout.Tbl
 (** This cache maps unnamed type shapes to their references. *)
 let cache = Cache.create 16
 
-let add_to_cache (type_shape : Shape.t) (type_layout : Layout.t) reference =
-  if Shape.is_mu_closed type_shape
+module DebruijnEnv : sig
+  type 'a t
+
+  val empty : 'a t
+
+  val get_opt : 'a t -> int -> 'a option
+
+  val push : 'a t -> 'a -> 'a t
+
+  val is_empty : 'a t -> bool
+end = struct
+  type 'a t = 'a list
+
+  let empty = []
+
+  let get_opt t i = List.nth_opt t i
+
+  let push t x = x :: t
+
+  let is_empty = function [] -> true | _ -> false
+end
+
+let add_to_cache (type_shape : Shape.t) (type_layout : Layout.t) reference
+    ~rec_env =
+  if DebruijnEnv.is_empty rec_env
   then Cache.add cache { type_shape; type_layout } reference
+
+let find_in_cache (type_shape : Shape.t) (type_layout : Layout.t) ~rec_env =
+  if DebruijnEnv.is_empty rec_env
+  then Cache.find_opt cache { type_shape; type_layout }
+  else None
 
 (** This second cache is for named type shapes. Every type name should be
     associated with at most one DWARF die, so this cache maps type names to
@@ -1386,14 +1411,11 @@ let name_cache = String.Tbl.create 16
    [type_shape_to_dwarf_die_with_aliased_name] below. *)
 let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     (type_layout : base_layout) ~parent_proto_die ~fallback_value_die ~rec_env =
-  match
-    Cache.find_opt cache
-      ({ type_shape; type_layout = Base type_layout } : Shape_with_layout.t)
-  with
+  match find_in_cache type_shape (Base type_layout) ~rec_env with
   | Some reference -> reference
   | None ->
     let reference = Proto_die.create_reference () in
-    add_to_cache type_shape (Base type_layout) reference;
+    add_to_cache type_shape (Base type_layout) reference ~rec_env;
     let name = None in
     (* Instead of omitting the name argument below, we fix it to be [None] here
        such that it is easier to change this code if in the future we want to
@@ -1571,7 +1593,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
         ~constr_name ~arg_name ~arg_layout:base_layout ~arg_die ()
     | Rec_var i -> (
-      match rec_env i with
+      match DebruijnEnv.get_opt rec_env i with
       | Some reference' ->
         create_typedef_die ~reference ~parent_proto_die ?name reference'
       | None ->
@@ -1589,8 +1611,8 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
         (* CR sspies: We are creating two typedefs for recursive types. One
            should be enough. *)
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
-          type_layout ~rec_env:(fun i ->
-            if i = 0 then Some reference else rec_env (i - 1))
+          type_layout
+          ~rec_env:(DebruijnEnv.push rec_env reference)
       in
       create_typedef_die ~reference ~parent_proto_die ?name reference'
     | Alias sh ->
@@ -2024,7 +2046,7 @@ let type_shape_to_dwarf_die_with_aliased_name (type_name : string)
     let unnamed_die =
       type_shape_to_dwarf_die type_shape type_layout ~parent_proto_die
         ~fallback_value_die (* note that we do not pass the type name here *)
-        ~rec_env:(fun _ -> None)
+        ~rec_env:DebruijnEnv.empty
     in
     let reference = Proto_die.create_reference () in
     let layout_name =
