@@ -199,9 +199,6 @@ val report_type_mismatch :
 val report_modality_sub_error :
   string -> string -> Format.formatter -> Mode.Modality.error -> unit
 
-val report_mode_sub_error :
-  string -> string -> Format.formatter -> Mode.Value.error -> unit
-
 val report_extension_constructor_mismatch :
   string -> string -> string ->
   Env.t ->

@@ -830,7 +830,7 @@ let core env id x =
       Format.dprintf
         "@[<hv 2>Class declarations %s do not match:@ @]@ %a%t"
         (Ident.name id)
-        (Includecore.report_mode_sub_error "first is" "second is") e
+        (Mode.Value.report_error ~for_include:true) e
         Printtyp.Conflicts.print_explanations
 
 let missing_field ppf item =
@@ -940,7 +940,7 @@ and module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx = function
       dwith_context ctx printer :: before
   | Mode e ->
       let printer ppf =
-        Includecore.report_mode_sub_error "Got" "expected" ppf e
+        Mode.Value.report_error ~for_include:true ppf e
       in
       dwith_context ctx printer :: before
 
