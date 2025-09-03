@@ -364,14 +364,26 @@ let prelude :
  fun (module Utils) ~on_fatal_callback cfg_with_infos ->
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   on_fatal ~f:on_fatal_callback;
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  (* Extract function-specific regalloc params from codegen_options *)
+  function_specific_params :=
+    List.concat_map cfg.fun_codegen_options ~f:(function
+      | Cfg.Use_regalloc_param params -> params
+      | Cfg.Reduce_code_size | Cfg.No_CSE | Cfg.Use_linscan_regalloc 
+      | Cfg.Use_regalloc _ | Cfg.Assume_zero_alloc _ | Cfg.Check_zero_alloc _ -> []);
   if debug
-  then Utils.log "run (%S)" (Cfg_with_layout.cfg cfg_with_layout).fun_name;
+  then (
+    Utils.log "run (%S)" cfg.fun_name;
+    match !function_specific_params with
+    | [] -> ()
+    | params -> 
+      Utils.log "function_specific_params: %s" 
+        (String.concat ", " params));
   Reg.reinit_relocatable_regs ();
   if debug && Lazy.force invariants
   then (
     Utils.log "precondition";
     Regalloc_invariants.precondition cfg_with_layout);
-  let cfg = Cfg_with_layout.cfg cfg_with_layout in
   (* We identify critical edges, and pre-emptively insert block so that the
      register allocator will not have to change the shape of the CFG. *)
   let critical_edges = compute_critical_edges cfg in
