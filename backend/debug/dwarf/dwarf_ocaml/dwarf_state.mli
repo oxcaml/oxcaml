@@ -20,9 +20,9 @@ open Dwarf_high
 
 module Diagnostics : sig
   type variable_reduction =
-    { initial_size_memory : int;
-      reduced_size_memory : int;
-      evaluated_size_memory : int;
+    { shape_size_before_reduction_in_bytes : int;
+      shape_size_after_reduction_in_bytes : int;
+      shape_size_after_evaluation_in_bytes : int;
       reduction_steps : int;
       evaluation_steps : int;
       type_name : string;

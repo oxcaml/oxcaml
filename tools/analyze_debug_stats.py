@@ -63,14 +63,14 @@ matplotlib.use('Agg')  # Use non-interactive backend
 from io import BytesIO
 
 class StatEntry:
-    def __init__(self, type_name, initial_size_memory, reduced_size_memory, evaluated_size_memory,
+    def __init__(self, type_name, shape_size_before_reduction_in_bytes, shape_size_after_reduction_in_bytes, shape_size_after_evaluation_in_bytes,
                  reduction_steps,
                  evaluation_steps, dwarf_die_size, cms_files_loaded, cms_files_cached,
                  cms_files_missing, cms_files_unreadable, file_path):
         self.type_name = type_name
-        self.initial_size_memory = initial_size_memory
-        self.reduced_size_memory = reduced_size_memory
-        self.evaluated_size_memory = evaluated_size_memory
+        self.shape_size_before_reduction_in_bytes = shape_size_before_reduction_in_bytes
+        self.shape_size_after_reduction_in_bytes = shape_size_after_reduction_in_bytes
+        self.shape_size_after_evaluation_in_bytes = shape_size_after_evaluation_in_bytes
         self.reduction_steps = reduction_steps
         self.evaluation_steps = evaluation_steps
         self.dwarf_die_size = dwarf_die_size
@@ -114,9 +114,9 @@ def parse_json_file(file_path):
             try:
                 entry = StatEntry(
                     type_name=var_data['type'],
-                    initial_size_memory=int(var_data['initial_size_memory']),
-                    reduced_size_memory=int(var_data['reduced_size_memory']),
-                    evaluated_size_memory=int(var_data['evaluated_size_memory']),
+                    shape_size_before_reduction_in_bytes=int(var_data['shape_size_before_reduction_in_bytes']),
+                    shape_size_after_reduction_in_bytes=int(var_data['shape_size_after_reduction_in_bytes']),
+                    shape_size_after_evaluation_in_bytes=int(var_data['shape_size_after_evaluation_in_bytes']),
                     reduction_steps=int(var_data['reduction_steps']),
                     evaluation_steps=int(var_data['evaluation_steps']),
                     dwarf_die_size=int(var_data['dwarf_die_size']),
@@ -492,9 +492,9 @@ def analyze_stats(search_dir="."):
 
 
     # Aggregate statistics for individual variables
-    initial_sizes_memory = [e.initial_size_memory for e in all_entries]
-    reduced_sizes_memory = [e.reduced_size_memory for e in all_entries]
-    evaluated_sizes_memory = [e.evaluated_size_memory for e in all_entries]
+    shape_sizes_before_reduction = [e.shape_size_before_reduction_in_bytes for e in all_entries]
+    shape_sizes_after_reduction = [e.shape_size_after_reduction_in_bytes for e in all_entries]
+    shape_sizes_after_evaluation = [e.shape_size_after_evaluation_in_bytes for e in all_entries]
     reduction_steps = [e.reduction_steps for e in all_entries]
     evaluation_steps = [e.evaluation_steps for e in all_entries]
     dwarf_die_sizes = [e.dwarf_die_size for e in all_entries]
@@ -524,18 +524,18 @@ def analyze_stats(search_dir="."):
                 print("{:2d}. **{:,}** - `{}`".format(i+1, value, label))
         print()
 
-    print("### Initial Sizes")
-    print(create_histogram(initial_sizes_memory, "Initial Sizes", xlabel="Size (bytes)"), end="")
-    print_top_values(initial_sizes_memory, types, "Top 5 Initial Sizes", unit="bytes")
+    print("### Shape Sizes Before Reduction")
+    print(create_histogram(shape_sizes_before_reduction, "Shape Sizes Before Reduction", xlabel="Size (bytes)"), end="")
+    print_top_values(shape_sizes_before_reduction, types, "Top 5 Shape Sizes Before Reduction", unit="bytes")
 
-    # Reduced Sizes section
-    print("### Reduced Sizes")
-    print(create_histogram(reduced_sizes_memory, "Reduced Sizes", xlabel="Size (bytes)"), end="")
-    print_top_values(reduced_sizes_memory, types, "Top 5 Reduced Sizes", unit="bytes")
+    # Shape Sizes After Reduction section
+    print("### Shape Sizes After Reduction")
+    print(create_histogram(shape_sizes_after_reduction, "Shape Sizes After Reduction", xlabel="Size (bytes)"), end="")
+    print_top_values(shape_sizes_after_reduction, types, "Top 5 Shape Sizes After Reduction", unit="bytes")
 
-    print("### Evaluated Sizes")
-    print(create_histogram(evaluated_sizes_memory, "Evaluated Sizes", xlabel="Size (bytes)"), end="")
-    print_top_values(evaluated_sizes_memory, types, "Top 5 Evaluated Sizes", unit="bytes")
+    print("### Shape Sizes After Evaluation")
+    print(create_histogram(shape_sizes_after_evaluation, "Shape Sizes After Evaluation", xlabel="Size (bytes)"), end="")
+    print_top_values(shape_sizes_after_evaluation, types, "Top 5 Shape Sizes After Evaluation", unit="bytes")
 
     # Reduction Steps section
     print("### Reduction Steps")
@@ -563,14 +563,14 @@ def analyze_stats(search_dir="."):
     print_top_values(cms_files_cached, types, "Top 5 CMS Cache Hits", unit="cache hits")
 
     # File-level aggregation and statistics
-    file_stats = defaultdict(lambda: {'count': 0, 'total_initial_memory': 0, 'total_reduced_memory': 0, 'total_evaluated_memory': 0, 'total_dwarf_dies': 0, 'cms_files_loaded': 0, 'cms_files_cached': 0})
+    file_stats = defaultdict(lambda: {'count': 0, 'total_shape_size_before_reduction': 0, 'total_shape_size_after_reduction': 0, 'total_shape_size_after_evaluation': 0, 'total_dwarf_dies': 0, 'cms_files_loaded': 0, 'cms_files_cached': 0})
 
     for entry in all_entries:
         basename = os.path.basename(entry.file_path)
         file_stats[basename]['count'] += 1
-        file_stats[basename]['total_initial_memory'] += entry.initial_size_memory
-        file_stats[basename]['total_reduced_memory'] += entry.reduced_size_memory
-        file_stats[basename]['total_evaluated_memory'] += entry.evaluated_size_memory
+        file_stats[basename]['total_shape_size_before_reduction'] += entry.shape_size_before_reduction_in_bytes
+        file_stats[basename]['total_shape_size_after_reduction'] += entry.shape_size_after_reduction_in_bytes
+        file_stats[basename]['total_shape_size_after_evaluation'] += entry.shape_size_after_evaluation_in_bytes
         file_stats[basename]['total_dwarf_dies'] += entry.dwarf_die_size
         file_stats[basename]['cms_files_loaded'] += entry.cms_files_loaded
         file_stats[basename]['cms_files_cached'] += entry.cms_files_cached
@@ -579,8 +579,8 @@ def analyze_stats(search_dir="."):
     print()
     print("Top 20 files by DWARF DIE size:")
     print()
-    print("| File | Variables | Initial (Bytes) | Reduced (Bytes) | Evaluated (Bytes) | Total DIEs | CMS Loaded | CMS Cache Hits |")
-    print("|------|-----------|-----------------|-----------------|-------------------|------------|------------|----------------|")
+    print("| File | Variables | Before Reduction (Bytes) | After Reduction (Bytes) | After Evaluation (Bytes) | Total DIEs | CMS Loaded | CMS Cache Hits |")
+    print("|------|-----------|---------------------------|-------------------------|--------------------------|------------|------------|----------------|")
 
     # Sort by total DIEs descending
     sorted_files = sorted(file_stats.items(),
@@ -594,8 +594,8 @@ def analyze_stats(search_dir="."):
             source_filename = filename
 
         print("| {} | {:,} | {:,} | {:,} | {:,} | {:,} | {:,} | {:,} |".format(
-            source_filename, stats['count'], stats['total_initial_memory'],
-            stats['total_reduced_memory'], stats['total_evaluated_memory'], stats['total_dwarf_dies'], stats['cms_files_loaded'], stats['cms_files_cached']))
+            source_filename, stats['count'], stats['total_shape_size_before_reduction'],
+            stats['total_shape_size_after_reduction'], stats['total_shape_size_after_evaluation'], stats['total_dwarf_dies'], stats['cms_files_loaded'], stats['cms_files_cached']))
 
     # Add missing/unreadable files section at the end
     if all_missing_files or all_unreadable_files:
