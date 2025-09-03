@@ -71,11 +71,6 @@ val new_block_with_addr_exn :
     This function raises if there are no blocks being worked on. *)
 val end_block_with_last_exn : t -> Jsir.last -> t
 
-(** Create a [Jsir.program] with the blocks in the result, including the
-    current block. This function raises if there are still blocks being
-    worked on, or there is a reserved address that has not been used yet. *)
-val to_program_exn : t -> Jsir.program
-
 (** Returns the address for a special block for invalid switches, creating one if it
     doesn't exist already. *)
 val invalid_switch_block : t -> t * Jsir.Addr.t
@@ -83,3 +78,22 @@ val invalid_switch_block : t -> t * Jsir.Addr.t
 (** Get a public method and return the function. Increments the method cache ID. *)
 val get_public_method :
   t -> obj:Jsir.Var.t -> field:Jsir.Var.t -> t * Jsir.Var.t
+
+(** Register the fact that we import the (toplevel module of the) given compilation unit
+    from the JSOO global data table. This is used to inform Js_of_ocaml that it needs to
+    add this compilation unit to the global data table. *)
+val import_compilation_unit : t -> Compilation_unit.t -> t
+(* CR selee: Eventually we should do something similar for symbols too, so that
+   we don't put unused symbols in the symbol table. *)
+
+val global_data_var : t -> t * Jsir.Var.t
+
+type program =
+  { program : Jsir.program;
+    imported_compilation_units : Compilation_unit.Set.t
+  }
+
+(** Create a [program] with the blocks in the result, including the
+    current block. This function raises if there are still blocks being
+    worked on, or there is a reserved address that has not been used yet. *)
+val to_program_exn : t -> program

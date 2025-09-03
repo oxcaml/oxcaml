@@ -96,16 +96,27 @@ let symbol_to_native_strings symbol =
     |> Jsir.Native_string.of_string,
     Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
 
+let symbol_is_for_compilation_unit symbol =
+  let compilation_unit = Symbol.compilation_unit symbol in
+  Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
+
 let register_symbol' ~res symbol var =
-  let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
-  To_jsir_result.add_instr_exn res
-    (Let
-       ( Jsir.Var.fresh (),
-         Prim
-           ( Extern "caml_register_symbol",
-             [ Pc (NativeString compilation_unit_name);
-               Pc (NativeString symbol_name);
-               Pv var ] ) ))
+  match symbol_is_for_compilation_unit symbol with
+  | true ->
+    (* We don't need to add this symbol to our symbol table, because we will
+       instead fetch it from jsoo's global data table (see
+       [get_symbol_for_global_data]) *)
+    res
+  | false ->
+    let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( Jsir.Var.fresh (),
+           Prim
+             ( Extern "caml_register_symbol",
+               [ Pc (NativeString compilation_unit_name);
+                 Pc (NativeString symbol_name);
+                 Pv var ] ) ))
 
 let add_symbol_without_registering t symbol jvar =
   { t with symbols = Symbol.Map.add symbol jvar t.symbols }
@@ -130,13 +141,17 @@ let get_exn_handler_exn t cont = Continuation.Map.find cont t.exn_handlers
 
 let get_var_exn t fvar = Variable.Map.find fvar t.vars
 
-let get_predef_exception ~res symbol =
-  (* jsoo already registers these in global data *)
-  let global_data = Jsir.Var.fresh () in
-  let res =
-    To_jsir_result.add_instr_exn res
-      (Let (global_data, Prim (Extern "caml_get_global_data", [])))
+let get_symbol_from_global_data ~compilation_unit ~symbol_name ~res =
+  let res = To_jsir_result.import_compilation_unit res compilation_unit in
+  let res, global_data = To_jsir_result.global_data_var res in
+  let symbol_name = Jsir.Native_string.of_string symbol_name in
+  let var = Jsir.Var.fresh () in
+  let expr : Jsir.expr =
+    Prim (Extern "caml_js_get", [Pv global_data; Pc (NativeString symbol_name)])
   in
+  var, To_jsir_result.add_instr_exn res (Let (var, expr))
+
+let get_predef_exception ~res symbol =
   let symbol_name = Symbol.linkage_name_as_string symbol in
   (* Chop off caml_exn_ *)
   let caml_exn_ = "caml_exn_" in
@@ -148,27 +163,36 @@ let get_predef_exception ~res symbol =
   let symbol_name =
     String.sub symbol_name (String.length caml_exn_)
       (String.length symbol_name - String.length caml_exn_)
-    |> Jsir.Native_string.of_string
   in
-  let exn_var = Jsir.Var.fresh () in
-  let exn_expr : Jsir.expr =
-    Prim (Extern "caml_js_get", [Pv global_data; Pc (NativeString symbol_name)])
-  in
-  exn_var, To_jsir_result.add_instr_exn res (Let (exn_var, exn_expr))
+  (* jsoo already registers these in global data *)
+  get_symbol_from_global_data
+    ~compilation_unit:(Symbol.compilation_unit symbol)
+    ~symbol_name ~res
 
 let get_external_symbol ~res symbol =
   match Symbol.is_predefined_exception symbol with
   | true -> get_predef_exception ~res symbol
-  | false ->
-    let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
-    let var = Jsir.Var.fresh () in
-    let expr : Jsir.expr =
-      Prim
-        ( Extern "caml_get_symbol",
-          [ Pc (NativeString compilation_unit_name);
-            Pc (NativeString symbol_name) ] )
-    in
-    var, To_jsir_result.add_instr_exn res (Let (var, expr))
+  | false -> (
+    match symbol_is_for_compilation_unit symbol with
+    | true ->
+      let compilation_unit = Symbol.compilation_unit symbol in
+      let compilation_unit_name =
+        Compilation_unit.name_as_string compilation_unit
+      in
+      get_symbol_from_global_data ~compilation_unit
+        ~symbol_name:compilation_unit_name ~res
+    | false ->
+      let compilation_unit_name, symbol_name =
+        symbol_to_native_strings symbol
+      in
+      let var = Jsir.Var.fresh () in
+      let expr : Jsir.expr =
+        Prim
+          ( Extern "caml_get_symbol",
+            [ Pc (NativeString compilation_unit_name);
+              Pc (NativeString symbol_name) ] )
+      in
+      var, To_jsir_result.add_instr_exn res (Let (var, expr)))
 
 let get_symbol t ~res symbol =
   match Symbol.compilation_unit symbol |> Compilation_unit.is_current with

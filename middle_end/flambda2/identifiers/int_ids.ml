@@ -501,6 +501,8 @@ module Symbol = struct
 
   let compilation_unit t = Symbol0.compilation_unit (find_data t)
 
+  let for_compilation_unit t = Symbol0.for_compilation_unit t |> create_wrapped
+
   let linkage_name t = Symbol0.linkage_name (find_data t)
 
   let linkage_name_as_string t = Linkage_name.to_string (linkage_name t)
