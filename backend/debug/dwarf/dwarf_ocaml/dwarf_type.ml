@@ -191,9 +191,12 @@ end = struct
       if !Dwarf_flags.ddwarf_shape_reduction_diags
       then
         let diagnostic : DS.Diagnostics.variable_reduction =
-          { shape_size_before_reduction_in_bytes = d.shape_size_before_reduction_in_bytes;
-            shape_size_after_reduction_in_bytes = d.shape_size_after_reduction_in_bytes;
-            shape_size_after_evaluation_in_bytes = d.shape_size_after_evaluation_in_bytes;
+          { shape_size_before_reduction_in_bytes =
+              d.shape_size_before_reduction_in_bytes;
+            shape_size_after_reduction_in_bytes =
+              d.shape_size_after_reduction_in_bytes;
+            shape_size_after_evaluation_in_bytes =
+              d.shape_size_after_evaluation_in_bytes;
             reduction_steps =
               Shape_reduce.Diagnostics.reduction_steps
                 d.shape_reduction_diagnostics;

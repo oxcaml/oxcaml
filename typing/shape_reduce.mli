@@ -27,7 +27,6 @@ type result =
 
 val print_result : Format.formatter -> result -> unit
 
-
 module Diagnostics : sig
 
   type t
@@ -58,7 +57,6 @@ module Diagnostics : sig
 
 end
 
-
 (** The [Make] functor is used to generate a reduction function for
     shapes.
 
@@ -76,7 +74,8 @@ end
 module Make(_ : sig
     val fuel : int
 
-    val read_unit_shape : diagnostics:Diagnostics.t -> unit_name:string -> Shape.t option
+    val read_unit_shape :
+      diagnostics:Diagnostics.t -> unit_name:string -> Shape.t option
   end) : sig
   val reduce : ?diagnostics: Diagnostics.t -> Env.t -> Shape.t -> Shape.t
 

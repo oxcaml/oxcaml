@@ -133,8 +133,10 @@ let format_variable_json (variable : DS.Diagnostics.variable_reduction) =
   let type_with_layout = Printf.sprintf "%s @ %s" variable.type_name layout in
   Json.object_
     [ Json.field "type" (Json.string type_with_layout);
-      Json.field "shape_size_before_reduction_in_bytes" (Json.int variable.shape_size_before_reduction_in_bytes);
-      Json.field "shape_size_after_reduction_in_bytes" (Json.int variable.shape_size_after_reduction_in_bytes);
+      Json.field "shape_size_before_reduction_in_bytes"
+        (Json.int variable.shape_size_before_reduction_in_bytes);
+      Json.field "shape_size_after_reduction_in_bytes"
+        (Json.int variable.shape_size_after_reduction_in_bytes);
       Json.field "shape_size_after_evaluation_in_bytes"
         (Json.int variable.shape_size_after_evaluation_in_bytes);
       Json.field "reduction_steps" (Json.int variable.reduction_steps);
