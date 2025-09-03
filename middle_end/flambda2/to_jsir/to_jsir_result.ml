@@ -48,7 +48,8 @@ type t =
     next_method_cache_id : int;
         (** JSOO has a similar variable which is incremented for every method call;
             we mimic this here. *)
-    imported_compilation_units : Compilation_unit.Set.t
+    imported_compilation_units : Compilation_unit.Set.t;
+    global_data_var : Jsir.Var.t option
   }
 
 let create () =
@@ -58,7 +59,8 @@ let create () =
     reserved_addrs = Jsir.Addr.Set.empty;
     invalid_switch_block = None;
     next_method_cache_id = 1;
-    imported_compilation_units = Compilation_unit.Set.empty
+    imported_compilation_units = Compilation_unit.Set.empty;
+    global_data_var = None
   }
 
 let add_instr_exn t instr =
@@ -161,6 +163,13 @@ let import_compilation_unit t compilation_unit =
       Compilation_unit.Set.add compilation_unit t.imported_compilation_units
   }
 
+let global_data_var t =
+  match t.global_data_var with
+  | Some var -> t, var
+  | None ->
+    let var = Jsir.Var.fresh () in
+    { t with global_data_var = Some var }, var
+
 type program =
   { program : Jsir.program;
     imported_compilation_units : Compilation_unit.Set.t
@@ -173,7 +182,8 @@ let to_program_exn
       reserved_addrs;
       invalid_switch_block = _;
       next_method_cache_id = _;
-      imported_compilation_units
+      imported_compilation_units;
+      global_data_var
     } =
   if List.length current_blocks <> 0
   then
@@ -186,6 +196,16 @@ let to_program_exn
     Misc.fatal_error
       "To_jsir_result.to_program_exn: expected all reserved addresses to be \
        used";
+  let complete_blocks =
+    match global_data_var with
+    | None -> complete_blocks
+    | Some var ->
+      let entry_block = Jsir.Addr.Map.find Jsir.Addr.zero complete_blocks in
+      let body : Jsir.instr list =
+        Let (var, Prim (Extern "caml_get_global_data", [])) :: entry_block.body
+      in
+      Jsir.Addr.Map.add Jsir.Addr.zero { entry_block with body } complete_blocks
+  in
   let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in
   let program =
     { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
