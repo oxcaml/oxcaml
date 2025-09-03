@@ -2751,7 +2751,7 @@ module SArg = struct
   let make_isin h arg = Lprim (Pnot, [ make_isout h arg ], Loc_unknown)
 
   let make_is_nonzero arg =
-    if !Clflags.native_code then
+    if !Clflags.native_code || Clflags.is_flambda2 () then
       Lprim (Pintcomp Cne,
              [arg; Lconst (Const_base (Const_int 0))],
              Loc_unknown)
