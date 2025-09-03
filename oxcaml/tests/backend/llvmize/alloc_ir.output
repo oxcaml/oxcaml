@@ -1,44 +1,44 @@
 source_filename = "alloc.ml"
 
-@camlAlloc__data_begin = global {  } {  }, align 8
-define void @camlAlloc__code_begin() { ret void }
+@camlAlloc__data_begin = global {  } {  }, align 8, section ".data"
+define void @camlAlloc__code_begin() { unreachable }
 
-@camlAlloc__gc_roots = global { i64 } { i64 0 }, align 8
-@.header.camlAlloc = global { i64 } { i64 7936 }, align 8
-@camlAlloc = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlAlloc__my_fold_9, ptr @camlAlloc__local_iota_10, ptr @camlAlloc__big_local_alloc_11, ptr @camlAlloc__heap_iota_13, ptr @camlAlloc__big_heap_alloc_14, ptr @camlAlloc__make_ref_16, ptr @camlAlloc__heap_ref_incr_17 }, align 8
-@.header.camlAlloc__heap_ref_incr_17 = global { i64 } { i64 3063 }, align 8
-@camlAlloc__heap_ref_incr_17 = global { ptr, i64 } { ptr @camlAlloc__heap_ref_incr_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlAlloc__make_ref_16 = global { i64 } { i64 3063 }, align 8
-@camlAlloc__make_ref_16 = global { ptr, i64 } { ptr @camlAlloc__make_ref_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlAlloc__big_heap_alloc_14 = global { i64 } { i64 3063 }, align 8
-@camlAlloc__big_heap_alloc_14 = global { ptr, i64 } { ptr @camlAlloc__big_heap_alloc_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlAlloc__heap_iota_13 = global { i64 } { i64 4087 }, align 8
-@camlAlloc__heap_iota_13 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlAlloc__heap_iota_HIDE_STAMP }, align 8
-@.header.camlAlloc__big_local_alloc_11 = global { i64 } { i64 3063 }, align 8
-@camlAlloc__big_local_alloc_11 = global { ptr, i64 } { ptr @camlAlloc__big_local_alloc_HIDE_STAMP, i64 108086391056891909 }, align 8
-@.header.camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12 = global { i64 } { i64 4087 }, align 8
-@camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12 = global { ptr, i64, ptr } { ptr @caml_curry2L2, i64 180143985094819847, ptr @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_HIDE_STAMP }, align 8
-@.header.camlAlloc__local_iota_10 = global { i64 } { i64 4087 }, align 8
-@camlAlloc__local_iota_10 = global { ptr, i64, ptr } { ptr @caml_curry2L1, i64 180143985094819847, ptr @camlAlloc__local_iota_HIDE_STAMP }, align 8
-@.header.camlAlloc__my_fold_9 = global { i64 } { i64 4087 }, align 8
-@camlAlloc__my_fold_9 = global { ptr, i64, ptr } { ptr @caml_curry3L1, i64 252201579132747783, ptr @camlAlloc__my_fold_HIDE_STAMP }, align 8
-@.header.camlAlloc__const_block138 = global { i64 } { i64 2827 }, align 8
-@camlAlloc__const_block138 = global { ptr, ptr } { ptr @camlAlloc__immstring136, ptr @camlAlloc__const_block113 }, align 8
-@.header.camlAlloc__immstring136 = global { i64 } { i64 3068 }, align 8
-@camlAlloc__immstring136 = global { [ 15 x i8 ], [ 0 x i8 ], i8 } { [ 15 x i8 ] c"\68\65\61\70\5f\72\65\66\5f\69\6e\63\72\3a\20", [ 0 x i8 ] zeroinitializer, i8 0 }, align 8
-@.header.camlAlloc__const_block127 = global { i64 } { i64 2827 }, align 8
-@camlAlloc__const_block127 = global { ptr, ptr } { ptr @camlAlloc__immstring125, ptr @camlAlloc__const_block113 }, align 8
-@.header.camlAlloc__immstring125 = global { i64 } { i64 4092 }, align 8
-@camlAlloc__immstring125 = global { [ 16 x i8 ], [ 7 x i8 ], i8 } { [ 16 x i8 ] c"\62\69\67\5f\68\65\61\70\5f\61\6c\6c\6f\63\3a\20", [ 7 x i8 ] zeroinitializer, i8 7 }, align 8
-@.header.camlAlloc__const_block115 = global { i64 } { i64 2827 }, align 8
-@camlAlloc__const_block115 = global { ptr, ptr } { ptr @camlAlloc__immstring109, ptr @camlAlloc__const_block113 }, align 8
-@.header.camlAlloc__const_block113 = global { i64 } { i64 4868 }, align 8
-@camlAlloc__const_block113 = global { i64, i64, i64, ptr } { i64 1, i64 1, i64 1, ptr @camlAlloc__const_block111 }, align 8
-@.header.camlAlloc__const_block111 = global { i64 } { i64 2828 }, align 8
-@camlAlloc__const_block111 = global { i64, i64 } { i64 21, i64 1 }, align 8
-@.header.camlAlloc__immstring109 = global { i64 } { i64 4092 }, align 8
-@camlAlloc__immstring109 = global { [ 17 x i8 ], [ 6 x i8 ], i8 } { [ 17 x i8 ] c"\62\69\67\5f\6c\6f\63\61\6c\5f\61\6c\6c\6f\63\3a\20", [ 6 x i8 ] zeroinitializer, i8 6 }, align 8
-define cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__my_fold_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3, i64 %4)  {
+@camlAlloc__gc_roots = global { i64 } { i64 0 }, align 8, section ".data"
+@.header.camlAlloc = global { i64 } { i64 7936 }, align 8, section ".data"
+@camlAlloc = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlAlloc__my_fold_9, ptr @camlAlloc__local_iota_10, ptr @camlAlloc__big_local_alloc_11, ptr @camlAlloc__heap_iota_13, ptr @camlAlloc__big_heap_alloc_14, ptr @camlAlloc__make_ref_16, ptr @camlAlloc__heap_ref_incr_17 }, align 8, section ".data"
+@.header.camlAlloc__heap_ref_incr_17 = global { i64 } { i64 3063 }, align 8, section ".data"
+@camlAlloc__heap_ref_incr_17 = global { ptr, i64 } { ptr @camlAlloc__heap_ref_incr_HIDE_STAMP, i64 108086391056891909 }, align 8, section ".data"
+@.header.camlAlloc__make_ref_16 = global { i64 } { i64 3063 }, align 8, section ".data"
+@camlAlloc__make_ref_16 = global { ptr, i64 } { ptr @camlAlloc__make_ref_HIDE_STAMP, i64 108086391056891909 }, align 8, section ".data"
+@.header.camlAlloc__big_heap_alloc_14 = global { i64 } { i64 3063 }, align 8, section ".data"
+@camlAlloc__big_heap_alloc_14 = global { ptr, i64 } { ptr @camlAlloc__big_heap_alloc_HIDE_STAMP, i64 108086391056891909 }, align 8, section ".data"
+@.header.camlAlloc__heap_iota_13 = global { i64 } { i64 4087 }, align 8, section ".data"
+@camlAlloc__heap_iota_13 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlAlloc__heap_iota_HIDE_STAMP }, align 8, section ".data"
+@.header.camlAlloc__big_local_alloc_11 = global { i64 } { i64 3063 }, align 8, section ".data"
+@camlAlloc__big_local_alloc_11 = global { ptr, i64 } { ptr @camlAlloc__big_local_alloc_HIDE_STAMP, i64 108086391056891909 }, align 8, section ".data"
+@.header.camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12 = global { i64 } { i64 4087 }, align 8, section ".data"
+@camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12 = global { ptr, i64, ptr } { ptr @caml_curry2L2, i64 180143985094819847, ptr @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_HIDE_STAMP }, align 8, section ".data"
+@.header.camlAlloc__local_iota_10 = global { i64 } { i64 4087 }, align 8, section ".data"
+@camlAlloc__local_iota_10 = global { ptr, i64, ptr } { ptr @caml_curry2L1, i64 180143985094819847, ptr @camlAlloc__local_iota_HIDE_STAMP }, align 8, section ".data"
+@.header.camlAlloc__my_fold_9 = global { i64 } { i64 4087 }, align 8, section ".data"
+@camlAlloc__my_fold_9 = global { ptr, i64, ptr } { ptr @caml_curry3L1, i64 252201579132747783, ptr @camlAlloc__my_fold_HIDE_STAMP }, align 8, section ".data"
+@.header.camlAlloc__const_block138 = global { i64 } { i64 2827 }, align 8, section ".data"
+@camlAlloc__const_block138 = global { ptr, ptr } { ptr @camlAlloc__immstring136, ptr @camlAlloc__const_block113 }, align 8, section ".data"
+@.header.camlAlloc__immstring136 = global { i64 } { i64 3068 }, align 8, section ".data"
+@camlAlloc__immstring136 = global { [ 15 x i8 ], [ 0 x i8 ], i8 } { [ 15 x i8 ] c"\68\65\61\70\5f\72\65\66\5f\69\6e\63\72\3a\20", [ 0 x i8 ] zeroinitializer, i8 0 }, align 8, section ".data"
+@.header.camlAlloc__const_block127 = global { i64 } { i64 2827 }, align 8, section ".data"
+@camlAlloc__const_block127 = global { ptr, ptr } { ptr @camlAlloc__immstring125, ptr @camlAlloc__const_block113 }, align 8, section ".data"
+@.header.camlAlloc__immstring125 = global { i64 } { i64 4092 }, align 8, section ".data"
+@camlAlloc__immstring125 = global { [ 16 x i8 ], [ 7 x i8 ], i8 } { [ 16 x i8 ] c"\62\69\67\5f\68\65\61\70\5f\61\6c\6c\6f\63\3a\20", [ 7 x i8 ] zeroinitializer, i8 7 }, align 8, section ".data"
+@.header.camlAlloc__const_block115 = global { i64 } { i64 2827 }, align 8, section ".data"
+@camlAlloc__const_block115 = global { ptr, ptr } { ptr @camlAlloc__immstring109, ptr @camlAlloc__const_block113 }, align 8, section ".data"
+@.header.camlAlloc__const_block113 = global { i64 } { i64 4868 }, align 8, section ".data"
+@camlAlloc__const_block113 = global { i64, i64, i64, ptr } { i64 1, i64 1, i64 1, ptr @camlAlloc__const_block111 }, align 8, section ".data"
+@.header.camlAlloc__const_block111 = global { i64 } { i64 2828 }, align 8, section ".data"
+@camlAlloc__const_block111 = global { i64, i64 } { i64 21, i64 1 }, align 8, section ".data"
+@.header.camlAlloc__immstring109 = global { i64 } { i64 4092 }, align 8, section ".data"
+@camlAlloc__immstring109 = global { [ 17 x i8 ], [ 6 x i8 ], i8 } { [ 17 x i8 ] c"\62\69\67\5f\6c\6f\63\61\6c\5f\61\6c\6c\6f\63\3a\20", [ 6 x i8 ] zeroinitializer, i8 6 }, align 8, section ".data"
+define  cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__my_fold_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3, i64 %4) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -156,7 +156,7 @@ L110:                                                ; preds = %L107
   ret { { ptr, ptr }, { i64 } } %76
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__local_iota_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__local_iota_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -244,47 +244,48 @@ L120:                                                ; preds = %L118
   %56 = inttoptr i64 %55 to ptr
   %57 = load i64, ptr %56
   %58 = icmp slt i64 %57, %53
-  br i1 %58, label %60, label %59
-59:
-   call  void @caml_call_local_realloc() cold
-  br label %60
+  %59 =  call  i1 @llvm.expect.i1(i1 %58, i1 1)
+  br i1 %59, label %61, label %60
 60:
-  %61 = load i64, ptr %ds
-  %62 = add i64 %61, 72
-  %63 = inttoptr i64 %62 to ptr
-  %64 = load i64, ptr %63
-  %65 = add i64 %53, %64
-  %66 = add i64 %65, 8
-  store i64 %66, ptr %14
+   call  void @caml_call_local_realloc() cold
+  br label %61
+61:
+  %62 = load i64, ptr %ds
+  %63 = add i64 %62, 72
+  %64 = inttoptr i64 %63 to ptr
+  %65 = load i64, ptr %64
+  %66 = add i64 %53, %65
+  %67 = add i64 %66, 8
+  store i64 %67, ptr %14
   store i64 2816, ptr %15
-  %67 = load i64, ptr %14
-  %68 = add i64 %67, -8
-  %69 = inttoptr i64 %68 to ptr
-  %70 = load i64, ptr %15
-  store i64 %70, ptr %69
-  %71 = load i64, ptr %14
-  %72 = add i64 %71, 0
-  %73 = inttoptr i64 %72 to ptr
-  %74 = load i64, ptr %7
-  store i64 %74, ptr %73
-  %75 = load i64, ptr %14
-  %76 = add i64 %75, 8
-  %77 = inttoptr i64 %76 to ptr
-  %78 = load i64, ptr %13
-  store i64 %78, ptr %77
-  %79 = load i64, ptr %14
-  store i64 %79, ptr %5
-  %80 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
-  %81 = load ptr, ptr %ds
-  %82 = insertvalue { { ptr, ptr }, { i64 } } %80, ptr %81, 0, 0
-  %83 = load ptr, ptr %alloc
-  %84 = insertvalue { { ptr, ptr }, { i64 } } %82, ptr %83, 0, 1
-  %85 = load i64, ptr %5
-  %86 = insertvalue { { ptr, ptr }, { i64 } } %84, i64 %85, 1, 0
-  ret { { ptr, ptr }, { i64 } } %86
+  %68 = load i64, ptr %14
+  %69 = add i64 %68, -8
+  %70 = inttoptr i64 %69 to ptr
+  %71 = load i64, ptr %15
+  store i64 %71, ptr %70
+  %72 = load i64, ptr %14
+  %73 = add i64 %72, 0
+  %74 = inttoptr i64 %73 to ptr
+  %75 = load i64, ptr %7
+  store i64 %75, ptr %74
+  %76 = load i64, ptr %14
+  %77 = add i64 %76, 8
+  %78 = inttoptr i64 %77 to ptr
+  %79 = load i64, ptr %13
+  store i64 %79, ptr %78
+  %80 = load i64, ptr %14
+  store i64 %80, ptr %5
+  %81 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %82 = load ptr, ptr %ds
+  %83 = insertvalue { { ptr, ptr }, { i64 } } %81, ptr %82, 0, 0
+  %84 = load ptr, ptr %alloc
+  %85 = insertvalue { { ptr, ptr }, { i64 } } %83, ptr %84, 0, 1
+  %86 = load i64, ptr %5
+  %87 = insertvalue { { ptr, ptr }, { i64 } } %85, i64 %86, 1, 0
+  ret { { ptr, ptr }, { i64 } } %87
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__big_local_alloc_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__big_local_alloc_HIDE_STAMP(ptr %0, ptr %1, i64 %2) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -388,7 +389,7 @@ L130:                                                ; preds = %L129
   ret { { ptr, ptr }, { i64 } } %64
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -432,7 +433,7 @@ L133:                                                ; preds = %L1
   ret { { ptr, ptr }, { i64 } } %27
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__heap_iota_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__heap_iota_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -517,49 +518,50 @@ L144:                                                ; preds = %L142
   %53 = inttoptr i64 %52 to ptr
   %54 = load i64, ptr %53
   %55 = icmp ult i64 %54, %50
-  br i1 %55, label %after.56, label %56
-56:
-  %57 = load ptr, ptr %ds
-  %58 = load ptr, ptr %alloc
-  %59 =  call cc 104 { { ptr, ptr }, {  } } @caml_call_gc(ptr %57, ptr %58)
-  %60 = extractvalue { { ptr, ptr }, {  } } %59, 0, 0
-  store ptr %60, ptr %ds
-  %61 = extractvalue { { ptr, ptr }, {  } } %59, 0, 1
-  store ptr %61, ptr %alloc
-  br label %after.56
-after.56:
-  %62 = load i64, ptr %alloc
-  %63 = add i64 %62, 8
-  store i64 %63, ptr %14
+  %56 =  call  i1 @llvm.expect.i1(i1 %55, i1 1)
+  br i1 %56, label %after.57, label %57
+57:
+  %58 = load ptr, ptr %ds
+  %59 = load ptr, ptr %alloc
+  %60 =  call cc 104 { { ptr, ptr }, {  } } @caml_call_gc(ptr %58, ptr %59) cold
+  %61 = extractvalue { { ptr, ptr }, {  } } %60, 0, 0
+  store ptr %61, ptr %ds
+  %62 = extractvalue { { ptr, ptr }, {  } } %60, 0, 1
+  store ptr %62, ptr %alloc
+  br label %after.57
+after.57:
+  %63 = load i64, ptr %alloc
+  %64 = add i64 %63, 8
+  store i64 %64, ptr %14
   store i64 2048, ptr %15
-  %64 = load i64, ptr %14
-  %65 = add i64 %64, -8
-  %66 = inttoptr i64 %65 to ptr
-  %67 = load i64, ptr %15
-  store i64 %67, ptr %66
-  %68 = load i64, ptr %14
-  %69 = add i64 %68, 0
-  %70 = inttoptr i64 %69 to ptr
-  %71 = load i64, ptr %7
-  store i64 %71, ptr %70
-  %72 = load i64, ptr %14
-  %73 = add i64 %72, 8
-  %74 = inttoptr i64 %73 to ptr
-  %75 = load i64, ptr %13
-  store i64 %75, ptr %74
-  %76 = load i64, ptr %14
-  store i64 %76, ptr %5
-  %77 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
-  %78 = load ptr, ptr %ds
-  %79 = insertvalue { { ptr, ptr }, { i64 } } %77, ptr %78, 0, 0
-  %80 = load ptr, ptr %alloc
-  %81 = insertvalue { { ptr, ptr }, { i64 } } %79, ptr %80, 0, 1
-  %82 = load i64, ptr %5
-  %83 = insertvalue { { ptr, ptr }, { i64 } } %81, i64 %82, 1, 0
-  ret { { ptr, ptr }, { i64 } } %83
+  %65 = load i64, ptr %14
+  %66 = add i64 %65, -8
+  %67 = inttoptr i64 %66 to ptr
+  %68 = load i64, ptr %15
+  store i64 %68, ptr %67
+  %69 = load i64, ptr %14
+  %70 = add i64 %69, 0
+  %71 = inttoptr i64 %70 to ptr
+  %72 = load i64, ptr %7
+  store i64 %72, ptr %71
+  %73 = load i64, ptr %14
+  %74 = add i64 %73, 8
+  %75 = inttoptr i64 %74 to ptr
+  %76 = load i64, ptr %13
+  store i64 %76, ptr %75
+  %77 = load i64, ptr %14
+  store i64 %77, ptr %5
+  %78 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %79 = load ptr, ptr %ds
+  %80 = insertvalue { { ptr, ptr }, { i64 } } %78, ptr %79, 0, 0
+  %81 = load ptr, ptr %alloc
+  %82 = insertvalue { { ptr, ptr }, { i64 } } %80, ptr %81, 0, 1
+  %83 = load i64, ptr %5
+  %84 = insertvalue { { ptr, ptr }, { i64 } } %82, i64 %83, 1, 0
+  ret { { ptr, ptr }, { i64 } } %84
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__big_heap_alloc_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__big_heap_alloc_HIDE_STAMP(ptr %0, ptr %1, i64 %2) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -676,7 +678,7 @@ L160:                                                ; preds = %L156
   br label %L156
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__make_ref_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__make_ref_HIDE_STAMP(ptr %0, ptr %1, i64 %2) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -701,45 +703,46 @@ L170:                                                ; preds = %L1
   %14 = inttoptr i64 %13 to ptr
   %15 = load i64, ptr %14
   %16 = icmp ult i64 %15, %11
-  br i1 %16, label %after.17, label %17
-17:
-  %18 = load ptr, ptr %ds
-  %19 = load ptr, ptr %alloc
-  %20 =  call cc 104 { { ptr, ptr }, {  } } @caml_call_gc(ptr %18, ptr %19)
-  %21 = extractvalue { { ptr, ptr }, {  } } %20, 0, 0
-  store ptr %21, ptr %ds
-  %22 = extractvalue { { ptr, ptr }, {  } } %20, 0, 1
-  store ptr %22, ptr %alloc
-  br label %after.17
-after.17:
-  %23 = load i64, ptr %alloc
-  %24 = add i64 %23, 8
-  store i64 %24, ptr %6
+  %17 =  call  i1 @llvm.expect.i1(i1 %16, i1 1)
+  br i1 %17, label %after.18, label %18
+18:
+  %19 = load ptr, ptr %ds
+  %20 = load ptr, ptr %alloc
+  %21 =  call cc 104 { { ptr, ptr }, {  } } @caml_call_gc(ptr %19, ptr %20) cold
+  %22 = extractvalue { { ptr, ptr }, {  } } %21, 0, 0
+  store ptr %22, ptr %ds
+  %23 = extractvalue { { ptr, ptr }, {  } } %21, 0, 1
+  store ptr %23, ptr %alloc
+  br label %after.18
+after.18:
+  %24 = load i64, ptr %alloc
+  %25 = add i64 %24, 8
+  store i64 %25, ptr %6
   store i64 1024, ptr %7
-  %25 = load i64, ptr %6
-  %26 = add i64 %25, -8
-  %27 = inttoptr i64 %26 to ptr
-  %28 = load i64, ptr %7
-  store i64 %28, ptr %27
+  %26 = load i64, ptr %6
+  %27 = add i64 %26, -8
+  %28 = inttoptr i64 %27 to ptr
+  %29 = load i64, ptr %7
+  store i64 %29, ptr %28
   store i64 1, ptr %8
-  %29 = load i64, ptr %6
-  %30 = add i64 %29, 0
-  %31 = inttoptr i64 %30 to ptr
-  %32 = load i64, ptr %8
-  store i64 %32, ptr %31
-  %33 = load i64, ptr %6
-  store i64 %33, ptr %4
-  %34 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
-  %35 = load ptr, ptr %ds
-  %36 = insertvalue { { ptr, ptr }, { i64 } } %34, ptr %35, 0, 0
-  %37 = load ptr, ptr %alloc
-  %38 = insertvalue { { ptr, ptr }, { i64 } } %36, ptr %37, 0, 1
-  %39 = load i64, ptr %4
-  %40 = insertvalue { { ptr, ptr }, { i64 } } %38, i64 %39, 1, 0
-  ret { { ptr, ptr }, { i64 } } %40
+  %30 = load i64, ptr %6
+  %31 = add i64 %30, 0
+  %32 = inttoptr i64 %31 to ptr
+  %33 = load i64, ptr %8
+  store i64 %33, ptr %32
+  %34 = load i64, ptr %6
+  store i64 %34, ptr %4
+  %35 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %36 = load ptr, ptr %ds
+  %37 = insertvalue { { ptr, ptr }, { i64 } } %35, ptr %36, 0, 0
+  %38 = load ptr, ptr %alloc
+  %39 = insertvalue { { ptr, ptr }, { i64 } } %37, ptr %38, 0, 1
+  %40 = load i64, ptr %4
+  %41 = insertvalue { { ptr, ptr }, { i64 } } %39, i64 %40, 1, 0
+  ret { { ptr, ptr }, { i64 } } %41
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__heap_ref_incr_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__heap_ref_incr_HIDE_STAMP(ptr %0, ptr %1, i64 %2) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -859,7 +862,7 @@ L176:                                                ; preds = %L174
   ret { { ptr, ptr }, { i64 } } %80
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__entry(ptr %0, ptr %1)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlAlloc__entry(ptr %0, ptr %1) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -1227,6 +1230,7 @@ declare cc 104 { { ptr, ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HI
 declare cc 104 { { ptr, ptr }, { i64 } } @caml_apply2(ptr, ptr, i64, i64, i64)
 declare cc 104 { { ptr, ptr }, {  } } @caml_call_gc(ptr, ptr)
 declare  void @caml_call_local_realloc()
+declare  i1 @llvm.expect.i1(i1, i1)
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
 
@@ -1236,6 +1240,6 @@ declare void @llvm.write_register.i64(metadata, i64)
 @caml_curry2L2 = external global ptr
 @caml_curry3L1 = external global ptr
 
-@camlAlloc__data_end = global {  } {  }, align 8
-define void @camlAlloc__code_end() { ret void }
-@camlAlloc__frametable = global {  } {  }, align 8
+@camlAlloc__data_end = global {  } {  }, align 8, section ".data"
+define void @camlAlloc__code_end() { unreachable }
+@camlAlloc__frametable = global { i64 } { i64 0 }, align 8, section ".data"

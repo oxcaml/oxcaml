@@ -1,14 +1,14 @@
 source_filename = "gcd.ml"
 
-@camlGcd__data_begin = global {  } {  }, align 8
-define void @camlGcd__code_begin() { ret void }
+@camlGcd__data_begin = global {  } {  }, align 8, section ".data"
+define void @camlGcd__code_begin() { unreachable }
 
-@camlGcd__gc_roots = global { i64 } { i64 0 }, align 8
-@.header.camlGcd = global { i64 } { i64 1792 }, align 8
-@camlGcd = global { ptr } { ptr @camlGcd__gcd_1 }, align 8
-@.header.camlGcd__gcd_1 = global { i64 } { i64 3063 }, align 8
-@camlGcd__gcd_1 = global { ptr, i64 } { ptr @camlGcd__gcd_HIDE_STAMP, i64 108086391056891909 }, align 8
-define cc 104 { { ptr, ptr }, { i64 } } @camlGcd__gcd_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
+@camlGcd__gc_roots = global { i64 } { i64 0 }, align 8, section ".data"
+@.header.camlGcd = global { i64 } { i64 1792 }, align 8, section ".data"
+@camlGcd = global { ptr } { ptr @camlGcd__gcd_1 }, align 8, section ".data"
+@.header.camlGcd__gcd_1 = global { i64 } { i64 3063 }, align 8, section ".data"
+@camlGcd__gcd_1 = global { ptr, i64 } { ptr @camlGcd__gcd_HIDE_STAMP, i64 108086391056891909 }, align 8, section ".data"
+define  cc 104 { { ptr, ptr }, { i64 } } @camlGcd__gcd_HIDE_STAMP(ptr %0, ptr %1, i64 %2) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -232,7 +232,7 @@ L142:                                                ; preds = %L109
   ret { { ptr, ptr }, { i64 } } %151
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlGcd__entry(ptr %0, ptr %1)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlGcd__entry(ptr %0, ptr %1) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -270,6 +270,6 @@ declare void @llvm.write_register.i64(metadata, i64)
 @camlGcd_data = external global ptr
 @caml_exn_Division_by_zero = external global ptr
 
-@camlGcd__data_end = global {  } {  }, align 8
-define void @camlGcd__code_end() { ret void }
-@camlGcd__frametable = global {  } {  }, align 8
+@camlGcd__data_end = global {  } {  }, align 8, section ".data"
+define void @camlGcd__code_end() { unreachable }
+@camlGcd__frametable = global { i64 } { i64 0 }, align 8, section ".data"

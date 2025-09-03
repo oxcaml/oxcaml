@@ -1,40 +1,40 @@
 source_filename = "csel.ml"
 
-@camlCsel__data_begin = global {  } {  }, align 8
-define void @camlCsel__code_begin() { ret void }
+@camlCsel__data_begin = global {  } {  }, align 8, section ".data"
+define void @camlCsel__code_begin() { unreachable }
 
-@camlCsel__gc_roots = global { i64 } { i64 0 }, align 8
-@.header.camlCsel = global { i64 } { i64 2816 }, align 8
-@camlCsel = global { ptr, ptr } { ptr @camlCsel__csel_2, ptr @camlCsel__min_3 }, align 8
-@.header.camlCsel__min_3 = global { i64 } { i64 4087 }, align 8
-@camlCsel__min_3 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlCsel__min_HIDE_STAMP }, align 8
-@.header.camlCsel__csel_2 = global { i64 } { i64 4087 }, align 8
-@camlCsel__csel_2 = global { ptr, i64, ptr } { ptr @caml_curry3, i64 252201579132747783, ptr @camlCsel__csel_HIDE_STAMP }, align 8
-@.header.camlCsel__const_block81 = global { i64 } { i64 2827 }, align 8
-@camlCsel__const_block81 = global { ptr, ptr } { ptr @camlCsel__immstring79, ptr @camlCsel__const_block32 }, align 8
-@.header.camlCsel__immstring79 = global { i64 } { i64 3068 }, align 8
-@camlCsel__immstring79 = global { [ 10 x i8 ], [ 5 x i8 ], i8 } { [ 10 x i8 ] c"\6d\69\6e\20\31\20\31\20\3d\20", [ 5 x i8 ] zeroinitializer, i8 5 }, align 8
-@.header.camlCsel__const_block70 = global { i64 } { i64 2827 }, align 8
-@camlCsel__const_block70 = global { ptr, ptr } { ptr @camlCsel__immstring68, ptr @camlCsel__const_block32 }, align 8
-@.header.camlCsel__immstring68 = global { i64 } { i64 3068 }, align 8
-@camlCsel__immstring68 = global { [ 10 x i8 ], [ 5 x i8 ], i8 } { [ 10 x i8 ] c"\6d\69\6e\20\33\20\32\20\3d\20", [ 5 x i8 ] zeroinitializer, i8 5 }, align 8
-@.header.camlCsel__const_block58 = global { i64 } { i64 2827 }, align 8
-@camlCsel__const_block58 = global { ptr, ptr } { ptr @camlCsel__immstring56, ptr @camlCsel__const_block32 }, align 8
-@.header.camlCsel__immstring56 = global { i64 } { i64 3068 }, align 8
-@camlCsel__immstring56 = global { [ 10 x i8 ], [ 5 x i8 ], i8 } { [ 10 x i8 ] c"\6d\69\6e\20\32\20\33\20\3d\20", [ 5 x i8 ] zeroinitializer, i8 5 }, align 8
-@.header.camlCsel__const_block46 = global { i64 } { i64 2827 }, align 8
-@camlCsel__const_block46 = global { ptr, ptr } { ptr @camlCsel__immstring44, ptr @camlCsel__const_block32 }, align 8
-@.header.camlCsel__immstring44 = global { i64 } { i64 4092 }, align 8
-@camlCsel__immstring44 = global { [ 16 x i8 ], [ 7 x i8 ], i8 } { [ 16 x i8 ] c"\63\73\65\6c\20\74\72\75\65\20\33\20\34\20\3d\20", [ 7 x i8 ] zeroinitializer, i8 7 }, align 8
-@.header.camlCsel__const_block34 = global { i64 } { i64 2827 }, align 8
-@camlCsel__const_block34 = global { ptr, ptr } { ptr @camlCsel__immstring28, ptr @camlCsel__const_block32 }, align 8
-@.header.camlCsel__const_block32 = global { i64 } { i64 4868 }, align 8
-@camlCsel__const_block32 = global { i64, i64, i64, ptr } { i64 1, i64 1, i64 1, ptr @camlCsel__const_block30 }, align 8
-@.header.camlCsel__const_block30 = global { i64 } { i64 2828 }, align 8
-@camlCsel__const_block30 = global { i64, i64 } { i64 21, i64 1 }, align 8
-@.header.camlCsel__immstring28 = global { i64 } { i64 4092 }, align 8
-@camlCsel__immstring28 = global { [ 17 x i8 ], [ 6 x i8 ], i8 } { [ 17 x i8 ] c"\63\73\65\6c\20\66\61\6c\73\65\20\31\20\32\20\3d\20", [ 6 x i8 ] zeroinitializer, i8 6 }, align 8
-define cc 104 { { ptr, ptr }, { i64 } } @camlCsel__csel_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3, i64 %4)  {
+@camlCsel__gc_roots = global { i64 } { i64 0 }, align 8, section ".data"
+@.header.camlCsel = global { i64 } { i64 2816 }, align 8, section ".data"
+@camlCsel = global { ptr, ptr } { ptr @camlCsel__csel_2, ptr @camlCsel__min_3 }, align 8, section ".data"
+@.header.camlCsel__min_3 = global { i64 } { i64 4087 }, align 8, section ".data"
+@camlCsel__min_3 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlCsel__min_HIDE_STAMP }, align 8, section ".data"
+@.header.camlCsel__csel_2 = global { i64 } { i64 4087 }, align 8, section ".data"
+@camlCsel__csel_2 = global { ptr, i64, ptr } { ptr @caml_curry3, i64 252201579132747783, ptr @camlCsel__csel_HIDE_STAMP }, align 8, section ".data"
+@.header.camlCsel__const_block81 = global { i64 } { i64 2827 }, align 8, section ".data"
+@camlCsel__const_block81 = global { ptr, ptr } { ptr @camlCsel__immstring79, ptr @camlCsel__const_block32 }, align 8, section ".data"
+@.header.camlCsel__immstring79 = global { i64 } { i64 3068 }, align 8, section ".data"
+@camlCsel__immstring79 = global { [ 10 x i8 ], [ 5 x i8 ], i8 } { [ 10 x i8 ] c"\6d\69\6e\20\31\20\31\20\3d\20", [ 5 x i8 ] zeroinitializer, i8 5 }, align 8, section ".data"
+@.header.camlCsel__const_block70 = global { i64 } { i64 2827 }, align 8, section ".data"
+@camlCsel__const_block70 = global { ptr, ptr } { ptr @camlCsel__immstring68, ptr @camlCsel__const_block32 }, align 8, section ".data"
+@.header.camlCsel__immstring68 = global { i64 } { i64 3068 }, align 8, section ".data"
+@camlCsel__immstring68 = global { [ 10 x i8 ], [ 5 x i8 ], i8 } { [ 10 x i8 ] c"\6d\69\6e\20\33\20\32\20\3d\20", [ 5 x i8 ] zeroinitializer, i8 5 }, align 8, section ".data"
+@.header.camlCsel__const_block58 = global { i64 } { i64 2827 }, align 8, section ".data"
+@camlCsel__const_block58 = global { ptr, ptr } { ptr @camlCsel__immstring56, ptr @camlCsel__const_block32 }, align 8, section ".data"
+@.header.camlCsel__immstring56 = global { i64 } { i64 3068 }, align 8, section ".data"
+@camlCsel__immstring56 = global { [ 10 x i8 ], [ 5 x i8 ], i8 } { [ 10 x i8 ] c"\6d\69\6e\20\32\20\33\20\3d\20", [ 5 x i8 ] zeroinitializer, i8 5 }, align 8, section ".data"
+@.header.camlCsel__const_block46 = global { i64 } { i64 2827 }, align 8, section ".data"
+@camlCsel__const_block46 = global { ptr, ptr } { ptr @camlCsel__immstring44, ptr @camlCsel__const_block32 }, align 8, section ".data"
+@.header.camlCsel__immstring44 = global { i64 } { i64 4092 }, align 8, section ".data"
+@camlCsel__immstring44 = global { [ 16 x i8 ], [ 7 x i8 ], i8 } { [ 16 x i8 ] c"\63\73\65\6c\20\74\72\75\65\20\33\20\34\20\3d\20", [ 7 x i8 ] zeroinitializer, i8 7 }, align 8, section ".data"
+@.header.camlCsel__const_block34 = global { i64 } { i64 2827 }, align 8, section ".data"
+@camlCsel__const_block34 = global { ptr, ptr } { ptr @camlCsel__immstring28, ptr @camlCsel__const_block32 }, align 8, section ".data"
+@.header.camlCsel__const_block32 = global { i64 } { i64 4868 }, align 8, section ".data"
+@camlCsel__const_block32 = global { i64, i64, i64, ptr } { i64 1, i64 1, i64 1, ptr @camlCsel__const_block30 }, align 8, section ".data"
+@.header.camlCsel__const_block30 = global { i64 } { i64 2828 }, align 8, section ".data"
+@camlCsel__const_block30 = global { i64, i64 } { i64 21, i64 1 }, align 8, section ".data"
+@.header.camlCsel__immstring28 = global { i64 } { i64 4092 }, align 8, section ".data"
+@camlCsel__immstring28 = global { [ 17 x i8 ], [ 6 x i8 ], i8 } { [ 17 x i8 ] c"\63\73\65\6c\20\66\61\6c\73\65\20\31\20\32\20\3d\20", [ 6 x i8 ] zeroinitializer, i8 6 }, align 8, section ".data"
+define  cc 104 { { ptr, ptr }, { i64 } } @camlCsel__csel_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3, i64 %4) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -79,7 +79,7 @@ L101:                                                ; preds = %L1
   ret { { ptr, ptr }, { i64 } } %29
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlCsel__min_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlCsel__min_HIDE_STAMP(ptr %0, ptr %1, i64 %2, i64 %3) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -120,7 +120,7 @@ L105:                                                ; preds = %L1
   ret { { ptr, ptr }, { i64 } } %26
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlCsel__entry(ptr %0, ptr %1)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlCsel__entry(ptr %0, ptr %1) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -614,7 +614,7 @@ L132:                                                ; preds = %L131
   ret { { ptr, ptr }, { i64 } } %305
 }
 
-@.temp.Csel.0 = global { ptr } { ptr @caml_csel_value }, align 8
+@.temp.Csel.0 = global { ptr } { ptr @caml_csel_value }, align 8, section ".data"
 declare cc 104 { { ptr, ptr }, { i64 } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr, ptr, i64, i64, i64)
 declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
@@ -624,6 +624,6 @@ declare void @llvm.write_register.i64(metadata, i64)
 @caml_curry2 = external global ptr
 @caml_curry3 = external global ptr
 
-@camlCsel__data_end = global {  } {  }, align 8
-define void @camlCsel__code_end() { ret void }
-@camlCsel__frametable = global {  } {  }, align 8
+@camlCsel__data_end = global {  } {  }, align 8, section ".data"
+define void @camlCsel__code_end() { unreachable }
+@camlCsel__frametable = global { i64 } { i64 0 }, align 8, section ".data"

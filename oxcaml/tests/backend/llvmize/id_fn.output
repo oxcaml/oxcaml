@@ -1,14 +1,14 @@
 source_filename = "id_fn.ml"
 
-@camlId_fn__data_begin = global {  } {  }, align 8
-define void @camlId_fn__code_begin() { ret void }
+@camlId_fn__data_begin = global {  } {  }, align 8, section ".data"
+define void @camlId_fn__code_begin() { unreachable }
 
-@camlId_fn__gc_roots = global { i64 } { i64 0 }, align 8
-@.header.camlId_fn = global { i64 } { i64 1792 }, align 8
-@camlId_fn = global { ptr } { ptr @camlId_fn__f_1 }, align 8
-@.header.camlId_fn__f_1 = global { i64 } { i64 3063 }, align 8
-@camlId_fn__f_1 = global { ptr, i64 } { ptr @camlId_fn__f_HIDE_STAMP, i64 108086391056891909 }, align 8
-define cc 104 { { ptr, ptr }, { i64 } } @camlId_fn__f_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
+@camlId_fn__gc_roots = global { i64 } { i64 0 }, align 8, section ".data"
+@.header.camlId_fn = global { i64 } { i64 1792 }, align 8, section ".data"
+@camlId_fn = global { ptr } { ptr @camlId_fn__f_1 }, align 8, section ".data"
+@.header.camlId_fn__f_1 = global { i64 } { i64 3063 }, align 8, section ".data"
+@camlId_fn__f_1 = global { ptr, i64 } { ptr @camlId_fn__f_HIDE_STAMP, i64 108086391056891909 }, align 8, section ".data"
+define  cc 104 { { ptr, ptr }, { i64 } } @camlId_fn__f_HIDE_STAMP(ptr %0, ptr %1, i64 %2) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -34,7 +34,7 @@ L101:                                                ; preds = %L1
   ret { { ptr, ptr }, { i64 } } %14
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlId_fn__entry(ptr %0, ptr %1)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlId_fn__entry(ptr %0, ptr %1) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -70,6 +70,6 @@ declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.write_register.i64(metadata, i64)
 
 
-@camlId_fn__data_end = global {  } {  }, align 8
-define void @camlId_fn__code_end() { ret void }
-@camlId_fn__frametable = global {  } {  }, align 8
+@camlId_fn__data_end = global {  } {  }, align 8, section ".data"
+define void @camlId_fn__code_end() { unreachable }
+@camlId_fn__frametable = global { i64 } { i64 0 }, align 8, section ".data"

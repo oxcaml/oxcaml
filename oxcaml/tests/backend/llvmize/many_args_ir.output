@@ -1,14 +1,14 @@
 source_filename = "many_args.ml"
 
-@camlMany_args__data_begin = global {  } {  }, align 8
-define void @camlMany_args__code_begin() { ret void }
+@camlMany_args__data_begin = global {  } {  }, align 8, section ".data"
+define void @camlMany_args__code_begin() { unreachable }
 
-@camlMany_args__gc_roots = global { i64 } { i64 0 }, align 8
-@.header.camlMany_args = global { i64 } { i64 1792 }, align 8
-@camlMany_args = global { ptr } { ptr @camlMany_args__call_with_1 }, align 8
-@.header.camlMany_args__call_with_1 = global { i64 } { i64 3063 }, align 8
-@camlMany_args__call_with_1 = global { ptr, i64 } { ptr @camlMany_args__call_with_HIDE_STAMP, i64 108086391056891909 }, align 8
-define cc 104 { { ptr, ptr }, { i64 } } @camlMany_args__call_with_HIDE_STAMP(ptr %0, ptr %1, i64 %2)  {
+@camlMany_args__gc_roots = global { i64 } { i64 0 }, align 8, section ".data"
+@.header.camlMany_args = global { i64 } { i64 1792 }, align 8, section ".data"
+@camlMany_args = global { ptr } { ptr @camlMany_args__call_with_1 }, align 8, section ".data"
+@.header.camlMany_args__call_with_1 = global { i64 } { i64 3063 }, align 8, section ".data"
+@camlMany_args__call_with_1 = global { ptr, i64 } { ptr @camlMany_args__call_with_HIDE_STAMP, i64 108086391056891909 }, align 8, section ".data"
+define  cc 104 { { ptr, ptr }, { i64 } } @camlMany_args__call_with_HIDE_STAMP(ptr %0, ptr %1, i64 %2) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -31,16 +31,16 @@ define cc 104 { { ptr, ptr }, { i64 } } @camlMany_args__call_with_HIDE_STAMP(ptr
   %18 = alloca i64
   %19 = alloca i64
   %20 = load i64, ptr %ds
-  %21 = add i64 %20, 568
+  %21 = add i64 %20, 576
   %22 = inttoptr i64 %21 to ptr
   %23 = load i64, ptr %ds
-  %24 = add i64 %23, 576
+  %24 = add i64 %23, 584
   %25 = inttoptr i64 %24 to ptr
   %26 = load i64, ptr %ds
-  %27 = add i64 %26, 584
+  %27 = add i64 %26, 592
   %28 = inttoptr i64 %27 to ptr
   %29 = load i64, ptr %ds
-  %30 = add i64 %29, 592
+  %30 = add i64 %29, 600
   %31 = inttoptr i64 %30 to ptr
   %32 = alloca i64
   %33 = alloca i64
@@ -132,7 +132,7 @@ L103:                                                ; preds = %L101
   ret { { ptr, ptr }, { i64 } } %84
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlMany_args__entry(ptr %0, ptr %1)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlMany_args__entry(ptr %0, ptr %1) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -170,6 +170,6 @@ declare void @llvm.write_register.i64(metadata, i64)
 
 @camlMany_args_defn = external global ptr
 
-@camlMany_args__data_end = global {  } {  }, align 8
-define void @camlMany_args__code_end() { ret void }
-@camlMany_args__frametable = global {  } {  }, align 8
+@camlMany_args__data_end = global {  } {  }, align 8, section ".data"
+define void @camlMany_args__code_end() { unreachable }
+@camlMany_args__frametable = global { i64 } { i64 0 }, align 8, section ".data"

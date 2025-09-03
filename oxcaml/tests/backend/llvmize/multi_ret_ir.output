@@ -1,16 +1,16 @@
 source_filename = "multi_ret.ml"
 
-@camlMulti_ret__data_begin = global {  } {  }, align 8
-define void @camlMulti_ret__code_begin() { ret void }
+@camlMulti_ret__data_begin = global {  } {  }, align 8, section ".data"
+define void @camlMulti_ret__code_begin() { unreachable }
 
-@camlMulti_ret__gc_roots = global { i64 } { i64 0 }, align 8
-@.header.camlMulti_ret = global { i64 } { i64 2816 }, align 8
-@camlMulti_ret = global { ptr, ptr } { ptr @camlMulti_ret__empty_block4, ptr @camlMulti_ret__permute_1 }, align 8
-@.header.camlMulti_ret__permute_1 = global { i64 } { i64 4087 }, align 8
-@camlMulti_ret__permute_1 = global { ptr, i64, ptr } { ptr @caml_curryF_F_F_F_RFFFF, i64 324259173170675719, ptr @camlMulti_ret__permute_HIDE_STAMP }, align 8
-@.header.camlMulti_ret__empty_block4 = global { i64 } { i64 768 }, align 8
-@camlMulti_ret__empty_block4 = global {  } {  }, align 8
-define cc 104 { { ptr, ptr }, { double, double, double, double } } @camlMulti_ret__permute_HIDE_STAMP(ptr %0, ptr %1, double %2, double %3, double %4, double %5)  {
+@camlMulti_ret__gc_roots = global { i64 } { i64 0 }, align 8, section ".data"
+@.header.camlMulti_ret = global { i64 } { i64 2816 }, align 8, section ".data"
+@camlMulti_ret = global { ptr, ptr } { ptr @camlMulti_ret__empty_block4, ptr @camlMulti_ret__permute_1 }, align 8, section ".data"
+@.header.camlMulti_ret__permute_1 = global { i64 } { i64 4087 }, align 8, section ".data"
+@camlMulti_ret__permute_1 = global { ptr, i64, ptr } { ptr @caml_curryF_F_F_F_RFFFF, i64 324259173170675719, ptr @camlMulti_ret__permute_HIDE_STAMP }, align 8, section ".data"
+@.header.camlMulti_ret__empty_block4 = global { i64 } { i64 768 }, align 8, section ".data"
+@camlMulti_ret__empty_block4 = global {  } {  }, align 8, section ".data"
+define  cc 104 { { ptr, ptr }, { double, double, double, double } } @camlMulti_ret__permute_HIDE_STAMP(ptr %0, ptr %1, double %2, double %3, double %4, double %5) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -63,7 +63,7 @@ L101:                                                ; preds = %L1
   ret { { ptr, ptr }, { double, double, double, double } } %35
 }
 
-define cc 104 { { ptr, ptr }, { i64 } } @camlMulti_ret__entry(ptr %0, ptr %1)  {
+define  cc 104 { { ptr, ptr }, { i64 } } @camlMulti_ret__entry(ptr %0, ptr %1) noinline {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -100,6 +100,6 @@ declare void @llvm.write_register.i64(metadata, i64)
 
 @caml_curryF_F_F_F_RFFFF = external global ptr
 
-@camlMulti_ret__data_end = global {  } {  }, align 8
-define void @camlMulti_ret__code_end() { ret void }
-@camlMulti_ret__frametable = global {  } {  }, align 8
+@camlMulti_ret__data_end = global {  } {  }, align 8, section ".data"
+define void @camlMulti_ret__code_end() { unreachable }
+@camlMulti_ret__frametable = global { i64 } { i64 0 }, align 8, section ".data"
