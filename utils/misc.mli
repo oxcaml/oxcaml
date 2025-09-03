@@ -1131,6 +1131,31 @@ type alerts = string Stdlib.String.Map.t
 
 val remove_double_underscores : string -> string
 
+(** {1 JSON utilities} *)
+module Json : sig
+  (** Simple JSON generation utilities.
+
+      Note that the encoding of strings into JSON strings is not perfect. We are
+      using OCaml's [%S] format specifier, which escapes most special characters
+      reasonably, but there can be discrepancies around, for example, unicode
+      characters. *)
+
+  val field : string -> string -> string
+  (** [field name value] creates a JSON field with the given name and value. *)
+
+  val string : string -> string
+  (** [string value] formats a string value as a JSON string. *)
+
+  val int : int -> string
+  (** [int value] formats an integer value as a JSON number. *)
+
+  val object_ : string list -> string
+  (** [object_ fields] creates a JSON object from a list of field strings. *)
+
+  val array : string list -> string
+  (** [array items] creates a JSON array from a list of item strings. *)
+end
+
 (** Non-empty lists *)
 module Nonempty_list : sig
   type nonrec 'a t = ( :: ) of 'a * 'a list

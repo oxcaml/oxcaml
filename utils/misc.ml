@@ -1922,6 +1922,22 @@ let remove_double_underscores s =
   loop 0;
   Buffer.contents buf
 
+module Json = struct
+  let field name value = Printf.sprintf "%S: %s" name value
+
+  let string value = Printf.sprintf "%S" value
+
+  let int value = string_of_int value
+
+  let object_ fields =
+    let field_strings = String.concat ",\n" fields in
+    Printf.sprintf "{\n%s\n}" field_strings
+
+  let array items =
+    let item_strings = String.concat ",\n" items in
+    Printf.sprintf "[\n%s\n]" item_strings
+end
+
 module Nonempty_list = struct
   type nonrec 'a t = ( :: ) of 'a * 'a list
 

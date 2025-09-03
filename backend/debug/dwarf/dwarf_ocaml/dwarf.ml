@@ -21,28 +21,7 @@ open Dwarf_low
 module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 module L = Linear
-
-module Json = struct
-  (* Note that the encoding of strings into JSON strings is not perfect. We are
-     using OCaml's %S format specifier, which escapes most special characters
-     reasonably, but there could be some discrepancies around, for example,
-     unicode characters. *)
-  let field name value = Printf.sprintf "%S: %s" name value
-
-  let string value = Printf.sprintf "%S" value
-
-  let int value = string_of_int value
-
-  let object_ fields =
-    let field_strings = String.concat ",\n" fields in
-    Printf.sprintf "{\n%s\n}" field_strings
-
-  let array items =
-    let item_strings = String.concat ",\n" items in
-    Printf.sprintf "[\n%s\n]" item_strings
-end
-(* CR sspies: Should this go to the Misc module? It's not particularly
-   efficient, but good enough for outputting JSON in this case. *)
+module Json = Misc.Json
 
 type t =
   { state : DS.t;
@@ -155,18 +134,18 @@ let emit_stats_file t =
     let base = Filename.remove_extension sourcefile in
     base ^ ".debug-stats.json"
   in
-  let diagnostics = DS.diagnostics t.state in
+  let { DS.Diagnostics.variables } = DS.diagnostics t.state in
   let oc = open_out stats_filename in
   (* Format variables array *)
-  let variable_jsons =
-    List.rev_map format_variable_json diagnostics.variables
-  in
+  let variable_jsons = List.rev_map format_variable_json variables in
   (* Create the main JSON object *)
   let main_object =
     Json.object_
       [ Json.field "compilation_parameters" (Json.object_ []);
-        (* CR sspies: Add the configuration parameters here once they are
-           there. *)
+        (* CR sspies: Curretly, we do not have any performance dials yet for the
+           DWARF shape emission (such as depth dials for various recursive
+           traversals). Once they are implemented, add them here to record their
+           values in the debug json files. *)
         Json.field "variables" (Json.array variable_jsons) ]
   in
   Printf.fprintf oc "%s\n" main_object;
