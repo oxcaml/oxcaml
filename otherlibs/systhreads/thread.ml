@@ -41,7 +41,7 @@ let default_uncaught_exception_handler = thread_uncaught_exception
 
 let uncaught_exception_handler = Atomic.make { Modes.Portable.portable = default_uncaught_exception_handler }
 
-let set_uncaught_exception_handler (fn @ portable) = Atomic.Contended.set uncaught_exception_handler { Modes.Portable.portable = fn }
+let set_uncaught_exception_handler (fn @ portable) = Atomic.set uncaught_exception_handler { Modes.Portable.portable = fn }
 
 exception Exit
 
@@ -58,7 +58,7 @@ let create (fn @ once) arg =
         let raw_backtrace = Printexc.get_raw_backtrace () in
         flush stdout; flush stderr;
         try
-          (Atomic.Contended.get uncaught_exception_handler).portable exn
+          (Atomic.get uncaught_exception_handler).portable exn
         with
         | Exit -> ()
         | exn' ->

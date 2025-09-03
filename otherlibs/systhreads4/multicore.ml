@@ -286,8 +286,8 @@ let manager (t : t) =
 let create_initial_manager =
   let need_manager = Atomic.make true in
   fun () ->
-    if Atomic.Contended.get need_manager &&
-       Atomic.Contended.exchange need_manager false
+    if Atomic.get need_manager &&
+       Atomic.exchange need_manager false
     then ignore (Thread.Portable.create manager (get 0))
 
 let spawn_on ~domain:i f a =
