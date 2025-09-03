@@ -307,6 +307,36 @@ Error: The kind of type "cell" is value mod non_float
          because of the annotation on the declaration of the type cell.
 |}]
 
+type 'a cell : sync_data with 'a =
+  | Nil : 'a cell
+  | Cons of { value : 'a; mutable next: 'a cell [@atomic] }
+(* CR layouts v2.8: This should be accepted *)
+[%%expect{|
+Lines 1-3, characters 0-59:
+1 | type 'a cell : sync_data with 'a =
+2 |   | Nil : 'a cell
+3 |   | Cons of { value : 'a; mutable next: 'a cell [@atomic] }
+Error: The kind of type "cell" is value mod non_float
+         because it's a boxed variant type.
+       But the kind of type "cell" must be a subkind of sync_data with 'a
+         because of the annotation on the declaration of the type cell.
+|}]
+
+type 'a cell : sync_data with 'a =
+  | Nil
+  | Cons : { value : 'b; mutable next: 'b cell [@atomic] } -> 'b cell
+(* CR layouts v2.8: This should be accepted *)
+[%%expect{|
+Lines 1-3, characters 0-69:
+1 | type 'a cell : sync_data with 'a =
+2 |   | Nil
+3 |   | Cons : { value : 'b; mutable next: 'b cell [@atomic] } -> 'b cell
+Error: The kind of type "cell" is value mod non_float
+         because it's a boxed variant type.
+       But the kind of type "cell" must be a subkind of sync_data with 'a
+         because of the annotation on the declaration of the type cell.
+|}]
+
 (* Existentials that are the type arguments to abstract types should end up as [type :
    kind] in the with-bounds.
 

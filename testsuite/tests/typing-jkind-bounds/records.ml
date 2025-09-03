@@ -72,17 +72,21 @@ type ('a : immutable_data) t = { x : 'a option; }
 (* atomic or immutable records annotated as sync *)
 type t : sync_data = { mutable x : int [@atomic] }
 type t : sync_data = { x : int; y : int; mutable z : int [@atomic] }
-type t : sync_data = { x : int; mutable y : int [@atomic]; mutable z : int [@atomic] }
-type nonrec t : sync_data = { t : t }
+type t : sync_data = { mutable x : int Atomic.t [@atomic] }
+type t : sync_data = { x : int }
 type ('a : sync_data) t : sync_data = { x : 'a }
 type ('a : immutable_data) t : sync_data = { x : 'a }
+type t : sync_data = { x : int Atomic.t; y : string }
+type ('a : sync_data) t : sync_data = { x : 'a option }
 [%%expect {|
 type t = { mutable x : int [@atomic]; }
 type t = { x : int; y : int; mutable z : int [@atomic]; }
-type t = { x : int; mutable y : int [@atomic]; mutable z : int [@atomic]; }
-type nonrec t = { t : t; }
+type t = { mutable x : int Atomic.t [@atomic]; }
+type t = { x : int; }
 type ('a : sync_data) t = { x : 'a; }
 type ('a : immutable_data) t = { x : 'a; }
+type t = { x : int Atomic.t; y : string; }
+type ('a : sync_data) t = { x : 'a option; }
 |}]
 
 (* mutable or immutable records annotated as mutable *)

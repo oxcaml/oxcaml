@@ -74,12 +74,35 @@ type ('a : immutable_data) t = Foo of 'a option
 type t = Foo | Bar | Baz
 |}]
 
-(* mutable or immutable records annotated as mutable *)
+(* atomic or immutable records annotated as sync *)
+type t : sync_data = Foo of { mutable x : int [@atomic] }
+type t : sync_data = Foo of { x : int } | Bar of { y : int; mutable z : int [@atomic] }
+type t : sync_data = Foo of { mutable x : int Atomic.t [@atomic] }
+type t : sync_data = Foo of int
+type ('a : sync_data) t : sync_data = Foo of 'a
+type ('a : immutable_data) t : sync_data = Foo of 'a | Bar
+type t : sync_data = Foo of int Atomic.t | Bar of string
+type ('a : sync_data) t : sync_data = Foo of { x : 'a option }
+[%%expect {|
+type t = Foo of { mutable x : int [@atomic]; }
+type t = Foo of { x : int; } | Bar of { y : int; mutable z : int [@atomic]; }
+type t = Foo of { mutable x : int Atomic.t [@atomic]; }
+type t = Foo of int
+type ('a : sync_data) t = Foo of 'a
+type ('a : immutable_data) t = Foo of 'a | Bar
+type t = Foo of int Atomic.t | Bar of string
+type ('a : sync_data) t = Foo of { x : 'a option; }
+|}]
+
+(* mutable or immutable variants annotated as mutable *)
 type t : mutable_data = Foo of { mutable x : int }
 type t : mutable_data = Foo of { x : int } | Bar of { y : int; mutable z : int }
 type t : mutable_data = Foo of { mutable x : int ref }
 type t : mutable_data = Foo of int
+type t : mutable_data = Foo of { mutable x : int [@atomic] }
+type t : mutable_data = Foo of { mutable x : int ref [@atomic] }
 type ('a : mutable_data) t : mutable_data = Foo of 'a
+type ('a : sync_data) t : mutable_data = Foo of 'a
 type ('a : immutable_data) t : mutable_data = Foo of 'a | Bar
 type t : mutable_data = Foo of int ref | Bar of string
 type ('a : mutable_data) t : mutable_data = Foo of { x : 'a option }
@@ -88,13 +111,16 @@ type t = Foo of { mutable x : int; }
 type t = Foo of { x : int; } | Bar of { y : int; mutable z : int; }
 type t = Foo of { mutable x : int ref; }
 type t = Foo of int
+type t = Foo of { mutable x : int [@atomic]; }
+type t = Foo of { mutable x : int ref [@atomic]; }
 type ('a : mutable_data) t = Foo of 'a
+type ('a : sync_data) t = Foo of 'a
 type ('a : immutable_data) t = Foo of 'a | Bar
 type t = Foo of int ref | Bar of string
 type ('a : mutable_data) t = Foo of { x : 'a option; }
 |}]
 
-(* annotations that aren't mutable_data or immutable_data *)
+(* annotations that aren't mutable_data, sync_data, or immutable_data *)
 type t : value mod contended = Foo of { x : unit -> unit }
 type 'a t : value mod contended = Foo of ('a -> 'a) | Bar
 type ('a : value mod contended portable, 'b : value mod portable) t : value mod portable
@@ -241,6 +267,31 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod external_
          because of the annotation on the declaration of the type t.
+|}]
+
+type t : sync_data = Foo of { mutable x : int ref [@atomic] }
+[%%expect {|
+Line 1, characters 0-61:
+1 | type t : sync_data = Foo of { mutable x : int ref [@atomic] }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is mutable_data
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of sync_data
+         because of the annotation on the declaration of the type t.
+|}]
+
+type ('a : mutable_data) t : sync_data = Foo of { mutable x : 'a [@atomic] }
+[%%expect {|
+Line 1, characters 0-76:
+1 | type ('a : mutable_data) t : sync_data = Foo of { mutable x : 'a [@atomic] }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is sync_data with 'a @@ unyielding many
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of sync_data
+         because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with 'a ≰ mod contended
 |}]
 
 (**** Test 2: Annotations with "with" are accepted when appropriate ****)
