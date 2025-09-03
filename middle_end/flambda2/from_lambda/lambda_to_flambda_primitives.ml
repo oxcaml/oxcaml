@@ -2598,13 +2598,14 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Word_size ->
         [Simple (Simple.const_int (Target_ocaml_int.of_int (8 * size_int)))]
       | Int_size ->
-        [Simple (Simple.const_int (Target_ocaml_int.of_int ((8 * size_int) - 1)))]
+        [ Simple
+            (Simple.const_int (Target_ocaml_int.of_int ((8 * size_int) - 1))) ]
       | Max_wosize ->
         [ Simple
             (Simple.const_int
                (Target_ocaml_int.of_int
                   ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
-                   - 1))) ]
+                  - 1))) ]
       | Ostype_unix ->
         [Simple (Simple.const_bool (String.equal Sys.os_type "Unix"))]
       | Ostype_win32 ->
@@ -2612,7 +2613,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Ostype_cygwin ->
         [Simple (Simple.const_bool (String.equal Sys.os_type "Cygwin"))]
       | Backend_type ->
-        [Simple Simple.const_zero] (* constructor 0 is the same as Native here *)
+        [Simple Simple.const_zero]
+        (* constructor 0 is the same as Native here *)
       | Runtime5 -> [Simple (Simple.const_bool Config.runtime5)]))
   | Pint_as_pointer mode, [[arg]] ->
     (* This is not a stack allocation, but nonetheless has a region
