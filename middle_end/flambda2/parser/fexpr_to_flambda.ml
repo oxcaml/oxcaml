@@ -506,8 +506,8 @@ let array_kind : 'a -> Fexpr.array_kind -> Flambda_primitive.Array_kind.t =
   | Naked_floats -> Naked_floats
   | Values -> Values
   | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
-  | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
-  | Unboxed_product _ ->
+  | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+  | Naked_vec512s | Unboxed_product _ ->
     Misc.fatal_error
       "fexpr support for arrays of unboxed elements not yet implemented"
 
@@ -518,7 +518,8 @@ let array_set_kind :
   | Naked_floats -> Naked_floats
   | Values ia -> Values (init_or_assign env ia)
   | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
-  | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+  | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+  | Naked_vec512s ->
     Misc.fatal_error
       "fexpr support for arrays of unboxed elements not yet implemented"
 

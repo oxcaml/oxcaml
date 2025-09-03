@@ -20,34 +20,34 @@ open Cmm
 (** Tags for unboxed or untagged arrays using mixed block headers with 
     scannable_prefix = 0 *)
 module Unboxed_or_untagged_array_tags : sig
-  val untagged_int_array_tag : int 
+  val untagged_int_array_tag : int
 
   val unboxed_int64_array_tag : int
 
   val unboxed_nativeint_array_tag : int
 
   val untagged_int8_array_zero_tag : int
-  
+
   val untagged_int8_array_one_tag : int
- 
+
   val untagged_int8_array_two_tag : int
- 
+
   val untagged_int8_array_three_tag : int
- 
+
   val untagged_int8_array_four_tag : int
- 
+
   val untagged_int8_array_five_tag : int
- 
+
   val untagged_int8_array_six_tag : int
 
   val untagged_int8_array_seven_tag : int
-  
+
   val untagged_int16_array_zero_tag : int
-  
+
   val untagged_int16_array_one_tag : int
- 
+
   val untagged_int16_array_two_tag : int
- 
+
   val untagged_int16_array_three_tag : int
 
   val unboxed_int32_array_zero_tag : int
