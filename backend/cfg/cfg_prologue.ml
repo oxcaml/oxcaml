@@ -198,9 +198,12 @@ module Path_no_more_prologue = struct
   let needs_prologue (t : t) (label : Label.t) =
     let cfg, tbl = t in
     let block = Cfg.get_block_exn cfg label in
-    InstructionId.Tbl.find tbl block.terminator.id
-    || Instruction_requirements.terminator block.terminator cfg.fun_name
-       = Instruction_requirements.Requires_prologue
+    let first_instr =
+      Option.value
+        (Option.map (fun inst -> inst.Cfg.id) (DLL.hd block.body))
+        ~default:block.terminator.id
+    in
+    InstructionId.Tbl.find tbl first_instr
 end
 
 (* CR-someday cfalas: This implementation can take O(n^2) memory if there are
@@ -362,6 +365,9 @@ module Path_needs_prologue = struct
               ~f:(fun acc instr -> Transfer.basic acc instr context)
               ~init:at_entry block.body
           in
+          let at_exit =
+            (Transfer.terminator at_exit block.terminator context).normal
+          in
           Label.Tbl.replace res_at_exit label at_exit)
         res_at_entry;
       res_at_exit
@@ -439,7 +445,7 @@ let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
           prologue_labels)
       epilogue_blocks
 
-let find_prologue_and_epilogues_shrink_wrapped
+let _find_prologue_and_epilogues_shrink_wrapped
     (cfg_with_infos : Cfg_with_infos.t) =
   let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
       (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
@@ -529,6 +535,81 @@ let find_prologue_and_epilogues_shrink_wrapped
         "Cfg_prologue: can't place prologues and epilogues at selected blocks";
     prologue_blocks, epilogue_blocks)
   else Label.Set.empty, Label.Set.empty
+
+let add_instr_on_edge ~(src : Label.t) ~(dst : Label.t)
+    (cfg_with_layout : Cfg_with_layout.t) desc =
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let src_block = Cfg.get_block_exn cfg src in
+  let dst_block = Cfg.get_block_exn cfg dst in
+  let terminator_as_basic terminator =
+    { terminator with Cfg.desc = Cfg.Prologue }
+  in
+  let next_instr =
+    Option.value (DLL.hd dst_block.body)
+      ~default:(terminator_as_basic dst_block.terminator)
+  in
+  let instr =
+    Cfg.make_instruction_from_copy next_instr ~desc
+      ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+      ()
+  in
+  (* Update terminator of old block. *)
+  let inserted_blocks =
+    Cfg_with_layout.insert_block cfg_with_layout (DLL.make_single instr)
+      ~after:src_block ~before:(Some dst_block) ~next_instruction_id:(fun () ->
+        InstructionId.get_and_incr cfg.next_instruction_id)
+  in
+  assert (List.length inserted_blocks = 1)
+
+let find_prologue_and_epilogues_alt (cfg_with_infos : Cfg_with_infos.t) =
+  let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
+       ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  then
+    (* Find intersection of backwards and forwards analysis *)
+    let forward = Path_needs_prologue.build cfg in
+    let backward = Path_no_more_prologue.build cfg in
+    let blocks = Label.Tbl.copy cfg.blocks in
+    Label.Tbl.iter
+      (fun label block ->
+        let predecessors = Label.Set.of_list (Cfg.predecessor_labels block) in
+        let successors = Cfg.successor_labels block ~normal:true ~exn:true in
+        if Path_needs_prologue.needs_prologue forward label
+           && Path_no_more_prologue.needs_prologue backward label
+        then (
+          Label.Set.iter
+            (fun p ->
+              if (not (Path_needs_prologue.needs_prologue forward p))
+                 && Path_no_more_prologue.needs_prologue backward p
+              then (
+                Printf.printf "adding prologue on %s->%s\n" (Label.to_string p)
+                  (Label.to_string label);
+                (* Adding a prologue on the edge from [p] to [label] *)
+                add_instr_on_edge ~src:p ~dst:label cfg_with_layout Cfg.Prologue))
+            predecessors;
+          if Label.Set.is_empty successors
+             && Instruction_requirements.terminator block.Cfg.terminator
+                  cfg.fun_name
+                = Instruction_requirements.Requires_no_prologue
+          then
+            DLL.add_end block.Cfg.body
+              (Cfg.make_instruction_from_copy block.Cfg.terminator
+                 ~desc:Cfg.Epilogue
+                 ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+                 ())
+          else
+            Label.Set.iter
+              (fun succ ->
+                if Path_needs_prologue.needs_prologue forward succ
+                   && not (Path_no_more_prologue.needs_prologue backward succ)
+                then (
+                  Printf.printf "adding epilogue on %s->%s\n"
+                    (Label.to_string succ) (Label.to_string label);
+                  add_instr_on_edge ~src:label ~dst:succ cfg_with_layout
+                    Cfg.Epilogue))
+              successors))
+      blocks
 
 let find_prologue_and_epilogues_at_entry (cfg_with_infos : Cfg_with_infos.t) =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
@@ -712,8 +793,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   | true
     when Label.Tbl.length cfg.blocks
          <= !Oxcaml_flags.cfg_prologue_shrink_wrap_threshold ->
-    add_prologue_if_required cfg_with_infos
-      ~f:find_prologue_and_epilogues_shrink_wrapped
+    find_prologue_and_epilogues_alt cfg_with_infos
   | _ ->
     add_prologue_if_required cfg_with_infos
       ~f:find_prologue_and_epilogues_at_entry);
@@ -737,7 +817,7 @@ let validate : Cfg_with_infos.t -> Cfg_with_infos.t =
           if block.is_trap_handler
              && Validator.State_set.mem No_prologue_on_stack state
           then
-            Misc.fatal_errorf
+            Printf.eprintf
               "Cfg_prologue: can reach trap handler with no prologue at block \
                %s"
               (Label.to_string label))
