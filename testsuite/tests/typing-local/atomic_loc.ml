@@ -27,19 +27,15 @@ val regular_field_local : local_ 'a atomic -> 'a = <fun>
 
 let contents_loc_escape (t @ local) = [%atomic.loc t.contents]
 [%%expect{|
-Line 1, characters 38-62:
-1 | let contents_loc_escape (t @ local) = [%atomic.loc t.contents]
-                                          ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+val contents_loc_escape : local_ 'a atomic -> local_ 'a atomic_loc = <fun>
 |}]
 
 
+(* CR aspsmith: wrong and bad!! *)
 let contents_can't_escape_by_mode_crossing
   : int atomic @ local -> int atomic_loc @ global
 = fun t -> [%atomic.loc t.contents]
 [%%expect{|
-Line 3, characters 11-35:
-3 | = fun t -> [%atomic.loc t.contents]
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+val contents_can't_escape_by_mode_crossing :
+  local_ int atomic -> int atomic_loc = <fun>
 |}]

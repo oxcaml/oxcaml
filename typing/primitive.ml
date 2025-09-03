@@ -872,6 +872,41 @@ let prim_has_valid_reprs ~loc prim =
     | "%reinterpret_unboxed_int64_as_tagged_int63" ->
       exactly [Same_as_ocaml_repr C.bits64; Same_as_ocaml_repr C.value]
 
+    | "%atomic_load_loc" ->
+      exactly [Same_as_ocaml_repr (Product [Base Value; Base Value])]
+    | "%atomic_set_loc" ->
+      exactly [ Same_as_ocaml_repr (Product [Base Value; Base Value])
+              ; Same_as_ocaml_repr C.value]
+    | "%atomic_exchange_loc" ->
+      exactly [ Same_as_ocaml_repr (Product [Base Value; Base Value])
+              ; Same_as_ocaml_repr C.value]
+    | "%atomic_cas_loc" ->
+      exactly [ Same_as_ocaml_repr (Product [Base Value; Base Value])
+              ; Same_as_ocaml_repr C.value
+              ; Same_as_ocaml_repr C.value]
+    | "%atomic_compare_exchange_loc" ->
+      exactly [ Same_as_ocaml_repr (Product [Base Value; Base Value])
+              ; Same_as_ocaml_repr C.value
+              ; Same_as_ocaml_repr C.value]
+    | "%atomic_fetch_add_loc" ->
+      exactly [ Same_as_ocaml_repr (Product [Base Value; Base Value])
+              ; Same_as_ocaml_repr C.value]
+    | "%atomic_add_loc" ->
+      exactly [ Same_as_ocaml_repr (Product [Base Value; Base Value])
+              ; Same_as_ocaml_repr C.value]
+    | "%atomic_sub_loc" ->
+      exactly [ Same_as_ocaml_repr (Product [Base Value; Base Value])
+              ; Same_as_ocaml_repr C.value]
+    | "%atomic_land_loc" ->
+      exactly [ Same_as_ocaml_repr (Product [Base Value; Base Value])
+              ; Same_as_ocaml_repr C.value]
+    | "%atomic_lxor_loc" ->
+      exactly [ Same_as_ocaml_repr (Product [Base Value; Base Value])
+              ; Same_as_ocaml_repr C.value]
+    | "%atomic_lor_loc" ->
+      exactly [ Same_as_ocaml_repr (Product [Base Value; Base Value])
+              ; Same_as_ocaml_repr C.value]
+
     | name -> (
         match String.Map.find_opt name stringlike_indexing_primitives with
         | Some reprs -> exactly reprs

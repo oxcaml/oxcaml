@@ -1892,32 +1892,41 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind) args =
       Lprim (prim, args, loc)
   | Loc ->
       (* the primitive application
-           [Lprim(%atomic_exchange_loc, [(ptr, ofs); v])]
+           [Lprim(%atomic_exchange_loc, [#(ptr, ofs); v])]
          becomes
            [Lprim(caml_atomic_exchange_field, [ptr; ofs; v])]
-         and in the general case of a non-tuple expression <loc>
+         and in the general case of a non-unboxed-tuple expression <loc>
            [Lprim(%atomic_exchange_loc, [loc; v])]
          becomes
+         becomes
            [Llet(p, loc,
-              Lprim(caml_atomic_exchange_field, [Field(p, 0); Field(p, 1); v]))]
+              Lprim(caml_atomic_exchange_field,
+                    [unboxed_product_field(p, 0);
+                     unboxed_product_field(p, 1);
+                     v]))]
       *)
       let loc_arg, rest = split args in
       match loc_arg with
-      | Lprim (Pmakeblock _, [ptr; ofs], _argloc) ->
-          let args = ptr :: ofs :: rest in
-          Lprim (prim, args, loc)
+      | Lprim (Pmake_unboxed_product _, [ptr; ofs], _argloc) ->
+        let args = ptr :: ofs :: rest in
+        Lprim (prim, args, loc)
       | _ ->
-          let varg = Ident.create_local "atomic_arg" in
-          let ptr =
-            Lprim (Pfield (0, Pointer, Reads_agree), [Lvar varg], loc)
-          in
-          let ofs =
-            Lprim (Pfield (1, Immediate, Reads_agree), [Lvar varg], loc)
-          in
-          let args = ptr :: ofs :: rest in
-          Llet (
-            Strict, Pvalue { raw_kind = Pgenval; nullable = Non_nullable},
-            varg, Lambda.debug_uid_none, loc_arg, Lprim (prim, args, loc))
+        let varg = Ident.create_local "atomic_arg" in
+        let field i =
+          Lprim (
+            Punboxed_product_field
+              (i,
+               [Pvalue { raw_kind = Pgenval; nullable = Non_nullable};
+                Pvalue { raw_kind = Pintval; nullable = Non_nullable}]),
+            [Lvar varg],
+            loc)
+        in
+        let ptr = field 0 in
+        let ofs = field 1 in
+        let args = ptr :: ofs :: rest in
+        Llet (
+          Strict, Pvalue { raw_kind = Pgenval; nullable = Non_nullable},
+          varg, Lambda.debug_uid_none, loc_arg, Lprim (prim, args, loc))
 
 let caml_restore_raw_backtrace =
   Lambda.simple_prim_on_values ~name:"caml_restore_raw_backtrace" ~arity:2

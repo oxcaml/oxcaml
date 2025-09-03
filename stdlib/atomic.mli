@@ -149,7 +149,7 @@ module Loc : sig
 
       The API below mirrors the API to access {{!t}atomic references},
       see the documentation above for more information. *)
-  type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
+  type ('a : value_or_null) t : value & value = 'a atomic_loc
 
   external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load_loc"
 

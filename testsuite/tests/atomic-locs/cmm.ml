@@ -18,6 +18,13 @@ let get (r : 'a atomic) : 'a =
 let set (r : 'a atomic) v =
   r.x <- v
 
+let get_loc (r : 'a atomic) : 'a =
+  Atomic.Loc.get [%atomic.loc r.x]
+
+let set (r : 'a atomic) v =
+  Atomic.Loc.set [%atomic.loc r.x] v
+
+
 (* check immediates too *)
 
 let get_imm (r : int atomic) : int =
@@ -25,6 +32,15 @@ let get_imm (r : int atomic) : int =
 
 let set_imm (r : int atomic) v =
   r.x <- v
+
+(* CR atomic-fields: The following two don't notice that the type of the field is an
+   immediate *)
+
+let get_imm_loc (r : int atomic) : int =
+  Atomic.Loc.get [%atomic.loc r.x]
+
+let set_imm_loc (r : int atomic) v =
+  Atomic.Loc.set [%atomic.loc r.x] v
 
 (* TEST
    arch_amd64;

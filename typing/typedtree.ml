@@ -246,8 +246,7 @@ and expression_desc =
       extended_expression : (expression * Jkind.sort) option;
     }
   | Texp_atomic_loc of
-      expression * Jkind.sort * Longident.t loc * label_description *
-      alloc_mode
+      expression * Jkind.sort * Longident.t loc * label_description
   | Texp_field of
       expression * Jkind.sort * Longident.t loc * label_description *
         texp_field_boxing * Unique_barrier.t

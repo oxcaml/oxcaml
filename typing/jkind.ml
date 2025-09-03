@@ -3279,6 +3279,7 @@ module Format_history = struct
       = function
     | Unboxed_tuple -> fprintf ppf "it is an unboxed tuple"
     | Unboxed_record -> fprintf ppf "it is an unboxed record"
+    | Primitive id -> fprintf ppf "it is the primitive type %s" (Ident.name id)
 
   let format_creation_reason ppf ~layout_or_kind :
       History.creation_reason -> unit = function
@@ -4027,6 +4028,7 @@ module Debug_printers = struct
     function
     | Unboxed_tuple -> fprintf ppf "Unboxed_tuple"
     | Unboxed_record -> fprintf ppf "Unboxed_record"
+    | Primitive id -> fprintf ppf "Primitive %s" (Ident.name id)
 
   let creation_reason ppf : History.creation_reason -> unit = function
     | Annotated (ctx, loc) ->

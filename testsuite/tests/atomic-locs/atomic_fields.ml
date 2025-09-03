@@ -200,8 +200,8 @@ Error: Invalid "[%atomic.loc]" payload, a record field access is expected.
 
 (* Test with function application result *)
 let get_record () : atomic_record = { x = 1; atomic_field = "test"; regular_field = "test" }
-let test_function_result = [%atomic.loc (get_record ()).atomic_field]
+let test_function_result () = [%atomic.loc (get_record ()).atomic_field]
 [%%expect{|
 val get_record : unit -> atomic_record = <fun>
-val test_function_result : string atomic_loc = <abstr>
+val test_function_result : unit -> string atomic_loc = <fun>
 |}]

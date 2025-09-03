@@ -365,6 +365,7 @@ module History = struct
   type product_creation_reason =
     | Unboxed_tuple
     | Unboxed_record
+    | Primitive of Ident.t
 
   type creation_reason =
     | Annotated : ('l * 'r) annotation_context * Location.t -> creation_reason

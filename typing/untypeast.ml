@@ -614,7 +614,7 @@ let expression sub exp =
         Pexp_record_unboxed_product
           (list,
            Option.map (fun (exp, _) -> sub.expr sub exp) extended_expression)
-    | Texp_atomic_loc (exp, _, lid, _label, _) ->
+    | Texp_atomic_loc (exp, _, lid, _label) ->
         Pexp_extension ({ txt = "ocaml.atomic.loc"; loc },
                         PStr [ Str.eval ~loc
                                  (Exp.field ~loc

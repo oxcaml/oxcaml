@@ -135,7 +135,7 @@ module Contended = struct
 end
 
 module Loc = struct
-  type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
+  type ('a : value_or_null) t : value & value = 'a atomic_loc
   external get : ('a : value_or_null).
     'a t @ local -> 'a @@ portable = "%atomic_load_loc"
   external set : ('a : value_or_null).

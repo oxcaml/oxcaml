@@ -4356,7 +4356,7 @@ let rec is_nonexpansive exp =
            | Kept _ -> true)
         fields
       && is_nonexpansive_opt (Option.map fst extended_expression)
-  | Texp_atomic_loc(exp, _, _, _, _) -> is_nonexpansive exp
+  | Texp_atomic_loc(exp, _, _, _) -> is_nonexpansive exp
   | Texp_field(exp, _, _, _, _, _) -> is_nonexpansive exp
   | Texp_unboxed_field(exp, _, _, _, _) -> is_nonexpansive exp
   | Texp_idx (ba, _uas) ->
@@ -7163,7 +7163,6 @@ and type_expect_
           then raise (Error (loc, env, Label_not_atomic lid.txt));
           let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
           unify_exp env record ty_res;
-          let alloc_mode, argument_mode = register_allocation expected_mode in
           begin match Mode.Modality.Const.equate label.lbl_modalities
                         (Typemode.atomic_mutable_modalities)
           with
@@ -7171,11 +7170,11 @@ and type_expect_
           | Error _ ->
             raise (Error (loc, env, Modalities_on_atomic_field lid.txt))
           end;
-          submode ~loc ~env rmode argument_mode;
+          submode ~loc ~env rmode expected_mode;
           rue {
             exp_desc =
               Texp_atomic_loc
-                (record, record_sort, lid, label, alloc_mode);
+                (record, record_sort, lid, label);
             exp_loc = loc; exp_extra = [];
             exp_type = instance (Predef.type_atomic_loc ty_arg);
             exp_attributes = sexp.pexp_attributes;

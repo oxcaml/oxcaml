@@ -446,8 +446,7 @@ and expression_desc =
                 extended_expression = Some E0 }
           *)
   | Texp_atomic_loc of
-      expression * Jkind.sort * Longident.t loc * Types.label_description *
-      alloc_mode
+      expression * Jkind.sort * Longident.t loc * Types.label_description
   | Texp_field of expression * Jkind.sort * Longident.t loc *
       Types.label_description * texp_field_boxing * Unique_barrier.t
     (** - The sort is the sort of the whole record (which may be non-value if
