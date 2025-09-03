@@ -37,11 +37,7 @@ let copy_object_file oc name =
              (Filename.remove_extension (Filename.basename name)))
       in
       let compunit =
-        { cu_name;
-          cu_pos = compunit_pos;
-          cu_codesize = compunit_size;
-          cu_imports = [||]
-        }
+        { cu_name; cu_pos = compunit_pos; cu_codesize = compunit_size }
       in
       [compunit])
     else if buffer = cmja_magic_number

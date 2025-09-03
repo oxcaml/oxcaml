@@ -484,7 +484,9 @@ type program =
 
 type cmj_body =
   { program : program;
-    last_var : Addr.t
+    last_var : Addr.t;
+    imported_compilation_units : Compilation_unit.t list;
+    exported_compilation_unit : Compilation_unit.t
   }
 
 let noloc = No

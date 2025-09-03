@@ -587,5 +587,5 @@ let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
   let res, _addr = To_jsir_result.new_block res ~params:[] in
   let _env, res = expr ~env ~res (Flambda_unit.body flambda_unit) in
   let program = To_jsir_result.to_program_exn res in
-  Jsir.invariant program;
+  Jsir.invariant program.program;
   program
