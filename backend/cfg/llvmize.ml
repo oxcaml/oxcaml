@@ -305,9 +305,7 @@ let get_ident_for_reg t reg =
 
 let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
 
-(* CR yusumez: Write to this ppf alongside the normal one when -dllvmir is
-   passed *)
-let _get_ppf_dump t = t.ppf_dump
+let get_ppf_dump t = t.ppf_dump
 
 let add_called_fun t name ~cc ~args ~res =
   (match String.Map.find_opt name t.called_functions with
@@ -1818,7 +1816,7 @@ module F = struct
     data_decl t (Cmm_helpers.make_symbol sym) [Cint 0n]
 
   let empty_fun_decl t sym =
-    line t.ppf "define void %a() { ret void }" pp_global
+    line t.ppf "define void %a() { unreachable }" pp_global
       (Cmm_helpers.make_symbol sym)
 
   let fun_decl t sym { cc; args; res } =
@@ -2124,7 +2122,9 @@ let data (ds : Cmm.data_item list) =
       | None -> define_symbol ~private_:true ~header:None ~symbol:None ds)
   in
   try block ds
-  with _ -> Misc.fatal_error "Llvmize: error while decoding data items"
+  with _ ->
+    Misc.fatal_errorf "Llvmize: error while decoding data items: %a"
+      Printcmm.data ds
 
 (* Declare menitoned but not declared data items as extern *)
 let declare_data t =
@@ -2209,7 +2209,7 @@ let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
   with Sys_error _msg -> ()
 
-let llvmir_to_assembly t =
+let invoke_clang_with_llvmir ~output_filename ~input_filename ~extra_flags =
   (* CR-someday gyorsh: add other optimization flags and control which passes to
      perform. *)
   let cmd =
@@ -2220,21 +2220,40 @@ let llvmir_to_assembly t =
     then ["-fno-omit-frame-pointer"]
     else ["-fomit-frame-pointer"; "-momit-leaf-frame-pointer"]
   in
+  let llvm_flags = ["-march=haswell"; "-mtune=skylake"] in
+  Ccomp.command
+    (String.concat " "
+       ([cmd]
+       @ ["-o"; Filename.quote output_filename]
+       @ ["-x ir"; Filename.quote input_filename]
+       @ ["-O3"; "-S"; "-Wno-override-module"]
+       @ fp_flags @ llvm_flags @ extra_flags))
+
+let llvmir_to_assembly t =
   match t.asm_filename with
   | None -> 0
   | Some asm_filename ->
-    Ccomp.command
-      (String.concat " "
-         ([ cmd;
-            "-o";
-            Filename.quote asm_filename;
-            "-O3";
-            "-S";
-            "-march=haswell";
-            "-mtune=skylake";
-            "-Wno-override-module" ]
-         @ fp_flags
-         @ ["-x ir"; Filename.quote t.llvmir_filename]))
+    invoke_clang_with_llvmir ~input_filename:t.llvmir_filename
+      ~output_filename:asm_filename ~extra_flags:[]
+
+let dump_llvmir ~llvmir_filename ~message t =
+  let ppf_dump = get_ppf_dump t in
+  let ic = In_channel.open_text llvmir_filename in
+  let contents = In_channel.input_all ic in
+  Format.fprintf ppf_dump "\n*** %s\n\n%s" message contents;
+  In_channel.close ic
+
+let dump_llvmir_after_llvmize t =
+  dump_llvmir ~llvmir_filename:t.llvmir_filename ~message:"After llvmize" t
+
+let dump_llvmir_after_opt t =
+  let opt_llvmir_filename = t.llvmir_filename ^ ".opt.ll" in
+  let _cmd_ret =
+    invoke_clang_with_llvmir ~input_filename:t.llvmir_filename
+      ~output_filename:opt_llvmir_filename ~extra_flags:["-emit-llvm"]
+  in
+  dump_llvmir ~llvmir_filename:opt_llvmir_filename ~message:"After llopt" t;
+  remove_file opt_llvmir_filename
 
 let assemble_file ~asm_filename ~obj_filename =
   let cmd =
@@ -2278,6 +2297,11 @@ let end_assembly () =
   F.zero_symbol_decl t "frametable";
   (* Close channel to .ll file *)
   Out_channel.close t.oc;
+  (* Dump if -dllvmir passed *)
+  if !Oxcaml_flags.dump_llvmir
+  then (
+    dump_llvmir_after_llvmize t;
+    dump_llvmir_after_opt t);
   (* Call clang to compile .ll to .s *)
   let ret_code = llvmir_to_assembly t in
   if ret_code <> 0
