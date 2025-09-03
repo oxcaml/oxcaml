@@ -800,6 +800,14 @@ module F = struct
   (* CR-soon yusumez: Add implementations for missing basic and terminator
      instructions *)
 
+  let call_intrinsic t name args res =
+    let arg_types = List.map fst args in
+    let res_type = Option.map fst res in
+    let intrinsic_name = "llvm." ^ name in
+    add_called_fun t intrinsic_name ~cc:Default ~args:arg_types ~res:res_type;
+    ins_call_custom_arg ~attrs:"" ~tail:false ~cc:Default ~pp_name:pp_global t
+      intrinsic_name args res
+
   (* CR yusumez: This needs to be refactored. It is really ugly. *)
   (* This will take function arguments as identifiers and return a list of
      identifiers for every return value. This exists to separate runtime
@@ -1522,11 +1530,18 @@ module F = struct
         let local_limit_ptr = load_domainstate_addr t Domain_local_limit in
         let local_limit = fresh_ident t in
         let skip_realloc = fresh_ident t in
-        let call_realloc = fresh_ident t in
-        let after_alloc = fresh_ident t in
         ins_load t ~src:local_limit_ptr ~dst:local_limit Llvm_typ.i64;
         ins_icmp t "slt" local_limit new_local_sp skip_realloc Llvm_typ.i64;
-        ins_branch_cond_ident t skip_realloc after_alloc call_realloc;
+        (* Let LLVM know calling realloc isn't likely *)
+        let skip_realloc_expect = fresh_ident t in
+        call_intrinsic t "expect.i1"
+          [ Llvm_typ.bool, Llvm_value.Local_ident skip_realloc;
+            Llvm_typ.bool, Llvm_value.Immediate "1" ]
+          (Some (Llvm_typ.bool, skip_realloc_expect));
+        (* Branch appropriately *)
+        let call_realloc = fresh_ident t in
+        let after_alloc = fresh_ident t in
+        ins_branch_cond_ident t skip_realloc_expect after_alloc call_realloc;
         (* Call realloc *)
         line t.ppf "%a:" Ident.print call_realloc;
         (* CR yusumez: handle simd regs appropriately once we have them *)
@@ -1547,27 +1562,35 @@ module F = struct
           Llvm_typ.i64;
         ins_store_into_reg t new_local_sp_addr_offset i.res.(0)
       | Heap ->
+        (* Make some space *)
         let alloc_ptr = fresh_ident t in
         let new_alloc_ptr = fresh_ident t in
         ins_load t ~src:allocation_ident ~dst:alloc_ptr Llvm_typ.i64;
         ins_binop_imm t "sub" alloc_ptr (Int.to_string bytes) new_alloc_ptr
           Llvm_typ.i64;
         ins_store t ~src:new_alloc_ptr ~dst:allocation_ident Llvm_typ.i64;
+        (* Check if we exceeded the limit *)
         let domain_young_limit =
           let ptr = load_domainstate_addr t Domain_young_limit in
           let res = fresh_ident t in
           ins_load t ~src:ptr ~dst:res Llvm_typ.i64;
           res
         in
-        let should_skip_gc = fresh_ident t in
+        let skip_gc = fresh_ident t in
+        ins_icmp t "ult" domain_young_limit new_alloc_ptr skip_gc Llvm_typ.i64;
+        (* Let LLVM know calling gc isn't likely *)
+        let skip_gc_expect = fresh_ident t in
+        call_intrinsic t "expect.i1"
+          [ Llvm_typ.bool, Llvm_value.Local_ident skip_gc;
+            Llvm_typ.bool, Llvm_value.Immediate "1" ]
+          (Some (Llvm_typ.bool, skip_gc_expect));
+        (* Branch appropriately *)
         let gc_call = fresh_ident t in
         let after_gc_call =
           (* CR yusumez: We need to think about how we create identifiers... *)
           Ident.named ("after." ^ Format.asprintf "%a" Ident.print gc_call)
         in
-        ins_icmp t "ult" domain_young_limit new_alloc_ptr should_skip_gc
-          Llvm_typ.i64;
-        ins_branch_cond_ident t should_skip_gc after_gc_call gc_call;
+        ins_branch_cond_ident t skip_gc_expect after_gc_call gc_call;
         line t.ppf "%a:" Ident.print gc_call;
         (* CR yusumez: handle simd regs appropriately once we have them *)
         (* Note that we use [call_simple] here to properly adjust R15. *)
@@ -2008,7 +2031,11 @@ let cfg (cl : CL.t) =
     F.ins_branch t entry_label;
     DLL.iter ~f:pp_block layout
   in
-  let fun_attrs = fun_attrs t fun_codegen_options in
+  let fun_attrs =
+    fun_attrs t fun_codegen_options @ ["noinline"]
+    (* CR yusumez: We'd like to propagate [@inline never] or [@cold] attributes
+       through, but this should be fine now? *)
+  in
   let fun_args =
     List.map (fun ident -> Llvm_typ.ptr, ident) runtime_arg_idents
     @ List.filter_map
