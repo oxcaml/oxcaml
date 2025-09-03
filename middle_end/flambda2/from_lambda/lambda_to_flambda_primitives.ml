@@ -1053,7 +1053,9 @@ let array_vector_access_validity_condition array ~size_int
     | Naked_vec128s -> 16
     | Naked_vec256s -> 32
     | Naked_vec512s -> 64
-    | Naked_floats | Immediates | Naked_ints | Naked_int64s | Naked_nativeints -> 8
+    | Naked_floats | Immediates | Naked_ints | Naked_int64s | Naked_nativeints
+      ->
+      8
     | Naked_int32s | Naked_float32s -> 4
     | Naked_int16s -> 2
     | Naked_int8s -> 1
@@ -1341,9 +1343,10 @@ let rec array_load_unsafe ~array ~index ~(mut : Lambda.mutable_flag) array_kind
           ~current_region)
       (List.combine indexes unarized)
   | No_float_array_opt
-      (( Immediates | Values | Naked_floats | Naked_float32s | Naked_ints 
+      (( Immediates | Values | Naked_floats | Naked_float32s | Naked_ints
        | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
-       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ) as nfo) ->
+       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ) as
+      nfo) ->
     let array_load_kind : P.Array_load_kind.t =
       match nfo with
       | Immediates -> Immediates
@@ -1428,8 +1431,9 @@ let rec array_set_unsafe dbg ~array ~index array_kind
            (List.combine indexes (List.combine unarized new_values))) ]
   | No_float_array_opt
       (( Immediates | Values _ | Naked_floats | Naked_float32s | Naked_ints
-       | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
-       | Naked_vec128s | Naked_vec256s | Naked_vec512s ) as nfo) -> (
+       | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
+       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ) as
+      nfo) -> (
     match nfo with
     | Immediates -> normal_case Immediates new_values
     | Values init_or_assign -> normal_case (Values init_or_assign) new_values
@@ -2256,8 +2260,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     match array_kind with
     | Array_kind
         ( Immediates | Values | Naked_floats | Naked_float32s | Naked_ints
-        | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
-        | Naked_vec128s | Naked_vec256s | Naked_vec512s )
+        | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
+        | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s )
     | Float_array_opt_dynamic ->
       [prim]
     | Array_kind (Unboxed_product _ as array_kind) ->

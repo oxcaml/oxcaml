@@ -36,9 +36,9 @@ let simplify_array_set (array_kind : P.Array_kind.t)
         | Immediates
         (* We don't expect specialisation regressions from Immediates to
            Values. *)
-        | Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-        | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-        | Naked_vec256s | Naked_vec512s ->
+        | Naked_floats | Naked_float32s | Naked_ints | Naked_int8s
+        | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
+        | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
           Misc.fatal_errorf
             "Didn't expect array specialisation to yield array kind %a from \
              array set kind %a (original array kind %a):@ %a"

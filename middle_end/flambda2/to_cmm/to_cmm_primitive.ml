@@ -322,8 +322,8 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   match array_kind, load_kind with
   | (Values | Immediates | Unboxed_product _), Immediates ->
     C.int_array_ref arr index dbg
-  | (Naked_ints | Naked_int64s | Naked_nativeints)
-  , (Naked_ints | Naked_int64s | Naked_nativeints) ->
+  | ( (Naked_ints | Naked_int64s | Naked_nativeints),
+      (Naked_ints | Naked_int64s | Naked_nativeints) ) ->
     C.unboxed_int64_or_nativeint_array_ref arr ~array_index:index dbg
   | Unboxed_product _, (Naked_ints | Naked_int64s | Naked_nativeints) ->
     C.unboxed_int64_or_nativeint_array_ref arr ~array_index:index dbg
@@ -340,7 +340,8 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
     C.untagged_mutable_int8_unboxed_product_array_ref arr ~array_index:index dbg
   | Naked_int16s, Naked_int16s -> C.untagged_int16_array_ref arr index dbg
   | Unboxed_product _, Naked_int16s ->
-    C.untagged_mutable_int16_unboxed_product_array_ref arr ~array_index:index dbg
+    C.untagged_mutable_int16_unboxed_product_array_ref arr ~array_index:index
+      dbg
   | Naked_int32s, Naked_int32s -> C.unboxed_int32_array_ref arr index dbg
   | Unboxed_product _, Naked_int32s ->
     C.unboxed_mutable_int32_unboxed_product_array_ref arr ~array_index:index dbg
@@ -392,49 +393,50 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | Naked_vec512s, Naked_vec512s ->
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
-  | ( ( Naked_floats |  Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+  | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+      | Naked_vec256s | Naked_vec512s ),
       Values ) ->
     Misc.fatal_errorf
       "Cannot use array load kind [Values] on naked number/vector arrays:@ %a"
       Debuginfo.print_compact dbg
   | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+      | Naked_vec256s | Naked_vec512s ),
       Immediates )
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_int8s | Naked_int16s
-      | Naked_int32s | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
-      (Naked_ints | Naked_int64s | Naked_nativeints) )
-  | ( ( Values | Immediates |  Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_int8s
+      | Naked_int16s | Naked_int32s | Naked_vec128s | Naked_vec256s
       | Naked_vec512s ),
+      (Naked_ints | Naked_int64s | Naked_nativeints) )
+  | ( ( Values | Immediates | Naked_float32s | Naked_ints | Naked_int8s
+      | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_floats ) ->
     Misc.fatal_errorf
       "Array reinterpret load operation (array kind %a, array ref kind %a) not \
        yet supported"
       P.Array_kind.print array_kind P.Array_load_kind.print load_kind
-  | ( ( Values | Immediates | Naked_floats | Naked_ints | Naked_int8s | Naked_int16s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+  | ( ( Values | Immediates | Naked_floats | Naked_ints | Naked_int8s
+      | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_float32s )
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints | Naked_int8s
-      | Naked_int16s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints
+      | Naked_int8s | Naked_int16s | Naked_int64s | Naked_nativeints
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_int32s ) ->
     Misc.fatal_errorf
       "Array reinterpret loads with 32-bit load kinds are not supported:@ %a"
       Debuginfo.print_compact dbg
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints | Naked_int8s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints
+      | Naked_int8s | Naked_int32s | Naked_int64s | Naked_nativeints
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_int16s ) ->
     Misc.fatal_errorf
       "Array reinterpret loads with 16-bit load kinds are not supported:@ %a"
       Debuginfo.print_compact dbg
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints | Naked_int16s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints
+      | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_int8s ) ->
     Misc.fatal_errorf
       "Array reinterpret loads with 8-bit load kinds are not supported:@ %a"
@@ -461,11 +463,13 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
     C.int_array_set arr index new_value dbg
   | (Values | Immediates | Unboxed_product _), Values init ->
     addr_array_store init ~arr ~index ~new_value dbg
-  | (Naked_ints | Naked_int64s | Naked_nativeints)
-  , (Naked_ints | Naked_int64s | Naked_nativeints) ->
-    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index ~new_value dbg
+  | ( (Naked_ints | Naked_int64s | Naked_nativeints),
+      (Naked_ints | Naked_int64s | Naked_nativeints) ) ->
+    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
+      ~new_value dbg
   | Unboxed_product _, (Naked_ints | Naked_int64s | Naked_nativeints) ->
-    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index ~new_value dbg
+    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
+      ~new_value dbg
   | Naked_floats, Naked_floats | Unboxed_product _, Naked_floats ->
     C.float_array_set arr index new_value dbg
   | Naked_float32s, Naked_float32s ->
@@ -561,48 +565,49 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
     array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
       new_value
   | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+      | Naked_vec256s | Naked_vec512s ),
       Values _ ) ->
     Misc.fatal_errorf
       "Cannot use array set kind [Values] on naked number/vector arrays:@ %a"
       Debuginfo.print_compact dbg
   | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+      | Naked_vec256s | Naked_vec512s ),
       Immediates )
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_int8s | Naked_int16s
-      | Naked_int32s | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
-      (Naked_ints | Naked_int64s | Naked_nativeints) )
-  | ( ( Values | Immediates | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_int8s
+      | Naked_int16s | Naked_int32s | Naked_vec128s | Naked_vec256s
       | Naked_vec512s ),
+      (Naked_ints | Naked_int64s | Naked_nativeints) )
+  | ( ( Values | Immediates | Naked_float32s | Naked_ints | Naked_int8s
+      | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_floats ) ->
     Misc.fatal_errorf
       "Array reinterpret set operation (array kind %a, array ref kind %a) not \
        yet supported"
       P.Array_kind.print array_kind P.Array_set_kind.print set_kind
-  | ( ( Values | Immediates | Naked_floats | Naked_ints | Naked_int8s | Naked_int16s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+  | ( ( Values | Immediates | Naked_floats | Naked_ints | Naked_int8s
+      | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_float32s )
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints | Naked_int8s
-      | Naked_int16s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints
+      | Naked_int8s | Naked_int16s | Naked_int64s | Naked_nativeints
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_int32s ) ->
     Misc.fatal_errorf
       "Array reinterpret stores with 32-bit set kinds are not supported:@ %a"
       Debuginfo.print_compact dbg
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints | Naked_int8s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints
+      | Naked_int8s | Naked_int32s | Naked_int64s | Naked_nativeints
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_int16s ) ->
     Misc.fatal_errorf
       "Array reinterpret stores with 16-bit set kinds are not supported:@ %a"
       Debuginfo.print_compact dbg
-  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints | Naked_int16s
-      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-      | Naked_vec512s ),
+  | ( ( Values | Immediates | Naked_floats | Naked_float32s | Naked_ints
+      | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Naked_int8s ) ->
     Misc.fatal_errorf
       "Array reinterpret stores with 8-bit set kinds are not supported:@ %a"

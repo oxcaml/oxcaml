@@ -1370,15 +1370,31 @@ module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
 
 type t1 = float32
 type t2 = float32#
+type t3 = int8
+type t4 = int8#
+type t5 = int16
+type t6 = int16#
 
 let x = 3.14s
 let x () = #3.14s
+let y = 42s
+let y () = #42s
+let z = 42S
+let z () = #42S
 
 [%%expect{|
 type t1 = float32
 type t2 = float32#
+type t3 = int8
+type t4 = int8#
+type t5 = int16
+type t6 = int16#
 val x : float32 = 3.1400001s
 val x : unit -> float32# = <fun>
+val y : int8 = 42s
+val y : unit -> int8# = <fun>
+val z : int16 = 42S
+val z : unit -> int16# = <fun>
 |}]
 
 (********)
