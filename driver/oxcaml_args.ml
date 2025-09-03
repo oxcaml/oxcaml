@@ -1742,6 +1742,7 @@ module Extra_params = struct
     | "gupstream-dwarf" -> set' Debugging.restrict_to_upstream_dwarf
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
+    | "gdwarf-pedantic" -> set' Clflags.dwarf_pedantic
     | "gdwarf-max-function-complexity" ->
         set_int' Debugging.dwarf_max_function_complexity
     | "llvm-path" ->

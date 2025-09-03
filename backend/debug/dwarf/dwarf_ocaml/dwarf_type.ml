@@ -329,8 +329,16 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
   | [] ->
     if !Clflags.dwarf_pedantic
     then
-      Misc.fatal_error
-        "Empty path provided to [field_project_path]" (* field should exist *)
+      let pp_projected_field fmt (name, shape, layout) =
+        Format.fprintf fmt "(%a, %a, %a)"
+          (Format.pp_print_option Format.pp_print_string)
+          name Shape.print shape Layout.format layout
+      in
+      Misc.fatal_errorf
+        "Empty path provided to [field_project_path] for projecting from %a"
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space pp_projected_field)
+        (Array.to_list fields)
+      (* field should exist *)
     else None, Shape.leaf' None, Sort.Value
   | [i] -> (
     match Array.get fields i with
@@ -1210,8 +1218,7 @@ module Shape_with_layout = struct
         ({ type_shape = x2; type_layout = y2 } : t) =
       Shape.equal x1 x2 && Layout.equal y1 y2
 
-    let output _oc _t =
-      if !Clflags.dwarf_pedantic then Misc.fatal_error "unimplemented"
+    let output _oc _t = Misc.fatal_error "unimplemented"
   end)
 end
 
@@ -1651,9 +1658,9 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     if !Clflags.dwarf_pedantic
     then
       Misc.fatal_errorf
-        "unboxed record at different layout than its field,\n\
-        \       record layout: %a,  field_layout: %a" Layout.format type_layout
-        Layout.format ly
+        "unboxed record at different layout than its field, record layout: %a, \
+         field_layout: %a"
+        Layout.format type_layout Layout.format ly
     else unknown_base_layouts type_layout
   | Record { fields = ([] | _ :: _ :: _) as fields; kind = Record_unboxed }, _
     ->

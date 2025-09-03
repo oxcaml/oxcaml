@@ -179,8 +179,21 @@ module Type_shape = struct
           | Tlink _ | Tsubst _ ->
             if !Clflags.dwarf_pedantic
             then
-              Misc.fatal_error
-                "linking and substitution should not reach this stage."
+              let str =
+                match desc with
+                | Tlink _ -> "Tlink"
+                | Tsubst _ -> "Tsubst"
+                | _ -> assert false
+              in
+              Misc.fatal_errorf
+                "Linking and substitution should not reach this stage. Found \
+                 %s type in file %s."
+                str
+                (match Compilation_unit.get_current () with
+                | None -> "<unknown>"
+                | Some cu -> Compilation_unit.full_path_as_string cu)
+              (* We cannot access the type printer here, so this
+                 is the best we can do for now. *)
             else unknown_shape
           | Tvariant rd ->
             let row_fields = Types.row_fields rd in
@@ -422,13 +435,14 @@ module Type_decl_shape = struct
               lbl_list
           | Record_inlined _ ->
             if !Clflags.dwarf_pedantic
-            then Misc.fatal_error "inlined records not allowed here"
-            else
-              unknown_shape
-              (* Inline records of this form should not occur as part of type
-                 declarations.  They do not exist for top-level declarations,
-                 but they do exist temporarily such as inside of a match (e.g.,
-                 [t] is an inline record in [match e with Foo t -> ...]). *))
+            then
+              Misc.fatal_error
+                "Inlined records should not occur in type declarations, since \
+                 they only exist temporarily as the type of record arguments \
+                 inside of a match. For example, if [Foo] is the constructor \
+                 [Foo { a : int; b : int }], then [r] is an inline record in \
+                 [match e with Foo r -> ...]."
+            else unknown_shape)
         | Type_abstract _ -> unknown_shape
         | Type_open -> unknown_shape
         | Type_record_unboxed_product (lbl_list, _, _) ->
