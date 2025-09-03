@@ -1069,6 +1069,11 @@ let function_attribute ppf t =
   | Irc_regalloc -> fprintf ppf "regalloc_irc@ "
   | Ls_regalloc -> fprintf ppf "regalloc_ls@ "
   | Gi_regalloc -> fprintf ppf "regalloc_gi@ "
+  end;
+  begin match t.regalloc_param with
+  | [] -> ()
+  | params ->
+      List.iter (fun param -> fprintf ppf "regalloc_param(%S)@ " param) params
   end
 
 let apply_tailcall_attribute ppf = function

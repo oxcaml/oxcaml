@@ -53,6 +53,9 @@ let is_loop_attribute =
 let is_regalloc_attribute =
   [ "regalloc", Return ]
 
+let is_regalloc_param_attribute =
+  [ "regalloc_param", Return ]
+
 let is_opaque_attribute =
   [ "opaque", Return ]
 
@@ -195,6 +198,19 @@ let parse_regalloc_attribute attr =
         ]
         payload
 
+let parse_regalloc_param_attribute attr =
+  match attr with
+  | None -> None
+  | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
+      match payload with
+      | PStr [{pstr_desc=Pstr_eval(
+          {pexp_desc=Pexp_constant(Pconst_string(s, _, _)); _}, _); _}] ->
+          Some s
+      | _ ->
+          Location.prerr_warning loc
+            (Warnings.Attribute_payload (txt, "It must be a string literal"));
+          None
+
 let parse_opaque_attribute attr =
   match attr with
   | None -> false
@@ -232,6 +248,10 @@ let get_loop_attribute l =
 let get_regalloc_attribute l =
   let attr = find_attribute is_regalloc_attribute l in
   parse_regalloc_attribute attr
+
+let get_regalloc_param_attributes l =
+  let attrs = select_attributes is_regalloc_param_attribute l in
+  List.filter_map (fun attr -> parse_regalloc_param_attribute (Some attr)) attrs
 
 let check_local_inline loc attr =
   match attr.local, attr.inline with
@@ -372,6 +392,18 @@ let add_regalloc_attribute expr loc attributes =
     end
   | _ -> expr
 
+let add_regalloc_param_attribute expr _loc attributes =
+  match expr with
+  | Lfunction({ attr } as funct) ->
+    let params = get_regalloc_param_attributes attributes in
+    begin match params with
+    | [] -> expr
+    | _ ->
+      let attr = { attr with regalloc_param = attr.regalloc_param @ params } in
+      lfunction_with_attr ~attr funct
+    end
+  | _ -> expr
+
 let add_tmc_attribute expr loc attributes =
   match expr with
   | Lfunction funct ->
@@ -495,6 +527,9 @@ let add_function_attributes lam loc attr =
   in
   let lam =
     add_regalloc_attribute lam loc attr
+  in
+  let lam =
+    add_regalloc_param_attribute lam loc attr
   in
   let lam =
     add_tmc_attribute lam loc attr
