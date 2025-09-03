@@ -1,5 +1,6 @@
 (* TEST
  include stdlib_upstream_compatible;
+ include stdlib_stable;
  flags = "-extension layouts_beta";
  expect;
 *)
@@ -11,6 +12,7 @@ module Float_u = Stdlib_upstream_compatible.Float_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
 
 let test_float s f =
   Format.printf "%s: %f\n" s (Float_u.to_float f); Format.print_flush ()
@@ -20,16 +22,20 @@ let test_int64 s f =
   Format.printf "%s: %Ld\n" s (Int64_u.to_int64 f); Format.print_flush ()
 let test_nativeint s f =
   Format.printf "%s: %s\n" s (Nativeint_u.to_string f); Format.print_flush ()
+let test_int s f =
+  Format.printf "%s: %d\n" s (Int_u.to_int f); Format.print_flush ()
 
 [%%expect{|
 module Float_u = Stdlib_upstream_compatible.Float_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
 val test_float : string -> Float_u.t -> unit = <fun>
 val test_int32 : string -> Int32_u.t -> unit = <fun>
 val test_int64 : string -> Int64_u.t -> unit = <fun>
 val test_nativeint : string -> Nativeint_u.t -> unit = <fun>
+val test_int : string -> int# -> unit = <fun>
 |}]
 
 (*****************************************)
@@ -169,6 +175,27 @@ Line 1, characters 36-51:
 Error: Integer literal exceeds the range of representable integers of type "int32#"
 |}]
 
+let () = test_int "invalid_int" (#0x8000000000000000)
+[%%expect{|
+Line 1, characters 32-53:
+1 | let () = test_int "invalid_int" (#0x8000000000000000)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int#"
+|}]
+
+let () = test_int "max_int + 1" (#4611686018427387904)
+[%%expect{|
+max_int + 1: -4611686018427387904
+|}]
+
+let () = test_int "max_int + 2" (#4611686018427387905)
+[%%expect{|
+Line 1, characters 32-54:
+1 | let () = test_int "max_int + 2" (#4611686018427387905)
+                                    ^^^^^^^^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int#"
+|}]
+
 (*****************************************)
 (* Patterns *)
 
@@ -297,9 +324,7 @@ val f2 : float# -> float# -> unit = <fun>
 
 let f _ _ = ();;
 let () = f
-(* This lexes as a directive. #2 is not a valid unboxed int literal
-   anyway, as it lacks a suffix.
-*)
+(* This lexes as a directive. *)
 #2 "literals.ml"
 ()
 ()
