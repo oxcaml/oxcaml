@@ -366,19 +366,20 @@ let prelude :
   on_fatal ~f:on_fatal_callback;
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   (* Extract function-specific regalloc params from codegen_options *)
-  function_specific_params :=
-    List.concat_map cfg.fun_codegen_options ~f:(function
-      | Cfg.Use_regalloc_param params -> params
-      | Cfg.Reduce_code_size | Cfg.No_CSE | Cfg.Use_linscan_regalloc 
-      | Cfg.Use_regalloc _ | Cfg.Cold | Cfg.Assume_zero_alloc _ | Cfg.Check_zero_alloc _ -> []);
+  function_specific_params
+    := List.concat_map cfg.fun_codegen_options ~f:(function
+         | Cfg.Use_regalloc_param params -> params
+         | Cfg.Reduce_code_size | Cfg.No_CSE | Cfg.Use_linscan_regalloc
+         | Cfg.Use_regalloc _ | Cfg.Cold | Cfg.Assume_zero_alloc _
+         | Cfg.Check_zero_alloc _ ->
+           []);
   if debug
   then (
     Utils.log "run (%S)" cfg.fun_name;
     match !function_specific_params with
     | [] -> ()
-    | params -> 
-      Utils.log "function_specific_params: %s" 
-        (String.concat ", " params));
+    | params ->
+      Utils.log "function_specific_params: %s" (String.concat ", " params));
   Reg.reinit_relocatable_regs ();
   if debug && Lazy.force invariants
   then (
