@@ -149,11 +149,13 @@ module DLS : sig
     *)
 
     val get : 'a key -> 'a @@ nonportable
+    [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.get]."]
     (** [get k] returns [v] if a value [v] is associated to the key [k] on
         the calling domain's domain-local state. Sets [k]'s value with its
         initialiser and returns it otherwise. *)
 
     val set : 'a key -> 'a -> unit @@ nonportable
+    [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.set]."]
     (** [set k v] updates the calling domain's domain-local state to associate
         the key [k] with value [v]. It overwrites any previous values associated
         to [k], which cannot be restored later. *)
