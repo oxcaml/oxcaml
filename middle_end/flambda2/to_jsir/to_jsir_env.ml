@@ -90,14 +90,11 @@ let add_exn_handler t cont ~addr ~exn_param ~extra_args =
 
 let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
 
-let symbol_to_strings symbol =
-  ( Symbol.compilation_unit symbol
-    |> Compilation_unit.name |> Compilation_unit.Name.to_string,
-    Symbol.linkage_name_as_string symbol )
-
 let symbol_to_native_strings symbol =
-  let cu_name, symbol_name = symbol_to_strings symbol in
-  Jsir.Native_string.of_string cu_name, Jsir.Native_string.of_string symbol_name
+  ( Symbol.compilation_unit symbol
+    |> Compilation_unit.name |> Compilation_unit.Name.to_string
+    |> Jsir.Native_string.of_string,
+    Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
 
 let register_symbol' ~res symbol var =
   let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
@@ -167,12 +164,15 @@ let get_external_symbol ~res symbol =
   match Symbol.is_predefined_exception symbol with
   | true -> get_predef_exception ~res symbol
   | false -> (
-    let is_toplevel_module ~compilation_unit_name ~symbol_name =
-      String.equal symbol_name ("caml" ^ compilation_unit_name)
-    in
-    let compilation_unit_name, symbol_name = symbol_to_strings symbol in
-    match is_toplevel_module ~compilation_unit_name ~symbol_name with
-    | true -> get_symbol_from_global_data compilation_unit_name ~res
+    let compilation_unit = Symbol.compilation_unit symbol in
+    match
+      Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
+    with
+    | true ->
+      let compilation_unit_name =
+        Compilation_unit.name_as_string compilation_unit
+      in
+      get_symbol_from_global_data compilation_unit_name ~res
     | false ->
       let compilation_unit_name, symbol_name =
         symbol_to_native_strings symbol
