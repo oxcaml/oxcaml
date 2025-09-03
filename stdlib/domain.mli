@@ -104,8 +104,7 @@ module DLS : sig
     type 'a key : value mod portable contended
     (** Type of a DLS key *)
 
-    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
-        @@ nonportable
+    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key @@ nonportable
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.new_key]."]
     (** [new_key f] returns a new key bound to initialiser [f] for accessing
 ,        domain-local variables.
