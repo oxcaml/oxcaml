@@ -49,6 +49,9 @@ type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
 type shape_format = Old_merlin | Debugging_shapes
+type gdwarf_fidelity =
+  | Fidelity_low | Fidelity_medium
+  | Fidelity_high | Fidelity_very_high | Fidelity_ultra_high
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
@@ -65,6 +68,22 @@ and debug_full = ref false              (* For full DWARF support *)
 and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
 and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)
 and dwarf_pedantic = ref false          (* -gdwarf-pedantic *)
+and gdwarf_config_shape_reduce_depth = ref 2
+  (* -gdwarf-config-shape-reduce-depth *)
+and gdwarf_config_shape_eval_depth = ref 1
+  (* -gdwarf-config-shape-eval-depth *)
+and gdwarf_config_max_cms_files_per_unit = ref 0
+  (* -gdwarf-config-max-cms-files-per-unit *)
+and gdwarf_config_max_cms_files_per_variable = ref 0
+  (* -gdwarf-config-max-cms-files-per-variable *)
+and gdwarf_config_max_type_to_shape_depth = ref 10
+  (* -gdwarf-config-max-type-to-shape-depth *)
+and gdwarf_config_max_shape_reduce_steps_per_variable = ref (Some 100)
+  (* -gdwarf-config-max-shape-reduce-steps-per-variable *)
+and gdwarf_config_max_evaluation_steps_per_variable = ref (Some 1000)
+  (* -gdwarf-config-max-evaluation-steps-per-variable *)
+and gdwarf_fidelity = ref (None : gdwarf_fidelity option)
+  (* -gdwarf-fidelity *)
 and unsafe = ref false                  (* -unsafe *)
 and use_linscan = ref false             (* -linscan *)
 and link_everything = ref false         (* -linkall *)
@@ -220,6 +239,59 @@ let rounds () =
   match !simplify_rounds with
   | None -> !default_simplify_rounds
   | Some r -> r
+
+let gdwarf_fidelity_of_string s =
+  match String.lowercase_ascii s with
+  | "low" -> Some Fidelity_low
+  | "medium" -> Some Fidelity_medium
+  | "high" -> Some Fidelity_high
+  | "very-high" -> Some Fidelity_very_high
+  | "ultra-high" -> Some Fidelity_ultra_high
+  | _ -> None
+
+let set_gdwarf_fidelity fidelity =
+  gdwarf_fidelity := Some fidelity;
+  match fidelity with
+  | Fidelity_low ->
+      gdwarf_config_shape_eval_depth := 1;
+      gdwarf_config_shape_reduce_depth := 2;
+      gdwarf_config_max_cms_files_per_unit := 0;
+      gdwarf_config_max_cms_files_per_variable := 0;
+      gdwarf_config_max_type_to_shape_depth := 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some 100;
+      gdwarf_config_max_evaluation_steps_per_variable := Some 1000
+  | Fidelity_medium ->
+      gdwarf_config_shape_eval_depth := 2;
+      gdwarf_config_shape_reduce_depth := 2;
+      gdwarf_config_max_cms_files_per_unit := 20;
+      gdwarf_config_max_cms_files_per_variable := 5;
+      gdwarf_config_max_type_to_shape_depth := 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some (1000);
+      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000)
+  | Fidelity_high ->
+      gdwarf_config_shape_eval_depth := 3;
+      gdwarf_config_shape_reduce_depth := 3;
+      gdwarf_config_max_cms_files_per_unit := 50;
+      gdwarf_config_max_cms_files_per_variable := 10;
+      gdwarf_config_max_type_to_shape_depth := 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some (10_000);
+      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000_000)
+  | Fidelity_very_high ->
+      gdwarf_config_shape_eval_depth := 4;
+      gdwarf_config_shape_reduce_depth := 3;
+      gdwarf_config_max_cms_files_per_unit := 100;
+      gdwarf_config_max_cms_files_per_variable := 10;
+      gdwarf_config_max_type_to_shape_depth := 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None
+  | Fidelity_ultra_high ->
+      gdwarf_config_shape_eval_depth := 5;
+      gdwarf_config_shape_reduce_depth := 5;
+      gdwarf_config_max_cms_files_per_unit := 1000;
+      gdwarf_config_max_cms_files_per_variable := 50;
+      gdwarf_config_max_type_to_shape_depth := 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None
 
 let default_inline_threshold = if Config.flambda then 10. else 10. /. 8.
 let inline_toplevel_multiplier = 16
