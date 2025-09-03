@@ -447,6 +447,12 @@ let transl_regalloc_attrib : Regalloc_attribute.t -> Cmm.codegen_option list =
   | Ls -> [Use_regalloc Ls_regalloc]
   | Gi -> [Use_regalloc Gi_regalloc]
 
+(* Translation of regalloc_param attributes on functions. *)
+let transl_regalloc_param_attrib : Regalloc_param_attribute.t -> Cmm.codegen_option list =
+  function
+  | [] -> []
+  | params -> [Use_regalloc_param params]
+
 (* Translation of the bodies of functions. *)
 
 let params_and_body0 env res code_id ~result_arity ~fun_dbg
@@ -539,9 +545,13 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let regalloc_attribute =
     Env.get_code_metadata env code_id |> Code_metadata.regalloc_attribute
   in
+  let regalloc_param_attribute =
+    Env.get_code_metadata env code_id |> Code_metadata.regalloc_param_attribute
+  in
   let fun_flags =
     transl_check_attrib zero_alloc_attribute
     @ transl_regalloc_attrib regalloc_attribute
+    @ transl_regalloc_param_attrib regalloc_param_attribute
     @
     if Flambda_features.optimize_for_speed () then [] else [Cmm.Reduce_code_size]
   in
