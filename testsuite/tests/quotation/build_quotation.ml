@@ -344,6 +344,18 @@ Here is an example of a case that is not matched:
 - : <[ int ]> expr = <[ let x = 42 in let x__1 = x in x__1 ]>
 |}];;
 
+<[ let rec f x = if x mod 2 = 0 then x + g (x / 2) else g (x - 1)
+   and g x = if x = 0 then 0 else x + f (x - 1) in
+   f 20 ]>;;
+[%%expect {|
+- : <[ int ]> expr =
+<[
+  let rec f =
+  (fun x -> if ((x mod 2) = 0) then (x + (g (x / 2))) else g (x - 1))
+  and g = (fun x__1 -> if (x__1 = 0) then 0 else x__1 + (f (x__1 - 1))) in
+  f 20 ]>
+|}];;
+
 <[
   let (let+) x f = f x in
   let+ a = 42 in a
@@ -361,7 +373,7 @@ Here is an example of a case that is not matched:
 - : <[ int option ]> expr =
 <[
   let (let+) = (fun x f -> Stdlib.Option.map f x) in
-    let+ a = Some 42 in a * 2
+  let+ a = Some 42 in a * 2
 ]>
 |}];;
 
@@ -376,8 +388,9 @@ Here is an example of a case that is not matched:
 <[
   let (let*) = (fun x f -> Stdlib.List.map f x)
   and (and*) = Stdlib.List.combine in
-    let* a = (::) (1, ((::) (2, ((::) (3, [])))))
-    and* b = (::) (10, ((::) (20, ((::) (30, []))))) in a + b ]>
+  let* a = (::) (1, ((::) (2, ((::) (3, [])))))
+  and* b = (::) (10, ((::) (20, ((::) (30, []))))) in a + b
+]>
 |}];;
 
 <[ fun (f: int -> int) (x: int) -> f x ]>;;
@@ -421,8 +434,8 @@ Here is an example of a case that is not matched:
 [%%expect {|
 - : <[ int ]> expr =
 <[
-  let x = (Stdlib.ref 0) in for i = 10 downto 0 do (x := ((! x) + i)) done;
-    ! x
+  let x = (Stdlib.ref 0) in
+  for i = 10 downto 0 do (x := ((! x) + i)) done; ! x
 ]>
 |}];;
 
@@ -443,8 +456,7 @@ Here is an example of a case that is not matched:
 - : <[ int ]> expr =
 <[
   let f = (Stdlib.ref 1) and i = (Stdlib.ref 5) in
-    while (! i) > 0 do  (f := ((! i) * (! f)); i := ((! i) - 1)) done;
-    ! f
+  while (! i) > 0 do  (f := ((! i) * (! f)); i := ((! i) - 1)) done; ! f
 ]>
 |}];;
 

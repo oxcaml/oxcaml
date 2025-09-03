@@ -1364,8 +1364,13 @@ module Ast = struct
   let print_obj_closed fmt closed_flag =
     pp fmt "%s" (match closed_flag with OOpen -> ".." | OClosed -> "")
 
+  let print_prefix fmt rec_flag =
+    match rec_flag with
+    | Nonrecursive -> pp fmt "let"
+    | Recursive -> pp fmt "let@ rec"
+
   let rec print_vb env fmt ({ pat; expr } : value_binding) =
-    pp fmt "%a@ =@ @[%a@]" (print_pat env) pat (print_exp_with_parens env) expr
+    pp fmt "%a@ =@ @[<2>%a@]" (print_pat env) pat (print_exp_with_parens env) expr
 
   and print_const fmt = function
     | Int n -> pp fmt "%d" n
@@ -1669,12 +1674,9 @@ module Ast = struct
     | Let (_, [], _) ->
       failwith "Cannot create empty let-expressions. This should not happen."
     | Let (rec_flag, vb :: vbs, body) ->
-      let prefix =
-        match rec_flag with Nonrecursive -> "let" | Recursive -> "let@ rec"
-      in
-      pp fmt "@[<2>@[@[<2>%s@ %a@]@ " prefix (print_vb env) vb;
-      List.iter (fun vb -> pp fmt "@[<2>and@ %a@]@ " (print_vb env) vb) vbs;
-      pp fmt "in@]@;%a@]" (print_exp env) body
+      pp fmt "@[@[%a@ %a@]@ " print_prefix rec_flag (print_vb env) vb;
+      List.iter (fun vb -> pp fmt "@[and@ %a@]@ " (print_vb env) vb) vbs;
+      pp fmt "in@;@[<2>%a@]@]" (print_exp env) body
     | Let_op ([], _, _) ->
       failwith "Cannot create empty let-expressions. This should not happen."
     | Let_op (binders, defs, case) -> (
@@ -1689,15 +1691,16 @@ module Ast = struct
           iter3 f xs ys zs
         | _ -> failwith "Lists should have equal length."
       in
+      pp fmt "@[";
       iter3
         (fun binder (_, pat_bind) def ->
-          pp fmt "@[<2>@[%s@ %a@ =@ @[%a@]@ "
+          pp fmt "@[%s@ %a@ =@ @[<2>%a@]@]@ "
             (without_parens (suffix_string_of_ident_value binder))
             (print_pat env) pat_bind (print_exp env) def)
         binders bind_lefts defs;
       match case.rhs with
-      | Some exp -> pp fmt "in@]@;%a@]" (print_exp env) exp
-      | None -> pp fmt ".")
+      | Some exp -> pp fmt "in@;@[<2>%a@]@]" (print_exp env) exp
+      | None -> pp fmt ".@]")
     | Exclave exp -> pp fmt "exclave_@ %a" (print_exp env) exp
     | Construct (ident, exp_opt) -> (
       match exp_opt with
