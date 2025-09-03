@@ -1717,6 +1717,7 @@ module With_cms_reduce = Shape_reduce.Make (struct
       else (
         decr max_number_of_cms_files;
         let filename = String.uncapitalize_ascii unit_name in
+        (* CR mshinwell: we should use [Compilation_unit.t] *)
         match Load_path.find_normalized (filename ^ ".cms") with
         | exception Not_found -> None
         | fn -> (
