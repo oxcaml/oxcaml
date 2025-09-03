@@ -59,6 +59,7 @@ type codegen_option =
   | Use_linscan_regalloc
   | Use_regalloc of regalloc_kind
   | Use_regalloc_param of string list
+  | Cold
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
@@ -94,7 +95,8 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
       :: of_cmm_codegen_option tl
     | Use_linscan_regalloc -> Use_linscan_regalloc :: of_cmm_codegen_option tl
     | Use_regalloc kind -> Use_regalloc (convert_regalloc_kind kind) :: of_cmm_codegen_option tl
-    | Use_regalloc_param params -> Use_regalloc_param params :: of_cmm_codegen_option tl)
+    | Use_regalloc_param params -> Use_regalloc_param params :: of_cmm_codegen_option tl
+    | Cold -> Cold :: of_cmm_codegen_option tl)
 
 type t =
   { blocks : basic_block Label.Tbl.t;

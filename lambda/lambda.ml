@@ -823,6 +823,7 @@ type function_attribute = {
   loop: loop_attribute;
   regalloc: regalloc_attribute;
   regalloc_param: regalloc_param_attribute;
+  cold: bool;
   is_a_functor: bool;
   is_opaque: bool;
   stub: bool;
@@ -1096,6 +1097,7 @@ let default_function_attribute = {
   loop = Default_loop;
   regalloc = Default_regalloc;
   regalloc_param = [];
+  cold = false;
   is_a_functor = false;
   is_opaque = false;
   stub = false;

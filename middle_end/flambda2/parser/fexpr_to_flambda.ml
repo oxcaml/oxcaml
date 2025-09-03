@@ -1022,7 +1022,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
             ~poll_attribute:Default
             ~regalloc_attribute:Regalloc_attribute.Default 
-            ~regalloc_param_attribute:[] ~dbg:Debuginfo.none
+            ~regalloc_param_attribute:[] ~cold:false ~dbg:Debuginfo.none
             ~is_tupled ~is_my_closure_used
             ~inlining_decision:Never_inline_attribute
             ~absolute_history:
