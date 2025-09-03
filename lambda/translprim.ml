@@ -987,7 +987,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%atomic_exchange_field" -> Atomic(Exchange, Field, Pointer)
     | "%atomic_exchange_loc" -> Atomic(Exchange, Loc, Pointer)
     | "%atomic_compare_exchange" -> Atomic(Compare_exchange, Ref, Pointer)
-    | "%atomic_compare_exchange_field" -> Atomic(Compare_exchange, Field, Pointer)
+    | "%atomic_compare_exchange_field" ->
+      Atomic(Compare_exchange, Field, Pointer)
     | "%atomic_compare_exchange_loc" -> Atomic(Compare_exchange, Loc, Pointer)
     | "%atomic_cas" -> Atomic(Compare_and_set, Ref, Pointer)
     | "%atomic_cas_field" -> Atomic(Compare_and_set, Field, Pointer)
@@ -1631,14 +1632,18 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     (match fst (maybe_pointer_type env set_to) with
     | Pointer -> None
     | Immediate -> Some (Atomic (Set, kind, Immediate)))
-  | Atomic (Compare_and_set, (Ref | Loc as kind), Pointer), [_; compare_with; set_to]
-  | Atomic (Compare_and_set, (Field as kind), Pointer), [_; _; compare_with; set_to] ->
+  | Atomic (Compare_and_set, (Ref | Loc as kind), Pointer),
+    [_; compare_with; set_to]
+  | Atomic (Compare_and_set, (Field as kind), Pointer),
+    [_; _; compare_with; set_to] ->
     (match fst (maybe_pointer_type env compare_with),
            fst (maybe_pointer_type env set_to) with
     | Pointer, _ | _, Pointer -> None
     | Immediate, Immediate -> Some (Atomic (Compare_and_set, kind, Immediate)))
-  | Atomic (Compare_exchange, (Ref | Loc as kind), Pointer), [_; compare_with; set_to]
-  | Atomic (Compare_exchange, (Field as kind), Pointer), [_; _; compare_with; set_to] ->
+  | Atomic (Compare_exchange, (Ref | Loc as kind), Pointer),
+    [_; compare_with; set_to]
+  | Atomic (Compare_exchange, (Field as kind), Pointer),
+    [_; _; compare_with; set_to] ->
     (match fst (maybe_pointer_type env compare_with),
            fst (maybe_pointer_type env set_to) with
     | Pointer, _ | _, Pointer -> None
