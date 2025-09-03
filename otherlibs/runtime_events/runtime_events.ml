@@ -292,43 +292,33 @@ module User = struct
        maximum number of threads that requested a buffer concurrently,
        and we never free those buffers. *)
     let create_buffer () = Bytes.create 1024 in
-    (* CR-someday mslater: remove magic by switching to FLS *)
-    let write_buffer_cache = 
-      Domain.Safe.DLS.new_key (fun () -> {Modes.Contended.contended = ref []})
+    let write_buffer_cache = Domain.Safe.DLS.new_key
+      (fun () : bytes Modes.Contended.t list Atomic.t -> Atomic.make [])
     in
-    let pop_or_create buffers =
-      (* intended to be thread-safe *)
-      (* begin atomic *)
-      match !buffers with
-      | [] ->
-          (* end atomic *)
-          create_buffer ()
-      | b::bs ->
-          buffers := bs;
-          (* end atomic *)
-          b
-    in
-    let[@poll error] compare_and_set r old_val new_val =
-      if !r == old_val then (r := new_val; true)
-      else false
+    let rec pop_or_create buffers =
+      match Atomic.get buffers with
+      | [] -> {Modes.Contended.contended = create_buffer ()}
+      | (b :: bs) as old_buffers ->
+        if Atomic.compare_and_set buffers old_buffers bs 
+        then b 
+        else pop_or_create buffers
     in
     let rec push buffers buf =
-      (* intended to be thread-safe *)
-      let old_buffers = !buffers in
+      let old_buffers = Atomic.get buffers in
       let new_buffers = buf :: old_buffers in
-      (* retry if !buffers changed under our feet: *)
-      if compare_and_set buffers old_buffers new_buffers
+      if Atomic.compare_and_set buffers old_buffers new_buffers
       then ()
       else push buffers buf
     in
     fun consumer ->
-      let buffers = 
-        (Domain.Safe.DLS.get write_buffer_cache).Modes.Contended.contended
-        |> Obj.magic_uncontended
-      in
+      let buffers = Domain.Safe.DLS.get write_buffer_cache in
       let buf = pop_or_create buffers in
       Fun.protect ~finally:(fun () -> push buffers buf)
-        (fun () -> consumer buf)
+        (fun () -> 
+          (* Safe because [buffers] contains unique references and no other
+             thread could have popped [buf]. *)
+          let buf = Obj.magic_uncontended buf.Modes.Contended.contended in
+          consumer buf)
 
   let write (type a) (event : a t) (value : a) =
     if runtime_events_are_active () then

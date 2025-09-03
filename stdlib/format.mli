@@ -1001,9 +1001,7 @@ val std_formatter : formatter @@ nonportable
   It is defined as {!formatter_of_out_channel} {!Stdlib.stdout}.
 *)
 
-val get_std_formatter : unit -> formatter
-[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
-                             contention in DLS."]
+val get_std_formatter : unit -> formatter @@ nonportable
 (** [get_std_formatter ()] returns the current domain's standard formatter used
     to write to standard output.
     @since 5.0
@@ -1015,9 +1013,7 @@ val err_formatter : formatter @@ nonportable
   It is defined as {!formatter_of_out_channel} {!Stdlib.stderr}.
 *)
 
-val get_err_formatter : unit -> formatter
-[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
-                             contention in DLS."]
+val get_err_formatter : unit -> formatter @@ nonportable
 (** [get_err_formatter ()] returns the current domain's formatter used to write
    to standard error.
    @since 5.0
@@ -1033,9 +1029,7 @@ val formatter_of_buffer : Buffer.t -> formatter
 val stdbuf : Buffer.t @@ nonportable
 (** The initial domain's string buffer in which [str_formatter] writes. *)
 
-val get_stdbuf : unit -> Buffer.t
-[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
-                             contention in DLS."]
+val get_stdbuf : unit -> Buffer.t @@ nonportable
 (** [get_stdbuf ()] returns the current domain's string buffer in which the
     current domain's string formatter writes.
     @since 5.0 *)
@@ -1046,9 +1040,7 @@ val str_formatter : formatter @@ nonportable
   [str_formatter] is defined as {!formatter_of_buffer} {!stdbuf}.
 *)
 
-val get_str_formatter : unit -> formatter
-[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
-                             contention in DLS."]
+val get_str_formatter : unit -> formatter @@ nonportable
 (** The current domain's formatter to output to the current domains string
     buffer.
     @since 5.0
