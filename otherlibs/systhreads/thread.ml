@@ -41,7 +41,8 @@ let default_uncaught_exception_handler = thread_uncaught_exception
 
 let uncaught_exception_handler = Atomic.make { Modes.Portable.portable = default_uncaught_exception_handler }
 
-let set_uncaught_exception_handler (fn @ portable) = Atomic.set uncaught_exception_handler { Modes.Portable.portable = fn }
+let set_uncaught_exception_handler (fn @ portable) =
+  Atomic.set uncaught_exception_handler { Modes.Portable.portable = fn }
 
 exception Exit
 
