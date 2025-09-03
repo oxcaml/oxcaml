@@ -1431,9 +1431,16 @@ module F = struct
 
   let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     match op with
-    | Move | Opaque ->
+    | Move ->
       let temp = load_reg_to_temp t i.arg.(0) in
       ins_store_into_reg t temp i.res.(0)
+    | Opaque ->
+      let temp = load_reg_to_temp t i.arg.(0) in
+      let typ = Llvm_typ.of_machtyp_component i.res.(0).typ in
+      let opaque_temp = fresh_ident t in
+      ins t {|%a = call %a asm "", "=r,0"(%a %a)|} pp_ident opaque_temp
+        Llvm_typ.pp_t typ Llvm_typ.pp_t typ pp_ident temp;
+      ins_store_into_reg t opaque_temp i.res.(0)
     | Const_int n ->
       ins_store_value t
         ~src:Llvm_value.(Immediate (Nativeint.to_string n))
