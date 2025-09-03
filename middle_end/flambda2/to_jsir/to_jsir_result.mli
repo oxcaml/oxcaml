@@ -83,3 +83,7 @@ val to_program_exn : t -> Jsir.program
 (** Returns the address for a special block for invalid switches, creating one if it
     doesn't exist already. *)
 val invalid_switch_block : t -> t * Jsir.Addr.t
+
+(** Get a public method and return the function. Increments the method cache ID. *)
+val get_public_method :
+  t -> obj:Jsir.Var.t -> field:Jsir.Var.t -> t * Jsir.Var.t
