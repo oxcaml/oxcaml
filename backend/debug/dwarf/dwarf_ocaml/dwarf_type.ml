@@ -105,7 +105,7 @@ module Shape_reduction_diagnostics : sig
 
   val record_after_dwarf_generation : t -> Proto_die.t -> unit
 
-  val append_to_dwarf_state : DS.t -> t -> unit
+  val append_diagnostics_to_dwarf_state : DS.t -> t -> unit
 end = struct
   type d =
     { type_name : string;
@@ -153,22 +153,22 @@ end = struct
     match d with
     | None -> ()
     | Some d ->
-      d.shape_size_before_reduction_memory
-        <- Obj.reachable_words (Obj.repr shape) * 8
+      d.shape_size_before_reduction_in_bytes
+        <- Obj.reachable_words (Obj.repr shape) * Sys.word_size
 
   let record_after_reduction d shape =
     match d with
     | None -> ()
     | Some d ->
-      d.shape_size_after_reduction_memory
-        <- Obj.reachable_words (Obj.repr shape) * 8
+      d.shape_size_after_reduction_in_bytes
+        <- Obj.reachable_words (Obj.repr shape) * Sys.word_size
 
   let record_after_evaluation d shape =
     match d with
     | None -> ()
     | Some d ->
-      d.shape_size_after_evaluation_memory
-        <- Obj.reachable_words (Obj.repr shape) * 8
+      d.shape_size_after_evaluation_in_bytes
+        <- Obj.reachable_words (Obj.repr shape) * Sys.word_size
 
   let compute_die_size die =
     Proto_die.depth_first_fold die ~init:0 ~f:(fun acc d ->
@@ -184,7 +184,7 @@ end = struct
     | None -> ()
     | Some d -> d.dwarf_die_size_after <- compute_die_size die
 
-  let append_to_dwarf_state state d =
+  let append_diagnostics_to_dwarf_state state d =
     match d with
     | None -> ()
     | Some d ->
@@ -1910,8 +1910,7 @@ module With_cms_reduce = Shape_reduce.Make (struct
   (* CR sspies: Investigate the performance some more and the balance between
      different variables. *)
 
-  let read_shape_from_cms ~diagnostics filename =
-    let cms_file = filename ^ ".cms" in
+  let read_shape_from_cms ~diagnostics cms_file =
     match Load_path.find_normalized cms_file with
     | exception Not_found -> None
     | cms_path -> (
@@ -1924,8 +1923,7 @@ module With_cms_reduce = Shape_reduce.Make (struct
           None)
       | cms_infos -> Some cms_infos.cms_impl_shape)
 
-  let read_shape_from_cmt ~diagnostics filename =
-    let cmt_file = filename ^ ".cmt" in
+  let read_shape_from_cmt ~diagnostics cmt_file =
     match Load_path.find_normalized cmt_file with
     | exception Not_found -> None
     | cmt_path -> (
@@ -1950,10 +1948,12 @@ module With_cms_reduce = Shape_reduce.Make (struct
       then None
       else
         let filename = String.uncapitalize_ascii unit_name in
+        let cms_file = filename ^ ".cms" in
+        let cmt_file = filename ^ ".cmt" in
         let shape_opt_opt =
-          match read_shape_from_cms ~diagnostics filename with
+          match read_shape_from_cms ~diagnostics cms_file with
           | Some shape -> Some shape
-          | None -> read_shape_from_cmt ~diagnostics filename
+          | None -> read_shape_from_cmt ~diagnostics cmt_file
         in
         let shape_opt =
           match shape_opt_opt with
@@ -1962,13 +1962,13 @@ module With_cms_reduce = Shape_reduce.Make (struct
             Shape_reduce.Diagnostics.count_cms_file_loaded diagnostics;
             shape_opt
           | None ->
-            Shape_reduce.Diagnostics.add_cms_file_missing diagnostics
-              (filename ^ ".cms");
+            Shape_reduce.Diagnostics.add_cms_file_missing diagnostics cms_file;
             None
         in
+        (* Note: [shape_opt] is an option, and we are also caching the [None]
+           case. *)
         String.Tbl.add cms_file_cache unit_name shape_opt;
         shape_opt
-  (* Note: This is an option, and we are also caching the None case. *)
 end)
 
 module D = Shape_reduction_diagnostics
@@ -2113,5 +2113,5 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
         reference
     in
     D.record_after_dwarf_generation reduction_diagnostics parent_proto_die;
-    D.append_to_dwarf_state state reduction_diagnostics;
+    D.append_diagnostics_to_dwarf_state state reduction_diagnostics;
     reference
