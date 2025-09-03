@@ -397,8 +397,7 @@ Line 4, characters 24-27:
 Error: This value is "stateful"
        because it closes over the value "a" (at Line 3, characters 28-29)
        which is expected to be "read_write".
-
-       However, it is expected to be "stateless".
+       However, the highlighted expression is expected to be "stateless".
 |}]
 
 let foo : int Atomic.t @ read_write -> (unit -> unit) @ stateless =
@@ -486,8 +485,7 @@ Line 4, characters 22-25:
 Error: This value is "observing"
        because it closes over the value "a" (at Line 3, characters 26-27)
        which is expected to be "read" or "read_write".
-
-       However, it is expected to be "stateless".
+       However, the highlighted expression is expected to be "stateless".
 |}]
 
 (* Closing over a observing value also gives observing. *)
@@ -692,8 +690,7 @@ Line 1, characters 42-43:
                                               ^
 Error: This value is "immutable" because it is used inside a lazy expression
        which is expected to be "stateless".
-
-       However, it is expected to be "read" or "read_write"
+       However, the highlighted expression is expected to be "read" or "read_write"
        because its mutable field "contents" is being read.
 |}]
 
@@ -704,8 +701,7 @@ Line 1, characters 42-43:
                                               ^
 Error: This value is "immutable" because it is used inside a lazy expression
        which is expected to be "stateless".
-
-       However, it is expected to be "read_write"
+       However, the highlighted expression is expected to be "read_write"
        because its mutable field "contents" is being written.
 |}]
 
@@ -718,8 +714,7 @@ Line 1, characters 42-43:
                                               ^
 Error: This value is "read" because it is used inside a lazy expression
        which is expected to be "observing".
-
-       However, it is expected to be "read_write"
+       However, the highlighted expression is expected to be "read_write"
        because its mutable field "contents" is being written.
 |}]
 

@@ -853,9 +853,8 @@ Line 1, characters 23-36:
 1 | let make_tuple x y z = stack_ (x, y), z
                            ^^^^^^^^^^^^^
 Error: This value is "local"
-       because it is a stack expression.
-
-       However, it is expected to be "global".
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 type u = A of unit | C of int | B of int * int | D

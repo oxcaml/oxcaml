@@ -47,8 +47,7 @@ Error: This value is "nonportable"
        which is "nonportable"
        because it closes over the value "foo" (at Line 15, characters 12-15)
        which is "nonportable".
-
-       However, it is expected to be "portable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 let u =

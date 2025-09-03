@@ -16,7 +16,7 @@ Line 2, characters 37-38:
 2 |     lazy (let x @ local = "hello" in x)
                                          ^
 Error: This value is "local" but is expected to be "global"
-       because it is a lazy expression and thus always allocated on the heap.
+       because it is a lazy expression and thus always needs to be allocated on the heap.
 |}]
 
 let foo (local_ x) =
@@ -28,7 +28,7 @@ Line 2, characters 18-19:
 Error: The value "x" is "local" but is expected to be "global"
        because it is used inside a lazy expression
        which is expected to be "global"
-       because it is a lazy expression and thus always allocated on the heap.
+       because it is a lazy expression and thus always needs to be allocated on the heap.
 |}]
 
 (* For simplicity, we also require them to be [unyielding]. *)
@@ -41,7 +41,7 @@ Line 2, characters 18-19:
 Error: The value "x" is "yielding" but is expected to be "unyielding"
        because it is used inside a lazy expression
        which is expected to be "unyielding"
-       because it is a lazy expression and thus always allocated on the heap.
+       because it is a lazy expression and thus always needs to be allocated on the heap.
 |}]
 
 (* lazy expression is constructed as global *)

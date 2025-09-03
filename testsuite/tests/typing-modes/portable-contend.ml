@@ -127,8 +127,7 @@ Line 4, characters 23-26:
 Error: This value is "nonportable"
        because it closes over the value "best_bytes" (at Line 3, characters 24-34)
        which is "nonportable".
-
-       However, it is expected to be "portable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Closing over reading mutable field gives nonportable *)
@@ -144,8 +143,7 @@ Line 4, characters 23-26:
 Error: This value is "nonportable"
        because it closes over the value "r" (at Line 3, characters 25-26)
        which is expected to be "shared" or "uncontended".
-
-       However, it is expected to be "portable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Closing over reading mutable field from shared value is nonportable *)
@@ -160,8 +158,7 @@ Line 3, characters 23-26:
 Error: This value is "nonportable"
        because it closes over the value "r" (at Line 2, characters 25-26)
        which is expected to be "shared" or "uncontended".
-
-       However, it is expected to be "portable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Closing over reading immutable field is OK *)
@@ -246,8 +243,7 @@ Line 4, characters 23-26:
 Error: This value is "nonportable"
        because it closes over the value "r" (at Line 3, characters 27-28)
        which is expected to be "uncontended".
-
-       However, it is expected to be "portable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Closing over read gives nonportable *)
@@ -263,8 +259,7 @@ Line 4, characters 23-26:
 Error: This value is "nonportable"
        because it closes over the value "r" (at Line 3, characters 27-28)
        which is expected to be "uncontended".
-
-       However, it is expected to be "portable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Closing over Array.length doesn't force nonportable; but that needs a
@@ -305,8 +300,7 @@ Line 4, characters 23-26:
 Error: This value is "nonportable"
        because it closes over the value "r" (at Line 3, characters 25-26)
        which is "nonportable".
-
-       However, it is expected to be "portable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* closing over nonportable gives nonportable *)

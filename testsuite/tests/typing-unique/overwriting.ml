@@ -143,9 +143,8 @@ Line 3, characters 13-14:
 3 |   overwrite_ r with { x }
                  ^
 Error: This value is "local"
-       because it is a stack expression.
-
-       However, it is expected to be in the parent region or "global".
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be in the parent region or "global".
 |}]
 
 let returning_regional () x =

@@ -1972,9 +1972,10 @@ module Report = struct
     | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
     | Lazy_allocated_on_heap ->
       pp_print_string ppf
-        "it is a lazy expression and thus always allocated on the heap"
+        "it is a lazy expression and thus always needs to be allocated on the \
+         heap"
     | Class_legacy_monadic | Class_legacy_comonadic ->
-      pp_print_string ppf "it is a class and thus always of legacy modes"
+      pp_print_string ppf "it is a class and thus always at the legacy modes"
     | Tailcall_function ->
       pp_print_string ppf "it is the function in a tail call"
     | Tailcall_argument ->
@@ -1987,9 +1988,11 @@ module Report = struct
       fprintf ppf
         "it is a function return value.@\n\
          Hint: Use exclave_ to return a local value"
-    | Stack_expression -> pp_print_string ppf "it is a stack expression"
+    | Stack_expression ->
+      fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
     | Module_allocated_on_heap ->
-      pp_print_string ppf "it is a module and thus always allocated on the heap"
+      pp_print_string ppf
+        "it is a module and thus always needs to be allocated on the heap"
 
   let print_lock_item ppf = function
     | Module -> fprintf ppf "module"
@@ -2155,7 +2158,7 @@ module Report = struct
         (Misc.Style.as_inline_code !print_longident)
         target_lid);
     (match print_ahint_sided obj ppf actual with
-    | Mode_with_hint -> fprintf ppf ".@\n@\nHowever, it "
+    | Mode_with_hint -> fprintf ppf ".@\nHowever, the highlighted expression "
     | Mode -> fprintf ppf "@ but "
     | Nothing -> assert false);
     ignore (print_ahint_sided obj ppf expected);
