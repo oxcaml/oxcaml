@@ -225,4 +225,34 @@ Error: Unbound type constructor "int16"
 Hint: Did you mean "int", "int32" or "int64"?
 |}];;
 
-(* CR jrayman: int8 literal, int16 literal *)
+let _ = 1s;;
+[%%expect{|
+Line 1, characters 8-10:
+1 | let _ = 1s;;
+            ^^
+Error: Found 8-bit int literal 1s, but int8 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 1S;;
+[%%expect{|
+Line 1, characters 8-10:
+1 | let _ = 1S;;
+            ^^
+Error: Found 16-bit int literal 1S, but int16 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = #1s;;
+[%%expect{|
+Line 1, characters 8-11:
+1 | let _ = #1s;;
+            ^^^
+Error: Found 8-bit int literal #1s, but int8 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = #1S;;
+[%%expect{|
+Line 1, characters 8-11:
+1 | let _ = #1S;;
+            ^^^
+Error: Found 16-bit int literal #1S, but int16 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;

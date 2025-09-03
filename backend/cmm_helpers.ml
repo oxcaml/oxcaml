@@ -37,27 +37,27 @@ module Unboxed_or_untagged_array_tags = struct
 
   let untagged_int16_array_zero_tag = 4
 
-  let untagged_int16_array_one_tag = 7
+  let untagged_int16_array_three_tag = 5
 
   let untagged_int16_array_two_tag = 6
 
-  let untagged_int16_array_three_tag = 5
+  let untagged_int16_array_one_tag = 7
 
   let untagged_int8_array_zero_tag = 8
 
-  let untagged_int8_array_one_tag = 15
-
-  let untagged_int8_array_two_tag = 14
-
-  let untagged_int8_array_three_tag = 13
-
-  let untagged_int8_array_four_tag = 12
-
-  let untagged_int8_array_five_tag = 11
+  let untagged_int8_array_seven_tag = 9
 
   let untagged_int8_array_six_tag = 10
 
-  let untagged_int8_array_seven_tag = 9
+  let untagged_int8_array_five_tag = 11
+
+  let untagged_int8_array_four_tag = 12
+
+  let untagged_int8_array_three_tag = 13
+
+  let untagged_int8_array_two_tag = 14
+
+  let untagged_int8_array_one_tag = 15
 
   let unboxed_float32_array_zero_tag = 16
 

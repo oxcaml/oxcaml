@@ -293,6 +293,8 @@ type error =
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
+  | Int8_literal of string
+  | Int16_literal of string
   | Illegal_letrec_pat
   | Illegal_letrec_expr
   | Illegal_mutable_pat

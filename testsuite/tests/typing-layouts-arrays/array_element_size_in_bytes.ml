@@ -17,29 +17,14 @@ let bytes_per_word = 8
 (* Tag definitions from Cmm_helpers.Unboxed_array_tags *)
 let unboxed_product_array_tag = 0
 let unboxed_int64_array_tag = 1
-let unboxed_int32_array_even_tag = 2
-let unboxed_int32_array_odd_tag = 3
-let unboxed_float32_array_even_tag = 4
-let unboxed_float32_array_odd_tag = 5
-let unboxed_vec128_array_tag = 6
-let unboxed_vec256_array_tag = 7
-let unboxed_vec512_array_tag = 8
-let unboxed_nativeint_array_tag = 9
-
-
-
-(* Tag definitions from Cmm_helpers.Unboxed_array_tags *)
-let unboxed_product_array_tag = 0
-let unboxed_int64_array_tag = 1
-let unboxed_int32_array_even_tag = 2
-let unboxed_int32_array_odd_tag = 3
-let unboxed_float32_array_even_tag = 4
-let unboxed_float32_array_odd_tag = 5
-let unboxed_vec128_array_tag = 6
-let unboxed_vec256_array_tag = 7
-let unboxed_vec512_array_tag = 8
-let unboxed_nativeint_array_tag = 9
-
+let unboxed_int32_array_zero_tag = 2
+let unboxed_int32_array_one_tag = 3
+let unboxed_float32_array_zero_tag = 16
+let unboxed_float32_array_one_tag = 17
+let unboxed_vec128_array_tag = 18
+let unboxed_vec256_array_tag = 19
+let unboxed_vec512_array_tag = 20
+let unboxed_nativeint_array_tag = 21
 
 
 external[@layout_poly] size_in_bytes : ('a : any mod separable). 'a array -> int
@@ -168,8 +153,8 @@ let check_float32u ~(init : float32#) ~element_size =
       | Native ->
         (* Tag is based on original element count, not padded count *)
         let expected_tag =
-          if n mod 2 = 0 then unboxed_float32_array_even_tag
-          else unboxed_float32_array_odd_tag in
+          if n mod 2 = 0 then unboxed_float32_array_zero_tag
+          else unboxed_float32_array_one_tag in
         assert (tag = expected_tag);
         (* Check mixed block has zero scannable fields *)
         Block_checks.check_mixed_block_scannable_size ~array_type:"float32#" (Obj.repr x) 0
@@ -203,8 +188,8 @@ let check_int32u ~(init : int32#) ~element_size =
       | Native ->
         (* Tag is based on original element count, not padded count *)
         let expected_tag =
-          if n mod 2 = 0 then unboxed_int32_array_even_tag
-          else unboxed_int32_array_odd_tag in
+          if n mod 2 = 0 then unboxed_int32_array_zero_tag
+          else unboxed_int32_array_one_tag in
         assert (tag = expected_tag);
         (* Check mixed block has zero scannable fields *)
         Block_checks.check_mixed_block_scannable_size ~array_type:"int32#" (Obj.repr x) 0

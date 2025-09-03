@@ -247,6 +247,8 @@ type error =
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
+  | Int8_literal of string
+  | Int16_literal of string
   | Illegal_letrec_pat
   | Illegal_letrec_expr
   | Illegal_mutable_pat
@@ -779,6 +781,8 @@ type constant_integer_result =
   | Nativeint of nativeint
 
 type constant_integer_error =
+  | Int8_literal_not_enabled
+  | Int16_literal_not_enabled
   | Int8_literal_overflow
   | Int16_literal_overflow
   | Int32_literal_overflow
@@ -790,15 +794,19 @@ let constant_integer i ~suffix :
     (constant_integer_result, constant_integer_error) result =
   match suffix with
   | 's' ->
+    if Language_extension.is_enabled Small_numbers then
     begin
       try Ok (Int8 (Misc.Int_literal_converter.int8 i))
       with Failure _ -> Error Int8_literal_overflow
     end
+    else Error (Int8_literal_not_enabled)
   | 'S' ->
+    if Language_extension.is_enabled Small_numbers then
     begin
       try Ok (Int16 (Misc.Int_literal_converter.int16 i))
       with Failure _ -> Error Int16_literal_overflow
     end
+    else Error (Int16_literal_not_enabled)
   | 'l' ->
     begin
       try Ok (Int32 (Misc.Int_literal_converter.int32 i))
@@ -825,6 +833,8 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
       | Ok (Int32 v) -> Ok (Const_int32 v)
       | Ok (Int64 v) -> Ok (Const_int64 v)
       | Ok (Nativeint v) -> Ok (Const_nativeint v)
+      | Error Int8_literal_not_enabled -> Error (Int8_literal i)
+      | Error Int16_literal_not_enabled -> Error (Int16_literal i)
       | Error Int8_literal_overflow -> Error (Literal_overflow "int8")
       | Error Int16_literal_overflow -> Error (Literal_overflow "int16")
       | Error Int32_literal_overflow -> Error (Literal_overflow "int32")
@@ -858,6 +868,10 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
       | Ok (Int32 v) -> Ok (Const_unboxed_int32 v)
       | Ok (Int64 v) -> Ok (Const_unboxed_int64 v)
       | Ok (Nativeint v) -> Ok (Const_unboxed_nativeint v)
+      | Error Int8_literal_not_enabled ->
+        Error (Int8_literal (Misc.format_as_unboxed_literal i))
+      | Error Int16_literal_not_enabled ->
+        Error (Int16_literal (Misc.format_as_unboxed_literal i))
       | Error Int8_literal_overflow -> Error (Literal_overflow "int8#")
       | Error Int16_literal_overflow -> Error (Literal_overflow "int16#")
       | Error Int32_literal_overflow -> Error (Literal_overflow "int32#")
@@ -11384,6 +11398,14 @@ let report_error ~loc env =
   | Float32_literal f ->
       Location.errorf ~loc "Found 32-bit float literal %ss, but float32 is not enabled. \
                             You must enable -extension small_numbers to use this feature." f
+  | Int8_literal i ->
+      Location.errorf ~loc
+        "Found 8-bit int literal %ss, but int8 is not enabled. \
+         You must enable -extension small_numbers to use this feature." i
+  | Int16_literal i ->
+      Location.errorf ~loc
+        "Found 16-bit int literal %sS, but int16 is not enabled. \
+         You must enable -extension small_numbers to use this feature." i
   | Illegal_letrec_pat ->
       Location.errorf ~loc
         "Only variables are allowed as left-hand side of %a"
