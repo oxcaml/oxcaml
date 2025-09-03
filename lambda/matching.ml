@@ -1275,11 +1275,13 @@ let can_group discr pat =
   | ( _,
       ( Any
       | Constant
-          ( Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _ | Const_string _ 
-          | Const_float _ | Const_float32 _ | Const_unboxed_float _ 
-          | Const_unboxed_float32 _ | Const_int32 _ | Const_int64 _ | Const_nativeint _
-          | Const_untagged_int _ | Const_untagged_int8 _ | Const_untagged_int16 _
-          | Const_unboxed_int32 _ | Const_unboxed_int64 _ | Const_unboxed_nativeint _ )
+          ( Const_int _ | Const_char _ | Const_string _ | Const_float _
+          | Const_float32 _ | Const_unboxed_float _ | Const_unboxed_float32 _
+          | Const_int8 _ | Const_int16 _
+          | Const_int32 _ | Const_int64 _ | Const_nativeint _
+          | Const_untagged_int8 _ | Const_untagged_int16 _
+          | Const_unboxed_int32 _ | Const_unboxed_int64 _
+          | Const_untagged_int _ | Const_unboxed_nativeint _ )
       | Construct _ | Tuple _ | Unboxed_tuple _ | Record _
       | Record_unboxed_product _ | Array _ | Variant _ | Lazy ) ) ->
       false

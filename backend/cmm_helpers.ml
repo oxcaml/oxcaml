@@ -38,25 +38,25 @@ module Unboxed_or_untagged_array_tags = struct
   let untagged_int16_array_zero_tag = 4
 
   let untagged_int16_array_one_tag = 7
-  
+
   let untagged_int16_array_two_tag = 6
-  
+
   let untagged_int16_array_three_tag = 5
-  
+
   let untagged_int8_array_zero_tag = 8
 
   let untagged_int8_array_one_tag = 15
-  
+
   let untagged_int8_array_two_tag = 14
-  
+
   let untagged_int8_array_three_tag = 13
-  
+
   let untagged_int8_array_four_tag = 12
-  
+
   let untagged_int8_array_five_tag = 11
-  
+
   let untagged_int8_array_six_tag = 10
-  
+
   let untagged_int8_array_seven_tag = 9
 
   let unboxed_float32_array_zero_tag = 16
@@ -1631,18 +1631,25 @@ let unboxed_or_untagged_packed_array_length ~mod_log2 arr dbg =
   bind "arr" arr (fun arr ->
       let size_in_words = get_size arr dbg in
       let tag = get_tag arr dbg in
-      (* Calculate: (size_in_words << mod_log2) - (tag & ((1 << mod_log2) - 1)) *)
+      (* Calculate: (size_in_words << mod_log2) - (tag & ((1 << mod_log2) -
+         1)) *)
       let total_slots = lsl_int size_in_words (int ~dbg mod_log2) dbg in
-      let adjustment = Cop (Cand, [tag; int ~dbg ((1 lsl mod_log2) - 1)], dbg) in
+      let adjustment =
+        Cop (Cand, [tag; int ~dbg ((1 lsl mod_log2) - 1)], dbg)
+      in
       tag_int (sub_int total_slots adjustment dbg) dbg)
 
-let untagged_int8_array_length = unboxed_or_untagged_packed_array_length ~mod_log2:3
+let untagged_int8_array_length =
+  unboxed_or_untagged_packed_array_length ~mod_log2:3
 
-let untagged_int16_array_length = unboxed_or_untagged_packed_array_length ~mod_log2:2
+let untagged_int16_array_length =
+  unboxed_or_untagged_packed_array_length ~mod_log2:2
 
-let unboxed_int32_array_length = unboxed_or_untagged_packed_array_length ~mod_log2:1
+let unboxed_int32_array_length =
+  unboxed_or_untagged_packed_array_length ~mod_log2:1
 
-let unboxed_float32_array_length = unboxed_or_untagged_packed_array_length ~mod_log2:1
+let unboxed_float32_array_length =
+  unboxed_or_untagged_packed_array_length ~mod_log2:1
 
 let unboxed_or_untagged_int_or_int64_or_nativeint_array_length arr dbg =
   bind "arr" arr (fun arr -> tag_int (get_size arr dbg) dbg)
@@ -1855,7 +1862,8 @@ let rec sign_extend ~bits ~dbg e =
         | e -> sign_extend_via_shift e)
       (low_bits ~bits e ~dbg)
 
-let unboxed_or_untagged_packed_array_ref arr index dbg ~log2_size_addr ~memory_chunk =
+let unboxed_or_untagged_packed_array_ref arr index dbg ~log2_size_addr
+    ~memory_chunk =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           Cop
@@ -1866,17 +1874,20 @@ let unboxed_or_untagged_packed_array_ref arr index dbg ~log2_size_addr ~memory_c
 let untagged_int8_array_ref =
   (* N.B. The resulting value will be sign extended by the code generated for a
      [Eight_signed] load. *)
-  unboxed_or_untagged_packed_array_ref ~log2_size_addr:0 ~memory_chunk:Byte_signed
+  unboxed_or_untagged_packed_array_ref ~log2_size_addr:0
+    ~memory_chunk:Byte_signed
 
 let untagged_int16_array_ref =
   (* N.B. The resulting value will be sign extended by the code generated for a
      [Sixteen_signed] load. *)
-  unboxed_or_untagged_packed_array_ref ~log2_size_addr:1 ~memory_chunk:Sixteen_signed
+  unboxed_or_untagged_packed_array_ref ~log2_size_addr:1
+    ~memory_chunk:Sixteen_signed
 
 let unboxed_int32_array_ref =
   (* N.B. The resulting value will be sign extended by the code generated for a
      [Thirtytwo_signed] load. *)
-  unboxed_or_untagged_packed_array_ref ~log2_size_addr:2 ~memory_chunk:Thirtytwo_signed
+  unboxed_or_untagged_packed_array_ref ~log2_size_addr:2
+    ~memory_chunk:Thirtytwo_signed
 
 let untagged_mutable_int8_unboxed_product_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
@@ -1944,8 +1955,7 @@ let unboxed_mutable_int32_unboxed_product_array_set arr ~array_index ~new_value
                   dbg ))))
 
 let unboxed_float32_array_ref =
-  unboxed_or_untagged_packed_array_ref
-    ~log2_size_addr:2
+  unboxed_or_untagged_packed_array_ref ~log2_size_addr:2
     ~memory_chunk:(Single { reg = Float32 })
 
 let unboxed_int64_or_nativeint_array_ref arr ~array_index dbg =
@@ -1953,7 +1963,7 @@ let unboxed_int64_or_nativeint_array_ref arr ~array_index dbg =
       bind "index" array_index (fun index -> int_array_ref arr index dbg))
 
 let unboxed_or_untagged_packed_array_set arr ~index ~new_value dbg
-      ~log2_size_addr ~memory_chunk =
+    ~log2_size_addr ~memory_chunk =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
@@ -1963,20 +1973,23 @@ let unboxed_or_untagged_packed_array_set arr ~index ~new_value dbg
                   dbg ))))
 
 let untagged_int8_array_set =
-  unboxed_or_untagged_packed_array_set ~log2_size_addr:0 ~memory_chunk:Thirtytwo_signed
+  unboxed_or_untagged_packed_array_set ~log2_size_addr:0
+    ~memory_chunk:Thirtytwo_signed
 
 let untagged_int16_array_set =
-  unboxed_or_untagged_packed_array_set ~log2_size_addr:1 ~memory_chunk:Thirtytwo_signed
+  unboxed_or_untagged_packed_array_set ~log2_size_addr:1
+    ~memory_chunk:Thirtytwo_signed
 
 let unboxed_int32_array_set =
-  unboxed_or_untagged_packed_array_set ~log2_size_addr:2 ~memory_chunk:Thirtytwo_signed
+  unboxed_or_untagged_packed_array_set ~log2_size_addr:2
+    ~memory_chunk:Thirtytwo_signed
 
 let unboxed_float32_array_set =
-  unboxed_or_untagged_packed_array_set
-    ~log2_size_addr:2
+  unboxed_or_untagged_packed_array_set ~log2_size_addr:2
     ~memory_chunk:(Single { reg = Float32 })
 
-let unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index ~new_value dbg =
+let unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
+    ~new_value dbg =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
@@ -4949,93 +4962,94 @@ type mod8 =
 let make_untagged_int8_array_payload dbg untagged_int8_list =
   if Sys.big_endian
   then
-    Misc.fatal_error "Big-endian platforms not yet supported for untagged arrays";
-  (* values are sign-extended by default. We need to change zero-extend for the `or` 
-     operation to be correct. *)
+    Misc.fatal_error
+      "Big-endian platforms not yet supported for untagged arrays";
+  (* values are sign-extended by default. We need to change zero-extend for the
+     `or` operation to be correct. *)
   let rec aux acc = function
     | [] -> Zero, List.rev acc
     | a :: [] -> One, List.rev (a :: acc)
-    | a :: b :: [] -> 
+    | [a; b] ->
       let i =
         Cop
           ( Cor,
-            [             zero_extend ~bits:8 a ~dbg
-            ; Cop (Clsl, [                    b     ; Cconst_int (8, dbg)], dbg) ],
+            [ zero_extend ~bits:8 a ~dbg;
+              Cop (Clsl, [b; Cconst_int (8, dbg)], dbg) ],
             dbg )
       in
-      Two, List.rev (i :: acc) 
-    | a :: b :: c :: [] -> 
+      Two, List.rev (i :: acc)
+    | [a; b; c] ->
       let i =
         Cop
           ( Cor,
-            [             zero_extend ~bits:8 a ~dbg
-            ; Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int ( 8, dbg)], dbg)
-            ; Cop (Clsl, [                    c     ; Cconst_int (16, dbg)], dbg) ],
+            [ zero_extend ~bits:8 a ~dbg;
+              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
+              Cop (Clsl, [c; Cconst_int (16, dbg)], dbg) ],
             dbg )
       in
-      Three, List.rev (i :: acc) 
-    | a :: b :: c :: d :: [] -> 
+      Three, List.rev (i :: acc)
+    | [a; b; c; d] ->
       let i =
         Cop
           ( Cor,
-            [             zero_extend ~bits:8 a ~dbg
-            ; Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int ( 8, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg)
-            ; Cop (Clsl, [                    d     ; Cconst_int (24, dbg)], dbg) ],
+            [ zero_extend ~bits:8 a ~dbg;
+              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg);
+              Cop (Clsl, [d; Cconst_int (24, dbg)], dbg) ],
             dbg )
       in
-      Four, List.rev (i :: acc) 
-    | a :: b :: c :: d :: e :: [] -> 
+      Four, List.rev (i :: acc)
+    | [a; b; c; d; e] ->
       let i =
         Cop
           ( Cor,
-            [             zero_extend ~bits:8 a ~dbg
-            ; Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int ( 8, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg)
-            ; Cop (Clsl, [                    e     ; Cconst_int (32, dbg)], dbg) ],
+            [ zero_extend ~bits:8 a ~dbg;
+              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg);
+              Cop (Clsl, [e; Cconst_int (32, dbg)], dbg) ],
             dbg )
       in
-      Five, List.rev (i :: acc) 
-    | a :: b :: c :: d :: e :: f :: [] ->
+      Five, List.rev (i :: acc)
+    | [a; b; c; d; e; f] ->
       let i =
         Cop
           ( Cor,
-            [             zero_extend ~bits:8 a ~dbg
-            ; Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int ( 8, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 e ~dbg; Cconst_int (32, dbg)], dbg)
-            ; Cop (Clsl, [                    f     ; Cconst_int (40, dbg)], dbg) ],
+            [ zero_extend ~bits:8 a ~dbg;
+              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 e ~dbg; Cconst_int (32, dbg)], dbg);
+              Cop (Clsl, [f; Cconst_int (40, dbg)], dbg) ],
             dbg )
       in
-      Six, List.rev (i :: acc) 
-    | a :: b :: c :: d :: e :: f :: g :: [] ->
+      Six, List.rev (i :: acc)
+    | [a; b; c; d; e; f; g] ->
       let i =
         Cop
           ( Cor,
-            [             zero_extend ~bits:8 a ~dbg
-            ; Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int ( 8, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 e ~dbg; Cconst_int (32, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 f ~dbg; Cconst_int (40, dbg)], dbg)
-            ; Cop (Clsl, [                    g     ; Cconst_int (48, dbg)], dbg) ],
+            [ zero_extend ~bits:8 a ~dbg;
+              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 e ~dbg; Cconst_int (32, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 f ~dbg; Cconst_int (40, dbg)], dbg);
+              Cop (Clsl, [g; Cconst_int (48, dbg)], dbg) ],
             dbg )
       in
-      Seven, List.rev (i :: acc) 
+      Seven, List.rev (i :: acc)
     | a :: b :: c :: d :: e :: f :: g :: h :: r ->
       let i =
         Cop
           ( Cor,
-            [             zero_extend ~bits:8 a ~dbg
-            ; Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int ( 8, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 e ~dbg; Cconst_int (32, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 f ~dbg; Cconst_int (40, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:8 g ~dbg; Cconst_int (48, dbg)], dbg)
-            ; Cop (Clsl, [                    h     ; Cconst_int (56, dbg)], dbg) ],
+            [ zero_extend ~bits:8 a ~dbg;
+              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 e ~dbg; Cconst_int (32, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 f ~dbg; Cconst_int (40, dbg)], dbg);
+              Cop (Clsl, [zero_extend ~bits:8 g ~dbg; Cconst_int (48, dbg)], dbg);
+              Cop (Clsl, [h; Cconst_int (56, dbg)], dbg) ],
             dbg )
       in
       aux (i :: acc) r
@@ -5047,7 +5061,7 @@ let allocate_untagged_int8_array ~elements mode dbg =
   let tag =
     match num_elts with
     | Zero -> Unboxed_or_untagged_array_tags.untagged_int8_array_zero_tag
-    | One -> Unboxed_or_untagged_array_tags.untagged_int8_array_one_tag 
+    | One -> Unboxed_or_untagged_array_tags.untagged_int8_array_one_tag
     | Two -> Unboxed_or_untagged_array_tags.untagged_int8_array_two_tag
     | Three -> Unboxed_or_untagged_array_tags.untagged_int8_array_three_tag
     | Four -> Unboxed_or_untagged_array_tags.untagged_int8_array_four_tag
@@ -5064,9 +5078,10 @@ let allocate_untagged_int8_array ~elements mode dbg =
       local_block_header tag size
         ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
-  Cop 
-    ( Calloc (mode, Alloc_block_kind_int8_u_array)
-    , Cconst_natint (header, dbg) :: payload, dbg )
+  Cop
+    ( Calloc (mode, Alloc_block_kind_int8_u_array),
+      Cconst_natint (header, dbg) :: payload,
+      dbg )
 
 type mod4 =
   | Zero
@@ -5077,28 +5092,30 @@ type mod4 =
 let make_untagged_int16_array_payload dbg untagged_int16_list =
   if Sys.big_endian
   then
-    Misc.fatal_error "Big-endian platforms not yet supported for untagged arrays";
-  (* values are sign-extended by default. We need to change zero-extend for the `or`
-     operation to be correct. *)
+    Misc.fatal_error
+      "Big-endian platforms not yet supported for untagged arrays";
+  (* values are sign-extended by default. We need to change zero-extend for the
+     `or` operation to be correct. *)
   let rec aux acc = function
     | [] -> Zero, List.rev acc
     | a :: [] -> One, List.rev (a :: acc)
-    | a :: b :: [] -> 
+    | [a; b] ->
       let i =
         Cop
           ( Cor,
-            [             zero_extend ~bits:16 a ~dbg
-            ; Cop (Clsl, [                     b     ; Cconst_int (16, dbg)], dbg) ],
+            [ zero_extend ~bits:16 a ~dbg;
+              Cop (Clsl, [b; Cconst_int (16, dbg)], dbg) ],
             dbg )
       in
       Two, List.rev (i :: acc)
-    | a :: b :: c :: [] -> 
+    | [a; b; c] ->
       let i =
         Cop
           ( Cor,
-            [             zero_extend ~bits:16 a ~dbg
-            ; Cop (Clsl, [zero_extend ~bits:16 b ~dbg; Cconst_int (16, dbg)], dbg)
-            ; Cop (Clsl, [                     c     ; Cconst_int (32, dbg)], dbg) ],
+            [ zero_extend ~bits:16 a ~dbg;
+              Cop
+                (Clsl, [zero_extend ~bits:16 b ~dbg; Cconst_int (16, dbg)], dbg);
+              Cop (Clsl, [c; Cconst_int (32, dbg)], dbg) ],
             dbg )
       in
       Three, List.rev (i :: acc)
@@ -5106,10 +5123,12 @@ let make_untagged_int16_array_payload dbg untagged_int16_list =
       let i =
         Cop
           ( Cor,
-            [             zero_extend ~bits:16 a ~dbg
-            ; Cop (Clsl, [zero_extend ~bits:16 b ~dbg; Cconst_int (16, dbg)], dbg)
-            ; Cop (Clsl, [zero_extend ~bits:16 c ~dbg; Cconst_int (32, dbg)], dbg)
-            ; Cop (Clsl, [                     d     ; Cconst_int (48, dbg)], dbg) ],
+            [ zero_extend ~bits:16 a ~dbg;
+              Cop
+                (Clsl, [zero_extend ~bits:16 b ~dbg; Cconst_int (16, dbg)], dbg);
+              Cop
+                (Clsl, [zero_extend ~bits:16 c ~dbg; Cconst_int (32, dbg)], dbg);
+              Cop (Clsl, [d; Cconst_int (48, dbg)], dbg) ],
             dbg )
       in
       aux (i :: acc) r
@@ -5121,7 +5140,7 @@ let allocate_untagged_int16_array ~elements mode dbg =
   let tag =
     match num_elts with
     | Zero -> Unboxed_or_untagged_array_tags.untagged_int16_array_zero_tag
-    | One -> Unboxed_or_untagged_array_tags.untagged_int16_array_one_tag 
+    | One -> Unboxed_or_untagged_array_tags.untagged_int16_array_one_tag
     | Two -> Unboxed_or_untagged_array_tags.untagged_int16_array_two_tag
     | Three -> Unboxed_or_untagged_array_tags.untagged_int16_array_three_tag
   in
@@ -5134,9 +5153,10 @@ let allocate_untagged_int16_array ~elements mode dbg =
       local_block_header tag size
         ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
-  Cop 
-    ( Calloc (mode, Alloc_block_kind_int16_u_array)
-    , Cconst_natint (header, dbg) :: payload, dbg )
+  Cop
+    ( Calloc (mode, Alloc_block_kind_int16_u_array),
+      Cconst_natint (header, dbg) :: payload,
+      dbg )
 
 type mod2 =
   | Zero
@@ -5177,8 +5197,8 @@ let make_unboxed_int32_array_payload dbg unboxed_int32_list =
   in
   aux [] unboxed_int32_list
 
-let allocate_unboxed_packed_mod2_array ~make_payload ~alloc_kind ~zero_tag ~one_tag
-    ~elements mode dbg =
+let allocate_unboxed_packed_mod2_array ~make_payload ~alloc_kind ~zero_tag
+    ~one_tag ~elements mode dbg =
   let num_elts, payload = make_payload dbg elements in
   let tag = match num_elts with Zero -> zero_tag | One -> one_tag in
   let header =
@@ -5193,7 +5213,8 @@ let allocate_unboxed_packed_mod2_array ~make_payload ~alloc_kind ~zero_tag ~one_
   Cop (Calloc (mode, alloc_kind), Cconst_natint (header, dbg) :: payload, dbg)
 
 let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  allocate_unboxed_packed_mod2_array ~make_payload:make_unboxed_int32_array_payload
+  allocate_unboxed_packed_mod2_array
+    ~make_payload:make_unboxed_int32_array_payload
     ~alloc_kind:Alloc_block_kind_int32_u_array
     ~zero_tag:Unboxed_or_untagged_array_tags.unboxed_int32_array_zero_tag
     ~one_tag:Unboxed_or_untagged_array_tags.unboxed_int32_array_one_tag
@@ -5219,10 +5240,11 @@ let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   aux [] unboxed_float32_list
 
 let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  allocate_unboxed_packed_mod2_array ~make_payload:make_unboxed_float32_array_payload
+  allocate_unboxed_packed_mod2_array
+    ~make_payload:make_unboxed_float32_array_payload
     ~alloc_kind:Alloc_block_kind_float32_u_array
     ~zero_tag:Unboxed_or_untagged_array_tags.unboxed_float32_array_zero_tag
-    ~one_tag:Unboxed_or_untagged_array_tags.unboxed_float32_array_one_tag 
+    ~one_tag:Unboxed_or_untagged_array_tags.unboxed_float32_array_one_tag
     ~elements mode dbg
 
 let allocate_untagged_int_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
@@ -5230,10 +5252,12 @@ let allocate_untagged_int_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     let size = List.length elements in
     match mode with
     | Heap ->
-      white_mixed_block_header Unboxed_or_untagged_array_tags.untagged_int_array_tag size
+      white_mixed_block_header
+        Unboxed_or_untagged_array_tags.untagged_int_array_tag size
         ~scannable_prefix_len:0
     | Local ->
-      local_block_header Unboxed_or_untagged_array_tags.untagged_int_array_tag size
+      local_block_header Unboxed_or_untagged_array_tags.untagged_int_array_tag
+        size
         ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
   Cop
@@ -5246,10 +5270,12 @@ let allocate_unboxed_int64_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     let size = List.length elements in
     match mode with
     | Heap ->
-      white_mixed_block_header Unboxed_or_untagged_array_tags.unboxed_int64_array_tag size
+      white_mixed_block_header
+        Unboxed_or_untagged_array_tags.unboxed_int64_array_tag size
         ~scannable_prefix_len:0
     | Local ->
-      local_block_header Unboxed_or_untagged_array_tags.unboxed_int64_array_tag size
+      local_block_header Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
+        size
         ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
   Cop
@@ -5262,10 +5288,12 @@ let allocate_unboxed_nativeint_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     let size = List.length elements in
     match mode with
     | Heap ->
-      white_mixed_block_header Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
-        size ~scannable_prefix_len:0
+      white_mixed_block_header
+        Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag size
+        ~scannable_prefix_len:0
     | Local ->
-      local_block_header Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag size
+      local_block_header
+        Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag size
         ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
   Cop
@@ -5288,17 +5316,20 @@ let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~tag ~elements
 let allocate_unboxed_vec128_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec128
     ~alloc_kind:Alloc_block_kind_vec128_u_array
-    ~tag:Unboxed_or_untagged_array_tags.unboxed_vec128_array_tag ~elements mode dbg
+    ~tag:Unboxed_or_untagged_array_tags.unboxed_vec128_array_tag ~elements mode
+    dbg
 
 let allocate_unboxed_vec256_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec256
     ~alloc_kind:Alloc_block_kind_vec256_u_array
-    ~tag:Unboxed_or_untagged_array_tags.unboxed_vec256_array_tag ~elements mode dbg
+    ~tag:Unboxed_or_untagged_array_tags.unboxed_vec256_array_tag ~elements mode
+    dbg
 
 let allocate_unboxed_vec512_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec512
     ~alloc_kind:Alloc_block_kind_vec512_u_array
-    ~tag:Unboxed_or_untagged_array_tags.unboxed_vec512_array_tag ~elements mode dbg
+    ~tag:Unboxed_or_untagged_array_tags.unboxed_vec512_array_tag ~elements mode
+    dbg
 
 (* Drop internal optional arguments from exported interface *)
 let block_header x y = block_header x y

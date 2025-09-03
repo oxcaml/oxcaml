@@ -2206,7 +2206,8 @@ let primitive_can_raise prim =
     false
 
 let constant_layout: constant -> layout = function
-  | Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _ -> non_null_value Pintval
+  | Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _ ->
+    non_null_value Pintval
   | Const_string _ -> non_null_value Pgenval
   | Const_int32 _ -> non_null_value (Pboxedintval Boxed_int32)
   | Const_int64 _ -> non_null_value (Pboxedintval Boxed_int64)
@@ -2803,7 +2804,9 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Punboxedoruntaggedintarray Unboxed_int32 ->
     (* int32# arrays are packed *)
     4
-  | Punboxedoruntaggedintarray (Untagged_int | Unboxed_int64 | Unboxed_nativeint) -> 8
+  | Punboxedoruntaggedintarray
+      (Untagged_int | Unboxed_int64 | Unboxed_nativeint) ->
+    8
   | Punboxedvectorarray Unboxed_vec128 -> 16
   | Punboxedvectorarray Unboxed_vec256 -> 32
   | Punboxedvectorarray Unboxed_vec512 -> 64
