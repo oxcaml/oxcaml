@@ -91,4 +91,12 @@
 (lldb) c
 (lldb) b Test_datatypes_dwarf.f_exception_with_unboxed
 (lldb) c
+(lldb) b Test_datatypes_dwarf.f_tree
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_forest
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) quit

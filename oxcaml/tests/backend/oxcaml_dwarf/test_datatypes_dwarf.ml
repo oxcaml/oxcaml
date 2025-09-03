@@ -217,3 +217,65 @@ let[@inline never] [@local never] f_exception_with_unboxed (x: exn) =
   | _ -> x
 let _ = f_exception_with_unboxed
     (Exception_with_unboxed_record { value = #1.41; flag = true })
+
+(* Mutually recursive types - tree and forest *)
+type tree = 
+  | Empty
+  | Node of { value: int [@warning "-69"]; children: forest [@warning "-69"] }
+and forest =
+  | EmptyForest
+  | WithTree of { tree: tree [@warning "-69"]; rest: forest [@warning "-69"] }
+
+let[@inline never] [@local never] f_tree (x: tree) = x
+let[@inline never] [@local never] f_forest (x: forest) = x
+
+(* Test empty tree *)
+let _ = f_tree Empty
+
+(* Test simple leaf tree with empty forest *)
+let _ = f_tree (Node { value = 42; children = EmptyForest })
+
+(* Test nested tree structure *)
+let _ = f_tree (Node {
+  value = 1;
+  children = WithTree {
+    tree = Node { value = 2; children = EmptyForest };
+    rest = WithTree {
+      tree = Node { value = 3; children = WithTree {
+        tree = Node { value = 4; children = EmptyForest };
+        rest = WithTree {
+          tree = Node { value = 5; children = EmptyForest };
+          rest = EmptyForest
+        }
+      }};
+      rest = EmptyForest
+    }
+  }
+})
+
+(* Test empty forest *)
+let _ = f_forest EmptyForest
+
+(* Test forest with single tree *)
+let _ = f_forest (WithTree { tree = Node { value = 10; children = EmptyForest }; rest = EmptyForest })
+
+(* Test complex forest *)
+let _ = f_forest (WithTree {
+  tree = Node { value = 100; children = EmptyForest };
+  rest = WithTree {
+    tree = Node { value = 200; children = WithTree {
+      tree = Node { value = 201; children = EmptyForest };
+      rest = WithTree {
+        tree = Node { value = 202; children = WithTree {
+          tree = Node { value = 2021; children = EmptyForest };
+          rest = EmptyForest
+        }};
+        rest = EmptyForest
+      }
+    }};
+    rest = WithTree {
+      tree = Node { value = 300; children = EmptyForest };
+      rest = EmptyForest
+    }
+  }
+})
