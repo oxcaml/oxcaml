@@ -33,8 +33,8 @@ type constant =
       (** Integer constants such as [#3] [#3l] [#3L] [#3n].
 
           Suffixes [[g-z][G-Z]] are accepted by the parser.
-          Suffixes except ['s], ['S'], ['l'], ['L'] and ['n'] are rejected by the 
-          typechecker
+          Suffixes except ['s], ['S'], ['l'], ['L'] and ['n'] are rejected by
+          the typechecker
       *)
   | Pconst_char of char  (** Character such as ['c']. *)
   | Pconst_string of string * Location.t * string option

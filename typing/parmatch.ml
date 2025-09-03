@@ -2297,11 +2297,13 @@ let inactive ~partial pat =
         | Tpat_constant c -> begin
             match c with
             | Const_string _
-            | Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _ | Const_float _ 
-            | Const_float32 _ | Const_unboxed_float _ | Const_unboxed_float32 _ 
-            | Const_int32 _ | Const_int64 _ | Const_nativeint _ | Const_untagged_int _
-            | Const_untagged_int8 _ | Const_untagged_int16 _ | Const_unboxed_int32 _
-            | Const_unboxed_int64 _ | Const_unboxed_nativeint _
+            | Const_int _ | Const_char _ | Const_float _ | Const_float32 _
+            | Const_unboxed_float _ | Const_unboxed_float32 _
+            | Const_int8 _ | Const_int16 _ | Const_int32 _ | Const_int64 _
+            | Const_nativeint _
+            | Const_untagged_int8 _ | Const_untagged_int16 _
+            | Const_unboxed_int32 _ | Const_unboxed_int64 _
+            | Const_untagged_int _ | Const_unboxed_nativeint _
             -> true
           end
         | Tpat_tuple ps ->
