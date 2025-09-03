@@ -448,8 +448,8 @@ let transl_regalloc_attrib : Regalloc_attribute.t -> Cmm.codegen_option list =
   | Gi -> [Use_regalloc Gi_regalloc]
 
 (* Translation of regalloc_param attributes on functions. *)
-let transl_regalloc_param_attrib : Regalloc_param_attribute.t -> Cmm.codegen_option list =
-  function
+let transl_regalloc_param_attrib :
+    Regalloc_param_attribute.t -> Cmm.codegen_option list = function
   | [] -> []
   | params -> [Use_regalloc_param params]
 
@@ -552,9 +552,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let regalloc_param_attribute =
     Env.get_code_metadata env code_id |> Code_metadata.regalloc_param_attribute
   in
-  let cold =
-    Env.get_code_metadata env code_id |> Code_metadata.cold
-  in
+  let cold = Env.get_code_metadata env code_id |> Code_metadata.cold in
   let fun_flags =
     transl_check_attrib zero_alloc_attribute
     @ transl_regalloc_attrib regalloc_attribute

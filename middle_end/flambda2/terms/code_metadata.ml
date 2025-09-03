@@ -170,10 +170,10 @@ type 'a create_type =
 let createk k code_id ~newer_version_of ~params_arity ~param_modes
     ~first_complex_local_param ~result_arity ~result_types ~result_mode ~stub
     ~(inline : Inline_attribute.t) ~zero_alloc_attribute ~poll_attribute
-    ~regalloc_attribute ~regalloc_param_attribute ~cold ~is_a_functor ~is_opaque 
-    ~recursive ~cost_metrics ~inlining_arguments ~dbg ~is_tupled 
-    ~is_my_closure_used ~inlining_decision ~absolute_history 
-    ~relative_history ~loopify =
+    ~regalloc_attribute ~regalloc_param_attribute ~cold ~is_a_functor ~is_opaque
+    ~recursive ~cost_metrics ~inlining_arguments ~dbg ~is_tupled
+    ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
+    ~loopify =
   (match stub, inline with
   | true, (Available_inline | Never_inline | Default_inline)
   | ( false,
@@ -604,7 +604,8 @@ let approx_equal
   && Zero_alloc_attribute.equal zero_alloc_attribute1 zero_alloc_attribute2
   && Poll_attribute.equal poll_attribute1 poll_attribute2
   && Regalloc_attribute.equal regalloc_attribute1 regalloc_attribute2
-  && Regalloc_param_attribute.equal regalloc_param_attribute1 regalloc_param_attribute2
+  && Regalloc_param_attribute.equal regalloc_param_attribute1
+       regalloc_param_attribute2
   && Bool.equal cold1 cold2
   && Bool.equal is_a_functor1 is_a_functor2
   && Bool.equal is_opaque1 is_opaque2

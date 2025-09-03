@@ -692,8 +692,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~regalloc_attribute:Regalloc_attribute.Default
               ~regalloc_param_attribute:[]
               ~zero_alloc_attribute:Zero_alloc_attribute.Default_zero_alloc
-              ~cold:false
-              ~is_a_functor:false ~is_opaque:false ~recursive
+              ~cold:false ~is_a_functor:false ~is_opaque:false ~recursive
               ~cost_metrics:cost_metrics_of_body
               ~inlining_arguments:(DE.inlining_arguments (DA.denv dacc))
               ~dbg ~is_tupled:false
