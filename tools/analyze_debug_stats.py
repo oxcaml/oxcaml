@@ -65,7 +65,7 @@ from io import BytesIO
 class StatEntry:
     def __init__(self, type_name, initial_size_memory, reduced_size_memory, evaluated_size_memory,
                  reduction_steps,
-                 evaluation_steps, dwarf_die_size, cms_files_loaded, cms_files_cached, 
+                 evaluation_steps, dwarf_die_size, cms_files_loaded, cms_files_cached,
                  cms_files_missing, cms_files_unreadable, file_path):
         self.type_name = type_name
         self.initial_size_memory = initial_size_memory
@@ -80,13 +80,23 @@ class StatEntry:
         self.cms_files_unreadable = cms_files_unreadable
         self.file_path = file_path
 
+class DwarfSection:
+    def __init__(self, name, compressed_size, uncompressed_size, is_compressed):
+        self.name = name
+        self.compressed_size = compressed_size
+        self.uncompressed_size = uncompressed_size
+        self.is_compressed = is_compressed
+
 class FileMeasurement:
-    def __init__(self, file_path, main_size, debug_size=None, dwarf_sections={}, total_dwarf_size=0):
+    def __init__(self, file_path, main_size, debug_size=None, debug_uncompressed_size=None,
+                 dwarf_sections=[], total_dwarf_compressed=0, total_dwarf_uncompressed=0):
         self.file_path = file_path
         self.main_size = main_size
         self.debug_size = debug_size
+        self.debug_uncompressed_size = debug_uncompressed_size
         self.dwarf_sections = dwarf_sections
-        self.total_dwarf_size = total_dwarf_size
+        self.total_dwarf_compressed = total_dwarf_compressed
+        self.total_dwarf_uncompressed = total_dwarf_uncompressed
 
 def parse_json_file(file_path):
     """Parse a single JSON file and return (entries, file_metadata) tuple."""
@@ -125,28 +135,62 @@ def parse_json_file(file_path):
 
     return entries, file_metadata
 
+
 def analyze_dwarf_sections(file_path):
-    """Analyze DWARF sections in a binary using objdump."""
+    """Analyze DWARF sections in a binary using readelf and objdump, detecting compression."""
     try:
-        # Run objdump to get section headers
-        result = subprocess.run(['objdump', '-h', file_path],
-                              capture_output=True, text=True, check=True)
+        # Use readelf to determine the sizes of the sections (compressed)
+        readelf_result = subprocess.run(['readelf', '-SW', file_path],
+                                      capture_output=True, text=True, check=True)
 
-        # Parse the output to find debug sections using regex
+        section_pattern = re.compile(r'^\s*\[\s*\d+\]\s+(\.(?:z)?debug\w*)\s+\w+\s+[0-9a-fA-F]+\s+[0-9a-fA-F]+\s+([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s+(.*)$')
+
+        # Use objdump to determine the sizes of the sections (uncompressed)
+        objdump_result = subprocess.run(['objdump', '-h', file_path],
+                                      capture_output=True, text=True, check=True)
+
         dwarf_sections = {}
-        # Match objdump section lines: idx section_name size vma lma file_off algn
-        section_pattern = re.compile(r'^\s*\d+\s+(\.debug\w*)\s+([0-9a-fA-F]+)')
 
-        for line in result.stdout.split('\n'):
+        # First pass: Parse readelf output to get compression info and compressed sizes
+        for line in readelf_result.stdout.split('\n'):
             match = section_pattern.match(line)
             if match:
                 section_name = match.group(1)
                 size_hex = match.group(2)
+                flags = match.group(3)
+
                 try:
-                    size_bytes = int(size_hex, 16)
-                    dwarf_sections[section_name] = size_bytes
+                    compressed_size = int(size_hex, 16)
+                    is_compressed = (section_name.startswith('.zdebug') or 'C' in flags)
+
+                    # Normalize section name (remove 'z' prefix if present)
+                    normalized_name = section_name.replace('.zdebug', '.debug')
+
+                    dwarf_sections[normalized_name] = DwarfSection(
+                        normalized_name, compressed_size, compressed_size, is_compressed
+                    )
                 except ValueError:
                     continue
+
+        # Second pass: Parse objdump output to get uncompressed sizes
+        for line in objdump_result.stdout.split('\n'):
+            # objdump format: Idx Name Size VMA LMA File off Algn
+            if '.debug' in line:
+                parts = line.split()
+                if len(parts) >= 3:
+                    section_name = parts[1]  # Name column
+                    size_hex = parts[2]      # Size column (uncompressed)
+
+                    try:
+                        uncompressed_size = int(size_hex, 16)
+                        if section_name in dwarf_sections:
+                            dwarf_sections[section_name].uncompressed_size = uncompressed_size
+                        else:
+                            dwarf_sections[section_name] = DwarfSection(
+                                section_name, uncompressed_size, uncompressed_size, False
+                            )
+                    except (ValueError, IndexError):
+                        continue
 
         return dwarf_sections
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -174,18 +218,31 @@ def measure_file_sizes(file_paths):
         dwarf_sections = analyze_dwarf_sections(file_path)
 
         # Also analyze DWARF sections in the .debug file if it exists
+        debug_uncompressed_size = None
         if debug_size is not None:
             debug_dwarf_sections = analyze_dwarf_sections(debug_file_path)
+            # Calculate uncompressed size of debug sidecar from its DWARF sections
+            debug_uncompressed_size = sum(section.uncompressed_size for section in debug_dwarf_sections.values())
+
             # Merge the sections, summing sizes for sections that appear in both
-            for section_name, section_size in debug_dwarf_sections.items():
+            for section_name, section_data in debug_dwarf_sections.items():
                 if section_name in dwarf_sections:
-                    dwarf_sections[section_name] += section_size
+                    # Sum both compressed and uncompressed sizes
+                    dwarf_sections[section_name].compressed_size += section_data.compressed_size
+                    dwarf_sections[section_name].uncompressed_size += section_data.uncompressed_size
+                    # Keep compression status (any compression counts as compressed)
+                    dwarf_sections[section_name].is_compressed = (
+                        dwarf_sections[section_name].is_compressed or section_data.is_compressed
+                    )
                 else:
-                    dwarf_sections[section_name] = section_size
+                    dwarf_sections[section_name] = section_data
 
-        total_dwarf_size = sum(dwarf_sections.values())
+        # Calculate totals
+        total_dwarf_compressed = sum(section.compressed_size for section in dwarf_sections.values())
+        total_dwarf_uncompressed = sum(section.uncompressed_size for section in dwarf_sections.values())
 
-        measurements.append(FileMeasurement(file_path, main_size, debug_size, dwarf_sections, total_dwarf_size))
+        measurements.append(FileMeasurement(file_path, main_size, debug_size, debug_uncompressed_size,
+                                          list(dwarf_sections.values()), total_dwarf_compressed, total_dwarf_uncompressed))
 
     return measurements
 
@@ -317,25 +374,42 @@ def display_file_measurements(file_measurements):
         for measurement in file_measurements:
             # Total size is main binary + debug sidecar (they are separate files)
             total_size = measurement.main_size + (measurement.debug_size or 0)
-            dwarf_percentage = (measurement.total_dwarf_size / total_size * 100) if total_size > 0 else 0
+
+            # Calculate percentages based on actual on-disk sizes (compressed)
+            dwarf_compressed_percentage = (measurement.total_dwarf_compressed / total_size * 100) if total_size > 0 else 0
 
             print("## `{}`".format(measurement.file_path))
-            print("- **Total size**: {:,} bytes".format(total_size))
+            print("- **Total file size**: {:,} bytes".format(total_size))
             if measurement.debug_size is not None:
                 print("  - Main binary: {:,} bytes".format(measurement.main_size))
                 print("  - Debug sidecar: {:,} bytes".format(measurement.debug_size))
-            print("- **DWARF sections** (aggregated): {:,} bytes ({:.1f}% of total)".format(
-                measurement.total_dwarf_size, dwarf_percentage))
+
+            # Show DWARF section info with compression details in single line
+            if measurement.total_dwarf_compressed != measurement.total_dwarf_uncompressed:
+                compression_ratio = measurement.total_dwarf_uncompressed / measurement.total_dwarf_compressed if measurement.total_dwarf_compressed > 0 else 1
+                print("- **DWARF sections**: {:,} bytes ({:,} bytes uncompressed; {:.1f}x); {:.1f}% of total".format(
+                    measurement.total_dwarf_compressed, measurement.total_dwarf_uncompressed, compression_ratio,
+                    dwarf_compressed_percentage))
+            else:
+                print("- **DWARF sections**: {:,} bytes ({:.1f}% of total)".format(
+                    measurement.total_dwarf_compressed, dwarf_compressed_percentage))
 
             if measurement.dwarf_sections:
-                print("  - DWARF section breakdown:")
-                # Sort sections by size descending
-                sorted_sections = sorted(measurement.dwarf_sections.items(),
-                                       key=lambda x: x[1], reverse=True)
-                for section_name, section_size in sorted_sections:
-                    section_percentage = (section_size / measurement.total_dwarf_size * 100) if measurement.total_dwarf_size > 0 else 0
-                    print("    - `{}`: {:,} bytes ({:.1f}% of DWARF)".format(
-                        section_name, section_size, section_percentage))
+                # Sort sections by compressed size descending
+                sorted_sections = sorted(measurement.dwarf_sections,
+                                       key=lambda x: x.compressed_size, reverse=True)
+
+                for section in sorted_sections:
+                    # Calculate percentage of total DWARF compressed size
+                    section_percentage = (section.compressed_size / measurement.total_dwarf_compressed * 100) if measurement.total_dwarf_compressed > 0 else 0
+
+                    if section.is_compressed and section.compressed_size != section.uncompressed_size:
+                        section_ratio = section.uncompressed_size / section.compressed_size if section.compressed_size > 0 else 1
+                        print("  - `{}`: {:,} bytes compressed ({:,} bytes uncompressed; {:.1f}x ratio), {:.1f}% of compressed DWARF".format(
+                            section.name, section.compressed_size, section.uncompressed_size, section_ratio, section_percentage))
+                    else:
+                        print("  - `{}`: {:,} bytes (not compressed); {:.1f}% of DWARF".format(
+                            section.name, section.compressed_size, section_percentage))
             print()
 
 def analyze_stats(search_dir="."):
@@ -519,20 +593,20 @@ def analyze_stats(search_dir="."):
         print("| {} | {:,} | {:,} | {:,} | {:,} | {:,} | {:,} | {:,} |".format(
             source_filename, stats['count'], stats['total_initial_memory'],
             stats['total_reduced_memory'], stats['total_evaluated_memory'], stats['total_dwarf_dies'], stats['cms_files_loaded'], stats['cms_files_cached']))
-    
+
     # Add missing/unreadable files section at the end
     if all_missing_files or all_unreadable_files:
         print()
         print("## CMS File Issues")
         print()
-        
+
         if all_missing_files:
             print("### Files Not Found ({:,} total)".format(len(all_missing_files)))
             print()
             missing_list = ", ".join("`{}`".format(f) for f in sorted(all_missing_files))
             print(missing_list)
             print()
-        
+
         if all_unreadable_files:
             print("### Files Unreadable ({:,} total)".format(len(all_unreadable_files)))
             print()
