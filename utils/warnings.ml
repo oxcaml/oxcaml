@@ -108,7 +108,9 @@ type t =
   | Inlining_impossible of string           (* 55 *)
   | Unreachable_case                        (* 56 *)
   | Ambiguous_var_in_pattern_guard of string list (* 57 *)
-  | No_cmx_file of string                   (* 58 *)
+  | No_cmx_file of
+      { missing_extension : string;
+        module_name : string }              (* 58 *)
   | Flambda_assignment_to_non_mutable_value (* 59 *)
   | Unused_module of string                 (* 60 *)
   | Unboxable_type_in_prim_decl of string   (* 61 *)
@@ -1164,15 +1166,11 @@ let message = function
          Only the first match will be used to evaluate the guard expression.\n\
          %a"
         vars_explanation Misc.print_see_manual ref_manual
-  | No_cmx_file name ->
-      let extension =
-        match !Clflags.jsir with
-        | false -> "cmx"
-        | true -> "cmjx"
-      in
+  | No_cmx_file { missing_extension; module_name } ->
       Printf.sprintf
         "no %s file was found in path for module %s, \
-         and its interface was not compiled with -opaque" extension name
+         and its interface was not compiled with -opaque"
+        missing_extension module_name
   | Flambda_assignment_to_non_mutable_value ->
       "A potential assignment to a non-mutable value was detected \n\
         in this source file.  Such assignments may generate incorrect code \n\

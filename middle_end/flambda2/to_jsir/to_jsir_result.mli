@@ -83,8 +83,8 @@ val get_public_method :
     from the JSOO global data table. This is used to inform Js_of_ocaml that it needs to
     add this compilation unit to the global data table. *)
 val import_compilation_unit : t -> Compilation_unit.t -> t
-(* CR selee: Eventually this should also be used for symbols too, so that we
-   don't put unused symbols in the symbol table. *)
+(* CR selee: Eventually we should do something similar for symbols too, so that
+   we don't put unused symbols in the symbol table. *)
 
 val global_data_var : t -> t * Jsir.Var.t
 

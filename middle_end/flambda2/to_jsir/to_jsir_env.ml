@@ -90,25 +90,33 @@ let add_exn_handler t cont ~addr ~exn_param ~extra_args =
 
 let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
 
-let symbol_to_strings symbol =
-  ( Symbol.compilation_unit symbol
-    |> Compilation_unit.name |> Compilation_unit.Name.to_string,
-    Symbol.linkage_name_as_string symbol )
-
 let symbol_to_native_strings symbol =
-  let cu_name, symbol_name = symbol_to_strings symbol in
-  Jsir.Native_string.of_string cu_name, Jsir.Native_string.of_string symbol_name
+  ( Symbol.compilation_unit symbol
+    |> Compilation_unit.name |> Compilation_unit.Name.to_string
+    |> Jsir.Native_string.of_string,
+    Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
+
+let symbol_is_for_compilation_unit symbol =
+  let compilation_unit = Symbol.compilation_unit symbol in
+  Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
 
 let register_symbol' ~res symbol var =
-  let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
-  To_jsir_result.add_instr_exn res
-    (Let
-       ( Jsir.Var.fresh (),
-         Prim
-           ( Extern "caml_register_symbol",
-             [ Pc (NativeString compilation_unit_name);
-               Pc (NativeString symbol_name);
-               Pv var ] ) ))
+  match symbol_is_for_compilation_unit symbol with
+  | true ->
+    (* We don't need to add this symbol to our symbol table, because we will
+       instead fetch it from jsoo's global data table (see
+       [get_symbol_for_global_data]) *)
+    res
+  | false ->
+    let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( Jsir.Var.fresh (),
+           Prim
+             ( Extern "caml_register_symbol",
+               [ Pc (NativeString compilation_unit_name);
+                 Pc (NativeString symbol_name);
+                 Pv var ] ) ))
 
 let add_symbol_without_registering t symbol jvar =
   { t with symbols = Symbol.Map.add symbol jvar t.symbols }
@@ -165,11 +173,9 @@ let get_external_symbol ~res symbol =
   match Symbol.is_predefined_exception symbol with
   | true -> get_predef_exception ~res symbol
   | false -> (
-    let compilation_unit = Symbol.compilation_unit symbol in
-    match
-      Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
-    with
+    match symbol_is_for_compilation_unit symbol with
     | true ->
+      let compilation_unit = Symbol.compilation_unit symbol in
       let compilation_unit_name =
         Compilation_unit.name_as_string compilation_unit
       in

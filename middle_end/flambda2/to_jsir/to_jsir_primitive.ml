@@ -209,6 +209,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
       | Naked_nativeint -> "caml_nativeint_bswap"
       | Tagged_immediate ->
         (* [Lambda_to_flambda_primitives will never produce this *)
+        (* CR selee: this will no longer be true once smallints are merged *)
         Misc.fatal_error "Found Int_arith with Tagged_immediate"
       | Naked_int8 | Naked_int16 -> primitive_not_supported ()
     in
