@@ -2012,3 +2012,21 @@ module Nonempty_list = struct
   let (@) (x :: xs) (y :: ys) =
     x :: List.(xs @ (y :: ys))
 end
+
+module Maybe_bounded = struct
+  type t =
+    | Unbounded
+    | Bounded of { mutable bound: int }
+
+  let decr = function
+    | Unbounded -> ()
+    | Bounded r -> r.bound <- r.bound - 1
+
+  let is_depleted = function
+    | Unbounded -> false
+    | Bounded r -> r.bound <= 0
+
+  let of_option = function
+    | None -> Unbounded
+    | Some n -> Bounded { bound = n }
+end

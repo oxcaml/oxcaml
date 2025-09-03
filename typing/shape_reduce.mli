@@ -73,9 +73,15 @@ end
     compilation unit to prevent conflicting entries in these memoization tables.
 *)
 module Make(_ : sig
-    val fuel : int
+    val fuel : unit -> int
 
     val projection_rules_for_merlin_enabled : bool
+
+    val fuel_for_compilation_units : unit -> int
+
+    val max_shape_reduce_steps_per_variable : unit -> Misc.Maybe_bounded.t
+
+    val max_compilation_unit_depth : unit -> int
 
     val read_unit_shape :
       diagnostics:Diagnostics.t -> unit_name:string -> Shape.t option

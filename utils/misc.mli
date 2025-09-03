@@ -1173,3 +1173,13 @@ module Nonempty_list : sig
 
   val (@) : 'a t -> 'a t -> 'a t
 end
+
+module Maybe_bounded : sig
+  type t =
+    | Unbounded
+    | Bounded of { mutable bound: int }
+
+  val decr : t -> unit
+  val is_depleted : t -> bool
+  val of_option : int option -> t
+end
