@@ -292,8 +292,11 @@ module User = struct
        maximum number of threads that requested a buffer concurrently,
        and we never free those buffers. *)
     let create_buffer () = Bytes.create 1024 in
-    let write_buffer_cache = Domain.Safe.DLS.new_key
-      (fun () : bytes Modes.Contended.t list Atomic.t -> Atomic.make [])
+    let open struct 
+      type buffer_cache = bytes Modes.Contended.t list Atomic.t 
+    end in
+    let write_buffer_cache = 
+      Domain.Safe.DLS.new_key (fun () : buffer_cache -> Atomic.make [])
     in
     let rec pop_or_create buffers =
       match Atomic.get buffers with

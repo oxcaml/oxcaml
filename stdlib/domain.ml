@@ -422,9 +422,6 @@ module type S = sig
 
     type 'a key : value mod portable contended
 
-    (** Systhreads can access DLS state concurrently, and borrowing makes it 
-        possible to give another domain [shared] access, so this function is 
-        only safe if ['a] crosses contention. *)
     val new_key
       : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
       -> (unit -> 'a) @ portable
@@ -433,7 +430,6 @@ module type S = sig
 
     val get : 'a key -> 'a @@ portable
     val set : 'a key -> 'a -> unit @@ portable
-
     val init : unit -> unit
   end
 
@@ -459,8 +455,7 @@ module M : S = (val impl)
 include M
 
 module Safe = struct
-  (* Note the exposed signature of [new_key] requires that ['a] crosses
-     contention, making it safe. *)
+  (* Note the exposed signature of [get] and [set] add modes for safety. *)
   module DLS = DLS
   let spawn = spawn
   let at_exit = at_exit

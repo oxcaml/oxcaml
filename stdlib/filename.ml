@@ -338,11 +338,9 @@ module DLS = Domain.Safe.DLS
 module Rng : sig
   val bits : unit -> int
 end = struct
-  open Modes.Contended
-  (* CR-someday mslater: remove magic by switching to FLS *)
-  let key = DLS.new_key (fun () -> {contended = Random.State.make_self_init ()})
-  let[@inline] bits () = Random.State.bits 
-    (Obj.magic_uncontended (DLS.get key).contended)
+  (* CR-someday mslater: switch to FLS *)
+  let key = DLS.new_key Random.State.make_self_init
+  let[@inline] bits () = Random.State.bits (Obj.magic_uncontended (DLS.get key))
 end
 
 let temp_file_name temp_dir prefix suffix =

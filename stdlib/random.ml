@@ -17,7 +17,6 @@
 (* Pseudo-random number generator *)
 
 open! Stdlib
-open Modes.Contended
 module DLS = Domain.Safe.DLS
 
 [@@@ocaml.flambda_o3]
@@ -342,23 +341,19 @@ let mk_default () =
            586573249833713189L
            (-8591268803865043407L)
            6388613595849772044L
-           
-(* CR-someday mslater: remove magic by switching to FLS *)
+
+(* CR-someday mslater: switch to FLS *)
 let random_key =
   DLS.new_key
-    ~split_from_parent:(fun {contended = s} ->
-      let s = State.split (Obj.magic_uncontended s) in
-      (fun () -> {contended = s}))
-    (fun () -> {contended = mk_default ()})
+    ~split_from_parent:(fun s ->
+      let s = State.split s in
+      (fun () -> Obj.magic_uncontended s))
+    mk_default
 
-let[@inline] apply0 f () = 
-  f (Obj.magic_uncontended (DLS.get random_key).contended)
-
-let[@inline] apply1 f v = 
-  f (Obj.magic_uncontended (DLS.get random_key).contended) v
-
+let[@inline] apply0 f () = f (Obj.magic_uncontended (DLS.get random_key))
+let[@inline] apply1 f v =  f (Obj.magic_uncontended (DLS.get random_key)) v
 let[@inline] apply_in_range f ~min ~max = 
-  f (Obj.magic_uncontended (DLS.get random_key).contended) ~min ~max
+  f (Obj.magic_uncontended (DLS.get random_key)) ~min ~max
 
 let bits = apply0 State.bits
 let int = apply1 State.int

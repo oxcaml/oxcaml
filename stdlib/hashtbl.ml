@@ -65,12 +65,10 @@ let is_randomized () = Atomic.Contended.get randomized
 module Rng : sig
   val bits : unit -> int
 end = struct
-  open Modes.Contended
-  (* CR-someday mslater: remove magic by switching to FLS *)
-  let key = Domain.Safe.DLS.new_key 
-    (fun () -> {contended = Random.State.make_self_init ()})
-  let[@inline] bits () = Random.State.bits 
-    (Obj.magic_uncontended (Domain.Safe.DLS.get key).contended)
+  (* CR-someday mslater: switch to FLS *)
+  let key = Domain.Safe.DLS.new_key Random.State.make_self_init
+  let[@inline] bits () = 
+    Random.State.bits (Obj.magic_uncontended (Domain.Safe.DLS.get key))
 end
 
 (* Functions which appear before the functorial interface must either be

@@ -1031,21 +1031,18 @@ and err_formatter = formatter_of_out_channel Stdlib.stderr
 and str_formatter = formatter_of_buffer stdbuf
 
 (* Initialise domain local state *)
-module DLS = Domain.Safe.DLS
 
-(* CR-someday mslater: remove magic by switching to FLS *)
-let unsafe_dls_key (type a) (f : unit -> a) = 
-  let open struct 
-    type magic : value mod contended = T of a
-    [@@unboxed] [@@unsafe_allow_any_mode_crossing]
-  end in
-  DLS.new_key (fun () -> T (f ()))
-  |> (Obj.magic : magic DLS.key -> a DLS.key)
+(* CR-someday mslater: switch to FLS *)
+module DLS = struct 
+  let new_key = Domain.Safe.DLS.new_key
+  let get = Obj.magic_portable Domain.DLS.get
+  let set = Obj.magic_portable Domain.DLS.set
+end
 
-let stdbuf_key = unsafe_dls_key pp_make_buffer
+let stdbuf_key = DLS.new_key pp_make_buffer
 let _ = DLS.set stdbuf_key stdbuf
 
-let str_formatter_key = unsafe_dls_key (fun () ->
+let str_formatter_key = DLS.new_key (fun () ->
   formatter_of_buffer (DLS.get stdbuf_key))
 let _ = DLS.set str_formatter_key str_formatter
 
@@ -1060,11 +1057,11 @@ let buffered_out_flush oc key () : unit =
   Stdlib.flush oc;
   Buffer.clear buf
 
-let std_buf_key = unsafe_dls_key (fun () -> Buffer.create pp_buffer_size)
+let std_buf_key = DLS.new_key (fun () -> Buffer.create pp_buffer_size)
 
-let err_buf_key = unsafe_dls_key (fun () -> Buffer.create pp_buffer_size)
+let err_buf_key = DLS.new_key (fun () -> Buffer.create pp_buffer_size)
 
-let std_formatter_key = unsafe_dls_key (fun () ->
+let std_formatter_key = DLS.new_key (fun () ->
   let ppf =
     pp_make_formatter (buffered_out_string std_buf_key)
       (buffered_out_flush Stdlib.stdout std_buf_key) ignore ignore ignore
@@ -1076,7 +1073,7 @@ let std_formatter_key = unsafe_dls_key (fun () ->
   ppf)
 let _ = DLS.set std_formatter_key std_formatter
 
-let err_formatter_key = unsafe_dls_key (fun () ->
+let err_formatter_key = DLS.new_key (fun () ->
   let ppf =
     pp_make_formatter (buffered_out_string err_buf_key)
       (buffered_out_flush Stdlib.stderr err_buf_key) ignore ignore ignore
@@ -1109,8 +1106,8 @@ let flush_str_formatter () =
   let str_formatter = DLS.get str_formatter_key in
   flush_buffer_formatter stdbuf str_formatter
 
-let make_synchronized_formatter output flush =
-  unsafe_dls_key (Obj.magic_portable (fun () ->
+let make_synchronized_formatter_safe output flush =
+  DLS.new_key (fun () ->
     let buf = Buffer.create pp_buffer_size in
     let output' = Buffer.add_substring buf in
     let flush' () =
@@ -1118,10 +1115,15 @@ let make_synchronized_formatter output flush =
       Buffer.clear buf;
       flush ()
     in
-    make_formatter output' flush'))
+    make_formatter output' flush')
+
+let make_synchronized_formatter_unsafe output flush = 
+  make_synchronized_formatter_safe 
+    (Obj.magic_portable output)
+    (Obj.magic_portable flush)
 
 let synchronized_formatter_of_out_channel oc =
-  make_synchronized_formatter
+  make_synchronized_formatter_safe
     (fun s ofs len -> output_substring oc s ofs len)
     (fun () -> flush oc)
 
@@ -1481,6 +1483,11 @@ let kasprintf k (Format (fmt, _)) =
 
 
 let asprintf fmt = kasprintf id fmt
+
+module Safe = struct
+  let make_synchronized_formatter = make_synchronized_formatter_safe
+end
+let make_synchronized_formatter = make_synchronized_formatter_unsafe
 
 (* Flushing standard formatters at end of execution. *)
 

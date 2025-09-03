@@ -148,12 +148,12 @@ module DLS : sig
         explicit synchronization to avoid data races.
     *)
 
-    val get : 'a key -> 'a @@ portable
+    val get : 'a key -> 'a @@ nonportable
     (** [get k] returns [v] if a value [v] is associated to the key [k] on
         the calling domain's domain-local state. Sets [k]'s value with its
         initialiser and returns it otherwise. *)
 
-    val set : 'a key -> 'a -> unit @@ portable
+    val set : 'a key -> 'a -> unit @@ nonportable
     (** [set k v] updates the calling domain's domain-local state to associate
         the key [k] with value [v]. It overwrites any previous values associated
         to [k], which cannot be restored later. *)
@@ -171,22 +171,17 @@ module Safe : sig @@ portable
     (** Type of a DLS key *)
 
     val new_key
-      : ('a : value mod contended).
-        ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
+      : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
       -> (unit -> 'a) @ portable
       -> 'a key
-    (** Like {!DLS.new_key}, but is safe to use in the presence of multiple 
+    (** Like {!DLS.new_key}, but safe to use in the presence of multiple 
         domains. *)
 
-    val get : 'a key -> 'a
-    (** [get k] returns [v] if a value [v] is associated to the key [k] on
-        the calling domain's domain-local state. Sets [k]'s value with its
-        initialiser and returns it otherwise. *)
+    val get : ('a : value mod portable). 'a key -> 'a @ contended
+    (** Like {!DLS.get}, but safe to use in the presence of multiple domains. *)
 
-    val set : 'a key -> 'a -> unit
-    (** [set k v] updates the calling domain's domain-local state to associate
-        the key [k] with value [v]. It overwrites any previous values associated
-        to [k], which cannot be restored later. *)
+    val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
+    (** Like {!DLS.set}, but safe to use in the presence of multiple domains. *)
   end
 
   val spawn : (unit -> 'a) @ portable once -> 'a t

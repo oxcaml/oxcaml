@@ -984,8 +984,6 @@ val formatter_of_out_channel : out_channel -> formatter
 val synchronized_formatter_of_out_channel :
   out_channel -> formatter Domain.Safe.DLS.key
 [@@alert unstable][@@alert "-unstable"]
-[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
-                             contention in DLS."]
 (** [synchronized_formatter_of_out_channel oc] returns the key to the
     domain-local state that holds the domain-local formatter for writing to the
     corresponding output channel [oc].
@@ -1069,10 +1067,7 @@ val make_synchronized_formatter :
   (string -> int -> int -> unit) -> (unit -> unit) -> formatter Domain.Safe.DLS.key
   @@ nonportable
 [@@alert unstable][@@alert "-unstable"]
-[@@alert unsafe_multidomain "It is unsafe to store values that do not cross \
-                             contention in DLS."]
-[@@alert unsafe_multidomain "It is unsafe to inject nonportable values into \
-                             DLS."]
+[@@alert unsafe_multidomain "Use [Format.Safe.make_synchronized_formatter]."]
 (** [make_synchronized_formatter out flush] returns the key to the domain-local
     state that holds the domain-local formatter that outputs with function
     [out], and flushes with function [flush].
@@ -1467,6 +1462,18 @@ val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
 
   @since 4.03
 *)
+
+(** Submodule containing non-backwards-compatible functions which enforce thread safety
+    via modes. *)
+module Safe : sig
+  (** Like {!make_synchronized_formatter}, but can be called from any domain.
+      The provided closures must be [portable] as they will be called from other domains
+      that access the returned [Domain.Safe.DLS.key]. *)
+  val make_synchronized_formatter :
+    (string -> int -> int -> unit) @ portable
+    -> (unit -> unit) @ portable
+    -> formatter Domain.Safe.DLS.key
+end
 
 (** {1:examples Examples}
 
