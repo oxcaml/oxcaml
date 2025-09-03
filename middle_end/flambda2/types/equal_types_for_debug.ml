@@ -195,7 +195,7 @@ let equal_function_type ~equal_type env (t1 : TG.function_type)
 let equal_closures_entry ~equal_type env (t1 : TG.closures_entry)
     (t2 : TG.closures_entry) =
   Function_slot.Map.equal
-    (Or_unknown_or_bottom.equal (equal_function_type ~equal_type env))
+    (Or_unknown.equal (equal_function_type ~equal_type env))
     t1.function_types t2.function_types
   && equal_function_slot_indexed_product ~equal_type env t1.closure_types
        t2.closure_types

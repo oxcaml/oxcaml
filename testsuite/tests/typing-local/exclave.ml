@@ -62,7 +62,7 @@ let foo x =
 Line 5, characters 8-9:
 5 |     ref y
             ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* following we check error detection *)
@@ -162,7 +162,7 @@ type data = { mutable a : string; }
 Line 6, characters 9-10:
 6 |   x.a <- z;
              ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo x =

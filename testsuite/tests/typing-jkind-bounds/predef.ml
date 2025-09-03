@@ -69,7 +69,7 @@ type t_test = int option require_portable
 type t_test = int option require_many
 type t_test = int option require_contended
 type ('a : value mod portable) t_test = 'a option require_portable
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = int option require_portable
 type t_test = int option require_many
@@ -148,7 +148,7 @@ let foo (t : int option @ local) = use_global t [@nontail]
 Line 1, characters 46-47:
 1 | let foo (t : int option @ local) = use_global t [@nontail]
                                                   ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* ref *)
@@ -188,7 +188,7 @@ Error: The kind of type "'a ref" is mutable_data with 'a @@ unyielding many.
 type t_test = int ref require_portable
 type t_test = int ref require_many
 type ('a : value mod portable) t_test = 'a ref require_portable
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = int ref require_portable
 type t_test = int ref require_many
@@ -243,7 +243,7 @@ let foo (t : int ref @ contended) = use_uncontended t
 Line 1, characters 52-53:
 1 | let foo (t : int ref @ contended) = use_uncontended t
                                                         ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* list *)
@@ -287,7 +287,7 @@ type t_test = int list require_portable
 type t_test = int list require_many
 type t_test = int list require_contended
 type ('a : value mod portable) t_test = 'a list require_portable
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = int list require_portable
 type t_test = int list require_many
@@ -366,7 +366,7 @@ let foo (t : int list @ local) = use_global t [@nontail]
 Line 1, characters 44-45:
 1 | let foo (t : int list @ local) = use_global t [@nontail]
                                                 ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* array *)
@@ -404,7 +404,7 @@ Error: The kind of type "'a array" is mutable_data with 'a
 type t_test = int array require_portable
 type t_test = int array require_many
 type ('a : value mod portable) t_test = 'a array require_portable
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = int array require_portable
 type t_test = int array require_many
@@ -456,7 +456,7 @@ let foo (t : int array @ contended) = use_uncontended t
 Line 1, characters 54-55:
 1 | let foo (t : int array @ contended) = use_uncontended t
                                                           ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* iarray *)
@@ -498,7 +498,7 @@ type t_test = int iarray require_portable
 type t_test = int iarray require_many
 type t_test = int iarray require_contended
 type ('a : value mod portable) t_test = 'a iarray require_portable
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 type t_test = int iarray require_portable
 type t_test = int iarray require_many
@@ -577,5 +577,5 @@ let foo (t : int iarray @ local) = use_global t [@nontail]
 Line 1, characters 46-47:
 1 | let foo (t : int iarray @ local) = use_global t [@nontail]
                                                   ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]

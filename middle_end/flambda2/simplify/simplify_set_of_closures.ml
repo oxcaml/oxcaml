@@ -589,8 +589,7 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures
         match old_code_id with
         | Deleted _ ->
           ( ( result_code_ids_to_never_delete_this_set,
-              Function_slot.Map.add function_slot Or_unknown_or_bottom.Unknown
-                fun_types,
+              Function_slot.Map.add function_slot Or_unknown.Unknown fun_types,
               outer_dacc ),
             old_code_id )
         | Code_id { code_id = old_code_id; only_full_applications } ->

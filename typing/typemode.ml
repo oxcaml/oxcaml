@@ -157,7 +157,7 @@ let transl_mod_bounds annots =
       then
         (* CR layouts v2.8: This warning is disabled for now because transl_type_decl
            results in 3 calls to transl_annots per user-written annotation. This results
-           in the warning being reported 3 times. *)
+           in the warning being reported 3 times. Internal ticket 2801. *)
         (* Location.prerr_warning new_raw.loc (Warnings.Mod_by_top new_raw.txt) *)
         ();
       let is_dup =
@@ -418,8 +418,8 @@ let mutable_implied_modalities ~for_mutable_variable mut =
 let mutable_implied_modalities ~for_mutable_variable mut =
   let l = mutable_implied_modalities ~for_mutable_variable mut in
   List.fold_left
-    (fun t (Modality.Atom.P a) -> Modality.Value.Const.set a t)
-    Modality.Value.Const.id l
+    (fun t (Modality.Atom.P a) -> Modality.Const.set a t)
+    Modality.Const.id l
 
 let idx_expected_modalities ~(mut : bool) =
   (* There are two design constraints on what modalities we allow in an index
@@ -431,8 +431,8 @@ let idx_expected_modalities ~(mut : bool) =
          primitives (see [idx_imm.mli] and [idx_mut.mli] in [Stdlib_beta]). *)
   let modality_of_list l =
     List.fold_left
-      (fun t (Modality.Atom.P a) -> Modality.Value.Const.set a t)
-      Modality.Value.Const.id l
+      (fun t (Modality.Atom.P a) -> Modality.Const.set a t)
+      Modality.Const.id l
   in
   let expected1 = mutable_implied_modalities mut ~for_mutable_variable:false in
   let expected2 =
@@ -445,11 +445,11 @@ let idx_expected_modalities ~(mut : bool) =
           P (Comonadic (Linearity, Meet_with Linearity.Const.legacy));
           P (Comonadic (Yielding, Meet_with Yielding.Const.legacy));
           P (Monadic (Uniqueness, Join_with Uniqueness.Const.legacy)) ]
-    else Mode.Modality.Value.Const.id
+    else Mode.Modality.Const.id
   in
   (* CR layouts v8: only perform this check at most twice: for [mut = true] and
      [mut = false] *)
-  match Mode.Modality.Value.Const.equate expected1 expected2 with
+  match Mode.Modality.Const.equate expected1 expected2 with
   | Ok () -> expected1
   | Error _ ->
     Misc.fatal_error
@@ -486,12 +486,12 @@ let implied_modalities (P a : Modality.Atom.packed) : Modality.Atom.packed list
     [P (Comonadic (Portability, Meet_with b))]
   | _ -> []
 
-let least_modalities_implying mut (t : Modality.Value.Const.t) =
+let least_modalities_implying mut (t : Modality.Const.t) =
   let baseline =
     mutable_implied_modalities ~for_mutable_variable:false
       (Types.is_mutable mut)
   in
-  let annotated = Modality.Value.Const.(diff baseline t) in
+  let annotated = Modality.Const.(diff baseline t) in
   let implied = List.concat_map implied_modalities annotated in
   let exclude_implied =
     List.filter (fun x -> not @@ List.mem x implied) annotated
@@ -500,7 +500,7 @@ let least_modalities_implying mut (t : Modality.Value.Const.t) =
     List.filter_map
       (fun (Modality.Atom.P m_implied) ->
         let m_projected =
-          Modality.Value.Const.proj (Modality.Atom.axis m_implied) t
+          Modality.Const.proj (Modality.Atom.axis m_implied) t
         in
         if m_projected <> m_implied
         then Some (Modality.Atom.P m_projected)
@@ -552,9 +552,9 @@ let transl_modalities ~maturity mut modalities =
      - For the same axis, later modalities overrides earlier modalities. *)
   List.fold_left
     (fun m (Atom.P a as t) ->
-      let m = Value.Const.set a m in
+      let m = Const.set a m in
       List.fold_left
-        (fun m (Atom.P a) -> Value.Const.set a m)
+        (fun m (Atom.P a) -> Const.set a m)
         m (implied_modalities t))
     mut_modalities modalities
 

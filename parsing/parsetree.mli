@@ -1332,7 +1332,8 @@ and jkind_annotation_desc =
   | Default
   | Abbreviation of string
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
-     full kind annotations. We may want to narrow this type some. *)
+     full kind annotations. We may want to narrow this type some.
+     Internal ticket 5085. *)
   | Mod of jkind_annotation * modes
   | With of jkind_annotation * core_type * modalities
   | Kind_of of core_type

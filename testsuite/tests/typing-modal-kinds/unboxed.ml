@@ -139,7 +139,7 @@ let foo (x : int ref portable @ contended) = use_uncontended x
 Line 1, characters 61-62:
 1 | let foo (x : int ref portable @ contended) = use_uncontended x
                                                                  ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type 'a portable = Portable of { portable : 'a @@ portable } [@@unboxed]
@@ -154,7 +154,7 @@ let foo (x : int ref portable @ contended) = use_uncontended x
 Line 1, characters 61-62:
 1 | let foo (x : int ref portable @ contended) = use_uncontended x
                                                                  ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type 'a portable = Portable : 'a @@ portable -> 'a portable [@@unboxed]
@@ -169,7 +169,7 @@ let foo (x : int ref portable @ contended) = use_uncontended x
 Line 1, characters 61-62:
 1 | let foo (x : int ref portable @ contended) = use_uncontended x
                                                                  ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type 'a portable = Portable : { portable : 'a @@ portable } -> 'a portable [@@unboxed]
@@ -184,7 +184,7 @@ let foo (x : int ref portable @ contended) = use_uncontended x
 Line 1, characters 61-62:
 1 | let foo (x : int ref portable @ contended) = use_uncontended x
                                                                  ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* unboxed records *)
@@ -200,7 +200,7 @@ let f (x : (int -> int) t @ nonportable) = use_portable_vv x
 [%%expect{|
 val f : (int -> int) t -> unit = <fun>
 |}]
-(* CR layouts v2.8: fix principality *)
+(* CR layouts v2.8: fix principality. Internal ticket 5111 *)
 
 type ('a : value & value mod portable) require_portable_vv
 
@@ -213,7 +213,7 @@ type t2 = (int -> int) t require_portable_vv
 [%%expect{|
 type t2 = (int -> int) t require_portable_vv
 |}]
-(* CR layouts v2.8: fix principality *)
+(* CR layouts v2.8: fix principality. Internal ticket 5111 *)
 
 type 'a t : value & value mod portable =
   #{ x : 'a portable; y : 'a @@ portable }

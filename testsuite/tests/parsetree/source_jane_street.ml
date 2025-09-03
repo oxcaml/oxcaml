@@ -107,7 +107,7 @@ type t = ..
 type t += K : ('a : float64). 'a ignore -> t
 |}]
 
-(* CR layouts v2.8: re-enable this *)
+(* CR layouts v2.8: re-enable this. Internal ticket 5118. *)
 (*
 module M : sig
   kind_abbrev_ k = immediate
@@ -324,7 +324,7 @@ let broken_local =
 Line 2, characters 10-30:
 2 |   [ 5 for local_ n in [ 1; 2 ] ];;
               ^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* User-written attributes *)
@@ -634,7 +634,7 @@ let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 Line 1, characters 48-49:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
                                                     ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
@@ -821,8 +821,10 @@ let f x = stack_ (ref x)
 Line 1, characters 10-24:
 1 | let f x = stack_ (ref x)
               ^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 type t = { a : int }
@@ -850,7 +852,9 @@ let make_tuple x y z = stack_ (x, y), z
 Line 1, characters 23-36:
 1 | let make_tuple x y z = stack_ (x, y), z
                            ^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is a stack expression.
+       However, it is expected to be "global".
 |}]
 
 type u = A of unit | C of int | B of int * int | D
@@ -1286,7 +1290,7 @@ type 'a contended_with_int : immutable_data with 'a @@ contended
 type 'a abstract
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
   | Mk : ('a : value mod portable) abstract -> existential_abstract
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 type 'a abstract
 Lines 2-3, characters 0-67:
@@ -1317,7 +1321,7 @@ end = struct
 end
 
 (* CR layouts v2.8: Expect this output to change once modal kinds are
-   supported. *)
+   supported. Internal ticket 5118. *)
 
 [%%expect{|
 Line 9, characters 16-27:

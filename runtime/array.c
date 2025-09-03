@@ -383,24 +383,26 @@ static value make_vect_gen(value len, value init, int local)
 #endif
   } else {
     if (size > Max_array_wosize) caml_invalid_argument("Array.make");
-    else if (local) {
+    else if (local) { /* local array */
       res = caml_alloc_local(size, 0);
       for (i = 0; i < size; i++) Field(res, i) = init;
-    } else if (size <= Max_young_wosize) {
+    } else if (size <= Max_young_wosize) { /* array on minor heap */
       res = caml_alloc_small(size, 0);
       for (i = 0; i < size; i++) Field(res, i) = init;
-    } else {
-      if (Is_block(init) && Is_young(init)) {
-        /* We don't want to create so many major-to-minor references,
-           so [init] is moved to the major heap by doing a minor GC. */
-        CAML_EV_COUNTER (EV_C_FORCE_MINOR_MAKE_VECT, 1);
-        caml_minor_collection ();
-      }
-      CAMLassert(!(Is_block(init) && Is_young(init)));
+    } else { /* array on major heap */
+      bool init_on_minor = (Is_block(init) && Is_young(init) &&
+                            !caml_maybe_minor_gc_before_writes(size));
       res = caml_alloc_shr(size, 0);
-      /* We now know that [init] is not in the minor heap, so there is
-         no need to call [caml_initialize]. */
-      for (i = 0; i < size; i++) Field(res, i) = init;
+      if (init_on_minor) {
+        /* init is still on the minor heap (we didn't just collect),
+         * so every entry needs a remembered set entry */
+        for (i = 0; i < size; i++) {
+          Ref_table_add(&Caml_state->minor_tables->major_ref, &Field(res, i));
+          Field(res, i) = init;
+        }
+      } else {
+        for (i = 0; i < size; i++) Field(res, i) = init;
+      }
     }
   }
   /* Give the GC a chance to run, and run memprof callbacks.
@@ -516,45 +518,41 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
   } else if (size > Max_array_wosize) {
     caml_invalid_argument(
       "%makearray_dynamic: array size too large (> Max_array_wosize)");
-  } else if (is_local) {
+  } else if (is_local) { /* local array */
     res = caml_alloc_local(size, tag);
     for (i = 0; i < size; i++) {
       Field(res, i) = Field(v_init, i % num_initializers);
     }
-  } else if (size <= Max_young_wosize) {
+  } else if (size <= Max_young_wosize) { /* array on minor heap */
     res = caml_alloc_small(size, tag);
     for (i = 0; i < size; i++) {
       Field(res, i) = Field(v_init, i % num_initializers);
     }
-  } else {
-    int move_init_to_major = 0;
+  } else { /* array on major heap */
+    mlsize_t minor_fields = 0;
     for (mlsize_t i = 0; i < num_initializers; i++) {
       if (Is_block(Field(v_init, i)) && Is_young(Field(v_init, i))) {
-        move_init_to_major = 1;
+        ++ minor_fields;
       }
     }
-    if (move_init_to_major) {
-      /* We don't want to create so many major-to-minor references,
-         so the contents of [v_init] are moved to the major heap by doing
-         a minor GC. */
-      /* CR mslater/mshinwell: Why is this better than adding them to the
-         remembered set with caml_initialize?  See discussion in a
-         conversation on:
-         https://github.com/oxcaml/oxcaml/pull/3317
-      */
-      CAML_EV_COUNTER (EV_C_FORCE_MINOR_MAKE_VECT, 1);
-      caml_minor_collection ();
-    }
+    bool collected =
+      caml_maybe_minor_gc_before_writes(minor_fields * non_unarized_length);
 #ifdef DEBUG
-    for (mlsize_t i = 0; i < num_initializers; i++) {
-      CAMLassert(!(Is_block(Field(v_init, i)) && Is_young(Field(v_init, i))));
+    if (collected) {
+      for (mlsize_t i = 0; i < num_initializers; i++) {
+        CAMLassert(!(Is_block(Field(v_init, i)) && Is_young(Field(v_init, i))));
+      }
     }
+#else
+    (void)collected;
 #endif
     res = caml_alloc_shr(size, tag);
-    /* We now know that everything in [v_init] is not in the minor heap, so
-       there is no need to call [caml_initialize]. */
     for (i = 0; i < size; i++) {
-      Field(res, i) = Field(v_init, i % num_initializers);
+      value v = Field(v_init, i % num_initializers);
+      if (Is_block(v) && Is_young(v)) {
+        Ref_table_add(&Caml_state->minor_tables->major_ref, &Field(res, i));
+      }
+      Field(res, i) = v;
     }
   }
 

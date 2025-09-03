@@ -153,7 +153,7 @@ and row_like_for_closures = private
   }
 
 and closures_entry = private
-  { function_types : function_type Or_unknown_or_bottom.t Function_slot.Map.t;
+  { function_types : function_type Or_unknown.t Function_slot.Map.t;
     closure_types : function_slot_indexed_product;
     value_slot_types : value_slot_indexed_product
   }
@@ -475,7 +475,7 @@ module Closures_entry : sig
   type t = closures_entry
 
   val create :
-    function_types:Function_type.t Or_unknown_or_bottom.t Function_slot.Map.t ->
+    function_types:Function_type.t Or_unknown.t Function_slot.Map.t ->
     closure_types:Product.Function_slot_indexed.t ->
     value_slot_types:Product.Value_slot_indexed.t ->
     t

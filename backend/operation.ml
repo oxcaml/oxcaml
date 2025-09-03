@@ -36,7 +36,7 @@ let rec equal_trap_stack ts1 ts2 =
   match ts1, ts2 with
   | Uncaught, Uncaught -> true
   | Specific_trap (lbl1, ts1), Specific_trap (lbl2, ts2) ->
-    Int.equal lbl1 lbl2 && equal_trap_stack ts1 ts2
+    Static_label.equal lbl1 lbl2 && equal_trap_stack ts1 ts2
   | Uncaught, Specific_trap _ | Specific_trap _, Uncaught -> false
 
 type integer_comparison = Cmm.integer_comparison

@@ -342,7 +342,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -350,7 +350,7 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type t = { mutable x : int }
@@ -367,7 +367,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -375,7 +375,7 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let foo (t : t @ contended) = use_uncontended t
@@ -383,7 +383,7 @@ let foo (t : t @ contended) = use_uncontended t
 Line 1, characters 46-47:
 1 | let foo (t : t @ contended) = use_uncontended t
                                                   ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type 'a t = { x : 'a }
@@ -401,7 +401,7 @@ let foo (t : int t @ local) = use_global t [@nontail]
 Line 1, characters 41-42:
 1 | let foo (t : int t @ local) = use_global t [@nontail]
                                              ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -409,7 +409,7 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -420,7 +420,7 @@ type 'a t = { x : 'a; }
 Line 3, characters 47-48:
 3 | let foo (t : _ t @ nonportable) = use_portable t
                                                    ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
@@ -428,7 +428,7 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ once) = use_many t
@@ -436,7 +436,7 @@ let foo (t : _ t @ once) = use_many t
 Line 1, characters 36-37:
 1 | let foo (t : _ t @ once) = use_many t
                                         ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
@@ -444,7 +444,7 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -452,7 +452,7 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -460,7 +460,7 @@ let foo (t : ('a : immutable_data) t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case *)
+(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
 [%%expect {|
 type 'a t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -469,7 +469,7 @@ type 'a t = { x : 'a; }
 Line 3, characters 15-16:
 3 |   use_portable t;
                    ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
@@ -477,7 +477,7 @@ let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
 Line 1, characters 59-60:
 1 | let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
                                                                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
@@ -485,7 +485,7 @@ let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
 Line 1, characters 61-62:
 1 | let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
                                                                  ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type ('a : immutable_data) t = { x : 'a }
@@ -493,7 +493,7 @@ let foo (t : _ t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case *)
+(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
 [%%expect {|
 type ('a : immutable_data) t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -502,7 +502,7 @@ type ('a : immutable_data) t = { x : 'a; }
 Line 3, characters 15-16:
 3 |   use_portable t;
                    ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
@@ -510,7 +510,7 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -518,7 +518,7 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -533,7 +533,7 @@ let foo (t : (unit -> unit) t @ nonportable) = use_portable t
 Line 1, characters 60-61:
 1 | let foo (t : (unit -> unit) t @ nonportable) = use_portable t
                                                                 ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (**** Test 4: Record types satisfy type constraints when appropriate ****)
@@ -581,7 +581,7 @@ let () =
 let () =
   cross_contended func;
   cross_nonnull func
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 |}, Principal{|
 Line 2, characters 13-16:
@@ -675,7 +675,7 @@ type t_test = int t require_contended
 type t_test = (unit -> unit) t require_contended
 type ('a : value mod contended) t_test = 'a t require_contended
 type 'a t_test = 'a t require_nonnull
-(* CR layouts v2.8: fix principal case *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type 'a t = { x : 'a; }
 type t_test = int t require_many

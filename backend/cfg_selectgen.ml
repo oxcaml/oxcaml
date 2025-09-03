@@ -23,7 +23,6 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-4-9-40-41-42"]
 
 module DLL = Oxcaml_utils.Doubly_linked_list
-module Int = Numbers.Int
 module Or_never_returns = Select_utils.Or_never_returns
 module SU = Select_utils
 module V = Backend_var
@@ -1041,7 +1040,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       body =
     let handlers =
       List.map
-        (fun (nfail, ids, e2, dbg, is_cold) ->
+        (fun Cmm.{ label = nfail; params = ids; body = e2; dbg; is_cold } ->
           let rs =
             List.map
               (fun (id, typ) ->
@@ -1059,8 +1058,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (fun (env, map) (nfail, ids, rs, e2, dbg, is_cold) ->
           let label = Cmm.new_label () in
           let env, r = SU.env_add_static_exception nfail rs env label in
-          env, Int.Map.add nfail (r, (ids, rs, e2, dbg, is_cold, label)) map)
-        (env, Int.Map.empty) handlers
+          ( env,
+            Static_label.Map.add nfail
+              (r, (ids, rs, e2, dbg, is_cold, label))
+              map ))
+        (env, Static_label.Map.empty)
+        handlers
     in
     let r_body, sub_body = emit_new_sub_cfg env body ~bound_name in
     let translate_one_handler _nfail
@@ -1105,16 +1108,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
-        Int.Map.partition
+        Static_label.Map.partition
           (fun _n (r, _) ->
             match !r with SU.Unreachable -> true | SU.Reachable _ -> false)
           not_built
       in
-      if Int.Map.is_empty to_build
+      if Static_label.Map.is_empty to_build
       then already_built
       else
         let already_built =
-          Int.Map.fold
+          Static_label.Map.fold
             (fun nfail handler already_built ->
               translate_one_handler nfail handler :: already_built)
             to_build already_built
@@ -1130,7 +1133,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (* We cannot drop exception handlers as some trap instructions may refer
            to them even if they're unreachable. Instead, [translate_one_handler]
            will generate a dummy handler for the unreachable cases. *)
-        Int.Map.fold
+        Static_label.Map.fold
           (fun nfail handler all_handlers ->
             translate_one_handler nfail handler :: all_handlers)
           handlers_map []
@@ -1162,9 +1165,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let handler =
           try SU.env_find_static_exception nfail env
           with Not_found ->
-            Misc.fatal_error
-              ("Selection.emit_expr: unbound label "
-             ^ Stdlib.Int.to_string nfail)
+            Misc.fatal_errorf "Selection.emit_expr: unbound label %a"
+              Static_label.format nfail
         in
         (* Intermediate registers to handle cases where some registers from src
            are present in dest *)
@@ -1319,7 +1321,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   and emit_tail_catch env sub_cfg (flag : Cmm.ccatch_flag) handlers e1 =
     let handlers =
       List.map
-        (fun (nfail, ids, e2, dbg, is_cold) ->
+        (fun Cmm.{ label = nfail; params = ids; body = e2; dbg; is_cold } ->
           let rs =
             List.map
               (fun (id, typ) ->
@@ -1335,8 +1337,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (fun (env, map) (nfail, ids, rs, e2, dbg, is_cold) ->
           let label = Cmm.new_label () in
           let env, r = SU.env_add_static_exception nfail rs env label in
-          env, Int.Map.add nfail (r, (ids, rs, e2, dbg, is_cold, label)) map)
-        (env, Int.Map.empty) handlers
+          ( env,
+            Static_label.Map.add nfail
+              (r, (ids, rs, e2, dbg, is_cold, label))
+              map ))
+        (env, Static_label.Map.empty)
+        handlers
     in
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let s_body = emit_tail_new_sub_cfg env e1 in
@@ -1383,16 +1389,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
-        Int.Map.partition
+        Static_label.Map.partition
           (fun _n (r, _) ->
             match !r with SU.Unreachable -> true | SU.Reachable _ -> false)
           not_built
       in
-      if Int.Map.is_empty to_build
+      if Static_label.Map.is_empty to_build
       then already_built
       else
         let already_built =
-          Int.Map.fold
+          Static_label.Map.fold
             (fun nfail handler already_built ->
               translate_one_handler nfail handler :: already_built)
             to_build already_built
@@ -1408,7 +1414,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (* We cannot drop exception handlers as some trap instructions may refer
            to them even if they're unreachable. Instead, [translate_one_handler]
            will generate a dummy handler for the unreachable cases. *)
-        Int.Map.fold
+        Static_label.Map.fold
           (fun nfail handler all_handlers ->
             translate_one_handler nfail handler :: all_handlers)
           handlers_map []

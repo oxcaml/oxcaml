@@ -1884,7 +1884,8 @@ let jkind_subst env level params args jkind =
      In the vastly common case, the params are a list of distinct Tvars. In that
      scenario, we can likely build a copy_scope that will just perform the
      substitution during the copy, avoiding copying the params and then unifying
-     them. Though we should measure, this should be a nice little speedup. *)
+     them. Though we should measure, this should be a nice little speedup.
+     Internal ticket 5105. *)
   if List.length params <> List.length args then raise Cannot_subst;
   let old_level = !current_level in
   current_level := level;
@@ -1896,7 +1897,8 @@ let jkind_subst env level params args jkind =
     (* CR layouts v2.8: It's plausibly worth immediately calling [Jkind.normalize
        ~mode:Require_best] on this jkind, so that if we do multiple things with it down
        the road we don't have to normalize each time. But doing so in a way that avoids
-       looping (when normalize calls [jkind_subst] itself) is nontrivial. *)
+       looping (when normalize calls [jkind_subst] itself) is nontrivial.
+       Internal ticket 5106. *)
     jkind'
   with Unify _ ->
     current_level := old_level;
@@ -2156,10 +2158,10 @@ let is_principal ty =
 type unwrapped_type_expr =
   { ty : type_expr
   ; is_open : bool
-  ; modality : Mode.Modality.Value.Const.t }
+  ; modality : Mode.Modality.Const.t }
 
 let mk_unwrapped_type_expr ty =
-  { ty; is_open = false; modality = Mode.Modality.Value.Const.id }
+  { ty; is_open = false; modality = Mode.Modality.Const.id }
 
 type unbox_result =
   (* unboxing process made a step: either an unboxing or removal of a [Tpoly] *)
@@ -2225,7 +2227,7 @@ let unbox_once env ty =
   | Tpoly (ty, bound_vars) ->
     Stepped { ty;
               is_open = not (Misc.Stdlib.List.is_empty bound_vars);
-              modality = Mode.Modality.Value.Const.id }
+              modality = Mode.Modality.Const.id }
   | _ -> Final_result
 
 let contained_without_boxing env ty =
@@ -2257,9 +2259,7 @@ let rec get_unboxed_type_representation
     match unbox_once env ty with
     | Stepped { ty = ty2; is_open = is_open2; modality = modality2 } ->
       let is_open = is_open || is_open2 in
-      let modality =
-        Mode.Modality.Value.Const.concat modality ~then_:modality2
-      in
+      let modality = Mode.Modality.Const.concat modality ~then_:modality2 in
       get_unboxed_type_representation
         ~is_open ~modality env ty ty2 (fuel - 1)
     | Stepped_or_null _ | Stepped_record_unboxed_product _ | Final_result ->
@@ -2269,7 +2269,7 @@ let rec get_unboxed_type_representation
 let get_unboxed_type_representation env ty =
   (* Do not give too much fuel: PR#7424 *)
   get_unboxed_type_representation
-    ~is_open:false ~modality:Mode.Modality.Value.Const.id env ty ty 100
+    ~is_open:false ~modality:Mode.Modality.Const.id env ty ty 100
 
 let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
@@ -2323,7 +2323,8 @@ let rec estimate_type_jkind ~expand_component env ty =
          false ltys
      in
      (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
-        just to throw most of it away will go away once we get [layout_of]. *)
+        just to throw most of it away will go away once we get [layout_of].
+        Internal ticket 2912. *)
      let layouts =
        List.map (fun (ty, _modality (* ignore; we just care about layout *)) ->
          estimate_type_jkind ~expand_component env ty |>
@@ -2344,13 +2345,14 @@ let rec estimate_type_jkind ~expand_component env ty =
         let level = get_level ty in
         (* CR layouts v2.8: We could possibly skip this substitution if we're
            called from [constrain_type_jkind]; the jkind returned without
-           substing is just weaker than the one we would get by substing. *)
+           substing is just weaker than the one we would get by substing.
+           Internal ticket 5107. *)
         jkind_subst env level type_decl.type_params args jkind
       else
         jkind
     with
     (* CR layouts v2.8: It will be confusing when a [Cannot_subst] leads to
-       a [Missing_cmi]. *)
+       a [Missing_cmi]. Internal ticket 5109. *)
     | Cannot_subst | Not_found -> Jkind.Builtin.any ~why:(Missing_cmi p)
     end
   | Tobject _ -> Jkind.for_object
@@ -2371,7 +2373,7 @@ let rec estimate_type_jkind ~expand_component env ty =
        _all_ with-bounds. We can imagine doing better, just rounding up those
        variables bound in this [Tpoly]. *)
     (* CR layouts v2.8: Consider doing better -- but only once we can write
-       down a test case that cares. *)
+       down a test case that cares. Internal ticket 5110. *)
     Jkind.round_up ~context |>
     Jkind.disallow_right
   | Tof_kind jkind -> Jkind.mark_best jkind
@@ -2381,7 +2383,7 @@ and close_open_jkind ~expand_component ~is_open env jkind =
   if is_open (* if the type has free variables, we can't let these leak into
                 with-bounds *)
     (* CR layouts v2.8: Do better, by tracking the actual free variables and
-       rounding only those variables up. *)
+       rounding only those variables up. Internal ticket 5110. *)
   then
     let context = mk_jkind_context env (fun ty ->
       Some (estimate_type_jkind ~expand_component env ty)) in
@@ -2401,7 +2403,7 @@ let type_jkind env ty =
     ~expand_component:(get_unboxed_type_approximation env) env
 
 (* CR layouts v2.8: This function is quite suspect. See Jane Street internal
-   gdoc titled "Let's kill type_jkind_purely". *)
+   gdoc titled "Let's kill type_jkind_purely". Internal ticket 3782. *)
 let type_jkind_purely env ty =
   if !Clflags.principal || Env.has_local_constraints env then
     (* We snapshot to keep this pure; see the test in [typing-local/crossing.ml]
@@ -2414,7 +2416,8 @@ let type_jkind_purely env ty =
     type_jkind env ty
 
 (* CR layouts v2.8: It's possible we can remove this function if we change
-   [jkind_subst] to not substitute non-principal things. Investigate. *)
+   [jkind_subst] to not substitute non-principal things. Investigate.
+   Internal ticket 5111. *)
 let type_jkind_purely_if_principal env ty =
   match is_principal ty with
   | true -> Some (type_jkind_purely env ty)
@@ -2710,7 +2713,7 @@ let rec intersect_type_jkind ~reason env ty1 jkind2 =
        intersection. So we might find an intersection where there isn't really
        one. See the comment above this function arguing why this is OK here. *)
     (* CR layouts v2.8: Think about doing better, but it's probably not worth
-       it. *)
+       it. Internal ticket 5112. *)
     Jkind.intersection_or_error ~type_equal ~context ~reason jkind1 jkind2
 
 (* See comment on [jkind_unification_mode] *)
@@ -3655,7 +3658,8 @@ let add_jkind_equation ~reason uenv destination jkind1 =
         begin
           try
             let decl = Env.find_type p env in
-            (* CR layouts v2.8: We might be able to do better here. *)
+            (* CR layouts v2.8: We might be able to do better here. Internal
+               ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
             | Some jkind, Some decl_jkind when
                    not (Jkind.equal jkind decl_jkind) ->
@@ -5082,8 +5086,8 @@ let relevant_pairs pairs v =
 
 let zap_modalities_to_floor_if_modes_enabled_at level =
   if Language_extension.(is_at_least Mode level)
-    then Mode.Modality.Value.zap_to_floor
-    else Mode.Modality.Value.zap_to_id
+    then Mode.Modality.zap_to_floor
+    else Mode.Modality.zap_to_id
 
 
 (** The mode crossing of the memory block of a structure. *)
@@ -5126,8 +5130,8 @@ let mode_crossing_module = Mode.Crossing.max
 
 let zap_modalities_to_floor_if_at_least level =
   if Language_extension.(is_at_least Mode level)
-    then Mode.Modality.Value.zap_to_floor
-    else Mode.Modality.Value.zap_to_id
+    then Mode.Modality.zap_to_floor
+    else Mode.Modality.zap_to_id
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
@@ -7005,7 +7009,8 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
   in
   match get_desc ty with
     Tvar _ | Tunivar _ -> ty
-    (* CR layouts v2.8: This needs to traverse the jkind. *)
+    (* CR layouts v2.8: This needs to traverse the jkind. Internal
+       ticket 5113. *)
   | _ -> try TypeHash.find nondep_hash ty
   with Not_found ->
     let ty' = newgenstub ~scope:(get_scope ty)
@@ -7111,7 +7116,8 @@ let rec nondep_type_decl env mid is_covariant decl =
               None, decl.type_private
     and jkind =
       try Jkind.map_type_expr (nondep_type_rec env mid) decl.type_jkind
-      (* CR layouts v2.8: This should be done with a proper nondep_jkind. *)
+      (* CR layouts v2.8: This should be done with a proper nondep_jkind.
+         Internal ticket 5113. *)
       with Nondep_cannot_erase _ when is_covariant ->
         let context = mk_jkind_context_check_principal env in
         Jkind.round_up ~context decl.type_jkind |>
@@ -7309,25 +7315,26 @@ let print_global_state fmt global_state =
    The problem is that Env depends on Jkind, and so the type of [type_equal]
    can't be written in Jkind. It's possible that, after jkind.ml is broken up,
    this problem goes away, because the dependency from Env to Jkind is pretty
-   minimal. *)
+   minimal. Internal ticket 3339. *)
 let type_equal env ty1 ty2 = is_equal env false [ty1] [ty2]
 let () = type_equal' := type_equal
 
 let check_decl_jkind env decl jkind =
   (* CR layouts v2.8: This could use an algorithm like [constrain_type_jkind]
      to expand only as much as needed, but the l/l subtype algorithm is tricky,
-     and so we leave this optimization for later. *)
+     and so we leave this optimization for later. Internal ticket 5114. *)
   let type_equal = type_equal env in
   let type_jkind_purely = type_jkind_purely env in
   let context = mk_jkind_context_always_principal env in
   (* CR layouts v2.8: When we have [layout_of], this logic should move to the
      place where [type_jkind] is set. But for now, it has to be here, because we
      want this in module inclusion but not other places (because substitutions
-     won't improve the layout) *)
+     won't improve the layout). Internal ticket 2912. *)
   (* CR layouts v2.8: This improvement ignores types with both [@@unboxed]
      and [@@unsafe_allow_any_mode_crossing], because the stdlib didn't build
      otherwise. But we really shouldn't allow mixing those two features, and
-     so instead of trying to get to the bottom of it, I'm just punting. *)
+     so instead of trying to get to the bottom of it, I'm just punting.
+     Internal ticket 4349. *)
   let decl_jkind = match decl.type_kind, decl.type_manifest with
     | Type_abstract _, Some inner_ty ->
       (* CR layouts v3.3: Ad-hoc solution, this time due to the magic
@@ -7349,7 +7356,7 @@ let check_decl_jkind env decl jkind =
       | Final_result | Stepped _ | Stepped_record_unboxed_product _
       | Missing _ ->
         Jkind.for_abbreviation ~type_jkind_purely
-          ~modality:Mode.Modality.Value.Const.id inner_ty
+        ~modality:Mode.Modality.Const.id inner_ty
       end
     (* These next cases are more properly rule TK_UNBOXED from kind-inference.md
        (not rule FIND_ABBREV, as documented with [Jkind.for_abbreviation]), but
@@ -7375,15 +7382,14 @@ let check_decl_jkind env decl jkind =
     match decl.type_manifest with
     | None -> err
     | Some ty ->
-      (* CR layouts v2.8: Should this use [type_jkind_purely_if_principal]? I
-         think not. *)
       let ty_jkind = type_jkind env ty in
       match Jkind.sub_jkind_l ~type_equal ~context ty_jkind jkind with
       | Ok () -> Ok ()
       | Error _ as err -> err
 
 let constrain_decl_jkind env decl jkind =
-  (* CR layouts v2.8: This will need to be deeply reimplemented. *)
+  (* CR layouts v2.8: This will need to be deeply reimplemented. Internal
+     ticket 5115. *)
   match Jkind.try_allow_r jkind with
   (* This case is sad, because it can't refine type variables. Hence
      the need for reimplementation. Hopefully no one hits this for

@@ -1249,15 +1249,15 @@ let rec lam ppf = function
   | Lstaticraise (i, ls)  ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
-      fprintf ppf "@[<2>(exit@ %d%a)@]" i lams ls;
+      fprintf ppf "@[<2>(exit@ %a%a)@]" Static_label.format i lams ls;
   | Lstaticcatch(lbody, (i, vars), lhandler, r, _kind) ->
       let excl =
         match r with
         | Popped_region -> " exclave"
         | Same_region -> ""
       in
-      fprintf ppf "@[<2>(catch@ %a@;<1 -1>with (%d%a)%s@ %a)@]"
-        lam lbody i
+      fprintf ppf "@[<2>(catch@ %a@;<1 -1>with (%a%a)%s@ %a)@]"
+        lam lbody Static_label.format i
         (fun ppf vars ->
            List.iter
              (fun (x, duid, k) ->

@@ -206,7 +206,8 @@ end
 module M : sig type 'a t : mutable_data with 'a @@ unyielding many end
 |}]
 
-(* CR layouts v2.8: 'a u's kind should get normalized to just immutable_data *)
+(* CR layouts v2.8: 'a u's kind should get normalized to just immutable_data.
+   Internal ticket 4770. *)
 module M = struct
   type ('a : immutable_data) u : immutable_data with 'a
   type 'a t : immutable_data = 'a u
@@ -255,7 +256,6 @@ type q = { x : v; }
 type u
 type t = private u
 type v : immutable_data with u = { value : t }
-(* CR layouts v2.8: this should be accepted *)
 [%%expect {|
 type u
 type t = private u
@@ -275,7 +275,7 @@ type t = [ `bar | `foo ]
 
 type t
 type u : immutable_data with t = [`foo of t]
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect {|
 type t
 Line 2, characters 0-44:

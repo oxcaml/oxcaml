@@ -18,7 +18,7 @@ val use_many : 'a -> unit = <fun>
 (* Simple cases : closed polymorphic variants with fields *)
 
 type 'a t : immutable_data with 'a = [ `A of 'a ]
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 0-49:
 1 | type 'a t : immutable_data with 'a = [ `A of 'a ]
@@ -31,7 +31,7 @@ Error: The kind of type "[ `A of 'a ]" is value mod non_float
 |}]
 
 type 'a u : mutable_data with 'a = [ `B of 'a ref ]
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 0-51:
 1 | type 'a u : mutable_data with 'a = [ `B of 'a ref ]
@@ -44,7 +44,7 @@ Error: The kind of type "[ `B of 'a ref ]" is value mod non_float
 |}]
 
 type 'a v : value mod contended with 'a = [ `C of 'a | `D of 'a -> 'a | `E of 'a option ]
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 0-89:
 1 | type 'a v : value mod contended with 'a = [ `C of 'a | `D of 'a -> 'a | `E of 'a option ]
@@ -58,7 +58,7 @@ Error: The kind of type "[ `C of 'a | `D of 'a -> 'a | `E of 'a option ]" is
 |}]
 
 type 'a w : value mod contended with 'a = [ 'a t | 'a v ]
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 47-48:
 1 | type 'a w : value mod contended with 'a = [ 'a t | 'a v ]
@@ -69,7 +69,7 @@ Error: Unbound type constructor "t"
 let cross_contention (x : int t @ contended) = use_uncontended x
 let cross_portability (x : int t @ nonportable) = use_portable x
 let cross_linearity (x : int t @ once) = use_many x
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 30-31:
 1 | let cross_contention (x : int t @ contended) = use_uncontended x
@@ -127,7 +127,7 @@ module type S =
 (* Since the jkind of [ `A of 'a ] has best quality, we can substitute with another type *)
 type 'a simple : immutable_data with 'a
 module type S2 = S with type 'a abstract = 'a simple
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type 'a simple : immutable_data with 'a
 Line 2, characters 17-52:
@@ -198,7 +198,7 @@ module type S2 =
 |}]
 
 (* CR layouts v2.8: ['a abstract] should get the kind [immutable_data with 'a polyvar]
-   and this should fail: *)
+   and this should fail: (Internal ticket 4294) *)
 module type S3 = S with type 'a record = 'a simple
 [%%expect{|
 Line 1, characters 17-50:
@@ -210,7 +210,7 @@ Error: The signature constrained by "with" has no component named "record"
 
 (* Harder cases: row variables *)
 
-(* CR layouts v2.8: These are both correct, but we could probably infer a more precise kind for both. *)
+(* CR layouts v2.8: These are both correct, but we could probably infer a more precise kind for both. Internal ticket 4294 *)
 type ('a, 'b) t : immutable_data with 'a = [< `X | `Y of 'a] as 'b
 [%%expect{|
 Line 1, characters 0-66:
@@ -238,15 +238,15 @@ Error: The kind of type "[> `X | `Y of 'a ]" is value mod non_float
 
 let f (x : [< `A of int | `B of string] @ contended) =
   use_uncontended x
-(* CR layouts v2.8: This should be accepted  *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294  *)
 [%%expect{|
 Line 2, characters 18-19:
 2 |   use_uncontended x
                       ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
-(* CR layouts v2.8: This should also be accepted, but not with a best quality. *)
+(* CR layouts v2.8: This should also be accepted, but not with a best quality. Internal ticket 4294 *)
 module M : sig
   type 'a t : immutable_data with 'a = private [< `A of 'a | `B of ('a * 'a) | `C ]
 end = struct
@@ -284,7 +284,7 @@ Error: This alias is bound to type "[> `Foo of int ]"
 |}]
 
 type t2 = { f : ('a : value mod portable). ([< `Foo of int] as 'a) -> unit }
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 64-65:
 1 | type t2 = { f : ('a : value mod portable). ([< `Foo of int] as 'a) -> unit }
@@ -300,7 +300,7 @@ Error: This alias is bound to type "[< `Foo of int ]"
 
 (* Recursive polymorphic variants. *)
 type trec1 : immutable_data = [ `A of string | `B of 'a ] as 'a
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 0-63:
 1 | type trec1 : immutable_data = [ `A of string | `B of 'a ] as 'a
@@ -314,7 +314,7 @@ Error: The kind of type "[ `A of string | `B of 'a ] as 'a" is
 |}]
 
 type trec2 : immutable_data = [ `A | `B of 'a list ] as 'a
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 0-58:
 1 | type trec2 : immutable_data = [ `A | `B of 'a list ] as 'a
@@ -341,7 +341,7 @@ Error: The kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" is
 |}]
 
 type trec_succeeds : value mod immutable = [ `C | `D of 'a * unit -> 'a ] as 'a
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 0-79:
 1 | type trec_succeeds : value mod immutable = [ `C | `D of 'a * unit -> 'a ] as 'a
@@ -375,7 +375,7 @@ Error: The kind of type "[ `X of
 
 type trec_rec_succeeds : value mod immutable =
   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Lines 1-2, characters 0-80:
 1 | type trec_rec_succeeds : value mod immutable =
@@ -408,7 +408,7 @@ Error: The kind of type "t2" is immutable_data
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted *)
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 0-57:
 1 | type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted *)
@@ -434,7 +434,7 @@ Error: The kind of type "t2" is immutable_data
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 Line 1, characters 0-75:
 1 | type t3 : immediate with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
@@ -469,7 +469,7 @@ module M2 : S with type t = [ `A of string ] = struct
   type t = [ `A of string ]
 end
 type t3 : immediate with M2.t = C of string (* should be accepted *)
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 module M2 : sig type t = [ `A of string ] end
 Line 4, characters 0-43:
@@ -522,7 +522,7 @@ module M2 : S with type t = [ `A of string | `B of int ] = struct
   type t = [ `A of string | `B of int ]
 end
 type t3 : immediate with M2.t = C of string (* should be accepted *)
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 module M2 : sig type t = [ `A of string | `B of int ] end
 Line 4, characters 0-43:

@@ -343,7 +343,7 @@ let bad (x : int ref t @ contended) = use_uncontended x
 Line 1, characters 54-55:
 1 | let bad (x : int ref t @ contended) = use_uncontended x
                                                           ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* Reexporting after adding with-bounds *)
@@ -372,7 +372,7 @@ let bad (x : int ref B.t_reexported @ contended) = use_uncontended x
 Line 1, characters 67-68:
 1 | let bad (x : int ref B.t_reexported @ contended) = use_uncontended x
                                                                        ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type 'a bad_reexport : immutable_data = 'a t = P : ('a, 'k) imm -> 'a bad_reexport

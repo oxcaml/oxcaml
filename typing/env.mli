@@ -195,18 +195,6 @@ type unbound_value_hint =
   | No_hint
   | Missing_rec of Location.t
 
-type locality_context =
-  | Tailcall_function
-  | Tailcall_argument
-  | Partial_application
-  | Return
-  | Lazy
-
-type closure_context =
-  | Function of locality_context option
-  | Functor
-  | Lazy
-
 type escaping_context =
   | Letop
   | Probe
@@ -230,13 +218,6 @@ val locks_empty : locks
 val locks_is_empty : locks -> bool
 
 val mode_unit : Mode.Value.lr
-
-(** Items whose accesses are affected by locks *)
-type lock_item =
-  | Value
-  | Module
-  | Class
-  | Constructor
 
 type structure_components_reason =
   | Project
@@ -270,10 +251,11 @@ type lookup_error =
         container_class_type : string
       }
   | Cannot_scrape_alias of Longident.t * Path.t
-  | Local_value_escaping of lock_item * Longident.t * escaping_context
-  | Once_value_used_in of lock_item * Longident.t * shared_context
-  | Value_used_in_closure of lock_item * Longident.t * Mode.Value.Comonadic.error * closure_context
-  | Local_value_used_in_exclave of lock_item * Longident.t
+  | Local_value_escaping of Mode.Hint.lock_item * Longident.t * escaping_context
+  | Once_value_used_in of Mode.Hint.lock_item * Longident.t * shared_context
+  | Value_used_in_closure of Mode.Hint.lock_item * Longident.t *
+      Mode.Value.Comonadic.error
+  | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
@@ -305,7 +287,8 @@ type actual_mode = {
     list of locks and constrains the mode and the type. Return the access mode
     of the value allowed by the locks. [ty] is optional as the function works on
     modules and classes as well, for which [ty] should be [None]. *)
-val walk_locks : env:t -> loc:Location.t -> Longident.t -> item:lock_item ->
+val walk_locks : env:t -> loc:Location.t -> Longident.t ->
+  item:Mode.Hint.lock_item ->
   type_expr option -> mode_with_locks -> actual_mode
 
 val lookup_value:
@@ -538,7 +521,7 @@ val add_escape_lock : escaping_context -> t -> t
     `unique` variables beyond the lock can still be accessed, but will be
     relaxed to `shared` *)
 val add_share_lock : shared_context -> t -> t
-val add_closure_lock : closure_context
+val add_closure_lock : Mode.Hint.closure_context
   -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t

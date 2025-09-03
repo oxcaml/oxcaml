@@ -158,6 +158,15 @@ let[@inline never] [@local never] f_poly_bits32 (type a : bits32) (x: a) = x
 let _ = f_poly_bits32 #42l
 let _ = f_poly_bits32 (-#123l)
 
+(* Unboxed tuple field *)
+type t = { f : #(int64# * int); s : string; b : bool }
+
+let[@inline never] [@local never] f_unboxed_tuple_field (x: t) = 
+  let { f; s; b } = x in { f; s; b }
+let _ = f_unboxed_tuple_field { f = #(#42L, 24); s = "hello"; b = true }
+let _ = f_unboxed_tuple_field { f = #(#0L, 1); s = ""; b = false }
+let _ = f_unboxed_tuple_field { f = #(#10L, -100); s = "world"; b = true }
+
 (* Custom exceptions *)
 exception Simple_exception
 exception Exception_with_int of int
