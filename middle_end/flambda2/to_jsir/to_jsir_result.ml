@@ -45,9 +45,10 @@ type t =
     next_addr : Jsir.Addr.t;
     reserved_addrs : Jsir.Addr.Set.t;
     invalid_switch_block : Jsir.Addr.t option;
-    next_method_cache_id : int
+    next_method_cache_id : int;
         (** JSOO has a similar variable which is incremented for every method call;
             we mimic this here. *)
+    imported_compilation_units : Compilation_unit.Set.t
   }
 
 let create () =
@@ -56,7 +57,8 @@ let create () =
     next_addr = Jsir.Addr.zero;
     reserved_addrs = Jsir.Addr.Set.empty;
     invalid_switch_block = None;
-    next_method_cache_id = 1
+    next_method_cache_id = 1;
+    imported_compilation_units = Compilation_unit.Set.empty
   }
 
 let add_instr_exn t instr =
@@ -126,28 +128,6 @@ let end_block_with_last_exn t last =
   let complete_blocks = Jsir.Addr.Map.add addr new_block t.complete_blocks in
   { t with complete_blocks; current_blocks = rest_current_blocks }
 
-let to_program_exn
-    { complete_blocks;
-      current_blocks;
-      next_addr = _;
-      reserved_addrs;
-      invalid_switch_block = _;
-      next_method_cache_id = _
-    } =
-  if List.length current_blocks <> 0
-  then
-    Misc.fatal_errorf
-      "To_jsir_result.to_program_exn: expected current_blocks to be empty, \
-       instead found %d"
-      (List.length current_blocks);
-  if not (Jsir.Addr.Set.is_empty reserved_addrs)
-  then
-    Misc.fatal_error
-      "To_jsir_result.to_program_exn: expected all reserved addresses to be \
-       used";
-  let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in
-  { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
-
 let invalid_switch_block t =
   match t.invalid_switch_block with
   | Some addr -> t, addr
@@ -174,3 +154,40 @@ let get_public_method t ~obj ~field =
                  Pc (Int (Targetint.of_int_exn method_cache_id)) ] ) ))
   in
   { t with next_method_cache_id = method_cache_id + 1 }, f
+
+let import_compilation_unit t compilation_unit =
+  { t with
+    imported_compilation_units =
+      Compilation_unit.Set.add compilation_unit t.imported_compilation_units
+  }
+
+type program =
+  { program : Jsir.program;
+    imported_compilation_units : Compilation_unit.Set.t
+  }
+
+let to_program_exn
+    { complete_blocks;
+      current_blocks;
+      next_addr = _;
+      reserved_addrs;
+      invalid_switch_block = _;
+      next_method_cache_id = _;
+      imported_compilation_units
+    } =
+  if List.length current_blocks <> 0
+  then
+    Misc.fatal_errorf
+      "To_jsir_result.to_program_exn: expected current_blocks to be empty, \
+       instead found %d"
+      (List.length current_blocks);
+  if not (Jsir.Addr.Set.is_empty reserved_addrs)
+  then
+    Misc.fatal_error
+      "To_jsir_result.to_program_exn: expected all reserved addresses to be \
+       used";
+  let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in
+  let program =
+    { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
+  in
+  { program; imported_compilation_units }

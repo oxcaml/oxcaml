@@ -231,10 +231,15 @@ type program =
 
 type cmj_body =
   { program : program;
-    last_var : Addr.t
+    last_var : Addr.t;
         (** Highest used variable in the translation, since it is kept track by a
         mutable state (in [Var]), and the [ocamlj] compiler and [js_of_ocaml]
         need to have these in sync *)
+    imported_compilation_units : Compilation_unit.t list;
+        (** Compilation units fetched from JSOO's global data table. Needed to fill in
+        [Unit_info.t] in JSOO*)
+    exported_compilation_unit : Compilation_unit.t
+        (** Current compilation unit. Needed to fill in [Unit_info.t] in JSOO *)
   }
 
 module Print : sig

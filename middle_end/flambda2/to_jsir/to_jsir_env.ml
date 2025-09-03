@@ -130,7 +130,8 @@ let get_exn_handler_exn t cont = Continuation.Map.find cont t.exn_handlers
 
 let get_var_exn t fvar = Variable.Map.find fvar t.vars
 
-let get_symbol_from_global_data symbol_name ~res =
+let get_symbol_from_global_data ~compilation_unit ~symbol_name ~res =
+  let res = To_jsir_result.import_compilation_unit res compilation_unit in
   (* CR selee: only make this once *)
   let global_data = Jsir.Var.fresh () in
   let res =
@@ -158,7 +159,9 @@ let get_predef_exception ~res symbol =
       (String.length symbol_name - String.length caml_exn_)
   in
   (* jsoo already registers these in global data *)
-  get_symbol_from_global_data symbol_name ~res
+  get_symbol_from_global_data
+    ~compilation_unit:(Symbol.compilation_unit symbol)
+    ~symbol_name ~res
 
 let get_external_symbol ~res symbol =
   match Symbol.is_predefined_exception symbol with
@@ -172,7 +175,8 @@ let get_external_symbol ~res symbol =
       let compilation_unit_name =
         Compilation_unit.name_as_string compilation_unit
       in
-      get_symbol_from_global_data compilation_unit_name ~res
+      get_symbol_from_global_data ~compilation_unit
+        ~symbol_name:compilation_unit_name ~res
     | false ->
       let compilation_unit_name, symbol_name =
         symbol_to_native_strings symbol
