@@ -2220,7 +2220,7 @@ let invoke_clang_with_llvmir ~output_filename ~input_filename ~extra_flags =
     then ["-fno-omit-frame-pointer"]
     else ["-fomit-frame-pointer"; "-momit-leaf-frame-pointer"]
   in
-  let llvm_flags = ["-march=haswell"; "-mtune=skylake"] in
+  let llvm_flags = [!Oxcaml_flags.llvm_flags] in
   Ccomp.command
     (String.concat " "
        ([cmd]

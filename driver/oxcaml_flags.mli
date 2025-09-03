@@ -113,6 +113,7 @@ val symbol_visibility_protected : bool ref
 val dump_llvmir : bool ref
 val keep_llvmir : bool ref
 val llvm_path : string option ref
+val llvm_flags : string ref
 
 module Flambda2 : sig
   val debug : bool ref
