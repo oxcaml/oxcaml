@@ -480,9 +480,8 @@ module DLS = struct
     DLS.new_key ?split_from_parent (Obj.magic_portable f)
   ;;
 
-  let get key = DLS.get key
-  let set key value = DLS.set key value
-
+  let get = DLS.get
+  let set = DLS.set
   let init = DLS.init
 end
 
