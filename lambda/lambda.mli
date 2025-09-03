@@ -676,6 +676,9 @@ type regalloc_attribute =
   | Gi_regalloc (* [@regalloc gi] *)
   | Default_regalloc (* no [@regalloc] attribute *)
 
+type regalloc_param_attribute = string list
+(* [@regalloc_param] attributes - can have multiple with string payloads *)
+
 type curried_function_kind = { nlocal: int } [@@unboxed]
 (** A well-formed function parameter list is of the form
      [G @ L @ [ Final_arg ]],
@@ -743,6 +746,7 @@ type function_attribute = {
   poll: poll_attribute;
   loop: loop_attribute;
   regalloc: regalloc_attribute;
+  regalloc_param: regalloc_param_attribute;
   is_a_functor: bool;
   is_opaque: bool;
   stub: bool;
