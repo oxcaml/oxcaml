@@ -48,6 +48,8 @@ val operation : Debuginfo.t -> Cmm.operation -> string
 
 val expression : formatter -> Cmm.expression -> unit
 
+val phantom_defining_expr : formatter -> Cmm.phantom_defining_expr -> unit
+
 val fundecl : formatter -> Cmm.fundecl -> unit
 
 val data : formatter -> Cmm.data_item list -> unit

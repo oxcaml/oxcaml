@@ -14,6 +14,7 @@
 
 open! Cmm_helpers
 open! Cmm_builtins
+module FV = To_cmm_free_vars
 module Ece = Effects_and_coeffects
 
 let remove_skipped_params params_with_types =
@@ -35,7 +36,7 @@ let rec remove_skipped_args args param_types =
 
 let remove_var_with_provenance free_vars var =
   let v = Backend_var.With_provenance.var var in
-  Backend_var.Set.remove v free_vars
+  FV.remove v free_vars
 
 let remove_var_opt_with_provenance free_vars var =
   match var with
@@ -177,7 +178,7 @@ let name0 ?consider_inlining_effectful_expressions env res name =
           res;
           expr =
             { cmm = symbol ~dbg:Debuginfo.none sym;
-              free_vars = Backend_var.Set.empty;
+              free_vars = FV.empty;
               effs = Ece.pure_can_be_duplicated
             }
         })
@@ -233,7 +234,7 @@ let simple ?consider_inlining_effectful_expressions ~dbg env res s =
           res;
           expr =
             { cmm = const ~dbg c;
-              free_vars = Backend_var.Set.empty;
+              free_vars = FV.empty;
               effs = Ece.pure_can_be_duplicated
             }
         })
@@ -310,13 +311,11 @@ let simple_list ?consider_inlining_effectful_expressions ~dbg env res l =
     let To_cmm_env.{ env; res; expr = { cmm; free_vars; effs } } =
       simple ?consider_inlining_effectful_expressions ~dbg env res x
     in
-    let free_vars = Backend_var.Set.union acc_free_vars free_vars in
+    let free_vars = FV.union acc_free_vars free_vars in
     cmm :: list, free_vars, env, res, Ece.join acc_effs effs
   in
   let args, free_vars, env, res, effs =
-    List.fold_left aux
-      ([], Backend_var.Set.empty, env, res, Ece.pure_can_be_duplicated)
-      l
+    List.fold_left aux ([], FV.empty, env, res, Ece.pure_can_be_duplicated) l
   in
   List.rev args, free_vars, env, res, effs
 
@@ -508,7 +507,7 @@ let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
       | None -> To_cmm_env.{ cmm; free_vars; effs }
       | Some (prev : To_cmm_env.expr_with_info) ->
         let cmm = sequence prev.cmm cmm in
-        let free_vars = Backend_var.Set.union prev.free_vars free_vars in
+        let free_vars = FV.union prev.free_vars free_vars in
         let effs = Ece.join prev.effs effs in
         To_cmm_env.{ cmm; free_vars; effs }
     in

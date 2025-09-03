@@ -14,6 +14,7 @@
 
 module Env = To_cmm_env
 module R = To_cmm_result
+module FV = To_cmm_free_vars
 
 (* Notes:
 
@@ -110,11 +111,11 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   let free_vars =
     To_cmm_shared.remove_var_with_provenance body_free_vars toplevel_region_var
   in
-  if not (Backend_var.Set.is_empty free_vars)
+  if not (FV.is_empty free_vars)
   then
     Misc.fatal_errorf
       "Unbound free_vars in module init code when translating to cmm: %a"
-      Backend_var.Set.print free_vars;
+      FV.print free_vars;
   (* CR mshinwell: This should at least be given a source file location. *)
   let dbg = Debuginfo.none in
   let body =
