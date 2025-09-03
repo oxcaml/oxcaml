@@ -1783,11 +1783,12 @@ module F = struct
     | Cskip _ -> fprintf ppf "zeroinitializer"
     | Csingle f | Cdouble f ->
       fprintf ppf "%.20f" f
-      (* 64-bit floats with at least 17 digits are guaranteed to round trip
-         exactly through string conversions by the IEEE 754 standard (9 digits
-         for 32-bit floats). *)
+      (* CR yusumez: 64-bit floats with at least 17 digits are guaranteed to
+         round trip exactly through string conversions by the IEEE 754 standard
+         (9 digits for 32-bit floats). However, it would still be nice to print
+         them in hex (as we do in Const_float). *)
     | Cvec128 _ | Cvec256 _ | Cvec512 _ ->
-      Misc.fatal_error "Llvmize: vector data item snot implemented"
+      Misc.fatal_error "Llvmize: vector data items not implemented"
 
   let pp_typ_and_const ppf (d : Cmm.data_item) =
     fprintf ppf "%a %a" Llvm_typ.pp_t (typ_of_data_item d) pp_const_data_item d
@@ -2308,6 +2309,15 @@ let end_assembly () =
 (* CR gyorsh: assume 64-bit architecture *)
 (* CR yusumez: We ignore whether symbols are local/global. *)
 (* CR yusumez: Move all arch-specific things to an arch-specific file. *)
+(* CR yusumez: The structure of this file needs to be completely refactored:
+
+   - Separate IR generation from printing/emitting
+
+   - Make working with identifiers easy (make instructions with results return
+   the fresh identifier themselves, carry their types around, etc.)
+
+   - Factor out small common operations in a better way (eg. for function
+   calls) *)
 
 (* Error report *)
 
