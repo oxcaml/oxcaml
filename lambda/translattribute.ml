@@ -413,7 +413,7 @@ let add_cold_attribute expr loc attributes =
     if get_cold_attribute attributes then begin
       if attr.cold then Location.prerr_warning loc
             (Warnings.Duplicated_attribute "cold");
-      let attr = { attr with cold = true } in
+      let attr = { attr with cold = true; inline = Never_inline; specialise = Never_specialise; local = Never_local; } in
       lfunction_with_attr ~attr funct
     end else
       expr
