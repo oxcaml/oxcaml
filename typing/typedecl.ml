@@ -1110,9 +1110,9 @@ let transl_declaration env sdecl (id, uid) =
       set_private_row env sdecl.ptype_loc p decl
     end;
     (* CR sspies: We used to compute shapes here, which were then added to
-      various typing environments. The computation of the shapes has moved
-      further down in the translation, so they are currently not added to the
-      intermediate environments. Find out whether that is an issue.   *)
+       various typing environments. The computation of the shapes has moved
+       further down in the translation, so they are currently not added to the
+       intermediate environments. Find out whether that is an issue. *)
     let decl =
       {
         typ_id = id;
@@ -3043,11 +3043,12 @@ let transl_type_decl env rec_flag sdecl_list =
   let final_env = add_types_to_env ~shapes:(Some shapes) decls env in
   (* Save the type shapes of the declarations in [Type_shape] for debug info. *)
   if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
-  (* CR sspies: Adding the shapes to the table below is obsolete. The
-     information is now contained in the shapes themselves. Remove it in a
-     subsequent PR (and adjust the printing of the declarations as appropriate).
-  *)
     List.iter (fun (sh, (_, decl)) ->
+      (* CR sspies: Adding the shapes to the table below is obsolete. The
+         information is now contained in the shapes themselves. Remove it in a
+         subsequent PR (and adjust the printing of the declarations as
+         appropriate).
+      *)
       let uid = decl.type_uid in
       Uid.Tbl.add Type_shape.all_type_decls uid sh
     ) (List.combine shapes decls);

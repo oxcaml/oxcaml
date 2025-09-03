@@ -22,7 +22,7 @@ type shape_with_layout = private
     type_layout : Layout.t;
     type_name : string
   }
-(* CR sspies: We need to revist the treatment of layouts for type shapes.
+(* CR sspies: We need to revisit the treatment of layouts for type shapes.
    Currently, as the declaration above indicates, we use the layout from the
    binder of the variable and propagate it through. Once type shapes are merged
    into shapes, we should compute layouts on-demand from shapes directly. The

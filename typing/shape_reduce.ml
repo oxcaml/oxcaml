@@ -181,98 +181,10 @@ end) = struct
           Layout.equal ly1 ly2 &&
           equal_delayed_nf dnf1 dnf2)
         f1 f2
-    | ( NVar _,
-        ( NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
+    | ( ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NLeaf,
-        ( NVar _ | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
-        | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
-        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NApp _,
-        ( NVar _ | NLeaf | NAbs _ | NStruct _ | NProj _ | NComp_unit _
-        | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
-        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NAbs _,
-        ( NVar _ | NLeaf | NApp _ | NStruct _ | NProj _ | NComp_unit _
-        | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
-        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NStruct _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NProj _ | NComp_unit _
-        | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
-        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NProj _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NComp_unit _
-        | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
-        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NComp_unit _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NAlias _
-        | NError _
-        | NConstr _ | NTuple _ | NUnboxed_tuple _ | NPredef _
-        | NArrow _ | NPoly_variant _ | NVariant _ | NVariant_unboxed _
-        | NRecord _ ) )
-    | ( NAlias _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
-        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NError _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NAlias _ | NConstr _ | NTuple _ | NUnboxed_tuple _
-        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NConstr _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NAlias _ | NError _  | NTuple _ | NUnboxed_tuple _
-        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NTuple _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NAlias _ | NError _ | NConstr _ | NUnboxed_tuple _
-        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NUnboxed_tuple _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NAlias _ | NError _ | NConstr _ | NTuple _ | NPredef _
-        | NArrow _ | NPoly_variant _ | NVariant _ | NVariant_unboxed _
-        | NRecord _ ) )
-    | ( NPredef _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NAlias _ | NError _ | NConstr _ | NTuple _
-        | NUnboxed_tuple _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NArrow _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NAlias _ | NError _ | NConstr _ | NTuple _
-        | NUnboxed_tuple _ | NPredef _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NPoly_variant _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NAlias _ | NError _ | NConstr _ | NTuple _
-        | NUnboxed_tuple _ | NPredef _ | NArrow _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NVariant _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NAlias _ | NError _ | NConstr _ | NTuple _
-        | NUnboxed_tuple _ | NPredef _ | NArrow _ | NPoly_variant _
-        | NVariant_unboxed _ | NRecord _ ) )
-    | ( NVariant_unboxed _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NAlias _ | NError _ | NConstr _ | NTuple _
-        | NUnboxed_tuple _ | NPredef _ | NArrow _ | NPoly_variant _
-        | NVariant _ | NRecord _ ) )
-    | ( NRecord _,
-        ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
-        | NComp_unit _ | NAlias _ | NError _ | NConstr _ | NTuple _
-        | NUnboxed_tuple _ | NPredef _ | NArrow _ | NPoly_variant _
-        | NVariant _ | NVariant_unboxed _ ) ) ->
-      false
+        | NVariant_unboxed _ | NRecord _ ), _ ) -> false
 
   and equal_nf t1 t2 =
     if not (Option.equal Uid.equal t1.uid t2.uid) then false
@@ -468,13 +380,15 @@ end) = struct
           let ret_nf = reduce env ret in
           return (NArrow (arg_nf, ret_nf))
       | Poly_variant constrs ->
-          let dnf_constrs = poly_variant_constructors_map
-                              (delay_reduce env) constrs in
+          let dnf_constrs =
+            poly_variant_constructors_map (delay_reduce env) constrs
+          in
           return (NPoly_variant dnf_constrs)
       | Variant { simple_constructors; complex_constructors } ->
           let dnf_complex_constructors =
-            complex_constructors_map (fun (t, ly) ->
-              (delay_reduce env t, ly)) complex_constructors in
+            complex_constructors_map (fun (t, ly) -> (delay_reduce env t, ly))
+              complex_constructors
+          in
           return (NVariant { simple_constructors;
                              complex_constructors = dnf_complex_constructors })
       | Variant_unboxed { name; arg_name; arg_shape; arg_layout } ->
@@ -482,8 +396,10 @@ end) = struct
           return (NVariant_unboxed { name; arg_name;
                                      arg_shape = dnf_arg_shape; arg_layout })
       | Record { fields; kind } ->
-          let dnf_fields = List.map (fun (name, t, ly) ->
-            (name, delay_reduce env t, ly)) fields in
+          let dnf_fields =
+            List.map (fun (name, t, ly) -> (name, delay_reduce env t, ly))
+              fields
+          in
           return (NRecord { fields = dnf_fields; kind })
 
   and read_back env (nf : nf) : t =
@@ -542,14 +458,17 @@ end) = struct
       let t_complex_constructors =
         complex_constructors_map
           (fun (dnf, ly) -> (read_back_force dnf, ly))
-          complex_constructors in
+          complex_constructors
+      in
       variant ?uid simple_constructors t_complex_constructors
     | NVariant_unboxed { name; arg_name; arg_shape; arg_layout } ->
       let t_arg_shape = read_back_force arg_shape in
       variant_unboxed ?uid name arg_name t_arg_shape arg_layout
     | NRecord { fields; kind } ->
-      let t_fields = List.map (fun (name, dnf, ly) ->
-        (name, read_back_force dnf, ly)) fields in
+      let t_fields =
+        List.map (fun (name, dnf, ly) -> (name, read_back_force dnf, ly))
+          fields
+      in
       record ?uid kind t_fields
 
   (* Sharing the memo tables is safe at the level of a compilation unit since

@@ -1737,10 +1737,9 @@ let shape_of_path ~namespace env =
   Shape.of_path ~namespace ~find_shape:(find_shape env)
 
 let shape_of_path_opt ~namespace env path =
-  try
-    (Some (shape_of_path ~namespace env path))
-  with
-    Not_found -> None
+  match shape_of_path ~namespace env path with
+  | shape -> Some shape
+  | exception Not_found -> None
 
 let shape_for_constr env path ~args =
   Option.map (fun sh -> Shape.app_list sh args)

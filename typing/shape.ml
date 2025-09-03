@@ -819,7 +819,7 @@ let var uid id =
     hash = Hashtbl.hash (hash_var, Some uid, id);
     approximated = false }
 
-(* variable without uid *)
+(* variable maybe without uid *)
 let var' uid id =
   { uid; desc = Var id;
     hash = Hashtbl.hash (hash_var, uid, id);

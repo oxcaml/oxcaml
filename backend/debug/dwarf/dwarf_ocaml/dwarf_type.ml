@@ -1519,8 +1519,8 @@ and type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die
       (fun sh ->
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die ~rec_env
           sh Jkind_types.Sort.Value)
-      (* CR sspies: Can polymorphic variant constructors really only carry
-         values? If not, we should propagate that information here. *)
+      (* At the moment, polymorphic variant constructor arguments always have
+         layout [value]. *)
       constructors
   in
   create_type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die ?name
