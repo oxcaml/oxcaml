@@ -1622,32 +1622,18 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
         match fst (maybe_pointer_type env rhs) with
         | Pointer -> None
         | Immediate -> Some (Atomic (Load, Field, Immediate)))
-  | Atomic (Set, (Ref | Loc as kind), Pointer), [_; set_to]
-  | Atomic (Set, (Field as kind), Pointer), [_; _; set_to] ->
-    (match fst (maybe_pointer_type env set_to) with
+  | Atomic (Set as op, (Ref | Loc as kind), Pointer), [_; v]
+  | Atomic (Set as op, (Field as kind), Pointer), [_; _; v]
+  | Atomic (Exchange as op, (Ref | Loc as kind), Pointer), [_; v]
+  | Atomic (Exchange as op, (Field as kind), Pointer), [_; _; v]
+  | Atomic (Compare_and_set as op, (Ref | Loc as kind), Pointer), [_; _; v]
+  | Atomic (Compare_and_set as op, (Field as kind), Pointer), [_; _; _; v]
+  | Atomic (Compare_exchange as op, (Ref | Loc as kind), Pointer), [_; _; v]
+  | Atomic (Compare_exchange as op, (Field as kind), Pointer), [_; _; _; v] ->
+    (* Checking [v] is sufficient for CAS: we only need the contents' type. *)
+    (match fst (maybe_pointer_type env v) with
     | Pointer -> None
-    | Immediate -> Some (Atomic (Set, kind, Immediate)))
-  | Atomic (Exchange, (Ref | Loc as kind), Pointer), [_; set_to]
-  | Atomic (Exchange, (Field as kind), Pointer), [_; _; set_to] ->
-    (match fst (maybe_pointer_type env set_to) with
-    | Pointer -> None
-    | Immediate -> Some (Atomic (Set, kind, Immediate)))
-  | Atomic (Compare_and_set, (Ref | Loc as kind), Pointer),
-    [_; compare_with; set_to]
-  | Atomic (Compare_and_set, (Field as kind), Pointer),
-    [_; _; compare_with; set_to] ->
-    (match fst (maybe_pointer_type env compare_with),
-           fst (maybe_pointer_type env set_to) with
-    | Pointer, _ | _, Pointer -> None
-    | Immediate, Immediate -> Some (Atomic (Compare_and_set, kind, Immediate)))
-  | Atomic (Compare_exchange, (Ref | Loc as kind), Pointer),
-    [_; compare_with; set_to]
-  | Atomic (Compare_exchange, (Field as kind), Pointer),
-    [_; _; compare_with; set_to] ->
-    (match fst (maybe_pointer_type env compare_with),
-           fst (maybe_pointer_type env set_to) with
-    | Pointer, _ | _, Pointer -> None
-    | Immediate, Immediate -> Some (Atomic (Compare_exchange, kind, Immediate)))
+    | Immediate -> Some (Atomic (op, kind, Immediate)))
   | _ -> None
 
 let caml_equal =
