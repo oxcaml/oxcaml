@@ -360,20 +360,14 @@ L134:                                                ; preds = %L129
 L138:                                                ; preds = %L106
   %220 = load i64, ptr %13
   store i64 %220, ptr %4
-  %221 = load i64, ptr %ds
-  %222 = add i64 %221, 48
-  %223 = inttoptr i64 %222 to ptr
-  %224 = load i64, ptr %223
-  %225 = inttoptr i64 %224 to ptr
-  %226 = load i64, ptr %225
-  %227 = add i64 %224, 8
-  %228 = inttoptr i64 %227 to ptr
-  %229 = load ptr, ptr %228
-  %230 = load i64, ptr %4
-  %231 = add i64 %224, 16
-  store i64 %226, ptr %223
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %231)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %230, ptr %229)
+  %221 = load i64, ptr %4
+  %222 = load ptr, ptr %ds
+  %223 = load ptr, ptr %alloc
+  %224 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %222, ptr %223, i64 %221)
+  %225 = extractvalue { { ptr, ptr }, {  } } %224, 0, 0
+  store ptr %225, ptr %ds
+  %226 = extractvalue { { ptr, ptr }, {  } } %224, 0, 1
+  store ptr %226, ptr %alloc
   unreachable
 }
 
@@ -585,20 +579,14 @@ L167:                                                ; preds = %L149
 L169:                                                ; preds = %L149
   %140 = load i64, ptr %15
   store i64 %140, ptr %4
-  %141 = load i64, ptr %ds
-  %142 = add i64 %141, 48
-  %143 = inttoptr i64 %142 to ptr
-  %144 = load i64, ptr %143
-  %145 = inttoptr i64 %144 to ptr
-  %146 = load i64, ptr %145
-  %147 = add i64 %144, 8
-  %148 = inttoptr i64 %147 to ptr
-  %149 = load ptr, ptr %148
-  %150 = load i64, ptr %4
-  %151 = add i64 %144, 16
-  store i64 %146, ptr %143
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %151)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %150, ptr %149)
+  %141 = load i64, ptr %4
+  %142 = load ptr, ptr %ds
+  %143 = load ptr, ptr %alloc
+  %144 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %142, ptr %143, i64 %141)
+  %145 = extractvalue { { ptr, ptr }, {  } } %144, 0, 0
+  store ptr %145, ptr %ds
+  %146 = extractvalue { { ptr, ptr }, {  } } %144, 0, 1
+  store ptr %146, ptr %alloc
   unreachable
 }
 
@@ -898,20 +886,14 @@ L204:                                                ; preds = %L199
 L208:                                                ; preds = %L179
   %199 = load i64, ptr %13
   store i64 %199, ptr %4
-  %200 = load i64, ptr %ds
-  %201 = add i64 %200, 48
-  %202 = inttoptr i64 %201 to ptr
-  %203 = load i64, ptr %202
-  %204 = inttoptr i64 %203 to ptr
-  %205 = load i64, ptr %204
-  %206 = add i64 %203, 8
-  %207 = inttoptr i64 %206 to ptr
-  %208 = load ptr, ptr %207
-  %209 = load i64, ptr %4
-  %210 = add i64 %203, 16
-  store i64 %205, ptr %202
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %210)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %209, ptr %208)
+  %200 = load i64, ptr %4
+  %201 = load ptr, ptr %ds
+  %202 = load ptr, ptr %alloc
+  %203 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %201, ptr %202, i64 %200)
+  %204 = extractvalue { { ptr, ptr }, {  } } %203, 0, 0
+  store ptr %204, ptr %ds
+  %205 = extractvalue { { ptr, ptr }, {  } } %203, 0, 1
+  store ptr %205, ptr %alloc
   unreachable
 }
 
@@ -1021,20 +1003,14 @@ L220:                                                ; preds = %L1
   store i64 %16, ptr %8
   %17 = load i64, ptr %8
   store i64 %17, ptr %4
-  %18 = load i64, ptr %ds
-  %19 = add i64 %18, 48
-  %20 = inttoptr i64 %19 to ptr
-  %21 = load i64, ptr %20
-  %22 = inttoptr i64 %21 to ptr
-  %23 = load i64, ptr %22
-  %24 = add i64 %21, 8
-  %25 = inttoptr i64 %24 to ptr
-  %26 = load ptr, ptr %25
-  %27 = load i64, ptr %4
-  %28 = add i64 %21, 16
-  store i64 %23, ptr %20
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %28)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %27, ptr %26)
+  %18 = load i64, ptr %4
+  %19 = load ptr, ptr %ds
+  %20 = load ptr, ptr %alloc
+  %21 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %19, ptr %20, i64 %18)
+  %22 = extractvalue { { ptr, ptr }, {  } } %21, 0, 0
+  store ptr %22, ptr %ds
+  %23 = extractvalue { { ptr, ptr }, {  } } %21, 0, 1
+  store ptr %23, ptr %alloc
   unreachable
 }
 
@@ -1056,20 +1032,14 @@ L225:                                                ; preds = %L1
   store ptr @camlExn_part2__Exn3229, ptr %6
   %8 = load i64, ptr %6
   store i64 %8, ptr %4
-  %9 = load i64, ptr %ds
-  %10 = add i64 %9, 48
-  %11 = inttoptr i64 %10 to ptr
-  %12 = load i64, ptr %11
-  %13 = inttoptr i64 %12 to ptr
-  %14 = load i64, ptr %13
-  %15 = add i64 %12, 8
-  %16 = inttoptr i64 %15 to ptr
-  %17 = load ptr, ptr %16
-  %18 = load i64, ptr %4
-  %19 = add i64 %12, 16
-  store i64 %14, ptr %11
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %19)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %18, ptr %17)
+  %9 = load i64, ptr %4
+  %10 = load ptr, ptr %ds
+  %11 = load ptr, ptr %alloc
+  %12 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %10, ptr %11, i64 %9)
+  %13 = extractvalue { { ptr, ptr }, {  } } %12, 0, 0
+  store ptr %13, ptr %ds
+  %14 = extractvalue { { ptr, ptr }, {  } } %12, 0, 1
+  store ptr %14, ptr %alloc
   unreachable
 }
 
@@ -1501,183 +1471,165 @@ L283:                                                ; preds = %L267
 L287:                                                ; preds = %L267
   %293 = load i64, ptr %41
   store i64 %293, ptr %4
-  %294 = load i64, ptr %ds
-  %295 = add i64 %294, 48
-  %296 = inttoptr i64 %295 to ptr
-  %297 = load i64, ptr %296
-  %298 = inttoptr i64 %297 to ptr
-  %299 = load i64, ptr %298
-  %300 = add i64 %297, 8
-  %301 = inttoptr i64 %300 to ptr
-  %302 = load ptr, ptr %301
-  %303 = load i64, ptr %4
-  %304 = add i64 %297, 16
-  store i64 %299, ptr %296
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %304)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %303, ptr %302)
+  %294 = load i64, ptr %4
+  %295 = load ptr, ptr %ds
+  %296 = load ptr, ptr %alloc
+  %297 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %295, ptr %296, i64 %294)
+  %298 = extractvalue { { ptr, ptr }, {  } } %297, 0, 0
+  store ptr %298, ptr %ds
+  %299 = extractvalue { { ptr, ptr }, {  } } %297, 0, 1
+  store ptr %299, ptr %alloc
   unreachable
 L292:                                                ; preds = %L275, %L283
-  %305 = load i64, ptr %30
-  store i64 %305, ptr %56
-  %306 = load i64, ptr %56
-  store i64 %306, ptr %18
-  %307 = load i64, ptr %ds
-  %308 = add i64 %307, 48
-  %309 = inttoptr i64 %308 to ptr
-  %310 = load i64, ptr %169
-  store i64 %310, ptr %309
+  %300 = load i64, ptr %30
+  store i64 %300, ptr %56
+  %301 = load i64, ptr %56
+  store i64 %301, ptr %18
+  %302 = load i64, ptr %ds
+  %303 = add i64 %302, 48
+  %304 = inttoptr i64 %303 to ptr
+  %305 = load i64, ptr %169
+  store i64 %305, ptr %304
    call  void @llvm.stackrestore(ptr %168)
   br label %L311
 L251:                                                ; preds = %L248, %L287
   call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""()
-  %311 = call i64 asm sideeffect "movq %r15, $0", "=r"()
-  store i64 %311, ptr %alloc
+  %306 = call i64 asm sideeffect "movq %r15, $0", "=r"()
+  store i64 %306, ptr %alloc
   store i64 %165, ptr %4
-  %312 = load i64, ptr %4
-  store i64 %312, ptr %29
-  %313 = load i64, ptr %28
-  %314 = load i64, ptr %ds
-  %315 = add i64 %314, 64
-  %316 = inttoptr i64 %315 to ptr
-  store i64 %313, ptr %316
+  %307 = load i64, ptr %4
+  store i64 %307, ptr %29
+  %308 = load i64, ptr %28
+  %309 = load i64, ptr %ds
+  %310 = add i64 %309, 64
+  %311 = inttoptr i64 %310 to ptr
+  store i64 %308, ptr %311
   store i64 1, ptr %57
-  %317 = load i64, ptr %57
-  store i64 %317, ptr %58
+  %312 = load i64, ptr %57
+  store i64 %312, ptr %58
   store ptr @camlExn_part1, ptr %59
-  %318 = load i64, ptr %59
-  %319 = add i64 %318, 0
-  %320 = inttoptr i64 %319 to ptr
-  %321 = load i64, ptr %320
-  store i64 %321, ptr %60
-  %322 = load i64, ptr %29
-  %323 = add i64 %322, 0
-  %324 = inttoptr i64 %323 to ptr
-  %325 = load i64, ptr %324
-  store i64 %325, ptr %61
-  %326 = load i64, ptr %61
-  %327 = load i64, ptr %60
-  %328 = icmp slt i64 %326, %327
-  br i1 %328, label %L306, label %329
-329:
-  %330 = load i64, ptr %61
-  %331 = load i64, ptr %60
-  %332 = icmp sgt i64 %330, %331
-  br i1 %332, label %L306, label %L300
+  %313 = load i64, ptr %59
+  %314 = add i64 %313, 0
+  %315 = inttoptr i64 %314 to ptr
+  %316 = load i64, ptr %315
+  store i64 %316, ptr %60
+  %317 = load i64, ptr %29
+  %318 = add i64 %317, 0
+  %319 = inttoptr i64 %318 to ptr
+  %320 = load i64, ptr %319
+  store i64 %320, ptr %61
+  %321 = load i64, ptr %61
+  %322 = load i64, ptr %60
+  %323 = icmp slt i64 %321, %322
+  br i1 %323, label %L306, label %324
+324:
+  %325 = load i64, ptr %61
+  %326 = load i64, ptr %60
+  %327 = icmp sgt i64 %325, %326
+  br i1 %327, label %L306, label %L300
 L300:                                                ; preds = %L251
-  %333 = load i64, ptr %29
-  store i64 %333, ptr %62
-  %334 = load i64, ptr %62
-  %335 = add i64 %334, 8
-  store i64 %335, ptr %62
-  %336 = load i64, ptr %62
-  %337 = add i64 %336, 0
-  %338 = inttoptr i64 %337 to ptr
-  %339 = load i64, ptr %338
-  store i64 %339, ptr %63
-  %340 = load i64, ptr %63
-  store i64 %340, ptr %64
-  %341 = load i64, ptr %64
-  %342 = load i64, ptr %26
-  %343 = add i64 %341, %342
-  store i64 %343, ptr %64
-  %344 = load i64, ptr %64
-  store i64 %344, ptr %65
-  %345 = load i64, ptr %65
-  %346 = add i64 %345, -1
-  store i64 %346, ptr %65
-  %347 = load i64, ptr %65
-  store i64 %347, ptr %66
-  %348 = load i64, ptr %66
-  store i64 %348, ptr %18
+  %328 = load i64, ptr %29
+  store i64 %328, ptr %62
+  %329 = load i64, ptr %62
+  %330 = add i64 %329, 8
+  store i64 %330, ptr %62
+  %331 = load i64, ptr %62
+  %332 = add i64 %331, 0
+  %333 = inttoptr i64 %332 to ptr
+  %334 = load i64, ptr %333
+  store i64 %334, ptr %63
+  %335 = load i64, ptr %63
+  store i64 %335, ptr %64
+  %336 = load i64, ptr %64
+  %337 = load i64, ptr %26
+  %338 = add i64 %336, %337
+  store i64 %338, ptr %64
+  %339 = load i64, ptr %64
+  store i64 %339, ptr %65
+  %340 = load i64, ptr %65
+  %341 = add i64 %340, -1
+  store i64 %341, ptr %65
+  %342 = load i64, ptr %65
+  store i64 %342, ptr %66
+  %343 = load i64, ptr %66
+  store i64 %343, ptr %18
   br label %L311
 L306:                                                ; preds = %L251
-  %349 = load i64, ptr %29
-  store i64 %349, ptr %4
-  %350 = load i64, ptr %ds
-  %351 = add i64 %350, 48
-  %352 = inttoptr i64 %351 to ptr
-  %353 = load i64, ptr %352
-  %354 = inttoptr i64 %353 to ptr
-  %355 = load i64, ptr %354
-  %356 = add i64 %353, 8
-  %357 = inttoptr i64 %356 to ptr
-  %358 = load ptr, ptr %357
-  %359 = load i64, ptr %4
-  %360 = add i64 %353, 16
-  store i64 %355, ptr %352
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %360)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %359, ptr %358)
+  %344 = load i64, ptr %29
+  store i64 %344, ptr %4
+  %345 = load i64, ptr %4
+  %346 = load ptr, ptr %ds
+  %347 = load ptr, ptr %alloc
+  %348 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %346, ptr %347, i64 %345)
+  %349 = extractvalue { { ptr, ptr }, {  } } %348, 0, 0
+  store ptr %349, ptr %ds
+  %350 = extractvalue { { ptr, ptr }, {  } } %348, 0, 1
+  store ptr %350, ptr %alloc
   unreachable
 L311:                                                ; preds = %L292, %L300
-  %361 = load i64, ptr %ds
-  %362 = add i64 %361, 48
-  %363 = inttoptr i64 %362 to ptr
-  %364 = load i64, ptr %113
-  store i64 %364, ptr %363
+  %351 = load i64, ptr %ds
+  %352 = add i64 %351, 48
+  %353 = inttoptr i64 %352 to ptr
+  %354 = load i64, ptr %113
+  store i64 %354, ptr %353
    call  void @llvm.stackrestore(ptr %112)
-  %365 = load i64, ptr %18
-  store i64 %365, ptr %4
-  %366 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
-  %367 = load ptr, ptr %ds
-  %368 = insertvalue { { ptr, ptr }, { i64 } } %366, ptr %367, 0, 0
-  %369 = load ptr, ptr %alloc
-  %370 = insertvalue { { ptr, ptr }, { i64 } } %368, ptr %369, 0, 1
-  %371 = load i64, ptr %4
-  %372 = insertvalue { { ptr, ptr }, { i64 } } %370, i64 %371, 1, 0
-  ret { { ptr, ptr }, { i64 } } %372
+  %355 = load i64, ptr %18
+  store i64 %355, ptr %4
+  %356 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %357 = load ptr, ptr %ds
+  %358 = insertvalue { { ptr, ptr }, { i64 } } %356, ptr %357, 0, 0
+  %359 = load ptr, ptr %alloc
+  %360 = insertvalue { { ptr, ptr }, { i64 } } %358, ptr %359, 0, 1
+  %361 = load i64, ptr %4
+  %362 = insertvalue { { ptr, ptr }, { i64 } } %360, i64 %361, 1, 0
+  ret { { ptr, ptr }, { i64 } } %362
 L235:                                                ; preds = %L232, %L306
   call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""()
-  %373 = call i64 asm sideeffect "movq %r15, $0", "=r"()
-  store i64 %373, ptr %alloc
+  %363 = call i64 asm sideeffect "movq %r15, $0", "=r"()
+  store i64 %363, ptr %alloc
   store i64 %109, ptr %4
-  %374 = load i64, ptr %4
-  store i64 %374, ptr %17
-  %375 = load i64, ptr %16
-  %376 = load i64, ptr %ds
-  %377 = add i64 %376, 64
-  %378 = inttoptr i64 %377 to ptr
-  store i64 %375, ptr %378
+  %364 = load i64, ptr %4
+  store i64 %364, ptr %17
+  %365 = load i64, ptr %16
+  %366 = load i64, ptr %ds
+  %367 = add i64 %366, 64
+  %368 = inttoptr i64 %367 to ptr
+  store i64 %365, ptr %368
   store i64 1, ptr %67
-  %379 = load i64, ptr %67
-  store i64 %379, ptr %68
+  %369 = load i64, ptr %67
+  store i64 %369, ptr %68
   store ptr @camlExn_part2__Exn3229, ptr %69
-  %380 = load i64, ptr %17
-  %381 = load i64, ptr %69
-  %382 = icmp slt i64 %380, %381
-  br i1 %382, label %L319, label %383
-383:
-  %384 = load i64, ptr %17
-  %385 = load i64, ptr %69
-  %386 = icmp sgt i64 %384, %385
-  br i1 %386, label %L319, label %L317
+  %370 = load i64, ptr %17
+  %371 = load i64, ptr %69
+  %372 = icmp slt i64 %370, %371
+  br i1 %372, label %L319, label %373
+373:
+  %374 = load i64, ptr %17
+  %375 = load i64, ptr %69
+  %376 = icmp sgt i64 %374, %375
+  br i1 %376, label %L319, label %L317
 L317:                                                ; preds = %L235
-  %387 = load i64, ptr %14
-  store i64 %387, ptr %4
-  %388 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
-  %389 = load ptr, ptr %ds
-  %390 = insertvalue { { ptr, ptr }, { i64 } } %388, ptr %389, 0, 0
-  %391 = load ptr, ptr %alloc
-  %392 = insertvalue { { ptr, ptr }, { i64 } } %390, ptr %391, 0, 1
-  %393 = load i64, ptr %4
-  %394 = insertvalue { { ptr, ptr }, { i64 } } %392, i64 %393, 1, 0
-  ret { { ptr, ptr }, { i64 } } %394
+  %377 = load i64, ptr %14
+  store i64 %377, ptr %4
+  %378 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %379 = load ptr, ptr %ds
+  %380 = insertvalue { { ptr, ptr }, { i64 } } %378, ptr %379, 0, 0
+  %381 = load ptr, ptr %alloc
+  %382 = insertvalue { { ptr, ptr }, { i64 } } %380, ptr %381, 0, 1
+  %383 = load i64, ptr %4
+  %384 = insertvalue { { ptr, ptr }, { i64 } } %382, i64 %383, 1, 0
+  ret { { ptr, ptr }, { i64 } } %384
 L319:                                                ; preds = %L235
-  %395 = load i64, ptr %17
-  store i64 %395, ptr %4
-  %396 = load i64, ptr %ds
-  %397 = add i64 %396, 48
-  %398 = inttoptr i64 %397 to ptr
-  %399 = load i64, ptr %398
-  %400 = inttoptr i64 %399 to ptr
-  %401 = load i64, ptr %400
-  %402 = add i64 %399, 8
-  %403 = inttoptr i64 %402 to ptr
-  %404 = load ptr, ptr %403
-  %405 = load i64, ptr %4
-  %406 = add i64 %399, 16
-  store i64 %401, ptr %398
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %406)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %405, ptr %404)
+  %385 = load i64, ptr %17
+  store i64 %385, ptr %4
+  %386 = load i64, ptr %4
+  %387 = load ptr, ptr %ds
+  %388 = load ptr, ptr %alloc
+  %389 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %387, ptr %388, i64 %386)
+  %390 = extractvalue { { ptr, ptr }, {  } } %389, 0, 0
+  store ptr %390, ptr %ds
+  %391 = extractvalue { { ptr, ptr }, {  } } %389, 0, 1
+  store ptr %391, ptr %alloc
   unreachable
 }
 
@@ -1877,69 +1829,61 @@ L359:                                                ; preds = %L353
   %130 = load i64, ptr %27
   store i64 %130, ptr %4
   %131 = load i64, ptr %ds
-  %132 = add i64 %131, 48
+  %132 = add i64 %131, 240
   %133 = inttoptr i64 %132 to ptr
-  %134 = load i64, ptr %133
-  %135 = inttoptr i64 %134 to ptr
-  %136 = load i64, ptr %135
-  %137 = add i64 %134, 8
-  %138 = inttoptr i64 %137 to ptr
-  %139 = load ptr, ptr %138
-  %140 = load i64, ptr %4
-  %141 = add i64 %134, 16
-  store i64 %136, ptr %133
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %141)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %140, ptr %139)
+  store i64 0, ptr %133
+  %134 = load i64, ptr %4
+  %135 = load ptr, ptr %ds
+  %136 = load ptr, ptr %alloc
+  %137 =  call cc 104 { { ptr, ptr }, {  } } @caml_raise_exn(ptr %135, ptr %136, i64 %134)
+  %138 = extractvalue { { ptr, ptr }, {  } } %137, 0, 0
+  store ptr %138, ptr %ds
+  %139 = extractvalue { { ptr, ptr }, {  } } %137, 0, 1
+  store ptr %139, ptr %alloc
   unreachable
 L362:                                                ; preds = %L335
-  %142 = load i64, ptr %12
-  store i64 %142, ptr %4
-  %143 = load i64, ptr %ds
-  %144 = add i64 %143, 48
-  %145 = inttoptr i64 %144 to ptr
-  %146 = load i64, ptr %145
-  %147 = inttoptr i64 %146 to ptr
-  %148 = load i64, ptr %147
-  %149 = add i64 %146, 8
-  %150 = inttoptr i64 %149 to ptr
-  %151 = load ptr, ptr %150
-  %152 = load i64, ptr %4
-  %153 = add i64 %146, 16
-  store i64 %148, ptr %145
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %153)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %152, ptr %151)
+  %140 = load i64, ptr %12
+  store i64 %140, ptr %4
+  %141 = load i64, ptr %4
+  %142 = load ptr, ptr %ds
+  %143 = load ptr, ptr %alloc
+  %144 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %142, ptr %143, i64 %141)
+  %145 = extractvalue { { ptr, ptr }, {  } } %144, 0, 0
+  store ptr %145, ptr %ds
+  %146 = extractvalue { { ptr, ptr }, {  } } %144, 0, 1
+  store ptr %146, ptr %alloc
   unreachable
 L366:                                                ; preds = %L345, %L353
-  %154 = load i64, ptr %7
-  %155 = icmp slt i64 %154, 2001
-  br i1 %155, label %L368, label %156
-156:
-  %157 = load i64, ptr %7
-  %158 = icmp sgt i64 %157, 2001
-  br i1 %158, label %L368, label %L371
+  %147 = load i64, ptr %7
+  %148 = icmp slt i64 %147, 2001
+  br i1 %148, label %L368, label %149
+149:
+  %150 = load i64, ptr %7
+  %151 = icmp sgt i64 %150, 2001
+  br i1 %151, label %L368, label %L371
 L368:                                                ; preds = %L366
-  %159 = load i64, ptr %7
-  store i64 %159, ptr %28
-  %160 = load i64, ptr %28
-  %161 = add i64 %160, 2
-  store i64 %161, ptr %28
-  %162 = load i64, ptr %28
-  store i64 %162, ptr %29
-  %163 = load i64, ptr %29
-  store i64 %163, ptr %7
+  %152 = load i64, ptr %7
+  store i64 %152, ptr %28
+  %153 = load i64, ptr %28
+  %154 = add i64 %153, 2
+  store i64 %154, ptr %28
+  %155 = load i64, ptr %28
+  store i64 %155, ptr %29
+  %156 = load i64, ptr %29
+  store i64 %156, ptr %7
   br label %L329
 L371:                                                ; preds = %L366
   store i64 1, ptr %30
-  %164 = load i64, ptr %30
-  store i64 %164, ptr %4
-  %165 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
-  %166 = load ptr, ptr %ds
-  %167 = insertvalue { { ptr, ptr }, { i64 } } %165, ptr %166, 0, 0
-  %168 = load ptr, ptr %alloc
-  %169 = insertvalue { { ptr, ptr }, { i64 } } %167, ptr %168, 0, 1
-  %170 = load i64, ptr %4
-  %171 = insertvalue { { ptr, ptr }, { i64 } } %169, i64 %170, 1, 0
-  ret { { ptr, ptr }, { i64 } } %171
+  %157 = load i64, ptr %30
+  store i64 %157, ptr %4
+  %158 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
+  %159 = load ptr, ptr %ds
+  %160 = insertvalue { { ptr, ptr }, { i64 } } %158, ptr %159, 0, 0
+  %161 = load ptr, ptr %alloc
+  %162 = insertvalue { { ptr, ptr }, { i64 } } %160, ptr %161, 0, 1
+  %163 = load i64, ptr %4
+  %164 = insertvalue { { ptr, ptr }, { i64 } } %162, i64 %163, 1, 0
+  ret { { ptr, ptr }, { i64 } } %164
 }
 
 define  cc 104 { { ptr, ptr }, { i64 } } @camlExn_part2__catch_wildcard_HIDE_STAMP(ptr %0, ptr %1, i64 %2) noinline {
@@ -2320,6 +2264,8 @@ define private cc 104 {ptr, ptr, i32} @wrap_try(ptr %r14, ptr %r15) returns_twic
 @caml_ml_flush = external global ptr
 @caml_ml_output = external global ptr
 @caml_ml_output_char = external global ptr
+@caml_raise_exn = external global ptr
+@caml_reraise_exn = external global ptr
 
 @camlExn_part2__data_end = global {  } {  }, align 8, section ".data"
 define void @camlExn_part2__code_end() { unreachable }

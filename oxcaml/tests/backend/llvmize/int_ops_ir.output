@@ -373,19 +373,17 @@ L149:                                                ; preds = %L136
   %77 = load i64, ptr %19
   store i64 %77, ptr %4
   %78 = load i64, ptr %ds
-  %79 = add i64 %78, 48
+  %79 = add i64 %78, 240
   %80 = inttoptr i64 %79 to ptr
-  %81 = load i64, ptr %80
-  %82 = inttoptr i64 %81 to ptr
-  %83 = load i64, ptr %82
-  %84 = add i64 %81, 8
-  %85 = inttoptr i64 %84 to ptr
-  %86 = load ptr, ptr %85
-  %87 = load i64, ptr %4
-  %88 = add i64 %81, 16
-  store i64 %83, ptr %80
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %88)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %87, ptr %86)
+  store i64 0, ptr %80
+  %81 = load i64, ptr %4
+  %82 = load ptr, ptr %ds
+  %83 = load ptr, ptr %alloc
+  %84 =  call cc 104 { { ptr, ptr }, {  } } @caml_raise_exn(ptr %82, ptr %83, i64 %81)
+  %85 = extractvalue { { ptr, ptr }, {  } } %84, 0, 0
+  store ptr %85, ptr %ds
+  %86 = extractvalue { { ptr, ptr }, {  } } %84, 0, 1
+  store ptr %86, ptr %alloc
   unreachable
 }
 
@@ -489,19 +487,17 @@ L172:                                                ; preds = %L154
   %64 = load i64, ptr %19
   store i64 %64, ptr %4
   %65 = load i64, ptr %ds
-  %66 = add i64 %65, 48
+  %66 = add i64 %65, 240
   %67 = inttoptr i64 %66 to ptr
-  %68 = load i64, ptr %67
-  %69 = inttoptr i64 %68 to ptr
-  %70 = load i64, ptr %69
-  %71 = add i64 %68, 8
-  %72 = inttoptr i64 %71 to ptr
-  %73 = load ptr, ptr %72
-  %74 = load i64, ptr %4
-  %75 = add i64 %68, 16
-  store i64 %70, ptr %67
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %75)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %74, ptr %73)
+  store i64 0, ptr %67
+  %68 = load i64, ptr %4
+  %69 = load ptr, ptr %ds
+  %70 = load ptr, ptr %alloc
+  %71 =  call cc 104 { { ptr, ptr }, {  } } @caml_raise_exn(ptr %69, ptr %70, i64 %68)
+  %72 = extractvalue { { ptr, ptr }, {  } } %71, 0, 0
+  store ptr %72, ptr %ds
+  %73 = extractvalue { { ptr, ptr }, {  } } %71, 0, 1
+  store ptr %73, ptr %alloc
   unreachable
 }
 
@@ -1776,6 +1772,7 @@ declare void @llvm.write_register.i64(metadata, i64)
 @caml_int_clz_untagged_to_untagged = external global ptr
 @caml_int_ctz_untagged_to_untagged = external global ptr
 @caml_int_popcnt_untagged_to_untagged = external global ptr
+@caml_raise_exn = external global ptr
 
 @camlInt_ops__data_end = global {  } {  }, align 8, section ".data"
 define void @camlInt_ops__code_end() { unreachable }

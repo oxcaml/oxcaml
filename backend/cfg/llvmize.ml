@@ -1068,7 +1068,7 @@ module F = struct
       ins_branch_cond t is_gt gt eq
     | Raise raise_kind -> (
       match raise_kind with
-      | Raise_notrace | Raise_regular | Raise_reraise ->
+      | Raise_notrace ->
         (* CR yusumez: Handle backtraces appropriately once we have frametables
            (calling runtime functions expect a safepoint) *)
         let ds_exn_handler_sp = load_domainstate_addr t Domain_exn_handler in
@@ -1103,6 +1103,27 @@ module F = struct
         ins t
           {|call void asm sideeffect "movq $0, %%rax; jmpq *$1", "r,r,~{rax}"(i64 %a, ptr %a)|}
           pp_ident exn_payload pp_ident exn_handler_addr;
+        ins_unreachable t
+      | Raise_regular ->
+        let backtrace_pos = load_domainstate_addr t Domain_backtrace_pos in
+        ins_store_value t ~src:(Llvm_value.Immediate "0") ~dst:backtrace_pos
+          Llvm_typ.i64;
+        let exn_payload = load_reg_to_temp t i.arg.(0) in
+        add_referenced_symbol t "caml_raise_exn";
+        call_simple ~cc:Ocaml ~pp_name:pp_global t "caml_raise_exn"
+          [ ( Llvm_typ.of_machtyp_component i.arg.(0).typ,
+              Llvm_value.Local_ident exn_payload ) ]
+          []
+        |> ignore;
+        ins_unreachable t
+      | Raise_reraise ->
+        let exn_payload = load_reg_to_temp t i.arg.(0) in
+        add_referenced_symbol t "caml_reraise_exn";
+        call_simple ~cc:Ocaml ~pp_name:pp_global t "caml_reraise_exn"
+          [ ( Llvm_typ.of_machtyp_component i.arg.(0).typ,
+              Llvm_value.Local_ident exn_payload ) ]
+          []
+        |> ignore;
         ins_unreachable t)
     | Float_test { width; lt; eq; gt; uo } ->
       let typ = Llvm_typ.of_float_width width in

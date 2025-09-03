@@ -278,19 +278,17 @@ L113:                                                ; preds = %L1
   %9 = load i64, ptr %7
   store i64 %9, ptr %5
   %10 = load i64, ptr %ds
-  %11 = add i64 %10, 48
+  %11 = add i64 %10, 240
   %12 = inttoptr i64 %11 to ptr
-  %13 = load i64, ptr %12
-  %14 = inttoptr i64 %13 to ptr
-  %15 = load i64, ptr %14
-  %16 = add i64 %13, 8
-  %17 = inttoptr i64 %16 to ptr
-  %18 = load ptr, ptr %17
-  %19 = load i64, ptr %5
-  %20 = add i64 %13, 16
-  store i64 %15, ptr %12
-  call void @llvm.write_register.i64(metadata !{!"rsp\00"}, i64 %20)
-  call void asm sideeffect "movq $0, %rax; jmpq *$1", "r,r,~{rax}"(i64 %19, ptr %18)
+  store i64 0, ptr %12
+  %13 = load i64, ptr %5
+  %14 = load ptr, ptr %ds
+  %15 = load ptr, ptr %alloc
+  %16 =  call cc 104 { { ptr, ptr }, {  } } @caml_raise_exn(ptr %14, ptr %15, i64 %13)
+  %17 = extractvalue { { ptr, ptr }, {  } } %16, 0, 0
+  store ptr %17, ptr %ds
+  %18 = extractvalue { { ptr, ptr }, {  } } %16, 0, 1
+  store ptr %18, ptr %alloc
   unreachable
 }
 
@@ -422,6 +420,7 @@ declare void @llvm.write_register.i64(metadata, i64)
 @caml_c_call = external global ptr
 @caml_c_call_stack_args_llvm_backend = external global ptr
 @caml_exn_Assert_failure = external global ptr
+@caml_raise_exn = external global ptr
 @int_and_float = external global ptr
 @print_and_add = external global ptr
 @too_many = external global ptr
