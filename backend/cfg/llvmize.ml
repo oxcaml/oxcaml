@@ -800,7 +800,7 @@ module F = struct
   (* CR-soon yusumez: Add implementations for missing basic and terminator
      instructions *)
 
-  let call_intrinsic t name args res =
+  let call_llvm_intrinsic t name args res =
     let arg_types = List.map fst args in
     let res_type = Option.map fst res in
     let intrinsic_name = "llvm." ^ name in
@@ -1153,12 +1153,11 @@ module F = struct
     in
     let do_unary_intrinsic op_name =
       let typ = Llvm_typ.i64 in
-      let intrinsic_name = asprintf "llvm.%s.%a" op_name Llvm_typ.pp_t typ in
       let arg = load_reg_to_temp t i.arg.(0) in
       let res = fresh_ident t in
-      add_called_fun t intrinsic_name ~cc:Default ~args:[typ] ~res:(Some typ);
-      ins_call ~cc:Default ~pp_name:pp_global t intrinsic_name
-        [typ, arg]
+      call_llvm_intrinsic t
+        (op_name ^ "." ^ Llvm_typ.to_string typ)
+        [typ, Llvm_value.Local_ident arg]
         (Some (typ, res));
       res
     in
@@ -1239,12 +1238,9 @@ module F = struct
       | Iabsf ->
         let arg = load_reg_to_temp t i.arg.(0) in
         let res = fresh_ident t in
-        let fabs_name =
-          "llvm.fabs." ^ match width with Float32 -> "f32" | Float64 -> "f64"
-        in
-        add_called_fun t fabs_name ~cc:Default ~args:[typ] ~res:(Some typ);
-        ins_call ~cc:Default ~pp_name:pp_global t fabs_name
-          [typ, arg]
+        call_llvm_intrinsic t
+          ("fabs." ^ Llvm_typ.(of_float_width width |> to_string))
+          [typ, Llvm_value.Local_ident arg]
           (Some (typ, res));
         res
       | Icompf comp ->
@@ -1289,10 +1285,9 @@ module F = struct
       let arg = load_reg_to_temp t i.arg.(0) in
       let trunced = do_trunc arg in
       let bswapped = fresh_ident t in
-      let bswap_fun_name = "llvm.bswap." ^ Llvm_typ.to_string typ in
-      add_called_fun t bswap_fun_name ~cc:Default ~args:[typ] ~res:(Some typ);
-      ins_call ~cc:Default ~pp_name:pp_global t bswap_fun_name
-        [typ, trunced]
+      call_llvm_intrinsic t
+        ("bswap." ^ Llvm_typ.to_string typ)
+        [typ, Llvm_value.Local_ident trunced]
         (Some (typ, bswapped));
       let zexted = do_zext bswapped in
       ins_store_into_reg t zexted i.res.(0)
@@ -1325,14 +1320,14 @@ module F = struct
                (fun arg_typ reg ->
                  let reg_typ = Llvm_typ.of_machtyp_component reg.Reg.typ in
                  ( arg_typ,
-                   do_conv (load_reg_to_temp t reg) ~src:reg_typ ~dst:arg_typ ))
+                   Llvm_value.Local_ident
+                     (do_conv (load_reg_to_temp t reg) ~src:reg_typ ~dst:arg_typ)
+                 ))
                arg_typs
         in
         let res_ident = fresh_ident t in
         let res = Some (res_typ, res_ident) in
-        add_called_fun t name ~cc:Default ~args:(List.map fst args)
-          ~res:(Option.map fst res);
-        ins_call ~cc:Default ~pp_name:pp_global t name args res;
+        call_llvm_intrinsic t name args res;
         let conved_res =
           do_conv res_ident ~src:res_typ
             ~dst:(Llvm_typ.of_machtyp_component i.res.(0).typ)
@@ -1341,17 +1336,17 @@ module F = struct
       in
       match func_symbol with
       | "caml_sse2_float64_min" ->
-        do_intrinsic_call "llvm.x86.sse2.min.sd"
+        do_intrinsic_call "x86.sse2.min.sd"
           [Llvm_typ.doublex2; Llvm_typ.doublex2]
           Llvm_typ.doublex2
       | "caml_sse2_float64_max" ->
-        do_intrinsic_call "llvm.x86.sse2.max.sd"
+        do_intrinsic_call "x86.sse2.max.sd"
           [Llvm_typ.doublex2; Llvm_typ.doublex2]
           Llvm_typ.doublex2
       | "caml_rdtsc_unboxed" ->
-        do_intrinsic_call "llvm.readcyclecounter" [] Llvm_typ.i64
+        do_intrinsic_call "readcyclecounter" [] Llvm_typ.i64
       | "caml_rdpmc_unboxed" ->
-        do_intrinsic_call "llvm.x86.rdpmc" [Llvm_typ.i32] Llvm_typ.i64
+        do_intrinsic_call "x86.rdpmc" [Llvm_typ.i32] Llvm_typ.i64
       | _ -> not_implemented_basic ~msg:"specific intrinsic" i)
     | _ -> not_implemented_basic ~msg:"specific" i
 
@@ -1534,7 +1529,7 @@ module F = struct
         ins_icmp t "slt" local_limit new_local_sp skip_realloc Llvm_typ.i64;
         (* Let LLVM know calling realloc isn't likely *)
         let skip_realloc_expect = fresh_ident t in
-        call_intrinsic t "expect.i1"
+        call_llvm_intrinsic t "expect.i1"
           [ Llvm_typ.bool, Llvm_value.Local_ident skip_realloc;
             Llvm_typ.bool, Llvm_value.Immediate "1" ]
           (Some (Llvm_typ.bool, skip_realloc_expect));
@@ -1580,7 +1575,7 @@ module F = struct
         ins_icmp t "ult" domain_young_limit new_alloc_ptr skip_gc Llvm_typ.i64;
         (* Let LLVM know calling gc isn't likely *)
         let skip_gc_expect = fresh_ident t in
-        call_intrinsic t "expect.i1"
+        call_llvm_intrinsic t "expect.i1"
           [ Llvm_typ.bool, Llvm_value.Local_ident skip_gc;
             Llvm_typ.bool, Llvm_value.Immediate "1" ]
           (Some (Llvm_typ.bool, skip_gc_expect));
@@ -1662,9 +1657,7 @@ module F = struct
         not_implemented_basic ~msg:"vector reinterpret cast" i)
     | Specific op -> specific t i op
     | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
-    | Pause ->
-      add_called_fun t "llvm.x86.sse2.pause" ~cc:Default ~args:[] ~res:None;
-      ins_call ~cc:Default ~pp_name:pp_global t "llvm.x86.sse2.pause" [] None
+    | Pause -> call_llvm_intrinsic t "x86.sse2.pause" [] None
     | Poll -> () (* CR yusumez: insert poll call *)
     | Probe_is_enabled _ | Name_for_debugger _ | Dls_get ->
       not_implemented_basic i
@@ -1687,10 +1680,8 @@ module F = struct
         in
         ins_store t ~src:prev_sp ~dst:ds_exn_handler_addr Llvm_typ.i64;
         (* Pop! *)
-        add_called_fun t "llvm.stackrestore" ~cc:Default ~args:[Llvm_typ.ptr]
-          ~res:None;
-        ins_call ~cc:Default ~pp_name:pp_global t "llvm.stackrestore"
-          [Llvm_typ.ptr, stacksave_ptr]
+        call_llvm_intrinsic t "stackrestore"
+          [Llvm_typ.ptr, Llvm_value.Local_ident stacksave_ptr]
           None)
     | Pushtrap { lbl_handler } -> (
       t.emit_exn_intrinsic_decls <- true;
@@ -1724,10 +1715,7 @@ module F = struct
       line t.ppf "%a:" Ident.print try_block_label;
       (* Save state of stack *)
       let stacksave_ptr = fresh_ident t in
-      add_called_fun t "llvm.stacksave" ~cc:Default ~args:[]
-        ~res:(Some Llvm_typ.ptr);
-      ins_call ~cc:Default ~pp_name:pp_global t "llvm.stacksave" []
-        (Some (Llvm_typ.ptr, stacksave_ptr));
+      call_llvm_intrinsic t "stacksave" [] (Some (Llvm_typ.ptr, stacksave_ptr));
       let trap_block = fresh_ident t in
       (* [prev_sp; handler_addr; saved_rbp; padding] - we need to save rbp since
          it will get clobbered by the time we get to the handler, and LLVM is
