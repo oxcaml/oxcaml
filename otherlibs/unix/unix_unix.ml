@@ -197,7 +197,7 @@ external unsafe_environment : unit -> string array @@ portable
                             = "caml_unix_environment_unsafe"
 external getenv: string -> string @@ portable = "caml_sys_getenv"
 external unsafe_getenv: string -> string @@ portable = "caml_sys_unsafe_getenv"
-external putenv: string -> string -> unit @@ portable = "caml_unix_putenv"
+external putenv: string -> string -> unit = "caml_unix_putenv"
 
 type process_status =
     WEXITED of int
@@ -215,7 +215,7 @@ external execvp : string -> string array -> 'a @@ portable = "caml_unix_execvp"
 external execvpe : string -> string array -> string array -> 'a @@ portable
                  = "caml_unix_execvpe"
 
-external fork : unit -> int @@ portable = "caml_unix_fork"
+external fork : unit -> int = "caml_unix_fork"
 external wait : unit -> int * process_status @@ portable = "caml_unix_wait"
 external waitpid : wait_flag list -> int -> int * process_status @@ portable
    = "caml_unix_waitpid"
@@ -261,13 +261,16 @@ external unsafe_read : file_descr -> bytes -> int -> int -> int @@ portable
 external unsafe_read_bigarray :
   file_descr -> _ Bigarray.Array1.t -> int -> int -> int @@ portable
   = "caml_unix_read_bigarray"
-external unsafe_write : file_descr -> bytes -> int -> int -> int @@ portable
-                      = "caml_unix_write"
+external unsafe_write :
+  file_descr -> bytes @ shared -> int -> int -> int @@ portable
+  = "caml_unix_write"
 external unsafe_write_bigarray :
-  file_descr -> _ Bigarray.Array1.t -> int -> int -> single: bool -> int @@ portable
+  file_descr -> _ Bigarray.Array1.t @ shared -> int -> int -> single: bool
+  -> int @@ portable
   = "caml_unix_write_bigarray"
-external unsafe_single_write : file_descr -> bytes -> int -> int -> int @@ portable
-   = "caml_unix_single_write"
+external unsafe_single_write :
+  file_descr -> bytes @ shared -> int -> int -> int @@ portable
+  = "caml_unix_single_write"
 
 let read fd buf ofs len =
   if ofs < 0 || len < 0 || ofs > Bytes.length buf - len
@@ -629,10 +632,11 @@ external unsafe_recvfrom :
   file_descr -> bytes -> int -> int -> msg_flag list -> int * sockaddr @@ portable
                                   = "caml_unix_recvfrom"
 external unsafe_send :
-  file_descr -> bytes -> int -> int -> msg_flag list -> int @@ portable
+  file_descr -> bytes @ shared -> int -> int -> msg_flag list -> int @@ portable
                                   = "caml_unix_send"
 external unsafe_sendto :
-  file_descr -> bytes -> int -> int -> msg_flag list -> sockaddr -> int @@ portable
+  file_descr -> bytes @ shared -> int -> int -> msg_flag list -> sockaddr
+  -> int @@ portable
                                   = "caml_unix_sendto" "caml_unix_sendto_native"
 
 let recv fd buf ofs len flags =
@@ -744,14 +748,16 @@ type service_entry =
 external gethostname : unit -> string @@ portable = "caml_unix_gethostname"
 external gethostbyname : string -> host_entry @@ portable = "caml_unix_gethostbyname"
 external gethostbyaddr : inet_addr -> host_entry @@ portable = "caml_unix_gethostbyaddr"
-external getprotobyname : string -> protocol_entry @@ portable
-                                         = "caml_unix_getprotobyname"
-external getprotobynumber : int -> protocol_entry @@ portable
-                                         = "caml_unix_getprotobynumber"
-external getservbyname : string -> string -> service_entry @@ portable
-                                         = "caml_unix_getservbyname"
-external getservbyport : int -> string -> service_entry @@ portable
-                                         = "caml_unix_getservbyport"
+external getprotobyname : string -> protocol_entry = "caml_unix_getprotobyname"
+external getprotobynumber : int -> protocol_entry = "caml_unix_getprotobynumber"
+external getservbyname :
+  string -> string -> service_entry = "caml_unix_getservbyname"
+external thread_unsafe_getservbyname :
+  string -> string -> service_entry @@ portable = "caml_unix_getservbyname"
+external getservbyport :
+  int -> string -> service_entry = "caml_unix_getservbyport"
+external thread_unsafe_getservbyport :
+  int -> string -> service_entry @@ portable = "caml_unix_getservbyport"
 
 type addr_info =
   { ai_family : socket_domain;
@@ -772,7 +778,7 @@ external getaddrinfo_system
   : string -> string -> getaddrinfo_option list -> addr_info list @@ portable
   = "caml_unix_getaddrinfo"
 
-let getaddrinfo_emulation node service opts =
+let thread_unsafe_getaddrinfo_emulation node service opts =
   (* Parse options *)
   let opt_socktype = ref None
   and opt_protocol = ref 0
@@ -790,7 +796,7 @@ let getaddrinfo_emulation node service opts =
         [ty, int_of_string service]
       with Failure _ ->
       try
-        [ty, (getservbyname service kind).s_port]
+        [ty, (thread_unsafe_getservbyname service kind).s_port]
       with Not_found -> []
   in
   let ports =
@@ -834,11 +840,19 @@ let getaddrinfo_emulation node service opts =
           addresses)
       ports)
 
+let allow_thread_unsafe_emulation =
+  let open struct
+    external runtime5 : unit -> bool @@ portable = "%runtime5"
+    external domain_id :
+      unit -> int @@ portable = "caml_ml_domain_id" [@@noalloc]
+  end in
+  fun () -> not (runtime5 ()) || domain_id () = 0
+
 let getaddrinfo node service opts =
   try
     List.rev(getaddrinfo_system node service opts)
-  with Invalid_argument _ ->
-    getaddrinfo_emulation node service opts
+  with Invalid_argument _ when allow_thread_unsafe_emulation () ->
+    thread_unsafe_getaddrinfo_emulation node service opts
 
 type name_info =
   { ni_hostname : string;
@@ -855,7 +869,7 @@ external getnameinfo_system
   : sockaddr -> getnameinfo_option list -> name_info @@ portable
   = "caml_unix_getnameinfo"
 
-let getnameinfo_emulation addr opts =
+let thread_unsafe_getnameinfo_emulation addr opts =
   match addr with
   | ADDR_UNIX f ->
       { ni_hostname = ""; ni_service = f } (* why not? *)
@@ -871,7 +885,7 @@ let getnameinfo_emulation addr opts =
         try
           if List.mem NI_NUMERICSERV opts then raise Not_found;
           let kind = if List.mem NI_DGRAM opts then "udp" else "tcp" in
-          (getservbyport p kind).s_name
+          (thread_unsafe_getservbyport p kind).s_name
         with Not_found ->
           Int.to_string p in
       { ni_hostname = hostname; ni_service = service }
@@ -879,8 +893,8 @@ let getnameinfo_emulation addr opts =
 let getnameinfo addr opts =
   try
     getnameinfo_system addr opts
-  with Invalid_argument _ ->
-    getnameinfo_emulation addr opts
+  with Invalid_argument _ when allow_thread_unsafe_emulation () ->
+    thread_unsafe_getnameinfo_emulation addr opts
 
 (* High-level process management (system, popen) *)
 
@@ -1216,8 +1230,9 @@ type setattr_when = TCSANOW | TCSADRAIN | TCSAFLUSH
 
 external tcgetattr: file_descr -> terminal_io @@ portable = "caml_unix_tcgetattr"
 
-external tcsetattr: file_descr -> setattr_when -> terminal_io -> unit @@ portable
-               = "caml_unix_tcsetattr"
+external tcsetattr:
+  file_descr -> setattr_when -> terminal_io @ shared -> unit @@ portable
+  = "caml_unix_tcsetattr"
 external tcsendbreak: file_descr -> int -> unit @@ portable = "caml_unix_tcsendbreak"
 external tcdrain: file_descr -> unit @@ portable = "caml_unix_tcdrain"
 

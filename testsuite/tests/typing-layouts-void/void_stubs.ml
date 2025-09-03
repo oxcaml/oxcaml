@@ -3,8 +3,7 @@
    expect;
 *)
 
-(* Void is not yet allowed in C stubs. *)
-(* CR layouts v5: allow some of these, improve the error message for others *)
+(* CR layouts v5: improve the error messages *)
 
 type void : void
 type r = #{ v1 : void; v2 : void }
@@ -16,11 +15,7 @@ type r = #{ v1 : void; v2 : void; }
 
 external ext_void_arg : void -> unit = "foo" "bar"
 [%%expect{|
-Line 1, characters 24-36:
-1 | external ext_void_arg : void -> unit = "foo" "bar"
-                            ^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
+external ext_void_arg : void -> unit = "foo" "bar"
 |}]
 
 external ext_void_return : unit -> void = "foo" "bar"
@@ -39,11 +34,7 @@ Error: The primitive [foo] is used in an invalid declaration.
 
 external ext_void_in_product_return : unit -> #(string * void) = "foo" "bar"
 [%%expect{|
-Line 1, characters 38-62:
-1 | external ext_void_in_product_return : unit -> #(string * void) = "foo" "bar"
-                                          ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
+external ext_void_in_product_return : unit -> #(string * void) = "foo" "bar"
 |}]
 
 external ext_all_void_arg : r -> unit = "foo" "bar"
@@ -56,9 +47,5 @@ Error: The primitive [foo] is used in an invalid declaration.
 |}]
 external ext_all_void_return : unit -> r = "foo" "bar"
 [%%expect{|
-Line 1, characters 31-40:
-1 | external ext_all_void_return : unit -> r = "foo" "bar"
-                                   ^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
+external ext_all_void_return : unit -> r = "foo" "bar"
 |}]

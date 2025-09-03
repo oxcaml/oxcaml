@@ -21,10 +21,10 @@ type string_contents =
 type t
 
 (* CR mshinwell: [size] shouldn't be needed when passing [Contents] *)
-val create : contents:string_contents -> size:Targetint_31_63.t -> t
+val create : contents:string_contents -> size:Target_ocaml_int.t -> t
 
 val contents : t -> string_contents
 
-val size : t -> Targetint_31_63.t
+val size : t -> Target_ocaml_int.t
 
 include Container_types.S with type t := t

@@ -42,6 +42,8 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
 
 let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
   raw_lambda
+  |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
+        (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
   |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
   |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
   |> Profile.(record generate)
@@ -57,7 +59,7 @@ let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
              Asmgen.compile_implementation
                unix
                ~pipeline
-               ~sourcefile:(Some (Unit_info.source_file i.target))
+               ~sourcefile:(Some (Unit_info.original_source_file i.target))
                ~prefixname:(Unit_info.prefix i.target)
                ~ppf_dump:i.ppf_dump
                program;
@@ -71,10 +73,10 @@ let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
                ~arg_descr
            end))
 
-let compile_from_typed i typed ~transl_style ~unix ~pipeline ~as_arg_for =
+let compile_from_typed i typed ~unix ~pipeline ~as_arg_for =
   typed
   |> Profile.(record transl)
-    (Translmod.transl_implementation i.module_name ~style:transl_style)
+    (Translmod.transl_implementation i.module_name)
   |> compile_from_raw_lambda i ~unix ~pipeline ~as_arg_for
 
 type flambda2 =
@@ -89,7 +91,7 @@ let emit unix i =
   Compilenv.reset i.target;
   Asmgen.compile_implementation_linear unix
     (Unit_info.prefix i.target)
-    ~progname:(Unit_info.source_file i.target)
+    ~progname:(Unit_info.original_source_file i.target)
 
 type starting_point =
   | Parsing
@@ -110,10 +112,6 @@ let starting_point_of_compiler_pass start_from  =
 let implementation_aux unix ~(flambda2 : flambda2) ~start_from
       ~source_file ~output_prefix ~keep_symbol_tables
       ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
-  let transl_style : Translmod.compilation_unit_style =
-    if Config.flambda || Config.flambda2 then Plain_block
-    else Set_individual_fields
-  in
   let pipeline : Asmgen.pipeline =
     Direct_to_cmm (flambda2 ~keep_symbol_tables)
   in
@@ -139,7 +137,7 @@ let implementation_aux unix ~(flambda2 : flambda2) ~start_from
         |> Option.map Global_module.Parameter_name.of_string
       in
       if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-      compile_from_typed info typed ~unix ~transl_style ~pipeline ~as_arg_for
+      compile_from_typed info typed ~unix ~pipeline ~as_arg_for
     in
     Compile_common.implementation
       ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
@@ -164,7 +162,7 @@ let implementation_aux unix ~(flambda2 : flambda2) ~start_from
     in
     let impl =
       Translmod.transl_instance info.module_name ~runtime_args
-        ~main_module_block_size ~arg_block_idx ~style:transl_style
+        ~main_module_block_size ~arg_block_idx
     in
     if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
     compile_from_raw_lambda info impl ~unix ~pipeline ~as_arg_for

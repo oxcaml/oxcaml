@@ -226,12 +226,11 @@ type t5 += T5_5 of t_immediate * t_value * t_void
 type t5 += T5_6 of t_value * t_immediate;;
 [%%expect{|
 type t5 = ..
-type t5 += T5_1 of t_void
-type t5 += T5_2 of t_value
-type t5 += T5_3 of t_immediate
-type t5 += T5_4 of t_void * t_immediate
-type t5 += T5_5 of t_immediate * t_value * t_void
-type t5 += T5_6 of t_value * t_immediate
+Line 3, characters 11-25:
+3 | type t5 += T5_1 of t_void
+               ^^^^^^^^^^^^^^
+Error: Extensible types can't have fields of unboxed type.
+       Consider wrapping the unboxed fields in a record.
 |}]
 
 
@@ -280,9 +279,11 @@ type t5 += T5_15 of { x : t_value; y : t_immediate };;
 [%%expect{|
 type t5 += T5_11 of { x : t_value; }
 type t5 += T5_12 of { x : t_immediate; }
-type t5 += T5_13 of { x : t_void; y : t_immediate; }
-type t5 += T5_14 of { x : t_immediate; y : t_value; z : t_void; }
-type t5 += T5_15 of { x : t_value; y : t_immediate; }
+Line 4, characters 11-51:
+4 | type t5 += T5_13 of { x : t_void; y : t_immediate }
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Extensible types can't have fields of unboxed type.
+       Consider wrapping the unboxed fields in a record.
 |}];;
 
 type t5 += T5_16 of { x : t_void }
@@ -337,14 +338,14 @@ Error: This expression has type "float" but an expression was expected of type
 (* See Note [Default layouts in transl_declaration] in Typedecl. *)
 type t7 = A | B | C | D of t7_void
 and t7_2 = { x : t7 } [@@unboxed]
-and t7_void : void
+and t7_void : void mod everything
 
 type t7_3 : immediate = t7_2
 
 [%%expect{|
 type t7 = A | B | C | D of t7_void
 and t7_2 = { x : t7; } [@@unboxed]
-and t7_void : void
+and t7_void : void mod everything
 type t7_3 = t7_2
 |}]
 

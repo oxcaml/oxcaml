@@ -63,6 +63,26 @@ end) = struct
     | NLeaf
     | NComp_unit of string
     | NError of string
+    | NConstr of Ident.t * nf list
+    | NTuple of nf list
+    | NUnboxed_tuple of nf list
+    | NPredef of Predef.t * nf list
+    | NArrow of nf * nf
+    | NPoly_variant of delayed_nf poly_variant_constructors
+    | NVariant of {
+      simple_constructors: string list;
+      complex_constructors: (delayed_nf * Layout.t) complex_constructors
+    }
+    | NVariant_unboxed of
+      { name : string;
+        arg_name : string option;
+        arg_shape : delayed_nf;
+        arg_layout : Layout.t
+      }
+    | NRecord of
+        { fields : (string * delayed_nf * Layout.t) list;
+          kind : record_kind
+        }
 
   (* A type of normal forms for strong call-by-need evaluation.
      The normal form of an abstraction
@@ -121,16 +141,50 @@ end) = struct
     | NComp_unit c1, NComp_unit c2 -> String.equal c1 c2
     | NAlias a1, NAlias a2 -> equal_delayed_nf a1 a2
     | NError e1, NError e2 -> String.equal e1 e2
-    | NVar _, (NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NLeaf, (NVar _ | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NApp _, (NVar _ | NLeaf | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NAbs _, (NVar _ | NLeaf | NApp _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NStruct _, (NVar _ | NLeaf | NApp _ | NAbs _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NProj _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NComp_unit _ | NAlias _ | NError _)
-    | NComp_unit _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NAlias _ | NError _)
-    | NAlias _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NError _)
-    | NError _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _)
-    -> false
+    | NConstr (id1, args1), NConstr (id2, args2) ->
+      Ident.equal id1 id2 && List.equal equal_nf args1 args2
+    | NTuple args1, NTuple args2 ->
+      List.equal equal_nf args1 args2
+    | NUnboxed_tuple args1, NUnboxed_tuple args2 ->
+      List.equal equal_nf args1 args2
+    | NPredef (p1, args1), NPredef (p2, args2) ->
+      Predef.equal p1 p2 && List.equal equal_nf args1 args2
+    | NArrow (arg1, ret1), NArrow (arg2, ret2) ->
+      equal_nf arg1 arg2 && equal_nf ret1 ret2
+    | NPoly_variant constrs1, NPoly_variant constrs2 ->
+      let equal_pv_constructor c1 c2 =
+        String.equal c1.pv_constr_name c2.pv_constr_name &&
+        List.equal equal_delayed_nf c1.pv_constr_args c2.pv_constr_args
+      in
+      List.equal equal_pv_constructor constrs1 constrs2
+    | NVariant { simple_constructors = sc1; complex_constructors = cc1 },
+      NVariant { simple_constructors = sc2; complex_constructors = cc2 } ->
+      List.equal String.equal sc1 sc2 &&
+      List.equal
+        (Shape.equal_complex_constructor
+          (fun (dnf1, ly1) (dnf2, ly2) ->
+            Layout.equal ly1 ly2 && equal_delayed_nf dnf1 dnf2))
+        cc1 cc2
+    | NVariant_unboxed { name = n1; arg_name = an1; arg_shape = as1;
+                         arg_layout = al1 },
+      NVariant_unboxed { name = n2; arg_name = an2; arg_shape = as2;
+                         arg_layout = al2 } ->
+      String.equal n1 n2 &&
+      Option.equal String.equal an1 an2 &&
+      Layout.equal al1 al2 &&
+      equal_delayed_nf as1 as2
+    | NRecord { fields = f1; kind = k1 }, NRecord { fields = f2; kind = k2 } ->
+      Shape.equal_record_kind k1 k2 &&
+      List.equal
+        (fun (name1, dnf1, ly1) (name2, dnf2, ly2) ->
+          String.equal name1 name2 &&
+          Layout.equal ly1 ly2 &&
+          equal_delayed_nf dnf1 dnf2)
+        f1 f2
+    | ( ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
+        | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
+        | NVariant_unboxed _ | NRecord _ ), _ ) -> false
 
   and equal_nf t1 t2 =
     if not (Option.equal Uid.equal t1.uid t2.uid) then false
@@ -309,6 +363,44 @@ end) = struct
           return (NStruct mnf)
       | Alias t -> return (NAlias (delay_reduce env t))
       | Error s -> approx_nf (return (NError s))
+      | Constr (id, args) ->
+          let nfs = List.map (reduce env) args in
+          return (NConstr (id, nfs))
+      | Tuple args ->
+          let nfs = List.map (reduce env) args in
+          return (NTuple nfs)
+      | Unboxed_tuple args ->
+          let nfs = List.map (reduce env) args in
+          return (NUnboxed_tuple nfs)
+      | Predef (p, args) ->
+          let nfs = List.map (reduce env) args in
+          return (NPredef (p, nfs))
+      | Arrow (arg, ret) ->
+          let arg_nf = reduce env arg in
+          let ret_nf = reduce env ret in
+          return (NArrow (arg_nf, ret_nf))
+      | Poly_variant constrs ->
+          let dnf_constrs =
+            poly_variant_constructors_map (delay_reduce env) constrs
+          in
+          return (NPoly_variant dnf_constrs)
+      | Variant { simple_constructors; complex_constructors } ->
+          let dnf_complex_constructors =
+            complex_constructors_map (fun (t, ly) -> (delay_reduce env t, ly))
+              complex_constructors
+          in
+          return (NVariant { simple_constructors;
+                             complex_constructors = dnf_complex_constructors })
+      | Variant_unboxed { name; arg_name; arg_shape; arg_layout } ->
+          let dnf_arg_shape = delay_reduce env arg_shape in
+          return (NVariant_unboxed { name; arg_name;
+                                     arg_shape = dnf_arg_shape; arg_layout })
+      | Record { fields; kind } ->
+          let dnf_fields =
+            List.map (fun (name, t, ly) -> (name, delay_reduce env t, ly))
+              fields
+          in
+          return (NRecord { fields = dnf_fields; kind })
 
   and read_back env (nf : nf) : t =
   in_read_back_memo_table env.read_back_memo_table nf (read_back_ env) nf
@@ -325,7 +417,7 @@ end) = struct
     let read_back_force dnf = read_back (force env dnf) in
     match desc with
     | NVar v ->
-      var (Option.get uid) v
+      var' uid v
     | NApp (nft, nfu) ->
         let f = read_back nft in
         let arg = read_back nfu in
@@ -343,6 +435,41 @@ end) = struct
     | NComp_unit s -> comp_unit ?uid s
     | NAlias nf -> alias ?uid (read_back_force nf)
     | NError t -> error ?uid t
+    | NConstr (id, args) ->
+      let t_args = List.map read_back args in
+      constr ?uid id t_args
+    | NTuple args ->
+      let t_args = List.map read_back args in
+      tuple ?uid t_args
+    | NUnboxed_tuple args ->
+      let t_args = List.map read_back args in
+      unboxed_tuple ?uid t_args
+    | NPredef (p, args) ->
+      let t_args = List.map read_back args in
+      predef ?uid p t_args
+    | NArrow (arg, ret) ->
+      let t_arg = read_back arg in
+      let t_ret = read_back ret in
+      arrow ?uid t_arg t_ret
+    | NPoly_variant constrs ->
+      let t_constrs = poly_variant_constructors_map read_back_force constrs in
+      poly_variant ?uid t_constrs
+    | NVariant { simple_constructors; complex_constructors } ->
+      let t_complex_constructors =
+        complex_constructors_map
+          (fun (dnf, ly) -> (read_back_force dnf, ly))
+          complex_constructors
+      in
+      variant ?uid simple_constructors t_complex_constructors
+    | NVariant_unboxed { name; arg_name; arg_shape; arg_layout } ->
+      let t_arg_shape = read_back_force arg_shape in
+      variant_unboxed ?uid name arg_name t_arg_shape arg_layout
+    | NRecord { fields; kind } ->
+      let t_fields =
+        List.map (fun (name, dnf, ly) -> (name, read_back_force dnf, ly))
+          fields
+      in
+      record ?uid kind t_fields
 
   (* Sharing the memo tables is safe at the level of a compilation unit since
     idents should be unique *)
@@ -372,6 +499,9 @@ end) = struct
     | NComp_unit _ -> true
     | NError _ -> false
     | NLeaf -> false
+    | NConstr _ | NTuple _ | NUnboxed_tuple _
+    | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _ | NVariant_unboxed _
+    | NRecord _ -> false
 
   let rec reduce_aliases_for_uid env (nf : nf) =
     match nf with

@@ -76,7 +76,7 @@ module Deep : sig
       effects performed by the computation enclosed by the handler. *)
 
   val match_with: ('c -> 'a) -> 'c -> ('a,'b) handler -> 'b
-  (** [match_with f v h] runs the computation [f v] in the handler [h]. *)
+  (** [match_with f x h] runs the computation [f x] in the handler [h]. *)
 
   type 'a effect_handler =
     { effc: 'b. 'b t -> (('b, 'a) continuation -> 'a) option }
@@ -85,7 +85,7 @@ module Deep : sig
       [fun e -> raise e]. *)
 
   val try_with: ('b -> 'a) -> 'b -> 'a effect_handler -> 'a
-  (** [try_with f v h] runs the computation [f v] under the handler [h]. *)
+  (** [try_with f x h] runs the computation [f x] under the handler [h]. *)
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =

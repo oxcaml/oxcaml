@@ -1,34 +1,42 @@
 (* TEST
+ {
+   flags = "-extension layouts_beta -extension small_numbers_beta";
    native;
+ }
 *)
 
 (* Preliminaries to minimize deps *)
 
-external int32_u_to_int32 : int32# -> int32
-  = "%box_int32" [@@warning "-187"]
+external i8_of_int : int -> int8# = "%int8#_of_int"
+external i16_of_int : int -> int16# = "%int16#_of_int"
+external icaml_of_int : int -> int# = "%int#_of_int"
+external i8_equal : int8# -> int8# -> bool = "%int8#_equal"
+external i16_equal : int16# -> int16# -> bool = "%int16#_equal"
+external int_equal : int -> int -> bool = "%int_equal"
+external icaml_equal : int# -> int# -> bool = "%int#_equal"
+external i32_equal : int32# -> int32# -> bool = "%int32#_equal"
+external i64_equal : int64# -> int64# -> bool = "%int64#_equal"
+external isize_equal : nativeint# -> nativeint# -> bool = "%nativeint#_equal"
+external f64_equal : float# -> float# -> bool = "%float#_ordered_and_equal"
+external f32_equal : float32# -> float32# -> bool = "%float32#_ordered_and_equal"
+external box_f64 : float# -> float = "%float_of_float#"
+external box_f32 : float32# -> float32 = "%float32_of_float32#"
 
-external int64_u_to_int64 : int64# -> int64
-  = "%box_int64" [@@warning "-187"]
+external float32_to_bits
+  :  (float32[@local_opt])
+  -> int32
+  = "caml_float32_to_bits_bytecode" "caml_float32_to_bits"
+[@@unboxed] [@@noalloc] [@@builtin]
 
-external nativeint_u_to_nativeint : nativeint# -> nativeint
-  = "%box_nativeint" [@@warning "-187"]
+let f64_bits_equal x y =
+  Int64.equal (Int64.bits_of_float (box_f64 x)) (Int64.bits_of_float (box_f64 y))
+;;
 
-external nativeint_to_nativeint_u : nativeint -> nativeint#
-  = "%unbox_nativeint" [@@warning "-187"]
+let f32_bits_equal x y =
+  Int32.equal (float32_to_bits (box_f32 x)) (float32_to_bits (box_f32 y))
+;;
 
-external float_u_to_float : float# -> float
-  = "%box_float" [@@warning "-187"]
-
-(* CR mshinwell for gyorsh: enable these float32 cases *)
-  (*
-external float32_u_to_float : float32# -> float32
-  = "%box_float32" [@@warning "-187"]
-  *)
-
-let nativeint_u_add u1 n2 =
-  let n1 = nativeint_u_to_nativeint u1 in
-  let n = Nativeint.add n1 n2 in
-  nativeint_to_nativeint_u n
+external ( + ) : nativeint# -> nativeint# -> nativeint# = "%nativeint#_add"
 
 (* The test itself starts here *)
 
@@ -36,50 +44,45 @@ let nativeint_u_add u1 n2 =
    makes it easier to write the test below. *)
 type ('a : any) t = nativeint#
 
-external read : ('a : any mod external_). 'a t -> 'a = "%peek"
-  [@@layout_poly]
+external read : ('a : any mod external_). 'a t -> 'a = "%peek" [@@layout_poly]
+external write : ('a : any mod external_). 'a t -> 'a -> unit = "%poke" [@@layout_poly]
 
-external write : ('a : any mod external_). 'a t -> 'a -> unit = "%poke"
-  [@@layout_poly]
-
-external calloc :
-  count:(int[@untagged]) -> size:(int[@untagged]) -> nativeint# =
-  "caml_no_bytecode_impl" "calloc"
-  [@@noalloc]
-
-let test_read p1 p2 p3 p4 p5 p6
-  : #(int * int32# * int64# * nativeint# * float# * float#) =
-  #(read p1, read p2, read p3, read p4, read p5, read p6)
-
-(* CR mshinwell for gyorsh: the last number here should be #0.1234s *)
-let values () = #(min_int, #400l, #9999999999L, #123456n, #0.87654, #0.1234)
-
-let test_write p1 p2 p3 p4 p5 p6 =
-  let #(n1, n2, n3, n4, n5, n6) = values () in
-  write p1 n1;
-  write p2 n2;
-  write p3 n3;
-  write p4 n4;
-  write p5 n5;
-  write p6 n6
+external calloc
+  :  count:(int[@untagged])
+  -> size:(int[@untagged])
+  -> nativeint#
+  = "caml_no_bytecode_impl" "calloc"
+[@@noalloc]
 
 let () =
-  let buf = calloc ~count:6 ~size:8 in
-  let int_buf = buf in
-  let int32_buf = nativeint_u_add buf 8n in
-  let int64_buf = nativeint_u_add buf 16n in
-  let nativeint_buf = nativeint_u_add buf 24n in
-  let float_buf = nativeint_u_add buf 32n in
-  let float32_buf = nativeint_u_add buf 40n in
-  test_write int_buf int32_buf int64_buf nativeint_buf float_buf float32_buf;
-  let #(n1, n2, n3, n4, n5, n6) =
-    test_read int_buf int32_buf int64_buf nativeint_buf float_buf float32_buf
-  in
-  let #(n1', n2', n3', n4', n5', n6') = values () in
-  assert (Int.equal n1 n1');
-  assert (Int32.equal (int32_u_to_int32 n2) (int32_u_to_int32 n2'));
-  assert (Int64.equal (int64_u_to_int64 n3) (int64_u_to_int64 n3'));
-  assert (Nativeint.equal (nativeint_u_to_nativeint n4)
-    (nativeint_u_to_nativeint n4'));
-  assert (Float.equal (float_u_to_float n5) (float_u_to_float n5'));
-  assert (Float.equal (float_u_to_float n6) (float_u_to_float n6'))
+  let buf = calloc ~count:1 ~size:51 in
+  let i64 = #9999999999L in
+  let isize = #123456n in
+  let i32 = #400l in
+  let i16 = i16_of_int 0x1234 in
+  let i8 = i8_of_int 0x12 in
+  let int = min_int in
+  let icaml = icaml_of_int max_int in
+  let f64 = #0.1234 in
+  let f32 = -#0.1234s in
+  write (buf + #0n) i64;
+  write (buf + #8n) f64;
+  write (buf + #16n) isize;
+  write (buf + #24n) int;
+  write (buf + #32n) icaml;
+  write (buf + #40n) i32;
+  write (buf + #44n) f32;
+  write (buf + #48n) i16;
+  write (buf + #50n) i8;
+  assert (i64_equal i64 (read (buf + #0n)));
+  assert (f64_equal f64 (read (buf + #8n)));
+  assert (f64_bits_equal f64 (read (buf + #8n)));
+  assert (isize_equal isize (read (buf + #16n)));
+  assert (int_equal int (read (buf + #24n)));
+  assert (icaml_equal icaml (read (buf + #32n)));
+  assert (i32_equal i32 (read (buf + #40n)));
+  assert (f32_equal f32 (read (buf + #44n)));
+  assert (f32_bits_equal f32 (read (buf + #44n)));
+  assert (i16_equal i16 (read (buf + #48n)));
+  assert (i8_equal i8 (read (buf + #50n)))
+;;

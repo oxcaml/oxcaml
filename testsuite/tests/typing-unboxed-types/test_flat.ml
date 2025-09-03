@@ -17,16 +17,10 @@ Error: This type cannot be unboxed because
        You should annotate it with "[@@ocaml.boxed]".
 |}];;
 
-(* should fail (the existential _ still occurs in an abstract type) *)
+(* accept since [list] is always non-float *)
 type t18 = A : _ list abs -> t18 [@@ocaml.unboxed];;
 [%%expect{|
-Line 1, characters 0-50:
-1 | type t18 = A : _ list abs -> t18 [@@ocaml.unboxed];;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type cannot be unboxed because
-       it might contain both float and non-float values,
-       depending on the instantiation of an unnamed existential variable.
-       You should annotate it with "[@@ocaml.boxed]".
+type t18 = A : 'a list abs -> t18 [@@unboxed]
 |}];;
 
 (* regression test for PR#7511 (wrong determination of unboxability for GADTs)
@@ -71,16 +65,10 @@ module M :
   sig type 'a r constraint 'a = unit -> 'b val inj : 'b -> (unit -> 'b) r end
 |}];;
 
-(* reject *)
+(* accept since functions are non-float *)
 type t = T : (unit -> _) M.r -> t [@@unboxed];;
 [%%expect{|
-Line 1, characters 0-45:
-1 | type t = T : (unit -> _) M.r -> t [@@unboxed];;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type cannot be unboxed because
-       it might contain both float and non-float values,
-       depending on the instantiation of an unnamed existential variable.
-       You should annotate it with "[@@ocaml.boxed]".
+type t = T : (unit -> 'a) M.r -> t [@@unboxed]
 |}];;
 
 (* accept *)
@@ -121,16 +109,10 @@ end;;
 module N : sig type 'a r val inj : 'b -> (unit -> 'b) r end
 |}];;
 
-(* reject *)
+(* accept since functions are non-float *)
 type t = T : (unit -> _) N.r -> t [@@unboxed];;
 [%%expect{|
-Line 1, characters 0-45:
-1 | type t = T : (unit -> _) N.r -> t [@@unboxed];;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type cannot be unboxed because
-       it might contain both float and non-float values,
-       depending on the instantiation of an unnamed existential variable.
-       You should annotate it with "[@@ocaml.boxed]".
+type t = T : (unit -> 'a) N.r -> t [@@unboxed]
 |}];;
 
 (* accept *)
@@ -190,16 +172,10 @@ module M :
   sig type 'a r constraint 'a = unit -> 'b val inj : 'b -> (unit -> 'b) r end
 |}];;
 
-(* reject *)
+(* accept since functions are non-float *)
 type t = T : (unit -> _) M.r -> t [@@unboxed];;
 [%%expect{|
-Line 1, characters 0-45:
-1 | type t = T : (unit -> _) M.r -> t [@@unboxed];;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type cannot be unboxed because
-       it might contain both float and non-float values,
-       depending on the instantiation of an unnamed existential variable.
-       You should annotate it with "[@@ocaml.boxed]".
+type t = T : (unit -> 'a) M.r -> t [@@unboxed]
 |}];;
 
 type 'a s = S : (unit -> 'a) M.r -> 'a option s [@@unboxed];;

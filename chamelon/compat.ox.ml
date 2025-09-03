@@ -4,10 +4,8 @@ open Mode
 
 let dummy_jkind = Jkind.Builtin.value ~why:(Unknown "dummy_layout")
 let dummy_value_mode = Value.disallow_right Value.legacy
-
-let dummy_alloc_mode =
-  { mode = Alloc.disallow_left Alloc.legacy; locality_context = None }
-
+let dummy_value_sort = Jkind.Sort.value
+let dummy_alloc_mode = Alloc.disallow_left Alloc.legacy
 let mkTvar name = Tvar { name; jkind = dummy_jkind }
 
 let mkTarrow (label, t1, t2, comm) =
@@ -294,20 +292,23 @@ let mkpattern_data ~pat_desc ~pat_loc ~pat_extra ~pat_type ~pat_env
     pat_unique_barrier = Unique_barrier.not_computed ();
   }
 
-type tpat_var_identifier = Value.l
+type tpat_var_identifier = Jkind.Sort.t * Value.l
 
-let mkTpat_var ?id:(mode = dummy_value_mode) (ident, name) =
-  Tpat_var (ident, name, Uid.internal_not_actually_unique, mode)
+let mkTpat_var ?id:(sort, mode = (dummy_value_sort, dummy_value_mode))
+    (ident, name) =
+  Tpat_var (ident, name, Uid.internal_not_actually_unique, sort, mode)
 
-type tpat_alias_identifier = Value.l * Types.type_expr
+type tpat_alias_identifier = Jkind.Sort.t * Value.l * Types.type_expr
 
-let mkTpat_alias ~id:(mode, ty) (p, ident, name) =
-  Tpat_alias (p, ident, name, Uid.internal_not_actually_unique, mode, ty)
+let mkTpat_alias ~id:(sort, mode, ty) (p, ident, name) =
+  Tpat_alias (p, ident, name, Uid.internal_not_actually_unique, sort, mode, ty)
 
 type tpat_array_identifier = mutability * Jkind.sort
 
 let mkTpat_array
-    ?id:(mut, arg_sort = (Mutable Value.Comonadic.legacy, Jkind.Sort.value)) l =
+    ?id:(mut, arg_sort =
+        ( Mutable { mode = Value.Comonadic.legacy; atomic = Nonatomic },
+          Jkind.Sort.value )) l =
   Tpat_array (mut, arg_sort, l)
 
 type tpat_tuple_identifier = string option list
@@ -340,9 +341,10 @@ type 'a matched_pattern_desc =
 
 let view_tpat (type a) (p : a pattern_desc) : a matched_pattern_desc =
   match p with
-  | Tpat_var (ident, name, _uid, mode) -> Tpat_var (ident, name, mode)
-  | Tpat_alias (p, ident, name, _uid, mode, ty) ->
-      Tpat_alias (p, ident, name, (mode, ty))
+  | Tpat_var (ident, name, _uid, sort, mode) ->
+      Tpat_var (ident, name, (sort, mode))
+  | Tpat_alias (p, ident, name, _uid, sort, mode, ty) ->
+      Tpat_alias (p, ident, name, (sort, mode, ty))
   | Tpat_array (mut, arg_sort, l) -> Tpat_array (l, (mut, arg_sort))
   | Tpat_tuple pats ->
       let labels, pats = List.split pats in
@@ -412,7 +414,7 @@ let mk_value_description ~val_type ~val_kind ~val_attributes =
     val_type;
     val_kind;
     val_loc = Location.none;
-    val_modalities = Mode.Modality.Value.id;
+    val_modalities = Mode.Modality.id;
     val_attributes;
     val_uid = Uid.internal_not_actually_unique;
     val_zero_alloc = Zero_alloc.default;

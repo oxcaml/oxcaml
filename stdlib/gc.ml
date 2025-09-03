@@ -213,6 +213,8 @@ module Memprof =
         c_start sampling_rate callstack_size tracker
     end
 
+    external participate : t -> unit @@ portable = "caml_memprof_participate"
+
     external stop : unit -> unit @@ portable = "caml_memprof_stop"
 
     external discard : t -> unit @@ portable = "caml_memprof_discard"

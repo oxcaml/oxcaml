@@ -8,7 +8,7 @@ let local_ foo : string @ unique = "hello"
 Line 1, characters 4-42:
 1 | let local_ foo : string @ unique = "hello"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let local_ foo @ unique = "hello"
@@ -16,7 +16,7 @@ let local_ foo @ unique = "hello"
 Line 1, characters 4-33:
 1 | let local_ foo @ unique = "hello"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let local_ foo : 'a. ('a -> 'a) @ unique = fun x -> x
@@ -24,7 +24,7 @@ let local_ foo : 'a. ('a -> 'a) @ unique = fun x -> x
 Line 1, characters 4-53:
 1 | let local_ foo : 'a. ('a -> 'a) @ unique = fun x -> x
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo : type a. (a -> a) @ unique = fun x -> x
@@ -37,7 +37,7 @@ let (x, y) @ local unique = "hello", "world"
 Line 1, characters 4-44:
 1 | let (x, y) @ local unique = "hello", "world"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let (x, y) : _ @ local unique = "hello", "world"
@@ -45,7 +45,7 @@ let (x, y) : _ @ local unique = "hello", "world"
 Line 1, characters 4-48:
 1 | let (x, y) : _ @ local unique = "hello", "world"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo @ foo = "hello"
@@ -71,8 +71,10 @@ let foo a b @ local = local_ "hello"
 Line 1, characters 22-36:
 1 | let foo a b @ local = local_ "hello"
                           ^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo = fun a b @ local -> local_ "hello"
@@ -80,8 +82,10 @@ let foo = fun a b @ local -> local_ "hello"
 Line 1, characters 29-43:
 1 | let foo = fun a b @ local -> local_ "hello"
                                  ^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo a b @ local = exclave_ "hello"
@@ -100,8 +104,10 @@ let foo a b @ local = local_ 42
 Line 1, characters 22-31:
 1 | let foo a b @ local = local_ 42
                           ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo = fun a b @ local -> local_ 42
@@ -109,8 +115,10 @@ let foo = fun a b @ local -> local_ 42
 Line 1, characters 29-38:
 1 | let foo = fun a b @ local -> local_ 42
                                  ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo a b : int @ local = local_ 42
@@ -128,8 +136,10 @@ let foo a b @ local = local_ 42
 Line 1, characters 22-31:
 1 | let foo a b @ local = local_ 42
                           ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let foo = fun a b @ local -> local_ 42
@@ -137,8 +147,10 @@ let foo = fun a b @ local -> local_ 42
 Line 1, characters 29-38:
 1 | let foo = fun a b @ local -> local_ 42
                                  ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 
@@ -165,7 +177,7 @@ let foo = ("hello" : _ @ local)
 Line 1, characters 10-31:
 1 | let foo = ("hello" : _ @ local)
               ^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* this is not mode annotation *)
@@ -391,10 +403,10 @@ type r = Foo of string @@ global aliased many
 type r = Foo of string @@ global many aliased
 |}]
 
-(* mutable implies global aliased many. No warnings are given since we imagine
-   that the coupling will be removed soon. *)
+(* mutable implies [global many unyielding], and legacy modalities for monadic
+   axes. *)
 type r = {
-  mutable x : string @@ global aliased many
+  mutable x : string @@ global unyielding aliased many
 }
 [%%expect{|
 type r = { mutable x : string; }

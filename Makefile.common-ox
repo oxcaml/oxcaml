@@ -22,7 +22,15 @@ define dune_boot_context
   (profile dev)
   (env (_
     (flags (:standard -warn-error +A -alert -unsafe_multidomain))
-    (env-vars ("OCAMLPARAM" ""))))))
+    (env-vars
+      ("OCAMLPARAM" "")
+
+      ; Avoid using the full OC_CFLAGS for C code compiled during the boot
+      ; In particular, we should avoid using ASan here even if it is otherwise
+      ; enabled, since (a) it is of little benefit, because it has no effect
+      ; on the final compiler, and (b) it breaks, because linking is missing
+      ; the matching -fsanitize=address flag
+      ("OC_CFLAGS_SEXP" "boot_oc_cflags.sexp"))))))
 endef
 
 ifneq ($(origin BUILD_OCAMLPARAM), undefined)
@@ -40,7 +48,7 @@ define dune_runtime_stdlib_context
     (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
     (OCAMLLIB ("$(CURDIR)/_build/_bootinstall/lib/ocaml")))
   (env (_
-    (flags (:standard -warn-error +A -alert -unsafe_multidomain))
+    (flags (:standard -directory stdlib -warn-error +A -alert -unsafe_multidomain))
     $(ENV_VARS)))))
 endef
 
@@ -53,7 +61,7 @@ define dune_main_context
     (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
     (OCAMLLIB ("$(CURDIR)/_build/runtime_stdlib_install/lib/ocaml_runtime_stdlib")))
   (env (_
-    (flags (:standard -warn-error +A -alert -unsafe_multidomain))
+    (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard -fno-asan))
     $(ENV_VARS)))))
@@ -61,7 +69,7 @@ endef
 
 
 .DEFAULT_GOAL := compiler
-.PHONY: boot-compiler boot-runtest runtime-stdlib compiler runtest
+.PHONY: boot-compiler boot-runtest runtime-stdlib compiler runtest runtest-llvmize runtest-dwarf
 
 boot_targets = \
   $(boot_ocamlc) \
@@ -70,8 +78,7 @@ boot_targets = \
   $(boot_ocamlmklib) \
   $(boot_ocamldep) \
   $(boot_ocamlobjinfo) \
-  ocamltest/ocamltest.native \
-  tools/regalloc/regalloc.exe
+  ocamltest/ocamltest.native
 
 boot-compiler: _build/_bootinstall
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
@@ -87,6 +94,9 @@ runtime-stdlib: boot-compiler
 	$(cpl) -R _build/install/runtime_stdlib _build/runtime_stdlib_install
 # Dune does not believe the compiler can make .cmxs unless the following file exists.
 	@touch _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink.cmxa
+# Dune will look here if the system compiler is OCaml 5 instead.
+	@mkdir -p _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink/
+	@touch _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink/dynlink.cmxa
 
 # This target is a polling version of "make runtime-stdlib"
 .PHONY: runtime-stdlib-hacking
@@ -98,6 +108,7 @@ compiler: runtime-stdlib
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           $(dune) build $(ws_main) \
           --only-package=ocaml @install \
+          tools/regalloc/regalloc.exe \
           oxcaml/testsuite/tools/expect.exe \
           oxcaml/testsuite/tools/codegen_main.exe \
           oxcaml/testsuite/tools/asmgen_$(ARCH).o \
@@ -112,6 +123,11 @@ compiler: runtime-stdlib
 runtest: compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_main)
 
+runtest-llvmize: compiler
+	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-llvmize $(ws_main)
+
+runtest-dwarf: compiler
+	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-dwarf $(ws_main)
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
@@ -161,7 +177,9 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/otherlibs/dynlink/natdynlinkops
 
 # flags.sexp
-	echo '(:standard $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_flags.sexp
+	echo '(:standard $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
+	echo '(:standard $(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
+	echo '( )' > boot_oc_cflags.sexp
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
 	echo '( $(OC_CPPFLAGS) )' > oc_cppflags.sexp
 	echo '( $(SHAREDLIB_CFLAGS) )' > sharedlib_cflags.sexp
@@ -199,7 +217,7 @@ _install: compiler
 	$(cpl) _build/install/main/bin/* _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
 	$(cpl) -R _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/* _install/lib/ocaml/
-	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa}
+	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa,dynlink/dynlink.cmxa}
 	$(cpl) -R _build/install/main/lib/ocaml/* _install/lib/ocaml/
 	if [ "x$(legacy_layout)" == "xyes" ] ; \
 	then \
@@ -462,10 +480,14 @@ boot-_install: runtime-stdlib
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
 	$(cpl) _build/runtime_stdlib_install/bin/* _install/bin/
-	$(cpl) _build/_bootinstall/bin/* _install/bin/
+	# can't use a hard link here because ocamllex comes from the system and
+	# is possibly on a different device
+	ln -sf $(realpath _build/_bootinstall/bin/ocamllex.opt) _install/bin/ocamllex.opt
+	$(cpl) _build/_bootinstall/bin/ocaml{c,opt,mklib,dep,objinfo}.opt _install/bin/
+	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
 	$(cpl) -R _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/* \
     _install/lib/ocaml/
-	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa}
+	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa,dynlink/dynlink.cmxa}
 	$(cpl) -R _build/_bootinstall/lib/ocaml/* _install/lib/ocaml/
 	rm -f _install/lib/ocaml/{META,dune-package}
 	rm -f _install/lib/ocaml/compiler-libs/*.cmo
@@ -477,4 +499,3 @@ boot-_install: runtime-stdlib
 	find _build/default/ \( -name "flambda2*.cmi" \
           -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
           -print0 | xargs -0 -I '{}' cp -f '{}' _install/lib/ocaml/compiler-libs
-

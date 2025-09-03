@@ -111,7 +111,7 @@ Error: Mutable variable cannot be used inside closure.
 (* Test 3.3: Locally defined functors *)
 module type S_3_3 = sig module F () : sig val x : int end end
 
-let m_3_3 =
+let [@warning "-26"] m_3_3 =
   let mutable y = 42 in
   (module (struct module F () = struct let x = y end end) : S_3_3)
 
@@ -151,7 +151,8 @@ let foo4_1 y =
 Line 4, characters 9-24:
 4 |     x <- local_ (i :: x)
              ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       but is expected to be in the parent region or "global".
 |}]
 
 
@@ -187,7 +188,8 @@ let foo4_3 y = (* Can't sneak local out of non-local while loop body region *)
 Line 5, characters 9-26:
 5 |     x <- (local_ (x + !i));
              ^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       but is expected to be in the parent region or "global".
 |}]
 
 let foo4_4 y = (* Can't sneak local out of non-local while cond region *)
@@ -200,7 +202,8 @@ let foo4_4 y = (* Can't sneak local out of non-local while cond region *)
 Line 3, characters 13-29:
 3 |   while x <- (local_ (x + 1)); x <= 100 do
                  ^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       but is expected to be in the parent region or "global".
 |}]
 
 (* exclave_ closes one region, not two *)
@@ -217,7 +220,7 @@ let foo4_5 y =
 Line 5, characters 11-30:
 5 |       x <- local_ ((i*j) :: x)
                ^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo4_6 y =
@@ -233,7 +236,8 @@ let foo4_6 y =
 Line 5, characters 11-30:
 5 |       x <- local_ ((i*j) :: x)
                ^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       but is expected to be in the parent region or "global".
 |}]
 
 (* This is valid since both regions are closed *)
@@ -260,8 +264,11 @@ let foo4_8 () =
 Line 4, characters 2-3:
 4 |   x
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Can't return [x] if it is local in some cases *)
@@ -274,8 +281,11 @@ let foo4_9 b =
 Line 4, characters 2-3:
 4 |   x
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Test 5: Allowed interactions with locals. *)
@@ -329,7 +339,7 @@ val foo5_4 : int -> int = <fun>
 
 (* Test 6: Regionality *)
 (* 6.1: regional <- regional assignment is allowed *)
-let allowed_6_1 =
+let [@warning "-26"] allowed_6_1 =
   let mutable x = [] in
   let y = stack_ (1 :: []) in
   for i = 0 to 1 do
@@ -352,7 +362,7 @@ let disallowed_6_2 =
 Line 6, characters 11-12:
 6 |       x <- z
                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* 6.3: The mode system doesn't distinguish higher levels of regionality from
@@ -369,7 +379,7 @@ let disallowed_6_3 =
 Line 6, characters 11-12:
 6 |       x <- y
                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* Test 11: binding a mutable variable shouldn't be simplified away *)
@@ -422,7 +432,7 @@ val reset_ref : int ref @ unique -> unit = <fun>
 Line 6, characters 12-13:
 6 |   reset_ref x;
                 ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (* Test 13.2: Unique mutable variable *)
@@ -435,7 +445,7 @@ let x_13_2 =
 Line 3, characters 12-13:
 3 |   reset_ref x;
                 ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (* Test 13.3: [let mutable x @ m] checks only that the initial value of x has
@@ -467,7 +477,7 @@ let allowed_13_4 =
 val allowed_13_4 : unit = ()
 |}]
 
-let allowed_13_5 =
+let [@warning "-26"] allowed_13_5 =
   let mutable f @ portable = fun _ -> () in
   (f <- fun z -> x_13_3 := z)
 [%%expect{|
@@ -482,7 +492,10 @@ let disallowed_13_6 =
 Line 4, characters 19-20:
 4 |   require_portable f
                        ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable"
+       because it closes over the value "x_13_3" (at Line 3, characters 17-23)
+       which is expected to be "uncontended".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* [f] remains non-portable even if a portable function is reassigned *)
@@ -495,7 +508,10 @@ let disallowed_13_7 =
 Line 5, characters 19-20:
 5 |   require_portable f
                        ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable"
+       because it closes over the value "x_13_3" (at Line 3, characters 17-23)
+       which is expected to be "uncontended".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 
@@ -568,6 +584,45 @@ Error: This expression has type "int" but an expression was expected of type
   Hint: Did you mean "3."?
 |}]
 
+(* Test 18.1: unmutated mutable variable warning *)
+let x_18_1 =
+  let mutable x = 3 in x + 1
+;;
+[%%expect{|
+Line 2, characters 14-15:
+2 |   let mutable x = 3 in x + 1
+                  ^
+Warning 186 [unmutated-mutable]: mutable variable x was never mutated.
+
+val x_18_1 : int = 4
+|}]
+
+(* Test 18.2: mutation doesn't count as use *)
+let x_18_2 =
+  let mutable x = 3 in x <- 4; 4
+;;
+[%%expect{|
+Line 2, characters 14-15:
+2 |   let mutable x = 3 in x <- 4; 4
+                  ^
+Warning 26 [unused-var]: variable x was mutated but never used.
+
+val x_18_2 : int = 4
+|}]
+
+(* Test 18.3: Mutable variable isn't mutated or used *)
+let x_18_3 =
+  let mutable x = 3 in 5
+;;
+[%%expect{|
+Line 2, characters 14-15:
+2 |   let mutable x = 3 in 5
+                  ^
+Warning 26 [unused-var]: unused variable x.
+
+val x_18_3 : int = 5
+|}]
+
 (* Tests 19 and 20: some mode crossing *)
 let f_19 () =
   let mutable x : int = 42 in
@@ -585,12 +640,15 @@ let foo_20 y =
 Line 4, characters 2-3:
 4 |   x
       ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Test 21: Unboxed products not supported yet *)
-let foo_21 =
+let [@warning "-26"] foo_21 =
   let mutable bar = #(123, 456) in
   bar <- #(789, 101);
   42

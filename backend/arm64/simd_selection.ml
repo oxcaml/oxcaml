@@ -83,12 +83,10 @@ let select_simd_instr op args dbg =
     Some (Round_f32 Current, args)
   | "caml_simd_float64_round_current" | "caml_neon_float64_round_current" ->
     Some (Round_f64 Current, args)
-  | "caml_simd_float32_round_near" | "caml_neon_float32_round_near" ->
-    Some (Round_f32 Nearest, args)
-  | "caml_simd_float64_round_near" | "caml_neon_float64_round_near" ->
-    Some (Round_f64 Nearest, args)
   | "caml_simd_cast_float32_int64" | "caml_neon_cast_float32_int64" ->
     Some (Round_f32_s64, args)
+  | "caml_simd_cast_float64_int64" | "caml_neon_cast_float64_int64" ->
+    Some (Round_f64_s64, args)
   (* min/max that match amd64 behavior, regardless of the value of FPCR.AH.
      implemented as a sequence of instructions *)
   | "caml_simd_float32_min" -> Some (Min_scalar_f32, args)
@@ -207,9 +205,11 @@ let select_simd_instr op args dbg =
   | "caml_neon_float32x4_round_towards_zero" -> Some (Roundq_f32 Zero, args)
   | "caml_neon_float64x2_round_towards_zero" -> Some (Roundq_f64 Zero, args)
   | "caml_neon_cvt_int32x4_to_float32x4" -> Some (Cvtq_f32_s32, args)
-  | "caml_neon_cvt_float32x4_to_int32x4" -> Some (Cvtq_s32_f32, args)
+  | "caml_neon_cvt_float32x4_to_int32x4" -> Some (Cvtnq_s32_f32, args)
+  | "caml_neon_cvtt_float32x4_to_int32x4" -> Some (Cvtq_s32_f32, args)
   | "caml_neon_cvt_int64x2_to_float64x2" -> Some (Cvtq_f64_s64, args)
-  | "caml_neon_cvt_float64x2_to_int64x2" -> Some (Cvtq_s64_f64, args)
+  | "caml_neon_cvt_float64x2_to_int64x2" -> Some (Cvtnq_s64_f64, args)
+  | "caml_neon_cvtt_float64x2_to_int64x2" -> Some (Cvtq_s64_f64, args)
   | "caml_neon_cvt_float32x2_to_float64x2" -> Some (Cvt_f64_f32, args)
   | "caml_neon_cvt_float64x2_to_float32x2" -> Some (Cvt_f32_f64, args)
   | "caml_neon_cvtsx_int32x4_to_int64x2" -> Some (Movl_s32, args)
@@ -423,7 +423,7 @@ let pseudoregs_for_operation (simd_op : Simd.operation) arg res =
   | Rf64x2_to_Rf32x2 | Rs8x16_to_Rs8x16 | Rs8x16_Rs8x16_to_Rs8x16
   | Rs64x2_to_Rs64x2 | Rf64x2_to_Rs64x2 | Rf64x2_Rf64x2_to_Rs64x2
   | Rs32x4_Rs32x4_to_Rs32x4 | Rf32_Rf32_to_Rf32 | Rf64_Rf64_to_Rf64
-  | Rf32_to_Rf32 | Rf64_to_Rf64 | Rf32_to_Rs64 | Rs64x2_to_Rs64 _
+  | Rf32_to_Rf32 | Rf64_to_Rf64 | Rf32_to_Rs64 | Rf64_to_Rs64 | Rs64x2_to_Rs64 _
   | Rs32x4_to_Rs32 _ | Rs32x4lane_to_Rs32x4 _ | Rs64x2lane_to_Rs64x2 _
   | Rf64x2_to_Rf64x2 | Rs64x2_to_Rf64x2 | Rs32x2_to_Rs64x2
   | Rs16x8_Rs16x8_to_Rs16x8 | Rs16x8_to_Rs16x8 | Rs16x8_to_Rs16 _

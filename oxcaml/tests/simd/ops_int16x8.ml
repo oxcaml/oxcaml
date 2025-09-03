@@ -24,9 +24,9 @@ let check_binop msg scalar vector i0 i1 =
   (failmsg := fun () -> Printf.printf "%s: %04x | %04x\n%!" msg i0 i1);
   let r0 = scalar i0 i1 in
   let r1 = scalar i1 i0 in
-  let expect = Int16.of_ints r0 r1 r0 r1 r0 r1 r0 r1 in
-  let v1 = Int16.of_ints i0 i1 i0 i1 i0 i1 i0 i1 in
-  let v2 = Int16.of_ints i1 i0 i1 i0 i1 i0 i1 i0 in
+  let expect = Int16.to_int16x8 r0 r1 r0 r1 r0 r1 r0 r1 in
+  let v1 = Int16.to_int16x8 i0 i1 i0 i1 i0 i1 i0 i1 in
+  let v2 = Int16.to_int16x8 i1 i0 i1 i0 i1 i0 i1 i0 in
   let result = vector v1 v2 in
   eq (int16x8_low_int64 result)
     (int16x8_high_int64 result)
@@ -54,26 +54,26 @@ let () =
   Int16.check_ints (check_binop "mul_low" Int16.mul_low mul_low);
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvt_sx_i64\n%!" l r);
-      let v = Int16.of_ints l r 0 0 0 0 0 0 in
+      let v = Int16.to_int16x8 l r 0 0 0 0 0 0 in
       let result = cvtsx_i64 v in
       let expectl = Int16.cvtsx_i64 l in
       let expectr = Int16.cvtsx_i64 r in
       eq (int64x2_low_int64 result) (int64x2_high_int64 result) expectl expectr);
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvt_zx_i64\n%!" l r);
-      let v = Int16.of_ints l r 0 0 0 0 0 0 in
+      let v = Int16.to_int16x8 l r 0 0 0 0 0 0 in
       let result = cvtzx_i64 v in
       let expectl = Int16.cvtzx_i64 l in
       let expectr = Int16.cvtzx_i64 r in
       eq (int64x2_low_int64 result) (int64x2_high_int64 result) expectl expectr);
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvt_si8\n%!" l r);
-      let v = Int16.of_ints l r l r l r l r in
+      let v = Int16.to_int16x8 l r l r l r l r in
       let result = cvt_si8 v v in
       let expectl = Int16.cvt_si8 l in
       let expectr = Int16.cvt_si8 r in
       let expect =
-        Int8.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int8.to_int8x16 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int8x16_low_int64 result)
@@ -82,12 +82,12 @@ let () =
         (int8x16_high_int64 expect));
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvt_su8\n%!" l r);
-      let v = Int16.of_ints l r l r l r l r in
+      let v = Int16.to_int16x8 l r l r l r l r in
       let result = cvt_su8 v v in
       let expectl = Int16.cvt_su8 l in
       let expectr = Int16.cvt_su8 r in
       let expect =
-        Int8.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int8.to_int8x16 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int8x16_low_int64 result)
@@ -96,34 +96,34 @@ let () =
         (int8x16_high_int64 expect));
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvt_sx_i32\n%!" l r);
-      let v = Int16.of_ints l r l r 0 0 0 0 in
+      let v = Int16.to_int16x8 l r l r 0 0 0 0 in
       let result = cvtsx_i32 v in
       let expectl = Int16.cvtsx_i32 l in
       let expectr = Int16.cvtsx_i32 r in
-      let expect = Int32s.of_int32s expectl expectr expectl expectr in
+      let expect = Int32s.to_int32x4 expectl expectr expectl expectr in
       eq (int32x4_low_int64 result)
         (int32x4_high_int64 result)
         (int32x4_low_int64 expect)
         (int32x4_high_int64 expect));
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvt_zx_i32\n%!" l r);
-      let v = Int16.of_ints l r l r 0 0 0 0 in
+      let v = Int16.to_int16x8 l r l r 0 0 0 0 in
       let result = cvtzx_i32 v in
       let expectl = Int16.cvtzx_i32 l in
       let expectr = Int16.cvtzx_i32 r in
-      let expect = Int32s.of_int32s expectl expectr expectl expectr in
+      let expect = Int32s.to_int32x4 expectl expectr expectl expectr in
       eq (int32x4_low_int64 result)
         (int32x4_high_int64 result)
         (int32x4_low_int64 expect)
         (int32x4_high_int64 expect));
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x abs\n%!" l r);
-      let v = Int16.of_ints l r l r l r l r in
+      let v = Int16.to_int16x8 l r l r l r l r in
       let result = abs v in
       let expectl = Int16.abs l in
       let expectr = Int16.abs r in
       let expect =
-        Int16.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int16.to_int16x8 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int16x8_low_int64 result)
@@ -132,11 +132,11 @@ let () =
         (int16x8_high_int64 expect));
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x hadd\n%!" l r);
-      let v0 = Int16.of_ints l l r r l l r r in
-      let v1 = Int16.of_ints r r l l r r l l in
+      let v0 = Int16.to_int16x8 l l r r l l r r in
+      let v1 = Int16.to_int16x8 r r l l r r l l in
       let result = hadd v0 v1 in
       let expect =
-        Int16.of_ints (Int16.add l l) (Int16.add r r) (Int16.add l l)
+        Int16.to_int16x8 (Int16.add l l) (Int16.add r r) (Int16.add l l)
           (Int16.add r r) (Int16.add r r) (Int16.add l l) (Int16.add r r)
           (Int16.add l l)
       in
@@ -171,13 +171,13 @@ let () =
 let () =
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08x << %08x\n%!" l r);
-      let v = Int16.of_ints l r l r l r l r in
+      let v = Int16.to_int16x8 l r l r l r l r in
       let shift = Int16.logand r 0xf in
-      let result = sll v (Int16.of_ints shift 0 0 0 0 0 0 0) in
+      let result = sll v (Int16.to_int16x8 shift 0 0 0 0 0 0 0) in
       let expectl = Int16.shift_left l shift in
       let expectr = Int16.shift_left r shift in
       let expect =
-        Int16.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int16.to_int16x8 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int16x8_low_int64 result)
@@ -186,13 +186,13 @@ let () =
         (int16x8_high_int64 expect));
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08x >> %08x\n%!" l r);
-      let v = Int16.of_ints l r l r l r l r in
+      let v = Int16.to_int16x8 l r l r l r l r in
       let shift = Int16.logand r 0xf in
-      let result = srl v (Int16.of_ints shift 0 0 0 0 0 0 0) in
+      let result = srl v (Int16.to_int16x8 shift 0 0 0 0 0 0 0) in
       let expectl = Int16.shift_right_logical l shift in
       let expectr = Int16.shift_right_logical r shift in
       let expect =
-        Int16.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int16.to_int16x8 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int16x8_low_int64 result)
@@ -201,13 +201,13 @@ let () =
         (int16x8_high_int64 expect));
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08x >>a %08x\n%!" l r);
-      let v = Int16.of_ints l r l r l r l r in
+      let v = Int16.to_int16x8 l r l r l r l r in
       let shift = Int16.logand r 0xf in
-      let result = sra v (Int16.of_ints shift 0 0 0 0 0 0 0) in
+      let result = sra v (Int16.to_int16x8 shift 0 0 0 0 0 0 0) in
       let expectl = Int16.shift_right l shift in
       let expectr = Int16.shift_right r shift in
       let expect =
-        Int16.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int16.to_int16x8 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int16x8_low_int64 result)
@@ -216,12 +216,12 @@ let () =
         (int16x8_high_int64 expect));
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08x|%08x << 7\n%!" l r);
-      let v = Int16.of_ints l r l r l r l r in
+      let v = Int16.to_int16x8 l r l r l r l r in
       let result = slli 7 v in
       let expectl = Int16.shift_left l 7 in
       let expectr = Int16.shift_left r 7 in
       let expect =
-        Int16.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int16.to_int16x8 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int16x8_low_int64 result)
@@ -230,12 +230,12 @@ let () =
         (int16x8_high_int64 expect));
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08x|%08x >> 7\n%!" l r);
-      let v = Int16.of_ints l r l r l r l r in
+      let v = Int16.to_int16x8 l r l r l r l r in
       let result = srli 7 v in
       let expectl = Int16.shift_right_logical l 7 in
       let expectr = Int16.shift_right_logical r 7 in
       let expect =
-        Int16.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int16.to_int16x8 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int16x8_low_int64 result)
@@ -244,12 +244,12 @@ let () =
         (int16x8_high_int64 expect));
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08x|%08x >>a 7\n%!" l r);
-      let v = Int16.of_ints l r l r l r l r in
+      let v = Int16.to_int16x8 l r l r l r l r in
       let result = srai 7 v in
       let expectl = Int16.shift_right l 7 in
       let expectr = Int16.shift_right r 7 in
       let expect =
-        Int16.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int16.to_int16x8 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int16x8_low_int64 result)

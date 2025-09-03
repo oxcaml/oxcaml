@@ -265,11 +265,10 @@ type b : void mod local unique once uncontended nonportable internal = a
 type c : void mod local unique once uncontended nonportable internal
 type d : void = c
 [%%expect{|
-Line 1, characters 9-13:
-1 | type a : void
-             ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+type a : void
+type b = a
+type c : void
+type d = c
 |}]
 
 type a : immediate
@@ -603,7 +602,7 @@ let f (x : t) : _ as (_ : value mod global) = x
 type t = private int
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t : value = private int
 let f (x : t) : _ as (_ : value mod aliased) = x
@@ -611,7 +610,7 @@ let f (x : t) : _ as (_ : value mod aliased) = x
 type t = private int
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t : value = private int
 let f (x : t) : _ as (_ : value mod many) = x
@@ -619,7 +618,7 @@ let f (x : t) : _ as (_ : value mod many) = x
 type t = private int
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t : value = private int
 let f (x : t) : _ as (_ : value mod portable) = x
@@ -627,7 +626,7 @@ let f (x : t) : _ as (_ : value mod portable) = x
 type t = private int
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t : value = private int
 let f (x : t) : _ as (_ : value mod contended) = x
@@ -635,7 +634,7 @@ let f (x : t) : _ as (_ : value mod contended) = x
 type t = private int
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t : value = private int
 let f (x : t) : _ as (_ : value mod external_) = x
@@ -643,7 +642,7 @@ let f (x : t) : _ as (_ : value mod external_) = x
 type t = private int
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t = private int
 let f (x : t) : _ as (_ : value mod global) = x
@@ -670,7 +669,7 @@ let f (x : t) : _ as (_ : value mod global) = x
 type t = private { x : int; } [@@unboxed]
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t : value = private { x : int } [@@unboxed]
 let f (x : t) : _ as (_ : value mod aliased) = x
@@ -678,7 +677,7 @@ let f (x : t) : _ as (_ : value mod aliased) = x
 type t = private { x : int; } [@@unboxed]
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t : value = private { x : int } [@@unboxed]
 let f (x : t) : _ as (_ : value mod many) = x
@@ -686,7 +685,7 @@ let f (x : t) : _ as (_ : value mod many) = x
 type t = private { x : int; } [@@unboxed]
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t : value = private { x : int } [@@unboxed]
 let f (x : t) : _ as (_ : value mod portable) = x
@@ -694,7 +693,7 @@ let f (x : t) : _ as (_ : value mod portable) = x
 type t = private { x : int; } [@@unboxed]
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t : value = private { x : int } [@@unboxed]
 let f (x : t) : _ as (_ : value mod contended) = x
@@ -702,7 +701,7 @@ let f (x : t) : _ as (_ : value mod contended) = x
 type t = private { x : int; } [@@unboxed]
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 type t : value = private { x : int } [@@unboxed]
 let f (x : t) : _ as (_ : value mod external_) = x
@@ -710,7 +709,7 @@ let f (x : t) : _ as (_ : value mod external_) = x
 type t = private { x : int; } [@@unboxed]
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119 *)
 
 (************************************)
 (* Test 5: Mode crossing of records *)
@@ -1122,7 +1121,6 @@ let x = (Foo true : _ as (_ : value mod portable contended aliased))
 type t = Foo of bool [@@unboxed]
 val x : t = <unknown constructor>
 |}]
-(* CR layouts v2.8: This should be rejected once nominative types remember their kinds *)
 
 type t : value mod global = Foo of int [@@unboxed]
 type t : value mod many = Foo of int [@@unboxed]
@@ -1149,7 +1147,6 @@ Error: The kind of type "t" is value
        But the kind of type "t" must be a subkind of any mod portable
          because of the annotation on the declaration of the type t.
 |}]
-(* CR layouts v2.8: this should be accepted portability *)
 
 (***********************************************)
 (* Test 7: Inference with modality annotations *)
@@ -1159,19 +1156,6 @@ type 'a t : value mod global portable contended many aliased unyielding =
 [%%expect {|
 type 'a t = { x : 'a @@ global many portable aliased contended; } [@@unboxed]
 |}]
-(* CR layouts v2.8: this could be accepted, if we infer ('a : value mod
-   unyielding). We do not currently do this, because we finish inference of the
-   type declaration before ever consulting the jkind annotation. *)
-(* CR layouts v2.8: In addition, the error message is a little sad, in that it
-   reports the jkind of t imprecisely. Really, its jkind should have "mod
-   unyielding with 'a @@ stuff" -- because if 'a mode-crossing yielding, then so
-   does 'a t (and this is true in practice). What's going on here is that the
-   algorithm in typedecl uses the jkind of 'a (which is value) as the jkind of
-   'a t (after taking modalities into account). This is misleading, though
-   understandable. In the end, though, this bug manifests only as a confusing
-   error message, not deeper misbehavior, and so is low priority. When we have
-   [layout_of], we'll be able to give a better jkind to [@@unboxed] types, and
-   this will likely improve. *)
 
 type 'a t : value mod global immutable stateless many aliased unyielding non_float =
   Foo of 'a @@ global immutable stateless many aliased [@@unboxed]
@@ -1186,7 +1170,20 @@ Error: The kind of type "t" is value
            immutable_data mod global aliased yielding
          because of the annotation on the declaration of the type t.
 |}]
-(* CR layouts v2.8: this should be accepted *)
+(* CR layouts v2.8: this could be accepted, if we infer ('a : value mod
+   unyielding). We do not currently do this, because we finish inference of the
+   type declaration before ever consulting the jkind annotation. Internal
+   ticket 5120. *)
+(* CR layouts v2.8: In addition, the error message is a little sad, in that it
+   reports the jkind of t imprecisely. Really, its jkind should have "mod
+   unyielding with 'a @@ stuff" -- because if 'a mode-crossing yielding, then so
+   does 'a t (and this is true in practice). What's going on here is that the
+   algorithm in typedecl uses the jkind of 'a (which is value) as the jkind of
+   'a t (after taking modalities into account). This is misleading, though
+   understandable. In the end, though, this bug manifests only as a confusing
+   error message, not deeper misbehavior, and so is low priority. When we have
+   [layout_of], we'll be able to give a better jkind to [@@unboxed] types, and
+   this will likely improve. Internal ticket 5120. *)
 
 type ('a : value mod global) t : value mod global = { x : 'a @@ global } [@@unboxed]
 type ('a : immediate) t : immediate = { x : 'a @@ global } [@@unboxed]
@@ -1220,7 +1217,7 @@ Error: The kind of type "t" is value mod external_
        But the kind of type "t" must be a subkind of immediate
          because of the annotation on the declaration of the type t.
 |}]
-(* CR layouts v2.8: this should be accepted *)
+(* CR layouts v2.8: this should be accepted. Internal ticket 5120. *)
 
 type 'a t : value mod many = { x : 'a @@ many }
 type 'a t : value mod contended = { x : 'a @@ contended }
@@ -1512,7 +1509,7 @@ Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-21.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
-   word *)
+   word. Internal ticket 5120. *)
 
 type 'a t : any = private 'a
 [%%expect {|
@@ -1540,7 +1537,7 @@ Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-29.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
-  word *)
+  word. Internal ticket 5120. *)
 
 type 'a t : value mod global = Foo of 'a [@@unboxed]
 [%%expect {|
@@ -1554,7 +1551,7 @@ Error: The kind of type "t" is value
          because of the annotation on the declaration of the type t.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
-  value mod global *)
+  value mod global. Internal ticket 5120. *)
 
 type 'a t : value mod global = { x : 'a }
 [%%expect {|

@@ -26,15 +26,27 @@ open Allowance
 (** Asttypes exposes basic definitions shared both by Parsetree and Types. *)
 open Asttypes
 
+(** Whether or not a mutable field is atomic *)
+type atomic =
+  | Nonatomic
+  | Atomic
+
 (** Describes a mutable field/element. *)
 type mutability =
   | Immutable
-  | Mutable of Mode.Value.Comonadic.lr
-  (** Mode of new field value in mutation. *)
+  | Mutable of
+      { mode : Mode.Value.Comonadic.lr
+        (** Mode of new field value in mutation. *)
+      ; atomic : atomic
+      }
 
-(** Returns [true] is the [mutable_flag] is mutable. Should be called if not
-    interested in the payload of [Mutable]. *)
+(** Returns [true] is the [mutable_flag] is mutable or atomic. Should be called
+    if not interested in the payload of [Mutable]. *)
 val is_mutable : mutability -> bool
+
+(** Returns [true] is the [mutable_flag] is atomic. Should be called
+    if not interested in the payload of [Mutable]. *)
+val is_atomic : mutability -> bool
 
 (** Given the parameter [m0] on mutable, return the mode of future writes. *)
 val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
@@ -73,7 +85,7 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** The mod-bounds of a jkind *)
 module Jkind_mod_bounds : sig
-  module Locality = Mode.Locality.Const
+  module Areality = Mode.Regionality.Const
   module Linearity = Mode.Linearity.Const
   module Uniqueness = Mode.Uniqueness.Const_op
   module Portability = Mode.Portability.Const
@@ -88,7 +100,7 @@ module Jkind_mod_bounds : sig
   type t
 
   val create :
-    locality:Locality.t ->
+    areality:Areality.t ->
     linearity:Linearity.t ->
     uniqueness:Uniqueness.t ->
     portability:Portability.t ->
@@ -101,7 +113,7 @@ module Jkind_mod_bounds : sig
     separability:Separability.t ->
     t
 
-  val locality : t -> Locality.t
+  val areality : t -> Areality.t
   val linearity : t -> Linearity.t
   val uniqueness : t -> Uniqueness.t
   val portability : t -> Portability.t
@@ -113,7 +125,7 @@ module Jkind_mod_bounds : sig
   val nullability : t -> Nullability.t
   val separability : t -> Separability.t
 
-  val set_locality : Locality.t -> t -> t
+  val set_areality : Areality.t -> t -> t
   val set_linearity : Linearity.t -> t -> t
   val set_uniqueness : Uniqueness.t -> t -> t
   val set_portability : Portability.t -> t -> t
@@ -827,6 +839,9 @@ and mixed_block_element =
   (* A [Float_boxed] is a float that's stored flat but boxed upon projection. *)
   | Float64
   | Float32
+  | Bits8
+  | Bits16
+  | Untagged_immediate
   | Bits32
   | Bits64
   | Vec128
@@ -835,6 +850,7 @@ and mixed_block_element =
   | Word
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
+  | Void
 
 and mixed_product_shape = mixed_block_element array
 
@@ -899,7 +915,7 @@ and label_declaration =
   {
     ld_id: Ident.t;
     ld_mutable: mutability;
-    ld_modalities: Mode.Modality.Value.Const.t;
+    ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t;
     ld_loc: Location.t;
@@ -919,7 +935,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    ca_modalities: Mode.Modality.Value.Const.t;
+    ca_modalities: Mode.Modality.Const.t;
     ca_type: type_expr;
     ca_sort: Jkind_types.Sort.Const.t;
     ca_loc: Location.t;
@@ -932,7 +948,8 @@ and constructor_arguments =
 val tys_of_constr_args : constructor_arguments -> type_expr list
 
 (* Returns the inner type and its modalities, if unboxed. *)
-val find_unboxed_type : type_declaration -> (type_expr * Mode.Modality.Value.Const.t) option
+val find_unboxed_type : type_declaration ->
+  (type_expr * Mode.Modality.Const.t) option
 
 type extension_constructor =
   {
@@ -1020,7 +1037,7 @@ module type Wrapped = sig
 
   type value_description =
     { val_type: type_expr wrapped;                (* Type of the value *)
-      val_modalities: Mode.Modality.Value.t;      (* Modalities on the value *)
+      val_modalities: Mode.Modality.t;      (* Modalities on the value *)
       val_kind: value_kind;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
@@ -1055,7 +1072,7 @@ module type Wrapped = sig
   and module_declaration =
   {
     md_type: module_type;
-    md_modalities : Mode.Modality.Value.t;
+    md_modalities : Mode.Modality.t;
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
@@ -1146,7 +1163,7 @@ type 'a gen_label_description =
     lbl_res: type_expr;                 (* Type of the result *)
     lbl_arg: type_expr;                 (* Type of the argument *)
     lbl_mut: mutability;                (* Is this a mutable field? *)
-    lbl_modalities: Mode.Modality.Value.Const.t;
+    lbl_modalities: Mode.Modality.Const.t;
                                         (* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
     lbl_pos: int;                       (* Position in type *)

@@ -282,6 +282,7 @@ let default_load ppf (program : Lambda.program) =
   res
 
 let load_lambda ppf ~compilation_unit ~required_globals lam size =
+  if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let slam = Simplif.simplify_lambda lam in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
@@ -346,12 +347,15 @@ let name_expression ~loc ~attrs sort exp =
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
-      val_modalities = Mode.Modality.Value.id;
+      val_modalities = Mode.Modality.id;
       val_uid = Uid.internal_not_actually_unique; }
   in
   let sg = [Sig_value(id, vd, Exported)] in
   let pat =
-    { pat_desc = Tpat_var(id, mknoloc name, vd.val_uid, Mode.Value.disallow_right Mode.Value.legacy);
+    { pat_desc =
+        Tpat_var(id, mknoloc name, vd.val_uid,
+          Jkind.Sort.(of_const Const.for_module_field),
+          Mode.Value.disallow_right Mode.Value.legacy);
       pat_loc = loc;
       pat_extra = [];
       pat_type = exp.exp_type;
@@ -429,7 +433,6 @@ let execute_phrase print_outcome ppf phr =
               required_globals; code = res } =
           Translmod.transl_implementation compilation_unit
             (str, coercion, None)
-            ~style:Plain_block
         in
         remember compilation_unit sg';
         let size =

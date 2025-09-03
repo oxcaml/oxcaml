@@ -136,6 +136,7 @@ struct caml_thread_struct {
   void * signal_stack;       /* this thread's signal stack */
   size_t signal_stack_size;  /* size of this thread's signal stack in bytes */
   int is_main;               /* whether this is the main thread of its domain */
+  dynamic_thread_t dynamic;  /* dynamic value bindings */
 
 #ifndef NATIVE_CODE
   intnat trap_sp_off;      /* saved value of Caml_state->trap_sp_off */
@@ -149,10 +150,7 @@ struct caml_thread_struct {
 
 typedef struct caml_thread_struct* caml_thread_t;
 
-/* Thread-local key for accessing the current thread's [caml_thread_t] */
-st_tlskey caml_thread_key;
-
-#define This_thread ((caml_thread_t) st_tls_get(caml_thread_key))
+static CAMLthread_local caml_thread_t This_thread;
 
 /* overall table for threads across domains */
 struct caml_thread_table {
@@ -267,7 +265,8 @@ static void caml_thread_scan_roots(
       if (th != active) {
         if (th->current_stack != NULL)
           caml_do_local_roots(action, fflags, fdata,
-                              th->local_roots, th->current_stack, th->gc_regs);
+                              th->local_roots, th->current_stack, th->gc_regs,
+                              th->dynamic);
       }
       th = th->next;
     } while (th != active);
@@ -334,6 +333,7 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->external_raise_async = th->external_raise_async;
 #endif
   caml_memprof_enter_thread(th->memprof);
+  caml_dynamic_enter_thread(th->dynamic);
 }
 
 CAMLexport void caml_thread_restore_runtime_state(void)
@@ -398,7 +398,7 @@ static void caml_thread_leave_blocking_section(void)
 /* Create and setup a new thread info block.
    This block has no associated thread descriptor and
    is not inserted in the list of threads. */
-static caml_thread_t caml_thread_new_info(void)
+static caml_thread_t caml_thread_new_info(caml_thread_t parent)
 {
   caml_thread_t th = NULL;
   caml_domain_state *domain_state = Caml_state;
@@ -418,10 +418,12 @@ static caml_thread_t caml_thread_new_info(void)
      must be initialized to a valid value, as in [domain_create]. */
 
   th->current_stack = caml_alloc_main_stack(stack_wsize);
-  if (th->current_stack == NULL) goto out_err1;
+  if (th->current_stack == NULL) goto fail_alloc_stack;
 
   th->memprof = caml_memprof_new_thread(domain_state);
-  if (th->memprof == NULL) goto out_err2;
+  if (th->memprof == NULL) goto fail_memprof;
+  th->dynamic = caml_dynamic_new_thread(parent->dynamic);
+  if (th->dynamic == NULL) goto fail_dynamic;
 
   th->c_stack = NULL;
   th->local_roots = NULL;
@@ -442,9 +444,11 @@ static caml_thread_t caml_thread_new_info(void)
 #endif
   return th;
 
- out_err2:
+ fail_dynamic:
+  caml_memprof_delete_thread(th->memprof);
+ fail_memprof:
   caml_free_stack(th->current_stack);
- out_err1:
+ fail_alloc_stack:
   caml_stat_free(th);
   return NULL;
 }
@@ -469,6 +473,7 @@ void caml_thread_free_info(caml_thread_t th)
      init_mask: stack-allocated
   */
   caml_memprof_delete_thread(th->memprof);
+  caml_dynamic_delete_thread(th->dynamic);
   caml_free_stack(th->current_stack);
   caml_free_backtrace_buffer(th->backtrace_buffer);
 
@@ -500,7 +505,7 @@ static value caml_thread_new_descriptor(value clos)
 /* Allocate a thread info block and add it to the list of threads */
 static caml_thread_t thread_alloc_and_add(void)
 {
-  caml_thread_t th = caml_thread_new_info();
+  caml_thread_t th = caml_thread_new_info(Active_thread);
 
   if (th == NULL) return NULL;
 
@@ -630,7 +635,7 @@ CAMLprim value caml_thread_use_domains(value unit)
      so we can switch lockmode */
   domain_lockmode = LOCKMODE_DOMAINS;
 
-  return Val_unit; 
+  return Val_unit;
 }
 
 static void caml_thread_domain_spawn_hook(void)
@@ -687,13 +692,15 @@ static void caml_thread_domain_initialize_hook(void)
   new_thread->prev = new_thread;
   new_thread->backtrace_last_exn = Val_unit;
   new_thread->memprof = caml_memprof_main_thread(Caml_state);
+  new_thread->dynamic = Caml_state->dynamic_bindings;
+  CAMLassert(new_thread->dynamic);
   new_thread->is_main = 1;
   new_thread->signal_stack = NULL;
 
-  st_tls_set(caml_thread_key, new_thread);
-
+  This_thread = new_thread;
   Active_thread = new_thread;
   caml_memprof_enter_thread(new_thread->memprof);
+  caml_dynamic_enter_thread(new_thread->dynamic);
 }
 
 static void thread_yield(void);
@@ -703,11 +710,11 @@ void caml_thread_interrupt_hook(void)
   /* Do not attempt to yield from the backup thread */
   if (caml_bt_is_self()) return;
 
-  uintnat is_on = 1;
+  uintnat mask = ~ST_INTERRUPT_FLAG;
   atomic_uintnat* req_external_interrupt =
     &Caml_state->requested_external_interrupt;
 
-  if (atomic_compare_exchange_strong(req_external_interrupt, &is_on, 0)) {
+  if (atomic_fetch_and(req_external_interrupt, mask) & ST_INTERRUPT_FLAG) {
     thread_yield();
   }
 
@@ -732,9 +739,6 @@ CAMLprim value caml_thread_initialize(value unit)
   if (thread_table == NULL)
     caml_fatal_error("caml_thread_initialize: failed to allocate thread"
                      " table");
-
-  /* Initialize the key to the [caml_thread_t] structure */
-  st_tls_newkey(&caml_thread_key);
 
   /* First initialise the systhread chain on this domain */
   caml_thread_domain_initialize_hook();
@@ -797,7 +801,7 @@ static void thread_detach_from_runtime(void)
      again.  It also removes the thread from memprof. */
   caml_thread_remove_and_free(th);
   /* Forget the now-freed thread info */
-  st_tls_set(caml_thread_key, NULL);
+  This_thread = NULL;
   /* Release domain lock */
   thread_lock_release(Caml_state->id);
 }
@@ -805,7 +809,7 @@ static void thread_detach_from_runtime(void)
 /* Register current thread */
 static void thread_init_current(caml_thread_t th)
 {
-  st_tls_set(caml_thread_key, th);
+  This_thread = th;
   restore_runtime_state(th);
   th->signal_stack = caml_init_signal_stack(&th->signal_stack_size);
 }
@@ -842,9 +846,9 @@ static void * caml_thread_start(void * v)
   return 0;
 }
 
-static st_retcode create_tick_thread(void)
+static st_retcode start_tick_thread(void)
 {
-  if (Tick_thread_running) return 0;
+  if (Tick_thread_running || Tick_thread_disabled) return 0;
 
 #ifdef POSIX_SIGNALS
   sigset_t mask, old_mask;
@@ -858,7 +862,7 @@ static st_retcode create_tick_thread(void)
   struct caml_thread_tick_args* tick_thread_args =
     caml_stat_alloc_noexc(sizeof(struct caml_thread_tick_args));
   if (tick_thread_args == NULL)
-    caml_fatal_error("create_tick_thread: failed to allocate thread args");
+    caml_fatal_error("start_tick_thread: failed to allocate thread args");
 
   tick_thread_args->domain_id = Caml_state->id;
   tick_thread_args->stop = &Tick_thread_stop;
@@ -876,17 +880,10 @@ static st_retcode create_tick_thread(void)
   return 0;
 }
 
-static st_retcode start_tick_thread(void)
-{
-  if (Tick_thread_running) return 0;
-  st_retcode err = create_tick_thread();
-  if (err == 0) Tick_thread_running = 1;
-  return err;
-}
-
 CAMLprim value caml_enable_tick_thread(value v_enable)
 {
   int enable = Long_val(v_enable) ? 1 : 0;
+  Tick_thread_disabled = !enable;
 
   if (enable) {
     st_retcode err = start_tick_thread();
@@ -895,7 +892,6 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
     stop_tick_thread();
   }
 
-  Tick_thread_disabled = !enable;
   return Val_unit;
 }
 
@@ -911,7 +907,7 @@ CAMLprim value caml_thread_new(value clos)
   /* Create the tick thread if not already done.
      Because of PR#4666, we start the tick thread late, only when we create
      the first additional thread in the current process */
-  st_retcode err = create_tick_thread();
+  st_retcode err = start_tick_thread();
   sync_check_error(err, "Thread.create");
 
   /* Create a thread info block */
@@ -954,7 +950,7 @@ CAMLexport int caml_c_thread_register(void)
   thread_lock_acquire(Dom_c_threads);
 
   /* Create tick thread if not already done */
-  st_retcode err = create_tick_thread();
+  st_retcode err = start_tick_thread();
   if (err != 0) goto out_err;
 
   /* Set a thread info block */
@@ -999,7 +995,7 @@ CAMLexport int caml_c_thread_unregister(void)
 
 CAMLprim value caml_thread_self(value unit)
 {
-  return Active_thread->descr;
+  return This_thread->descr;
 }
 
 /* Return the identifier of a thread */

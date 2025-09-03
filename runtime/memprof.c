@@ -1701,23 +1701,6 @@ static value capture_callstack_GC(memprof_domain_t domain, int alloc_idx)
   return res;
 }
 
-/* Given a stashed callstack, copy it to the Caml heap and free the
- * stash. Given a non-stashed callstack, simply return it. */
-
-static value unstash_callstack(value callstack)
-{
-  CAMLparam1(callstack);
-  if (Is_long(callstack)) { /* stashed on C heap */
-    callstack_stash_t stash = Ptr_val(callstack);
-    callstack = caml_alloc(stash->frames, 0);
-    for (size_t i = 0; i < stash->frames; ++i) {
-      Field(callstack, i) = Val_backtrace_slot(stash->stack[i]);
-    }
-    caml_stat_free(stash);
-  }
-  CAMLreturn(callstack);
-}
-
 /**** Running callbacks ****/
 
 /* Runs a single callback, in thread `thread`, for entry number `i` in
@@ -1802,12 +1785,26 @@ static value run_alloc_callback_exn(memprof_thread_t thread,
   entry_t e = &es->t[i];
   CAMLassert(e->deallocated || e->offset || Is_block(e->block));
 
-  e->user_data = unstash_callstack(e->user_data);
   value sample_info = caml_alloc_small(4, 0);
   Field(sample_info, 0) = Val_long(e->samples);
   Field(sample_info, 1) = Val_long(e->wosize);
   Field(sample_info, 2) = Val_long(e->source);
   Field(sample_info, 3) = e->user_data;
+
+  if (Is_long(e->user_data)) {
+    /* Callstack stashed on C heap, so copy it to OCaml heap */
+    CAMLparam1(sample_info);
+    CAMLlocal1(callstack);
+    callstack_stash_t stash = Ptr_val(e->user_data);
+    callstack = caml_alloc(stash->frames, 0);
+    for (size_t i = 0; i < stash->frames; ++i) {
+      Field(callstack, i) = Val_backtrace_slot(stash->stack[i]);
+    }
+    caml_stat_free(stash);
+    Store_field(sample_info, 3, callstack);
+    CAMLdrop;
+  }
+
   value callback =
     e->alloc_young ? Alloc_minor(es->config) : Alloc_major(es->config);
   return run_callback_exn(thread, es, i, callback, sample_info, CB_ALLOC);
@@ -2210,6 +2207,19 @@ CAMLexport void caml_memprof_enter_thread(memprof_thread_t thread)
 
 /**** Interface to OCaml ****/
 
+/* Set config of the domain and all its threads */
+static void set_config(memprof_domain_t domain, value config)
+{
+  CAMLassert(domain->entries.size == 0);
+  domain->entries.config = config;
+  memprof_thread_t thread = domain->threads;
+  while (thread) {
+    CAMLassert(thread->entries.size == 0);
+    thread->entries.config = config;
+    thread = thread->next;
+  }
+}
+
 CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 {
   CAMLparam3(lv, szv, tracker);
@@ -2259,16 +2269,9 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
     caml_initialize(&Field(config, i), Field(tracker,
                                              i - CONFIG_FIELD_FIRST_CALLBACK));
   }
-  CAMLassert(domain->entries.size == 0);
 
-  /* Set config pointers of the domain and all its threads */
-  domain->entries.config = config;
-  memprof_thread_t thread = domain->threads;
-  while (thread) {
-    CAMLassert(thread->entries.size == 0);
-    thread->entries.config = config;
-    thread = thread->next;
-  }
+
+  set_config(domain, config);
 
   /* reset PRNG, generate first batch of random numbers. */
   rand_init(domain);
@@ -2279,6 +2282,43 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
   set_action_pending_as_needed(domain);
 
   CAMLreturn(config);
+}
+
+CAMLprim value caml_memprof_participate(value config)
+{
+  CAMLparam1(config);
+  memprof_domain_t domain = Caml_state->memprof;
+  CAMLassert(domain);
+
+  if (Sampling(thread_config(domain->current))) {
+    caml_failwith("Gc.Memprof.participate: already profiling.");
+  }
+
+  switch (Status(config)) {
+  case CONFIG_STATUS_DISCARDED:
+    caml_failwith("Gc.Memprof.restart: profile already discarded.");
+  case CONFIG_STATUS_STOPPED:
+    caml_failwith("Gc.Memprof.restart: profile already stopped.");
+  case CONFIG_STATUS_SAMPLING:
+    break;
+  }
+
+  /* Orphan any surviving tracking entries from a previous profile. */
+  if (!orphans_create(domain)) {
+    caml_raise_out_of_memory();
+  }
+
+  set_config(domain, config);
+
+  /* reset PRNG, generate first batch of random numbers. */
+  rand_init(domain);
+
+  caml_memprof_set_trigger(Caml_state);
+  caml_reset_young_limit(Caml_state);
+  orphans_update_pending(domain);
+  set_action_pending_as_needed(domain);
+
+  CAMLreturn(Val_unit);
 }
 
 CAMLprim value caml_memprof_stop(value unit)
@@ -2312,6 +2352,7 @@ CAMLprim value caml_memprof_stop(value unit)
 
 CAMLprim value caml_memprof_discard(value config)
 {
+  CAMLparam1(config);
   uintnat status = Status(config);
   CAMLassert((status == CONFIG_STATUS_STOPPED) ||
              (status == CONFIG_STATUS_SAMPLING) ||
@@ -2328,5 +2369,5 @@ CAMLprim value caml_memprof_discard(value config)
 
   Set_status(config, CONFIG_STATUS_DISCARDED);
 
-  return Val_unit;
+  CAMLreturn(Val_unit);
 }

@@ -16,7 +16,6 @@
 
 (** OxCaml specific command line flags *)
 
-val use_ocamlcfg : bool ref
 val dump_cfg : bool ref
 val cfg_invariants : bool ref
 val regalloc : string ref
@@ -36,6 +35,10 @@ val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
 
 val cfg_eliminate_dead_trap_handlers : bool ref
+
+val cfg_prologue_validate : bool ref
+val cfg_prologue_shrink_wrap : bool ref
+val cfg_prologue_shrink_wrap_threshold : int ref
 
 val reorder_blocks_random : int option ref
 val basic_block_sections : bool ref
@@ -58,6 +61,7 @@ type zero_alloc_checker_details_cutoff =
 
 val zero_alloc_checker_details_cutoff : zero_alloc_checker_details_cutoff ref
 val default_zero_alloc_checker_details_cutoff : zero_alloc_checker_details_cutoff
+val zero_alloc_checker_details_extra : bool ref
 
 type zero_alloc_checker_join =
   | Keep_all
@@ -105,6 +109,10 @@ val use_cached_generic_functions : bool ref
 val cached_generic_functions_path : string ref
 
 val symbol_visibility_protected : bool ref
+
+val dump_llvmir : bool ref
+val keep_llvmir : bool ref
+val llvm_path : string option ref
 
 module Flambda2 : sig
   val debug : bool ref

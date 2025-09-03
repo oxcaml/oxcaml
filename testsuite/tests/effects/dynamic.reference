@@ -1,0 +1,47 @@
+get [expect 1]: 1
+get on other thread [expect 1]: 1
+get on earlier thread [expect 1]: 1
+get after set_root [expect 2]: 2
+get on child thread created after set_root [expect 2]: 2
+get on pre-existing thread after set_root [expect 3]: 3
+get after set_root on child thread [expect 2]: 2
+with_temporarily [expect 6]: 6
+In other thread during with_temporarily [expect 7]: 7
+with_temporarily still [expect 6]: 6
+after with_temporarily [expect 7]: 7
+In fiber [expect 10]: 10
+In pre-existing thread [expect 20]: 20
+in handler [expect 11]: 11
+In pre-existing thread [expect 20]: 20
+In continuation [expect 12]: 12
+after fiber [expect 13]: 13
+In pre-existing thread [expect 20]: 20
+after continuation [expect 14]: 14
+In pre-existing thread [expect 20]: 20
+In fiber [expect 20]: 20
+In pre-existing thread [expect 30]: 30
+in handler [expect 21]: 21
+with_temporarily [expect 22]: 22
+In other thread during with_temporarily [expect 21]: 21
+with_temporarily still [expect 22]: 22
+after with_temporarily [expect 21]: 21
+In pre-existing thread [expect 30]: 30
+In continuation [expect 23]: 23
+after fiber [expect 24]: 24
+In pre-existing thread [expect 30]: 30
+after continuation [expect 25]: 25
+In pre-existing thread [expect 30]: 30
+In fiber [expect 40]: 40
+In pre-existing thread [expect 50]: 50
+with_temporarily in fiber [expect 41]: 41
+in handler [expect 42): 42
+continuing in with_temporarily [expect 41]: 41
+still in continuation, after with_temporarily [expect 43]: 43
+after fiber [expect 44]: 44
+In pre-existing thread [expect 50]: 50
+with_temporarily [expect 45]: 45
+In other thread during with_temporarily [expect 44]: 44
+with_temporarily still [expect 45]: 45
+after with_temporarily [expect 44]: 44
+after continuation returns [expect 46]: 46
+In pre-existing thread [expect 50]: 50

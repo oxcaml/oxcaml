@@ -8,107 +8,89 @@ open Jkind_axis
    externality/nullability) will stay in this file, while [transl_modifiers]
    should go into [typekind.ml] and calls [transl_modalities]. *)
 
-type modal = private |
-
-type maybe_nonmodal = private |
-
-type 'm annot_type =
-  | Modifier : maybe_nonmodal annot_type
-  | Mode : modal annot_type
-  | Modality : modal annot_type
+type annot_type =
+  | Modifier
+  | Mode
+  | Modality
 
 type error =
   | Duplicated_axis : _ Axis.t -> error
-  | Unrecognized_modifier : _ annot_type * string -> error
+  | Unrecognized_modifier : annot_type * string -> error
 
 exception Error of Location.t * error
 
-module Axis_pair = struct
-  type 'm t =
-    | Modal_axis_pair : ('a, _, _) Mode.Alloc.Axis.t * 'a -> modal t
-    | Any_axis_pair : 'a Axis.t * 'a -> maybe_nonmodal t
-    | Everything_but_nullability : maybe_nonmodal t
+module Modal_axis_pair = struct
+  [@@@warning "-18"]
 
-  let of_string s =
-    let open Mode in
+  type t = P : 'a Alloc.Axis.t * 'a -> t
+
+  type t_value = P : 'a Value.Axis.t * 'a -> t_value
+
+  let to_value (P (ax, a) : t) : t_value =
+    match Const.Axis.is_areality ax with
+    | Left Refl -> P (Comonadic Areality, Const.locality_as_regionality a)
+    | Right ax -> P (ax, a)
+
+  let of_string s : t =
+    let comonadic (type a) (ax : a Alloc.Comonadic.Axis.t) (a : a) : t =
+      P (Comonadic ax, a)
+    in
+    let monadic (type a) (ax : a Alloc.Monadic.Axis.t) (a : a) : t =
+      P (Monadic ax, a)
+    in
     match s with
-    | "local" -> Any_axis_pair (Modal (Comonadic Areality), Locality.Const.Local)
-    | "global" ->
-      Any_axis_pair (Modal (Comonadic Areality), Locality.Const.Global)
-    | "unique" ->
-      Any_axis_pair (Modal (Monadic Uniqueness), Uniqueness.Const.Unique)
-    | "aliased" ->
-      Any_axis_pair (Modal (Monadic Uniqueness), Uniqueness.Const.Aliased)
-    | "once" -> Any_axis_pair (Modal (Comonadic Linearity), Linearity.Const.Once)
-    | "many" -> Any_axis_pair (Modal (Comonadic Linearity), Linearity.Const.Many)
-    | "nonportable" ->
-      Any_axis_pair
-        (Modal (Comonadic Portability), Portability.Const.Nonportable)
-    | "portable" ->
-      Any_axis_pair (Modal (Comonadic Portability), Portability.Const.Portable)
-    | "contended" ->
-      Any_axis_pair (Modal (Monadic Contention), Contention.Const.Contended)
-    | "shared" ->
-      Any_axis_pair (Modal (Monadic Contention), Contention.Const.Shared)
-    | "uncontended" ->
-      Any_axis_pair (Modal (Monadic Contention), Contention.Const.Uncontended)
-    | "maybe_null" ->
-      Any_axis_pair (Nonmodal Nullability, Nullability.Maybe_null)
-    | "non_null" -> Any_axis_pair (Nonmodal Nullability, Nullability.Non_null)
-    | "internal" -> Any_axis_pair (Nonmodal Externality, Externality.Internal)
-    | "external64" ->
-      Any_axis_pair (Nonmodal Externality, Externality.External64)
-    | "external_" -> Any_axis_pair (Nonmodal Externality, Externality.External)
-    | "yielding" ->
-      Any_axis_pair (Modal (Comonadic Yielding), Yielding.Const.Yielding)
-    | "unyielding" ->
-      Any_axis_pair (Modal (Comonadic Yielding), Yielding.Const.Unyielding)
-    | "stateless" ->
-      Any_axis_pair
-        (Modal (Comonadic Statefulness), Statefulness.Const.Stateless)
-    | "observing" ->
-      Any_axis_pair
-        (Modal (Comonadic Statefulness), Statefulness.Const.Observing)
-    | "stateful" ->
-      Any_axis_pair (Modal (Comonadic Statefulness), Statefulness.Const.Stateful)
-    | "immutable" ->
-      Any_axis_pair (Modal (Monadic Visibility), Visibility.Const.Immutable)
-    | "read" -> Any_axis_pair (Modal (Monadic Visibility), Visibility.Const.Read)
-    | "read_write" ->
-      Any_axis_pair (Modal (Monadic Visibility), Visibility.Const.Read_write)
-    | "maybe_separable" ->
-      Any_axis_pair (Nonmodal Separability, Separability.Maybe_separable)
-    | "separable" ->
-      Any_axis_pair (Nonmodal Separability, Separability.Separable)
-    | "non_float" ->
-      Any_axis_pair (Nonmodal Separability, Separability.Non_float)
-    | "everything" -> Everything_but_nullability
+    | "local" -> comonadic Areality Local
+    (* "regional" is not supported *)
+    | "global" -> comonadic Areality Global
+    | "unique" -> monadic Uniqueness Unique
+    | "aliased" -> monadic Uniqueness Aliased
+    | "once" -> comonadic Linearity Once
+    | "many" -> comonadic Linearity Many
+    | "nonportable" -> comonadic Portability Nonportable
+    | "portable" -> comonadic Portability Portable
+    | "contended" -> monadic Contention Contended
+    | "shared" -> monadic Contention Shared
+    | "uncontended" -> monadic Contention Uncontended
+    | "yielding" -> comonadic Yielding Yielding
+    | "unyielding" -> comonadic Yielding Unyielding
+    | "stateless" -> comonadic Statefulness Stateless
+    | "observing" -> comonadic Statefulness Observing
+    | "stateful" -> comonadic Statefulness Stateful
+    | "immutable" -> monadic Visibility Immutable
+    | "read" -> monadic Visibility Read
+    | "read_write" -> monadic Visibility Read_write
     | _ -> raise Not_found
 end
 
-let transl_annot (type m) ~(annot_type : m annot_type) ~required_mode_maturity
-    annot : m Axis_pair.t Location.loc =
-  Option.iter
-    (fun maturity ->
-      Language_extension.assert_enabled ~loc:annot.loc Mode maturity)
-    required_mode_maturity;
-  let pair : m Axis_pair.t =
-    match Axis_pair.of_string annot.txt, annot_type with
-    | Any_axis_pair (Nonmodal _, _), (Mode | Modality)
-    | Everything_but_nullability, (Mode | Modality)
-    | (exception Not_found) ->
-      raise (Error (annot.loc, Unrecognized_modifier (annot_type, annot.txt)))
-    | Any_axis_pair (Modal axis, mode), Mode -> Modal_axis_pair (axis, mode)
-    | Any_axis_pair (Modal axis, mode), Modality -> Modal_axis_pair (axis, mode)
-    | pair, Modifier -> pair
-  in
-  { txt = pair; loc = annot.loc }
+module Axis_pair = struct
+  type t = P : 'a Axis.t * 'a -> t
 
-let unpack_mode_annot { txt = Parsetree.Mode s; loc } = { txt = s; loc }
+  [@@@warning "-18"]
+
+  let of_string s =
+    match Modal_axis_pair.of_string s with
+    | modal ->
+      let (P (ax, a)) = Modal_axis_pair.to_value modal in
+      P (Modal ax, a)
+    | exception Not_found -> (
+      let nonmodal (type a) (ax : a Axis.Nonmodal.t) (a : a) : t =
+        P (Nonmodal ax, a)
+      in
+      match s with
+      | "maybe_null" -> nonmodal Nullability Maybe_null
+      | "non_null" -> nonmodal Nullability Non_null
+      | "internal" -> nonmodal Externality Internal
+      | "external64" -> nonmodal Externality External64
+      | "external_" -> nonmodal Externality External
+      | "maybe_separable" -> nonmodal Separability Maybe_separable
+      | "separable" -> nonmodal Separability Separable
+      | "non_float" -> nonmodal Separability Non_float
+      | _ -> raise Not_found)
+end
 
 module Transled_modifiers = struct
   type t =
-    { locality : Mode.Locality.Const.t Location.loc option;
+    { areality : Mode.Regionality.Const.t Location.loc option;
       linearity : Mode.Linearity.Const.t Location.loc option;
       uniqueness : Mode.Uniqueness.Const.t Location.loc option;
       portability : Mode.Portability.Const.t Location.loc option;
@@ -122,7 +104,7 @@ module Transled_modifiers = struct
     }
 
   let empty =
-    { locality = None;
+    { areality = None;
       linearity = None;
       uniqueness = None;
       portability = None;
@@ -137,7 +119,7 @@ module Transled_modifiers = struct
 
   let get (type a) ~(axis : a Axis.t) (t : t) : a Location.loc option =
     match axis with
-    | Modal (Comonadic Areality) -> t.locality
+    | Modal (Comonadic Areality) -> t.areality
     | Modal (Comonadic Linearity) -> t.linearity
     | Modal (Monadic Uniqueness) -> t.uniqueness
     | Modal (Comonadic Portability) -> t.portability
@@ -152,7 +134,7 @@ module Transled_modifiers = struct
   let set (type a) ~(axis : a Axis.t) (t : t) (value : a Location.loc option) :
       t =
     match axis with
-    | Modal (Comonadic Areality) -> { t with locality = value }
+    | Modal (Comonadic Areality) -> { t with areality = value }
     | Modal (Comonadic Linearity) -> { t with linearity = value }
     | Modal (Monadic Uniqueness) -> { t with uniqueness = value }
     | Modal (Comonadic Portability) -> { t with portability = value }
@@ -166,42 +148,42 @@ module Transled_modifiers = struct
 end
 
 let transl_mod_bounds annots =
-  let step bounds_so_far annot =
-    match
-      transl_annot ~annot_type:Modifier ~required_mode_maturity:None
-      @@ unpack_mode_annot annot
-    with
-    | { txt = Any_axis_pair (type a) ((axis, mode) : a Axis.t * a); loc } ->
+  let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
+    match Axis_pair.of_string txt with
+    | P (type a) ((axis, mode) : a Axis.t * a) ->
       let (module A) = Axis.get axis in
       let is_top = A.le A.max mode in
       if is_top
       then
         (* CR layouts v2.8: This warning is disabled for now because transl_type_decl
            results in 3 calls to transl_annots per user-written annotation. This results
-           in the warning being reported 3 times. *)
+           in the warning being reported 3 times. Internal ticket 2801. *)
         (* Location.prerr_warning new_raw.loc (Warnings.Mod_by_top new_raw.txt) *)
         ();
       let is_dup =
         Option.is_some (Transled_modifiers.get ~axis bounds_so_far)
       in
-      if is_dup then raise (Error (annot.loc, Duplicated_axis axis));
+      if is_dup then raise (Error (loc, Duplicated_axis axis));
       Transled_modifiers.set ~axis bounds_so_far (Some { txt = mode; loc })
-    | { txt = Everything_but_nullability; loc } ->
-      Transled_modifiers.
-        { locality = Some { txt = Locality.Const.min; loc };
-          linearity = Some { txt = Linearity.Const.min; loc };
-          uniqueness = Some { txt = Uniqueness.Const_op.min; loc };
-          portability = Some { txt = Portability.Const.min; loc };
-          contention = Some { txt = Contention.Const_op.min; loc };
-          yielding = Some { txt = Yielding.Const.min; loc };
-          externality = Some { txt = Externality.min; loc };
-          statefulness = Some { txt = Statefulness.Const.min; loc };
-          visibility = Some { txt = Visibility.Const_op.min; loc };
-          nullability =
-            Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
-          separability =
-            Transled_modifiers.get ~axis:(Nonmodal Separability) bounds_so_far
-        }
+    | exception Not_found -> (
+      match txt with
+      | "everything" ->
+        Transled_modifiers.
+          { areality = Some { txt = Regionality.Const.min; loc };
+            linearity = Some { txt = Linearity.Const.min; loc };
+            uniqueness = Some { txt = Uniqueness.Const_op.min; loc };
+            portability = Some { txt = Portability.Const.min; loc };
+            contention = Some { txt = Contention.Const_op.min; loc };
+            yielding = Some { txt = Yielding.Const.min; loc };
+            externality = Some { txt = Externality.min; loc };
+            statefulness = Some { txt = Statefulness.Const.min; loc };
+            visibility = Some { txt = Visibility.Const_op.min; loc };
+            nullability =
+              Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
+            separability =
+              Transled_modifiers.get ~axis:(Nonmodal Separability) bounds_so_far
+          }
+      | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
   in
   let empty_modifiers = Transled_modifiers.empty in
   let modifiers = List.fold_left step empty_modifiers annots in
@@ -212,7 +194,7 @@ let transl_mod_bounds annots =
       ( Transled_modifiers.get ~axis:(Modal (Comonadic Yielding)) modifiers,
         Transled_modifiers.get ~axis:(Modal (Comonadic Areality)) modifiers )
     with
-    | None, Some { txt = Locality.Const.Global; _ } ->
+    | None, Some { txt = Regionality.Const.Global; _ } ->
       Transled_modifiers.set ~axis:(Modal (Comonadic Yielding)) modifiers
         (Some { txt = Yielding.Const.Unyielding; loc = Location.none })
     | _, _ -> modifiers
@@ -244,8 +226,8 @@ let transl_mod_bounds annots =
     | _, _ -> modifiers
   in
   let open Types.Jkind_mod_bounds in
-  let locality =
-    Option.fold ~some:Location.get_txt ~none:Locality.max modifiers.locality
+  let areality =
+    Option.fold ~some:Location.get_txt ~none:Areality.max modifiers.areality
   in
   let linearity =
     Option.fold ~some:Location.get_txt ~none:Linearity.max modifiers.linearity
@@ -282,7 +264,7 @@ let transl_mod_bounds annots =
     Option.fold ~some:Location.get_txt ~none:Separability.max
       modifiers.separability
   in
-  create ~locality ~linearity ~uniqueness ~portability ~contention ~yielding
+  create ~areality ~linearity ~uniqueness ~portability ~contention ~yielding
     ~statefulness ~visibility ~externality ~nullability ~separability
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
@@ -314,32 +296,19 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   { annots with yielding; contention; portability }
 
 let transl_mode_annots annots : Alloc.Const.Option.t =
-  let step modifiers_so_far annot =
-    let { txt =
-            Modal_axis_pair (type a d0 d1)
-              ((axis, mode) : (a, d0, d1) Mode.Alloc.Axis.t * a);
-          loc
-        } =
-      transl_annot ~annot_type:Mode ~required_mode_maturity:(Some Stable)
-      @@ unpack_mode_annot annot
+  let step modes_so_far { txt = Parsetree.Mode txt; loc } =
+    Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
+    let (P (ax, a)) =
+      try Modal_axis_pair.of_string txt
+      with Not_found -> raise (Error (loc, Unrecognized_modifier (Mode, txt)))
     in
-    let axis = Axis.Modal axis in
-    if Option.is_some (Transled_modifiers.get ~axis modifiers_so_far)
-    then raise (Error (annot.loc, Duplicated_axis axis));
-    Transled_modifiers.set ~axis modifiers_so_far (Some { txt = mode; loc })
+    if Option.is_some (Alloc.Const.Option.proj ax modes_so_far)
+    then
+      let (P ax) = Const.Axis.alloc_as_value (P ax) in
+      raise (Error (loc, Duplicated_axis (Modal ax)))
+    else Alloc.Const.Option.set ax (Some a) modes_so_far
   in
-  let empty_modifiers = Transled_modifiers.empty in
-  let modes = List.fold_left step empty_modifiers annots in
-  default_mode_annots
-    { areality = Option.map get_txt modes.locality;
-      linearity = Option.map get_txt modes.linearity;
-      uniqueness = Option.map get_txt modes.uniqueness;
-      portability = Option.map get_txt modes.portability;
-      contention = Option.map get_txt modes.contention;
-      yielding = Option.map get_txt modes.yielding;
-      statefulness = Option.map get_txt modes.statefulness;
-      visibility = Option.map get_txt modes.visibility
-    }
+  List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
 
 let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
   let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
@@ -398,102 +367,102 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
       visibility ]
 
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
-  let axis_pair =
-    transl_annot ~annot_type:Modality ~required_mode_maturity:(Some maturity)
-      { txt = modality; loc }
+  Language_extension.assert_enabled ~loc Mode maturity;
+  let (P (ax, a)) =
+    try Modal_axis_pair.(of_string modality |> to_value)
+    with Not_found ->
+      raise (Error (loc, Unrecognized_modifier (Modality, modality)))
   in
-  let atom =
-    match axis_pair.txt with
-    | Modal_axis_pair (Comonadic Areality, mode) ->
-      Modality.Atom
-        (Comonadic Areality, Meet_with (Const.locality_as_regionality mode))
-    | Modal_axis_pair (Comonadic Linearity, mode) ->
-      Modality.Atom (Comonadic Linearity, Meet_with mode)
-    | Modal_axis_pair (Comonadic Portability, mode) ->
-      Modality.Atom (Comonadic Portability, Meet_with mode)
-    | Modal_axis_pair (Monadic Uniqueness, mode) ->
-      Modality.Atom (Monadic Uniqueness, Join_with mode)
-    | Modal_axis_pair (Monadic Contention, mode) ->
-      Modality.Atom (Monadic Contention, Join_with mode)
-    | Modal_axis_pair (Comonadic Yielding, mode) ->
-      Modality.Atom (Comonadic Yielding, Meet_with mode)
-    | Modal_axis_pair (Comonadic Statefulness, mode) ->
-      Modality.Atom (Comonadic Statefulness, Meet_with mode)
-    | Modal_axis_pair (Monadic Visibility, mode) ->
-      Modality.Atom (Monadic Visibility, Join_with mode)
+  let atom : Modality.atom =
+    match[@warning "-18"] ax with
+    | Comonadic ax -> Atom (Comonadic ax, Meet_with a)
+    | Monadic ax -> Atom (Monadic ax, Join_with a)
   in
   atom, loc
 
-let untransl_modality (a : Modality.t) : Parsetree.modality loc =
+let untransl_modality (a : Modality.atom) : Parsetree.modality loc =
   let s =
     match a with
-    | Atom (Comonadic Areality, Meet_with Regionality.Const.Global) -> "global"
-    | Atom (Comonadic Areality, Meet_with Regionality.Const.Local) -> "local"
-    | Atom (Comonadic Linearity, Meet_with Linearity.Const.Many) -> "many"
-    | Atom (Comonadic Linearity, Meet_with Linearity.Const.Once) -> "once"
-    | Atom (Monadic Uniqueness, Join_with Uniqueness.Const.Aliased) -> "aliased"
-    | Atom (Monadic Uniqueness, Join_with Uniqueness.Const.Unique) -> "unique"
-    | Atom (Comonadic Portability, Meet_with Portability.Const.Portable) ->
-      "portable"
-    | Atom (Comonadic Portability, Meet_with Portability.Const.Nonportable) ->
-      "nonportable"
-    | Atom (Monadic Contention, Join_with Contention.Const.Contended) ->
-      "contended"
-    | Atom (Monadic Contention, Join_with Contention.Const.Shared) -> "shared"
-    | Atom (Monadic Contention, Join_with Contention.Const.Uncontended) ->
-      "uncontended"
-    | Atom (Comonadic Yielding, Meet_with Yielding.Const.Yielding) -> "yielding"
-    | Atom (Comonadic Yielding, Meet_with Yielding.Const.Unyielding) ->
-      "unyielding"
-    | Atom (Comonadic Statefulness, Meet_with Statefulness.Const.Stateless) ->
-      "stateless"
-    | Atom (Comonadic Statefulness, Meet_with Statefulness.Const.Observing) ->
-      "observing"
-    | Atom (Comonadic Statefulness, Meet_with Statefulness.Const.Stateful) ->
-      "stateful"
-    | Atom (Monadic Visibility, Join_with Visibility.Const.Immutable) ->
-      "immutable"
-    | Atom (Monadic Visibility, Join_with Visibility.Const.Read) -> "read"
-    | Atom (Monadic Visibility, Join_with Visibility.Const.Read_write) ->
-      "read_write"
-    | _ -> failwith "BUG: impossible modality atom"
+    | Atom (Comonadic ax, Meet_with a) ->
+      Format.asprintf "%a" (Value.Comonadic.Const.Per_axis.print ax) a
+    | Atom (Monadic ax, Join_with a) ->
+      Format.asprintf "%a" (Value.Monadic.Const.Per_axis.print ax) a
   in
   { txt = Modality s; loc = Location.none }
 
-(* For now, mutable implies legacy modalities for both comonadic axes and
-   monadic axes. In the future, implications on the comonadic axes will be
-   removed. The implications on the monadic axes will stay. Implied modalities
-   can be overriden. *)
-(* CR zqian: decouple mutable and comonadic modalities *)
-let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
-  let comonadic : Modality.t list =
+(* For now, mutable implies:
+   1. [global] and [unyielding]. This is for compatibility with existing code
+      and will be removed in the future.
+   2. [many]. This is to remedy the coarse treatment of modalities in the
+      uniqueness analysis.
+      See [https://github.com/oxcaml/oxcaml/pull/4415#discussion_r2250801078].
+   3. legacy modalities for all monadic axes. This will stay in the future.
+
+   Implied modalities can be overriden. *)
+(* CR zqian: remove [1] and [2] *)
+let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
+  let comonadic : Modality.atom list =
     [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
       Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
-      Atom (Comonadic Portability, Meet_with Portability.Const.legacy);
-      Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
-      Atom (Comonadic Statefulness, Meet_with Statefulness.Const.legacy) ]
+      Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy) ]
   in
-  let monadic : Modality.t list =
+  let monadic : Modality.atom list =
     [ Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy);
       Atom (Monadic Contention, Join_with Contention.Const.legacy);
       Atom (Monadic Visibility, Join_with Visibility.Const.legacy) ]
   in
-  match mut with
-  | Immutable -> []
-  | Mutable _ -> if for_mutable_variable then monadic else monadic @ comonadic
+  if mut
+  then if for_mutable_variable then monadic else monadic @ comonadic
+  else []
 
-let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
+let mutable_implied_modalities ~for_mutable_variable mut =
   let l = mutable_implied_modalities ~for_mutable_variable mut in
   List.fold_left
-    (fun t (Modality.Atom (ax, a)) -> Modality.Value.Const.set ax a t)
-    Modality.Value.Const.id l
+    (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
+    Modality.Const.id l
+
+let idx_expected_modalities ~(mut : bool) =
+  (* There are two design constraints on what modalities we allow in an index
+     creation to contain. Because these are coupled, this function checks that
+     they are equal.
+      1. The default modalities (id for non-mutable fields, global many aliased
+         unyielding for mutable fields) should work.
+      2. It should also be safe wrt to type signatures given to block index
+         primitives (see [idx_imm.mli] and [idx_mut.mli] in [Stdlib_beta]). *)
+  let modality_of_list l =
+    List.fold_left
+      (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
+      Modality.Const.id l
+  in
+  let expected1 = mutable_implied_modalities mut ~for_mutable_variable:false in
+  let expected2 =
+    if mut
+    then
+      (* If this list is updated, the external bindings in the [Idx_imm] and
+         [Idx_mut] modules in [Stdlib_beta] may also have to be updated. *)
+      modality_of_list
+        [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
+          Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
+          Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
+          Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy) ]
+      [@warning "-18"]
+    else Mode.Modality.Const.id
+  in
+  (* CR layouts v8: only perform this check at most twice: for [mut = true] and
+     [mut = false] *)
+  match Mode.Modality.Const.equate expected1 expected2 with
+  | Ok () -> expected1
+  | Error _ ->
+    Misc.fatal_error
+      "Typemode.idx_expected_modalities: mismatch with mutable implied \
+       modalities"
 
 (* Since [yielding] is the default mode in presence of [local],
    the [global] modality must also apply [unyielding] unless specified.
 
    Similarly for [visibility]/[contention] and [statefulness]/[portability]. *)
-let implied_modalities (Atom (ax, a) : Modality.t) : Modality.t list =
-  match ax, a with
+let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
+  match[@warning "-18"] ax, a with
   | Comonadic Areality, Meet_with a ->
     let b : Yielding.Const.t =
       match a with
@@ -517,9 +486,12 @@ let implied_modalities (Atom (ax, a) : Modality.t) : Modality.t list =
     [Atom (Comonadic Portability, Meet_with b)]
   | _ -> []
 
-let least_modalities_implying mut (t : Modality.Value.Const.t) =
-  let baseline = mutable_implied_modalities ~for_mutable_variable:false mut in
-  let annotated = Modality.Value.Const.(diff baseline t) in
+let least_modalities_implying mut (t : Modality.Const.t) =
+  let baseline =
+    mutable_implied_modalities ~for_mutable_variable:false
+      (Types.is_mutable mut)
+  in
+  let annotated = Modality.Const.(diff baseline t) in
   let implied = List.concat_map implied_modalities annotated in
   let exclude_implied =
     List.filter (fun x -> not @@ List.mem x implied) annotated
@@ -527,7 +499,7 @@ let least_modalities_implying mut (t : Modality.Value.Const.t) =
   let overridden =
     List.filter_map
       (fun (Modality.Atom (ax, m_implied)) ->
-        let m_projected = Modality.Value.Const.proj ax t in
+        let m_projected = Modality.Const.proj ax t in
         if m_projected <> m_implied
         then Some (Modality.Atom (ax, m_projected))
         else None)
@@ -536,8 +508,11 @@ let least_modalities_implying mut (t : Modality.Value.Const.t) =
   exclude_implied @ overridden
 
 let sort_dedup_modalities ~warn l =
-  let compare (Modality.Atom (ax0, _), _) (Modality.Atom (ax1, _), _) =
-    Value.Axis.compare ax0 ax1
+  let open Modality in
+  let compare (Atom (ax0, _), _) (Atom (ax1, _), _) =
+    let (P ax0) = Axis.to_value (P ax0) in
+    let (P ax1) = Axis.to_value (P ax1) in
+    Mode.Value.Axis.compare ax0 ax1
   in
   let dedup ~on_dup =
     let rec loop x = function
@@ -551,11 +526,14 @@ let sort_dedup_modalities ~warn l =
     in
     function [] -> [] | x :: xs -> loop x xs
   in
-  let on_dup (Modality.Atom (ax0, _), loc0) (a1, _) =
+  let on_dup (Atom (ax0, _), loc0) (Atom (ax1, a1), _) =
     if warn
     then
-      let axis = Format.asprintf "%a" Value.Axis.print ax0 in
-      let { txt = Modality overriden_by; _ } = untransl_modality a1 in
+      let (P ax0) = Axis.to_value (P ax0) in
+      let axis = Format.asprintf "%a" Mode.Value.Axis.print ax0 in
+      let { txt = Modality overriden_by; _ } =
+        untransl_modality (Atom (ax1, a1))
+      in
       Location.prerr_warning loc0
         (Warnings.Modal_axis_specified_twice { axis; overriden_by })
   in
@@ -563,7 +541,8 @@ let sort_dedup_modalities ~warn l =
 
 let transl_modalities ~maturity mut modalities =
   let mut_modalities =
-    mutable_implied_modalities mut ~for_mutable_variable:false
+    mutable_implied_modalities (Types.is_mutable mut)
+      ~for_mutable_variable:false
   in
   let modalities = List.map (transl_modality ~maturity) modalities in
   (* axes listed in the order of implication. *)
@@ -574,14 +553,17 @@ let transl_modalities ~maturity mut modalities =
      - For the same axis, later modalities overrides earlier modalities. *)
   List.fold_left
     (fun m (Atom (ax, a) as t) ->
-      let m = Value.Const.set ax a m in
+      let m = Const.set ax a m in
       List.fold_left
-        (fun m (Atom (ax, a)) -> Value.Const.set ax a m)
+        (fun m (Atom (ax, a)) -> Const.set ax a m)
         m (implied_modalities t))
     mut_modalities modalities
 
-let let_mutable_modalities m0 =
-  mutable_implied_modalities (Mutable m0) ~for_mutable_variable:true
+let let_mutable_modalities =
+  mutable_implied_modalities true ~for_mutable_variable:true
+
+let atomic_mutable_modalities =
+  mutable_implied_modalities true ~for_mutable_variable:false
 
 let untransl_modalities mut t =
   t

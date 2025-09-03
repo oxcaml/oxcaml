@@ -69,7 +69,7 @@ module S = struct
     { lt : Label.t;  (** if x < y (resp. x < n) goto [lt] label *)
       eq : Label.t;  (** if x = y (resp. x = n) goto [eq] label *)
       gt : Label.t;  (** if x > y (resp. x > n) goto [gt] label *)
-      is_signed : bool;
+      is_signed : Scalar.Signedness.t;
       imm : int option
     }
 
@@ -119,6 +119,7 @@ module S = struct
     | Pushtrap of { lbl_handler : Label.t }
     | Poptrap of { lbl_handler : Label.t }
     | Prologue
+    | Epilogue
     | Stack_check of { max_frame_size_bytes : int }
 
   type 'a with_label_after =

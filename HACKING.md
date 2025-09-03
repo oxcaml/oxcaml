@@ -458,3 +458,21 @@ if using GNU binutils.  It is recommended to install the Jane Street `patdiff` e
 before running `make compare`.  The comparison script has not been maintained since the
 early releases of OxCaml; it was written as part of the acceptance process
 for the initial release.
+
+## Bumping the OxCaml LLVM version
+
+Some tests require a custom version of LLVM with specific features for OxCaml
+(such as support for interpreting the DWARF emitted by OxCaml). To bump the
+version of LLVM that is used, make a release here:
+
+  https://github.com/ocaml-flambda/llvm-project/releases
+
+Pick the source branch from which the release should be built and give it a
+tag (e.g., `oxcaml-lldb-<LLVM_VERSION>-minus<COUNTER>` for the OxCaml LLDB
+release). Once the release is published, a build action will trigger that
+produces the corresponding binaries for the release and attaches them. This
+takes a while (between 2 and 3 hours).
+
+
+On the OxCaml side (in this repo), modify `build.yml` to point to the new tag
+and branch the runner should use for the tests.

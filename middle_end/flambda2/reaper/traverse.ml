@@ -35,18 +35,23 @@ let reaper_test_opaque = Sys.getenv_opt "REAPEROPAQUE" <> None
 
 let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
   let return =
-    List.init
-      (Flambda_arity.cardinal_unarized (Code.result_arity code))
-      (fun i ->
+    List.mapi
+      (fun i kind ->
         Variable.create
-          (Format.asprintf "function_return_%i_%a" i Code_id.print code_id))
+          (Format.asprintf "function_return_%i_%a" i Code_id.print code_id)
+          (Flambda_kind.With_subkind.kind kind))
+      (Flambda_arity.unarized_components (Code.result_arity code))
   in
-  let exn = Variable.create "function_exn" in
-  let my_closure = Variable.create "my_closure" in
+  let exn = Variable.create "function_exn" Flambda_kind.value in
+  let my_closure = Variable.create "my_closure" Flambda_kind.value in
   let arity = Code.params_arity code in
   let params =
-    List.init (Flambda_arity.cardinal_unarized arity) (fun i ->
-        Variable.create (Printf.sprintf "function_param_%i" i))
+    List.mapi
+      (fun i kind ->
+        Variable.create
+          (Printf.sprintf "function_param_%i" i)
+          (Flambda_kind.With_subkind.kind kind))
+      (Flambda_arity.unarize arity)
   in
   let has_unsafe_result_type =
     match Code.result_types code with
@@ -68,8 +73,12 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
       (if Code.is_tupled code then 1 else Flambda_arity.num_params arity)
       (fun i ->
         Code_id_or_name.var
+          (* These witnesses are not going to end up as actual program
+             variables; giving them kind Value is a bit misleading but should
+             not cause any issue. *)
           (Variable.create
-             (Printf.sprintf "witness_%d_for_%s" i (Code_id.name code_id))))
+             (Printf.sprintf "witness_%d_for_%s" i (Code_id.name code_id))
+             Flambda_kind.value))
   in
   let code_dep =
     { Traverse_acc.arity;
@@ -239,6 +248,7 @@ and traverse_let denv acc let_expr : rev_expr =
     { parent = let_acc;
       conts = denv.conts;
       current_code_id = denv.current_code_id;
+      should_preserve_direct_calls = denv.should_preserve_direct_calls;
       le_monde_exterieur = denv.le_monde_exterieur;
       all_constants = denv.all_constants
     }
@@ -294,7 +304,7 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let block = Code_id_or_name.name (Acc.simple_to_name acc ~denv block) in
     default_bp (fun to_ ->
         Graph.add_accessor_dep (Acc.graph acc) ~to_
-          (Block (Targetint_31_63.to_int field, kind))
+          (Block (Target_ocaml_int.to_int field, kind))
           ~base:block);
     match mut with
     | Immutable | Immutable_unique -> ()
@@ -432,6 +442,7 @@ and traverse_let_cont_non_recursive denv acc cont ~body handler =
     let denv =
       { parent = Let_cont { cont; handler; parent = denv.parent };
         conts;
+        should_preserve_direct_calls = denv.should_preserve_direct_calls;
         current_code_id = denv.current_code_id;
         le_monde_exterieur = denv.le_monde_exterieur;
         all_constants = denv.all_constants
@@ -442,6 +453,7 @@ and traverse_let_cont_non_recursive denv acc cont ~body handler =
   traverse_cont_handler
     { parent = Hole;
       conts = denv.conts;
+      should_preserve_direct_calls = denv.should_preserve_direct_calls;
       current_code_id = denv.current_code_id;
       le_monde_exterieur = denv.le_monde_exterieur;
       all_constants = denv.all_constants
@@ -490,6 +502,7 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
           traverse
             { parent = Hole;
               conts;
+              should_preserve_direct_calls = denv.should_preserve_direct_calls;
               current_code_id = denv.current_code_id;
               le_monde_exterieur = denv.le_monde_exterieur;
               all_constants = denv.all_constants
@@ -503,6 +516,7 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
   let denv =
     { parent = Let_cont_rec { invariant_params; handlers; parent = denv.parent };
       conts;
+      should_preserve_direct_calls = denv.should_preserve_direct_calls;
       current_code_id = denv.current_code_id;
       le_monde_exterieur = denv.le_monde_exterieur;
       all_constants = denv.all_constants
@@ -582,7 +596,7 @@ and traverse_apply denv acc apply : rev_expr =
   { expr; holed_expr = denv.parent }
 
 and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
-  let calls_are_not_pure = Variable.create "not_pure" in
+  let calls_are_not_pure = Variable.create "not_pure" Flambda_kind.value in
   Acc.used ~denv (Simple.var calls_are_not_pure) acc;
   let add_call_widget (function_call : Call_kind.Function_call.t) =
     let args, closure_entry_point =
@@ -632,11 +646,13 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
                   ~base:callee)
               return_args)
         | _ :: _ ->
-          let v = Variable.create "partial_apply" in
+          let v = Variable.create "partial_apply" Flambda_kind.value in
           Graph.add_accessor_dep (Acc.graph acc) ~to_:(Code_id_or_name.var v)
             (Apply (closure_entry_point, Normal 0))
             ~base:callee;
-          let calls_are_not_pure = Variable.create "not_pure" in
+          let calls_are_not_pure =
+            Variable.create "not_pure" Flambda_kind.value
+          in
           Acc.used ~denv (Simple.var calls_are_not_pure) acc;
           add_deps (Code_id_or_name.var v) rest calls_are_not_pure)
     in
@@ -653,9 +669,10 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
        calls_are_not_pure } in Acc.add_apply apply_dep acc; if Option.is_some
        (Apply.callee apply) then add_call_widget function_call) else default_acc
        acc *)
-    if Option.is_some (Apply.callee apply)
-    then add_call_widget function_call
-    else if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
+    if Option.is_some (Apply.callee apply) then add_call_widget function_call;
+    if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
+       && (Option.is_none (Apply.callee apply)
+          || denv.should_preserve_direct_calls)
     then
       let apply_dep =
         { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
@@ -668,7 +685,8 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         }
       in
       Acc.add_apply apply_dep acc
-    else default_acc acc
+    else if Option.is_none (Apply.callee apply)
+    then default_acc acc
   | Function
       { function_call =
           (Indirect_unknown_arity | Indirect_known_arity) as function_call;
@@ -685,7 +703,7 @@ and traverse_apply_cont denv acc apply_cont : rev_expr =
 and traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
   Acc.used ~denv (Switch_expr.scrutinee switch) acc;
-  Targetint_31_63.Map.iter
+  Target_ocaml_int.Map.iter
     (fun _ apply_cont -> apply_cont_deps denv acc apply_cont)
     (Switch_expr.arms switch);
   { expr; holed_expr = denv.parent }
@@ -745,9 +763,19 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     };
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
+  let check_zero_alloc =
+    match Code.zero_alloc_attribute code with
+    | Default_zero_alloc ->
+      (* The effect of [Clflags.zero_alloc_assert] has been compiled into
+         [Check] earlier. *)
+      false
+    | Assume _ -> false
+    | Check _ -> true
+  in
   let denv =
     { parent = Hole;
       conts;
+      should_preserve_direct_calls = check_zero_alloc;
       current_code_id = Some code_id;
       le_monde_exterieur;
       all_constants
@@ -834,8 +862,12 @@ let run ~get_code_metadata (unit : Flambda_unit.t) =
      all_constants) ~from:(Code_id_or_name.symbol all_constants); *)
   Graph.add_any_source (Acc.graph acc) (Code_id_or_name.symbol all_constants);
   let create_holed () =
-    let dummy_toplevel_return = Variable.create "dummy_toplevel_return" in
-    let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" in
+    let dummy_toplevel_return =
+      Variable.create "dummy_toplevel_return" Flambda_kind.value
+    in
+    let dummy_toplevel_exn =
+      Variable.create "dummy_toplevel_exn" Flambda_kind.value
+    in
     Acc.root dummy_toplevel_return acc;
     Acc.root dummy_toplevel_exn acc;
     let return_continuation = Flambda_unit.return_continuation unit in
@@ -860,6 +892,7 @@ let run ~get_code_metadata (unit : Flambda_unit.t) =
     traverse
       { parent = Hole;
         conts;
+        should_preserve_direct_calls = false;
         current_code_id = None;
         le_monde_exterieur = Name.symbol le_monde_exterieur;
         all_constants = Name.symbol all_constants

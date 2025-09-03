@@ -384,9 +384,12 @@ let worst_case ty =
     such that [ty] is separable at mode [m] in [gamma], under
     the signature [sigma]. *)
 let check_type
-  : Env.t -> type_expr -> mode -> context
-  = fun env ty m ->
+  : upstream_compatible:bool -> Env.t -> type_expr -> mode -> context
+  = fun ~upstream_compatible env ty m ->
   let rec check_type hyps ty m =
+    if not upstream_compatible
+      && Ctype.check_type_separability env ty Non_float
+    then empty else
     if Hyps.safe ty m hyps then empty
     else if Hyps.unsafe ty m hyps then worst_case ty
     else
@@ -474,24 +477,14 @@ let worst_msig decl = List.map (fun _ -> Deepsep) decl.type_params
 
     Note: this differs from {!Types.Separability.default_signature},
     which does not have access to the declaration and its immediacy. *)
-(* CR layouts v2.8: At the moment things that are not value are certainly
-   separable: they must be any or void, and there are no runtime values
-   of either of those things.  So, we put the same exception here for them
-   as is described above for immediate.  But check whether we still believe
-   this when we add unboxed floats, or, better, just delete the float
-   array optimization and this entire file at that point. *)
 let msig_of_external_type env decl =
-  let is_not_value_or_null =
-    Result.is_error (Ctype.check_decl_jkind env decl
-                        (Jkind.Builtin.value_or_null ~why:Separability_check))
-  in
-  let jkind_of_type = Ctype.type_jkind_purely_if_principal env in
+  let context = Ctype.mk_jkind_context_check_principal env in
   let is_external =
-    match Jkind.get_externality_upper_bound ~jkind_of_type decl.type_jkind with
+    match Jkind.get_externality_upper_bound ~context decl.type_jkind with
     | Internal -> false
     | External | External64 -> true
   in
-  if is_not_value_or_null || is_external then best_msig decl else worst_msig decl
+  if is_external then best_msig decl else worst_msig decl
 
 (** [msig_of_context ~decl_loc constructor context] returns the
    separability signature of a single-constructor type whose
@@ -613,6 +606,26 @@ let msig_of_context : decl_loc:Location.t -> parameters:type_expr list
     TVarMap.iter check_existential context;
     mode_signature
 
+let check_separability_with_upstream_compat ~loc ~parameters env ty m =
+  (* It's complicated to properly incorporate the upstream-compatibility
+     logic into the code above, so we just run the check twice. *)
+  let upstream_result =
+    try
+      let ctx = check_type ~upstream_compatible:true env ty m in
+      Some (msig_of_context ~decl_loc:loc ~parameters ctx)
+    with Error _ -> None
+  in
+  match upstream_result with
+  | Some msig -> msig
+  | None ->
+      let ctx = check_type ~upstream_compatible:false env ty m in
+      let msig = msig_of_context ~decl_loc:loc ~parameters ctx in
+      if Language_extension.erasable_extensions_only () then
+        Location.prerr_warning loc
+          (Warnings.Incompatible_with_upstream
+            Warnings.Separability_check);
+      msig
+
 (** [check_def env def] returns the signature required
     for the type definition [def] in the typing environment [env].
 
@@ -627,14 +640,14 @@ let check_def
   | Abstract ->
       msig_of_external_type env def
   | Synonym type_expr ->
-      check_type env type_expr Sep
-      |> msig_of_context ~decl_loc:def.type_loc ~parameters:def.type_params
+      check_separability_with_upstream_compat ~loc:def.type_loc
+        ~parameters:def.type_params env type_expr Sep
   | Open | Algebraic ->
       best_msig def
   | Unboxed constructor ->
-      check_type env constructor.argument_type Sep
-      |> msig_of_context ~decl_loc:def.type_loc
-           ~parameters:constructor.result_type_parameter_instances
+      check_separability_with_upstream_compat ~loc:def.type_loc
+        ~parameters:constructor.result_type_parameter_instances
+        env constructor.argument_type Sep
 
 let compute_decl env decl =
   if Config.flat_float_array then check_def env decl

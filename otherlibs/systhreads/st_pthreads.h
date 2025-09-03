@@ -62,25 +62,6 @@ static void st_thread_join(st_thread_id thr)
   /* best effort: ignore errors */
 }
 
-/* Thread-specific state */
-
-typedef pthread_key_t st_tlskey;
-
-static int st_tls_newkey(st_tlskey * res)
-{
-  return pthread_key_create(res, NULL);
-}
-
-Caml_inline void * st_tls_get(st_tlskey k)
-{
-  return pthread_getspecific(k);
-}
-
-Caml_inline void st_tls_set(st_tlskey k, void * v)
-{
-  pthread_setspecific(k, v);
-}
-
 /* The master lock.  This is a mutex that is held most of the time,
    so we implement it in a slightly convoluted way to avoid
    all risks of busy-waiting.  Also, we count the number of waiting
@@ -294,6 +275,8 @@ struct caml_thread_tick_args {
   atomic_uintnat* stop;
 };
 
+#define ST_INTERRUPT_FLAG   ((uintnat)1)
+
 /* The tick thread: interrupt the domain periodically to force preemption  */
 static void * caml_thread_tick(void * arg)
 {
@@ -309,7 +292,7 @@ static void * caml_thread_tick(void * arg)
   while(! atomic_load_acquire(stop)) {
     st_msleep(Thread_timeout);
 
-    atomic_store_release(&domain->requested_external_interrupt, 1);
+    atomic_fetch_or(&domain->requested_external_interrupt, ST_INTERRUPT_FLAG);
     caml_interrupt_self();
   }
   return NULL;

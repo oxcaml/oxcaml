@@ -86,10 +86,15 @@ type after_downwards_traversal_of_body_and_handlers_data =
     (* total cont uses env in body + handlers, including the uses of the
        continuations currently being bound *)
     at_unit_toplevel : bool;
+    consts_lifted_during_body : Lifted_constant_state.t;
     consts_lifted_after_fork : Lifted_constant_state.t;
-    (* this includes the constants lifted during the body, but also the ones
-       lifted during the handler. This is useful for continuation specialisation
-       (and mutually recursive continuations). *)
+    (* We need to keep a copy of the constants lifted during the body, separate
+       from the constants lifted after the fork (i.e. those from the body
+       **and** the handlers (there may be multiple handlers, e.g. during
+       specialization, or for recursive continuations)), because when
+       specializing a continuation, the consts lifted from the first downwards
+       pass on the handler must be dropped (but those from the body must be
+       kept), since we forget everything that happened during that pass. *)
     lifted_params : Lifted_cont_params.t;
     invariant_params : Bound_parameters.t;
     invariant_extra_params_and_args : EPA.t;
@@ -305,11 +310,17 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
           (fun _id -> EPA.Extra_arg.Already_in_scope (Simple.var var))
           rewrite_ids
       in
+      let var_duid = Flambda_debug_uid.none in
+      (* CR sspies: Improve the debug UID propagation here in the future.
+         Concretely, extra params can sometimes be generated and not user
+         visible (e.g. create during unboxing), and sometimes can be
+         user-visible, or at least aliases of user-visible variable (e.g. CSE,
+         loop invariants, etc...). See #3967. *)
       let var_kind =
         Flambda_kind.With_subkind.anything (Variable.Map.find var aliases_kind)
       in
       EPA.add
-        ~extra_param:(Bound_parameter.create var var_kind)
+        ~extra_param:(Bound_parameter.create var var_kind var_duid)
         ~extra_args epa ~invalids:Apply_cont_rewrite_id.Set.empty)
     required_extra_args.extra_args_for_aliases EPA.empty
 
@@ -555,8 +566,13 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
   let handler, uacc =
     Variable.Lmap.fold
       (fun var bound_to (handler, uacc) ->
+        let var_duid = Flambda_debug_uid.none in
+        (* CR sspies: [var] can be derived/aliased from a user visible variable.
+           If we can, it would be good to propagate debugging UIDs (or derived
+           UIDs) here in the future. For now, we make due without. See #3967 *)
         let bound_pattern =
-          Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
+          Bound_pattern.singleton
+            (Bound_var.create var var_duid Name_mode.normal)
         in
         let named = Named.create_simple bound_to in
         let handler, uacc =
@@ -591,9 +607,9 @@ let add_phantom_params_bindings uacc handler new_phantom_params =
   let new_phantom_param_bindings_outermost_first =
     List.map
       (fun param ->
-        let var = BP.var param in
+        let param_var, param_uid = BP.var_and_uid param in
         let kind = K.With_subkind.kind (BP.kind param) in
-        let var = Bound_var.create var Name_mode.phantom in
+        let var = Bound_var.create param_var param_uid Name_mode.phantom in
         let let_bound = Bound_pattern.singleton var in
         let prim = Flambda_primitive.(Nullary (Optimised_out kind)) in
         let named = Named.create_prim prim Debuginfo.none in
@@ -1174,11 +1190,15 @@ and specialize_continuation_if_needed ~simplify_expr dacc
         (* Remove the (generic) continuation uses from the CUE, since we will
            then add uses for each of the specialized continuation. *)
         let cont_uses_env = CUE.remove data.cont_uses_env_after_body cont in
+        (* We need to drop the constants lifted during the first downwards
+           traversal of the handler. *)
+        let consts_lifted_after_fork = data.consts_lifted_during_body in
         let data =
           { data with
             handlers = Continuation.Map.empty;
             cont_uses_env;
-            cont_uses_env_after_body = cont_uses_env
+            cont_uses_env_after_body = cont_uses_env;
+            consts_lifted_after_fork
           }
         in
         compute_specialized_continuation_handlers ~simplify_expr ~replay
@@ -1380,7 +1400,7 @@ and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
       k dacc rebuild_handler cont_uses_env_in_handler)
 
 and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
-    ~invariant_params consts_lifted_after_fork all_handlers_set denv_to_reset
+    ~invariant_params ~consts_lifted_after_fork all_handlers_set denv_to_reset
     dacc cont
     ({ params; handler; is_cold } as original : One_recursive_handler.t) k =
   (* Here we perform the downwards traversal on a single handler.
@@ -1460,6 +1480,7 @@ and simplify_recursive_handlers ~down_to_up ~data ~rebuild_body ~dacc_after_body
           invariant_extra_params_and_args = invariant_epa;
           handlers = simplified_handlers;
           at_unit_toplevel = false;
+          consts_lifted_during_body;
           consts_lifted_after_fork
         }
       in
@@ -1472,7 +1493,7 @@ and simplify_recursive_handlers ~down_to_up ~data ~rebuild_body ~dacc_after_body
       in
       let handler = Continuation.Lmap.find cont continuation_handlers in
       simplify_single_recursive_handler ~simplify_expr ~invariant_params
-        cont_uses_env_so_far consts_lifted_after_fork all_conts_set common_denv
+        cont_uses_env_so_far ~consts_lifted_after_fork all_conts_set common_denv
         dacc cont handler (fun dacc rebuild cont_uses_env_so_far ->
           let dacc, consts_lifted_in_handler =
             DA.get_and_clear_lifted_constants dacc
@@ -1531,6 +1552,7 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
           invariant_extra_params_and_args = EPA.empty;
           handlers = Continuation.Map.empty;
           at_unit_toplevel = false;
+          consts_lifted_during_body;
           consts_lifted_after_fork = consts_lifted_during_body
         }
       in
@@ -1603,6 +1625,7 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
               invariant_extra_params_and_args = EPA.empty;
               handlers = Continuation.Map.singleton cont rebuild;
               at_unit_toplevel;
+              consts_lifted_during_body;
               consts_lifted_after_fork
             }
           in

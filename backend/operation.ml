@@ -36,26 +36,17 @@ let rec equal_trap_stack ts1 ts2 =
   match ts1, ts2 with
   | Uncaught, Uncaught -> true
   | Specific_trap (lbl1, ts1), Specific_trap (lbl2, ts2) ->
-    Int.equal lbl1 lbl2 && equal_trap_stack ts1 ts2
+    Static_label.equal lbl1 lbl2 && equal_trap_stack ts1 ts2
   | Uncaught, Specific_trap _ | Specific_trap _, Uncaught -> false
 
-type integer_comparison =
-  | Isigned of Cmm.integer_comparison
-  | Iunsigned of Cmm.integer_comparison
+type integer_comparison = Cmm.integer_comparison
 
-let string_of_integer_comparison = function
-  | Isigned c -> Printf.sprintf " %ss " (Printcmm.integer_comparison c)
-  | Iunsigned c -> Printf.sprintf " %su " (Printcmm.integer_comparison c)
+let string_of_integer_comparison c =
+  Printf.sprintf " %s " (Printcmm.integer_comparison c)
 
-let equal_integer_comparison left right =
-  match left, right with
-  | Isigned left, Isigned right -> Cmm.equal_integer_comparison left right
-  | Iunsigned left, Iunsigned right -> Cmm.equal_integer_comparison left right
-  | Isigned _, Iunsigned _ | Iunsigned _, Isigned _ -> false
+let equal_integer_comparison = Scalar.Integer_comparison.equal
 
-let invert_integer_comparison = function
-  | Isigned cmp -> Isigned (Cmm.negate_integer_comparison cmp)
-  | Iunsigned cmp -> Iunsigned (Cmm.negate_integer_comparison cmp)
+let invert_integer_comparison = Scalar.Integer_comparison.negate
 
 type integer_operation =
   | Iadd
@@ -342,8 +333,9 @@ let is_pure = function
   | Floatop _ -> true
   | Csel _ -> true
   | Reinterpret_cast
-      ( V128_of_v128 | Float32_of_float | Float32_of_int32 | Float_of_float32
-      | Float_of_int64 | Int64_of_float | Int32_of_float32 ) ->
+      ( V128_of_vec _ | V256_of_vec _ | V512_of_vec _ | Float32_of_float
+      | Float32_of_int32 | Float_of_float32 | Float_of_int64 | Int64_of_float
+      | Int32_of_float32 ) ->
     true
   | Static_cast _ -> true
   (* Conservative to ensure valueofint/intofvalue are not eliminated before
@@ -368,9 +360,7 @@ let is_pure = function
    with regs, use the dreaded Format. *)
 
 let intcomp (comp : integer_comparison) =
-  match comp with
-  | Isigned c -> Printf.sprintf " %ss " (Printcmm.integer_comparison c)
-  | Iunsigned c -> Printf.sprintf " %su " (Printcmm.integer_comparison c)
+  Printf.sprintf " %s " (Printcmm.integer_comparison comp)
 
 let intop (op : integer_operation) =
   match op with
@@ -433,7 +423,8 @@ let dump ppf op =
   | Reinterpret_cast cast ->
     Format.fprintf ppf "%s" (Printcmm.reinterpret_cast cast)
   | Static_cast cast -> Format.fprintf ppf "%s" (Printcmm.static_cast cast)
-  | Specific _ -> Format.fprintf ppf "specific"
+  | Specific specific ->
+    Format.fprintf ppf "specific %s" (Arch.specific_operation_name specific)
   | Probe_is_enabled { name } -> Format.fprintf ppf "probe_is_enabled %s" name
   | Opaque -> Format.fprintf ppf "opaque"
   | Begin_region -> Format.fprintf ppf "beginregion"

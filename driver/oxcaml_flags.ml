@@ -13,7 +13,6 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
-let use_ocamlcfg = ref true             (* -[no-]ocamlcfg *)
 let dump_cfg = ref false                (* -dcfg *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
 let regalloc = ref ""                   (* -regalloc *)
@@ -35,6 +34,11 @@ let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
 let cfg_eliminate_dead_trap_handlers = ref false  (* -cfg-eliminate-dead-trap-handlers *)
+
+let cfg_prologue_validate = ref false    (* -[no-]cfg-prologue-validate *)
+let cfg_prologue_shrink_wrap = ref false    (* -[no-]cfg-prologue-shrink-wrap *)
+let cfg_prologue_shrink_wrap_threshold = ref 16384 
+                                       (* -cfg-prologue-shrink-wrap-threshold *)
 
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
 let basic_block_sections = ref false    (* -basic-block-sections *)
@@ -63,6 +67,7 @@ type zero_alloc_checker_join =
   | Widen of int  (* n > 0 *)
   | Error of int (* n > 0 *)
 
+let zero_alloc_checker_details_extra = ref false
 let default_zero_alloc_checker_join = Widen 100
 let zero_alloc_checker_join = ref default_zero_alloc_checker_join
                               (* -zero-alloc-checker-join n *)
@@ -123,6 +128,14 @@ let flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 =
   | Set Oclassic -> oclassic
   | Set O2 -> o2
   | Set O3 -> o3
+
+  (* -llvm-backend is at [Clflags.llvm_backend] *)
+
+let dump_llvmir = ref false (* -dllvmir *)
+
+let keep_llvmir = ref false (* -keep-llvmir *)
+
+let llvm_path = ref None (* -llvm-path *)
 
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)

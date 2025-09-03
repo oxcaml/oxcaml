@@ -979,7 +979,7 @@ Iarray.stable_sort
      "five"; "six"; "seven"; "eight"; "nine";
      "ten" :];;
 [%%expect{|
-- : string iarray =
+- : String.t iarray =
 [:"one"; "two"; "six"; "ten"; "zero"; "four"; "five"; "nine"; "three";
   "seven"; "eight":]
 |}];;

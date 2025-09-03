@@ -124,6 +124,7 @@
   parsetree
   debug_event
   solver_intf
+  mode_hint
   mode_intf)
  (modules
   ;; UTILS
@@ -186,6 +187,7 @@
   ident
   path
   jkind
+  scalar
   primitive
   shape
   shape_reduce
@@ -203,7 +205,6 @@
   persistent_env
   env
   errortrace
-  mode
   jkind_types
   jkind_intf
   signature_with_global_bindings
@@ -215,6 +216,7 @@
   mtype
   envaux
   includecore
+  type_shape
   tast_iterator
   tast_mapper
   signature_group
@@ -236,6 +238,7 @@
   typecore
   solver_intf
   solver
+  mode_hint
   mode_intf
   mode
   uniqueness_analysis
@@ -252,8 +255,10 @@
   ;; lambda/
   debuginfo
   lambda
+  static_label
   matching
   mixed_block_shape
+  mixed_product_bytes
   printlambda
   runtimedef
   runtimetags
@@ -381,6 +386,26 @@
      (run make -s OCAMLYACC_INCLUDE_PATH=%{ocaml_where}))
     (copy yacc/ocamlyacc ocamlyacc)))))
 
+; Regular OCaml Rule (first phase of bootstrapping)
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy %{project_root}/ocamlopt_upstream_flags.sexp %{targets})))
+
+; OxCaml Rule
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (or
+   (= %{context_name} "main")
+   (= %{context_name} "runtime_stdlib")))
+ (action
+  (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
+
 (install
  (files ocamlyacc)
  (section bin)
@@ -479,6 +504,7 @@
   cmm_helpers
   cmm_builtins
   cmm_invariants
+  cmm_peephole_engine
   cmm
   cmmgen_state
   CSE
@@ -547,6 +573,7 @@
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_prologue
   extra_debug
   label
   linear_utils
@@ -554,6 +581,7 @@
   vectorize
   vectorize_utils
   vectorize_specific
+  llvmize
   ;; backend/regalloc
   regalloc_gi
   regalloc_gi_state
@@ -598,6 +626,7 @@
   dwarf_reg_locations
   dwarf_state
   dwarf_variables_and_parameters
+  dwarf_type
   ;; driver/
   opterrors
   optcompile
@@ -626,7 +655,8 @@
  (modes byte native)
  ; same flags as for ocamlcommon library
  (flags
-  (-strict-sequence
+  (:standard
+   -strict-sequence
    -bin-annot
    -safe-string
    -strict-formats

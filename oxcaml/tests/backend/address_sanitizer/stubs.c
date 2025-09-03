@@ -14,9 +14,11 @@
 
 CAMLprim value ocaml_address_sanitizer_test_alloc(size_t len, int64_t tag) {
   assert(len > 0);
-  assert(tag >= No_scan_tag);
   header_t *block = malloc((len * sizeof(value)) + sizeof(header_t));
   *block = Caml_out_of_heap_header(/*wosize=*/len, /*tag=*/tag);
+  if (Scannable_tag(tag)) {
+    for (size_t i = 0; i < len; i++) Op_hp(block)[i] = Val_unit;
+  }
   return Val_hp(block);
 }
 
@@ -30,6 +32,13 @@ CAMLprim value ocaml_address_sanitizer_test_free(value block) {
 CAMLprim __m128i ocaml_address_sanitizer_test_vec128_of_int64s(int64_t low,
                                                                int64_t high) {
   return _mm_set_epi64x(high, low);
+}
+
+CAMLprim __m256i ocaml_address_sanitizer_test_vec256_of_int64s(int64_t w0,
+                                                               int64_t w1,
+                                                               int64_t w2,
+                                                               int64_t w3) {
+  return _mm256_set_epi64x(w3, w2, w1, w0);
 }
 
 CAMLprim value DO_NOT_SANITIZE caml_prefetch_read_low(const void *ptr) {

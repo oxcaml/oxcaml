@@ -28,6 +28,7 @@ module Env = struct
     { parent : Rev_expr.rev_expr_holed;
       conts : cont_kind Continuation.Map.t;
       current_code_id : Code_id.t option;
+      should_preserve_direct_calls : bool;
       le_monde_exterieur : Name.t;
       all_constants : Name.t
     }
@@ -117,6 +118,8 @@ let alias_kind name simple t =
         | Tagged_immediate _ | Null -> Flambda_kind.value
         | Naked_float _ -> Flambda_kind.naked_float
         | Naked_float32 _ -> Flambda_kind.naked_float32
+        | Naked_int8 _ -> Flambda_kind.naked_int8
+        | Naked_int16 _ -> Flambda_kind.naked_int16
         | Naked_int32 _ -> Flambda_kind.naked_int32
         | Naked_int64 _ -> Flambda_kind.naked_int64
         | Naked_nativeint _ -> Flambda_kind.naked_nativeint
@@ -235,7 +238,7 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
           List.length
             (Flambda_arity.unarize (Code_metadata.params_arity code_metadata))
         in
-        let always_used = Variable.create "always_used" in
+        let always_used = Variable.create "always_used" Flambda_kind.value in
         Graph.add_use t.deps (Code_id_or_name.var always_used);
         for i = 0 to num_direct_params - 1 do
           Graph.add_coconstructor_dep t.deps
@@ -289,7 +292,7 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
             code_dep.return;
           Graph.add_constructor_dep t.deps ~from:call_witness Code_of_closure
             ~base:(Code_id_or_name.name name);
-          let untuple_var = Variable.create "untuple_var" in
+          let untuple_var = Variable.create "untuple_var" Flambda_kind.value in
           Graph.add_coconstructor_dep t.deps
             ~from:(Code_id_or_name.var untuple_var)
             (Param (Indirect_code_pointer, 0))
@@ -327,7 +330,7 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
                       ~base:func)
                   code_dep.return
               | _ :: _ ->
-                let v = Variable.create "partial_apply" in
+                let v = Variable.create "partial_apply" Flambda_kind.value in
                 Graph.add_constructor_dep t.deps ~from:(Code_id_or_name.var v)
                   (Apply (Indirect_code_pointer, Normal 0))
                   ~base:func;

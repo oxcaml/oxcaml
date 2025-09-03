@@ -301,7 +301,8 @@ let pat
     match x.pat_desc with
     | Tpat_any
     | Tpat_constant _ -> x.pat_desc
-    | Tpat_var (id, s, uid, m) -> Tpat_var (id, map_loc sub s, uid, m)
+    | Tpat_var (id, s, uid, sort, m) ->
+      Tpat_var (id, map_loc sub s, uid, sort, m)
     | Tpat_tuple l ->
         Tpat_tuple (List.map (fun (label, p) -> label, sub.pat sub p) l)
     | Tpat_unboxed_tuple l ->
@@ -323,8 +324,8 @@ let pat
         Tpat_record_unboxed_product
           (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
     | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
-    | Tpat_alias (p, id, s, uid, m, ty) ->
-        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, m, ty)
+    | Tpat_alias (p, id, s, uid, sort, m, ty) ->
+        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -456,6 +457,19 @@ let expr sub x =
           label, Overridden (map_loc sub lid, sub.expr sub exp))
       fields
   in
+  let map_block_access sub = function
+    | Baccess_field (lid, ld) ->
+      Baccess_field (map_loc sub lid, ld)
+    | Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort } ->
+      let index = sub.expr sub index in
+      Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
+    | Baccess_block (mut, idx) ->
+      Baccess_block (mut, sub.expr sub idx)
+  in
+  let map_unboxed_access sub = function
+    | Uaccess_unboxed_field (lid, ld) ->
+      Uaccess_unboxed_field (map_loc sub lid, ld)
+  in
   let exp_desc =
     match x.exp_desc with
     | Texp_ident (path, lid, vd, idk, uu) ->
@@ -530,8 +544,14 @@ let expr sub x =
           ld,
           sub.expr sub exp2
         )
+    | Texp_atomic_loc (exp, sort, lid, ld, alloc_mode) ->
+        Texp_atomic_loc
+          (sub.expr sub exp, sort, map_loc sub lid, ld, alloc_mode)
     | Texp_array (amut, sort, list, alloc_mode) ->
         Texp_array (amut, sort, List.map (sub.expr sub) list, alloc_mode)
+    | Texp_idx (ba, uas) ->
+        Texp_idx
+          (map_block_access sub ba, List.map (map_unboxed_access sub) uas)
     | Texp_list_comprehension comp ->
         Texp_list_comprehension (map_comprehension comp)
     | Texp_array_comprehension (amut, sort, comp) ->

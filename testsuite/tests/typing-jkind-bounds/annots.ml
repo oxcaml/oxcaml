@@ -25,17 +25,13 @@ type t_any : any
 type t_void : void;;
 
 [%%expect{|
-Line 1, characters 14-18:
-1 | type t_void : void;;
-                  ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+type t_void : void
 |}]
 
-type t_any_non_null : any_non_null;;
+type t_any_mod_separable : any mod separable;;
 
 [%%expect{|
-type t_any_non_null : any_non_null
+type t_any_mod_separable : any mod separable
 |}]
 
 type t_value_or_null : value_or_null;;
@@ -1373,7 +1369,7 @@ let f (x : t) : _ as (_ : immediate) = x
 type t = private int
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119. *)
 
 type t : immediate = private int
 let f (x : t) : _ as (_ : immediate) = x
@@ -1399,7 +1395,7 @@ type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since u is nominative *)
+(* CR layouts v2.8: This should fail since u is nominative. Internal ticket 5119. *)
 
 type t : bits64 mod portable aliased
 type u : bits64 mod portable aliased = private t

@@ -85,7 +85,8 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
       match Reg.Tbl.find_opt var_to_block_temp var with
       | None -> Reg.Tbl.add var_to_block_temp var temp
       | Some block_temp -> replace temp block_temp)
-    | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
+    | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
+    | Stack_check _
     | Op
         ( Move | Opaque | Begin_region | End_region | Dls_get | Poll | Pause
         | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
@@ -441,7 +442,6 @@ let postlude :
         Utils.log "stack_slots[%a]=%d" Stack_class.print stack_class
           num_stack_slots);
     Utils.dedent ());
-  remove_prologue_if_not_required cfg_with_layout;
   update_live_fields cfg_with_layout (Cfg_with_infos.liveness cfg_with_infos);
   f ();
   if debug && Lazy.force invariants

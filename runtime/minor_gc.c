@@ -154,6 +154,26 @@ void caml_set_minor_heap_size (asize_t wsize)
   reset_minor_tables(r);
 }
 
+/* We are about to write `count` ref table entries. We may wish to
+ * avoid them all by doing a minor GC first. Heuristic is that if we
+ * are going to use a significant chunk of the available remembered
+ * set space, without growing the remembered set, then do the GC. */
+
+#define WRITE_PERCENT_TO_TRIGGER_MINOR_GC 10
+
+bool caml_maybe_minor_gc_before_writes(mlsize_t count)
+{
+  struct caml_ref_table *table = &Caml_state->minor_tables->major_ref;
+  size_t space = table->base ? (table->limit - table->ptr) : table->size;
+  if (count > (space * WRITE_PERCENT_TO_TRIGGER_MINOR_GC) / 100) {
+    CAML_EV_COUNTER(EV_C_FORCE_MINOR_MAKE_VECT, 1);
+    caml_minor_collection();
+    return true;
+  }
+  return false;
+}
+
+
 /*****************************************************************************/
 
 struct oldify_state {
@@ -195,11 +215,6 @@ Caml_inline header_t get_header_val(value v) {
 
   return spin_on_header(v);
 }
-
-header_t caml_get_header_val(value v) {
-  return get_header_val(v);
-}
-
 
 static int try_update_object_header(value v, volatile value *p, value result,
                                     mlsize_t infix_offset) {
@@ -375,7 +390,7 @@ static void oldify_one (void* st_v, value v, volatile value *p)
       #endif
     }
 
-  } else if (tag >= No_scan_tag) {
+  } else if (!Scannable_tag(tag)) {
     sz = Wosize_hd (hd);
     st->live_bytes += Bhsize_hd(hd);
     result = alloc_shared(st->domain, sz, tag, Reserved_hd(hd));
@@ -749,7 +764,8 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   CAML_EV_BEGIN(EV_MINOR_LOCAL_ROOTS);
   caml_do_local_roots(
     &oldify_one, oldify_scanning_flags, &st,
-    domain->local_roots, domain->current_stack, domain->gc_regs);
+    domain->local_roots, domain->current_stack, domain->gc_regs,
+    domain->dynamic_bindings);
 
   scan_roots_hook = atomic_load(&caml_scan_roots_hook);
   if (scan_roots_hook != NULL)
@@ -884,7 +900,7 @@ static void dependent_accounting_minor (caml_domain_state *domain)
     value *v = &elt->block;
     CAMLassert (Is_block (*v));
     if (Is_young(*v)) {
-      if (get_header_val(*v) == 0) { /* value copied to major heap */
+      if (Hd_val(*v) == 0) { /* value copied to major heap */
         /* inlined version of [caml_alloc_dependent_memory] */
         domain->allocated_dependent_bytes += elt->mem;
         domain->stat_promoted_dependent_bytes += elt->mem;

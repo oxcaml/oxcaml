@@ -68,9 +68,7 @@ let close_phrase lam =
   ) (free_variables lam) lam
 
 let toplevel_value id =
-  let glob, pos =
-    if Config.flambda then toplevel_value id else Translmod.nat_toplevel_name id
-  in
+  let glob, pos = toplevel_value id in
   (Obj.magic (global_symbol glob)).(pos)
 
 (* Return the value referred to by a path *)
@@ -96,6 +94,7 @@ include Topcommon.MakeEvalPrinter(EvalBase)
 let may_trace = ref false (* Global lock on tracing *)
 
 let load_lambda ppf ~compilation_unit ~required_globals phrase_name lam size =
+  if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let slam = Simplif.simplify_lambda lam in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
@@ -210,18 +209,13 @@ let execute_phrase print_outcome ppf phr =
          | None -> str, sg', false
       in
       let compilation_unit, res, required_globals, size =
-        if Config.flambda then
-          let { Lambda.compilation_unit; main_module_block_size = size;
-                required_globals; code = res } =
-            Translmod.transl_implementation phrase_comp_unit
-              (str, Tcoerce_none, None)
-              ~style:Plain_block
-          in
-          remember compilation_unit sg';
-          compilation_unit, close_phrase res, required_globals, size
-        else
-          let size, res = Translmod.transl_store_phrases phrase_comp_unit str in
-          phrase_comp_unit, res, Compilation_unit.Set.empty, size
+        let { Lambda.compilation_unit; main_module_block_size = size;
+              required_globals; code = res } =
+          Translmod.transl_implementation phrase_comp_unit
+            (str, Tcoerce_none, None)
+        in
+        remember compilation_unit sg';
+        compilation_unit, close_phrase res, required_globals, size
       in
       Warnings.check_fatal ();
       begin try
@@ -233,12 +227,9 @@ let execute_phrase print_outcome ppf phr =
         let out_phr =
           match res with
           | Result _ ->
-              if Config.flambda then
-                (* CR-someday trefis: *)
-                Env.register_import_as_opaque
-                  (Compilation_unit.name compilation_unit)
-              else
-                Compilenv.record_global_approx_toplevel ();
+              (* CR-someday trefis: *)
+              Env.register_import_as_opaque
+                (Compilation_unit.name compilation_unit);
               if print_outcome then
                 Printtyp.wrap_printing_env ~error:false oldenv (fun () ->
                 match str.str_items with

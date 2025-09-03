@@ -14,10 +14,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = Tag.t * Targetint_31_63.t
+type t = Tag.t * Target_ocaml_int.t
 
 include Container_types.S with type t := t
 
 val tag : t -> Tag.t
 
-val size : t -> Targetint_31_63.t
+val size : t -> Target_ocaml_int.t

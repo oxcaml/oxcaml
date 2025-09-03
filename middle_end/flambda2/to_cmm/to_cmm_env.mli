@@ -21,6 +21,19 @@ type t
 (** Free names for cmm expressions *)
 type free_vars = Backend_var.Set.t
 
+(** Delayed symbol initializations *)
+module Symbol_inits : sig
+  type t
+
+  val empty : t
+
+  val merge : t -> t -> t
+
+  val is_empty : t -> bool
+
+  val print : Format.formatter -> t -> unit
+end
+
 (** A cmm expression along with extra information *)
 type expr_with_info =
   { cmm : Cmm.expression;
@@ -67,6 +80,15 @@ type 'env trans_prim =
       ( 'env,
         Flambda_primitive.ternary_primitive,
         Cmm.expression -> Cmm.expression -> Cmm.expression -> prim_res )
+      prim_helper;
+    quaternary :
+      ( 'env,
+        Flambda_primitive.quaternary_primitive,
+        Cmm.expression ->
+        Cmm.expression ->
+        Cmm.expression ->
+        Cmm.expression ->
+        prim_res )
       prim_helper;
     variadic :
       ( 'env,
@@ -133,11 +155,13 @@ val exported_offsets : t -> Exported_offsets.t
     the new environment and the created variable. Will produce a fatal error if
     the given variable is already bound. *)
 val create_bound_parameter :
-  t -> Variable.t -> t * Backend_var.With_provenance.t
+  t -> Variable.t * Flambda_debug_uid.t -> t * Backend_var.With_provenance.t
 
 (** Same as {!create_variable} but for a list of variables. *)
 val create_bound_parameters :
-  t -> Variable.t list -> t * Backend_var.With_provenance.t list
+  t ->
+  (Variable.t * Flambda_debug_uid.t) list ->
+  t * Backend_var.With_provenance.t list
 
 (** {2 Delayed let-bindings}
 
@@ -233,7 +257,7 @@ val bind_variable_to_primitive :
   ?extra:extra_info ->
   t ->
   To_cmm_result.t ->
-  Variable.t ->
+  Bound_var.t ->
   inline:'a inline ->
   defining_expr:'a bound_expr ->
   effects_and_coeffects_of_defining_expr:Effects_and_coeffects.t ->
@@ -245,7 +269,7 @@ val bind_variable :
   ?extra:extra_info ->
   t ->
   To_cmm_result.t ->
-  Variable.t ->
+  Bound_var.t ->
   defining_expr:Cmm.expression ->
   free_vars_of_defining_expr:free_vars ->
   num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
@@ -255,7 +279,7 @@ val bind_variable :
 val add_alias :
   t ->
   To_cmm_result.t ->
-  var:Variable.t ->
+  var:Bound_var.t ->
   alias_of:Variable.t ->
   num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
   t * To_cmm_result.t
@@ -281,9 +305,19 @@ val flush_delayed_lets :
   mode:flush_mode ->
   t ->
   To_cmm_result.t ->
-  (Cmm.expression -> free_vars -> Cmm.expression * free_vars)
+  (Cmm.expression ->
+  free_vars ->
+  Symbol_inits.t ->
+  Cmm.expression * free_vars * Symbol_inits.t)
   * t
   * To_cmm_result.t
+
+val place_symbol_inits :
+  params:(Backend_var.With_provenance.t * _) list ->
+  Cmm.expression ->
+  free_vars ->
+  Symbol_inits.t ->
+  Cmm.expression * free_vars * Symbol_inits.t
 
 (** Fetch the extra info for a Flambda variable (if any), specified as a
     [Simple]. *)

@@ -325,7 +325,7 @@ let get_block_and_constant_field ~block ~field =
     ~const:(fun _ -> None)
     ~symbol:(fun _ ~coercion:_ -> None)
     ~var:(fun var ~coercion:_ ->
-      let field = Targetint_31_63.to_int field in
+      let field = Target_ocaml_int.to_int field in
       Some (var, field))
 
 let record_let_binding ~rewrite_id ~generate_phantom_lets ~let_bound

@@ -262,8 +262,11 @@ let create_coerced_singleton_let uacc var defining_expr
     | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> (
       let uncoerced_var =
         let name = "uncoerced_" ^ Variable.unique_name (VB.var var) in
-        Variable.create name
+        Variable.create name (Variable.kind (VB.var var))
       in
+      let uncoerced_var_duid = Flambda_debug_uid.none in
+      (* CR sspies: In the future, try propagating the debugging UID information
+         here if possible. *)
       (* Generate [let var = uncoerced_var @ <coercion>] *)
       let ((body, uacc, inner_result) as inner) =
         let defining_simple =
@@ -284,7 +287,8 @@ let create_coerced_singleton_let uacc var defining_expr
         (* Generate [let uncoerced_var = <defining_expr>] *)
         let ((_body, _uacc, outer_result) as outer) =
           let bound =
-            Bound_pattern.singleton (VB.create uncoerced_var name_mode)
+            Bound_pattern.singleton
+              (VB.create uncoerced_var uncoerced_var_duid name_mode)
           in
           create_let uacc bound defining_expr ~free_names_of_defining_expr ~body
             ~cost_metrics_of_defining_expr
@@ -536,8 +540,8 @@ let create_let_symbols uacc lifted_constant ~body =
                 | Naked_number Naked_float -> Naked_floats { size = Unknown }
                 | Naked_number
                     ( Naked_float32 | Naked_immediate | Naked_nativeint
-                    | Naked_int32 | Naked_vec128 | Naked_vec256 | Naked_vec512
-                    | Naked_int64 )
+                    | Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec128
+                    | Naked_vec256 | Naked_vec512 | Naked_int64 )
                 | Region | Rec_info ->
                   Misc.fatal_errorf
                     "Unexpected kind %a for symbol projection: %a"
@@ -569,7 +573,7 @@ let create_let_symbols uacc lifted_constant ~body =
       let free_names_of_defining_expr = Named.free_names defining_expr in
       let expr, uacc, _ =
         create_coerced_singleton_let uacc
-          (VB.create var Name_mode.normal)
+          (VB.create var Flambda_debug_uid.none Name_mode.normal)
           defining_expr ~coercion_from_defining_expr_to_var
           ~free_names_of_defining_expr ~body:expr ~cost_metrics_of_defining_expr
       in
@@ -601,7 +605,7 @@ let place_lifted_constants uacc ~lifted_constants_from_defining_expr
   place_constants uacc ~around:body lifted_constants_from_defining_expr
 
 let create_switch uacc ~condition_dbg ~scrutinee ~arms =
-  if Targetint_31_63.Map.cardinal arms < 1
+  if Target_ocaml_int.Map.cardinal arms < 1
   then
     ( RE.create_invalid Zero_switch_arms,
       UA.notify_added ~code_size:Code_size.invalid uacc )
@@ -613,13 +617,13 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
       in
       RE.create_apply_cont action, uacc
     in
-    match Targetint_31_63.Map.get_singleton arms with
+    match Target_ocaml_int.Map.get_singleton arms with
     | Some (_discriminant, action) -> change_to_apply_cont action
     | None -> (
       (* At that point, we've already applied the apply cont rewrite to the
          action of the arms. *)
       let actions =
-        Apply_cont_expr.Set.of_list (Targetint_31_63.Map.data arms)
+        Apply_cont_expr.Set.of_list (Target_ocaml_int.Map.data arms)
       in
       match Apply_cont_expr.Set.get_singleton actions with
       | Some action ->
@@ -817,11 +821,13 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
          binds [kinded_params]. *)
       let params =
         List.map
-          (fun _kind -> Variable.create "param")
+          (fun kind ->
+            let param_var =
+              Variable.create "param" (Flambda_kind.With_subkind.kind kind)
+            in
+            let param_var_duid = Flambda_debug_uid.none in
+            BP.create param_var kind param_var_duid)
           (Flambda_arity.unarized_components arity)
-      in
-      let params =
-        List.map2 BP.create params (Flambda_arity.unarized_components arity)
       in
       let args = List.map BP.simple params in
       let params = Bound_parameters.create params in

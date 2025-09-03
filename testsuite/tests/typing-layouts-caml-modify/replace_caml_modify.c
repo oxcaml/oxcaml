@@ -1,17 +1,17 @@
 #include <caml/mlvalues.h>
 #include <stdbool.h>
 
-// Use this to track whether caml_modify has been called
-static bool called_modify = false;
+// Use this to track how many times caml_modify has been called
+static int called_modify = 0;
 
 CAMLprim value replace_caml_modify_called_modify()
 {
-  return Val_bool(called_modify);
+  return Val_int(called_modify);
 }
 
 CAMLprim value replace_caml_modify_reset()
 {
-  called_modify = false;
+  called_modify = 0;
   return Val_unit;
 }
 
@@ -22,7 +22,7 @@ CAMLextern void __real_caml_modify(value *fp, value v);
 CAMLprim void __wrap_caml_modify(value *fp, value v)
 {
   // Record that caml_modify was called and then call the actual caml_modify
-  called_modify = true;
+  called_modify += 1;
   __real_caml_modify(fp, v);
 }
 

@@ -107,7 +107,7 @@ type t = ..
 type t += K : ('a : float64). 'a ignore -> t
 |}]
 
-(* CR layouts v2.8: re-enable this *)
+(* CR layouts v2.8: re-enable this. Internal ticket 5118. *)
 (*
 module M : sig
   kind_abbrev_ k = immediate
@@ -123,7 +123,7 @@ Uncaught exception: Misc.Fatal_error
 *)
 
 type t1 : any
-type t2 : any_non_null
+type t2 : any mod separable
 type t3 : value_or_null
 type t4 : value
 type t5 : void
@@ -137,7 +137,7 @@ type t12 : bits64
 
 [%%expect{|
 type t1 : any
-type t2 : any_non_null
+type t2 : any mod separable
 type t3 : value_or_null
 type t4
 type t5 : void
@@ -324,7 +324,7 @@ let broken_local =
 Line 2, characters 10-30:
 2 |   [ 5 for local_ n in [ 1; 2 ] ];;
               ^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* User-written attributes *)
@@ -634,7 +634,7 @@ let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 Line 1, characters 48-49:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
                                                     ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
@@ -821,8 +821,10 @@ let f x = stack_ (ref x)
 Line 1, characters 10-24:
 1 | let f x = stack_ (ref x)
               ^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 type t = { a : int }
@@ -850,7 +852,9 @@ let make_tuple x y z = stack_ (x, y), z
 Line 1, characters 23-36:
 1 | let make_tuple x y z = stack_ (x, y), z
                            ^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 type u = A of unit | C of int | B of int * int | D
@@ -927,7 +931,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : 'a iarray -> 'a iarray = <fun>
+val f : ('a : value_or_null mod separable). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)
@@ -1221,6 +1225,52 @@ val payload : string = "payload"
 val inc : 'a with_idx -> 'a with_idx = <fun>
 |}]
 
+(*****************)
+(* Block indices *)
+
+type 'a r = { foo : 'a }
+let idx_r () = (.foo)
+let idx_r_r () = (.foo.#foo)
+let idx_array x = (.(x))
+let idx_array_L x = (.L(x))
+let idx_array_l x = (.l(x))
+let idx_array_n x = (.n(x))
+let idx_iarray x = (.:(x))
+let idx_iarray_L x = (.:L(x))
+let idx_iarray_l x = (.:l(x))
+let idx_iarray_n x = (.:n(x))
+let idx_imm x = (.idx_imm(x))
+let idx_mut x = (.idx_mut(x))
+[%%expect{|
+type 'a r = { foo : 'a; }
+val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
+val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
+val idx_array :
+  ('a : value_or_null mod non_float). int -> ('a array, 'a) idx_mut = <fun>
+val idx_array_L :
+  ('a : value_or_null mod non_float). int64# -> ('a array, 'a) idx_mut =
+  <fun>
+val idx_array_l :
+  ('a : value_or_null mod non_float). int32# -> ('a array, 'a) idx_mut =
+  <fun>
+val idx_array_n :
+  ('a : value_or_null mod non_float). nativeint# -> ('a array, 'a) idx_mut =
+  <fun>
+val idx_iarray :
+  ('a : value_or_null mod non_float). int -> ('a iarray, 'a) idx_imm = <fun>
+val idx_iarray_L :
+  ('a : value_or_null mod non_float). int64# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_iarray_l :
+  ('a : value_or_null mod non_float). int32# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_iarray_n :
+  ('a : value_or_null mod non_float). nativeint# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
+val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
+|}]
+
 (***************)
 (* Modal kinds *)
 
@@ -1240,7 +1290,7 @@ type 'a contended_with_int : immutable_data with 'a @@ contended
 type 'a abstract
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
   | Mk : ('a : value mod portable) abstract -> existential_abstract
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 type 'a abstract
 Lines 2-3, characters 0-67:
@@ -1271,7 +1321,7 @@ end = struct
 end
 
 (* CR layouts v2.8: Expect this output to change once modal kinds are
-   supported. *)
+   supported. Internal ticket 5118. *)
 
 [%%expect{|
 Line 9, characters 16-27:

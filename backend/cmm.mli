@@ -86,6 +86,8 @@ val ge_component : machtype_component -> machtype_component -> bool
     to external C functions *)
 type exttype =
   | XInt  (**r OCaml value, word-sized integer *)
+  | XInt8  (**r 8-bit integer *)
+  | XInt16  (**r 16-bit integer *)
   | XInt32  (**r 32-bit integer *)
   | XInt64  (**r 64-bit integer  *)
   | XFloat32  (**r single-precision FP number *)
@@ -105,19 +107,23 @@ type stack_align =
 
 val equal_stack_align : stack_align -> stack_align -> bool
 
-type integer_comparison = Lambda.integer_comparison =
+type integer_comparison = Scalar.Integer_comparison.t =
   | Ceq
   | Cne
   | Clt
   | Cgt
   | Cle
   | Cge
+  | Cult
+  | Cugt
+  | Cule
+  | Cuge
 
 val negate_integer_comparison : integer_comparison -> integer_comparison
 
 val swap_integer_comparison : integer_comparison -> integer_comparison
 
-type float_comparison = Lambda.float_comparison =
+type float_comparison = Scalar.Float_comparison.t =
   | CFeq
   | CFneq
   | CFlt
@@ -235,6 +241,11 @@ type float_width =
   | Float64
   | Float32
 
+type vector_width =
+  | Vec128
+  | Vec256
+  | Vec512
+
 type vec128_type =
   | Int8x16
   | Int16x8
@@ -291,7 +302,11 @@ type reinterpret_cast =
   | Int64_of_float
   | Float32_of_int32
   | Int32_of_float32
-  | V128_of_v128 (* Converts between vector types of the same width. *)
+  (* When reinterpreting a smaller vector as a larger vector, the upper bits are
+     unspecified. *)
+  | V128_of_vec of vector_width
+  | V256_of_vec of vector_width
+  | V512_of_vec of vector_width
 
 (* These casts may require a particular value-preserving operation, e.g.
    truncating a float to an int. *)
@@ -302,6 +317,10 @@ type static_cast =
   | Float32_of_float
   | V128_of_scalar of vec128_type
   | Scalar_of_v128 of vec128_type
+  | V256_of_scalar of vec256_type
+  | Scalar_of_v256 of vec256_type
+  | V512_of_scalar of vec512_type
+  | Scalar_of_v512 of vec512_type
 
 module Alloc_mode : sig
   type t =
@@ -398,7 +417,6 @@ type operation =
   | Ccmpi of integer_comparison
   | Caddv (* pointer addition that produces a [Val] (well-formed Caml value) *)
   | Cadda (* pointer addition that produces a [Addr] (derived heap pointer) *)
-  | Ccmpa of integer_comparison
   | Cnegf of float_width
   | Cabsf of float_width
   | Caddf of float_width
@@ -482,7 +500,15 @@ type ccatch_flag =
 
 (** Every basic block should have a corresponding [Debuginfo.t] for its
     beginning. *)
-type expression =
+type static_handler =
+  { label : Lambda.static_label;
+    params : (Backend_var.With_provenance.t * machtype) list;
+    body : expression;
+    dbg : Debuginfo.t;
+    is_cold : bool
+  }
+
+and expression =
   | Cconst_int of int * Debuginfo.t
   | Cconst_natint of nativeint * Debuginfo.t
   | Cconst_float32 of float * Debuginfo.t
@@ -507,15 +533,7 @@ type expression =
       * Debuginfo.t
   | Cswitch of
       expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
-  | Ccatch of
-      ccatch_flag
-      * (Lambda.static_label
-        * (Backend_var.With_provenance.t * machtype) list
-        * expression
-        * Debuginfo.t
-        * bool (* is_cold *))
-        list
-      * expression
+  | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
 
 type codegen_option =
@@ -540,7 +558,8 @@ type fundecl =
     fun_body : expression;
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
-    fun_dbg : Debuginfo.t
+    fun_dbg : Debuginfo.t;
+    fun_ret_type : machtype
   }
 
 (** When data items that are less than 64 bits wide occur in blocks, whose

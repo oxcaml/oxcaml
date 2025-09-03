@@ -42,7 +42,12 @@ let u =
 Line 10, characters 17-20:
 10 |     portable_use foo
                       ^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable"
+       because it closes over the module "F" (at Line 7, characters 23-24)
+       which is "nonportable"
+       because it closes over the value "foo" (at Line 15, characters 12-15)
+       which is "nonportable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 let u =
@@ -174,7 +179,8 @@ let (bar @ portable) () =
 Line 3, characters 4-9:
 3 |     N.foo ()
         ^^^^^
-Error: The value "N.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "N.foo" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 let (bar @ portable) () =
@@ -184,7 +190,8 @@ let (bar @ portable) () =
 Line 3, characters 4-9:
 3 |     M.foo ()
         ^^^^^
-Error: The value "M.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "M.foo" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 (* chained aliases. Creating alias of alias is fine. *)
@@ -207,7 +214,8 @@ let (bar @ portable) () =
 Line 4, characters 4-10:
 4 |     N'.foo ()
         ^^^^^^
-Error: The value "N'.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "N'.foo" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 (* module aliases in structures still walk locks. *)
@@ -220,7 +228,8 @@ let (bar @ portable) () =
 Line 3, characters 19-20:
 3 |         module L = M
                        ^
-Error: The module "M" is nonportable, so cannot be used inside a function that is portable.
+Error: The module "M" is "nonportable" but is expected to be "portable"
+       because it is used inside a function which is expected to be "portable".
 |}]
 
 module F (X : S @ portable) = struct
@@ -374,7 +383,8 @@ val foo : unit -> unit = <fun>
 Line 4, characters 14-17:
 4 |     let bar = foo
                   ^^^
-Error: The value "foo" is nonportable, so cannot be used inside a functor that is portable.
+Error: The value "foo" is "nonportable" but is expected to be "portable"
+       because it is used inside a functor which is expected to be "portable".
 |}]
 
 module (F @ portable) (X : sig val x : int -> int end) = struct
@@ -415,4 +425,101 @@ module type S =
     module F : functor (X : sig end) -> sig end
     module rec M : sig module N : sig end end
   end
+|}]
+
+module rec Foo : sig
+    val bar : unit -> unit
+end = struct
+include (Foo : module type of struct
+    include Foo
+end)
+let (bar @ stateful) () = ()
+end
+[%%expect{|
+module rec Foo : sig val bar : unit -> unit end
+|}]
+
+module type S = sig
+    module type S = sig end
+
+    module type Key = sig
+    module M0 : S
+    end
+
+    module L : sig
+    module M : Key
+
+    module N : sig
+        module Label : Key with M
+
+        include sig
+            module Key : S
+        end
+        with module Key = Label
+    end
+    end
+
+    include sig
+        module L' : S
+    end
+    with module L' = L
+
+end
+[%%expect{|
+module type S =
+  sig
+    module type S = sig end
+    module type Key = sig module M0 : S end
+    module L :
+      sig
+        module M : Key
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end
+          end
+      end
+    module L' :
+      sig
+        module M : sig module M0 : sig end end
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end
+          end
+      end
+  end
+|}]
+
+(* CR zqian: fix [make_aliases_absent]. *)
+module type S = sig
+    module type S = sig end
+
+    module type Key = sig
+    module M0 : S
+    end
+
+    module L : sig
+    module M : Key
+
+    module N : sig
+        module Label : Key with M
+
+        include sig
+            module Key : S
+        end
+        with module Key = Label
+        @@ portable
+    end
+    end
+
+    include sig
+        module L' : S
+    end
+    with module L' = L
+    @@ portable
+end
+[%%expect{|
+Uncaught exception: File "typing/env.ml", line 2126, characters 13-19: Assertion failed
+
 |}]

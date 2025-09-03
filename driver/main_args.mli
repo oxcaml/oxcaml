@@ -54,6 +54,8 @@ module type Common_options = sig
   val _no_strict_formats : unit -> unit
   val _unboxed_types : unit -> unit
   val _no_unboxed_types : unit -> unit
+  val _dump_debug_uids : unit -> unit
+  val _dump_debug_uid_tables : unit -> unit
   val _verbose_types : unit -> unit
   val _no_verbose_types : unit -> unit
   val _version : unit -> unit
@@ -94,6 +96,7 @@ module type Compiler_options = sig
   val _as_parameter : unit -> unit
   val _binannot : unit -> unit
   val _binannot_cms : unit -> unit
+  val _shape_format : string -> unit
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit
@@ -112,6 +115,7 @@ module type Compiler_options = sig
   val _intf : string -> unit
   val _intf_suffix : string -> unit
   val _keep_docs : unit -> unit
+  val _llvm_backend : unit -> unit
   val _no_keep_docs : unit -> unit
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit

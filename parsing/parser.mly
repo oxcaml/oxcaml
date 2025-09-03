@@ -287,6 +287,9 @@ let unclosed opening_name opening_loc closing_name closing_loc =
   raise(Syntaxerr.Error(Syntaxerr.Unclosed(make_loc opening_loc, opening_name,
                                            make_loc closing_loc, closing_name)))
 
+let quotation_reserved name loc =
+  raise(Syntaxerr.Error(Syntaxerr.Quotation_reserved(make_loc loc, name)))
+
 (* Normal mutable arrays and immutable arrays are parsed identically, just with
    different delimiters.  The parsing is done by the [array_exprs] rule, and the
    [Generic_array] module provides (1) a type representing the possible results,
@@ -983,6 +986,7 @@ let maybe_pmod_constraint mode expr =
 %token COMMA                  ","
 %token CONSTRAINT             "constraint"
 %token DO                     "do"
+%token DOLLAR                 "$"
 %token DONE                   "done"
 %token DOT                    "."
 %token DOTDOT                 ".."
@@ -1039,6 +1043,7 @@ let maybe_pmod_constraint mode expr =
 %token LBRACKETPERCENT        "[%"
 %token LBRACKETPERCENTPERCENT "[%%"
 %token LESS                   "<"
+%token LESSLBRACKET           "<["
 %token LESSMINUS              "<-"
 %token LET                    "let"
 %token <string> LIDENT        "lident" (* just an example *)
@@ -1075,6 +1080,7 @@ let maybe_pmod_constraint mode expr =
 %token QUOTE                  "'"
 %token RBRACE                 "}"
 %token RBRACKET               "]"
+%token RBRACKETGREATER        "]>"
 %token REC                    "rec"
 %token RPAREN                 ")"
 %token SEMI                   ";"
@@ -1176,9 +1182,8 @@ The precedences must be listed from low to high.
 /* Finally, the first tokens of simple_expr are above everything else. */
 %nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT HASH_FLOAT INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT
+          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN
-
 
 /* Entry points */
 
@@ -2917,6 +2922,11 @@ fun_expr:
       { mkexp ~loc:$sloc (mkinfix e1 op e2) }
 ;
 
+unboxed_access:
+  | DOTHASH mkrhs(label_longident)
+      { Uaccess_unboxed_field $2 }
+;
+
 simple_expr:
   | LPAREN seq_expr RPAREN
       { reloc_exp ~loc:$sloc $2 }
@@ -3057,6 +3067,50 @@ comprehension_clause:
   | HASH_SUFFIX { () }
 ;
 
+%inline indexop_block_access(dot, index):
+  | d=dot LPAREN i=index RPAREN
+    { d, Paren,   i }
+  | d=dot LBRACE i=index RBRACE
+    { d, Brace,   i }
+  | d=dot LBRACKET i=index RBRACKET
+    { d, Bracket, i }
+;
+
+block_access:
+  | DOT mkrhs(label_longident)
+    { Baccess_field $2 }
+  | DOT _p=LPAREN i=seq_expr RPAREN
+    { Baccess_array (Mutable, Index_int, i) }
+  | DOTOP _p=LPAREN i=seq_expr RPAREN
+    {
+      match $1 with
+      | ":" -> Baccess_array (Immutable, Index_int, i)
+      | _ -> raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
+    }
+  | DOT ident _p=LPAREN i=seq_expr RPAREN
+    {
+      match $2 with
+      | "L" -> Baccess_array (Mutable, Index_unboxed_int64, i)
+      | "l" -> Baccess_array (Mutable, Index_unboxed_int32, i)
+      | "n" -> Baccess_array (Mutable, Index_unboxed_nativeint, i)
+      | "idx_imm" -> Baccess_block (Immutable, i)
+      | "idx_mut" -> Baccess_block (Mutable, i)
+      | _ ->
+        raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
+    }
+  | DOTOP ident _p=LPAREN i=seq_expr RPAREN
+    {
+      match $1, $2 with
+      | ":", "L" -> Baccess_array (Immutable, Index_unboxed_int64, i)
+      | ":", "l" -> Baccess_array (Immutable, Index_unboxed_int32, i)
+      | ":", "n" -> Baccess_array (Immutable, Index_unboxed_nativeint, i)
+      | _ ->
+        raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
+    }
+  | DOT ident _p=LPAREN seq_expr _e=error
+    { indexop_unclosed_error $loc(_p) Paren $loc(_e) }
+;
+
 %inline simple_expr_:
   | mkrhs(val_longident)
       { Pexp_ident ($1) }
@@ -3078,6 +3132,8 @@ comprehension_clause:
       { Pexp_field($1, $3) }
   | simple_expr DOTHASH mkrhs(label_longident)
       { Pexp_unboxed_field($1, $3) }
+  | LPAREN block_access llist(unboxed_access) RPAREN
+      { Pexp_idx ($2, $3) }
   | od=open_dot_declaration DOT LPAREN seq_expr RPAREN
       { Pexp_open(od, $4) }
   | od=open_dot_declaration DOT LBRACELESS object_expr_content GREATERRBRACE
@@ -3138,6 +3194,12 @@ comprehension_clause:
           mkexp_attrs ~loc:($startpos($3), $endpos)
             (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, [])) $5 in
         Pexp_open(od, modexp) }
+  | LESSLBRACKET expr_semi_list RBRACKETGREATER
+      { quotation_reserved "<[" $loc($1) }
+  | LESSLBRACKET expr_semi_list error
+      { unclosed "<[" $loc($1) "]>" $loc($3) }
+  | DOLLAR error
+      { quotation_reserved "$" $loc($1) }
   | mod_longident DOT
     LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($3) ")" $loc($8) }
@@ -4758,6 +4820,12 @@ atomic_type:
       { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
   | LPAREN TYPE COLON jkind=jkind_annotation RPAREN
       { mktyp ~loc:$loc (Ptyp_of_kind jkind) }
+  | LESSLBRACKET core_type RBRACKETGREATER
+      { quotation_reserved "<[" $loc($1) }
+  | LESSLBRACKET core_type error
+      { unclosed "<[" $loc($1) "]>" $loc($3) }
+  | DOLLAR error
+      { quotation_reserved "$" $loc($1) }
 
 
 (* This is the syntax of the actual type parameters in an application of

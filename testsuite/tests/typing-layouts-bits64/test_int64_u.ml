@@ -2,6 +2,10 @@
  include stdlib_upstream_compatible;
 *)
 
+(* External declarations for unsigned comparison primitives *)
+external unsigned_lt : int64# -> int64# -> bool = "%int64#_unsigned_lessthan"
+external unsigned_gt : int64# -> int64# -> bool = "%int64#_unsigned_greaterthan"
+
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
@@ -333,4 +337,60 @@ let () =
   test_binary_of "equal"               Int64.equal               Int64_u.equal                bool_result;
   test_binary    "min"                 Int64.min                 Int64_u.min;
   test_binary    "max"                 Int64.max                 Int64_u.max;
+
+  (* Explicit unsigned comparison tests with hardcoded expected values *)
+  let module I = Int64_u in
+
+  (* Define constants using unboxed literals *)
+  let zero = #0L in
+  let one = #1L in
+  let minus_one = -#1L in
+  let max_int = #0x7FFFFFFFFFFFFFFFL in
+  let min_int = -#0x8000000000000000L in
+
+  (* Test that -1 (0xFFFFFFFFFFFFFFFF) > 0 when compared as unsigned *)
+  assert (I.unsigned_compare minus_one zero = 1);
+  assert (I.unsigned_compare zero minus_one = -1);
+
+  (* Test that min_int (0x8000000000000000) > max_int (0x7FFFFFFFFFFFFFFF)
+     when compared as unsigned *)
+  assert (I.unsigned_compare min_int max_int = 1);
+  assert (I.unsigned_compare max_int min_int = -1);
+
+  (* Test ordering: when viewed as unsigned:
+     0 < 1 < max_int < min_int < -1 *)
+  assert (I.unsigned_compare zero one = -1);
+  assert (I.unsigned_compare one max_int = -1);
+  assert (I.unsigned_compare max_int min_int = -1);
+  assert (I.unsigned_compare min_int minus_one = -1);
+
+  (* Test equality *)
+  assert (I.unsigned_compare zero zero = 0);
+  assert (I.unsigned_compare minus_one minus_one = 0);
+  assert (I.unsigned_compare min_int min_int = 0);
+
+  (* Test specific values *)
+  let neg_billion = I.of_int (-1000000000) in
+  let pos_billion = I.of_int 1000000000 in
+  assert (I.unsigned_compare neg_billion pos_billion = 1);
+  assert (I.unsigned_compare pos_billion neg_billion = -1);
+
+  (* Test the unsigned_lt primitive directly *)
+  assert (unsigned_lt zero minus_one = true); (* 0 < 0xFFFFFFFFFFFFFFFF *)
+  assert (unsigned_lt minus_one zero = false);
+  assert (unsigned_lt max_int min_int
+    = true); (* 0x7FFFFFFFFFFFFFFF < 0x8000000000000000 *)
+  assert (unsigned_lt min_int max_int = false);
+  assert (unsigned_lt pos_billion neg_billion = true);
+  assert (unsigned_lt neg_billion pos_billion = false);
+
+  (* Test unsigned greater than using primitive comparisons *)
+  assert (unsigned_gt minus_one zero = true); (* 0xFFFFFFFFFFFFFFFF > 0 *)
+  assert (unsigned_gt zero minus_one = false);
+  assert (unsigned_gt min_int max_int
+    = true); (* 0x8000000000000000 > 0x7FFFFFFFFFFFFFFF *)
+  assert (unsigned_gt max_int min_int = false);
+  assert (unsigned_gt neg_billion pos_billion = true);
+  assert (unsigned_gt pos_billion neg_billion = false);
+
   ()

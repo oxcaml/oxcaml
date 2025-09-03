@@ -95,7 +95,7 @@ let effects_of (expr : Cmm.expression) :
     Effects_of_all_expressions args
   | _ -> Use_default
 
-let select_addressing chunk (expr : Cmm.expression) :
+let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match expr with
   | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
@@ -113,7 +113,12 @@ let select_addressing chunk (expr : Cmm.expression) :
     Ibased (s.sym_name, 0), Ctuple []
   | arg -> Iindexed 0, arg
 
-let select_operation ~generic_select_condition:_ (op : Cmm.operation)
+let select_addressing chunk exp : addressing_mode * Cmm.expression =
+  if !Clflags.llvm_backend (* Llvmize only expects [Iindexed] *)
+  then Iindexed 0, exp
+  else select_addressing' chunk exp
+
+let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     (args : Cmm.expression list) dbg ~label_after:_ :
     Cfg_selectgen_target_intf.select_operation_result =
   let[@inline] rewrite_multiply_add_or_sub shift_op mul_op ~arg1 ~args2 dbg :
@@ -212,6 +217,15 @@ let select_operation ~generic_select_condition:_ (op : Cmm.operation)
   (* Other operations are regular *)
   | _ -> Use_default
 
+let select_operation
+    ~(generic_select_condition :
+       Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
+    (args : Cmm.expression list) dbg ~label_after :
+    Cfg_selectgen_target_intf.select_operation_result =
+  if !Clflags.llvm_backend
+  then Use_default
+  else select_operation' ~generic_select_condition op args dbg ~label_after
+
 let select_store ~is_assign:_ _addr _exp :
     Cfg_selectgen_target_intf.select_store_result =
   Maybe_out_of_range
@@ -222,13 +236,13 @@ let is_store_out_of_range kind ~byte_offset :
 
 let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
-  let ty_arg_is_int32 =
+  let ty_arg_is_small_int =
     match ty_arg with
-    | XInt32 -> true
+    | XInt32 | XInt16 | XInt8 -> true
     | XInt | XInt64 | XFloat32 | XFloat | XVec128 -> false
     | XVec256 | XVec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
   in
-  if macosx && ty_arg_is_int32 && is_stack_slot dst
+  if macosx && ty_arg_is_small_int && is_stack_slot dst
   then Rewritten (Op (Specific Imove32), src, dst)
   else Use_default
 

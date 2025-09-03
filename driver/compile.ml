@@ -46,10 +46,13 @@ let raw_lambda_to_bytecode i raw_lambda ~as_arg_for =
            arg_block_idx } ->
        Builtin_attributes.warn_unused ();
        lambda
+       |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
+          (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
        |> Simplif.simplify_lambda
        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
        |> Blambda_of_lambda.blambda_of_lambda
+            ~compilation_unit:(Some i.module_name)
        |> print_if i.ppf_dump Clflags.dump_blambda Printblambda.blambda
        |> Bytegen.compile_implementation i.module_name
        |> print_if i.ppf_dump Clflags.dump_instr Printinstr.instrlist
@@ -67,7 +70,7 @@ let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
   in
   (structure, coercion, argument_coercion)
   |> Profile.(record transl)
-    (Translmod.transl_implementation i.module_name ~style:Set_global_to_block)
+    (Translmod.transl_implementation i.module_name)
   |> raw_lambda_to_bytecode i
 
 let emit_bytecode i
@@ -136,7 +139,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
     in
     let impl =
       Translmod.transl_instance info.module_name ~runtime_args
-        ~main_module_block_size ~arg_block_idx ~style:Set_global_to_block
+        ~main_module_block_size ~arg_block_idx
     in
     let bytecode = raw_lambda_to_bytecode info impl ~as_arg_for in
     emit_bytecode info bytecode

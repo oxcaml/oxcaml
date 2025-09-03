@@ -1,12 +1,12 @@
 (library
  (name compiler_owee)
  (flags
-  (-w -27-69))
+  (:standard -w -27-69))
  (foreign_stubs
   (language c)
   (names owee_stubs)
   (flags
-   ((:include %{project_root}/oc_cflags.sexp)
+   ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
     (:include %{project_root}/sharedlib_cflags.sexp)
     (:include %{project_root}/oc_cppflags.sexp))))
  (synopsis "OCaml library to work with DWARF format"))

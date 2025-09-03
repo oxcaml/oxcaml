@@ -47,11 +47,15 @@ module type Num_common = sig
 
   val to_const : t -> Reg_width_const.t
 
-  val to_immediate : t -> Targetint_31_63.t
+  val to_immediate : t -> Target_ocaml_int.t
 
   val to_naked_float32 : t -> Numeric_types.Float32_by_bit_pattern.t
 
   val to_naked_float : t -> Numeric_types.Float_by_bit_pattern.t
+
+  val to_naked_int8 : t -> Numeric_types.Int8.t
+
+  val to_naked_int16 : t -> Numeric_types.Int16.t
 
   val to_naked_int32 : t -> Numeric_types.Int32.t
 
@@ -93,13 +97,13 @@ module type Int_number_kind = sig
 
     val xor : t -> t -> t
 
-    val shift_left : t -> Targetint_31_63.t -> t
+    val shift_left : t -> Target_ocaml_int.t -> t
 
     (* [shift_right] is arithmetic shift right, matching [Int32], [Int64],
        etc. *)
-    val shift_right : t -> Targetint_31_63.t -> t
+    val shift_right : t -> Target_ocaml_int.t -> t
 
-    val shift_right_logical : t -> Targetint_31_63.t -> t
+    val shift_right_logical : t -> Target_ocaml_int.t -> t
 
     val swap_byte_endianness : t -> t
 
@@ -144,6 +148,10 @@ module For_naked_immediates : Int_number_kind
 module For_float32s : Boxable_number_kind
 
 module For_floats : Boxable_number_kind
+
+module For_int8s : Int_number_kind
+
+module For_int16s : Int_number_kind
 
 module For_int32s : Boxable_int_number_kind
 

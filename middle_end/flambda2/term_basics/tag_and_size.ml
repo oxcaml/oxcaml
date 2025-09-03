@@ -14,9 +14,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = Tag.t * Targetint_31_63.t
+type t = Tag.t * Target_ocaml_int.t
 
-include Container_types.Make_pair (Tag) (Targetint_31_63)
+include Container_types.Make_pair (Tag) (Target_ocaml_int)
 
 let tag (tag, _) = tag
 

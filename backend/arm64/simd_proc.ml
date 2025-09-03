@@ -72,6 +72,7 @@ type register_behavior =
   | Rf32_to_Rf32
   | Rf64_to_Rf64
   | Rf32_to_Rs64
+  | Rf64_to_Rs64
   (* extract *)
   | Rs8x16_to_Rs8 of { lane : int }
   | Rs16x8_to_Rs16 of { lane : int }
@@ -96,6 +97,7 @@ let register_behavior (op : Simd.operation) =
   match op with
   (* unary *)
   | Round_f32_s64 -> Rf32_to_Rs64
+  | Round_f64_s64 -> Rf64_to_Rs64
   | Round_f32 _ -> Rf32_to_Rf32
   | Round_f64 _ -> Rf64_to_Rf64
   (* binary *)
@@ -112,7 +114,7 @@ let register_behavior (op : Simd.operation) =
   | Sqrtq_f64 | Rsqrteq_f64 | Roundq_f64 _ -> Rf64x2_to_Rf64x2
   | Addq_s64 | Subq_s64 | Paddq_s64 | Shlq_u64 | Shlq_s64 ->
     Rs64x2_Rs64x2_to_Rs64x2
-  | Cvtq_s32_f32 -> Rf32x4_to_Rs32x4
+  | Cvtq_s32_f32 | Cvtnq_s32_f32 -> Rf32x4_to_Rs32x4
   | Cvtq_f32_s32 -> Rs32x4_to_Rf32x4
   | Cvt_f64_f32 ->
     (* Input should be in Vec128 register but only the bottom f32x2 is used by
@@ -140,7 +142,7 @@ let register_behavior (op : Simd.operation) =
   | Cmp_f32 _ -> Rf32x4_Rf32x4_to_Rs32x4
   | Cmpz_f32 _ -> Rf32x4_to_Rs32x4
   | Cmp_f64 _ -> Rf64x2_Rf64x2_to_Rs64x2
-  | Cmpz_f64 _ | Cvtq_s64_f64 -> Rf64x2_to_Rs64x2
+  | Cmpz_f64 _ | Cvtq_s64_f64 | Cvtnq_s64_f64 -> Rf64x2_to_Rs64x2
   | Cvtq_f64_s64 -> Rs64x2_to_Rf64x2
   | Cmp_s32 _ -> Rf32x4_Rf32x4_to_Rs32x4
   | Cmp_s64 _ -> Rs64x2_Rs64x2_to_Rs64x2

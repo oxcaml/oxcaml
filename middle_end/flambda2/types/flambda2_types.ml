@@ -19,7 +19,8 @@ module Typing_env = struct
   open Meet_env
 
   let add_equation t name ty =
-    add_equation t name ty ~meet_type:(Meet.meet_type ())
+    use_meet_env t ~f:(fun t ->
+        add_equation t name ty ~meet_type:(Meet.meet_type ()))
 
   let add_is_null_relation t name ~scrutinee =
     add_equation t name (Type_grammar.is_null ~scrutinee)
@@ -31,15 +32,18 @@ module Typing_env = struct
     add_equation t name (Type_grammar.get_tag_for_block ~block:scrutinee)
 
   let add_equations_on_params t ~params ~param_types =
-    add_equations_on_params t ~params ~param_types
-      ~meet_type:(Meet.meet_type ())
+    use_meet_env t ~f:(fun t ->
+        add_equations_on_params t ~params ~param_types
+          ~meet_type:(Meet.meet_type ()))
 
   let add_env_extension t extension =
-    add_env_extension t extension ~meet_type:(Meet.meet_type ())
+    use_meet_env t ~f:(fun t ->
+        add_env_extension t extension ~meet_type:(Meet.meet_type ()))
 
   let add_env_extension_with_extra_variables t extension =
-    add_env_extension_with_extra_variables t extension
-      ~meet_type:(Meet.meet_type ())
+    use_meet_env t ~f:(fun t ->
+        add_env_extension_with_extra_variables t extension
+          ~meet_type:(Meet.meet_type ()))
 
   module Alias_set = Aliases.Alias_set
 end

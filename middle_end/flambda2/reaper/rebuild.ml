@@ -47,6 +47,10 @@ type param_decision =
   | Delete
   | Unbox of Variable.t DS.unboxed_fields Field.Map.t
 
+(* CR sspies: Throughout this file, we create bound paramters and variables
+   without corresponding debugging uids. Does it make sense to properly
+   propagate debugging uids there? If so, where should they come from? *)
+
 let print_param_decision ppf param_decision =
   match param_decision with
   | Keep (v, kind) ->
@@ -185,11 +189,14 @@ let get_parameters params_decisions =
     (fun acc param_decision ->
       match param_decision with
       | Delete -> acc
-      | Keep (var, kind) -> Bound_parameter.create var kind :: acc
+      | Keep (var, kind) ->
+        Bound_parameter.create var kind Flambda_debug_uid.none :: acc
       | Unbox fields ->
         fold_unboxed_with_kind
-          (fun kind v acc -> Bound_parameter.create v (KS.anything kind) :: acc)
-          fields acc)
+          (fun kind v acc ->
+            Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
+            :: acc)
+          fields acc) (* CR sspies: Missing debug uid. *)
     [] params_decisions
   |> List.rev
 
@@ -198,12 +205,15 @@ let get_parameters_and_modes params_decisions modes =
     (fun acc (param_decision, mode) ->
       match param_decision with
       | Delete -> acc
-      | Keep (var, kind) -> (Bound_parameter.create var kind, mode) :: acc
+      | Keep (var, kind) ->
+        (Bound_parameter.create var kind Flambda_debug_uid.none, mode) :: acc
       | Unbox fields ->
         fold_unboxed_with_kind
           (fun kind v acc ->
-            (Bound_parameter.create v (KS.anything kind), mode) :: acc)
-          fields acc)
+            ( Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none,
+              mode )
+            :: acc)
+          fields acc) (* CR sspies: Missing debug uid. *)
     []
     (List.combine params_decisions modes)
   |> List.rev |> List.split
@@ -242,7 +252,9 @@ let bind_fields fields arg_fields hole =
   fold2_unboxed_subset
     (fun var arg hole ->
       let bp =
-        Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
+        Bound_pattern.singleton
+          (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+        (* CR sspies: Missing debug uid. *)
       in
       RE.create_let bp (Named.create_simple (Simple.var arg)) ~body:hole)
     fields arg_fields hole
@@ -581,7 +593,10 @@ let rebuild_named_default_case env (named : Named.t) =
         Named.create_prim
           (P.Unary
              ( Block_load
-                 { field = Targetint_31_63.of_int field; kind; mut = Immutable },
+                 { field = Target_ocaml_int.of_int field;
+                   kind;
+                   mut = Immutable
+                 },
                arg ))
           dbg)
     | Closure_representation (arg_fields, function_slots, current_function_slot)
@@ -605,7 +620,7 @@ let rebuild_named_default_case env (named : Named.t) =
   | Prim (Unary (Block_load { kind; field; _ }, arg), _dbg)
     when simple_is_unboxable env arg ->
     let kind = P.Block_access_kind.element_kind_for_load kind in
-    let field = GFG.Field.Block (Targetint_31_63.to_int field, kind) in
+    let field = GFG.Field.Block (Target_ocaml_int.to_int field, kind) in
     rewrite_field_access arg field
   | Prim (Unary (Project_value_slot { value_slot; _ }, arg), _dbg)
     when simple_is_unboxable env arg ->
@@ -618,7 +633,7 @@ let rebuild_named_default_case env (named : Named.t) =
   | Prim (Unary (Block_load { kind; field; _ }, arg), dbg)
     when simple_changed_repr env arg ->
     let kind = P.Block_access_kind.element_kind_for_load kind in
-    let field = GFG.Field.Block (Targetint_31_63.to_int field, kind) in
+    let field = GFG.Field.Block (Target_ocaml_int.to_int field, kind) in
     rewrite_field_access_chg_repr arg field dbg
   | Prim (Unary (Project_value_slot { value_slot; _ }, arg), dbg)
     when simple_changed_repr env arg ->
@@ -654,6 +669,9 @@ let rewrite_apply_cont_expr env ac =
     in
     Some (Apply_cont_expr.with_continuation_and_args ac cont ~args)
 
+let reaper_produce_invalid_when_never_returns =
+  Sys.getenv_opt "REAPER_INVALIDS" <> None
+
 let make_apply_wrapper env
     (make_apply : continuation:Apply_expr.Result_continuation.t -> Apply_expr.t)
     apply_continuation return_decisions =
@@ -662,17 +680,14 @@ let make_apply_wrapper env
     let apply = make_apply ~continuation:Never_returns in
     RE.from_expr ~expr:(Expr.create_apply apply)
       ~free_names:(Apply.free_names apply)
-  | Return return_cont ->
+  | Return return_cont -> (
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
       Continuation.Map.find return_cont env.cont_params_to_keep
     in
     let return_cont_wrapper = Continuation.rename return_cont in
     let apply = make_apply ~continuation:(Return return_cont_wrapper) in
-    let apply_expr = Expr.create_apply apply in
     let rev_args_or_invalid =
-      (* TODO if the decisions are equal, don't introduce the wrapper. Not
-         really important but this will be simpler for debugging *)
       List.fold_left2
         (fun (rev_args_or_invalid : _ Or_invalid.t) apply_decision func_decision
              : _ Or_invalid.t ->
@@ -722,19 +737,86 @@ let make_apply_wrapper env
         (Or_invalid.Ok (0, []))
         apply_decisions return_decisions
     in
-    let cont_handler =
-      let return_parameters = get_parameters return_decisions in
-      let handler =
-        match rev_args_or_invalid with
-        | Ok (_, rev_args) ->
-          let args = List.rev rev_args in
+    let return_parameters = get_parameters return_decisions in
+    match rev_args_or_invalid with
+    | Ok (_, rev_args) ->
+      let args = List.rev rev_args in
+      if List.compare_lengths args return_parameters = 0
+         && List.for_all2
+              (fun arg param ->
+                Simple.pattern_match'
+                  ~const:(fun _ -> false)
+                  ~symbol:(fun _ ~coercion:_ -> false)
+                  ~var:(fun v ~coercion:_ ->
+                    Variable.equal v (Bound_parameter.var param))
+                  arg)
+              args return_parameters
+      then
+        (* If the decisions are equal, we are making the same transformation to
+           the arguments passed to the return continuation in the callee as to
+           the parameters of the return continuation in the caller. In this
+           case, do not introduce the wrapper, as it would just be a
+           continuation alias. The wrapper can turn tail calls into non-tail
+           ones, making it important to not introduce them if not necessary.
+           Fortunately, if there is a loop of possible tail calls [f1 -> f2 ->
+           ... -> fn -> f1] (including indirect calls), then the uses of the
+           results of these functions will all be the same, guaranteeing that
+           they get the same decisions. As such, no wrappers will be needed in
+           these cases, enforcing that tail calls that get turned into non-tail
+           calls can only happen outside of such loops, and thus ensuring that
+           the stack required during execution is only O(1) larger. In pratice,
+           this should not happen much in any case, but a typical example would
+           be: *)
+        (* let f x y = #(x, y) in
+         * let g x y = f x y in
+         * fun x y ->
+         *   let #(a, b) = f x y in
+         *   let #(c, _) = g x y in
+         *   a + b + c
+         *)
+        (* Here, [g] gets a wrapper to return a single value, while [f] does
+           not. As such, the tail call from [g] to [f] is lost. However, this
+           can only happen because the uses of [g] do not match those of [f],
+           which would be the case if a loop of tail calls between them
+           existed. *)
+        let apply = make_apply ~continuation:(Return return_cont) in
+        RE.from_expr ~expr:(Expr.create_apply apply)
+          ~free_names:(Apply.free_names apply)
+      else
+        let apply_expr = Expr.create_apply apply in
+        let handler =
           let apply_cont =
             Apply_cont_expr.create return_cont ~args ~dbg:(Apply.dbg apply)
           in
           RE.from_expr
             ~expr:(Expr.create_apply_cont apply_cont)
             ~free_names:(Apply_cont_expr.free_names apply_cont)
-        | Invalid ->
+        in
+        let cont_handler =
+          RE.create_continuation_handler
+            (Bound_parameters.create return_parameters)
+            ~handler ~is_exn_handler:false ~is_cold:false
+          (* TODO: take the one from the original return cont *)
+        in
+        let body =
+          RE.from_expr ~expr:apply_expr ~free_names:(Apply.free_names apply)
+        in
+        RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
+    | Invalid ->
+      (* For the same reason as above, we need not to introduce a wrapper in
+         this case. However this makes it impossible to introduce a runtime
+         error if the function actually returns due to a bug in the reaper, so
+         we gate the [Invalid] wrapper behind an option which can be enabled
+         when debugging. The typical example would be something like: *)
+      (* let rec loop () =
+       *   do_something ();
+       *   loop ()
+       *)
+      (* where we don't want to degrade the tail call to a non-tail one as it
+         would blow up the stack. *)
+      if reaper_produce_invalid_when_never_returns
+      then
+        let handler =
           RE.from_expr
             ~expr:
               (Expr.create_invalid
@@ -743,16 +825,21 @@ let make_apply_wrapper env
                        Simple.print
                        (Option.get (Apply.callee apply)))))
             ~free_names:Name_occurrences.empty
-      in
-      RE.create_continuation_handler
-        (Bound_parameters.create return_parameters)
-        ~handler ~is_exn_handler:false ~is_cold:false
-      (* TODO: take the one from the original return cont *)
-    in
-    let body =
-      RE.from_expr ~expr:apply_expr ~free_names:(Apply.free_names apply)
-    in
-    RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
+        in
+        let cont_handler =
+          RE.create_continuation_handler
+            (Bound_parameters.create return_parameters)
+            ~handler ~is_exn_handler:false ~is_cold:true
+        in
+        let body =
+          RE.from_expr ~expr:(Expr.create_apply apply)
+            ~free_names:(Apply.free_names apply)
+        in
+        RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
+      else
+        let apply = make_apply ~continuation:Never_returns in
+        RE.from_expr ~expr:(Expr.create_apply apply)
+          ~free_names:(Apply.free_names apply))
 
 let rewrite_call_kind env (call_kind : Call_kind.t) =
   let rewrite_simple = rewrite_simple env in
@@ -917,7 +1004,8 @@ let rebuild_apply env apply =
     in
     let func_decisions =
       List.map
-        (fun kind -> Keep (Variable.create "function_return", kind))
+        (fun kind ->
+          Keep (Variable.create "function_return" (KS.kind kind), kind))
         (Flambda_arity.unarized_components return_arity)
     in
     make_apply_wrapper env make_apply (Apply.continuation apply) func_decisions
@@ -1005,13 +1093,15 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
       fold2_unboxed_subset
         (fun var (field, kind) hole ->
           let bp =
-            Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
+            Bound_pattern.singleton
+              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+            (* CR sspies: Missing debug uid. *)
           in
           let named =
             Named.create_prim
               (P.Unary
                  ( Block_load
-                     { field = Targetint_31_63.of_int field;
+                     { field = Target_ocaml_int.of_int field;
                        kind;
                        mut = Immutable
                      },
@@ -1026,7 +1116,9 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
       fold2_unboxed_subset
         (fun var value_slot hole ->
           let bp =
-            Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
+            Bound_pattern.singleton
+              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+            (* CR sspies: Missing debug uid. *)
           in
           let named =
             Named.create_prim
@@ -1086,7 +1178,9 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
               | Unboxed _ -> Misc.fatal_errorf "Trying to unbox non-unboxable"
             in
             let bp =
-              Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
+              Bound_pattern.singleton
+                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+              (* CR sspies: Missing debug uid. *)
             in
             RE.create_let bp (Named.create_simple simple) ~body:hole
           | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
@@ -1097,7 +1191,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
     | Prim (Unary (Block_load { field; kind; _ }, arg), dbg) ->
       let field =
         Field.Block
-          ( Targetint_31_63.to_int field,
+          ( Target_ocaml_int.to_int field,
             P.Block_access_kind.element_kind_for_load kind )
       in
       load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
@@ -1162,7 +1256,9 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                 in
                 let bp =
                   Bound_pattern.singleton
-                    (Bound_var.create var Name_mode.normal)
+                    (Bound_var.create var Flambda_debug_uid.none
+                       Name_mode.normal)
+                  (* CR sspies: Missing debug uid. *)
                 in
                 RE.create_let bp (Named.create_simple arg) ~body:hole
             | Block _ | Is_int | Get_tag | Function_slot _ | Code_of_closure
@@ -1310,7 +1406,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
       let ks =
         KS.create K.value
           (Variant
-             { consts = Targetint_31_63.Set.empty;
+             { consts = Target_ocaml_int.Set.empty;
                non_consts =
                  Tag.Scannable.Map.singleton tag (block_shape, subkinds)
              })
@@ -1538,7 +1634,9 @@ and rebuild_holed (env : env) res (rev_expr : Rev_expr.rev_expr_holed)
               | Some fields ->
                 fold_unboxed_with_kind
                   (fun kind v acc ->
-                    Bound_parameter.create v (KS.anything kind) :: acc)
+                    Bound_parameter.create v (KS.anything kind)
+                      Flambda_debug_uid.none
+                    :: acc) (* CR sspies: Missing debug uid. *)
                   fields [])
             l
         in
@@ -1614,11 +1712,11 @@ and rebuild_expr (env : env) (res : rebuild_result)
         RE.from_expr ~expr ~free_names)
     | Switch switch ->
       let arms =
-        Targetint_31_63.Map.filter_map
+        Target_ocaml_int.Map.filter_map
           (fun _ -> rewrite_apply_cont_expr env)
           (Switch_expr.arms switch)
       in
-      if Targetint_31_63.Map.is_empty arms
+      if Target_ocaml_int.Map.is_empty arms
       then
         RE.from_expr
           ~expr:(Expr.create_invalid Zero_switch_arms)
@@ -1747,7 +1845,9 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       | Some fields ->
         ( fold_unboxed_with_kind
             (fun kind v acc ->
-              Bound_parameter.create v (KS.anything kind) :: acc)
+              Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
+              :: acc)
+            (* CR sspies: Missing debug uid. *)
             fields [],
           Code_metadata.with_is_my_closure_used false code_metadata )
     in

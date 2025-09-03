@@ -88,11 +88,12 @@ type t =
     (* CR-someday gyorsh: compute locally. *)
     fun_num_stack_slots : int Stack_class.Tbl.t;
     fun_poll : Lambda.poll_attribute;
-    next_instruction_id : InstructionId.sequence
+    next_instruction_id : InstructionId.sequence;
+    fun_ret_type : Cmm.machtype
   }
 
 let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
-    ~fun_num_stack_slots ~fun_poll ~next_instruction_id =
+    ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type =
   { fun_name;
     fun_args;
     fun_codegen_options;
@@ -104,7 +105,8 @@ let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     fun_contains_calls;
     fun_num_stack_slots;
     fun_poll;
-    next_instruction_id
+    next_instruction_id;
+    fun_ret_type
   }
 
 let mem_block t label = Label.Tbl.mem t.blocks label
@@ -275,6 +277,7 @@ let dump_basic ppf (basic : basic) =
   | Poptrap { lbl_handler } ->
     fprintf ppf "Poptrap handler=%a" Label.format lbl_handler
   | Prologue -> fprintf ppf "Prologue"
+  | Epilogue -> fprintf ppf "Epilogue"
   | Stack_check { max_frame_size_bytes } ->
     fprintf ppf "Stack_check size=%d" max_frame_size_bytes
 
@@ -320,7 +323,7 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
   | Int_test { lt; eq; gt; is_signed; imm } ->
     let cmp =
       Printf.sprintf " %s%s"
-        (if is_signed then "s" else "u")
+        (match is_signed with Signed -> "s" | Unsigned -> "u")
         (match imm with None -> second_arg | Some i -> " " ^ Int.to_string i)
     in
     fprintf ppf "if%s <%s goto %a%s" first_arg cmp Label.format lt sep;
@@ -477,11 +480,12 @@ let is_pure_basic : basic -> bool = function
     (* Those instructions modify the trap stack which actually modifies the
        stack pointer. *)
     false
-  | Prologue ->
+  | Prologue | Epilogue ->
     (* [Prologue] grows the stack when entering a function and therefore
        modifies the stack pointer. [Prologue] can be considered pure if it's
        ensured that it wouldn't modify the stack pointer (e.g. there are no used
-       local stack slots nor calls). *)
+       local stack slots nor calls). [Epilogue] shrinks the stack when leaving a
+       function, and can also be considered pure under the same conditions. *)
     false
   | Stack_check _ ->
     (* May reallocate the stack. *)
@@ -509,7 +513,8 @@ let is_noop_move instr =
       | Opaque | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
       | Specific _ | Name_for_debugger _ | Begin_region | End_region | Dls_get
       | Poll | Alloc _ | Pause )
-  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
+  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
+    ->
     false
 
 let set_stack_offset (instr : _ instruction) stack_offset =
@@ -555,6 +560,22 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     available_across
   }
 
+let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
+    ?(res = [||]) ?(irc_work_list = Unknown_list) ?(ls_order = -1) () =
+  { desc;
+    arg;
+    res;
+    dbg = copy.dbg;
+    fdo = copy.fdo;
+    live = copy.live;
+    stack_offset = copy.stack_offset;
+    id;
+    irc_work_list;
+    ls_order;
+    available_before = copy.available_before;
+    available_across = copy.available_across
+  }
+
 let invalid_stack_offset = -1
 
 let make_empty_block ?label terminator : basic_block =
@@ -575,7 +596,7 @@ let make_empty_block ?label terminator : basic_block =
 let is_poll (instr : basic instruction) =
   match instr.desc with
   | Op Poll -> true
-  | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
+  | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Alloc _ | Move | Spill | Reload | Opaque | Pause | Begin_region
       | End_region | Dls_get | Const_int _ | Const_float32 _ | Const_float _
@@ -593,7 +614,7 @@ let is_poll (instr : basic instruction) =
 let is_alloc (instr : basic instruction) =
   match instr.desc with
   | Op (Alloc _) -> true
-  | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
+  | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
       | Dls_get | Pause | Const_int _ | Const_float32 _ | Const_float _
@@ -611,7 +632,7 @@ let is_alloc (instr : basic instruction) =
 let is_end_region (b : basic) =
   match b with
   | Op End_region -> true
-  | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
+  | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Alloc _ | Poll | Move | Spill | Reload | Opaque | Begin_region | Dls_get
       | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
@@ -702,7 +723,7 @@ let remove_trap_instructions t removed_trap_handlers =
         | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
         | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
         | Dls_get | Poll | Alloc _ | Pause )
-    | Reloadretaddr | Prologue | Stack_check _ ->
+    | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =
     match r with

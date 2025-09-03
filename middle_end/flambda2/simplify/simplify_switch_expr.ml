@@ -16,7 +16,7 @@
 
 open! Simplify_import
 module TE = Flambda2_types.Typing_env
-module TI = Targetint_31_63
+module TI = Target_ocaml_int
 module Alias_set = TE.Alias_set
 
 type mergeable_arms =
@@ -180,9 +180,9 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
               let not_arms = TI.Map.add arm action not_arms in
               maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
             else maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
-          | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int32 _
-          | Naked_int64 _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-          | Naked_nativeint _ | Null ->
+          | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
+          | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
+          | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Null ->
             maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
         in
         Simple.pattern_match arg ~const ~name:(fun _ ~coercion:_ ->
@@ -277,9 +277,9 @@ let recognize_switch_with_single_arg_to_same_destination0 ~arms =
          immediate, the value which we store inside values of that type is still
          a normal untagged [TI.t]. *)
       check_args Reg_width_const.is_tagged_immediate Leave_as_tagged_immediate
-    | Naked_float _ | Naked_float32 _ | Naked_int32 _ | Naked_int64 _
-    | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-    | Null ->
+    | Naked_float _ | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
+    | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
+    | Naked_vec256 _ | Naked_vec512 _ | Null ->
       None)
 
 let recognize_switch_with_single_arg_to_same_destination ~arms =
@@ -293,7 +293,7 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
     dbg =
   let rebuilding = UA.are_rebuilding_terms uacc in
   let block_sym =
-    let var = Variable.create "switch_block" in
+    let var = Variable.create "switch_block" K.value in
     Symbol.create
       (Compilation_unit.get_current_exn ())
       (Linkage_name.of_string (Variable.unique_name var))
@@ -327,14 +327,16 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
     Binary (Array_load (Values, Values, Immutable), block, tagged_scrutinee)
   in
   let load_from_block = Named.create_prim load_from_block_prim dbg in
-  let arg_var = Variable.create "arg" in
+  let arg_var = Variable.create "arg" K.value in
+  let arg_var_duid = Flambda_debug_uid.none in
   let arg = Simple.var arg_var in
-  let final_arg_var, final_arg =
+  let final_arg_var, final_arg_var_duid, final_arg =
     match must_untag_lookup_table_result with
     | Must_untag ->
-      let final_arg_var = Variable.create "final_arg" in
-      final_arg_var, Simple.var final_arg_var
-    | Leave_as_tagged_immediate -> arg_var, arg
+      let final_arg_var = Variable.create "final_arg" K.naked_immediate in
+      let final_arg_var_duid = Flambda_debug_uid.none in
+      final_arg_var, final_arg_var_duid, Simple.var final_arg_var
+    | Leave_as_tagged_immediate -> arg_var, arg_var_duid, arg
   in
   (* Note that, unlike for the untagging of normal Switch scrutinees, there's no
      problem with CSE and Data_flow here. The reason is that in this case the
@@ -353,11 +355,13 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
       match must_untag_lookup_table_result with
       | Leave_as_tagged_immediate -> body
       | Must_untag ->
-        let bound = BPt.singleton (BV.create final_arg_var NM.normal) in
+        let bound =
+          BPt.singleton (BV.create final_arg_var final_arg_var_duid NM.normal)
+        in
         let untag_arg = Named.create_prim untag_arg_prim dbg in
         RE.create_let rebuilding bound untag_arg ~body ~free_names_of_body
     in
-    let bound = BPt.singleton (BV.create arg_var NM.normal) in
+    let bound = BPt.singleton (BV.create arg_var arg_var_duid NM.normal) in
     RE.create_let rebuilding bound load_from_block ~body ~free_names_of_body
   in
   let extra_free_names =
@@ -384,6 +388,92 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
     |> UA.notify_added ~code_size:increase_in_code_size
   in
   expr, uacc
+
+let recognize_affine_switch_to_same_destination consts =
+  match consts with
+  | [] | [_] -> None
+  | const0 :: const1 :: other_consts ->
+    let slope = TI.sub const1 const0 in
+    let rec check offset slope index = function
+      | [] -> Some (offset, slope)
+      | const :: _ when not TI.(equal const (add (mul index slope) offset)) ->
+        None
+      | _ :: consts -> check offset slope TI.(add index one) consts
+    in
+    check const0 slope (TI.of_int 2) other_consts
+
+(* Tiny DSL to preserve sanity while rebuilding expressions. *)
+
+let bound_prim name kind prim dbg = name, kind, prim, dbg
+
+let ( let$ ) (name, kind, prim, dbg) k uacc ~dacc_before_switch =
+  match
+    find_cse_simple ~required:false dacc_before_switch (UA.required_names uacc)
+      prim
+  with
+  | Some simple -> k simple uacc ~dacc_before_switch
+  | None ->
+    let named = Named.create_prim prim dbg in
+    let var = Variable.create name kind in
+    let uacc = UA.add_free_names uacc (NO.singleton_variable var NM.normal) in
+    let body, uacc = k (Simple.var var) uacc ~dacc_before_switch in
+    let duid = Flambda_debug_uid.none in
+    let binding : EB.binding_to_place =
+      { let_bound = BPt.singleton (BV.create var duid NM.normal);
+        simplified_defining_expr = Simplified_named.create named;
+        original_defining_expr = None
+      }
+    in
+    EB.make_new_let_bindings uacc ~bindings_outermost_first:[binding] ~body
+
+let return ~code_size ~free_names expr uacc ~dacc_before_switch:_ =
+  let uacc = UA.notify_added ~code_size uacc in
+  let uacc = UA.add_free_names uacc free_names in
+  expr, uacc
+
+let run uacc ~dacc_before_switch k = k uacc ~dacc_before_switch
+
+let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch ~original
+    ~scrutinee ~tagged_scrutinee ~dest ~offset ~slope
+    ~must_untag_lookup_table_result dbg =
+  (* We are creating the following fragment: *)
+  (* let scaled = x * slope in
+   * let final = scaled + offset in
+   * apply_cont k final
+   *)
+  let scrutinee, kind, standard_int, const =
+    match must_untag_lookup_table_result with
+    | Must_untag ->
+      ( scrutinee,
+        K.naked_immediate,
+        K.Standard_int.Naked_immediate,
+        Reg_width_const.naked_immediate )
+    | Leave_as_tagged_immediate ->
+      ( tagged_scrutinee,
+        K.value,
+        K.Standard_int.Tagged_immediate,
+        Reg_width_const.tagged_immediate )
+  in
+  run ~dacc_before_switch uacc
+    (let mul_prim : P.t =
+       Binary
+         (Int_arith (standard_int, Mul), scrutinee, Simple.const (const slope))
+     in
+     let$ scaled_arg = bound_prim "scaled_arg" kind mul_prim dbg in
+     let prim : P.t =
+       Binary
+         (Int_arith (standard_int, Add), scaled_arg, Simple.const (const offset))
+     in
+     let$ final_arg = bound_prim "final_arg" kind prim dbg in
+     let apply_cont = Apply_cont.create dest ~args:[final_arg] ~dbg in
+     let free_names = Apply_cont.free_names apply_cont in
+     let increase_in_code_size =
+       Code_size.( - )
+         (Code_size.apply_cont apply_cont)
+         (Code_size.switch original)
+     in
+     return ~code_size:increase_in_code_size ~free_names
+       (RE.create_apply_cont apply_cont))
 
 let rebuild_switch ~original ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
     ~dacc_before_switch uacc ~after_rebuild =
@@ -465,10 +555,16 @@ let rebuild_switch ~original ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
               tagging_prim
           with
           | None -> normal_case0 uacc
-          | Some tagged_scrutinee ->
-            rebuild_switch_with_single_arg_to_same_destination uacc
-              ~dacc_before_switch ~original ~tagged_scrutinee ~dest ~consts
-              ~must_untag_lookup_table_result dbg)
+          | Some tagged_scrutinee -> (
+            match recognize_affine_switch_to_same_destination consts with
+            | None ->
+              rebuild_switch_with_single_arg_to_same_destination uacc
+                ~dacc_before_switch ~original ~tagged_scrutinee ~dest ~consts
+                ~must_untag_lookup_table_result dbg
+            | Some (offset, slope) ->
+              rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
+                ~original ~scrutinee ~tagged_scrutinee ~dest ~offset ~slope
+                ~must_untag_lookup_table_result dbg))
       in
       match switch_merged with
       | Some (dest, args) ->
@@ -510,7 +606,8 @@ let rebuild_switch ~original ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
             let uacc =
               UA.notify_removed ~operation:Removed_operations.branch uacc
             in
-            let not_scrutinee = Variable.create "not_scrutinee" in
+            let not_scrutinee = Variable.create "not_scrutinee" K.value in
+            let not_scrutinee_duid = Flambda_debug_uid.none in
             let not_scrutinee' = Simple.var not_scrutinee in
             let tagging_prim : P.t = Unary (Tag_immediate, scrutinee) in
             match
@@ -526,7 +623,8 @@ let rebuild_switch ~original ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                   Debuginfo.none
               in
               let bound =
-                VB.create not_scrutinee NM.normal |> Bound_pattern.singleton
+                VB.create not_scrutinee not_scrutinee_duid NM.normal
+                |> Bound_pattern.singleton
               in
               let apply_cont =
                 Apply_cont.create dest ~args:[not_scrutinee'] ~dbg
@@ -697,7 +795,8 @@ let simplify_switch0 dacc switch ~down_to_up =
 
 let simplify_switch ~simplify_let_with_bound_pattern ~simplify_function_body
     dacc switch ~down_to_up =
-  let tagged_scrutinee = Variable.create "tagged_scrutinee" in
+  let tagged_scrutinee = Variable.create "tagged_scrutinee" K.value in
+  let tagged_scrutinee_duid = Flambda_debug_uid.none in
   let tagging_prim =
     Named.create_prim
       (Unary (Tag_immediate, Switch.scrutinee switch))
@@ -706,7 +805,8 @@ let simplify_switch ~simplify_let_with_bound_pattern ~simplify_function_body
   let let_expr =
     (* [body] won't be looked at (see below). *)
     Let.create
-      (Bound_pattern.singleton (Bound_var.create tagged_scrutinee NM.normal))
+      (Bound_pattern.singleton
+         (Bound_var.create tagged_scrutinee tagged_scrutinee_duid NM.normal))
       tagging_prim
       ~body:(Expr.create_switch switch)
       ~free_names_of_body:Unknown

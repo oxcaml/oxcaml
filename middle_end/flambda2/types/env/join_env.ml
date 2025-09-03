@@ -188,6 +188,8 @@ module Simples_in_joined_envs : sig
 
   val raw_name : t -> string
 
+  val kind : t -> Flambda_kind.t
+
   val add : Index.t -> Simple_in_one_joined_env.t -> t -> t
 
   val of_list : (Index.t * Simple.t) list -> t
@@ -267,6 +269,11 @@ end = struct
       with Not_found -> None
     in
     match shared_name with Some raw_name -> raw_name | None -> "join_var"
+
+  let kind (t : t) =
+    match Index.Map.choose_opt (t :> Simple.t Index.Map.t) with
+    | Some (_, s) -> Simple.kind s
+    | None -> Misc.fatal_error "Simple_in_joined_envs.kind: No binding"
 
   let of_list list =
     List.fold_left
@@ -576,7 +583,8 @@ end = struct
        record it so that it can be found by [find] if we encounter the same set
        of values later. *)
     let raw_name = Simples_in_joined_envs.raw_name simples in
-    let var = Variable.create raw_name in
+    let kind = Simples_in_joined_envs.kind simples in
+    let var = Variable.create raw_name kind in
     let var_as_name = Name_in_target_env.create (Name.var var) in
     let joined_simples =
       Simples_in_joined_envs.Map.add simples var_as_name t.joined_simples
@@ -1031,7 +1039,7 @@ type t =
 
        {b Note}: This can be a subset of all the actual joined environments when
        performing a join inside env extensions. *)
-    target_env : TE.t
+    target_env : ME.t
   }
 
 type join_result =
@@ -1091,13 +1099,15 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
   in
   let target_env = t.target_env in
   let exists_in_target_env (name : Name_in_one_joined_env.t) =
-    if TE.mem ~min_name_mode:Name_mode.in_types target_env (name :> Name.t)
+    if TE.mem ~min_name_mode:Name_mode.in_types (ME.typing_env target_env)
+         (name :> Name.t)
     then Some (Name_in_target_env.create (name :> Name.t))
     else None
   in
   let is_bound_strictly_earlier (name : Name_in_target_env.t)
       ~(than : Simple_in_target_env.t) =
-    TE.alias_is_bound_strictly_earlier t.target_env
+    TE.alias_is_bound_strictly_earlier
+      (ME.typing_env t.target_env)
       ~bound_name:(name :> Name.t)
       ~alias:(than :> Simple.t)
   in
@@ -1116,7 +1126,9 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
           (* Passing [None] to [TE.find] here is OK, because [name] has been
              demoted in at least one environment thus cannot be imported. *)
           let ty_in_target_env =
-            TE.find target_env (name_in_target_env :> Name.t) None
+            TE.find (ME.typing_env target_env)
+              (name_in_target_env :> Name.t)
+              None
           in
           let kind = TG.kind ty_in_target_env in
           Join_equations.add_joined_simple ~joined_envs:t.joined_envs
@@ -1236,8 +1248,12 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
     let target_env =
       Variable.Map.fold
         (fun var kind target_env ->
-          TE.add_definition target_env
-            (Bound_name.create_var (Bound_var.create var Name_mode.in_types))
+          ME.add_definition target_env
+            (Bound_name.create_var
+               (* Variables with [Name_mode.in_types] do not exist at runtime,
+                  so we do not equip them with a [Flambda_debug_uid.t]. See
+                  #3967. *)
+               (Bound_var.create var Flambda_debug_uid.none Name_mode.in_types))
             kind)
         extra_variables target_env
     in
@@ -1248,7 +1264,7 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
           let simple = (simple :> Simple.t) in
           (* Passing [None] to [TE.find] here is OK, because [name] has been
              demoted in at least one environment thus cannot be imported. *)
-          let kind = TG.kind (TE.find target_env name None) in
+          let kind = TG.kind (TE.find (ME.typing_env target_env) name None) in
           let ty = TG.alias_type_of kind simple in
           ME.add_equation ~meet_type target_env name ty)
         demoted_in_target_env target_env
@@ -1262,7 +1278,7 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
     let target_env =
       Variable.Map.fold
         (fun var symbol_projection target_env ->
-          TE.add_symbol_projection target_env var symbol_projection)
+          ME.add_symbol_projection target_env var symbol_projection)
         symbol_projections target_env
     in
     target_env
@@ -1283,7 +1299,10 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
         assert (not (TE.is_bottom parent_env));
         let cut_after = TE.current_scope parent_env in
         let typing_env = TE.increment_scope parent_env in
-        match ME.add_env_extension_strict ~meet_type typing_env extension with
+        match
+          ME.use_meet_env_strict typing_env ~f:(fun meet_env ->
+              ME.add_env_extension ~meet_type meet_env extension)
+        with
         | Bottom ->
           (* We can reach bottom here if the extension was created in a more
              generic context, but is added in a context where it is no longer
@@ -1319,11 +1338,15 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
             (* Passing [None] to [TE.find] here is OK, because [name] has been
                demoted in at least one environment thus cannot be imported. *)
             match Name.must_be_var_opt (name :> Name.t) with
-            | None -> TG.kind (TE.find t.target_env (name :> Name.t) None)
+            | None ->
+              TG.kind
+                (TE.find (ME.typing_env t.target_env) (name :> Name.t) None)
             | Some var -> (
               match Variable.Map.find_opt var extra_variables with
               | Some kind -> kind
-              | None -> TG.kind (TE.find t.target_env (name :> Name.t) None))
+              | None ->
+                TG.kind
+                  (TE.find (ME.typing_env t.target_env) (name :> Name.t) None))
           in
           let ty = TG.alias_type_of kind (simple :> Simple.t) in
           Name.Map.add (name :> Name.t) ty equations)
@@ -1342,13 +1365,15 @@ let n_way_join_simples t kind simples : _ Or_bottom.t * _ =
   let simples = Simples_in_joined_envs.of_list simples in
   let target_env = t.target_env in
   let exists_in_target_env (name : Name_in_one_joined_env.t) =
-    if TE.mem ~min_name_mode:Name_mode.in_types target_env (name :> Name.t)
+    if TE.mem ~min_name_mode:Name_mode.in_types (ME.typing_env target_env)
+         (name :> Name.t)
     then Some (Name_in_target_env.create (name :> Name.t))
     else None
   in
   let is_bound_strictly_earlier (name : Name_in_target_env.t)
       ~(than : Simple_in_target_env.t) =
-    TE.alias_is_bound_strictly_earlier t.target_env
+    TE.alias_is_bound_strictly_earlier
+      (ME.typing_env t.target_env)
       ~bound_name:(name :> Name.t)
       ~alias:(than :> Simple.t)
   in
@@ -1375,7 +1400,11 @@ type env_id = Index.t
 
 type 'a join_arg = env_id * 'a
 
-let target_join_env { target_env; _ } = target_env
+let code_age_relation { target_env; _ } =
+  TE.code_age_relation (ME.typing_env target_env)
+
+let code_age_relation_resolver { target_env; _ } =
+  TE.code_age_relation_resolver (ME.typing_env target_env)
 
 type n_way_join_type = t -> TG.t join_arg list -> TG.t Or_unknown.t * t
 

@@ -43,6 +43,55 @@ module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol
 module L = Asm_targets.Asm_label
 
+(* Name of current function *)
+let function_name = ref ""
+
+(* Keep the name of the current block section to get back to it after emitting
+   data. *)
+let current_basic_block_section = ref ""
+
+module I = struct
+  include I
+
+  exception Extension_disabled of string
+
+  let () =
+    Printexc.register_printer (function
+      | Extension_disabled msg -> Some ("extension disabled: " ^ msg)
+      | _ -> None)
+
+  let require_vec256 () =
+    if not (Arch.Extension.enabled_vec256 ())
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found 256-bit register whilst emitting %s, but AVX is not \
+               enabled."
+              !function_name))
+
+  let require_vec512 () =
+    if not (Arch.Extension.enabled_vec512 ())
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found 512-bit register whilst emitting %s, but AVX512F is not \
+               enabled."
+              !function_name))
+
+  let simd (simd : Simd_instrs.instr) args =
+    if not (Arch.Extension.enabled_instruction simd)
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found '%s' whilst emitting %s, but %s is not enabled."
+              simd.mnemonic !function_name
+              (Amd64_simd_defs.exts_to_string simd.ext)));
+    I.simd simd args
+end
+
 (** Turn a Linear label into an assembly label. The section is checked against the
     section tracked by [D] when emitting label definitions. *)
 let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
@@ -72,10 +121,10 @@ let register_name typ r : X86_ast.arg =
   | Int | Val | Addr -> Reg64 int_reg_name.(r)
   | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(r - 100)
   | Vec256 ->
-    Arch.Extension.require_vec256 ();
+    I.require_vec256 ();
     Regf ymm_reg_name.(r - 100)
   | Vec512 ->
-    Arch.Extension.require_vec512 ();
+    I.require_vec512 ();
     Regf zmm_reg_name.(r - 100)
 
 let phys_rax = phys_reg Int 0
@@ -291,13 +340,6 @@ let emit_named_text_section ?(suffix = "") func_name =
       D.unsafe_set_internal_section_ref Text)
   else D.text ()
 
-(* Name of current function *)
-let function_name = ref ""
-
-(* Keep the name of the current block section to get back to it after emitting
-   data. *)
-let current_basic_block_section = ref ""
-
 let emit_function_or_basic_block_section_name () =
   let suffix =
     if String.length !current_basic_block_section = 0
@@ -329,10 +371,10 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
   | Float -> REAL8
   | Vec128 -> VEC128
   | Vec256 ->
-    Arch.Extension.require_vec256 ();
+    I.require_vec256 ();
     VEC256
   | Vec512 ->
-    Arch.Extension.require_vec512 ();
+    I.require_vec512 ();
     VEC512
   | Valx2 -> VEC128
   | Int | Addr | Val -> QWORD
@@ -387,6 +429,17 @@ let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
 
 let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 
+let narrow_to_xmm : X86_ast.arg -> X86_ast.arg = function
+  | Regf (YMM r | ZMM r) -> Regf (XMM r)
+  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+    | Regf (XMM _)
+    | Mem _ | Mem64_RIP _ ) as res ->
+    res
+
+let argX i n = narrow_to_xmm (reg i.arg.(n))
+
+let resX i n = narrow_to_xmm (reg i.res.(n))
+
 (* Output an addressing mode *)
 
 let addressing addr typ i n =
@@ -425,11 +478,11 @@ let must_save_simd_regs live =
     live;
   if !v512
   then (
-    Arch.Extension.require_vec512 ();
+    I.require_vec512 ();
     Save_zmm)
   else if !v256
   then (
-    Arch.Extension.require_vec256 ();
+    I.require_vec256 ();
     Save_ymm)
   else Save_xmm
 
@@ -647,6 +700,28 @@ let emit_jump_tables () =
 
 (* Names for instructions *)
 
+let sse_or_avx sse vex src dst =
+  if Arch.Extension.enabled AVX
+  then I.simd vex [| src; dst |]
+  else I.simd sse [| src; dst |]
+
+let sse_or_avx3 sse vex src1 src2 dst =
+  if Arch.Extension.enabled AVX
+  then I.simd vex [| src2; src1; dst |]
+  else (
+    assert (equal_arg src1 dst);
+    I.simd sse [| src2; dst |])
+
+let sse_or_avx_dst sse vex src dst =
+  if Arch.Extension.enabled AVX
+  then I.simd vex [| src; dst; dst |]
+  else I.simd sse [| src; dst |]
+
+let cmp_sse_or_avx sse vex cond src1 src2 dst =
+  if Arch.Extension.enabled AVX
+  then I.simd vex [| imm_of_float_condition cond; src1; src2; dst |]
+  else I.simd sse [| imm_of_float_condition cond; src1; src2 |]
+
 let instr_for_intop = function
   | Iadd -> I.add
   | Isub -> I.sub
@@ -660,41 +735,41 @@ let instr_for_intop = function
   | Idiv | Imod | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ -> assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
+  let open Simd_instrs in
   match width, op with
-  | Float64, Iaddf -> I.addsd
-  | Float64, Isubf -> I.subsd
-  | Float64, Imulf -> I.mulsd
-  | Float64, Idivf -> I.divsd
-  | Float32, Iaddf -> I.addss
-  | Float32, Isubf -> I.subss
-  | Float32, Imulf -> I.mulss
-  | Float32, Idivf -> I.divss
+  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd
+  | Float64, Isubf -> sse_or_avx3 subsd vsubsd
+  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd
+  | Float64, Idivf -> sse_or_avx3 divsd vdivsd
+  | Float32, Iaddf -> sse_or_avx3 addss vaddss
+  | Float32, Isubf -> sse_or_avx3 subss vsubss
+  | Float32, Imulf -> sse_or_avx3 mulss vmulss
+  | Float32, Idivf -> sse_or_avx3 divss vdivss
   | (Float32 | Float64), (Inegf | Iabsf | Icompf _) -> assert false
 
 let instr_for_floatarithmem (width : Cmm.float_width) op =
+  let open Simd_instrs in
   match width, op with
-  | Float64, Ifloatadd -> I.addsd
-  | Float64, Ifloatsub -> I.subsd
-  | Float64, Ifloatmul -> I.mulsd
-  | Float64, Ifloatdiv -> I.divsd
-  | Float32, Ifloatadd -> I.addss
-  | Float32, Ifloatsub -> I.subss
-  | Float32, Ifloatmul -> I.mulss
-  | Float32, Ifloatdiv -> I.divss
+  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd
+  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd
+  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd
+  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd
+  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss
+  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss
+  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss
+  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss
 
 let cond : Operation.integer_comparison -> X86_ast.condition = function
-  | Isigned Ceq -> E
-  | Isigned Cne -> NE
-  | Isigned Cle -> LE
-  | Isigned Cgt -> G
-  | Isigned Clt -> L
-  | Isigned Cge -> GE
-  | Iunsigned Ceq -> E
-  | Iunsigned Cne -> NE
-  | Iunsigned Cle -> BE
-  | Iunsigned Cgt -> A
-  | Iunsigned Clt -> B
-  | Iunsigned Cge -> AE
+  | Ceq -> E
+  | Cne -> NE
+  | Cle -> LE
+  | Cgt -> G
+  | Clt -> L
+  | Cge -> GE
+  | Cult -> B (* unsigned less than *)
+  | Cule -> BE (* unsigned less or equal *)
+  | Cugt -> A (* unsigned greater than *)
+  | Cuge -> AE (* unsigned greater or equal *)
 
 (* Output an = 0 or <> 0 test. *)
 
@@ -719,10 +794,11 @@ let emit_float_test (width : Cmm.float_width) (cmp : Cmm.float_comparison) i
      If FP traps are on (they are off by default),
      comisd traps on QNaN and SNaN but ucomisd traps on SNaN only.
   *)
+  let open Simd_instrs in
   let ucomi, comi =
     match width with
-    | Float64 -> I.ucomisd, I.comisd
-    | Float32 -> I.ucomiss, I.comiss
+    | Float64 -> sse_or_avx ucomisd vucomisd, sse_or_avx comisd vcomisd
+    | Float32 -> sse_or_avx ucomiss vucomiss, sse_or_avx comiss vcomiss
   in
   match cmp with
   | CFeq when equal_arg (arg i 1) (arg i 0) ->
@@ -783,14 +859,11 @@ let emit_test i ~(taken : X86_ast.condition -> unit) = function
   | Iinttest cmp ->
     I.cmp (arg i 1) (arg i 0);
     taken (cond cmp)
-  | Iinttest_imm
-      (((Isigned Ceq | Isigned Cne | Iunsigned Ceq | Iunsigned Cne) as cmp), 0)
-    ->
+  | Iinttest_imm (((Ceq | Cne) as cmp), 0) ->
     output_test_zero i.arg.(0);
     taken (cond cmp)
   | Iinttest_imm
-      ( (( Isigned (Ceq | Cne | Clt | Cgt | Cle | Cge)
-         | Iunsigned (Ceq | Cne | Clt | Cgt | Cle | Cge) ) as cmp),
+      ( ((Ceq | Cne | Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge) as cmp),
         n ) ->
     I.cmp (int n) (arg i 0);
     taken (cond cmp)
@@ -801,22 +874,6 @@ let emit_test i ~(taken : X86_ast.condition -> unit) = function
   | Ieventest ->
     I.test (int 1) (arg8 i 0);
     taken E
-
-(* Deallocate the stack frame before a return or tail call *)
-
-let output_epilogue f =
-  if !frame_required
-  then (
-    let n = frame_size () - 8 - if fp then 8 else 0 in
-    if n <> 0
-    then (
-      I.add (int n) rsp;
-      D.cfi_adjust_cfa_offset ~bytes:(-n));
-    if fp then I.pop rbp;
-    f ();
-    (* reset CFA back cause function body may continue *)
-    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n)
-  else f ()
 
 (* Floating-point constants *)
 
@@ -919,8 +976,56 @@ let emit_global_label ~section s =
   let lbl = Cmm_helpers.make_symbol s in
   emit_global_label_for_symbol ~section lbl
 
+let movd src dst =
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, is_regf src with
+  | false, false -> I.simd movd_X_r32m32 [| src; dst |]
+  | false, true -> I.simd movd_r32m32_X [| src; dst |]
+  | true, false -> I.simd vmovd_X_r32m32 [| src; dst |]
+  | true, true -> I.simd vmovd_r32m32_X [| src; dst |]
+
+let movq src dst =
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, is_regf src with
+  | false, false -> I.simd movq_X_r64m64 [| src; dst |]
+  | false, true -> I.simd movq_r64m64_X [| src; dst |]
+  | true, false -> I.simd vmovq_X_r64m64 [| src; dst |]
+  | true, true -> I.simd vmovq_r64m64_X [| src; dst |]
+
+let movss src dst =
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, is_mem src, is_mem dst with
+  | _, true, true -> assert false
+  | false, false, _ -> I.simd movss_Xm32_X [| src; dst |]
+  | false, true, _ -> I.simd movss_X_m32 [| src; dst |]
+  | true, false, false -> I.simd vmovss_X_X_X [| src; dst; dst |]
+  | true, false, true -> I.simd vmovss_m32_X [| src; dst |]
+  | true, true, false -> I.simd vmovss_X_m32 [| src; dst |]
+
+let movsd src dst =
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, is_mem src, is_mem dst with
+  | _, true, true -> assert false
+  | false, false, _ -> I.simd movsd_Xm64_X [| src; dst |]
+  | false, true, _ -> I.simd movsd_X_m64 [| src; dst |]
+  | true, false, false -> I.simd vmovsd_X_X_X [| src; dst; dst |]
+  | true, false, true -> I.simd vmovsd_m64_X [| src; dst |]
+  | true, true, false -> I.simd vmovsd_X_m64 [| src; dst |]
+
+let movpd ~unaligned src dst =
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, is_mem src, unaligned with
+  | false, true, false -> I.simd movapd_X_Xm128 [| src; dst |]
+  | false, true, true -> I.simd movupd_X_Xm128 [| src; dst |]
+  | false, false, false -> I.simd movapd_Xm128_X [| src; dst |]
+  | false, false, true -> I.simd movupd_Xm128_X [| src; dst |]
+  | true, false, false -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, false, true -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, true, false -> I.simd vmovupd_X_Xm128 [| src; dst |]
+  | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
+
 let move (src : Reg.t) (dst : Reg.t) =
-  let open Amd64_simd_instrs in
+  let open Simd_instrs in
   let distinct = not (Reg.same_loc src dst) in
   match src.typ, src.loc, dst.typ, dst.loc with
   | _, Stack _, _, Stack _ ->
@@ -929,12 +1034,9 @@ let move (src : Reg.t) (dst : Reg.t) =
   | Float, Reg _, Float, Reg _
   | Float32, Reg _, Float32, Reg _
   | (Vec128 | Valx2), (Reg _ | Stack _), (Vec128 | Valx2), (Reg _ | Stack _) ->
-    if distinct
-    then
-      (* Vec128 stack slots are aligned, domainstate slots are not. *)
-      if Reg.is_domainstate src || Reg.is_domainstate dst
-      then I.movupd (reg src) (reg dst)
-      else I.movapd (reg src) (reg dst)
+    (* Vec128 stack slots are aligned, domainstate slots are not. *)
+    let unaligned = Reg.is_domainstate src || Reg.is_domainstate dst in
+    if distinct then movpd ~unaligned (reg src) (reg dst)
   | Vec256, Reg _, Vec256, (Reg _ | Stack _) ->
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct then I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
@@ -945,9 +1047,9 @@ let move (src : Reg.t) (dst : Reg.t) =
     (* CR-soon mslater: avx512 *)
     Misc.fatal_error "avx512 instructions not yet implemented"
   | Float, (Reg _ | Stack _), Float, (Reg _ | Stack _) ->
-    if distinct then I.movsd (reg src) (reg dst)
+    if distinct then movsd (reg src) (reg dst)
   | Float32, (Reg _ | Stack _), Float32, (Reg _ | Stack _) ->
-    if distinct then I.movss (reg src) (reg dst)
+    if distinct then movss (reg src) (reg dst)
   | (Int | Val | Addr), (Reg _ | Stack _), (Int | Val | Addr), (Reg _ | Stack _)
     ->
     if distinct then I.mov (reg src) (reg dst)
@@ -1121,6 +1223,7 @@ module Address_sanitizer : sig
   (** Implements [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping]. *)
   val emit_sanitize :
     ?dependencies:X86_ast.arg array ->
+    instr:instruction ->
     address:X86_ast.arg ->
     Cmm.memory_chunk ->
     memory_access ->
@@ -1169,21 +1272,28 @@ end = struct
       | I64 | I128 | I256 | I512 -> false
   end
 
-  let mov_address src dest =
-    match (src : X86_ast.arg) with
-    | Mem
-        { scale = 1;
-          base = None;
-          sym = None;
-          displ = 0;
-          idx;
-          arch = _;
-          typ = _
-        } ->
+  let mov_address ~offset src dest =
+    match (src : X86_ast.arg), offset with
+    | ( Mem
+          { scale = 1;
+            base = None;
+            sym = None;
+            displ = 0;
+            idx;
+            arch = _;
+            typ = _
+          },
+        0 ) ->
       I.mov (Reg64 idx) dest
-    | Mem _ | Mem64_RIP _ | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _
-    | Reg32 _ | Reg64 _ | Regf _ ->
-      I.lea src dest
+    | Mem mem, offset ->
+      I.lea (Mem { mem with displ = mem.displ + offset }) dest
+    | Mem64_RIP (ty, sym, displ), offset ->
+      I.lea (Mem64_RIP (ty, sym, displ + offset)) dest
+    | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+        | Regf _ ),
+        offset ) ->
+      I.lea src dest;
+      if offset <> 0 then I.add (int offset) dest
 
   let[@inline always] is_stack_16_byte_aligned () =
     (* Yes, sadly this does result in materially better assembly than
@@ -1191,7 +1301,8 @@ end = struct
        https://github.com/oxcaml/oxcaml/issues/2187 *)
     !stack_offset land 15 = 0
 
-  let asan_report_function memory_chunk_size memory_access : X86_ast.arg =
+  let asan_report_function simd_regs memory_chunk_size memory_access :
+      X86_ast.arg =
     let chunk_size = Memory_chunk_size.to_bytes_log2 memory_chunk_size in
     let access =
       match memory_access with
@@ -1201,24 +1312,58 @@ end = struct
     let index = (chunk_size lsl 1) + access in
     (* We take extra care to structure our code such that these are statically
        allocated as manifest constants in a flat array. *)
-    match index with
-    | 0 -> Sym "caml_asan_report_load1_noabort"
-    | 1 -> Sym "caml_asan_report_store1_noabort"
-    | 2 -> Sym "caml_asan_report_load2_noabort"
-    | 3 -> Sym "caml_asan_report_store2_noabort"
-    | 4 -> Sym "caml_asan_report_load4_noabort"
-    | 5 -> Sym "caml_asan_report_store4_noabort"
-    | 6 -> Sym "caml_asan_report_load8_noabort"
-    | 7 -> Sym "caml_asan_report_store8_noabort"
-    | 8 -> Sym "caml_asan_report_load16_noabort"
-    | 9 -> Sym "caml_asan_report_store16_noabort"
-    | _ ->
-      (* CR-soon mslater: this is wrong, 32/64-byte operations should be routed
-         to [__asan_report_load_n_noabort]. Also, unaligned 16-byte operations
-         need a second check that the last byte's address is valid. *)
-      if access = 0
-      then Sym "caml_asan_report_load16_noabort"
-      else Sym "caml_asan_report_store16_noabort"
+    match simd_regs with
+    | Save_xmm -> (
+      match index with
+      | 0 -> Sym "caml_asan_report_load1_noabort"
+      | 1 -> Sym "caml_asan_report_store1_noabort"
+      | 2 -> Sym "caml_asan_report_load2_noabort"
+      | 3 -> Sym "caml_asan_report_store2_noabort"
+      | 4 -> Sym "caml_asan_report_load4_noabort"
+      | 5 -> Sym "caml_asan_report_store4_noabort"
+      | 6 -> Sym "caml_asan_report_load8_noabort"
+      | 7 -> Sym "caml_asan_report_store8_noabort"
+      | 8 -> Sym "caml_asan_report_load16_noabort"
+      | 9 -> Sym "caml_asan_report_store16_noabort"
+      | 10 -> Sym "caml_asan_report_load32_noabort"
+      | 11 -> Sym "caml_asan_report_store32_noabort"
+      | 12 -> Sym "caml_asan_report_load64_noabort"
+      | 13 -> Sym "caml_asan_report_store64_noabort"
+      | _ -> assert false)
+    | Save_ymm -> (
+      match index with
+      | 0 -> Sym "caml_asan_report_load1_noabort_avx"
+      | 1 -> Sym "caml_asan_report_store1_noabort_avx"
+      | 2 -> Sym "caml_asan_report_load2_noabort_avx"
+      | 3 -> Sym "caml_asan_report_store2_noabort_avx"
+      | 4 -> Sym "caml_asan_report_load4_noabort_avx"
+      | 5 -> Sym "caml_asan_report_store4_noabort_avx"
+      | 6 -> Sym "caml_asan_report_load8_noabort_avx"
+      | 7 -> Sym "caml_asan_report_store8_noabort_avx"
+      | 8 -> Sym "caml_asan_report_load16_noabort_avx"
+      | 9 -> Sym "caml_asan_report_store16_noabort_avx"
+      | 10 -> Sym "caml_asan_report_load32_noabort_avx"
+      | 11 -> Sym "caml_asan_report_store32_noabort_avx"
+      | 12 -> Sym "caml_asan_report_load64_noabort_avx"
+      | 13 -> Sym "caml_asan_report_store64_noabort_avx"
+      | _ -> assert false)
+    | Save_zmm -> (
+      match index with
+      | 0 -> Sym "caml_asan_report_load1_noabort_avx512"
+      | 1 -> Sym "caml_asan_report_store1_noabort_avx512"
+      | 2 -> Sym "caml_asan_report_load2_noabort_avx512"
+      | 3 -> Sym "caml_asan_report_store2_noabort_avx512"
+      | 4 -> Sym "caml_asan_report_load4_noabort_avx512"
+      | 5 -> Sym "caml_asan_report_store4_noabort_avx512"
+      | 6 -> Sym "caml_asan_report_load8_noabort_avx512"
+      | 7 -> Sym "caml_asan_report_store8_noabort_avx512"
+      | 8 -> Sym "caml_asan_report_load16_noabort_avx512"
+      | 9 -> Sym "caml_asan_report_store16_noabort_avx512"
+      | 10 -> Sym "caml_asan_report_load32_noabort_avx512"
+      | 11 -> Sym "caml_asan_report_store32_noabort_avx512"
+      | 12 -> Sym "caml_asan_report_load64_noabort_avx512"
+      | 13 -> Sym "caml_asan_report_store64_noabort_avx512"
+      | _ -> assert false)
 
   (* CR-soon ksvetlitski: find a way to accomplish this without breaking the
      abstraction barrier of [X86_ast]. *)
@@ -1237,8 +1382,8 @@ end = struct
      [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping].
      I'd recommend reading that first for reference before touching this
      function. *)
-  let emit_sanitize ?(dependencies = [||]) ~address
-      (memory_chunk : Cmm.memory_chunk) (memory_access : memory_access) =
+  let emit_shadow_check ?(dependencies = [||]) ?(offset = 0) ~address ~report
+      (memory_chunk : Cmm.memory_chunk) =
     let[@inline always] need_to_save_register register =
       uses_register register address
       || Array.exists (uses_register register) dependencies
@@ -1254,7 +1399,7 @@ end = struct
        You could do this at the end of the prologue if you wanted to; the point
        is just that you have to do this before you modify the contents of any
        registers (other than [rsp]). *)
-    mov_address address rdi;
+    mov_address ~offset address rdi;
     let need_to_save_r11 = need_to_save_register R11 in
     if need_to_save_r11 then push r11;
     let need_to_save_r10 =
@@ -1302,12 +1447,13 @@ end = struct
         (* [push rax] is a single-byte instruction, as opposed to something like
            [push 0] which is a 2-byte instruction. *)
         push rax;
-      (* The asan report wrappers use a special calling convention via the C
-         attribute [__attribute__((preserve_all))] so that all registers except
-         for [r11] (which is clobbered) are callee-saved, in order to minimize
-         the amount of spilling we have to do here. [address] is already in
-         [rdi], and this function accepts just a single argument. *)
-      I.call (asan_report_function memory_chunk_size memory_access);
+      (* Pass base address to report function. *)
+      if offset <> 0 then I.add (int (-offset)) rdi;
+      (* The asan report wrappers preserve all registers except for [r11] (which
+         is clobbered), in order to minimize the amount of spilling we have to
+         do here. [address] is already in [rdi], and this function accepts just
+         a single argument. *)
+      I.call report;
       if need_to_align_stack then pop rax
     in
     D.define_label asan_check_succeded_label;
@@ -1315,8 +1461,8 @@ end = struct
     if need_to_save_r11 then pop r11;
     if need_to_save_rdi then pop rdi
 
-  let[@inline always] emit_sanitize ?dependencies ~address memory_chunk
-      memory_access =
+  let[@inline always] emit_sanitize ?dependencies ~instr ~address
+      (memory_chunk : Cmm.memory_chunk) memory_access =
     (* Checking [Config.with_address_sanitizer] is redundant, but we do it
        because it's a compile-time constant, so it enables the compiler to
        completely optimize-out the AddressSanitizer code when the compiler was
@@ -1328,8 +1474,30 @@ end = struct
          on the grounds that the backing memory for freshly allocated records is
          provided directly by the runtime and guaranteed to be safe to use. *)
       | Store_initialize -> ()
-      | Load | Store_modify ->
-        emit_sanitize ?dependencies ~address memory_chunk memory_access
+      | Load | Store_modify -> (
+        let report =
+          asan_report_function
+            (must_save_simd_regs instr.live)
+            (Memory_chunk_size.of_memory_chunk memory_chunk)
+            memory_access
+        in
+        match memory_chunk with
+        | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+        | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
+        | Double | Onetwentyeight_aligned ->
+          emit_shadow_check ?dependencies ~address ~report memory_chunk
+        | Onetwentyeight_unaligned ->
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:15 ~address ~report
+            Byte_unsigned
+        | Twofiftysix_unaligned | Twofiftysix_aligned ->
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:31 ~address ~report
+            Byte_unsigned
+        | Fivetwelve_unaligned | Fivetwelve_aligned ->
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:63 ~address ~report
+            Byte_unsigned)
 end
 
 let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
@@ -1348,7 +1516,7 @@ let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
     | Sixtyfour | Word -> X86_ast.QWORD, arg instr src_index
   in
   let dst = addressing addr typ instr first_memory_arg_index in
-  Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~address:dst
+  Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr ~address:dst
     Thirtytwo_unsigned Store_modify;
   match op with
   | Fetch_and_add ->
@@ -1379,51 +1547,82 @@ let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
     I.xchg src dst
 
 let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
+  let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
   | Int_of_value | Value_of_int -> if distinct then I.mov (arg i 0) (res i 0)
   | Float_of_float32 | Float32_of_float ->
-    if distinct then I.movss (arg i 0) (res i 0)
-  | V128_of_v128 -> if distinct then I.movapd (arg i 0) (res i 0)
-  | Float_of_int64 | Int64_of_float -> I.movq (arg i 0) (res i 0)
-  | Float32_of_int32 -> I.movd (arg32 i 0) (res i 0)
-  | Int32_of_float32 -> I.movd (arg i 0) (res32 i 0)
+    if distinct then movss (arg i 0) (res i 0)
+  | V128_of_vec (Vec128 | Vec256) ->
+    if distinct then movpd ~unaligned:false (argX i 0) (res i 0)
+  | V256_of_vec Vec128 ->
+    if distinct then movpd ~unaligned:false (arg i 0) (resX i 0)
+  | V256_of_vec Vec256 ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct
+    then
+      if Reg.is_stack i.arg.(0)
+      then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
+      else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
+  | V128_of_vec Vec512 | V256_of_vec Vec512 | V512_of_vec _ ->
+    (* CR-soon mslater: avx512 *)
+    Misc.fatal_error "avx512 instructions not yet implemented"
+  | Float_of_int64 | Int64_of_float -> movq (arg i 0) (res i 0)
+  | Float32_of_int32 -> movd (arg32 i 0) (res i 0)
+  | Int32_of_float32 -> movd (arg i 0) (res32 i 0)
 
 let emit_static_cast (cast : Cmm.static_cast) i =
+  let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
-  | Float_of_int Float64 -> I.cvtsi2sd (arg i 0) (res i 0)
-  | Int_of_float Float64 -> I.cvttsd2si (arg i 0) (res i 0)
-  | Float_of_int Float32 -> I.cvtsi2ss (arg i 0) (res i 0)
-  | Int_of_float Float32 -> I.cvttss2si (arg i 0) (res i 0)
-  | Float_of_float32 -> I.cvtss2sd (arg i 0) (res i 0)
-  | Float32_of_float -> I.cvtsd2ss (arg i 0) (res i 0)
-  | V128_of_scalar Float64x2 | Scalar_of_v128 Float64x2 ->
-    if distinct then I.movsd (arg i 0) (res i 0)
-  | Scalar_of_v128 Int64x2 | V128_of_scalar Int64x2 ->
-    I.movq (arg i 0) (res i 0)
-  | Scalar_of_v128 Int32x4 -> I.movd (arg i 0) (res32 i 0)
-  | V128_of_scalar Int32x4 -> I.movd (arg32 i 0) (res i 0)
-  | V128_of_scalar Float32x4 | Scalar_of_v128 Float32x4 ->
-    if distinct then I.movss (arg i 0) (res i 0)
-  | Scalar_of_v128 Int16x8 ->
+  | Float_of_int Float64 ->
+    sse_or_avx_dst cvtsi2sd_X_r64m64 vcvtsi2sd_X_X_r64m64 (arg i 0) (res i 0)
+  | Int_of_float Float64 ->
+    sse_or_avx cvttsd2si_r64_Xm64 vcvttsd2si_r64_Xm64 (arg i 0) (res i 0)
+  | Float_of_int Float32 ->
+    sse_or_avx_dst cvtsi2ss_X_r64m64 vcvtsi2ss_X_X_r64m64 (arg i 0) (res i 0)
+  | Int_of_float Float32 ->
+    sse_or_avx cvttss2si_r64_Xm32 vcvttss2si_r64_Xm32 (arg i 0) (res i 0)
+  | Float_of_float32 -> sse_or_avx_dst cvtss2sd vcvtss2sd (arg i 0) (res i 0)
+  | Float32_of_float -> sse_or_avx_dst cvtsd2ss vcvtsd2ss (arg i 0) (res i 0)
+  | Scalar_of_v128 Float64x2 | Scalar_of_v256 Float64x4 ->
+    if distinct then movsd (argX i 0) (res i 0)
+  | V128_of_scalar Float64x2 | V256_of_scalar Float64x4 ->
+    if distinct then movsd (arg i 0) (resX i 0)
+  | Scalar_of_v128 Int64x2 | Scalar_of_v256 Int64x4 -> movq (argX i 0) (res i 0)
+  | V128_of_scalar Int64x2 | V256_of_scalar Int64x4 -> movq (arg i 0) (resX i 0)
+  | Scalar_of_v128 Int32x4 | Scalar_of_v256 Int32x8 ->
+    movd (argX i 0) (res32 i 0)
+  | V128_of_scalar Int32x4 | V256_of_scalar Int32x8 ->
+    movd (arg32 i 0) (resX i 0)
+  | Scalar_of_v128 Float32x4 | Scalar_of_v256 Float32x8 ->
+    if distinct then movss (argX i 0) (res i 0)
+  | V128_of_scalar Float32x4 | V256_of_scalar Float32x8 ->
+    if distinct then movss (arg i 0) (resX i 0)
+  | Scalar_of_v128 Int16x8 | Scalar_of_v256 Int16x16 ->
     (* [movw] and [movzx] cannot operate on vector registers. We must zero
        extend as the result is an untagged positive int. CR mslater: (SIMD)
        remove zx once we have unboxed int16 *)
-    I.movd (arg i 0) (res32 i 0);
+    movd (argX i 0) (res32 i 0);
     I.movzx (res16 i 0) (res i 0)
-  | Scalar_of_v128 Int8x16 ->
+  | Scalar_of_v128 Int8x16 | Scalar_of_v256 Int8x32 ->
     (* [movb] and [movzx] cannot operate on vector registers. We must zero
        extend as the result is an untagged positive int. CR mslater: (SIMD)
        remove zx once we have unboxed int8 *)
-    I.movd (arg i 0) (res32 i 0);
+    movd (argX i 0) (res32 i 0);
     I.movzx (res8 i 0) (res i 0)
-  | V128_of_scalar Int16x8 | V128_of_scalar Int8x16 ->
+  | V128_of_scalar Int16x8
+  | V128_of_scalar Int8x16
+  | V256_of_scalar Int16x16
+  | V256_of_scalar Int8x32 ->
     (* [movw] and [movb] cannot operate on vector registers. Moving 32 bits is
        OK because the argument is an untagged positive int and these operations
        leave the top bits of the vector unspecified. CR mslater: (SIMD) don't
        load 32 bits once we have unboxed int16/int8 *)
-    I.movd (arg32 i 0) (res i 0)
+    movd (arg32 i 0) (resX i 0)
+  | V512_of_scalar _ | Scalar_of_v512 _ ->
+    (* CR-soon mslater: avx512 *)
+    Misc.fatal_error "avx512 instructions not yet implemented"
 
 let assert_loc (loc : Simd.loc) arg =
   (match Reg.is_reg arg with
@@ -1437,7 +1636,9 @@ let assert_loc (loc : Simd.loc) arg =
   | None -> ()
 
 let check_simd_instr (simd : Simd.instr) imm instr =
-  assert (Bool.equal simd.imm (Option.is_some imm));
+  (match simd.imm with
+  | Imm_none | Imm_reg -> assert (Option.is_none imm)
+  | Imm_spec -> assert (Option.is_some imm));
   Array.iteri
     (fun j (arg : Simd.arg) -> assert_loc arg.loc instr.arg.(j))
     simd.args;
@@ -1473,7 +1674,7 @@ let emit_simd_instr (simd : Simd.instr) imm instr =
   in
   let args =
     match simd.res with
-    | First_arg | Res { enc = Implicit; _ } -> args
+    | First_arg | Res { enc = Implicit | Immediate; _ } -> args
     | Res { loc; enc = RM_r | RM_rm | Vex_v } -> (
       match Simd.loc_is_pinned loc with
       | Some _ -> args
@@ -1487,6 +1688,7 @@ let emit_simd_instr (simd : Simd.instr) imm instr =
   I.simd simd (Array.of_list args)
 
 let emit_simd (op : Simd.operation) instr =
+  let open Simd_instrs in
   let imm = op.imm in
   match op.instr with
   | Instruction simd -> emit_simd_instr simd imm instr
@@ -1495,9 +1697,9 @@ let emit_simd (op : Simd.operation) instr =
     | Sqrtss | Sqrtsd | Roundss | Roundsd ->
       (* Avoids partial register stall *)
       if not (equal_arg (arg instr 0) (res instr 0))
-      then I.xorpd (res instr 0) (res instr 0);
+      then sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res instr 0) (res instr 0);
       emit_simd_instr seq.instr imm instr
-    | Pcompare_string p ->
+    | Pcompare_string p | Vpcompare_string p ->
       let cond : X86_ast.condition =
         match p with
         | Pcmpestra -> A
@@ -1513,26 +1715,41 @@ let emit_simd (op : Simd.operation) instr =
       in
       emit_simd_instr seq.instr imm instr;
       I.set cond (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Ptestz | Vptestz_X | Vptestz_Y ->
+      emit_simd_instr seq.instr imm instr;
+      I.set E (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Ptestc | Vptestc_X | Vptestc_Y ->
+      emit_simd_instr seq.instr imm instr;
+      I.set B (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Ptestnzc | Vptestnzc_X | Vptestnzc_Y ->
+      emit_simd_instr seq.instr imm instr;
+      I.set A (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))
 
 let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i addr =
   let open Simd_instrs in
   assert (Reg.is_reg i.arg.(0));
   assert (not (Reg.is_reg i.arg.(1)));
-  assert (Reg.same_loc i.arg.(0) i.res.(0));
   match simd with
-  | SSE2 Add_f64 -> I.simd addpd [| addr; res i 0 |]
-  | SSE2 Sub_f64 -> I.simd subpd [| addr; res i 0 |]
-  | SSE2 Mul_f64 -> I.simd mulpd [| addr; res i 0 |]
-  | SSE2 Div_f64 -> I.simd divpd [| addr; res i 0 |]
-  | SSE Add_f32 -> I.simd addps [| addr; res i 0 |]
-  | SSE Sub_f32 -> I.simd subps [| addr; res i 0 |]
-  | SSE Mul_f32 -> I.simd mulps [| addr; res i 0 |]
-  | SSE Div_f32 -> I.simd divps [| addr; res i 0 |]
+  | Add_f64 -> sse_or_avx3 addpd vaddpd_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Sub_f64 -> sse_or_avx3 subpd vsubpd_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Mul_f64 -> sse_or_avx3 mulpd vmulpd_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Div_f64 -> sse_or_avx3 divpd vdivpd_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Add_f32 -> sse_or_avx3 addps vaddps_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Sub_f32 -> sse_or_avx3 subps vsubps_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Mul_f32 -> sse_or_avx3 mulps vmulps_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Div_f32 -> sse_or_avx3 divps vdivps_X_X_Xm128 (arg i 0) addr (res i 0)
+
+let prologue_stack_offset () =
+  assert !frame_required;
+  frame_size () - 8 - if fp then 8 else 0
 
 (* Emit an instruction *)
 let emit_instr ~first ~fallthrough i =
-  let open Amd64_simd_instrs in
+  let open Simd_instrs in
   emit_debug_info_linear i;
   match i.desc with
   | Lend -> ()
@@ -1545,11 +1762,23 @@ let emit_instr ~first ~fallthrough i =
       I.mov rsp rbp);
     if !frame_required
     then
-      let n = frame_size () - 8 - if fp then 8 else 0 in
+      let n = prologue_stack_offset () in
       if n <> 0
       then (
         I.sub (int n) rsp;
         D.cfi_adjust_cfa_offset ~bytes:n)
+  | Lepilogue_open ->
+    (* Deallocate the stack frame before a return or tail call *)
+    let n = prologue_stack_offset () in
+    if n <> 0
+    then (
+      I.add (int n) rsp;
+      D.cfi_adjust_cfa_offset ~bytes:(-n));
+    if fp then I.pop rbp
+  | Lepilogue_close ->
+    (* reset CFA back cause function body may continue *)
+    let n = prologue_stack_offset () in
+    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop (Const_int n) ->
     if Nativeint.equal n 0n
@@ -1579,29 +1808,29 @@ let emit_instr ~first ~fallthrough i =
     match f with
     | 0x0000_0000l ->
       (* +0.0 *)
-      I.xorpd (res i 0) (res i 0)
+      sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
     | _ ->
       (* float32 constants take up 8 bytes when we emit them with
          [float_literal] (see the conversion from int32 to int64 below). Thus,
          we load the lower half. Note that this is different from Cmm 32-bit
          floats ([Csingle]), which are emitted as 4-byte constants. *)
       let lbl = add_float_constant (Int64.of_int32 f) in
-      I.movss (mem64_rip REAL4 (L.encode lbl)) (res i 0))
+      movss (mem64_rip REAL4 (L.encode lbl)) (res i 0))
   | Lop (Const_float f) -> (
     match f with
     | 0x0000_0000_0000_0000L ->
       (* +0.0 *)
-      I.xorpd (res i 0) (res i 0)
+      sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
     | _ ->
       let lbl = add_float_constant f in
-      I.movsd (mem64_rip REAL8 (L.encode lbl)) (res i 0))
+      movsd (mem64_rip REAL8 (L.encode lbl)) (res i 0))
   | Lop (Const_vec128 { word0; word1 }) -> (
     match word1, word0 with
     | 0x0000_0000_0000_0000L, 0x0000_0000_0000_0000L ->
-      I.xorpd (res i 0) (res i 0)
+      sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
     | _ ->
       let lbl = add_vec128_constant { word0; word1 } in
-      I.movapd (mem64_rip VEC128 (L.encode lbl)) (res i 0))
+      movpd ~unaligned:false (mem64_rip VEC128 (L.encode lbl)) (res i 0))
   | Lop (Const_vec256 { word0; word1; word2; word3 }) -> (
     match
       List.for_all (fun w -> Int64.equal w 0L) [word3; word2; word1; word0]
@@ -1624,7 +1853,7 @@ let emit_instr ~first ~fallthrough i =
     add_used_symbol func.sym_name;
     emit_call func;
     record_frame i.live (Dbg_other i.dbg)
-  | Lcall_op Ltailcall_ind -> output_epilogue (fun () -> I.jmp (arg i 0))
+  | Lcall_op Ltailcall_ind -> I.jmp (arg i 0)
   | Lcall_op (Ltailcall_imm { func }) ->
     if String.equal func.sym_name !function_name
     then
@@ -1632,10 +1861,9 @@ let emit_instr ~first ~fallthrough i =
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point ->
         I.jmp (emit_label_arg ~section:Text tailrec_entry_point)
-    else
-      output_epilogue (fun () ->
-          add_used_symbol func.sym_name;
-          emit_jump func)
+    else (
+      add_used_symbol func.sym_name;
+      emit_jump func)
   | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
     add_used_symbol func;
     if stack_ofs > 0
@@ -1684,7 +1912,7 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Load { memory_chunk; addressing_mode; _ }) -> (
     let[@inline always] load ~dest data_type instruction =
       let address = addressing addressing_mode data_type i 0 in
-      Address_sanitizer.emit_sanitize ~address memory_chunk Load;
+      Address_sanitizer.emit_sanitize ~address ~instr:i memory_chunk Load;
       instruction address dest
     in
     match memory_chunk with
@@ -1695,8 +1923,10 @@ let emit_instr ~first ~fallthrough i =
     | Sixteen_signed -> load ~dest:(res i 0) WORD I.movsx
     | Thirtytwo_unsigned -> load ~dest:(res32 i 0) DWORD I.mov
     | Thirtytwo_signed -> load ~dest:(res i 0) DWORD I.movsxd
-    | Onetwentyeight_unaligned -> load ~dest:(res i 0) VEC128 I.movupd
-    | Onetwentyeight_aligned -> load ~dest:(res i 0) VEC128 I.movapd
+    | Onetwentyeight_unaligned ->
+      load ~dest:(res i 0) VEC128 (movpd ~unaligned:true)
+    | Onetwentyeight_aligned ->
+      load ~dest:(res i 0) VEC128 (movpd ~unaligned:false)
     | Twofiftysix_unaligned ->
       load ~dest:(res i 0) VEC256 (fun src dst ->
           I.simd vmovupd_Y_Ym256 [| src; dst |])
@@ -1706,9 +1936,10 @@ let emit_instr ~first ~fallthrough i =
     | Fivetwelve_unaligned | Fivetwelve_aligned ->
       (* CR-soon mslater: avx512 *)
       Misc.fatal_error "avx512 instructions not yet implemented"
-    | Single { reg = Float64 } -> load ~dest:(res i 0) REAL4 I.cvtss2sd
-    | Single { reg = Float32 } -> load ~dest:(res i 0) REAL4 I.movss
-    | Double -> load ~dest:(res i 0) REAL8 I.movsd)
+    | Single { reg = Float64 } ->
+      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd)
+    | Single { reg = Float32 } -> load ~dest:(res i 0) REAL4 movss
+    | Double -> load ~dest:(res i 0) REAL8 movsd)
   | Lop (Store (chunk, addr, is_modify)) -> (
     let memory_access : Address_sanitizer.memory_access =
       if is_modify then Store_modify else Store_initialize
@@ -1716,8 +1947,8 @@ let emit_instr ~first ~fallthrough i =
     let[@inline always] store data_type arg_func instruction =
       let address = addressing addr data_type i 1 in
       let src = arg_func i 0 in
-      Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~address chunk
-        memory_access;
+      Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr:i ~address
+        chunk memory_access;
       instruction src address
     in
     match chunk with
@@ -1725,8 +1956,8 @@ let emit_instr ~first ~fallthrough i =
     | Byte_unsigned | Byte_signed -> store BYTE arg8 I.mov
     | Sixteen_unsigned | Sixteen_signed -> store WORD arg16 I.mov
     | Thirtytwo_signed | Thirtytwo_unsigned -> store DWORD arg32 I.mov
-    | Onetwentyeight_unaligned -> store VEC128 arg I.movupd
-    | Onetwentyeight_aligned -> store VEC128 arg I.movapd
+    | Onetwentyeight_unaligned -> store VEC128 arg (movpd ~unaligned:true)
+    | Onetwentyeight_aligned -> store VEC128 arg (movpd ~unaligned:false)
     | Twofiftysix_unaligned ->
       store VEC256 arg (fun src dst -> I.simd vmovupd_Ym256_Y [| src; dst |])
     | Twofiftysix_aligned ->
@@ -1736,21 +1967,21 @@ let emit_instr ~first ~fallthrough i =
       Misc.fatal_error "avx512 instructions not yet implemented"
     | Single { reg = Float64 } ->
       let src = arg i 0 in
-      I.cvtsd2ss src xmm15;
+      sse_or_avx_dst cvtsd2ss vcvtsd2ss src xmm15;
       let address = addressing addr REAL4 i 1 in
-      Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~address
-        chunk memory_access;
-      I.movss xmm15 address
-    | Single { reg = Float32 } -> store REAL4 arg I.movss
-    | Double -> store REAL8 arg I.movsd)
+      Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~instr:i
+        ~address chunk memory_access;
+      movss xmm15 address
+    | Single { reg = Float32 } -> store REAL4 arg movss
+    | Double -> store REAL8 arg movsd)
   | Lop (Specific (Istore_int (n, addr, is_modify))) ->
     let address = addressing addr QWORD i 0 in
     let src = nat n in
     let memory_access : Address_sanitizer.memory_access =
       if is_modify then Store_modify else Store_initialize
     in
-    Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~address Word_int
-      memory_access;
+    Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr:i ~address
+      Word_int memory_access;
     I.mov src address
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assert (n <= (Config.max_young_wosize + 1) * Arch.size_addr);
@@ -1865,29 +2096,39 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Intop_atomic { op; size; addr }) -> emit_atomic i op size addr
   | Lop (Floatop (Float64, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
+    let r0, r1 = res i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    I.cmpsd cond a1 a0;
-    I.movq a0 (res i 0);
-    I.neg (res i 0)
+    cmp_sse_or_avx cmpsd vcmpsd cond a1 a0 r1;
+    movq r1 r0;
+    I.neg r0
   | Lop (Floatop (Float32, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
+    let r0, r0_32, r1 = res i 0, res32 i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    I.cmpss cond a1 a0;
-    I.movd a0 (res32 i 0);
+    cmp_sse_or_avx cmpss vcmpss cond a1 a0 r1;
+    movd r1 r0_32;
     (* CMPSS only sets the bottom 32 bits of the result, so we sign-extend to
        copy the result to the top 32 bits. *)
-    I.movsxd (res32 i 0) (res i 0);
-    I.neg (res i 0)
+    I.movsxd r0_32 r0;
+    I.neg r0
   | Lop (Floatop (Float64, Inegf)) ->
-    I.xorpd (mem64_rip VEC128 (emit_symbol "caml_negf_mask")) (res i 0)
+    sse_or_avx_dst xorpd vxorpd_X_X_Xm128
+      (mem64_rip VEC128 (emit_symbol "caml_negf_mask"))
+      (res i 0)
   | Lop (Floatop (Float64, Iabsf)) ->
-    I.andpd (mem64_rip VEC128 (emit_symbol "caml_absf_mask")) (res i 0)
+    sse_or_avx_dst andpd vandpd_X_X_Xm128
+      (mem64_rip VEC128 (emit_symbol "caml_absf_mask"))
+      (res i 0)
   | Lop (Floatop (Float32, Inegf)) ->
-    I.xorps (mem64_rip VEC128 (emit_symbol "caml_negf32_mask")) (res i 0)
+    sse_or_avx_dst xorps vxorps_X_X_Xm128
+      (mem64_rip VEC128 (emit_symbol "caml_negf32_mask"))
+      (res i 0)
   | Lop (Floatop (Float32, Iabsf)) ->
-    I.andps (mem64_rip VEC128 (emit_symbol "caml_absf32_mask")) (res i 0)
+    sse_or_avx_dst andps vandps_X_X_Xm128
+      (mem64_rip VEC128 (emit_symbol "caml_absf32_mask"))
+      (res i 0)
   | Lop (Floatop (width, ((Iaddf | Isubf | Imulf | Idivf) as floatop))) ->
-    instr_for_floatop width floatop (arg i 1) (res i 0)
+    instr_for_floatop width floatop (arg i 0) (arg i 1) (res i 0)
   | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
   | Lop (Specific (Ilea addr)) -> I.lea (addressing addr NONE i 0) (res i 0)
   | Lop (Specific (Ioffset_loc (n, addr))) ->
@@ -1895,16 +2136,16 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Specific (Ifloatarithmem (Float64, op, addr))) ->
     let address = addressing addr REAL8 i 1 in
     let dest = res i 0 in
-    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~address Double
-      Load;
-    instr_for_floatarithmem Float64 op address dest
+    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~instr:i ~address
+      Double Load;
+    instr_for_floatarithmem Float64 op (arg i 0) address dest
   | Lop (Specific (Ifloatarithmem (Float32, op, addr))) ->
     let address = addressing addr REAL4 i 1 in
     let dest = res i 0 in
-    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~address
+    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~instr:i ~address
       (Single { reg = Float32 })
       Load;
-    instr_for_floatarithmem Float32 op address dest
+    instr_for_floatarithmem Float32 op (arg i 0) address dest
   | Lop (Specific (Ibswap { bitwidth = Sixteen })) ->
     I.xchg ah al;
     I.movzx (res16 i 0) (res i 0)
@@ -1918,7 +2159,7 @@ let emit_instr ~first ~fallthrough i =
        to do this earlier, based on previous experience with similar things, but
        maybe the change should be left for later. mshinwell: The current
        situation is fine for now. *)
-    if Arch.Extension.enabled LZCNT
+    if Arch.Extension.enabled BMI
     then I.lzcnt (arg i 0) (res i 0)
     else if arg_is_non_zero
     then (
@@ -1995,22 +2236,23 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Specific Ipackf32) ->
     let arg0, arg1 = i.arg.(0), i.arg.(1) in
     assert (Reg.is_reg arg0 && Reg.is_reg arg1 && Reg.same_loc arg0 i.res.(0));
-    I.simd Simd_instrs.unpcklps [| arg i 1; res i 0 |]
+    if Arch.Extension.enabled AVX
+    then I.simd vunpcklps_X_X_Xm128 [| arg i 1; res i 0; res i 0 |]
+    else I.simd unpcklps [| arg i 1; res i 0 |]
   | Lop (Specific (Isimd op)) -> emit_simd op i
   | Lop (Specific (Isimd_mem (op, addressing_mode))) ->
     let address = addressing addressing_mode VEC128 i 1 in
     Address_sanitizer.emit_sanitize
       ~dependencies:[| res i 0 |]
-      ~address Onetwentyeight_unaligned Store_modify;
+      ~instr:i ~address Onetwentyeight_unaligned Store_modify;
     emit_simd_instr_with_memory_arg op i address
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
-  | Lop (Specific Ipause) -> I.pause ()
   | Lop (Specific (Icldemote addr)) ->
     let address = addressing addr QWORD i 0 in
     (* This isn't really a [Load] or a [Store], but it is closer to [Store]
        semantically. *)
-    Address_sanitizer.emit_sanitize ~address Word_val Store_modify;
+    Address_sanitizer.emit_sanitize ~instr:i ~address Word_val Store_modify;
     I.cldemote address
   | Lop (Specific (Iprefetch { is_write; locality; addr })) ->
     let address = addressing addr QWORD i 0 in
@@ -2026,7 +2268,7 @@ let emit_instr ~first ~fallthrough i =
 
        On these grounds I would consider prefetching invalid addresses to
        usually be a bug, and so we do sanitize such accesses. *)
-    Address_sanitizer.emit_sanitize ~address Word_val memory_access;
+    Address_sanitizer.emit_sanitize ~instr:i ~address Word_val memory_access;
     let locality : X86_ast.prefetch_temporal_locality_hint =
       match locality with
       | Nonlocal -> Nta
@@ -2069,14 +2311,14 @@ let emit_instr ~first ~fallthrough i =
     I.mov (addressing (Ibased (semaphore_sym, Global, 2)) WORD i 0) (res16 i 0);
     (* If the semaphore is 0, then the result is 0, otherwise 1. *)
     I.cmp (int 0) (res16 i 0);
-    I.set (cond (Iunsigned Cne)) (res8 i 0);
+    I.set (cond Cne) (res8 i 0);
     I.movzx (res8 i 0) (res i 0)
   | Lop Dls_get ->
     if Config.runtime5
     then I.mov (domain_field Domainstate.Domain_dls_root) (res i 0)
     else Misc.fatal_error "Dls is not supported in runtime4."
   | Lreloadretaddr -> ()
-  | Lreturn -> output_epilogue (fun () -> I.ret ())
+  | Lreturn -> I.ret ()
   | Llabel { label = lbl; section_name } ->
     let lbl = label_to_asm_label ~section:Text lbl in
     emit_Llabel fallthrough lbl section_name
@@ -2163,8 +2405,9 @@ let emit_instr ~first ~fallthrough i =
       ~save_simd:(must_save_simd_regs i.live)
 
 let emit_instr ~first ~fallthrough i =
-  try emit_instr ~first ~fallthrough i
-  with exn ->
+  try emit_instr ~first ~fallthrough i with
+  | I.Extension_disabled _ as exn -> raise exn
+  | exn ->
     Format.eprintf "Exception whilst emitting instruction:@ %a\n"
       Printlinear.instr i;
     raise exn
@@ -2172,17 +2415,18 @@ let emit_instr ~first ~fallthrough i =
 let rec emit_all ~first ~fallthrough i =
   match i.desc with
   | Lend -> ()
-  | Lprologue | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _ | Lop _
-  | Lcall_op _ | Llabel _ | Lbranch _
+  | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+  | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
   | Lcondbranch (_, _)
   | Lcondbranch3 (_, _, _)
   | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _
     ->
-    (try emit_instr ~first ~fallthrough i
-     with exn ->
-       Format.eprintf "Exception whilst emitting instruction:@ %a\n"
-         Printlinear.instr i;
-       raise exn);
+    (try emit_instr ~first ~fallthrough i with
+    | I.Extension_disabled _ as exn -> raise exn
+    | exn ->
+      Format.eprintf "Exception whilst emitting instruction:@ %a\n"
+        Printlinear.instr i;
+      raise exn);
     emit_all ~first:false ~fallthrough:(Linear.has_fallthrough i.desc) i.next
 
 let all_functions = ref []
@@ -2521,8 +2765,8 @@ let emit_probe_handler_wrapper p =
       name, handler_code_sym
     | Lcall_op
         (Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _ | Lextcall _)
-    | Lprologue | Lend | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-    | Lop _ | Llabel _ | Lbranch _
+    | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+    | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
     | Lcondbranch (_, _)
     | Lcondbranch3 (_, _, _)
     | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -2685,8 +2929,8 @@ let emit_probe_notes0 () =
       | Lcall_op
           ( Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _
           | Lextcall _ )
-      | Lprologue | Lend | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-      | Lop _ | Llabel _ | Lbranch _
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
       | Lcondbranch (_, _)
       | Lcondbranch3 (_, _, _)
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _

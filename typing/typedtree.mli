@@ -103,10 +103,7 @@ type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 
 val print_unique_use : Format.formatter -> unique_use -> unit
 
-type alloc_mode = {
-  mode : Mode.Alloc.r;
-  locality_context : Env.locality_context option;
-}
+type alloc_mode = Mode.Alloc.r
 
 type texp_field_boxing =
   | Boxing of alloc_mode * unique_use
@@ -157,11 +154,13 @@ and 'k pattern_desc =
   (* value patterns *)
   | Tpat_any : value pattern_desc
         (** _ *)
-  | Tpat_var : Ident.t * string loc * Uid.t * Mode.Value.l -> value pattern_desc
+  | Tpat_var :
+      Ident.t * string loc * Uid.t * Jkind_types.Sort.t * Mode.Value.l ->
+      value pattern_desc
         (** x *)
   | Tpat_alias :
-      value general_pattern * Ident.t * string loc * Uid.t * Mode.Value.l
-      * Types.type_expr
+      value general_pattern * Ident.t * string loc * Uid.t * Jkind_types.Sort.t
+      * Mode.Value.l * Types.type_expr
         -> value pattern_desc
         (** P as a *)
   | Tpat_constant : constant -> value pattern_desc
@@ -446,6 +445,9 @@ and expression_desc =
               { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
                 extended_expression = Some E0 }
           *)
+  | Texp_atomic_loc of
+      expression * Jkind.sort * Longident.t loc * Types.label_description *
+      alloc_mode
   | Texp_field of expression * Jkind.sort * Longident.t loc *
       Types.label_description * texp_field_boxing * Unique_barrier.t
     (** - The sort is the sort of the whole record (which may be non-value if
@@ -460,6 +462,7 @@ and expression_desc =
       Types.label_description * expression
     (** [alloc_mode] translates to the [modify_mode] of the record *)
   | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
+  | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of Types.mutability * Jkind.sort * comprehension
   | Texp_ifthenelse of expression * expression * expression option
@@ -600,6 +603,21 @@ and meth =
     Tmeth_name of string
   | Tmeth_val of Ident.t
   | Tmeth_ancestor of Ident.t * Path.t
+
+and block_access =
+  | Baccess_field of Longident.t loc * Types.label_description
+  | Baccess_array of {
+      mut: mutable_flag;
+      index_kind: index_kind;
+      index: expression;
+      base_ty: Types.type_expr;
+      elt_ty: Types.type_expr;
+      elt_sort: Jkind.Sort.t
+    }
+  | Baccess_block of mutable_flag * expression
+
+and unboxed_access =
+  | Uaccess_unboxed_field of Longident.t loc * Types.unboxed_label_description
 
 and comprehension =
   {
@@ -882,7 +900,7 @@ and primitive_coercion =
 
 and signature = {
   sig_items : signature_item list;
-  sig_modalities : Mode.Modality.Value.Const.t;
+  sig_modalities : Mode.Modality.Const.t;
   sig_type : Types.signature;
   sig_final_env : Env.t;
   sig_sloc : Location.t;
@@ -905,7 +923,7 @@ and signature_item_desc =
   | Tsig_modtype of module_type_declaration
   | Tsig_modtypesubst of module_type_declaration
   | Tsig_open of open_description
-  | Tsig_include of include_description * Mode.Modality.Value.Const.t
+  | Tsig_include of include_description * Mode.Modality.Const.t
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
@@ -917,7 +935,7 @@ and module_declaration =
      md_uid: Uid.t;
      md_presence: Types.module_presence;
      md_type: module_type;
-     md_modalities: Mode.Modality.Value.t;
+     md_modalities: Mode.Modality.t;
      md_attributes: attributes;
      md_loc: Location.t;
     }
@@ -1079,7 +1097,7 @@ and label_declaration =
      ld_name: string loc;
      ld_uid: Uid.t;
      ld_mutable: Types.mutability;
-     ld_modalities: Mode.Modality.Value.Const.t;
+     ld_modalities: Mode.Modality.Const.t;
      ld_type: core_type;
      ld_loc: Location.t;
      ld_attributes: attributes;
@@ -1099,7 +1117,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    ca_modalities: Mode.Modality.Value.Const.t;
+    ca_modalities: Mode.Modality.Const.t;
     ca_type: core_type;
     ca_loc: Location.t;
   }
@@ -1304,7 +1322,7 @@ val mkloc: 'a -> Location.t -> 'a Asttypes.loc
 
 val pat_bound_idents: 'k general_pattern -> Ident.t list
 val pat_bound_idents_full:
-  Jkind.Sort.Const.t -> 'k general_pattern
+  'k general_pattern
   -> (Ident.t * string loc * Types.type_expr * Types.Uid.t * Jkind.Sort.Const.t) list
 
 (** Splits an or pattern into its value (left) and exception (right) parts. *)
