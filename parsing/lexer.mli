@@ -49,9 +49,10 @@ val comments : unit -> (string * Location.t) list
 val token_with_comments : Lexing.lexbuf -> Parser.token
 
 (* Syntax mode configuration *)
-type syntax_mode = { quotations : bool ref }
+module Syntax_mode : sig
+  val quotations : bool ref
+end
 
-val syntax_mode : syntax_mode
 val reset_syntax_mode : unit -> unit
 
 (*

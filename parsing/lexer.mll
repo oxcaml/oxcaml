@@ -162,13 +162,12 @@ let print_warnings = ref true
 let at_beginning_of_line pos = (pos.pos_cnum = pos.pos_bol)
 
 (* Syntax mode configuration for the #syntax directive *)
-type syntax_mode = {
-  quotations : bool ref;
-}
+module Syntax_mode = struct
+  let quotations = ref Config.syntax_quotations
+end
 
-let syntax_mode = { quotations = ref Config.syntax_quotations }
 let reset_syntax_mode () =
-  syntax_mode.quotations := Config.syntax_quotations
+  Syntax_mode.quotations := Config.syntax_quotations
 
 (* See the comment on the [directive] lexer. *)
 type directive_lexing_already_consumed =
@@ -761,7 +760,7 @@ rule token = parse
   | ","  { COMMA }
   | "->" { MINUSGREATER }
   | "$" {
-      if !(syntax_mode.quotations) then
+      if !(Syntax_mode.quotations) then
         DOLLAR
       else
         INFIXOP0 "$"
@@ -778,7 +777,7 @@ rule token = parse
   | ";;" { SEMISEMI }
   | "<"  { LESS }
   | "<[" {
-      if !(syntax_mode.quotations) then
+      if !(Syntax_mode.quotations) then
         LESSLBRACKET
       else
         (* Put back the '[' and return just LESS *)
@@ -793,7 +792,7 @@ rule token = parse
   | "[>" { LBRACKETGREATER }
   | "]"  { RBRACKET }
   | "]>" {
-      if !(syntax_mode.quotations) then
+      if !(Syntax_mode.quotations) then
         RBRACKETGREATER
       else
         (* Put back the '>' and return just RBRACKET *)
@@ -909,7 +908,7 @@ and directive already_consumed = parse
         in
         match mode with
         | "quotations" ->
-            syntax_mode.quotations := toggle;
+            Syntax_mode.quotations := toggle;
             token lexbuf
         | _ ->
             directive_error lexbuf ("unknown syntax mode " ^ mode)
