@@ -2,9 +2,7 @@ open Misc
 open Config
 open Cmj_format
 
-type error =
-  | File_not_found of string
-  | Not_an_object_file of string
+type error = File_not_found of string | Not_an_object_file of string
 
 exception Error of error
 
@@ -22,8 +20,7 @@ let copy_object_file oc name =
   let ic = open_in_bin file_name in
   try
     let buffer = really_input_string ic (String.length cmj_magic_number) in
-    if buffer = cmj_magic_number
-    then (
+    if buffer = cmj_magic_number then (
       let compunit_pos = pos_out oc in
       seek_in ic 0;
       let file_size = in_channel_length ic in
@@ -39,9 +36,8 @@ let copy_object_file oc name =
       let compunit =
         { cu_name; cu_pos = compunit_pos; cu_codesize = compunit_size }
       in
-      [compunit])
-    else if buffer = cmja_magic_number
-    then (
+      [ compunit ])
+    else if buffer = cmja_magic_number then (
       let toc_pos = input_binary_int ic in
       seek_in ic toc_pos;
       let toc = (input_value ic : library) in
@@ -51,11 +47,11 @@ let copy_object_file oc name =
     else raise (Error (Not_an_object_file file_name))
   with
   | End_of_file ->
-    close_in ic;
-    raise (Error (Not_an_object_file file_name))
+      close_in ic;
+      raise (Error (Not_an_object_file file_name))
   | x ->
-    close_in ic;
-    raise x
+      close_in ic;
+      raise x
 
 let create_archive file_list lib_name =
   let outchan = open_out_bin lib_name in
@@ -80,11 +76,11 @@ module Style = Misc.Style
 
 let report_error ppf = function
   | File_not_found name ->
-    fprintf ppf "Cannot find file %a" Style.inline_code name
+      fprintf ppf "Cannot find file %a" Style.inline_code name
   | Not_an_object_file name ->
-    fprintf ppf "The file %a is not a JavaScript IR object file"
-      (Style.as_inline_code Location.print_filename)
-      name
+      fprintf ppf "The file %a is not a JavaScript IR object file"
+        (Style.as_inline_code Location.print_filename)
+        name
 
 let () =
   Location.register_error_of_exn (function
