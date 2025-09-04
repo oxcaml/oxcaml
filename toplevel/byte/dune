@@ -24,7 +24,7 @@
 (rule
  (targets bytetop)
  ; This should be generated from the stdlib modules files
- (action (run %{ocaml_where}/../../bin/ocamlrun 
+ (action (run %{ocaml_where}/../../bin/ocamlrun
               -I ../../middle_end/flambda2/numbers/floats
               %{exe:../expunge.bc} %{dep:../topstart.bc} %{targets}
                     stdlib__Arg

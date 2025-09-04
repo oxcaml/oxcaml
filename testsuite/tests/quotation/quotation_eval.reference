@@ -1,0 +1,14 @@
+
+Test 0
+Output: 42
+
+Test 1
+Output: [42; 43]
+
+Test 2
+Output: Hello world!
+
+Test 3
+Output: This quote should fail to compile. If it's started working then you need
+to come up with a new way for this test to pass type-checking but fail
+to compile.

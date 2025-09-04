@@ -786,6 +786,12 @@ let fix_exec_name name =
 (* Main entry point (build a custom runtime if needed) *)
 
 let link objfiles output_name =
+  let early_pervasives =
+    if !Translcore.uses_eval then
+      [ "stdlib.cma"; "dynlink/dynlink.cma"; "unix/unix.cma"; "eval.cma" ]
+    else
+      [ "stdlib.cma" ]
+  in
   let objfiles =
     match
       !Clflags.nopervasives,
@@ -793,16 +799,8 @@ let link objfiles output_name =
       !Clflags.output_complete_executable
     with
     | true, _, _         -> objfiles
-    | false, true, false ->
-        let libs = "stdlib.cma" :: objfiles in
-        if !Translcore.uses_eval then
-          "stdlib.cma" :: "dynlink/dynlink.cma" :: "eval.cma" :: objfiles
-        else libs
-    | _                  ->
-        let libs = "stdlib.cma" :: objfiles @ ["std_exit.cmo"] in
-        if !Translcore.uses_eval then
-          "stdlib.cma" :: "dynlink/dynlink.cma" :: "eval.cma" :: objfiles @ ["std_exit.cmo"]
-        else libs
+    | false, true, false -> early_pervasives @ objfiles
+    | _                  -> early_pervasives @ objfiles @ ["std_exit.cmo"]
   in
   let tolink = List.fold_right scan_file objfiles [] in
   begin
