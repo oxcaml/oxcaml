@@ -540,10 +540,10 @@ module Int_literal_converter : sig
         and returns [min_int] in this case. *)
 
   val int8 : string -> int
-    (** Likewise, but only accepts values which fit in an [int8] *)
+    (** Likewise, at type [int8] *)
 
   val int16 : string -> int
-    (** Likewise, but only accepts values which fit in an [int16] *)
+    (** Likewise, at type [int16] *)
 
   val int32 : string -> int32
     (** Likewise, at type [int32] *)

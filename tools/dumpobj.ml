@@ -100,7 +100,7 @@ let rec print_struct_const = function
   | Const_base(Const_untagged_int8 i) -> printf "%ds" i
   | Const_base(Const_int16 i)
   | Const_base(Const_untagged_int16 i) -> printf "%dS" i
-  | Const_base(Const_untagged_int i) -> printf "#%d" i
+  | Const_base(Const_untagged_int i) -> printf "#%dm" i
   | Const_block(tag, args) ->
       printf "<%d>" tag;
       begin match args with
