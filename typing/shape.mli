@@ -217,6 +217,11 @@ and desc =
     (* CR sspies: We could in principle discard the arguments of the arrow,
        since they are neither needed for printing nor for debug information. *)
   | Poly_variant of t poly_variant_constructors
+  | Mu of t
+  (** [Mu t] represents a binder for a recursive type with body [t]. Its
+      variables are [Rec_var n] below, where [n] is a DeBruijn-index to maximize
+      sharing between alpha-equivalent shapes.  *)
+  | Rec_var of int
 
   (* constructors for type declarations *)
   | Variant of
@@ -244,6 +249,12 @@ and desc =
       { fields : (string * t * Layout.t) list;
         kind : record_kind
       }
+  | Mutrec of t Ident.Map.t
+    (** [Mutrec m] represents a map of (potentially mutually-recursive)
+        declarations. Declarations with type variables are represented as
+        abstractions inside. To project out a declaration, [Proj_decl] can be
+        used. *)
+  | Proj_decl of t * Ident.t
 
 (** For DWARF type emission to work as expected, we store the layouts in the
     declaration alongside the shapes in those cases where the layout "expands"
@@ -329,6 +340,8 @@ val unboxed_tuple : ?uid:Uid.t -> t list -> t
 val predef : ?uid:Uid.t -> Predef.t -> t list -> t
 val arrow : ?uid:Uid.t -> t -> t -> t
 val poly_variant : ?uid:Uid.t -> t poly_variant_constructors -> t
+val mu : ?uid:Uid.t -> t -> t
+val rec_var : ?uid:Uid.t -> int -> t
 
 (* constructors for type declarations *)
 val variant :
@@ -336,6 +349,9 @@ val variant :
 val variant_unboxed :
   ?uid:Uid.t -> string -> string option -> t -> Layout.t -> t
 val record : ?uid:Uid.t -> record_kind -> (string * t * Layout.t) list -> t
+val mutrec : ?uid:Uid.t -> t Ident.Map.t -> t
+val proj_decl : ?uid:Uid.t -> t -> Ident.t -> t
+
 
 val set_approximated : approximated:bool -> t -> t
 
@@ -407,3 +423,18 @@ val of_path :
   namespace:Sig_component_kind.t -> Path.t -> t
 
 val set_uid_if_none : t -> Uid.t -> t
+
+module Cache : Hashtbl.S with type key = t
+
+(** DeBruijn Environment for working with the recursive binders. *)
+module DeBruijn_env : sig
+  type 'a t
+
+  val empty : 'a t
+
+  val is_empty : 'a t -> bool
+
+  val push : 'a t -> 'a -> 'a t
+
+  val get_opt : 'a t -> int -> 'a option
+end

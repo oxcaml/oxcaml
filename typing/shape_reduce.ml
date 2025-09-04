@@ -63,12 +63,16 @@ end) = struct
     | NLeaf
     | NComp_unit of string
     | NError of string
+    | NMu of nf
+    | NRec_var of int
+    | NMutrec of nf Ident.Map.t
+    | NProj_decl of nf * Ident.t
     | NConstr of Ident.t * nf list
     | NTuple of nf list
     | NUnboxed_tuple of nf list
     | NPredef of Predef.t * nf list
     | NArrow of nf * nf
-    | NPoly_variant of delayed_nf poly_variant_constructors
+    | NPoly_variant of nf poly_variant_constructors
     | NVariant of {
       simple_constructors: string list;
       complex_constructors: (delayed_nf * Layout.t) complex_constructors
@@ -141,6 +145,12 @@ end) = struct
     | NComp_unit c1, NComp_unit c2 -> String.equal c1 c2
     | NAlias a1, NAlias a2 -> equal_delayed_nf a1 a2
     | NError e1, NError e2 -> String.equal e1 e2
+    | NMu (nf1), NMu (nf2) -> equal_nf nf1 nf2
+    | NRec_var i1, NRec_var i2 -> Int.equal i1 i2
+    | NMutrec defs1, NMutrec defs2 ->
+      Ident.Map.equal equal_nf defs1 defs2
+    | NProj_decl (nf1, id1), NProj_decl (nf2, id2) ->
+      Ident.equal id1 id2 && equal_nf nf1 nf2
     | NConstr (id1, args1), NConstr (id2, args2) ->
       Ident.equal id1 id2 && List.equal equal_nf args1 args2
     | NTuple args1, NTuple args2 ->
@@ -154,7 +164,7 @@ end) = struct
     | NPoly_variant constrs1, NPoly_variant constrs2 ->
       let equal_pv_constructor c1 c2 =
         String.equal c1.pv_constr_name c2.pv_constr_name &&
-        List.equal equal_delayed_nf c1.pv_constr_args c2.pv_constr_args
+        List.equal equal_nf c1.pv_constr_args c2.pv_constr_args
       in
       List.equal equal_pv_constructor constrs1 constrs2
     | NVariant { simple_constructors = sc1; complex_constructors = cc1 },
@@ -184,7 +194,8 @@ end) = struct
     | ( ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
-        | NVariant_unboxed _ | NRecord _ ), _ ) -> false
+        | NVariant_unboxed _ | NRecord _ | NMutrec _ | NProj_decl _ | NMu _
+        | NRec_var _ ), _ ) -> false
 
   and equal_nf t1 t2 =
     if not (Option.equal Uid.equal t1.uid t2.uid) then false
@@ -194,6 +205,8 @@ end) = struct
       type nonrec t = local_env * t
 
       let hash t = Hashtbl.hash t
+      (* CR sspies: The implementation of [hash] should change to use the
+      pre-computed hash value of shapes and match the equality function.  *)
 
       let equal (env1, t1) (env2, t2) =
         if equal t1 t2 then equal_local_env env1 env2
@@ -204,6 +217,9 @@ end) = struct
       type nonrec t = nf
 
       let hash t = Hashtbl.hash t
+      (* CR sspies: The implementation of [hash] should change to match the
+         equality function. Perhaps it would also make sense to pre-compute the
+         hash values of the normal forms. *)
 
   let equal a b = equal_nf a b
   end)
@@ -358,11 +374,19 @@ end) = struct
               reduce env res
           end
       | Leaf -> return NLeaf
+      | Mu t_body -> return (NMu (reduce env t_body))
+      | Rec_var n -> return (NRec_var n)
       | Struct m ->
           let mnf = Item.Map.map (delay_reduce env) m in
           return (NStruct mnf)
       | Alias t -> return (NAlias (delay_reduce env t))
       | Error s -> approx_nf (return (NError s))
+      | Mutrec defs ->
+          let dnfs = Ident.Map.map (reduce env) defs in
+          return (NMutrec dnfs)
+      | Proj_decl (t, id) ->
+          let nf = reduce env t in
+          return (NProj_decl (nf, id))
       | Constr (id, args) ->
           let nfs = List.map (reduce env) args in
           return (NConstr (id, nfs))
@@ -381,7 +405,7 @@ end) = struct
           return (NArrow (arg_nf, ret_nf))
       | Poly_variant constrs ->
           let dnf_constrs =
-            poly_variant_constructors_map (delay_reduce env) constrs
+            poly_variant_constructors_map (reduce env) constrs
           in
           return (NPoly_variant dnf_constrs)
       | Variant { simple_constructors; complex_constructors } ->
@@ -435,6 +459,16 @@ end) = struct
     | NComp_unit s -> comp_unit ?uid s
     | NAlias nf -> alias ?uid (read_back_force nf)
     | NError t -> error ?uid t
+    | NMu (t_body) ->
+      mu ?uid (read_back t_body)
+    | NRec_var n ->
+      rec_var ?uid n
+    | NMutrec defs ->
+      let t_defs = Ident.Map.map read_back defs in
+      mutrec ?uid t_defs
+    | NProj_decl (nf, id) ->
+      let t = read_back nf in
+      proj_decl ?uid t id
     | NConstr (id, args) ->
       let t_args = List.map read_back args in
       constr ?uid id t_args
@@ -452,7 +486,7 @@ end) = struct
       let t_ret = read_back ret in
       arrow ?uid t_arg t_ret
     | NPoly_variant constrs ->
-      let t_constrs = poly_variant_constructors_map read_back_force constrs in
+      let t_constrs = poly_variant_constructors_map read_back constrs in
       poly_variant ?uid t_constrs
     | NVariant { simple_constructors; complex_constructors } ->
       let t_complex_constructors =
@@ -499,7 +533,9 @@ end) = struct
     | NComp_unit _ -> true
     | NError _ -> false
     | NLeaf -> false
-    | NConstr _ | NTuple _ | NUnboxed_tuple _
+    | NMu _ -> false
+    | NRec_var _ -> false
+    | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
     | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _ | NVariant_unboxed _
     | NRecord _ -> false
 
