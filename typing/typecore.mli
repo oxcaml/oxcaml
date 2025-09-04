@@ -300,8 +300,13 @@ type error =
   | Label_not_atomic of Longident.t
   | Modalities_on_atomic_field of Longident.t
   | Literal_overflow of string
-  | Unknown_literal of string * char
-  | Float32_literal of string
+  | Unknown_literal of string * string
+  | Disabled_literal :
+      { name : string
+      ; constant : Parsetree.constant
+      ; extension_required : 'maturity Language_extension.t
+      ; maturity : 'maturity
+      } -> error
   | Illegal_letrec_pat
   | Illegal_letrec_expr
   | Illegal_mutable_pat

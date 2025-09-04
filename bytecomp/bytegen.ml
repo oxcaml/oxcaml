@@ -335,7 +335,7 @@ external is_boot_compiler : unit -> bool = "caml_is_boot_compiler"
 external float32_of_string : string -> Obj.t = "caml_float32_of_string"
 
 let rec contains_float32s_or_nulls = function
-  | Const_base (Const_float32 _ | Const_unboxed_float32 _) | Const_null -> true
+  | Const_base (Const_float32 _) | Const_null -> true
   | Const_block (_, fields) -> List.exists contains_float32s_or_nulls fields
   | Const_mixed_block _ ->
     Misc.fatal_error "[Const_mixed_block] not supported in bytecode."
@@ -343,13 +343,13 @@ let rec contains_float32s_or_nulls = function
 
 let rec translate_float32s_or_nulls stack_info env cst sz cont =
   match cst with
-  | Const_base (Const_float32 f | Const_unboxed_float32 f) ->
+  | Const_base (Const_float32 (_, f)) ->
     let i = float32_of_string f in
-    Kconst (Const_base (Const_int32 (Obj.obj i)))
+    Kconst (Const_base (Const_int32 (Value, Obj.obj i)))
     :: Kccall ("caml_float32_of_bits_bytecode", 1)
     :: cont
   | Const_null ->
-    Kconst (Const_base (Const_int 0))
+    Kconst (Const_base (Const_int (Value, 0)))
     :: Kccall ("caml_int_as_pointer", 1)
     :: cont
   | Const_block (tag, fields) as cst when contains_float32s_or_nulls cst ->
@@ -411,7 +411,7 @@ and comp_expr stack_info env exp sz cont =
       | Self -> Kgetmethod, met :: obj_and_args
       | Public -> (
         match met with
-        | Const (Const_base (Const_int n)) -> Kgetpubmet n, obj_and_args
+        | Const (Const_base (Const_int (_, n))) -> Kgetpubmet n, obj_and_args
         | _ -> Kgetdynmet, met :: obj_and_args)
     in
     if is_tailcall cont && not nontail
@@ -837,7 +837,7 @@ let comp_block env exp sz cont =
   let used_safe = !(stack_info.max_stack_used) + Config.stack_safety_margin in
   if used_safe > Config.stack_threshold
   then
-    Kconst (Const_base (Const_int used_safe))
+    Kconst (Const_base (Const_int (Value, used_safe)))
     :: Kccall ("caml_ensure_stack_capacity", 1)
     :: code
   else code

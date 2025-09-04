@@ -58,20 +58,20 @@ let share_expr ~kind ~expr k =
 let switch_for_if_then_else ~loc ~cond ~ifso ~ifnot ~kind =
   let rec aux ~loc ~kind ~cond ~ifso ~ifnot =
     match[@warning "-4"] cond with
-    | L.Lconst (Const_base (Const_int 1)) -> ifso
-    | L.Lconst (Const_base (Const_int 0)) -> ifnot
+    | L.Lconst (Const_base (Const_int (_, 1))) -> ifso
+    | L.Lconst (Const_base (Const_int (_, 0))) -> ifnot
     (* CR gbury: should we try to use the locs here, or is it better to keep
        using the locs from each individual condition ? *)
     | L.Lprim (Psequand, [a; b], loc) ->
       share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifso ->
           aux ~loc ~kind ~cond:a ~ifso ~ifnot)
-    | L.Lifthenelse (a, b, Lconst (Const_base (Const_int 0)), _) ->
+    | L.Lifthenelse (a, b, Lconst (Const_base (Const_int (_, 0))), _) ->
       share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifso ->
           aux ~loc ~kind ~cond:a ~ifso ~ifnot)
     | L.Lprim (Psequor, [a; b], loc) ->
       share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifnot ->
           aux ~loc ~kind ~cond:a ~ifso ~ifnot)
-    | L.Lifthenelse (a, Lconst (Const_base (Const_int 1)), b, _) ->
+    | L.Lifthenelse (a, Lconst (Const_base (Const_int (_, 1))), b, _) ->
       share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifnot ->
           aux ~loc ~kind ~cond:a ~ifso ~ifnot)
     | L.Lprim (Pnot, [c], loc) -> aux ~loc ~kind ~cond:c ~ifso:ifnot ~ifnot:ifso
@@ -83,10 +83,10 @@ let switch_for_if_then_else ~loc ~cond ~ifso ~ifnot ~kind =
               aux ~loc ~kind ~cond ~ifso:new_ifso ~ifnot:new_ifnot))
     | _ -> (
       match[@warning "-4"] ifso, ifnot with
-      | L.Lconst (Const_base (Const_int 1)), L.Lconst (Const_base (Const_int 0))
+      | L.Lconst (Const_base (Const_int (Value, 1))), L.Lconst (Const_base (Const_int (Value, 0)))
         ->
         cond
-      | L.Lconst (Const_base (Const_int 0)), L.Lconst (Const_base (Const_int 1))
+      | L.Lconst (Const_base (Const_int (Value, 0))), L.Lconst (Const_base (Const_int (Value, 1)))
         ->
         L.Lprim (Pnot, [cond], loc)
       | _ -> mk_switch ~cond ~ifso ~ifnot ~kind)
@@ -113,7 +113,7 @@ let rec_catch_for_while_loop env cond body =
             Lifthenelse
               ( Lvar cond_result,
                 Lsequence (body, Lstaticraise (cont, [])),
-                Lconst (Const_base (Const_int 0)),
+                L.lambda_unit,
                 L.layout_unit ) ),
         Same_region,
         L.layout_unit )
@@ -483,7 +483,7 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     makearray_dynamic_singleton_uninitialized "unboxed_float32" ~length mode loc
     |> initialize_array env loc ~length (Punboxedfloatarray_set Unboxed_float32)
          (Thirty_two
-            { zero_init = Lconst (Const_base (Const_unboxed_float32 "0")) })
+            { zero_init = Lconst (Const_base (Const_float32 (Naked, "0"))) })
          ~init
   | Punboxedfloatarray Unboxed_float64 ->
     makearray_dynamic_singleton_uninitialized "unboxed_float64" ~length mode loc
@@ -494,7 +494,7 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     |> initialize_array env loc ~length
          (Punboxedoruntaggedintarray_set Unboxed_int32)
          (Thirty_two
-            { zero_init = Lconst (Const_base (Const_unboxed_int32 0l)) })
+            { zero_init = Lconst (Const_base (Const_int32 (Naked, 0l))) })
          ~init
   | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
     ->
@@ -678,12 +678,12 @@ let transform_primitive0 env (prim : L.primitive) args loc =
   (* For Psequor and Psequand, earlier passes (notably for region handling)
      assume that [b] is in tail-position, so we must keep it so. *)
   | Psequor, [a; b] ->
-    let const_true = L.Lconst (Const_base (Const_int 1)) in
+    let const_true = L.Lconst (L.const_int 1) in
     Transformed
       (switch_for_if_then_else ~loc ~cond:a ~ifso:const_true ~ifnot:b
          ~kind:Lambda.layout_int)
   | Psequand, [a; b] ->
-    let const_false = L.Lconst (Const_base (Const_int 0)) in
+    let const_false = L.Lconst (L.const_int 0) in
     Transformed
       (switch_for_if_then_else ~loc ~cond:a ~ifso:b ~ifnot:const_false
          ~kind:Lambda.layout_int)
@@ -692,9 +692,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
   | ( (Pbytes_to_string | Pbytes_of_string | Parray_of_iarray | Parray_to_iarray),
       [arg] ) ->
     Transformed arg
-  | Pignore, [arg] ->
-    let result = L.Lconst (Const_base (Const_int 0)) in
-    Transformed (L.Lsequence (arg, result))
+  | Pignore, [arg] -> Transformed (L.Lsequence (arg, L.lambda_unit))
   | Pfield _, [L.Lprim (Pgetglobal cu, [], _)]
     when Compilation_unit.equal cu (Env.current_unit env) ->
     Misc.fatal_error

@@ -539,6 +539,8 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type ident_int
        ~jkind:Jkind.Const.Builtin.immediate
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_untagged_immediate
+  |> add_type ident_int8 ~jkind:Jkind.Const.Builtin.immediate
+  |> add_type ident_int16 ~jkind:Jkind.Const.Builtin.immediate
   |> add_type ident_int32 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int32
   |> add_type ident_int64 ~jkind:Jkind.Const.Builtin.immutable_data

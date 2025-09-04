@@ -141,7 +141,7 @@ end = struct
     let k_with_placeholder =
       apply { constr with flag = Mutable } tmc_placeholder in
     let placeholder_pos = List.length constr.before in
-    let placeholder_pos_lam = Lconst (Const_base (Const_int placeholder_pos)) in
+    let placeholder_pos_lam = Lconst (const_int placeholder_pos) in
     let block_var = Ident.create_local "block" in
     let block_var_duid = Lambda.debug_uid_none in
     Llet (Strict, Lambda.layout_block, block_var, block_var_duid,

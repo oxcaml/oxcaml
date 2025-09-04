@@ -36,14 +36,14 @@ end)
 
 let constant_int integral n : constant =
   match Scalar.Integral.width integral with
-  | Taggable Int -> Const_int n
-  | Taggable Int8 -> Const_int (Numbers.Int8.to_int (Numbers.Int8.of_int_exn n))
+  | Taggable Int -> Const_int (Value, n)
+  | Taggable Int8 -> Const_int8 (Value, Numbers.Int8.to_int (Numbers.Int8.of_int_exn n))
   | Taggable Int16 ->
-    Const_int (Numbers.Int16.to_int (Numbers.Int16.of_int_exn n))
-  | Boxable (Int32 Any_locality_mode) -> Const_int32 (Int32.of_int n)
-  | Boxable (Int64 Any_locality_mode) -> Const_int64 (Int64.of_int n)
+    Const_int16 (Value, Numbers.Int16.to_int (Numbers.Int16.of_int_exn n))
+  | Boxable (Int32 Any_locality_mode) -> Const_int32 (Value, Int32.of_int n)
+  | Boxable (Int64 Any_locality_mode) -> Const_int64 (Value, Int64.of_int n)
   | Boxable (Nativeint Any_locality_mode) ->
-    Const_nativeint (Nativeint.of_int n)
+    Const_nativeint (Value, Nativeint.of_int n)
 
 let const_int size n = Const_base (constant_int size n)
 
@@ -60,7 +60,7 @@ let ccallf fmt = kccallf Fun.id fmt
 let is_immed n = Instruct.immed_min <= n && n <= Instruct.immed_max
 
 let is_representable_const_int = function
-  | Const (Const_base (Const_int i)) -> is_immed i
+  | Const (Const_base (Const_int (_, i))) -> is_immed i
   | _ -> false
 
 let caml_sys_const name =
@@ -84,9 +84,9 @@ let sign_extend width exp =
   let go ~bits =
     let unused_bits = Sys.int_size - bits in
     match exp with
-    | Const (Const_base (Const_int n))
+    | Const (Const_base (Const_int (nf, n)))
       when is_immed ((n lsl unused_bits) asr unused_bits) ->
-      Const (Const_base (Const_int ((n lsl unused_bits) asr unused_bits)))
+      Const (Const_base (Const_int (nf, (n lsl unused_bits) asr unused_bits)))
     | exp ->
       let width = tagged_immediate bits in
       let int_size = Prim (caml_sys_const Int_size, [unit]) in
@@ -102,8 +102,8 @@ let zero_extend width exp =
   let go ~bits =
     let mask = (1 lsl bits) - 1 in
     match exp with
-    | Const (Const_base (Const_int n)) when is_immed (n land mask) ->
-      Const (Const_base (Const_int (n land mask)))
+    | Const (Const_base (Const_int (nf, n))) when is_immed (n land mask) ->
+      Const (Const_base (Const_int (nf, n land mask)))
     | exp -> Prim (Andint, [exp; tagged_immediate mask])
   in
   match (width : tagged_integer) with
@@ -437,34 +437,34 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               (Untagged_int8 | Untagged_int16 | Untagged_int) ->
             Misc.unboxed_small_int_arrays_are_not_implemented ()
           | Punboxedfloatarray Unboxed_float32 ->
-            Lconst (Const_base (Const_float32 "0.0"))
+            Lconst (Const_base (Const_float32 (Value, "0.0")))
           | Punboxedfloatarray Unboxed_float64 ->
-            Lconst (Const_base (Const_float "0.0"))
+            Lconst (Const_base (Const_float (Value, "0.0")))
           | Punboxedoruntaggedintarray Unboxed_int32 ->
-            Lconst (Const_base (Const_int32 0l))
+            Lconst (Const_base (Const_int32 (Value, 0l)))
           | Punboxedoruntaggedintarray Unboxed_int64 ->
-            Lconst (Const_base (Const_int64 0L))
+            Lconst (Const_base (Const_int64 (Value, 0L)))
           | Punboxedoruntaggedintarray Unboxed_nativeint ->
-            Lconst (Const_base (Const_nativeint 0n))
+            Lconst (Const_base (Const_nativeint (Value, 0n)))
           | Punboxedvectorarray _ -> raise Not_found
           | Pgcignorableproductarray ignorables ->
             let rec convert_ignorable
                 (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
               match ign with
-              | Pint_ignorable -> Lconst (Const_base (Const_int 0))
+              | Pint_ignorable -> Lconst (Const_base (Const_int (Value, 0)))
               | Punboxedoruntaggedint_ignorable
                   (Untagged_int8 | Untagged_int16 | Untagged_int) ->
                 Misc.unboxed_small_int_arrays_are_not_implemented ()
               | Punboxedfloat_ignorable Unboxed_float32 ->
-                Lconst (Const_base (Const_float32 "0.0"))
+                Lconst (Const_base (Const_float32 (Value, "0.0")))
               | Punboxedfloat_ignorable Unboxed_float64 ->
-                Lconst (Const_base (Const_float "0.0"))
+                Lconst (Const_base (Const_float (Value, "0.0")))
               | Punboxedoruntaggedint_ignorable Unboxed_int32 ->
-                Lconst (Const_base (Const_int32 0l))
+                Lconst (Const_base (Const_int32 (Value, 0l)))
               | Punboxedoruntaggedint_ignorable Unboxed_int64 ->
-                Lconst (Const_base (Const_int64 0L))
+                Lconst (Const_base (Const_int64 (Value, 0L)))
               | Punboxedoruntaggedint_ignorable Unboxed_nativeint ->
-                Lconst (Const_base (Const_nativeint 0n))
+                Lconst (Const_base (Const_nativeint (Value, 0n)))
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in
                 Lprim
@@ -509,10 +509,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pget_idx _ -> binary (Ccall "caml_unsafe_get_idx_bytecode")
     | Pset_idx _ -> ternary (Ccall "caml_unsafe_set_idx_bytecode")
     | Pmake_idx_field pos ->
-      Const (Const_block (0, [Const_base (Const_int pos)]))
+      Const (Const_block (0, [Const_base (Const_int (Value, pos))]))
     | Pmake_idx_mixed_field (_, pos, path) ->
       let path_consts =
-        List.map (fun x -> Const_base (Const_int x)) (pos :: path)
+        List.map (fun x -> Const_base (Const_int (Value, x))) (pos :: path)
       in
       Const (Const_block (0, path_consts))
     | Pmake_idx_array (_, ik, _, path) -> (
@@ -540,7 +540,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             unary (Ccall "caml_nativeint_to_int")
         in
         let path =
-          List.map (fun pos -> Const (Const_base (Const_int pos))) path
+          List.map (fun pos -> Const (Const_base (Const_int (Value, pos)))) path
         in
         Blambda.Prim (Makeblock { tag = 0 }, index :: path)
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
@@ -551,7 +551,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [path_prefix] ->
         let path_prefix = comp_expr path_prefix in
         let path_suffix_consts =
-          List.map (fun x -> Const_base (Const_int x)) path
+          List.map (fun x -> Const_base (Const_int (Value, x))) path
         in
         let path_suffix = Const (Const_block (0, path_suffix_consts)) in
         Blambda.Prim
@@ -863,13 +863,13 @@ and comp_binary_scalar_intrinsic :
       match op with
       | Add ->
         (match y with
-        | Const (Const_base (Const_int y)) when is_immed y ->
+        | Const (Const_base (Const_int (_, y))) when is_immed y ->
           Prim (Offsetint y, [x])
         | _ -> prim Addint)
         |> sign_extend taggable
       | Sub ->
         (match y with
-        | Const (Const_base (Const_int y)) when is_immed (-y) ->
+        | Const (Const_base (Const_int (_, y))) when is_immed (-y) ->
           Prim (Offsetint (-y), [x])
         | _ -> prim Subint)
         |> sign_extend taggable
@@ -1053,9 +1053,9 @@ and make_unsigned_comparison size signed_comparison x y =
     | Taggable Int16 -> Const (const_int size (-0x8000))
     | Taggable Int -> min_int_at_runtime Int_size
     | Boxable (Int32 Any_locality_mode) ->
-      Const (Const_base (Const_int32 Int32.min_int))
+      Const (Const_base (Const_int32 (Value, Int32.min_int)))
     | Boxable (Int64 Any_locality_mode) ->
-      Const (Const_base (Const_int64 Int64.min_int))
+      Const (Const_base (Const_int64 (Value, Int64.min_int)))
     | Boxable (Nativeint Any_locality_mode) -> min_int_at_runtime Word_size
   in
   let flip_sign_bit arg =

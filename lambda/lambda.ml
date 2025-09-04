@@ -963,11 +963,13 @@ type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
     arg_block_idx: int; }
 
-let const_int n = Const_base (Const_int n)
-
-let tagged_immediate n = Lconst (const_int n)
+(* const_int_with_size was removed as it was unused *)
 
 let int = Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
+
+let const_int n = Const_base (Const_int (Value, n))
+
+let tagged_immediate n = Lconst (const_int n)
 
 let const_unit = const_int 0
 
@@ -2206,19 +2208,39 @@ let primitive_can_raise prim =
   | Ppeek _ | Ppoke _ ->
     false
 
-let constant_layout: constant -> layout = function
-  | Const_int _ | Const_char _ -> non_null_value Pintval
+let unboxed_integer_of_boxed_integer = function
+  | Boxed_int64 -> Unboxed_int64
+  | Boxed_nativeint -> Unboxed_nativeint
+  | Boxed_int32 -> Unboxed_int32
+
+let constant_layout constant : layout =
+  let boxed_integer naked boxed =
+    match (naked : naked_flag) with
+    | Value -> non_null_value (Pboxedintval boxed)
+    | Naked ->
+      Punboxed_or_untagged_integer
+        (unboxed_integer_of_boxed_integer boxed)
+  in
+  let boxed_float naked boxed =
+    match (naked : naked_flag) with
+    | Value -> non_null_value (Pboxedfloatval boxed)
+    | Naked -> Punboxed_float (Primitive.unboxed_float boxed)
+  in
+  match (constant : constant) with
+  | Const_int (Value, (_ : int))
+  | Const_char (Value, (_ : char))
+  | Const_int8 (Value, (_ : int))
+  | Const_int16 (Value, (_ : int)) -> non_null_value Pintval
+  | Const_int (Naked, (_ : int)) -> Punboxed_or_untagged_integer Untagged_int
+  | Const_char (Naked, (_ : char))
+  | Const_int8 (Naked, (_ : int)) -> Punboxed_or_untagged_integer Untagged_int8
+  | Const_int16 (Naked, (_ : int)) -> Punboxed_or_untagged_integer Untagged_int16
   | Const_string _ -> non_null_value Pgenval
-  | Const_int32 _ -> non_null_value (Pboxedintval Boxed_int32)
-  | Const_int64 _ -> non_null_value (Pboxedintval Boxed_int64)
-  | Const_nativeint _ -> non_null_value (Pboxedintval Boxed_nativeint)
-  | Const_unboxed_int32 _ -> Punboxed_or_untagged_integer Unboxed_int32
-  | Const_unboxed_int64 _ -> Punboxed_or_untagged_integer Unboxed_int64
-  | Const_unboxed_nativeint _ -> Punboxed_or_untagged_integer Unboxed_nativeint
-  | Const_float _ -> non_null_value (Pboxedfloatval Boxed_float64)
-  | Const_float32 _ -> non_null_value (Pboxedfloatval Boxed_float32)
-  | Const_unboxed_float _ -> Punboxed_float Unboxed_float64
-  | Const_unboxed_float32 _ -> Punboxed_float Unboxed_float32
+  | Const_int32 (n, (_ : int32)) -> boxed_integer n Boxed_int32
+  | Const_int64 (n, (_ : int64)) -> boxed_integer n Boxed_int64
+  | Const_nativeint (n, (_ : nativeint)) -> boxed_integer n Boxed_nativeint
+  | Const_float (n, (_ : string)) -> boxed_float n Boxed_float64
+  | Const_float32 (n, (_ : string)) -> boxed_float n Boxed_float32
 
 let structured_constant_layout = function
   | Const_base const -> constant_layout const

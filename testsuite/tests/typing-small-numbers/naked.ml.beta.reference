@@ -1,0 +1,51 @@
+type t = float32#
+external ignore : t -> unit = "%ignore"
+type t = char#
+external ignore : t -> unit = "%ignore"
+Line 1, characters 18-25:
+1 | let () = ignore (-#'\x80');;
+                      ^^^^^^^
+Error: This expression has type "char#" but an expression was expected of type
+         "int"
+type t = int8#
+external ignore : t -> unit = "%ignore"
+Line 1, characters 16-23:
+1 | let () = ignore #0xfffy;;
+                    ^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int8#"
+type t = int16#
+external ignore : t -> unit = "%ignore"
+Line 5, characters 2-11:
+5 | | #2w..#12w -> ()
+      ^^^^^^^^^
+Error: Only character intervals are supported in patterns.
+Line 3, characters 16-19:
+3 | let () = ignore #1i;;
+                    ^^^
+Error: This expression has type "int#" but an expression was expected of type
+         "t" = "int16#"
+Line 1, characters 16-22:
+1 | let () = ignore (-#1i);;
+                    ^^^^^^
+Error: This expression has type "int#" but an expression was expected of type
+         "t" = "int16#"
+Line 1, characters 16-23:
+1 | let () = ignore #0xfffi;;
+                    ^^^^^^^
+Error: This expression has type "int#" but an expression was expected of type
+         "t" = "int16#"
+Line 1, characters 16-24:
+1 | let () = ignore (-#0o7i);;
+                    ^^^^^^^^
+Error: This expression has type "int#" but an expression was expected of type
+         "t" = "int16#"
+Line 1, characters 16-27:
+1 | let () = ignore (-#0b1010i);;
+                    ^^^^^^^^^^^
+Error: This expression has type "int#" but an expression was expected of type
+         "t" = "int16#"
+
+
+Line 6, characters 0-0:
+Error: Syntax error
+

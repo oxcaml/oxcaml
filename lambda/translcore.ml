@@ -128,7 +128,7 @@ let extract_constant = function
   | _ -> raise Not_constant
 
 let extract_float = function
-    Const_base(Const_float f) -> f
+    Const_base(Const_float (Value, f)) -> f
   | _ -> fatal_error "Translcore.extract_float"
 
 let transl_apply_position position =
@@ -244,8 +244,8 @@ let assert_failed loc ~scopes exp =
           [slot;
            Lconst(Const_block(0,
               [Const_base(Const_string (fname, exp.exp_loc, None));
-               Const_base(Const_int line);
-               Const_base(Const_int char)]))], loc))], loc)
+               const_int line;
+               const_int char]))], loc))], loc)
 
 type fusable_function =
   { params : function_param list
@@ -681,7 +681,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Some
               (Patomic_load_field { immediate_or_pointer },
                [targ;
-                Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
+                Lconst (Const_base (Const_int (Value, field_offset_for_label lbl)))])
           else
             Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
@@ -702,7 +702,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Some
               (Patomic_load_field { immediate_or_pointer },
                [targ;
-                Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
+                Lconst (Const_base (Const_int (Value, field_offset_for_label lbl)))])
           else
             Some (Pfield (lbl.lbl_pos + 1, immediate_or_pointer, sem), [targ])
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
@@ -772,7 +772,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         Jkind.Sort.Const.for_boxed_record
       in
       let arg_lambda = transl_exp ~scopes sort_arg arg in
-      let field_lambda = Lconst (Const_base (Const_int lbl.lbl_pos)) in
+      let field_lambda = Lconst (Const_base (Const_int (Value, lbl.lbl_pos))) in
       let newval_lambda = transl_exp ~scopes lbl.lbl_sort newval in
       let prim, args =
         match lbl.lbl_repres with
@@ -1317,9 +1317,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let pos_fname = Clflags.prepend_directory pos.pos_fname in
       let cl =
         [ Const_base (Const_string (pos_fname, e.exp_loc, None))
-        ; Const_base (Const_int pos.pos_lnum)
-        ; Const_base (Const_int pos.pos_bol)
-        ; Const_base (Const_int pos.pos_cnum)
+        ; const_int pos.pos_lnum
+        ; const_int pos.pos_bol
+        ; const_int pos.pos_cnum
         ]
       in
       Lconst(Const_block(0, cl))
@@ -2279,7 +2279,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl =
   | _ -> ()
   end;
   let field_offset = field_offset_for_label lbl in
-  let lbl = Lconst (Const_base (Const_int field_offset)) in
+  let lbl = Lconst (Const_base (Const_int (Value, field_offset))) in
   (arg, lbl)
 
 and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
