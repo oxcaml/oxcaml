@@ -21,7 +21,7 @@ let () =
   let non_initial : int option Atomic.t = Atomic.make None in
   (match
     Multicore.spawn_on ~domain:1 (fun () ->
-      Atomic.Contended.set non_initial (Some (Multicore.current_domain ())))
+      Atomic.set non_initial (Some (Multicore.current_domain ())))
       ()
    with
    | Spawned -> ()

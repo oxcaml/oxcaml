@@ -59,8 +59,8 @@ let randomized_default =
 
 let randomized = Atomic.make randomized_default
 
-let randomize () = Atomic.Contended.set randomized true
-let is_randomized () = Atomic.Contended.get randomized
+let randomize () = Atomic.set randomized true
+let is_randomized () = Atomic.get randomized
 
 module Rng : sig
   val bits : unit -> int
