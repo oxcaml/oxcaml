@@ -274,6 +274,21 @@ module type Jscomp_options = sig
   include Core_options
   include Compiler_options
 
+  val _inline : string -> unit
+  val _inline_toplevel : string -> unit
+  val _inlining_report : unit -> unit
+  val _dump_pass : string -> unit
+  val _inline_max_depth : string -> unit
+  val _rounds : int -> unit
+  val _inline_max_unroll : string -> unit
+  val _inline_call_cost : string -> unit
+  val _inline_alloc_cost : string -> unit
+  val _inline_prim_cost : string -> unit
+  val _inline_branch_cost : string -> unit
+  val _inline_indirect_cost : string -> unit
+  val _inline_lifting_benefit : string -> unit
+  val _inline_branch_factor : string -> unit
+
   val _dflambda : unit -> unit
   val _dflambda_heavy_invariants : unit -> unit
   val _dflambda_invariants : unit -> unit
