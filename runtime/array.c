@@ -603,7 +603,7 @@ static value caml_make_unboxed_int32_vect0(value len, int local)
   
   /* Use appropriate unboxed array tag based on even/odd length */
   tag_t tag = (num_elements % 2 == 0) 
-    ? Unboxed_int32_array_zero_tag : Unboxed_int32_array_one_tag;
+    ? Unboxed_int32_array_even_tag : Unboxed_int32_array_odd_tag;
   
   /* Mixed block with no scannable fields */
   reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);

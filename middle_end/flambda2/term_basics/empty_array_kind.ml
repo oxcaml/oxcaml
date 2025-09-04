@@ -17,9 +17,6 @@ type t =
   | Values_or_immediates_or_naked_floats
   | Unboxed_products
   | Naked_float32s
-  | Naked_ints
-  | Naked_int8s
-  | Naked_int16s
   | Naked_int32s
   | Naked_int64s
   | Naked_nativeints
@@ -32,9 +29,6 @@ let print ppf t =
   | Values_or_immediates_or_naked_floats -> Format.pp_print_string ppf "regular"
   | Unboxed_products -> Format.pp_print_string ppf "Unboxed_products"
   | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
-  | Naked_ints -> Format.pp_print_string ppf "Naked_ints"
-  | Naked_int8s -> Format.pp_print_string ppf "Naked_int8s"
-  | Naked_int16s -> Format.pp_print_string ppf "Naked_int16s"
   | Naked_int32s -> Format.pp_print_string ppf "Naked_int32s"
   | Naked_int64s -> Format.pp_print_string ppf "Naked_int64s"
   | Naked_nativeints -> Format.pp_print_string ppf "Naked_nativeints"
@@ -50,9 +44,8 @@ let of_element_kind t =
   match (t : Flambda_kind.t) with
   | Value | Naked_number Naked_float -> Values_or_immediates_or_naked_floats
   | Naked_number Naked_float32 -> Naked_float32s
-  | Naked_number Naked_immediate -> Naked_ints
-  | Naked_number Naked_int8 -> Naked_int8s
-  | Naked_number Naked_int16 -> Naked_int16s
+  | Naked_number (Naked_int8 | Naked_int16 | Naked_immediate) ->
+    Misc.unboxed_small_int_arrays_are_not_implemented ()
   | Naked_number Naked_int32 -> Naked_int32s
   | Naked_number Naked_int64 -> Naked_int64s
   | Naked_number Naked_nativeint -> Naked_nativeints
@@ -69,9 +62,9 @@ let of_lambda array_kind =
   | Punboxedfloatarray Unboxed_float64 ->
     Values_or_immediates_or_naked_floats
   | Punboxedfloatarray Unboxed_float32 -> Naked_float32s
-  | Punboxedoruntaggedintarray Untagged_int -> Naked_ints
-  | Punboxedoruntaggedintarray Untagged_int8 -> Naked_int8s
-  | Punboxedoruntaggedintarray Untagged_int16 -> Naked_int16s
+  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
+    ->
+    Misc.unboxed_small_int_arrays_are_not_implemented ()
   | Punboxedoruntaggedintarray Unboxed_int32 -> Naked_int32s
   | Punboxedoruntaggedintarray Unboxed_int64 -> Naked_int64s
   | Punboxedoruntaggedintarray Unboxed_nativeint -> Naked_nativeints

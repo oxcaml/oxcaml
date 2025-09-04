@@ -1105,7 +1105,7 @@ and glb_scannable_kind kind1 kind2 =
 
 (* The following function computes the greatest lower bound of array kinds:
 
-        gen      unboxed-{float,int8,int16,int32,int64,nativeint}
+        gen      unboxed-float  unboxed-int32  unboxed-int64  unboxed-nativeint
          |
       /------\
       |      |
@@ -1141,12 +1141,6 @@ let glb_array_type loc t1 t2 =
     Punboxedfloatarray Unboxed_float32
   | Punboxedfloatarray _, _ | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
-  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int8),
-    Punboxedoruntaggedintarray Untagged_int8 ->
-    Punboxedoruntaggedintarray Untagged_int8
-  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int16),
-    Punboxedoruntaggedintarray Untagged_int16 ->
-    Punboxedoruntaggedintarray Untagged_int16
   | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int32),
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray Unboxed_int32
@@ -1219,12 +1213,6 @@ let glb_array_ref_type loc t1 t2 =
   | Punboxedfloatarray_ref _, _
   | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int8),
-    Punboxedoruntaggedintarray Untagged_int8 ->
-    Punboxedoruntaggedintarray_ref Untagged_int8
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int16),
-    Punboxedoruntaggedintarray Untagged_int16 ->
-    Punboxedoruntaggedintarray_ref Untagged_int16
   | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int32),
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_ref Unboxed_int32
@@ -1311,12 +1299,6 @@ let glb_array_set_type loc t1 t2 =
   | Punboxedfloatarray_set _, _
   | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int8),
-    Punboxedoruntaggedintarray Untagged_int8 ->
-    Punboxedoruntaggedintarray_set Untagged_int8
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int16),
-    Punboxedoruntaggedintarray Untagged_int16 ->
-    Punboxedoruntaggedintarray_set Untagged_int16
   | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int32),
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_set Unboxed_int32
