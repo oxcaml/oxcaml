@@ -351,6 +351,10 @@ val any_naked_float32 : t
 
 val any_naked_float : t
 
+val any_naked_int8 : t
+
+val any_naked_int16 : t
+
 val any_naked_int32 : t
 
 val any_naked_int64 : t
@@ -363,7 +367,7 @@ val any_rec_info : t
 
 (** Building of types representing tagged / boxed values from specified
     constants. *)
-val this_tagged_immediate : Targetint_31_63.t -> t
+val this_tagged_immediate : Target_ocaml_int.t -> t
 
 val this_boxed_float32 :
   Numeric_types.Float32_by_bit_pattern.t -> Alloc_mode.For_types.t -> t
@@ -386,7 +390,7 @@ val this_boxed_vec256 :
 val this_boxed_vec512 :
   Vector_types.Vec512.Bit_pattern.t -> Alloc_mode.For_types.t -> t
 
-val these_tagged_immediates : Targetint_31_63.Set.t -> t
+val these_tagged_immediates : Target_ocaml_int.Set.t -> t
 
 val these_boxed_float32s :
   Numeric_types.Float32_by_bit_pattern.Set.t -> Alloc_mode.For_types.t -> t
@@ -405,11 +409,15 @@ val these_boxed_nativeints :
 
 (** Building of types representing untagged / unboxed values from specified
     constants. *)
-val this_naked_immediate : Targetint_31_63.t -> t
+val this_naked_immediate : Target_ocaml_int.t -> t
 
 val this_naked_float32 : Numeric_types.Float32_by_bit_pattern.t -> t
 
 val this_naked_float : Numeric_types.Float_by_bit_pattern.t -> t
+
+val this_naked_int8 : Numeric_types.Int8.t -> t
+
+val this_naked_int16 : Numeric_types.Int16.t -> t
 
 val this_naked_int32 : Numeric_types.Int32.t -> t
 
@@ -425,11 +433,15 @@ val this_naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
 
 val this_rec_info : Rec_info_expr.t -> t
 
-val these_naked_immediates : Targetint_31_63.Set.t -> t
+val these_naked_immediates : Target_ocaml_int.Set.t -> t
 
 val these_naked_float32s : Numeric_types.Float32_by_bit_pattern.Set.t -> t
 
 val these_naked_floats : Numeric_types.Float_by_bit_pattern.Set.t -> t
+
+val these_naked_int8s : Numeric_types.Int8.Set.t -> t
+
+val these_naked_int16s : Numeric_types.Int16.Set.t -> t
 
 val these_naked_int32s : Numeric_types.Int32.Set.t -> t
 
@@ -441,6 +453,10 @@ val boxed_float32_alias_to :
   naked_float32:Variable.t -> Alloc_mode.For_types.t -> t
 
 val boxed_float_alias_to : naked_float:Variable.t -> Alloc_mode.For_types.t -> t
+
+val tagged_int8_alias_to : naked_int8:Variable.t -> t
+
+val tagged_int16_alias_to : naked_int16:Variable.t -> t
 
 val boxed_int32_alias_to : naked_int32:Variable.t -> Alloc_mode.For_types.t -> t
 
@@ -494,7 +510,7 @@ val immutable_block :
     variable. *)
 val immutable_block_with_size_at_least :
   tag:Tag.t Or_unknown.t ->
-  n:Targetint_31_63.t ->
+  n:Target_ocaml_int.t ->
   shape:Flambda_kind.Block_shape.t ->
   field_n_minus_one:Variable.t ->
   t
@@ -588,22 +604,28 @@ type 'a proof_of_property = private
 
 (* CR mshinwell: Should remove "_equals_" from these names *)
 val prove_equals_tagged_immediates :
-  Typing_env.t -> t -> Targetint_31_63.Set.t proof_of_property
+  Typing_env.t -> t -> Target_ocaml_int.Set.t proof_of_property
 
 val meet_equals_tagged_immediates :
-  Typing_env.t -> t -> Targetint_31_63.Set.t meet_shortcut
+  Typing_env.t -> t -> Target_ocaml_int.Set.t meet_shortcut
 
 val meet_naked_immediates :
-  Typing_env.t -> t -> Targetint_31_63.Set.t meet_shortcut
+  Typing_env.t -> t -> Target_ocaml_int.Set.t meet_shortcut
 
 val meet_equals_single_tagged_immediate :
-  Typing_env.t -> t -> Targetint_31_63.t meet_shortcut
+  Typing_env.t -> t -> Target_ocaml_int.t meet_shortcut
 
 val meet_naked_float32s :
   Typing_env.t -> t -> Numeric_types.Float32_by_bit_pattern.Set.t meet_shortcut
 
 val meet_naked_floats :
   Typing_env.t -> t -> Numeric_types.Float_by_bit_pattern.Set.t meet_shortcut
+
+val meet_naked_int8s :
+  Typing_env.t -> t -> Numeric_types.Int8.Set.t meet_shortcut
+
+val meet_naked_int16s :
+  Typing_env.t -> t -> Numeric_types.Int16.Set.t meet_shortcut
 
 val meet_naked_int32s :
   Typing_env.t -> t -> Numeric_types.Int32.Set.t meet_shortcut
@@ -615,9 +637,9 @@ val meet_naked_nativeints :
   Typing_env.t -> t -> Targetint_32_64.Set.t meet_shortcut
 
 type variant_like_proof = private
-  { const_ctors : Targetint_31_63.Set.t Or_unknown.t;
+  { const_ctors : Target_ocaml_int.Set.t Or_unknown.t;
     non_const_ctors_with_sizes :
-      (Targetint_31_63.t * Flambda_kind.Block_shape.t) Tag.Scannable.Map.t
+      (Target_ocaml_int.t * Flambda_kind.Block_shape.t) Tag.Scannable.Map.t
   }
 
 val meet_variant_like : Typing_env.t -> t -> variant_like_proof meet_shortcut
@@ -639,6 +661,8 @@ type boxed_or_tagged_number = private
 
 val prove_is_a_boxed_or_tagged_number :
   Typing_env.t -> t -> boxed_or_tagged_number proof_of_property
+
+val prove_nothing : Typing_env.t -> t -> _ proof_of_property
 
 val prove_is_a_tagged_immediate : Typing_env.t -> t -> unit proof_of_property
 
@@ -664,12 +688,12 @@ val prove_is_or_is_not_a_boxed_float :
 val prove_unique_tag_and_size :
   Typing_env.t ->
   t ->
-  (Tag.t * Flambda_kind.Block_shape.t * Targetint_31_63.t) proof_of_property
+  (Tag.t * Flambda_kind.Block_shape.t * Target_ocaml_int.t) proof_of_property
 
 val prove_unique_fully_constructed_immutable_heap_block :
   Typing_env.t ->
   t ->
-  (Tag.t * Flambda_kind.Block_shape.t * Targetint_31_63.t * Simple.t list)
+  (Tag.t * Flambda_kind.Block_shape.t * Target_ocaml_int.t * Simple.t list)
   proof_of_property
 
 val prove_is_int : Typing_env.t -> t -> bool proof_of_property
@@ -769,7 +793,7 @@ val meet_block_field_simple :
   min_name_mode:Name_mode.t ->
   field_kind:Flambda_kind.t ->
   t ->
-  Targetint_31_63.t ->
+  Target_ocaml_int.t ->
   Simple.t meet_shortcut
 
 val meet_project_value_slot_simple :

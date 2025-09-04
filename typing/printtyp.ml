@@ -1380,14 +1380,10 @@ let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
 (* CR layouts v2.8: This should use the annotation in the jkind, if there
    is one. But first that annotation needs to be in Typedtree, not in
    Parsetree. *)
-let out_jkind_option_of_jkind jkind =
+let out_jkind_option_of_jkind ~ignore_null jkind =
   let desc = Jkind.get jkind in
   let elide =
-    (* CR layouts: We ignore nullability here to avoid needlessly printing
-       ['a : value_or_null] when it's not relevant (most cases).
-       Unfortunately, this makes error messages really confusing, because
-       we don't consider jkind annotations. *)
-    Jkind.is_value_for_printing ~ignore_null:true jkind (* C2.1 *)
+    Jkind.is_value_for_printing ~ignore_null jkind (* C2.1 *)
     || (match desc.layout with
         | Sort (Var _) -> not !Clflags.verbose_types (* X1 *)
         | _ -> false)
@@ -1475,18 +1471,47 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
   | Some l -> l
   | None -> List.map tree_of_mode_new l
 
-(* [alloc_mode] is the mode that our printing has expressed on [ty]. For the
-  example [A -> local_ (B -> C)], we will call [tree_of_typexp] on (B -> C) with
-  alloc_mode = local. This is helpful for reproducing the mode currying logic in
-  [ctype.ml], so that parsing and printing roundtrip. *)
-let rec tree_of_typexp mode alloc_mode ty =
+(** The modal context on a type when printing it. This is to reproduce the mode
+    currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
+type modal =
+  | Arrow_return of
+    { acc : Mode.Alloc.Const.t;
+      mode : Mode.Alloc.lr; }
+    (** This is the RHS (say [r]) of an arrow type, where [mode] is the real
+        mode of [r]. and:
+    - If [r] is also an arrow type, then [acc] is how users would interpret
+      [r]'s mode, if [r] doesn't have any parens aound it.
+    - If [r] is not an arrow type, in which case [acc] is meaningless.
+
+    The callee is responsible for printing the type with the modes, with parens
+    if needed.
+
+    Note that if [r] is an aliased type (e.g., [(int -> 'r) as 'r]), it will be
+    treated as NOT an arrow type, to align with the currying logic in
+    [typetexp.ml].
+
+    If [r] is [Tpoly (Tarrow_, [])], it will be treated as NOT an arrow type.
+    This gives tedious (but still correct) printing. *)
+
+  | Other of Mode.Alloc.Const.t
+    (** In other cases, the caller has already printed the modes (as the
+        constructor argument) on the type. *)
+
+let rec tree_of_modal_typexp mode modal ty =
+  let not_arrow tree =
+    match modal with
+    | Arrow_return {mode; _} ->
+        let mode = Alloc.zap_to_legacy mode in
+        Otyp_ret (Orm_any (tree_of_modes mode), tree)
+    | Other _ -> tree
+  in
   let px = proxy ty in
   if List.memq px !printed_aliases && not (List.memq px !delayed) then
    let non_gen = is_non_gen mode (Transient_expr.type_expr px) in
    let name = Names.name_of_type (Names.new_var_name ~non_gen ty) px in
-   Otyp_var (non_gen, name) else
+   not_arrow (Otyp_var (non_gen, name)) else
 
-  let pr_typ () =
+  let pr_typ alloc_mode =
     let tty = Transient_expr.repr ty in
     match tty.desc with
     | Tvar _ ->
@@ -1494,9 +1519,6 @@ let rec tree_of_typexp mode alloc_mode ty =
         let name_gen = Names.new_var_name ~non_gen ty in
         Otyp_var (non_gen, Names.name_of_type name_gen tty)
     | Tarrow ((l, marg, mret), ty1, ty2, _) ->
-        (* In this branch we do some mutation that needs to be reverted, as
-           printing should not mutate states. *)
-        let snap = Btype.snapshot () in
         let lab =
           if !print_labels || is_omittable l then outcome_label l
           else Nolabel
@@ -1519,9 +1541,9 @@ let rec tree_of_typexp mode alloc_mode ty =
             tree_of_typexp mode arg_mode ty1
         in
         let acc_mode = curry_mode alloc_mode arg_mode in
-        let (rm, t2) = tree_of_ret_typ_mutating mode acc_mode (mret, ty2) in
-        Btype.backtrack snap;
-        Otyp_arrow (lab, tree_of_modes arg_mode, t1, rm, t2)
+        let modal = Arrow_return {acc = acc_mode; mode = mret} in
+        let t2 = tree_of_modal_typexp mode modal ty2 in
+        Otyp_arrow (lab, tree_of_modes arg_mode, t1, t2)
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
@@ -1615,15 +1637,32 @@ let rec tree_of_typexp mode alloc_mode ty =
     (* add_printed_alias chose a name, thus the name generator
        doesn't matter.*)
     let alias = Names.name_of_type (Names.new_var_name ~non_gen ty) px in
-    Otyp_alias {non_gen;  aliased = pr_typ (); alias } end
-  else pr_typ ()
+    let tree =
+      Otyp_alias {non_gen;  aliased = pr_typ Mode.Alloc.Const.legacy; alias }
+    in
+    not_arrow tree end
+  else
+    match modal with
+    | Arrow_return {acc; mode} ->
+        let rm, alloc_mode = tree_of_ret_typ_mutating acc mode ty in
+        let ty = pr_typ alloc_mode in
+        Otyp_ret (rm, ty)
+    | Other m -> pr_typ m
+
+and tree_of_typexp mode alloc_mode ty =
+  tree_of_modal_typexp mode (Other alloc_mode) ty
 
 (* qtvs = quantified type variables *)
 (* this silently drops any arguments that are not generic Tvar or Tunivar *)
 and tree_of_qtvs qtvs =
   let tree_of_qtv v : (string * out_jkind option) option =
-    let tree jkind = Some (Names.name_of_type Names.new_name v,
-                            out_jkind_option_of_jkind jkind)
+    (* CR layouts: We ignore nullability here to avoid needlessly printing
+       ['a : value_or_null] when it's not relevant (most cases).
+       Unfortunately, this makes error messages really confusing, because
+       we don't consider jkind annotations. *)
+    let tree jkind =
+      Some (Names.name_of_type Names.new_name v,
+            out_jkind_option_of_jkind ~ignore_null:true jkind)
     in
     match v.desc with
     | Tvar { jkind } when v.level = generic_level -> tree jkind
@@ -1652,35 +1691,25 @@ and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
   (tree_of_typexp Type Alloc.Const.legacy ty,
    tree_of_modalities Immutable gf)
 
-(** We are on the RHS of an arrow type, where [ty] is the return type, and [m]
-    is the return mode. This function decides the printed modes on [ty].
-    - If [ty] is another arrow type, [acc_mode] is the mode that has accumulated
-      from the currying, and thus the mode that the user would interpret as on
-      [ty] if it doesn't have parens around it.
-    - If [ty] is not an arrow type, [acc_mode] is meaningless.
-
-    NB: This function might mutate states; the caller is responsible for
+(** NB: This function might mutate states; the caller is responsible for
     reverting them. *)
-and tree_of_ret_typ_mutating mode acc_mode (m, ty) =
+and tree_of_ret_typ_mutating acc_mode m ty=
   match get_desc ty with
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
         can omit parens and modes. *)
       match Alloc.equate (Alloc.of_const acc_mode) m with
       | Ok () ->
-        let ty = tree_of_typexp mode acc_mode ty in
-        (Orm_no_parens, ty)
+        (Orm_no_parens, acc_mode)
       | Error _ ->
         (* In this branch we need to print parens. [m] might have undetermined
         axes and we adopt a similar logic to the [marg] above. *)
         let m = Alloc.zap_to_legacy m in
-        let ty = tree_of_typexp mode m ty in
-        (Orm_parens (tree_of_modes m), ty)
+        (Orm_parens (tree_of_modes m), m)
       end
   | _ ->
     let m = Alloc.zap_to_legacy m in
-    let ty = tree_of_typexp mode m ty in
-    (Orm_not_arrow (tree_of_modes m), ty)
+    (Orm_any (tree_of_modes m), m)
 
 and tree_of_typobject mode fi nm =
   begin match nm with
@@ -1723,14 +1752,21 @@ and tree_of_typfields mode rest = function
       let (fields, rest) = tree_of_typfields mode rest l in
       (field :: fields, rest)
 
-let tree_of_typexp mode ty = tree_of_typexp mode Alloc.Const.legacy ty
+let tree_of_typexp mode ty =
+  (* [tree_of_typexp] mutates state, which we need to backtrack. *)
+  (* CR zqian: the backtracking should happen at a higher-level than this. In
+  particular, it should happen only once per user printing command. *)
+  let snap = Btype.snapshot () in
+  let r = tree_of_typexp mode Alloc.Const.legacy ty in
+  Btype.backtrack snap;
+  r
 
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
 
 (* Only used for printing a single modality in error message *)
 let modality ?(id = fun _ppf -> ()) ppf modality =
-  if Mode.Modality.is_id modality then id ppf
+  if Mode.Modality.Atom.is_id modality then id ppf
   else
     modality
     |> Typemode.untransl_modality
@@ -1832,18 +1868,23 @@ let extract_qtvs tyl =
 let param_jkind ty =
   match get_desc ty with
   | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
-     out_jkind_option_of_jkind jkind
+     out_jkind_option_of_jkind ~ignore_null:false jkind
   | _ -> None (* this is (C2.2) from Note [When to print jkind annotations] *)
 
 let tree_of_label l =
   let mut =
     match l.ld_mutable with
-    | Mutable m ->
+    | Mutable { mode; atomic } ->
+        let atomic =
+          match atomic with
+          | Atomic -> Atomic
+          | Nonatomic -> Nonatomic
+        in
         let mut =
           let open Value.Comonadic in
-          match equate m legacy with
-          | Ok () -> Om_mutable None
-          | Error _ -> Om_mutable (Some "<non-legacy>")
+          match equate mode legacy with
+          | Ok () -> Om_mutable (None, atomic)
+          | Error _ -> Om_mutable (Some "<non-legacy>", atomic)
         in
         mut
     | Immutable -> Om_immutable

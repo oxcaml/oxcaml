@@ -35,9 +35,11 @@ type error =
   | Removed_string_set of Location.t
   | Missing_unboxed_literal_suffix of Location.t
   | Malformed_instance_identifier of Location.t
+  | Quotation_reserved of Location.t * string
   | Let_mutable_not_allowed_at_structure_level of Location.t
   | Let_mutable_not_allowed_in_class_definition of Location.t
   | Let_mutable_not_allowed_with_function_bindings of Location.t
+  | Block_access_bad_paren of Location.t
 
 exception Error of error
 exception Escape_error
@@ -54,9 +56,11 @@ let location_of_error = function
   | Removed_string_set l -> l
   | Missing_unboxed_literal_suffix l -> l
   | Malformed_instance_identifier l -> l
+  | Quotation_reserved (l, _) -> l
   | Let_mutable_not_allowed_at_structure_level l -> l
   | Let_mutable_not_allowed_in_class_definition l -> l
   | Let_mutable_not_allowed_with_function_bindings l -> l
+  | Block_access_bad_paren l -> l
 
 
 let ill_formed_ast loc s =

@@ -126,6 +126,7 @@ COMPILERLIBS_SOURCES=\
   typing/path.ml \
   typing/shape.ml \
   typing/jkind_types.ml \
+  typing/scalar.ml \
   typing/primitive.ml \
   typing/zero_alloc.ml \
   typing/types.ml \
@@ -141,6 +142,7 @@ COMPILERLIBS_SOURCES=\
   typing/persistent_env.ml \
   typing/env.ml \
   typing/shape_reduce.ml \
+  typing/type_shape.ml \
   typing/typedtree.ml \
   lambda/debuginfo.ml \
   lambda/lambda.ml \

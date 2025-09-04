@@ -131,6 +131,11 @@ val find_constructor_address: Path.t -> t -> address
 val shape_of_path:
   namespace:Shape.Sig_component_kind.t -> t -> Path.t -> Shape.t
 
+(* CR sspies: The function [find_uid_of_path] is only temporary and will be
+   removed in a subsequent PR that removes the paths from type shapes. For now,
+   it is here to reduce code duplication. *)
+val find_uid_of_path : t -> Path.t -> Uid.t option
+
 val add_functor_arg: Ident.t -> t -> t
 val is_functor_arg: Path.t -> t -> bool
 
@@ -168,16 +173,19 @@ val mark_value_used: Uid.t -> unit
 val mark_module_used: Uid.t -> unit
 val mark_type_used: Uid.t -> unit
 
+(* Mark mutable variable as mutated *)
+val mark_value_mutated: Uid.t -> unit
+
 type constructor_usage = Positive | Pattern | Exported_private | Exported
 val mark_constructor_used:
-    constructor_usage -> constructor_declaration -> unit
+    constructor_usage -> Uid.t -> unit
 val mark_extension_used:
-    constructor_usage -> extension_constructor -> unit
+    constructor_usage -> Uid.t -> unit
 
 type label_usage =
     Projection | Mutation | Construct | Exported_private | Exported
 val mark_label_used:
-    label_usage -> label_declaration -> unit
+    label_usage -> Uid.t -> unit
 
 (* Lookup by long identifiers *)
 
@@ -228,6 +236,7 @@ type lock_item =
   | Value
   | Module
   | Class
+  | Constructor
 
 type structure_components_reason =
   | Project
@@ -331,14 +340,14 @@ val lookup_module_instance_path:
 
 val lookup_constructor:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  constructor_description
+  constructor_description * locks
 val lookup_all_constructors:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  ((constructor_description * (unit -> unit)) list,
+  (((constructor_description * locks) * (unit -> unit)) list,
    Location.t * t * lookup_error) result
 val lookup_all_constructors_from_type:
   ?use:bool -> loc:Location.t -> constructor_usage -> Path.t -> t ->
-  (constructor_description * (unit -> unit)) list
+  ((constructor_description * locks) * (unit -> unit)) list
 
 val lookup_label:
   ?use:bool -> record_form:'rcd record_form -> loc:Location.t -> label_usage -> Longident.t -> t ->
@@ -355,6 +364,8 @@ type settable_variable =
   | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
   | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind.Sort.t
 
+(** For a mutable variable, [use] means mark as mutated. For an instance
+    variable, it means mark as used. *)
 val lookup_settable_variable:
   ?use:bool -> loc:Location.t -> string -> t -> settable_variable
 
@@ -635,6 +646,8 @@ val in_signature: bool -> t -> t
 val is_in_signature: t -> bool
 
 val set_value_used_callback:
+    Subst.Lazy.value_description -> (unit -> unit) -> unit
+val set_value_mutated_callback:
     Subst.Lazy.value_description -> (unit -> unit) -> unit
 val set_type_used_callback:
     type_declaration -> ((unit -> unit) -> unit) -> unit

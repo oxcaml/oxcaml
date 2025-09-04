@@ -104,7 +104,10 @@ type t =
     fun_num_stack_slots : int Stack_class.Tbl.t;
         (** Precomputed at register allocation time *)
     fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
-    next_instruction_id : InstructionId.sequence (* Next instruction id. *)
+    next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
+    fun_ret_type : Cmm.machtype
+        (** Function return type. As in [fun_args], this value is not used when starting
+            from Linear. *)
   }
 
 val create :
@@ -116,6 +119,7 @@ val create :
   fun_num_stack_slots:int Stack_class.Tbl.t ->
   fun_poll:Lambda.poll_attribute ->
   next_instruction_id:InstructionId.sequence ->
+  fun_ret_type:Cmm.machtype ->
   t
 
 val fun_name : t -> string
@@ -233,6 +237,19 @@ val make_instruction :
   ?available_across:Reg_availability_set.t option ->
   unit ->
   'a instruction
+
+(** Make sure that the default parameter values of [irc_work_list] and [ls_order] are
+    reasonable before using. *)
+val make_instruction_from_copy :
+  'a instruction ->
+  desc:'b ->
+  id:InstructionId.t ->
+  ?arg:Reg.t array ->
+  ?res:Reg.t array ->
+  ?irc_work_list:irc_work_list ->
+  ?ls_order:int ->
+  unit ->
+  'b instruction
 
 val make_empty_block : ?label:Label.t -> terminator instruction -> basic_block
 

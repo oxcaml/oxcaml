@@ -1354,6 +1354,20 @@ let datalog_rules =
        constructor_rel call_witness code_id_of_witness codeid;
        cannot_change_calling_convention codeid ]
      ==> cannot_unbox0 allocation_id);
+    (* Cannot unbox parameters of [Indirect_unknown_arity] calls, even if they
+       do not escape. *)
+    (let$ [usage; allocation_id; relation; _v] =
+       ["usage"; "allocation_id"; "relation"; "_v"]
+     in
+     [ sources_rel usage allocation_id;
+       coaccessor_rel usage relation _v;
+       filter
+         (fun [f] ->
+           match CoField.decode f with
+           | Param (Indirect_code_pointer, _) -> true
+           | Param (Direct_code_pointer, _) -> false)
+         [relation] ]
+     ==> cannot_unbox0 allocation_id);
     (let$ [alias; allocation_id; relation; to_] =
        ["alias"; "allocation_id"; "relation"; "to_"]
      in
@@ -1603,7 +1617,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
           in
           let fields =
             mk_unboxed_fields ~has_to_be_unboxed
-              ~mk:(fun _kind name -> Variable.create name)
+              ~mk:(fun kind name -> Variable.create name kind)
               db
               (get_all_usages db (Code_id_or_name.Map.singleton to_patch ()))
               new_name

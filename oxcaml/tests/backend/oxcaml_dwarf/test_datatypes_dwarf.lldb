@@ -1,0 +1,90 @@
+(lldb) b Test_datatypes_dwarf.f_start
+(lldb) run
+(lldb) b Test_datatypes_dwarf.f_simple_variant
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_complex_variant
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_basic_record
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_mixed_record
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_variant_float
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_variant_int
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_variant_value_int
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_variant_value_string
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_variant_value_bool
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_record_simple
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_record_complex
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_poly_variant
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_open_poly_variant
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_nested_variant
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_mixed_combo
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_option_variant
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_either
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_poly_float64
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_poly_bits32
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_exception_specific
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_exception_poly
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_exception_with_record
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_exception_with_unboxed
+(lldb) c
+(lldb) quit

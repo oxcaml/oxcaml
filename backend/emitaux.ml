@@ -525,7 +525,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
       let s = fs + n in
       loop i.next s (max s max_fs) nontail_flag
     | Lcall_op (Lcall_ind | Lcall_imm _) -> loop i.next fs max_fs true
-    | Lprologue
+    | Lprologue | Lepilogue_open | Lepilogue_close
     | Lop
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
         | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _

@@ -194,6 +194,7 @@ let classify_expression : Typedtree.expression -> sd =
 
     | Texp_variant _
     | Texp_tuple _
+    | Texp_atomic_loc _
     | Texp_extension_constructor _
     | Texp_constant _
     | Texp_src_pos ->
@@ -234,7 +235,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_apply _ ->
         Dynamic
 
-    | Texp_array _ ->
+    | Texp_array _
+    | Texp_idx _ ->
         Static
     | Texp_pack mexp ->
         classify_module_expression env mexp
@@ -289,7 +291,7 @@ let classify_expression : Typedtree.expression -> sd =
     let old_env = env in
     let add_value_binding env vb =
       match vb.vb_pat.pat_desc with
-      | Tpat_var (id, _loc, _uid, _mode) ->
+      | Tpat_var (id, _loc, _uid, _sort, _mode) ->
           let size = classify_expression old_env vb.vb_expr in
           Ident.add id size env
       | _ ->
@@ -622,7 +624,7 @@ let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
   | Lambda.Paddrarray | Lambda.Pintarray ->
     (* non-generic, non-float arrays act as constructors *)
     Guard
-  | Lambda.Punboxedfloatarray _ | Lambda.Punboxedintarray _
+  | Lambda.Punboxedfloatarray _ | Lambda.Punboxedoruntaggedintarray _
   | Lambda.Punboxedvectorarray _
   | Lambda.Pgcscannableproductarray _ | Lambda.Pgcignorableproductarray _ ->
     Dereference
@@ -734,9 +736,29 @@ let rec expression : Typedtree.expression -> term_judg =
       list expression (List.map snd exprs) << Guard
     | Texp_unboxed_tuple exprs ->
       list expression (List.map (fun (_, e, _) -> e) exprs) << Return
+    | Texp_atomic_loc (expr, _, _, _, _) ->
+      expression expr << Guard
     | Texp_array (_, elt_sort, exprs, _) ->
       let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
       list expression exprs << array_mode exp elt_sort
+    | Texp_idx (ba, _uas) ->
+      let block_access = function
+        | Baccess_field _ -> empty
+        | Baccess_array
+            { mut = _
+            ; index_kind = _
+            ; index
+            ; base_ty = _
+            ; elt_ty = _
+            ; elt_sort = _ } ->
+          expression index << Dereference
+        | Baccess_block (_, idx) ->
+          expression idx << Dereference
+      in
+      (* All unboxed accesses are nonrecursive, but we include the below match
+         in case we add new unboxed access types *)
+      let _unboxed_access = function Uaccess_unboxed_field _ -> empty in
+      block_access ba
     | Texp_list_comprehension { comp_body; comp_clauses } ->
       join ((expression comp_body << Guard) ::
             comprehension_clauses comp_clauses)
@@ -760,8 +782,9 @@ let rec expression : Typedtree.expression -> term_judg =
             | Constructor_mixed mixed_shape ->
                 (match mixed_shape.(i) with
                  | Value | Float_boxed -> Guard
-                 | Float64 | Float32 | Bits32 | Bits64
-                 | Vec128 | Vec256 | Vec512 | Word | Product _ ->
+                 | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+                 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+                 | Void | Product _ ->
                    Dereference))
       in
       let arg i e = expression e << arg_mode i in
@@ -787,8 +810,9 @@ let rec expression : Typedtree.expression -> term_judg =
           | Record_mixed mixed_shape ->
             (match mixed_shape.(i) with
              | Value | Float_boxed -> Guard
-             | Float64 | Float32 | Bits32 | Bits64
-             | Vec128 | Vec256 | Vec512 | Word | Product _ ->
+             | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+             | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+             | Void | Product _ ->
                Dereference)
         in
         let field (label, field_def) =
@@ -1484,8 +1508,8 @@ and pattern : type k . k general_pattern -> Env.t -> mode = fun pat env ->
 and is_destructuring_pattern : type k . k general_pattern -> bool =
   fun pat -> match pat.pat_desc with
     | Tpat_any -> false
-    | Tpat_var (_, _, _, _) -> false
-    | Tpat_alias (pat, _, _, _, _, _) -> is_destructuring_pattern pat
+    | Tpat_var (_, _, _, _, _) -> false
+    | Tpat_alias (pat, _, _, _, _, _, _) -> is_destructuring_pattern pat
     | Tpat_constant _ -> true
     | Tpat_tuple _ -> true
     | Tpat_unboxed_tuple _ -> true

@@ -9,7 +9,7 @@
   (language c)
   (names float32_stubs)
   (flags
-   ((:include %{project_root}/oc_cflags.sexp)
+   ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
     (:include %{project_root}/sharedlib_cflags.sexp)
     (:include %{project_root}/oc_cppflags.sexp))))
  (ocamlopt_flags

@@ -78,8 +78,6 @@ module Array_kind : sig
 
   val must_be_gc_scannable : t -> bool
 
-  val has_custom_ops : t -> bool
-
   val width_in_scalars : t -> int
 end
 
@@ -147,9 +145,9 @@ module Duplicate_block_kind : sig
   type t =
     | Values of
         { tag : Tag.Scannable.t;
-          length : Targetint_31_63.t
+          length : Target_ocaml_int.t
         }
-    | Naked_floats of { length : Targetint_31_63.t }
+    | Naked_floats of { length : Target_ocaml_int.t }
     | Mixed
         (** We could store tag/length (or other relevant fields) on [Mixed],
             but we don't because the fields of [t] are currently only used for
@@ -165,14 +163,14 @@ module Duplicate_array_kind : sig
   type t =
     | Immediates
     | Values
-    | Naked_floats of { length : Targetint_31_63.t option }
-    | Naked_float32s of { length : Targetint_31_63.t option }
-    | Naked_int32s of { length : Targetint_31_63.t option }
-    | Naked_int64s of { length : Targetint_31_63.t option }
-    | Naked_nativeints of { length : Targetint_31_63.t option }
-    | Naked_vec128s of { length : Targetint_31_63.t option }
-    | Naked_vec256s of { length : Targetint_31_63.t option }
-    | Naked_vec512s of { length : Targetint_31_63.t option }
+    | Naked_floats of { length : Target_ocaml_int.t option }
+    | Naked_float32s of { length : Target_ocaml_int.t option }
+    | Naked_int32s of { length : Target_ocaml_int.t option }
+    | Naked_int64s of { length : Target_ocaml_int.t option }
+    | Naked_nativeints of { length : Target_ocaml_int.t option }
+    | Naked_vec128s of { length : Target_ocaml_int.t option }
+    | Naked_vec256s of { length : Target_ocaml_int.t option }
+    | Naked_vec512s of { length : Target_ocaml_int.t option }
 
   val print : Format.formatter -> t -> unit
 
@@ -204,13 +202,13 @@ module Block_access_kind : sig
   type t =
     | Values of
         { tag : Tag.Scannable.t Or_unknown.t;
-          size : Targetint_31_63.t Or_unknown.t;
+          size : Target_ocaml_int.t Or_unknown.t;
           field_kind : Block_access_field_kind.t
         }
-    | Naked_floats of { size : Targetint_31_63.t Or_unknown.t }
+    | Naked_floats of { size : Target_ocaml_int.t Or_unknown.t }
     | Mixed of
         { tag : Tag.Scannable.t Or_unknown.t;
-          size : Targetint_31_63.t Or_unknown.t;
+          size : Target_ocaml_int.t Or_unknown.t;
           field_kind : Mixed_block_access_field_kind.t;
           shape : Flambda_kind.Mixed_block_shape.t
         }
@@ -295,6 +293,8 @@ type string_accessor_width =
   | Single
   | Sixty_four
   | One_twenty_eight of { aligned : bool }
+  | Two_fifty_six of { aligned : bool }
+  | Five_twelve of { aligned : bool }
 
 val kind_of_string_accessor_width : string_accessor_width -> Flambda_kind.t
 
@@ -353,6 +353,8 @@ type nullary_primitive =
     the immediate after untagging) and exchanges the two halves of the 16-bit
     quantity. The higher-order bits are zeroed. *)
 type unary_int_arith_op = Swap_byte_endianness
+(* CR mshinwell/jvanburen: we should consider splitting this swapping primitive
+   into two, based on the semantics *)
 
 (** Naked float unary arithmetic operations. *)
 type unary_float_arith_op =
@@ -373,7 +375,7 @@ type unary_primitive =
   | Block_load of
       { kind : Block_access_kind.t;
         mut : Mutability.t;
-        field : Targetint_31_63.t
+        field : Target_ocaml_int.t
       }
   | Duplicate_block of { kind : Duplicate_block_kind.t }
       (** [Duplicate_block] may not be used to change the tag or the mutability
@@ -458,9 +460,6 @@ type unary_primitive =
           ocamlopt-generated code. Tag reads that are allowed to be lazy tags
           (by the type system) should always go through caml_obj_tag, which is
           opaque to the compiler. *)
-  | Atomic_load of Block_access_field_kind.t
-  (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
-     deleting [Atomic_load] *)
   | Peek of Flambda_kind.Standard_int_or_float.t
   | Make_lazy of Lazy_block_tag.t
 
@@ -495,21 +494,12 @@ type binary_float_arith_op =
   | Mul
   | Div
 
-(** Binary atomic arithmetic operations on integers. *)
-type binary_int_atomic_op =
-  | Fetch_add
-  | Add
-  | Sub
-  | And
-  | Or
-  | Xor
-
 (** Primitives taking exactly two arguments. *)
 type binary_primitive =
   | Block_set of
       { kind : Block_access_kind.t;
         init : Init_or_assign.t;
-        field : Targetint_31_63.t
+        field : Target_ocaml_int.t
       }
   | Array_load of Array_kind.t * Array_load_kind.t * Mutability.t
       (** Unarized or SIMD array load.
@@ -528,10 +518,20 @@ type binary_primitive =
   | Float_arith of float_bitwidth * binary_float_arith_op
   | Float_comp of float_bitwidth * unit comparison_behaviour
   | Bigarray_get_alignment of int
-  | Atomic_set of Block_access_field_kind.t
-  | Atomic_exchange of Block_access_field_kind.t
-  | Atomic_int_arith of binary_int_atomic_op
+  | Atomic_load_field of Block_access_field_kind.t
+  (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
+     deleting [Atomic_load_field] *)
   | Poke of Flambda_kind.Standard_int_or_float.t
+  | Read_offset of Flambda_kind.With_subkind.t * Asttypes.mutable_flag
+
+(** Atomic arithmetic operations on integers. *)
+type int_atomic_op =
+  | Fetch_add
+  | Add
+  | Sub
+  | And
+  | Or
+  | Xor
 
 (** Primitives taking exactly three arguments. *)
 type ternary_primitive =
@@ -540,8 +540,15 @@ type ternary_primitive =
           for more details on the unarization. *)
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
   | Bigarray_set of num_dimensions * Bigarray_kind.t * Bigarray_layout.t
-  | Atomic_compare_and_set of Block_access_field_kind.t
-  | Atomic_compare_exchange of
+  | Atomic_field_int_arith of int_atomic_op
+  | Atomic_set_field of Block_access_field_kind.t
+  | Atomic_exchange_field of Block_access_field_kind.t
+  | Write_offset of Flambda_kind.With_subkind.t * Alloc_mode.For_assignments.t
+
+(** Primitives taking exactly four arguments. *)
+type quaternary_primitive =
+  | Atomic_compare_and_set_field of Block_access_field_kind.t
+  | Atomic_compare_exchange_field of
       { atomic_kind : Block_access_field_kind.t;
             (** The kind of values which the atomic can hold. *)
         args_kind : Block_access_field_kind.t
@@ -571,6 +578,8 @@ type t =
   | Unary of unary_primitive * Simple.t
   | Binary of binary_primitive * Simple.t * Simple.t
   | Ternary of ternary_primitive * Simple.t * Simple.t * Simple.t
+  | Quaternary of
+      quaternary_primitive * Simple.t * Simple.t * Simple.t * Simple.t
   | Variadic of variadic_primitive * Simple.t list
 
 type primitive_application = t
@@ -591,6 +600,7 @@ module Without_args : sig
     | Unary of unary_primitive
     | Binary of binary_primitive
     | Ternary of ternary_primitive
+    | Quaternary of quaternary_primitive
     | Variadic of variadic_primitive
 
   val print : Format.formatter -> t -> unit
@@ -609,6 +619,10 @@ val args_kind_of_binary_primitive :
 
 val args_kind_of_ternary_primitive :
   ternary_primitive -> Flambda_kind.t * Flambda_kind.t * Flambda_kind.t
+
+val args_kind_of_quaternary_primitive :
+  quaternary_primitive ->
+  Flambda_kind.t * Flambda_kind.t * Flambda_kind.t * Flambda_kind.t
 
 type arg_kinds =
   | Variadic_mixed of Flambda_kind.Mixed_block_shape.t
@@ -633,6 +647,8 @@ val result_kind_of_binary_primitive : binary_primitive -> result_kind
 
 val result_kind_of_ternary_primitive : ternary_primitive -> result_kind
 
+val result_kind_of_quaternary_primitive : quaternary_primitive -> result_kind
+
 val result_kind_of_variadic_primitive : variadic_primitive -> result_kind
 
 (** Describe the kind of the result of the given primitive. *)
@@ -646,6 +662,9 @@ val result_kind_of_unary_primitive' : unary_primitive -> Flambda_kind.t
 val result_kind_of_binary_primitive' : binary_primitive -> Flambda_kind.t
 
 val result_kind_of_ternary_primitive' : ternary_primitive -> Flambda_kind.t
+
+val result_kind_of_quaternary_primitive' :
+  quaternary_primitive -> Flambda_kind.t
 
 val result_kind_of_variadic_primitive' : variadic_primitive -> Flambda_kind.t
 
@@ -703,6 +722,9 @@ val equal_unary_primitive : unary_primitive -> unary_primitive -> bool
 val equal_binary_primitive : binary_primitive -> binary_primitive -> bool
 
 val equal_ternary_primitive : ternary_primitive -> ternary_primitive -> bool
+
+val equal_quaternary_primitive :
+  quaternary_primitive -> quaternary_primitive -> bool
 
 val equal_variadic_primitive : variadic_primitive -> variadic_primitive -> bool
 

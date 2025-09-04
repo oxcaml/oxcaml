@@ -6,3 +6,5 @@ jsmaindriver.ml
 jsmaindriver.mli
 jslibrarian.ml
 jslibrarian.mli
+oxcaml_args.ml
+oxcaml_args.mli

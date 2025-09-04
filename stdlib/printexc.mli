@@ -116,7 +116,7 @@ val use_printers: exn -> string option
 
 (** {1 Raw backtraces} *)
 
-type raw_backtrace : mutable_data
+type raw_backtrace : immutable_data
 (** The type [raw_backtrace] stores a backtrace in a low-level format,
     which can be converted to usable form using [raw_backtrace_entries]
     and [backtrace_slots_of_raw_entry] below.

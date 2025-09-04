@@ -102,8 +102,7 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
   in
   let raw_lambda =
     (structure, coercion, argument_coercion)
-    |> Profile.(record transl)
-         (Translmod.transl_implementation i.module_name ~style:Plain_block)
+    |> Profile.(record transl) (Translmod.transl_implementation i.module_name)
   in
   let jsir, main_module_block_format, arg_descr =
     raw_lambda_to_jsir i raw_lambda ~as_arg_for
@@ -164,7 +163,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
     Compilenv.reset info.target;
     let impl =
       Translmod.transl_instance info.module_name ~runtime_args
-        ~main_module_block_size ~arg_block_idx ~style:Plain_block
+        ~main_module_block_size ~arg_block_idx
     in
     let jsir, main_module_block_format, arg_descr_computed =
       raw_lambda_to_jsir info impl ~as_arg_for

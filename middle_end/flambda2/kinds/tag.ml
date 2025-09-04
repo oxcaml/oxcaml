@@ -41,16 +41,16 @@ let create_exn tag =
   else tag
 
 let create_from_targetint ti =
-  let min_tag = Targetint_31_63.of_int min_tag in
-  let max_tag = Targetint_31_63.of_int max_tag in
-  if Targetint_31_63.compare ti min_tag >= 0
-     && Targetint_31_63.compare ti max_tag <= 0
-  then Some (Targetint_31_63.to_int ti)
+  let min_tag = Target_ocaml_int.of_int min_tag in
+  let max_tag = Target_ocaml_int.of_int max_tag in
+  if Target_ocaml_int.compare ti min_tag >= 0
+     && Target_ocaml_int.compare ti max_tag <= 0
+  then Some (Target_ocaml_int.to_int ti)
   else None
 
 let to_int t = t
 
-let to_targetint_31_63 t = Targetint_31_63.of_int (to_int t)
+let to_targetint_31_63 t = Target_ocaml_int.of_int (to_int t)
 
 let zero = 0
 

@@ -226,7 +226,8 @@ end = struct
       let desc = basic_instruction.desc in
       match desc with
       | Op op -> Some op
-      | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
+      | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+      | Stack_check _ ->
         None)
     | Terminator _ -> None
 

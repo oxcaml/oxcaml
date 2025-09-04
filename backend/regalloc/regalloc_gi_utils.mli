@@ -82,10 +82,6 @@ module Range : sig
   val print : Format.formatter -> t -> unit
 
   val overlap : t list -> t list -> bool
-
-  val is_live : t list -> pos:int -> bool
-
-  val remove_expired : t list -> pos:int -> t list
 end
 
 module Interval : sig
@@ -126,10 +122,14 @@ module Hardware_register : sig
   type t =
     { location : location;
       interval : Interval.t;
-      mutable assigned : assigned list
+      assigned : assigned Reg.Tbl.t
     }
 
   val add_non_evictable : t -> Reg.t -> Interval.t -> unit
+
+  val add_evictable : t -> Reg.t -> Interval.t -> unit
+
+  val remove_evictable : t -> Reg.t -> unit
 end
 
 type available =
@@ -147,5 +147,6 @@ module Hardware_registers : sig
 
   val of_reg : t -> Reg.t -> Hardware_register.t option
 
-  val find_available : t -> SpillCosts.t -> Reg.t -> Interval.t -> available
+  val find_available :
+    t -> SpillCosts.t Lazy.t -> Reg.t -> Interval.t -> available
 end

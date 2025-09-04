@@ -457,26 +457,25 @@ and print_out_type_mode ~arg mode ppf ty =
 
 and print_out_type_1 ppf =
   function
-  | Otyp_arrow (lab, am, ty1, rm, ty2) ->
+  | Otyp_arrow (lab, am, ty1, ty2) ->
       pp_open_box ppf 0;
       print_arg_label_and_out_type ppf lab ty1 ~print_type:(print_out_arg am);
       pp_print_string ppf " ->";
       pp_print_space ppf ();
-      print_out_ret rm ppf ty2;
+      print_out_ret ppf ty2;
       pp_close_box ppf ()
   | ty -> print_out_type_2 ppf ty
 
 and print_out_arg am ppf ty =
   print_out_type_mode ~arg:true am ppf ty
 
-and print_out_ret rm ppf =
+and print_out_ret ppf =
   function
-  | Otyp_arrow _ as ty ->
+  | Otyp_ret (rm, (Otyp_arrow _ as ty)) ->
     begin match rm with
-    | Orm_not_arrow _ -> assert false
     | Orm_no_parens ->
       print_out_type_1 ppf ty
-    | Orm_parens rm ->
+    | Orm_any rm | Orm_parens rm ->
       let m_legacy, m_new = partition_modes rm in
       print_out_modes_legacy ppf m_legacy;
       pp_print_char ppf '(';
@@ -484,10 +483,8 @@ and print_out_ret rm ppf =
       pp_print_char ppf ')';
       print_out_modes_new ppf m_new
     end
-  | ty ->
-    match rm with
-    | Orm_not_arrow rm -> print_out_type_mode ~arg:false rm ppf ty
-    | _ -> assert false
+  | Otyp_ret (Orm_any rm, ty) -> print_out_type_mode ~arg:false rm ppf ty
+  | _ -> assert false
 
 and print_out_type_2 ppf =
   function
@@ -565,6 +562,7 @@ and print_out_type_3 ppf =
       print_out_jkind jk
   | Otyp_of_kind jk ->
     fprintf ppf "(type@ :@ %a)" print_out_jkind jk
+  | Otyp_ret _ -> assert false
 and print_out_type ppf typ =
   print_out_type_0 ppf typ
 and print_simple_out_type ppf typ =
@@ -605,19 +603,24 @@ and print_typargs ppf =
       pp_print_space ppf ()
 and print_out_label ppf (name, mut, arg, gbl) =
   (* See the notes [NON-LEGACY MODES] *)
-  let mut =
+  let mut, atomic =
     match mut with
-    | Om_immutable -> ""
-    | Om_mutable None -> "mutable "
-    | Om_mutable (Some s) -> "mutable(" ^ s ^ ") "
+    | Om_immutable -> "", Nonatomic
+    | Om_mutable (None, atomic) -> "mutable ", atomic
+    | Om_mutable (Some s, atomic) -> "mutable(" ^ s ^ ") ", atomic
+  in
+  let print_atomic ppf atomic = match atomic with
+    | Nonatomic -> ()
+    | Atomic -> fprintf ppf " [@@atomic]"
   in
   let m_legacy, m_new = partition_modalities gbl in
-  fprintf ppf "@[<2>%s%a%a :@ %a%a@];"
+  fprintf ppf "@[<2>%s%a%a :@ %a%a%a@];"
     mut
     print_out_modalities_legacy m_legacy
     print_lident name
     print_out_type arg
     print_out_modalities_new m_new
+    print_atomic atomic
 
 and print_out_jkind_const ppf ojkind =
   let rec pp_element ~nested ppf (ojkind : Outcometree.out_jkind_const) =

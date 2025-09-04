@@ -184,8 +184,7 @@ let oper_result_type = function
     typ_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
-  | Clsr | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpa _
-  | Ccmpf _ ->
+  | Clsr | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
     typ_int
   | Caddv -> typ_val
   | Cadda -> typ_addr
@@ -206,7 +205,9 @@ let oper_result_type = function
   | Cpackf32 -> typ_float
   | Ccsel ty -> ty
   | Creinterpret_cast Value_of_int -> typ_val
-  | Creinterpret_cast V128_of_v128 -> typ_vec128
+  | Creinterpret_cast (V128_of_vec _) -> typ_vec128
+  | Creinterpret_cast (V256_of_vec _) -> typ_vec256
+  | Creinterpret_cast (V512_of_vec _) -> typ_vec512
   | Creinterpret_cast (Float_of_int64 | Float_of_float32) -> typ_float
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
   | Creinterpret_cast (Int_of_value | Int64_of_float | Int32_of_float32) ->
@@ -218,6 +219,16 @@ let oper_result_type = function
   | Cstatic_cast (Scalar_of_v128 Float64x2) -> typ_float
   | Cstatic_cast (Scalar_of_v128 Float32x4) -> typ_float32
   | Cstatic_cast (Scalar_of_v128 (Int8x16 | Int16x8 | Int32x4 | Int64x2)) ->
+    typ_int
+  | Cstatic_cast (V256_of_scalar _) -> typ_vec256
+  | Cstatic_cast (Scalar_of_v256 Float64x4) -> typ_float
+  | Cstatic_cast (Scalar_of_v256 Float32x8) -> typ_float32
+  | Cstatic_cast (Scalar_of_v256 (Int8x32 | Int16x16 | Int32x8 | Int64x4)) ->
+    typ_int
+  | Cstatic_cast (V512_of_scalar _) -> typ_vec512
+  | Cstatic_cast (Scalar_of_v512 Float64x8) -> typ_float
+  | Cstatic_cast (Scalar_of_v512 Float32x16) -> typ_float32
+  | Cstatic_cast (Scalar_of_v512 (Int8x64 | Int16x32 | Int32x16 | Int64x8)) ->
     typ_int
   | Craise _ -> typ_void
   | Cprobe _ -> typ_void
@@ -293,12 +304,6 @@ let size_expr env exp =
     | _ -> Misc.fatal_error "Selection.size_expr"
   in
   size V.Map.empty exp
-
-(* Swap the two arguments of an integer comparison *)
-
-let swap_intcomp = function
-  | Operation.Isigned cmp -> Operation.Isigned (swap_integer_comparison cmp)
-  | Operation.Iunsigned cmp -> Operation.Iunsigned (swap_integer_comparison cmp)
 
 (* Name of function being compiled *)
 let current_function_name = ref ""
@@ -416,20 +421,24 @@ let float_test_of_float_comparison :
 
 let int_test_of_integer_comparison :
     Cmm.integer_comparison ->
-    signed:bool ->
     immediate:int option ->
     label_false:Label.t ->
     label_true:Label.t ->
     Cfg.int_test =
- fun comparison ~signed:is_signed ~immediate:imm ~label_false ~label_true ->
-  let lt, eq, gt =
+ fun comparison ~immediate:imm ~label_false ~label_true ->
+  let lt, eq, gt, is_signed =
+    let module S = Scalar.Signedness in
     match comparison with
-    | Ceq -> label_false, label_true, label_false
-    | Cne -> label_true, label_false, label_true
-    | Clt -> label_true, label_false, label_false
-    | Cgt -> label_false, label_false, label_true
-    | Cle -> label_true, label_true, label_false
-    | Cge -> label_false, label_true, label_true
+    | Ceq -> label_false, label_true, label_false, S.Signed
+    | Cne -> label_true, label_false, label_true, S.Signed
+    | Clt -> label_true, label_false, label_false, S.Signed
+    | Cgt -> label_false, label_false, label_true, S.Signed
+    | Cle -> label_true, label_true, label_false, S.Signed
+    | Cge -> label_false, label_true, label_true, S.Signed
+    | Cult -> label_true, label_false, label_false, S.Unsigned
+    | Cugt -> label_false, label_false, label_true, S.Unsigned
+    | Cule -> label_true, label_true, label_false, S.Unsigned
+    | Cuge -> label_false, label_true, label_true, S.Unsigned
   in
   { lt; eq; gt; is_signed; imm }
 
@@ -440,12 +449,7 @@ let terminator_of_test :
     Cfg.terminator =
  fun test ~label_false ~label_true ->
   let int_test comparison immediate =
-    let signed, comparison =
-      match comparison with
-      | Operation.Isigned comparison -> true, comparison
-      | Operation.Iunsigned comparison -> false, comparison
-    in
-    int_test_of_integer_comparison comparison ~signed ~immediate ~label_false
+    int_test_of_integer_comparison comparison ~immediate ~label_false
       ~label_true
   in
   match test with
@@ -533,7 +537,7 @@ module Stack_offset_and_exn = struct
         | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
         | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
         | Dls_get | Poll | Pause | Alloc _ )
-    | Reloadretaddr | Prologue ->
+    | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
       Misc.fatal_error

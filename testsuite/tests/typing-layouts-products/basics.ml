@@ -1163,8 +1163,8 @@ external ext_tuple_arg_with_attr_t : (#(int * bool) [@untagged]) -> int = "foo"
 Line 1, characters 38-51:
 1 | external ext_tuple_arg_with_attr_t : (#(int * bool) [@untagged]) -> int = "foo"
                                           ^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int"
-       and other immediate types can be untagged.
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 external ext_product_arg : t_product -> int = "foo" "bar"
@@ -1200,8 +1200,8 @@ external ext_product_arg_with_attr_t : (t_product [@untagged]) -> int = "foo"
 Line 1, characters 40-49:
 1 | external ext_product_arg_with_attr_t : (t_product [@untagged]) -> int = "foo"
                                             ^^^^^^^^^
-Error: Don't know how to untag this type. Only "int"
-       and other immediate types can be untagged.
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 external ext_tuple_return : int -> #(int * bool) = "foo" "bar"
@@ -1244,8 +1244,8 @@ external ext_tuple_return_with_attr_t :
 Line 2, characters 10-23:
 2 |   int -> (#(int * bool) [@untagged]) = "foo"
               ^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int"
-       and other immediate types can be untagged.
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 
@@ -1278,8 +1278,8 @@ external ext_product_return_with_attr_t : int -> (t_product [@untagged]) = "foo"
 Line 1, characters 50-59:
 1 | external ext_product_return_with_attr_t : int -> (t_product [@untagged]) = "foo"
                                                       ^^^^^^^^^
-Error: Don't know how to untag this type. Only "int"
-       and other immediate types can be untagged.
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity"
@@ -1342,8 +1342,8 @@ external ext_record_arg_with_attr_t :
 Line 2, characters 3-29:
 2 |   (ext_record_arg_attr_record [@untagged]) -> int = "foo"
        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int"
-       and other immediate types can be untagged.
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 type t = #{ i : int; b : bool }
@@ -1392,8 +1392,8 @@ external ext_record_return_with_attr_t : int -> (t [@untagged]) = "foo"
 Line 1, characters 49-50:
 1 | external ext_record_return_with_attr_t : int -> (t [@untagged]) = "foo"
                                                      ^
-Error: Don't know how to untag this type. Only "int"
-       and other immediate types can be untagged.
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity"
@@ -1624,33 +1624,33 @@ Error: The primitive [caml_make_vect] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external[@layout_poly] make : ('a : any_non_null) . int -> 'a -> 'a array =
+external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =
   "caml_make_vect"
 
 let _ = make 3 #(1,2)
 [%%expect{|
 Lines 1-2, characters 0-18:
-1 | external[@layout_poly] make : ('a : any_non_null) . int -> 'a -> 'a array =
+1 | external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =
 2 |   "caml_make_vect"
 Error: Attribute "[@layout_poly]" can only be used on built-in primitives.
 |}]
 
 (* CR layouts v7.1: The two errors below should be improved when we move product
    arrays to beta. *)
-external[@layout_poly] array_get : ('a : any_non_null) . 'a array -> int -> 'a =
+external[@layout_poly] array_get : ('a : any mod separable) . 'a array -> int -> 'a =
   "%array_safe_get"
 let f x : #(int * int) = array_get x 3
 [%%expect{|
-external array_get : ('a : any_non_null). 'a array -> int -> 'a
+external array_get : ('a : any mod separable). 'a array -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 val f : #(int * int) array -> #(int * int) = <fun>
 |}]
 
-external[@layout_poly] array_set : ('a : any_non_null) . 'a array -> int -> 'a -> unit =
+external[@layout_poly] array_set : ('a : any mod separable) . 'a array -> int -> 'a -> unit =
   "%array_safe_set"
 let f x = array_set x 3 #(1,2)
 [%%expect{|
-external array_set : ('a : any_non_null). 'a array -> int -> 'a -> unit
+external array_set : ('a : any mod separable). 'a array -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
 val f : #(int * int) array -> unit = <fun>
 |}]
@@ -2044,31 +2044,37 @@ Error: This type "s_record" should be an instance of type
 (********************************************)
 (* Test 18: Subkinding with sorts and [any] *)
 
-(* CR layouts: Change to use [any] instead of [any_non_null] when doing so
+(* CR layouts: Change to use [any] instead of [any mod separable] when doing so
    won't cause trouble with the [alpha] check. *)
 
 (* test intersection *)
-let rec f : ('a : any_non_null & value). unit -> 'a -> 'a = fun () -> f ()
+let rec f : ('a : any mod separable & value). unit -> 'a -> 'a = fun () -> f ()
 
 let g (x : 'a) = f () x
 
 [%%expect{|
-val f : ('a : any_non_null & value). unit -> 'a -> 'a = <fun>
-val g : ('a : value & value). 'a -> 'a = <fun>
+val f :
+  ('a : any mod separable & value_or_null mod separable). unit -> 'a -> 'a =
+  <fun>
+val g :
+  ('a : value_or_null mod separable & value_or_null mod separable). 'a -> 'a =
+  <fun>
 |}]
 
 (* test subjkinding *)
-let rec f : ('a : any_non_null & value). unit -> 'a -> 'a = fun () -> f ()
+let rec f : ('a : any mod separable & value). unit -> 'a -> 'a = fun () -> f ()
 
 let g (type a) (x : a) = f () x
 
 [%%expect{|
-val f : ('a : any_non_null & value). unit -> 'a -> 'a = <fun>
+val f :
+  ('a : any mod separable & value_or_null mod separable). unit -> 'a -> 'a =
+  <fun>
 Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^
 Error: This expression has type "a" but an expression was expected of type
-         "('a : '_representable_layout_21 & value)"
+         "('a : '_representable_layout_21 & value_or_null mod separable)"
        The layout of a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable

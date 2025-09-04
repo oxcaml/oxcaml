@@ -51,6 +51,14 @@ let () =
   ignore (Atomic.incr r, Atomic.decr r);
   assert (Atomic.get r = cur)
 
+(* Test operations on the contents field of the atomic *)
+
+let () = assert (Atomic.Loc.get [%atomic.loc r.contents] = 1)
+
+let () = assert ((Atomic.Loc.set [%atomic.loc r.contents] 5; Atomic.get r) = 5)
+
+let () = assert ((Atomic.Loc.incr [%atomic.loc r.contents]; Atomic.get r) = 6)
+
 (* Test primitives with non-immediate types *)
 
 let a = ref 1

@@ -19,11 +19,6 @@
 open Typedtree
 open Lambda
 
-type compilation_unit_style =
-  | Plain_block (* Flambda *)
-  | Set_global_to_block (* Bytecode *)
-  | Set_individual_fields (* Closure *)
-
 (* The triple here is the structure, the coercion from the raw structure to
    the main signature, and the coercion from the main signature to the argument
    signature (corresponding to the [structure], [coercion], and
@@ -33,17 +28,16 @@ type compilation_unit_style =
    can't, because [Opttoploop] calls it and doesn't have a full implementation.
    But [Opttoploop] _shouldn't_ be calling it, it should be calling
    [transl_store_phrases], because it's only storing phrases. But [Opttoploop]
-   _should not exist anymore_, since upstream refactored the toplevel code. *)
+   _should not exist anymore_, since upstream refactored the toplevel code.
+   mshinwell: PR4527 has now removed transl_store* *)
 val transl_implementation:
       Compilation_unit.t -> structure * module_coercion * module_coercion option
-        -> style:compilation_unit_style -> Lambda.program
-val transl_store_phrases: Compilation_unit.t -> structure -> int * lambda
+        -> Lambda.program
 
 val transl_toplevel_definition: structure -> lambda
 
 val transl_package:
-      Compilation_unit.t option list -> Compilation_unit.t -> module_coercion
-        -> style:compilation_unit_style -> int * lambda
+      Compilation_unit.t option list -> module_coercion -> int * lambda
 
 type runtime_arg =
   | (* A module from which we need to project out the argument block *)
@@ -60,10 +54,9 @@ type runtime_arg =
 val transl_instance:
       Compilation_unit.t -> runtime_args:runtime_arg list
         -> main_module_block_size:int -> arg_block_idx:int option
-        -> style:compilation_unit_style -> Lambda.program
+        -> Lambda.program
 
 val toplevel_name: Ident.t -> string
-val nat_toplevel_name: Ident.t -> Compilation_unit.t * int
 
 val primitive_declarations: Primitive.description list ref
 

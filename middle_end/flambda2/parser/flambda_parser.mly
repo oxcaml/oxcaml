@@ -433,7 +433,7 @@ unop:
     mut = mutability;
     kind = block_access_kind;
     LPAREN; field = tag; RPAREN;
-    { Block_load { kind; mut; field = Targetint_31_63.of_int field } }
+    { Block_load { kind; mut; field = Target_ocaml_int.of_int field } }
 
 infix_binop:
   | o = binary_int_arith_op { Int_arith o }
@@ -471,6 +471,10 @@ string_accessor_width:
       | 64, None -> Sixty_four
       | 128, Some 'a' -> One_twenty_eight {aligned = true}
       | 128, Some 'u' -> One_twenty_eight {aligned = false}
+      | 256, Some 'a' -> Two_fifty_six {aligned = true}
+      | 256, Some 'u' -> Two_fifty_six {aligned = false}
+      | 512, Some 'a' -> Five_twelve {aligned = true}
+      | 512, Some 'u' -> Five_twelve {aligned = false}
       | _, _ -> Misc.fatal_error "invalid string accessor width" }
 
 array_kind:
@@ -580,7 +584,9 @@ binop_app:
     LPAREN; field = tag; RPAREN;
     init = init_or_assign;
     v = simple
-    { Binary (Block_set { kind; init; field = Targetint_31_63.of_int field }, block, v) }
+    { Binary
+        (Block_set
+           { kind; init; field = Target_ocaml_int.of_int field }, block, v) }
   | op = prefix_binop; LPAREN; arg1 = simple; COMMA; arg2 = simple; RPAREN
     { Binary (op, arg1, arg2) }
   | arg1 = simple; op = infix_binop; arg2 = simple

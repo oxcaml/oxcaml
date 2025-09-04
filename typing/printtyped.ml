@@ -91,8 +91,10 @@ let fmt_mutable_flag f x =
 let fmt_mutable_mode_flag f (x : Types.mutability) =
   match x with
   | Immutable -> fprintf f "Immutable"
-  | Mutable m ->
-    fprintf f "Mutable(%a)" (Mode.Value.Comonadic.print ()) m
+  | Mutable { mode; atomic = Nonatomic } ->
+    fprintf f "Mutable(%a)" (Mode.Value.Comonadic.print ()) mode
+  | Mutable { mode; atomic = Atomic } ->
+    fprintf f "Atomic(%a)" (Mode.Value.Comonadic.print ()) mode
 
 let fmt_virtual_flag f x =
   match x with
@@ -128,6 +130,12 @@ let fmt_partiality f x =
   match x with
   | Total -> ()
   | Partial -> fprintf f " (Partial)"
+
+let fmt_index_kind f = function
+  | Index_int -> fprintf f "Index_int"
+  | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
+  | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
+  | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
 
 let line i f s (*...*) =
   fprintf f "%s" (String.make (2*i) ' ');
@@ -332,11 +340,13 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   end;
   match x.pat_desc with
   | Tpat_any -> line i ppf "Tpat_any\n";
-  | Tpat_var (s,_,_,m) ->
+  | Tpat_var (s,_,_,sort,m) ->
       line i ppf "Tpat_var \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" Jkind.Sort.format sort;
       value_mode i ppf m
-  | Tpat_alias (p, s,_,_,m,_) ->
+  | Tpat_alias (p, s,_,_,sort,m,_) ->
       line i ppf "Tpat_alias \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" Jkind.Sort.format sort;
       value_mode i ppf m;
       pattern i ppf p;
   | Tpat_constant (c) -> line i ppf "Tpat_constant %a\n" fmt_constant c;
@@ -581,6 +591,16 @@ and expression i ppf x =
       line i ppf "%a\n" Jkind.Sort.format sort;
       alloc_mode i ppf amode;
       list i expression ppf l;
+  | Texp_idx (ba, uas) ->
+      line i ppf "Texp_idx\n";
+      block_access i ppf ba;
+      List.iter (unboxed_access i ppf) uas;
+  | Texp_atomic_loc (e, sort, li, _, amode) ->
+      line i ppf "Texp_atomic_loc\n";
+      expression i ppf e;
+      line i ppf "%a\n" Jkind.Sort.format sort;
+      longident i ppf li;
+      alloc_mode i ppf amode
   | Texp_list_comprehension comp ->
       line i ppf "Texp_list_comprehension\n";
       comprehension i ppf comp
@@ -1174,6 +1194,24 @@ and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ -> _ =
   fun i ppf (li, _, p) ->
   line i ppf "%a\n" fmt_longident li;
   pattern (i+1) ppf p;
+
+and block_access i ppf = function
+  | Baccess_field (li, _) ->
+      line i ppf "Baccess_field %a\n" fmt_longident li
+  | Baccess_array
+        { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort } ->
+      line i ppf "Baccess_array %a %a %a\n"
+        fmt_mutable_flag mut fmt_index_kind index_kind
+        Jkind.Sort.format elt_sort;
+      expression i ppf index
+  | Baccess_block (mut, index) ->
+      line i ppf "Baccess_block %a\n"
+        fmt_mutable_flag mut;
+      expression i ppf index
+
+and unboxed_access i ppf = function
+  | Uaccess_unboxed_field (li, _) ->
+      line i ppf "Uaccess_unboxed_field %a\n" fmt_longident li
 
 and comprehension i ppf {comp_body; comp_clauses} =
   line i ppf "comprehension\n";

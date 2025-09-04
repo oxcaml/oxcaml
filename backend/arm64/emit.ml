@@ -519,32 +519,32 @@ end = struct
     | Zip2q_f32 | Zip1q_f64 | Zip2q_f64 | Addq_f32 | Subq_f32 | Mulq_f32
     | Divq_f32 | Minq_f32 | Maxq_f32 | Addq_f64 | Subq_f64 | Mulq_f64 | Divq_f64
     | Minq_f64 | Maxq_f64 | Recpeq_f32 | Sqrtq_f32 | Rsqrteq_f32 | Sqrtq_f64
-    | Rsqrteq_f64 | Cvtq_s32_f32 | Cvtq_f32_s32 | Cvt_f64_f32 | Cvt_f32_f64
-    | Paddq_f32 | Fmin_f32 | Fmax_f32 | Fmin_f64 | Fmax_f64 | Addq_s64
-    | Subq_s64 | Cmp_f32 _ | Cmpz_f32 _ | Cmpz_s32 _ | Cmp_f64 _ | Cmpz_f64 _
-    | Cmp_s32 _ | Cmp_s64 _ | Cmpz_s64 _ | Mvnq_s32 | Orrq_s32 | Andq_s32
-    | Eorq_s32 | Negq_s32 | Getq_lane_s32 _ | Getq_lane_s64 _ | Mulq_s32
-    | Mulq_s16 | Addq_s32 | Subq_s32 | Minq_s32 | Maxq_s32 | Minq_u32 | Maxq_u32
-    | Absq_s32 | Absq_s64 | Paddq_f64 | Paddq_s32 | Paddq_s64 | Mvnq_s64
-    | Orrq_s64 | Andq_s64 | Eorq_s64 | Negq_s64 | Shlq_u32 | Shlq_u64 | Shlq_s32
-    | Shlq_s64 | Shlq_n_u32 _ | Shlq_n_u64 _ | Shrq_n_u32 _ | Shrq_n_u64 _
-    | Shrq_n_s32 _ | Shrq_n_s64 _ | Setq_lane_s32 _ | Setq_lane_s64 _
-    | Dupq_lane_s32 _ | Dupq_lane_s64 _ | Cvtq_f64_s64 | Cvtq_s64_f64 | Movl_s32
-    | Movl_u32 | Addq_s16 | Paddq_s16 | Qaddq_s16 | Qaddq_u16 | Subq_s16
-    | Qsubq_s16 | Qsubq_u16 | Absq_s16 | Minq_s16 | Maxq_s16 | Minq_u16
-    | Maxq_u16 | Mvnq_s16 | Orrq_s16 | Andq_s16 | Eorq_s16 | Negq_s16 | Cntq_u16
-    | Shlq_u16 | Shlq_s16 | Cmp_s16 _ | Cmpz_s16 _ | Shlq_n_u16 _ | Shrq_n_u16 _
-    | Shrq_n_s16 _ | Getq_lane_s16 _ | Setq_lane_s16 _ | Dupq_lane_s16 _
-    | Movn_s64 | Copyq_laneq_s64 _ | Addq_s8 | Paddq_s8 | Qaddq_s8 | Qaddq_u8
-    | Subq_s8 | Qsubq_s8 | Qsubq_u8 | Absq_s8 | Minq_s8 | Maxq_s8 | Minq_u8
-    | Maxq_u8 | Mvnq_s8 | Orrq_s8 | Andq_s8 | Eorq_s8 | Negq_s8 | Cntq_u8
-    | Shlq_u8 | Shlq_s8 | Cmp_s8 _ | Cmpz_s8 _ | Shlq_n_u8 _ | Shrq_n_u8 _
-    | Shrq_n_s8 _ | Getq_lane_s8 _ | Setq_lane_s8 _ | Dupq_lane_s8 _ | Extq_u8 _
-    | Qmovn_high_s64 | Qmovn_s64 | Qmovn_high_s32 | Qmovn_s32 | Qmovn_high_u32
-    | Qmovn_u32 | Qmovn_high_s16 | Qmovn_s16 | Qmovn_high_u16 | Qmovn_u16
-    | Movn_high_s64 | Movn_high_s32 | Movn_s32 | Movn_high_s16 | Movn_s16
-    | Mullq_s16 | Mullq_u16 | Mullq_high_s16 | Mullq_high_u16 | Movl_s16
-    | Movl_u16 | Movl_s8 | Movl_u8 ->
+    | Rsqrteq_f64 | Cvtq_s32_f32 | Cvtnq_s32_f32 | Cvtq_f32_s32 | Cvt_f64_f32
+    | Cvt_f32_f64 | Paddq_f32 | Fmin_f32 | Fmax_f32 | Fmin_f64 | Fmax_f64
+    | Addq_s64 | Subq_s64 | Cmp_f32 _ | Cmpz_f32 _ | Cmpz_s32 _ | Cmp_f64 _
+    | Cmpz_f64 _ | Cmp_s32 _ | Cmp_s64 _ | Cmpz_s64 _ | Mvnq_s32 | Orrq_s32
+    | Andq_s32 | Eorq_s32 | Negq_s32 | Getq_lane_s32 _ | Getq_lane_s64 _
+    | Mulq_s32 | Mulq_s16 | Addq_s32 | Subq_s32 | Minq_s32 | Maxq_s32 | Minq_u32
+    | Maxq_u32 | Absq_s32 | Absq_s64 | Paddq_f64 | Paddq_s32 | Paddq_s64
+    | Mvnq_s64 | Orrq_s64 | Andq_s64 | Eorq_s64 | Negq_s64 | Shlq_u32 | Shlq_u64
+    | Shlq_s32 | Shlq_s64 | Shlq_n_u32 _ | Shlq_n_u64 _ | Shrq_n_u32 _
+    | Shrq_n_u64 _ | Shrq_n_s32 _ | Shrq_n_s64 _ | Setq_lane_s32 _
+    | Setq_lane_s64 _ | Dupq_lane_s32 _ | Dupq_lane_s64 _ | Cvtq_f64_s64
+    | Cvtq_s64_f64 | Cvtnq_s64_f64 | Movl_s32 | Movl_u32 | Addq_s16 | Paddq_s16
+    | Qaddq_s16 | Qaddq_u16 | Subq_s16 | Qsubq_s16 | Qsubq_u16 | Absq_s16
+    | Minq_s16 | Maxq_s16 | Minq_u16 | Maxq_u16 | Mvnq_s16 | Orrq_s16 | Andq_s16
+    | Eorq_s16 | Negq_s16 | Cntq_u16 | Shlq_u16 | Shlq_s16 | Cmp_s16 _
+    | Cmpz_s16 _ | Shlq_n_u16 _ | Shrq_n_u16 _ | Shrq_n_s16 _ | Getq_lane_s16 _
+    | Setq_lane_s16 _ | Dupq_lane_s16 _ | Movn_s64 | Copyq_laneq_s64 _ | Addq_s8
+    | Paddq_s8 | Qaddq_s8 | Qaddq_u8 | Subq_s8 | Qsubq_s8 | Qsubq_u8 | Absq_s8
+    | Minq_s8 | Maxq_s8 | Minq_u8 | Maxq_u8 | Mvnq_s8 | Orrq_s8 | Andq_s8
+    | Eorq_s8 | Negq_s8 | Cntq_u8 | Shlq_u8 | Shlq_s8 | Cmp_s8 _ | Cmpz_s8 _
+    | Shlq_n_u8 _ | Shrq_n_u8 _ | Shrq_n_s8 _ | Getq_lane_s8 _ | Setq_lane_s8 _
+    | Dupq_lane_s8 _ | Extq_u8 _ | Qmovn_high_s64 | Qmovn_s64 | Qmovn_high_s32
+    | Qmovn_s32 | Qmovn_high_u32 | Qmovn_u32 | Qmovn_high_s16 | Qmovn_s16
+    | Qmovn_high_u16 | Qmovn_u16 | Movn_high_s64 | Movn_high_s32 | Movn_s32
+    | Movn_high_s16 | Movn_s16 | Mullq_s16 | Mullq_u16 | Mullq_high_s16
+    | Mullq_high_u16 | Movl_s16 | Movl_u16 | Movl_s8 | Movl_u8 ->
       1
 
   let emit_rounding_mode (rm : Simd.Rounding_mode.t) : I.Rounding_mode.t =
@@ -620,7 +620,8 @@ end = struct
     | Recpeq_f32 -> ins I.FRECPE operands
     | Sqrtq_f32 | Sqrtq_f64 -> ins I.FSQRT operands
     | Rsqrteq_f32 | Rsqrteq_f64 -> ins I.FRSQRTE operands
-    | Cvtq_s32_f32 | Cvtq_s64_f64 -> ins I.FCVTNS operands
+    | Cvtq_s32_f32 | Cvtq_s64_f64 -> ins I.FCVTZS operands
+    | Cvtnq_s32_f32 | Cvtnq_s64_f64 -> ins I.FCVTNS operands
     | Cvtq_f32_s32 | Cvtq_f64_s64 -> ins I.SCVTF operands
     | Cvt_f64_f32 -> ins I.FCVTL operands
     | Cvt_f32_f64 -> ins I.FCVTN operands
@@ -795,18 +796,16 @@ let emit_stack_realloc () =
 
 let cond_for_comparison :
     integer_comparison -> Arm64_ast.Instruction_name.Cond.t = function
-  | Isigned Ceq -> EQ
-  | Isigned Cne -> NE
-  | Isigned Cle -> LE
-  | Isigned Cge -> GE
-  | Isigned Clt -> LT
-  | Isigned Cgt -> GT
-  | Iunsigned Ceq -> EQ
-  | Iunsigned Cne -> NE
-  | Iunsigned Cle -> LS
-  | Iunsigned Cge -> CS
-  | Iunsigned Clt -> CC
-  | Iunsigned Cgt -> HI
+  | Ceq -> EQ
+  | Cne -> NE
+  | Cle -> LE
+  | Cge -> GE
+  | Clt -> LT
+  | Cgt -> GT
+  | Cule -> LS
+  | Cuge -> CS
+  | Cult -> CC
+  | Cugt -> HI
 
 let instr_for_int_operation = function
   | Iadd -> I.ADD
@@ -897,18 +896,6 @@ let emit_stack_adjustment n =
   if mh <> 0 then DSL.ins instr [| DSL.sp; DSL.sp; DSL.imm mh |];
   if ml <> 0 then DSL.ins instr [| DSL.sp; DSL.sp; DSL.imm ml |];
   if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n)
-
-(* Deallocate the stack frame and reload the return address before a return or
-   tail call *)
-
-let output_epilogue f =
-  let n = frame_size () in
-  if !contains_calls
-  then DSL.ins I.LDR [| DSL.reg_x_30; DSL.emit_mem_sp_offset (n - 8) |];
-  if n > 0 then emit_stack_adjustment n;
-  f ();
-  (* reset CFA back because function body may continue *)
-  if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
 
 (* Output add-immediate / sub-immediate / cmp-immediate instructions *)
 
@@ -1072,8 +1059,8 @@ let num_call_gc_points instr =
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
         | Name_for_debugger _ )
-    | Lprologue | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-    | Lcall_op _ | Llabel _ | Lbranch _
+    | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+    | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
     | Lcondbranch (_, _)
     | Lcondbranch3 (_, _, _)
     | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -1141,9 +1128,10 @@ module BR = Branch_relaxation.Make (struct
           | Floatop (_, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ )
-      | Lprologue | Lend | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-      | Lcall_op _ | Llabel _ | Lbranch _ | Lswitch _ | Ladjust_stack_offset _
-      | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
         None
       | Lop (Const_vec256 _ | Const_vec512 _) ->
         Misc.fatal_error "arm64: got 256/512 bit vector"
@@ -1172,6 +1160,8 @@ module BR = Branch_relaxation.Make (struct
   let instr_size = function
     | Lend -> 0
     | Lprologue -> prologue_size ()
+    | Lepilogue_open -> epilogue_size ()
+    | Lepilogue_close -> 0
     | Lop (Move | Spill | Reload) -> 1
     | Lop (Const_int n) -> num_instructions_for_intconst n
     | Lop (Const_float32 _) -> 2
@@ -1267,7 +1257,11 @@ module BR = Branch_relaxation.Make (struct
           ( Float32_of_float | Float_of_float32 | Float32_of_int32
           | Int32_of_float32 )) ->
       1
-    | Lop (Reinterpret_cast V128_of_v128) -> 1
+    | Lop (Reinterpret_cast (V128_of_vec Vec128)) -> 1
+    | Lop
+        (Reinterpret_cast
+          (V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _)) ->
+      Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Static_cast (Float_of_int Float64 | Int_of_float Float64)) -> 1
     | Lop
         (Static_cast
@@ -1281,6 +1275,11 @@ module BR = Branch_relaxation.Make (struct
           (Scalar_of_v128 (Int32x4 | Int64x2 | Float32x4 | Float64x2))) ->
       1
     | Lop (Static_cast (V128_of_scalar _)) -> 1
+    | Lop
+        (Static_cast
+          ( V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _
+          | Scalar_of_v512 _ )) ->
+      Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Floatop (Float64, (Iaddf | Isubf | Imulf | Idivf))) -> 1
     | Lop (Floatop (Float32, (Iaddf | Isubf | Imulf | Idivf))) -> 1
     | Lop (Specific Inegmulf) -> 1
@@ -1560,12 +1559,14 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
       DSL.check_reg Float32 src;
       DSL.check_reg Float dst;
       DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg_d src |])
-  | V128_of_v128 ->
+  | V128_of_vec Vec128 ->
     if distinct
     then (
       DSL.check_reg Vec128 src;
       DSL.check_reg Vec128 dst;
       DSL.ins I.MOV [| DSL.emit_reg_v16b dst; DSL.emit_reg_v16b src |])
+  | V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _ ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
   | Int_of_value | Value_of_int -> move src dst
 
 let emit_static_cast (cast : Cmm.static_cast) i =
@@ -1631,6 +1632,8 @@ let emit_static_cast (cast : Cmm.static_cast) i =
       then (
         DSL.check_reg Float src;
         DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg src |]))
+  | V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
 
 (* Output the assembly code for an instruction *)
 
@@ -1646,6 +1649,14 @@ let emit_instr i =
     then (
       D.cfi_offset ~reg:30 (* return address *) ~offset:(-8);
       DSL.ins I.STR [| DSL.reg_x_30; DSL.emit_mem_sp_offset (n - 8) |])
+  | Lepilogue_open ->
+    let n = frame_size () in
+    if !contains_calls
+    then DSL.ins I.LDR [| DSL.reg_x_30; DSL.emit_mem_sp_offset (n - 8) |];
+    if n > 0 then emit_stack_adjustment n
+  | Lepilogue_close ->
+    let n = frame_size () in
+    if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Intop_atomic _) ->
     (* Never generated; builtins are not yet translated to atomics *)
     assert false
@@ -1709,8 +1720,7 @@ let emit_instr i =
   | Lcall_op (Lcall_imm { func }) ->
     DSL.ins I.BL [| DSL.emit_symbol (S.create func.sym_name) |];
     record_frame i.live (Dbg_other i.dbg)
-  | Lcall_op Ltailcall_ind ->
-    output_epilogue (fun () -> DSL.ins I.BR [| DSL.emit_reg i.arg.(0) |])
+  | Lcall_op Ltailcall_ind -> DSL.ins I.BR [| DSL.emit_reg i.arg.(0) |]
   | Lcall_op (Ltailcall_imm { func }) ->
     if String.equal func.sym_name !function_name
     then
@@ -1718,9 +1728,7 @@ let emit_instr i =
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point ->
         DSL.ins I.B [| DSL.emit_label tailrec_entry_point |]
-    else
-      output_epilogue (fun () ->
-          DSL.ins I.B [| DSL.emit_symbol (S.create func.sym_name) |])
+    else DSL.ins I.B [| DSL.emit_symbol (S.create func.sym_name) |]
   | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
     if Config.runtime5 && stack_ofs > 0
     then (
@@ -2192,7 +2200,7 @@ let emit_instr i =
              DSL.cond EQ
           |])
   | Lreloadretaddr -> ()
-  | Lreturn -> output_epilogue (fun () -> DSL.ins I.RET [||])
+  | Lreturn -> DSL.ins I.RET [||]
   | Llabel { label = lbl; _ } ->
     let lbl = label_to_asm_label ~section:Text lbl in
     D.define_label lbl

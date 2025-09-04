@@ -2,7 +2,10 @@ File "fail20.ml", line 10, characters 5-15:
 Error: Annotation check for zero_alloc strict failed on function Fail20.foo1 (camlFail20.foo1_HIDE_STAMP).
 
 File "fail20.ml", line 12, characters 7-18:
-Error: allocation of 32 bytes on a path to exceptional return (fail20.ml:12,7--18;fail20.ml:3,18--30)
+Error: allocation of 32 bytes on a path to exceptional return
+inlined from
+fail20.ml:3,18--30[Fail20.exn][camlFail20.exn_HIDE_STAMP]
+fail20.ml:12,7--18[Fail20.foo1]
 
 File "fail20.ml", line 17, characters 5-15:
 Error: Annotation check for zero_alloc failed on function Fail20.foo (camlFail20.foo_HIDE_STAMP).

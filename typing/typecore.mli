@@ -70,6 +70,7 @@ type pattern_variable =
     pv_loc: Location.t;
     pv_as_var: bool;
     pv_attributes: Typedtree.attributes;
+    pv_sort: Jkind.Sort.t;
   }
 
 val mk_expected:
@@ -184,7 +185,8 @@ type submode_reason =
   | Application of type_expr
       (* Check that the result of an application is a submode of the expected mode
          from the context *)
-
+  | Constructor of Longident.t
+      (* Check that this constructor is allowed in this context. *)
   | Other (* add more cases here for better hints *)
 
 val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allowed * 'r) Mode.Value.t -> unit
@@ -293,6 +295,10 @@ type error =
   (* CR-soon mshinwell: Use an inlined record *)
   | Probe_is_enabled_format
   | Extension_not_enabled : _ Language_extension.t -> error
+  | Atomic_in_pattern of Longident.t
+  | Invalid_atomic_loc_payload
+  | Label_not_atomic of Longident.t
+  | Modalities_on_atomic_field of Longident.t
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
@@ -309,6 +315,12 @@ type error =
   | Wrong_expected_record_boxing of wrong_kind_context * record_form_packed * type_expr
   | Expr_not_a_record_type of record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
+  | Invalid_unboxed_access of
+      { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
+  | Block_access_record_unboxed
+  | Block_access_private_record
+  | Block_index_modality_mismatch of
+      { mut : bool; err : Mode.Modality.Value.equate_error }
   | Submode_failed of
       Mode.Value.error * submode_reason *
       Env.locality_context option *

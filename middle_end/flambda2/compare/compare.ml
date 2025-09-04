@@ -460,7 +460,7 @@ and subst_apply_cont env apply_cont =
 and subst_switch env switch =
   let scrutinee = subst_simple env (Switch_expr.scrutinee switch) in
   let arms =
-    Targetint_31_63.Map.map_sharing (subst_apply_cont env)
+    Target_ocaml_int.Map.map_sharing (subst_apply_cont env)
       (Switch_expr.arms switch)
   in
   Expr.create_switch
@@ -1100,14 +1100,14 @@ let switch_exprs env switch1 switch2 : Expr.t Comparison.t =
     lists
       ~f:
         (pairs
-           ~f1:(Comparator.of_predicate Targetint_31_63.equal)
+           ~f1:(Comparator.of_predicate Target_ocaml_int.equal)
            ~f2:apply_cont_exprs ~subst2:subst_apply_cont)
       ~subst:(fun env (target_imm, apply_cont) ->
         target_imm, subst_apply_cont env apply_cont)
       ~subst_snd:true env
-      (Targetint_31_63.Map.bindings arms1)
-      (Targetint_31_63.Map.bindings arms2)
-    |> Comparison.map ~f:Targetint_31_63.Map.of_list
+      (Target_ocaml_int.Map.bindings arms1)
+      (Target_ocaml_int.Map.bindings arms2)
+    |> Comparison.map ~f:Target_ocaml_int.Map.of_list
   in
   pairs ~f1:compare_arms ~f2:simple_exprs ~subst2:subst_simple env
     (Switch.arms switch1, Switch.scrutinee switch1)
@@ -1358,8 +1358,12 @@ and cont_handlers env handler1 handler2 =
 let flambda_units u1 u2 =
   let ret_cont = Continuation.create ~sort:Toplevel_return () in
   let exn_cont = Continuation.create () in
-  let toplevel_my_region = Variable.create "toplevel_my_region" in
-  let toplevel_my_ghost_region = Variable.create "toplevel_my_ghost_region" in
+  let toplevel_my_region =
+    Variable.create "toplevel_my_region" Flambda_kind.region
+  in
+  let toplevel_my_ghost_region =
+    Variable.create "toplevel_my_ghost_region" Flambda_kind.region
+  in
   let mk_renaming u =
     let renaming = Renaming.empty in
     let renaming =

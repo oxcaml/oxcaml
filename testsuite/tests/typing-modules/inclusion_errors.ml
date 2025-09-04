@@ -881,7 +881,7 @@ Error: Signature mismatch:
 |}];;
 
 module M : sig
-  val f : < m : [< `Foo]> -> unit
+  val f : < m : [< `Foo] > -> unit
 end = struct
   let f (x : < m : 'a. [< `Foo] as 'a >) = ()
 end;;
@@ -908,12 +908,12 @@ Error: Signature mismatch:
 module M : sig
   val f : < m : 'a. [< `Foo] as 'a > -> unit
 end = struct
-  let f (x : < m : [`Foo]>) = ()
+  let f (x : < m : [`Foo] >) = ()
 end;;
 [%%expect{|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (x : < m : [`Foo]>) = ()
+4 |   let f (x : < m : [`Foo] >) = ()
 5 | end..
 Error: Signature mismatch:
        Modules do not match:

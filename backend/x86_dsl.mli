@@ -96,11 +96,7 @@ module I : sig
 
   val add : arg -> arg -> unit
 
-  val addsd : arg -> arg -> unit
-
   val and_ : arg -> arg -> unit
-
-  val andpd : arg -> arg -> unit
 
   val bsf : arg -> arg -> unit
 
@@ -118,27 +114,9 @@ module I : sig
 
   val cmp : arg -> arg -> unit
 
-  val cmpsd : float_condition -> arg -> arg -> unit
-
-  val comisd : arg -> arg -> unit
-
   val cqo : unit -> unit
 
-  val cvtsi2ss : arg -> arg -> unit
-
-  val cvtsd2ss : arg -> arg -> unit
-
-  val cvtsi2sd : arg -> arg -> unit
-
-  val cvtss2sd : arg -> arg -> unit
-
-  val cvttss2si : arg -> arg -> unit (* truncate *)
-
-  val cvttsd2si : arg -> arg -> unit (* truncate *)
-
   val dec : arg -> unit
-
-  val divsd : arg -> arg -> unit
 
   val hlt : unit -> unit
 
@@ -190,25 +168,11 @@ module I : sig
 
   val mov : arg -> arg -> unit
 
-  val movapd : arg -> arg -> unit
-
-  val movupd : arg -> arg -> unit
-
-  val movd : arg -> arg -> unit
-
-  val movq : arg -> arg -> unit
-
-  val movsd : arg -> arg -> unit
-
-  val movss : arg -> arg -> unit
-
   val movsx : arg -> arg -> unit
 
   val movsxd : arg -> arg -> unit
 
   val movzx : arg -> arg -> unit
-
-  val mulsd : arg -> arg -> unit
 
   val neg : arg -> unit
 
@@ -248,37 +212,11 @@ module I : sig
 
   val sub : arg -> arg -> unit
 
-  val subsd : arg -> arg -> unit
-
   val test : arg -> arg -> unit
-
-  val ucomisd : arg -> arg -> unit
 
   val xchg : arg -> arg -> unit
 
   val xor : arg -> arg -> unit
-
-  val xorpd : arg -> arg -> unit
-
-  (* Float32 arithmetic *)
-
-  val addss : arg -> arg -> unit
-
-  val subss : arg -> arg -> unit
-
-  val mulss : arg -> arg -> unit
-
-  val divss : arg -> arg -> unit
-
-  val comiss : arg -> arg -> unit
-
-  val ucomiss : arg -> arg -> unit
-
-  val xorps : arg -> arg -> unit
-
-  val andps : arg -> arg -> unit
-
-  val cmpss : float_condition -> arg -> arg -> unit
 
   (* BMI instructions *)
 

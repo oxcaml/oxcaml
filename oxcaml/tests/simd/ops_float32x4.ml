@@ -84,7 +84,7 @@ let check_unop msg scalar vector f =
 let () =
   Float32.check_floats (fun f _ -> check_unop "rcp" Float32.rcp rcp f);
   Float32.check_floats (fun f _ -> check_unop "sqrt" Float32.sqrt sqrt f);
-  Float32.check_floats (fun f _ -> check_unop "rqrt" Float32.rsqrt rsqrt f)
+  Float32.check_floats (fun f _ -> check_unop "rsqrt" Float32.rsqrt rsqrt f)
 
 let () =
   Float32.check_floats (fun f0 f1 ->
@@ -115,6 +115,25 @@ let () =
       let fv = Float32.to_float32x4 f0 f1 0l 0l in
       let res = cvt_float64x2 fv in
       eq_float64x2 ~result:res ~expect:iv)
+
+let () =
+  Float32.check_floats (fun f0 f1 ->
+      (failmsg
+         := fun () ->
+              Printf.printf "cvtt %f | %f\n%!" (Int32.float_of_bits f0)
+                (Int32.float_of_bits f1));
+      let i0 =
+        Float32.cvtt_i32 f0 |> Int64.of_int32 |> Int64.logand 0xffffffffL
+      in
+      let i1 =
+        Float32.cvtt_i32 f1 |> Int64.of_int32 |> Int64.logand 0xffffffffL
+      in
+      let ii = Int64.(logor (shift_left i1 32) i0) in
+      let iv = int32x4_of_int64s ii ii in
+      let fv = Float32.to_float32x4 f0 f1 f0 f1 in
+      let res = cvtt_int32x4 fv in
+      eq (int32x4_low_int64 res) (int32x4_high_int64 res) (int32x4_low_int64 iv)
+        (int32x4_high_int64 iv))
 
 let () =
   Float32.check_floats (fun f0 f1 ->

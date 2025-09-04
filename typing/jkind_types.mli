@@ -48,9 +48,12 @@ module Sort : sig
   type base =
     | Void
     | Value
+    | Untagged_immediate
     | Float64
     | Float32
     | Word
+    | Bits8
+    | Bits16
     | Bits32
     | Bits64
     | Vec128

@@ -226,6 +226,8 @@ type block_access_kind =
 type standard_int = Flambda_kind.Standard_int.t =
   | Tagged_immediate
   | Naked_immediate
+  | Naked_int8
+  | Naked_int16
   | Naked_int32
   | Naked_int64
   | Naked_nativeint
@@ -235,6 +237,8 @@ type standard_int_or_float = Flambda_kind.Standard_int_or_float.t =
   | Naked_immediate
   | Naked_float32
   | Naked_float
+  | Naked_int8
+  | Naked_int16
   | Naked_int32
   | Naked_int64
   | Naked_nativeint
@@ -290,7 +294,7 @@ type unop =
   | Block_load of
       { kind : block_access_kind;
         mut : mutability;
-        field : Targetint_31_63.t
+        field : Target_ocaml_int.t
       }
   | Array_length of array_kind_for_length
   | Boolean_not
@@ -352,6 +356,8 @@ type string_accessor_width = Flambda_primitive.string_accessor_width =
   | Single
   | Sixty_four
   | One_twenty_eight of { aligned : bool }
+  | Two_fifty_six of { aligned : bool }
+  | Five_twelve of { aligned : bool }
 
 type array_load_kind = Flambda_primitive.Array_load_kind.t =
   | Immediates
@@ -399,7 +405,7 @@ type binop =
   | Block_set of
       { kind : block_access_kind;
         init : init_or_assign;
-        field : Targetint_31_63.t
+        field : Target_ocaml_int.t
       }
   | Array_load of array_kind * array_load_kind * mutability
   | Phys_equal of equality_comparison

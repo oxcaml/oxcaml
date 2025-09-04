@@ -142,6 +142,10 @@ let access_array base numelt size =
 %token SUBI
 %token SWITCH
 %token TRY
+%token UGEI
+%token UGTI
+%token ULEI
+%token ULTI
 %token UNIT
 %token UNSIGNED
 %token VAL
@@ -177,7 +181,10 @@ fundecl:
            ]
            else [ Reduce_code_size ];
          fun_poll = Lambda.Default_poll;
-         fun_dbg = debuginfo ()} }
+         fun_dbg = debuginfo ();
+         (* CR yusumez: Adding return types to the parser might require a lot
+            of changes, so we assume this for now. *)
+         fun_ret_type = Cmm.typ_val } }
 ;
 fun_name:
     STRING              { Cmm.global_symbol $1 }
@@ -387,14 +394,12 @@ binaryop:
   | LEI                         { Ccmpi Cle }
   | GTI                         { Ccmpi Cgt }
   | GEI                         { Ccmpi Cge }
+  | ULTI                        { Ccmpi Cult }
+  | ULEI                        { Ccmpi Cule }
+  | UGTI                        { Ccmpi Cugt }
+  | UGEI                        { Ccmpi Cuge }
   | ADDA                        { Cadda }
   | ADDV                        { Caddv }
-  | EQA                         { Ccmpa Ceq }
-  | NEA                         { Ccmpa Cne }
-  | LTA                         { Ccmpa Clt }
-  | LEA                         { Ccmpa Cle }
-  | GTA                         { Ccmpa Cgt }
-  | GEA                         { Ccmpa Cge }
   | ADDF                        { Caddf Float64 }
   | MULF                        { Cmulf Float64 }
   | DIVF                        { Cdivf Float64 }

@@ -57,6 +57,9 @@ let with_int_prefix ~(kind : Flambda_kind.Standard_int.t) ~percent_for_imms op =
     | Naked_int32, _ -> "caml_int32"
     | Naked_int64, _ -> "caml_int64"
     | Naked_nativeint, _ -> "caml_nativeint"
+    | (Naked_int8 | Naked_int16), _ ->
+      (* CR selee: smallints *)
+      primitive_not_supported ()
   in
   prefix ^ "_" ^ op
 
@@ -125,14 +128,19 @@ let block_access_kind (kind : Flambda_primitive.Block_access_kind.t) :
   | Values _ -> Non_float
   | Naked_floats _ -> Float
   | Mixed { field_kind = Value_prefix _; _ } -> Non_float
+  | Mixed { field_kind = Flat_suffix (Naked_float | Naked_float32); _ } -> Float
   | Mixed
-      { field_kind = Flat_suffix (Naked_int32 | Naked_int64 | Naked_nativeint);
+      { field_kind =
+          Flat_suffix
+            (Naked_immediate | Naked_int32 | Naked_int64 | Naked_nativeint);
         _
       } ->
     Non_float
-  | Mixed { field_kind = Flat_suffix (Naked_float | Naked_float32); _ } -> Float
   | Mixed
-      { field_kind = Flat_suffix (Naked_vec128 | Naked_vec256 | Naked_vec512);
+      { field_kind =
+          Flat_suffix
+            ( Naked_int8 | Naked_int16 | Naked_vec128 | Naked_vec256
+            | Naked_vec512 );
         _
       } ->
     primitive_not_supported ()
@@ -171,7 +179,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     let expr, res =
       match prim_arg ~env ~res x with
       | Pv v, res ->
-        ( Jsir.Field (v, Targetint_31_63.to_int field, block_access_kind kind),
+        ( Jsir.Field (v, Target_ocaml_int.to_int field, block_access_kind kind),
           res )
       | Pc _, _res -> Misc.fatal_error "Block_load on constant"
     in
@@ -196,19 +204,20 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Opaque_identity { middle_end_only = false; kind : Flambda_kind.t = _ } ->
     (* CR selee: treating these as the identity for now *)
     identity ~env ~res x
-  | Int_arith (kind, Swap_byte_endianness) ->
-    let extern_name =
-      match kind with
-      | Naked_immediate -> "caml_bswap16"
-      | Naked_int32 -> "caml_int32_bswap"
-      | Naked_int64 -> "caml_int64_bswap"
-      | Naked_nativeint -> "caml_nativeint_bswap"
-      | Tagged_immediate ->
-        (* [Lambda_to_flambda_primitives will never produce this *)
-        (* CR selee: this will no longer be true once smallints are merged *)
-        Misc.fatal_error "Found Int_arith with Tagged_immediate"
-    in
-    use_prim' (Extern extern_name)
+  | Int_arith (kind, Swap_byte_endianness) -> (
+    match kind with
+    | Naked_int8 -> identity ~env ~res x
+    | ( Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
+      | Naked_immediate | Tagged_immediate ) as kind ->
+      let extern_name =
+        match kind with
+        | Naked_int32 -> "caml_int32_bswap"
+        | Naked_int64 -> "caml_int64_bswap"
+        | Naked_nativeint -> "caml_nativeint_bswap"
+        | Naked_int16 | Naked_immediate | Tagged_immediate -> "caml_bswap16"
+        | Naked_int8 -> assert false
+      in
+      use_prim' (Extern extern_name))
   | Float_arith (bitwidth, op) ->
     let op_name = match op with Abs -> "abs" | Neg -> "neg" in
     let extern_name = with_float_suffix ~bitwidth op_name in
@@ -267,7 +276,10 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | Naked_nativeint, Naked_float32 -> caml_of "float32" "nativeint"
     | Naked_nativeint, Naked_float -> caml_to "nativeint" "float"
     | Naked_nativeint, Naked_int32 -> caml_to "nativeint" "int32"
-    | Naked_nativeint, Naked_int64 -> caml_of "int64" "nativeint")
+    | Naked_nativeint, Naked_int64 -> caml_of "int64" "nativeint"
+    | (Naked_int8 | Naked_int16), _ | _, (Naked_int8 | Naked_int16) ->
+      (* CR selee: smallints *)
+      primitive_not_supported ())
   | Boolean_not -> use_prim' Not
   | Reinterpret_64_bit_word reinterpret ->
     let extern_name =
@@ -296,7 +308,6 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     (* CR selee: check [js_of_ocaml/compiler/tests_check_prim/main.output], this
        primitive ("caml_get_header") seems to be missing from jsoo *)
     primitive_not_supported ()
-  | Atomic_load _ -> use_prim' (Extern "caml_atomic_load")
   | Peek _ ->
     (* Unsupported in bytecode *)
     primitive_not_supported ()
@@ -321,7 +332,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     ( None,
       env,
       To_jsir_result.add_instr_exn res
-        (Set_field (x, Targetint_31_63.to_int field, block_access_kind kind, y))
+        (Set_field (x, Target_ocaml_int.to_int field, block_access_kind kind, y))
     )
   | Array_load (kind, load_kind, _mut) -> (
     match kind, load_kind with
@@ -344,7 +355,8 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Thirty_two -> "get32"
       | Single -> "getf32"
       | Sixty_four -> "get64"
-      | One_twenty_eight _ -> primitive_not_supported ()
+      | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ ->
+        primitive_not_supported ()
     in
     let extern_name =
       match value with
@@ -353,7 +365,8 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Bigstring -> (
         match width with
         | Eight -> "caml_ba_get_1"
-        | Sixteen | Thirty_two | Single | Sixty_four | One_twenty_eight _ ->
+        | Sixteen | Thirty_two | Single | Sixty_four | One_twenty_eight _
+        | Two_fifty_six _ | Five_twelve _ ->
           "caml_ba_uint8_" ^ op_name)
     in
     use_prim' (Extern extern_name)
@@ -393,6 +406,9 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         "shift_right_unsigned"
       | (Tagged_immediate | Naked_immediate), Asr -> "asr"
       | (Naked_int32 | Naked_int64 | Naked_nativeint), Asr -> "shift_right"
+      | (Naked_int8 | Naked_int16), _ ->
+        (* CR selee: smallints *)
+        primitive_not_supported ()
     in
     let extern_name = with_int_prefix ~kind op_name ~percent_for_imms:true in
     use_prim' (Extern extern_name)
@@ -410,6 +426,9 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
             Extern "caml_lessthan",
             Extern "caml_int64_ult",
             Extern "caml_lessequal" )
+        | Naked_int8 | Naked_int16 ->
+          (* CR selee: smallints *)
+          primitive_not_supported ()
       in
       let unsigned_le x y =
         let var_ule = Jsir.Var.fresh () in
@@ -481,26 +500,15 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         | Float32 -> "caml_float32_compare")
     in
     use_prim' (Extern extern_name)
+  | Atomic_load_field _ -> use_prim' (Extern "caml_atomic_load_field")
   | Bigarray_get_alignment _ ->
     (* Only used for SIMD *)
     primitive_not_supported ()
-  | Atomic_set _ ->
-    let _var, env, res = use_prim' (Extern "caml_atomic_exchange") in
-    unit ~env ~res
-  | Atomic_exchange _ -> use_prim' (Extern "caml_atomic_exchange")
-  | Atomic_int_arith op ->
-    let extern_name =
-      match op with
-      | Fetch_add -> "caml_atomic_fetch_add"
-      | Add -> "caml_atomic_add"
-      | Sub -> "caml_atomic_sub"
-      | And -> "caml_atomic_land"
-      | Or -> "caml_atomic_lor"
-      | Xor -> "caml_atomic_lxor"
-    in
-    use_prim' (Extern extern_name)
   | Poke _ ->
     (* Unsupported in bytecode *)
+    primitive_not_supported ()
+  | Read_offset _ ->
+    (* CR selee: look before merge *)
     primitive_not_supported ()
 
 let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
@@ -531,7 +539,7 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   | Bytes_or_bigstring_set (value, width) ->
     let extern_name =
       match value, width with
-      | _, One_twenty_eight _ ->
+      | _, One_twenty_eight _ | _, Two_fifty_six _ | _, Five_twelve _ ->
         (* No SIMD *)
         primitive_not_supported ()
       | Bytes, Eight -> "caml_bytes_unsafe_set"
@@ -555,9 +563,24 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
         "caml_ba_set_"
     in
     use_prim' (Extern (extern_prefix ^ Int.to_string dims))
-  | Atomic_compare_and_set _ -> use_prim' (Extern "caml_atomic_cas")
-  | Atomic_compare_exchange _ ->
-    use_prim' (Extern "caml_atomic_compare_exchange")
+  | Atomic_field_int_arith op ->
+    let extern_name =
+      match op with
+      | Fetch_add -> "caml_atomic_fetch_add_field"
+      | Add -> "caml_atomic_add_field"
+      | Sub -> "caml_atomic_sub_field"
+      | And -> "caml_atomic_land_field"
+      | Or -> "caml_atomic_lor_field"
+      | Xor -> "caml_atomic_lxor_field"
+    in
+    use_prim' (Extern extern_name)
+  | Atomic_set_field _ ->
+    let _var, env, res = use_prim' (Extern "caml_atomic_exchange_field") in
+    unit ~env ~res
+  | Atomic_exchange_field _ -> use_prim' (Extern "caml_atomic_exchange_field")
+  | Write_offset _ ->
+    (* CR selee: look before merge *)
+    primitive_not_supported ()
 
 let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   match f with
@@ -595,12 +618,20 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
         (Let (var, Block (Tag.to_int tag, Array.of_list xs, Array, mutability)))
     )
 
+let quaternary ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y z =
+  let use_prim' prim = use_prim' ~env ~res prim [w; x; y; z] in
+  match f with
+  | Atomic_compare_and_set_field _ -> use_prim' (Extern "caml_atomic_cas_field")
+  | Atomic_compare_exchange_field _ ->
+    use_prim' (Extern "caml_atomic_compare_exchange_field")
+
 let primitive ~env ~res (prim : Flambda_primitive.t) =
   match prim with
   | Nullary f -> nullary ~env ~res f
   | Unary (f, x) -> unary ~env ~res f x
   | Binary (f, x, y) -> binary ~env ~res f x y
   | Ternary (f, x, y, z) -> ternary ~env ~res f x y z
+  | Quaternary (f, w, x, y, z) -> quaternary ~env ~res f w x y z
   | Variadic (f, xs) -> variadic ~env ~res f xs
 
 let extern ~env ~res symbol args =

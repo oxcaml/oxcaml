@@ -127,6 +127,8 @@ let ge_component comp1 comp2 =
 
 type exttype =
   | XInt
+  | XInt8
+  | XInt16
   | XInt32
   | XInt64
   | XFloat32
@@ -137,6 +139,8 @@ type exttype =
 
 let machtype_of_exttype = function
   | XInt -> typ_int
+  | XInt8 -> typ_int
+  | XInt16 -> typ_int
   | XInt32 -> typ_int
   | XInt64 -> typ_int
   | XFloat -> typ_float
@@ -158,21 +162,25 @@ let equal_stack_align left right =
   | Align_16, Align_16 | Align_32, Align_32 | Align_64, Align_64 -> true
   | (Align_16 | Align_32 | Align_64), _ -> false
 
-type integer_comparison = Lambda.integer_comparison =
+type integer_comparison = Scalar.Integer_comparison.t =
   | Ceq
   | Cne
   | Clt
   | Cgt
   | Cle
   | Cge
+  | Cult
+  | Cugt
+  | Cule
+  | Cuge
 
-let negate_integer_comparison = Lambda.negate_integer_comparison
+let negate_integer_comparison = Scalar.Integer_comparison.negate
 
-let swap_integer_comparison = Lambda.swap_integer_comparison
+let swap_integer_comparison = Scalar.Integer_comparison.swap
 
 (* With floats [not (x < y)] is not the same as [x >= y] due to NaNs, so we
    provide additional comparisons to represent the negations.*)
-type float_comparison = Lambda.float_comparison =
+type float_comparison = Scalar.Float_comparison.t =
   | CFeq
   | CFneq
   | CFlt
@@ -184,9 +192,9 @@ type float_comparison = Lambda.float_comparison =
   | CFge
   | CFnge
 
-let negate_float_comparison = Lambda.negate_float_comparison
+let negate_float_comparison = Scalar.Float_comparison.negate
 
-let swap_float_comparison = Lambda.swap_float_comparison
+let swap_float_comparison = Scalar.Float_comparison.swap
 
 type label = Label.t
 
@@ -296,6 +304,11 @@ type float_width =
   | Float64
   | Float32
 
+type vector_width =
+  | Vec128
+  | Vec256
+  | Vec512
+
 type memory_chunk =
   | Byte_unsigned
   | Byte_signed
@@ -323,7 +336,9 @@ type reinterpret_cast =
   | Int64_of_float
   | Float32_of_int32
   | Int32_of_float32
-  | V128_of_v128
+  | V128_of_vec of vector_width
+  | V256_of_vec of vector_width
+  | V512_of_vec of vector_width
 
 type static_cast =
   | Float_of_int of float_width
@@ -332,6 +347,10 @@ type static_cast =
   | Float32_of_float
   | V128_of_scalar of vec128_type
   | Scalar_of_v128 of vec128_type
+  | V256_of_scalar of vec256_type
+  | Scalar_of_v256 of vec256_type
+  | V512_of_scalar of vec512_type
+  | Scalar_of_v512 of vec512_type
 
 module Alloc_mode = struct
   type t =
@@ -427,7 +446,6 @@ type operation =
   | Ccmpi of integer_comparison
   | Caddv
   | Cadda
-  | Ccmpa of integer_comparison
   | Cnegf of float_width
   | Cabsf of float_width
   | Caddf of float_width
@@ -555,7 +573,8 @@ type fundecl =
     fun_body : expression;
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
-    fun_dbg : Debuginfo.t
+    fun_dbg : Debuginfo.t;
+    fun_ret_type : machtype
   }
 
 type data_item =
@@ -618,8 +637,8 @@ let iter_shallow_tail f = function
         | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
-        | Catomic _ | Ccmpi _ | Ccmpa _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
-        | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+        | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
+        | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
         | Ccmpf (_, _)
         | Cprobe _ | Cprobe_is_enabled _
         | Ctuple_field (_, _) ),
@@ -652,8 +671,8 @@ let map_shallow_tail f = function
           | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
-          | Catomic _ | Ccmpi _ | Ccmpa _ | Cnegf _ | Cabsf _ | Caddf _
-          | Csubf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+          | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
+          | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
           | Ccmpf (_, _)
           | Cprobe _ | Cprobe_is_enabled _
           | Ctuple_field (_, _) ),
@@ -747,25 +766,12 @@ let equal_machtype_component
       machtype_component) (right : machtype_component) =
   rank_machtype_component left = rank_machtype_component right
 
-let equal_exttype left right =
-  match left, right with
-  | XInt, XInt -> true
-  | XInt32, XInt32 -> true
-  | XInt64, XInt64 -> true
-  | XFloat32, XFloat32 -> true
-  | XFloat, XFloat -> true
-  | XVec128, XVec128 -> true
-  | XVec256, XVec256 -> true
-  | XVec512, XVec512 -> true
-  | XInt, (XInt32 | XInt64 | XFloat | XFloat32 | XVec128 | XVec256 | XVec512)
-  | XInt32, (XInt | XInt64 | XFloat | XFloat32 | XVec128 | XVec256 | XVec512)
-  | XInt64, (XInt | XInt32 | XFloat | XFloat32 | XVec128 | XVec256 | XVec512)
-  | XFloat, (XInt | XInt32 | XFloat32 | XInt64 | XVec128 | XVec256 | XVec512)
-  | XVec128, (XInt | XInt32 | XInt64 | XFloat | XFloat32 | XVec256 | XVec512)
-  | XVec256, (XInt | XInt32 | XInt64 | XFloat | XFloat32 | XVec128 | XVec512)
-  | XVec512, (XInt | XInt32 | XInt64 | XFloat | XFloat32 | XVec128 | XVec256)
-  | XFloat32, (XInt | XInt32 | XInt64 | XFloat | XVec128 | XVec256 | XVec512) ->
-    false
+let equal_exttype
+    (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
+     | XVec256 | XVec512 ) as left) right =
+  (* we can use polymorphic compare as long as exttype is all constant
+     constructors *)
+  Stdlib.( = ) left right
 
 let equal_vec128_type v1 v2 =
   match v1, v2 with
@@ -777,11 +783,39 @@ let equal_vec128_type v1 v2 =
   | Float64x2, Float64x2 -> true
   | (Int8x16 | Int16x8 | Int32x4 | Int64x2 | Float32x4 | Float64x2), _ -> false
 
+let equal_vec256_type v1 v2 =
+  match v1, v2 with
+  | Int8x32, Int8x32 -> true
+  | Int16x16, Int16x16 -> true
+  | Int32x8, Int32x8 -> true
+  | Int64x4, Int64x4 -> true
+  | Float32x8, Float32x8 -> true
+  | Float64x4, Float64x4 -> true
+  | (Int8x32 | Int16x16 | Int32x8 | Int64x4 | Float32x8 | Float64x4), _ -> false
+
+let equal_vec512_type v1 v2 =
+  match v1, v2 with
+  | Int8x64, Int8x64 -> true
+  | Int16x32, Int16x32 -> true
+  | Int32x16, Int32x16 -> true
+  | Int64x8, Int64x8 -> true
+  | Float32x16, Float32x16 -> true
+  | Float64x8, Float64x8 -> true
+  | (Int8x64 | Int16x32 | Int32x16 | Int64x8 | Float32x16 | Float64x8), _ ->
+    false
+
 let equal_float_width left right =
   match left, right with
   | Float64, Float64 -> true
   | Float32, Float32 -> true
   | (Float32 | Float64), _ -> false
+
+let equal_vector_width left right =
+  match left, right with
+  | Vec128, Vec128 -> true
+  | Vec256, Vec256 -> true
+  | Vec512, Vec512 -> true
+  | (Vec128 | Vec256 | Vec512), _ -> false
 
 let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
     =
@@ -794,10 +828,13 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
   | Int64_of_float, Int64_of_float -> true
   | Float32_of_int32, Float32_of_int32 -> true
   | Int32_of_float32, Int32_of_float32 -> true
-  | V128_of_v128, V128_of_v128 -> true
+  | V128_of_vec w1, V128_of_vec w2
+  | V256_of_vec w1, V256_of_vec w2
+  | V512_of_vec w1, V512_of_vec w2 ->
+    equal_vector_width w1 w2
   | ( ( Int_of_value | Value_of_int | Float_of_float32 | Float32_of_float
       | Float_of_int64 | Int64_of_float | Float32_of_int32 | Int32_of_float32
-      | V128_of_v128 ),
+      | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ),
       _ ) ->
     false
 
@@ -809,8 +846,13 @@ let equal_static_cast (left : static_cast) (right : static_cast) =
   | Int_of_float f1, Int_of_float f2 -> equal_float_width f1 f2
   | Scalar_of_v128 v1, Scalar_of_v128 v2 -> equal_vec128_type v1 v2
   | V128_of_scalar v1, V128_of_scalar v2 -> equal_vec128_type v1 v2
+  | Scalar_of_v256 v1, Scalar_of_v256 v2 -> equal_vec256_type v1 v2
+  | V256_of_scalar v1, V256_of_scalar v2 -> equal_vec256_type v1 v2
+  | Scalar_of_v512 v1, Scalar_of_v512 v2 -> equal_vec512_type v1 v2
+  | V512_of_scalar v1, V512_of_scalar v2 -> equal_vec512_type v1 v2
   | ( ( Float32_of_float | Float_of_float32 | Float_of_int _ | Int_of_float _
-      | Scalar_of_v128 _ | V128_of_scalar _ ),
+      | Scalar_of_v128 _ | V128_of_scalar _ | Scalar_of_v256 _
+      | V256_of_scalar _ | Scalar_of_v512 _ | V512_of_scalar _ ),
       _ ) ->
     false
 
@@ -948,21 +990,7 @@ let equal_memory_chunk left right =
       | Fivetwelve_aligned ) ) ->
     false
 
-let equal_integer_comparison left right =
-  match left, right with
-  | Ceq, Ceq -> true
-  | Cne, Cne -> true
-  | Clt, Clt -> true
-  | Cgt, Cgt -> true
-  | Cle, Cle -> true
-  | Cge, Cge -> true
-  | Ceq, (Cne | Clt | Cgt | Cle | Cge)
-  | Cne, (Ceq | Clt | Cgt | Cle | Cge)
-  | Clt, (Ceq | Cne | Cgt | Cle | Cge)
-  | Cgt, (Ceq | Cne | Clt | Cle | Cge)
-  | Cle, (Ceq | Cne | Clt | Cgt | Cge)
-  | Cge, (Ceq | Cne | Clt | Cgt | Cle) ->
-    false
+let equal_integer_comparison = Scalar.Integer_comparison.equal
 
 let caml_flambda2_invalid = "caml_flambda2_invalid"
 

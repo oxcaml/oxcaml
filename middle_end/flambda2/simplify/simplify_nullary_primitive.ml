@@ -41,7 +41,7 @@ let simplify_nullary_primitive dacc original_prim (prim : P.nullary_primitive)
           DE.merge_inlined_debuginfo denv ~from_apply_expr:dbg)
     in
     let named = Named.create_simple Simple.const_unit in
-    let ty = T.this_tagged_immediate Targetint_31_63.zero in
+    let ty = T.this_tagged_immediate Target_ocaml_int.zero in
     let dacc = DA.add_variable dacc result_var ty in
     Simplify_primitive_result.create named ~try_reify:false dacc
   | Dls_get ->
@@ -51,11 +51,11 @@ let simplify_nullary_primitive dacc original_prim (prim : P.nullary_primitive)
     Simplify_primitive_result.create named ~try_reify:false dacc
   | Poll ->
     let named = Named.create_prim original_prim dbg in
-    let ty = T.this_tagged_immediate Targetint_31_63.zero in
+    let ty = T.this_tagged_immediate Target_ocaml_int.zero in
     let dacc = DA.add_variable dacc result_var ty in
     Simplify_primitive_result.create named ~try_reify:false dacc
   | Cpu_relax ->
     let named = Named.create_prim original_prim dbg in
-    let ty = T.this_tagged_immediate Targetint_31_63.zero in
+    let ty = T.this_tagged_immediate Target_ocaml_int.zero in
     let dacc = DA.add_variable dacc result_var ty in
     Simplify_primitive_result.create named ~try_reify:false dacc

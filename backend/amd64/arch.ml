@@ -27,7 +27,6 @@ module Extension = struct
       | SSE4_1
       | SSE4_2
       | CLMUL
-      | LZCNT
       | BMI
       | BMI2
       | AVX
@@ -43,12 +42,11 @@ module Extension = struct
       | SSE4_1 -> 5
       | SSE4_2 -> 6
       | CLMUL -> 7
-      | LZCNT -> 8
-      | BMI -> 9
-      | BMI2 -> 10
-      | AVX -> 11
-      | AVX2 -> 12
-      | AVX512F -> 13
+      | BMI -> 8
+      | BMI2 -> 9
+      | AVX -> 10
+      | AVX2 -> 11
+      | AVX512F -> 12
 
     let compare left right = Int.compare (rank left) (rank right)
   end
@@ -65,7 +63,6 @@ module Extension = struct
     | SSE4_1 -> "SSE41"
     | SSE4_2 -> "SSE42"
     | CLMUL -> "CLMUL"
-    | LZCNT -> "LZCNT"
     | BMI -> "BMI"
     | BMI2 -> "BMI2"
     | AVX -> "AVX"
@@ -81,7 +78,6 @@ module Extension = struct
     | SSE4_1 -> "Penryn+"
     | SSE4_2 -> "Nehalem+"
     | CLMUL -> "Westmere+"
-    | LZCNT -> "Haswell+"
     | BMI -> "Haswell+"
     | BMI2 -> "Haswell+"
     | AVX -> "Sandybridge+"
@@ -89,30 +85,58 @@ module Extension = struct
     | AVX512F -> "SkylakeXeon+"
 
   let enabled_by_default = function
-    | SSE3 | SSSE3 | SSE4_1 | SSE4_2
-    | POPCNT | CLMUL | LZCNT | BMI | BMI2 | AVX | AVX2 -> true
+    (* We enable all Haswell extensions by default, unless the compiler
+       was configured on a CPU without support. Note SSE/SSE2 cannot be
+       disabled as they are included in baseline x86_64. *)
+    | POPCNT -> Config.has_popcnt
+    | CLMUL -> Config.has_pclmul
+    | SSE3 -> Config.has_sse3
+    | SSSE3 -> Config.has_ssse3
+    | SSE4_1 -> Config.has_sse4_1
+    | SSE4_2 -> Config.has_sse4_2
+    | BMI -> Config.has_bmi
+    | BMI2 -> Config.has_bmi2
+    | AVX -> Config.has_avx
+    | AVX2 -> Config.has_avx2
     | PREFETCHW | PREFETCHWT1 | AVX512F -> false
 
   let all =
     Set.of_list
       [ POPCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2; CLMUL;
-        LZCNT; BMI; BMI2; AVX; AVX2; AVX512F ]
+        BMI; BMI2; AVX; AVX2; AVX512F ]
 
-  let config = ref (Set.filter enabled_by_default all)
+  let directly_implied_by e1 e2 =
+    match e1, e2 with
+    | SSE3, SSSE3
+    | SSSE3, SSE4_1
+    | SSE4_1, SSE4_2
+    | SSE4_2, AVX
+    | AVX, AVX2
+    | AVX2, AVX512F
+    | BMI, BMI2 -> true
+    | (POPCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1
+      | SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | AVX512F), _ -> false
+
+  let rec fix set less =
+    let closure =
+      Set.filter (fun ext -> Set.exists (less ext) set) all
+      |> Set.union set
+    in
+    if Set.equal closure set then set
+    else fix closure less
+
+  let implication ext =
+    let set = Set.singleton ext in
+    let implies = fix set directly_implied_by in
+    let implied_by = fix set (fun e1 e2 -> directly_implied_by e2 e1) in
+    implies, implied_by
+
+  let config =
+    let default = Set.filter enabled_by_default all in
+    ref (fix default directly_implied_by)
 
   let enabled t = Set.mem t !config
   let disabled t = not (enabled t)
-
-  let allow_vec256 () = List.exists enabled [AVX; AVX2; AVX512F]
-  let allow_vec512 () = List.exists enabled [AVX512F]
-
-  let require_vec256 () =
-    if not (allow_vec256 ())
-    then Misc.fatal_error "AVX or AVX512 is required for 256-bit vectors"
-
-  let require_vec512 () =
-    if not (allow_vec512 ())
-    then Misc.fatal_error "AVX512 is required for 512-bit vectors"
 
   let args =
     let y t = "-f" ^ (name t |> String.lowercase_ascii) in
@@ -121,13 +145,33 @@ module Extension = struct
       let print_default b = if b then " (default)" else "" in
       let yd = print_default (enabled t) in
       let nd = print_default (disabled t) in
-      (y t, Arg.Unit (fun () -> config := Set.add t !config),
+      let implies, implied_by = implication t in
+      (y t, Arg.Unit (fun () ->
+        config := Set.union !config implies),
         Printf.sprintf "Enable %s instructions (%s)%s" (name t) (generation t) yd) ::
-      (n t, Arg.Unit (fun () -> config := Set.remove t !config),
+      (n t, Arg.Unit (fun () ->
+        config := Set.diff !config implied_by),
         Printf.sprintf "Disable %s instructions (%s)%s" (name t) (generation t) nd) :: acc)
     all []
 
-    let available () = Set.fold (fun t acc -> t :: acc) !config []
+  let available () = Set.fold (fun t acc -> t :: acc) !config []
+
+  let enabled_vec256 () = enabled AVX
+  let enabled_vec512 () = enabled AVX512F
+
+  let enabled_instruction (instr : Amd64_simd_instrs.instr) =
+    let enabled : Amd64_simd_defs.ext -> bool = function
+      | SSE | SSE2 -> true
+      | SSE3 -> enabled SSE3
+      | SSSE3 -> enabled SSSE3
+      | SSE4_1 -> enabled SSE4_1
+      | SSE4_2 -> enabled SSE4_2
+      | PCLMULQDQ -> enabled CLMUL
+      | BMI2 -> enabled BMI2
+      | AVX -> enabled AVX
+      | AVX2 -> enabled AVX2
+    in
+    Array.for_all enabled instr.ext
 end
 
 (* Emit elf notes with trap handling information. *)
@@ -205,7 +249,6 @@ type specific_operation =
   | Ilfence                            (* load fence *)
   | Isfence                            (* store fence *)
   | Imfence                            (* memory fence *)
-  | Ipause                             (* hint for spin-wait loops *)
   | Ipackf32                           (* UNPCKLPS on registers; see Cpackf32 *)
   | Isimd of Simd.operation            (* SIMD instruction set operations *)
   | Isimd_mem of Simd.Mem.operation * addressing_mode
@@ -260,6 +303,22 @@ let num_args_addressing = function
   | Iindexed2 _ -> 2
   | Iscaled _ -> 1
   | Iindexed2scaled _ -> 2
+
+let addressing_displacement_for_llvmize addr =
+  if not !Clflags.llvm_backend
+  then
+    Misc.fatal_error
+      "Arch.displacement_addressing_for_llvmize: should only be called with \
+        -llvm-backend"
+  else
+    match addr with
+    | Iindexed d -> d
+    | Ibased _
+    | Iindexed2 _
+    | Iscaled _
+    | Iindexed2scaled _ ->
+      Misc.fatal_error
+        "Arch.displacement_addressing_for_llvmize: unexpected addressing mode"
 
 (* Printing operations and addressing modes *)
 
@@ -340,8 +399,6 @@ let print_specific_operation printreg op ppf arg =
       Simd.print_operation printreg simd ppf arg
   | Isimd_mem (simd, addr) ->
       Simd.Mem.print_operation printreg (print_addressing printreg addr) simd ppf arg
-  | Ipause ->
-      fprintf ppf "pause"
   | Icldemote _ ->
       fprintf ppf "cldemote %a" printreg arg.(0)
   | Iprefetch { is_write; locality; _ } ->
@@ -367,7 +424,6 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Ipackf32 -> "packf32"
   | Isimd _simd -> "simd"
   | Isimd_mem (_simd,_addr) -> "simd_mem"
-  | Ipause -> "pause"
   | Icldemote _ -> "cldemote"
   | Iprefetch _ -> "prefetch"
 
@@ -383,7 +439,7 @@ let win64 =
 let operation_is_pure = function
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32
   | Ifloatarithmem _  -> true
-  | Irdtsc | Irdpmc | Ipause
+  | Irdtsc | Irdpmc
   | Ilfence | Isfence | Imfence
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
   | Icldemote _ | Iprefetch _ -> false
@@ -395,7 +451,7 @@ let operation_is_pure = function
 let operation_allocates = function
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32
   | Ifloatarithmem _
-  | Irdtsc | Irdpmc | Ipause | Ipackf32
+  | Irdtsc | Irdpmc  | Ipackf32
   | Isimd _ | Isimd_mem _
   | Ilfence | Isfence | Imfence
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
@@ -407,7 +463,7 @@ open X86_ast
    float comparison, so we have to swap the arguments. The swap information
    is also needed downstream because one of the arguments is clobbered. *)
 let float_cond_and_need_swap cond =
-  match (cond : Lambda.float_comparison) with
+  match (cond : Scalar.Float_comparison.t) with
   | CFeq  -> EQf,  false
   | CFneq -> NEQf, false
   | CFlt  -> LTf,  false
@@ -478,8 +534,6 @@ let equal_specific_operation left right =
     true
   | Imfence, Imfence ->
     true
-  | Ipause, Ipause ->
-    true
   | Ipackf32, Ipackf32 ->
     true
   | Icldemote x, Icldemote x' -> equal_addressing_mode x x'
@@ -494,7 +548,7 @@ let equal_specific_operation left right =
     Simd.Mem.equal_operation l r && equal_addressing_mode al ar
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
      Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
-     Ipause | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
+      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
     false
 
 (* addressing mode functions *)
@@ -590,8 +644,6 @@ let isomorphic_specific_operation op1 op2 =
     true
   | Imfence, Imfence ->
     true
-  | Ipause, Ipause ->
-    true
   | Ipackf32, Ipackf32 ->
     true
   | Icldemote x, Icldemote x' -> equal_addressing_mode_without_displ x x'
@@ -605,6 +657,6 @@ let isomorphic_specific_operation op1 op2 =
   | Isimd_mem (l,al), Isimd_mem (r,ar) ->
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
-     Ipause | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
+     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
+    | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
     false

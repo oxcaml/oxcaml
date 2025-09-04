@@ -145,7 +145,7 @@ extern frame_descr ** caml_frame_descriptors;
 extern uintnat caml_frame_descriptors_mask;
 
 #define Hash_retaddr(addr) \
-  (((uintnat)(addr) >> 3) & caml_frame_descriptors_mask)
+  ((((uintnat)(addr) * 52437813) >> 5) & caml_frame_descriptors_mask)
 
 #define Retaddr_frame(d) \
   ((uintnat)&(d)->retaddr_rel + \

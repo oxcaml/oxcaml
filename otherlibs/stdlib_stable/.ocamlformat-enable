@@ -8,3 +8,9 @@ arm64/float32.mli
 arm64/float32.ml
 generic/stdlib_stable.mli
 generic/stdlib_stable.ml
+int.ml
+int.mli
+int8.ml
+int8.mli
+int16.ml
+int16.mli

@@ -24,6 +24,8 @@ let unknown (kind : K.t) =
   | Naked_number Naked_immediate -> TG.any_naked_immediate
   | Naked_number Naked_float32 -> TG.any_naked_float32
   | Naked_number Naked_float -> TG.any_naked_float
+  | Naked_number Naked_int8 -> TG.any_naked_int8
+  | Naked_number Naked_int16 -> TG.any_naked_int16
   | Naked_number Naked_int32 -> TG.any_naked_int32
   | Naked_number Naked_int64 -> TG.any_naked_int64
   | Naked_number Naked_nativeint -> TG.any_naked_nativeint
@@ -44,6 +46,8 @@ let bottom (kind : K.t) =
   | Naked_number Naked_immediate -> TG.bottom_naked_immediate
   | Naked_number Naked_float32 -> TG.bottom_naked_float32
   | Naked_number Naked_float -> TG.bottom_naked_float
+  | Naked_number Naked_int8 -> TG.bottom_naked_int8
+  | Naked_number Naked_int16 -> TG.bottom_naked_int16
   | Naked_number Naked_int32 -> TG.bottom_naked_int32
   | Naked_number Naked_int64 -> TG.bottom_naked_int64
   | Naked_number Naked_nativeint -> TG.bottom_naked_nativeint
@@ -60,6 +64,10 @@ let these_naked_immediates is = TG.these_naked_immediates is
 let these_naked_float32s fs = TG.these_naked_float32s fs
 
 let these_naked_floats fs = TG.these_naked_floats fs
+
+let these_naked_int8s is = TG.these_naked_int8s is
+
+let these_naked_int16s is = TG.these_naked_int16s is
 
 let these_naked_int32s is = TG.these_naked_int32s is
 
@@ -87,10 +95,10 @@ let any_tagged_immediate_or_null =
     { non_null = Ok any_tagged_immediate_non_null; is_null = Maybe_null }
 
 let these_tagged_immediates0 imms =
-  match Targetint_31_63.Set.get_singleton imms with
+  match Target_ocaml_int.Set.get_singleton imms with
   | Some imm -> TG.this_tagged_immediate imm
   | _ ->
-    if Targetint_31_63.Set.is_empty imms
+    if Target_ocaml_int.Set.is_empty imms
     then TG.bottom_value
     else
       TG.create_variant ~is_unique:false
@@ -99,9 +107,9 @@ let these_tagged_immediates0 imms =
 
 let these_tagged_immediates imms = these_tagged_immediates0 imms
 
-let any_tagged_bool = these_tagged_immediates Targetint_31_63.all_bools
+let any_tagged_bool = these_tagged_immediates Target_ocaml_int.all_bools
 
-let any_naked_bool = TG.these_naked_immediates Targetint_31_63.all_bools
+let any_naked_bool = TG.these_naked_immediates Target_ocaml_int.all_bools
 
 let this_boxed_float32 f alloc_mode =
   TG.box_float32 (TG.this_naked_float32 f) alloc_mode
@@ -208,7 +216,7 @@ let blocks_with_these_tags tags alloc_mode : _ Or_unknown.t =
          ~extensions:No_extensions)
 
 let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
-  match Targetint_31_63.of_int_option (List.length fields) with
+  match Target_ocaml_int.of_int_option (List.length fields) with
   | None ->
     (* CR-someday mshinwell: This should be a special kind of error. *)
     Misc.fatal_error "Block too long for target"
@@ -221,7 +229,7 @@ let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
       ~extensions:No_extensions
 
 let immutable_block_non_null ~is_unique tag ~shape alloc_mode ~fields =
-  match Targetint_31_63.of_int_option (List.length fields) with
+  match Target_ocaml_int.of_int_option (List.length fields) with
   | None ->
     (* CR-someday mshinwell: This should be a special kind of error. *)
     Misc.fatal_error "Block too long for target"
@@ -235,7 +243,7 @@ let immutable_block_non_null ~is_unique tag ~shape alloc_mode ~fields =
       ~extensions:No_extensions
 
 let immutable_block_with_size_at_least ~tag ~n ~shape ~field_n_minus_one =
-  let n = Targetint_31_63.to_int n in
+  let n = Target_ocaml_int.to_int n in
   let field_tys =
     List.init n (fun index ->
         let field_kind = K.Block_shape.element_kind shape index in
@@ -397,6 +405,8 @@ let type_for_const const =
   | Tagged_immediate i -> TG.this_tagged_immediate i
   | Naked_float32 f -> TG.this_naked_float32 f
   | Naked_float f -> TG.this_naked_float f
+  | Naked_int8 n -> TG.this_naked_int8 n
+  | Naked_int16 n -> TG.this_naked_int16 n
   | Naked_int32 n -> TG.this_naked_int32 n
   | Naked_int64 n -> TG.this_naked_int64 n
   | Naked_nativeint n -> TG.this_naked_nativeint n
@@ -438,6 +448,8 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
   | Naked_number Naked_immediate -> TG.any_naked_immediate
   | Naked_number Naked_float32 -> TG.any_naked_float32
   | Naked_number Naked_float -> TG.any_naked_float
+  | Naked_number Naked_int8 -> TG.any_naked_int8
+  | Naked_number Naked_int16 -> TG.any_naked_int16
   | Naked_number Naked_int32 -> TG.any_naked_int32
   | Naked_number Naked_int64 -> TG.any_naked_int64
   | Naked_number Naked_nativeint -> TG.any_naked_nativeint

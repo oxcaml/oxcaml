@@ -196,11 +196,6 @@ Caml_inline header_t get_header_val(value v) {
   return spin_on_header(v);
 }
 
-header_t caml_get_header_val(value v) {
-  return get_header_val(v);
-}
-
-
 static int try_update_object_header(value v, volatile value *p, value result,
                                     mlsize_t infix_offset) {
   int success = 0;
@@ -375,7 +370,7 @@ static void oldify_one (void* st_v, value v, volatile value *p)
       #endif
     }
 
-  } else if (tag >= No_scan_tag) {
+  } else if (!Scannable_tag(tag)) {
     sz = Wosize_hd (hd);
     st->live_bytes += Bhsize_hd(hd);
     result = alloc_shared(st->domain, sz, tag, Reserved_hd(hd));
@@ -749,7 +744,8 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   CAML_EV_BEGIN(EV_MINOR_LOCAL_ROOTS);
   caml_do_local_roots(
     &oldify_one, oldify_scanning_flags, &st,
-    domain->local_roots, domain->current_stack, domain->gc_regs);
+    domain->local_roots, domain->current_stack, domain->gc_regs,
+    domain->dynamic_bindings);
 
   scan_roots_hook = atomic_load(&caml_scan_roots_hook);
   if (scan_roots_hook != NULL)
@@ -884,7 +880,7 @@ static void dependent_accounting_minor (caml_domain_state *domain)
     value *v = &elt->block;
     CAMLassert (Is_block (*v));
     if (Is_young(*v)) {
-      if (get_header_val(*v) == 0) { /* value copied to major heap */
+      if (Hd_val(*v) == 0) { /* value copied to major heap */
         /* inlined version of [caml_alloc_dependent_memory] */
         domain->allocated_dependent_bytes += elt->mem;
         domain->stat_promoted_dependent_bytes += elt->mem;

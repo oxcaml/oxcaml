@@ -2,6 +2,10 @@
  include stdlib_upstream_compatible;
 *)
 
+(* External declarations for unsigned comparison primitives *)
+external unsigned_lt : int32# -> int32# -> bool = "%int32#_unsigned_lessthan"
+external unsigned_gt : int32# -> int32# -> bool = "%int32#_unsigned_greaterthan"
+
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 
 (* Print all individual successful tests; used for debugging, as it will cause
@@ -313,4 +317,57 @@ let () =
   test_binary_of "equal"               Int32.equal               Int32_u.equal                bool_result;
   test_binary    "min"                 Int32.min                 Int32_u.min;
   test_binary    "max"                 Int32.max                 Int32_u.max;
+
+  (* Explicit unsigned comparison tests with hardcoded expected values *)
+  let module I = Int32_u in
+
+  (* Define constants using unboxed literals *)
+  let zero = #0l in
+  let one = #1l in
+  let minus_one = -#1l in
+  let max_int = #0x7FFFFFFFl in
+  let min_int = -#0x80000000l in
+
+  (* Test that -1 (0xFFFFFFFF) > 0 when compared as unsigned *)
+  assert (I.unsigned_compare minus_one zero = 1);
+  assert (I.unsigned_compare zero minus_one = -1);
+
+  (* Test that min_int (0x80000000) > max_int (0x7FFFFFFF) when compared as unsigned *)
+  assert (I.unsigned_compare min_int max_int = 1);
+  assert (I.unsigned_compare max_int min_int = -1);
+
+  (* Test ordering: when viewed as unsigned:
+     0 < 1 < max_int < min_int < -1 *)
+  assert (I.unsigned_compare zero one = -1);
+  assert (I.unsigned_compare one max_int = -1);
+  assert (I.unsigned_compare max_int min_int = -1);
+  assert (I.unsigned_compare min_int minus_one = -1);
+
+  (* Test equality *)
+  assert (I.unsigned_compare zero zero = 0);
+  assert (I.unsigned_compare minus_one minus_one = 0);
+  assert (I.unsigned_compare min_int min_int = 0);
+
+  (* Test specific values *)
+  let neg_1000 = I.of_int (-1000) in (* 0xFFFFFC18 *)
+  let pos_1000 = I.of_int 1000 in
+  assert (I.unsigned_compare neg_1000 pos_1000 = 1);
+  assert (I.unsigned_compare pos_1000 neg_1000 = -1);
+
+  (* Test the unsigned_lt primitive directly *)
+  assert (unsigned_lt zero minus_one = true); (* 0 < 0xFFFFFFFF *)
+  assert (unsigned_lt minus_one zero = false);
+  assert (unsigned_lt max_int min_int = true); (* 0x7FFFFFFF < 0x80000000 *)
+  assert (unsigned_lt min_int max_int = false);
+  assert (unsigned_lt pos_1000 neg_1000 = true);
+  assert (unsigned_lt neg_1000 pos_1000 = false);
+
+  (* Test unsigned greater than using primitive comparisons *)
+  assert (unsigned_gt minus_one zero = true); (* 0xFFFFFFFF > 0 *)
+  assert (unsigned_gt zero minus_one = false);
+  assert (unsigned_gt min_int max_int = true); (* 0x80000000 > 0x7FFFFFFF *)
+  assert (unsigned_gt max_int min_int = false);
+  assert (unsigned_gt neg_1000 pos_1000 = true);
+  assert (unsigned_gt pos_1000 neg_1000 = false);
+
   ()

@@ -119,6 +119,7 @@
   jkind_intf
   jkind_axis
   jkind_types
+  scalar
   primitive
   zero_alloc
   types
@@ -128,6 +129,7 @@
   value_rec_types
   btype
   lazy_backtrack
+  type_shape
   zero_alloc_utils
   subst
   signature_with_global_bindings
@@ -280,6 +282,8 @@
 
 (copy_files ../../typing/primitive.ml)
 
+(copy_files ../../typing/scalar.ml)
+
 (copy_files ../../typing/shape.ml)
 
 (copy_files ../../typing/allowance.ml)
@@ -297,6 +301,8 @@
 (copy_files ../../typing/types.ml)
 
 (copy_files ../../typing/btype.ml)
+
+(copy_files ../../typing/type_shape.ml)
 
 (copy_files ../../typing/subst.ml)
 
@@ -434,6 +440,8 @@
 
 (copy_files ../../typing/primitive.mli)
 
+(copy_files ../../typing/scalar.mli)
+
 (copy_files ../../typing/shape.mli)
 
 (copy_files ../../typing/allowance.mli)
@@ -451,6 +459,8 @@
 (copy_files ../../typing/types.mli)
 
 (copy_files ../../typing/btype.mli)
+
+(copy_files ../../typing/type_shape.mli)
 
 (copy_files ../../typing/subst.mli)
 
@@ -598,6 +608,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Zero_alloc.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Scalar.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Primitive.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Oprint.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
@@ -617,6 +628,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Persistent_env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Predef.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Dll.cmo
@@ -694,6 +706,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Zero_alloc.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Scalar.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Primitive.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Oprint.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
@@ -713,6 +726,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Persistent_env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Predef.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Dll.cmx

@@ -875,9 +875,13 @@ let rec choice ctx t =
         Lprim (Popaque layout, [l1], loc)
 
     (* in common cases we just return *)
+    | Pphys_equal _
+    | Pscalar _
+    (* Note for Pscalar: operations returning boxed values could be
+       considered constructions someday *)
     | Pbytes_to_string | Pbytes_of_string
     | Parray_to_iarray | Parray_of_iarray
-    | Pgetglobal _ | Psetglobal _ | Pgetpredef _
+    | Pgetglobal _ | Pgetpredef _
     | Pfield _ | Pfield_computed _
     | Psetfield _ | Psetfield_computed _
     | Pfloatfield _ | Psetfloatfield _
@@ -886,24 +890,13 @@ let rec choice ctx t =
     | Pccall _
     | Praise _
     | Pnot
-    | Pnegint | Paddint | Psubint | Pmulint | Pdivint _ | Pmodint _
-    | Pandint | Porint | Pxorint
-    | Plslint | Plsrint | Pasrint
-    | Pintcomp _ | Punboxed_int_comp _
-    | Poffsetint _ | Poffsetref _
-    | Pintoffloat _ | Pfloatofint (_, _)
-    | Pfloatoffloat32 _ | Pfloat32offloat _
-    | Pnegfloat (_, _) | Pabsfloat (_, _)
-    | Paddfloat (_, _) | Psubfloat (_, _)
-    | Pmulfloat (_, _) | Pdivfloat (_, _)
-    | Pfloatcomp (_, _) | Punboxed_float_comp (_, _)
+    | Poffsetref _
     | Pstringlength | Pstringrefu  | Pstringrefs
     | Pbyteslength | Pbytesrefu | Pbytessetu | Pbytesrefs | Pbytessets
     | Parraylength _ | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _
     | Parrayblit _
     | Pisint _ | Pisnull | Pisout
     | Pignore
-    | Pcompare_ints | Pcompare_floats _ | Pcompare_bints _
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
     | Punbox_unit
@@ -912,13 +905,12 @@ let rec choice ctx t =
     | Prunstack | Pperform | Presume | Preperform | Pdls_get
 
     (* we don't handle atomic primitives *)
-    | Patomic_exchange _ | Patomic_compare_exchange _
-    | Patomic_compare_set _ | Patomic_fetch_add
-    | Patomic_add | Patomic_sub | Patomic_land
-    | Patomic_lor | Patomic_lxor | Patomic_load _ | Patomic_set _
+    | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+    | Patomic_compare_set_field _ | Patomic_fetch_add_field
+    | Patomic_add_field | Patomic_sub_field | Patomic_land_field
+    | Patomic_lor_field | Patomic_lxor_field
+    | Patomic_load_field _ | Patomic_set_field _
     | Pcpu_relax
-    | Punbox_float _ | Pbox_float (_, _)
-    | Punbox_int _ | Pbox_int _
     | Punbox_vector _ | Pbox_vector (_, _)
 
     (* it doesn't seem worth it to support lazy blocks for tmc *)
@@ -945,53 +937,44 @@ let rec choice ctx t =
     | Pobj_magic _
     | Pprobe_is_enabled _
 
-    (* operations returning boxed values could be considered
-       constructions someday *)
-    | Pbintofint _ | Pintofbint _
-    | Pcvtbint _
-    | Pnegbint _
-    | Paddbint _ | Psubbint _ | Pmulbint _ | Pdivbint _ | Pmodbint _
-    | Pandbint _ | Porbint _ | Pxorbint _ | Plslbint _ | Plsrbint _ | Pasrbint _
-    | Pbintcomp _
-
     (* more common cases... *)
     | Pbigarrayref _ | Pbigarrayset _
     | Pbigarraydim _
     | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
-    | Pstring_load_64 _ | Pstring_load_128 _
+    | Pstring_load_64 _ | Pstring_load_vec _
     | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-    | Pbytes_load_64 _ | Pbytes_load_128 _
+    | Pbytes_load_64 _ | Pbytes_load_vec _
     | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
-    | Pbytes_set_64 _ | Pbytes_set_128 _
+    | Pbytes_set_64 _ | Pbytes_set_vec _
     | Pbigstring_load_16 _ | Pbigstring_load_32 _ | Pbigstring_load_f32 _
-    | Pbigstring_load_64 _ | Pbigstring_load_128 _
+    | Pbigstring_load_64 _ | Pbigstring_load_vec _
     | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
-    | Pbigstring_set_64 _ | Pbigstring_set_128 _
-    | Pfloatarray_load_128 _
-    | Pfloat_array_load_128 _
-    | Pint_array_load_128 _
-    | Punboxed_float_array_load_128 _
-    | Punboxed_float32_array_load_128 _
-    | Punboxed_int32_array_load_128 _
-    | Punboxed_int64_array_load_128 _
-    | Punboxed_nativeint_array_load_128 _
-    | Pfloatarray_set_128 _
-    | Pfloat_array_set_128 _
-    | Pint_array_set_128 _
-    | Punboxed_float_array_set_128 _
-    | Punboxed_float32_array_set_128 _
-    | Punboxed_int32_array_set_128 _
-    | Punboxed_int64_array_set_128 _
-    | Punboxed_nativeint_array_set_128 _
+    | Pbigstring_set_64 _ | Pbigstring_set_vec _
+    | Pfloatarray_load_vec _
+    | Pfloat_array_load_vec _
+    | Pint_array_load_vec _
+    | Punboxed_float_array_load_vec _
+    | Punboxed_float32_array_load_vec _
+    | Punboxed_int32_array_load_vec _
+    | Punboxed_int64_array_load_vec _
+    | Punboxed_nativeint_array_load_vec _
+    | Pfloatarray_set_vec _
+    | Pfloat_array_set_vec _
+    | Pint_array_set_vec _
+    | Punboxed_float_array_set_vec _
+    | Punboxed_float32_array_set_vec _
+    | Punboxed_int32_array_set_vec _
+    | Punboxed_int64_array_set_vec _
+    | Punboxed_nativeint_array_set_vec _
     | Pget_header _
     | Pctconst _
-    | Pbswap16
-    | Pbbswap _
     | Pint_as_pointer _
     | Psequand | Psequor
     | Ppoll
     | Ppeek _ | Ppoke _
-      ->
+    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _
+    | Pmake_idx_array _
+    | Pget_idx _ | Pset_idx _ ->
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
 

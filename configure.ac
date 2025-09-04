@@ -98,7 +98,6 @@ AC_ARG_ENABLE([dev],
 
 AC_SUBST([prefix])
 AC_SUBST([middle_end])
-AC_SUBST([dune])
 
 coverage="$enable_coverage"
 AC_SUBST([coverage])
@@ -196,6 +195,7 @@ AC_ARG_ENABLE([stack_checks],
 AC_SUBST([enable_runtime5])
 AC_SUBST([runtime_suffix])
 AC_SUBST([enable_stack_checks])
+AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([CONFIGURE_ARGS])
 AC_SUBST([native_compiler])
 AC_SUBST([default_build_target])
@@ -325,6 +325,9 @@ AC_SUBST([ASPP])
 AC_SUBST([endianness])
 AC_SUBST([AS])
 AC_SUBST([asm_cfi_supported])
+AC_SUBST([as_compress_debug_sections_flag])
+AC_SUBST([cc_compress_debug_sections_flag])
+AC_SUBST([objcopy_compress_debug_sections_flag])
 AC_SUBST([sharedlib_cflags])
 AC_SUBST([rpath])
 AC_SUBST([mkdll])
@@ -350,6 +353,8 @@ AC_SUBST([cmm_invariants])
 AC_SUBST([windows_unicode])
 AC_SUBST([flat_float_array])
 AC_SUBST([function_sections])
+AC_SUBST([oxcaml_dwarf_flags_for_compiler])
+AC_SUBST([assembly_flag_for_compiler])
 AC_SUBST([probes])
 AC_SUBST([oc_native_compflags])
 AC_SUBST([afl])
@@ -364,6 +369,7 @@ AC_SUBST([stack_allocation])
 AC_SUBST([poll_insertion])
 AC_SUBST([enable_multidomain])
 AC_SUBST([dune])
+AC_SUBST([objcopy])
 AC_SUBST([ocaml_bindir])
 AC_SUBST([ocaml_libdir])
 AC_SUBST([QS])
@@ -473,12 +479,6 @@ AC_ARG_VAR([ASPP], [which assembler (with preprocessor) to use])
 AC_ARG_VAR([PARTIALLD], [how to build partial (relocatable) object files])
 
 # Command-line arguments to configure
-
-AC_PATH_PROG([dune], [dune], [])
-AC_ARG_WITH([dune],
-  [AS_HELP_STRING([--with-dune],
-    [Path to dune executable (otherwise PATH is searched)])],
-  [dune=$with_dune])
 
 AC_ARG_ENABLE([debug-runtime],
   [AS_HELP_STRING([--disable-debug-runtime],
@@ -641,6 +641,12 @@ AC_ARG_ENABLE([cmm-invariants],
   [AS_HELP_STRING([--enable-cmm-invariants],
     [enable invariants checks in Cmm])])
 
+AC_ARG_ENABLE([oxcaml-dwarf],
+  [AS_HELP_STRING([--enable-oxcaml-dwarf],
+    [enable OxCaml DWARF by default @<:@default=no@:>@])],
+  [],
+  [enable_oxcaml_dwarf=no])
+
 AC_ARG_WITH([target-bindir],
   [AS_HELP_STRING([--with-target-bindir],
     [location of the runtime binaries on the target system])],
@@ -702,6 +708,18 @@ AC_ARG_ENABLE([stack-allocation],
 AC_ARG_ENABLE([poll-insertion],
   [AS_HELP_STRING([--enable-poll-insertion],
     [enable insertion of poll points])])
+
+AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
+  [AS_HELP_STRING([--enable-oxcaml-dwarf-on-compiler],
+    [Compile the compiler and standard library with OxCaml DWARF])],
+  [],
+  [enable_oxcaml_dwarf_on_compiler=no])
+
+AC_ARG_ENABLE([keep-compiler-asm],
+  [AS_HELP_STRING([--enable-keep-compiler-asm],
+    [Configure the compiler to use -S during bootstrapping, which will produce .s assembly files for the files in the compiler tree. The files can be found in _build/main when building with dune])],
+  [],
+  [enable_keep_compiler_asm=no])
 
 AC_ARG_ENABLE([multidomain],
   [AS_HELP_STRING([--enable-multidomain],
@@ -2237,6 +2255,14 @@ AC_CHECK_FUNC([gettimeofday],
 
 AC_CHECK_FUNC([mktime], [AC_DEFINE([HAS_MKTIME])])
 
+## gmtime_r
+
+AC_CHECK_FUNC([gmtime_r], [AC_DEFINE([HAS_GMTIME_R])])
+
+## localtime_r
+
+AC_CHECK_FUNC([localtime_r], [AC_DEFINE([HAS_LOCALTIME_R])])
+
 ## setsid
 
 AS_CASE([$host],
@@ -2363,6 +2389,26 @@ AX_FUNC_WHICH_GETHOSTBYADDR_R
 AS_CASE([$ac_cv_func_which_gethostbyaddr_r],
   [eight], [AC_DEFINE([HAS_GETHOSTBYADDR_R],[8])],
   [seven], [AC_DEFINE([HAS_GETHOSTBYADDR_R],[7])])
+
+## getlogin_r
+
+AC_CHECK_FUNC([getlogin_r], [AC_DEFINE([HAS_GETLOGIN_R])])
+
+## getpwnam_r
+
+AC_CHECK_FUNC([getpwnam_r], [AC_DEFINE([HAS_GETPWNAM_R])])
+
+## getgrnam_r
+
+AC_CHECK_FUNC([getgrnam_r], [AC_DEFINE([HAS_GETGRNAM_R])])
+
+## getpwuid_r
+
+AC_CHECK_FUNC([getpwuid_r], [AC_DEFINE([HAS_GETPWUID_R])])
+
+## getgrgid_r
+
+AC_CHECK_FUNC([getgrgid_r], [AC_DEFINE([HAS_GETGRGID_R])])
 
 ## mkstemp
 
@@ -2622,11 +2668,36 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
 ## Does the assembler support debug prefix map and CFI directives
 as_has_debug_prefix_map=false
 asm_cfi_supported=false
+as_compress_debug_sections_flag=""
+cc_compress_debug_sections_flag=""
+objcopy_compress_debug_sections_flag=""
 AS_IF([$native_compiler],
   [AS_CASE([$host],
     [*-*-mingw32*|*-pc-windows], [],
     [OCAML_AS_HAS_DEBUG_PREFIX_MAP
-    OCAML_AS_HAS_CFI_DIRECTIVES])])
+    OCAML_AS_HAS_CFI_DIRECTIVES
+    OCAML_AS_COMPRESSION_SUPPORT
+    OCAML_CC_COMPRESSION_SUPPORT
+    OCAML_OBJCOPY_COMPRESSION_SUPPORT])])
+
+dnl Prefer llvm-objcopy. If llvm-objcopy is not found, use objcopy.
+dnl GNU objcopy 2.35.2 sometimes modifies .relro_padding and .init_array
+dnl sections incorrectly, llvm-copy does not.
+default_objcopy="llvm-objcopy objcopy"
+
+AS_IF([$native_compiler],
+  [AS_CASE([$system],
+    [macosx],[],
+    [AC_PATH_PROGS([objcopy], [$default_objcopy], [])
+     AS_IF([test x"$objcopy" = "x"],
+       [AC_MSG_ERROR([objcopy not found on PATH; install, or use --with-objcopy])])
+     AC_MSG_NOTICE([Using objcopy executable: $objcopy])])])
+
+AC_ARG_WITH([objcopy],
+  [AS_HELP_STRING([--with-objcopy],
+    [Path to objcopy executable (otherwise PATH is searched for 'llvm-objcopy' or
+    'objcopy')])],
+  [objcopy=$with_objcopy])
 
 ## Frame pointers
 
@@ -2822,6 +2893,21 @@ AS_IF([test x"$with_afl" = "xyes"],
   [afl=true],
   [afl=false])
 
+# Configure DWARF debugging flags for oxcaml compiler
+AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
+  [oxcaml_dwarf_flags_for_compiler="-g -gno-upstream-dwarf -bin-annot-cms -shape-format debugging-shapes"],
+  [oxcaml_dwarf_flags_for_compiler=""])
+
+# Ensure compatibility: oxcaml-dwarf-on-compiler requires function-sections to be disabled
+AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
+  [AS_IF([test x"$enable_function_sections" != "xno"],
+    [AC_MSG_ERROR([--enable-oxcaml-dwarf-on-compiler requires --disable-function-sections to be passed])])])
+
+# Configure assembly emission flag for compiler
+AS_IF([test x"$enable_keep_compiler_asm" = "xyes"],
+  [assembly_flag_for_compiler="-S"],
+  [assembly_flag_for_compiler=""])
+
 # Enable debugging support
 # TODO: add a --disable-debug-info configure option that disables debugging
 # info for both C and OCaml
@@ -2850,6 +2936,79 @@ AS_IF([test x"$enable_multidomain" = "xyes"],
     [AC_MSG_ERROR([Creating multiple domains is only supported on runtime5 with \
 poll insertion enabled.])])], [])
 
+AC_SUBST([has_popcnt])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("popcnt")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_POPCNT]) has_popcnt=yes, [])
+
+AC_SUBST([has_pclmul])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("pclmul")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_PCLMUL]) has_pclmul=yes, [])
+
+AC_SUBST([has_sse3])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("sse3")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSE3]) has_sse3=yes, [])
+
+AC_SUBST([has_ssse3])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("ssse3")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSSE3]) has_ssse3=yes, [])
+
+AC_SUBST([has_sse4_1])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("sse4.1")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSE4_1]) has_sse4_1=yes, [])
+
+AC_SUBST([has_sse4_2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("sse4.2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSE4_2]) has_sse4_2=yes, [])
+
+AC_SUBST([has_bmi])
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
 int main(void) {
   __builtin_cpu_init ();
@@ -2859,7 +3018,43 @@ int main(void) {
     return 1;
   }
 }
-]])], AC_DEFINE([HAS_BMI]), [])
+]])], AC_DEFINE([HAS_BMI]) has_bmi=yes, [])
+
+AC_SUBST([has_bmi2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("bmi2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_BMI2]) has_bmi2=yes, [])
+
+AC_SUBST([has_avx])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX]) has_avx=yes, [])
+
+AC_SUBST([has_avx2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX2]) has_avx2=yes, [])
 
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"

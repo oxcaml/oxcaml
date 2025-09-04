@@ -33,7 +33,7 @@ end
 
 module Lambda_utils = struct
   module Constants = struct
-    let int n = Lconst (const_int n)
+    let int n = tagged_immediate n
 
     let float f = Lconst (Const_base (Const_float (Float.to_string f)))
 
@@ -113,31 +113,33 @@ module Lambda_utils = struct
 
   let int_ops ~loc : (module Int_ops) =
     (module struct
-      let binop prim l r = Lprim (prim, [l; r], loc)
+      let binop prim l r = Lprim (Pscalar (Binary prim), [l; r], loc)
 
-      let ( + ) = binop Paddint
+      let size = int
 
-      let ( - ) = binop Psubint
+      let ( + ) = binop (Integral (size, Add))
 
-      let ( * ) = binop Pmulint
+      let ( - ) = binop (Integral (size, Sub))
 
-      let ( / ) = binop (Pdivint Unsafe)
+      let ( * ) = binop (Integral (size, Mul))
 
-      let ( = ) = binop (Pintcomp Ceq)
+      let ( / ) = binop (Integral (size, Div Unsafe))
 
-      let ( <> ) = binop (Pintcomp Cne)
+      let ( = ) = binop (Icmp (size, Ceq))
 
-      let ( < ) = binop (Pintcomp Clt)
+      let ( <> ) = binop (Icmp (size, Cne))
 
-      let ( > ) = binop (Pintcomp Cgt)
+      let ( < ) = binop (Icmp (size, Clt))
 
-      let ( <= ) = binop (Pintcomp Cle)
+      let ( > ) = binop (Icmp (size, Cgt))
 
-      let ( >= ) = binop (Pintcomp Cge)
+      let ( <= ) = binop (Icmp (size, Cle))
 
-      let ( && ) = binop Psequor
+      let ( >= ) = binop (Icmp (size, Cge))
 
-      let ( || ) = binop Psequor
+      let ( && ) l r = Lprim (Psequand, [l; r], loc)
+
+      let ( || ) l r = Lprim (Psequor, [l; r], loc)
 
       let i = Constants.int
 

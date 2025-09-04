@@ -35,18 +35,23 @@ let reaper_test_opaque = Sys.getenv_opt "REAPEROPAQUE" <> None
 
 let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
   let return =
-    List.init
-      (Flambda_arity.cardinal_unarized (Code.result_arity code))
-      (fun i ->
+    List.mapi
+      (fun i kind ->
         Variable.create
-          (Format.asprintf "function_return_%i_%a" i Code_id.print code_id))
+          (Format.asprintf "function_return_%i_%a" i Code_id.print code_id)
+          (Flambda_kind.With_subkind.kind kind))
+      (Flambda_arity.unarized_components (Code.result_arity code))
   in
-  let exn = Variable.create "function_exn" in
-  let my_closure = Variable.create "my_closure" in
+  let exn = Variable.create "function_exn" Flambda_kind.value in
+  let my_closure = Variable.create "my_closure" Flambda_kind.value in
   let arity = Code.params_arity code in
   let params =
-    List.init (Flambda_arity.cardinal_unarized arity) (fun i ->
-        Variable.create (Printf.sprintf "function_param_%i" i))
+    List.mapi
+      (fun i kind ->
+        Variable.create
+          (Printf.sprintf "function_param_%i" i)
+          (Flambda_kind.With_subkind.kind kind))
+      (Flambda_arity.unarize arity)
   in
   let has_unsafe_result_type =
     match Code.result_types code with
@@ -68,8 +73,12 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
       (if Code.is_tupled code then 1 else Flambda_arity.num_params arity)
       (fun i ->
         Code_id_or_name.var
+          (* These witnesses are not going to end up as actual program
+             variables; giving them kind Value is a bit misleading but should
+             not cause any issue. *)
           (Variable.create
-             (Printf.sprintf "witness_%d_for_%s" i (Code_id.name code_id))))
+             (Printf.sprintf "witness_%d_for_%s" i (Code_id.name code_id))
+             Flambda_kind.value))
   in
   let code_dep =
     { Traverse_acc.arity;
@@ -294,7 +303,7 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let block = Code_id_or_name.name (Acc.simple_to_name acc ~denv block) in
     default_bp (fun to_ ->
         Graph.add_accessor_dep (Acc.graph acc) ~to_
-          (Block (Targetint_31_63.to_int field, kind))
+          (Block (Target_ocaml_int.to_int field, kind))
           ~base:block);
     match mut with
     | Immutable | Immutable_unique -> ()
@@ -582,7 +591,7 @@ and traverse_apply denv acc apply : rev_expr =
   { expr; holed_expr = denv.parent }
 
 and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
-  let calls_are_not_pure = Variable.create "not_pure" in
+  let calls_are_not_pure = Variable.create "not_pure" Flambda_kind.value in
   Acc.used ~denv (Simple.var calls_are_not_pure) acc;
   let add_call_widget (function_call : Call_kind.Function_call.t) =
     let args, closure_entry_point =
@@ -632,11 +641,13 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
                   ~base:callee)
               return_args)
         | _ :: _ ->
-          let v = Variable.create "partial_apply" in
+          let v = Variable.create "partial_apply" Flambda_kind.value in
           Graph.add_accessor_dep (Acc.graph acc) ~to_:(Code_id_or_name.var v)
             (Apply (closure_entry_point, Normal 0))
             ~base:callee;
-          let calls_are_not_pure = Variable.create "not_pure" in
+          let calls_are_not_pure =
+            Variable.create "not_pure" Flambda_kind.value
+          in
           Acc.used ~denv (Simple.var calls_are_not_pure) acc;
           add_deps (Code_id_or_name.var v) rest calls_are_not_pure)
     in
@@ -685,7 +696,7 @@ and traverse_apply_cont denv acc apply_cont : rev_expr =
 and traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
   Acc.used ~denv (Switch_expr.scrutinee switch) acc;
-  Targetint_31_63.Map.iter
+  Target_ocaml_int.Map.iter
     (fun _ apply_cont -> apply_cont_deps denv acc apply_cont)
     (Switch_expr.arms switch);
   { expr; holed_expr = denv.parent }
@@ -834,8 +845,12 @@ let run ~get_code_metadata (unit : Flambda_unit.t) =
      all_constants) ~from:(Code_id_or_name.symbol all_constants); *)
   Graph.add_any_source (Acc.graph acc) (Code_id_or_name.symbol all_constants);
   let create_holed () =
-    let dummy_toplevel_return = Variable.create "dummy_toplevel_return" in
-    let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" in
+    let dummy_toplevel_return =
+      Variable.create "dummy_toplevel_return" Flambda_kind.value
+    in
+    let dummy_toplevel_exn =
+      Variable.create "dummy_toplevel_exn" Flambda_kind.value
+    in
     Acc.root dummy_toplevel_return acc;
     Acc.root dummy_toplevel_exn acc;
     let return_continuation = Flambda_unit.return_continuation unit in

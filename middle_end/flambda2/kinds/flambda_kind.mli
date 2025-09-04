@@ -18,9 +18,14 @@
 
 module Naked_number_kind : sig
   type t =
+    (* CR mshinwell: I think we should consider renaming [Naked_immediate] to
+       [Naked_int] or (maybe better) [Naked_int31_63], to avoid confusion with
+       [Lambda.Const_naked_immediate]. *)
     | Naked_immediate
     | Naked_float32
     | Naked_float
+    | Naked_int8
+    | Naked_int16
     | Naked_int32
     | Naked_int64
     | Naked_nativeint
@@ -58,6 +63,10 @@ val naked_float32 : t
 
 val naked_float : t
 
+val naked_int8 : t
+
+val naked_int16 : t
+
 val naked_int32 : t
 
 val naked_int64 : t
@@ -83,9 +92,12 @@ include Container_types.S with type t := t
 type flat_suffix_element = private
   | Naked_float
   | Naked_float32
+  | Naked_int8
+  | Naked_int16
   | Naked_int32
   | Naked_int64
   | Naked_nativeint
+  | Naked_immediate
   | Naked_vec128
   | Naked_vec256
   | Naked_vec512
@@ -150,6 +162,8 @@ module Standard_int : sig
   type t =
     | Tagged_immediate
     | Naked_immediate
+    | Naked_int8
+    | Naked_int16
     | Naked_int32
     | Naked_int64
     | Naked_nativeint
@@ -176,8 +190,6 @@ module Boxable_number : sig
     | Naked_vec512
 
   val unboxed_kind : t -> kind
-
-  val primitive_kind : t -> Primitive.boxed_integer
 
   val print_lowercase : Format.formatter -> t -> unit
 
@@ -211,7 +223,7 @@ module With_subkind : sig
       | Boxed_vec512
       | Tagged_immediate
       | Variant of
-          { consts : Targetint_31_63.Set.t;
+          { consts : Target_ocaml_int.Set.t;
             non_consts : (Block_shape.t * full_kind list) Tag.Scannable.Map.t
           }
       | Float_block of { num_fields : int }
@@ -255,6 +267,10 @@ module With_subkind : sig
   val naked_float32 : t
 
   val naked_float : t
+
+  val naked_int8 : t
+
+  val naked_int16 : t
 
   val naked_int32 : t
 
@@ -353,6 +369,8 @@ module Standard_int_or_float : sig
     | Naked_immediate
     | Naked_float32
     | Naked_float
+    | Naked_int8
+    | Naked_int16
     | Naked_int32
     | Naked_int64
     | Naked_nativeint

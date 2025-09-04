@@ -86,7 +86,7 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
       Ok (Specific (m0, m1, c))
     end
 
-let check_modes env ?(crossing = Crossing.top) ~item ?typ = function
+let check_modes env ?(crossing = Crossing.max) ~item ?typ = function
   | All -> Ok ()
   | Specific (m0, m1, c) ->
       let m0 =
@@ -180,9 +180,9 @@ let value_descriptions ~loc env name
              let ty2, mode_l2, mode_y2, _ = Ctype.instance_prim p2 vd2.val_type in
              Option.iter (Mode.Locality.equate_exn loc) mode_l2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
-             try 
+             try
                Ctype.moregeneral env true ty1 ty2
-             with Ctype.Moregen err -> 
+             with Ctype.Moregen err ->
                raise (Dont_match (Type err))
            ) yielding
          ) locality;
@@ -265,6 +265,7 @@ type kind_mismatch = type_kind * type_kind
 type label_mismatch =
   | Type of Errortrace.equality_error
   | Mutability of position
+  | Atomicity of position
   | Modality of Modality.Value.equate_error
 
 type record_change =
@@ -335,12 +336,12 @@ let report_modality_sub_error first second ppf e =
   let print_modality id ppf m =
     Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ppf m
   in
-  let Modality.Value.Error(ax, {left; right}) = e in
+  let Modality.Value.Error {left; right} = e in
   Format.fprintf ppf "%s is %a and %s is %a."
     (String.capitalize_ascii second)
-    (print_modality "empty") (Atom (ax, right) : Modality.t)
+    (print_modality "empty") right
     first
-    (print_modality "not") (Atom (ax, left) : Modality.t)
+    (print_modality "not") left
 
 let report_mode_sub_error got expected ppf e =
   let Mode.Value.Error(ax, {left; right}) = e in
@@ -432,6 +433,10 @@ let report_label_mismatch first second env ppf err =
       report_type_inequality env ppf err
   | Mutability ord ->
       Format.fprintf ppf "%s is mutable and %s is not."
+        (String.capitalize_ascii (choose ord first second))
+        (choose_other ord first second)
+  | Atomicity ord ->
+      Format.fprintf ppf "%s is atomic and %s is not."
         (String.capitalize_ascii (choose ord first second))
         (choose_other ord first second)
   | Modality err_ -> report_modality_equate_error first second ppf err_
@@ -688,7 +693,8 @@ let report_type_mismatch first second decl env ppf err =
   | With_null_representation ord ->
       pr "Their internal representations differ:@ %s %s %s."
          (choose ord first second) decl
-         "has a null constructor"
+         "has a constructor represented as a null pointer";
+      pr "@ Hint: add [%@%@or_null_reexport]."
   | Jkind v ->
       Jkind.Violation.report_with_name ~name:first ppf v
   | Unsafe_mode_crossing mismatch ->
@@ -717,19 +723,25 @@ module Record_diffing = struct
   let compare_labels env params1 params2
         (ld1 : Types.label_declaration)
         (ld2 : Types.label_declaration) =
-        let mut =
+        let err =
           match ld1.ld_mutable, ld2.ld_mutable with
           | Immutable, Immutable -> None
-          | Mutable _, Immutable -> Some First
-          | Immutable, Mutable _ -> Some Second
-          | Mutable m1, Mutable m2 ->
-            let open Mode.Value.Comonadic in
-            equate_exn m1 legacy;
-            equate_exn m2 legacy;
-            None
+          | Mutable _, Immutable -> Some (Mutability First)
+          | Immutable, Mutable _ -> Some (Mutability Second)
+          | Mutable { mode = m1; atomic = atomic1 },
+            Mutable { mode = m2; atomic = atomic2 } ->
+            begin match atomic1, atomic2 with
+            | Atomic, Nonatomic -> Some (Atomicity First)
+            | Nonatomic, Atomic -> Some (Atomicity Second)
+            | Atomic, Atomic | Nonatomic, Nonatomic ->
+                let open Mode.Value.Comonadic in
+                equate_exn m1 legacy;
+                equate_exn m2 legacy;
+                None
+            end
         in
-        begin match mut with
-        | Some mut -> Some (Mutability mut)
+        begin match err with
+        | Some err -> Some err
         | None ->
           match
             Modality.Value.Const.equate ld1.ld_modalities ld2.ld_modalities
@@ -1400,7 +1412,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
   let mark_and_compare_records record_form labels1 rep1 labels2 rep2 =
     if mark then begin
       let mark usage lbls =
-        List.iter (Env.mark_label_used usage) lbls
+        List.iter (fun lbl -> Env.mark_label_used usage lbl.Types.ld_uid) lbls
       in
       let usage : Env.label_usage =
         if decl2.type_private = Public then Env.Exported
@@ -1434,7 +1446,9 @@ let type_declarations ?(equality = false) ~loc env ~mark name
     | (Type_variant (cstrs1, rep1, umc1), Type_variant (cstrs2, rep2, umc2)) -> begin
         if mark then begin
           let mark usage cstrs =
-            List.iter (Env.mark_constructor_used usage) cstrs
+            List.iter (fun cstr ->
+              Env.mark_constructor_used usage cstr.Types.cd_uid
+            ) cstrs
           in
           let usage : Env.constructor_usage =
             if decl2.type_private = Public then Env.Exported
@@ -1478,9 +1492,9 @@ let type_declarations ?(equality = false) ~loc env ~mark name
          (match name with None -> "_" | Some n -> "'" ^ n)
          Printtyp.type_expr ty
   | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
-     let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+     let context = Ctype.mk_jkind_context_always_principal env in
      Some (Parameter_jkind
-             (ty, Jkind.Violation.of_ ~jkind_of_type
+             (ty, Jkind.Violation.of_ ~context
                     (Not_a_subjkind (Jkind.disallow_right original_jkind,
                                      Jkind.disallow_left inferred_jkind,
                                      []))))
@@ -1513,7 +1527,7 @@ let extension_constructors ~loc env ~mark id ext1 ext2 =
       if ext2.ext_private = Public then Env.Exported
       else Env.Exported_private
     in
-    Env.mark_extension_used usage ext1
+    Env.mark_extension_used usage ext1.ext_uid
   end;
   let ty1 =
     Btype.newgenty (Tconstr(ext1.ext_type_path, ext1.ext_type_params, ref Mnil))

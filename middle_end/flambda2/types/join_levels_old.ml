@@ -47,7 +47,11 @@ let join_types ~env_at_fork envs_with_levels =
                     let kind = TEL.find_kind level var in
                     TE.add_definition base_env
                       (Bound_name.create_var
-                         (Bound_var.create var Name_mode.in_types))
+                         (Bound_var.create var Flambda_debug_uid.none
+                            (* Variables with [Name_mode.in_types] do not exist
+                               at runtime, so we do not equip them with a
+                               [Flambda_debug_uid.t]. See #3967. *)
+                            Name_mode.in_types))
                       kind)
                 vars base_env)
             (TEL.variables_by_binding_time level)
@@ -85,9 +89,10 @@ let join_types ~env_at_fork envs_with_levels =
         (* CR vlaviron: This is very likely quadratic (number of uses times
            number of variables in all uses). However it's hard to know how we
            could do better. *)
-        ME.add_env_extension_maybe_bottom base_env
-          (TEE.from_map joined_types)
-          ~meet_type:Meet_and_join.meet_type
+        ME.use_meet_env base_env ~f:(fun base_env ->
+            ME.add_env_extension_maybe_bottom base_env
+              (TEE.from_map joined_types)
+              ~meet_type:Meet_and_join.meet_type)
       in
       let join_types name joined_ty use_ty =
         let same_unit =
@@ -95,7 +100,24 @@ let join_types ~env_at_fork envs_with_levels =
             (Name.compilation_unit name)
             (Compilation_unit.get_current_exn ())
         in
-        if same_unit && not (TE.mem base_env name)
+        (* CR bclement: This assertion not holding for variables would be a
+           serious bug, because the [base_env] is created by adding in all the
+           variables that are defined in any of the joined environments.
+
+           However, it could fail for symbols if some of the lifted constants
+           from one of the joined environments are not inserted into the base
+           environment by [Simplify_expr]. This would normally be a bug in
+           [Simplify_expr], but it can currently happen in the presence of
+           (continuation) specialization where constants from the
+           not-specialized case can sometimes leak into the wrong environments.
+
+           The bug is tricky to fix, but otherwise harmless, as we can just
+           leave the equation for the symbol alone, so we restrict the assertion
+           to variables only for now.
+
+           Once the issue in [Simplify_expr] is fixed, we can drop the
+           [Name.is_var name] part of the check below again. *)
+        if same_unit && Name.is_var name && not (TE.mem base_env name)
         then
           Misc.fatal_errorf "Name %a not defined in [base_env]:@ %a" Name.print
             name TE.print base_env;
@@ -332,8 +354,9 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
       ~extra_lifted_consts_in_use_envs ~extra_allowed_names
   in
   let result_env =
-    ME.add_env_extension_from_level definition_typing_env level
-      ~meet_type:Meet_and_join.meet_type
+    ME.use_meet_env definition_typing_env ~f:(fun target_env ->
+        ME.add_env_extension_from_level target_env level
+          ~meet_type:Meet_and_join.meet_type)
   in
   TE.compute_joined_aliases result_env alias_candidates
     (List.map (fun (env_at_use, _, _, _) -> env_at_use) after_cuts)

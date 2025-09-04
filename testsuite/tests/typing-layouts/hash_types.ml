@@ -317,7 +317,7 @@ Error: The type constructor "t#" expects 1 argument(s),
 (*******************************************)
 (* Type recursion through unboxed versions *)
 
-type t = int
+type t = string
 and bad = t#
 [%%expect{|
 Line 2, characters 0-12:
@@ -326,7 +326,7 @@ Line 2, characters 0-12:
 Error: The type "t" has no unboxed version.
 |}]
 
-type t = int
+type t = string
 and bad = t# * t#
 [%%expect{|
 Line 2, characters 0-17:
@@ -345,11 +345,11 @@ Error: The type "bad_b" has no unboxed version.
 |}]
 
 type a = b
-and b = int
+and b = string
 type bad = a#
 [%%expect{|
 type a = b
-and b = int
+and b = string
 Line 3, characters 11-13:
 3 | type bad = a#
                ^^
@@ -379,9 +379,9 @@ end = struct
   type t = Bad2.t#
 end
 and Bad2 : sig
-  type t = int
+  type t = string
 end = struct
-  type t = int
+  type t = string
 end
 [%%expect{|
 Line 2, characters 11-18:
@@ -744,12 +744,12 @@ Error: In this "with" constraint, the new definition of "t"
 (* Can't substitute an unboxed version for a nonexistent unboxed version *)
 module type Bad = sig
   type t = float#
-end with type t := int#
+end with type t := string#
 [%%expect{|
-Line 3, characters 19-23:
-3 | end with type t := int#
-                       ^^^^
-Error: The type "int" has no unboxed version.
+Line 3, characters 19-26:
+3 | end with type t := string#
+                       ^^^^^^^
+Error: The type "string" has no unboxed version.
 |}]
 
 (* Test subst when a decl's type_unboxed_version over-approximately [None]
@@ -895,12 +895,12 @@ module type S = sig
   module type x
   module M:x
 end
-with module type x = sig type t = int end
+with module type x = sig type t = string end
 module Bad (M : S) = struct
   let id : M.M.t# -> r# = fun x -> x
 end
 [%%expect{|
-module type S = sig module type x = sig type t = int end module M : x end
+module type S = sig module type x = sig type t = string end module M : x end
 Line 7, characters 11-17:
 7 |   let id : M.M.t# -> r# = fun x -> x
                ^^^^^^
@@ -930,12 +930,12 @@ module type S = sig
   module type x
   module M:x
 end
-with module type x := sig type t = int end
+with module type x := sig type t = string end
 module Bad (M : S) = struct
   type u = M.M.t#
 end
 [%%expect{|
-module type S = sig module M : sig type t = int end end
+module type S = sig module M : sig type t = string end end
 Line 7, characters 11-17:
 7 |   type u = M.M.t#
                ^^^^^^
@@ -985,14 +985,14 @@ module F :
 
 (* No unboxed version *)
 module type S = sig type t end
-type m = (module S with type t = int)
+type m = (module S with type t = string)
 module Bad (X : sig val x : m end) = struct
   module M = (val X.x)
   type u = M.t#
 end
 [%%expect{|
 module type S = sig type t end
-type m = (module S with type t = int)
+type m = (module S with type t = string)
 Line 5, characters 11-15:
 5 |   type u = M.t#
                ^^^^

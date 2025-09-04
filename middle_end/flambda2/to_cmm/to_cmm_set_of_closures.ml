@@ -28,7 +28,10 @@ type translate_expr =
   To_cmm_env.t ->
   To_cmm_result.t ->
   Expr.t ->
-  Cmm.expression * To_cmm_env.free_vars * To_cmm_result.t
+  Cmm.expression
+  * To_cmm_env.free_vars
+  * To_cmm_env.Symbol_inits.t
+  * To_cmm_result.t
 
 (* Filling of closure blocks *)
 
@@ -197,6 +200,8 @@ end = struct
                  a 64-bit slot, and wish to initialize the whole. *)
               | Naked_number Naked_int32 -> UK.naked_int32_fields
               | Naked_number Naked_float32 -> UK.naked_float32_fields
+              | Naked_number Naked_int16 -> UK.naked_int16_fields
+              | Naked_number Naked_int8 -> UK.naked_int8_fields
               | Region | Rec_info ->
                 Misc.fatal_errorf "Unexpected value slot kind for %a: %a"
                   Value_slot.print value_slot Flambda_kind.print kind
@@ -438,7 +443,7 @@ let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
 let params_and_body0 env res code_id ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~return_continuation ~exn_continuation params ~body
     ~my_closure ~(is_my_closure_used : _ Or_unknown.t) ~my_region
-    ~my_ghost_region ~translate_expr =
+    ~my_ghost_region ~(translate_expr : translate_expr) =
   let params =
     let is_my_closure_used =
       match is_my_closure_used with
@@ -448,8 +453,10 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     if not is_my_closure_used
     then params
     else
+      let my_closure_duid = Flambda_debug_uid.none in
       let my_closure_param =
         Bound_parameter.create my_closure Flambda_kind.With_subkind.any_value
+          my_closure_duid
       in
       Bound_parameters.append params
         (Bound_parameters.create [my_closure_param])
@@ -473,7 +480,10 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     match my_region with
     | None -> env, None
     | Some my_region ->
-      let env, region = Env.create_bound_parameter env my_region in
+      let my_region_duid = Flambda_debug_uid.none in
+      let env, region =
+        Env.create_bound_parameter env (my_region, my_region_duid)
+      in
       env, Some region
   in
   (* Similarly for [my_ghost_region]. *)
@@ -481,12 +491,23 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     match my_ghost_region with
     | None -> env, None
     | Some my_ghost_region ->
-      let env, region = Env.create_bound_parameter env my_ghost_region in
+      let my_ghost_region_duid = Flambda_debug_uid.none in
+      let env, region =
+        Env.create_bound_parameter env (my_ghost_region, my_ghost_region_duid)
+      in
       env, Some region
   in
   (* Translate the arg list and body *)
   let env, fun_params = C.function_bound_parameters env params in
-  let fun_body, fun_body_free_vars, res = translate_expr env res body in
+  let fun_body, fun_body_free_vars, fun_body_symbol_inits, res =
+    translate_expr env res body
+  in
+  (* Symbol definitions should have been lifted at top-level *)
+  if not (To_cmm_env.Symbol_inits.is_empty fun_body_symbol_inits)
+  then
+    Misc.fatal_errorf
+      "Found leftover symbol initializations statements in a function body: %a"
+      To_cmm_env.Symbol_inits.print fun_body_symbol_inits;
   let fun_free_vars =
     C.remove_vars_with_machtype
       (C.remove_var_opt_with_provenance
@@ -518,10 +539,16 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     Env.get_code_metadata env code_id
     |> Code_metadata.poll_attribute |> Poll_attribute.to_lambda
   in
-  C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll, res
+  let fun_ret_type =
+    Env.get_code_metadata env code_id
+    |> Code_metadata.result_arity |> C.extended_machtype_of_return_arity
+    |> C.Extended_machtype.to_machtype
+  in
+  ( C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll fun_ret_type,
+    res )
 
 let params_and_body env res code_id p ~result_arity ~fun_dbg
-    ~zero_alloc_attribute ~translate_expr =
+    ~zero_alloc_attribute ~(translate_expr : translate_expr) =
   Function_params_and_body.pattern_match p
     ~f:(fun
          ~return_continuation
@@ -650,8 +677,8 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
  *   g
 
  *)
-let lift_set_of_closures env res ~body ~bound_vars layout set ~translate_expr
-    ~num_normal_occurrences_of_bound_vars =
+let lift_set_of_closures env res ~body ~bound_vars layout set
+    ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)
   let comp_unit = Compilation_unit.get_current_exn () in
   let dbg = debuginfo_for_set_of_closures env set in
@@ -685,7 +712,6 @@ let lift_set_of_closures env res ~body ~bound_vars layout set ~translate_expr
   let env, res =
     List.fold_left2
       (fun (env, res) cid v ->
-        let v = Bound_var.var v in
         let sym =
           C.symbol ~dbg
             (R.symbol res (Function_slot.Map.find cid closure_symbols))
@@ -700,7 +726,8 @@ let lift_set_of_closures env res ~body ~bound_vars layout set ~translate_expr
 
 let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
     (layout : Slot_offsets.Layout.t) ~num_normal_occurrences_of_bound_vars
-    ~(closure_alloc_mode : Alloc_mode.For_allocations.t) ~translate_expr =
+    ~(closure_alloc_mode : Alloc_mode.For_allocations.t)
+    ~(translate_expr : translate_expr) =
   let fun_decls = Set_of_closures.function_decls set in
   let decls = Function_declarations.funs_in_order fun_decls in
   let value_slots = Set_of_closures.value_slots set in
@@ -727,7 +754,9 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
       ~mode:(C.alloc_mode_for_allocations_to_cmm closure_alloc_mode)
       dbg ~tag l memory_chunks
   in
-  let soc_var = Variable.create "*set_of_closures*" in
+  let soc_var = Variable.create "*set_of_closures*" Flambda_kind.value in
+  let soc_var_duid = Flambda_debug_uid.none in
+  let soc_var = Bound_var.create soc_var soc_var_duid Name_mode.normal in
   let defining_expr = Env.simple csoc free_vars in
   let env, res =
     Env.bind_variable_to_primitive env res soc_var ~inline:Env.Do_not_inline
@@ -740,7 +769,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
           res;
           expr = { cmm = soc_cmm_var; free_vars = s_free_vars; effs = peff }
         } =
-    Env.inline_variable env res soc_var
+    Env.inline_variable env res (Bound_var.var soc_var)
   in
   assert (
     match To_cmm_effects.classify_by_effects_and_coeffects peff with
@@ -767,7 +796,6 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
         match get_closure_by_offset env cid with
         | None -> env, res
         | Some (defining_expr, effects_and_coeffects_of_defining_expr) ->
-          let v = Bound_var.var v in
           Env.bind_variable env res v ~defining_expr
             ~free_vars_of_defining_expr:s_free_vars
             ~num_normal_occurrences_of_bound_vars
@@ -779,7 +807,8 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   translate_expr env res body
 
 let let_dynamic_set_of_closures env res ~body ~bound_vars
-    ~num_normal_occurrences_of_bound_vars set ~translate_expr =
+    ~num_normal_occurrences_of_bound_vars set ~(translate_expr : translate_expr)
+    =
   let layout = layout_for_set_of_closures env set in
   if layout.empty_env
   then

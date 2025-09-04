@@ -26,15 +26,27 @@ open Allowance
 (** Asttypes exposes basic definitions shared both by Parsetree and Types. *)
 open Asttypes
 
+(** Whether or not a mutable field is atomic *)
+type atomic =
+  | Nonatomic
+  | Atomic
+
 (** Describes a mutable field/element. *)
 type mutability =
   | Immutable
-  | Mutable of Mode.Value.Comonadic.lr
-  (** Mode of new field value in mutation. *)
+  | Mutable of
+      { mode : Mode.Value.Comonadic.lr
+        (** Mode of new field value in mutation. *)
+      ; atomic : atomic
+      }
 
-(** Returns [true] is the [mutable_flag] is mutable. Should be called if not
-    interested in the payload of [Mutable]. *)
+(** Returns [true] is the [mutable_flag] is mutable or atomic. Should be called
+    if not interested in the payload of [Mutable]. *)
 val is_mutable : mutability -> bool
+
+(** Returns [true] is the [mutable_flag] is atomic. Should be called
+    if not interested in the payload of [Mutable]. *)
+val is_atomic : mutability -> bool
 
 (** Given the parameter [m0] on mutable, return the mode of future writes. *)
 val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
@@ -73,7 +85,7 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** The mod-bounds of a jkind *)
 module Jkind_mod_bounds : sig
-  module Locality = Mode.Locality.Const
+  module Areality = Mode.Regionality.Const
   module Linearity = Mode.Linearity.Const
   module Uniqueness = Mode.Uniqueness.Const_op
   module Portability = Mode.Portability.Const
@@ -88,7 +100,7 @@ module Jkind_mod_bounds : sig
   type t
 
   val create :
-    locality:Locality.t ->
+    areality:Areality.t ->
     linearity:Linearity.t ->
     uniqueness:Uniqueness.t ->
     portability:Portability.t ->
@@ -101,7 +113,7 @@ module Jkind_mod_bounds : sig
     separability:Separability.t ->
     t
 
-  val locality : t -> Locality.t
+  val areality : t -> Areality.t
   val linearity : t -> Linearity.t
   val uniqueness : t -> Uniqueness.t
   val portability : t -> Portability.t
@@ -113,7 +125,7 @@ module Jkind_mod_bounds : sig
   val nullability : t -> Nullability.t
   val separability : t -> Separability.t
 
-  val set_locality : Locality.t -> t -> t
+  val set_areality : Areality.t -> t -> t
   val set_linearity : Linearity.t -> t -> t
   val set_uniqueness : Uniqueness.t -> t -> t
   val set_portability : Portability.t -> t -> t
@@ -827,6 +839,9 @@ and mixed_block_element =
   (* A [Float_boxed] is a float that's stored flat but boxed upon projection. *)
   | Float64
   | Float32
+  | Bits8
+  | Bits16
+  | Untagged_immediate
   | Bits32
   | Bits64
   | Vec128
@@ -835,6 +850,7 @@ and mixed_block_element =
   | Word
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
+  | Void
 
 and mixed_product_shape = mixed_block_element array
 

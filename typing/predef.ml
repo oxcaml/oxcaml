@@ -50,8 +50,11 @@ and ident_string = ident_create "string"
 and ident_extension_constructor = ident_create "extension_constructor"
 and ident_floatarray = ident_create "floatarray"
 and ident_lexing_position = ident_create "lexing_position"
+and ident_atomic_loc = ident_create "atomic_loc"
 
 and ident_or_null = ident_create "or_null"
+and ident_idx_imm = ident_create "idx_imm"
+and ident_idx_mut = ident_create "idx_mut"
 
 and ident_int8x16 = ident_create "int8x16"
 and ident_int16x8 = ident_create "int16x8"
@@ -94,6 +97,9 @@ and path_string = Pident ident_string
 and path_extension_constructor = Pident ident_extension_constructor
 and path_floatarray = Pident ident_floatarray
 and path_lexing_position = Pident ident_lexing_position
+and path_idx_imm = Pident ident_idx_imm
+and path_idx_mut = Pident ident_idx_mut
+and path_atomic_loc = Pident ident_atomic_loc
 
 and path_or_null = Pident ident_or_null
 
@@ -119,6 +125,10 @@ and path_float64x8 = Pident ident_float64x8
 let path_unboxed_float = Path.unboxed_version path_float
 and path_unboxed_float32 = Path.unboxed_version path_float32
 and path_unboxed_nativeint = Path.unboxed_version path_nativeint
+and path_unboxed_char = Path.unboxed_version path_char
+and path_unboxed_int = Path.unboxed_version path_int
+and path_unboxed_int8 = Path.unboxed_version path_int8
+and path_unboxed_int16 = Path.unboxed_version path_int16
 and path_unboxed_int32 = Path.unboxed_version path_int32
 and path_unboxed_int64 = Path.unboxed_version path_int64
 
@@ -164,6 +174,7 @@ and type_extension_constructor =
       newgenty (Tconstr(path_extension_constructor, [], ref Mnil))
 and type_floatarray = newgenty (Tconstr(path_floatarray, [], ref Mnil))
 and type_lexing_position = newgenty (Tconstr(path_lexing_position, [], ref Mnil))
+and type_atomic_loc t = newgenty (Tconstr(path_atomic_loc, [t], ref Mnil))
 
 and type_unboxed_float = newgenty (Tconstr(path_unboxed_float, [], ref Mnil))
 and type_unboxed_float32 = newgenty (Tconstr(path_unboxed_float32, [], ref Mnil))
@@ -171,7 +182,13 @@ and type_unboxed_nativeint =
       newgenty (Tconstr(path_unboxed_nativeint, [], ref Mnil))
 and type_unboxed_int32 = newgenty (Tconstr(path_unboxed_int32, [], ref Mnil))
 and type_unboxed_int64 = newgenty (Tconstr(path_unboxed_int64, [], ref Mnil))
+and type_unboxed_char = newgenty (Tconstr(path_unboxed_char, [], ref Mnil))
+and type_unboxed_int = newgenty (Tconstr(path_unboxed_int, [], ref Mnil))
+and type_unboxed_int8 = newgenty (Tconstr(path_unboxed_int8, [], ref Mnil))
+and type_unboxed_int16 = newgenty (Tconstr(path_unboxed_int16, [], ref Mnil))
 and type_or_null t = newgenty (Tconstr(path_or_null, [t], ref Mnil))
+and type_idx_imm t1 t2 = newgenty (Tconstr(path_idx_imm, [t1; t2], ref Mnil))
+and type_idx_mut t1 t2 = newgenty (Tconstr(path_idx_mut, [t1; t2], ref Mnil))
 
 and type_int8x16 = newgenty (Tconstr(path_int8x16, [], ref Mnil))
 and type_int16x8 = newgenty (Tconstr(path_int16x8, [], ref Mnil))
@@ -401,6 +418,30 @@ let mk_add_type1 add_type type_ident
   in
   add_type type_ident decl env
 
+let mk_add_type2 add_type type_ident ~jkind ~param1_jkind ~param2_jkind
+      ~type_variance ~type_separability env =
+  let param1 = newgenvar param1_jkind in
+  let param2 = newgenvar param2_jkind in
+  let decl =
+    { type_params = [param1; param2];
+      type_arity = 2;
+      type_kind = Type_abstract Definition;
+      type_jkind = Jkind.mark_best (jkind);
+      type_loc = Location.none;
+      type_private = Asttypes.Public;
+      type_manifest = None;
+      type_variance;
+      type_separability;
+      type_is_newtype = false;
+      type_expansion_scope = lowest_level;
+      type_attributes = [];
+      type_unboxed_default = false;
+      type_uid = Uid.of_predef_id type_ident;
+      type_unboxed_version = None;
+    }
+  in
+  add_type type_ident decl env
+
 let mk_add_extension add_extension id args =
   List.iter (fun (_, sort) ->
       let raise_error () = Misc.fatal_error
@@ -408,8 +449,8 @@ let mk_add_extension add_extension id args =
             constructor; should this have Constructor_mixed shape?" in
       match (sort : Jkind.Sort.Const.t) with
       | Base Value -> ()
-      | Base (Void | Float32 | Float64 | Word | Bits32 | Bits64 |
-              Vec128 | Vec256 | Vec512)
+      | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
+             Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _ -> raise_error ())
     args;
   add_extension id
@@ -463,13 +504,14 @@ let unrestricted tvar ca_sort =
 let build_initial_env add_type add_extension empty_env =
   let add_type_with_jkind, add_type = mk_add_type add_type
   and add_type1 = mk_add_type1 add_type
+  and add_type2 = mk_add_type2 add_type
   and add_extension = mk_add_extension add_extension in
   empty_env
   (* Predefined types *)
   |> add_type1 ident_array
        ~variance:Variance.full
        ~separability:Separability.Ind
-       ~param_jkind:(Jkind.Builtin.any_non_null ~why:Array_type_argument)
+       ~param_jkind:Jkind.for_array_argument
        ~jkind:(fun param ->
          Jkind.Builtin.mutable_data ~why:(Primitive ident_array) |>
          Jkind.add_with_bounds
@@ -478,7 +520,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type1 ident_iarray
        ~variance:Variance.covariant
        ~separability:Separability.Ind
-       ~param_jkind:(Jkind.Builtin.any_non_null ~why:Array_type_argument)
+       ~param_jkind:Jkind.for_array_argument
        ~jkind:(fun param ->
          Jkind.Builtin.immutable_data ~why:(Primitive ident_iarray) |>
          Jkind.add_with_bounds
@@ -488,13 +530,15 @@ let build_initial_env add_type add_extension empty_env =
        ~kind:(variant [ cstr ident_false []; cstr ident_true []])
        ~jkind:Jkind.Const.Builtin.immediate
   |> add_type ident_char ~jkind:Jkind.Const.Builtin.immediate
-  |> add_type_with_jkind ident_exn ~kind:Type_open
-    ~jkind:(Jkind.for_non_float ~why:(Primitive ident_exn))
+       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int8
+  |> add_type ident_exn ~kind:Type_open ~jkind:Jkind.Const.Builtin.exn
   |> add_type ident_extension_constructor ~jkind:Jkind.Const.Builtin.immutable_data
   |> add_type_with_jkind ident_float ~jkind:(Jkind.for_float ident_float)
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_float
   |> add_type ident_floatarray ~jkind:Jkind.Const.Builtin.mutable_data
-  |> add_type ident_int ~jkind:Jkind.Const.Builtin.immediate
+  |> add_type ident_int
+       ~jkind:Jkind.Const.Builtin.immediate
+       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_untagged_immediate
   |> add_type ident_int32 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int32
   |> add_type ident_int64 ~jkind:Jkind.Const.Builtin.immutable_data
@@ -532,6 +576,42 @@ let build_initial_env add_type add_extension empty_env =
          Jkind.add_with_bounds
            ~modality:Mode.Modality.Value.Const.id
            ~type_expr:param)
+  |> add_type2 ident_idx_imm
+       ~param1_jkind:(
+         Jkind.Builtin.value ~why:(Type_argument {
+           parent_path = Path.Pident ident_idx_imm;
+           position = 1;
+           arity = 2;
+         }))
+       ~param2_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_idx_imm;
+           position = 2;
+           arity = 2;
+         }))
+       ~jkind:(
+         Jkind.of_builtin ~why:(Primitive ident_idx_imm)
+           Jkind.Const.Builtin.bits64)
+       ~type_variance:[Variance.full; Variance.covariant]
+       ~type_separability:[Separability.Ind; Separability.Ind]
+  |> add_type2 ident_idx_mut
+       ~param1_jkind:(
+         Jkind.Builtin.value ~why:(Type_argument {
+           parent_path = Path.Pident ident_idx_mut;
+           position = 1;
+           arity = 2;
+         }))
+       ~param2_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_idx_mut;
+           position = 2;
+           arity = 2;
+         }))
+       ~jkind:(
+         Jkind.of_builtin ~why:(Primitive ident_idx_mut)
+           Jkind.Const.Builtin.bits64)
+       ~type_variance:[Variance.full; Variance.full]
+       ~type_separability:[Separability.Ind; Separability.Ind]
   |> add_type_with_jkind ident_lexing_position
        ~kind:(
          let lbl (field, field_type) =
@@ -568,6 +648,16 @@ let build_initial_env add_type add_extension empty_env =
          add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr:type_int |>
          add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr:type_int |>
          add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr:type_string)
+  |> add_type1 ident_atomic_loc
+       ~variance:Variance.full
+       ~separability:Separability.Ind
+       ~param_jkind:(
+         Jkind.Builtin.value_or_null ~why:(Primitive ident_atomic_loc))
+       ~jkind:(fun param ->
+         Jkind.Builtin.mutable_data ~why:(Primitive ident_atomic_loc) |>
+         Jkind.add_with_bounds
+           ~modality:Mode.Modality.Value.Const.id
+           ~type_expr:param)
   |> add_type ident_string ~jkind:Jkind.Const.Builtin.immutable_data
   |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit
@@ -611,22 +701,6 @@ let add_simd_stable_extension_types add_type env =
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
   |> add_type ident_float64x2 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
-
-(* CR-soon mslater:
-  Remaining work before these can be moved to stable:
-    - Static & reinterpet casts (tests: see ops.ml)
-    - Constants (tests: see consts.ml, consts_u.ml)
-    - Array accessors (tests: see arrays.ml, arrays_u.ml)
-    - Correct ASAN checks for 32/64 byte memory chunks
-    - Correct TSAN save/restore SIMD registers
-  Not strictly required for stable, but will be necessary:
-    - Align Vec256 stack slots on the OCaml stack
-    - Use VEX encoding for SSE intrinsics when AVX is enabled
-    - AVX & AVX2 intrinsics (tests: see ops.ml, ocaml_simd_sse)
-*)
-let add_simd_beta_extension_types add_type env =
-  let _, add_type = mk_add_type add_type in
-  env
   |> add_type ident_int8x32 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_int16x16 ~jkind:Jkind.Const.Builtin.immutable_data
@@ -639,6 +713,8 @@ let add_simd_beta_extension_types add_type env =
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_float64x4 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
+
+let add_simd_beta_extension_types _add_type env = env
 
 let add_simd_alpha_extension_types add_type env =
   let _, add_type = mk_add_type add_type in
@@ -661,13 +737,13 @@ let add_small_number_extension_types add_type env =
   env
   |> add_type ident_float32 ~jkind:Jkind.Const.Builtin.immutable_data
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_float32
-
-let add_small_number_beta_extension_types add_type env =
-  let _, add_type = mk_add_type add_type in
-  env
   |> add_type ident_int8 ~jkind:Jkind.Const.Builtin.immediate
+       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int8
   |> add_type ident_int16 ~jkind:Jkind.Const.Builtin.immediate
+       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int16
 
+let add_small_number_beta_extension_types _add_type env =
+  env
 
 let or_null_argument_sort = Jkind.Sort.Const.value
 
@@ -679,11 +755,12 @@ let or_null_kind tvar =
   Type_variant (cstrs, Variant_with_null, None)
 
 let or_null_jkind param =
-  Jkind.Builtin.immediate_or_null ~why:(Primitive ident_or_null) |>
-  Jkind.add_with_bounds
+  Jkind.Const.Builtin.value_or_null_mod_everything
+  |> Jkind.of_builtin ~why:(Primitive ident_or_null)
+  |> Jkind.add_with_bounds
     ~modality:Mode.Modality.Value.Const.id
-    ~type_expr:param |>
-  Jkind.mark_best
+    ~type_expr:param
+  |> Jkind.mark_best
 
 let add_or_null add_type env =
   let add_type1 = mk_add_type1 add_type in
@@ -699,6 +776,7 @@ let add_or_null add_type env =
      the most argument types, and forbid arrays from accepting [or_null]s.
      In the future, we will track separability in the jkind system. *)
   ~kind:or_null_kind
+  ~param_jkind:(Jkind.for_or_null_argument ident_or_null)
   ~jkind:or_null_jkind
 
 let builtin_values =

@@ -528,9 +528,9 @@ and switch ~env ~res e =
     To_jsir_shared.simple ~env ~res (Switch_expr.scrutinee e)
   in
   let arms = Switch_expr.arms e in
-  let domain = Targetint_31_63.Map.keys arms in
-  let min = Targetint_31_63.Set.min_elt domain |> Targetint_31_63.to_int in
-  let max = Targetint_31_63.Set.max_elt domain |> Targetint_31_63.to_int in
+  let domain = Target_ocaml_int.Map.keys arms in
+  let min = Target_ocaml_int.Set.min_elt domain |> Target_ocaml_int.to_int in
+  let max = Target_ocaml_int.Set.max_elt domain |> Target_ocaml_int.to_int in
   (* Flambda2 allows the domain to be arbitrary non-negative subsets of
      targetint, whereas JSIR requires [0..n].
 
@@ -540,7 +540,7 @@ and switch ~env ~res e =
   let res, arms =
     Array.fold_left_map
       (fun res i ->
-        let apply_cont = Targetint_31_63.Map.find_opt i arms in
+        let apply_cont = Target_ocaml_int.Map.find_opt i arms in
         let last, res =
           match apply_cont with
           | Some apply_cont -> apply_cont0 ~env ~res apply_cont
@@ -556,7 +556,7 @@ and switch ~env ~res e =
           let res = To_jsir_result.end_block_with_last_exn res last in
           res, (addr, []))
       res
-      (Array.init (max + 1) Targetint_31_63.of_int)
+      (Array.init (max + 1) Target_ocaml_int.of_int)
   in
   let last : Jsir.last =
     match Array.length arms with

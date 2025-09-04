@@ -624,6 +624,12 @@ val type_jkind_purely : Env.t -> type_expr -> jkind_l
    functions exported by [Jkind]. *)
 val type_jkind_purely_if_principal : Env.t -> type_expr -> jkind_l option
 
+(* Helper functions for creating jkind contexts *)
+val mk_jkind_context :
+  Env.t -> (type_expr -> jkind_l option) -> Jkind.jkind_context
+val mk_jkind_context_check_principal : Env.t -> Jkind.jkind_context
+val mk_jkind_context_always_principal : Env.t -> Jkind.jkind_context
+
 (* Find a type's sort (if fixed is false: constraining it to be an
    arbitrary sort variable, if needed) *)
 val type_sort :
@@ -631,11 +637,6 @@ val type_sort :
   fixed:bool ->
   Env.t -> type_expr -> (Jkind.sort, Jkind.Violation.t) result
 
-(* As [type_sort ~fixed:false], but constrain the jkind to be non-null.
-   Used for checking array elements. *)
-val type_legacy_sort :
-  why:Jkind.History.concrete_legacy_creation_reason ->
-  Env.t -> type_expr -> (Jkind.sort, Jkind.Violation.t) result
 
 (* Jkind checking. [constrain_type_jkind] will update the jkind of type
    variables to make the check true, if possible.  [check_decl_jkind] and
@@ -798,3 +799,13 @@ val zap_modalities_to_floor_if_at_least :
   Language_extension.maturity ->
   Mode.Modality.Value.t ->
   Mode.Modality.Value.Const.t
+
+val check_constructor_crossing_creation :
+  Env.t -> Longident.t loc
+  -> tag -> res:type_expr -> args:constructor_argument list
+  -> Env.locks -> (Mode.Value.r, Mode.Value.error) result
+
+val check_constructor_crossing_destruction :
+  Env.t -> Longident.t loc
+  -> tag -> res:type_expr -> args:constructor_argument list
+  -> Env.locks -> (Mode.Value.l, Mode.Value.error) result
