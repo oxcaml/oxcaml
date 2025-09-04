@@ -21,6 +21,7 @@ let counter = Atomic.make 0
 
 let eval settings code =
   (* Compilation happens here during partial application, not when thunk is called *)
+
   let exp = CamlinternalQuote.Code.to_exp code in
   let code_string = Format.asprintf "%a" CamlinternalQuote.Exp.print exp in
 
@@ -45,19 +46,27 @@ let eval settings code =
   let flags = if settings.debug then "-g" :: flags else flags in
   let flags = if settings.unsafe then "-unsafe" :: flags else flags in
   let flags = if settings.noassert then "-noassert" :: flags else flags in
-  let compiler_cmd =
+  let flags = Array.of_list flags in
+  let cmd, args =
     if settings.native_code then
-      String.concat " " (["./_install/bin/ocamlopt"; "-shared"; "-o"; obj_file; ml_file] @ flags)
+      "ocamlopt", Array.append  [| "ocamlopt"; "-shared"; "-o"; obj_file; ml_file |] flags
     else
-      String.concat " " (["./_install/bin/ocamlc"; "-c"; ml_file] @ flags)
+      "ocamlc", Array.append  [| "ocamlc"; "-c"; ml_file |] flags
   in
 
   (* Compile the code *)
-  let compile_result = Sys.command compiler_cmd in
-  if compile_result <> 0 then begin
+  let stdout, stdin, stderr = Unix.open_process_args_full cmd args (Unix.environment ()) in
+  let compile_out = In_channel.input_all stdout in
+  let compile_err = In_channel.input_all stderr in
+  let compile_result = Unix.close_process_full (stdout, stdin, stderr) in
+  (match compile_result with
+  | Unix.WEXITED 0 -> ()
+  | _ ->
     (try Sys.remove ml_file with _ -> ());
-    failwith ("Compilation failed for: " ^ code_string)
-  end;
+    failwith (
+      Printf.sprintf
+        "Compilation failed for:\n%s\nStdout:\n%s\nStderr:\n%s\n"
+        code_string compile_out compile_err));
 
   (* Load the compiled library *)
   Dynlink.loadfile obj_file;
@@ -69,10 +78,14 @@ let eval settings code =
   with _ -> ());
 
   (* Get the eval function *)
-  let bytecode_or_asm_symbol = "Eval_code_" ^ (string_of_int id) in
+  let bytecode_or_asm_symbol =
+    if settings.native_code
+    then "camlEval_code_" ^ (string_of_int id)
+    else "Eval_code_" ^ (string_of_int id)
+  in
   let eval_module_opt = Dynlink.unsafe_get_global_value ~bytecode_or_asm_symbol in
   let eval_module = match eval_module_opt with
-    | Some module_obj -> module_obj
-    | None -> failwith "Could not find compiled module in dynamic library"
+  | Some module_obj -> module_obj
+  | None -> failwith "Could not find compiled module in dynamic library"
   in
   Obj.obj (Obj.field eval_module 0)

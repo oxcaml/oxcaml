@@ -13,7 +13,7 @@
 (library
  (name eval)
  (modes byte native)
- (libraries dynlink_internal)
+ (libraries dynlink_internal unix)
  (flags
   (:standard
    -strict-sequence
@@ -28,9 +28,14 @@
 
 (install
  (files
-  eval.cma
+  (.eval.objs/native/eval.cmx as eval.cmx)
   eval.cmxa
   eval.a
-  (.eval.objs/byte/eval.cmi as eval/eval.cmi))
+  eval.cmxs
+  eval.cma
+  ; (eval.mli as eval/eval.mli)
+  (.eval.objs/byte/eval.cmi as eval.cmi)
+  (.eval.objs/byte/eval.cmt as eval.cmt)
+  (.eval.objs/byte/eval.cmti as eval.cmti))
  (section lib)
  (package ocaml))

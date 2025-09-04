@@ -1671,7 +1671,7 @@ module Ast = struct
       failwith "Cannot create empty let-expressions. This should not happen."
     | Let (rec_flag, vb :: vbs, body) ->
       let prefix =
-        match rec_flag with Nonrecursive -> "let" | Recursive -> "let@ rec"
+        match rec_flag with Nonrecursive -> "let" | Recursive -> "let rec"
       in
       pp fmt "@[<2>@[@[<2>%s@ %a@]@ " prefix (print_vb env) vb;
       List.iter (fun vb -> pp fmt "@[<2>and@ %a@]@ " (print_vb env) vb) vbs;
