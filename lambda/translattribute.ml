@@ -415,6 +415,27 @@ let add_cold_attribute expr loc attributes =
             (Warnings.Duplicated_attribute "cold");
       (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never][@local never]`
          so we do the equivalent here. *)
+      (* CR xclerc for xclerc: create a new `Warnings` constructor. *)
+      begin match attr.inline with 
+      | Always_inline
+      | Never_inline
+      | Available_inline
+      | Unroll _ ->
+        Location.prerr_warning loc (Warnings.Duplicated_attribute "cold/inline");
+      | Default_inline -> ()
+      end;
+      begin match attr.specialise with
+      | Always_specialise
+      | Never_specialise ->
+        Location.prerr_warning loc (Warnings.Duplicated_attribute "cold/specialise");
+      | Default_specialise -> ()
+      end;
+      begin match attr.local with
+      | Always_local
+      | Never_local ->
+        Location.prerr_warning loc (Warnings.Duplicated_attribute "cold/local");
+      | Default_local -> ()
+      end;
       let attr = { attr with cold = true; inline = Never_inline; specialise = Never_specialise; local = Never_local; } in
       lfunction_with_attr ~attr funct
     end else
