@@ -221,7 +221,12 @@ expr:
   | LBRACKET RBRACKET { Ctuple [] }
   | LPAREN LET letdef sequence RPAREN { make_letdef $3 $4 }
   | LPAREN APPLY location expr exprlist machtype RPAREN
-                { Cop(Capply ($6, Lambda.Rc_normal),
+                {
+                  let callsite_types =
+                    {args = []; res = Extended_machtype.of_machtype $6} in
+                  Cop(Capply {callsite_types;
+                              funcdef_types = callsite_types;
+                              pos = Lambda.Rc_normal},
                       $4 :: List.rev $5, debuginfo ?loc:$3 ()) }
   | LPAREN EXTCALL STRING exprlist machtype RPAREN
                {Cop(Cextcall {func=$3; ty=$5; alloc=false;

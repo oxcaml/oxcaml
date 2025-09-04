@@ -172,6 +172,10 @@ module Llvm_typ = struct
       size1 = size2 && equal typ1 typ2
     | (Int _ | Float | Double | Ptr _ | Struct _ | Array _ | Vector _), _ ->
       false
+
+  let is_ptr = function
+    | Ptr _ -> true
+    | Int _ | Float | Double | Struct _ | Array _ | Vector _ -> false
 end
 
 module Calling_conventions = struct
@@ -326,34 +330,43 @@ let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
 
 let get_ppf_dump t = t.ppf_dump
 
+let add_referenced_symbol t sym_name =
+  t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
+
 let add_called_fun t name ~cc ~args ~res =
-  (match String.Map.find_opt name t.called_functions with
-  | None -> ()
-  | Some { cc = cc'; args = args'; res = res' } ->
-    let all_equal =
-      Calling_conventions.equal cc cc'
-      && List.equal Llvm_typ.equal args args'
-      && Option.equal Llvm_typ.equal res res'
-    in
-    if not all_equal
-    then
-      Misc.fatal_errorf
-        "Llvmize: Same function referenced with incompatible signatures: %s \
-         (expected: (%a) -> %a, got: (%a) -> %a)"
-        name
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space Llvm_typ.pp_t)
-        args'
-        (Format.pp_print_option
-           ~none:(fun ppf () -> Format.fprintf ppf "void")
-           Llvm_typ.pp_t)
-        res'
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space Llvm_typ.pp_t)
-        args
-        (Format.pp_print_option
-           ~none:(fun ppf () -> Format.fprintf ppf "void")
-           Llvm_typ.pp_t)
-        res');
-  t.called_functions <- String.Map.add name { cc; args; res } t.called_functions
+  if String.begins_with name ~prefix:"caml_apply"
+  then add_referenced_symbol t name
+  else (
+    (match String.Map.find_opt name t.called_functions with
+    | None -> ()
+    | Some { cc = cc'; args = args'; res = res' } ->
+      let all_equal =
+        Calling_conventions.equal cc cc'
+        && List.equal Llvm_typ.equal args args'
+        && Option.equal Llvm_typ.equal res res'
+      in
+      if not all_equal
+      then
+        Misc.fatal_errorf
+          "Llvmize: Same function referenced with incompatible signatures: %s \
+           (expected: (%a) -> %a : %s, got: (%a) -> %a) : %s"
+          name
+          (Format.pp_print_list ~pp_sep:Format.pp_print_space Llvm_typ.pp_t)
+          args'
+          (Format.pp_print_option
+             ~none:(fun ppf () -> Format.fprintf ppf "void")
+             Llvm_typ.pp_t)
+          res'
+          (Calling_conventions.to_llvmir_string cc')
+          (Format.pp_print_list ~pp_sep:Format.pp_print_space Llvm_typ.pp_t)
+          args
+          (Format.pp_print_option
+             ~none:(fun ppf () -> Format.fprintf ppf "void")
+             Llvm_typ.pp_t)
+          res
+          (Calling_conventions.to_llvmir_string cc));
+    t.called_functions
+      <- String.Map.add name { cc; args; res } t.called_functions)
 
 let add_c_call_wrapper t c_fun_name ~args ~res =
   let wrapper_name = ".wrapper." ^ c_fun_name in
@@ -372,9 +385,6 @@ let add_c_call_wrapper t c_fun_name ~args ~res =
   t.c_call_wrappers
     <- String.Map.add wrapper_name { c_fun_name; args; res } t.c_call_wrappers;
   wrapper_name
-
-let add_referenced_symbol t sym_name =
-  t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
 
 (* Runtime registers are passed explicitly as arguments to and returned from all
    OCaml functions. They have LLVM type ptr. *)
@@ -519,11 +529,13 @@ module F = struct
      creating identifiers for registers via [get_ident_for_reg] or creating
      extra labels (as in [ins_switch])) *)
 
-  let ins_load t ~src ~dst typ =
-    ins t "%a = load %a, ptr %a" pp_ident dst Llvm_typ.pp_t typ pp_ident src
+  let ins_load ?(ptr_typ = Llvm_typ.ptr) t ~src ~dst typ =
+    ins t "%a = load %a, %a %a" pp_ident dst Llvm_typ.pp_t typ Llvm_typ.pp_t
+      ptr_typ pp_ident src
 
-  let ins_store t ~src ~dst typ =
-    ins t "store %a %a, ptr %a" Llvm_typ.pp_t typ pp_ident src pp_ident dst
+  let ins_store ?(ptr_typ = Llvm_typ.ptr) t ~src ~dst typ =
+    ins t "store %a %a, %a %a" Llvm_typ.pp_t typ pp_ident src Llvm_typ.pp_t
+      ptr_typ pp_ident dst
 
   let ins_store_value t ~src ~dst typ =
     ins t "store %a %a, ptr %a" Llvm_typ.pp_t typ Llvm_value.pp_t src pp_ident
@@ -566,13 +578,10 @@ module F = struct
       ifnot
 
   (* note: `ins_switch` does not take a default label, as switches are assumed
-     to be exhaustive. Since it is mandatory in LLVM, we will use a per-function
-     label with an `unreachable` instruction, on a per-need basis (See
-     `fun_info.needs_unreachable_label` field). *)
-  let ins_switch t typ value labels =
-    let discr = fresh_ident t in
+     to be exhaustive. Since it is mandatory in LLVM, we will use a label with
+     an `unreachable` instruction for every instance of this instruction. *)
+  let ins_switch t typ discr labels =
     let unreachable_label = fresh_ident t in
-    ins_load t ~src:value ~dst:discr typ;
     ins t "switch %a %a, label %a [" Llvm_typ.pp_t typ pp_ident discr pp_ident
       unreachable_label;
     Array.iteri
@@ -667,9 +676,9 @@ module F = struct
 
   let ins_ret t ident typ = ins t "ret %a %a" Llvm_typ.pp_t typ pp_ident ident
 
-  let ins_atomicrmw t op ~ptr ~arg ~res typ =
-    ins t "%a = atomicrmw %s ptr %a, %a %a acq_rel" pp_ident res op pp_ident ptr
-      Llvm_typ.pp_t typ pp_ident arg
+  let ins_atomicrmw t op ~ptr ~ptr_typ ~arg ~res typ =
+    ins t "%a = atomicrmw %s %a %a, %a %a acq_rel" pp_ident res op Llvm_typ.pp_t
+      ptr_typ pp_ident ptr Llvm_typ.pp_t typ pp_ident arg
 
   let ins_cmpxchg t ~ptr ~compare_with ~set_if_eq ~res typ =
     ins t "%a = cmpxchg ptr %a, %a %a, %a %a acq_rel monotonic" pp_ident res
@@ -717,19 +726,6 @@ module F = struct
     | Int _, Ptr _ -> do_conv "inttoptr"
     | Ptr _, Int _ -> do_conv "ptrtoint"
     | Ptr _, Ptr _ -> do_conv "addrspacecast"
-    (* Vector <-> Double *)
-    | Double, Vector { size = _; elem_typ = Double } ->
-      let poison = make_poison t dst in
-      let res = fresh_ident t in
-      ins_insertelement t ~src:(Local_ident ident) ~dst:(Local_ident poison)
-        ~src_typ:src ~dst_typ:dst ~res ~idx:(Immediate "0")
-        ~idx_typ:Llvm_typ.i64;
-      res
-    | Vector { size = _; elem_typ = Double }, Double ->
-      let res = fresh_ident t in
-      ins_extractelement t ~src:(Local_ident ident) ~dst:res ~src_typ:src
-        ~idx:(Immediate "0") ~idx_typ:Llvm_typ.i64;
-      res
     | _ ->
       Misc.fatal_errorf "Llvmize.cast: unexpected types: %a, %a" Llvm_typ.pp_t
         src Llvm_typ.pp_t dst
@@ -775,14 +771,14 @@ module F = struct
   (* Load the address as an ident with type ptr *)
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
     let offset = Arch.addressing_displacement_for_llvmize addr in
+    let reg_typ = Llvm_typ.of_machtyp_component i.arg.(n).typ in
+    let typ = if Llvm_typ.is_ptr reg_typ then reg_typ else Llvm_typ.ptr in
     let arg = load_reg_to_temp t i.arg.(n) in
-    do_offset
-      ~src:(Llvm_typ.of_machtyp_component i.arg.(n).Reg.typ)
-      ~dst:Llvm_typ.ptr t arg offset
+    typ, do_offset ~src:reg_typ ~dst:typ t arg offset
 
   let int_comp t (comp : Operation.integer_comparison) (i : 'a Cfg.instruction)
       ~imm =
-    let typ = Llvm_typ.of_machtyp_component i.arg.(0).typ in
+    let typ = Llvm_typ.i64 in
     let comp_name =
       match comp with
       | Ceq -> "eq"
@@ -798,13 +794,13 @@ module F = struct
     in
     match imm with
     | None ->
-      let arg1 = load_reg_to_temp t i.arg.(0) in
-      let arg2 = load_reg_to_temp t i.arg.(1) in
+      let arg1 = cast_and_load_reg_to_temp t typ i.arg.(0) in
+      let arg2 = cast_and_load_reg_to_temp t typ i.arg.(1) in
       let res = fresh_ident t in
       ins_icmp t comp_name arg1 arg2 res typ;
       res
     | Some n ->
-      let arg = load_reg_to_temp t i.arg.(0) in
+      let arg = cast_and_load_reg_to_temp t typ i.arg.(0) in
       let res = fresh_ident t in
       ins_icmp_imm t comp_name arg (string_of_int n) res typ;
       res
@@ -831,10 +827,9 @@ module F = struct
     res
 
   let odd_test t (i : 'a Cfg.instruction) =
-    let arg = load_reg_to_temp t i.arg.(0) in
+    let arg = cast_and_load_reg_to_temp t Llvm_typ.i64 i.arg.(0) in
     let is_odd = fresh_ident t in
-    ins_conv t "trunc" ~src:arg ~dst:is_odd
-      ~src_typ:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
+    ins_conv t "trunc" ~src:arg ~dst:is_odd ~src_typ:Llvm_typ.i64
       ~dst_typ:Llvm_typ.bool;
     is_odd
 
@@ -954,6 +949,9 @@ module F = struct
       op.callsite_types.args
       (pp_print_list ~pp_sep:pp_comma print_extended_machtyp)
       op.funcdef_types.args;
+    ins t "; callsite_types.res: [%a], funcdef_types.res: [%a]"
+      print_extended_machtyp op.callsite_types.res print_extended_machtyp
+      op.funcdef_types.res;
     let safe_to_cast ~(src : Cmm.Extended_machtype_component.t)
         ~(dst : Cmm.Extended_machtype_component.t) =
       match src, dst with
@@ -983,15 +981,21 @@ module F = struct
           print_extended_machtyp_comp src print_extended_machtyp_comp dst
     in
     let args =
-      List.map
-        (fun ident ->
-          let loaded = fresh_ident t in
-          (* [ident] is a pointer to a pointer *)
-          ins_load t ~src:ident ~dst:loaded Llvm_typ.ptr;
-          Llvm_typ.ptr, loaded)
-        runtime_regs
-      @ List.map3
-          (fun reg callsite_ty funcdef_ty ->
+      let runtime_args =
+        List.map
+          (fun ident ->
+            let loaded = fresh_ident t in
+            (* [ident] is a pointer to a pointer *)
+            ins_load t ~src:ident ~dst:loaded Llvm_typ.ptr;
+            Llvm_typ.ptr, loaded)
+          runtime_regs
+      in
+      let provided_types =
+        List.combine op.callsite_types.args op.funcdef_types.args
+      in
+      let passed_args, _ =
+        List.map2_prefix
+          (fun reg (callsite_ty, funcdef_ty) ->
             check_safe_to_cast ~src:callsite_ty.(0) ~dst:funcdef_ty.(0);
             let temp = load_reg_to_temp t reg in
             let typ = Llvm_typ.of_extended_machtype funcdef_ty in
@@ -1000,7 +1004,9 @@ module F = struct
               cast
                 ~src:(Llvm_typ.of_machtyp_component reg.Reg.typ)
                 ~dst:typ t temp ))
-          arg_regs op.callsite_types.args op.funcdef_types.args
+          arg_regs provided_types
+      in
+      runtime_args @ passed_args
     in
     let arg_types = List.map fst args in
     (* Prepare return *)
@@ -1017,6 +1023,9 @@ module F = struct
           (Cmm.Extended_machtype.to_machtype op.funcdef_types.res
           |> Array.to_list)
     in
+    ins t "; res_regs: [%a]"
+      (pp_print_list ~pp_sep:pp_comma Printreg.reg)
+      res_regs;
     let do_call ~pp_name fn =
       let res_ident = fresh_ident t in
       (* CR yusumez: Despite frame pointers being disabled and no register
@@ -1305,12 +1314,13 @@ module F = struct
       extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
       ins_unreachable t
     | Switch labels ->
-      let arg = get_ident_for_reg t i.arg.(0) in
-      ins_switch t Llvm_typ.i64 arg labels
+      let typ = Llvm_typ.i64 in
+      let arg = cast_and_load_reg_to_temp t typ i.arg.(0) in
+      ins_switch t typ arg labels
 
   let int_op t (i : Cfg.basic Cfg.instruction)
       (op : Operation.integer_operation) ~imm =
-    let typ = Llvm_typ.of_machtyp_component i.res.(0).typ in
+    let typ = Llvm_typ.i64 in
     let do_binop op_name =
       match imm with
       | None ->
@@ -1384,7 +1394,7 @@ module F = struct
       | Ictz _ -> do_unary_intrinsic "cttz"
       | Ipopcnt -> do_unary_intrinsic "ctpop"
     in
-    ins_store_into_reg t res i.res.(0)
+    cast_and_store_into_reg t typ res i.res.(0)
 
   let float_op t (i : Cfg.basic Cfg.instruction) (width : Cmm.float_width)
       (op : Operation.float_operation) =
@@ -1543,10 +1553,10 @@ module F = struct
       | Thirtytwo -> Llvm_typ.i32
       | Sixtyfour | Word -> Llvm_typ.i64
     in
-    let ptr = load_addr t addr i first_memory_arg_index in
+    let ptr_typ, ptr = load_addr t addr i first_memory_arg_index in
     let do_atomicrmw ?(set_res = false) op =
       let res = fresh_ident t in
-      ins_atomicrmw t op ~ptr ~arg ~res typ;
+      ins_atomicrmw t op ~ptr ~ptr_typ ~arg ~res typ;
       if set_res then ins_store_into_reg t res i.res.(0)
     in
     let do_cmpxchg () =
@@ -1622,10 +1632,10 @@ module F = struct
     | Load { memory_chunk; addressing_mode; mutability = _; is_atomic = _ } -> (
       (* Q: what do we do with mutability / is_atomic / is_modify? *)
       (* CR yusumez: val mismatch *)
-      let src = load_addr t addressing_mode i 0 in
+      let ptr_typ, src = load_addr t addressing_mode i 0 in
       let basic typ =
         let temp = fresh_ident t in
-        ins_load t ~src ~dst:temp typ;
+        ins_load ~ptr_typ t ~src ~dst:temp typ;
         cast_and_store_into_reg t typ temp i.res.(0)
       in
       let extend_int op typ =
@@ -1636,7 +1646,8 @@ module F = struct
         cast_and_store_into_reg t Llvm_typ.i64 temp2 i.res.(0)
       in
       match memory_chunk with
-      | Word_int | Word_val -> basic Llvm_typ.i64
+      | Word_int -> basic Llvm_typ.i64
+      | Word_val -> basic Llvm_typ.val_ptr
       | Byte_unsigned -> extend_int "zext" Llvm_typ.i8
       | Byte_signed -> extend_int "sext" Llvm_typ.i8
       | Sixteen_unsigned -> extend_int "zext" Llvm_typ.i16
@@ -1657,7 +1668,7 @@ module F = struct
       | Fivetwelve_aligned ->
         not_implemented_basic ~msg:"load" i)
     | Store (chunk, addr, _is_modify) -> (
-      let dst = load_addr t addr i 1 in
+      let ptr_typ, dst = load_addr t addr i 1 in
       let basic typ =
         let temp = load_reg_to_temp t i.arg.(0) in
         let casted =
@@ -1665,7 +1676,7 @@ module F = struct
             ~src:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
             ~dst:typ t temp
         in
-        ins_store t ~src:casted ~dst typ
+        ins_store ~ptr_typ t ~src:casted ~dst typ
       in
       let trunc ?(trunc_op = "trunc") dst_typ =
         let reg_typ = i.arg.(0).typ |> Llvm_typ.of_machtyp_component in
@@ -1797,9 +1808,10 @@ module F = struct
         ins_store_into_reg t res i.res.(0))
     | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
     | Csel test_op ->
+      let typ = Llvm_typ.of_machtyp_component i.res.(0).typ in
       let len = Array.length i.arg in
-      let ifso = load_reg_to_temp t i.arg.(len - 2) in
-      let ifnot = load_reg_to_temp t i.arg.(len - 1) in
+      let ifso = cast_and_load_reg_to_temp t typ i.arg.(len - 2) in
+      let ifnot = cast_and_load_reg_to_temp t typ i.arg.(len - 1) in
       let cond = test t test_op i in
       let dst = fresh_ident t in
       ins_select t ~cond ~ifso ~ifnot ~dst
