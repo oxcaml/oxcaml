@@ -1133,12 +1133,12 @@ val remove_double_underscores : string -> string
 
 (** {1 JSON utilities} *)
 module Json : sig
-  (** Simple JSON generation utilities.
+  (** Simple (and not very robust) JSON generation utilities.
 
-      Note that the encoding of strings into JSON strings is not perfect. We are
-      using OCaml's [%S] format specifier, which escapes most special characters
-      reasonably, but there can be discrepancies around, for example, unicode
-      characters. *)
+      Everything is string based, creating lots of intermediate strings.
+      Moreover, [Json.string] uses a custom string encoding based on the code
+      for the format specifier [%S], but with escapes for [\u00HH] instead of
+      OCaml's [\DDD]. *)
 
   val field : string -> string -> string
   (** [field name value] creates a JSON field with the given name and value. *)
