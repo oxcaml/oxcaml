@@ -175,24 +175,24 @@ Line 1, characters 36-51:
 Error: Integer literal exceeds the range of representable integers of type "int32#"
 |}]
 
-let () = test_int "invalid_int" (#0x8000000000000000)
+let () = test_int "invalid_int" (#0x8000000000000000m)
 [%%expect{|
-Line 1, characters 32-53:
-1 | let () = test_int "invalid_int" (#0x8000000000000000)
-                                    ^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 32-54:
+1 | let () = test_int "invalid_int" (#0x8000000000000000m)
+                                    ^^^^^^^^^^^^^^^^^^^^^^
 Error: Integer literal exceeds the range of representable integers of type "int#"
 |}]
 
-let () = test_int "max_int + 1" (#4611686018427387904)
+let () = test_int "max_int + 1" (#4611686018427387904m)
 [%%expect{|
 max_int + 1: -4611686018427387904
 |}]
 
-let () = test_int "max_int + 2" (#4611686018427387905)
+let () = test_int "max_int + 2" (#4611686018427387905m)
 [%%expect{|
-Line 1, characters 32-54:
-1 | let () = test_int "max_int + 2" (#4611686018427387905)
-                                    ^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 32-55:
+1 | let () = test_int "max_int + 2" (#4611686018427387905m)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Integer literal exceeds the range of representable integers of type "int#"
 |}]
 
@@ -324,7 +324,9 @@ val f2 : float# -> float# -> unit = <fun>
 
 let f _ _ = ();;
 let () = f
-(* This lexes as a directive. *)
+(* This lexes as a directive. #2 is not a valid unboxed int literal
+   anyway, as it lacks a suffix.
+*)
 #2 "literals.ml"
 ()
 ()

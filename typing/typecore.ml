@@ -779,6 +779,7 @@ type constant_integer_result =
   | Int32 of int32
   | Int64 of int64
   | Nativeint of nativeint
+  | Int of int
 
 type constant_integer_error =
   | Int8_literal_not_enabled
@@ -788,51 +789,58 @@ type constant_integer_error =
   | Int32_literal_overflow
   | Int64_literal_overflow
   | Nativeint_literal_overflow
-  | Unknown_constant_literal
+  | Int_literal_overflow
+  | Unknown_constant_literal of char
 
 let constant_integer i ~suffix :
     (constant_integer_result, constant_integer_error) result =
   match suffix with
-  | 's' ->
+  | Some 's' ->
     if Language_extension.is_enabled Small_numbers then
     begin
       try Ok (Int8 (Misc.Int_literal_converter.int8 i))
       with Failure _ -> Error Int8_literal_overflow
     end
     else Error (Int8_literal_not_enabled)
-  | 'S' ->
+  | Some 'S' ->
     if Language_extension.is_enabled Small_numbers then
     begin
       try Ok (Int16 (Misc.Int_literal_converter.int16 i))
       with Failure _ -> Error Int16_literal_overflow
     end
     else Error (Int16_literal_not_enabled)
-  | 'l' ->
+  | Some 'l' ->
     begin
       try Ok (Int32 (Misc.Int_literal_converter.int32 i))
       with Failure _ -> Error Int32_literal_overflow
     end
-  | 'L' ->
+  | Some 'L' ->
     begin
       try Ok (Int64 (Misc.Int_literal_converter.int64 i))
       with Failure _ -> Error Int64_literal_overflow
     end
-  | 'n' ->
+  | Some 'n' ->
     begin
       try Ok (Nativeint (Misc.Int_literal_converter.nativeint i))
       with Failure _ -> Error Nativeint_literal_overflow
     end
-  | _ -> Error Unknown_constant_literal
+  | Some 'm' | None ->
+    begin
+      try Ok (Int (Misc.Int_literal_converter.int i))
+      with Failure _ -> Error Int_literal_overflow
+    end
+  | Some suffix -> Error (Unknown_constant_literal suffix)
 
 let constant : Parsetree.constant -> (Typedtree.constant, error) result =
   function
-  | Pconst_integer (i, Some suffix) ->
+  | Pconst_integer (i, suffix) ->
     begin match constant_integer i ~suffix with
       | Ok (Int8 v) -> Ok (Const_int8 v)
       | Ok (Int16 v) -> Ok (Const_int16 v)
       | Ok (Int32 v) -> Ok (Const_int32 v)
       | Ok (Int64 v) -> Ok (Const_int64 v)
       | Ok (Nativeint v) -> Ok (Const_nativeint v)
+      | Ok (Int v) -> Ok (Const_int v)
       | Error Int8_literal_not_enabled -> Error (Int8_literal i)
       | Error Int16_literal_not_enabled -> Error (Int16_literal i)
       | Error Int8_literal_overflow -> Error (Literal_overflow "int8")
@@ -840,13 +848,10 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
       | Error Int32_literal_overflow -> Error (Literal_overflow "int32")
       | Error Int64_literal_overflow -> Error (Literal_overflow "int64")
       | Error Nativeint_literal_overflow -> Error (Literal_overflow "nativeint")
-      | Error Unknown_constant_literal -> Error (Unknown_literal (i, suffix))
+      | Error Int_literal_overflow -> Error (Literal_overflow "int")
+      | Error Unknown_constant_literal suffix ->
+        Error (Unknown_literal (i, suffix))
     end
-  | Pconst_integer (i,None) ->
-     begin
-       try Ok (Const_int (Misc.Int_literal_converter.int i))
-       with Failure _ -> Error (Literal_overflow "int")
-     end
   | Pconst_char c -> Ok (Const_char c)
   | Pconst_string (s,loc,d) -> Ok (Const_string (s,loc,d))
   | Pconst_float (f,None)-> Ok (Const_float f)
@@ -861,13 +866,14 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
       else Error (Float32_literal (Misc.format_as_unboxed_literal f))
   | Pconst_unboxed_float (x, Some c) ->
       Error (Unknown_literal (Misc.format_as_unboxed_literal x, c))
-  | Pconst_unboxed_integer (i, Some suffix) ->
-      begin match constant_integer i ~suffix with
+  | Pconst_unboxed_integer (i, suffix) ->
+      begin match constant_integer i ~suffix:(Some suffix) with
       | Ok (Int8 v) -> Ok (Const_untagged_int8 v)
       | Ok (Int16 v) -> Ok (Const_untagged_int16 v)
       | Ok (Int32 v) -> Ok (Const_unboxed_int32 v)
       | Ok (Int64 v) -> Ok (Const_unboxed_int64 v)
       | Ok (Nativeint v) -> Ok (Const_unboxed_nativeint v)
+      | Ok (Int v) -> Ok (Const_untagged_int v)
       | Error Int8_literal_not_enabled ->
         Error (Int8_literal (Misc.format_as_unboxed_literal i))
       | Error Int16_literal_not_enabled ->
@@ -877,14 +883,15 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
       | Error Int32_literal_overflow -> Error (Literal_overflow "int32#")
       | Error Int64_literal_overflow -> Error (Literal_overflow "int64#")
       | Error Nativeint_literal_overflow -> Error (Literal_overflow "nativeint#")
-      | Error Unknown_constant_literal ->
+      | Error Int_literal_overflow -> Error (Literal_overflow "int#")
+      | Error Unknown_constant_literal suffix ->
           Error (Unknown_literal (Misc.format_as_unboxed_literal i, suffix))
       end
-  | Pconst_unboxed_integer (i, None) ->
-     begin
-       try Ok (Const_untagged_int (Misc.Int_literal_converter.int i))
-       with Failure _ -> Error (Literal_overflow "int#")
-     end
+  (* | Pconst_unboxed_integer (i, None) -> *)
+  (*    begin *)
+  (*      try Ok (Const_untagged_int (Misc.Int_literal_converter.int i)) *)
+  (*      with Failure _ -> Error (Literal_overflow "int#") *)
+  (*    end *)
 
 let constant_or_raise env loc cst =
   match constant cst with

@@ -54,7 +54,7 @@ let () = test_int64 "negative_one" (- #1L)
 let () = test_nativeint "two_fifty_five_in_hex" (#0xFFn)
 let () = test_int32 "twenty_five_in_octal" (#0o31l)
 let () = test_int64 "forty_two_in_binary" (#0b101010L)
-let () = test_int "max_int + 1" (#4611686018427387904)
+let () = test_int "max_int + 1" (#4611686018427387904m)
 
 (*****************************************)
 (* Patterns *)
@@ -120,21 +120,21 @@ test_int64 "result" (f #7L);;
 
 let f x =
   match x with
-  | #4 -> `Four
-  | #5 -> `Five
+  | #4m -> `Four
+  | #5m -> `Five
   | _ -> `Other
 ;;
 
 let () =
-  match f #4 with
+  match f #4m with
   | `Four -> ()
   | _ -> assert false;;
 
 let f x =
   match x with
-  | #4 -> #0
-  | #5 -> #1
+  | #4m -> #0m
+  | #5m -> #1m
   | x ->  x
 ;;
 
-test_int "result" (f #7);;
+test_int "result" (f #7m);;

@@ -29,12 +29,12 @@ type constant =
      Suffixes [[g-z][G-Z]] are accepted by the parser.
      Suffixes except ['l'], ['L'] and ['n'] are rejected by the typechecker
   *)
-  | Pconst_unboxed_integer of string * char option
+  | Pconst_unboxed_integer of string * char
       (** Integer constants such as [#3] [#3l] [#3L] [#3n].
 
-          Suffixes [[g-z][G-Z]] are accepted by the parser.
-          Suffixes except ['s], ['S'], ['l'], ['L'] and ['n'] are rejected by
-          the typechecker
+          A suffix [[g-z][G-Z]] is required by the parser.
+          Suffixes except ['s'], ['S'], ['l'], ['L'], ['n'], and ['m'] are
+          rejected by the typechecker
       *)
   | Pconst_char of char  (** Character such as ['c']. *)
   | Pconst_string of string * Location.t * string option
