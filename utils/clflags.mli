@@ -86,6 +86,7 @@ val gdwarf_config_max_cms_files_per_variable : int ref
 val gdwarf_config_max_type_to_shape_depth : int ref
 val gdwarf_config_max_shape_reduce_steps_per_variable : int option ref
 val gdwarf_config_max_evaluation_steps_per_variable : int option ref
+val gdwarf_config_shape_reduce_fuel : int ref
 val gdwarf_fidelity : gdwarf_fidelity option ref
 val gdwarf_fidelity_of_string : string -> gdwarf_fidelity option
 val set_gdwarf_fidelity : gdwarf_fidelity -> unit

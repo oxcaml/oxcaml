@@ -1914,7 +1914,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     unknown_base_layouts type_layout
 
 module With_cms_reduce = Shape_reduce.Make (struct
-  let fuel () = 10
+  let fuel () = !Clflags.gdwarf_config_shape_reduce_fuel
 
   let fuel_for_compilation_units () =
     !Clflags.gdwarf_config_max_cms_files_per_variable
