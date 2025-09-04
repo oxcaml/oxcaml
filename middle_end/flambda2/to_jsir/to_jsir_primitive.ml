@@ -631,7 +631,7 @@ let primitive ~env ~res (prim : Flambda_primitive.t) =
   | Unary (f, x) -> unary ~env ~res f x
   | Binary (f, x, y) -> binary ~env ~res f x y
   | Ternary (f, x, y, z) -> ternary ~env ~res f x y z
-  | Quaternary (f, w, x, y, z) -> quaternary ~env ~res f x w y z
+  | Quaternary (f, w, x, y, z) -> quaternary ~env ~res f w x y z
   | Variadic (f, xs) -> variadic ~env ~res f xs
 
 let extern ~env ~res symbol args =
