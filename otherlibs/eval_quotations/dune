@@ -13,7 +13,7 @@
 (library
  (name eval_quotations)
  (modes byte native)
- (libraries dynlink_internal)
+ (libraries dynlink_internal unix)
  (flags
   (:standard
    -strict-sequence
@@ -28,9 +28,14 @@
 
 (install
  (files
-  eval_quotations.cma
+  (.eval_quotations.objs/native/eval_quotations.cmx as eval_quotations.cmx)
   eval_quotations.cmxa
   eval_quotations.a
-  (.eval_quotations.objs/byte/eval_quotations.cmi as eval_quotations/eval_quotations.cmi))
+  eval_quotations.cmxs
+  eval_quotations.cma
+  ; (eval_quotations.mli as eval_quotations/eval_quotations.mli)
+  (.eval_quotations.objs/byte/eval_quotations.cmi as eval_quotations.cmi)
+  (.eval_quotations.objs/byte/eval_quotations.cmt as eval_quotations.cmt)
+  (.eval_quotations.objs/byte/eval_quotations.cmti as eval_quotations.cmti))
  (section lib)
  (package ocaml))

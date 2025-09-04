@@ -1,0 +1,8 @@
+# @configure_input@
+
+version = "@VERSION@"
+description = "Runtime support for quotation evaluation"
+archive(byte) = "eval_quotations.cma"
+archive(native) = "eval_quotations.cmxa"
+plugin(byte) = "eval_quotations.cma"
+plugin(native) = "eval_quotations.cmxs"

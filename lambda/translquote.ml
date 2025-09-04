@@ -71,7 +71,14 @@ let triple (x, y, z) =
 
 (* Let-expressions *)
 
-let bind id def body = Llet (Strict, Ptop, id, debug_uid_none, def, body)
+let bind id def body =
+  Llet
+    ( Strict,
+      Pvalue { nullable = Non_nullable; raw_kind = Pgenval },
+      id,
+      debug_uid_none,
+      def,
+      body )
 
 (* Typed representation of complex lambdas *)
 
@@ -176,7 +183,7 @@ end = struct
   let func_ _ id body =
     let param_from_name name =
       { name;
-        layout = Ptop;
+        layout = Pvalue { nullable = Non_nullable; raw_kind = Pgenval };
         debug_uid = debug_uid_none;
         attributes = { unbox_param = false };
         mode = alloc_heap
@@ -185,8 +192,9 @@ end = struct
     lfunction
       ~kind:(Curried { nlocal = 1 })
       ~params:[param_from_name id]
-      ~return:Ptop ~attr:default_function_attribute ~body ~loc:Loc_unknown
-      ~mode:alloc_heap ~ret_mode:alloc_heap
+      ~return:(Pvalue { nullable = Non_nullable; raw_kind = Pgenval })
+      ~attr:default_function_attribute ~body ~loc:Loc_unknown ~mode:alloc_heap
+      ~ret_mode:alloc_heap
 
   let func arg_sort body_lam id body = func_ arg_sort id (body_lam body)
 
@@ -304,7 +312,8 @@ let apply modname field loc args =
          ap_args = args;
          ap_probe = None;
          ap_loc = of_location ~scopes:empty_scopes loc;
-         ap_result_layout = Ptop;
+         ap_result_layout =
+           Pvalue { nullable = Non_nullable; raw_kind = Pgenval };
          ap_region_close = Rc_normal;
          ap_mode = alloc_heap;
          ap_tailcall = Default_tailcall;

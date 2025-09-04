@@ -1,54 +1,59 @@
-(* TEST
- expect;
-*)
+(* TEST *)
 
-let a0 = [%eval: int];;
-let b0 = a0 <[ 1 ]>;;
-let c0 = b0 ();;
+let test0 =
+  Printf.printf "\nTest 0\n";
+  let eval : <[int]> expr -> unit -> int = [%eval: int] in
+  Printf.printf "Compiling...\n";
+  let compiled = eval <[ 42 ]> in
+  Printf.printf "Running...\n";
+  let output = compiled () in
+  Printf.printf "Output: %d\n" output;
+;;
 
-[%%expect{|
-val a0 : <[ int ]> expr -> unit -> int = <fun>
-val b0 : unit -> int = <fun>
-Exception: Invalid_argument "1".
-|}]
+let test1 =
+  Printf.printf "\nTest 1\n";
+  let eval = [%eval: int -> int list] in
+  Printf.printf "Compiling...\n";
+  let compiled = eval <[ fun x -> [ x ; x + 1 ] ]> in
+  Printf.printf "Running...\n";
+  let output = (compiled ()) 42 in
+  Printf.printf
+    "Output: [%s]\n"
+    (String.concat "; " (List.map string_of_int output))
+;;
 
-let a1 = [%eval: int -> int list];;
-let b1 = a1 <[ fun x -> [ x ; x + 1 ] ]>;;
-let c1 = b1 ();;
-let d1 = c1 42;;
+let test2 =
+  Printf.printf "\nTest 2\n";
+  let eval = [%eval: Buffer.t] in
+  Printf.printf "Compiling...\n";
+  let compiled : unit -> Buffer.t = eval
+    <[ let b = Buffer.create 42 in Buffer.add_string b "Hello world!" ; b ]>
+  in
+  Printf.printf "Running...\n";
+  let output = compiled () in
+  Printf.printf "Output: %s\n" (Buffer.contents output);
+;;
 
-[%%expect{|
-val a1 : <[ int -> int list ]> expr -> unit -> int -> int list = <fun>
-val b1 : unit -> int -> int list = <fun>
-Exception: Invalid_argument "fun x -> (::) (x, ((::) ((x + 1), [])))".
-|}]
-
-let a2 = [%eval: Buffer.t]
-let b2 = a2 <[ Buffer.create 42 ]>;;
-let c2 = b2 ();;
-
-[%%expect{|
-val a2 : <[ Buffer.t ]> expr -> unit -> Buffer.t = <fun>
-val b2 : unit -> Buffer.t = <fun>
-Exception: Invalid_argument "Stdlib.Buffer.create 42".
-|}]
-
-let a3 = [%eval: unit]
-(* This quote passes type-checking but fail during compilation, this lets us test exactly
-   when compilation of the quote happens (and what happens when it fails). *)
-let b3 = a3 <[
+let test3 =
+  Printf.printf "\nTest 3\n";
+  let eval = [%eval: string] in
+  Printf.printf "Compiling...\n";
+  (* This quote passes type-checking but fail during compilation, this lets us test exactly
+     when compilation of the quote happens (and what happens when it fails). *)
+  let quote = <[
     let ignore (_ @ local) = () in
     let[@tail_mod_cons] rec foo x = exclave_
       if x = 0 then [] else x :: foo (x - 1)
     in
-    ignore (foo 5)
-  ]>;;
-let c3 = b3 ();;
-
-[%%expect{|
-val a3 : <[ unit ]> expr -> unit -> unit = <fun>
-val b3 : unit -> unit = <fun>
-Exception:
-Invalid_argument
- "let ignore = (fun _ -> ()) in\n  let@ rec foo =\n    (fun x -> exclave_ if (x = 0) then [] else (::) (x, (foo (x - 1)))) in\n  ignore (foo 5)".
-|}]
+    ignore (foo 5);
+    "This quote should fail to compile. If it's started working then you need\n\
+     to come up with a new way for this test to pass type-checking but fail\n\
+     to compile."
+  ]> in
+  try
+    let compiled = eval quote in
+    Printf.printf "Running...\n";
+    let output = compiled () in
+    Printf.printf "Output: %s\n" output;
+  with Failure error -> Printf.printf "Error: %s\n" error
+;;

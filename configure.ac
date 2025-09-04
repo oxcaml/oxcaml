@@ -403,6 +403,7 @@ AC_CONFIG_FILES([otherlibs/stdlib_beta/META])
 AC_CONFIG_FILES([otherlibs/stdlib_alpha/META])
 AC_CONFIG_FILES([otherlibs/dynlink/META])
 AC_CONFIG_FILES([otherlibs/runtime_events/META])
+AC_CONFIG_FILES([otherlibs/eval_quotations/META])
 AC_CONFIG_FILES([stdlib/META])
 
 # Definitions related to the version of OCaml

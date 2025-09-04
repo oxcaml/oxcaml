@@ -555,15 +555,15 @@ let call_linker file_list_rev startup_file output_name =
       else if needs_objcopy_workflow then
         (* Run objcopy to extract debug info into .debug file *)
         let debug_file = output_name ^ ".debug" in
-        let compression_flag = 
+        let compression_flag =
           match Dwarf_flags.get_dwarf_objcopy_compression_format () with
-          | Some compression -> 
-            Printf.sprintf " %s=%s" 
+          | Some compression ->
+            Printf.sprintf " %s=%s"
               Config.objcopy_compress_debug_sections_flag compression
           | None -> ""
         in
-        let objcopy_cmd = 
-          Printf.sprintf 
+        let objcopy_cmd =
+          Printf.sprintf
             "objcopy --enable-deterministic-archives \
              --only-keep-debug%s %s %s && \
              objcopy --enable-deterministic-archives \
@@ -582,10 +582,10 @@ let call_linker file_list_rev startup_file output_name =
     | Fission_dsymutil ->
       if not (Target_system.is_macos ()) then
         raise (Error(Dwarf_fission_dsymutil_not_macos))
-      else if mode = Ccomp.Exe && 
+      else if mode = Ccomp.Exe &&
               not !Dwarf_flags.restrict_to_upstream_dwarf then
         (* Run dsymutil on the executable *)
-        let dsymutil_cmd = 
+        let dsymutil_cmd =
           Printf.sprintf "dsymutil %s" (Filename.quote output_name) in
         let dsymutil_exit = Ccomp.command dsymutil_cmd in
         if dsymutil_exit <> 0 then
@@ -610,16 +610,16 @@ let link unix ~ppf_dump objfiles output_name =
   Profile.(record_call (annotate_file_name output_name)) (fun () ->
     let stdlib = "stdlib.cmxa" in
     let stdexit = "std_exit.cmx" in
+    let early_pervasives =
+      if !Translcore.uses_eval_quotation then
+        [ stdlib; "dynlink/dynlink.cmxa"; "unix/unix.cmxa"; "eval_quotations.cmxa" ]
+      else
+        [ stdlib ]
+    in
     let objfiles =
       if !Clflags.nopervasives then objfiles
-      else if !Clflags.output_c_object then
-        if !Translcore.uses_eval_quotation then
-          stdlib :: "dynlink/dynlink.cmxa" :: "eval_quotations.cmxa" :: objfiles
-        else stdlib :: objfiles
-      else
-        if !Translcore.uses_eval_quotation then
-          stdlib :: "dynlink/dynlink.cmxa" :: "eval_quotations.cmxa" :: (objfiles @ [stdexit])
-        else stdlib :: (objfiles @ [stdexit]) in
+      else if !Clflags.output_c_object then early_pervasives @ objfiles
+      else early_pervasives @ (objfiles @ [stdexit]) in
     let genfns = Generic_fns.Tbl.make () in
     let ml_objfiles, units_tolink, cached_genfns_imports =
       List.fold_right
