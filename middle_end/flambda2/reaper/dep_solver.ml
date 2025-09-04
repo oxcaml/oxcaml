@@ -993,6 +993,34 @@ type field_usage =
     As function slots are transparent for [get_usages], functions slot
     usages are ignored here.
 *)
+let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
+  (* CR-someday ncourant: likewise here; I find this function particulartly
+     ugly. *)
+  let out_tbl, out = rel1_r "out" Cols.[n] in
+  let in_tbl, in_ = rel1_r "in_" Cols.[n] in
+  let in_field_tbl, in_field = rel1_r "in_field" Cols.[f] in
+  let open! Syntax in
+  let open! Global_flow_graph in
+  let q =
+    mk_exists_query ["field"] ["x"] (fun [field] [x] ->
+        [in_ x; field_usages_top_rel x field])
+  in
+  let r =
+    let$ [x; field; y] = ["x"; "field"; "y"] in
+    [in_ x; field_usages_rel x field y; in_field field] ==> out y
+  in
+  fun db field (Usages s) ->
+    let field = Field.encode field in
+    let db = Datalog.set_table in_tbl s db in
+    if exists_with_parameters q [field] db
+    then Used_as_top
+    else
+      let db =
+        Datalog.set_table in_field_tbl (FieldC.Map.singleton field ()) db
+      in
+      let db = Datalog.Schedule.(run (saturate [r]) db) in
+      Used_as_vars (Datalog.get_table out_tbl db)
+
 let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
   (* CR-someday ncourant: likewise here; I find this function particulartly
      ugly. *)
@@ -1722,6 +1750,105 @@ let rewrite_kind_with_subkind uses var kind =
     rewrite_kind_with_subkind_not_top_not_bottom db
       (Code_id_or_name.Map.singleton var ())
       kind
+
+module TypesRewriter = Flambda2_types.Rewriter.Make (struct
+  type t0 =
+    | Any_usage
+    | Usages of unit Code_id_or_name.Map.t
+
+  type t = Datalog.database * t0
+
+  let compare_t0 x y =
+    match x, y with
+    | Any_usage, Any_usage -> 0
+    | Usages usages1, Usages usages2 ->
+      Code_id_or_name.Map.compare Unit.compare usages1 usages2
+    | Any_usage, Usages _ -> -1
+    | Usages _, Any_usage -> 1
+
+  let compare (_db1, t1) (_db2, t2) = compare_t0 t1 t2
+
+  module T = Container_types.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+
+    let equal t1 t2 = compare t1 t2 = 0
+
+    let hash _t = failwith "hash"
+
+    let print ff (_db, t) =
+      match t with
+      | Any_usage -> Format.fprintf ff "Any_usage"
+      | Usages usages ->
+        Format.fprintf ff "(Usages %a)" Code_id_or_name.Set.print
+          (Code_id_or_name.Map.keys usages)
+  end)
+
+  module Map = T.Map
+
+  type set_of_closures0 =
+    { database : Datalog.database;
+      set_of_closures_usages : t0;
+      by_function_slot_usages : (t0 * Code_id.t option) Function_slot.Map.t
+    }
+
+  let rewrite (db, usages) typing_env flambda_type =
+    let open Flambda2_types.Rewriter in
+    if match usages with
+       | Any_usage -> false
+       | Usages m -> Code_id_or_name.Map.is_empty m
+    then
+      (* No usages, this might have been deleted: convert to Unknown *)
+      Rule.rewrite
+        (Pattern.var (Var.create ()) (db, Any_usage))
+        (Expr.unknown (Flambda2_types.kind flambda_type))
+    else
+      match
+        Flambda2_types.meet_single_closures_entry typing_env flambda_type
+      with
+      | Invalid ->
+        (* Not a closure. For now, we can never change the representation of
+           this, so no rewrite is necessary. *)
+        Rule.identity (db, usages)
+      | Need_meet ->
+        (* Multiple closures are possible. We are never able to use this
+           information currently; convert to Unknown. *)
+        Rule.rewrite
+          (Pattern.var (Var.create ()) (db, Any_usage))
+          (Expr.unknown (Flambda2_types.kind flambda_type))
+      | Known_result (function_slot, alloc_mode, closures_entry, function_type)
+        ->
+        assert false
+
+  let block_slot ?tag:_ (db, t) index _typing_env flambda_type =
+    match t with
+    | Any_usage -> db, Any_usage
+    | Usages usages -> (
+      let field_kind = Flambda2_types.kind flambda_type in
+      let field = Field.Block (Target_ocaml_int.to_int index, field_kind) in
+      match get_one_field db field (Usages usages) with
+      | Used_as_top -> db, Any_usage
+      | Used_as_vars vs ->
+        let (Usages usages) = get_all_usages ~for_unboxing:false db vs in
+        db, Usages usages)
+
+  let array_slot (db, _t) _index _typing_env _flambda_type =
+    (* Array primitives are opaque. Thus, anything put inside the array when it
+       was created has been treated as escaping, thus giving a [Any_usage]
+       result. *)
+    db, Any_usage
+
+  let value_slot _t _value_slot _typing_env _flambda_type =
+    Misc.fatal_error
+      "[value_slot] should never be called, because all set of closures should \
+       be handled by [rewrite]"
+
+  let function_slot _t _function_slot _typing_env _flambda_type =
+    Misc.fatal_error
+      "[function_slot] should never be called, because all set of closures \
+       should be handled by [rewrite]"
+end)
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db fields name_prefix =
   Field.Map.filter_map
