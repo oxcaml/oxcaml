@@ -158,10 +158,16 @@ let get_public_method t ~obj ~field =
   { t with next_method_cache_id = method_cache_id + 1 }, f
 
 let import_compilation_unit t compilation_unit =
-  { t with
-    imported_compilation_units =
-      Compilation_unit.Set.add compilation_unit t.imported_compilation_units
-  }
+  match Compilation_unit.equal compilation_unit Compilation_unit.predef_exn with
+  | true ->
+    (* We shouldn't add this to our linking information, because JSOO adds these
+       to global data by default *)
+    t
+  | false ->
+    { t with
+      imported_compilation_units =
+        Compilation_unit.Set.add compilation_unit t.imported_compilation_units
+    }
 
 let global_data_var t =
   match t.global_data_var with
