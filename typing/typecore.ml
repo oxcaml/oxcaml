@@ -887,11 +887,6 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
       | Error Unknown_constant_literal suffix ->
           Error (Unknown_literal (Misc.format_as_unboxed_literal i, suffix))
       end
-  (* | Pconst_unboxed_integer (i, None) -> *)
-  (*    begin *)
-  (*      try Ok (Const_untagged_int (Misc.Int_literal_converter.int i)) *)
-  (*      with Failure _ -> Error (Literal_overflow "int#") *)
-  (*    end *)
 
 let constant_or_raise env loc cst =
   match constant cst with

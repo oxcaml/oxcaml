@@ -38,7 +38,7 @@ let pretty_const c = match c with
 | Const_int64 i -> Printf.sprintf "%LdL" i
 | Const_nativeint i -> Printf.sprintf "%ndn" i
 | Const_untagged_int i ->
-  Printf.sprintf "%s" (Misc.format_as_unboxed_literal (Int.to_string i))
+  Printf.sprintf "%sm" (Misc.format_as_unboxed_literal (Int.to_string i))
 | Const_untagged_int8 i ->
   Printf.sprintf "%ss" (Misc.format_as_unboxed_literal (Int.to_string i))
 | Const_untagged_int16 i ->
