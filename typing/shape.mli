@@ -146,6 +146,10 @@ module Item : sig
 
   val compare : t -> t -> int
 
+  val is_constructor : t -> bool
+  val is_label : t -> bool
+  val is_unboxed_label : t -> bool
+
   module Map : Map.S with type key = t
 end
 
@@ -243,29 +247,23 @@ and desc =
   | Rec_var of DeBruijn_index.t
 
   (* constructors for type declarations *)
-  | Variant of
-    { simple_constructors : string list;
-      (** The string is the name of the constructor. The runtime
-          representation of the constructor at index [i] in this list is
-          [2 * i + 1]. See [dwarf_type.ml] for more details. *)
-      complex_constructors : (t * Layout.t) complex_constructors
-      (** All constructors in this category are represented as blocks.
-          The index [i] in the list indicates the tag at runtime. The
-          length of the constructor argument list [args] determines the
-          size of the block. *)
-    }
+  | Variant of (t * Layout.t) complex_constructors
+      (* CR sspies: Rename this just to constructor now that simple constructors
+         are no longer a thing. *)
   | Variant_unboxed of
     { name : string;
+      variant_uid : Uid.t option;
       arg_name : string option;
       (** if this is [None], we are looking at a singleton tuple;
           otherwise, it is a singleton record. *)
+      arg_uid : Uid.t option;
       arg_shape : t;
       arg_layout : Layout.t
     }
     (** An unboxed variant corresponds to the [@@unboxed] annotation.
         It must have a single, complex constructor. *)
   | Record of
-      { fields : (string * t * Layout.t) list;
+      { fields : (string * Uid.t option * t * Layout.t) list;
         kind : record_kind
       }
   | Mutrec of t Ident.Map.t
@@ -307,12 +305,14 @@ and 'a complex_constructors = 'a complex_constructor list
 
 and 'a complex_constructor =
   { name : string;
+    constr_uid: Uid.t option;
     kind : constructor_representation;
     args : 'a complex_constructor_argument list
   }
 
 and 'a complex_constructor_argument =
   { field_name : string option;
+    field_uid: Uid.t option;
     field_value : 'a
   }
 
@@ -364,10 +364,12 @@ val rec_var : ?uid:Uid.t -> DeBruijn_index.t -> t
 
 (* constructors for type declarations *)
 val variant :
-  ?uid:Uid.t -> string list -> (t * Layout.t) complex_constructors -> t
+  ?uid:Uid.t -> (t * Layout.t) complex_constructors -> t
 val variant_unboxed :
-  ?uid:Uid.t -> string -> string option -> t -> Layout.t -> t
-val record : ?uid:Uid.t -> record_kind -> (string * t * Layout.t) list -> t
+  ?uid:Uid.t -> variant_uid:Uid.t option -> arg_uid:Uid.t option ->
+  string -> string option -> t -> Layout.t -> t
+val record : ?uid:Uid.t -> record_kind ->
+  (string * Uid.t option * t * Layout.t) list -> t
 val mutrec : ?uid:Uid.t -> t Ident.Map.t -> t
 val proj_decl : ?uid:Uid.t -> t -> Ident.t -> t
 

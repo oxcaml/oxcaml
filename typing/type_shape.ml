@@ -81,15 +81,18 @@ end = struct
         (poly_variant_constructors_map subst fields)
     | Record { fields; kind } ->
       Shape.record ?uid:outer.uid kind
-        (List.map (fun (name, sh, layout) -> name, subst sh, layout) fields)
-    | Variant { simple_constructors; complex_constructors } ->
-      Shape.variant ?uid:outer.uid simple_constructors
+        (List.map
+           (fun (name, uid_opt, sh, layout) -> name, uid_opt, subst sh, layout)
+           fields)
+    | Variant constructors ->
+      Shape.variant ?uid:outer.uid
         (Shape.complex_constructors_map
            (fun (sh, layout) -> subst sh, layout)
-           complex_constructors)
-    | Variant_unboxed { name; arg_name; arg_shape; arg_layout; _ } ->
-      Shape.variant_unboxed ?uid:outer.uid name arg_name (subst arg_shape)
-        arg_layout
+           constructors)
+    | Variant_unboxed
+        { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout } ->
+      Shape.variant_unboxed ?uid:outer.uid ~variant_uid ~arg_uid name arg_name
+        (subst arg_shape) arg_layout
 
   type t =
     { uid : Uid.t;
@@ -375,6 +378,7 @@ module Type_decl_shape = struct
           (fun ({ ca_type = type_expr; ca_sort = type_layout; _ } :
                  Types.constructor_argument) ->
             { Shape.field_name = None;
+              field_uid = None;
               field_value =
                 ( Type_shape.of_type_expr_with_type_subst type_expr
                     shape_for_constr type_subst,
@@ -385,6 +389,7 @@ module Type_decl_shape = struct
         List.map
           (fun (lbl : Types.label_declaration) ->
             { Shape.field_name = Some (Ident.name lbl.ld_id);
+              field_uid = Some lbl.ld_uid;
               field_value =
                 ( Type_shape.of_type_expr_with_type_subst lbl.ld_type
                     shape_for_constr type_subst,
@@ -429,7 +434,11 @@ module Type_decl_shape = struct
         in
         Array.of_list lys
     in
-    { Shape.name; kind = constructor_repr; args }
+    { Shape.name;
+      constr_uid = Some cstr_args.cd_uid;
+      kind = constructor_repr;
+      args
+    }
 
   let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
     match cstr_args.cd_args with
@@ -444,6 +453,7 @@ module Type_decl_shape = struct
       (List.map
          (fun (lbl : Types.label_declaration) ->
            ( Ident.name lbl.ld_id,
+             Some lbl.ld_uid,
              Type_shape.of_type_expr_with_type_subst lbl.ld_type
                shape_for_constr type_subst,
              lbl.ld_sort ))
@@ -472,31 +482,29 @@ module Type_decl_shape = struct
           let cstrs_with_layouts =
             List.combine cstr_list (Array.to_list layouts)
           in
-          let simple_constructors, complex_constructors =
-            List.partition_map
+          let constructors =
+            List.map
               (fun ((cstr, arg_layouts) : Types.constructor_declaration * _) ->
                 let name = Ident.name cstr.cd_id in
-                match is_empty_constructor_list cstr with
-                | true -> Left name
-                | false ->
-                  Right
-                    (of_complex_constructor type_subst name cstr arg_layouts
-                       shape_for_constr))
+                of_complex_constructor type_subst name cstr arg_layouts
+                  shape_for_constr)
               cstrs_with_layouts
           in
-          Shape.variant simple_constructors complex_constructors
+          Shape.variant constructors
         | Type_variant ([cstr], Variant_unboxed, _unsafe_mode_crossing)
           when not (is_empty_constructor_list cstr) ->
           let name = Ident.name cstr.cd_id in
-          let field_name, type_expr, layout =
+          let cstr_uid = cstr.cd_uid in
+          let field_name, field_uid, type_expr, layout =
             match cstr.cd_args with
-            | Cstr_tuple [ca] -> None, ca.ca_type, ca.ca_sort
+            | Cstr_tuple [ca] -> None, None, ca.ca_type, ca.ca_sort
             | Cstr_record [ld] ->
-              Some (Ident.name ld.ld_id), ld.ld_type, ld.ld_sort
+              Some (Ident.name ld.ld_id), Some ld.ld_uid, ld.ld_type, ld.ld_sort
             | Cstr_tuple _ | Cstr_record _ ->
               Misc.fatal_error "Unboxed variant must have exactly one argument."
           in
-          Shape.variant_unboxed name field_name
+          Shape.variant_unboxed ~variant_uid:(Some cstr_uid) ~arg_uid:field_uid
+            name field_name
             (Type_shape.of_type_expr_with_type_subst type_expr shape_for_constr
                type_subst)
             layout
@@ -597,19 +605,25 @@ module Type_decl_shape = struct
         (fun { pv_constr_name = _; pv_constr_args = shs } ->
           List.for_all is_closed_type_shape shs)
         constrs
-    | Variant { simple_constructors = _; complex_constructors } ->
+    | Variant constructors ->
       List.for_all
-        (fun { name = _; kind = _; args } ->
+        (fun { name = _; constr_uid = _; kind = _; args } ->
           List.for_all
-            (fun { field_name = _; field_value = sh, _ } ->
+            (fun { field_name = _; field_uid = _; field_value = sh, _ } ->
               is_closed_type_shape sh)
             args)
-        complex_constructors
-    | Variant_unboxed { name = _; arg_name = _; arg_shape = sh; arg_layout = _ }
-      ->
+        constructors
+    | Variant_unboxed
+        { name = _;
+          variant_uid = _;
+          arg_name = _;
+          arg_uid = _;
+          arg_shape = sh;
+          arg_layout = _
+        } ->
       is_closed_type_shape sh
     | Record { fields; kind = _ } ->
-      List.for_all (fun (_, sh, _) -> is_closed_type_shape sh) fields
+      List.for_all (fun (_, _, sh, _) -> is_closed_type_shape sh) fields
     | Var _
     | App (_, _)
     | Struct _
@@ -718,6 +732,21 @@ module Type_decl_shape = struct
   let of_type_declaration id decl shape_for_constr =
     let decls = of_type_declarations [id, decl] shape_for_constr in
     match decls with [decl] -> decl | _ -> assert false
+
+  let of_extension_constructor_merlin_only (ext : Types.extension_constructor) =
+    match ext.ext_args with
+    | Types.Cstr_record lbls ->
+      let record =
+        record_of_labels
+          ~shape_for_constr:(fun _ ~args:_ -> None)
+          ~type_subst:[] Record_boxed lbls
+        (* CR sspies: Instead of [Record_boxed], it would be nicer to mark
+           these as virtual, because they only exist for Merlin. This saves
+           us from trouble when shapes that are intended for Merlin end up
+           in the DWARF emission, because they will at least be labeled. *)
+      in
+      Shape.set_uid_if_none record ext.ext_uid
+    | Types.Cstr_tuple _ -> Shape.leaf ext.ext_uid
 end
 
 let rec decompose_application (t : Shape.t) =
@@ -943,23 +972,27 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
            [maybe_evaluated_shape] above. Mapping an error or other cases to a
            leaf should not be a problem for DWARF emission, since it's the
            default fallback. *)
-      | Variant { simple_constructors; complex_constructors } ->
-        let complex_constructors =
+      | Variant constructors ->
+        let constructors =
           Shape.complex_constructors_map
             (fun (sh, ly) -> unfold_and_eval sh, ly)
-            complex_constructors
+            constructors
         in
-        Shape.variant simple_constructors complex_constructors
+        Shape.variant constructors
       | Record { fields; kind } ->
         Shape.record kind
-          (List.map (fun (name, sh, ly) -> name, unfold_and_eval sh, ly) fields)
+          (List.map
+             (fun (name, uid_opt, sh, ly) ->
+               name, uid_opt, unfold_and_eval sh, ly)
+             fields)
       | Poly_variant constrs ->
         Shape.poly_variant
           (Shape.poly_variant_constructors_map unfold_and_eval constrs)
       | Arrow (arg, ret) ->
         Shape.arrow (unfold_and_eval arg) (unfold_and_eval ret)
-      | Variant_unboxed { name; arg_name; arg_shape; arg_layout } ->
-        Shape.variant_unboxed name arg_name
+      | Variant_unboxed
+          { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout } ->
+        Shape.variant_unboxed ~variant_uid ~arg_uid name arg_name
           (unfold_and_eval arg_shape)
           arg_layout
       | Proj (t, i) ->

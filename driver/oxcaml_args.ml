@@ -838,7 +838,8 @@ let mk_restrict_to_upstream_dwarf f =
 let mk_no_restrict_to_upstream_dwarf f =
   ( "-gno-upstream-dwarf",
     Arg.Unit f,
-    " Emit potentially more DWARF information than the upstream compiler" )
+    " Emit potentially more DWARF information than the upstream compiler. \
+     Implies -shape-format debugging-shapes." )
 
 let mk_dwarf_inlined_frames f =
   ("-gdwarf-inlined-frames", Arg.Unit f, " Emit DWARF inlined frame information")
@@ -1570,14 +1571,16 @@ end
 
 module Debugging_options_impl = struct
   let restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := true
+    Debugging.restrict_to_upstream_dwarf := true;
+    Clflags.shape_format := Clflags.Old_merlin
 
   let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false
-  (* CR sspies: We have to be careful here. We can only enable no-upstream-dwarf
-     on the compiler once the Merlin support is fixed (i.e., once we can use
-     -shape-format debugging-shapes on the compiler), since without the debugging
-     shapes there is little DWARF information that we will get. *)
+    Debugging.restrict_to_upstream_dwarf := false;
+    Clflags.shape_format := Clflags.Debugging_shapes
+  (* CR sspies: We should only enable OxCaml DWARF on the compiler once we are
+     ready to switch, since it leads to different shapes in the .cms and .cmt
+     files. Merlin should continue to work, but we should be careful and probably
+     should switch over to debugging shapes in general first. *)
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false

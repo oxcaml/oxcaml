@@ -1433,7 +1433,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Record { fields; kind = Record_boxed | Record_floats } ->
       let fields =
         List.map
-          (fun (name, type_shape, (type_layout : Layout.t)) ->
+          (fun (name, _, type_shape, (type_layout : Layout.t)) ->
             let base_layout =
               match type_layout with
               | Base base_layout -> base_layout
@@ -1455,8 +1455,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
     | Record
-        { fields = [(field_name, sh, Base base_layout)]; kind = Record_unboxed }
-      ->
+        { fields = [(field_name, _, sh, Base base_layout)];
+          kind = Record_unboxed
+        } ->
       let field_die =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
           base_layout ~rec_env
@@ -1465,7 +1466,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       create_attribute_unboxed_record_die ~reference ~parent_proto_die ?name
         ~field_name ~field_size ~field_die ()
     | Record { fields; kind = Record_mixed mixed_block_shapes } ->
-      let fields = List.map (fun (name, sh, ly) -> Some name, sh, ly) fields in
+      let fields =
+        List.map (fun (name, _, sh, ly) -> Some name, sh, ly) fields
+      in
       let fields = flatten_fields_in_mixed_record ~mixed_block_shapes fields in
       let fields =
         List.map
@@ -1490,7 +1493,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
     | Record { fields = _; kind = Record_unboxed_product }
-    | Record { fields = [(_, _, Product _)]; kind = Record_unboxed } ->
+    | Record { fields = [(_, _, _, Product _)]; kind = Record_unboxed } ->
       if !Clflags.dwarf_pedantic
       then
         Misc.fatal_errorf
@@ -1507,7 +1510,15 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       (* [@@unboxed] records must have exactly one field; this should have been
          detected by earlier transformations such as at the point where the
          shape was created. *)
-    | Variant { simple_constructors; complex_constructors } -> (
+    | Variant constructors -> (
+      let simple_constructors, complex_constructors =
+        List.partition_map
+          (fun { S.name; constr_uid; kind; args } ->
+            if args = []
+            then Left name
+            else Right { S.name; constr_uid; kind; args })
+          constructors
+      in
       match complex_constructors with
       | [] ->
         create_simple_variant_die ~reference ~parent_proto_die ?name
@@ -1520,8 +1531,10 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
               ( name,
                 flatten_fields_in_mixed_record ~mixed_block_shapes
                   (List.map
-                     (fun { S.field_name = name; field_value = sh, ly } ->
-                       name, sh, ly)
+                     (fun { S.field_name = name;
+                            field_uid = _;
+                            field_value = sh, ly
+                          } -> name, sh, ly)
                      args) ))
             complex_constructors
         in
@@ -1819,7 +1832,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       Misc.fatal_errorf "record must have value layout, but got: %a"
         Layout.format type_layout
     else unknown_base_layouts type_layout
-  | Record { fields = [(_, sh, ly)]; kind = Record_unboxed }, _
+  | Record { fields = [(_, _, sh, ly)]; kind = Record_unboxed }, _
     when Layout.equal ly type_layout -> (
     match type_layout with
     | Product _ ->
@@ -1829,7 +1842,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
        is of product sort, we simply look through the unboxed product.
        Otherwise, we will create an additional DWARF entry for it. *)
     | Base b -> [Known (type_shape, b)])
-  | Record { fields = [(_, _, ly)]; kind = Record_unboxed }, _ ->
+  | Record { fields = [(_, _, _, ly)]; kind = Record_unboxed }, _ ->
     if !Clflags.dwarf_pedantic
     then
       Misc.fatal_errorf
@@ -1841,11 +1854,11 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     ->
     Misc.fatal_errorf "unboxed record must have exactly one field, found %a"
       (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_string)
-      (List.map (fun (name, _, _) -> name) fields)
+      (List.map (fun (name, _, _, _) -> name) fields)
   | Record { fields; kind = Record_unboxed_product }, _ -> (
     match type_layout with
     | Product prod_shapes when List.compare_lengths prod_shapes fields = 0 ->
-      List.concat_map (fun (_, sh, ly) -> flatten_shape sh ly) fields
+      List.concat_map (fun (_, _, sh, ly) -> flatten_shape sh ly) fields
     | Layout.Product prod_shapes ->
       if !Clflags.dwarf_pedantic
       then

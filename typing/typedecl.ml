@@ -824,12 +824,12 @@ let shape_declarations env decls =
     Type_shape.Type_decl_shape.of_type_declarations decls
       (Env.shape_for_constr env)
 
-let shape_extension_constructor ext uid =
+let shape_extension_constructor ext  =
   match !Clflags.shape_format with
-  | Clflags.Old_merlin -> old_merlin_shape_extension_constructor ext uid
-  | Clflags.Debugging_shapes -> Shape.leaf uid
-    (* CR sspies: In the future, we should use a more precise shape here. For
-      now we simply use a leaf to indicate that there is some shape here. *)
+  | Clflags.Old_merlin ->
+    old_merlin_shape_extension_constructor ext.ext_args ext.ext_uid
+  | Clflags.Debugging_shapes ->
+    Type_shape.Type_decl_shape.of_extension_constructor_merlin_only ext
 
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
@@ -3210,7 +3210,7 @@ let transl_extension_constructor ~scope env type_path type_params
       Typedtree.ext_loc = sext.pext_loc;
       Typedtree.ext_attributes = sext.pext_attributes; }
   in
-  let shape = shape_extension_constructor args ext_cstrs.ext_type.ext_uid in
+  let shape = shape_extension_constructor ext in
   ext_cstrs, shape
 
 let transl_extension_constructor ~scope env type_path type_params
