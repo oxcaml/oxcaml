@@ -11,7 +11,8 @@
 >8      string  Z               native library data (.cmxa)
 >8      string  z               native library data compiled with flambda (.cmxa)
 >8      string  T               module implementation data (.cmt)
->8      string  J               Js_of_ocaml IR data (.cmj)
+>8      string  J               Js_of_ocaml IR object data (.cmj)
+>8      string  K               Js_of_ocaml IR library data (.cmja)
 >8      string  L               native object data in compiler's Linear format (.cmir-linear)
 >8      string  G               native object data in compiler's CFG format (.cmir-cfg)
 >9      string  >\0             (Version %3.3s).
