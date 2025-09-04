@@ -27,8 +27,8 @@ val a : int Atomic.t = {Atomic.contents = 0}
   (atomic_set_field_imm a 0 1))
 - : unit = ()
 (let (a =? (apply (field_imm 0 (global Toploop!)) "a"))
-  (atomic_set_field_imm a 0 2))
-- : int = 0
+  (atomic_exchange_field_imm a 0 2))
+- : int = 1
 (let (a =? (apply (field_imm 0 (global Toploop!)) "a"))
   (atomic_compare_set_field_imm a 0 2 3))
 - : bool = true
@@ -102,8 +102,8 @@ val a : int atomic = {x = 0}
   (atomic_set_field_imm a 0 1))
 - : unit = ()
 (let (a =? (apply (field_imm 0 (global Toploop!)) "a"))
-  (atomic_set_field_imm a 0 2))
-- : int = 0
+  (atomic_exchange_field_imm a 0 2))
+- : int = 1
 (let (a =? (apply (field_imm 0 (global Toploop!)) "a"))
   (atomic_compare_set_field_imm a 0 2 3))
 - : bool = true
@@ -201,8 +201,8 @@ val a : int atomic = {x = 0}
   (atomic_set_field_imm a 0 1))
 - : unit = ()
 (let (a =? (apply (field_imm 0 (global Toploop!)) "a"))
-  (atomic_set_field_imm a 0 2))
-- : int = 0
+  (atomic_exchange_field_imm a 0 2))
+- : int = 1
 (let (a =? (apply (field_imm 0 (global Toploop!)) "a"))
   (atomic_compare_set_field_imm a 0 2 3))
 - : bool = true
