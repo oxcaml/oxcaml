@@ -712,13 +712,24 @@ let add_instr_on_edge ~(src : Label.t) ~(dst : Label.t)
       ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
       ()
   in
-  (* Update terminator of old block. *)
-  let inserted_blocks =
-    Cfg_with_layout.insert_block cfg_with_layout (DLL.make_single instr)
-      ~after:src_block ~before:(Some dst_block) ~next_instruction_id:(fun () ->
-        InstructionId.get_and_incr cfg.next_instruction_id)
-  in
-  assert (List.length inserted_blocks = 1)
+  if List.length (Cfg.predecessor_labels dst_block) = 1
+  then
+    (* We can place the prologue/epilogue at the beginning of the dst block *)
+    DLL.add_begin dst_block.body instr
+  else if Label.Set.cardinal
+            (Cfg.successor_labels src_block ~normal:true ~exn:true)
+          = 1
+          && instr.desc = Cfg.Prologue
+  then DLL.add_end src_block.body instr
+  else
+    (* Insert a block in the middle *)
+    let inserted_blocks =
+      Cfg_with_layout.insert_block cfg_with_layout (DLL.make_single instr)
+        ~after:src_block ~before:(Some dst_block)
+        ~next_instruction_id:(fun () ->
+          InstructionId.get_and_incr cfg.next_instruction_id)
+    in
+    assert (List.length inserted_blocks = 1)
 
 let find_prologue_and_epilogues_alt (cfg_with_infos : Cfg_with_infos.t) =
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
