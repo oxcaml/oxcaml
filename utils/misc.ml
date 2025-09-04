@@ -2020,7 +2020,8 @@ module Maybe_bounded = struct
 
   let decr = function
     | Unbounded -> ()
-    | Bounded r -> r.bound <- r.bound - 1
+    | Bounded r when r.bound > 0 -> r.bound <- r.bound - 1
+    | Bounded _ -> ()
 
   let is_depleted = function
     | Unbounded -> false
@@ -2028,5 +2029,5 @@ module Maybe_bounded = struct
 
   let of_option = function
     | None -> Unbounded
-    | Some n -> Bounded { bound = n }
+    | Some n -> if n < 0 then Bounded { bound = 0 } else Bounded { bound = n }
 end

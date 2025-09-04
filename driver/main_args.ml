@@ -899,42 +899,62 @@ let mk_debug_ocaml f =
 
 let mk_gdwarf_config_shape_reduce_depth f =
   "-gdwarf-config-shape-reduce-depth", Arg.Int f,
-  "<n>  Maximum depth for shape reduction in DWARF debug info (default: 2)"
+  Printf.sprintf "<n>  Maximum depth for shape reduction in DWARF debug info \
+  (default: %d)" !Clflags.gdwarf_config_shape_reduce_depth
 
 let mk_gdwarf_config_shape_eval_depth f =
   "-gdwarf-config-shape-eval-depth", Arg.Int f,
-  "<n>  Maximum depth for shape evaluation in DWARF debug info (default: 1)"
+  Printf.sprintf "<n>  Maximum depth for shape evaluation in DWARF debug info \
+  (default: %d)" !Clflags.gdwarf_config_shape_eval_depth
 
 let mk_gdwarf_config_max_cms_files_per_unit f =
   "-gdwarf-config-max-cms-files-per-unit", Arg.Int f,
-  "<n>  Maximum CMS files per compilation unit in DWARF debug info (default: 0)"
+  Printf.sprintf "<n>  Maximum CMS files per compilation unit in DWARF debug \
+  info (default: %d)" !Clflags.gdwarf_config_max_cms_files_per_unit
 
 let mk_gdwarf_config_max_cms_files_per_variable f =
   "-gdwarf-config-max-cms-files-per-variable", Arg.Int f,
-  "<n>  Maximum CMS files per variable in DWARF debug info (default: 0)"
+  Printf.sprintf "<n>  Maximum CMS files per variable in DWARF debug info \
+  (default: %d)" !Clflags.gdwarf_config_max_cms_files_per_variable
 
 let mk_gdwarf_config_max_type_to_shape_depth f =
   "-gdwarf-config-max-type-to-shape-depth", Arg.Int f,
-  "<n>  Maximum type-to-shape depth for generating DWARF debug info \
-  (default: 10)"
+  Printf.sprintf "<n>  Maximum type-to-shape depth for generating DWARF debug \
+  info (default: %d)" !Clflags.gdwarf_config_max_type_to_shape_depth
+
 let mk_gdwarf_config_max_shape_reduce_steps_per_variable f =
   "-gdwarf-config-max-shape-reduce-steps-per-variable", Arg.String f,
-  "<n|none>  Maximum shape reduction steps per variable in DWARF debug info \
-  (default: 100, use 'none' for unlimited)"
+  Printf.sprintf "<n|none>  Maximum shape reduction steps per variable in \
+  DWARF debug info (default: %s, use 'none' for unlimited)"
+    (match !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable with
+     | Some n -> string_of_int n
+     | None -> "none")
 
 let mk_gdwarf_config_max_evaluation_steps_per_variable f =
   "-gdwarf-config-max-evaluation-steps-per-variable", Arg.String f,
-  "<n|none>  Maximum evaluation steps per variable in DWARF debug info \
-  (default: 1000, use 'none' for unlimited)"
+  Printf.sprintf "<n|none>  Maximum evaluation steps per variable in DWARF \
+  debug info (default: %s, use 'none' for unlimited)"
+    (match !Clflags.gdwarf_config_max_evaluation_steps_per_variable with
+     | Some n -> string_of_int n
+     | None -> "none")
 
 let mk_gdwarf_config_shape_reduce_fuel f =
   "-gdwarf-config-shape-reduce-fuel", Arg.Int f,
-  "<n>  Fuel for shape reduction when producing DWARF debug info (default: 10)"
+  Printf.sprintf "<n>  Fuel for shape reduction when producing DWARF debug \
+  info (default: %d)" !Clflags.gdwarf_config_shape_reduce_fuel
 
 let mk_gdwarf_fidelity f =
   "-gdwarf-fidelity", Arg.String f,
-  "<level>  Set DWARF debug info fidelity level \
-  (low|medium|high|very-high|ultra-high)"
+  "<level>  Set fidelity level of the DWARF debug information \
+  (low|medium|high|very-high|ultra-high). Higher values produce more detailed \
+  debug information at the expense of increased compilation times.\n\
+  \t- low is fast, but it does not support recursive types or retrieving \
+      declaration information from other files\n\
+  \t- medium is a reasonable default (it does support recursive declarations), \
+      but it is conservative with respect to retrieving \
+      declarations (including finding them through functor application)\n\
+  \t- high and above should provide good debugging information at increased \
+      compilation times"
 
 let mk_opaque f =
   "-opaque", Arg.Unit f,
