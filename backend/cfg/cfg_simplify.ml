@@ -64,9 +64,9 @@ end = struct
         exceptional : domain
       }
 
-    let basic value _ _ = value
+    let basic value _ _ _ = value
 
-    let terminator value _ _ = { normal = value; exceptional = value }
+    let terminator value _ _ _ = { normal = value; exceptional = value }
   end
 
   module Dataflow = Cfg_dataflow.Forward (Domain) (Transfer)

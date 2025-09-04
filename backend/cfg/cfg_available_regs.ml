@@ -203,8 +203,8 @@ module Transfer = struct
     in
     Some (ok avail_across), ok avail_after
 
-  let basic ({ avail_before } : domain) (instr : Cfg.basic Cfg.instruction) () :
-      domain =
+  let basic ({ avail_before } : domain) (instr : Cfg.basic Cfg.instruction) _ ()
+      : domain =
     assert (Option.is_some avail_before);
     instr.available_before <- avail_before;
     let avail_before = Option.get avail_before in
@@ -326,7 +326,7 @@ module Transfer = struct
     { avail_before = Some avail_after }
 
   let terminator ({ avail_before } : domain)
-      (term : Cfg.terminator Cfg.instruction) () : image =
+      (term : Cfg.terminator Cfg.instruction) _ () : image =
     assert (Option.is_some avail_before);
     term.available_before <- avail_before;
     let avail_before = Option.get avail_before in
