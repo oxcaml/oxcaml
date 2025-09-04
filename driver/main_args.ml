@@ -1192,6 +1192,21 @@ module type Jscomp_options = sig
   include Compiler_options
 
   (* CR selee: should we include more things from [Native]? Review *)
+  val _inline : string -> unit
+  val _inline_toplevel : string -> unit
+  val _inlining_report : unit -> unit
+  val _dump_pass : string -> unit
+  val _inline_max_depth : string -> unit
+  val _rounds : int -> unit
+  val _inline_max_unroll : string -> unit
+  val _inline_call_cost : string -> unit
+  val _inline_alloc_cost : string -> unit
+  val _inline_prim_cost : string -> unit
+  val _inline_branch_cost : string -> unit
+  val _inline_indirect_cost : string -> unit
+  val _inline_lifting_benefit : string -> unit
+  val _inline_branch_factor : string -> unit
+
   val _dflambda : unit -> unit
   val _dflambda_heavy_invariants : unit -> unit
   val _dflambda_invariants : unit -> unit
@@ -1892,6 +1907,21 @@ struct
     mk_args F._args;
     mk_args0 F._args0;
 
+    mk_inline_branch_factor F._inline_branch_factor;
+    mk_inline F._inline;
+    mk_inline_toplevel F._inline_toplevel;
+    mk_inline_alloc_cost F._inline_alloc_cost;
+    mk_inline_branch_cost F._inline_branch_cost;
+    mk_inline_call_cost F._inline_call_cost;
+    mk_inline_prim_cost F._inline_prim_cost;
+    mk_inline_indirect_cost F._inline_indirect_cost;
+    mk_inline_lifting_benefit F._inline_lifting_benefit;
+    mk_inline_max_depth F._inline_max_depth;
+    mk_inline_max_unroll F._inline_max_unroll;
+    mk_inlining_report F._inlining_report;
+    mk_rounds F._rounds;
+    mk_dump_pass F._dump_pass;
+
     mk_dflambda F._dflambda;
     mk_drawflambda F._drawflambda;
     mk_dflambda_invariants F._dflambda_invariants;
@@ -2400,6 +2430,50 @@ third-party libraries such as Lwt, but with a different API."
   module Jsmain = struct
     include Core
     include Compiler
+
+    let _dump_pass pass = set_dumped_pass pass true
+    let _inline spec =
+      Float_arg_helper.parse spec "Syntax: -inline <n> | <round>=<n>[,...]"
+        inline_threshold
+    let _inline_alloc_cost spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-alloc-cost <n> | <round>=<n>[,...]"
+        inline_alloc_cost
+    let _inline_branch_cost spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-branch-cost <n> | <round>=<n>[,...]"
+        inline_branch_cost
+    let _inline_branch_factor spec =
+      Float_arg_helper.parse spec
+        "Syntax: -inline-branch-factor <n> | <round>=<n>[,...]"
+        inline_branch_factor
+    let _inline_call_cost spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-call-cost <n> | <round>=<n>[,...]" inline_call_cost
+    let _inline_indirect_cost spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-indirect-cost <n> | <round>=<n>[,...]"
+        inline_indirect_cost
+    let _inline_lifting_benefit spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-lifting-benefit <n> | <round>=<n>[,...]"
+        inline_lifting_benefit
+    let _inline_max_depth spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-max-depth <n> | <round>=<n>[,...]" inline_max_depth
+    let _inline_max_unroll spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-max-unroll <n> | <round>=<n>[,...]"
+        inline_max_unroll
+    let _inline_prim_cost spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-prim-cost <n> | <round>=<n>[,...]" inline_prim_cost
+    let _inline_toplevel spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-toplevel <n> | <round>=<n>[,...]"
+        inline_toplevel_threshold
+    let _inlining_report () = inlining_report := true
+    let _rounds n = simplify_rounds := (Some n)
 
     let _dflambda = set dump_flambda
     let _dflambda_heavy_invariants () =
