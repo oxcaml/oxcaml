@@ -1699,7 +1699,28 @@ module Element_repr = struct
        don't give us enough information to do this reliably, and you could just
        use unboxed floats instead. *)
 
-  let classify env  ty jkind =
+  let to_shape_element t : mixed_block_element =
+    let rec of_t : t -> mixed_block_element = function
+    | Unboxed_element unboxed -> of_unboxed_element unboxed
+    | Float_element | Value_element -> Value
+    | Void -> Void
+    and of_unboxed_element : unboxed_element -> mixed_block_element = function
+      | Float64 -> Float64
+      | Float32 -> Float32
+      | Bits8 -> Bits8
+      | Bits16 -> Bits16
+      | Bits32 -> Bits32
+      | Bits64 -> Bits64
+      | Vec128 -> Vec128
+      | Vec256 -> Vec256
+      | Vec512 -> Vec512
+      | Word -> Word
+      | Untagged_immediate -> Untagged_immediate
+      | Product l -> Product (Array.map of_t l)
+    in
+    of_t t
+
+  let classify env ty jkind =
     if is_float env ty
     then Float_element
     else
@@ -1729,28 +1750,7 @@ module Element_repr = struct
       in
       sort_to_t sort
 
-  and mixed_product_shape loc ts kind =
-    let to_shape_element (t,_ty) : mixed_block_element =
-      let rec of_t : t -> mixed_block_element = function
-      | Unboxed_element unboxed -> of_unboxed_element unboxed
-      | Float_element | Value_element -> Value
-      | Void -> Void
-      and of_unboxed_element : unboxed_element -> mixed_block_element = function
-        | Float64 -> Float64
-        | Float32 -> Float32
-        | Bits8 -> Bits8
-        | Bits16 -> Bits16
-        | Bits32 -> Bits32
-        | Bits64 -> Bits64
-        | Vec128 -> Vec128
-        | Vec256 -> Vec256
-        | Vec512 -> Vec512
-        | Word -> Word
-        | Untagged_immediate -> Untagged_immediate
-        | Product l -> Product (Array.map of_t l)
-      in
-      of_t t
-    in
+  let mixed_product_shape loc ts kind =
     let boxed_elements =
       let rec count_boxed_in_t acc : t -> int = function
         | Unboxed_element u -> count_boxed_in_unboxed_element acc u
@@ -1770,9 +1770,13 @@ module Element_repr = struct
     in
     if not mixed then None else begin
       assert_mixed_product_support loc kind ~value_prefix_len:boxed_elements;
-      Some (List.map to_shape_element ts |> Array.of_list)
+      Some (List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list)
     end
 end
+
+let mixed_block_element env ty jkind =
+  let unboxed_element = Element_repr.classify env ty jkind in
+  Element_repr.to_shape_element unboxed_element
 
 let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
