@@ -391,7 +391,7 @@ L149:                                                ; preds = %L136
   %87 = load i64, ptr %4
   %88 = load ptr, ptr %ds
   %89 = load ptr, ptr %alloc
-  %90 =  call cc 104 { { ptr, ptr }, {  } } @caml_raise_exn(ptr %88, ptr %89, i64 %87)
+  %90 =  call cc 104 { { ptr, ptr }, {  } } @caml_raise_exn(ptr %88, ptr %89, i64 %87) "statepoint-id"="0"
   %91 = extractvalue { { ptr, ptr }, {  } } %90, 0, 0
   store ptr %91, ptr %ds
   %92 = extractvalue { { ptr, ptr }, {  } } %90, 0, 1
@@ -509,7 +509,7 @@ L172:                                                ; preds = %L154
   %72 = load i64, ptr %4
   %73 = load ptr, ptr %ds
   %74 = load ptr, ptr %alloc
-  %75 =  call cc 104 { { ptr, ptr }, {  } } @caml_raise_exn(ptr %73, ptr %74, i64 %72)
+  %75 =  call cc 104 { { ptr, ptr }, {  } } @caml_raise_exn(ptr %73, ptr %74, i64 %72) "statepoint-id"="0"
   %76 = extractvalue { { ptr, ptr }, {  } } %75, 0, 0
   store ptr %76, ptr %ds
   %77 = extractvalue { { ptr, ptr }, {  } } %75, 0, 1

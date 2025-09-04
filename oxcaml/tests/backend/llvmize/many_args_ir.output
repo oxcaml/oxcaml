@@ -115,7 +115,7 @@ L101:                                                ; preds = %L1
   %76 = load i64, ptr %13
   %77 = inttoptr i64 %76 to ptr addrspace(1)
   ; res_regs: [pin:anon:I/0[%rax]]
-  %78 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @caml_apply13(ptr %56, ptr %57, ptr addrspace(1) %59, ptr addrspace(1) %61, ptr addrspace(1) %63, ptr addrspace(1) %65, ptr addrspace(1) %67, ptr addrspace(1) %69, ptr addrspace(1) %71, ptr addrspace(1) %73, ptr addrspace(1) %75, ptr addrspace(1) %77)
+  %78 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @caml_apply13(ptr %56, ptr %57, ptr addrspace(1) %59, ptr addrspace(1) %61, ptr addrspace(1) %63, ptr addrspace(1) %65, ptr addrspace(1) %67, ptr addrspace(1) %69, ptr addrspace(1) %71, ptr addrspace(1) %73, ptr addrspace(1) %75, ptr addrspace(1) %77) "statepoint-id"="8"
   %79 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %78, 0, 0
   store ptr %79, ptr %ds
   %80 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %78, 0, 1

@@ -48,7 +48,7 @@ L101:                                                ; preds = %L1
   ; res_regs: [pin:anon:V/0[%rax]]
   %24 = load i64, ptr %9
   %25 = inttoptr i64 %24 to ptr
-  %26 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } %25(ptr %20, ptr %21, ptr addrspace(1) %22, ptr addrspace(1) %23)
+  %26 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } %25(ptr %20, ptr %21, ptr addrspace(1) %22, ptr addrspace(1) %23) "statepoint-id"="8"
   %27 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %26, 0, 0
   store ptr %27, ptr %ds
   %28 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %26, 0, 1

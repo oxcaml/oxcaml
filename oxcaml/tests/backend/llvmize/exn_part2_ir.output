@@ -113,7 +113,7 @@ L101:                                                ; preds = %L1
   store i64 %60, ptr %13
   %61 = load ptr, ptr %ds
   %62 = load ptr, ptr %alloc
-  %63 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %61, ptr %62) returns_twice
+  %63 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %61, ptr %62) returns_twice "gc-leaf-function"="true"
   %64 = extractvalue { { ptr, ptr }, { i32 } } %63, 0, 0
   store ptr %64, ptr %ds
   %65 = extractvalue { { ptr, ptr }, { i32 } } %63, 0, 1
@@ -188,7 +188,7 @@ L101:                                                ; preds = %L1
   %111 = load i64, ptr %23
   %112 = inttoptr i64 %111 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %113 =  call cc 104 { { ptr, ptr }, { i64 } } %112(ptr %107, ptr %108, i64 %109, ptr addrspace(1) %110)
+  %113 =  call cc 104 { { ptr, ptr }, { i64 } } %112(ptr %107, ptr %108, i64 %109, ptr addrspace(1) %110) "statepoint-id"="40"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %114 = extractvalue { { ptr, ptr }, { i64 } } %113, 0, 0
   store ptr %114, ptr %ds
@@ -299,7 +299,7 @@ L125:                                                ; preds = %L106
   %183 = load i64, ptr %36
   %184 = inttoptr i64 %183 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %185 =  call cc 104 { { ptr, ptr }, { i64 } } %184(ptr %179, ptr %180, ptr addrspace(1) %181, ptr addrspace(1) %182)
+  %185 =  call cc 104 { { ptr, ptr }, { i64 } } %184(ptr %179, ptr %180, ptr addrspace(1) %181, ptr addrspace(1) %182) "statepoint-id"="8"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %186 = extractvalue { { ptr, ptr }, { i64 } } %185, 0, 0
   store ptr %186, ptr %ds
@@ -357,7 +357,7 @@ L129:                                                ; preds = %L125
   %218 = load i64, ptr %45
   %219 = inttoptr i64 %218 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %220 =  call cc 104 { { ptr, ptr }, { i64 } } %219(ptr %214, ptr %215, ptr addrspace(1) %216, ptr addrspace(1) %217)
+  %220 =  call cc 104 { { ptr, ptr }, { i64 } } %219(ptr %214, ptr %215, ptr addrspace(1) %216, ptr addrspace(1) %217) "statepoint-id"="8"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %221 = extractvalue { { ptr, ptr }, { i64 } } %220, 0, 0
   store ptr %221, ptr %ds
@@ -386,7 +386,7 @@ L138:                                                ; preds = %L106
   %235 = load i64, ptr %4
   %236 = load ptr, ptr %ds
   %237 = load ptr, ptr %alloc
-  %238 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %236, ptr %237, i64 %235)
+  %238 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %236, ptr %237, i64 %235) "statepoint-id"="0"
   %239 = extractvalue { { ptr, ptr }, {  } } %238, 0, 0
   store ptr %239, ptr %ds
   %240 = extractvalue { { ptr, ptr }, {  } } %238, 0, 1
@@ -462,7 +462,7 @@ L143:                                                ; preds = %L1
   store i64 %48, ptr %14
   %49 = load ptr, ptr %ds
   %50 = load ptr, ptr %alloc
-  %51 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %49, ptr %50) returns_twice
+  %51 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %49, ptr %50) returns_twice "gc-leaf-function"="true"
   %52 = extractvalue { { ptr, ptr }, { i32 } } %51, 0, 0
   store ptr %52, ptr %ds
   %53 = extractvalue { { ptr, ptr }, { i32 } } %51, 0, 1
@@ -527,7 +527,7 @@ L143:                                                ; preds = %L1
   %93 = load i64, ptr %21
   %94 = inttoptr i64 %93 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %95 =  call cc 104 { { ptr, ptr }, { i64 } } %94(ptr %89, ptr %90, i64 %91, ptr addrspace(1) %92)
+  %95 =  call cc 104 { { ptr, ptr }, { i64 } } %94(ptr %89, ptr %90, i64 %91, ptr addrspace(1) %92) "statepoint-id"="40"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %96 = extractvalue { { ptr, ptr }, { i64 } } %95, 0, 0
   store ptr %96, ptr %ds
@@ -616,7 +616,7 @@ L169:                                                ; preds = %L149
   %149 = load i64, ptr %4
   %150 = load ptr, ptr %ds
   %151 = load ptr, ptr %alloc
-  %152 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %150, ptr %151, i64 %149)
+  %152 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %150, ptr %151, i64 %149) "statepoint-id"="0"
   %153 = extractvalue { { ptr, ptr }, {  } } %152, 0, 0
   store ptr %153, ptr %ds
   %154 = extractvalue { { ptr, ptr }, {  } } %152, 0, 1
@@ -696,7 +696,7 @@ L174:                                                ; preds = %L1
   store i64 %55, ptr %13
   %56 = load ptr, ptr %ds
   %57 = load ptr, ptr %alloc
-  %58 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %56, ptr %57) returns_twice
+  %58 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %56, ptr %57) returns_twice "gc-leaf-function"="true"
   %59 = extractvalue { { ptr, ptr }, { i32 } } %58, 0, 0
   store ptr %59, ptr %ds
   %60 = extractvalue { { ptr, ptr }, { i32 } } %58, 0, 1
@@ -747,7 +747,7 @@ L174:                                                ; preds = %L1
   %90 = load i64, ptr %4
   ; res_regs: [pin:anon:I/0[%rax]]
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %91 =  call cc 104 { { ptr, ptr }, { i64 } } @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP(ptr %88, ptr %89, i64 %90)
+  %91 =  call cc 104 { { ptr, ptr }, { i64 } } @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP(ptr %88, ptr %89, i64 %90) "statepoint-id"="40"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %92 = extractvalue { { ptr, ptr }, { i64 } } %91, 0, 0
   store ptr %92, ptr %ds
@@ -858,7 +858,7 @@ L195:                                                ; preds = %L179
   %161 = load i64, ptr %31
   %162 = inttoptr i64 %161 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %163 =  call cc 104 { { ptr, ptr }, { i64 } } %162(ptr %157, ptr %158, ptr addrspace(1) %159, ptr addrspace(1) %160)
+  %163 =  call cc 104 { { ptr, ptr }, { i64 } } %162(ptr %157, ptr %158, ptr addrspace(1) %159, ptr addrspace(1) %160) "statepoint-id"="8"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %164 = extractvalue { { ptr, ptr }, { i64 } } %163, 0, 0
   store ptr %164, ptr %ds
@@ -916,7 +916,7 @@ L199:                                                ; preds = %L195
   %196 = load i64, ptr %40
   %197 = inttoptr i64 %196 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %198 =  call cc 104 { { ptr, ptr }, { i64 } } %197(ptr %192, ptr %193, ptr addrspace(1) %194, ptr addrspace(1) %195)
+  %198 =  call cc 104 { { ptr, ptr }, { i64 } } %197(ptr %192, ptr %193, ptr addrspace(1) %194, ptr addrspace(1) %195) "statepoint-id"="8"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %199 = extractvalue { { ptr, ptr }, { i64 } } %198, 0, 0
   store ptr %199, ptr %ds
@@ -945,7 +945,7 @@ L208:                                                ; preds = %L179
   %213 = load i64, ptr %4
   %214 = load ptr, ptr %ds
   %215 = load ptr, ptr %alloc
-  %216 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %214, ptr %215, i64 %213)
+  %216 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %214, ptr %215, i64 %213) "statepoint-id"="0"
   %217 = extractvalue { { ptr, ptr }, {  } } %216, 0, 0
   store ptr %217, ptr %ds
   %218 = extractvalue { { ptr, ptr }, {  } } %216, 0, 1
@@ -1011,7 +1011,7 @@ L213:                                                ; preds = %L1
   ; res_regs: [pin:anon:I/0[%rax]]
   %37 = load i64, ptr %14
   %38 = inttoptr i64 %37 to ptr
-  %39 =  call cc 104 { { ptr, ptr }, { i64 } } %38(ptr %33, ptr %34, i64 %35, ptr addrspace(1) %36)
+  %39 =  call cc 104 { { ptr, ptr }, { i64 } } %38(ptr %33, ptr %34, i64 %35, ptr addrspace(1) %36) "statepoint-id"="8"
   %40 = extractvalue { { ptr, ptr }, { i64 } } %39, 0, 0
   store ptr %40, ptr %ds
   %41 = extractvalue { { ptr, ptr }, { i64 } } %39, 0, 1
@@ -1068,7 +1068,7 @@ L220:                                                ; preds = %L1
   %19 = load i64, ptr %4
   %20 = load ptr, ptr %ds
   %21 = load ptr, ptr %alloc
-  %22 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %20, ptr %21, i64 %19)
+  %22 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %20, ptr %21, i64 %19) "statepoint-id"="0"
   %23 = extractvalue { { ptr, ptr }, {  } } %22, 0, 0
   store ptr %23, ptr %ds
   %24 = extractvalue { { ptr, ptr }, {  } } %22, 0, 1
@@ -1097,7 +1097,7 @@ L225:                                                ; preds = %L1
   %9 = load i64, ptr %4
   %10 = load ptr, ptr %ds
   %11 = load ptr, ptr %alloc
-  %12 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %10, ptr %11, i64 %9)
+  %12 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %10, ptr %11, i64 %9) "statepoint-id"="0"
   %13 = extractvalue { { ptr, ptr }, {  } } %12, 0, 0
   store ptr %13, ptr %ds
   %14 = extractvalue { { ptr, ptr }, {  } } %12, 0, 1
@@ -1218,7 +1218,7 @@ L228:                                                ; preds = %L1
   %91 = load i64, ptr %13
   %92 = inttoptr i64 %91 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %93 =  call cc 104 { { ptr, ptr }, { i64 } } %92(ptr %87, ptr %88, i64 %89, ptr addrspace(1) %90)
+  %93 =  call cc 104 { { ptr, ptr }, { i64 } } %92(ptr %87, ptr %88, i64 %89, ptr addrspace(1) %90) "statepoint-id"="8"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %94 = extractvalue { { ptr, ptr }, { i64 } } %93, 0, 0
   store ptr %94, ptr %ds
@@ -1241,7 +1241,7 @@ L232:                                                ; preds = %L228
   store i64 %103, ptr %17
   %104 = load ptr, ptr %ds
   %105 = load ptr, ptr %alloc
-  %106 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %104, ptr %105) returns_twice
+  %106 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %104, ptr %105) returns_twice "gc-leaf-function"="true"
   %107 = extractvalue { { ptr, ptr }, { i32 } } %106, 0, 0
   store ptr %107, ptr %ds
   %108 = extractvalue { { ptr, ptr }, { i32 } } %106, 0, 1
@@ -1306,7 +1306,7 @@ L232:                                                ; preds = %L228
   %148 = load i64, ptr %25
   %149 = inttoptr i64 %148 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %150 =  call cc 104 { { ptr, ptr }, { i64 } } %149(ptr %144, ptr %145, i64 %146, ptr addrspace(1) %147)
+  %150 =  call cc 104 { { ptr, ptr }, { i64 } } %149(ptr %144, ptr %145, i64 %146, ptr addrspace(1) %147) "statepoint-id"="40"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %151 = extractvalue { { ptr, ptr }, { i64 } } %150, 0, 0
   store ptr %151, ptr %ds
@@ -1329,7 +1329,7 @@ L248:                                                ; preds = %L232
   store i64 %160, ptr %29
   %161 = load ptr, ptr %ds
   %162 = load ptr, ptr %alloc
-  %163 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %161, ptr %162) returns_twice
+  %163 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %161, ptr %162) returns_twice "gc-leaf-function"="true"
   %164 = extractvalue { { ptr, ptr }, { i32 } } %163, 0, 0
   store ptr %164, ptr %ds
   %165 = extractvalue { { ptr, ptr }, { i32 } } %163, 0, 1
@@ -1394,7 +1394,7 @@ L248:                                                ; preds = %L232
   %205 = load i64, ptr %37
   %206 = inttoptr i64 %205 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %207 =  call cc 104 { { ptr, ptr }, { i64 } } %206(ptr %201, ptr %202, i64 %203, ptr addrspace(1) %204)
+  %207 =  call cc 104 { { ptr, ptr }, { i64 } } %206(ptr %201, ptr %202, i64 %203, ptr addrspace(1) %204) "statepoint-id"="72"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %208 = extractvalue { { ptr, ptr }, { i64 } } %207, 0, 0
   store ptr %208, ptr %ds
@@ -1417,7 +1417,7 @@ L264:                                                ; preds = %L248
   store i64 %217, ptr %41
   %218 = load ptr, ptr %ds
   %219 = load ptr, ptr %alloc
-  %220 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %218, ptr %219) returns_twice
+  %220 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %218, ptr %219) returns_twice "gc-leaf-function"="true"
   %221 = extractvalue { { ptr, ptr }, { i32 } } %220, 0, 0
   store ptr %221, ptr %ds
   %222 = extractvalue { { ptr, ptr }, { i32 } } %220, 0, 1
@@ -1469,7 +1469,7 @@ L264:                                                ; preds = %L248
   %254 = load i64, ptr %44
   %255 = inttoptr i64 %254 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %256 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } %255(ptr %250, ptr %251, i64 %252, ptr addrspace(1) %253)
+  %256 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } %255(ptr %250, ptr %251, i64 %252, ptr addrspace(1) %253) "statepoint-id"="104"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %257 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %256, 0, 0
   store ptr %257, ptr %ds
@@ -1559,7 +1559,7 @@ L287:                                                ; preds = %L267
   %305 = load i64, ptr %5
   %306 = load ptr, ptr %ds
   %307 = load ptr, ptr %alloc
-  %308 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %306, ptr %307, i64 %305)
+  %308 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %306, ptr %307, i64 %305) "statepoint-id"="64"
   %309 = extractvalue { { ptr, ptr }, {  } } %308, 0, 0
   store ptr %309, ptr %ds
   %310 = extractvalue { { ptr, ptr }, {  } } %308, 0, 1
@@ -1654,7 +1654,7 @@ L306:                                                ; preds = %L251
   %365 = load i64, ptr %5
   %366 = load ptr, ptr %ds
   %367 = load ptr, ptr %alloc
-  %368 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %366, ptr %367, i64 %365)
+  %368 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %366, ptr %367, i64 %365) "statepoint-id"="32"
   %369 = extractvalue { { ptr, ptr }, {  } } %368, 0, 0
   store ptr %369, ptr %ds
   %370 = extractvalue { { ptr, ptr }, {  } } %368, 0, 1
@@ -1723,7 +1723,7 @@ L319:                                                ; preds = %L235
   %410 = load i64, ptr %5
   %411 = load ptr, ptr %ds
   %412 = load ptr, ptr %alloc
-  %413 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %411, ptr %412, i64 %410)
+  %413 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %411, ptr %412, i64 %410) "statepoint-id"="0"
   %414 = extractvalue { { ptr, ptr }, {  } } %413, 0, 0
   store ptr %414, ptr %ds
   %415 = extractvalue { { ptr, ptr }, {  } } %413, 0, 1
@@ -1786,7 +1786,7 @@ L329:                                                ; preds = %L324, %L368
   store i64 %38, ptr %11
   %39 = load ptr, ptr %ds
   %40 = load ptr, ptr %alloc
-  %41 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %39, ptr %40) returns_twice
+  %41 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %39, ptr %40) returns_twice "gc-leaf-function"="true"
   %42 = extractvalue { { ptr, ptr }, { i32 } } %41, 0, 0
   store ptr %42, ptr %ds
   %43 = extractvalue { { ptr, ptr }, { i32 } } %41, 0, 1
@@ -1850,7 +1850,7 @@ L329:                                                ; preds = %L324, %L368
   %83 = load i64, ptr %17
   %84 = inttoptr i64 %83 to ptr
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %85 =  call cc 104 { { ptr, ptr }, { i64 } } %84(ptr %79, ptr %80, i64 %81, ptr addrspace(1) %82)
+  %85 =  call cc 104 { { ptr, ptr }, { i64 } } %84(ptr %79, ptr %80, i64 %81, ptr addrspace(1) %82) "statepoint-id"="40"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %86 = extractvalue { { ptr, ptr }, { i64 } } %85, 0, 0
   store ptr %86, ptr %ds
@@ -1946,7 +1946,7 @@ L359:                                                ; preds = %L353
   %144 = load i64, ptr %4
   %145 = load ptr, ptr %ds
   %146 = load ptr, ptr %alloc
-  %147 =  call cc 104 { { ptr, ptr }, {  } } @caml_raise_exn(ptr %145, ptr %146, i64 %144)
+  %147 =  call cc 104 { { ptr, ptr }, {  } } @caml_raise_exn(ptr %145, ptr %146, i64 %144) "statepoint-id"="0"
   %148 = extractvalue { { ptr, ptr }, {  } } %147, 0, 0
   store ptr %148, ptr %ds
   %149 = extractvalue { { ptr, ptr }, {  } } %147, 0, 1
@@ -1959,7 +1959,7 @@ L362:                                                ; preds = %L335
   %152 = load i64, ptr %4
   %153 = load ptr, ptr %ds
   %154 = load ptr, ptr %alloc
-  %155 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %153, ptr %154, i64 %152)
+  %155 =  call cc 104 { { ptr, ptr }, {  } } @caml_reraise_exn(ptr %153, ptr %154, i64 %152) "statepoint-id"="0"
   %156 = extractvalue { { ptr, ptr }, {  } } %155, 0, 0
   store ptr %156, ptr %ds
   %157 = extractvalue { { ptr, ptr }, {  } } %155, 0, 1
@@ -2050,7 +2050,7 @@ L377:                                                ; preds = %L1
   store i64 %40, ptr %12
   %41 = load ptr, ptr %ds
   %42 = load ptr, ptr %alloc
-  %43 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %41, ptr %42) returns_twice
+  %43 =  call cc 104 { { ptr, ptr }, { i32 } } @wrap_try(ptr %41, ptr %42) returns_twice "gc-leaf-function"="true"
   %44 = extractvalue { { ptr, ptr }, { i32 } } %43, 0, 0
   store ptr %44, ptr %ds
   %45 = extractvalue { { ptr, ptr }, { i32 } } %43, 0, 1
@@ -2091,7 +2091,7 @@ L377:                                                ; preds = %L1
   %69 = load i64, ptr %4
   ; res_regs: [pin:anon:I/0[%rax]]
   call void asm sideeffect "push %rbp", "~{rsp}"()
-  %70 =  call cc 104 { { ptr, ptr }, { i64 } } @camlExn_part2__raise_3_HIDE_STAMP(ptr %67, ptr %68, i64 %69)
+  %70 =  call cc 104 { { ptr, ptr }, { i64 } } @camlExn_part2__raise_3_HIDE_STAMP(ptr %67, ptr %68, i64 %69) "statepoint-id"="40"
   call void asm sideeffect "pop %rbp", "~{rsp}"()
   %71 = extractvalue { { ptr, ptr }, { i64 } } %70, 0, 0
   store ptr %71, ptr %ds
@@ -2160,7 +2160,7 @@ L380:                                                ; preds = %L377
   %108 = load i64, ptr %9
   %109 = load ptr, ptr %ds
   %110 = load ptr, ptr %alloc
-  %111 =  call cc 105 { { ptr, ptr }, { ptr addrspace(1) } } @caml_c_call(ptr %109, ptr %110, ptr @caml_ml_output, i64 poison, i64 %105, i64 %106, i64 %107, i64 %108)
+  %111 =  call cc 105 { { ptr, ptr }, { ptr addrspace(1) } } @caml_c_call(ptr %109, ptr %110, ptr @caml_ml_output, i64 poison, i64 %105, i64 %106, i64 %107, i64 %108) "statepoint-id"="0"
   %112 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %111, 0, 0
   store ptr %112, ptr %ds
   %113 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %111, 0, 1
@@ -2194,7 +2194,7 @@ L393:                                                ; preds = %L380
   %128 = load i64, ptr %7
   %129 = load ptr, ptr %ds
   %130 = load ptr, ptr %alloc
-  %131 =  call cc 105 { { ptr, ptr }, { ptr addrspace(1) } } @caml_c_call(ptr %129, ptr %130, ptr @caml_ml_output_char, i64 poison, i64 %127, i64 %128)
+  %131 =  call cc 105 { { ptr, ptr }, { ptr addrspace(1) } } @caml_c_call(ptr %129, ptr %130, ptr @caml_ml_output_char, i64 poison, i64 %127, i64 %128) "statepoint-id"="0"
   %132 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %131, 0, 0
   store ptr %132, ptr %ds
   %133 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %131, 0, 1
@@ -2224,7 +2224,7 @@ L396:                                                ; preds = %L393
   %146 = load i64, ptr %6
   %147 = load ptr, ptr %ds
   %148 = load ptr, ptr %alloc
-  %149 =  call cc 105 { { ptr, ptr }, { ptr addrspace(1) } } @caml_c_call(ptr %147, ptr %148, ptr @caml_ml_flush, i64 poison, i64 %146)
+  %149 =  call cc 105 { { ptr, ptr }, { ptr addrspace(1) } } @caml_c_call(ptr %147, ptr %148, ptr @caml_ml_flush, i64 poison, i64 %146) "statepoint-id"="0"
   %150 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %149, 0, 0
   store ptr %150, ptr %ds
   %151 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %149, 0, 1

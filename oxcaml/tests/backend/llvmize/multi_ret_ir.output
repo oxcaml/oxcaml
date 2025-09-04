@@ -10,7 +10,7 @@ define void @camlMulti_ret__code_begin() { unreachable }
 @camlMulti_ret__permute_1 = global { ptr, i64, ptr } { ptr @caml_curryF_F_F_F_RFFFF, i64 324259173170675719, ptr @camlMulti_ret__permute_HIDE_STAMP }, align 8, section ".data"
 @.header.camlMulti_ret__empty_block4 = global { i64 } { i64 768 }, align 8, section ".data"
 @camlMulti_ret__empty_block4 = global {  } {  }, align 8, section ".data"
-define  cc 104 { { ptr, ptr }, { double, double, double, double } } @camlMulti_ret__permute_HIDE_STAMP(ptr %0, ptr %1, double %2, double %3, double %4, double %5) noinline {
+define  cc 104 { { ptr, ptr }, { double, double, double, double } } @camlMulti_ret__permute_HIDE_STAMP(ptr %0, ptr %1, double %2, double %3, double %4, double %5) noinline gc "statepoint-example" {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
@@ -63,13 +63,13 @@ L101:                                                ; preds = %L1
   ret { { ptr, ptr }, { double, double, double, double } } %35
 }
 
-define  cc 104 { { ptr, ptr }, { i64 } } @camlMulti_ret__entry(ptr %0, ptr %1) noinline {
+define  cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlMulti_ret__entry(ptr %0, ptr %1) noinline gc "statepoint-example" {
   %ds = alloca ptr
   store ptr %0, ptr %ds
   %alloc = alloca ptr
   store ptr %1, ptr %alloc
   %3 = alloca i64
-  %4 = alloca i64
+  %4 = alloca ptr addrspace(1)
   %5 = alloca i64
   %6 = alloca i64
   %7 = alloca i64
@@ -81,18 +81,20 @@ L107:                                                ; preds = %L1
   %8 = load i64, ptr %5
   store i64 %8, ptr %6
   %9 = load i64, ptr %6
-  store i64 %9, ptr %4
+  %10 = inttoptr i64 %9 to ptr addrspace(1)
+  store ptr addrspace(1) %10, ptr %4
   store i64 1, ptr %7
-  %10 = load i64, ptr %7
-  store i64 %10, ptr %3
-  %11 = extractvalue { { { ptr, ptr }, { i64 } } } poison, 0
-  %12 = load ptr, ptr %ds
-  %13 = insertvalue { { ptr, ptr }, { i64 } } %11, ptr %12, 0, 0
-  %14 = load ptr, ptr %alloc
-  %15 = insertvalue { { ptr, ptr }, { i64 } } %13, ptr %14, 0, 1
-  %16 = load i64, ptr %3
-  %17 = insertvalue { { ptr, ptr }, { i64 } } %15, i64 %16, 1, 0
-  ret { { ptr, ptr }, { i64 } } %17
+  %11 = load i64, ptr %7
+  store i64 %11, ptr %3
+  %12 = extractvalue { { { ptr, ptr }, { ptr addrspace(1) } } } poison, 0
+  %13 = load ptr, ptr %ds
+  %14 = insertvalue { { ptr, ptr }, { ptr addrspace(1) } } %12, ptr %13, 0, 0
+  %15 = load ptr, ptr %alloc
+  %16 = insertvalue { { ptr, ptr }, { ptr addrspace(1) } } %14, ptr %15, 0, 1
+  %17 = load i64, ptr %3
+  %18 = inttoptr i64 %17 to ptr addrspace(1)
+  %19 = insertvalue { { ptr, ptr }, { ptr addrspace(1) } } %16, ptr addrspace(1) %18, 1, 0
+  ret { { ptr, ptr }, { ptr addrspace(1) } } %19
 }
 
 declare i64 @llvm.read_register.i64(metadata)
@@ -102,4 +104,3 @@ declare void @llvm.write_register.i64(metadata, i64)
 
 @camlMulti_ret__data_end = global {  } {  }, align 8, section ".data"
 define void @camlMulti_ret__code_end() { unreachable }
-@camlMulti_ret__frametable = global { i64 } { i64 0 }, align 8, section ".data"

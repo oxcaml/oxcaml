@@ -768,6 +768,16 @@ module F = struct
     ins t "call void @llvm.write_register.i64(metadata !{!\"rsp\\00\"}, i64 %a)"
       pp_ident ident
 
+  (* This tells the frametable printer in LLVM to adjust its frame size
+     appropriately. This is because it doesn't properly track trap blocks (which
+     count as "dynamic objects" on the stack). Note that we multiply by 2 since
+     our trap blocks are 4 words wide as opposed to 2 for the normal compiler.
+     We also assume the normal stack offset is 0 (a violation will get caught
+     since we fail at Stackoffset) *)
+  let statepoint_id_attr_for_stack_adjustment ?(offset = 0)
+      (i : 'a Cfg.instruction) =
+    asprintf {|"statepoint-id"="%d"|} ((i.stack_offset * 2) + offset)
+
   (* Load the address as an ident with type ptr *)
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
     let offset = Arch.addressing_displacement_for_llvmize addr in
@@ -1038,7 +1048,9 @@ module F = struct
       let should_save_rbp = t.current_fun_info.fun_has_try && not tail in
       if should_save_rbp
       then ins t {|call void asm sideeffect "push %%rbp", "~{rsp}"()|};
-      ins_call ~tail ~cc:Ocaml ~pp_name t fn args (Some (res_type, res_ident));
+      let statepoint_id = statepoint_id_attr_for_stack_adjustment ~offset:8 i in
+      ins_call ~attrs:statepoint_id ~tail ~cc:Ocaml ~pp_name t fn args
+        (Some (res_type, res_ident));
       if should_save_rbp
       then ins t {|call void asm sideeffect "pop %%rbp", "~{rsp}"()|};
       res_ident
@@ -1131,8 +1143,9 @@ module F = struct
     let make_ocaml_c_call caml_c_call_symbol args res_types =
       add_referenced_symbol t caml_c_call_symbol;
       add_referenced_symbol t func_symbol;
-      call_simple ~cc:Ocaml_c_call ~pp_name:pp_global t caml_c_call_symbol args
-        res_types
+      let statepoint_id = statepoint_id_attr_for_stack_adjustment i in
+      call_simple ~attrs:statepoint_id ~cc:Ocaml_c_call ~pp_name:pp_global t
+        caml_c_call_symbol args res_types
       (* CR yusumez: Record frame table here *)
     in
     let call_func args res_types =
@@ -1272,7 +1285,9 @@ module F = struct
           Llvm_typ.i64;
         let exn_payload = load_reg_to_temp t i.arg.(0) in
         add_referenced_symbol t "caml_raise_exn";
-        call_simple ~cc:Ocaml ~pp_name:pp_global t "caml_raise_exn"
+        let statepoint_id = statepoint_id_attr_for_stack_adjustment i in
+        call_simple ~attrs:statepoint_id ~cc:Ocaml ~pp_name:pp_global t
+          "caml_raise_exn"
           [ ( Llvm_typ.of_machtyp_component i.arg.(0).typ,
               Llvm_value.Local_ident exn_payload ) ]
           []
@@ -1281,7 +1296,9 @@ module F = struct
       | Raise_reraise ->
         let exn_payload = load_reg_to_temp t i.arg.(0) in
         add_referenced_symbol t "caml_reraise_exn";
-        call_simple ~cc:Ocaml ~pp_name:pp_global t "caml_reraise_exn"
+        let statepoint_id = statepoint_id_attr_for_stack_adjustment i in
+        call_simple ~attrs:statepoint_id ~cc:Ocaml ~pp_name:pp_global t
+          "caml_reraise_exn"
           [ ( Llvm_typ.of_machtyp_component i.arg.(0).typ,
               Llvm_value.Local_ident exn_payload ) ]
           []
@@ -1701,7 +1718,8 @@ module F = struct
     | Intop op -> int_op t i op ~imm:None
     | Intop_imm (op, n) -> int_op t i op ~imm:(Some n)
     | Floatop (width, op) -> float_op t i width op
-    | Stackoffset _ -> () (* We leave stack handling to LLVM *)
+    | Stackoffset n ->
+      if n <> 0 then Misc.fatal_error "Llvmize: stack arguments not supported"
     | Begin_region ->
       let local_sp_addr = load_domainstate_addr t Domain_local_sp in
       let local_sp = fresh_ident t in
@@ -1794,8 +1812,9 @@ module F = struct
         add_called_fun t "caml_call_gc" ~cc:Ocaml
           ~args:[Llvm_typ.ptr; Llvm_typ.ptr]
           ~res:(Some (make_ret_type []));
-        call_simple ~attrs:"cold" ~cc:Ocaml ~pp_name:pp_global t "caml_call_gc"
-          [] []
+        let statepoint_id = statepoint_id_attr_for_stack_adjustment i in
+        call_simple ~attrs:(statepoint_id ^ " cold") ~cc:Ocaml
+          ~pp_name:pp_global t "caml_call_gc" [] []
         |> ignore;
         ins_branch_ident t after_gc_call;
         line t.ppf "%a:" Ident.print after_gc_call;
@@ -1898,8 +1917,8 @@ module F = struct
          calling convention), the handler is not removed as dead code (thanks to
          the branch), and no breaking control flow optimisations are made
          (thanks to the "returns twice" attribute). *)
-      call_simple ~attrs:"returns_twice" ~cc:Ocaml ~pp_name:pp_global t
-        "wrap_try" [] [Llvm_typ.i32]
+      call_simple ~attrs:{|returns_twice "gc-leaf-function"="true"|} ~cc:Ocaml
+        ~pp_name:pp_global t "wrap_try" [] [Llvm_typ.i32]
       |> ignore (* Note that we don't need the returned identifier here. *);
       (* Record label here - we will jump here for the handler *)
       let pre_try_label = fresh_ident t in

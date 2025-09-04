@@ -225,7 +225,7 @@ L112:                                                ; preds = %L1
   %80 = load i64, ptr %6
   %81 = load i64, ptr %7
   ; res_regs: [pin:anon:I/0[%rax]]
-  %82 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCsel__csel_HIDE_STAMP(ptr %77, ptr %78, i64 %79, i64 %80, i64 %81)
+  %82 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCsel__csel_HIDE_STAMP(ptr %77, ptr %78, i64 %79, i64 %80, i64 %81) "statepoint-id"="8"
   %83 = extractvalue { { ptr, ptr }, { i64 } } %82, 0, 0
   store ptr %83, ptr %ds
   %84 = extractvalue { { ptr, ptr }, { i64 } } %82, 0, 1
@@ -258,7 +258,7 @@ L114:                                                ; preds = %L112
   %97 = load i64, ptr %7
   %98 = inttoptr i64 %97 to ptr addrspace(1)
   ; res_regs: [pin:anon:V/0[%rax]]
-  %99 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %91, ptr %92, ptr addrspace(1) %94, ptr addrspace(1) %96, ptr addrspace(1) %98)
+  %99 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %91, ptr %92, ptr addrspace(1) %94, ptr addrspace(1) %96, ptr addrspace(1) %98) "statepoint-id"="8"
   %100 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %99, 0, 0
   store ptr %100, ptr %ds
   %101 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %99, 0, 1
@@ -290,7 +290,7 @@ L115:                                                ; preds = %L114
   ; res_regs: [pin:anon:I/0[%rax]]
   %116 = load i64, ptr %19
   %117 = inttoptr i64 %116 to ptr
-  %118 =  call cc 104 { { ptr, ptr }, { i64 } } %117(ptr %112, ptr %113, i64 %114, ptr addrspace(1) %115)
+  %118 =  call cc 104 { { ptr, ptr }, { i64 } } %117(ptr %112, ptr %113, i64 %114, ptr addrspace(1) %115) "statepoint-id"="8"
   %119 = extractvalue { { ptr, ptr }, { i64 } } %118, 0, 0
   store ptr %119, ptr %ds
   %120 = extractvalue { { ptr, ptr }, { i64 } } %118, 0, 1
@@ -320,7 +320,7 @@ L116:                                                ; preds = %L115
   %130 = load i64, ptr %6
   %131 = load i64, ptr %7
   ; res_regs: [pin:anon:I/0[%rax]]
-  %132 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCsel__csel_HIDE_STAMP(ptr %127, ptr %128, i64 %129, i64 %130, i64 %131)
+  %132 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCsel__csel_HIDE_STAMP(ptr %127, ptr %128, i64 %129, i64 %130, i64 %131) "statepoint-id"="8"
   %133 = extractvalue { { ptr, ptr }, { i64 } } %132, 0, 0
   store ptr %133, ptr %ds
   %134 = extractvalue { { ptr, ptr }, { i64 } } %132, 0, 1
@@ -353,7 +353,7 @@ L118:                                                ; preds = %L116
   %147 = load i64, ptr %7
   %148 = inttoptr i64 %147 to ptr addrspace(1)
   ; res_regs: [pin:anon:V/0[%rax]]
-  %149 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %141, ptr %142, ptr addrspace(1) %144, ptr addrspace(1) %146, ptr addrspace(1) %148)
+  %149 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %141, ptr %142, ptr addrspace(1) %144, ptr addrspace(1) %146, ptr addrspace(1) %148) "statepoint-id"="8"
   %150 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %149, 0, 0
   store ptr %150, ptr %ds
   %151 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %149, 0, 1
@@ -385,7 +385,7 @@ L119:                                                ; preds = %L118
   ; res_regs: [pin:anon:I/0[%rax]]
   %166 = load i64, ptr %32
   %167 = inttoptr i64 %166 to ptr
-  %168 =  call cc 104 { { ptr, ptr }, { i64 } } %167(ptr %162, ptr %163, i64 %164, ptr addrspace(1) %165)
+  %168 =  call cc 104 { { ptr, ptr }, { i64 } } %167(ptr %162, ptr %163, i64 %164, ptr addrspace(1) %165) "statepoint-id"="8"
   %169 = extractvalue { { ptr, ptr }, { i64 } } %168, 0, 0
   store ptr %169, ptr %ds
   %170 = extractvalue { { ptr, ptr }, { i64 } } %168, 0, 1
@@ -411,7 +411,7 @@ L120:                                                ; preds = %L119
   %178 = load i64, ptr %4
   %179 = load i64, ptr %6
   ; res_regs: [pin:anon:I/0[%rax]]
-  %180 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCsel__min_HIDE_STAMP(ptr %176, ptr %177, i64 %178, i64 %179)
+  %180 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCsel__min_HIDE_STAMP(ptr %176, ptr %177, i64 %178, i64 %179) "statepoint-id"="8"
   %181 = extractvalue { { ptr, ptr }, { i64 } } %180, 0, 0
   store ptr %181, ptr %ds
   %182 = extractvalue { { ptr, ptr }, { i64 } } %180, 0, 1
@@ -444,7 +444,7 @@ L122:                                                ; preds = %L120
   %195 = load i64, ptr %7
   %196 = inttoptr i64 %195 to ptr addrspace(1)
   ; res_regs: [pin:anon:V/0[%rax]]
-  %197 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %189, ptr %190, ptr addrspace(1) %192, ptr addrspace(1) %194, ptr addrspace(1) %196)
+  %197 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %189, ptr %190, ptr addrspace(1) %192, ptr addrspace(1) %194, ptr addrspace(1) %196) "statepoint-id"="8"
   %198 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %197, 0, 0
   store ptr %198, ptr %ds
   %199 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %197, 0, 1
@@ -476,7 +476,7 @@ L123:                                                ; preds = %L122
   ; res_regs: [pin:anon:I/0[%rax]]
   %214 = load i64, ptr %44
   %215 = inttoptr i64 %214 to ptr
-  %216 =  call cc 104 { { ptr, ptr }, { i64 } } %215(ptr %210, ptr %211, i64 %212, ptr addrspace(1) %213)
+  %216 =  call cc 104 { { ptr, ptr }, { i64 } } %215(ptr %210, ptr %211, i64 %212, ptr addrspace(1) %213) "statepoint-id"="8"
   %217 = extractvalue { { ptr, ptr }, { i64 } } %216, 0, 0
   store ptr %217, ptr %ds
   %218 = extractvalue { { ptr, ptr }, { i64 } } %216, 0, 1
@@ -502,7 +502,7 @@ L124:                                                ; preds = %L123
   %226 = load i64, ptr %4
   %227 = load i64, ptr %6
   ; res_regs: [pin:anon:I/0[%rax]]
-  %228 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCsel__min_HIDE_STAMP(ptr %224, ptr %225, i64 %226, i64 %227)
+  %228 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCsel__min_HIDE_STAMP(ptr %224, ptr %225, i64 %226, i64 %227) "statepoint-id"="8"
   %229 = extractvalue { { ptr, ptr }, { i64 } } %228, 0, 0
   store ptr %229, ptr %ds
   %230 = extractvalue { { ptr, ptr }, { i64 } } %228, 0, 1
@@ -535,7 +535,7 @@ L126:                                                ; preds = %L124
   %243 = load i64, ptr %7
   %244 = inttoptr i64 %243 to ptr addrspace(1)
   ; res_regs: [pin:anon:V/0[%rax]]
-  %245 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %237, ptr %238, ptr addrspace(1) %240, ptr addrspace(1) %242, ptr addrspace(1) %244)
+  %245 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %237, ptr %238, ptr addrspace(1) %240, ptr addrspace(1) %242, ptr addrspace(1) %244) "statepoint-id"="8"
   %246 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %245, 0, 0
   store ptr %246, ptr %ds
   %247 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %245, 0, 1
@@ -567,7 +567,7 @@ L127:                                                ; preds = %L126
   ; res_regs: [pin:anon:I/0[%rax]]
   %262 = load i64, ptr %56
   %263 = inttoptr i64 %262 to ptr
-  %264 =  call cc 104 { { ptr, ptr }, { i64 } } %263(ptr %258, ptr %259, i64 %260, ptr addrspace(1) %261)
+  %264 =  call cc 104 { { ptr, ptr }, { i64 } } %263(ptr %258, ptr %259, i64 %260, ptr addrspace(1) %261) "statepoint-id"="8"
   %265 = extractvalue { { ptr, ptr }, { i64 } } %264, 0, 0
   store ptr %265, ptr %ds
   %266 = extractvalue { { ptr, ptr }, { i64 } } %264, 0, 1
@@ -593,7 +593,7 @@ L128:                                                ; preds = %L127
   %274 = load i64, ptr %4
   %275 = load i64, ptr %6
   ; res_regs: [pin:anon:I/0[%rax]]
-  %276 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCsel__min_HIDE_STAMP(ptr %272, ptr %273, i64 %274, i64 %275)
+  %276 =  call cc 104 { { ptr, ptr }, { i64 } } @camlCsel__min_HIDE_STAMP(ptr %272, ptr %273, i64 %274, i64 %275) "statepoint-id"="8"
   %277 = extractvalue { { ptr, ptr }, { i64 } } %276, 0, 0
   store ptr %277, ptr %ds
   %278 = extractvalue { { ptr, ptr }, { i64 } } %276, 0, 1
@@ -626,7 +626,7 @@ L130:                                                ; preds = %L128
   %291 = load i64, ptr %7
   %292 = inttoptr i64 %291 to ptr addrspace(1)
   ; res_regs: [pin:anon:V/0[%rax]]
-  %293 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %285, ptr %286, ptr addrspace(1) %288, ptr addrspace(1) %290, ptr addrspace(1) %292)
+  %293 =  call cc 104 { { ptr, ptr }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(ptr %285, ptr %286, ptr addrspace(1) %288, ptr addrspace(1) %290, ptr addrspace(1) %292) "statepoint-id"="8"
   %294 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %293, 0, 0
   store ptr %294, ptr %ds
   %295 = extractvalue { { ptr, ptr }, { ptr addrspace(1) } } %293, 0, 1
@@ -658,7 +658,7 @@ L131:                                                ; preds = %L130
   ; res_regs: [pin:anon:I/0[%rax]]
   %310 = load i64, ptr %68
   %311 = inttoptr i64 %310 to ptr
-  %312 =  call cc 104 { { ptr, ptr }, { i64 } } %311(ptr %306, ptr %307, i64 %308, ptr addrspace(1) %309)
+  %312 =  call cc 104 { { ptr, ptr }, { i64 } } %311(ptr %306, ptr %307, i64 %308, ptr addrspace(1) %309) "statepoint-id"="8"
   %313 = extractvalue { { ptr, ptr }, { i64 } } %312, 0, 0
   store ptr %313, ptr %ds
   %314 = extractvalue { { ptr, ptr }, { i64 } } %312, 0, 1
