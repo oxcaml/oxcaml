@@ -721,6 +721,9 @@ let mk_instantiate_opt = mk_instantiate0 ~ext:"cmx"
 let mk_use_prims f =
   "-use-prims", Arg.String f, "<file>  (undocumented)"
 
+(* CR sspies: If the default here is flipped, update the help message for
+   -gno-upstream-dwarf. *)
+
 let mk_shape_format f =
   "-shape-format",
   Arg.Symbol (["old-merlin"; "debugging-shapes"], f),
