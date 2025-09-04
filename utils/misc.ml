@@ -852,9 +852,9 @@ module Int_literal_converter = struct
   let int64 s = cvt_int_aux s Int64.neg Int64.of_string
   let nativeint s = cvt_int_aux s Nativeint.neg Nativeint.of_string
 
+  external parse_intnat : string -> (int [@untagged])
+
   (* Follows "parse_sign_and_base" in runtime/ints.c *)
-  (* CR jrayman for reviewer: is there a way to hook
-     "caml_int8/16_of_string_unboxed" here? *)
   let parse_signedness s =
     let char_at i =
       if String.length s > i
@@ -886,7 +886,7 @@ module Int_literal_converter = struct
     in
     if i < lower_limit || i > upper_limit
     then failwith "small int overflow";
-    (* CR jrayman for reviewer: there is no sign extend, right? *)
+    (* handle overflow *)
     if i > max_int then i - (max_uint + 1)
     else if i < min_int then i + (max_uint + 1)
     else i
