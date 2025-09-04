@@ -78,7 +78,7 @@ type fundecl =
     fundecl : L.fundecl
   }
 
-let dwarf_for_fundecl t fundecl ~fun_end_label =
+let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
   if not
        (!Clflags.debug
        && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
@@ -89,13 +89,13 @@ let dwarf_for_fundecl t fundecl ~fun_end_label =
       if not !Dwarf_flags.restrict_to_upstream_dwarf
       then
         Profile.record "debug_available_ranges_vars"
-          (fun fundecl -> Available_ranges_vars.create fundecl)
+          (fun fundecl -> Available_ranges_vars.create ~ppf_dump fundecl)
           ~accumulate:true fundecl
       else Available_ranges_vars.empty, fundecl
     in
     let inlined_frame_ranges, fundecl =
       Profile.record "debug_inlined_frame_ranges"
-        (fun fundecl -> Inlined_frame_ranges.create fundecl)
+        (fun fundecl -> Inlined_frame_ranges.create ~ppf_dump fundecl)
         ~accumulate:true fundecl
     in
     Dwarf_concrete_instances.for_fundecl ~get_file_id:t.get_file_id t.state

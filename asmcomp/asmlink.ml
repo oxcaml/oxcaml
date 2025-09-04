@@ -372,7 +372,8 @@ let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units cached_g
     Unit_info.make_dummy ~input_name:"caml_startup" startup_comp_unit
   in
   Compilenv.reset startup_unit_info;
-  Emitaux.Dwarf_helpers.init ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
+  Emitaux.Dwarf_helpers.init ~ppf_dump
+    ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
     ~sourcefile:sourcefile_for_dwarf;
   Emit.begin_assembly unix;
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
@@ -432,7 +433,8 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
     Unit_info.make_dummy ~input_name:"caml_startup" shared_startup_comp_unit
   in
   Compilenv.reset shared_startup_unit_info;
-  Emitaux.Dwarf_helpers.init ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
+  Emitaux.Dwarf_helpers.init ~ppf_dump
+    ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
     ~sourcefile:sourcefile_for_dwarf;
   Emit.begin_assembly unix;
   emit_ocamlrunparam ~ppf_dump;

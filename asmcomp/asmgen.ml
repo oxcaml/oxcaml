@@ -575,7 +575,7 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
       remove_asm_file ())
 
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
-  Emitaux.Dwarf_helpers.init ~disable_dwarf:false ~sourcefile;
+  Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:false ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
   ++ (fun x ->
@@ -626,7 +626,7 @@ let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
         end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
             cmm_phrases))
 
-let linear_gen_implementation unix filename =
+let linear_gen_implementation ~ppf_dump unix filename =
   let open Linear_format in
   let linear_unit_info, _ = restore filename in
   let current_package = Compilation_unit.Prefix.from_clflags () in
@@ -640,16 +640,16 @@ let linear_gen_implementation unix filename =
   start_from_emit := true;
   (* CR mshinwell: set [sourcefile] properly; [filename] isn't a .ml file *)
   let sourcefile = Some filename in
-  Emitaux.Dwarf_helpers.init ~disable_dwarf:false ~sourcefile;
+  Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:false ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
   Profile.record "Emit" (List.iter emit_item) linear_unit_info.items;
   emit_end_assembly ~sourcefile ()
 
-let compile_implementation_linear unix output_prefix ~progname =
-  compile_unit ~may_reduce_heap:true ~output_prefix
+let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
+  compile_unit ~ppf_dump ~may_reduce_heap:true ~output_prefix
     ~asm_filename:(asm_filename output_prefix)
     ~keep_asm:!keep_asm_file ~obj_filename:(output_prefix ^ ext_obj) (fun () ->
-      linear_gen_implementation unix progname)
+      linear_gen_implementation ~ppf_dump unix progname)
 
 (* Error report *)
 
