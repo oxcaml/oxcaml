@@ -135,15 +135,12 @@ let constant = function
   | Const_float32 f -> Pconst_float (f, Some 's')
   | Const_unboxed_float f -> Pconst_unboxed_float (f, None)
   | Const_unboxed_float32 f -> Pconst_unboxed_float (f, Some 's')
-  | Const_untagged_int i -> Pconst_unboxed_integer (Int.to_string i, None)
-  | Const_untagged_int8 i -> Pconst_unboxed_integer (Int.to_string i, Some 's')
-  | Const_untagged_int16 i -> Pconst_unboxed_integer (Int.to_string i, Some 'S')
-  | Const_unboxed_int32 i ->
-    Pconst_unboxed_integer (Int32.to_string i, Some 'l')
-  | Const_unboxed_int64 i ->
-    Pconst_unboxed_integer (Int64.to_string i, Some 'L')
-  | Const_unboxed_nativeint i ->
-    Pconst_unboxed_integer (Nativeint.to_string i, Some 'n')
+  | Const_untagged_int i -> Pconst_unboxed_integer (Int.to_string i, 'm')
+  | Const_untagged_int8 i -> Pconst_unboxed_integer (Int.to_string i, 's')
+  | Const_untagged_int16 i -> Pconst_unboxed_integer (Int.to_string i, 'S')
+  | Const_unboxed_int32 i -> Pconst_unboxed_integer (Int32.to_string i, 'l')
+  | Const_unboxed_int64 i -> Pconst_unboxed_integer (Int64.to_string i, 'L')
+  | Const_unboxed_nativeint i -> Pconst_unboxed_integer (Nativeint.to_string i, 'n')
 
 let attribute sub a = {
     attr_name = map_loc sub a.attr_name;
