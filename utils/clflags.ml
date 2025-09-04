@@ -82,6 +82,8 @@ and gdwarf_config_max_shape_reduce_steps_per_variable = ref (Some 100)
   (* -gdwarf-config-max-shape-reduce-steps-per-variable *)
 and gdwarf_config_max_evaluation_steps_per_variable = ref (Some 1000)
   (* -gdwarf-config-max-evaluation-steps-per-variable *)
+and gdwarf_config_shape_reduce_fuel = ref 10
+  (* -gdwarf-config-shape-reduce-fuel *)
 and gdwarf_fidelity = ref (None : gdwarf_fidelity option)
   (* -gdwarf-fidelity *)
 and unsafe = ref false                  (* -unsafe *)
@@ -259,7 +261,8 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_max_cms_files_per_variable := 0;
       gdwarf_config_max_type_to_shape_depth := 10;
       gdwarf_config_max_shape_reduce_steps_per_variable := Some 100;
-      gdwarf_config_max_evaluation_steps_per_variable := Some 1000
+      gdwarf_config_max_evaluation_steps_per_variable := Some 1000;
+      gdwarf_config_shape_reduce_fuel := 10
   | Fidelity_medium ->
       gdwarf_config_shape_eval_depth := 2;
       gdwarf_config_shape_reduce_depth := 2;
@@ -267,7 +270,8 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_max_cms_files_per_variable := 5;
       gdwarf_config_max_type_to_shape_depth := 10;
       gdwarf_config_max_shape_reduce_steps_per_variable := Some (1000);
-      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000)
+      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000);
+      gdwarf_config_shape_reduce_fuel := 10
   | Fidelity_high ->
       gdwarf_config_shape_eval_depth := 3;
       gdwarf_config_shape_reduce_depth := 3;
@@ -275,7 +279,8 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_max_cms_files_per_variable := 10;
       gdwarf_config_max_type_to_shape_depth := 10;
       gdwarf_config_max_shape_reduce_steps_per_variable := Some (10_000);
-      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000_000)
+      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000_000);
+      gdwarf_config_shape_reduce_fuel := 20
   | Fidelity_very_high ->
       gdwarf_config_shape_eval_depth := 4;
       gdwarf_config_shape_reduce_depth := 3;
@@ -283,7 +288,8 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_max_cms_files_per_variable := 10;
       gdwarf_config_max_type_to_shape_depth := 10;
       gdwarf_config_max_shape_reduce_steps_per_variable := None;
-      gdwarf_config_max_evaluation_steps_per_variable := None
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := Int.max_int
   | Fidelity_ultra_high ->
       gdwarf_config_shape_eval_depth := 5;
       gdwarf_config_shape_reduce_depth := 5;
@@ -291,7 +297,8 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_max_cms_files_per_variable := 50;
       gdwarf_config_max_type_to_shape_depth := 10;
       gdwarf_config_max_shape_reduce_steps_per_variable := None;
-      gdwarf_config_max_evaluation_steps_per_variable := None
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := Int.max_int
 
 let default_inline_threshold = if Config.flambda then 10. else 10. /. 8.
 let inline_toplevel_multiplier = 16
