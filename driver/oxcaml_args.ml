@@ -833,7 +833,7 @@ let mk_no_restrict_to_upstream_dwarf f =
   ( "-gno-upstream-dwarf",
     Arg.Unit f,
     " Emit potentially more DWARF information than the upstream compiler. \
-      Implies -shape-format debugging-shapes." )
+     Implies -shape-format debugging-shapes." )
 
 let mk_dwarf_inlined_frames f =
   ("-gdwarf-inlined-frames", Arg.Unit f, " Emit DWARF inlined frame information")

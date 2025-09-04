@@ -876,14 +876,14 @@ let rec unfold_and_evaluate ~depth subst_type subst_constr (t : Shape.t) =
             in
             Shape.variant constructors
           | Record { fields; kind } ->
-              Shape.record kind
-                (List.map
-                  (fun ((name, uid, sh, ly) : _ * _ * Shape.t * _) ->
-                    ( name,
-                      uid,
-                      unfold_and_evaluate ~depth subst_type subst_constr sh,
-                      ly ))
-                  fields)
+            Shape.record kind
+              (List.map
+                 (fun ((name, uid, sh, ly) : _ * _ * Shape.t * _) ->
+                   ( name,
+                     uid,
+                     unfold_and_evaluate ~depth subst_type subst_constr sh,
+                     ly ))
+                 fields)
           | Poly_variant constrs ->
             Shape.poly_variant
               (Shape.poly_variant_constructors_map
