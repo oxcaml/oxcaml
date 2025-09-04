@@ -1652,6 +1652,19 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     | None -> None
     | Some contents_layout -> Some (Poke (Some contents_layout))
   )
+  | Primitive (Pset_idx (_, m), arity), (_ :: _ :: p3 :: _) ->
+    (* CR layouts: This is gross - particularly the call to [type_jkind] and the
+       conversion to and from [mixed_block_element]! The slightly less gross
+       thing would be to change [layout_of_const_sort_generic] in the same way
+       that we have changed [transl_mixed_block_element] to desecend into
+       products. But that's a big change that (a) will have substantial
+       performance impacts for lots of cases that don't matter, and (b) will
+       become obsolete when we do complex values. So for now, the gross
+       thing. *)
+    let jkind = Ctype.type_jkind env p3 in
+    let mbe = Typedecl.mixed_block_element env p3 jkind in
+    let mbe = transl_mixed_block_element env (to_location loc) p3 mbe in
+    Some (Primitive (Pset_idx (layout_of_mixed_block_element mbe, m), arity))
   | _ -> None
 
 let caml_equal =

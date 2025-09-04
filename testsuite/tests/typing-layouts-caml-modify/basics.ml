@@ -343,7 +343,7 @@ let () =
   end in
   let t = { x = "x"; y = 0 } in
   let idx = (.y) in
-  test ~expect_caml_modifies:1 (* should be 0 *)
+  test ~expect_caml_modifies:0
     (fun () -> unsafe_set t idx 1; ignore (Sys.opaque_identity t))
 
 let () =
@@ -361,7 +361,7 @@ let () =
   end in
   let t = { x = "x"; y = #(#0L, "a", true) } in
   let idx = (.y) in
-  test ~expect_caml_modifies:2 (* should be 1 *)
+  test ~expect_caml_modifies:1
     (fun () -> unsafe_set t idx #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
 
@@ -375,7 +375,7 @@ let () =
   end in
   let t = { x = "x"; y = 0 } in
   let idx = (.y) in
-  test ~expect_caml_modifies:1 (* should be 0 *)
+  test ~expect_caml_modifies:0
     (fun () -> unsafe_set_imm t idx 1; ignore (Sys.opaque_identity t))
 
 external unsafe_set_i64 : ('a : value) ('b : bits64).
@@ -399,6 +399,6 @@ let () =
   end in
   let t = { x = "x"; y = #(#0L, "a", true) } in
   let idx = (.y) in
-  test ~expect_caml_modifies:3 (* should be 1 *)
+  test ~expect_caml_modifies:1
     (fun () -> unsafe_set_prod t idx #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
