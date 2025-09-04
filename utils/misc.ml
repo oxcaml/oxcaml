@@ -852,8 +852,6 @@ module Int_literal_converter = struct
   let int64 s = cvt_int_aux s Int64.neg Int64.of_string
   let nativeint s = cvt_int_aux s Nativeint.neg Nativeint.of_string
 
-  external parse_intnat : string -> (int [@untagged])
-
   (* Follows "parse_sign_and_base" in runtime/ints.c *)
   let parse_signedness s =
     let char_at i =
