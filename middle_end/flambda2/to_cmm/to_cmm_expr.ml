@@ -284,6 +284,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           |> Array.of_list |> Misc.Stdlib.Array.concat_arrays
       }
     in
+    let callsite_types : Cmm.func_call_sig =
+      { args = args_ty; res = return_ty }
+    in
     let args =
       if Code_metadata.is_my_closure_used code_metadata
       then
@@ -305,8 +308,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     match Apply.probe apply with
     | None ->
-      ( C.direct_call ~dbg ~funcdef_types return_ty pos (C.symbol ~dbg code_sym)
-          args_ty args,
+      ( C.direct_call ~dbg ~callsite_types ~funcdef_types pos
+          (C.symbol ~dbg code_sym) args,
         free_vars,
         env,
         res,

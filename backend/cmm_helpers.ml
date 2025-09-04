@@ -3322,7 +3322,9 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
     | (arg_ty, arg) :: args ->
       let newclos = V.create_local "clos" in
       let callsite_types =
-        { args = [arg_ty; Extended_machtype.typ_val]; res = result }
+        { args = [arg_ty; Extended_machtype.typ_val];
+          res = Extended_machtype.typ_val
+        }
       in
       Clet
         ( VP.create newclos,
@@ -4505,15 +4507,8 @@ let load ~dbg memory_chunk mutability ~addr =
 let store ~dbg kind init ~addr ~new_value =
   Cop (Cstore (kind, init), [addr; new_value], dbg)
 
-let direct_call ~dbg ~funcdef_types ty_res pos f_code_sym ty_args args =
-  Cop
-    ( Capply
-        { funcdef_types;
-          callsite_types = { args = ty_args; res = ty_res };
-          pos
-        },
-      f_code_sym :: args,
-      dbg )
+let direct_call ~dbg ~callsite_types ~funcdef_types pos f_code_sym args =
+  Cop (Capply { callsite_types; funcdef_types; pos }, f_code_sym :: args, dbg)
 
 let indirect_call ~dbg ty pos alloc_mode f args_type args =
   might_split_call_caml_apply ty args_type Asttypes.Mutable f args pos

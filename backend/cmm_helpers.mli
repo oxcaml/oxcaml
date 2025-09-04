@@ -932,11 +932,10 @@ val caml_modify_local :
     If a closure needs to be passed, it must be included in [args]. *)
 val direct_call :
   dbg:Debuginfo.t ->
+  callsite_types:func_call_sig ->
   funcdef_types:func_call_sig ->
-  Extended_machtype.t ->
   Lambda.region_close ->
   expression ->
-  Extended_machtype.t list ->
   expression list ->
   expression
 
