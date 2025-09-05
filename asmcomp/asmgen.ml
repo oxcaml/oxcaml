@@ -400,6 +400,7 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue_validate"
        Cfg_prologue.validate
   ++ Cfg_with_infos.cfg_with_layout
+  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_prologue"
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_simplify"
        Regalloc_utils.simplify_cfg
