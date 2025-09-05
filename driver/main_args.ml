@@ -926,7 +926,9 @@ let mk_gdwarf_config_max_shape_reduce_steps_per_variable f =
   "-gdwarf-config-max-shape-reduce-steps-per-variable", Arg.String f,
   Printf.sprintf "<n|none>  Maximum shape reduction steps per variable in \
   DWARF debug info (default: %s, use 'none' for unlimited)"
-    (match Clflags.gdwarf_config_defaults.max_shape_reduce_steps_per_variable with
+    (match
+      Clflags.gdwarf_config_defaults.max_shape_reduce_steps_per_variable
+    with
      | Some n -> string_of_int n
      | None -> "none")
 
