@@ -16,6 +16,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ portable
+
 open! Stdlib
 
 (** Unboxed 32-bit floating-point arithmetic.  This file primarily duplicates

@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ portable
+
 (** Signed 8-bit integer values.
 
     These integers are {8} bits wide and use two's complement representation.

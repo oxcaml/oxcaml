@@ -23,54 +23,55 @@ type t = int
 
 let size = Sys.int_size
 
-external ( < ) : int -> int -> bool = "%int_lessthan"
+external ( < ) : int -> int -> bool @@ portable = "%int_lessthan"
 
 let zero = 0
 let one = 1
 let minus_one = -1
 
-external to_int : int -> int = "%identity"
-external of_int : int -> int = "%identity"
-external neg : int -> int = "%int_neg"
-external add : int -> int -> int = "%int_add"
-external sub : int -> int -> int = "%int_sub"
-external mul : int -> int -> int = "%int_mul"
-external div : int -> int -> int = "%int_div"
-external rem : int -> int -> int = "%int_mod"
-external succ : int -> int = "%int_succ"
-external pred : int -> int = "%int_pred"
-external logand : int -> int -> int = "%int_and"
-external logor : int -> int -> int = "%int_or"
-external logxor : int -> int -> int = "%int_xor"
+external to_int : int -> int @@ portable = "%identity"
+external of_int : int -> int @@ portable = "%identity"
+external neg : int -> int @@ portable = "%int_neg"
+external add : int -> int -> int @@ portable = "%int_add"
+external sub : int -> int -> int @@ portable = "%int_sub"
+external mul : int -> int -> int @@ portable = "%int_mul"
+external div : int -> int -> int @@ portable = "%int_div"
+external rem : int -> int -> int @@ portable = "%int_mod"
+external succ : int -> int @@ portable = "%int_succ"
+external pred : int -> int @@ portable = "%int_pred"
+external logand : int -> int -> int @@ portable = "%int_and"
+external logor : int -> int -> int @@ portable = "%int_or"
+external logxor : int -> int -> int @@ portable = "%int_xor"
 
 let[@inline] lognot x = logxor x minus_one
 
-external shift_left : int -> int -> int = "%int_lsl"
-external shift_right : int -> int -> int = "%int_asr"
-external shift_right_logical : int -> int -> int = "%int_lsr"
+external shift_left : int -> int -> int @@ portable = "%int_lsl"
+external shift_right : int -> int -> int @@ portable = "%int_asr"
+external shift_right_logical : int -> int -> int @@ portable = "%int_lsr"
 
 let[@inline] abs x = if x < zero then neg x else x
 
-external equal : int -> int -> bool = "%int_equal"
-external compare : int -> int -> int = "%int_compare"
+external equal : int -> int -> bool @@ portable = "%int_equal"
+external compare : int -> int -> int @@ portable = "%int_compare"
 
 let[@inline] min x y = if x < y then x else y
 let[@inline] max x y = if x < y then y else x
 
-external of_float : float -> int = "%int_of_float"
-external to_float : int -> float = "%float_of_int"
-external format_int : string -> int -> string = "caml_format_int"
+external of_float : float -> int @@ portable = "%int_of_float"
+external to_float : int -> float @@ portable = "%float_of_int"
+external format_int : string -> int -> string @@ portable = "caml_format_int"
 
 let[@inline] to_string t = format_int "%d" t
 
-external of_string : string -> int = "caml_int_of_string"
+external of_string : string -> int @@ portable = "caml_int_of_string"
 
 let max_int = shift_right_logical minus_one 1
 let min_int = succ max_int
 let[@inline] unsigned_to_int t = if t < 0 then None else Some t
 
-external unsigned_compare : int -> int -> int = "%int_unsigned_compare"
-external unsigned_lt : int -> int -> bool = "%int_unsigned_lessthan"
+external unsigned_compare : int -> int -> int @@ portable
+  = "%int_unsigned_compare"
+external unsigned_lt : int -> int -> bool @@ portable = "%int_unsigned_lessthan"
 
 (* Unsigned division from signed division of the same bitness. See Warren Jr.,
    Henry S. (2013). Hacker's Delight (2 ed.), Sec 9-3. *)
