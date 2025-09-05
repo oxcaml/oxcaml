@@ -137,7 +137,8 @@ module Make(Params : sig
   val fuel_for_compilation_units : unit -> int
   val max_shape_reduce_steps_per_variable : unit -> Misc.Maybe_bounded.t
   val max_compilation_unit_depth : unit -> int
-  val read_unit_shape : diagnostics:Diagnostics.t -> unit_name:string -> t option
+  val read_unit_shape :
+    diagnostics:Diagnostics.t -> unit_name:string -> t option
 end) = struct
   (* We implement a strong call-by-need reduction, following an
      evaluator from Nathanaelle Courant. *)
