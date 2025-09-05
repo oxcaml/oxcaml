@@ -357,16 +357,12 @@ let add_prologue (cfg : Cfg.t) prologue_label =
 let add_prologue_if_required (cfg_with_infos : Cfg_with_infos.t) ~f =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
   let prologue_blocks, epilogue_blocks = f cfg_with_infos in
-  let terminator_as_basic terminator =
-    { terminator with Cfg.desc = Cfg.Prologue }
-  in
   Label.Set.iter (add_prologue cfg) prologue_blocks;
   Label.Set.iter
     (fun label ->
       let block = Cfg.get_block_exn cfg label in
-      let terminator = terminator_as_basic block.terminator in
       DLL.add_end block.body
-        (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
+        (Cfg.make_instruction_from_copy block.terminator ~desc:Cfg.Epilogue
            ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
            ()))
     epilogue_blocks
