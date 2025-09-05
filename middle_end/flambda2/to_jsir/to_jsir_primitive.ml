@@ -589,8 +589,8 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
     let tag =
       match kind with
       | Values (tag, _with_subkind) -> Tag.Scannable.to_tag tag
+      | Mixed (tag, _mixed_block_shape) -> Tag.Scannable.to_tag tag
       | Naked_floats -> Tag.double_array_tag
-      | Mixed _ -> failwith "unimplemented block kind"
     in
     let expr, env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields:xs in
     let var = Jsir.Var.fresh () in
