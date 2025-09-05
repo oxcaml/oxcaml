@@ -238,6 +238,7 @@ myStdenv.mkDerivation {
     Configure Flags: $configureFlags
 
     Available commands:
+      configurePhase           - Pre-build setup
       make boot-compiler       - Quick build (recommended for development)
       make boot-_install       - Quick install (recommended for development)
       make fmt                 - Auto-format code
