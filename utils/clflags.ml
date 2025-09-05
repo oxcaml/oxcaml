@@ -48,6 +48,28 @@ type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
+
+type gdwarf_config_defaults = {
+  shape_reduce_depth: int;
+  shape_eval_depth: int;
+  max_cms_files_per_unit: int;
+  max_cms_files_per_variable: int;
+  max_type_to_shape_depth: int;
+  max_shape_reduce_steps_per_variable: int option;
+  max_evaluation_steps_per_variable: int option;
+  shape_reduce_fuel: int;
+}
+
+let gdwarf_config_defaults = {
+  shape_reduce_depth = 2;
+  shape_eval_depth = 1;
+  max_cms_files_per_unit = 0;
+  max_cms_files_per_variable = 0;
+  max_type_to_shape_depth = 10;
+  max_shape_reduce_steps_per_variable = Some 100;
+  max_evaluation_steps_per_variable = Some 1000;
+  shape_reduce_fuel = 10;
+}
 type shape_format = Old_merlin | Debugging_shapes
 type gdwarf_fidelity =
   | Fidelity_low | Fidelity_medium
@@ -68,21 +90,29 @@ and debug_full = ref false              (* For full DWARF support *)
 and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
 and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)
 and dwarf_pedantic = ref false          (* -gdwarf-pedantic *)
-and gdwarf_config_shape_reduce_depth = ref 2
+and gdwarf_config_shape_reduce_depth =
+  ref gdwarf_config_defaults.shape_reduce_depth
   (* -gdwarf-config-shape-reduce-depth *)
-and gdwarf_config_shape_eval_depth = ref 1
+and gdwarf_config_shape_eval_depth =
+  ref gdwarf_config_defaults.shape_eval_depth
   (* -gdwarf-config-shape-eval-depth *)
-and gdwarf_config_max_cms_files_per_unit = ref 0
+and gdwarf_config_max_cms_files_per_unit =
+  ref gdwarf_config_defaults.max_cms_files_per_unit
   (* -gdwarf-config-max-cms-files-per-unit *)
-and gdwarf_config_max_cms_files_per_variable = ref 0
+and gdwarf_config_max_cms_files_per_variable =
+  ref gdwarf_config_defaults.max_cms_files_per_variable
   (* -gdwarf-config-max-cms-files-per-variable *)
-and gdwarf_config_max_type_to_shape_depth = ref 10
+and gdwarf_config_max_type_to_shape_depth =
+  ref gdwarf_config_defaults.max_type_to_shape_depth
   (* -gdwarf-config-max-type-to-shape-depth *)
-and gdwarf_config_max_shape_reduce_steps_per_variable = ref (Some 100)
+and gdwarf_config_max_shape_reduce_steps_per_variable =
+  ref gdwarf_config_defaults.max_shape_reduce_steps_per_variable
   (* -gdwarf-config-max-shape-reduce-steps-per-variable *)
-and gdwarf_config_max_evaluation_steps_per_variable = ref (Some 1000)
+and gdwarf_config_max_evaluation_steps_per_variable =
+  ref gdwarf_config_defaults.max_evaluation_steps_per_variable
   (* -gdwarf-config-max-evaluation-steps-per-variable *)
-and gdwarf_config_shape_reduce_fuel = ref 10
+and gdwarf_config_shape_reduce_fuel =
+  ref gdwarf_config_defaults.shape_reduce_fuel
   (* -gdwarf-config-shape-reduce-fuel *)
 and gdwarf_fidelity = ref (None : gdwarf_fidelity option)
   (* -gdwarf-fidelity *)
