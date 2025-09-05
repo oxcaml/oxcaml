@@ -49,7 +49,7 @@ external make_contended
   = "caml_atomic_make_contended"
 
 (** Get the current value of the atomic reference. *)
-val get : ('a : value_or_null). 'a t @ local -> 'a
+external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load"
 
 (** Set a new value for the atomic reference. *)
 external set : ('a : value_or_null). 'a t @ local -> 'a -> unit = "%atomic_set"
@@ -79,22 +79,22 @@ external compare_exchange
 
 (** [fetch_and_add r n] atomically increments the value of [r] by [n], and
     returns the current value (before the increment). *)
-val fetch_and_add : int t @ local -> int -> int
+external fetch_and_add : int t @ local -> int -> int = "%atomic_fetch_add"
 
 (** [add r i] atomically adds [i] onto [r]. *)
-val add : int t @ local -> int -> unit
+external add : int t @ local -> int -> unit =  "%atomic_add"
 
 (** [sub r i] atomically subtracts [i] onto [r]. *)
-val sub : int t @ local -> int -> unit
+external sub : int t @ local -> int -> unit =  "%atomic_sub"
 
 (** [logand r i] atomically bitwise-ands [i] onto [r]. *)
-val logand : int t @ local -> int -> unit
+external logand : int t @ local -> int -> unit =  "%atomic_land"
 
 (** [logor r i] atomically bitwise-ors [i] onto [r]. *)
-val logor : int t @ local -> int -> unit
+external logor : int t @ local -> int -> unit =  "%atomic_lor"
 
 (** [logxor r i] atomically bitwise-xors [i] onto [r]. *)
-val logxor : int t @ local -> int -> unit
+external logxor : int t @ local -> int -> unit =  "%atomic_lxor"
 
 (** [incr r] atomically increments the value of [r] by [1]. *)
 val incr : int t @ local -> unit

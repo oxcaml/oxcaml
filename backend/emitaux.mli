@@ -96,7 +96,11 @@ type error =
   | Inconsistent_probe_init of string * Debuginfo.t
 
 module Dwarf_helpers : sig
-  val init : disable_dwarf:bool -> sourcefile:string option -> unit
+  val init :
+    ppf_dump:Format.formatter ->
+    disable_dwarf:bool ->
+    sourcefile:string option ->
+    unit
 
   val begin_dwarf :
     code_begin:string ->

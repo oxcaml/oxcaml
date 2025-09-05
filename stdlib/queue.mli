@@ -47,60 +47,60 @@ exception Empty
 val create : ('a : value_or_null) .unit -> 'a t
 (** Return a new queue, initially empty. *)
 
-val add : ('a : value_or_null) . 'a -> 'a t -> unit
+val add : ('a : value_or_null) . 'a -> 'a t @ local -> unit
 (** [add x q] adds the element [x] at the end of the queue [q]. *)
 
-val push : ('a : value_or_null) . 'a -> 'a t -> unit
+val push : ('a : value_or_null) . 'a -> 'a t @ local -> unit
 (** [push] is a synonym for [add]. *)
 
-val take : ('a : value_or_null) . 'a t -> 'a
+val take : ('a : value_or_null) . 'a t @ local -> 'a
 (** [take q] removes and returns the first element in queue [q],
    or raises {!Empty} if the queue is empty. *)
 
-val take_opt : ('a : value_or_null) . 'a t -> 'a option
+val take_opt : ('a : value_or_null) . 'a t @ local -> 'a option
 (** [take_opt q] removes and returns the first element in queue [q],
    or returns [None] if the queue is empty.
    @since 4.08 *)
 
-val pop : ('a : value_or_null) . 'a t -> 'a
+val pop : ('a : value_or_null) . 'a t @ local -> 'a
 (** [pop] is a synonym for [take]. *)
 
-val peek : ('a : value_or_null) . 'a t -> 'a
+val peek : ('a : value_or_null) . 'a t @ local -> 'a
 (** [peek q] returns the first element in queue [q], without removing
    it from the queue, or raises {!Empty} if the queue is empty. *)
 
-val peek_opt : ('a : value_or_null) . 'a t -> 'a option
+val peek_opt : ('a : value_or_null) . 'a t @ local -> 'a option
 (** [peek_opt q] returns the first element in queue [q], without removing
    it from the queue, or returns [None] if the queue is empty.
    @since 4.08 *)
 
-val top : ('a : value_or_null) . 'a t -> 'a
+val top : ('a : value_or_null) . 'a t @ local -> 'a
 (** [top] is a synonym for [peek]. *)
 
-val clear : ('a : value_or_null) . 'a t -> unit
+val clear : ('a : value_or_null) . 'a t @ local -> unit
 (** Discard all elements from a queue. *)
 
-val copy : ('a : value_or_null) . 'a t -> 'a t
+val copy : ('a : value_or_null) . 'a t @ local -> 'a t
 (** Return a copy of the given queue. *)
 
-val is_empty : ('a : value_or_null) . 'a t -> bool
+val is_empty : ('a : value_or_null) . 'a t @ local -> bool
 (** Return [true] if the given queue is empty, [false] otherwise. *)
 
-val length : ('a : value_or_null) . 'a t -> int
+val length : ('a : value_or_null) . 'a t @ local -> int
 (** Return the number of elements in a queue. *)
 
-val iter : ('a : value_or_null) . ('a -> unit) -> 'a t -> unit
+val iter : ('a : value_or_null) . ('a -> unit) @ local -> 'a t @ local -> unit
 (** [iter f q] applies [f] in turn to all elements of [q],
    from the least recently entered to the most recently entered.
    The queue itself is unchanged. *)
 
 val fold : ('acc : value_or_null) ('a : value_or_null)
-  . ('acc -> 'a -> 'acc) -> 'acc -> 'a t -> 'acc
+  . ('acc -> 'a -> 'acc) @ local -> 'acc -> 'a t @ local -> 'acc
 (** [fold f accu q] is equivalent to [List.fold_left f accu l],
    where [l] is the list of [q]'s elements. The queue remains
    unchanged. *)
 
-val transfer : ('a : value_or_null) . 'a t -> 'a t -> unit
+val transfer : ('a : value_or_null) . 'a t @ local -> 'a t @ local -> unit
 (** [transfer q1 q2] adds all of [q1]'s elements at the end of
    the queue [q2], then clears [q1]. It is equivalent to the
    sequence [iter (fun x -> add x q2) q1; clear q1], but runs

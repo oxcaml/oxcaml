@@ -59,7 +59,7 @@ let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
              Asmgen.compile_implementation
                unix
                ~pipeline
-               ~sourcefile:(Some (Unit_info.original_source_file i.target))
+               ~sourcefile:(Some (Unit_info.source_file i.target))
                ~prefixname:(Unit_info.prefix i.target)
                ~ppf_dump:i.ppf_dump
                program;
@@ -91,7 +91,7 @@ let emit unix i =
   Compilenv.reset i.target;
   Asmgen.compile_implementation_linear unix
     (Unit_info.prefix i.target)
-    ~progname:(Unit_info.original_source_file i.target)
+    ~progname:(Unit_info.source_file i.target)
 
 type starting_point =
   | Parsing

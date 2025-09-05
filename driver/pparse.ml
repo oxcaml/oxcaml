@@ -182,19 +182,16 @@ let set_input_lexbuf ic =
   Location.input_lexbuf := Some lexbuf;
   lexbuf
 
-type 'a ast_result = { ast : 'a; source_file : string }
-
-let file_aux ~tool_name ~source_file inputfile (type a) parse_fun invariant_fun
-             (kind : a ast_kind) : a ast_result =
-  let { ast; source_file } =
+let file_aux ~tool_name ~sourcefile inputfile (type a) parse_fun invariant_fun
+             (kind : a ast_kind) : a =
+  let ast =
     let ast_magic = magic_of_kind kind in
     let (ic, is_ast_file) = open_and_check_magic inputfile ast_magic in
     let close_ic () = close_in ic in
     if is_ast_file then begin
-      let result =
+      let ast =
         Fun.protect ~finally:close_ic @@ fun () ->
-        let source_file = (input_value ic : string) in
-        Location.input_name := source_file;
+        Location.input_name := (input_value ic : string);
         begin match
           In_channel.with_open_bin !Location.input_name set_input_lexbuf
         with
@@ -204,37 +201,27 @@ let file_aux ~tool_name ~source_file inputfile (type a) parse_fun invariant_fun
         if !Clflags.unsafe then
           Location.prerr_warning (Location.in_file !Location.input_name)
             Warnings.Unsafe_array_syntax_without_parsing;
-        { ast = (input_value ic : a); source_file }
+        (input_value ic : a)
       in
-      if !Clflags.all_ppx = [] then invariant_fun result.ast;
+      if !Clflags.all_ppx = [] then invariant_fun ast;
       (* if all_ppx <> [], invariant_fun will be called by apply_rewriters *)
-      result
+      ast
     end else begin
       let lexbuf =
         Fun.protect ~finally:close_ic @@ fun () ->
         seek_in ic 0;
         set_input_lexbuf ic
       in
-      Location.init lexbuf source_file;
-      Profile.record_call "parser" (fun () ->
-        { ast = parse_fun lexbuf ; source_file })
+      Location.init lexbuf sourcefile;
+      Profile.record_call "parser" (fun () -> parse_fun lexbuf)
     end
   in
   Profile.record_call "-ppx" (fun () ->
-      { ast = apply_rewriters ~restore:false ~tool_name kind ast; source_file }
+      apply_rewriters ~restore:false ~tool_name kind ast
     )
 
 let file ~tool_name inputfile parse_fun ast_kind =
-  let { ast; source_file = _ } =
-    file_aux
-      ~tool_name
-      ~source_file:inputfile
-      inputfile
-      parse_fun
-      ignore
-      ast_kind
-  in
-  ast
+  file_aux ~tool_name ~sourcefile:inputfile inputfile parse_fun ignore ast_kind
 
 let report_error ppf = function
   | CannotRun cmd ->
@@ -251,19 +238,19 @@ let () =
       | _ -> None
     )
 
-let parse_file ~tool_name invariant_fun parse kind source_file =
-  Location.input_name := source_file;
-  let inputfile = preprocess source_file in
+let parse_file ~tool_name invariant_fun parse kind sourcefile =
+  Location.input_name := sourcefile;
+  let inputfile = preprocess sourcefile in
   Misc.try_finally
     (fun () ->
        Profile.record_call "parsing" @@ fun () ->
-       file_aux ~tool_name ~source_file inputfile parse invariant_fun kind)
+       file_aux ~tool_name ~sourcefile inputfile parse invariant_fun kind)
     ~always:(fun () -> remove_preprocessed inputfile)
 
-let parse_implementation ~tool_name source_file =
+let parse_implementation ~tool_name sourcefile =
   parse_file ~tool_name Ast_invariants.structure
-      (parse Structure) Structure source_file
+      (parse Structure) Structure sourcefile
 
-let parse_interface ~tool_name source_file =
+let parse_interface ~tool_name sourcefile =
   parse_file ~tool_name Ast_invariants.signature
-    (parse Signature) Signature source_file
+    (parse Signature) Signature sourcefile
