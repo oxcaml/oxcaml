@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@portable
+
 (** Signed integer values.
 
     These integers are {!Sys.int_size} bits wide

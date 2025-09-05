@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@portable
+
 (** Signed 16-bit integer values.
 
     These integers are {16} bits wide and use two's complement representation.
