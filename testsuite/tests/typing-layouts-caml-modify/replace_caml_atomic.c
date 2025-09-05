@@ -10,8 +10,8 @@
   CAMLextern void __real_caml_##name(arg_tys); \
   CAMLprim void __wrap_caml_##name(arg_tys)    \
   {                                            \
+    called_##name++;                           \
     __real_caml_##name(args);                  \
-    called_##name = true;                      \
   }
 
 TRACK(atomic_load, P(value ref), P(ref))
