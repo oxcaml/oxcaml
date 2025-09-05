@@ -294,16 +294,12 @@ let add_prologue_if_required (cfg : Cfg.t) ~f =
   match prologue_and_epilogue_blocks with
   | None -> ()
   | Some (prologue_label, epilogue_blocks) ->
-    let terminator_as_basic terminator =
-      { terminator with Cfg.desc = Cfg.Prologue }
-    in
     add_prologue ~prologue_label cfg;
     Label.Set.iter
       (fun label ->
         let block = Cfg.get_block_exn cfg label in
-        let terminator = terminator_as_basic block.terminator in
         DLL.add_end block.body
-          (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
+          (Cfg.make_instruction_from_copy block.terminator ~desc:Cfg.Epilogue
              ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
              ()))
       epilogue_blocks
