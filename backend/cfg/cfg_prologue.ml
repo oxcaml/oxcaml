@@ -320,25 +320,47 @@ let find_prologue_and_epilogues_at_entry (cfg_with_infos : Cfg_with_infos.t) =
     Label.Set.singleton cfg.entry_label, epilogue_blocks
   else Label.Set.empty, Label.Set.empty
 
+(* Add prologue at the start of the block, but after all the [Name_for_debugger]
+   instructions that refer to function parameters. Such operations always come
+   in a contiguous block (see selectgen). *)
+let add_prologue (cfg : Cfg.t) prologue_label =
+  let prologue_block = Cfg.get_block_exn cfg prologue_label in
+  let make_prologue_instruction ~(like : _ Cfg.instruction) =
+    Cfg.make_instruction_from_copy like ~desc:Cfg.Prologue
+      ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+      ()
+  in
+  let is_param_name_for_debugger (basic : Cfg.basic) =
+    match[@warning "-4"] basic with
+    | Op (Name_for_debugger { which_parameter; _ }) ->
+      Option.is_some which_parameter
+    | _ -> false
+  in
+  let not_param_name_for_debugger (i : Cfg.basic Cfg.instruction) =
+    not (is_param_name_for_debugger i.desc)
+  in
+  let next_instr =
+    DLL.find_cell_opt ~f:not_param_name_for_debugger prologue_block.body
+  in
+  match next_instr with
+  | None ->
+    let prologue_instruction =
+      make_prologue_instruction ~like:prologue_block.terminator
+    in
+    DLL.add_end prologue_block.body prologue_instruction
+  | Some next_instr ->
+    let prologue_instruction =
+      make_prologue_instruction ~like:(DLL.value next_instr)
+    in
+    DLL.insert_before next_instr prologue_instruction
+
 let add_prologue_if_required (cfg_with_infos : Cfg_with_infos.t) ~f =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
   let prologue_blocks, epilogue_blocks = f cfg_with_infos in
   let terminator_as_basic terminator =
     { terminator with Cfg.desc = Cfg.Prologue }
   in
-  Label.Set.iter
-    (fun prologue_label ->
-      let prologue_block = Cfg.get_block_exn cfg prologue_label in
-      let next_instr =
-        Option.value
-          (DLL.hd prologue_block.body)
-          ~default:(terminator_as_basic prologue_block.terminator)
-      in
-      DLL.add_begin prologue_block.body
-        (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
-           ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
-           ()))
-    prologue_blocks;
+  Label.Set.iter (add_prologue cfg) prologue_blocks;
   Label.Set.iter
     (fun label ->
       let block = Cfg.get_block_exn cfg label in
