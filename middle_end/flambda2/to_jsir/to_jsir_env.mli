@@ -62,8 +62,8 @@ type continuation =
     arity : int
   }
 
-(** Map a Flambda2 continuation to the address of the corresponding block as well the arity it is expecting.
-    Not to be used for continuations used as exception handlers
+(** Map a Flambda2 continuation to the address of the corresponding block as well the
+    arity it is expecting. Not to be used for continuations used as exception handlers
     (use [add_exn_handler]). *)
 val add_continuation : t -> Continuation.t -> Jsir.Addr.t -> arity:int -> t
 
