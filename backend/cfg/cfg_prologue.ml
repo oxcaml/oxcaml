@@ -731,12 +731,28 @@ let add_instr_on_edge ~(src : Label.t) ~(dst : Label.t)
     in
     assert (List.length inserted_blocks = 1)
 
+module Edge = struct
+  module T = struct
+    type t = Label.t * Label.t
+
+    let compare (left_src, left_dst) (right_src, right_dst) =
+      let c = Label.compare left_src right_src in
+      if c <> 0 then c else Label.compare left_dst right_dst
+  end
+
+  include T
+  module Set = Set.Make (T)
+end
+
 let find_prologue_and_epilogues_alt (cfg_with_infos : Cfg_with_infos.t) =
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let terminator_as_basic terminator =
+    { terminator with Cfg.desc = Cfg.Prologue }
+  in
   if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
        ~fun_num_stack_slots:cfg.fun_num_stack_slots
-  then
+  then (
     (* Find intersection of backwards and forwards analysis *)
     let backward = Path_no_more_prologue.build cfg in
     let forward = Path_needs_prologue.build cfg in
@@ -749,41 +765,118 @@ let find_prologue_and_epilogues_alt (cfg_with_infos : Cfg_with_infos.t) =
     in
     let blocks = Label.Tbl.copy cfg.blocks in
     let forward, backward = adjusted_forward, adjusted_backward in
-    Label.Tbl.iter
-      (fun label block ->
-        let predecessors = Label.Set.of_list (Cfg.predecessor_labels block) in
-        let successors = Cfg.successor_labels block ~normal:true ~exn:true in
-        if Path_needs_prologue.needs_prologue forward label
-           && Path_no_more_prologue.needs_prologue backward label
-        then (
-          Label.Set.iter
-            (fun p ->
-              if (not (Path_needs_prologue.needs_prologue forward p))
-                 && Path_no_more_prologue.needs_prologue backward p
-              then
-                (* Adding a prologue on the edge from [p] to [label] *)
-                add_instr_on_edge ~src:p ~dst:label cfg_with_layout Cfg.Prologue)
-            predecessors;
-          if Label.Set.is_empty successors
-             && Instruction_requirements.terminator block.Cfg.terminator
-                  cfg.fun_name
-                = Instruction_requirements.Requires_no_prologue
+    let prologue_edges, epilogue_edges =
+      Label.Tbl.fold
+        (fun label block (prol, epil) ->
+          let predecessors = Label.Set.of_list (Cfg.predecessor_labels block) in
+          let successors = Cfg.successor_labels block ~normal:true ~exn:true in
+          if Path_needs_prologue.needs_prologue forward label
+             && Path_no_more_prologue.needs_prologue backward label
           then
-            DLL.add_end block.Cfg.body
-              (Cfg.make_instruction_from_copy block.Cfg.terminator
-                 ~desc:Cfg.Epilogue
-                 ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
-                 ())
-          else
-            Label.Set.iter
-              (fun succ ->
-                if Path_needs_prologue.needs_prologue forward succ
-                   && not (Path_no_more_prologue.needs_prologue backward succ)
-                then
-                  add_instr_on_edge ~src:label ~dst:succ cfg_with_layout
-                    Cfg.Epilogue)
-              successors))
-      blocks
+            let prol =
+              Label.Set.fold
+                (fun p acc ->
+                  if (not (Path_needs_prologue.needs_prologue forward p))
+                     && Path_no_more_prologue.needs_prologue backward p
+                  then (p, label) :: acc
+                  else acc)
+                predecessors prol
+            in
+            if Label.Set.is_empty successors
+               && Instruction_requirements.terminator block.Cfg.terminator
+                    cfg.fun_name
+                  = Instruction_requirements.Requires_no_prologue
+            then (
+              DLL.add_end block.Cfg.body
+                (Cfg.make_instruction_from_copy block.Cfg.terminator
+                   ~desc:Cfg.Epilogue
+                   ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+                   ());
+              prol, epil)
+            else
+              ( prol,
+                Label.Set.fold
+                  (fun succ acc ->
+                    if Path_needs_prologue.needs_prologue forward succ
+                       && not
+                            (Path_no_more_prologue.needs_prologue backward succ)
+                    then (label, succ) :: acc
+                    else acc)
+                  successors epil )
+          else prol, epil)
+        blocks ([], [])
+    in
+    let epilogue_edges = ref (Edge.Set.of_list epilogue_edges) in
+    let q = Queue.of_seq (Edge.Set.to_seq !epilogue_edges) in
+    while not (Queue.is_empty q) do
+      let _, dst = Queue.take q in
+      (* If all predecessors of dst have an epilogue, move epilogue down *)
+      let dst_block = Cfg.get_block_exn cfg dst in
+      let preds = Cfg.predecessor_labels dst_block in
+      let succs = Cfg.successor_labels dst_block ~normal:true ~exn:true in
+      if Label.Set.cardinal succs <= List.length preds
+         && List.for_all (fun p -> Edge.Set.mem (p, dst) !epilogue_edges) preds
+      then (
+        List.iter
+          (fun p -> epilogue_edges := Edge.Set.remove (p, dst) !epilogue_edges)
+          preds;
+        if Label.Set.is_empty succs
+        then
+          let next_instr = terminator_as_basic dst_block.terminator in
+          DLL.add_end dst_block.body
+            (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Epilogue
+               ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+               ())
+        else
+          Label.Set.iter
+            (fun succ ->
+              epilogue_edges := Edge.Set.add (dst, succ) !epilogue_edges;
+              Queue.add (dst, succ) q)
+            succs)
+    done;
+    let prologue_edges = ref (Edge.Set.of_list prologue_edges) in
+    let q = Queue.of_seq (Edge.Set.to_seq !prologue_edges) in
+    while not (Queue.is_empty q) do
+      let src, _ = Queue.take q in
+      (* If all successors of src have a prologue, move prologue up *)
+      let src_block = Cfg.get_block_exn cfg src in
+      let succs = Cfg.successor_labels src_block ~normal:true ~exn:true in
+      let preds = Cfg.predecessor_labels src_block in
+      if Label.Set.cardinal succs >= List.length preds
+         && Label.Set.for_all
+              (fun succ -> Edge.Set.mem (src, succ) !prologue_edges)
+              succs
+      then (
+        Label.Set.iter
+          (fun succ ->
+            prologue_edges := Edge.Set.remove (src, succ) !prologue_edges)
+          succs;
+        if List.length preds > 0
+        then
+          List.iter
+            (fun p ->
+              prologue_edges := Edge.Set.add (p, src) !prologue_edges;
+              Queue.add (p, src) q)
+            preds
+        else
+          let next_instr =
+            Option.value (DLL.hd src_block.body)
+              ~default:(terminator_as_basic src_block.terminator)
+          in
+          DLL.add_begin src_block.body
+            (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
+               ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+               ()))
+    done;
+    Edge.Set.iter
+      (fun (src, dst) ->
+        add_instr_on_edge ~src ~dst cfg_with_layout Cfg.Epilogue)
+      !epilogue_edges;
+    Edge.Set.iter
+      (fun (src, dst) ->
+        add_instr_on_edge ~src ~dst cfg_with_layout Cfg.Prologue)
+      !prologue_edges;
+    ())
 
 let find_prologue_and_epilogues_at_entry (cfg_with_infos : Cfg_with_infos.t) =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
