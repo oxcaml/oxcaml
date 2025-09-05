@@ -178,7 +178,7 @@ let request_of_json context =
          (Locate (Some path, ml_or_mli choice, mandatory_position pos, None)))
   | `String "jump" :: `String target :: pos ->
     request (Query (Jump (target, mandatory_position pos)))
-  | [ `String "outline" ] -> request (Query Outline)
+  | [ `String "outline" ] -> request (Query (Outline { include_types = true }))
   | [ `String "shape"; pos ] -> request (Query (Shape (pos_of_json pos)))
   | [ `String "occurrences"; `String "ident"; `String "at"; jpos ] ->
     request (Query (Occurrences (`Ident_at (pos_of_json jpos), `Buffer)))

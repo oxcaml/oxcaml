@@ -156,7 +156,8 @@ let dump (type a) : a t -> json =
         ("hint-pattern-variable", `Bool hint_pattern_var);
         ("avoid-ghost-location", `Bool ghost)
       ]
-  | Outline -> mk "outline" []
+  | Outline { include_types } ->
+    mk "outline" [ ("include-types", `Bool include_types) ]
   | Errors { lexing; parsing; typing } ->
     let args =
       if lexing && parsing && typing then []
@@ -502,7 +503,7 @@ let json_of_response (type a) (query : a t) (response : a) : json =
         ]
     in
     `List [ assoc; `List (List.map ~f:Json.string strs) ]
-  | Outline, outlines -> `List (json_of_outline outlines)
+  | Outline _, outlines -> `List (json_of_outline outlines)
   | Shape _, shapes -> `List (List.map ~f:json_of_shape shapes)
   | Inlay_hints _, result -> json_of_inlay_hints result
   | Errors _, errors -> `List (List.map ~f:json_of_error errors)

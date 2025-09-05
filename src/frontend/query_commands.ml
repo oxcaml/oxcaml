@@ -748,10 +748,10 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
       | _ :: _ -> raise Construct.Not_a_hole
       | [] -> raise No_nodes
     end
-  | Outline ->
+  | Outline { include_types } ->
     let typer = Mpipeline.typer_result pipeline in
     let browse = Mbrowse.of_typedtree (Mtyper.get_typedtree typer) in
-    Outline.get [ Browse_tree.of_browse browse ]
+    Outline.get ~include_types [ Browse_tree.of_browse browse ]
   | Shape pos ->
     let typer = Mpipeline.typer_result pipeline in
     let browse = Mbrowse.of_typedtree (Mtyper.get_typedtree typer) in

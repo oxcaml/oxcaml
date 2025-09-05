@@ -258,7 +258,7 @@ type _ t =
   | Inlay_hints :
       Msource.position * Msource.position * bool * bool * bool
       -> (Lexing.position * string) list t
-  | Outline (* *) : outline t
+  | Outline (* *) : { include_types : bool } -> outline t
   | Shape (* *) : Msource.position -> shape list t
   | Errors (* *) : error_filter -> Location.error list t
   | Dump : Std.json list -> Std.json t
