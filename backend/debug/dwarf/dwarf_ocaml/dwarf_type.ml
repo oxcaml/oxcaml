@@ -122,7 +122,7 @@ end = struct
   type t = d option
 
   let create type_name type_layout =
-    if !Dwarf_flags.ddwarf_shape_reduction_diags
+    if !Dwarf_flags.ddwarf_metrics
     then
       Some
         { type_name;
@@ -188,7 +188,7 @@ end = struct
     match d with
     | None -> ()
     | Some d ->
-      if !Dwarf_flags.ddwarf_shape_reduction_diags
+      if !Dwarf_flags.ddwarf_metrics
       then
         let diagnostic : DS.Diagnostics.variable_reduction =
           { shape_size_before_reduction_in_bytes =

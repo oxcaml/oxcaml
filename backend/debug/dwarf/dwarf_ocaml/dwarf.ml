@@ -166,7 +166,7 @@ let emit t ~basic_block_sections ~binary_backend_available =
     ~address_table:(DS.address_table t.state)
     ~location_list_table:(DS.location_list_table t.state)
     ~basic_block_sections ~binary_backend_available;
-  if !Dwarf_flags.ddwarf_shape_reduction_diags then emit_stats_file t
+  if !Dwarf_flags.ddwarf_metrics then emit_stats_file t
 
 let emit t ~basic_block_sections ~binary_backend_available =
   Profile.record "emit_dwarf"
