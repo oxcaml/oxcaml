@@ -81,13 +81,25 @@ let block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
     let expr, env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields in
     bind_expr_to_symbol ~env ~res symbol expr
 
-let immutable_float_block_or_array ~env ~res ~symbol values ~array_or_not =
+let immutable_int_array ~env ~res ~symbol ~values =
+  ignore (env, res, symbol, values);
+  failwith "hi"
+
+module type Float_by_bit_pattern = sig
+  type t
+
+  val to_bits : t -> int64
+end
+
+let immutable_float_block_or_array (type t)
+    (module F : Float_by_bit_pattern with type t = t) ~env ~res ~symbol
+    (values : t Or_variable.t list) ~array_or_not =
   let all_consts = List.for_all Or_variable.is_const values in
   if all_consts
   then
-    let f (x : 'a Or_variable.t) =
+    let f (x : F.t Or_variable.t) =
       match x with
-      | Const c -> Numeric_types.Float_by_bit_pattern.to_bits c
+      | Const c -> F.to_bits c
       | Var _ ->
         Misc.fatal_error
           "Found a variable in Or_variable.t, even though we check that all \
@@ -99,9 +111,9 @@ let immutable_float_block_or_array ~env ~res ~symbol values ~array_or_not =
     let values, res =
       List.fold_right
         (fun x (values, res) ->
-          match (x : Numeric_types.Float_by_bit_pattern.t Or_variable.t) with
+          match (x : F.t Or_variable.t) with
           | Const c ->
-            let bits = Numeric_types.Float_by_bit_pattern.to_bits c in
+            let bits = F.to_bits c in
             let var = Jsir.Var.fresh () in
             ( var :: values,
               To_jsir_result.add_instr_exn res
@@ -141,41 +153,38 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     (* Need SIMD *)
     static_const_not_supported ()
   | Immutable_float_block values ->
-    immutable_float_block_or_array ~env ~res ~symbol values
-      ~array_or_not:NotArray
+    immutable_float_block_or_array
+      (module Numeric_types.Float_by_bit_pattern)
+      ~env ~res ~symbol values ~array_or_not:NotArray
   | Immutable_float_array values ->
-    immutable_float_block_or_array ~env ~res ~symbol values ~array_or_not:Array
+    immutable_float_block_or_array
+      (module Numeric_types.Float_by_bit_pattern)
+      ~env ~res ~symbol values ~array_or_not:Array
   | Immutable_float32_array values ->
-    ignore values;
-    static_const_not_supported ()
-  | Immutable_int32_array values ->
-    ignore values;
-    static_const_not_supported ()
-  | Immutable_int64_array values ->
-    ignore values;
-    static_const_not_supported ()
-  | Immutable_nativeint_array values ->
-    ignore values;
-    static_const_not_supported ()
-  | Immutable_vec128_array values ->
-    ignore values;
-    static_const_not_supported ()
-  | Immutable_vec256_array values ->
-    ignore values;
-    static_const_not_supported ()
-  | Immutable_vec512_array values ->
-    ignore values;
-    static_const_not_supported ()
+    immutable_float_block_or_array
+      (module Numeric_types.Float32_by_bit_pattern)
+      ~env ~res ~symbol values ~array_or_not:Array
   | Immutable_value_array values ->
     block_or_array ~env ~res ~symbol ~tag:Tag.zero ~mut:Immutable
       ~array_or_not:Array values
+  | Immutable_int32_array values -> immutable_int_array ~env ~res symbol values
+  | Immutable_int64_array values ->
+    ignore values;
+    failwith "hi"
+  | Immutable_nativeint_array values ->
+    ignore values;
+    failwith "hi"
+  | Immutable_vec128_array _ | Immutable_vec256_array _
+  | Immutable_vec512_array _ ->
+    (* Need SIMD *)
+    static_const_not_supported ()
   | Empty_array kind -> (
     match kind with
-    | Values_or_immediates_or_naked_floats | Naked_float32s ->
+    | Values_or_immediates_or_naked_floats | Naked_float32s | Naked_int32s
+    | Naked_int64s | Naked_nativeints ->
       bind_expr_to_symbol ~env ~res symbol
         (Prim (Extern "caml_make_vect", [Pc (Int Targetint.zero); Pc Null]))
-    | Unboxed_products | Naked_int32s | Naked_int64s | Naked_nativeints
-    | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+    | Unboxed_products | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
       (* No SIMD *)
       static_const_not_supported ())
   | Mutable_string { initial_value } ->
