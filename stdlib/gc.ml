@@ -204,13 +204,6 @@ module Memprof =
         ?(callstack_size = max_int)
         tracker =
         c_start sampling_rate callstack_size tracker
-
-      let start'
-        (_ : Domain.Safe.DLS.Access.t)
-        ~sampling_rate
-        ?(callstack_size = max_int)
-        tracker =
-        c_start sampling_rate callstack_size tracker
     end
 
     external participate : t -> unit @@ portable = "caml_memprof_participate"

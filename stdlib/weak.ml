@@ -20,7 +20,7 @@ open! Stdlib
 
 (** Weak array operations *)
 
-type !'a t
+type !'a t : mutable_data with 'a
 
 external create : int -> 'a t @@ portable = "caml_weak_create"
 

@@ -23,7 +23,7 @@ open! Stdlib
 
 (** {1 Low-level functions} *)
 
-type !'a t
+type !'a t : mutable_data with 'a
 (** The type of arrays of weak pointers (weak arrays).  A weak
    pointer is a value that the garbage collector may erase whenever
    the value is not used any more (through normal pointers) by the
