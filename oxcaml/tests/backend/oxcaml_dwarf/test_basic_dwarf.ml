@@ -12,11 +12,6 @@ let _ = f_bool true
 
 let _ = f_bool false
 
-(* CR sspies: Integer signedness issue in DWARF output - negative integers are
-   displayed as large unsigned values instead of their proper signed values. For
-   example, (-42) shows as 9223372036854775766 and min_int shows as a large
-   positive number instead of a negative value. This makes debugging confusing
-   when working with negative integers. *)
 let[@inline never] [@local never] f_int (x : int) = x
 
 let _ = f_int 0
@@ -120,7 +115,6 @@ let _ = f_string "hello world!"
 let _ = f_string "a"
 
 let _ = f_string "special chars: \n\t\""
-(* CR sspies: debugger shows the newline as an actual line break in output *)
 
 let _ = f_string "unicode: αβγ"
 
