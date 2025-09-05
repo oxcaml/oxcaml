@@ -84,4 +84,32 @@ value boxed_float32_stub(value v) {
 
 ## Int8 / Int16
 
-Coming soon.
+When small numbers are enabled, the following types are available:
+```
+int8
+int8#
+int16
+int16#
+```
+
+Literals use `s` for `int8` and `S` for `int16`:
+```
+42s  : int8
+#42s : int8#
+42S  : int16
+#42S : int16#
+```
+
+### Operations
+
+Operations on small integers are available via the `Stdlib_stable.Int8`,
+`Stdlib_stable.Int8_u`, `Stdlib_stable.Int16`, and `Stdlib_stable.Int16_u`
+libraries.
+
+### Representation
+
+Coming soon
+
+### Small int arrays
+
+Coming soon
