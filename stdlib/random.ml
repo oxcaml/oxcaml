@@ -342,7 +342,8 @@ let mk_default () =
            (-8591268803865043407L)
            6388613595849772044L
 
-(* CR-someday mslater: switch to FLS *)
+(* CR-soon mslater: switch to TLS to remove thread unsafety *)
+(* CR-someday mslater: switch to FLS to remove magic *)
 let random_key =
   DLS.new_key
     ~split_from_parent:(fun s ->

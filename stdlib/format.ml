@@ -1032,7 +1032,8 @@ and str_formatter = formatter_of_buffer stdbuf
 
 (* Initialise domain local state *)
 
-(* CR-someday mslater: switch to FLS *)
+(* CR-soon mslater: switch to TLS to remove thread unsafety *)
+(* CR-someday mslater: switch to FLS to remove magic *)
 module DLS = struct 
   let new_key = Domain.Safe.DLS.new_key
   let get = Obj.magic_portable Domain.DLS.get

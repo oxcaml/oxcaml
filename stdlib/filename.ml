@@ -338,7 +338,8 @@ module DLS = Domain.Safe.DLS
 module Rng : sig
   val bits : unit -> int
 end = struct
-  (* CR-someday mslater: switch to FLS *)
+  (* CR-soon mslater: switch to TLS to remove thread unsafety *)
+  (* CR-someday mslater: switch to FLS to remove magic *)
   let key = DLS.new_key Random.State.make_self_init
   let[@inline] bits () = Random.State.bits (Obj.magic_uncontended (DLS.get key))
 end
