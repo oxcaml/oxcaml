@@ -472,6 +472,12 @@ let char ~maybe_hash lit =
   | "" -> CHAR (lit)
   | unexpected -> fatal_error ("expected # or empty string: " ^ unexpected)
 
+let skip_hash ~maybe_hash =
+  match maybe_hash with
+  | "#" -> 1
+  | "" -> 0
+  | unexpected -> fatal_error ("expected # or empty string: " ^ unexpected)
+
 (* Error report *)
 
 open Format
@@ -706,13 +712,16 @@ rule token = parse
       { char ~maybe_hash (char_for_backslash c) }
   | ('#'? as maybe_hash)
     "\'\\" ['0'-'9'] ['0'-'9'] ['0'-'9'] "\'"
-      { char ~maybe_hash (char_for_decimal_code lexbuf 2) }
+      { char ~maybe_hash
+          (char_for_decimal_code lexbuf (2 + skip_hash ~maybe_hash)) }
   | ('#'? as maybe_hash)
     "\'\\" 'o' ['0'-'7'] ['0'-'7'] ['0'-'7'] "\'"
-      { char ~maybe_hash (char_for_octal_code lexbuf 3) }
+      { char ~maybe_hash
+        (char_for_octal_code lexbuf (3 + skip_hash ~maybe_hash)) }
   | ('#'? as maybe_hash)
     "\'\\" 'x' ['0'-'9' 'a'-'f' 'A'-'F'] ['0'-'9' 'a'-'f' 'A'-'F'] "\'"
-      { char ~maybe_hash (char_for_hexadecimal_code lexbuf 3) }
+      { char ~maybe_hash
+        (char_for_hexadecimal_code lexbuf (3 + skip_hash ~maybe_hash)) }
   | '#'? "\'" ("\\" [^ '#'] as esc)
       { error lexbuf (Illegal_escape (esc, None)) }
   | '#'? "\'\'"
