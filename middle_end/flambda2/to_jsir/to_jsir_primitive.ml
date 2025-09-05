@@ -336,15 +336,13 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     )
   | Array_load (kind, load_kind, _mut) -> (
     match kind, load_kind with
-    | ( (Immediates | Values | Naked_floats | Naked_float32s),
-        (Immediates | Values | Naked_floats | Naked_float32s) ) ->
+    | ( ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
+        | Naked_int64s | Naked_nativeints ),
+        ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
+        | Naked_int64s | Naked_nativeints ) ) ->
       use_prim' Array_get
-    | ( ( Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-        | Naked_vec256s | Naked_vec512s | Unboxed_product _ ),
-        _ )
-    | ( _,
-        ( Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-        | Naked_vec256s | Naked_vec512s ) ) ->
+    | (Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _), _
+    | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
       (* No SIMD *)
       primitive_not_supported ())
   | String_or_bigstring_load (value, width) ->
@@ -516,8 +514,10 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   match f with
   | Array_set (kind, set_kind) -> (
     match kind, set_kind with
-    | ( (Immediates | Values | Naked_floats | Naked_float32s),
-        (Immediates | Values _ | Naked_floats | Naked_float32s) ) ->
+    | ( ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
+        | Naked_int64s | Naked_nativeints ),
+        ( Immediates | Values _ | Naked_floats | Naked_float32s | Naked_int32s
+        | Naked_int64s | Naked_nativeints ) ) ->
       let arr, res =
         match prim_arg ~env ~res x with
         | Pv v, res -> v, res
@@ -528,12 +528,8 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       ( None,
         env,
         To_jsir_result.add_instr_exn res (Array_set (arr, index, new_value)) )
-    | ( ( Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-        | Naked_vec256s | Naked_vec512s | Unboxed_product _ ),
-        _ )
-    | ( _,
-        ( Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-        | Naked_vec256s | Naked_vec512s ) ) ->
+    | (Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _), _
+    | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
       (* No SIMD *)
       primitive_not_supported ())
   | Bytes_or_bigstring_set (value, width) ->
