@@ -116,13 +116,12 @@ module Llvm_typ = struct
 
   let of_machtyp_component (c : Cmm.machtype_component) =
     match c with
-    | Addr | Int ->
-      i64
-      (* Cfg allows vals to be assigned to ints and vice versa, so we do this to
-         make LLVM happy for now.
-
-         Update: well,,,, about that. *)
+    | Int -> i64
     | Val -> val_ptr
+    | Addr ->
+      val_ptr
+      (* We interpret [Addr]s as [val_ptr]s to let the RS4GC pass in LLVM to
+         handle derived pointers for us. *)
     | Float -> double
     | Float32 -> float
     | Vec128 | Vec256 | Vec512 | Valx2 ->
@@ -206,6 +205,10 @@ module Llvm_value = struct
 
   let poison = Immediate "poison"
 
+  let imm_int i = Immediate (Int.to_string i)
+
+  let local_ident i = Local_ident i
+
   let pp_t ppf t =
     let open Format in
     match t with
@@ -270,7 +273,8 @@ type t =
     mutable emit_exn_intrinsic_decls : bool;
         (* Whether to emit declarations / definitions for intrinsics / wrapper
            functions involved in generating try blocks *)
-    mutable c_call_wrappers : c_call_wrapper String.Map.t
+    mutable c_call_wrappers : c_call_wrapper String.Map.t;
+    mutable stack_offset : int
   }
 
 let create_fun_info ~fun_name ~fun_has_try ~fun_ret_type =
@@ -300,7 +304,8 @@ let create ~llvmir_filename ~ppf_dump =
     referenced_symbols = String.Set.empty;
     called_functions = String.Map.empty;
     emit_exn_intrinsic_decls = false;
-    c_call_wrappers = String.Map.empty
+    c_call_wrappers = String.Map.empty;
+    stack_offset = 0
   }
 
 let reset_fun_info t ~fun_name ~fun_has_try ~fun_ret_type =
@@ -385,6 +390,12 @@ let add_c_call_wrapper t c_fun_name ~args ~res =
   t.c_call_wrappers
     <- String.Map.add wrapper_name { c_fun_name; args; res } t.c_call_wrappers;
   wrapper_name
+
+let reject_addr_regs (regs : Reg.t array) =
+  if Array.to_list regs
+     |> List.map (fun (reg : Reg.t) -> Cmm.is_addr reg.typ)
+     |> List.fold_left ( || ) false
+  then Misc.fatal_error "Llvmize: shouldn't have an addr reg here!"
 
 (* Runtime registers are passed explicitly as arguments to and returned from all
    OCaml functions. They have LLVM type ptr. *)
@@ -600,12 +611,9 @@ module F = struct
   let ins_conv t op ~src ~dst ~src_typ ~dst_typ =
     ins_conv' t op ~src:(Llvm_value.Local_ident src) ~dst ~src_typ ~dst_typ
 
-  let ins_binop t op arg1 arg2 res typ =
-    ins t "%a = %s %a %a, %a" pp_ident res op Llvm_typ.pp_t typ pp_ident arg1
-      pp_ident arg2
-
-  let ins_binop_imm t op arg imm res typ =
-    ins t "%a = %s %a %a, %s" pp_ident res op Llvm_typ.pp_t typ pp_ident arg imm
+  let ins_binop t op ~arg1 ~arg2 ~res typ =
+    ins t "%a = %s %a %a, %a" pp_ident res op Llvm_typ.pp_t typ Llvm_value.pp_t
+      arg1 Llvm_value.pp_t arg2
 
   let ins_unary_op t op arg res typ =
     ins t "%a = %s %a %a" pp_ident res op Llvm_typ.pp_t typ pp_ident arg
@@ -646,6 +654,13 @@ module F = struct
     ins t "%a = insertelement %a %a, %a %a, %a %a" pp_ident res Llvm_typ.pp_t
       dst_typ Llvm_value.pp_t dst Llvm_typ.pp_t src_typ Llvm_value.pp_t src
       Llvm_typ.pp_t idx_typ Llvm_value.pp_t idx
+
+  let ins_getelementptr t ~arg ~ptr_typ ~res typ idxs =
+    ins t "%a = getelementptr %a, %a %a, %a" pp_ident res Llvm_typ.pp_t typ
+      Llvm_typ.pp_t ptr_typ pp_ident arg
+      (pp_print_list ~pp_sep:pp_comma (fun ppf (typ, v) ->
+           fprintf ppf "%a %a" Llvm_typ.pp_t typ Llvm_value.pp_t v))
+      idxs
 
   (* Auxiliary function to passing non-local-identifier arguments (like poison
      or global idents). *)
@@ -732,10 +747,16 @@ module F = struct
 
   let do_offset ?(int_typ = Llvm_typ.i64) ~(src : Llvm_typ.t)
       ~(dst : Llvm_typ.t) t ident offset =
-    let int_ident = cast ~src ~dst:int_typ t ident in
-    let offset_ident = fresh_ident t in
-    ins_binop_imm t "add" int_ident (Int.to_string offset) offset_ident int_typ;
-    cast ~src:int_typ ~dst t offset_ident
+    if offset = 0
+    then cast ~src ~dst t ident
+    else
+      let int_ident = cast ~src ~dst:int_typ t ident in
+      let offset_ident = fresh_ident t in
+      ins_binop t "add"
+        ~arg1:(Llvm_value.local_ident int_ident)
+        ~arg2:(Llvm_value.imm_int offset)
+        ~res:offset_ident int_typ;
+      cast ~src:int_typ ~dst t offset_ident
 
   let load_reg_to_temp t reg =
     let temp = fresh_ident t in
@@ -771,20 +792,25 @@ module F = struct
   (* This tells the frametable printer in LLVM to adjust its frame size
      appropriately. This is because it doesn't properly track trap blocks (which
      count as "dynamic objects" on the stack). Note that we multiply by 2 since
-     our trap blocks are 4 words wide as opposed to 2 for the normal compiler.
-     We also assume the normal stack offset is 0 (a violation will get caught
-     since we fail at Stackoffset) *)
-  let statepoint_id_attr_for_stack_adjustment ?(offset = 0)
+     our trap blocks are 4 words wide as opposed to 2 for the normal compiler
+     (without frame pointers). OCaml functions aren't supposed to pass arguments
+     via the stack, but C calls might, so we need to account for [Stackoffset]
+     instructions *)
+  let statepoint_id_attr_for_stack_adjustment ?(offset = 0) t
       (i : 'a Cfg.instruction) =
-    asprintf {|"statepoint-id"="%d"|} ((i.stack_offset * 2) + offset)
+    ins t "; stack offset -- instr: %d; cfg: %d; llvmize: %d" i.stack_offset
+      t.stack_offset offset;
+    asprintf {|"statepoint-id"="%d"|}
+      (((i.stack_offset - t.stack_offset) * 2) + offset)
 
   (* Load the address as an ident with type ptr *)
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
     let offset = Arch.addressing_displacement_for_llvmize addr in
-    let reg_typ = Llvm_typ.of_machtyp_component i.arg.(n).typ in
-    let typ = if Llvm_typ.is_ptr reg_typ then reg_typ else Llvm_typ.ptr in
+    let typ = Llvm_typ.of_machtyp_component i.arg.(n).typ in
+    if not (Llvm_typ.is_ptr typ)
+    then Misc.fatal_error "Llvmize.load_addr: unexpected address operand";
     let arg = load_reg_to_temp t i.arg.(n) in
-    typ, do_offset ~src:reg_typ ~dst:typ t arg offset
+    typ, do_offset ~src:typ ~dst:typ t arg offset
 
   let int_comp t (comp : Operation.integer_comparison) (i : 'a Cfg.instruction)
       ~imm =
@@ -858,7 +884,9 @@ module F = struct
     | Ieventest ->
       let is_odd = odd_test t i in
       let is_even = fresh_ident t in
-      ins_binop_imm t "xor" is_odd "1" is_even Llvm_typ.bool;
+      ins_binop t "xor"
+        ~arg1:(Llvm_value.local_ident is_odd)
+        ~arg2:(Llvm_value.imm_int 1) ~res:is_even Llvm_typ.bool;
       is_even
 
   let not_implemented_aux print_ins ?msg i =
@@ -1042,13 +1070,15 @@ module F = struct
          (including RBP) being callee-saved, the presence of different sized
          alloca's in different branches (which happens if there are any try
          blocks due to [Pushtrap]) causes LLVM to emit code using RBP as a frame
-         pointer in such a function. And, unfortunately, LLVM doesn't save RBP
-         in that case (perhaps because it is handled specially), so we have to
-         do it ourselves ._. *)
+         pointer in such a function. And, unfortunately, LLVM doesn't respect
+         our calling conventions and save RBP in that case (perhaps because it
+         is handled specially), so we have to do it ourselves ._. *)
       let should_save_rbp = t.current_fun_info.fun_has_try && not tail in
       if should_save_rbp
       then ins t {|call void asm sideeffect "push %%rbp", "~{rsp}"()|};
-      let statepoint_id = statepoint_id_attr_for_stack_adjustment ~offset:8 i in
+      let statepoint_id =
+        statepoint_id_attr_for_stack_adjustment ~offset:8 t i
+      in
       ins_call ~attrs:statepoint_id ~tail ~cc:Ocaml ~pp_name t fn args
         (Some (res_type, res_ident));
       if should_save_rbp
@@ -1143,7 +1173,7 @@ module F = struct
     let make_ocaml_c_call caml_c_call_symbol args res_types =
       add_referenced_symbol t caml_c_call_symbol;
       add_referenced_symbol t func_symbol;
-      let statepoint_id = statepoint_id_attr_for_stack_adjustment i in
+      let statepoint_id = statepoint_id_attr_for_stack_adjustment t i in
       call_simple ~attrs:statepoint_id ~cc:Ocaml_c_call ~pp_name:pp_global t
         caml_c_call_symbol args res_types
       (* CR yusumez: Record frame table here *)
@@ -1285,7 +1315,7 @@ module F = struct
           Llvm_typ.i64;
         let exn_payload = load_reg_to_temp t i.arg.(0) in
         add_referenced_symbol t "caml_raise_exn";
-        let statepoint_id = statepoint_id_attr_for_stack_adjustment i in
+        let statepoint_id = statepoint_id_attr_for_stack_adjustment t i in
         call_simple ~attrs:statepoint_id ~cc:Ocaml ~pp_name:pp_global t
           "caml_raise_exn"
           [ ( Llvm_typ.of_machtyp_component i.arg.(0).typ,
@@ -1296,7 +1326,7 @@ module F = struct
       | Raise_reraise ->
         let exn_payload = load_reg_to_temp t i.arg.(0) in
         add_referenced_symbol t "caml_reraise_exn";
-        let statepoint_id = statepoint_id_attr_for_stack_adjustment i in
+        let statepoint_id = statepoint_id_attr_for_stack_adjustment t i in
         call_simple ~attrs:statepoint_id ~cc:Ocaml ~pp_name:pp_global t
           "caml_reraise_exn"
           [ ( Llvm_typ.of_machtyp_component i.arg.(0).typ,
@@ -1317,16 +1347,20 @@ module F = struct
       let is_eq = float_comp t Cmm.CFeq i typ in
       ins_branch_cond t is_eq eq uo
     | Call { op; label_after } ->
+      reject_addr_regs i.arg;
       call t i op;
       ins_branch t label_after
     | Prim { op; label_after } -> (
+      reject_addr_regs i.arg;
       match op with
       | Probe _ -> not_implemented_terminator ~msg:"probe" i
       | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
         extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
         ins_branch t label_after)
     | Tailcall_self { destination } -> ins_branch t destination
-    | Tailcall_func op -> call ~tail:true t i op
+    | Tailcall_func op ->
+      reject_addr_regs i.arg;
+      call ~tail:true t i op
     | Call_no_return { func_symbol; alloc; stack_ofs; stack_align; _ } ->
       extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
       ins_unreachable t
@@ -1337,22 +1371,34 @@ module F = struct
 
   let int_op t (i : Cfg.basic Cfg.instruction)
       (op : Operation.integer_operation) ~imm =
-    let typ = Llvm_typ.i64 in
+    let reject_addr () =
+      if Cmm.is_addr i.res.(0).typ
+      then Misc.fatal_error "Llvmize: unexpected addr operand"
+    in
     let do_binop op_name =
+      reject_addr ();
+      let typ = Llvm_typ.i64 in
       match imm with
       | None ->
-        let arg1 = cast_and_load_reg_to_temp t typ i.arg.(0) in
-        let arg2 = cast_and_load_reg_to_temp t typ i.arg.(1) in
+        let arg1 =
+          cast_and_load_reg_to_temp t typ i.arg.(0) |> Llvm_value.local_ident
+        in
+        let arg2 =
+          cast_and_load_reg_to_temp t typ i.arg.(1) |> Llvm_value.local_ident
+        in
         let res = fresh_ident t in
-        ins_binop t op_name arg1 arg2 res typ;
-        res
+        ins_binop t op_name ~arg1 ~arg2 ~res typ;
+        typ, res
       | Some n ->
-        let arg = cast_and_load_reg_to_temp t typ i.arg.(0) in
+        let arg =
+          cast_and_load_reg_to_temp t typ i.arg.(0) |> Llvm_value.local_ident
+        in
         let res = fresh_ident t in
-        ins_binop_imm t op_name arg (string_of_int n) res typ;
-        res
+        ins_binop t op_name ~arg1:arg ~arg2:(Llvm_value.imm_int n) ~res typ;
+        typ, res
     in
     let do_unary_intrinsic op_name =
+      reject_addr ();
       let typ = Llvm_typ.i64 in
       let arg = load_reg_to_temp t i.arg.(0) in
       let res = fresh_ident t in
@@ -1360,12 +1406,44 @@ module F = struct
         (op_name ^ "." ^ Llvm_typ.to_string typ)
         [typ, Llvm_value.Local_ident arg]
         (Some (typ, res));
-      res
+      typ, res
     in
-    let res =
+    let do_gep ~negate_arg =
+      let ptr_typ = Llvm_typ.of_machtyp_component i.arg.(0).typ in
+      let base_ptr = load_reg_to_temp t i.arg.(0) in
+      let offset =
+        match imm with
+        | None ->
+          let temp =
+            cast_and_load_reg_to_temp t Llvm_typ.i64 i.arg.(1)
+            |> Llvm_value.local_ident
+          in
+          if negate_arg
+          then (
+            let res = fresh_ident t in
+            ins_binop t "sub" ~arg1:(Llvm_value.imm_int 0) ~arg2:temp ~res
+              Llvm_typ.i64;
+            Llvm_value.local_ident res)
+          else temp
+        | Some n ->
+          let n = if negate_arg then -n else n in
+          Llvm_value.Immediate (Int.to_string n)
+      in
+      let res = fresh_ident t in
+      ins_getelementptr t ~arg:base_ptr ~ptr_typ Llvm_typ.bool ~res
+        [Llvm_typ.i64, offset];
+      ptr_typ, res
+    in
+    let typ, res =
       match op with
-      | Iadd -> do_binop "add"
-      | Isub -> do_binop "sub"
+      | Iadd ->
+        if Cmm.is_addr i.res.(0).typ
+        then do_gep ~negate_arg:false
+        else do_binop "add"
+      | Isub ->
+        if Cmm.is_addr i.res.(0).typ
+        then do_gep ~negate_arg:true
+        else do_binop "sub"
       | Imul -> do_binop "mul"
       | Imulh { signed } ->
         (* Assuming operands are i64 *)
@@ -1379,19 +1457,22 @@ module F = struct
         let arg1 = Llvm_value.Local_ident (load_reg_to_temp t i.arg.(0)) in
         let arg2 =
           match imm with
-          | None -> Llvm_value.Local_ident (load_reg_to_temp t i.arg.(1))
-          | Some n -> Llvm_value.Immediate (string_of_int n)
+          | None -> Llvm_value.local_ident (load_reg_to_temp t i.arg.(1))
+          | Some n -> Llvm_value.imm_int n
         in
-        let arg1_ext = extend_value arg1 in
-        let arg2_ext = extend_value arg2 in
+        let arg1_ext = extend_value arg1 |> Llvm_value.local_ident in
+        let arg2_ext = extend_value arg2 |> Llvm_value.local_ident in
         let res_ext = fresh_ident t in
-        ins_binop t "mul" arg1_ext arg2_ext res_ext Llvm_typ.i128;
+        ins_binop t "mul" ~arg1:arg1_ext ~arg2:arg2_ext ~res:res_ext
+          Llvm_typ.i128;
         let shifted = fresh_ident t in
-        ins_binop_imm t "lshr" res_ext (string_of_int 64) shifted Llvm_typ.i128;
+        ins_binop t "lshr"
+          ~arg1:(Llvm_value.local_ident res_ext)
+          ~arg2:(Llvm_value.imm_int 64) ~res:shifted Llvm_typ.i128;
         let res = fresh_ident t in
         ins_conv t "trunc" ~src:shifted ~dst:res ~src_typ:Llvm_typ.i128
           ~dst_typ:Llvm_typ.i64;
-        res
+        Llvm_typ.i64, res
       | Idiv -> do_binop "sdiv"
       | Imod -> do_binop "srem"
       | Iand -> do_binop "and"
@@ -1405,8 +1486,8 @@ module F = struct
         (* convert i1 -> i64 *)
         let int_res = fresh_ident t in
         ins_conv t "zext" ~src:bool_res ~dst:int_res ~src_typ:Llvm_typ.bool
-          ~dst_typ:typ;
-        int_res
+          ~dst_typ:Llvm_typ.i64;
+        Llvm_typ.i64, int_res
       | Iclz _ -> do_unary_intrinsic "ctlz"
       | Ictz _ -> do_unary_intrinsic "cttz"
       | Ipopcnt -> do_unary_intrinsic "ctpop"
@@ -1419,10 +1500,10 @@ module F = struct
       match width with Float32 -> Llvm_typ.float | Float64 -> Llvm_typ.double
     in
     let do_binop op_name =
-      let arg1 = load_reg_to_temp t i.arg.(0) in
-      let arg2 = load_reg_to_temp t i.arg.(1) in
+      let arg1 = load_reg_to_temp t i.arg.(0) |> Llvm_value.local_ident in
+      let arg2 = load_reg_to_temp t i.arg.(1) |> Llvm_value.local_ident in
       let res = fresh_ident t in
-      ins_binop t op_name arg1 arg2 res typ;
+      ins_binop t op_name ~arg1 ~arg2 ~res typ;
       res
     in
     let res =
@@ -1658,7 +1739,7 @@ module F = struct
       let extend_int op typ =
         let temp = fresh_ident t in
         let temp2 = fresh_ident t in
-        ins_load t ~src ~dst:temp typ;
+        ins_load t ~ptr_typ ~src ~dst:temp typ;
         ins_conv t op ~src:temp ~dst:temp2 ~src_typ:typ ~dst_typ:Llvm_typ.i64;
         cast_and_store_into_reg t Llvm_typ.i64 temp2 i.res.(0)
       in
@@ -1719,7 +1800,9 @@ module F = struct
     | Intop_imm (op, n) -> int_op t i op ~imm:(Some n)
     | Floatop (width, op) -> float_op t i width op
     | Stackoffset n ->
-      if n <> 0 then Misc.fatal_error "Llvmize: stack arguments not supported"
+      t.stack_offset <- t.stack_offset + n
+      (* if n <> 0 then Misc.fatal_error "Llvmize: stack arguments not
+         supported" *)
     | Begin_region ->
       let local_sp_addr = load_domainstate_addr t Domain_local_sp in
       let local_sp = fresh_ident t in
@@ -1737,8 +1820,9 @@ module F = struct
         let local_sp = fresh_ident t in
         let new_local_sp = fresh_ident t in
         ins_load t ~src:local_sp_ptr ~dst:local_sp Llvm_typ.i64;
-        ins_binop_imm t "sub" local_sp (Int.to_string bytes) new_local_sp
-          Llvm_typ.i64;
+        ins_binop t "sub"
+          ~arg1:(Llvm_value.local_ident local_sp)
+          ~arg2:(Llvm_value.imm_int bytes) ~res:new_local_sp Llvm_typ.i64;
         ins_store t ~src:new_local_sp ~dst:local_sp_ptr Llvm_typ.i64;
         (* Check if new_local_sp exceeds local_limit *)
         let local_limit_ptr = load_domainstate_addr t Domain_local_limit in
@@ -1770,7 +1854,10 @@ module F = struct
         let local_top = fresh_ident t in
         let new_local_sp_addr = fresh_ident t in
         ins_load t ~src:local_top_ptr ~dst:local_top Llvm_typ.i64;
-        ins_binop t "add" new_local_sp local_top new_local_sp_addr Llvm_typ.i64;
+        ins_binop t "add"
+          ~arg1:(Llvm_value.local_ident new_local_sp)
+          ~arg2:(Llvm_value.local_ident local_top)
+          ~res:new_local_sp_addr Llvm_typ.i64;
         let res =
           do_offset ~src:Llvm_typ.i64 ~dst:Llvm_typ.val_ptr t new_local_sp_addr
             8
@@ -1781,8 +1868,9 @@ module F = struct
         let alloc_ptr = fresh_ident t in
         let new_alloc_ptr = fresh_ident t in
         ins_load t ~src:allocation_ident ~dst:alloc_ptr Llvm_typ.i64;
-        ins_binop_imm t "sub" alloc_ptr (Int.to_string bytes) new_alloc_ptr
-          Llvm_typ.i64;
+        ins_binop t "sub"
+          ~arg1:(Llvm_value.local_ident alloc_ptr)
+          ~arg2:(Llvm_value.imm_int bytes) ~res:new_alloc_ptr Llvm_typ.i64;
         ins_store t ~src:new_alloc_ptr ~dst:allocation_ident Llvm_typ.i64;
         (* Check if we exceeded the limit *)
         let domain_young_limit =
@@ -1812,7 +1900,7 @@ module F = struct
         add_called_fun t "caml_call_gc" ~cc:Ocaml
           ~args:[Llvm_typ.ptr; Llvm_typ.ptr]
           ~res:(Some (make_ret_type []));
-        let statepoint_id = statepoint_id_attr_for_stack_adjustment i in
+        let statepoint_id = statepoint_id_attr_for_stack_adjustment t i in
         call_simple ~attrs:(statepoint_id ^ " cold") ~cc:Ocaml
           ~pp_name:pp_global t "caml_call_gc" [] []
         |> ignore;
@@ -2091,19 +2179,19 @@ let open_out ~asm_filename =
   let t = get_current_compilation_unit "open_out" in
   t.asm_filename <- Some asm_filename
 
-let fun_attrs _t codegen_options =
-  (* CR yusumez: We'd like to propagate [@inline never] or [@cold] attributes
-     through, but this should be fine now? *)
-  let default_attrs = ["noinline"] in
-  default_attrs
-  @ List.concat_map
+let fun_attrs t codegen_options =
+  let exn_attrs = if t.current_fun_info.fun_has_try then ["noinline"] else [] in
+  let codegen_attrs =
+    List.concat_map
       (fun opt ->
         match (opt : Cfg.codegen_option) with
-        | Cfg.Cold -> ["cold"]
+        | Cfg.Cold -> ["cold"; "noinline"]
         | Reduce_code_size | No_CSE | Use_linscan_regalloc | Use_regalloc _
         | Use_regalloc_param _ | Assume_zero_alloc _ | Check_zero_alloc _ ->
           [] (* CR gyorsh: translate and communicate to llvm backend *))
       codegen_options
+  in
+  exn_attrs @ codegen_attrs |> List.sort_uniq String.compare
 
 let collect_body_regs cfg =
   Cfg.fold_blocks cfg
@@ -2236,6 +2324,7 @@ let cfg (cl : CL.t) =
            then arg, Some (fresh_ident t)
            else arg, None)
   in
+  reject_addr_regs fun_args;
   let pp_block label =
     let block = Label.Tbl.find blocks label in
     let preds = Cfg.predecessor_labels block in

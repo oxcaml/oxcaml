@@ -1138,5 +1138,10 @@ let is_int (m : machtype_component) =
   | Int -> true
   | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
 
+let is_addr (m : machtype_component) =
+  match m with
+  | Addr -> true
+  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+
 let is_exn_handler (flag : ccatch_flag) =
   match flag with Exn_handler -> true | Normal | Recursive -> false

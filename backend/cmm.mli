@@ -734,4 +734,6 @@ val is_val : machtype_component -> bool
 
 val is_int : machtype_component -> bool
 
+val is_addr : machtype_component -> bool
+
 val is_exn_handler : ccatch_flag -> bool
