@@ -90,7 +90,8 @@ let rec print_struct_const = function
   | Const_base(Const_unboxed_float32 f) -> print_float f
   | Const_base(Const_string (s, _, _)) -> printf "%S" s
   | Const_immstring s -> printf "%S" s
-  | Const_base(Const_char c) -> printf "%C" c
+  | Const_base(Const_char c)
+  | Const_base(Const_untagged_char c) -> printf "%C" c
   | Const_base(Const_int32 i)
   | Const_base(Const_unboxed_int32 i) -> printf "%ldl" i
   | Const_base(Const_nativeint i)
