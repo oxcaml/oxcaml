@@ -116,6 +116,14 @@ let select_operation_bmi2 ~dbg:_ op args =
 
 let select_operation_sse ~dbg op args =
   match op with
+  | "caml_sse_load_aligned" -> 
+    sse_or_avx movapd_X_Xm128 vmovapd_X_Xm128 (List.rev args)
+  | "caml_sse_load_unaligned" -> 
+    sse_or_avx movupd_X_Xm128 vmovupd_X_Xm128 (List.rev args)
+  | "caml_sse_store_aligned" -> 
+    sse_or_avx movapd_Xm128_X vmovapd_Xm128_X args
+  | "caml_sse_store_unaligned" -> 
+    sse_or_avx movupd_Xm128_X vmovupd_Xm128_X args
   | "caml_sse_float32_sqrt" | "sqrtf" ->
     seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss args
   | "caml_simd_float32_max" | "caml_sse_float32_max" ->
@@ -579,6 +587,10 @@ let select_operation_avx ~dbg:_ op args =
   then None
   else
     match op with
+    | "caml_avx_load_aligned" -> instr vmovapd_Y_Ym256 (List.rev args)
+    | "caml_avx_load_unaligned" -> instr vmovupd_Y_Ym256 (List.rev args)
+    | "caml_avx_store_aligned" -> instr vmovapd_Ym256_Y args
+    | "caml_avx_store_unaligned" -> instr vmovupd_Ym256_Y args
     | "caml_avx_float64x4_add" -> instr vaddpd_Y_Y_Ym256 args
     | "caml_avx_float32x8_add" -> instr vaddps_Y_Y_Ym256 args
     | "caml_avx_float32x8_addsub" -> instr vaddsubps_Y_Y_Ym256 args
