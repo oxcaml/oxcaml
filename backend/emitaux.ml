@@ -431,7 +431,7 @@ module Dwarf_helpers = struct
 
   let sourcefile_for_dwarf = ref None
 
-  let ppf_dump = ref Format.std_formatter
+  let ppf_dump = ref Format.err_formatter
 
   let begin_dwarf ~code_begin ~code_end ~file_emitter =
     match !sourcefile_for_dwarf with
