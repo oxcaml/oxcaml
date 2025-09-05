@@ -8,14 +8,7 @@
                 "tmmintrin.h": "c",
                 "pmmintrin.h": "c",
                 "*.tbl": "c",
-                "platform.h": "c",
-                "optional": "c",
-                "system_error": "c",
-                "array": "c",
-                "functional": "c",
-                "tuple": "c",
-                "type_traits": "c",
-                "utility": "c"
+                "platform.h": "c"
         },
         "[ocaml]": {
                 "editor.defaultFormatter": "ocamllabs.ocaml-platform",
