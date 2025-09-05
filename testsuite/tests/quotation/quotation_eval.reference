@@ -1,14 +1,21 @@
 
-Test 0
+Test simple eval
 Output: 42
 
-Test 1
+Test complex return type
 Output: [42; 43]
 
-Test 2
+Test side effects
+Compiling...
+Outside
+Running...
+Inside
+Done
+
+Test reference to global
 Output: Hello world!
 
-Test 3
-Output: This quote should fail to compile. If it's started working then you need
-to come up with a new way for this test to pass type-checking but fail
-to compile.
+Test late compilation error
+Output: This quote should fail to compile. If it's started working but you
+aren't running quotes through transl then you may need to find a new way
+to trigger this.
