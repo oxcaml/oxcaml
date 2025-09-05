@@ -29,14 +29,6 @@
 open! Flambda.Import
 open! Jsoo_imports.Import
 
-(* CR selee: we should eventually get rid of this *)
-let unsupported_multiple_return_variables vars =
-  match vars with
-  | [var] -> var
-  | [] -> Misc.fatal_error "Found return statement with no arguments"
-  | _ :: _ ->
-    Misc.fatal_error "Multiple return variables are currently unsupported."
-
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
 let create_let_simple ~env ~res fvar simple =
@@ -239,7 +231,10 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
             let env, res =
               match Continuation_handler.is_exn_handler handler with
               | false ->
-                let env = To_jsir_env.add_continuation env k addr in
+                let env =
+                  To_jsir_env.add_continuation env k addr
+                    ~arity:(List.length params)
+                in
                 (* CR selee: we keep the environment because we need the symbols
                    defined there, but really there should be a way to flush
                    variables out of the environment to respect flambda scoping
@@ -288,17 +283,22 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
             "Recursive continuation bindings cannot involve exception \
              handlers:@ %a"
             Let_cont.print e;
-        let domain = Flambda.Continuation_handlers.domain conts in
+        let conts = Flambda.Continuation_handlers.to_map conts in
         let env, res =
           (* See explanation in [To_jsir_static_const.code]: we first reserve
              addresses representing each continuation, so that mutually
              recursive continuations can refer to them. *)
-          List.fold_left
-            (fun (env, res) k ->
-              let res, addr = To_jsir_result.reserve_address res in
-              let env = To_jsir_env.add_continuation env k addr in
-              env, res)
-            (env, res) domain
+          Continuation.Lmap.fold
+            (fun k handler (env, res) ->
+              Continuation_handler.pattern_match handler
+                ~f:(fun params ~handler:_ ->
+                  let res, addr = To_jsir_result.reserve_address res in
+                  let env =
+                    To_jsir_env.add_continuation env k addr
+                      ~arity:(Bound_parameters.cardinal params)
+                  in
+                  env, res))
+            conts (env, res)
         in
         let env, res = expr ~env ~res body in
         let res =
@@ -310,14 +310,15 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                     To_jsir_shared.bound_parameters ~env
                       (Bound_parameters.append invariant_params params)
                   in
-                  let addr = To_jsir_env.get_continuation_exn env k in
+                  let ({ addr; arity = _ } : To_jsir_env.continuation) =
+                    To_jsir_env.get_continuation_exn env k
+                  in
                   let res =
                     To_jsir_result.new_block_with_addr_exn res ~params ~addr
                   in
                   let _env, res = expr ~env ~res cont_body in
                   res))
-            (Flambda.Continuation_handlers.to_map conts)
-            res
+            conts res
         in
         env, res)
 
@@ -412,9 +413,32 @@ and apply_expr ~env ~res e =
     if Continuation.equal (To_jsir_env.return_continuation env) cont
     then env, To_jsir_result.end_block_with_last_exn res (Return return_var)
     else
-      let addr = To_jsir_env.get_continuation_exn env cont in
+      let ({ addr; arity } : To_jsir_env.continuation) =
+        To_jsir_env.get_continuation_exn env cont
+      in
+      let return_vars, res =
+        match arity with
+        | 0 -> [], res
+        | 1 -> [return_var], res
+        | _ as arity ->
+          let return_vars = List.init arity (fun i -> i, Jsir.Var.fresh ()) in
+          let res =
+            List.fold_left
+              (fun res (i, var) ->
+                let field : Jsir.expr =
+                  (* CR selee: [Non_float] is ok for javascript because it
+                     doesn't change anything (see
+                     [js_of_ocaml/compiler/lib/generate.ml]), but will need
+                     changing for WASM. *)
+                  Field (return_var, i, Non_float)
+                in
+                To_jsir_result.add_instr_exn res (Let (var, field)))
+              res return_vars
+          in
+          List.map snd return_vars, res
+      in
       ( env,
-        To_jsir_result.end_block_with_last_exn res (Branch (addr, [return_var]))
+        To_jsir_result.end_block_with_last_exn res (Branch (addr, return_vars))
       )
 
 and apply_cont0 ~env ~res apply_cont =
@@ -456,12 +480,29 @@ and apply_cont0 ~env ~res apply_cont =
       in
       Stop, res
     | Return ->
-      let arg = unsupported_multiple_return_variables args in
+      let arg, res =
+        match args with
+        | [arg] -> arg, res
+        | [] ->
+          (* We have to return something - we will ignore this at the
+             application site. *)
+          let arg = Jsir.Var.fresh () in
+          arg, To_jsir_result.add_instr_exn res (Let (arg, Constant Null))
+        | _ :: _ as args ->
+          (* We box these back into a regular tuple - we will unbox this at the
+             application site. *)
+          let args = Array.of_list args in
+          let block : Jsir.expr = Block (0, args, NotArray, Immutable) in
+          let arg = Jsir.Var.fresh () in
+          arg, To_jsir_result.add_instr_exn res (Let (arg, block))
+      in
       Return arg, res
     | Normal_or_exn -> (
       match raise_kind_and_exn_handler with
       | None ->
-        let addr = To_jsir_env.get_continuation_exn env continuation in
+        let ({ addr; arity = _ } : To_jsir_env.continuation) =
+          To_jsir_env.get_continuation_exn env continuation
+        in
         Jsir.Branch (addr, args), res
       | Some (raise_kind, exn_handler) ->
         let raise_kind =
