@@ -742,6 +742,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
      mark the code as escaping. *)
   let is_opaque = Code_metadata.is_opaque code_metadata in
   let code_dep = Acc.find_code acc code_id in
+  Graph.add_code_id_my_closure (Acc.graph acc) code_id my_closure;
   let maybe_opaque var = if is_opaque then Variable.rename var else var in
   let return = List.map maybe_opaque code_dep.return in
   let exn = maybe_opaque code_dep.exn in
