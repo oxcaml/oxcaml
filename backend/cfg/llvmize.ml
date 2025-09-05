@@ -804,13 +804,12 @@ module F = struct
       (((i.stack_offset - t.stack_offset) * 2) + offset)
 
   (* Load the address as an ident with type ptr *)
-  let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
+  let load_addr t (addr : Arch.addressing_mode) (i : _ Cfg.instruction) n =
     let offset = Arch.addressing_displacement_for_llvmize addr in
-    let typ = Llvm_typ.of_machtyp_component i.arg.(n).typ in
-    if not (Llvm_typ.is_ptr typ)
-    then Misc.fatal_error "Llvmize.load_addr: unexpected address operand";
+    let reg_typ = Llvm_typ.of_machtyp_component i.arg.(n).typ in
+    let typ = if Llvm_typ.is_ptr reg_typ then reg_typ else Llvm_typ.ptr in
     let arg = load_reg_to_temp t i.arg.(n) in
-    typ, do_offset ~src:typ ~dst:typ t arg offset
+    typ, do_offset ~src:reg_typ ~dst:typ t arg offset
 
   let int_comp t (comp : Operation.integer_comparison) (i : 'a Cfg.instruction)
       ~imm =
@@ -1782,7 +1781,7 @@ module F = struct
         let temp = load_reg_to_temp t i.arg.(0) in
         let truncated = fresh_ident t in
         ins_conv t trunc_op ~src:temp ~dst:truncated ~src_typ:reg_typ ~dst_typ;
-        ins_store t ~src:truncated ~dst dst_typ
+        ins_store ~ptr_typ t ~src:truncated ~dst dst_typ
       in
       match chunk with
       | Word_int | Word_val -> basic Llvm_typ.i64
@@ -2302,6 +2301,8 @@ let cfg (cl : CL.t) =
       } =
     cfg
   in
+  if String.is_substring fun_name ~substring:"am_i_llvmize"
+  then Misc.fatal_error "Llvmize: yes, you are llvmize!";
   let fun_has_try =
     DLL.exists layout ~f:(fun label ->
         (Label.Tbl.find blocks label).is_trap_handler)

@@ -926,10 +926,14 @@ val caml_modify : dbg:Debuginfo.t -> expression -> expression -> expression
 val caml_modify_local :
   dbg:Debuginfo.t -> expression -> expression -> expression -> expression
 
-(** [direct_call ty f_code args] creates a direct call to the function code
-    [f_code] with arguments [args], with a return value of type [ty].
+(** [direct_call f_code args] creates a direct call to the function code
+    [f_code] with arguments [args].
 
-    If a closure needs to be passed, it must be included in [args]. *)
+    If a closure needs to be passed, it must be included in [args].
+    
+    [callsite_types] refer to the types we
+    expect to get passed or return in the callsite, while [funcdef_types] are
+    for where the function is defined. *)
 val direct_call :
   dbg:Debuginfo.t ->
   callsite_types:func_call_sig ->

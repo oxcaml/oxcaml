@@ -274,6 +274,12 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let result_arity = Code_metadata.result_arity code_metadata in
     if not (C.check_arity params_arity args)
     then Misc.fatal_errorf "Wrong arity for direct call";
+    let insert_val_to_args_if cond ({ args; res } : Cmm.func_call_sig) :
+        Cmm.func_call_sig =
+      if cond
+      then { args = args @ [Cmm.Extended_machtype.typ_val]; res }
+      else { args; res }
+    in
     let funcdef_types : Cmm.func_call_sig =
       { args =
           List.map C.extended_machtype_of_kind
@@ -283,9 +289,11 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
             (Flambda_arity.unarized_components result_arity)
           |> Array.of_list |> Misc.Stdlib.Array.concat_arrays
       }
+      |> insert_val_to_args_if (Code_metadata.is_my_closure_used code_metadata)
     in
     let callsite_types : Cmm.func_call_sig =
       { args = args_ty; res = return_ty }
+      |> insert_val_to_args_if (Code_metadata.is_my_closure_used code_metadata)
     in
     let args =
       if Code_metadata.is_my_closure_used code_metadata
