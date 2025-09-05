@@ -335,7 +335,7 @@ let mk_ddwarf_metrics f =
   ( "-ddwarf-metrics",
     Arg.Unit f,
     " Write DWARF metrics to auxiliary JSON file .debug-stats.json, which can \
-      then be aggregated with the analyze_debug_stats.py Python script." )
+     then be aggregated with the analyze_debug_stats.py Python script." )
 
 let mk_internal_assembler f =
   ( "-internal-assembler",
@@ -1282,9 +1282,7 @@ module Oxcaml_options_impl = struct
   let dranges = set' Oxcaml_flags.dranges
   let ddebug_invariants = set' Dwarf_flags.ddebug_invariants
   let ddwarf_types = set' Dwarf_flags.ddwarf_types
-
   let ddwarf_metrics = set' Dwarf_flags.ddwarf_metrics
-
   let heap_reduction_threshold x = Oxcaml_flags.heap_reduction_threshold := x
 
   let zero_alloc_check s =
