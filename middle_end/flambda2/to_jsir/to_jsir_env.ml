@@ -28,6 +28,11 @@
 
 open! Jsoo_imports.Import
 
+type continuation =
+  { addr : Jsir.Addr.t;
+    arity : int
+  }
+
 type exn_handler =
   { addr : Jsir.Addr.t;
     exn_param : Jsir.Var.t;
@@ -44,7 +49,7 @@ type t =
   { module_symbol : Symbol.t;
     return_continuation : Continuation.t;
     exn_continuation : Continuation.t;
-    continuations : Jsir.Addr.t Continuation.Map.t;
+    continuations : continuation Continuation.Map.t;
     exn_handlers : exn_handler Continuation.Map.t;
     vars : Jsir.Var.t Variable.Map.t;
     symbols : Jsir.Var.t Symbol.Map.t;
@@ -79,8 +84,10 @@ let exn_continuation t = t.exn_continuation
 let enter_function_body t ~return_continuation ~exn_continuation =
   { t with return_continuation; exn_continuation }
 
-let add_continuation t cont addr =
-  { t with continuations = Continuation.Map.add cont addr t.continuations }
+let add_continuation t cont addr ~arity =
+  { t with
+    continuations = Continuation.Map.add cont { addr; arity } t.continuations
+  }
 
 let add_exn_handler t cont ~addr ~exn_param ~extra_args =
   { t with
