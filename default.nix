@@ -173,6 +173,7 @@ myStdenv.mkDerivation {
   OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
 
   enableParallelBuilding = true;
+  separateDebugInfo = !dev;
 
   nativeBuildInputs =
     [
