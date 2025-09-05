@@ -1068,7 +1068,8 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
   | true
     when Label.Tbl.length cfg.blocks
-         <= !Oxcaml_flags.cfg_prologue_shrink_wrap_threshold ->
+         <= !Oxcaml_flags.cfg_prologue_shrink_wrap_threshold
+         && not Config.with_frame_pointers ->
     find_prologue_and_epilogues_alt cfg_with_infos
   | _ ->
     add_prologue_if_required cfg_with_infos
