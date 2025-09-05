@@ -186,6 +186,7 @@ myStdenv.mkDerivation {
       pkgs.which
       pkgs.parallel
       gfortran # Required for Bigarray Fortran tests
+      pkgs.llvm # llvm-objcopy is used for debuginfo
       upstream.ocamlformat_0_24_1 # required for make fmt
     ]
     ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
