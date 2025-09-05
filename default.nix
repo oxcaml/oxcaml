@@ -1,5 +1,5 @@
 {
-  nixpkgs ? import <nixpkgs> { },
+  pkgs ? import <nixpkgs> { },
   src ? ./.,
   addressSanitizer ? false,
   dev ? false,
@@ -16,7 +16,6 @@
   syntaxQuotations ? false,
 }:
 let
-  pkgs = nixpkgs.pkgs or nixpkgs;
   inherit (pkgs) lib fetchpatch;
 
   # Select stdenv based on whether asan is enabled
@@ -189,6 +188,7 @@ myStdenv.mkDerivation {
       pkgs.parallel
       gfortran # Required for Bigarray Fortran tests
       upstream.ocamlformat_0_24_1 # required for make fmt
+      pkgs.removeReferencesTo
     ]
     ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
     ++ lib.optional oxcamlLldb pkgs.python312;
@@ -220,6 +220,10 @@ myStdenv.mkDerivation {
       rm -f $out/bin/ocamlprof
       rm -f $out/lib/ocaml/expunge
     '';
+
+  postFixup = ''
+    remove-references-to -t ${dune} $out/lib/ocaml/Makefile.config
+  '';
 
   shellHook = ''
     export out="$(pwd)/_install"
