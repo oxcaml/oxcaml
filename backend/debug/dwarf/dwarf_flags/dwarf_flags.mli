@@ -83,7 +83,7 @@ val default_gdwarf_compression : string
 
 val gdwarf_compression : string ref
 
-val ddwarf_shape_reduction_diags : bool ref
+val ddwarf_metrics : bool ref
 
 (** Get the DWARF compression flag to pass to the C toolchain.
     Returns a flag of the form " -gz=<compression>" (note the leading space).

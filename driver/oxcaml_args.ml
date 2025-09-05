@@ -331,11 +331,11 @@ let mk_ddebug_invariants f =
 let mk_ddwarf_types f =
   ("-ddwarf-types", Arg.Unit f, " Enable debug output for DWARF type generation")
 
-let mk_ddwarf_shape_reduction_diags f =
-  ( "-ddwarf-shape-reduction-diags",
+let mk_ddwarf_metrics f =
+  ( "-ddwarf-metrics",
     Arg.Unit f,
-    " Write DWARF shape reduction diagnostics to auxiliary JSON file \
-     .debug-stats.json" )
+    " Write DWARF metrics to auxiliary JSON file .debug-stats.json, which can \
+      then be aggregated with the analyze_debug_stats.py Python script." )
 
 let mk_internal_assembler f =
   ( "-internal-assembler",
@@ -941,7 +941,7 @@ module type Oxcaml_options = sig
   val dranges : unit -> unit
   val ddebug_invariants : unit -> unit
   val ddwarf_types : unit -> unit
-  val ddwarf_shape_reduction_diags : unit -> unit
+  val ddwarf_metrics : unit -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : string -> unit
@@ -1071,7 +1071,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dranges F.dranges;
       mk_ddebug_invariants F.ddebug_invariants;
       mk_ddwarf_types F.ddwarf_types;
-      mk_ddwarf_shape_reduction_diags F.ddwarf_shape_reduction_diags;
+      mk_ddwarf_metrics F.ddwarf_metrics;
       mk_ocamlcfg F.ocamlcfg;
       mk_no_ocamlcfg F.no_ocamlcfg;
       mk_dcfg F.dcfg;
@@ -1283,8 +1283,7 @@ module Oxcaml_options_impl = struct
   let ddebug_invariants = set' Dwarf_flags.ddebug_invariants
   let ddwarf_types = set' Dwarf_flags.ddwarf_types
 
-  let ddwarf_shape_reduction_diags =
-    set' Dwarf_flags.ddwarf_shape_reduction_diags
+  let ddwarf_metrics = set' Dwarf_flags.ddwarf_metrics
 
   let heap_reduction_threshold x = Oxcaml_flags.heap_reduction_threshold := x
 
@@ -1685,8 +1684,7 @@ module Extra_params = struct
     | "dranges" -> set' Oxcaml_flags.dranges
     | "ddebug-invariants" -> set' Dwarf_flags.ddebug_invariants
     | "ddwarf-types" -> set' Dwarf_flags.ddwarf_types
-    | "ddwarf-shape-reduction-diags" ->
-        set' Dwarf_flags.ddwarf_shape_reduction_diags
+    | "ddwarf-metrics" -> set' Dwarf_flags.ddwarf_metrics
     | "reorder-blocks-random" ->
         set_int_option' Oxcaml_flags.reorder_blocks_random
     | "basic-block-sections" -> set' Oxcaml_flags.basic_block_sections
