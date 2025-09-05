@@ -1,11 +1,9 @@
 (* TEST
- modules = "replace_caml_modify.c";
+ modules = "replace_caml_atomic.c";
  {
    not-macos;
    arch_amd64;
-   flags = "-cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify \
-            -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify_local \
-            -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_load \
+   flags = "-cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_load \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_load_field \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_exchange \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_exchange_field \
