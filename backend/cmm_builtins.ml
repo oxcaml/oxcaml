@@ -963,7 +963,8 @@ let transl_builtin name args dbg typ_res =
   | "caml_int32_unsigned_to_int_trunc_unboxed_to_untagged" ->
     Some (zero_extend ~bits:32 ~dbg (one_arg name args))
   | "caml_csel_value" | "caml_csel_int_untagged" | "caml_csel_int64_unboxed"
-  | "caml_csel_int32_unboxed" | "caml_csel_nativeint_unboxed" ->
+  | "caml_csel_int32_unboxed" | "caml_csel_int16_unboxed"
+  | "caml_csel_int8_unboxed" | "caml_csel_nativeint_unboxed" ->
     (* Unboxed float variant of csel intrinsic is not currently supported. It
        can be emitted on arm64 using FCSEL, but there appears to be no
        corresponding instruction on amd64 for xmm registers. *)
