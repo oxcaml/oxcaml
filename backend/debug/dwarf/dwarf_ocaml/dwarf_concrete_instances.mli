@@ -17,6 +17,6 @@ val for_fundecl :
   Dwarf_state.t ->
   Linear.fundecl ->
   fun_end_label:Asm_targets.Asm_label.t ->
-  Available_ranges_vars.t ->
+  Available_ranges_all_vars.t ->
   Inlined_frame_ranges.t ->
   unit

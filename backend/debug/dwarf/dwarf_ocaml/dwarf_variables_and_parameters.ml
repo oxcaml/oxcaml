@@ -19,7 +19,7 @@ open! Int_replace_polymorphic_compare
 open! Asm_targets
 open! Dwarf_low
 open! Dwarf_high
-module ARV = Available_ranges_vars
+module ARAV = Available_ranges_all_vars
 module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 module L = Linear
@@ -80,13 +80,171 @@ let reg_location_description reg ~offset ~need_rvalue :
   | None -> None
   | Some simple_loc_desc -> Some (Simple simple_loc_desc)
 
+(* Helper functions for phantom variable DIE references *)
+let die_location_of_variable_lvalue state var ~proto_dies_for_vars =
+  match proto_dies_for_variable var ~proto_dies_for_vars with
+  | None -> None
+  | Some { value_die_lvalue; _ } ->
+    let location =
+      SLDL.Lvalue.location_from_another_die ~die_label:value_die_lvalue
+        ~compilation_unit_header_label:(DS.compilation_unit_header_label state)
+    in
+    Some location
+
+let die_location_of_variable_rvalue state var ~proto_dies_for_vars =
+  match proto_dies_for_variable var ~proto_dies_for_vars with
+  | None -> None
+  | Some { value_die_lvalue; _ } ->
+    (* For rvalues, we reference the same DIE but the debugger knows to evaluate
+       it as an rvalue *)
+    let location =
+      SLDL.Rvalue.location_from_another_die ~die_label:value_die_lvalue
+        ~compilation_unit_header_label:(DS.compilation_unit_header_label state)
+    in
+    Some location
+
+(* Phantom variables are always immutable, so we emit lvalue descriptions for
+   consistency with normal variables, and emit rvalue descriptions only when
+   required. *)
+let rec phantom_var_location_description state
+    ~(defining_expr : Linear.phantom_defining_expr) ~need_rvalue
+    ~proto_dies_for_vars ~parent : location_description option =
+  let module SLD = Simple_location_description in
+  let lvalue lvalue = Some (Simple (SLDL.compile (SLDL.of_lvalue lvalue))) in
+  let lvalue_without_address lvalue =
+    Some (Simple (SLDL.compile (SLDL.of_lvalue_without_address lvalue)))
+  in
+  let rvalue rvalue = Some (Simple (SLDL.compile (SLDL.of_rvalue rvalue))) in
+  match defining_expr with
+  | Lphantom_const_int i ->
+    let i = SLDL.Rvalue.signed_int_const i in
+    if need_rvalue
+    then rvalue i
+    else lvalue_without_address (SLDL.Lvalue_without_address.of_rvalue i)
+  | Lphantom_const_symbol symbol ->
+    let symbol = SLDL.Rvalue.const_symbol (Asm_symbol.create symbol) in
+    if need_rvalue
+    then rvalue symbol
+    else lvalue_without_address (SLDL.Lvalue_without_address.of_rvalue symbol)
+  | Lphantom_read_symbol_field { sym; field } ->
+    let symbol = Asm_symbol.create sym in
+    let field = Targetint.of_int field in
+    if need_rvalue
+    then rvalue (SLDL.Rvalue.read_symbol_field symbol ~field)
+    else lvalue (SLDL.Lvalue.in_symbol_field symbol ~field)
+  | Lphantom_var var -> (
+    if (* Variables referenced by phantom lets may themselves become unavailable
+          at certain program points. We wrap the location description in a
+          composite location description (with only one piece) so GDB correctly
+          detects unavailability rather than producing a stack underflow
+          error. *)
+       need_rvalue
+    then
+      match die_location_of_variable_rvalue state var ~proto_dies_for_vars with
+      | None -> None
+      | Some rvalue ->
+        let location = SLDL.compile (SLDL.of_rvalue rvalue) in
+        let composite =
+          Composite_location_description.pieces_of_simple_location_descriptions
+            [location, arch_size_addr]
+        in
+        Some (Composite composite)
+    else
+      match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
+      | None -> None
+      | Some lvalue ->
+        let location = SLDL.compile (SLDL.of_lvalue lvalue) in
+        let composite =
+          Composite_location_description.pieces_of_simple_location_descriptions
+            [location, arch_size_addr]
+        in
+        Some (Composite composite))
+  | Lphantom_read_field { var; field } ->
+    (* For now, show field access as unavailable since we cannot dereference
+       values built with implicit pointers. *)
+    None
+  | Lphantom_offset_var { var; offset_in_words } -> (
+    match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
+    | None -> None
+    | Some location ->
+      let offset_in_words = Targetint.of_int_exn offset_in_words in
+      if need_rvalue
+      then None
+      else lvalue (SLDL.Lvalue.offset_pointer location ~offset_in_words))
+  | Lphantom_block { tag; fields } ->
+    (* A phantom block construction: instead of the block existing in the target
+       program's address space, it is going to be conjured up in the debugger's
+       address space using DWARF instructions. References between such blocks
+       use "implicit pointers" rather than normal pointers in the target's
+       address space. *)
+    let header =
+      (* Create a proper OCaml block header with the tag and field count *)
+      let header_value =
+        Cmm_helpers.black_block_header tag (List.length fields)
+      in
+      SLDL.compile
+        (SLDL.of_rvalue
+           (SLDL.Rvalue.signed_int_const
+              (Targetint.of_int64 (Int64.of_nativeint header_value))))
+    in
+    let header_size = arch_size_addr in
+    let field_size = arch_size_addr in
+    (* Process each field - get its rvalue location *)
+    let field_pieces =
+      List.map
+        (fun field_var ->
+          let simple_location_description =
+            match
+              die_location_of_variable_rvalue state field_var
+                ~proto_dies_for_vars
+            with
+            | None ->
+              (* This field isn't accessible - use empty location *)
+              []
+            | Some rvalue -> SLDL.compile (SLDL.of_rvalue rvalue)
+          in
+          simple_location_description, field_size)
+        fields
+    in
+    (* Combine header and fields into a composite location description *)
+    let all_pieces = (header, header_size) :: field_pieces in
+    let composite_location_description =
+      Composite_location_description.pieces_of_simple_location_descriptions
+        all_pieces
+    in
+    (* Create a Proto_die for the phantom block with the composite location,
+       then return an implicit pointer to it *)
+    let proto_die =
+      Proto_die.create ~parent ~tag:Variable
+        ~attribute_values:
+          [ DAH.create_composite_location_description
+              composite_location_description ]
+        ()
+    in
+    let offset_in_bytes = Targetint.zero in
+    let die_label = Proto_die.reference proto_die in
+    let version =
+      match !Dwarf_flags.gdwarf_version with
+      | Four -> Dwarf_version.four
+      | Five -> Dwarf_version.five
+    in
+    if need_rvalue
+    then
+      rvalue (SLDL.Rvalue.implicit_pointer ~offset_in_bytes ~die_label version)
+    else
+      lvalue_without_address
+        (SLDL.Lvalue_without_address.implicit_pointer ~offset_in_bytes
+           ~die_label version)
+
 let single_location_description state ~parent ~subrange ~proto_dies_for_vars
     ~need_rvalue =
   let location_description =
-    let subrange_info = ARV.Subrange.info subrange in
-    let reg = ARV.Subrange_info.reg subrange_info in
-    let offset = ARV.Subrange_info.offset subrange_info in
-    reg_location_description reg ~offset ~need_rvalue
+    match ARAV.Subrange.info subrange with
+    | Non_phantom { reg; offset } ->
+      reg_location_description reg ~offset ~need_rvalue
+    | Phantom defining_expr ->
+      phantom_var_location_description state ~defining_expr ~need_rvalue
+        ~proto_dies_for_vars ~parent
   in
   match location_description with
   | None -> None
@@ -103,13 +261,13 @@ type location_list_entry =
 let location_list_entry state ~subrange single_location_description :
     location_list_entry =
   let start_pos =
-    Asm_label.create_int Text (ARV.Subrange.start_pos subrange |> Label.to_int)
+    Asm_label.create_int Text (ARAV.Subrange.start_pos subrange |> Label.to_int)
   in
-  let start_pos_offset = ARV.Subrange.start_pos_offset subrange in
+  let start_pos_offset = ARAV.Subrange.start_pos_offset subrange in
   let end_pos =
-    Asm_label.create_int Text (ARV.Subrange.end_pos subrange |> Label.to_int)
+    Asm_label.create_int Text (ARAV.Subrange.end_pos subrange |> Label.to_int)
   in
-  let end_pos_offset = ARV.Subrange.end_pos_offset subrange in
+  let end_pos_offset = ARAV.Subrange.end_pos_offset subrange in
   match !Dwarf_flags.gdwarf_version with
   | Four ->
     let location_list_entry =
@@ -146,8 +304,8 @@ let location_list_entry state ~subrange single_location_description :
 
 let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
     (var : Backend_var.t) ~ident_for_type ~range =
-  let range_info = ARV.Range.info range in
-  let provenance = ARV.Range_info.provenance range_info in
+  let range_info = ARAV.Range.info range in
+  let provenance = ARAV.Range_info.provenance range_info in
   let (parent_proto_die : Proto_die.t), hidden =
     match provenance with
     | None ->
@@ -156,7 +314,7 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
       function_proto_die, true
     | Some _provenance -> function_proto_die, false
   in
-  let is_parameter = ARV.Range_info.is_parameter range_info in
+  let is_parameter = ARAV.Range_info.is_parameter range_info in
   let type_and_name_attributes =
     match type_die_reference_for_var var ~proto_dies_for_vars with
     | None -> []
@@ -192,7 +350,7 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
        of location lists (and range lists, used below to describe lexical
        blocks) changed completely between DWARF-4 and DWARF-5. *)
     let dwarf_4_location_list_entries, location_list =
-      ARV.Range.fold range
+      ARAV.Range.fold range
         ~init:([], Location_list.create ())
         ~f:(fun (dwarf_4_location_list_entries, location_list) subrange ->
           let single_location_description =
@@ -258,18 +416,18 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
       ~attribute_values:(type_and_name_attributes @ location_attribute_value)
       ()
 
-let iterate_over_variable_like_things state ~available_ranges_vars ~f =
-  ARV.iter available_ranges_vars ~f:(fun var range ->
+let iterate_over_variable_like_things state ~available_ranges_all_vars ~f =
+  ARAV.iter available_ranges_all_vars ~f:(fun var range ->
       let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
       f var ~ident_for_type ~range)
 
-let dwarf state ~function_proto_die available_ranges_vars =
+let dwarf state ~function_proto_die available_ranges_all_vars =
   let proto_dies_for_vars = Backend_var.Tbl.create 42 in
-  iterate_over_variable_like_things state ~available_ranges_vars
+  iterate_over_variable_like_things state ~available_ranges_all_vars
     ~f:(fun var ~ident_for_type:_ ~range:_ ->
       let value_die_lvalue = Proto_die.create_reference () in
       let type_die = Proto_die.create_reference () in
       assert (not (Backend_var.Tbl.mem proto_dies_for_vars var));
       Backend_var.Tbl.add proto_dies_for_vars var { value_die_lvalue; type_die });
-  iterate_over_variable_like_things state ~available_ranges_vars
+  iterate_over_variable_like_things state ~available_ranges_all_vars
     ~f:(dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars)

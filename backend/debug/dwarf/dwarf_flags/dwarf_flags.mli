@@ -79,6 +79,10 @@ val gdwarf_may_alter_codegen : bool ref
     this variable being set to [true]). *)
 val dwarf_inlined_frames : bool ref
 
+(** Setting this to [true] will print availability sets (both regular and phantom)
+    when dumping CFG and Linear representations. *)
+val debug_avail_sets : bool ref
+
 val default_gdwarf_compression : string
 
 val gdwarf_compression : string ref

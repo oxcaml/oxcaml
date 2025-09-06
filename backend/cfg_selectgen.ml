@@ -37,6 +37,25 @@ exception Error of error * Debuginfo.t
    twice with the same [Target] (see [Asmgen] and [Peephole_utils] to avoid
    dependency cycles. *)
 module Make (Target : Cfg_selectgen_target_intf.S) = struct
+  (* Global accumulator for phantom lets in the current function *)
+  (* CR mshinwell: work out how to remove this mutable state *)
+  let accumulated_phantom_lets :
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref =
+    ref V.Map.empty
+
+  let accumulate_phantom_let var defining_expr =
+    match defining_expr with
+    | None -> ()
+    | Some defining_expr ->
+      if V.Map.mem (VP.var var) !accumulated_phantom_lets
+      then
+        Misc.fatal_errorf "Duplicate phantom let for variable %a" V.print
+          (VP.var var);
+      accumulated_phantom_lets
+        := V.Map.add (VP.var var)
+             (VP.provenance var, Cfg.phantom_defining_expr_of_cmm defining_expr)
+             !accumulated_phantom_lets
+
   (* A syntactic criterion used in addition to judgements about (co)effects as
      to whether the evaluation of a given expression may be deferred by
      [emit_parts]. This criterion is a property of the instruction selection
@@ -438,7 +457,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               in
               Cfg.Poptrap { lbl_handler }
           in
-          Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none)
+          let phantom_available_before = SU.phantom_vars_from_env env in
+          Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
+            ~phantom_available_before)
         traps;
       let loc = Proc.loc_results_return (Reg.typv r) in
       SU.insert_moves env sub_cfg r loc;
@@ -446,11 +467,15 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   (* Buffering of instruction sequences *)
 
-  let insert_debug _env sub_cfg basic dbg arg res =
-    Sub_cfg.add_instruction sub_cfg basic arg res dbg
+  let insert_debug env sub_cfg basic dbg arg res =
+    let phantom_available_before = SU.phantom_vars_from_env env in
+    Sub_cfg.add_instruction sub_cfg basic arg res dbg ~phantom_available_before
 
-  let insert_op_debug_returning_id _env sub_cfg op dbg arg res =
-    let instr = Sub_cfg.make_instr (Cfg.Op op) arg res dbg in
+  let insert_op_debug_returning_id env sub_cfg op dbg arg res =
+    let phantom_available_before = SU.phantom_vars_from_env env in
+    let instr =
+      Sub_cfg.make_instr (Cfg.Op op) arg res dbg ~phantom_available_before
+    in
     Sub_cfg.add_instruction' sub_cfg instr;
     instr.id
 
@@ -464,8 +489,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | [] -> Misc.fatal_error "Exception handler with no parameters"
         | r :: _ -> r
       in
+      (* CR mshinwell/gyorsh: fix Debuginfo.t + phantom_available_before *)
       Sub_cfg.add_instruction_at_start sub_cfg (Cfg.Op Move)
         [| Proc.loc_exn_bucket |] exn_bucket_in_handler Debuginfo.none
+        ~phantom_available_before:None
 
   let unreachable_handler : (Operation.trap_stack * Cmm.expression) Lazy.t =
     lazy
@@ -756,7 +783,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:(Some v) with
       | Never_returns -> Never_returns
       | Ok r1 -> emit_expr (bind_let env sub_cfg v r1) sub_cfg e2 ~bound_name)
-    | Cphantom_let (_var, _defining_expr, body) ->
+    | Cphantom_let (var, defining_expr, body) ->
+      (* Add to global accumulator for this function *)
+      accumulate_phantom_let var defining_expr;
+      let env = SU.env_add_phantom_let var env in
       emit_expr env sub_cfg body ~bound_name
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (
@@ -806,7 +836,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
-    | Cphantom_let (_var, _defining_expr, body) -> emit_tail env sub_cfg body
+    | Cphantom_let (var, defining_expr, body) ->
+      accumulate_phantom_let var defining_expr;
+      let env = SU.env_add_phantom_let var env in
+      emit_tail env sub_cfg body
     | Cop ((Capply (ty, Rc_normal) as op), args, dbg) ->
       emit_tail_apply env sub_cfg ty op args dbg
     | Csequence (e1, e2) -> (
@@ -1197,7 +1230,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 in
                 Cfg.Poptrap { lbl_handler }
             in
-            Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none)
+            let phantom_available_before = SU.phantom_vars_from_env env in
+            Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
+              ~phantom_available_before)
           traps;
         Sub_cfg.update_exit_terminator sub_cfg (Always handler.label);
         SU.set_traps nfail handler.SU.traps_ref env.SU.trap_stack traps;
@@ -1440,6 +1475,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* Sequentialization of a function definition *)
 
   let emit_fundecl ~future_funcnames f =
+    (* Clear phantom lets accumulator for this function *)
+    accumulated_phantom_lets := V.Map.empty;
     SU.current_function_name := f.Cmm.fun_name.sym_name;
     SU.current_function_is_check_enabled
       := Zero_alloc_checker.is_check_enabled f.Cmm.fun_codegen_options
@@ -1506,11 +1543,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ~fun_dbg:f.Cmm.fun_dbg ~fun_contains_calls:true
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:f.Cmm.fun_poll
         ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:f.Cmm.fun_ret_type
+        ~fun_phantom_lets:!accumulated_phantom_lets
     in
     let layout = DLL.make_empty () in
     let entry_block =
       Cfg.make_empty_block ~label:(Cfg.entry_label cfg)
-        (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none)
+        (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none
+           ~phantom_available_before:None)
     in
     Cfg.add_block_exn cfg entry_block;
     DLL.add_end layout entry_block.start;
@@ -1518,7 +1557,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Cfg.make_empty_block ~label:tailrec_label
         (Sub_cfg.make_instr
            (Cfg.Always (Sub_cfg.start_label body))
-           [||] [||] Debuginfo.none)
+           [||] [||] Debuginfo.none ~phantom_available_before:None)
     in
     Cfg.add_block_exn cfg tailrec_block;
     DLL.add_end layout tailrec_block.start;
@@ -1547,7 +1586,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           if Cfg.is_return_terminator block.terminator.desc
           then
             DLL.add_end block.body
-              (Sub_cfg.make_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none);
+              (Sub_cfg.make_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none
+                 ~phantom_available_before:None);
           Cfg.add_block_exn cfg block;
           DLL.add_end layout block.start)
         else assert (DLL.is_empty block.body));
