@@ -677,7 +677,9 @@ Line 3, characters 10-11:
 3 |   (module M : S)
               ^
 Error: Signature mismatch:
-       This escapes its region.
+       The first is "local"
+       but (because of the second) is expected to be "global"
+       because it is a module and thus always needs to be allocated on the heap.
 |}]
 
 (* Don't escape through a lazy value *)

@@ -182,6 +182,7 @@ module type Common_product = sig
       submode error with hints. *)
   val report_error :
     ?target:Mode_hint.lock_item * Longident.t ->
+    ?for_include:bool ->
     Format.formatter ->
     error ->
     unit
@@ -581,7 +582,7 @@ module type S = sig
       | Monadic of Monadic.error
       | Comonadic of Comonadic.error
 
-    val report_error : Format.formatter -> error -> unit
+    val report_error : ?for_include:bool -> Format.formatter -> error -> unit
 
     type 'a simple_axerror := 'a simple_error
 

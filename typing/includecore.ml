@@ -343,17 +343,6 @@ let report_modality_sub_error first second ppf e =
     first
     (print_modality "not") left
 
-let report_mode_sub_error got expected ppf e =
-  let Mode.Value.Error(ax, {left; right}) = Mode.Value.to_simple_error e in
-  match ax with
-  | Comonadic Areality -> Format.fprintf ppf "This escapes its region."
-  | _ ->
-    Format.fprintf ppf "%s %a but %s %a."
-      (String.capitalize_ascii got)
-      (Misc.Style.as_inline_code (Value.Const.print_axis ax)) left
-      expected
-      (Misc.Style.as_inline_code (Value.Const.print_axis ax)) right
-
 let report_modality_equate_error first second ppf
   ((equate_step, sub_error) : Modality.equate_error) =
   match equate_step with
@@ -405,10 +394,7 @@ let report_value_mismatch first second env ppf err =
         (fun ppf -> Format.fprintf ppf "is not compatible with the type")
   | Zero_alloc e -> Zero_alloc.print_error ppf e
   | Modality e -> report_modality_sub_error first second ppf e
-  | Mode e ->
-      let got = first ^ " is" in
-      let expected = second ^ " is" in
-      report_mode_sub_error got expected ppf e
+  | Mode e -> Mode.Value.report_error ~for_include:true ppf e
 
 let report_type_inequality env ppf err =
   Printtyp.report_equality_error ppf Type_scheme env err

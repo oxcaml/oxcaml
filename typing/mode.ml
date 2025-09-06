@@ -2143,8 +2143,10 @@ module Report = struct
 
   let print :
       type a.
-      ?target:_ -> a Lattices_mono.obj -> Format.formatter -> a t -> unit =
-   fun ?target obj ppf { left; right } ->
+      (* CR-soon zqian: Remove parameter [target] and [for_include]; the mode
+      hints should have enough information for decent print. *)
+      ?target:_ -> ?for_include:_ -> a Lattices_mono.obj -> Format.formatter -> a t -> unit =
+   fun ?target ?(for_include=false)obj ppf { left; right } ->
     let actual, expected =
       if C.is_opposite obj
       then Right right, Left left
@@ -2152,14 +2154,19 @@ module Report = struct
     in
     let open Format in
     (match target with
-    | None -> fprintf ppf "This value "
+    | None ->
+      if for_include then fprintf ppf "The first " else fprintf ppf "This value "
     | Some (target_item, target_lid) ->
       fprintf ppf "The %a %a " print_lock_item target_item
         (Misc.Style.as_inline_code !print_longident)
         target_lid);
     (match print_ahint_sided obj ppf actual with
-    | Mode_with_hint -> fprintf ppf ".@\nHowever, the highlighted expression "
-    | Mode -> fprintf ppf "@ but "
+    | Mode_with_hint ->
+        if for_include then fprintf ppf ".@\nHowever, because of the second, the first "
+        else fprintf ppf ".@\nHowever, the highlighted expression "
+    | Mode ->
+        if for_include then fprintf ppf "@ but (because of the second) "
+        else fprintf ppf "@ but "
     | Nothing -> assert false);
     ignore (print_ahint_sided obj ppf expected);
     fprintf ppf "."
@@ -2784,12 +2791,12 @@ module Comonadic_with (Areality : Areality) = struct
   (* overriding to report the offending axis *)
   let to_simple_error ({ left; right; _ } : error) = axis_of_error left right
 
-  let report_error ?target ppf err =
+  let report_error ?target ?for_include ppf err =
     let (Error (ax, _)) = to_simple_error err in
     let err = S.populate_error Obj.obj err in
     let err = Report.Of_solver.error_prod Obj.obj ax err in
     let obj = proj_obj ax in
-    Report.print ?target obj ppf err
+    Report.print ?target ?for_include obj ppf err
 end
 [@@inline]
 
@@ -2917,12 +2924,12 @@ module Monadic = struct
     (* monadic fragment is flipped *)
     axis_of_error right left
 
-  let report_error ?target ppf err =
+  let report_error ?target ?for_include ppf err =
     let (Error (ax, _)) = to_simple_error err in
     let err = S.populate_error Obj.obj err in
     let err = Report.Of_solver.error_prod Obj.obj ax err in
     let obj = proj_obj ax in
-    Report.print ?target obj ppf err
+    Report.print ?target ?for_include obj ppf err
 end
 
 type ('mo, 'como) monadic_comonadic =
@@ -3349,9 +3356,9 @@ module Value_with (Areality : Areality) = struct
       let (Error (ax, e)) = Comonadic.to_simple_error e in
       Error (Comonadic ax, e)
 
-  let report_error ppf = function
-    | Monadic e -> Monadic.report_error ppf e
-    | Comonadic e -> Comonadic.report_error ppf e
+  let report_error ?for_include ppf = function
+    | Monadic e -> Monadic.report_error ?for_include ppf e
+    | Comonadic e -> Comonadic.report_error ?for_include ppf e
 
   let submode_log { monadic = monadic0; comonadic = comonadic0 }
       { monadic = monadic1; comonadic = comonadic1 } ~log : (_, error) result =
