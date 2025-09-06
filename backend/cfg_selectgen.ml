@@ -1437,6 +1437,34 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     emit_tail env sub_cfg exp;
     sub_cfg
 
+  let insert_param_name_for_debugger block fun_args loc_arg num_regs_per_arg =
+    let loc_arg_index = ref 0 in
+    List.iteri
+      (fun param_index (var, _ty) ->
+        let provenance = VP.provenance var in
+        let var = VP.var var in
+        let num_regs_for_arg = num_regs_per_arg.(param_index) in
+        let hard_regs_for_arg =
+          Array.init num_regs_for_arg (fun index ->
+              loc_arg.(!loc_arg_index + index))
+        in
+        loc_arg_index := !loc_arg_index + num_regs_for_arg;
+        if Option.is_some provenance
+        then
+          let naming_op =
+            Operation.Name_for_debugger
+              { ident = var;
+                provenance;
+                which_parameter = Some param_index;
+                is_assignment = false;
+                regs = hard_regs_for_arg
+              }
+          in
+          DLL.add_end block.Cfg.body
+            (Sub_cfg.make_instr (Cfg.Op naming_op) hard_regs_for_arg [||]
+               Debuginfo.none))
+      fun_args
+
   (* Sequentialization of a function definition *)
 
   let emit_fundecl ~future_funcnames f =
@@ -1464,31 +1492,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         f.Cmm.fun_args rargs env
     in
     let body = Sub_cfg.make_empty () in
-    let loc_arg_index = ref 0 in
-    List.iteri
-      (fun param_index (var, _ty) ->
-        let provenance = VP.provenance var in
-        let var = VP.var var in
-        let num_regs_for_arg = num_regs_per_arg.(param_index) in
-        let hard_regs_for_arg =
-          Array.init num_regs_for_arg (fun index ->
-              loc_arg.(!loc_arg_index + index))
-        in
-        loc_arg_index := !loc_arg_index + num_regs_for_arg;
-        if Option.is_some provenance
-        then
-          let naming_op =
-            Operation.Name_for_debugger
-              { ident = var;
-                provenance;
-                which_parameter = Some param_index;
-                is_assignment = false;
-                regs = hard_regs_for_arg
-              }
-          in
-          insert_debug env body (Op naming_op) Debuginfo.none hard_regs_for_arg
-            [||])
-      f.Cmm.fun_args;
     SU.insert_moves env body loc_arg rarg;
     let prologue_poll_instr_id =
       insert_op_debug_returning_id env body Operation.Poll Debuginfo.none [||]
@@ -1512,6 +1515,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Cfg.make_empty_block ~label:(Cfg.entry_label cfg)
         (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none)
     in
+    insert_param_name_for_debugger entry_block f.Cmm.fun_args loc_arg
+      num_regs_per_arg;
     Cfg.add_block_exn cfg entry_block;
     DLL.add_end layout entry_block.start;
     let tailrec_block =
