@@ -118,10 +118,6 @@ let prologue_needed_block (block : Cfg.basic_block) ~fun_name =
   | Requires_prologue -> true
   | No_requirements | Requires_no_prologue -> false
 
-(* CR-someday cfalas: This implementation can take O(n^2) memory if there are
-   many blocks which need an epilogue. Ideally we should be able to re-use some
-   of the epilogues stored for the children instead of storing a fresh copy for
-   each block to bring this worst-case down. *)
 module Reachable_epilogues = struct
   type t = Label.Set.t Label.Tbl.t
 
@@ -147,7 +143,8 @@ module Reachable_epilogues = struct
                  (Label.Tbl.find t succ_label)))
           (Cfg.successor_labels ~normal:true ~exn:true block))
     in
-    collect cfg.entry_label;
+    Profile.record ~accumulate:true "reachable_epilogues" collect
+      cfg.entry_label;
     t
 
   let from_block (t : t) (label : Label.t) = Label.Tbl.find t label
@@ -188,6 +185,9 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
         Cfg_dominators.is_dominating doms prologue_label epilogue_label)
       epilogue_blocks
 
+let can_place_prologue =
+  Profile.record ~accumulate:true "can_place_prologue" can_place_prologue
+
 let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
   let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
       (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
@@ -225,11 +225,17 @@ let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
   if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
        ~fun_num_stack_slots:cfg.fun_num_stack_slots
   then (
-    let doms = Cfg_dominators.build cfg in
-    (* note: the other entries in the forest are dead code *)
-    let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
-    let loop_infos = Cfg_loop_infos.build cfg doms in
-    let reachable_epilogues = Reachable_epilogues.build cfg in
+    let doms, tree, loop_infos, reachable_epilogues =
+      Profile.record ~accumulate:true "build_doms_and_loops"
+        (fun () ->
+          let doms = Cfg_dominators.build cfg in
+          (* note: the other entries in the forest are dead code *)
+          let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
+          let loop_infos = Cfg_loop_infos.build cfg doms in
+          let reachable_epilogues = Reachable_epilogues.build cfg in
+          doms, tree, loop_infos, reachable_epilogues)
+        ()
+    in
     match visit tree cfg doms loop_infos reachable_epilogues with
     | None -> None
     | Some (prologue_label, epilogue_blocks) ->
@@ -237,6 +243,10 @@ let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
         can_place_prologue prologue_label cfg doms loop_infos epilogue_blocks);
       Some (prologue_label, epilogue_blocks))
   else None
+
+let find_prologue_and_epilogues_shrink_wrapped =
+  Profile.record ~accumulate:true "find_in_body"
+    find_prologue_and_epilogues_shrink_wrapped
 
 let find_prologue_and_epilogues_at_entry (cfg : Cfg.t) =
   if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
@@ -255,8 +265,14 @@ let find_prologue_and_epilogues_at_entry (cfg : Cfg.t) =
     Some (cfg.entry_label, epilogue_blocks)
   else None
 
+let find_prologue_and_epilogues_at_entry =
+  Profile.record ~accumulate:true "check_at_entry"
+    find_prologue_and_epilogues_at_entry
+
 let add_prologue_if_required (cfg : Cfg.t) ~f =
-  let prologue_and_epilogue_blocks = f cfg in
+  let prologue_and_epilogue_blocks =
+    Profile.record ~accumulate:true "find" f cfg
+  in
   match prologue_and_epilogue_blocks with
   | None -> ()
   | Some (prologue_label, epilogue_blocks) ->
@@ -411,7 +427,10 @@ end
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   if !Oxcaml_flags.cfg_prologue_validate
-  then validate_no_prologue cfg_with_layout;
+  then
+    Profile.record "validate_no_prologue"
+      (fun () -> validate_no_prologue cfg_with_layout)
+      ();
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
   | true
@@ -428,22 +447,28 @@ let validate : Cfg_with_layout.t -> Cfg_with_layout.t =
   match !Oxcaml_flags.cfg_prologue_validate with
   | true -> (
     match
-      Validator.run cfg
-        ~init:(Validator.State_set.singleton No_prologue_on_stack)
-        ~handlers_are_entry_points:false { fun_name }
+      Profile.record ~accumulate:true "validate_dataflow"
+        (fun () ->
+          Validator.run cfg
+            ~init:(Validator.State_set.singleton No_prologue_on_stack)
+            ~handlers_are_entry_points:false { fun_name })
+        ()
     with
     | Ok block_states ->
-      Label.Tbl.iter
-        (fun label state ->
-          let block = Cfg.get_block_exn cfg label in
-          if block.is_trap_handler
-             && Validator.State_set.mem No_prologue_on_stack state
-          then
-            Misc.fatal_errorf
-              "Cfg_prologue: can reach trap handler with no prologue at block \
-               %s"
-              (Label.to_string label))
-        block_states;
+      Profile.record ~accumulate:true "validate_traps"
+        (fun () ->
+          Label.Tbl.iter
+            (fun label state ->
+              let block = Cfg.get_block_exn cfg label in
+              if block.is_trap_handler
+                 && Validator.State_set.mem No_prologue_on_stack state
+              then
+                Misc.fatal_errorf
+                  "Cfg_prologue: can reach trap handler with no prologue at \
+                   block %s"
+                  (Label.to_string label))
+            block_states)
+        ();
       cfg_with_layout
     | Error () -> Misc.fatal_error "Cfg_prologue: dataflow analysis failed")
   | false -> cfg_with_layout
