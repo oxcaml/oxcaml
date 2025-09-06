@@ -1224,16 +1224,23 @@ end
 
 module Cache = Shape_with_layout.Tbl
 (* We add a cache based on type shapes to increase sharing the resulting DWARF.
-   The cache caches the combination of type shape and type layout. *)
+   The cache caches the combination of type shape and type layout. We make sure
+   to only cache closed shapes to avoid issues with the same DeBruijn variable
+   such as 0 that stands for different recursive types. *)
 
 (** This cache maps unnamed type shapes to their references. *)
 let cache = Cache.create 16
 
-let add_to_cache (type_shape : Shape.t) (type_layout : Layout.t) reference =
-  Cache.add cache { type_shape; type_layout } reference
-(* CR sspies: In the future, we need to check that these are closed to avoid
-   caching accidents. Due to the broken treatment of recursive types, this is
-   currently not correct, but good enough for now. *)
+let add_to_cache (type_shape : Shape.t) (type_layout : Layout.t) reference
+    ~rec_env =
+  if S.DeBruijn_env.is_empty rec_env
+     (* We only add closed shapes to avoid issues around free variables. *)
+  then Cache.add cache { type_shape; type_layout } reference
+
+let find_in_cache (type_shape : Shape.t) (type_layout : Layout.t) ~rec_env =
+  if S.DeBruijn_env.is_empty rec_env
+  then Cache.find_opt cache { type_shape; type_layout }
+  else None
 
 (** This second cache is for named type shapes. Every type name should be
     associated with at most one DWARF die, so this cache maps type names to
@@ -1247,14 +1254,11 @@ let name_cache = String.Tbl.create 16
    [type_shape_to_dwarf_die_with_aliased_name] below. *)
 let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     (type_layout : base_layout) ~parent_proto_die ~fallback_value_die ~rec_env =
-  match
-    Cache.find_opt cache
-      ({ type_shape; type_layout = Base type_layout } : Shape_with_layout.t)
-  with
+  match find_in_cache type_shape (Base type_layout) ~rec_env with
   | Some reference -> reference
   | None ->
     let reference = Proto_die.create_reference () in
-    add_to_cache type_shape (Base type_layout) reference;
+    add_to_cache type_shape (Base type_layout) reference ~rec_env;
     let name = None in
     (* Instead of omitting the name argument below, we fix it to be [None] here
        such that it is easier to change this code if in the future we want to
@@ -1266,8 +1270,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Constr _ ->
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
-      (* CR sspies: The [Constr] case is a precaution. With proper recursive
-         types, it should never trigger. For now, we simply use a fallback. *)
+      (* CR sspies: The [Constr] case should never trigger. Consider promoting
+         this to a louder error. For now, we are conservative and allow it via a
+         fallback. *)
     | Unboxed_tuple _ ->
       if !Clflags.dwarf_pedantic
       then
@@ -1291,7 +1296,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Record { fields; kind = Record_boxed | Record_floats } ->
       let fields =
         List.map
-          (fun (name, type_shape, (type_layout : Layout.t)) ->
+          (fun (name, _, type_shape, (type_layout : Layout.t)) ->
             let base_layout =
               match type_layout with
               | Base base_layout -> base_layout
@@ -1313,8 +1318,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
     | Record
-        { fields = [(field_name, sh, Base base_layout)]; kind = Record_unboxed }
-      ->
+        { fields = [(field_name, _, sh, Base base_layout)];
+          kind = Record_unboxed
+        } ->
       let field_die =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
           base_layout ~rec_env
@@ -1323,7 +1329,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       create_attribute_unboxed_record_die ~reference ~parent_proto_die ?name
         ~field_name ~field_size ~field_die ()
     | Record { fields; kind = Record_mixed mixed_block_shapes } ->
-      let fields = List.map (fun (name, sh, ly) -> Some name, sh, ly) fields in
+      let fields =
+        List.map (fun (name, _, sh, ly) -> Some name, sh, ly) fields
+      in
       let fields = flatten_fields_in_mixed_record ~mixed_block_shapes fields in
       let fields =
         List.map
@@ -1348,7 +1356,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
     | Record { fields = _; kind = Record_unboxed_product }
-    | Record { fields = [(_, _, Product _)]; kind = Record_unboxed } ->
+    | Record { fields = [(_, _, _, Product _)]; kind = Record_unboxed } ->
       if !Clflags.dwarf_pedantic
       then
         Misc.fatal_errorf
@@ -1365,7 +1373,15 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       (* [@@unboxed] records must have exactly one field; this should have been
          detected by earlier transformations such as at the point where the
          shape was created. *)
-    | Variant { simple_constructors; complex_constructors } -> (
+    | Variant constructors -> (
+      let simple_constructors, complex_constructors =
+        List.partition_map
+          (fun { S.name; constr_uid; kind; args } ->
+            if args = []
+            then Left name
+            else Right { S.name; constr_uid; kind; args })
+          constructors
+      in
       match complex_constructors with
       | [] ->
         create_simple_variant_die ~reference ~parent_proto_die ?name
@@ -1378,8 +1394,10 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
               ( name,
                 flatten_fields_in_mixed_record ~mixed_block_shapes
                   (List.map
-                     (fun { S.field_name = name; field_value = sh, ly } ->
-                       name, sh, ly)
+                     (fun { S.field_name = name;
+                            field_uid = _;
+                            field_value = sh, ly
+                          } -> name, sh, ly)
                      args) ))
             complex_constructors
         in
@@ -1417,6 +1435,29 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       in
       create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
         ~constr_name ~arg_name ~arg_layout:base_layout ~arg_die ()
+    | Rec_var i -> (
+      match S.DeBruijn_env.get_opt rec_env i with
+      | Some reference' ->
+        create_typedef_die ~reference ~parent_proto_die ?name reference'
+      | None ->
+        if !Clflags.dwarf_pedantic
+        then
+          Misc.fatal_errorf
+            "Recursive variable environment lookup failed: rec_env returned \
+             None for index %d"
+            i
+        else
+          create_typedef_die ~reference ~parent_proto_die ?name
+            fallback_value_die)
+    | Mu sh ->
+      let reference' =
+        (* CR sspies: We are creating two typedefs for recursive types. One
+           should be enough. *)
+        type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
+          type_layout
+          ~rec_env:(S.DeBruijn_env.push rec_env reference)
+      in
+      create_typedef_die ~reference ~parent_proto_die ?name reference'
     | Alias sh ->
       let reference' =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
@@ -1430,10 +1471,20 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
          do not have sufficient information. *)
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
+    | Proj_decl _ ->
+      if !Clflags.dwarf_pedantic
+      then
+        Misc.fatal_errorf
+          "Projections from mutually recursive definitions should have been \
+           resolved at this point. Found %a"
+          Shape.print type_shape
+      else
+        create_base_layout_type ~reference type_layout ?name ~parent_proto_die
+          ~fallback_value_die ()
     | Var _
     (* CR sspies: This case is currently triggered for free type variables. It
        should be taken care of when revisiting the layout computation. *)
-    | Abs _ | Comp_unit _ | Struct _ ->
+    | Abs _ | Comp_unit _ | Struct _ | Mutrec _ ->
       (* CR sspies: Change this to a loud error in the future. These cases
          should not happen with the new shapes, but at least the [Struct] case
          does happen for the old Merlin shapes. Investigate when they do happen.
@@ -1611,8 +1662,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       else unknown_base_layouts type_layout)
   | Constr _, Base b -> [Known (type_shape, b)]
   | Constr _, _ -> unknown_base_layouts type_layout
-  (* CR sspies: These should not happen with support for recursive types. For
-     now, we conservatively give back defaults. *)
+  (* CR sspies: These should not happen with support for recursive types. We
+     conservatively give back defaults. *)
   | Predef _, Base base_layout -> [Known (type_shape, base_layout)]
   | Predef _, _ ->
     if !Clflags.dwarf_pedantic
@@ -1644,7 +1695,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       Misc.fatal_errorf "record must have value layout, but got: %a"
         Layout.format type_layout
     else unknown_base_layouts type_layout
-  | Record { fields = [(_, sh, ly)]; kind = Record_unboxed }, _
+  | Record { fields = [(_, _, sh, ly)]; kind = Record_unboxed }, _
     when Layout.equal ly type_layout -> (
     match type_layout with
     | Product _ ->
@@ -1654,7 +1705,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
        is of product sort, we simply look through the unboxed product.
        Otherwise, we will create an additional DWARF entry for it. *)
     | Base b -> [Known (type_shape, b)])
-  | Record { fields = [(_, _, ly)]; kind = Record_unboxed }, _ ->
+  | Record { fields = [(_, _, _, ly)]; kind = Record_unboxed }, _ ->
     if !Clflags.dwarf_pedantic
     then
       Misc.fatal_errorf
@@ -1666,11 +1717,11 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     ->
     Misc.fatal_errorf "unboxed record must have exactly one field, found %a"
       (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_string)
-      (List.map (fun (name, _, _) -> name) fields)
+      (List.map (fun (name, _, _, _) -> name) fields)
   | Record { fields; kind = Record_unboxed_product }, _ -> (
     match type_layout with
     | Product prod_shapes when List.compare_lengths prod_shapes fields = 0 ->
-      List.concat_map (fun (_, sh, ly) -> flatten_shape sh ly) fields
+      List.concat_map (fun (_, _, sh, ly) -> flatten_shape sh ly) fields
     | Layout.Product prod_shapes ->
       if !Clflags.dwarf_pedantic
       then
@@ -1706,6 +1757,10 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
          its contents; got: %a and contents: %a"
         Layout.format type_layout Layout.format arg_layout
     else unknown_base_layouts type_layout
+  | Rec_var i, _ ->
+    unknown_base_layouts type_layout
+    (* A projection should not reach the point of a recursive variable. *)
+  | Mu sh, _ -> flatten_shape sh type_layout
   | Alias sh, _ -> flatten_shape sh type_layout
   | (App _ | Error _ | Proj _), _ ->
     (* In these cases, something has gone wrong during reduction, because we do
@@ -1714,7 +1769,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   | Var _, _
   (* CR sspies: This case is currently triggered for free type variables. It
      should be taken care of when revisiting the layout computation. *)
-  | (Abs _ | Comp_unit _ | Struct _), _ ->
+  | (Abs _ | Comp_unit _ | Struct _ | Proj_decl _ | Mutrec _), _ ->
     (* CR sspies: Change this to a loud error in the future. These cases should
        not happen with the new shapes, but at least the [Struct] cases does
        happen for the old Merlin shapes. Investigate when they do happen. For
@@ -1788,10 +1843,7 @@ let type_shape_to_dwarf_die_with_aliased_name (type_name : string)
     let unnamed_die =
       type_shape_to_dwarf_die type_shape type_layout ~parent_proto_die
         ~fallback_value_die (* note that we do not pass the type name here *)
-        ~rec_env:()
-      (* CR sspies: This is currently not used, but will be used for recursive
-         types. Removing it now and then adding it back just increases the diff
-         unnecessarily. *)
+        ~rec_env:S.DeBruijn_env.empty
     in
     let reference = Proto_die.create_reference () in
     let layout_name =
@@ -1829,7 +1881,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
   | Some { type_shape; type_name; type_layout } -> (
     let shape_reduce = With_cms_reduce.reduce Env.empty in
     let type_shape = shape_reduce type_shape in
-    (* CR sspies: In the future, we need to unfold recursive types here. *)
+    let type_shape = Type_shape.unfold_and_evaluate type_shape in
     let type_shape =
       match unboxed_projection, type_layout with
       | None, Base b -> Known (type_shape, b)

@@ -127,6 +127,10 @@ module Item : sig
 
   val compare : t -> t -> int
 
+  val is_constructor : t -> bool
+  val is_label : t -> bool
+  val is_unboxed_label : t -> bool
+
   module Map : Map.S with type key = t
 end
 
@@ -217,33 +221,38 @@ and desc =
     (* CR sspies: We could in principle discard the arguments of the arrow,
        since they are neither needed for printing nor for debug information. *)
   | Poly_variant of t poly_variant_constructors
+  | Mu of t
+  (** [Mu t] represents a binder for a recursive type with body [t]. Its
+      variables are [Rec_var n] below, where [n] is a DeBruijn-index to maximize
+      sharing between alpha-equivalent shapes.  *)
+  | Rec_var of int
 
   (* constructors for type declarations *)
-  | Variant of
-    { simple_constructors : string list;
-      (** The string is the name of the constructor. The runtime
-          representation of the constructor at index [i] in this list is
-          [2 * i + 1]. See [dwarf_type.ml] for more details. *)
-      complex_constructors : (t * Layout.t) complex_constructors
-      (** All constructors in this category are represented as blocks.
-          The index [i] in the list indicates the tag at runtime. The
-          length of the constructor argument list [args] determines the
-          size of the block. *)
-    }
+  | Variant of (t * Layout.t) complex_constructors
+      (* CR sspies: Rename this just to constructor now that simple constructors
+         are no longer a thing. *)
   | Variant_unboxed of
     { name : string;
+      variant_uid : Uid.t option;
       arg_name : string option;
       (** if this is [None], we are looking at a singleton tuple;
           otherwise, it is a singleton record. *)
+      arg_uid : Uid.t option;
       arg_shape : t;
       arg_layout : Layout.t
     }
     (** An unboxed variant corresponds to the [@@unboxed] annotation.
         It must have a single, complex constructor. *)
   | Record of
-      { fields : (string * t * Layout.t) list;
+      { fields : (string * Uid.t option * t * Layout.t) list;
         kind : record_kind
       }
+  | Mutrec of t Ident.Map.t
+    (** [Mutrec m] represents a map of (potentially mutually-recursive)
+        declarations. Declarations with type variables are represented as
+        abstractions inside. To project out a declaration, [Proj_decl] can be
+        used. *)
+  | Proj_decl of t * Ident.t
 
 (** For DWARF type emission to work as expected, we store the layouts in the
     declaration alongside the shapes in those cases where the layout "expands"
@@ -277,12 +286,14 @@ and 'a complex_constructors = 'a complex_constructor list
 
 and 'a complex_constructor =
   { name : string;
+    constr_uid: Uid.t option;
     kind : constructor_representation;
     args : 'a complex_constructor_argument list
   }
 
 and 'a complex_constructor_argument =
   { field_name : string option;
+    field_uid: Uid.t option;
     field_value : 'a
   }
 
@@ -329,13 +340,20 @@ val unboxed_tuple : ?uid:Uid.t -> t list -> t
 val predef : ?uid:Uid.t -> Predef.t -> t list -> t
 val arrow : ?uid:Uid.t -> t -> t -> t
 val poly_variant : ?uid:Uid.t -> t poly_variant_constructors -> t
+val mu : ?uid:Uid.t -> t -> t
+val rec_var : ?uid:Uid.t -> int -> t
 
 (* constructors for type declarations *)
 val variant :
-  ?uid:Uid.t -> string list -> (t * Layout.t) complex_constructors -> t
+  ?uid:Uid.t -> (t * Layout.t) complex_constructors -> t
 val variant_unboxed :
-  ?uid:Uid.t -> string -> string option -> t -> Layout.t -> t
-val record : ?uid:Uid.t -> record_kind -> (string * t * Layout.t) list -> t
+  ?uid:Uid.t -> variant_uid:Uid.t option -> arg_uid:Uid.t option ->
+  string -> string option -> t -> Layout.t -> t
+val record : ?uid:Uid.t -> record_kind ->
+  (string * Uid.t option * t * Layout.t) list -> t
+val mutrec : ?uid:Uid.t -> t Ident.Map.t -> t
+val proj_decl : ?uid:Uid.t -> t -> Ident.t -> t
+
 
 val set_approximated : approximated:bool -> t -> t
 
@@ -407,3 +425,18 @@ val of_path :
   namespace:Sig_component_kind.t -> Path.t -> t
 
 val set_uid_if_none : t -> Uid.t -> t
+
+module Cache : Hashtbl.S with type key = t
+
+(** DeBruijn Environment for working with the recursive binders. *)
+module DeBruijn_env : sig
+  type 'a t
+
+  val empty : 'a t
+
+  val is_empty : 'a t -> bool
+
+  val push : 'a t -> 'a -> 'a t
+
+  val get_opt : 'a t -> int -> 'a option
+end
