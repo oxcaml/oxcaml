@@ -88,7 +88,7 @@ let any_tagged_immediate =
 let any_tagged_immediate_non_null =
   TG.Head_of_kind_value_non_null.create_variant ~is_unique:false
     ~immediates:Unknown ~blocks:(Known TG.Row_like_for_blocks.bottom)
-    ~extensions:No_extensions
+    ~extensions:No_extensions ~is_int:None ~get_tag:None
 
 let any_tagged_immediate_or_null =
   TG.create_from_head_value
@@ -240,7 +240,7 @@ let immutable_block_non_null ~is_unique tag ~shape alloc_mode ~fields =
         (Known
            (TG.Row_like_for_blocks.create ~shape ~field_tys:fields (Closed tag)
               alloc_mode))
-      ~extensions:No_extensions
+      ~extensions:No_extensions ~is_int:None ~get_tag:None
 
 let immutable_block_with_size_at_least ~tag ~n ~shape ~field_n_minus_one =
   let n = Target_ocaml_int.to_int n in
@@ -286,7 +286,7 @@ let variant_non_null ~const_ctors ~non_const_ctors alloc_mode =
   in
   TG.Head_of_kind_value_non_null.create_variant ~is_unique:false
     ~immediates:(Known const_ctors) ~blocks:(Known blocks)
-    ~extensions:No_extensions
+    ~extensions:No_extensions ~is_int:None ~get_tag:None
 
 let exactly_this_closure function_slot ~all_function_slots_in_set:function_types
     ~all_closure_types_in_set:closure_types
