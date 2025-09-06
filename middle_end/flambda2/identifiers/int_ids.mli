@@ -105,7 +105,7 @@ module Variable : sig
 
   type exported
 
-  include Container_types.S with type t := t
+  include Container_types.S_plus_iterator with type t := t
 
   module Lmap : Lmap.S with type key := t
 
@@ -131,7 +131,7 @@ module Symbol : sig
 
   type exported
 
-  include Container_types.S with type t := t
+  include Container_types.S_plus_iterator with type t := t
 
   (* CR lmaurer: This treats the [Linkage_name.t] as a string to be prefixed
      rather than the actual linkage name. That's not really consistent with the
