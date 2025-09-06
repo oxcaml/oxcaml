@@ -406,6 +406,7 @@ let loop ppf =
   Sys.catch_break true;
   run_hooks After_setup;
   load_ocamlinit ppf;
+  Lexer.reset_syntax_mode();
   while true do
     let snap = ref (Btype.snapshot ()) in
     try
