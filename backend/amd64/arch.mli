@@ -77,7 +77,8 @@ type float_width = Cmm.float_width
 
 type specific_operation =
     Ilea of addressing_mode             (* "lea" gives scaled adds *)
-  | Istore_int of nativeint * addressing_mode * bool
+  | Istore_int of
+      { const : nativeint; addr : addressing_mode; is_assignment : bool }
                                         (* Store an integer constant *)
   | Ioffset_loc of int * addressing_mode (* Add a constant to a location *)
   | Ifloatarithmem of float_width * float_operation * addressing_mode
