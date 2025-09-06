@@ -7,7 +7,6 @@ let _ = f_unboxed_float #0.0
 (* CR sspies: floats that end in .0 are printed with just .
    It would be more uniform to always print the trailing 0. *)
 let _ = f_unboxed_float (-#3.14)
-(* CR sspies: debugger shows as #-3.14 rather than -#3.14 *)
 let _ = f_unboxed_float #1e10
 
 let[@inline never] [@local never] f_unboxed_float32 (x: float32#) = x
