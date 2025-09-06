@@ -1922,6 +1922,79 @@ let remove_double_underscores s =
   loop 0;
   Buffer.contents buf
 
+module Json = struct
+
+  (* [escape_unicode] is based on [Bytes.unsafe_escape], which is used
+     for the format specifier [%S]. It is adjusted to output unicode escape
+     chacarcters \u00HH instead of the usual OCaml character literals \DDD.
+     Adds quotes around the input string. *)
+  let escape_unicode str =
+    let s = Bytes.of_string str in
+    let n = ref 2 in (* for the quotes *)
+    for i = 0 to Bytes.length s - 1 do
+      n := !n +
+        (match Bytes.unsafe_get s i with
+        | '\"' | '\\' | '\n' | '\t' | '\r' | '\b' -> 2
+        | ' ' .. '~' -> 1
+        | _ -> 6)
+    done;
+    begin
+      let s' = Bytes.create !n in
+      Bytes.unsafe_set s' 0 '\"';
+      n := 1;
+      for i = 0 to Bytes.length s - 1 do
+        begin match Bytes.unsafe_get s i with
+        | ('\"' | '\\') as c ->
+            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n c
+        | '\n' ->
+            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'n'
+        | '\t' ->
+            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 't'
+        | '\r' ->
+            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'r'
+        | '\b' ->
+            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'b'
+        | (' ' .. '~') as c -> Bytes.unsafe_set s' !n c
+        | c ->
+            let a = Char.code c in
+            let hex_char n =
+              if n < 10 then Char.chr (48 + n)  (* '0'-'9' *)
+              else Char.chr (55 + n)            (* 'A'-'F' *)
+            in
+            Bytes.unsafe_set s' !n '\\';
+            incr n;
+            Bytes.unsafe_set s' !n 'u';
+            incr n;
+            Bytes.unsafe_set s' !n '0';
+            incr n;
+            Bytes.unsafe_set s' !n '0';
+            incr n;
+            Bytes.unsafe_set s' !n (hex_char (a / 16));
+            incr n;
+            Bytes.unsafe_set s' !n (hex_char (a mod 16));
+        end;
+        incr n
+      done;
+      Bytes.unsafe_set s' !n '\"';
+      String.of_bytes s'
+    end
+
+
+  let field name value = Printf.sprintf "%s: %s" (escape_unicode name) value
+
+  let string value = escape_unicode value
+
+  let int value = string_of_int value
+
+  let object_ fields =
+    let field_strings = String.concat ",\n" fields in
+    Printf.sprintf "{\n%s\n}" field_strings
+
+  let array items =
+    let item_strings = String.concat ",\n" items in
+    Printf.sprintf "[\n%s\n]" item_strings
+end
+
 module Nonempty_list = struct
   type nonrec 'a t = ( :: ) of 'a * 'a list
 

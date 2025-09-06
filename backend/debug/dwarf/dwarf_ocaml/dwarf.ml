@@ -21,6 +21,7 @@ open Dwarf_low
 module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 module L = Linear
+module Json = Misc.Json
 
 type t =
   { state : DS.t;
@@ -62,7 +63,7 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_begin
     DS.create ~compilation_unit_header_label ~compilation_unit_proto_die
       ~value_type_proto_die ~start_of_code_symbol debug_loc_table
       debug_ranges_table address_table location_list_table
-      ~get_file_num:get_file_id
+      ~get_file_num:get_file_id ~sourcefile
     (* CR mshinwell: does get_file_id successfully emit .file directives for
        files we haven't seen before? *)
   in
@@ -104,6 +105,52 @@ let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
       available_ranges_vars inlined_frame_ranges;
     { fun_end_label; fundecl }
 
+let format_variable_json (variable : DS.Diagnostics.variable_reduction) =
+  let layout =
+    Format.asprintf "%a" Jkind_types.Sort.Const.format variable.type_layout
+  in
+  let type_with_layout = Printf.sprintf "%s @ %s" variable.type_name layout in
+  Json.object_
+    [ Json.field "type" (Json.string type_with_layout);
+      Json.field "shape_size_before_reduction_in_bytes"
+        (Json.int variable.shape_size_before_reduction_in_bytes);
+      Json.field "shape_size_after_reduction_in_bytes"
+        (Json.int variable.shape_size_after_reduction_in_bytes);
+      Json.field "shape_size_after_evaluation_in_bytes"
+        (Json.int variable.shape_size_after_evaluation_in_bytes);
+      Json.field "reduction_steps" (Json.int variable.reduction_steps);
+      Json.field "evaluation_steps" (Json.int variable.evaluation_steps);
+      Json.field "dwarf_die_size" (Json.int variable.dwarf_die_size);
+      Json.field "cms_files_loaded" (Json.int variable.cms_files_loaded);
+      Json.field "cms_files_cached" (Json.int variable.cms_files_cached);
+      Json.field "cms_files_missing"
+        (Json.array (List.map Json.string variable.cms_files_missing));
+      Json.field "cms_files_unreadable"
+        (Json.array (List.map Json.string variable.cms_files_unreadable)) ]
+
+let emit_stats_file t =
+  let sourcefile = DS.sourcefile t.state in
+  let stats_filename =
+    let base = Filename.remove_extension sourcefile in
+    base ^ ".debug-stats.json"
+  in
+  let { DS.Diagnostics.variables } = DS.diagnostics t.state in
+  let oc = open_out stats_filename in
+  (* Format variables array *)
+  let variable_jsons = List.rev_map format_variable_json variables in
+  (* Create the main JSON object *)
+  let main_object =
+    Json.object_
+      [ Json.field "compilation_parameters" (Json.object_ []);
+        (* CR sspies: Curretly, we do not have any performance dials yet for the
+           DWARF shape emission (such as depth dials for various recursive
+           traversals). Once they are implemented, add them here to record their
+           values in the debug json files. *)
+        Json.field "variables" (Json.array variable_jsons) ]
+  in
+  Printf.fprintf oc "%s\n" main_object;
+  close_out oc
+
 let emit t ~basic_block_sections ~binary_backend_available =
   if t.emitted
   then
@@ -118,7 +165,8 @@ let emit t ~basic_block_sections ~binary_backend_available =
     ~debug_ranges_table:(DS.debug_ranges_table t.state)
     ~address_table:(DS.address_table t.state)
     ~location_list_table:(DS.location_list_table t.state)
-    ~basic_block_sections ~binary_backend_available
+    ~basic_block_sections ~binary_backend_available;
+  if !Dwarf_flags.ddwarf_metrics then emit_stats_file t
 
 let emit t ~basic_block_sections ~binary_backend_available =
   Profile.record "emit_dwarf"

@@ -86,6 +86,143 @@ module Debugging_the_compiler = struct
           | End_of_siblings -> indent := !indent - 2)
 end
 
+module Shape_reduction_diagnostics : sig
+  type t
+
+  val create : string -> Layout.t -> t
+
+  val shape_reduce_diagnostics : t -> Shape_reduce.Diagnostics.t
+
+  val shape_evaluation_diagnostics : t -> Type_shape.Evaluation_diagnostics.t
+
+  val record_before_reduction : t -> Shape.t -> unit
+
+  val record_after_reduction : t -> Shape.t -> unit
+
+  val record_after_evaluation : t -> Shape.t -> unit
+
+  val record_before_dwarf_generation : t -> Proto_die.t -> unit
+
+  val record_after_dwarf_generation : t -> Proto_die.t -> unit
+
+  val append_diagnostics_to_dwarf_state : DS.t -> t -> unit
+end = struct
+  type d =
+    { type_name : string;
+      type_layout : Layout.t;
+      mutable shape_size_before_reduction_in_bytes : int;
+      mutable shape_size_after_reduction_in_bytes : int;
+      mutable shape_size_after_evaluation_in_bytes : int;
+      mutable dwarf_die_size_before : int;
+      mutable dwarf_die_size_after : int;
+      shape_reduction_diagnostics : Shape_reduce.Diagnostics.t;
+      shape_evaluation_diagnostics : Type_shape.Evaluation_diagnostics.t
+    }
+
+  type t = d option
+
+  let create type_name type_layout =
+    if !Dwarf_flags.ddwarf_metrics
+    then
+      Some
+        { type_name;
+          type_layout;
+          shape_size_before_reduction_in_bytes = 0;
+          shape_size_after_reduction_in_bytes = 0;
+          shape_size_after_evaluation_in_bytes = 0;
+          dwarf_die_size_before = 0;
+          dwarf_die_size_after = 0;
+          shape_reduction_diagnostics =
+            Shape_reduce.Diagnostics.create_diagnostics ();
+          shape_evaluation_diagnostics =
+            Type_shape.Evaluation_diagnostics.create_diagnostics ()
+        }
+    else None
+
+  let shape_reduce_diagnostics d =
+    match d with
+    | None -> Shape_reduce.Diagnostics.no_diagnostics
+    | Some d -> d.shape_reduction_diagnostics
+
+  let shape_evaluation_diagnostics d =
+    match d with
+    | None -> Type_shape.Evaluation_diagnostics.no_diagnostics
+    | Some d -> d.shape_evaluation_diagnostics
+
+  let record_before_reduction d shape =
+    match d with
+    | None -> ()
+    | Some d ->
+      d.shape_size_before_reduction_in_bytes
+        <- Obj.reachable_words (Obj.repr shape) * Sys.word_size
+
+  let record_after_reduction d shape =
+    match d with
+    | None -> ()
+    | Some d ->
+      d.shape_size_after_reduction_in_bytes
+        <- Obj.reachable_words (Obj.repr shape) * Sys.word_size
+
+  let record_after_evaluation d shape =
+    match d with
+    | None -> ()
+    | Some d ->
+      d.shape_size_after_evaluation_in_bytes
+        <- Obj.reachable_words (Obj.repr shape) * Sys.word_size
+
+  let compute_die_size die =
+    Proto_die.depth_first_fold die ~init:0 ~f:(fun acc d ->
+        match d with DIE _ -> acc + 1 | End_of_siblings -> acc)
+
+  let record_before_dwarf_generation d die =
+    match d with
+    | None -> ()
+    | Some d -> d.dwarf_die_size_before <- compute_die_size die
+
+  let record_after_dwarf_generation d die =
+    match d with
+    | None -> ()
+    | Some d -> d.dwarf_die_size_after <- compute_die_size die
+
+  let append_diagnostics_to_dwarf_state state d =
+    match d with
+    | None -> ()
+    | Some d ->
+      if !Dwarf_flags.ddwarf_metrics
+      then
+        let diagnostic : DS.Diagnostics.variable_reduction =
+          { shape_size_before_reduction_in_bytes =
+              d.shape_size_before_reduction_in_bytes;
+            shape_size_after_reduction_in_bytes =
+              d.shape_size_after_reduction_in_bytes;
+            shape_size_after_evaluation_in_bytes =
+              d.shape_size_after_evaluation_in_bytes;
+            reduction_steps =
+              Shape_reduce.Diagnostics.reduction_steps
+                d.shape_reduction_diagnostics;
+            evaluation_steps =
+              Type_shape.Evaluation_diagnostics.get_reduction_steps
+                d.shape_evaluation_diagnostics;
+            type_name = d.type_name;
+            type_layout = d.type_layout;
+            dwarf_die_size = d.dwarf_die_size_after - d.dwarf_die_size_before;
+            cms_files_loaded =
+              Shape_reduce.Diagnostics.cms_files_loaded
+                d.shape_reduction_diagnostics;
+            cms_files_cached =
+              Shape_reduce.Diagnostics.cms_files_cached
+                d.shape_reduction_diagnostics;
+            cms_files_missing =
+              Shape_reduce.Diagnostics.cms_files_missing
+                d.shape_reduction_diagnostics;
+            cms_files_unreadable =
+              Shape_reduce.Diagnostics.cms_files_unreadable
+                d.shape_reduction_diagnostics
+          }
+        in
+        DS.add_variable_reduction_diagnostic state diagnostic
+end
+
 let base_layout_to_byte_size (sort : base_layout) =
   match sort with
   | Void -> 0
@@ -1224,16 +1361,23 @@ end
 
 module Cache = Shape_with_layout.Tbl
 (* We add a cache based on type shapes to increase sharing the resulting DWARF.
-   The cache caches the combination of type shape and type layout. *)
+   The cache caches the combination of type shape and type layout. We make sure
+   to only cache closed shapes to avoid issues with the same DeBruijn variable
+   such as 0 that stands for different recursive types. *)
 
 (** This cache maps unnamed type shapes to their references. *)
 let cache = Cache.create 16
 
-let add_to_cache (type_shape : Shape.t) (type_layout : Layout.t) reference =
-  Cache.add cache { type_shape; type_layout } reference
-(* CR sspies: In the future, we need to check that these are closed to avoid
-   caching accidents. Due to the broken treatment of recursive types, this is
-   currently not correct, but good enough for now. *)
+let add_to_cache (type_shape : Shape.t) (type_layout : Layout.t) reference
+    ~rec_env =
+  if S.DeBruijn_env.is_empty rec_env
+     (* We only add closed shapes to avoid issues around free variables. *)
+  then Cache.add cache { type_shape; type_layout } reference
+
+let find_in_cache (type_shape : Shape.t) (type_layout : Layout.t) ~rec_env =
+  if S.DeBruijn_env.is_empty rec_env
+  then Cache.find_opt cache { type_shape; type_layout }
+  else None
 
 (** This second cache is for named type shapes. Every type name should be
     associated with at most one DWARF die, so this cache maps type names to
@@ -1247,14 +1391,11 @@ let name_cache = String.Tbl.create 16
    [type_shape_to_dwarf_die_with_aliased_name] below. *)
 let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     (type_layout : base_layout) ~parent_proto_die ~fallback_value_die ~rec_env =
-  match
-    Cache.find_opt cache
-      ({ type_shape; type_layout = Base type_layout } : Shape_with_layout.t)
-  with
+  match find_in_cache type_shape (Base type_layout) ~rec_env with
   | Some reference -> reference
   | None ->
     let reference = Proto_die.create_reference () in
-    add_to_cache type_shape (Base type_layout) reference;
+    add_to_cache type_shape (Base type_layout) reference ~rec_env;
     let name = None in
     (* Instead of omitting the name argument below, we fix it to be [None] here
        such that it is easier to change this code if in the future we want to
@@ -1266,8 +1407,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Constr _ ->
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
-      (* CR sspies: The [Constr] case is a precaution. With proper recursive
-         types, it should never trigger. For now, we simply use a fallback. *)
+      (* CR sspies: The [Constr] case should never trigger. Consider promoting
+         this to a louder error. For now, we are conservative and allow it via a
+         fallback. *)
     | Unboxed_tuple _ ->
       if !Clflags.dwarf_pedantic
       then
@@ -1417,6 +1559,29 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       in
       create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
         ~constr_name ~arg_name ~arg_layout:base_layout ~arg_die ()
+    | Rec_var i -> (
+      match S.DeBruijn_env.get_opt rec_env i with
+      | Some reference' ->
+        create_typedef_die ~reference ~parent_proto_die ?name reference'
+      | None ->
+        if !Clflags.dwarf_pedantic
+        then
+          Misc.fatal_errorf
+            "Recursive variable environment lookup failed: rec_env returned \
+             None for index %d"
+            i
+        else
+          create_typedef_die ~reference ~parent_proto_die ?name
+            fallback_value_die)
+    | Mu sh ->
+      let reference' =
+        (* CR sspies: We are creating two typedefs for recursive types. One
+           should be enough. *)
+        type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
+          type_layout
+          ~rec_env:(S.DeBruijn_env.push rec_env reference)
+      in
+      create_typedef_die ~reference ~parent_proto_die ?name reference'
     | Alias sh ->
       let reference' =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
@@ -1430,10 +1595,20 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
          do not have sufficient information. *)
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
+    | Proj_decl _ ->
+      if !Clflags.dwarf_pedantic
+      then
+        Misc.fatal_errorf
+          "Projections from mutually recursive definitions should have been \
+           resolved at this point. Found %a"
+          Shape.print type_shape
+      else
+        create_base_layout_type ~reference type_layout ?name ~parent_proto_die
+          ~fallback_value_die ()
     | Var _
     (* CR sspies: This case is currently triggered for free type variables. It
        should be taken care of when revisiting the layout computation. *)
-    | Abs _ | Comp_unit _ | Struct _ ->
+    | Abs _ | Comp_unit _ | Struct _ | Mutrec _ ->
       (* CR sspies: Change this to a loud error in the future. These cases
          should not happen with the new shapes, but at least the [Struct] case
          does happen for the old Merlin shapes. Investigate when they do happen.
@@ -1611,8 +1786,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       else unknown_base_layouts type_layout)
   | Constr _, Base b -> [Known (type_shape, b)]
   | Constr _, _ -> unknown_base_layouts type_layout
-  (* CR sspies: These should not happen with support for recursive types. For
-     now, we conservatively give back defaults. *)
+  (* CR sspies: These should not happen with support for recursive types. We
+     conservatively give back defaults. *)
   | Predef _, Base base_layout -> [Known (type_shape, base_layout)]
   | Predef _, _ ->
     if !Clflags.dwarf_pedantic
@@ -1706,6 +1881,10 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
          its contents; got: %a and contents: %a"
         Layout.format type_layout Layout.format arg_layout
     else unknown_base_layouts type_layout
+  | Rec_var i, _ ->
+    unknown_base_layouts type_layout
+    (* A projection should not reach the point of a recursive variable. *)
+  | Mu sh, _ -> flatten_shape sh type_layout
   | Alias sh, _ -> flatten_shape sh type_layout
   | (App _ | Error _ | Proj _), _ ->
     (* In these cases, something has gone wrong during reduction, because we do
@@ -1714,7 +1893,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   | Var _, _
   (* CR sspies: This case is currently triggered for free type variables. It
      should be taken care of when revisiting the layout computation. *)
-  | (Abs _ | Comp_unit _ | Struct _), _ ->
+  | (Abs _ | Comp_unit _ | Struct _ | Proj_decl _ | Mutrec _), _ ->
     (* CR sspies: Change this to a loud error in the future. These cases should
        not happen with the new shapes, but at least the [Struct] cases does
        happen for the old Merlin shapes. Investigate when they do happen. For
@@ -1731,32 +1910,68 @@ module With_cms_reduce = Shape_reduce.Make (struct
   (* CR sspies: Investigate the performance some more and the balance between
      different variables. *)
 
-  let read_unit_shape ~unit_name =
+  let read_shape_from_cms ~diagnostics cms_file =
+    match Load_path.find_normalized cms_file with
+    | exception Not_found -> None
+    | cms_path -> (
+      match Cms_format.read cms_path with
+      | exception Cms_format.(Error (Not_a_shape _)) ->
+        if !Clflags.dwarf_pedantic
+        then Misc.fatal_errorf "Version mismatch loading .cms file %s" cms_file
+        else (
+          Shape_reduce.Diagnostics.add_cms_file_unreadable diagnostics cms_file;
+          None)
+      | cms_infos -> Some cms_infos.cms_impl_shape)
+
+  let read_shape_from_cmt ~diagnostics cmt_file =
+    match Load_path.find_normalized cmt_file with
+    | exception Not_found -> None
+    | cmt_path -> (
+      match Cmt_format.read cmt_path with
+      | exception Cmt_format.(Error (Not_a_typedtree _)) ->
+        if !Clflags.dwarf_pedantic
+        then Misc.fatal_errorf "Version mismatch loading .cmt file %s" cmt_file
+        else (
+          Shape_reduce.Diagnostics.add_cms_file_unreadable diagnostics cmt_file;
+          None)
+      | _, Some cmt_infos -> Some cmt_infos.cmt_impl_shape
+      | _ -> Some None)
+
+  let read_unit_shape ~diagnostics ~unit_name =
     match String.Tbl.find_opt cms_file_cache unit_name with
-    | Some shape -> shape
-    | None -> (
+    | Some shape ->
+      Shape_reduce.Diagnostics.count_cms_file_cached diagnostics;
+      shape
+    | None ->
       if !max_number_of_cms_files <= 0
          (* CR sspies: This needs a command line flag. *)
       then None
       else
         let filename = String.uncapitalize_ascii unit_name in
-        (* CR mshinwell: we should use [Compilation_unit.t] *)
-        match Load_path.find_normalized (filename ^ ".cms") with
-        | exception Not_found -> None
-        | fn -> (
-          match Cms_format.read fn with
-          | exception Cms_format.(Error (Not_a_shape _)) ->
-            Misc.fatal_errorf "Version mismatch loading .cms file %s" fn
-          | exception _ ->
-            None
-            (* We fail silently if there was trouble reading the file or the
-               like. *)
-          | cms_infos ->
+        let cms_file = filename ^ ".cms" in
+        let cmt_file = filename ^ ".cmt" in
+        let shape_opt_opt =
+          match read_shape_from_cms ~diagnostics cms_file with
+          | Some shape -> Some shape
+          | None -> read_shape_from_cmt ~diagnostics cmt_file
+        in
+        let shape_opt =
+          match shape_opt_opt with
+          | Some shape_opt ->
             decr max_number_of_cms_files;
-            let shape = cms_infos.cms_impl_shape in
-            String.Tbl.add cms_file_cache unit_name shape;
-            shape))
+            Shape_reduce.Diagnostics.count_cms_file_loaded diagnostics;
+            shape_opt
+          | None ->
+            Shape_reduce.Diagnostics.add_cms_file_missing diagnostics cms_file;
+            None
+        in
+        (* Note: [shape_opt] is an option, and we are also caching the [None]
+           case. *)
+        String.Tbl.add cms_file_cache unit_name shape_opt;
+        shape_opt
 end)
+
+module D = Shape_reduction_diagnostics
 
 (* Search for the first unused suffix-numbered version of [name] in the
    [name_cache] cache. If we come along a type of the same name and type shape,
@@ -1788,10 +2003,7 @@ let type_shape_to_dwarf_die_with_aliased_name (type_name : string)
     let unnamed_die =
       type_shape_to_dwarf_die type_shape type_layout ~parent_proto_die
         ~fallback_value_die (* note that we do not pass the type name here *)
-        ~rec_env:()
-      (* CR sspies: This is currently not used, but will be used for recursive
-         types. Removing it now and then adding it back just increases the diff
-         unnecessarily. *)
+        ~rec_env:S.DeBruijn_env.empty
     in
     let reference = Proto_die.create_reference () in
     let layout_name =
@@ -1826,10 +2038,22 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
      should simply not emit any DWARF information for this variable instead.
 
      mshinwell: or emit an "unknown layout" type *)
-  | Some { type_shape; type_name; type_layout } -> (
-    let shape_reduce = With_cms_reduce.reduce Env.empty in
+  | Some { type_shape; type_name; type_layout } ->
+    let reduction_diagnostics = D.create type_name type_layout in
+    let shape_reduce =
+      With_cms_reduce.reduce
+        ~diagnostics:(D.shape_reduce_diagnostics reduction_diagnostics)
+        Env.empty
+    in
+    D.record_before_reduction reduction_diagnostics type_shape;
     let type_shape = shape_reduce type_shape in
-    (* CR sspies: In the future, we need to unfold recursive types here. *)
+    D.record_after_reduction reduction_diagnostics type_shape;
+    let type_shape =
+      Type_shape.unfold_and_evaluate
+        ~diagnostics:(D.shape_evaluation_diagnostics reduction_diagnostics)
+        type_shape
+    in
+    D.record_after_evaluation reduction_diagnostics type_shape;
     let type_shape =
       match unboxed_projection, type_layout with
       | None, Base b -> Known (type_shape, b)
@@ -1865,23 +2089,29 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
          is match the style of unarization variables by appending "_unboxed" for
          the projections to indicate that the type is not the same. *)
     in
-    match type_shape with
-    | Known (type_shape, base_layout) ->
-      let reference =
-        type_shape_to_dwarf_die_with_aliased_name type_name type_shape
-          base_layout ~parent_proto_die ~fallback_value_die
-      in
-      if Debugging_the_compiler.enabled ()
-      then (
-        Format.eprintf "%a has become %a@." Uid.print var_uid
-          Asm_targets.Asm_label.print reference;
-        Debugging_the_compiler.print ~die:parent_proto_die);
-      reference
-    | Unknown base_layout ->
-      let reference = Proto_die.create_reference () in
-      create_base_layout_type ~reference ~parent_proto_die
-        ~name:("unknown @ " ^ Sort.to_string_base base_layout)
-        ~fallback_value_die base_layout ();
-      (* CR sspies: We do have the type name available here, so we could be more
-         precise in principle. *)
-      reference)
+    D.record_before_dwarf_generation reduction_diagnostics parent_proto_die;
+    let reference =
+      match type_shape with
+      | Known (type_shape, base_layout) ->
+        let reference =
+          type_shape_to_dwarf_die_with_aliased_name type_name type_shape
+            base_layout ~parent_proto_die ~fallback_value_die
+        in
+        if Debugging_the_compiler.enabled ()
+        then (
+          Format.eprintf "%a has become %a@." Uid.print var_uid
+            Asm_targets.Asm_label.print reference;
+          Debugging_the_compiler.print ~die:parent_proto_die);
+        reference
+      | Unknown base_layout ->
+        let reference = Proto_die.create_reference () in
+        create_base_layout_type ~reference ~parent_proto_die
+          ~name:("unknown @ " ^ Sort.to_string_base base_layout)
+          ~fallback_value_die base_layout ();
+        (* CR sspies: We do have the type name available here, so we could be
+           more precise in principle. *)
+        reference
+    in
+    D.record_after_dwarf_generation reduction_diagnostics parent_proto_die;
+    D.append_diagnostics_to_dwarf_state state reduction_diagnostics;
+    reference
