@@ -456,8 +456,10 @@ and desc =
   | Tuple of t list
   | Unboxed_tuple of t list
   | Predef of Predef.t * t list
-  | Arrow of t * t
+  | Arrow
   | Poly_variant of t poly_variant_constructors
+  | Mu of t
+  | Rec_var of int
 
   (* constructors for type declarations *)
   | Variant of
@@ -474,6 +476,8 @@ and desc =
       { fields : (string * t * Layout.t) list;
         kind : record_kind
       }
+  | Mutrec of t Ident.Map.t
+  | Proj_decl of t * Ident.t
 
 and 'a poly_variant_constructors = 'a poly_variant_constructor list
 
@@ -547,6 +551,9 @@ let rec equal_desc0 d1 d2 =
     if not (equal t1 t2) then false
     else equal v1 v2
   | Leaf, Leaf -> true
+  | Mu (t1_body), Mu (t2_body) ->
+    equal t1_body t2_body
+  | Rec_var i1, Rec_var i2 -> Int.equal i1 i2
   | Struct t1, Struct t2 ->
     Item.Map.equal equal t1 t2
   | Proj (t1, i1), Proj (t2, i2) ->
@@ -556,13 +563,18 @@ let rec equal_desc0 d1 d2 =
   | Constr (c1, ts1), Constr (c2, ts2) ->
     Ident.equal c1 c2
     && List.equal equal ts1 ts2
+  | Mutrec t1, Mutrec t2 ->
+    Ident.Map.equal equal t1 t2
+  | Proj_decl (t1, i1), Proj_decl (t2, i2) ->
+    if Ident.equal i1 i2 then
+      equal t1 t2
+    else false
   | Tuple t1, Tuple t2
   | Unboxed_tuple t1, Unboxed_tuple t2 ->
     List.equal equal t1 t2
   | Predef (p1, ts1), Predef (p2, ts2) ->
     Predef.equal p1 p2 && List.equal equal ts1 ts2
-  | Arrow (t1, t1'), Arrow (t2, t2') ->
-    equal t1 t2 && equal t1' t2'
+  | Arrow, Arrow -> true
   | Poly_variant pvs1, Poly_variant pvs2 ->
     List.equal equal_poly_variant_constructor pvs1 pvs2
   | Variant c1, Variant c2 ->
@@ -582,8 +594,8 @@ let rec equal_desc0 d1 d2 =
     && List.equal equal_field r1.fields r2.fields
   | (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _
     | Alias _ | Error _ | Variant _ | Variant_unboxed _ | Record _
-    | Predef _ | Arrow _ | Poly_variant _ | Tuple _ | Unboxed_tuple _
-    | Constr _), _
+    | Predef _ | Arrow | Poly_variant _ | Tuple _ | Unboxed_tuple _
+    | Constr _ | Mutrec _ | Proj_decl _ | Mu _ | Rec_var _), _
     -> false
 
 and equal_desc d1 d2 =
@@ -626,7 +638,7 @@ let rec print fmt t =
   in
   let print_nested fmt t =
     match t.desc with
-    | Var _ | Leaf | Comp_unit _ | Error _ | Predef (_, []) ->
+    | Var _ | Leaf | Rec_var _ | Comp_unit _ | Error _ | Predef (_, []) ->
       print fmt t
     | _ -> Format.fprintf fmt "(@[%a@])" print t
   in
@@ -654,6 +666,14 @@ let rec print fmt t =
         Format.fprintf fmt "@[%a(@,%a)%a@]" aux t1 aux t2 print_uid_opt uid
     | Leaf ->
         Format.fprintf fmt "<%a>" (Format.pp_print_option Uid.print) uid
+    | Mu (t_body) ->
+      Format.fprintf fmt "Rec@[%a %a@]"
+        print_uid_opt uid
+        print_nested t_body
+    | Rec_var id ->
+      Format.fprintf fmt "#%d%a"
+      id
+      print_uid_opt uid
     | Proj (t, item) ->
         begin match uid with
         | None ->
@@ -708,8 +728,8 @@ let rec print fmt t =
               (Format.pp_print_list
                 ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",@ ")
                 print) args) args
-    | Arrow (arg, ret) ->
-      Format.fprintf fmt "Arrow (%a, %a)" print arg print ret
+    | Arrow ->
+      Format.fprintf fmt "Arrow"
     | Poly_variant fields ->
       Format.fprintf fmt "Poly_variant (%a)"
         (Format.pp_print_list
@@ -747,6 +767,19 @@ let rec print fmt t =
     Format.fprintf fmt "Record%s { %a }" (print_record_type kind)
       (Format.pp_print_list ~pp_sep:(print_sep_string "; ") print_field)
       fields
+  | Mutrec m ->
+    let print_decls fmt =
+        Ident.Map.iter (fun id t ->
+            Format.fprintf fmt "@[<hv 2>%a :=@ %a;@]@,"
+              Ident.print id
+              aux t
+          )
+      in
+    Format.fprintf fmt "Mutrec @[%a@]" print_decls m
+  | Proj_decl (t, id) ->
+    Format.fprintf fmt "%a.%a"
+      print_nested t
+      Ident.print id
 
   in
   if t.approximated then
@@ -795,7 +828,8 @@ let hash_app = 6
 let hash_comp_unit = 7
 let hash_alias = 8
 let hash_error = 9
-(* CR sspies: space for recursive types *)
+let hash_mu = 10
+let hash_rec_var = 11
 let hash_tuple = 12
 let hash_unboxed_tuple = 13
 let hash_predef = 14
@@ -805,6 +839,8 @@ let hash_variant = 17
 let hash_variant_unboxed = 18
 let hash_record = 19
 let hash_constr = 20
+let hash_mutrec = 21
+let hash_proj_decl = 22
 
 let fresh_var ?(name="shape-var") uid =
   let var = Ident.create_local name in
@@ -881,6 +917,16 @@ let comp_unit ?uid s =
     hash = Hashtbl.hash (hash_comp_unit, uid, s);
     approximated = false }
 
+let mu ?uid t_body =
+  { uid; desc = Mu (t_body);
+    hash = Hashtbl.hash (hash_mu, uid, t_body.hash);
+    approximated = false }
+
+let rec_var ?uid n =
+  { uid; desc = Rec_var n;
+    hash = Hashtbl.hash (hash_rec_var, uid, n);
+    approximated = false }
+
 let app_list (base_shape : t) (args : t list) : t =
   List.fold_left (fun shape arg -> app shape ~arg) base_shape args
 
@@ -904,9 +950,9 @@ let predef ?uid (p : Predef.t) (ts : t list) =
       List.map (fun t -> t.hash) ts);
     approximated = false }
 
-let arrow ?uid t1 t2 =
-  { uid; desc = Arrow (t1, t2);
-    hash = Hashtbl.hash (hash_arrow, uid, t1.hash, t2.hash);
+let arrow ?uid () =
+  { uid; desc = Arrow;
+    hash = Hashtbl.hash (hash_arrow, uid);
     approximated = false }
 
 let poly_variant ?uid t =
@@ -938,6 +984,17 @@ let constr ?uid constr_uid args =
   { uid; desc = Constr (constr_uid, args);
     hash = Hashtbl.hash (hash_constr, uid, constr_uid,
       List.map (fun t -> t.hash) args);
+    approximated = false }
+
+let mutrec ?uid t =
+  { uid; desc = Mutrec t;
+    hash = Hashtbl.hash (hash_mutrec, uid,
+      Ident.Map.map (fun t -> t.hash) t);
+    approximated = false }
+
+let proj_decl ?uid t id =
+  { uid; desc = Proj_decl (t, id);
+    hash = Hashtbl.hash (hash_proj_decl, uid, t.hash, id);
     approximated = false }
 
 
@@ -1006,17 +1063,20 @@ let set_uid_if_none t uid =
   | Proj (t, i) -> proj ~uid t i
   | Comp_unit c -> comp_unit ~uid c
   | Error s -> error ~uid s
+  | Mu t -> mu ~uid t
+  | Rec_var i -> rec_var ~uid i
   | Constr (c, ts) -> constr ~uid c ts
   | Tuple ts -> tuple ~uid ts
   | Unboxed_tuple ts -> unboxed_tuple ~uid ts
   | Predef (p, ts) -> predef ~uid p ts
-  | Arrow (t1, t2) -> arrow ~uid t1 t2
+  | Arrow -> arrow ~uid ()
   | Poly_variant t -> poly_variant ~uid t
   | Variant t -> variant ~uid t.simple_constructors t.complex_constructors
   | Variant_unboxed t ->
     variant_unboxed ~uid t.name t.arg_name t.arg_shape t.arg_layout
   | Record t -> record ~uid t.kind t.fields
-
+  | Mutrec ts -> mutrec ~uid ts
+  | Proj_decl (t, i) -> proj_decl ~uid t i
 
 
 module Map = struct
@@ -1080,3 +1140,24 @@ module Map = struct
     let item = Item.class_type id in
     Item.Map.add item (proj shape item) t
 end
+
+
+module DeBruijn_env = struct
+  type 'a t = 'a list
+
+  let empty = []
+
+  let get_opt t i = List.nth_opt t i
+
+  let push t x = x :: t
+
+  let is_empty = function [] -> true | _ -> false
+end
+
+module Cache = Hashtbl.Make (struct
+  type nonrec t = t
+
+  let hash t = t.hash
+
+  let equal = equal
+end)

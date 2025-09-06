@@ -181,6 +181,8 @@ let default_gdwarf_compression = "zlib"
 
 let gdwarf_compression = ref default_gdwarf_compression
 
+let ddwarf_shape_reduction_diags = ref false
+
 let get_dwarf_compression_flag () =
   if !dwarf_inlined_frames || not !restrict_to_upstream_dwarf
   then Some !gdwarf_compression
