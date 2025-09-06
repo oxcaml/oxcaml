@@ -43,6 +43,12 @@ module Lambda_utils = struct
     let unboxed_float32 f =
       Lconst (Const_base (Const_unboxed_float32 (Float.to_string f)))
 
+    let untagged_int i = Lconst (Const_base (Const_untagged_int i))
+
+    let untagged_int8 i = Lconst (Const_base (Const_untagged_int8 i))
+
+    let untagged_int16 i = Lconst (Const_base (Const_untagged_int16 i))
+
     let unboxed_int32 i = Lconst (Const_base (Const_unboxed_int32 i))
 
     let unboxed_int64 i = Lconst (Const_base (Const_unboxed_int64 i))

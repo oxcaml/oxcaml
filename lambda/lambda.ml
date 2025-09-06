@@ -2206,11 +2206,15 @@ let primitive_can_raise prim =
     false
 
 let constant_layout: constant -> layout = function
-  | Const_int _ | Const_char _ -> non_null_value Pintval
+  | Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _ ->
+    non_null_value Pintval
   | Const_string _ -> non_null_value Pgenval
   | Const_int32 _ -> non_null_value (Pboxedintval Boxed_int32)
   | Const_int64 _ -> non_null_value (Pboxedintval Boxed_int64)
   | Const_nativeint _ -> non_null_value (Pboxedintval Boxed_nativeint)
+  | Const_untagged_int _ -> Punboxed_or_untagged_integer Untagged_int
+  | Const_untagged_int8 _ -> Punboxed_or_untagged_integer Untagged_int8
+  | Const_untagged_int16 _ -> Punboxed_or_untagged_integer Untagged_int16
   | Const_unboxed_int32 _ -> Punboxed_or_untagged_integer Unboxed_int32
   | Const_unboxed_int64 _ -> Punboxed_or_untagged_integer Unboxed_int64
   | Const_unboxed_nativeint _ -> Punboxed_or_untagged_integer Unboxed_nativeint
