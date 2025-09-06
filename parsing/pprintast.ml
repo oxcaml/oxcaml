@@ -246,6 +246,8 @@ let longident_loc f x = pp f "%a" longident x.txt
 let constant f = function
   | Pconst_char i ->
       pp f "%C"  i
+  | Pconst_untagged_char i ->
+      pp f "#%C"  i
   | Pconst_string (i, _, None) ->
       pp f "%S" i
   | Pconst_string (i, _, Some delim) ->
