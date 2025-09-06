@@ -182,9 +182,11 @@ let x () = #( M.Null, M.This "hi" )
 
 [%%expect{|
 module M :
-  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
-  stateless
-val x : unit -> #('a M.t * string M.t) = <fun>
+  sig
+    type ('a : value_or_null mod non_null) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
+  end @@ stateless
+val x : ('a : value_or_null mod non_null). unit -> #('a M.t * string M.t) =
+  <fun>
 |}]
 
 external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
