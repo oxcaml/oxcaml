@@ -20,6 +20,7 @@ type _ t =
   | Instances : unit t
   | Separability : unit t
   | Let_mutable : unit t
+  | Rec_type_parameters : unit t
 
 (* When you update this, update [pair_of_string] below too. *)
 let to_string : type a. a t -> string = function
@@ -38,3 +39,4 @@ let to_string : type a. a t -> string = function
   | Instances -> "instances"
   | Separability -> "separability"
   | Let_mutable -> "let_mutable"
+  | Rec_type_parameters -> "rec_type_parameters"

@@ -1498,20 +1498,28 @@ let type_declarations ?(equality = false) ~loc env ~mark name
                                      Jkind.disallow_left inferred_jkind,
                                      []))))
   | All_good ->
-  let abstr = Btype.type_kind_is_abstract decl2 && decl2.type_manifest = None in
+  let no_manifest = decl2.type_manifest = None in
   let need_variance =
-    abstr || decl1.type_private = Private || decl1.type_kind = Type_open in
+    no_manifest || decl1.type_private = Private || decl1.type_kind = Type_open
+  in
   if not need_variance then None else
-  let abstr = abstr || decl2.type_private = Private in
-  let opn = decl2.type_kind = Type_open && decl2.type_manifest = None in
+  let abstr =
+    (Btype.type_kind_is_abstract decl2 && no_manifest)
+    || decl2.type_private = Private
+  in
+  let opn = decl2.type_kind = Type_open && no_manifest in
   let constrained ty = not (Btype.is_Tvar ty) in
   if List.for_all2
       (fun ty (v1,v2) ->
         let open Variance in
         let imp a b = not a || b in
         let (co1,cn1) = get_upper v1 and (co2,cn2) = get_upper v2 in
-        (if abstr then (imp co1 co2 && imp cn1 cn2)
-         else if opn || constrained ty then (co1 = co2 && cn1 = cn2)
+        let mnc1 = mem May_noncontractive v1 in
+        let mnc2 = mem May_noncontractive v2 in
+        (if abstr then (imp co1 co2 && imp cn1 cn2 && imp mnc1 mnc2)
+         else if opn || constrained ty then
+           (co1 = co2 && cn1 = cn2 && mnc1 = mnc2)
+         else if no_manifest then imp mnc1 mnc2
          else true) &&
         let (p1,n1,j1) = get_lower v1 and (p2,n2,j2) = get_lower v2 in
         imp abstr (imp p2 p1 && imp n2 n1 && imp j2 j1))
