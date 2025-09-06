@@ -23,6 +23,8 @@ let oo_prim = Lambda.transl_prim "CamlinternalOO"
 
 let consts : (structured_constant, Ident.t) Hashtbl.t = Hashtbl.create 17
 
+let mk_int n = Lconst (const_int n)
+
 let share c =
   match c with
     Const_block (_n, l) when l <> [] ->
@@ -42,12 +44,12 @@ let method_cache = ref lambda_unit
 let method_count = ref 0
 let method_table = ref []
 
-let meth_tag s = Lconst(Const_base(Const_int(Btype.hash_variant s)))
+let meth_tag s = Lconst (const_int (Btype.hash_variant s))
 
 let next_cache tag =
   let n = !method_count in
   incr method_count;
-  (tag, [!method_cache; Lconst(Const_base(Const_int n))])
+  (tag, [!method_cache; Lconst (const_int n)])
 
 let rec is_path = function
     Lvar _ | Lprim (Pgetglobal _, [], _) | Lconst _ -> true
@@ -79,8 +81,6 @@ let reset_labels () =
   method_table := []
 
 (* Insert labels *)
-
-let int n = Lconst (Const_base (Const_int n))
 
 (* CR layouts v5: To change when we have arrays of other sorts *)
 let prim_makearray =
@@ -127,7 +127,7 @@ let transl_label_init_flambda f =
       Llet (Strict, Lambda.layout_array Pgenarray, method_cache_id,
         method_cache_duid,
         Lprim (Pccall prim_makearray,
-               [int !method_count; int 0],
+               [mk_int !method_count; mk_int 0],
                Loc_unknown),
         expr)
   in
@@ -148,7 +148,7 @@ let transl_store_label_init glob size f arg =
      Lprim(mod_setfield size,
            [Lprim(Pgetglobal glob, [], Loc_unknown);
             Lprim (Pccall prim_makearray,
-                   [int !method_count; int 0],
+                   [mk_int !method_count; mk_int 0],
                    Loc_unknown)],
            Loc_unknown),
      expr))

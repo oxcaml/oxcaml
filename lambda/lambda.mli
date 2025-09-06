@@ -589,6 +589,8 @@ val generic_value : value_kind
 *)
 val layout_of_extern_repr : extern_repr -> layout
 
+val layout_of_const_sort : Jkind_types.Sort.Const.t -> layout
+
 type structured_constant =
     Const_base of constant
   | Const_block of int * structured_constant list
