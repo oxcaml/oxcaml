@@ -187,6 +187,7 @@ myStdenv.mkDerivation {
       pkgs.parallel
       gfortran # Required for Bigarray Fortran tests
       upstream.ocamlformat_0_24_1 # required for make fmt
+      pkgs.git
     ]
     ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
     ++ lib.optional oxcamlLldb pkgs.python312;
@@ -222,22 +223,44 @@ myStdenv.mkDerivation {
   shellHook = ''
     export out="$(pwd)/_install"
     configureFlags+=" --prefix=$out"
-    export PS1="$name$ "
+    source ${pkgs.git}/share/bash-completion/completions/git-prompt.sh
+
+    # Configure git ps1 options
+    export GIT_PS1_SHOWDIRTYSTATE=1
+    export GIT_PS1_SHOWSTASHSTATE=1
+    export GIT_PS1_SHOWUNTRACKEDFILES=1
+    export GIT_PS1_SHOWUPSTREAM="auto"
+
+    # Set up prompt for both bash and zsh
+    if [ -n "$BASH_VERSION" ]; then
+      export PS1='[\u@\h \W$(__git_ps1 " (%s)")]\$ '
+    elif [ -n "$ZSH_VERSION" ]; then
+      setopt PROMPT_SUBST
+      export PS1='[%n@%m %c$(__git_ps1 " (%s)")]\$ '
+    fi
 
     cat >&2 << EOF
-    OxCaml Development Environment
+    $name Development Environment
     ==============================
 
-    Configure Flags: $configureFlags
+    Configure flags: $configureFlags
 
     Available commands:
-      make boot-compiler       - Quick build (recommended for development)
-      make boot-_install       - Quick install (recommended for development)
-      make fmt                 - Auto-format code
-      make                     - Full build
-      make install             - Install
-      make test                - Run all tests
-      make test-one TEST=...   - Run a single test
+      configurePhase            - Delete build artifacts and re-run automake/configure
+      make boot-compiler        - Quick build (recommended for development)
+      make boot-_install        - Quick install (recommended for development)
+      make fmt                  - Auto-format code
+      make                      - Full build
+      make install              - Install the compiler to ./_install
     EOF
-  '';
+  ''
+  + lib.optionalString ocamltest ''
+    cat >&2 << EOF
+      make ci                   - Run all continuous integration tests
+      make test                 - Run all tests
+      make test-one TEST=...    - Run a single test
+      make promote-one TEST=... - Accept the changed output of a failing test
+    EOF
+  ''
+  ;
 }
