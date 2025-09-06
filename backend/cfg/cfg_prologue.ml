@@ -118,40 +118,19 @@ let prologue_needed_block (block : Cfg.basic_block) ~fun_name =
   | Requires_prologue -> true
   | No_requirements | Requires_no_prologue -> false
 
-(* CR-someday cfalas: This implementation can take O(n^2) memory if there are
-   many blocks which need an epilogue. Ideally we should be able to re-use some
-   of the epilogues stored for the children instead of storing a fresh copy for
-   each block to bring this worst-case down. *)
-module Reachable_epilogues = struct
-  type t = Label.Set.t Label.Tbl.t
-
-  let build (cfg : Cfg.t) : t =
-    let t = Label.Tbl.map cfg.blocks (fun _ -> Label.Set.empty) in
-    let visited = ref Label.Set.empty in
-    let rec collect label =
-      if not (Label.Set.mem label !visited)
-      then (
-        visited := Label.Set.add label !visited;
-        let block = Cfg.get_block_exn cfg label in
-        (match
-           Instruction_requirements.terminator block.terminator cfg.fun_name
-         with
-        | Requires_no_prologue ->
-          Label.Tbl.replace t label (Label.Set.singleton label)
-        | No_requirements | Requires_prologue -> ());
-        Label.Set.iter
-          (fun succ_label ->
-            collect succ_label;
-            Label.Tbl.replace t label
-              (Label.Set.union (Label.Tbl.find t label)
-                 (Label.Tbl.find t succ_label)))
-          (Cfg.successor_labels ~normal:true ~exn:true block))
-    in
-    collect cfg.entry_label;
-    t
-
-  let from_block (t : t) (label : Label.t) = Label.Tbl.find t label
-end
+let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
+  let visited = ref Label.Set.empty in
+  let rec collect label =
+    if not (Label.Set.mem label !visited)
+    then (
+      visited := Label.Set.add label !visited;
+      let block = Cfg.get_block_exn cfg label in
+      Label.Set.iter
+        (fun succ_label -> collect succ_label)
+        (Cfg.successor_labels ~normal:true ~exn:true block))
+  in
+  Profile.record ~accumulate:true "descendants" collect block.start;
+  !visited
 
 let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
     (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
@@ -188,20 +167,31 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
         Cfg_dominators.is_dominating doms prologue_label epilogue_label)
       epilogue_blocks
 
+let can_place_prologue =
+  Profile.record ~accumulate:true "can_place_prologue" can_place_prologue
+
 let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
   let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
-      (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
-      (reachable_epilogues : Reachable_epilogues.t) =
+      (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t) =
     let block = Cfg.get_block_exn cfg tree.label in
     let epilogue_blocks =
-      Reachable_epilogues.from_block reachable_epilogues tree.label
+      Label.Set.filter
+        (fun label ->
+          let block = Cfg.get_block_exn cfg label in
+          let fun_name = Cfg.fun_name cfg in
+          match
+            Instruction_requirements.terminator block.terminator fun_name
+          with
+          | Requires_no_prologue -> true
+          | No_requirements | Requires_prologue -> false)
+        (descendants cfg block)
     in
     if prologue_needed_block block ~fun_name:cfg.fun_name
     then Some (tree.label, epilogue_blocks)
     else
       let children_prologue_block =
         List.filter_map
-          (fun tree -> visit tree cfg doms loop_infos reachable_epilogues)
+          (fun tree -> visit tree cfg doms loop_infos)
           tree.children
       in
       match children_prologue_block with
@@ -217,26 +207,27 @@ let find_prologue_and_epilogues_shrink_wrapped (cfg : Cfg.t) =
            to avoid duplication of the prologue. *)
         Some (tree.label, epilogue_blocks)
   in
-  (* [Proc.prologue_required] is cheap and should provide an over-estimate of
-     when we would need a prologue (in some cases [Proc.prologue_required] will
-     return [true] because it uses the value of [cfg.fun_contains_calls] which
-     was computed before CFG simplification, which can remove calls if they are
-     dead, making the prologue unnecessary). *)
-  if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-       ~fun_num_stack_slots:cfg.fun_num_stack_slots
-  then (
-    let doms = Cfg_dominators.build cfg in
-    (* note: the other entries in the forest are dead code *)
-    let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
-    let loop_infos = Cfg_loop_infos.build cfg doms in
-    let reachable_epilogues = Reachable_epilogues.build cfg in
-    match visit tree cfg doms loop_infos reachable_epilogues with
-    | None -> None
-    | Some (prologue_label, epilogue_blocks) ->
-      assert (
-        can_place_prologue prologue_label cfg doms loop_infos epilogue_blocks);
-      Some (prologue_label, epilogue_blocks))
-  else None
+  let doms, tree, loop_infos =
+    Profile.record ~accumulate:true "build_doms_and_loops"
+      (fun () ->
+        let doms = Cfg_dominators.build cfg in
+        (* note: the other entries in the forest are dead code *)
+        let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
+        let loop_infos = Cfg_loop_infos.build cfg doms in
+        doms, tree, loop_infos)
+      ()
+  in
+  let prologue_required = visit tree cfg doms loop_infos in
+  (match prologue_required with
+  | None -> ()
+  | Some (prologue_label, epilogue_blocks) ->
+    assert (
+      can_place_prologue prologue_label cfg doms loop_infos epilogue_blocks));
+  prologue_required
+
+let find_prologue_and_epilogues_shrink_wrapped =
+  Profile.record ~accumulate:true "find_in_body"
+    find_prologue_and_epilogues_shrink_wrapped
 
 let find_prologue_and_epilogues_at_entry (cfg : Cfg.t) =
   if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
@@ -255,8 +246,14 @@ let find_prologue_and_epilogues_at_entry (cfg : Cfg.t) =
     Some (cfg.entry_label, epilogue_blocks)
   else None
 
+let find_prologue_and_epilogues_at_entry =
+  Profile.record ~accumulate:true "check_at_entry"
+    find_prologue_and_epilogues_at_entry
+
 let add_prologue_if_required (cfg : Cfg.t) ~f =
-  let prologue_and_epilogue_blocks = f cfg in
+  let prologue_and_epilogue_blocks =
+    Profile.record ~accumulate:true "find" f cfg
+  in
   match prologue_and_epilogue_blocks with
   | None -> ()
   | Some (prologue_label, epilogue_blocks) ->
@@ -411,7 +408,10 @@ end
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
   if !Oxcaml_flags.cfg_prologue_validate
-  then validate_no_prologue cfg_with_layout;
+  then
+    Profile.record "validate_no_prologue"
+      (fun () -> validate_no_prologue cfg_with_layout)
+      ();
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
   | true
@@ -428,22 +428,28 @@ let validate : Cfg_with_layout.t -> Cfg_with_layout.t =
   match !Oxcaml_flags.cfg_prologue_validate with
   | true -> (
     match
-      Validator.run cfg
-        ~init:(Validator.State_set.singleton No_prologue_on_stack)
-        ~handlers_are_entry_points:false { fun_name }
+      Profile.record ~accumulate:true "validate_dataflow"
+        (fun () ->
+          Validator.run cfg
+            ~init:(Validator.State_set.singleton No_prologue_on_stack)
+            ~handlers_are_entry_points:false { fun_name })
+        ()
     with
     | Ok block_states ->
-      Label.Tbl.iter
-        (fun label state ->
-          let block = Cfg.get_block_exn cfg label in
-          if block.is_trap_handler
-             && Validator.State_set.mem No_prologue_on_stack state
-          then
-            Misc.fatal_errorf
-              "Cfg_prologue: can reach trap handler with no prologue at block \
-               %s"
-              (Label.to_string label))
-        block_states;
+      Profile.record ~accumulate:true "validate_traps"
+        (fun () ->
+          Label.Tbl.iter
+            (fun label state ->
+              let block = Cfg.get_block_exn cfg label in
+              if block.is_trap_handler
+                 && Validator.State_set.mem No_prologue_on_stack state
+              then
+                Misc.fatal_errorf
+                  "Cfg_prologue: can reach trap handler with no prologue at \
+                   block %s"
+                  (Label.to_string label))
+            block_states)
+        ();
       cfg_with_layout
     | Error () -> Misc.fatal_error "Cfg_prologue: dataflow analysis failed")
   | false -> cfg_with_layout
