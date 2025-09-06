@@ -15,7 +15,7 @@
 (**************************************************************************)
 let dump_cfg = ref false                (* -dcfg *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
-let regalloc = ref ""                   (* -regalloc *)
+let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
 let regalloc_linscan_threshold = ref max_int (* -regalloc-linscan-threshold *)
 let regalloc_params = ref ([] : string list)  (* -regalloc-param *)
