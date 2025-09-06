@@ -33,3 +33,7 @@ val value_map : 'a t -> default:'b -> f:('a -> 'b) -> 'b
 val free_names : _ t -> Name_occurrences.t
 
 val apply_renaming : 'a t -> Renaming.t -> 'a t
+
+val is_const : 'a t -> bool
+
+val is_var : 'a t -> bool

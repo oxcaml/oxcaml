@@ -20,6 +20,104 @@
    silently truncates the input int to make it fit, whereas we probably want to
    make it produce an error ? *)
 
+module type S = sig
+  type t
+
+  include Container_types.S with type t := t
+
+  val min_value : t
+
+  val max_value : t
+
+  val minus_one : t
+
+  val zero : t
+
+  val one : t
+
+  val ten : t
+
+  val hex_ff : t
+
+  val bool : bool -> t
+
+  val bool_true : t
+
+  val bool_false : t
+
+  val ( <= ) : t -> t -> bool
+
+  val ( >= ) : t -> t -> bool
+
+  val ( < ) : t -> t -> bool
+
+  val bottom_byte_to_int : t -> int
+
+  val of_char : char -> t
+
+  val of_int : int -> t
+
+  val of_int_option : int -> t option
+
+  val to_int : t -> int
+
+  val to_int_option : t -> int option
+
+  val to_int_exn : t -> int
+
+  val of_int32 : int32 -> t
+
+  val to_int32 : t -> int32
+
+  val of_int64 : int64 -> t
+
+  val to_int64 : t -> int64
+
+  val of_targetint : Targetint_32_64.t -> t
+
+  val to_targetint : t -> Targetint_32_64.t
+
+  val of_float : float -> t
+
+  val to_float : t -> float
+
+  val neg : t -> t
+
+  val get_least_significant_16_bits_then_byte_swap : t -> t
+
+  val add : t -> t -> t
+
+  val sub : t -> t -> t
+
+  val mul : t -> t -> t
+
+  val mod_ : t -> t -> t
+
+  val div : t -> t -> t
+
+  val and_ : t -> t -> t
+
+  val or_ : t -> t -> t
+
+  val xor : t -> t -> t
+
+  val shift_left : t -> int -> t
+
+  val shift_right : t -> int -> t
+
+  val shift_right_logical : t -> int -> t
+
+  val min : t -> t -> t
+
+  val max : t -> t -> t
+
+  val is_non_negative : t -> bool
+
+  val of_int8 : Numeric_types.Int8.t -> t
+
+  val of_int16 : Numeric_types.Int16.t -> t
+end
+
 module T0 = struct
   include Targetint_32_64
 
@@ -73,9 +171,12 @@ module T0 = struct
   let ( > ) t1 t2 = Stdlib.( > ) (Targetint_32_64.compare t1 t2) 0
 
   let to_int_option t =
-    let min_int_as_int64 = Targetint_32_64.of_int Stdlib.min_int in
-    let max_int_as_int64 = Targetint_32_64.of_int Stdlib.max_int in
-    if min_int_as_int64 <= t && t <= max_int_as_int64
+    (* CR selee: maybe change to [to_int_in_range_option t ~min ~max] *)
+    let t_as_int64 = to_int64 t in
+    let min_int_as_int64 = Int64.of_int Stdlib.min_int in
+    let max_int_as_int64 = Int64.of_int Stdlib.max_int in
+    let le x y = Stdlib.( <= ) (Int64.compare x y) 0 in
+    if le min_int_as_int64 t_as_int64 && le t_as_int64 max_int_as_int64
     then Some (to_int t)
     else None
 
@@ -99,7 +200,7 @@ module T0 = struct
   let is_non_negative t = t >= zero
 end
 
-module Self = struct
+module With_gc_bit = struct
   include T0
 
   (* Note: the [include T0] must be first so that the [One_bit_fewer] functions
@@ -107,6 +208,21 @@ module Self = struct
   include One_bit_fewer.Make (T0)
   include Container_types.Make (T0)
 end
+
+module Without_gc_bit = struct
+  include T0
+  include Container_types.Make (T0)
+end
+
+(* CR selee: this is extremely sad, and should be replaced with a proper config
+   variable in the future *)
+let has_gc_bit_in_int =
+  let compiler_name = Filename.basename Sys.argv.(0) in
+  match compiler_name with "ocamlj" | "ocamlj.opt" -> false | _ -> true
+
+module Self = (val if has_gc_bit_in_int
+                   then (module With_gc_bit)
+                   else (module Without_gc_bit) : S)
 
 include Self
 

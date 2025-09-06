@@ -156,6 +156,7 @@ val dump_linear : bool ref
 val debug_ocaml : bool ref
 val keep_startup_file : bool ref
 val native_code : bool ref
+val jsir : bool ref
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref
@@ -211,6 +212,7 @@ val default_inline_max_depth : int
 val inline_max_depth : Int_arg_helper.parsed ref
 val remove_unused_arguments : bool ref
 val dump_flambda_verbose : bool ref
+val dump_jsir : bool ref
 val classic_inlining : bool ref
 val afl_instrument : bool ref
 val afl_inst_ratio : int ref

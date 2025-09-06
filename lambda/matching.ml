@@ -2764,7 +2764,7 @@ module SArg = struct
   let make_isin h arg = Lprim (Pnot, [ make_isout h arg ], Loc_unknown)
 
   let make_is_nonzero arg =
-    if !Clflags.native_code
+    if !Clflags.native_code || Clflags.is_flambda2 ()
     then icmp Cne int arg (tagged_immediate 0) ~loc:Loc_unknown
     else arg
 
@@ -2805,7 +2805,7 @@ module SArg = struct
         },
         loc, kind ))
 
-  let make_catch kind handler = 
+  let make_catch kind handler =
     make_catch_delayed kind handler
 
   let make_exit i = make_exit i
@@ -3246,7 +3246,7 @@ let transl_match_on_option value_kind arg loc ~if_some ~if_none =
   (* Keeping the Pisint test would make the bytecode
       slightly worse, but it lets the native compiler generate
       better code -- see #10681. *)
-  if !Clflags.native_code then
+  if !Clflags.native_code || Clflags.is_flambda2 () then
     Lifthenelse(Lprim (Pisint { variant_only = true }, [ arg ], loc),
                 if_none, if_some, value_kind)
   else

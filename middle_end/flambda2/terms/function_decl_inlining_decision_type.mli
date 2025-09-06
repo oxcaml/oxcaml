@@ -31,6 +31,7 @@ type t =
       }
   | Functor of { size : Code_size.t }
   | Recursive
+  | Jsir_inlining_disabled
 
 val print : Format.formatter -> t -> unit
 

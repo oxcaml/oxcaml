@@ -1,0 +1,12 @@
+(include_subdirs no)
+
+(library
+ (name jsoo_imports)
+ (wrapped true)
+ (instrumentation (backend bisect_ppx))
+ (flags
+  (:standard))
+ (ocamlopt_flags
+  (:standard -O3))
+ (libraries
+  ocamlcommon))

@@ -137,6 +137,7 @@ and dump_rawflambda = ref false            (* -drawflambda *)
 and dump_flambda = ref false            (* -dflambda *)
 and dump_flambda_let = ref (None : int option) (* -dflambda-let=... *)
 and dump_flambda_verbose = ref false    (* -dflambda-verbose *)
+and dump_jsir = ref false               (* -djsir *)
 and dump_instr = ref false              (* -dinstr *)
 and keep_camlprimc_file = ref false     (* -dcamlprimc *)
 
@@ -169,6 +170,7 @@ let set_profile_granularity v =
   | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
 
 let native_code = ref false             (* set to true under ocamlopt *)
+let jsir = ref false                    (* set to true under ocamlj *)
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
@@ -506,7 +508,7 @@ module Compiler_ir = struct
 end
 
 let is_flambda2 () =
-  Config.flambda2 && !native_code
+  Config.flambda2 && (!native_code || !jsir)
 
 module Opt_flag_handler = struct
   type t = {

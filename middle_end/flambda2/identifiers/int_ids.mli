@@ -144,6 +144,8 @@ module Symbol : sig
 
   val compilation_unit : t -> Compilation_unit.t
 
+  val for_compilation_unit : Compilation_unit.t -> t
+
   val linkage_name : t -> Linkage_name.t
 
   val linkage_name_as_string : t -> string

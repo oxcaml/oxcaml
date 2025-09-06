@@ -32,6 +32,8 @@ module Sort : sig
     | Toplevel_return
 
   val equal : t -> t -> bool
+
+  val print : Format.formatter -> t -> unit
 end
 
 val create : ?sort:Sort.t -> ?name:string -> unit -> t

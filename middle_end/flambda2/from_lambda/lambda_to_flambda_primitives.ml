@@ -1660,8 +1660,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     List.map (List.map (fun arg : H.simple_or_prim -> Simple arg)) args
   in
   let size_int =
-    assert (Targetint.size mod 8 = 0);
-    Targetint.size / 8
+    assert (Targetint_32_64.size mod 8 = 0);
+    Targetint_32_64.size / 8
   in
   match prim, args with
   | Pphys_equal eq, [[arg1]; [arg2]] ->
@@ -2586,27 +2586,36 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           block,
           new_ref_value ) ]
   | Pctconst const, _ -> (
-    match const with
-    | Big_endian -> [Simple (Simple.const_bool big_endian)]
-    | Word_size ->
-      [Simple (Simple.const_int (Target_ocaml_int.of_int (8 * size_int)))]
-    | Int_size ->
-      [Simple (Simple.const_int (Target_ocaml_int.of_int ((8 * size_int) - 1)))]
-    | Max_wosize ->
-      [ Simple
-          (Simple.const_int
-             (Target_ocaml_int.of_int
-                ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
-                - 1))) ]
-    | Ostype_unix ->
-      [Simple (Simple.const_bool (String.equal Sys.os_type "Unix"))]
-    | Ostype_win32 ->
-      [Simple (Simple.const_bool (String.equal Sys.os_type "Win32"))]
-    | Ostype_cygwin ->
-      [Simple (Simple.const_bool (String.equal Sys.os_type "Cygwin"))]
-    | Backend_type ->
-      [Simple Simple.const_zero] (* constructor 0 is the same as Native here *)
-    | Runtime5 -> [Simple (Simple.const_bool Config.runtime5)])
+    match !Clflags.jsir with
+    | true ->
+      Misc.fatal_errorf
+        "Saw %a in JSIR mode, but it should've been simplified away in \
+         [Lambda_to_lambda_transforms]:@ %a"
+        Printlambda.primitive prim Debuginfo.print_compact dbg
+    | false -> (
+      match const with
+      | Big_endian -> [Simple (Simple.const_bool big_endian)]
+      | Word_size ->
+        [Simple (Simple.const_int (Target_ocaml_int.of_int (8 * size_int)))]
+      | Int_size ->
+        [ Simple
+            (Simple.const_int (Target_ocaml_int.of_int ((8 * size_int) - 1))) ]
+      | Max_wosize ->
+        [ Simple
+            (Simple.const_int
+               (Target_ocaml_int.of_int
+                  ((1 lsl ((8 * size_int) - (10 + Config.reserved_header_bits)))
+                  - 1))) ]
+      | Ostype_unix ->
+        [Simple (Simple.const_bool (String.equal Sys.os_type "Unix"))]
+      | Ostype_win32 ->
+        [Simple (Simple.const_bool (String.equal Sys.os_type "Win32"))]
+      | Ostype_cygwin ->
+        [Simple (Simple.const_bool (String.equal Sys.os_type "Cygwin"))]
+      | Backend_type ->
+        [Simple Simple.const_zero]
+        (* constructor 0 is the same as Native here *)
+      | Runtime5 -> [Simple (Simple.const_bool Config.runtime5)]))
   | Pint_as_pointer mode, [[arg]] ->
     (* This is not a stack allocation, but nonetheless has a region
        constraint. *)
@@ -2746,7 +2755,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         ~vec_kind:(vec_kind size) Naked_float32s array ~index_kind index ]
   | ( Pint_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
-    if Targetint.size <> 64
+    if Targetint_32_64.size <> 64
     then Misc.fatal_error "[Pint_array_load_vec]: immediates must be 64 bits.";
     [ array_like_load_vec ~dbg ~size_int ~current_region ~unsafe ~mode ~boxed
         ~vec_kind:(vec_kind size) Immediates array ~index_kind index ]
@@ -2756,7 +2765,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         ~vec_kind:(vec_kind size) Naked_int64s array ~index_kind index ]
   | ( Punboxed_nativeint_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
-    if Targetint.size <> 64
+    if Targetint_32_64.size <> 64
     then
       Misc.fatal_error
         "[Punboxed_nativeint_array_load_vec]: nativeint must be 64 bits.";
@@ -2783,7 +2792,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         Naked_float32s array ~index_kind index new_value ]
   | ( Pint_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
-    if Targetint.size <> 64
+    if Targetint_32_64.size <> 64
     then Misc.fatal_error "[Pint_array_set_vec]: immediates must be 64 bits.";
     [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind size)
         Immediates array ~index_kind index new_value ]
@@ -2793,7 +2802,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         Naked_int64s array ~index_kind index new_value ]
   | ( Punboxed_nativeint_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
-    if Targetint.size <> 64
+    if Targetint_32_64.size <> 64
     then
       Misc.fatal_error
         "[Punboxed_nativeint_array_set_vec]: nativeint must be 64 bits.";

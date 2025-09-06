@@ -19,15 +19,17 @@ module Use_info = struct
     | Expected_to_be_used
     | Unused_because_of_call_site_decision
     | Unused_because_function_unknown
+    | Jsir_inlining_disabled
 
   let equal t1 t2 =
     match t1, t2 with
     | Expected_to_be_used, Expected_to_be_used
     | Unused_because_of_call_site_decision, Unused_because_of_call_site_decision
-    | Unused_because_function_unknown, Unused_because_function_unknown ->
+    | Unused_because_function_unknown, Unused_because_function_unknown
+    | Jsir_inlining_disabled, Jsir_inlining_disabled ->
       true
     | ( ( Expected_to_be_used | Unused_because_of_call_site_decision
-        | Unused_because_function_unknown ),
+        | Unused_because_function_unknown | Jsir_inlining_disabled ),
         _ ) ->
       false
 
@@ -45,6 +47,8 @@ module Use_info = struct
         if Flambda_features.classic_mode ()
         then " (is it marked [@inline never]?)"
         else "")
+    | Jsir_inlining_disabled ->
+      Some "function inlining is disabled for Js_of_ocaml translation"
 end
 
 type t =

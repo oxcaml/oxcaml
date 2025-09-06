@@ -74,6 +74,7 @@ endef
 boot_targets = \
   $(boot_ocamlc) \
   $(boot_ocamlopt) \
+  $(boot_ocamlj) \
   $(boot_ocamlmklib) \
   $(boot_ocamldep) \
   $(boot_ocamlobjinfo) \
@@ -190,11 +191,12 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	cp $^ _build/_bootinstall/lib/ocaml
 	ln -sf ../../default/$(boot_ocamlopt) _build/_bootinstall/bin/ocamlopt.opt
 	ln -sf ../../default/$(boot_ocamlc) _build/_bootinstall/bin/ocamlc.opt
+	ln -sf ../../default/$(boot_ocamlj) _build/_bootinstall/bin/ocamlj.opt
 	ln -sf ../../default/$(boot_ocamlmklib) _build/_bootinstall/bin/ocamlmklib.opt
 	ln -sf ../../default/$(boot_ocamldep) _build/_bootinstall/bin/ocamldep.opt
 	ln -sf ../../default/$(boot_ocamlobjinfo) _build/_bootinstall/bin/ocamlobjinfo.opt
 	ln -sf "`which ocamllex`" _build/_bootinstall/bin/ocamllex.opt
-	for prog in ocamlopt ocamlc ocamllex ocamldep ocamlmklib; do \
+	for prog in ocamlopt ocamlj ocamlc ocamllex ocamldep ocamlmklib; do \
 	  ln -sf "$$prog.opt" "_build/_bootinstall/bin/$$prog"; \
 	done
 

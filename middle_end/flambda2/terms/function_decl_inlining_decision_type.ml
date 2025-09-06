@@ -31,6 +31,7 @@ type t =
       }
   | Functor of { size : Code_size.t }
   | Recursive
+  | Jsir_inlining_disabled
 
 let [@ocamlformat "disable"] print ppf t =
   match t with
@@ -73,6 +74,8 @@ let [@ocamlformat "disable"] print ppf t =
       Code_size.print size
   | Recursive ->
     Format.fprintf ppf "Recursive"
+  | Jsir_inlining_disabled ->
+    Format.fprintf ppf "Jsir_inlining_disabled"
 
 let report_decision ppf t =
   match t with
@@ -107,6 +110,9 @@ let report_decision ppf t =
       "this@ function@ is@ a@ functor@ (so@ the@ large@ function@ threshold@ \
        was@ not@ applied)"
   | Recursive -> Format.fprintf ppf "this@ function@ is@ recursive"
+  | Jsir_inlining_disabled ->
+    Format.fprintf ppf
+      "function@ inlining@ is@ disabled@ for@ Js_of_ocaml@ translation"
 
 type inlining_behaviour =
   | Cannot_be_inlined
@@ -116,7 +122,7 @@ type inlining_behaviour =
 let behaviour t =
   match t with
   | Not_yet_decided | Never_inline_attribute | Function_body_too_large _
-  | Recursive ->
+  | Recursive | Jsir_inlining_disabled ->
     Cannot_be_inlined
   | Stub | Attribute_inline | Small_function _ -> Must_be_inlined
   | Functor _ | Speculatively_inlinable _ -> Could_possibly_be_inlined
@@ -139,7 +145,8 @@ let has_attribute_inline t =
   match t with
   | Attribute_inline -> true
   | Not_yet_decided | Never_inline_attribute | Function_body_too_large _ | Stub
-  | Small_function _ | Speculatively_inlinable _ | Functor _ | Recursive ->
+  | Small_function _ | Speculatively_inlinable _ | Functor _ | Recursive
+  | Jsir_inlining_disabled ->
     false
 
 let cannot_be_inlined t =
@@ -177,8 +184,9 @@ let equal t1 t2 =
   | Functor { size = size1 }, Functor { size = size2 } ->
     Code_size.equal size1 size2
   | Recursive, Recursive -> true
+  | Jsir_inlining_disabled, Jsir_inlining_disabled -> true
   | ( ( Not_yet_decided | Never_inline_attribute | Function_body_too_large _
       | Stub | Attribute_inline | Small_function _ | Speculatively_inlinable _
-      | Functor _ | Recursive ),
+      | Functor _ | Recursive | Jsir_inlining_disabled ),
       _ ) ->
     false
