@@ -1,5 +1,15 @@
 #include <assert.h>
+
 #define BUILTIN(name) void name() { assert(0); }
+
+BUILTIN(caml_sse_load_aligned);
+BUILTIN(caml_sse_load_unaligned);
+BUILTIN(caml_sse_store_aligned);
+BUILTIN(caml_sse_store_unaligned);
+BUILTIN(caml_avx_load_aligned);
+BUILTIN(caml_avx_load_unaligned);
+BUILTIN(caml_avx_store_aligned);
+BUILTIN(caml_avx_store_unaligned);
 
 BUILTIN(caml_sse2_float64_add);
 BUILTIN(caml_sse2_float64_sub);
