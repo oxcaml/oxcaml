@@ -183,7 +183,7 @@ type simple =
   | Coerce of simple * coercion
 
 type array_kind = Flambda_primitive.Array_kind.t =
-  | Immediates
+  | Externals
   | Values
   | Naked_floats
   | Naked_float32s
@@ -360,7 +360,7 @@ type string_accessor_width = Flambda_primitive.string_accessor_width =
   | Five_twelve of { aligned : bool }
 
 type array_load_kind = Flambda_primitive.Array_load_kind.t =
-  | Immediates
+  | Externals
   | Values
   | Naked_floats
   | Naked_float32s
@@ -372,7 +372,7 @@ type array_load_kind = Flambda_primitive.Array_load_kind.t =
   | Naked_vec512s
 
 type array_set_kind =
-  | Immediates
+  | Externals
   | Values of init_or_assign
   | Naked_floats
   | Naked_float32s

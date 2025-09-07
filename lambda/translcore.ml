@@ -856,7 +856,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         begin match List.map extract_constant ll with
         | exception Not_constant
           when kind = Pfloatarray && Types.is_mutable amut ->
-            (* We cannot currently lift mutable [Pintarray] arrays safely in
+            (* We cannot currently lift mutable [Pextarray] arrays safely in
                Flambda because [caml_modify] might be called upon them
                (e.g. from code operating on polymorphic arrays, or functions
                such as [caml_array_blit].
@@ -875,7 +875,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 imm_array
               else
                 match kind with
-                | Paddrarray | Pintarray ->
+                | Paddrarray | Pextarray ->
                   Lconst(Const_block(0, cl))
                 | Pfloatarray ->
                   Lconst(Const_float_array(List.map extract_float cl))
@@ -905,7 +905,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
       let array_kind = Typeopt.array_kind e elt_sort in
       begin match array_kind with
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray
+      | Pgenarray | Paddrarray | Pextarray | Pfloatarray
       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
       | Punboxedvectorarray _ ->
         raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
