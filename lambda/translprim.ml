@@ -1646,7 +1646,9 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     let jkind = Ctype.type_jkind env p3 in
     let mbe = Typedecl.mixed_block_element env p3 jkind in
     let mbe = transl_mixed_block_element env (to_location loc) p3 mbe in
-    Some (Primitive (Pset_idx (layout_of_mixed_block_element mbe, m), arity))
+    Some (Primitive
+            (Pset_idx (layout_of_mixed_block_element_for_idx_set mbe, m),
+             arity))
   | _ -> None
 
 let caml_equal =
