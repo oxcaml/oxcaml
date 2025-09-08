@@ -150,7 +150,7 @@ let can_inline (t : t) : can_inline =
   | Replay_history_says_must_inline ->
     Inline { unroll_to = None; was_inline_always = false }
   | Jsir_inlining_disabled ->
-    Do_not_inline { erase_attribute_if_ignored = true }
+    Do_not_inline { erase_attribute_if_ignored = false }
 
 (* CR mshinwell/gbury: tidy up by using Format.pp_print_text *)
 let report_reason fmt t =
