@@ -345,7 +345,8 @@ and apply_expr ~env ~res e =
   let args = Apply_expr.args e in
   let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
-    | _, Effect _ -> failwith "effects not implemented yet"
+    | Some _, Effect _ ->
+      Misc.fatal_error "Received a nonempty callee for effects"
     | ( None,
         ( Function
             { function_call = Indirect_unknown_arity | Indirect_known_arity;
@@ -368,6 +369,37 @@ and apply_expr ~env ~res e =
         To_jsir_env.get_code_id_exn env code_id
       in
       apply_fn ~res ~f:closure ~args ~exact:false
+    | None, Effect effect ->
+      if List.length args <> 0
+      then Misc.fatal_error "Found non-empty argument list for effects";
+      let prim_name, args, res =
+        let open Jsir in
+        match effect with
+        | Perform { eff } ->
+          let eff, res = To_jsir_shared.simple ~env ~res eff in
+          "%perform", [Pv eff], res
+        | Reperform { eff; cont; last_fiber } ->
+          let eff, res = To_jsir_shared.simple ~env ~res eff in
+          let cont, res = To_jsir_shared.simple ~env ~res cont in
+          let last_fiber, res = To_jsir_shared.simple ~env ~res last_fiber in
+          "%reperform", [Pv eff; Pv cont; Pv last_fiber], res
+        | Run_stack { stack; f; arg } ->
+          let stack, res = To_jsir_shared.simple ~env ~res stack in
+          let f, res = To_jsir_shared.simple ~env ~res f in
+          let arg, res = To_jsir_shared.simple ~env ~res arg in
+          let unit = Pc (Int Targetint.zero) in
+          "%resume", [Pv stack; Pv f; Pv arg; unit], res
+        | Resume { stack; f; arg; last_fiber } ->
+          let stack, res = To_jsir_shared.simple ~env ~res stack in
+          let f, res = To_jsir_shared.simple ~env ~res f in
+          let arg, res = To_jsir_shared.simple ~env ~res arg in
+          let last_fiber, res = To_jsir_shared.simple ~env ~res last_fiber in
+          "%resume", [Pv stack; Pv f; Pv arg; Pv last_fiber], res
+      in
+      let prim : Jsir.expr = Prim (Extern prim_name, args) in
+      let var = Jsir.Var.fresh () in
+      let res = To_jsir_result.add_instr_exn res (Let (var, prim)) in
+      var, res
     | Some callee, Method { obj; kind; alloc_mode = _ } ->
       let args, res = To_jsir_shared.simples ~env ~res args in
       let obj, res = To_jsir_shared.simple ~env ~res obj in
