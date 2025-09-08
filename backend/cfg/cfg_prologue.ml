@@ -4,8 +4,7 @@ module DLL = Oxcaml_utils.Doubly_linked_list
 
 (* Before this pass, the CFG should not contain any prologues/epilogues. Iterate
    over the CFG and make sure that this is the case. *)
-let validate_no_prologue (cfg_with_layout : Cfg_with_layout.t) =
-  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+let validate_no_prologue (cfg : Cfg.t) =
   Label.Tbl.iter
     (fun _ block ->
       let body = block.Cfg.body in
@@ -408,22 +407,21 @@ module Validator = struct
   include (T : module type of T with type context := context)
 end
 
-let run : Cfg_with_layout.t -> Cfg_with_layout.t =
- fun cfg_with_layout ->
-  if !Oxcaml_flags.cfg_prologue_validate
-  then validate_no_prologue cfg_with_layout;
-  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+let run : Cfg_with_infos.t -> Cfg_with_infos.t =
+ fun cfg_with_infos ->
+  let cfg = Cfg_with_infos.cfg cfg_with_infos in
+  if !Oxcaml_flags.cfg_prologue_validate then validate_no_prologue cfg;
   (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
   | true
     when Label.Tbl.length cfg.blocks
          <= !Oxcaml_flags.cfg_prologue_shrink_wrap_threshold ->
     add_prologue_if_required cfg ~f:find_prologue_and_epilogues_shrink_wrapped
   | _ -> add_prologue_if_required cfg ~f:find_prologue_and_epilogues_at_entry);
-  cfg_with_layout
+  cfg_with_infos
 
-let validate : Cfg_with_layout.t -> Cfg_with_layout.t =
+let validate : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_layout ->
-  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let cfg = Cfg_with_infos.cfg cfg_with_layout in
   let fun_name = Cfg.fun_name cfg in
   match !Oxcaml_flags.cfg_prologue_validate with
   | true -> (
