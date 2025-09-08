@@ -29,14 +29,6 @@
 open! Flambda.Import
 open! Jsoo_imports.Import
 
-(* CR selee: we should eventually get rid of this *)
-let unsupported_multiple_return_variables vars =
-  match vars with
-  | [var] -> var
-  | [] -> Misc.fatal_error "Found return statement with no arguments"
-  | _ :: _ ->
-    Misc.fatal_error "Multiple return variables are currently unsupported."
-
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
 let create_let_simple ~env ~res fvar simple =
@@ -445,8 +437,32 @@ and apply_expr ~env ~res e =
     then env, To_jsir_result.end_block_with_last_exn res (Return return_var)
     else
       let addr = To_jsir_env.get_continuation_exn env cont in
+      let arity =
+        Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized
+      in
+      let return_vars, res =
+        match arity with
+        | 0 -> [], res
+        | 1 -> [return_var], res
+        | _ as arity ->
+          let return_vars = List.init arity (fun i -> i, Jsir.Var.fresh ()) in
+          let res =
+            List.fold_left
+              (fun res (i, var) ->
+                let field : Jsir.expr =
+                  (* CR selee: [Non_float] is ok for javascript because it
+                     doesn't change anything (see
+                     [js_of_ocaml/compiler/lib/generate.ml]), but will need
+                     changing for WASM. *)
+                  Field (return_var, i, Non_float)
+                in
+                To_jsir_result.add_instr_exn res (Let (var, field)))
+              res return_vars
+          in
+          List.map snd return_vars, res
+      in
       ( env,
-        To_jsir_result.end_block_with_last_exn res (Branch (addr, [return_var]))
+        To_jsir_result.end_block_with_last_exn res (Branch (addr, return_vars))
       )
 
 and apply_cont0 ~env ~res apply_cont =
@@ -491,7 +507,22 @@ and apply_cont0 ~env ~res apply_cont =
       in
       Stop, res
     | Return ->
-      let arg = unsupported_multiple_return_variables args in
+      let arg, res =
+        match args with
+        | [arg] -> arg, res
+        | [] ->
+          (* We have to return something - we will ignore this at the
+             application site. *)
+          let arg = Jsir.Var.fresh () in
+          arg, To_jsir_result.add_instr_exn res (Let (arg, Constant Null))
+        | _ :: _ as args ->
+          (* We box these back into a regular tuple - we will unbox this at the
+             application site. *)
+          let args = Array.of_list args in
+          let block : Jsir.expr = Block (0, args, NotArray, Immutable) in
+          let arg = Jsir.Var.fresh () in
+          arg, To_jsir_result.add_instr_exn res (Let (arg, block))
+      in
       Return arg, res
     | Normal_or_exn -> (
       match raise_kind_and_exn_handler with
