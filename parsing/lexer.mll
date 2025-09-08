@@ -461,10 +461,10 @@ let int ~maybe_hash lit modifier =
   | unexpected -> fatal_error ("expected # or empty string: " ^ unexpected)
 
 let produce_and_backtrack lexbuf token back =
-  (lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos - back;
-   let curpos = lexbuf.lex_curr_p in
-   lexbuf.lex_curr_p <- { curpos with pos_cnum = curpos.pos_cnum - back };
-   token)
+  lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos - back;
+  let curpos = lexbuf.lex_curr_p in
+  lexbuf.lex_curr_p <- { curpos with pos_cnum = curpos.pos_cnum - back };
+  token
 
 (* Error report *)
 
@@ -735,14 +735,11 @@ rule token = parse
           DOCSTRING(Docstrings.docstring "" (Location.curr lexbuf))
         else
           COMMENT (stars, Location.curr lexbuf) }
-  | "*)"
-      { let loc = Location.curr lexbuf in
-        Location.prerr_warning loc Warnings.Comment_not_end;
-        lexbuf.Lexing.lex_curr_pos <- lexbuf.Lexing.lex_curr_pos - 1;
-        let curpos = lexbuf.lex_curr_p in
-        lexbuf.lex_curr_p <- { curpos with pos_cnum = curpos.pos_cnum - 1 };
-        STAR
-      }
+  | "*)" {
+      let loc = Location.curr lexbuf in
+      Location.prerr_warning loc Warnings.Comment_not_end;
+      produce_and_backtrack lexbuf STAR 1
+    }
   | "#"
       { if not (at_beginning_of_line lexbuf.lex_start_p)
         then HASH
@@ -859,12 +856,9 @@ rule token = parse
    the line was already consumed, either just the '#' or the '#4'. That's
    indicated by the [already_consumed] argument. The caller is responsible
    for checking that the '#' appears in column 0.
-
-   The [directive] lexer always attempts to read the line number (or something else,
-   like "syntax" or other directive name) from the lexbuf.
 *)
 and directive already_consumed = parse
-  (* Expect to receive a line number from exactly one source (either the lexbuf or
+  (* Expects to receive a line number from exactly one source (either the lexbuf or
      the [already_consumed] argument, but not both) and will fail if this isn't
      the case. *)
   | ([' ' '\t']* (['0'-'9']+? as line_num_opt) [' ' '\t']*
@@ -893,9 +887,8 @@ and directive already_consumed = parse
             update_loc lexbuf (Some name) (line_num - 1) true 0;
             token lexbuf
       }
-  (* Lexer rule for the #syntax directive *)
-  | "syntax" [' ' '\t']+ (lowercase identchar* as mode) [' ' '\t']*
-    (lowercase identchar* as toggle) [^ '\010' '\013'] *
+  | "syntax" [' ' '\t']+ (lowercase identchar* as mode) [' ' '\t']+
+    (lowercase identchar* as toggle) [^ '\010' '\013']*
       { let toggle =
           match toggle with
           | "on" -> true
