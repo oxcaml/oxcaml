@@ -274,8 +274,8 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
   (match cfg_description with
   | None -> ()
   | Some cfg_description ->
-    let (_ : Cfg_with_layout.t) =
-      Regalloc_validate.run cfg_description cfg_with_layout
+    let (_ : Cfg_with_infos.t) =
+      Regalloc_validate.run cfg_description cfg_with_infos
     in
     ());
   let duration = end_time -. start_time in

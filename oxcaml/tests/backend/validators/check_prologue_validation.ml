@@ -18,7 +18,9 @@ let check =
         ())
     ~save:(fun cfg ->
       (* CR cfalas: Fix how the files are saved. *)
-      Cfg_with_layout.save_as_dot ~filename:"/tmp/test.dot" cfg "test-cfg";
+      let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg in
+      Cfg_with_layout.save_as_dot ~filename:"/tmp/test.dot" cfg_with_layout
+        "test-cfg";
       Format.printf "The failing cfg was put in /tmp/test.dot\n")
 
 let seq = ref (InstructionId.make_sequence ())
@@ -281,8 +283,8 @@ let () =
           fun_ret_type = Cmm.typ_void
         }
       in
-      let cfg_with_layout = Cfg_desc.make_post_regalloc cfg in
-      let cfg = Cfg_with_layout.cfg cfg_with_layout in
+      let cfg_with_infos = Cfg_desc.make_post_regalloc cfg in
+      let cfg = Cfg_with_infos.cfg cfg_with_infos in
       (* Manually correct the stack offset after the pushtrap *)
       let block = Cfg.get_block_exn cfg entry_label in
       let _ =
@@ -294,7 +296,7 @@ let () =
             match instr.desc with Pushtrap _ -> acc + 1 | _ -> acc)
           ~init:0
       in
-      cfg_with_layout)
+      cfg_with_infos)
     ~exp_std:""
     ~exp_err:
       ">> Fatal error: Cfg_prologue: error validating instruction #0003: \

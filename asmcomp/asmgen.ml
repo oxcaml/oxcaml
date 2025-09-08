@@ -394,12 +394,12 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
               cfg_with_infos_profile ~accumulate:true "cfg_irc" Regalloc_irc.run
             | LS ->
               cfg_with_infos_profile ~accumulate:true "cfg_ls" Regalloc_ls.run)
-         ++ Cfg_with_infos.cfg_with_layout
-         ++ cfg_with_layout_profile ~accumulate:true "cfg_validate_description"
+         ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
               (Regalloc_validate.run cfg_description))
-  ++ cfg_with_layout_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
-  ++ cfg_with_layout_profile ~accumulate:true "cfg_prologue_validate"
+  ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
+  ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue_validate"
        Cfg_prologue.validate
+  ++ Cfg_with_infos.cfg_with_layout
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_simplify"
        Regalloc_utils.simplify_cfg
