@@ -282,14 +282,14 @@ module Runtime_5 = struct
         let v : a = init.portable () in
         let new_obj = Obj_opt.some (Sys.opaque_identity v) in
         (* At this point, [st] or [st.(idx)] may have been changed
-           by another thread on the same domain.
+          by another thread on the same domain.
 
-           If [st] changed, it was resized into a larger value,
-           we can just reuse the new value.
+          If [st] changed, it was resized into a larger value,
+          we can just reuse the new value.
 
-           If [st.(idx)] changed, we drop the current value to avoid
-           letting other threads observe a 'revert' that forgets
-           previous modifications. *)
+          If [st.(idx)] changed, we drop the current value to avoid
+          letting other threads observe a 'revert' that forgets
+          previous modifications. *)
         let st = get_dls_state () in
         if array_compare_and_set st idx obj new_obj
         then v
