@@ -265,7 +265,7 @@ module Runtime_5 = struct
 
     let[@inline never] array_compare_and_set a i oldval newval =
       (* Note: we cannot use [@poll error] due to the
-         allocations on a.(i) in the Double_array case. *)
+        allocations on a.(i) in the Double_array case. *)
       let curval = Array.unsafe_get a i in
       if curval == oldval then (
         Array.unsafe_set a i newval;
