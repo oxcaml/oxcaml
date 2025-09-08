@@ -2329,6 +2329,25 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_vector Unboxed_vec512 -> Vec512
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
 
+let rec layout_of_mixed_block_element_for_idx_set (mbe : _ mixed_block_element)
+  : layout =
+  match mbe with
+  | Product mbes ->
+    Punboxed_product
+      (Array.to_list (Array.map layout_of_mixed_block_element_for_idx_set mbes))
+  | Value value_kind -> Pvalue value_kind
+  | Float64 | Float_boxed _ -> Punboxed_float Unboxed_float64
+  | Float32 -> Punboxed_float Unboxed_float32
+  | Bits64 -> Punboxed_or_untagged_integer Unboxed_int64
+  | Bits32 -> Punboxed_or_untagged_integer Unboxed_int32
+  | Bits16 -> Punboxed_or_untagged_integer Untagged_int16
+  | Bits8 -> Punboxed_or_untagged_integer Untagged_int8
+  | Word -> Punboxed_or_untagged_integer Unboxed_nativeint
+  | Vec128 -> Punboxed_vector Unboxed_vec128
+  | Vec256 -> Punboxed_vector Unboxed_vec256
+  | Vec512 -> Punboxed_vector Unboxed_vec512
+  | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
+
 let rec mixed_block_element_leaves (el : _ mixed_block_element)
   : _ mixed_block_element list =
   match el with

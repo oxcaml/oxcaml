@@ -1415,7 +1415,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       | Some (p2, rhs) ->
         match is_function_type env rhs with
         | None -> [p1;p2], rhs
-        | Some (p3, rhs) -> 
+        | Some (p3, rhs) ->
           match is_function_type env rhs with
           | None -> [p1;p2;p3], rhs
           | Some (p4, rhs) -> [p1;p2;p3;p4], rhs
@@ -1608,17 +1608,17 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Atomic (Load, (Ref | Loc as kind), Pointer), _ ->
     (match is_function_type env ty with
     | None -> None
-    | Some (_, rhs) -> 
+    | Some (_, rhs) ->
       match fst (maybe_pointer_type env rhs) with
       | Pointer -> None
       | Immediate -> Some (Atomic (Load, kind, Immediate)))
   | Atomic (Load, Field, Pointer), _ ->
     (match is_function_type env ty with
     | None -> None
-    | Some (_, ty) -> 
+    | Some (_, ty) ->
       match is_function_type env ty with
       | None -> None
-      | Some (_, rhs) -> 
+      | Some (_, rhs) ->
         match fst (maybe_pointer_type env rhs) with
         | Pointer -> None
         | Immediate -> Some (Atomic (Load, Field, Immediate)))
@@ -1634,6 +1634,21 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     (match fst (maybe_pointer_type env v) with
     | Pointer -> None
     | Immediate -> Some (Atomic (op, kind, Immediate)))
+  | Primitive (Pset_idx (_, m), arity), (_ :: _ :: p3 :: _) ->
+    (* CR layouts: This is gross - particularly the call to [type_jkind] and the
+       conversion to and from [mixed_block_element]! The slightly less gross
+       thing would be to change [layout_of_const_sort_generic] in the same way
+       that we have changed [transl_mixed_block_element] to desecend into
+       products. But that's a big change that (a) will have substantial
+       performance impacts for lots of cases that don't matter, and (b) will
+       become obsolete when we do complex values. So for now, the gross
+       thing. *)
+    let jkind = Ctype.type_jkind env p3 in
+    let mbe = Typedecl.mixed_block_element env p3 jkind in
+    let mbe = transl_mixed_block_element env (to_location loc) p3 mbe in
+    Some (Primitive
+            (Pset_idx (layout_of_mixed_block_element_for_idx_set mbe, m),
+             arity))
   | _ -> None
 
 let caml_equal =

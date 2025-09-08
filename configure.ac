@@ -196,6 +196,7 @@ AC_SUBST([enable_runtime5])
 AC_SUBST([runtime_suffix])
 AC_SUBST([enable_stack_checks])
 AC_SUBST([enable_oxcaml_dwarf])
+AC_SUBST([enable_syntax_quotations])
 AC_SUBST([CONFIGURE_ARGS])
 AC_SUBST([native_compiler])
 AC_SUBST([default_build_target])
@@ -644,6 +645,12 @@ AC_ARG_ENABLE([oxcaml-dwarf],
     [enable OxCaml DWARF by default @<:@default=no@:>@])],
   [],
   [enable_oxcaml_dwarf=no])
+
+AC_ARG_ENABLE([syntax-quotations],
+  [AS_HELP_STRING([--enable-syntax-quotations],
+    [enable support for quotation syntax by default @<:@default=no@:>@])],
+  [],
+  [enable_syntax_quotations=no])
 
 AC_ARG_WITH([target-bindir],
   [AS_HELP_STRING([--with-target-bindir],

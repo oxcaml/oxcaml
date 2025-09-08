@@ -43,11 +43,11 @@ module Cfg_desc : sig
       fun_ret_type : Cmm.machtype
     }
 
-  val make : remove_regalloc:bool -> remove_locs:bool -> t -> Cfg_with_layout.t
+  val make : remove_regalloc:bool -> remove_locs:bool -> t -> Cfg_with_infos.t
 
-  val make_pre_regalloc : t -> Cfg_with_layout.t
+  val make_pre_regalloc : t -> Cfg_with_infos.t
 
-  val make_post_regalloc : t -> Cfg_with_layout.t
+  val make_post_regalloc : t -> Cfg_with_infos.t
 end
 
 val entry_label : Label.t

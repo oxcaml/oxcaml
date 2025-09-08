@@ -13,6 +13,7 @@
   warnError ? true,
   oxcamlClang ? false,
   oxcamlLldb ? false,
+  syntaxQuotations ? false,
 }:
 let
   pkgs = nixpkgs.pkgs or nixpkgs;
@@ -28,6 +29,7 @@ let
     in
     [
       "--cache-file=/dev/null"
+      "--with-objcopy=${pkgs.llvm}/bin/llvm-objcopy"
       (mkFlag addressSanitizer "address-sanitizer")
       (mkFlag dev "dev")
       (mkFlag flambdaInvariants "flambda-invariants")
@@ -38,7 +40,7 @@ let
       (mkFlag stackChecks "stack-checks")
       (mkFlag warnError "warn-error")
       (mkFlag ocamltest "ocamltest")
-      "--with-objcopy=${pkgs.llvm}/bin/llvm-objcopy"
+      (mkFlag syntaxQuotations "syntax-quotations")
     ];
 
   upstream = pkgs.ocaml-ng.ocamlPackages_4_14;

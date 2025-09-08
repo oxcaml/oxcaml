@@ -142,7 +142,7 @@ let make_package_object unix ~ppf_dump members target coercion
       Direct_to_cmm (flambda2 ~keep_symbol_tables:true)
     in
     Asmgen.compile_implementation ~pipeline unix
-      ~sourcefile:(Unit_info.Artifact.source_file target)
+      ~sourcefile:(Unit_info.Artifact.original_source_file target)
       ~prefixname
       ~ppf_dump
       program;

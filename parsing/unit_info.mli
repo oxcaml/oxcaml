@@ -53,15 +53,30 @@ type t
     - the module name associated to the unit
     - the filename prefix (dirname + basename with all extensions stripped)
       for compilation artifacts
-    - the input source file
+    - the original input source file
+    - the raw input source file
     For instance, when calling [ocamlopt dir/x.mli -o target/y.cmi],
     - the input source file is [dir/x.mli]
     - the module name is [Y]
     - the prefix is [target/y]
+
+    When calling, for example, [ocamlopt foo.ml._.preprocess] (where
+    foo.ml._.preprocess is a serialized, ppx-expanded AST of foo.ml), the "raw"
+    source file is foo.ml._.preprocess, while foo.ml is the "original" source
+    file.
 *)
 
-(** [source_file u] is the source file of [u]. *)
-val source_file: t -> filename
+(** [original_source_file u] is the original source file of [u]. When calling,
+    for example, [ocamlopt foo.ml._.preprocess] (where foo.ml._.preprocess is a
+    serialized, ppx-expanded AST of foo.ml), foo.ml is the "original" source
+    file. *)
+val original_source_file: t -> filename
+
+(** [raw_source_file u] is the raw source file of [u]. When calling, for
+    example, [ocamlopt foo.ml._.preprocess] (where foo.ml._.preprocess is a
+    serialized, ppx-expanded AST of foo.ml), foo.ml._.preprocess is the "raw"
+    source file.) *)
+val raw_source_file: t -> filename
 
 (** [prefix u] is the filename prefix of the unit. *)
 val prefix: t -> file_prefix
@@ -104,6 +119,8 @@ val make_with_known_compilation_unit:
     [Location.input_name] as well. *)
 val make_dummy: input_name:string -> Compilation_unit.t -> t
 
+val set_original_source_file_name : t -> filename -> t
+
 (** {1:artifact_function Build artifacts }*)
 module Artifact: sig
   type t
@@ -113,8 +130,17 @@ module Artifact: sig
     - the input source file if it exists
 *)
 
-   (** [source_file a] is the source file of [a] if it exists. *)
-   val source_file: t -> filename option
+   (** [original_source_file a] is the original source file of [a] if it exists.
+       See [Unit_info.original_source_file] for a description of the distinction
+       of "original" vs "raw" source file
+    *)
+   val original_source_file: t -> filename option
+
+   (** [raw_source_file a] is the raw source file of [a] if it exists. See
+       [Unit_info.raw_source_file] for a description of the distinction of
+       "original" vs "raw" source file
+    *)
+   val raw_source_file: t -> filename option
 
   (** [prefix a] is the filename prefix of the compilation artifact. *)
    val prefix: t ->  file_prefix

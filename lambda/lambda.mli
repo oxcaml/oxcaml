@@ -1216,6 +1216,10 @@ val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> unit mixed_block_element
 
+(* Translates [Float_boxed] as [Punboxed_float Unboxed_float64], for
+   compatibility with block indices. *)
+val layout_of_mixed_block_element_for_idx_set : _ mixed_block_element -> layout
+
 val mixed_block_element_leaves
   : 'a mixed_block_element -> 'a mixed_block_element list
 
