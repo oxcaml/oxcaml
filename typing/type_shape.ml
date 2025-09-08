@@ -301,12 +301,19 @@ module Type_shape = struct
             if !Clflags.dwarf_pedantic
             then
               let str =
-                match desc with 
-                | Tlink _ -> "Tlink" 
+                match desc with
+                | Tlink _ -> "Tlink"
                 | Tsubst _ -> "Tsubst"
-                | Tnil | Tvar _ | Tarrow (_, _, _, _) | Ttuple _ | Tunboxed_tuple _ 
-                | Tconstr (_, _, _) | Tobject (_, _) | Tfield (_, _, _, _) | Tvariant _ 
-                | Tunivar _ | Tpoly (_, _) | Tpackage (_, _) | Tof_kind _ -> 
+                | Tnil | Tvar _
+                | Tarrow (_, _, _, _)
+                | Ttuple _ | Tunboxed_tuple _
+                | Tconstr (_, _, _)
+                | Tobject (_, _)
+                | Tfield (_, _, _, _)
+                | Tvariant _ | Tunivar _
+                | Tpoly (_, _)
+                | Tpackage (_, _)
+                | Tof_kind _ ->
                   assert false
               in
               Misc.fatal_errorf
