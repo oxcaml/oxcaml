@@ -38,6 +38,7 @@ let
       (mkFlag stackChecks "stack-checks")
       (mkFlag warnError "warn-error")
       (mkFlag ocamltest "ocamltest")
+      "--with-objcopy=${pkgs.llvm}/bin/llvm-objcopy"
     ];
 
   upstream = pkgs.ocaml-ng.ocamlPackages_4_14;
