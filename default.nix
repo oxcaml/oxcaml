@@ -13,7 +13,7 @@
   warnError ? true,
   oxcamlClang ? false,
   oxcamlLldb ? false,
-  syntaxQuotations ? true,
+  syntaxQuotations ? false,
 }:
 let
   pkgs = nixpkgs.pkgs or nixpkgs;
