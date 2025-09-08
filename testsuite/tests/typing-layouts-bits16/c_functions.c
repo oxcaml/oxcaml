@@ -1,7 +1,7 @@
-#include <caml/mlvalues.h>
-#include <caml/memory.h>
-#include <caml/alloc.h>
-#include <caml/custom.h>
+#include "caml/mlvalues.h"
+#include "caml/memory.h"
+#include "caml/alloc.h"
+#include "caml/custom.h"
 
 static value caml_copy_int16(int16_t x) {
   return Val_long(x);
