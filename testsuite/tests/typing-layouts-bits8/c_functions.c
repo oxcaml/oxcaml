@@ -1,12 +1,7 @@
-#include <caml/mlvalues.h>
-#include <caml/memory.h>
-#include <caml/alloc.h>
-#include <caml/custom.h>
-
-
-static int8_t Int8_val(value v) {
-  return (int8_t)Long_val(v);
-}
+#include "caml/mlvalues.h"
+#include "caml/memory.h"
+#include "caml/alloc.h"
+#include "caml/custom.h"
 
 static value caml_copy_int8(int8_t x) {
   return Val_long(x);
