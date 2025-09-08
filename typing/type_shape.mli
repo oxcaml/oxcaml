@@ -45,11 +45,35 @@ module Type_decl_shape : sig
     Ident.t -> Types.type_declaration -> path_lookup -> Shape.t
 end
 
-(** When producing a type shape with [of_type_expr], the resulting shape is
-    not in normal form. In particular, it can contain recursion arising from
-    mutually-recursive type declarations. This function should be applied after
-    shape reduction in order to unfold such declarations (within limits) and
-    thus produce a normal form. *)
+(** [unfold_and_evaluate] performs call-by-value evaluation of shapes. It should
+    be applied after [reduce] (from [shape_reduce.ml]) has already been used.
+    More specifically, when producing a type shape with [of_type_expr], the
+    resulting shape is not a normal form. A normal form---at least for the
+    emission into DWARF debug information---should no longer contain structures
+    (from modules), lambdas (from functors and parametric types), application
+    (from functor instantiation and type application), mutually recursive
+    declarations and their projections ([Constr] and [Proj_decl]). (Due to
+    missing information, it might still contain compilation units [Comp_unit]
+    and projections [Proj] from them.)
+
+    We reach the normal form of a type shape (e.g., during the emission of DWARF
+    information) in two steps:
+
+    1. We execute [shape_reduce], which will insert compilation units and then
+      reduce away projections [Proj] and functor applications. It will also,
+      partially, deal with instantiation of type variables. That is,
+      [of_type_declaration] inserts lambdas for non-recursive types with type
+      arguments. These are reduced away via [shape_reduce]. (For
+      (mutually-)recursive types, the next step handles the instantiation.)
+    2. After shape reduction, the type declaration can still contain recursive
+      or mutually-recursive declarations, which have not been unfolded. Since we
+      cannot directly emit these into DWARF, we then unfold recursive
+      declarations applied to type shape arguments into recursive types with
+      [unfold_and_evaluate]. For example,
+        [type 'a list = [] | :: of 'a * 'a list]
+      applied to [int] becomes the type shape
+        [Mu (Variant [] | :: of int * #0)].
+  *)
 val unfold_and_evaluate : Shape.t -> Shape.t
 
 type shape_with_layout = private

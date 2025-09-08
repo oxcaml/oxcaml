@@ -436,5 +436,5 @@ module DeBruijn_env : sig
 
   val push : 'a t -> 'a -> 'a t
 
-  val get_opt : 'a t -> int -> 'a option
+  val get_opt : 'a t -> de_bruijn_index:int -> 'a option
 end

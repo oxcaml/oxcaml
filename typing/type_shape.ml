@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+[@@@warning "+4"]
+
 module Uid = Shape.Uid
 module Layout = Jkind_types.Sort.Const
 
@@ -36,11 +38,12 @@ type path_lookup = Path.t -> args:Shape.t list -> Shape.t option
 module Recursive_binder : sig
   type t
 
-  val mk_recursive_binder : unit -> t
+  val create : unit -> t
 
-  val use_recursive_binder : t -> Shape.t
+  val mark_as_used : t -> Shape.t
 
-  val bind_recursive_binder : ?preserve_uid:bool -> t -> Shape.t -> Shape.t
+  val close_term_if_binder_is_used :
+    ?preserve_uid:bool -> t -> Shape.t -> Shape.t
 end = struct
   (* CR sspies: To improve performance, consider replacing this pass with
      a single pass over the resulting definition that simultaneously turns
@@ -126,22 +129,22 @@ end = struct
       mutable used : bool
     }
 
-  let mk_recursive_binder () = { uid = Uid.mk ~current_unit:None; used = false }
+  let create () = { uid = Uid.mk ~current_unit:None; used = false }
 
   (* CR sspies: Looking at this again after some evaluation of the shape
      mechanism, I think there is a question here of whether we want to use de
      Bruijn indices or just new identifiers for our recursive variables. The
      latter would allow us to avoid [shape_subst_uid_with_rec_var] in
-     [bind_recursive_binder], which saves us a (potentially costly) shape
-     traversal. The benefit of the de Bruijn indicies is that they increase
+     [close_term_if_binder_is_used], which saves us a (potentially costly) shape
+     traversal. The benefit of the de Bruijn indices is that they increase
      sharing between types that have the exact same recursive structure. I'm not
      sure how much this happens in practice.
   *)
-  let use_recursive_binder db =
+  let mark_as_used db =
     db.used <- true;
     Shape.leaf db.uid
 
-  let bind_recursive_binder ?(preserve_uid = true) db sh =
+  let close_term_if_binder_is_used ?(preserve_uid = true) db sh =
     if not db.used
     then sh
     else
@@ -252,13 +255,13 @@ module Type_shape = struct
     if cannot_proceed ()
     then
       match Numbers.Int.Map.find_opt (Types.get_id expr) visited with
-      | Some db -> Recursive_binder.use_recursive_binder db
+      | Some db -> Recursive_binder.mark_as_used db
       | None -> unknown_shape
     else
       match List.find_opt (fun (p, _) -> Types.eq_type p expr) subst with
       | Some (_, replace_by) -> replace_by
       | None ->
-        let rec_binder = Recursive_binder.mk_recursive_binder () in
+        let rec_binder = Recursive_binder.create () in
         let visited =
           Numbers.Int.Map.add (Types.get_id expr) rec_binder visited
         in
@@ -298,10 +301,13 @@ module Type_shape = struct
             if !Clflags.dwarf_pedantic
             then
               let str =
-                match desc with
-                | Tlink _ -> "Tlink"
+                match desc with 
+                | Tlink _ -> "Tlink" 
                 | Tsubst _ -> "Tsubst"
-                | _ -> assert false
+                | Tnil | Tvar _ | Tarrow (_, _, _, _) | Ttuple _ | Tunboxed_tuple _ 
+                | Tconstr (_, _, _) | Tobject (_, _) | Tfield (_, _, _, _) | Tvariant _ 
+                | Tunivar _ | Tpoly (_, _) | Tpackage (_, _) | Tof_kind _ -> 
+                  assert false
               in
               Misc.fatal_errorf
                 "Linking and substitution should not reach this stage. Found \
@@ -344,8 +350,8 @@ module Type_shape = struct
           | Tpackage _ -> unknown_shape
           (* CR sspies: Support first-class modules. *)
         in
-        Recursive_binder.bind_recursive_binder ~preserve_uid:false rec_binder
-          type_shape
+        Recursive_binder.close_term_if_binder_is_used ~preserve_uid:false
+          rec_binder type_shape
 
   let of_type_expr (expr : Types.type_expr) shape_for_constr =
     of_type_expr_go ~visited:Numbers.Int.Map.empty ~depth:0 expr []
@@ -568,7 +574,7 @@ module Type_decl_shape = struct
     in
     definition
 
-  (* Heuristic: In (a block of mutually) recursive defintions, it is possible
+  (* Heuristic: In (a block of mutually) recursive definitions, it is possible
      to create recursive cycles that do not have a closed form. For example,
 
         type 'a foo = A of 'a | B of (int * 'a) foo
@@ -594,6 +600,10 @@ module Type_decl_shape = struct
   *)
 
   let rec is_closed_type_shape shape =
+    (* [is_closed_type_shape] can be called frequently. It approximates whether
+       a shape is closed via a quick check. In particular, it does not keep
+       track of the currently bound variables. It returns false for, for
+       example, abstractions and application, and various variable cases. *)
     let open Shape in
     match shape.desc with
     | Leaf -> true
@@ -621,7 +631,14 @@ module Type_decl_shape = struct
       is_closed_type_shape sh
     | Record { fields; kind = _ } ->
       List.for_all (fun (_, sh, _) -> is_closed_type_shape sh) fields
-    | _ -> false
+    | Var _
+    | App (_, _)
+    | Struct _
+    | Proj (_, _)
+    | Mu _
+    | Proj_decl (_, _)
+    | Mutrec _ | Abs _ | Error _ | Comp_unit _ | Rec_var _ ->
+      false
 
   let shape_for_constr_with_declarations
       (decl_lookup_map : Types.type_declaration Ident.Map.t) shape_for_constr
@@ -643,7 +660,9 @@ module Type_decl_shape = struct
           recursive := true;
           (* We are applying the declaration to different arguments
              that are not closed. In this case, we create a version of the type
-             that can have any OCaml values for its arguments. *)
+             that can have anything for its arguments. *)
+          (* CR sspies: Revisit this case when revisiting the layouts and their
+             interactions with type shapes. *)
           Some
             (Shape.constr id' (List.map (fun _ -> Shape.leaf' None) inner_args))
         )
@@ -716,7 +735,19 @@ let rec decompose_application (t : Shape.t) =
   | Shape.App (f, arg) ->
     let head, tail = decompose_application f in
     head, tail @ [arg]
-  | _ -> t, []
+  | Var _
+  | Abs (_, _)
+  | Struct _ | Alias _ | Leaf
+  | Proj (_, _)
+  | Comp_unit _ | Error _
+  | Constr (_, _)
+  | Tuple _ | Unboxed_tuple _
+  | Predef (_, _)
+  | Arrow (_, _)
+  | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _ | Record _
+  | Mutrec _
+  | Proj_decl (_, _) ->
+    t, []
 
 let find_constr_id_with_args (subst_constr, _) id args =
   match Ident.Map.find_opt id subst_constr with
@@ -749,12 +780,28 @@ let update_subst_with_mutrec_decl (subst_constr, subst_constr_mut) t map =
 let eval_cache = Shape.Cache.create 256
 
 let add_to_cache t res subst_type (subst_constr_mut, subst_constr) =
+  (*= Due to internal sharing in memory, type shapes can become too large to
+      traverse recursively. As such, we cannot check here whether the shape [t]
+      is actually closed. We approximate this by checking whether it is being
+      evaluated in an empty environment, since an empty environment will always
+      lead to the same result (regardless of whether the shape is actually
+      closed). In an empty environment
+      - [subst_type] is empty, meaning there are no free type variables to
+        substitute.
+      - [subst_constr_mut] is empty, meaning there are no mutually-recursive
+        declarations that we could insert for [Constr]-entries, and
+      - [subst_constr] is empty, meaning there are no recursive occurrences
+        of a particular [Constr (id, args)] to be substituted with a recursive
+        variable.
+  *)
   if Ident.Map.is_empty subst_type
      && Ident.Map.is_empty subst_constr_mut
      && Ident.Map.is_empty subst_constr
   then Shape.Cache.add eval_cache t res
 
 let find_in_cache t subst_type (subst_constr_mut, subst_constr) =
+  (* We perform the same emptiness check as in [add_to_cache] when looking up a
+     value. *)
   if Ident.Map.is_empty subst_type
      && Ident.Map.is_empty subst_constr_mut
      && Ident.Map.is_empty subst_constr
@@ -787,20 +834,53 @@ and unfold_and_evaluate0 ~depth subst_type subst_constr (t : Shape.t) =
       match str.Shape.desc with
       | Mutrec ts ->
         let depth = depth + 1 in
-        let rec_binder = Recursive_binder.mk_recursive_binder () in
+        let rec_binder = Recursive_binder.create () in
         let subst_constr = update_subst_with_mutrec_decl subst_constr str ts in
         let subst_constr =
           update_subst_with_id_arg_binder subst_constr id args rec_binder
         in
-        let ts = Ident.Map.find i ts in
+        let ts = Ident.Map.find id ts in
         unfold_and_evaluate ~depth subst_type subst_constr
           (Shape.app_list ts args)
-        |> Recursive_binder.bind_recursive_binder ~preserve_uid:false rec_binder
+        |> Recursive_binder.close_term_if_binder_is_used ~preserve_uid:false
+             rec_binder
         |> Option.some
-      | Leaf -> None
-      | _ -> assert false
-      (* projections are always directly applied to the mutrec *))
-    | _ -> None
+      | Leaf | Error _ -> None
+      | Var _
+      | Abs (_, _)
+      | App (_, _)
+      | Struct _ | Alias _
+      | Proj (_, _)
+      | Comp_unit _
+      | Constr (_, _)
+      | Tuple _ | Unboxed_tuple _
+      | Predef (_, _)
+      | Arrow (_, _)
+      | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
+      | Record _
+      | Proj_decl (_, _) ->
+        if !Clflags.dwarf_pedantic
+        then
+          Misc.fatal_errorf
+            "Found %a in declaration projection %a. Expected either a mutrec \
+             declaration, an error, or a leaf."
+            Shape.print str Ident.print id
+          (* Projections are always directly applied to the mutrec. In the case of
+             imprecisions, the cases [Leaf] and [Error] can potentially occur. *)
+        else None)
+    | Var _
+    | Abs (_, _)
+    | App (_, _)
+    | Struct _ | Alias _ | Leaf
+    | Proj (_, _)
+    | Comp_unit _ | Error _
+    | Constr (_, _)
+    | Tuple _ | Unboxed_tuple _
+    | Predef (_, _)
+    | Arrow (_, _)
+    | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
+    | Record _ | Mutrec _ ->
+      None
   in
   let result =
     match maybe_evaluated_shape with
@@ -814,7 +894,7 @@ and unfold_and_evaluate0 ~depth subst_type subst_constr (t : Shape.t) =
       | Constr (id, constr_args) -> (
         let constr_args = unfold_and_eval_list constr_args in
         match find_constr_id_with_args subst_constr id constr_args with
-        | Some t -> Recursive_binder.use_recursive_binder t
+        | Some t -> Recursive_binder.mark_as_used t
         | None -> (
           match find_mut_rec_shape subst_constr id with
           | Some t -> unfold_and_eval (Shape.app_list t constr_args)
@@ -827,10 +907,25 @@ and unfold_and_evaluate0 ~depth subst_type subst_constr (t : Shape.t) =
           unfold_and_evaluate ~depth
             (Ident.Map.add x arg subst_type)
             subst_constr s'
-        | _ -> Shape.app f ~arg)
+        | Var _
+        | App (_, _)
+        | Struct _ | Alias _ | Leaf
+        | Proj (_, _)
+        | Comp_unit _ | Error _
+        | Constr (_, _)
+        | Tuple _ | Unboxed_tuple _
+        | Predef (_, _)
+        | Arrow (_, _)
+        | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
+        | Record _ | Mutrec _
+        | Proj_decl (_, _) ->
+          Shape.app f ~arg)
       | Proj_decl _ ->
         Shape.leaf' None
-        (* only possible for the [Leaf] case, see [maybe_evaluated_shape] above *)
+        (* Only possible for the [Leaf] and [Error] cases in pedantic mode, see
+           [maybe_evaluated_shape] above. Mapping an error or other cases to a
+           leaf should not be a problem for DWARF emission, since it's the
+           default fallback. *)
       | Variant { simple_constructors; complex_constructors } ->
         let complex_constructors =
           Shape.complex_constructors_map

@@ -1423,7 +1423,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
         ~constr_name ~arg_name ~arg_layout:base_layout ~arg_die ()
     | Rec_var de_bruijn_index -> (
-      match S.DeBruijn_env.get_opt rec_env de_bruijn_index with
+      match S.DeBruijn_env.get_opt rec_env ~de_bruijn_index with
       | Some reference' ->
         create_typedef_die ~reference ~parent_proto_die ?name reference'
       | None ->

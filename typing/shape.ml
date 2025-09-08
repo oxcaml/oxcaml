@@ -1148,7 +1148,7 @@ module DeBruijn_env = struct
 
   let empty = []
 
-  let get_opt t i = List.nth_opt t i
+  let get_opt t ~de_bruijn_index = List.nth_opt t de_bruijn_index
 
   let push t x = x :: t
 
