@@ -57,8 +57,9 @@ val enter_function_body :
 (** Symbol corresponding to the module currently compiling. *)
 val module_symbol : t -> Symbol.t
 
-(** Map a Flambda2 continuation to the address of the corresponding block. Not to be used
-    for continuations used as exception handlers (use [add_exn_handler]). *)
+(** Map a Flambda2 continuation to the address of the corresponding block.
+    Not to be used for continuations used as exception handlers
+    (use [add_exn_handler]). *)
 val add_continuation : t -> Continuation.t -> Jsir.Addr.t -> t
 
 type exn_handler =
@@ -141,7 +142,7 @@ val add_function_slot : t -> Function_slot.t -> Jsir.Var.t -> t
 (** Map a Flambda2 value slot to the corresponding JSIR closure variable. *)
 val add_value_slot : t -> Value_slot.t -> Jsir.Var.t -> t
 
-(** Return the block address and arity for the given continuation. Raises if given an
+(** Return the block address for the given continuation. Raises if given an
     unbound continuation. *)
 val get_continuation_exn : t -> Continuation.t -> Jsir.Addr.t
 
