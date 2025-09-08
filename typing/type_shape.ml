@@ -735,7 +735,7 @@ module Type_decl_shape = struct
 
   let of_extension_constructor_merlin_only (ext : Types.extension_constructor) =
     match ext.ext_args with
-    | Types.Cstr_record lbls ->
+    | Cstr_record lbls ->
       let record =
         record_of_labels
           ~shape_for_constr:(fun _ ~args:_ -> None)
@@ -746,7 +746,7 @@ module Type_decl_shape = struct
            in the DWARF emission, because they will at least be labeled. *)
       in
       Shape.set_uid_if_none record ext.ext_uid
-    | Types.Cstr_tuple _ -> Shape.leaf ext.ext_uid
+    | Cstr_tuple _ -> Shape.leaf ext.ext_uid
 end
 
 let rec decompose_application (t : Shape.t) =

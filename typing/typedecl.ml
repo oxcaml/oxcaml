@@ -824,11 +824,11 @@ let shape_declarations env decls =
     Type_shape.Type_decl_shape.of_type_declarations decls
       (Env.shape_for_constr env)
 
-let shape_extension_constructor ext  =
+let shape_extension_constructor ext =
   match !Clflags.shape_format with
-  | Clflags.Old_merlin ->
+  | Old_merlin ->
     old_merlin_shape_extension_constructor ext.ext_args ext.ext_uid
-  | Clflags.Debugging_shapes ->
+  | Debugging_shapes ->
     Type_shape.Type_decl_shape.of_extension_constructor_merlin_only ext
 
 let transl_declaration env sdecl (id, uid) =

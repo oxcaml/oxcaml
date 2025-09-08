@@ -1514,9 +1514,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       let simple_constructors, complex_constructors =
         List.partition_map
           (fun { S.name; constr_uid; kind; args } ->
-            if args = []
-            then Left name
-            else Right { S.name; constr_uid; kind; args })
+            match args with
+            | [] -> Left name
+            | _ :: _ -> Right { S.name; constr_uid; kind; args })
           constructors
       in
       match complex_constructors with
