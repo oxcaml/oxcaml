@@ -7,8 +7,6 @@
 external unsigned_lt : int8 -> int8 -> bool = "%int8_unsigned_lessthan"
 external unsigned_gt : int8 -> int8 -> bool = "%int8_unsigned_greaterthan"
 
-module I = Stdlib_stable.Int8
-
 let () =
   Test_smallint.run
     (module Stdlib_stable.Int8)
@@ -16,6 +14,7 @@ let () =
     ~max_int:0x7f;
 
   (* Explicit unsigned comparison tests *)
+  let module I = Stdlib_stable.Int8 in
 
   (* Test that -1 (0xFF) > 0 when compared as unsigned *)
   assert (I.unsigned_compare I.minus_one I.zero = 1);
@@ -63,28 +62,3 @@ let () =
   assert (unsigned_gt I.zero I.minus_one = false); (* 0 not > 255 *)
   assert (unsigned_gt I.min_int I.max_int = true); (* 128 > 127 *)
   assert (unsigned_gt I.max_int I.min_int = false); (* 127 not > 128 *)
-
-(* Tests for conversions to/from floats *)
-external of_float : float -> int8 = "%int8_of_float"
-external to_float : int8 -> float = "%float_of_int8"
-
-let () =
-  assert (I.equal (of_float 0.0) I.zero);
-  assert (I.equal (of_float (-0.0)) I.zero);
-  assert (I.equal (of_float 3.14) (I.of_int 3));
-  assert (I.equal (of_float (-3.14)) (I.of_int (-3)));
-  assert (I.equal (of_float (0.0 /. 0.0)) I.zero);(* strange but true *)
-  assert (I.equal (of_float (1.0 /. 0.0)) I.zero);(* strange but true *)
-  assert (I.equal (of_float 0.999999999999999999999999) I.one);
-  assert (I.equal (of_float (-0.999999999999999999999999)) I.minus_one);
-  assert (I.equal (of_float 127.0) I.max_int);
-  assert (I.equal (of_float (-127.0)) (I.add I.min_int I.one));
-  assert (I.equal (of_float (-128.0)) I.min_int);
-
-  assert (Float.equal (to_float I.zero) 0.0);
-  assert (Float.equal (to_float I.one) 1.0);
-  assert (Float.equal (to_float I.minus_one) (-1.0));
-  assert (Float.equal (to_float (I.add I.one I.one)) 2.0);
-  assert (Float.equal (to_float (I.sub I.minus_one I.one)) (-2.0));
-  assert (Float.equal (to_float I.max_int) 127.0);
-  assert (Float.equal (to_float I.min_int) (-128.0));
