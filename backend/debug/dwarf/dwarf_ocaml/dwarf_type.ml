@@ -1225,16 +1225,16 @@ end
 module Cache = Shape_with_layout.Tbl
 (* We add a cache based on type shapes to increase sharing the resulting DWARF.
    The cache caches the combination of type shape and type layout. We make sure
-   to only cache closed shapes to avoid issues with the same DeBruijn variable
-   such as 0 that stands for different recursive types. *)
+   to only cache closed shapes, as open types would require a context that binds
+   the relevant de Bruijn indices. *)
 
 (** This cache maps unnamed type shapes to their references. *)
 let cache = Cache.create 16
 
 let add_to_cache (type_shape : Shape.t) (type_layout : Layout.t) reference
     ~rec_env =
+  (* [rec_env] being empty means that the shape is closed. *)
   if S.DeBruijn_env.is_empty rec_env
-     (* We only add closed shapes to avoid issues around free variables. *)
   then Cache.add cache { type_shape; type_layout } reference
 
 let find_in_cache (type_shape : Shape.t) (type_layout : Layout.t) ~rec_env =
@@ -1422,8 +1422,8 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
       in
       create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
         ~constr_name ~arg_name ~arg_layout:base_layout ~arg_die ()
-    | Rec_var i -> (
-      match S.DeBruijn_env.get_opt rec_env i with
+    | Rec_var de_bruijn_index -> (
+      match S.DeBruijn_env.get_opt rec_env de_bruijn_index with
       | Some reference' ->
         create_typedef_die ~reference ~parent_proto_die ?name reference'
       | None ->
@@ -1431,8 +1431,8 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
         then
           Misc.fatal_errorf
             "Recursive variable environment lookup failed: rec_env returned \
-             None for index %d"
-            i
+             None for de Bruijn index %d"
+            de_bruijn_index
         else
           create_typedef_die ~reference ~parent_proto_die ?name
             fallback_value_die)

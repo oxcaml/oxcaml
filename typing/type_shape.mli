@@ -46,10 +46,10 @@ module Type_decl_shape : sig
 end
 
 (** When producing a type shape with [of_type_expr], the resulting shape is
-      not in normal form. In particular, it can contain mutually recursive
-      declarations from mutually recursive type declarations. This function
-      should be applied after shape reduction. It unfoldes the mutually
-      recursive types to result in one linearized form. *)
+    not in normal form. In particular, it can contain recursion arising from
+    mutually-recursive type declarations. This function should be applied after
+    shape reduction in order to unfold such declarations (within limits) and
+    thus produce a normal form. *)
 val unfold_and_evaluate : Shape.t -> Shape.t
 
 type shape_with_layout = private
