@@ -594,9 +594,19 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   | Make_array (kind, mut, _mode) ->
     let tag =
       match kind with
-      | Immediates | Values | Naked_int32s | Naked_int64s | Naked_nativeints ->
-        Tag.zero
-      | Naked_floats | Naked_float32s -> Tag.double_array_tag
+      | Immediates | Values -> 0
+      | Naked_int32s ->
+        if List.length xs mod 2 = 0
+        then Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_even_tag
+        else Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_odd_tag
+      | Naked_int64s -> Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag
+      | Naked_nativeints ->
+        Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag
+      | Naked_floats -> Tag.double_array_tag |> Tag.to_int
+      | Naked_float32s ->
+        if List.length xs mod 2 = 0
+        then Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_even_tag
+        else Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_odd_tag
       | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
         (* No SIMD *)
         primitive_not_supported ()
@@ -611,8 +621,7 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
     ( Some var,
       env,
       To_jsir_result.add_instr_exn res
-        (Let (var, Block (Tag.to_int tag, Array.of_list xs, Array, mutability)))
-    )
+        (Let (var, Block (tag, Array.of_list xs, Array, mutability))) )
 
 let quaternary ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y z =
   let use_prim' prim = use_prim' ~env ~res prim [w; x; y; z] in
