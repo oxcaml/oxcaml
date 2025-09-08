@@ -152,6 +152,7 @@ module Reachable_epilogues = struct
   let from_block (t : t) (label : Label.t) = Label.Tbl.find t label
 end
 
+(* CR-soon cfalas: consider moving this to [Cfg] *)
 let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
   let visited = ref Label.Set.empty in
   let rec collect label =
@@ -194,7 +195,11 @@ let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
      * Block C: Return
 
        If we duplicate the prologue to both B and C (which are both children of
-       A), the prologue will execute twice on the A->B->C path. *)
+       A), the prologue will execute twice on the A->B->C path.
+
+       This check will also prevent us from having a
+       Prologue..Epilogue..Prologue..Epilogue structure. However, we probably
+       shouldn't emit such structures anyway. *)
   else if Label.Set.exists
             (fun prologue ->
               let descendants =
@@ -215,19 +220,14 @@ let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
        prologue in block B, the prologue would not dominate the epilogue in
        block C, so in some cases the epilogue would be executed without a
        prologue on the stack, which would be illegal. *)
-    (* CR-soon cfalas: This should be done using post-dominators (i.e. A->B is
-       in the post-dominator tree if and only if executing A guarantees that we
-       are also executing B). In cases where the prologue does not dominate one
-       of its epilogues, it might be the case that when "combined together", all
-       the prologues in the set dominate the epilogue (i.e. all execution paths
-       from the entry to the epilogue pass through precisely one of the
-       prologues.
-
-       The current implementation is stricter, i.e. checks that each epilogue is
-       dominated by at least one of the prologues. (note: this is at the same
-       time not strict enough, if the set of prologues contains one which
-       dominates another this will return true, but that should never happen
-       when computing the prologues. *)
+    (* CR-soon cfalas: This condition has the correct effect, but can be
+       slightly misleading in diamond cases. For example, consider a CFG with
+       blocks A-D, and edges A->B, A->C, B->D, C->D. The current implementation
+       will not allow us to move the prologue from A to B and C, because neither
+       B nor C dominate D. In these cases, we are allowed to duplicate the
+       prologue, but we still don't want to, as this only happens when *all* of
+       the children of A require a prologue, in which case we can save space by
+       placing the prologue at A without an impact on performance. *)
     Label.Set.for_all
       (fun epilogue_label ->
         Label.Set.exists
