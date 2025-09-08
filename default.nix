@@ -13,6 +13,7 @@
   warnError ? true,
   oxcamlClang ? false,
   oxcamlLldb ? false,
+  syntaxQuotations ? true,
 }:
 let
   pkgs = nixpkgs.pkgs or nixpkgs;
@@ -38,6 +39,7 @@ let
       (mkFlag stackChecks "stack-checks")
       (mkFlag warnError "warn-error")
       (mkFlag ocamltest "ocamltest")
+      (mkFlag syntaxQuotations "syntax-quotations")
     ];
 
   upstream = pkgs.ocaml-ng.ocamlPackages_4_14;
