@@ -205,7 +205,8 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       | Naked_nativeints ->
         Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag
       | Naked_int64s -> Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag
-      | Unboxed_products | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+      | Unboxed_products -> 0
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         (* No SIMD *)
         static_const_not_supported ()
     in
