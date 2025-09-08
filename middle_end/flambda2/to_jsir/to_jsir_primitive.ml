@@ -607,7 +607,8 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
         if List.length xs mod 2 = 0
         then Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_even_tag
         else Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_odd_tag
-      | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
+      | Unboxed_product _ -> 0
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         (* No SIMD *)
         primitive_not_supported ()
     in
