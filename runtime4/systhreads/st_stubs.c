@@ -84,11 +84,13 @@ struct caml_thread_descr {
   value ident;                  /* Unique integer ID */
   value start_closure;          /* The closure to start this thread */
   value terminated;             /* Triggered event for thread termination */
+  value tls_state;              /* TLS state array */
 };
 
 #define Ident(v) (((struct caml_thread_descr *)(v))->ident)
 #define Start_closure(v) (((struct caml_thread_descr *)(v))->start_closure)
 #define Terminated(v) (((struct caml_thread_descr *)(v))->terminated)
+#define TLS_state(v) (((struct caml_thread_descr *)(v))->tls_state)
 
 /* The infos on threads (allocated via caml_stat_alloc()) */
 
@@ -474,10 +476,11 @@ static value caml_thread_new_descriptor(value clos)
     /* Create and initialize the termination semaphore */
     mu = caml_threadstatus_new();
     /* Create a descriptor for the new thread */
-    descr = caml_alloc_small(3, 0);
+    descr = caml_alloc_small(4, 0);
     Ident(descr) = Val_long(thread_next_ident);
     Start_closure(descr) = clos;
     Terminated(descr) = mu;
+    TLS_state(descr) = Val_unit;
     thread_next_ident++;
   End_roots();
   return descr;
@@ -826,6 +829,21 @@ CAMLprim value caml_thread_self(value unit)         /* ML */
 CAMLprim value caml_thread_id(value th)          /* ML */
 {
   return Ident(th);
+}
+
+/* Return the current TLS state */
+
+CAMLprim value caml_thread_get_state(value unit)
+{
+  return TLS_state(caml_thread_self(unit));
+}
+
+/* Set the current TLS state */
+
+CAMLprim value caml_thread_set_state(value state)
+{
+  caml_modify(&TLS_state(caml_thread_self(Val_unit)), state);
+  return Val_unit;
 }
 
 /* Print uncaught exception and backtrace */

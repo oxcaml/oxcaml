@@ -63,18 +63,20 @@ module Runtime_4 = struct
       end
 
     let set (idx, _init) x =
+      (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
       (* [Sys.opaque_identity] ensures that flambda does not look at the type of
-      * [x], which may be a [float] and conclude that the [st] is a float array.
-      * We do not want OCaml's float array optimisation kicking in here. *)
-      st.(idx) <- Obj.repr (Sys.opaque_identity x)
+       * [x], which may be a [float] and conclude that the [st] is a float array.
+       * We do not want OCaml's float array optimisation kicking in here. *)
+      Array.unsafe_set st idx (Obj.repr (Sys.opaque_identity x))
 
     let get (idx, init) =
+      (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
-      let v = st.(idx) in
+      let v = Array.unsafe_get st idx in
       if v == Obj.magic_uncontended unique_value then
         let v' = Obj.repr (init.portable ()) in
-        st.(idx) <- (Sys.opaque_identity v');
+        Array.unsafe_set st idx (Sys.opaque_identity v');
         Obj.magic v'
       else Obj.magic v
   end
@@ -226,7 +228,7 @@ module Runtime_5 = struct
       k
 
     (* If necessary, grow the current domain's local state array such that [idx]
-    * is a valid index in the array. *)
+     * is a valid index in the array. *)
     let rec maybe_grow idx =
       (* CR ocaml 5 all-runtime5: remove this hack which is here to stop
         the backend seeing the dls_get operation and failing on runtime4 *)
@@ -254,46 +256,47 @@ module Runtime_5 = struct
       end
 
     let set (type a) (idx, _init) (x : a) =
+      (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
       (* [Sys.opaque_identity] ensures that flambda does not look at the type of
-      * [x], which may be a [float] and conclude that the [st] is a float array.
-      * We do not want OCaml's float array optimisation kicking in here. *)
-      st.(idx) <- Obj_opt.some (Sys.opaque_identity x)
-
+       * [x], which may be a [float] and conclude that the [st] is a float array.
+       * We do not want OCaml's float array optimisation kicking in here. *)
+      Array.unsafe_set st idx (Obj_opt.some (Sys.opaque_identity x))
 
     let[@inline never] array_compare_and_set a i oldval newval =
       (* Note: we cannot use [@poll error] due to the
-        allocations on a.(i) in the Double_array case. *)
-      let curval = a.(i) in
+         allocations on a.(i) in the Double_array case. *)
+      let curval = Array.unsafe_get a i in
       if curval == oldval then (
         Array.unsafe_set a i newval;
         true
       ) else false
 
     let get (type a) ((idx, init) : a key) : a =
+      (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
-      let obj = st.(idx) in
+      let obj = Array.unsafe_get st idx in
       if Obj_opt.is_some obj
       then (Obj_opt.unsafe_get obj : a)
       else begin
         let v : a = init.portable () in
         let new_obj = Obj_opt.some (Sys.opaque_identity v) in
         (* At this point, [st] or [st.(idx)] may have been changed
-          by another thread on the same domain.
+           by another thread on the same domain.
 
-          If [st] changed, it was resized into a larger value,
-          we can just reuse the new value.
+           If [st] changed, it was resized into a larger value,
+           we can just reuse the new value.
 
-          If [st.(idx)] changed, we drop the current value to avoid
-          letting other threads observe a 'revert' that forgets
-          previous modifications. *)
+           If [st.(idx)] changed, we drop the current value to avoid
+           letting other threads observe a 'revert' that forgets
+           previous modifications. *)
         let st = get_dls_state () in
         if array_compare_and_set st idx obj new_obj
         then v
         else begin
           (* if st.(idx) changed, someone must have initialized
             the key in the meantime. *)
-          let updated_obj = st.(idx) in
+          let updated_obj = Array.unsafe_get st idx in
           if Obj_opt.is_some updated_obj
           then (Obj_opt.unsafe_get updated_obj : a)
           else assert false

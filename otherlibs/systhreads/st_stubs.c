@@ -109,6 +109,7 @@ static enum {
 #define Ident(v) Field(v, 0)
 #define Start_closure(v) Field(v, 1)
 #define Terminated(v) Field(v, 2)
+#define TLS_state(v) Field(v, 3)
 
 /* The infos on threads (allocated via caml_stat_alloc()) */
 
@@ -497,8 +498,8 @@ static value caml_thread_new_descriptor(value clos)
   /* Create and initialize the termination semaphore */
   mu = caml_threadstatus_new();
   /* Create a descriptor for the new thread */
-  descr = caml_alloc_3(0, Val_long(atomic_fetch_add(&thread_next_id, +1)),
-                       clos, mu);
+  descr = caml_alloc_4(0, Val_long(atomic_fetch_add(&thread_next_id, +1)),
+                       clos, mu, Val_unit);
   CAMLreturn(descr);
 }
 
@@ -1003,6 +1004,21 @@ CAMLprim value caml_thread_self(value unit)
 CAMLprim value caml_thread_id(value th)
 {
   return Ident(th);
+}
+
+/* Return the current TLS state */
+
+CAMLprim value caml_thread_get_state(value unit)
+{
+  return TLS_state(caml_thread_self(unit));
+}
+
+/* Set the current TLS state */
+
+CAMLprim value caml_thread_set_state(value state)
+{
+  caml_modify(&TLS_state(caml_thread_self(Val_unit)), state);
+  return Val_unit;
 }
 
 /* Print uncaught exception and backtrace */
