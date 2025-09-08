@@ -339,6 +339,13 @@ let add_prologue (cfg : Cfg.t) prologue_label =
   let not_param_name_for_debugger (i : Cfg.basic Cfg.instruction) =
     not (is_param_name_for_debugger i.desc)
   in
+  (* Insert [Prologue] before [next_instr]. [next_instr] is the first
+     instruction in the body of the [prologue_block] after all
+     [Name_for_debugger] instructions that refer to function parameters, or
+     [None] if there are no instructions after [Name_for_debugger] in the body
+     of this block (including the case where the body is empty, for example when
+     dwarf generation is not enabled). If [next_instr] is None, then [Prologue]
+     will be inserted at the end of the body. *)
   let next_instr =
     DLL.find_cell_opt ~f:not_param_name_for_debugger prologue_block.body
   in
