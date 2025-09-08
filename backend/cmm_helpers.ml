@@ -2043,7 +2043,11 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     (List.map Extended_machtype.change_tagged_int_to_val args_type)
     (Extended_machtype.change_tagged_int_to_val result)
     mode;
-  let callsite_types = { args = args_type; res = result } in
+  let callsite_types =
+    { args = Extended_machtype.[typ_val; typ_val; typ_val] @ args_type;
+      res = result
+    }
+  in
   let funcdef_types = func_call_sig_for_apply callsite_types in
   Cop
     ( Capply { callsite_types; funcdef_types; pos = apos },

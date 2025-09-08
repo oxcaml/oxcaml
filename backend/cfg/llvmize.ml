@@ -339,7 +339,8 @@ let add_referenced_symbol t sym_name =
   t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
 
 let add_called_fun t name ~cc ~args ~res =
-  if String.begins_with name ~prefix:"caml_apply"
+  (* if String.begins_with name ~prefix:"caml_apply" *)
+  if not (String.begins_with name ~prefix:"llvm")
   then add_referenced_symbol t name
   else (
     (match String.Map.find_opt name t.called_functions with
@@ -391,11 +392,11 @@ let add_c_call_wrapper t c_fun_name ~args ~res =
     <- String.Map.add wrapper_name { c_fun_name; args; res } t.c_call_wrappers;
   wrapper_name
 
-let reject_addr_regs (regs : Reg.t array) =
+let reject_addr_regs (regs : Reg.t array) msg =
   if Array.to_list regs
      |> List.map (fun (reg : Reg.t) -> Cmm.is_addr reg.typ)
      |> List.fold_left ( || ) false
-  then Misc.fatal_error "Llvmize: shouldn't have an addr reg here!"
+  then Misc.fatal_errorf "Llvmize: shouldn't have an addr reg here! - %s" msg
 
 (* Runtime registers are passed explicitly as arguments to and returned from all
    OCaml functions. They have LLVM type ptr. *)
@@ -1072,16 +1073,14 @@ module F = struct
          pointer in such a function. And, unfortunately, LLVM doesn't respect
          our calling conventions and save RBP in that case (perhaps because it
          is handled specially), so we have to do it ourselves ._. *)
-      let should_save_rbp = t.current_fun_info.fun_has_try && not tail in
-      if should_save_rbp
-      then ins t {|call void asm sideeffect "push %%rbp", "~{rsp}"()|};
-      let statepoint_id =
-        statepoint_id_attr_for_stack_adjustment ~offset:8 t i
-      in
+      (* let should_save_rbp = t.current_fun_info.fun_has_try && not tail in if
+         should_save_rbp then ins t {|call void asm sideeffect "push %%rbp",
+         "~{rsp}"()|}; *)
+      let statepoint_id = statepoint_id_attr_for_stack_adjustment t i in
       ins_call ~attrs:statepoint_id ~tail ~cc:Ocaml ~pp_name t fn args
         (Some (res_type, res_ident));
-      if should_save_rbp
-      then ins t {|call void asm sideeffect "pop %%rbp", "~{rsp}"()|};
+      (* if should_save_rbp then ins t {|call void asm sideeffect "pop %%rbp",
+         "~{rsp}"()|}; *)
       res_ident
     in
     (* Do the call *)
@@ -1346,11 +1345,11 @@ module F = struct
       let is_eq = float_comp t Cmm.CFeq i typ in
       ins_branch_cond t is_eq eq uo
     | Call { op; label_after } ->
-      reject_addr_regs i.arg;
+      (* reject_addr_regs i.arg "call"; *)
       call t i op;
       ins_branch t label_after
     | Prim { op; label_after } -> (
-      reject_addr_regs i.arg;
+      reject_addr_regs i.arg "prim";
       match op with
       | Probe _ -> not_implemented_terminator ~msg:"probe" i
       | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
@@ -1358,7 +1357,7 @@ module F = struct
         ins_branch t label_after)
     | Tailcall_self { destination } -> ins_branch t destination
     | Tailcall_func op ->
-      reject_addr_regs i.arg;
+      (* reject_addr_regs i.arg "tailcall func"; *)
       call ~tail:true t i op
     | Call_no_return { func_symbol; alloc; stack_ofs; stack_align; _ } ->
       extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
@@ -2325,7 +2324,7 @@ let cfg (cl : CL.t) =
            then arg, Some (fresh_ident t)
            else arg, None)
   in
-  reject_addr_regs fun_args;
+  reject_addr_regs fun_args "fun args";
   let pp_block label =
     let block = Label.Tbl.find blocks label in
     let preds = Cfg.predecessor_labels block in
