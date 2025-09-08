@@ -128,7 +128,15 @@ module TLS = struct
   let set_initial_keys (l : key_value list) =
     List.iter (fun (KV (k, v)) -> set k (v ())) l
 
-  (* Note we do not need to consider domains in runtime4. *)
+  (* Note we do not need to consider domains in runtime4.
+
+
+
+
+
+
+    ...padding so backtraces match the runtime5 implementation.
+  *)
 end
 
 type t : value mod contended portable
@@ -143,7 +151,6 @@ external yield : unit -> unit @@ portable = "caml_thread_yield"
 external self : unit -> t @@ portable = "caml_thread_self" [@@noalloc]
 external id : t -> int @@ portable = "caml_thread_id" [@@noalloc]
 external join : t -> unit @@ portable = "caml_thread_join"
-external exit_stub : unit -> unit @@ portable = "caml_thread_exit"
 
 (* For new, make sure the function passed to thread_new never
    raises an exception. *)
@@ -194,6 +201,8 @@ module Portable = struct
 end
 
 let create (fn @ many) arg = create fn arg
+
+external exit_stub : unit -> unit @@ portable = "caml_thread_exit"
 
 let exit () =
   ignore (Sys.opaque_identity (check_memprof_cb ()));
