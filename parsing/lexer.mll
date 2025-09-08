@@ -914,7 +914,6 @@ and directive already_consumed = parse
             directive_error lexbuf ("unknown syntax mode " ^ mode)
               ~already_consumed ~directive:"syntax"
       }
-  | "" { raise (Failure "not a syntax directive") }
 and comment = parse
     "(*"
       { comment_start_loc := (Location.curr lexbuf) :: !comment_start_loc;
