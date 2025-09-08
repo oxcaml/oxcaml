@@ -82,6 +82,20 @@ module Uid : sig
   include Identifiable.S with type t := t
 end
 
+module DeBruijn_index : sig
+  type t
+
+  (* Initial index, pick [0] for the top-level index. *)
+  val free_index : int -> t
+
+  val move_under_binder : t -> t
+
+  val equal: t -> t -> bool
+
+  val print: Format.formatter -> t -> unit
+
+end
+
 module Sig_component_kind : sig
   type t =
     | Value
@@ -221,7 +235,7 @@ and desc =
   (** [Mu t] represents a binder for a recursive type with body [t]. Its
       variables are [Rec_var n] below, where [n] is a DeBruijn-index to maximize
       sharing between alpha-equivalent shapes.  *)
-  | Rec_var of int
+  | Rec_var of DeBruijn_index.t
 
   (* constructors for type declarations *)
   | Variant of
@@ -341,7 +355,7 @@ val predef : ?uid:Uid.t -> Predef.t -> t list -> t
 val arrow : ?uid:Uid.t -> t -> t -> t
 val poly_variant : ?uid:Uid.t -> t poly_variant_constructors -> t
 val mu : ?uid:Uid.t -> t -> t
-val rec_var : ?uid:Uid.t -> int -> t
+val rec_var : ?uid:Uid.t -> DeBruijn_index.t -> t
 
 (* constructors for type declarations *)
 val variant :
@@ -436,5 +450,5 @@ module DeBruijn_env : sig
 
   val push : 'a t -> 'a -> 'a t
 
-  val get_opt : 'a t -> de_bruijn_index:int -> 'a option
+  val get_opt : 'a t -> de_bruijn_index:DeBruijn_index.t -> 'a option
 end

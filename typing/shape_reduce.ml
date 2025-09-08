@@ -64,7 +64,7 @@ end) = struct
     | NComp_unit of string
     | NError of string
     | NMu of nf
-    | NRec_var of int
+    | NRec_var of Shape.DeBruijn_index.t
     | NMutrec of nf Ident.Map.t
     | NProj_decl of nf * Ident.t
     | NConstr of Ident.t * nf list
@@ -146,7 +146,7 @@ end) = struct
     | NAlias a1, NAlias a2 -> equal_delayed_nf a1 a2
     | NError e1, NError e2 -> String.equal e1 e2
     | NMu (nf1), NMu (nf2) -> equal_nf nf1 nf2
-    | NRec_var i1, NRec_var i2 -> Int.equal i1 i2
+    | NRec_var i1, NRec_var i2 -> DeBruijn_index.equal i1 i2
     | NMutrec defs1, NMutrec defs2 ->
       Ident.Map.equal equal_nf defs1 defs2
     | NProj_decl (nf1, id1), NProj_decl (nf2, id2) ->

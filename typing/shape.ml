@@ -112,6 +112,34 @@ module Uid = struct
     | _ -> false
 end
 
+module DeBruijn_index = struct
+  type t = int
+
+  let free_index n =
+    if n < 0
+    then Misc.fatal_errorf "De_bruijn_index.free_index: negative index %d" n
+    else n
+
+  let move_under_binder n = n + 1
+
+  let equal n1 n2 = Int.equal n1 n2
+
+  let print fmt n = Format.fprintf fmt "%d" n
+end
+
+
+module DeBruijn_env = struct
+  type 'a t = 'a list
+
+  let empty = []
+
+  let get_opt t ~de_bruijn_index = List.nth_opt t de_bruijn_index
+
+  let push t x = x :: t
+
+  let is_empty = function [] -> true | _ -> false
+end
+
 module Sig_component_kind = struct
   type t =
     | Value
@@ -1140,19 +1168,6 @@ module Map = struct
   let add_class_type_proj t id shape =
     let item = Item.class_type id in
     Item.Map.add item (proj shape item) t
-end
-
-
-module DeBruijn_env = struct
-  type 'a t = 'a list
-
-  let empty = []
-
-  let get_opt t ~de_bruijn_index = List.nth_opt t de_bruijn_index
-
-  let push t x = x :: t
-
-  let is_empty = function [] -> true | _ -> false
 end
 
 module Cache = Hashtbl.Make (struct

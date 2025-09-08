@@ -74,7 +74,9 @@ end = struct
         (shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
     | Mu sh ->
       Shape.mu ?uid:outer.uid
-        (shape_subst_uid_with_rec_var ~preserve_uid uid (rv + 1) sh)
+        (shape_subst_uid_with_rec_var ~preserve_uid uid
+           (Shape.DeBruijn_index.move_under_binder rv)
+           sh)
     | Mutrec map ->
       Shape.mutrec ?uid:outer.uid
         (Ident.Map.map
@@ -148,7 +150,11 @@ end = struct
     if not db.used
     then sh
     else
-      let sh = shape_subst_uid_with_rec_var ~preserve_uid db.uid 0 sh in
+      let sh =
+        shape_subst_uid_with_rec_var ~preserve_uid db.uid
+          (Shape.DeBruijn_index.free_index 0)
+          sh
+      in
       Shape.mu ?uid:(if preserve_uid then Some db.uid else None) sh
 end
 

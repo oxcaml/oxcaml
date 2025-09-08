@@ -1431,8 +1431,8 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
         then
           Misc.fatal_errorf
             "Recursive variable environment lookup failed: rec_env returned \
-             None for de Bruijn index %d"
-            de_bruijn_index
+             None for de Bruijn index %a"
+            S.DeBruijn_index.print de_bruijn_index
         else
           create_typedef_die ~reference ~parent_proto_die ?name
             fallback_value_die)
