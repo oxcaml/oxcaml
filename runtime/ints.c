@@ -197,34 +197,6 @@ CAMLprim value caml_format_int(value fmt, value arg)
   return res;
 }
 
-/* 8-bit integers */
-
-int8_t caml_int8_of_float_unboxed_to_untagged(double x)
-{ return (int8_t) x; }
-
-CAMLprim value caml_int8_of_float(value v)
-{ return Val_int8((int8_t)(Double_val(v))); }
-
-double caml_int8_to_float_untagged_to_unboxed(int8_t x)
-{ return (double) x; }
-
-CAMLprim value caml_int8_to_float(value v)
-{ return caml_copy_double((double)(Int8_val(v))); }
-
-/* 16-bit integers */
-
-int16_t caml_int16_of_float_unboxed_to_untagged(double x)
-{ return (int16_t) x; }
-
-CAMLprim value caml_int16_of_float(value v)
-{ return Val_int16((int16_t)(Double_val(v))); }
-
-double caml_int16_to_float_untagged_to_unboxed(int16_t x)
-{ return (double) x; }
-
-CAMLprim value caml_int16_to_float(value v)
-{ return caml_copy_double((double)(Int16_val(v))); }
-
 /* 32-bit integers */
 
 static int int32_cmp(value v1, value v2)

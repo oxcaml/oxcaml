@@ -66,27 +66,10 @@ let () =
   assert (unsigned_gt pos_100 neg_100 = false); (* 100 not > 65436 *)
 
 (* Tests for conversions to/from floats *)
-external of_float_unboxed : (float[@unboxed]) -> (int16[@untagged]) =
-  "caml_int16_of_float" "caml_int16_of_float_unboxed_to_untagged"
-external of_float : float -> int16 = "caml_int16_of_float"
-
-external to_float_unboxed : (int16[@untagged]) -> (float[@unboxed]) =
-  "caml_int16_to_float" "caml_int16_to_float_untagged_to_unboxed"
-external to_float : int16 -> float = "caml_int16_to_float"
+external of_float : float -> int16 = "%int16_of_float"
+external to_float : int16 -> float = "%float_of_int16"
 
 let () =
-  assert (I.equal (of_float_unboxed 0.0) I.zero);
-  assert (I.equal (of_float_unboxed (-0.0)) I.zero);
-  assert (I.equal (of_float_unboxed 3.14) (I.of_int 3));
-  assert (I.equal (of_float_unboxed (-3.14)) (I.of_int (-3)));
-  assert (I.equal (of_float_unboxed (0.0 /. 0.0)) I.zero);(* strange but true *)
-  assert (I.equal (of_float_unboxed (1.0 /. 0.0)) I.zero);(* strange but true *)
-  assert (I.equal (of_float_unboxed 0.999999999999999999999999) I.one);
-  assert (I.equal (of_float_unboxed (-0.999999999999999999999999)) I.minus_one);
-  assert (I.equal (of_float_unboxed 32767.0) I.max_int);
-  assert (I.equal (of_float_unboxed (-32767.0)) (I.add I.min_int I.one));
-  assert (I.equal (of_float_unboxed (-32768.0)) I.min_int);
-
   assert (I.equal (of_float 0.0) I.zero);
   assert (I.equal (of_float (-0.0)) I.zero);
   assert (I.equal (of_float 3.14) (I.of_int 3));
@@ -98,14 +81,6 @@ let () =
   assert (I.equal (of_float 32767.0) I.max_int);
   assert (I.equal (of_float (-32767.0)) (I.add I.min_int I.one));
   assert (I.equal (of_float (-32768.0)) I.min_int);
-
-  assert (Float.equal (to_float_unboxed I.zero) 0.0);
-  assert (Float.equal (to_float_unboxed I.one) 1.0);
-  assert (Float.equal (to_float_unboxed I.minus_one) (-1.0));
-  assert (Float.equal (to_float_unboxed (I.add I.one I.one)) 2.0);
-  assert (Float.equal (to_float_unboxed (I.sub I.minus_one I.one)) (-2.0));
-  assert (Float.equal (to_float_unboxed I.max_int) 32767.0);
-  assert (Float.equal (to_float_unboxed I.min_int) (-32768.0));
 
   assert (Float.equal (to_float I.zero) 0.0);
   assert (Float.equal (to_float I.one) 1.0);

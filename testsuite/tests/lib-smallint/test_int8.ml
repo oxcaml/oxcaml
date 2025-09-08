@@ -65,27 +65,10 @@ let () =
   assert (unsigned_gt I.max_int I.min_int = false); (* 127 not > 128 *)
 
 (* Tests for conversions to/from floats *)
-external of_float_unboxed : (float[@unboxed]) -> (int8[@untagged]) =
-  "caml_int8_of_float" "caml_int8_of_float_unboxed_to_untagged"
-external of_float : float -> int8 = "caml_int8_of_float"
-
-external to_float_unboxed : (int8[@untagged]) -> (float[@unboxed]) =
-  "caml_int8_to_float" "caml_int8_to_float_untagged_to_unboxed"
-external to_float : int8 -> float = "caml_int8_to_float"
+external of_float : float -> int8 = "%int8_of_float"
+external to_float : int8 -> float = "%float_of_int8"
 
 let () =
-  assert (I.equal (of_float_unboxed 0.0) I.zero);
-  assert (I.equal (of_float_unboxed (-0.0)) I.zero);
-  assert (I.equal (of_float_unboxed 3.14) (I.of_int 3));
-  assert (I.equal (of_float_unboxed (-3.14)) (I.of_int (-3)));
-  assert (I.equal (of_float_unboxed (0.0 /. 0.0)) I.zero);(* strange but true *)
-  assert (I.equal (of_float_unboxed (1.0 /. 0.0)) I.zero);(* strange but true *)
-  assert (I.equal (of_float_unboxed 0.999999999999999999999999) I.one);
-  assert (I.equal (of_float_unboxed (-0.999999999999999999999999)) I.minus_one);
-  assert (I.equal (of_float_unboxed 127.0) I.max_int);
-  assert (I.equal (of_float_unboxed (-127.0)) (I.add I.min_int I.one));
-  assert (I.equal (of_float_unboxed (-128.0)) I.min_int);
-
   assert (I.equal (of_float 0.0) I.zero);
   assert (I.equal (of_float (-0.0)) I.zero);
   assert (I.equal (of_float 3.14) (I.of_int 3));
@@ -97,14 +80,6 @@ let () =
   assert (I.equal (of_float 127.0) I.max_int);
   assert (I.equal (of_float (-127.0)) (I.add I.min_int I.one));
   assert (I.equal (of_float (-128.0)) I.min_int);
-
-  assert (Float.equal (to_float_unboxed I.zero) 0.0);
-  assert (Float.equal (to_float_unboxed I.one) 1.0);
-  assert (Float.equal (to_float_unboxed I.minus_one) (-1.0));
-  assert (Float.equal (to_float_unboxed (I.add I.one I.one)) 2.0);
-  assert (Float.equal (to_float_unboxed (I.sub I.minus_one I.one)) (-2.0));
-  assert (Float.equal (to_float_unboxed I.max_int) 127.0);
-  assert (Float.equal (to_float_unboxed I.min_int) (-128.0));
 
   assert (Float.equal (to_float I.zero) 0.0);
   assert (Float.equal (to_float I.one) 1.0);
