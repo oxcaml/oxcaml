@@ -154,10 +154,24 @@ module Reachable_epilogues = struct
   let from_block (t : t) (label : Label.t) = Label.Tbl.find t label
 end
 
-let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
+(* CR-soon cfalas: consider moving this to [Cfg] *)
+let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
+  let visited = ref Label.Set.empty in
+  let rec collect label =
+    if not (Label.Set.mem label !visited)
+    then (
+      visited := Label.Set.add label !visited;
+      let block = Cfg.get_block_exn cfg label in
+      Label.Set.iter
+        (fun succ_label -> collect succ_label)
+        (Cfg.successor_labels ~normal:true ~exn:true block))
+  in
+  collect block.start;
+  !visited
+
+let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
     (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
     (epilogue_blocks : Label.Set.t) =
-  let prologue_block = Cfg.get_block_exn cfg prologue_label in
   (* Moving a prologue to a loop might cause it to execute multiple times, which
      is both inefficient as well as possibly incorrect.
 
@@ -165,62 +179,111 @@ let can_place_prologue (prologue_label : Label.t) (cfg : Cfg.t)
      [Pushtrap] or [Stackoffset] which shouldn't be allowed. This is because the
      prologue is added at the stack pointer, which would overlap with the
      handler pushed by a [Pushtrap]. *)
-  if Cfg_loop_infos.is_in_loop loop_infos prologue_label
-     || prologue_block.stack_offset <> 0
+  if Label.Set.exists
+       (fun label ->
+         let block = Cfg.get_block_exn cfg label in
+         Cfg_loop_infos.is_in_loop loop_infos label || block.stack_offset <> 0)
+       prologue_labels
+  then
+    false
+    (* Check that there are no prologues which might execute after another
+       prologue has already executed.
+
+       This might happen when duplicating a prologue in the following CFG:
+
+     * Block A: Condition with branch to Block B / C
+     * Block B: Contains an instruction requiring a prologue, with terminator
+       that jumps to Block C
+     * Block C: Return
+
+       If we duplicate the prologue to both B and C (which are both children of
+       A), the prologue will execute twice on the A->B->C path.
+
+       This check will also prevent us from having a
+       Prologue..Epilogue..Prologue..Epilogue structure. However, we probably
+       shouldn't emit such structures anyway. *)
+  else if Label.Set.exists
+            (fun prologue ->
+              let descendants =
+                descendants cfg (Cfg.get_block_exn cfg prologue)
+              in
+              let descendant_prologues =
+                Label.Set.inter prologue_labels descendants
+              in
+              let descendant_prologues =
+                Label.Set.remove prologue descendant_prologues
+              in
+              not (Label.Set.is_empty descendant_prologues))
+            prologue_labels
   then false
   else
     (* Check that the blocks requiring an epilogue are dominated by the prologue
-       block. Consider the following CFG:
-
-     *  Block A: Condition with branch to Block B / C
-     *  Block B: Contains an instruction requiring a prologue, with 
-        terminator that jumps to Block C
-     *  Block C: Return
-
-       We have the choice of putting the prologue in Block A or B, and we would
-       place an epilogue in Block C (or we could create a new block with the
-       epilogue).
-
-       If we try to place the prologue in block B, the prologue would not
-       dominate the epilogue in block C, so in some cases the epilogue would be
-       executed without a prologue on the stack, which would be illegal. *)
+       block. Consider the CFG from the example above. If we try to place the
+       prologue in block B, the prologue would not dominate the epilogue in
+       block C, so in some cases the epilogue would be executed without a
+       prologue on the stack, which would be illegal. *)
+    (* CR-soon cfalas: This condition has the correct effect, but can be
+       slightly misleading in diamond cases. For example, consider a CFG with
+       blocks A-D, and edges A->B, A->C, B->D, C->D. The current implementation
+       will not allow us to move the prologue from A to B and C, because neither
+       B nor C dominate D. In these cases, we are allowed to duplicate the
+       prologue, but we still don't want to, as this only happens when *all* of
+       the children of A require a prologue, in which case we can save space by
+       placing the prologue at A without an impact on performance. *)
     Label.Set.for_all
       (fun epilogue_label ->
-        Cfg_dominators.is_dominating doms prologue_label epilogue_label)
+        Label.Set.exists
+          (fun prologue_label ->
+            Cfg_dominators.is_dominating doms prologue_label epilogue_label)
+          prologue_labels)
       epilogue_blocks
 
-let can_place_prologue =
-  Profile.record ~accumulate:true "can_place_prologue" can_place_prologue
+let can_place_prologues =
+  Profile.record ~accumulate:true "can_place_prologue" can_place_prologues
 
 let find_prologue_and_epilogues_shrink_wrapped
     (cfg_with_infos : Cfg_with_infos.t) =
   let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
       (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
-      (reachable_epilogues : Reachable_epilogues.t) =
+      (reachable_epilogues : Reachable_epilogues.t) : Label.Set.t * Label.Set.t
+      =
     let block = Cfg.get_block_exn cfg tree.label in
     let epilogue_blocks =
       Reachable_epilogues.from_block reachable_epilogues tree.label
     in
+    (* If the current block needs a prologue, we can't propagate the prologue
+       downwards. If it's cold or all paths lead to an exception, there's no
+       reason to do so, as performance is not important. *)
+    let all_exceptional_paths =
+      Label.Set.for_all
+        (fun label ->
+          let block = Cfg.get_block_exn cfg label in
+          match[@ocaml.warning "-4"] block.terminator.desc with
+          | Raise _ -> true
+          | _ -> false)
+        epilogue_blocks
+    in
     if prologue_needed_block block ~fun_name:cfg.fun_name
-    then Some (tree.label, epilogue_blocks)
+       || block.cold || all_exceptional_paths
+    then Label.Set.singleton tree.label, epilogue_blocks
     else
       let children_prologue_block =
-        List.filter_map
+        List.map
           (fun tree -> visit tree cfg doms loop_infos reachable_epilogues)
           tree.children
       in
-      match children_prologue_block with
-      | [] -> None
-      | [(child, child_epilogue_blocks)] ->
-        (* Only a single child needs a prologue, so will consider moving the
-           prologue to that child *)
-        if can_place_prologue child cfg doms loop_infos child_epilogue_blocks
-        then Some (child, child_epilogue_blocks)
-        else Some (tree.label, epilogue_blocks)
-      | _ ->
-        (* Multiple children need a prologue. We keep the prologue at the parent
-           to avoid duplication of the prologue. *)
-        Some (tree.label, epilogue_blocks)
+      let child_prologue_blocks, child_epilogue_blocks =
+        List.fold_left
+          (fun (child_prologues, child_epilogues) (all_prologues, all_epilogues) ->
+            ( Label.Set.union all_prologues child_prologues,
+              Label.Set.union all_epilogues child_epilogues ))
+          (Label.Set.empty, Label.Set.empty)
+          children_prologue_block
+      in
+      if can_place_prologues child_prologue_blocks cfg doms loop_infos
+           child_epilogue_blocks
+      then child_prologue_blocks, child_epilogue_blocks
+      else Label.Set.singleton tree.label, epilogue_blocks
   in
   (* [Proc.prologue_required] is cheap and should provide an over-estimate of
      when we would need a prologue (in some cases [Proc.prologue_required] will
@@ -242,13 +305,13 @@ let find_prologue_and_epilogues_shrink_wrapped
           doms, tree, loop_infos, reachable_epilogues)
         ()
     in
-    match visit tree cfg doms loop_infos reachable_epilogues with
-    | None -> None
-    | Some (prologue_label, epilogue_blocks) ->
-      assert (
-        can_place_prologue prologue_label cfg doms loop_infos epilogue_blocks);
-      Some (prologue_label, epilogue_blocks))
-  else None
+    let prologue_blocks, epilogue_blocks =
+      visit tree cfg doms loop_infos reachable_epilogues
+    in
+    assert (
+      can_place_prologues prologue_blocks cfg doms loop_infos epilogue_blocks);
+    prologue_blocks, epilogue_blocks)
+  else Label.Set.empty, Label.Set.empty
 
 let find_prologue_and_epilogues_shrink_wrapped =
   Profile.record ~accumulate:true "find_in_body"
@@ -269,8 +332,8 @@ let find_prologue_and_epilogues_at_entry (cfg_with_infos : Cfg_with_infos.t) =
           | No_requirements | Requires_prologue -> acc)
         ~init:Label.Set.empty
     in
-    Some (cfg.entry_label, epilogue_blocks)
-  else None
+    Label.Set.singleton cfg.entry_label, epilogue_blocks
+  else Label.Set.empty, Label.Set.empty
 
 let find_prologue_and_epilogues_at_entry =
   Profile.record ~accumulate:true "check_at_entry"
@@ -278,32 +341,32 @@ let find_prologue_and_epilogues_at_entry =
 
 let add_prologue_if_required (cfg_with_infos : Cfg_with_infos.t) ~f =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  let prologue_and_epilogue_blocks = f cfg_with_infos in
-  match prologue_and_epilogue_blocks with
-  | None -> ()
-  | Some (prologue_label, epilogue_blocks) ->
-    let terminator_as_basic terminator =
-      { terminator with Cfg.desc = Cfg.Prologue }
-    in
-    let prologue_block = Cfg.get_block_exn cfg prologue_label in
-    let next_instr =
-      Option.value
-        (DLL.hd prologue_block.body)
-        ~default:(terminator_as_basic prologue_block.terminator)
-    in
-    DLL.add_begin prologue_block.body
-      (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
-         ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
-         ());
-    Label.Set.iter
-      (fun label ->
-        let block = Cfg.get_block_exn cfg label in
-        let terminator = terminator_as_basic block.terminator in
-        DLL.add_end block.body
-          (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
-             ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
-             ()))
-      epilogue_blocks
+  let prologue_blocks, epilogue_blocks = f cfg_with_infos in
+  let terminator_as_basic terminator =
+    { terminator with Cfg.desc = Cfg.Prologue }
+  in
+  Label.Set.iter
+    (fun prologue_label ->
+      let prologue_block = Cfg.get_block_exn cfg prologue_label in
+      let next_instr =
+        Option.value
+          (DLL.hd prologue_block.body)
+          ~default:(terminator_as_basic prologue_block.terminator)
+      in
+      DLL.add_begin prologue_block.body
+        (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
+           ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+           ()))
+    prologue_blocks;
+  Label.Set.iter
+    (fun label ->
+      let block = Cfg.get_block_exn cfg label in
+      let terminator = terminator_as_basic block.terminator in
+      DLL.add_end block.body
+        (Cfg.make_instruction_from_copy terminator ~desc:Cfg.Epilogue
+           ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+           ()))
+    epilogue_blocks
 
 module Validator = struct
   type state =
