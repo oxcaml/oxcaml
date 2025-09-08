@@ -143,12 +143,12 @@ CAMLprim value caml_int_of_string(value s)
 
 CAMLprim value caml_int16_of_string(value s)
 {
-    return Val_long((int16_t)parse_intnat(s, 16, INT16_ERRMSG));
+    return Val_int16((int16_t)parse_intnat(s, 16, INT16_ERRMSG));
 }
 
 CAMLprim value caml_int8_of_string(value s)
 {
-    return Val_long((int8_t)parse_intnat(s, 8, INT8_ERRMSG));
+    return Val_int8((int8_t)parse_intnat(s, 8, INT8_ERRMSG));
 }
 
 #define FORMAT_BUFFER_SIZE 32
@@ -196,6 +196,34 @@ CAMLprim value caml_format_int(value fmt, value arg)
   }
   return res;
 }
+
+/* 8-bit integers */
+
+int8_t caml_int16_of_float_unboxed_to_untagged(double x)
+{ return (int8_t) x; }
+
+CAMLprim value caml_int8_of_float(value v)
+{ return Val_int8((int8_t)(Double_val(v))); }
+
+double caml_int8_to_float_untagged_to_unboxed(int8_t x)
+{ return (double) x; }
+
+CAMLprim value caml_int8_to_float(value v)
+{ return caml_copy_double((double)(Int8_val(v))); }
+
+/* 16-bit integers */
+
+int16_t caml_int16_of_float_unboxed_to_untagged(double x)
+{ return (int16_t) x; }
+
+CAMLprim value caml_int16_of_float(value v)
+{ return Val_int16((int16_t)(Double_val(v))); }
+
+double caml_int16_to_float_untagged_to_unboxed(int16_t x)
+{ return (double) x; }
+
+CAMLprim value caml_int16_to_float(value v)
+{ return caml_copy_double((double)(Int16_val(v))); }
 
 /* 32-bit integers */
 
