@@ -3,11 +3,6 @@
 #include <caml/alloc.h>
 #include <caml/custom.h>
 
-
-static int16_t Int16_val(value v) {
-  return (int16_t)Long_val(v);
-}
-
 static value caml_copy_int16(int16_t x) {
   return Val_long(x);
 }
