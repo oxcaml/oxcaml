@@ -50,80 +50,45 @@ end = struct
      all binders into DeBruijn indices. *)
   let rec shape_subst_uid_with_rec_var ~preserve_uid uid rv outer =
     let open Shape in
+    let subst = shape_subst_uid_with_rec_var ~preserve_uid uid rv in
+    let subst_list = List.map subst in
     match outer.desc with
     | Leaf when Option.equal Uid.equal outer.uid (Some uid) ->
       let uid = if preserve_uid then Some uid else None in
       Shape.rec_var ?uid rv
     | Leaf | Error _ | Rec_var _ | Comp_unit _ | Var _ -> outer (* base cases *)
-    | Alias sh ->
-      Shape.alias ?uid:outer.uid
-        (shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
-    | App (sh, arg) ->
-      Shape.app ?uid:outer.uid
-        (shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
-        ~arg:(shape_subst_uid_with_rec_var ~preserve_uid uid rv arg)
-    | Proj (sh, item) ->
-      Shape.proj ?uid:outer.uid
-        (shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
-        item
-    | Struct map ->
-      Shape.str ?uid:outer.uid
-        (Item.Map.map (shape_subst_uid_with_rec_var ~preserve_uid uid rv) map)
-    | Abs (var, sh) ->
-      Shape.abs ?uid:outer.uid var
-        (shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
+    | Alias sh -> Shape.alias ?uid:outer.uid (subst sh)
+    | App (sh, arg) -> Shape.app ?uid:outer.uid (subst sh) ~arg:(subst arg)
+    | Proj (sh, item) -> Shape.proj ?uid:outer.uid (subst sh) item
+    | Struct map -> Shape.str ?uid:outer.uid (Item.Map.map subst map)
+    | Abs (var, sh) -> Shape.abs ?uid:outer.uid var (subst sh)
     | Mu sh ->
       Shape.mu ?uid:outer.uid
         (shape_subst_uid_with_rec_var ~preserve_uid uid
            (Shape.DeBruijn_index.move_under_binder rv)
            sh)
-    | Mutrec map ->
-      Shape.mutrec ?uid:outer.uid
-        (Ident.Map.map
-           (fun sh -> shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
-           map)
-    | Proj_decl (sh, id) ->
-      Shape.proj_decl ?uid:outer.uid
-        (shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
-        id
-    | Constr (id, args) ->
-      Shape.constr ?uid:outer.uid id
-        (List.map (shape_subst_uid_with_rec_var ~preserve_uid uid rv) args)
-    | Tuple shapes ->
-      Shape.tuple ?uid:outer.uid
-        (List.map (shape_subst_uid_with_rec_var ~preserve_uid uid rv) shapes)
+    | Mutrec map -> Shape.mutrec ?uid:outer.uid (Ident.Map.map subst map)
+    | Proj_decl (sh, id) -> Shape.proj_decl ?uid:outer.uid (subst sh) id
+    | Constr (id, args) -> Shape.constr ?uid:outer.uid id (subst_list args)
+    | Tuple shapes -> Shape.tuple ?uid:outer.uid (subst_list shapes)
     | Unboxed_tuple shapes ->
-      Shape.unboxed_tuple ?uid:outer.uid
-        (List.map (shape_subst_uid_with_rec_var ~preserve_uid uid rv) shapes)
+      Shape.unboxed_tuple ?uid:outer.uid (subst_list shapes)
     | Predef (predef, args) ->
-      Shape.predef predef ?uid:outer.uid
-        (List.map
-           (fun sh -> shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
-           args)
-    | Arrow (arg, ret) ->
-      Shape.arrow ?uid:outer.uid
-        (shape_subst_uid_with_rec_var ~preserve_uid uid rv arg)
-        (shape_subst_uid_with_rec_var ~preserve_uid uid rv ret)
+      Shape.predef predef ?uid:outer.uid (subst_list args)
+    | Arrow (arg, ret) -> Shape.arrow ?uid:outer.uid (subst arg) (subst ret)
     | Poly_variant fields ->
       Shape.poly_variant ?uid:outer.uid
-        (poly_variant_constructors_map
-           (shape_subst_uid_with_rec_var ~preserve_uid uid rv)
-           fields)
+        (poly_variant_constructors_map subst fields)
     | Record { fields; kind } ->
       Shape.record ?uid:outer.uid kind
-        (List.map
-           (fun (name, sh, layout) ->
-             name, shape_subst_uid_with_rec_var ~preserve_uid uid rv sh, layout)
-           fields)
+        (List.map (fun (name, sh, layout) -> name, subst sh, layout) fields)
     | Variant { simple_constructors; complex_constructors } ->
       Shape.variant ?uid:outer.uid simple_constructors
         (Shape.complex_constructors_map
-           (fun (sh, layout) ->
-             shape_subst_uid_with_rec_var ~preserve_uid uid rv sh, layout)
+           (fun (sh, layout) -> subst sh, layout)
            complex_constructors)
     | Variant_unboxed { name; arg_name; arg_shape; arg_layout; _ } ->
-      Shape.variant_unboxed ?uid:outer.uid name arg_name
-        (shape_subst_uid_with_rec_var ~preserve_uid uid rv arg_shape)
+      Shape.variant_unboxed ?uid:outer.uid name arg_name (subst arg_shape)
         arg_layout
 
   type t =
