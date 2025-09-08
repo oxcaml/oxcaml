@@ -227,6 +227,9 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
      (d) [key] is in [S.available_before insn] and it is also in it is in
      [S.available_across insn]. The existing range remains open. *)
 
+  (* CR mshinwell: can cases such as 2(b) actually happen - it seems like
+     [available_across] should be a subset of [available_before]? *)
+
   type action =
     | Open_one_byte_subrange
     | Open_subrange
@@ -356,7 +359,8 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
             fdo = insn.fdo;
             live = insn.live;
             available_before = insn.available_before;
-            available_across = insn.available_across
+            available_across = insn.available_across;
+            phantom_available_before = insn.phantom_available_before
           }
         in
         used_label := Some (label, label_insn);

@@ -359,6 +359,11 @@ let create_bound_parameter env (v, debug_uid) =
 let create_bound_parameters env vs =
   List.fold_left_map create_bound_parameter env vs
 
+let add_phantom_let_binding env var ~debug_uid =
+  let v' = gen_variable var ~debug_uid in
+  let env = add_bound_param env var v' in
+  env, v'
+
 let extra_info env simple =
   match Simple.must_be_var simple with
   | None -> None
@@ -826,6 +831,8 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
        flushed *)
     match Variable.Map.find var env.vars with
     | exception Not_found ->
+      Format.eprintf "%s\n%%!"
+        (Printexc.raw_backtrace_to_string (Printexc.get_callstack 20));
       Misc.fatal_errorf "Variable %a not found in env" Variable.print var
     | cmm, free_vars ->
       (* the env.vars map only contain bindings to expressions of the form

@@ -32,7 +32,8 @@ module Instruction = struct
       stack_offset = 0;
       ls_order = -1;
       available_before = None;
-      available_across = None
+      available_across = None;
+      phantom_available_before = None
     }
 end
 
@@ -97,7 +98,7 @@ module Cfg_desc = struct
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
         ~fun_poll:Lambda.Default_poll
         ~next_instruction_id:(InstructionId.make_sequence ())
-        ~fun_ret_type
+        ~fun_ret_type ~fun_phantom_lets:Backend_var.Set.empty
     in
     List.iter
       (fun (block : Block.t) ->
