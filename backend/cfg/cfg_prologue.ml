@@ -245,6 +245,11 @@ module Path_needs_prologue = struct
       (* The result returned by the forward analysis is the state at the entry
          of each block, but we want the state just before the terminator, i.e.
          after the entire body of the block. *)
+      (* CR-someday cfalas: to avoid having to recompute this, we can change
+         [Cfg_dataflow] so that we can choose whether we want the results
+         returned to be at the block input or at the block output (or before the
+         terminator). This can be done for both forward and backward
+         analysis. *)
       let res_at_exit = Label.Tbl.copy res_at_entry in
       let context = { fun_name = cfg.fun_name } in
       Label.Tbl.iter
@@ -401,8 +406,12 @@ let find_prologue_and_epilogues_shrink_wrapped
     let prologue_blocks, epilogue_blocks =
       visit tree cfg doms loop_infos reachable_epilogues path_needs_prologue
     in
-    assert (
-      can_place_prologues prologue_blocks cfg doms loop_infos epilogue_blocks);
+    if not
+         (can_place_prologues prologue_blocks cfg doms loop_infos
+            epilogue_blocks)
+    then
+      Misc.fatal_errorf
+        "Cfg_prologue: can't place prologues and epilogues at selected blocks";
     prologue_blocks, epilogue_blocks)
   else Label.Set.empty, Label.Set.empty
 
