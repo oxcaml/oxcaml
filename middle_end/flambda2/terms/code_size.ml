@@ -141,19 +141,29 @@ let arith_conversion_size src dst =
     1
 
 let unbox_number kind =
-  match (kind : Flambda_kind.Boxable_number.t) with
-  | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512 ->
-    1 (* 1 load *)
-  | Naked_int64 when arch32 -> 4 (* 2 Cadda + 2 loads *)
-  | Naked_int32 | Naked_int64 | Naked_nativeint -> 2
+  (* Box/unbox are identities in JSIR *)
+  if !Clflags.jsir
+  then 0
+  else
+    match (kind : Flambda_kind.Boxable_number.t) with
+    | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512
+      ->
+      1 (* 1 load *)
+    | Naked_int64 when arch32 -> 4 (* 2 Cadda + 2 loads *)
+    | Naked_int32 | Naked_int64 | Naked_nativeint -> 2
 (* Cadda + load *)
 
 let box_number kind =
-  match (kind : Flambda_kind.Boxable_number.t) with
-  | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512 ->
-    alloc_size (* 1 alloc *)
-  | Naked_int32 when not arch32 -> 1 + alloc_size (* shift/sextend + alloc *)
-  | Naked_int32 | Naked_int64 | Naked_nativeint -> alloc_size (* alloc *)
+  (* Box/unbox are identities in JSIR *)
+  if !Clflags.jsir
+  then 0
+  else
+    match (kind : Flambda_kind.Boxable_number.t) with
+    | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512
+      ->
+      alloc_size (* 1 alloc *)
+    | Naked_int32 when not arch32 -> 1 + alloc_size (* shift/sextend + alloc *)
+    | Naked_int32 | Naked_int64 | Naked_nativeint -> alloc_size (* alloc *)
 
 let block_load (kind : Flambda_primitive.Block_access_kind.t) =
   match kind with Values _ | Naked_floats _ | Mixed _ -> 1
@@ -400,9 +410,15 @@ let unary_prim_size prim =
     | Unboxed_int64_as_unboxed_float64 | Unboxed_float64_as_unboxed_int64 ->
       (* Needs a move between register classes. *) 1)
   | Unbox_number k -> unbox_number k
-  | Untag_immediate -> 1 (* 1 shift *)
+  | Untag_immediate ->
+    if !Clflags.jsir
+    then 0 (* Numbers are not tagged in JSIR *)
+    else 1 (* 1 shift *)
   | Box_number (k, _alloc_mode) -> box_number k
-  | Tag_immediate -> 2 (* 1 shift + add *)
+  | Tag_immediate ->
+    if !Clflags.jsir
+    then 0 (* Numbers are not tagged in JSIR *)
+    else 2 (* 1 shift + add *)
   | Project_function_slot _ -> 1 (* caddv *)
   | Project_value_slot _ -> 1 (* load *)
   | Is_boxed_float -> 4 (* tag load + comparison *)
