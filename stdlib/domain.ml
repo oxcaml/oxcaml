@@ -66,8 +66,8 @@ module Runtime_4 = struct
       (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
       (* [Sys.opaque_identity] ensures that flambda does not look at the type of
-       * [x], which may be a [float] and conclude that the [st] is a float array.
-       * We do not want OCaml's float array optimisation kicking in here. *)
+      * [x], which may be a [float] and conclude that the [st] is a float array.
+      * We do not want OCaml's float array optimisation kicking in here. *)
       Array.unsafe_set st idx (Obj.repr (Sys.opaque_identity x))
 
     let get (idx, init) =
@@ -228,7 +228,7 @@ module Runtime_5 = struct
       k
 
     (* If necessary, grow the current domain's local state array such that [idx]
-     * is a valid index in the array. *)
+    * is a valid index in the array. *)
     let rec maybe_grow idx =
       (* CR ocaml 5 all-runtime5: remove this hack which is here to stop
         the backend seeing the dls_get operation and failing on runtime4 *)
@@ -259,8 +259,8 @@ module Runtime_5 = struct
       (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
       (* [Sys.opaque_identity] ensures that flambda does not look at the type of
-       * [x], which may be a [float] and conclude that the [st] is a float array.
-       * We do not want OCaml's float array optimisation kicking in here. *)
+      * [x], which may be a [float] and conclude that the [st] is a float array.
+      * We do not want OCaml's float array optimisation kicking in here. *)
       Array.unsafe_set st idx (Obj_opt.some (Sys.opaque_identity x))
 
     let[@inline never] array_compare_and_set a i oldval newval =

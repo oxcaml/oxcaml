@@ -37,8 +37,10 @@ module TLS = struct
 
   type tls_state = Obj_opt.t array
 
-  external get_tls_state : unit -> tls_state @@ portable = "caml_thread_get_state"
-  external set_tls_state : tls_state -> unit @@ portable = "caml_thread_set_state"
+  external get_tls_state
+    : unit -> tls_state @@ portable = "caml_thread_get_state"
+  external set_tls_state
+    : tls_state -> unit @@ portable = "caml_thread_set_state"
 
   let init () =
     let state = Array.make 8 (Obj.magic_uncontended Obj_opt.none) in
@@ -82,7 +84,9 @@ module TLS = struct
         if idx < s then s else compute_new_size (2 * s)
       in
       let new_size = compute_new_size size in
-      let new_state = Array.make new_size (Obj.magic_uncontended Obj_opt.none) in
+      let new_state =
+        Array.make new_size (Obj.magic_uncontended Obj_opt.none)
+      in
       Array.blit state 0 new_state 0 size;
       set_tls_state new_state;
       new_state
