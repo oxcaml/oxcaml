@@ -231,10 +231,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
             let env, res =
               match Continuation_handler.is_exn_handler handler with
               | false ->
-                let env =
-                  To_jsir_env.add_continuation env k addr
-                    ~arity:(List.length params)
-                in
+                let env = To_jsir_env.add_continuation env k addr in
                 (* CR selee: we keep the environment because we need the symbols
                    defined there, but really there should be a way to flush
                    variables out of the environment to respect flambda scoping
@@ -283,22 +280,17 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
             "Recursive continuation bindings cannot involve exception \
              handlers:@ %a"
             Let_cont.print e;
-        let conts = Flambda.Continuation_handlers.to_map conts in
+        let domain = Flambda.Continuation_handlers.domain conts in
         let env, res =
           (* See explanation in [To_jsir_static_const.code]: we first reserve
              addresses representing each continuation, so that mutually
              recursive continuations can refer to them. *)
-          Continuation.Lmap.fold
-            (fun k handler (env, res) ->
-              Continuation_handler.pattern_match handler
-                ~f:(fun params ~handler:_ ->
-                  let res, addr = To_jsir_result.reserve_address res in
-                  let env =
-                    To_jsir_env.add_continuation env k addr
-                      ~arity:(Bound_parameters.cardinal params)
-                  in
-                  env, res))
-            conts (env, res)
+          List.fold_left
+            (fun (env, res) k ->
+              let res, addr = To_jsir_result.reserve_address res in
+              let env = To_jsir_env.add_continuation env k addr in
+              env, res)
+            (env, res) domain
         in
         let env, res = expr ~env ~res body in
         let res =
@@ -310,15 +302,14 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                     To_jsir_shared.bound_parameters ~env
                       (Bound_parameters.append invariant_params params)
                   in
-                  let ({ addr; arity = _ } : To_jsir_env.continuation) =
-                    To_jsir_env.get_continuation_exn env k
-                  in
+                  let addr = To_jsir_env.get_continuation_exn env k in
                   let res =
                     To_jsir_result.new_block_with_addr_exn res ~params ~addr
                   in
                   let _env, res = expr ~env ~res cont_body in
                   res))
-            conts res
+            (Flambda.Continuation_handlers.to_map conts)
+            res
         in
         env, res)
 
@@ -445,8 +436,9 @@ and apply_expr ~env ~res e =
     if Continuation.equal (To_jsir_env.return_continuation env) cont
     then env, To_jsir_result.end_block_with_last_exn res (Return return_var)
     else
-      let ({ addr; arity } : To_jsir_env.continuation) =
-        To_jsir_env.get_continuation_exn env cont
+      let addr = To_jsir_env.get_continuation_exn env cont in
+      let arity =
+        Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized
       in
       let return_vars, res =
         match arity with
@@ -535,9 +527,7 @@ and apply_cont0 ~env ~res apply_cont =
     | Normal_or_exn -> (
       match raise_kind_and_exn_handler with
       | None ->
-        let ({ addr; arity = _ } : To_jsir_env.continuation) =
-          To_jsir_env.get_continuation_exn env continuation
-        in
+        let addr = To_jsir_env.get_continuation_exn env continuation in
         Jsir.Branch (addr, args), res
       | Some (raise_kind, exn_handler) ->
         let raise_kind =
