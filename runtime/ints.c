@@ -199,7 +199,7 @@ CAMLprim value caml_format_int(value fmt, value arg)
 
 /* 8-bit integers */
 
-int8_t caml_int16_of_float_unboxed_to_untagged(double x)
+int8_t caml_int8_of_float_unboxed_to_untagged(double x)
 { return (int8_t) x; }
 
 CAMLprim value caml_int8_of_float(value v)
