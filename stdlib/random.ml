@@ -341,19 +341,22 @@ let mk_default () =
            586573249833713189L
            (-8591268803865043407L)
            6388613595849772044L
-
-(* CR-soon mslater: switch to TLS to remove thread unsafety *)
-(* CR-someday mslater: switch to FLS to remove magic *)
 let random_key =
   DLS.new_key
     ~split_from_parent:(fun s ->
       let s = State.split s in
+      (* Safe because [s] is an independent copy. *)
       (fun () -> Obj.magic_uncontended s))
     mk_default
 
+(* CR-someday mslater: using DLS means all threads in a domain share state.
+   This is safe because we cannot switch threads during [bits]. However, this
+   means the sequence is nondeterministic in the presence of threads. We could
+   use TLS instead, but we cannot depend on [Thread] in the stdlib. Ideally,
+   this should use FLS, which would be deterministic and non-magical. *)
 let[@inline] apply0 f () = f (Obj.magic_uncontended (DLS.get random_key))
 let[@inline] apply1 f v =  f (Obj.magic_uncontended (DLS.get random_key)) v
-let[@inline] apply_in_range f ~min ~max = 
+let[@inline] apply_in_range f ~min ~max =
   f (Obj.magic_uncontended (DLS.get random_key)) ~min ~max
 
 let bits = apply0 State.bits

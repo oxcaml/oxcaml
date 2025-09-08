@@ -1032,10 +1032,12 @@ and str_formatter = formatter_of_buffer stdbuf
 
 (* Initialise domain local state *)
 
-(* CR-soon mslater: switch to TLS to remove thread unsafety *)
-(* CR-someday mslater: switch to FLS to remove magic *)
-module DLS = struct 
+module DLS = struct
   let new_key = Domain.Safe.DLS.new_key
+
+  (* CR-someday mslater: [Format] is not thread-safe. Using TLS would be an
+     improvement, but we cannot depend on [Thread] in the stdlib. Eventually,
+     this should use FLS, which would let us remove the magic. *)
   let get = Obj.magic_portable Domain.DLS.get
   let set = Obj.magic_portable Domain.DLS.set
 end
@@ -1118,8 +1120,8 @@ let make_synchronized_formatter_safe output flush =
     in
     make_formatter output' flush')
 
-let make_synchronized_formatter_unsafe output flush = 
-  make_synchronized_formatter_safe 
+let make_synchronized_formatter_unsafe output flush =
+  make_synchronized_formatter_safe
     (Obj.magic_portable output)
     (Obj.magic_portable flush)
 

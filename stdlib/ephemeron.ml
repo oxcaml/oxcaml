@@ -417,10 +417,12 @@ module GenHashTable = struct
     module Rng : sig
       val bits : unit -> int
     end = struct
-      (* CR-soon mslater: switch to TLS to remove thread unsafety *)
-      (* CR-someday mslater: switch to FLS to remove magic *)
       let key = Domain.Safe.DLS.new_key Random.State.make_self_init
-      let[@inline] bits () = 
+      let[@inline] bits () =
+        (* CR-someday mslater: using DLS means all threads in a domain share
+           state. This is okay because we cannot switch threads during [bits],
+           and we don't care about determinism. Ideally, this should use FLS,
+           which would let us remove the magic. *)
         Random.State.bits (Obj.magic_uncontended (Domain.Safe.DLS.get key))
     end
 
