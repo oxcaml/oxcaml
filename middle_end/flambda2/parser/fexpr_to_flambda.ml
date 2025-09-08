@@ -244,11 +244,16 @@ let find_region env (r : Fexpr.region) =
 
 let find_code_id env code_id = fresh_or_existing_code_id env code_id
 
+(* TODO: This should not be hardcoded - machine_width should flow through
+   properly *)
+let machine_width = Target_system.Machine_width.Sixty_four
+
 let targetint (i : Fexpr.targetint) : Targetint_32_64.t =
-  Targetint_32_64.of_int64 i
+  Targetint_32_64.of_int64 machine_width i
 
 let targetint_31_63 (i : Fexpr.targetint) : Target_ocaml_int.t =
-  Target_ocaml_int.of_int64 i
+  (* TODO: machine_width should be passed through properly here *)
+  Target_ocaml_int.of_int64 Target_system.Machine_width.Sixty_four i
 
 let vec128 bits : Vector_types.Vec128.Bit_pattern.t =
   Vector_types.Vec128.Bit_pattern.of_bits bits
@@ -263,7 +268,11 @@ let tag_scannable (tag : Fexpr.tag_scannable) : Tag.Scannable.t =
   Tag.Scannable.create_exn tag
 
 let immediate i =
-  i |> Targetint_32_64.of_string |> Target_ocaml_int.of_targetint
+  (* TODO: This should not be hardcoded - machine_width should flow through
+     properly *)
+  i
+  |> Targetint_32_64.of_string machine_width
+  |> Target_ocaml_int.of_targetint machine_width
 
 let float32 f = f |> Numeric_types.Float32_by_bit_pattern.create
 
@@ -369,9 +378,10 @@ let field_of_block env (v : Fexpr.field_of_block) =
     match v with
     | Symbol s -> Simple.symbol (get_symbol env s)
     | Tagged_immediate i ->
-      let i = Targetint_32_64.of_string i in
+      let i = Targetint_32_64.of_string machine_width i in
       Simple.const
-        (Reg_width_const.tagged_immediate (Target_ocaml_int.of_targetint i))
+        (Reg_width_const.tagged_immediate
+           (Target_ocaml_int.of_targetint machine_width i))
     | Dynamically_computed var ->
       let var = find_var env var in
       Simple.var var
@@ -415,7 +425,10 @@ let block_access_kind (ak : Fexpr.block_access_kind) :
   let size s : _ Or_unknown.t =
     match s with
     | None -> Unknown
-    | Some s -> Known (s |> Target_ocaml_int.of_int64)
+    | Some s ->
+      (* TODO: Should get machine_width from fexpr context when available *)
+      Known
+        (s |> Target_ocaml_int.of_int64 Target_system.Machine_width.Sixty_four)
   in
   match ak with
   | Values { field_kind; tag; size = s } ->
@@ -730,7 +743,9 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     let arms =
       List.map
         (fun (case, apply) ->
-          Target_ocaml_int.of_int case, apply_cont env apply)
+          (* TODO: Should get machine_width from fexpr context when available *)
+          ( Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four case,
+            apply_cont env apply ))
         cases
       |> Target_ocaml_int.Map.of_list
     in

@@ -51,7 +51,8 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
            make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
          in
          lambda |> fun code ->
-         Flambda2.lambda_to_flambda ~ppf_dump:i.ppf_dump
+         Flambda2.lambda_to_flambda ~machine_width:Thirty_two_no_gc_tag_bit
+           ~ppf_dump:i.ppf_dump
            ~prefixname:(Unit_info.prefix i.target)
            { program with code }
          |> fun (flambda_result : Flambda2.flambda_result) ->

@@ -16,122 +16,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type repr =
+module MW = Target_system.Machine_width
+
+type t =
   | Int32 of int32
   | Int64 of int64
 
-type num_bits =
-  | Thirty_two
-  | Sixty_four
-
-module type S = sig
-  type t
-
-  type targetint = t
-
-  val num_bits : num_bits
-
-  val repr : t -> repr
-
-  include Container_types.S with type t := t
-
-  val zero : t
-
-  val one : t
-
-  val minus_one : t
-
-  val neg : t -> t
-
-  val add : t -> t -> t
-
-  val sub : t -> t -> t
-
-  val mul : t -> t -> t
-
-  val div : t -> t -> t
-
-  val shift_left : t -> int -> t
-
-  val shift_right : t -> int -> t
-
-  val shift_right_logical : t -> int -> t
-
-  val min : t -> t -> t
-
-  val max : t -> t -> t
-
-  val get_least_significant_16_bits_then_byte_swap : t -> t
-
-  module Pair : sig
-    type nonrec t = t * t
-
-    include Container_types.S with type t := t
-  end
-
-  val cross_product : Set.t -> Set.t -> Pair.Set.t
-
-  val max_int : t
-
-  val min_int : t
-
-  val rem : t -> t -> t
-
-  val succ : t -> t
-
-  val pred : t -> t
-
-  val abs : t -> t
-
-  val logand : t -> t -> t
-
-  val logor : t -> t -> t
-
-  val logxor : t -> t -> t
-
-  val lognot : t -> t
-
-  val swap_byte_endianness : t -> t
-
-  val of_int_exn : int -> t
-
-  val of_int : int -> t
-
-  val of_int32 : int32 -> t
-
-  val of_int64 : int64 -> t
-
-  val of_float : float -> t
-
-  val of_string : string -> t
-
-  val to_int : t -> int
-
-  val to_int32 : t -> int32
-
-  val to_int64 : t -> int64
-
-  val to_float : t -> float
-
-  val to_string : t -> string
-
-  val unsigned_div : t -> t -> t
-
-  val unsigned_rem : t -> t -> t
-
-  val unsigned_compare : t -> t -> int
-
-  module Targetint_set = Set
-end
+type targetint = t
 
 module Int32 = struct
   include Int32
 
-  type targetint = t
-
   let of_int_exn =
     match Sys.word_size with
-    (* size of [int] *)
+    (* size of [int] on the host *)
     | 32 -> Int32.of_int
     | 64 ->
       fun n ->
@@ -140,17 +38,7 @@ module Int32 = struct
         else Int32.of_int n
     | _ -> assert false
 
-  let num_bits = Thirty_two
-
-  let of_int32 x = x
-
-  let to_int32 x = x
-
-  let of_int64 = Int64.to_int32
-
   let to_int64 = Int64.of_int32
-
-  let repr x = Int32 x
 
   include Container_types.Make (struct
     type nonrec t = t
@@ -168,23 +56,6 @@ module Int32 = struct
 
   let max t1 t2 = if Int32.compare t1 t2 <= 0 then t2 else t1
 
-  module Targetint_set = Set
-
-  module Pair = struct
-    type nonrec t = t * t
-
-    module T_pair = Container_types.Pair (T) (T)
-    include Container_types.Make (T_pair)
-  end
-
-  let cross_product set1 set2 =
-    Set.fold
-      (fun elt1 result ->
-        Set.fold
-          (fun elt2 result -> Pair.Set.add (elt1, elt2) result)
-          set2 result)
-      set1 Pair.Set.empty
-
   let get_least_significant_16_bits_then_byte_swap t =
     let least_significant_byte = Int32.logand t 0xffl in
     let second_to_least_significant_byte =
@@ -199,21 +70,7 @@ end
 module Int64 = struct
   include Int64
 
-  type targetint = t
-
-  let num_bits = Sixty_four
-
   let of_int_exn = Int64.of_int
-
-  let of_int64 x = x
-
-  let to_int64 x = x
-
-  let repr x = Int64 x
-
-  let min t1 t2 = if Int64.compare t1 t2 <= 0 then t1 else t2
-
-  let max t1 t2 = if Int64.compare t1 t2 <= 0 then t2 else t1
 
   include Container_types.Make (struct
     type nonrec t = t
@@ -227,22 +84,9 @@ module Int64 = struct
     let [@ocamlformat "disable"] print ppf t = Format.fprintf ppf "%Ld" t
   end)
 
-  module Targetint_set = Set
+  let min t1 t2 = if Int64.compare t1 t2 <= 0 then t1 else t2
 
-  module Pair = struct
-    type nonrec t = t * t
-
-    module T_pair = Container_types.Pair (T) (T)
-    include Container_types.Make (T_pair)
-  end
-
-  let cross_product set1 set2 =
-    Set.fold
-      (fun elt1 result ->
-        Set.fold
-          (fun elt2 result -> Pair.Set.add (elt1, elt2) result)
-          set2 result)
-      set1 Pair.Set.empty
+  let max t1 t2 = if Int64.compare t1 t2 <= 0 then t2 else t1
 
   let get_least_significant_16_bits_then_byte_swap t =
     let least_significant_byte = Int64.logand t 0xffL in
@@ -255,22 +99,302 @@ module Int64 = struct
   external swap_byte_endianness : t -> t = "%bswap_int64"
 end
 
-(* CR selee: this is extremely sad, and should be replaced with a proper config
-   variable in the future *)
-let size =
-  let compiler_name = Filename.basename Sys.argv.(0) in
-  match compiler_name with "ocamlj" | "ocamlj.opt" -> 32 | _ -> Sys.word_size
+(* Helper function to extract machine width from a t value *)
+let machine_width t =
+  match t with
+  | Int32 _ ->
+    MW.Thirty_two
+    (* For targetint_32_64, Int32 always means traditional 32-bit *)
+  | Int64 _ -> MW.Sixty_four
 
-include (val match size with
-             | 32 -> (module Int32)
-             | 64 -> (module Int64)
-             | _ -> assert false : S)
+(* Print function *)
+let print ppf t =
+  match t with
+  | Int32 x -> Format.fprintf ppf "%ld" x
+  | Int64 x -> Format.fprintf ppf "%Ld" x
 
-let to_int_checked t =
+(* Creation functions *)
+let zero machine_width =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 Int32.zero
+  | MW.Sixty_four -> Int64 Int64.zero
+
+let one machine_width =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 Int32.one
+  | MW.Sixty_four -> Int64 Int64.one
+
+let minus_one machine_width =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 Int32.minus_one
+  | MW.Sixty_four -> Int64 Int64.minus_one
+
+let max_int machine_width =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 Int32.max_int
+  | MW.Sixty_four -> Int64 Int64.max_int
+
+let min_int machine_width =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 Int32.min_int
+  | MW.Sixty_four -> Int64 Int64.min_int
+
+(* Unary operations *)
+let neg t =
+  match t with Int32 x -> Int32 (Int32.neg x) | Int64 x -> Int64 (Int64.neg x)
+
+let abs t =
+  match t with Int32 x -> Int32 (Int32.abs x) | Int64 x -> Int64 (Int64.abs x)
+
+let succ t =
+  match t with
+  | Int32 x -> Int32 (Int32.succ x)
+  | Int64 x -> Int64 (Int64.succ x)
+
+let pred t =
+  match t with
+  | Int32 x -> Int32 (Int32.pred x)
+  | Int64 x -> Int64 (Int64.pred x)
+
+let lognot t =
+  match t with
+  | Int32 x -> Int32 (Int32.lognot x)
+  | Int64 x -> Int64 (Int64.lognot x)
+
+(* Binary operations - need to check compatibility *)
+let add t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.add x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.add x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf "Targetint_32_64.add: incompatible types %a and %a" print
+      t1 print t2
+
+let sub t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.sub x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.sub x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf "Targetint_32_64.sub: incompatible types %a and %a" print
+      t1 print t2
+
+let mul t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.mul x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.mul x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf "Targetint_32_64.mul: incompatible types %a and %a" print
+      t1 print t2
+
+let div t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.div x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.div x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf "Targetint_32_64.div: incompatible types %a and %a" print
+      t1 print t2
+
+let unsigned_div t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.unsigned_div x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.unsigned_div x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf
+      "Targetint_32_64.unsigned_div: incompatible types %a and %a" print t1
+      print t2
+
+let rem t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.rem x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.rem x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf "Targetint_32_64.rem: incompatible types %a and %a" print
+      t1 print t2
+
+let unsigned_rem t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.unsigned_rem x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.unsigned_rem x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf
+      "Targetint_32_64.unsigned_rem: incompatible types %a and %a" print t1
+      print t2
+
+let logand t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.logand x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.logand x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf "Targetint_32_64.logand: incompatible types %a and %a"
+      print t1 print t2
+
+let logor t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.logor x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.logor x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf "Targetint_32_64.logor: incompatible types %a and %a"
+      print t1 print t2
+
+let logxor t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.logxor x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.logxor x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf "Targetint_32_64.logxor: incompatible types %a and %a"
+      print t1 print t2
+
+(* Shift operations *)
+let shift_left t n =
+  match t with
+  | Int32 x -> Int32 (Int32.shift_left x n)
+  | Int64 x -> Int64 (Int64.shift_left x n)
+
+let shift_right t n =
+  match t with
+  | Int32 x -> Int32 (Int32.shift_right x n)
+  | Int64 x -> Int64 (Int64.shift_right x n)
+
+let shift_right_logical t n =
+  match t with
+  | Int32 x -> Int32 (Int32.shift_right_logical x n)
+  | Int64 x -> Int64 (Int64.shift_right_logical x n)
+
+(* Comparison functions *)
+let compare t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32.compare x1 x2
+  | Int64 x1, Int64 x2 -> Int64.compare x1 x2
+  | Int32 _, Int64 _ -> -1
+  | Int64 _, Int32 _ -> 1
+
+let equal t1 t2 = compare t1 t2 = 0
+
+let unsigned_compare t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32.unsigned_compare x1 x2
+  | Int64 x1, Int64 x2 -> Int64.unsigned_compare x1 x2
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf
+      "Targetint_32_64.unsigned_compare: incompatible types %a and %a" print t1
+      print t2
+
+let min t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.min x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.min x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf "Targetint_32_64.min: incompatible types %a and %a" print
+      t1 print t2
+
+let max t1 t2 =
+  match t1, t2 with
+  | Int32 x1, Int32 x2 -> Int32 (Int32.max x1 x2)
+  | Int64 x1, Int64 x2 -> Int64 (Int64.max x1 x2)
+  | Int32 _, Int64 _ | Int64 _, Int32 _ ->
+    Misc.fatal_errorf "Targetint_32_64.max: incompatible types %a and %a" print
+      t1 print t2
+
+(* Conversion functions *)
+let of_int machine_width n =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int32.of_int n)
+  | MW.Sixty_four -> Int64 (Int64.of_int n)
+
+let of_int_exn machine_width n =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int32.of_int_exn n)
+  | MW.Sixty_four -> Int64 (Int64.of_int_exn n)
+
+let to_int t =
+  match t with Int32 x -> Int32.to_int x | Int64 x -> Int64.to_int x
+
+let of_int32 machine_width x =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 x
+  | MW.Sixty_four -> Int64 (Int64.of_int32 x)
+
+let to_int32 t = match t with Int32 x -> x | Int64 x -> Int64.to_int32 x
+
+let of_int64 machine_width x =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int64.to_int32 x)
+  | MW.Sixty_four -> Int64 x
+
+let to_int64 t = match t with Int32 x -> Int32.to_int64 x | Int64 x -> x
+
+let of_float machine_width f =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int32.of_float f)
+  | MW.Sixty_four -> Int64 (Int64.of_float f)
+
+let to_float t =
+  match t with Int32 x -> Int32.to_float x | Int64 x -> Int64.to_float x
+
+let of_string machine_width s =
+  match machine_width with
+  | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int32.of_string s)
+  | MW.Sixty_four -> Int64 (Int64.of_string s)
+
+let to_string t =
+  match t with Int32 x -> Int32.to_string x | Int64 x -> Int64.to_string x
+
+(* Other utility functions *)
+let get_least_significant_16_bits_then_byte_swap t =
+  match t with
+  | Int32 x -> Int32 (Int32.get_least_significant_16_bits_then_byte_swap x)
+  | Int64 x -> Int64 (Int64.get_least_significant_16_bits_then_byte_swap x)
+
+let swap_byte_endianness t =
+  match t with
+  | Int32 x -> Int32 (Int32.swap_byte_endianness x)
+  | Int64 x -> Int64 (Int64.swap_byte_endianness x)
+
+let hash t =
+  match t with Int32 x -> Hashtbl.hash x | Int64 x -> Hashtbl.hash x
+
+(* Container_types implementation *)
+module Self = struct
+  type nonrec t = t
+
+  let compare = compare
+
+  let equal = equal
+
+  let hash = hash
+
+  let print = print
+end
+
+include Container_types.Make (Self)
+module Targetint_set = Set
+
+module Pair = struct
+  type nonrec t = t * t
+
+  module T_pair = Container_types.Pair (Self) (Self)
+  include Container_types.Make (T_pair)
+end
+
+let cross_product set1 set2 =
+  Set.fold
+    (fun elt1 result ->
+      Set.fold (fun elt2 result -> Pair.Set.add (elt1, elt2) result) set2 result)
+    set1 Pair.Set.empty
+
+let to_int_checked machine_width t =
   let i = to_int t in
-  let t' = of_int i in
+  let t' = of_int machine_width i in
   if not (equal t t')
   then
     Misc.fatal_errorf "Cannot translate Targetint_32_64 %a to an OCaml integer"
       print t;
   i
+
+(* Define repr type and function at the very end to avoid constructor
+   shadowing *)
+type repr =
+  | Int32 of int32
+  | Int64 of int64
+
+let repr (t : t) : repr = match t with Int32 x -> Int32 x | Int64 x -> Int64 x

@@ -21,6 +21,7 @@ module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
 let main unix argv ppf ~flambda2 =
+  let machine_width = Target_system.Machine_width.Sixty_four in
   native_code := true;
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -63,13 +64,13 @@ let main unix argv ppf ~flambda2 =
     Compmisc.read_clflags_from_env ();
     (* Set platform-appropriate DWARF fission default when oxcaml-dwarf is
        enabled *)
-    if Config.oxcaml_dwarf && 
+    if Config.oxcaml_dwarf &&
        !Clflags.dwarf_fission = Clflags.Fission_none &&
        Target_system.is_macos () then
       Clflags.dwarf_fission := Clflags.Fission_dsymutil;
     (* Set up DWARF compression for C compiler invocations *)
     if !Clflags.debug && !Clflags.native_code then
-      Clflags.dwarf_c_toolchain_flag := 
+      Clflags.dwarf_c_toolchain_flag :=
         Dwarf_flags.get_dwarf_c_toolchain_flag ();
     if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();
     if !Clflags.plugin then
@@ -77,7 +78,7 @@ let main unix argv ppf ~flambda2 =
     begin try
       Compenv.process_deferred_actions
         (ppf,
-         Optcompile.implementation unix ~flambda2,
+         Optcompile.implementation ~machine_width unix ~flambda2,
          Optcompile.interface,
          ".cmx",
          ".cmxa");
@@ -121,7 +122,7 @@ let main unix argv ppf ~flambda2 =
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
-        Asmpackager.package_files unix
+        Asmpackager.package_files ~machine_width unix
           ~ppf_dump (Compmisc.initial_env ())
           (Compenv.get_objfiles ~with_ocamlparam:false) target
           ~flambda2);
@@ -141,7 +142,8 @@ let main unix argv ppf ~flambda2 =
         | src :: args ->
           src, args
       in
-      Asminstantiator.instantiate unix ~src ~args target ~flambda2;
+      Asminstantiator.instantiate ~machine_width unix ~src ~args target
+        ~flambda2;
       Warnings.check_fatal ();
     end
     else if !shared then begin

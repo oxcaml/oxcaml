@@ -18,10 +18,12 @@
 val interface: source_file:string -> output_prefix:string -> unit
 
 val implementation
-   : (module Compiler_owee.Unix_intf.S)
+   : machine_width:Target_system.Machine_width.t
+  -> (module Compiler_owee.Unix_intf.S)
   -> flambda2:(
     ppf_dump:Format.formatter ->
     prefixname:string ->
+    machine_width:Target_system.Machine_width.t ->
     keep_symbol_tables:bool ->
     Lambda.program ->
     Cmm.phrase list)
@@ -30,10 +32,12 @@ val implementation
   -> unit
 
 val instance
-   : (module Compiler_owee.Unix_intf.S)
+   : machine_width:Target_system.Machine_width.t
+  -> (module Compiler_owee.Unix_intf.S)
   -> flambda2:(
     ppf_dump:Format.formatter ->
     prefixname:string ->
+    machine_width:Target_system.Machine_width.t ->
     keep_symbol_tables:bool ->
     Lambda.program ->
     Cmm.phrase list)

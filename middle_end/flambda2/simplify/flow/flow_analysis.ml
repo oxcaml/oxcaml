@@ -50,8 +50,8 @@ let print_graph ~print ~print_name ~lazy_ppf ~graph =
 
 (* analysis *)
 
-let analyze ?(speculative = false) ?print_name ~return_continuation
-    ~exn_continuation ~code_age_relation ~used_value_slots
+let analyze ?(speculative = false) ?print_name ~machine_width
+    ~return_continuation ~exn_continuation ~code_age_relation ~used_value_slots
     ~code_ids_to_never_delete ~specialization_map t : T.Flow_result.t =
   Profile.record_call ~accumulate:true "data_flow" (fun () ->
       if Flambda_features.dump_flow ()
@@ -94,8 +94,8 @@ let analyze ?(speculative = false) ?print_name ~return_continuation
       (* control flow graph *)
       let control = Control_flow_graph.create ~dummy_toplevel_cont t in
       let reference_analysis =
-        Mutable_unboxing.create ~dom:aliases ~dom_graph ~source_info:t
-          ~control_flow_graph:control
+        Mutable_unboxing.create ~machine_width ~dom:aliases ~dom_graph
+          ~source_info:t ~control_flow_graph:control
           ~required_names:dead_variable_result.required_names
           ~return_continuation ~exn_continuation
       in

@@ -12,6 +12,7 @@ let _test_recursive_meet () =
     TE.create
       ~resolver:(fun _ -> None)
       ~get_imported_names:(fun () -> Name.Set.empty)
+      ~machine_width:Sixty_four
   in
   let var_x = Variable.create "x" Flambda_kind.value in
   let var_y = Variable.create "y" Flambda_kind.value in
@@ -35,6 +36,7 @@ let _test_recursive_meet () =
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       Alloc_mode.For_types.heap
       ~fields:[alias name]
+      ~machine_width:Sixty_four
   in
   let env = TE.add_equation env n_x (mk_block_type n_y) in
   let env = TE.add_equation env n_y (mk_block_type n_z) in
@@ -43,13 +45,13 @@ let _test_recursive_meet () =
     T.immutable_block ~is_unique:false Tag.zero
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       ~fields:[alias n_v; alias n_v]
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   let ty2 =
     T.immutable_block ~is_unique:false Tag.zero
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       ~fields:[alias n_x; alias n_y]
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   Format.eprintf "Environment: %a@." TE.print env;
   match T.meet env ty1 ty2 with
@@ -63,6 +65,7 @@ let _test_bottom_detection () =
     TE.create
       ~resolver:(fun _ -> None)
       ~get_imported_names:(fun () -> Name.Set.empty)
+      ~machine_width:Sixty_four
   in
   let var_x = Variable.create "x" Flambda_kind.value in
   let n_x = Name.var var_x in
@@ -71,19 +74,20 @@ let _test_bottom_detection () =
   let alias name = T.alias_type_of Flambda_kind.value (Simple.name name) in
   let const n =
     T.alias_type_of Flambda_kind.value
-      (Simple.const (Reg_width_const.const_int (Target_ocaml_int.of_int n)))
+      (Simple.const
+         (Reg_width_const.const_int (Target_ocaml_int.of_int Sixty_four n)))
   in
   let ty1 =
     T.immutable_block ~is_unique:false Tag.zero
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       ~fields:[alias n_x; alias n_x]
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   let ty2 =
     T.immutable_block ~is_unique:false Tag.zero
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       ~fields:[const 0; const 1]
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   Format.eprintf "Environment: %a@." TE.print env;
   match T.meet env ty1 ty2 with
@@ -97,6 +101,7 @@ let _test_bottom_recursive () =
     TE.create
       ~resolver:(fun _ -> None)
       ~get_imported_names:(fun () -> Name.Set.empty)
+      ~machine_width:Sixty_four
   in
   let var_x = Variable.create "x" Flambda_kind.value in
   let n_x = Name.var var_x in
@@ -105,26 +110,27 @@ let _test_bottom_recursive () =
   let alias name = T.alias_type_of Flambda_kind.value (Simple.name name) in
   let const n =
     T.alias_type_of Flambda_kind.value
-      (Simple.const (Reg_width_const.const_int (Target_ocaml_int.of_int n)))
+      (Simple.const
+         (Reg_width_const.const_int (Target_ocaml_int.of_int Sixty_four n)))
   in
   let ty_x =
     T.immutable_block ~is_unique:false Tag.zero
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       ~fields:[T.unknown Flambda_kind.value; alias n_x]
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   let env = TE.add_equation env n_x ty_x in
   let ty_cell2 =
     T.immutable_block ~is_unique:false Tag.zero
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       ~fields:[const 1; T.unknown Flambda_kind.value]
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   let ty_cell1 =
     T.immutable_block ~is_unique:false Tag.zero
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       ~fields:[const 0; ty_cell2]
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   Format.eprintf "Environment: %a@." TE.print env;
   match T.meet env (alias n_x) ty_cell1 with
@@ -141,6 +147,7 @@ let test_double_recursion () =
     TE.create
       ~resolver:(fun _ -> None)
       ~get_imported_names:(fun () -> Name.Set.empty)
+      ~machine_width:Sixty_four
   in
   let var_x = Variable.create "x" Flambda_kind.value in
   let var_y = Variable.create "y" Flambda_kind.value in
@@ -159,19 +166,19 @@ let test_double_recursion () =
     T.immutable_block ~is_unique:false Tag.zero
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       ~fields:[alias n_x; alias n_y; alias n_z]
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   let ty_y =
     T.immutable_block ~is_unique:false Tag.zero
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       ~fields:[alias n_y; alias n_z; alias n_x]
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   let ty_z =
     T.immutable_block ~is_unique:false Tag.zero
       ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
       ~fields:[alias n_z; alias n_x; alias n_y]
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
   in
   let env = TE.add_equation env n_x ty_x in
   let env = TE.add_equation env n_y ty_y in

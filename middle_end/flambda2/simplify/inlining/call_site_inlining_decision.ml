@@ -97,14 +97,16 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
             ~specialization_map:(DA.specialization_map dacc)
             ~return_continuation:function_return_cont
             ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
+            ~machine_width:(DE.machine_width (DA.denv dacc))
         in
         let uenv =
           (* Note that we don't need to do anything special if the exception
              continuation takes extra arguments, since we are only simplifying
              the body of the function in question, not substituting it into an
              existing context. *)
+          let machine_width = DE.machine_width (DA.denv dacc) in
           UE.add_function_return_or_exn_continuation
-            (UE.create (DA.are_rebuilding_terms dacc))
+            (UE.create (DA.are_rebuilding_terms dacc) ~machine_width)
             (Exn_continuation.exn_handler exn_continuation)
             (Flambda_arity.create_singletons
                [Flambda_kind.With_subkind.any_value])

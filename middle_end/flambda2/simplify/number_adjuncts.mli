@@ -29,11 +29,11 @@ module type Num_common = sig
 
   val cross_product : Set.t -> Set.t -> Pair.Set.t
 
-  val zero : t
+  val zero : Target_system.Machine_width.t -> t
 
-  val one : t
+  val one : Target_system.Machine_width.t -> t
 
-  val minus_one : t
+  val minus_one : Target_system.Machine_width.t -> t
 
   val add : t -> t -> t
 
@@ -47,7 +47,7 @@ module type Num_common = sig
 
   val to_const : t -> Reg_width_const.t
 
-  val to_immediate : t -> Target_ocaml_int.t
+  val to_immediate : t -> Target_system.Machine_width.t -> Target_ocaml_int.t
 
   val to_naked_float32 : t -> Numeric_types.Float32_by_bit_pattern.t
 
@@ -61,7 +61,8 @@ module type Num_common = sig
 
   val to_naked_int64 : t -> Numeric_types.Int64.t
 
-  val to_naked_nativeint : t -> Targetint_32_64.t
+  val to_naked_nativeint :
+    t -> Target_system.Machine_width.t -> Targetint_32_64.t
 end
 
 module type Number_kind_common = sig

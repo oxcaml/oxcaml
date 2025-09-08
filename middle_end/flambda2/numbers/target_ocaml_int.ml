@@ -14,226 +14,566 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* CR-someday mshinwell/gbury: maybe we might want to consider adding some more
-   checks in some of the conversions functions to be more safe and more
-   consistent in the handling of overflows ? For instance One_bit_fewer.of_int
-   silently truncates the input int to make it fit, whereas we probably want to
-   make it produce an error ? *)
+module MW = Target_system.Machine_width
 
-module type S = sig
-  type t
+type t =
+  | Int31 of int32
+  | Int32 of int32
+  | Int63 of int64
 
-  include Container_types.S with type t := t
+(* Wrapper module for Int32 to work with One_bit_fewer *)
+module Int32_base = struct
+  type t = int32
 
-  val min_value : t
+  let compare = Int32.compare
 
-  val max_value : t
+  let equal = Int32.equal
 
-  val minus_one : t
+  let hash = Hashtbl.hash
 
-  val zero : t
+  let print ppf t = Format.fprintf ppf "%ld" t
 
-  val one : t
+  let min_value _machine_width = Int32.min_int
 
-  val ten : t
+  let max_value _machine_width = Int32.max_int
 
-  val hex_ff : t
+  let minus_one _machine_width = Int32.minus_one
 
-  val bool : bool -> t
+  let zero _machine_width = Int32.zero
 
-  val bool_true : t
+  let one _machine_width = Int32.one
 
-  val bool_false : t
+  let ten _machine_width = 10l
 
-  val ( <= ) : t -> t -> bool
+  let hex_ff _machine_width = 0xffl
 
-  val ( >= ) : t -> t -> bool
+  let ( <= ) x y = Int32.compare x y <= 0
 
-  val ( < ) : t -> t -> bool
+  let ( >= ) x y = Int32.compare x y >= 0
 
-  val bottom_byte_to_int : t -> int
+  let ( < ) x y = Int32.compare x y < 0
 
-  val of_char : char -> t
+  let ( > ) x y = Int32.compare x y > 0
 
-  val of_int : int -> t
+  let bottom_byte_to_int t = Int32.to_int (Int32.logand t 0xffl)
 
-  val of_int_option : int -> t option
+  let of_char _machine_width c = Int32.of_int (Char.code c)
 
-  val to_int : t -> int
+  let of_int _machine_width i = Int32.of_int i
 
-  val to_int_option : t -> int option
+  let of_int_option _machine_width i = Some (Int32.of_int i)
 
-  val to_int_exn : t -> int
+  let of_int32 _machine_width i = i
 
-  val of_int32 : int32 -> t
+  let of_int64 _machine_width i = Int64.to_int32 i
 
-  val to_int32 : t -> int32
+  let of_targetint _machine_width t =
+    match Targetint_32_64.repr t with
+    | Targetint_32_64.Int32 x -> x
+    | Targetint_32_64.Int64 x -> Int64.to_int32 x
 
-  val of_int64 : int64 -> t
+  let of_float _machine_width f = Int32.of_float f
 
-  val to_int64 : t -> int64
+  let to_float = Int32.to_float
 
-  val of_targetint : Targetint_32_64.t -> t
+  let to_int = Int32.to_int
 
-  val to_targetint : t -> Targetint_32_64.t
+  let to_int_exn = Int32.to_int
 
-  val of_float : float -> t
+  let to_int_option t = Some (Int32.to_int t)
 
-  val to_float : t -> float
+  let to_int32 t = t
 
-  val neg : t -> t
+  let to_int64 = Int64.of_int32
 
-  val get_least_significant_16_bits_then_byte_swap : t -> t
+  let to_targetint machine_width t = Targetint_32_64.of_int32 machine_width t
 
-  val add : t -> t -> t
-
-  val sub : t -> t -> t
-
-  val mul : t -> t -> t
-
-  val mod_ : t -> t -> t
-
-  val div : t -> t -> t
-
-  val and_ : t -> t -> t
-
-  val or_ : t -> t -> t
-
-  val xor : t -> t -> t
-
-  val shift_left : t -> int -> t
-
-  val shift_right : t -> int -> t
-
-  val shift_right_logical : t -> int -> t
-
-  val min : t -> t -> t
-
-  val max : t -> t -> t
-
-  val is_non_negative : t -> bool
-
-  val of_int8 : Numeric_types.Int8.t -> t
-
-  val of_int16 : Numeric_types.Int16.t -> t
-end
-
-module T0 = struct
-  include Targetint_32_64
-
-  let ten = Targetint_32_64.of_int 10
-
-  let hex_ff = Targetint_32_64.of_int 0xff
-
-  let bool_true = one
-
-  let bool_false = zero
-
-  let bool b = if b then bool_true else bool_false
-
-  let min_value = Targetint_32_64.min_int
-
-  let max_value = Targetint_32_64.max_int
-
-  let bottom_byte_to_int t =
-    Targetint_32_64.to_int (Targetint_32_64.logand t hex_ff)
-
-  let xor = Targetint_32_64.logxor
-
-  let or_ = Targetint_32_64.logor
-
-  let and_ = Targetint_32_64.logand
-
-  let mod_ = Targetint_32_64.rem
-
-  let of_char c = Targetint_32_64.of_int (Char.code c)
-
-  let of_int_option i = Some (of_int i)
-
-  let to_targetint t = t
-
-  let of_targetint t = t
-
-  let max t1 t2 = if Targetint_32_64.compare t1 t2 < 0 then t2 else t1
-
-  let min t1 t2 = if Targetint_32_64.compare t1 t2 < 0 then t1 else t2
-
-  let of_int8 i = Targetint_32_64.of_int (Numeric_types.Int8.to_int i)
-
-  let of_int16 i = Targetint_32_64.of_int (Numeric_types.Int16.to_int i)
-
-  let ( <= ) t1 t2 = Stdlib.( <= ) (Targetint_32_64.compare t1 t2) 0
-
-  let ( >= ) t1 t2 = Stdlib.( >= ) (Targetint_32_64.compare t1 t2) 0
-
-  let ( < ) t1 t2 = Stdlib.( < ) (Targetint_32_64.compare t1 t2) 0
-
-  let ( > ) t1 t2 = Stdlib.( > ) (Targetint_32_64.compare t1 t2) 0
-
-  let to_int_option t =
-    (* CR selee: maybe change to [to_int_in_range_option t ~min ~max] *)
-    let t_as_int64 = to_int64 t in
-    let min_int_as_int64 = Int64.of_int Stdlib.min_int in
-    let max_int_as_int64 = Int64.of_int Stdlib.max_int in
-    let le x y = Stdlib.( <= ) (Int64.compare x y) 0 in
-    if le min_int_as_int64 t_as_int64 && le t_as_int64 max_int_as_int64
-    then Some (to_int t)
-    else None
-
-  let to_int_exn t =
-    match to_int_option t with
-    | Some i -> i
-    | None ->
-      Misc.fatal_errorf "Targetint_31_63.to_int_exn: %a out of range"
-        Targetint_32_64.print t
+  let neg = Int32.neg
 
   let get_least_significant_16_bits_then_byte_swap t =
-    let least_significant_byte = Targetint_32_64.logand t hex_ff in
+    let least_significant_byte = Int32.logand t 0xffl in
     let second_to_least_significant_byte =
-      Targetint_32_64.shift_right_logical
-        (Targetint_32_64.logand t (Targetint_32_64.of_int 0xff00))
-        8
+      Int32.shift_right_logical (Int32.logand t 0xff00l) 8
     in
-    Targetint_32_64.logor second_to_least_significant_byte
-      (Targetint_32_64.shift_left least_significant_byte 8)
+    Int32.logor second_to_least_significant_byte
+      (Int32.shift_left least_significant_byte 8)
 
-  let is_non_negative t = t >= zero
+  let add = Int32.add
+
+  let sub = Int32.sub
+
+  let mul = Int32.mul
+
+  let mod_ = Int32.rem
+
+  let div = Int32.div
+
+  let and_ = Int32.logand
+
+  let or_ = Int32.logor
+
+  let xor = Int32.logxor
+
+  let shift_left = Int32.shift_left
+
+  let shift_right = Int32.shift_right
+
+  let shift_right_logical = Int32.shift_right_logical
+
+  let max x y = if Stdlib.( > ) (Int32.compare x y) 0 then x else y
+
+  let min x y = if Stdlib.( < ) (Int32.compare x y) 0 then x else y
 end
 
-module With_gc_bit = struct
-  include T0
+(* Wrapper module for Int64 to work with One_bit_fewer *)
+module Int64_base = struct
+  type t = int64
 
-  (* Note: the [include T0] must be first so that the [One_bit_fewer] functions
-     take precedence. *)
-  include One_bit_fewer.Make (T0)
-  include Container_types.Make (T0)
+  let compare = Int64.compare
+
+  let equal = Int64.equal
+
+  let hash = Hashtbl.hash
+
+  let print ppf t = Format.fprintf ppf "%Ld" t
+
+  let min_value _machine_width = Int64.min_int
+
+  let max_value _machine_width = Int64.max_int
+
+  let minus_one _machine_width = Int64.minus_one
+
+  let zero _machine_width = Int64.zero
+
+  let one _machine_width = Int64.one
+
+  let ten _machine_width = 10L
+
+  let hex_ff _machine_width = 0xffL
+
+  let ( <= ) x y = Int64.compare x y <= 0
+
+  let ( >= ) x y = Int64.compare x y >= 0
+
+  let ( < ) x y = Int64.compare x y < 0
+
+  let ( > ) x y = Int64.compare x y > 0
+
+  let bottom_byte_to_int t = Int64.to_int (Int64.logand t 0xffL)
+
+  let of_char _machine_width c = Int64.of_int (Char.code c)
+
+  let of_int _machine_width i = Int64.of_int i
+
+  let of_int_option _machine_width i = Some (Int64.of_int i)
+
+  let of_int32 _machine_width i = Int64.of_int32 i
+
+  let of_int64 _machine_width i = i
+
+  let of_targetint _machine_width t =
+    match Targetint_32_64.repr t with
+    | Targetint_32_64.Int32 x -> Int64.of_int32 x
+    | Targetint_32_64.Int64 x -> x
+
+  let of_float _machine_width f = Int64.of_float f
+
+  let to_float = Int64.to_float
+
+  let to_int = Int64.to_int
+
+  let to_int_exn = Int64.to_int
+
+  let to_int_option t = Some (Int64.to_int t)
+
+  let to_int32 = Int64.to_int32
+
+  let to_int64 t = t
+
+  let to_targetint machine_width t = Targetint_32_64.of_int64 machine_width t
+
+  let neg = Int64.neg
+
+  let get_least_significant_16_bits_then_byte_swap t =
+    let least_significant_byte = Int64.logand t 0xffL in
+    let second_to_least_significant_byte =
+      Int64.shift_right_logical (Int64.logand t 0xff00L) 8
+    in
+    Int64.logor second_to_least_significant_byte
+      (Int64.shift_left least_significant_byte 8)
+
+  let add = Int64.add
+
+  let sub = Int64.sub
+
+  let mul = Int64.mul
+
+  let mod_ = Int64.rem
+
+  let div = Int64.div
+
+  let and_ = Int64.logand
+
+  let or_ = Int64.logor
+
+  let xor = Int64.logxor
+
+  let shift_left = Int64.shift_left
+
+  let shift_right = Int64.shift_right
+
+  let shift_right_logical = Int64.shift_right_logical
+
+  let max x y = if Stdlib.( > ) (Int64.compare x y) 0 then x else y
+
+  let min x y = if Stdlib.( < ) (Int64.compare x y) 0 then x else y
 end
 
-module Without_gc_bit = struct
-  include T0
-  include Container_types.Make (T0)
+(* Create the One_bit_fewer versions for 31-bit and 63-bit *)
+module Int31 = One_bit_fewer.Make (Int32_base)
+module Int63 = One_bit_fewer.Make (Int64_base)
+
+let print ppf = function
+  | Int31 x -> Format.fprintf ppf "%ld" x
+  | Int32 x -> Format.fprintf ppf "%ld" x
+  | Int63 x -> Format.fprintf ppf "%Ld" x
+
+let machine_width = function
+  | Int31 _ -> MW.Thirty_two
+  | Int32 _ -> MW.Thirty_two_no_gc_tag_bit
+  | Int63 _ -> MW.Sixty_four
+
+let compare t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31.compare x1 x2
+  | Int32 x1, Int32 x2 -> Int32.compare x1 x2
+  | Int63 x1, Int63 x2 -> Int63.compare x1 x2
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf "Target_ocaml_int.compare: incompatible types %a and %a"
+      print t1 print t2
+
+let equal t1 t2 = compare t1 t2 = 0
+
+let hash = function
+  | Int31 x -> Int31.hash x
+  | Int32 x -> Hashtbl.hash x
+  | Int63 x -> Int63.hash x
+
+let zero machine_width =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.zero MW.Thirty_two)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 0l
+  | MW.Sixty_four -> Int63 (Int63.zero MW.Sixty_four)
+
+let one machine_width =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.one MW.Thirty_two)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 1l
+  | MW.Sixty_four -> Int63 (Int63.one MW.Sixty_four)
+
+let minus_one machine_width =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.minus_one MW.Thirty_two)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 (-1l)
+  | MW.Sixty_four -> Int63 (Int63.minus_one MW.Sixty_four)
+
+let ten machine_width =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.ten MW.Thirty_two)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 10l
+  | MW.Sixty_four -> Int63 (Int63.ten MW.Sixty_four)
+
+let hex_ff machine_width =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.hex_ff MW.Thirty_two)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 0xffl
+  | MW.Sixty_four -> Int63 (Int63.hex_ff MW.Sixty_four)
+
+let min_value machine_width =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.min_value MW.Thirty_two)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 Int32.min_int
+  | MW.Sixty_four -> Int63 (Int63.min_value MW.Sixty_four)
+
+let max_value machine_width =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.max_value MW.Thirty_two)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 Int32.max_int
+  | MW.Sixty_four -> Int63 (Int63.max_value MW.Sixty_four)
+
+let bool_true machine_width = one machine_width
+
+let bool_false machine_width = zero machine_width
+
+let bool machine_width b =
+  if b then bool_true machine_width else bool_false machine_width
+
+let ( <= ) t1 t2 = compare t1 t2 <= 0
+
+let ( >= ) t1 t2 = compare t1 t2 >= 0
+
+let ( < ) t1 t2 = compare t1 t2 < 0
+
+let bottom_byte_to_int = function
+  | Int31 x -> Int31.bottom_byte_to_int x
+  | Int32 x -> Int32.to_int (Int32.logand x 0xffl)
+  | Int63 x -> Int63.bottom_byte_to_int x
+
+let of_char machine_width c =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.of_char MW.Thirty_two c)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int32.of_int (Char.code c))
+  | MW.Sixty_four -> Int63 (Int63.of_char MW.Sixty_four c)
+
+let of_int machine_width i =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.of_int MW.Thirty_two i)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int32.of_int i)
+  | MW.Sixty_four -> Int63 (Int63.of_int MW.Sixty_four i)
+
+let of_int_option machine_width i = Some (of_int machine_width i)
+
+let of_int32 machine_width i =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.of_int32 MW.Thirty_two i)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 i
+  | MW.Sixty_four -> Int63 (Int63.of_int32 MW.Sixty_four i)
+
+let of_int64 machine_width i =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.of_int64 MW.Thirty_two i)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int64.to_int32 i)
+  | MW.Sixty_four -> Int63 (Int63.of_int64 MW.Sixty_four i)
+
+let of_float machine_width f =
+  match machine_width with
+  | MW.Thirty_two -> Int31 (Int31.of_float MW.Thirty_two f)
+  | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int32.of_float f)
+  | MW.Sixty_four -> Int63 (Int63.of_float MW.Sixty_four f)
+
+let to_float = function
+  | Int31 x -> Int31.to_float x
+  | Int32 x -> Int32.to_float x
+  | Int63 x -> Int63.to_float x
+
+let to_int = function
+  | Int31 x -> Int31.to_int x
+  | Int32 x -> Int32.to_int x
+  | Int63 x -> Int63.to_int x
+
+let to_int32 = function
+  | Int31 x -> Int31.to_int32 x
+  | Int32 x -> x
+  | Int63 x -> Int63.to_int32 x
+
+let to_int64 = function
+  | Int31 x -> Int31.to_int64 x
+  | Int32 x -> Int64.of_int32 x
+  | Int63 x -> Int63.to_int64 x
+
+let to_int_option t =
+  (* CR selee: maybe change to [to_int_in_range_option t ~min ~max] *)
+  let t_as_int64 = to_int64 t in
+  let min_int_as_int64 = Int64.of_int Stdlib.min_int in
+  let max_int_as_int64 = Int64.of_int Stdlib.max_int in
+  let le x y = Stdlib.( <= ) (Int64.compare x y) 0 in
+  if le min_int_as_int64 t_as_int64 && le t_as_int64 max_int_as_int64
+  then Some (to_int t)
+  else None
+
+let to_int_exn t =
+  match to_int_option t with
+  | Some i -> i
+  | None ->
+    Misc.fatal_errorf "Target_ocaml_int.to_int_exn: %a out of range" print t
+
+let of_targetint machine_width t =
+  match machine_width, Targetint_32_64.repr t with
+  | MW.Thirty_two, Targetint_32_64.Int32 x ->
+    Int31 (Int31.of_int32 MW.Thirty_two x)
+  | MW.Thirty_two_no_gc_tag_bit, Targetint_32_64.Int32 x -> Int32 x
+  | MW.Sixty_four, Targetint_32_64.Int64 x ->
+    Int63 (Int63.of_int64 MW.Sixty_four x)
+  | MW.Thirty_two, Targetint_32_64.Int64 _
+  | MW.Thirty_two_no_gc_tag_bit, Targetint_32_64.Int64 _
+  | MW.Sixty_four, Targetint_32_64.Int32 _ ->
+    Misc.fatal_errorf
+      "Target_ocaml_int.of_targetint: incompatible machine width and targetint"
+
+let to_targetint machine_width t =
+  match machine_width, t with
+  | MW.Thirty_two, Int31 x ->
+    Targetint_32_64.of_int32 MW.Thirty_two (Int31.to_int32 x)
+  | MW.Thirty_two_no_gc_tag_bit, Int32 x ->
+    Targetint_32_64.of_int32 MW.Thirty_two_no_gc_tag_bit x
+  | MW.Sixty_four, Int63 x ->
+    Targetint_32_64.of_int64 MW.Sixty_four (Int63.to_int64 x)
+  | MW.Thirty_two, (Int32 _ | Int63 _)
+  | MW.Thirty_two_no_gc_tag_bit, (Int31 _ | Int63 _)
+  | MW.Sixty_four, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf "Target_ocaml_int.to_targetint: mismatched machine width"
+
+let neg = function
+  | Int31 x -> Int31 (Int31.neg x)
+  | Int32 x -> Int32 (Int32.neg x)
+  | Int63 x -> Int63 (Int63.neg x)
+
+let add t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.add x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.add x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.add x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf "Target_ocaml_int.add: incompatible types %a and %a" print
+      t1 print t2
+
+let sub t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.sub x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.sub x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.sub x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf "Target_ocaml_int.sub: incompatible types %a and %a" print
+      t1 print t2
+
+let mul t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.mul x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.mul x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.mul x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf "Target_ocaml_int.mul: incompatible types %a and %a" print
+      t1 print t2
+
+let div t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.div x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.div x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.div x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf "Target_ocaml_int.div: incompatible types %a and %a" print
+      t1 print t2
+
+let mod_ t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.mod_ x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.rem x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.mod_ x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf "Target_ocaml_int.mod_: incompatible types %a and %a"
+      print t1 print t2
+
+let and_ t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.and_ x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.logand x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.and_ x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf "Target_ocaml_int.and_: incompatible types %a and %a"
+      print t1 print t2
+
+let or_ t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.or_ x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.logor x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.or_ x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf "Target_ocaml_int.or_: incompatible types %a and %a" print
+      t1 print t2
+
+let xor t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.xor x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.logxor x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.xor x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf "Target_ocaml_int.xor: incompatible types %a and %a" print
+      t1 print t2
+
+let shift_left t i =
+  match t with
+  | Int31 x -> Int31 (Int31.shift_left x i)
+  | Int32 x -> Int32 (Int32.shift_left x i)
+  | Int63 x -> Int63 (Int63.shift_left x i)
+
+let shift_right t i =
+  match t with
+  | Int31 x -> Int31 (Int31.shift_right x i)
+  | Int32 x -> Int32 (Int32.shift_right x i)
+  | Int63 x -> Int63 (Int63.shift_right x i)
+
+let shift_right_logical t i =
+  match t with
+  | Int31 x -> Int31 (Int31.shift_right_logical x i)
+  | Int32 x -> Int32 (Int32.shift_right_logical x i)
+  | Int63 x -> Int63 (Int63.shift_right_logical x i)
+
+let max t1 t2 = if Stdlib.( < ) (compare t1 t2) 0 then t2 else t1
+
+let min t1 t2 = if Stdlib.( < ) (compare t1 t2) 0 then t1 else t2
+
+let get_least_significant_16_bits_then_byte_swap t =
+  let mw = machine_width t in
+  let least_significant_byte = and_ t (hex_ff mw) in
+  let second_to_least_significant_byte =
+    shift_right_logical (and_ t (of_int mw 0xff00)) 8
+  in
+  or_ second_to_least_significant_byte (shift_left least_significant_byte 8)
+
+let is_non_negative t = t >= zero (machine_width t)
+
+let of_int8 machine_width i = of_int machine_width (Numeric_types.Int8.to_int i)
+
+let of_int16 machine_width i =
+  of_int machine_width (Numeric_types.Int16.to_int i)
+
+module Self = struct
+  type nonrec t = t
+
+  let print = print
+
+  let compare = compare
+
+  let equal = equal
+
+  let hash = hash
 end
 
-(* CR selee: this is extremely sad, and should be replaced with a proper config
-   variable in the future *)
-let has_gc_bit_in_int =
-  let compiler_name = Filename.basename Sys.argv.(0) in
-  match compiler_name with "ocamlj" | "ocamlj.opt" -> false | _ -> true
+include Container_types.Make (Self)
 
-module Self = (val if has_gc_bit_in_int
-                   then (module With_gc_bit)
-                   else (module Without_gc_bit) : S)
+let all_bools machine_width =
+  Set.of_list [bool_true machine_width; bool_false machine_width]
 
-include Self
-
-let all_bools = Set.of_list [bool_true; bool_false]
-
-let zero_one_and_minus_one = Set.of_list [zero; one; minus_one]
+let zero_one_and_minus_one machine_width =
+  Set.of_list [zero machine_width; one machine_width; minus_one machine_width]
 
 module Pair = struct
   type nonrec t = t * t
 
-  include Container_types.Make_pair (Self) (Self)
+  module T_pair = Container_types.Pair (Self) (Self)
+  include Container_types.Make (T_pair)
 end
 
-let cross_product = Pair.create_from_cross_product
+let cross_product set1 set2 =
+  Set.fold
+    (fun elt1 result ->
+      Set.fold (fun elt2 result -> Pair.Set.add (elt1, elt2) result) set2 result)
+    set1 Pair.Set.empty

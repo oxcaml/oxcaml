@@ -52,6 +52,7 @@ end
 
 type t =
   { round : int;
+    machine_width : Target_system.Machine_width.t;
     typing_env : TE.t;
     inlined_debuginfo : Inlined_debuginfo.t;
     disable_inlining : Disable_inlining.t;
@@ -94,7 +95,7 @@ type t =
            continuation's handler. *)
   }
 
-let [@ocamlformat "disable"] print ppf { round; typing_env;
+let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 inlined_debuginfo; disable_inlining;
                 inlining_state; propagating_float_consts;
                 at_unit_toplevel; unit_toplevel_exn_continuation;
@@ -107,6 +108,7 @@ let [@ocamlformat "disable"] print ppf { round; typing_env;
               } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(round@ %d)@]@ \
+      @[<hov 1>(machine_width@ %a)@]@ \
       @[<hov 1>(typing_env@ %a)@]@ \
       @[<hov 1>(inlined_debuginfo@ %a)@]@ \
       @[<hov 1>(disable_inlining@ %a)@]@ \
@@ -128,6 +130,7 @@ let [@ocamlformat "disable"] print ppf { round; typing_env;
       @[<hov 1>(cost_of_lifting_continuation_out_of_current_one %d)@]\
       )@]"
     round
+    Target_system.Machine_width.print machine_width
     TE.print typing_env
     Inlined_debuginfo.print inlined_debuginfo
     Disable_inlining.print disable_inlining
@@ -198,14 +201,15 @@ let define_variable t var kind =
 let define_extra_variable t var kind =
   (define_variable0 [@inlined hint]) ~extra:true t var kind
 
-let create ~round ~(resolver : resolver)
+let create ~round ~machine_width ~(resolver : resolver)
     ~(get_imported_names : get_imported_names)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation
     ~toplevel_my_region ~toplevel_my_ghost_region =
-  let typing_env = TE.create ~resolver ~get_imported_names in
+  let typing_env = TE.create ~machine_width ~resolver ~get_imported_names in
   let t =
     { round;
+      machine_width;
       typing_env;
       inlined_debuginfo = Inlined_debuginfo.none;
       disable_inlining = Do_not_disable_inlining;
@@ -242,6 +246,8 @@ let create ~round ~(resolver : resolver)
     K.region
 
 let all_code t = t.all_code
+
+let machine_width t = t.machine_width
 
 let resolver t = TE.resolver t.typing_env
 
@@ -287,7 +293,8 @@ let bump_current_level_scope t =
   { t with typing_env = TE.bump_current_level_scope t.typing_env }
 
 let enter_set_of_closures
-    { round;
+    { machine_width;
+      round;
       typing_env;
       inlined_debuginfo = _;
       disable_inlining;
@@ -314,7 +321,8 @@ let enter_set_of_closures
   let disable_inlining : Disable_inlining.t =
     if in_stub then Disable_inlining Stub else disable_inlining
   in
-  { round;
+  { machine_width;
+    round;
     typing_env = TE.closure_env typing_env;
     inlined_debuginfo = Inlined_debuginfo.none;
     disable_inlining;
@@ -456,7 +464,8 @@ let add_parameters_with_unknown_types ~extra ?alloc_modes ?name_mode t params =
   in
   let param_types =
     ListLabels.map2 params alloc_modes ~f:(fun param alloc_mode ->
-        T.unknown_with_subkind ~alloc_mode (BP.kind param))
+        T.unknown_with_subkind ~alloc_mode (BP.kind param)
+          ~machine_width:t.machine_width)
   in
   add_parameters ~extra ?name_mode t params' ~param_types
 
@@ -711,6 +720,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
      And we need to decide which parts of denv to use to simplify the handler of
      k' after they are lifted out from the handler of k. *)
   { (* denv *)
+    machine_width = denv.machine_width;
     inlined_debuginfo = denv.inlined_debuginfo;
     disable_inlining = denv.disable_inlining;
     inlining_state = denv.inlining_state;

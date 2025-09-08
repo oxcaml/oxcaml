@@ -37,6 +37,7 @@ type result = private
   }
 
 val rebuild :
+  machine_width:Target_system.Machine_width.t ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
   continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
   fixed_arity_continuations:Continuation.Set.t ->

@@ -158,7 +158,10 @@ let add_equations_on_params typing_env ~is_recursive ~params:params'
           if Flambda_kind.With_subkind.has_useful_subkind_info kind
           then
             let raw_kind = Flambda_kind.With_subkind.kind kind in
-            let type_from_kind = T.unknown_with_subkind kind in
+            let type_from_kind =
+              T.unknown_with_subkind kind
+                ~machine_width:(TE.machine_width typing_env)
+            in
             match T.meet typing_env type_from_kind param_type with
             | Bottom ->
               (* This should really replace the corresponding uses with

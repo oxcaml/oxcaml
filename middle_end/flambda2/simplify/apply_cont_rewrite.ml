@@ -152,7 +152,7 @@ let extra_args_list rewrite id =
          extra params were not empty for id %a"
         Apply_cont_rewrite_id.print id)
 
-let make_rewrite rewrite ~ctx id args : _ Or_invalid.t =
+let make_rewrite rewrite ~machine_width ~ctx id args : _ Or_invalid.t =
   let invariant_args, args =
     partition_used args rewrite.original_params_usage
   in
@@ -179,7 +179,7 @@ let make_rewrite rewrite ~ctx id args : _ Or_invalid.t =
               let temp_duid = Flambda_debug_uid.none in
               let extra_let =
                 ( Bound_var.create temp temp_duid Name_mode.normal,
-                  Code_size.prim prim,
+                  Code_size.prim ~machine_width prim,
                   Flambda.Named.create_prim prim Debuginfo.none )
               in
               ( Simple.var temp,
@@ -199,7 +199,7 @@ let make_rewrite rewrite ~ctx id args : _ Or_invalid.t =
               in
               let extra_let =
                 ( Bound_var.create temp temp_duid Name_mode.normal,
-                  Code_size.prim prim,
+                  Code_size.prim ~machine_width prim,
                   Flambda.Named.create_prim prim Debuginfo.none )
               in
               ( Simple.var temp,

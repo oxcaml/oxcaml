@@ -621,7 +621,7 @@ and switch ~env ~res e =
           let res = To_jsir_result.end_block_with_last_exn res last in
           res, (addr, []))
       res
-      (Array.init (max + 1) Target_ocaml_int.of_int)
+      (Array.init (max + 1) (Target_ocaml_int.of_int Thirty_two_no_gc_tag_bit))
   in
   let last : Jsir.last =
     match Array.length arms with
