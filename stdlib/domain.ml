@@ -28,9 +28,11 @@ external runtime5 : unit -> bool @@ portable = "%runtime5"
 
 module Obj_opt : sig @@ portable
   type t
-  val none : t
   val some : 'a -> t
   val is_some : t -> bool
+  val fresh : unit -> t array
+  val grow_array : t array -> int -> int -> t array
+  val compare_and_set : t array -> int -> t -> t -> bool
 
   (** [unsafe_get obj] may only be called safely
       if [is_some] is true.
@@ -41,64 +43,100 @@ module Obj_opt : sig @@ portable
 end = struct
   type t = Obj.t
   let none = Obj.magic_portable (Obj.repr (ref 0))
-  let some v = Obj.repr v
-  let is_some obj = (obj != Obj.magic_uncontended none)
-  let unsafe_get obj = Obj.obj obj
+  let fresh () = Array.make 7 (Obj.magic_uncontended none)
+  let[@inline] some v = 
+   (* [Sys.opaque_identity] ensures that flambda does not look at the type of
+    * [x], which may be a [float] and conclude that the [st] is a float array.
+    * We do not want OCaml's float array optimisation kicking in here. *)
+    Obj.repr (Sys.opaque_identity v)
+  let[@inline] is_some obj = (obj != Obj.magic_uncontended none)
+  let[@inline] unsafe_get obj = Obj.obj obj
+
+  let[@inline never] grow_array st idx size =
+    let rec compute_new_size s =
+      if idx < s then s else compute_new_size (2 * s + 1)
+    in
+    let new_size = compute_new_size size in
+    let new_st =
+      Array.make new_size (Obj.magic_uncontended none)
+    in
+    Array.blit st 0 new_st 0 size;
+    new_st
+
+  external compare_and_set 
+    : t array -> int -> t -> t -> bool @@ portable = "%atomic_cas_field"
 end
 
 module Runtime_4 = struct
   module DLS = struct
 
-    let unique_value = Obj.magic_portable (Obj.repr (ref 0))
-    let state = Obj.magic_portable (ref (Array.make 8 unique_value))
+    let state = Obj.magic_portable (Atomic.make (Obj_opt.fresh ()))
 
     let init () = ()
 
     type 'a key = int * (unit -> 'a) Modes.Portable.t
 
-    let key_counter = Obj.magic_portable (ref 0)
+    let key_counter = Atomic.make 0
 
     let new_key ?split_from_parent:_ init_orphan =
-      let key_counter = Obj.magic_uncontended key_counter in
-      let idx = !key_counter in
-      key_counter := idx + 1;
+      let idx = Atomic.fetch_and_add key_counter 1 in
       (idx, { portable = init_orphan })
 
     (* If necessary, grow the current domain's local state array such that [idx]
     * is a valid index in the array. *)
-    let maybe_grow idx =
-      let state = Obj.magic_uncontended state in
-      let st = !state in
+    let[@inline] rec maybe_grow idx =
+      let st = Atomic.get (Obj.magic_uncontended state) in
       let sz = Array.length st in
       if idx < sz then st
       else begin
-        let rec compute_new_size s =
-          if idx < s then s else compute_new_size (2 * s)
-        in
-        let new_sz = compute_new_size sz in
-        let new_st = Array.make new_sz (Obj.magic_uncontended unique_value) in
-        Array.blit st 0 new_st 0 sz;
-        state := new_st;
-        new_st
+        let new_st = Obj_opt.grow_array st idx sz in
+        (* We want a implementation that is safe with respect to
+          single-domain multi-threading: retry if the DLS state has
+          changed under our feet.
+          Note that the number of retries will be very small in
+          contended scenarios, as the array only grows, with
+          exponential resizing. *)
+        if Atomic.compare_and_set (Obj.magic_uncontended state) st new_st
+        then new_st
+        else maybe_grow idx
       end
 
-    let set (idx, _init) x =
+    let[@inline] set (type a) (idx, _init) (x : a) =
       (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
-      (* [Sys.opaque_identity] ensures that flambda does not look at the type of
-      * [x], which may be a [float] and conclude that the [st] is a float array.
-      * We do not want OCaml's float array optimisation kicking in here. *)
-      Array.unsafe_set st idx (Obj.repr (Sys.opaque_identity x))
+      Array.unsafe_set st idx (Obj_opt.some x)
 
-    let get (idx, init) =
+    let[@inline never] init_idx (type a) idx old_obj (init : _ -> a) =
+      let v : a = init () in
+      let new_obj = Obj_opt.some v in
+      (* At this point, [st] or [st.(idx)] may have been changed
+        by another thread on the same domain.
+
+        If [st] changed, it was resized into a larger value,
+        we can just reuse the new value.
+
+        If [st.(idx)] changed, we drop the current value to avoid
+        letting other threads observe a 'revert' that forgets
+        previous modifications. *)
+      let st = Atomic.get (Obj.magic_uncontended state) in
+      if Obj_opt.compare_and_set st idx old_obj new_obj
+      then v
+      else begin
+        (* if st.(idx) changed, someone must have initialized
+          the key in the meantime. *)
+        let updated_obj = Array.unsafe_get st idx in
+        if Obj_opt.is_some updated_obj
+        then (Obj_opt.unsafe_get updated_obj : a)
+        else assert false
+      end
+
+    let[@inline] get (type a) ((idx, init) : a key) : a =
       (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
-      let v = Array.unsafe_get st idx in
-      if v == Obj.magic_uncontended unique_value then
-        let v' = Obj.repr (init.portable ()) in
-        Array.unsafe_set st idx (Sys.opaque_identity v');
-        Obj.magic v'
-      else Obj.magic v
+      let obj = Array.unsafe_get st idx in
+      if Obj_opt.is_some obj
+      then (Obj_opt.unsafe_get obj : a)
+      else init_idx idx obj init.portable
   end
 
   (******** Callbacks **********)
@@ -195,7 +233,7 @@ module Runtime_5 = struct
       "caml_domain_dls_compare_and_set" [@@noalloc]
 
     let init () =
-      let st = Array.make 8 (Obj.magic_uncontended Obj_opt.none) in
+      let st = Obj_opt.fresh () in
       set_dls_state st
 
     type 'a key = int * (unit -> 'a) Modes.Portable.t
@@ -227,21 +265,12 @@ module Runtime_5 = struct
 
     (* If necessary, grow the current domain's local state array such that [idx]
     * is a valid index in the array. *)
-    let rec maybe_grow idx =
-      (* CR ocaml 5 all-runtime5: remove this hack which is here to stop
-        the backend seeing the dls_get operation and failing on runtime4 *)
-      if not (runtime5 ()) then assert false else
-      (* end of hack *)
+    let[@inline] rec maybe_grow idx =
       let st = get_dls_state () in
       let sz = Array.length st in
       if idx < sz then st
       else begin
-        let rec compute_new_size s =
-          if idx < s then s else compute_new_size (2 * s)
-        in
-        let new_sz = compute_new_size sz in
-        let new_st = Array.make new_sz (Obj.magic_uncontended Obj_opt.none) in
-        Array.blit st 0 new_st 0 sz;
+        let new_st = Obj_opt.grow_array st idx sz in
         (* We want a implementation that is safe with respect to
           single-domain multi-threading: retry if the DLS state has
           changed under our feet.
@@ -253,53 +282,42 @@ module Runtime_5 = struct
         else maybe_grow idx
       end
 
-    let set (type a) (idx, _init) (x : a) =
+    let[@inline] set (type a) (idx, _init) (x : a) =
       (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
-      (* [Sys.opaque_identity] ensures that flambda does not look at the type of
-      * [x], which may be a [float] and conclude that the [st] is a float array.
-      * We do not want OCaml's float array optimisation kicking in here. *)
-      Array.unsafe_set st idx (Obj_opt.some (Sys.opaque_identity x))
+      Array.unsafe_set st idx (Obj_opt.some x)
 
-    let[@inline never] array_compare_and_set a i oldval newval =
-      (* Note: we cannot use [@poll error] due to the
-        allocations on a.(i) in the Double_array case. *)
-      let curval = Array.unsafe_get a i in
-      if curval == oldval then (
-        Array.unsafe_set a i newval;
-        true
-      ) else false
+    let[@inline never] init_idx (type a) idx old_obj (init : _ -> a) =
+      let v : a = init () in
+      let new_obj = Obj_opt.some v in
+      (* At this point, [st] or [st.(idx)] may have been changed
+        by another thread on the same domain.
 
-    let get (type a) ((idx, init) : a key) : a =
+        If [st] changed, it was resized into a larger value,
+        we can just reuse the new value.
+
+        If [st.(idx)] changed, we drop the current value to avoid
+        letting other threads observe a 'revert' that forgets
+        previous modifications. *)
+      let st = get_dls_state () in
+      if Obj_opt.compare_and_set st idx old_obj new_obj
+      then v
+      else begin
+        (* if st.(idx) changed, someone must have initialized
+          the key in the meantime. *)
+        let updated_obj = Array.unsafe_get st idx in
+        if Obj_opt.is_some updated_obj
+        then (Obj_opt.unsafe_get updated_obj : a)
+        else assert false
+      end
+
+    let[@inline] get (type a) ((idx, init) : a key) : a =
       (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
       let obj = Array.unsafe_get st idx in
       if Obj_opt.is_some obj
       then (Obj_opt.unsafe_get obj : a)
-      else begin
-        let v : a = init.portable () in
-        let new_obj = Obj_opt.some (Sys.opaque_identity v) in
-        (* At this point, [st] or [st.(idx)] may have been changed
-          by another thread on the same domain.
-
-          If [st] changed, it was resized into a larger value,
-          we can just reuse the new value.
-
-          If [st.(idx)] changed, we drop the current value to avoid
-          letting other threads observe a 'revert' that forgets
-          previous modifications. *)
-        let st = get_dls_state () in
-        if array_compare_and_set st idx obj new_obj
-        then v
-        else begin
-          (* if st.(idx) changed, someone must have initialized
-            the key in the meantime. *)
-          let updated_obj = Array.unsafe_get st idx in
-          if Obj_opt.is_some updated_obj
-          then (Obj_opt.unsafe_get updated_obj : a)
-          else assert false
-        end
-      end
+      else init_idx idx obj init.portable
 
     type key_value : value mod portable contended =
         KV : 'a key * (unit -> 'a) @@ portable -> key_value
@@ -461,12 +479,14 @@ module TLS0 = struct
 
     external get_tls_state
       : unit -> tls_state @@ portable = "caml_thread_get_state"
+    [@@noalloc]
     external set_tls_state
       : tls_state -> unit @@ portable = "caml_thread_set_state"
+    [@@noalloc]
 
     let init () =
-      let state = Array.make 8 (Obj.magic_uncontended Obj_opt.none) in
-      set_tls_state state
+      let st = Obj_opt.fresh () in
+      set_tls_state st
 
     type 'a key = 'a DLS.key
 
@@ -496,45 +516,36 @@ module TLS0 = struct
       k
 
     (* If necessary, grow the current domain's local state array such that [idx]
-    * is a valid index in the array. *)
-    let maybe_grow idx =
-      let state = get_tls_state () in
-      let size = Array.length state in
-      if idx < size then state
+     * is a valid index in the array. *)
+    let[@inline] maybe_grow idx =
+      let st = get_tls_state () in
+      let size = Array.length st in
+      if idx < size then st
       else begin
-        let rec compute_new_size s =
-          if idx < s then s else compute_new_size (2 * s)
-        in
-        let new_size = compute_new_size size in
-        let new_state =
-          Array.make new_size (Obj.magic_uncontended Obj_opt.none)
-        in
-        Array.blit state 0 new_state 0 size;
-        set_tls_state new_state;
-        new_state
+        let new_st = Obj_opt.grow_array st idx size in
+        set_tls_state new_st;
+        new_st
       end
 
-    let set (type a) (idx, _init) (x : a) =
+    let[@inline] set (type a) (idx, _init) (x : a) =
       (* Assures [idx] is in range. *)
-      let state = maybe_grow idx in
-      (* [Sys.opaque_identity] ensures that flambda does not look at the type of
-      * [x], which may be a [float] and conclude that the [st] is a float array.
-      * We do not want OCaml's float array optimisation kicking in here. *)
-      Array.unsafe_set state idx (Obj_opt.some (Sys.opaque_identity x))
+      let st = maybe_grow idx in
+      Array.unsafe_set st idx (Obj_opt.some x)
 
-    let get (type a) ((idx, init) : a key) : a =
+    let[@inline never] init_idx (type a) idx (init : _ -> a) = 
+      let v : a = init () in
+      let new_obj = Obj_opt.some v in
+      let st = get_tls_state () in
+      Array.unsafe_set st idx new_obj;
+      v
+
+    let[@inline] get (type a) ((idx, init) : a key) : a =
       (* Assures [idx] is in range. *)
-      let state = maybe_grow idx in
-      let obj = Array.unsafe_get state idx in
+      let st = maybe_grow idx in
+      let obj = Array.unsafe_get st idx in
       if Obj_opt.is_some obj
       then (Obj_opt.unsafe_get obj : a)
-      else begin
-        let v : a = init.Modes.Portable.portable () in
-        let new_obj = Obj_opt.some (Sys.opaque_identity v) in
-        let state = get_tls_state () in
-        Array.unsafe_set state idx new_obj;
-        v
-      end
+      else init_idx idx init.portable
 
     type key_value : value mod portable contended =
         KV : 'a key * (unit -> 'a) @@ portable -> key_value
