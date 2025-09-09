@@ -26,6 +26,26 @@ external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 
 external runtime5 : unit -> bool @@ portable = "%runtime5"
 
+module Obj_opt : sig @@ portable
+  type t
+  val none : t
+  val some : 'a -> t
+  val is_some : t -> bool
+
+  (** [unsafe_get obj] may only be called safely
+      if [is_some] is true.
+
+      [unsafe_get (some v)] is equivalent to
+      [Obj.obj (Obj.repr v)]. *)
+  val unsafe_get : t -> 'a
+end = struct
+  type t = Obj.t
+  let none = Obj.magic_portable (Obj.repr (ref 0))
+  let some v = Obj.repr v
+  let is_some obj = (obj != Obj.magic_uncontended none)
+  let unsafe_get obj = Obj.obj obj
+end
+
 module Runtime_4 = struct
   module DLS = struct
 
@@ -164,26 +184,6 @@ module Runtime_5 = struct
 
   module DLS = struct
 
-    module Obj_opt : sig @@ portable
-      type t
-      val none : t
-      val some : 'a -> t
-      val is_some : t -> bool
-
-      (** [unsafe_get obj] may only be called safely
-          if [is_some] is true.
-
-          [unsafe_get (some v)] is equivalent to
-          [Obj.obj (Obj.repr v)]. *)
-      val unsafe_get : t -> 'a
-    end = struct
-      type t = Obj.t
-      let none = Obj.magic_portable (Obj.repr (ref 0))
-      let some v = Obj.repr v
-      let is_some obj = (obj != Obj.magic_uncontended none)
-      let unsafe_get obj = Obj.obj obj
-    end
-
     type dls_state = Obj_opt.t array
 
     external get_dls_state : unit -> dls_state @@ portable = "%dls_get"
@@ -194,11 +194,9 @@ module Runtime_5 = struct
     external compare_and_set_dls_state : dls_state -> dls_state -> bool @@ portable =
       "caml_domain_dls_compare_and_set" [@@noalloc]
 
-    let create_dls () =
+    let init () =
       let st = Array.make 8 (Obj.magic_uncontended Obj_opt.none) in
       set_dls_state st
-
-    let init () = create_dls ()
 
     type 'a key = int * (unit -> 'a) Modes.Portable.t
 
@@ -369,7 +367,7 @@ module Runtime_5 = struct
 
   let spawn f =
     do_before_first_spawn ();
-    let pk = DLS.get_initial_keys () in
+    let dls_keys = DLS.get_initial_keys () in
 
     (* [term_sync] is used to synchronize with the joining domains *)
     let term_sync =
@@ -380,8 +378,8 @@ module Runtime_5 = struct
 
     let body () =
       match
-        DLS.create_dls ();
-        DLS.set_initial_keys pk;
+        DLS.init ();
+        DLS.set_initial_keys dls_keys;
         let res = f () in
         res
       with
@@ -423,7 +421,7 @@ end
 module type S = sig
   module DLS : sig
 
-    type 'a key : value mod portable contended
+    type 'a key = int * (unit -> 'a) Modes.Portable.t
 
     val new_key
       : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
@@ -457,12 +455,165 @@ let impl = if runtime5 () then runtime_5_impl else runtime_4_impl
 module M : S = (val impl)
 include M
 
+module TLS0 = struct
+  module Impl = struct
+    type tls_state = Obj_opt.t array
+
+    external get_tls_state
+      : unit -> tls_state @@ portable = "caml_thread_get_state"
+    external set_tls_state
+      : tls_state -> unit @@ portable = "caml_thread_set_state"
+
+    let init () =
+      let state = Array.make 8 (Obj.magic_uncontended Obj_opt.none) in
+      set_tls_state state
+
+    type 'a key = 'a DLS.key
+
+    let key_counter = Atomic.make 0
+
+    type key_initializer : value mod contended portable =
+        KI : 'a key * ('a -> (unit -> 'a) @ portable once) @@ portable
+        -> key_initializer
+    [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
+
+    type key_initializer_list = key_initializer list
+
+    let parent_keys = Atomic.make ([] : key_initializer_list)
+
+    let rec add_parent_key ki =
+      let l = Atomic.get parent_keys in
+      if not (Atomic.compare_and_set parent_keys l (ki :: l))
+      then add_parent_key ki
+
+    let new_key ?split_from_parent init_orphan =
+      let idx = Atomic.fetch_and_add key_counter 1 in
+      let k = idx, { Modes.Portable.portable = init_orphan } in
+      begin match split_from_parent with
+      | None -> ()
+      | Some split -> add_parent_key (KI (k, split))
+      end;
+      k
+
+    (* If necessary, grow the current domain's local state array such that [idx]
+    * is a valid index in the array. *)
+    let maybe_grow idx =
+      let state = get_tls_state () in
+      let size = Array.length state in
+      if idx < size then state
+      else begin
+        let rec compute_new_size s =
+          if idx < s then s else compute_new_size (2 * s)
+        in
+        let new_size = compute_new_size size in
+        let new_state =
+          Array.make new_size (Obj.magic_uncontended Obj_opt.none)
+        in
+        Array.blit state 0 new_state 0 size;
+        set_tls_state new_state;
+        new_state
+      end
+
+    let set (type a) (idx, _init) (x : a) =
+      (* Assures [idx] is in range. *)
+      let state = maybe_grow idx in
+      (* [Sys.opaque_identity] ensures that flambda does not look at the type of
+      * [x], which may be a [float] and conclude that the [st] is a float array.
+      * We do not want OCaml's float array optimisation kicking in here. *)
+      Array.unsafe_set state idx (Obj_opt.some (Sys.opaque_identity x))
+
+    let get (type a) ((idx, init) : a key) : a =
+      (* Assures [idx] is in range. *)
+      let state = maybe_grow idx in
+      let obj = Array.unsafe_get state idx in
+      if Obj_opt.is_some obj
+      then (Obj_opt.unsafe_get obj : a)
+      else begin
+        let v : a = init.Modes.Portable.portable () in
+        let new_obj = Obj_opt.some (Sys.opaque_identity v) in
+        let state = get_tls_state () in
+        Array.unsafe_set state idx new_obj;
+        v
+      end
+
+    type key_value : value mod portable contended =
+        KV : 'a key * (unit -> 'a) @@ portable -> key_value
+    [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
+
+    let get_initial_keys () : key_value list =
+      List.map
+        (* [v] is applied exactly once in [set_initial_keys] *)
+        (fun (KI (k, split)) ->
+          let v = Obj.magic_many (split (get k)) |> Obj.magic_portable in
+          KV (k, v))
+        (Atomic.get parent_keys : key_initializer_list)
+
+    let set_initial_keys (l : key_value list) =
+      List.iter (fun (KV (k, v)) -> set k (v ())) l
+  end
+
+  type 'a key = 'a Impl.key
+
+  external has_tls_state
+    : unit -> bool @@ portable = "caml_thread_has_tls_state"
+  let has_tls_state = has_tls_state ()
+
+  let[@inline] new_key ?split_from_parent init = 
+    if has_tls_state 
+    then Impl.new_key ?split_from_parent init 
+    else DLS.new_key ?split_from_parent init 
+  let[@inline] get key = 
+    if has_tls_state then Impl.get key else DLS.get key
+  let[@inline] set key v = 
+    if has_tls_state then Impl.set key v else DLS.set key v
+
+  module Private = struct
+      type keys = Impl.key_value list
+      (* If threads are supported, the [Thread] module will call [init]. *)
+      let[@inline] init () = if has_tls_state then Impl.init ()
+      let[@inline] get_initial_keys () = 
+        if has_tls_state then Impl.get_initial_keys () else []
+      let[@inline] set_initial_keys keys = 
+        if has_tls_state then Impl.set_initial_keys keys
+  end
+end
+
 module Safe = struct
   (* Note the exposed signature of [get] and [set] add modes for safety. *)
   module DLS = DLS
-  let spawn = spawn
+  module TLS = TLS0
+  
+  let spawn f = 
+    let tls_keys = TLS.Private.get_initial_keys () in
+    spawn (fun () -> 
+      TLS.Private.init (); 
+      TLS.Private.set_initial_keys tls_keys; 
+      f ()) [@nontail]
+
   let at_exit = at_exit
 end
+
+module TLS = struct
+  type 'a key = 'a TLS0.key
+
+  let new_key ?split_from_parent f =
+    let split_from_parent =
+      match split_from_parent with
+      | None -> None
+      | Some split_from_parent ->
+        Some (Obj.magic_portable (fun x ->
+          Obj.magic_portable (fun () -> split_from_parent x)))
+    in
+    TLS0.new_key ?split_from_parent (Obj.magic_portable f)
+  ;;
+
+  let get = TLS0.get
+  let set = TLS0.set
+
+  module Private = TLS0.Private
+end
+
+let () = DLS.init ()
 
 module DLS = struct
   type 'a key = 'a Safe.DLS.key
@@ -480,12 +631,9 @@ module DLS = struct
 
   let get = DLS.get
   let set = DLS.set
-  let init = DLS.init
 end
 
 let spawn f = Safe.spawn (Obj.magic_portable f)
 let at_exit f = Safe.at_exit (Obj.magic_portable f)
-
-let () = DLS.init ()
 
 let _ = Stdlib.do_domain_local_at_exit := do_at_exit

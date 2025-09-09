@@ -5,6 +5,11 @@
  { native; }
 *)
 
+external has_tls_state
+    : unit -> bool @@ portable = "caml_thread_has_tls_state"
+
+let () = assert (has_tls_state ())
+
 let check_tls () =
   let k1 = Thread.TLS.new_key (fun () -> 10) in
   let k2 = Thread.TLS.new_key (fun () -> 1.0) in
@@ -16,7 +21,7 @@ let check_tls () =
   assert (v2 = 200.0);
   Gc.major ()
 
-let check_tls_domain_reuse () =
+let check_tls_reuse () =
   let k1 = Thread.TLS.new_key (fun () -> 100) in
   let k2 = Thread.TLS.new_key (fun () -> 200) in
   let threads = Array.init 4 (fun _ -> Thread.create(fun () ->
@@ -45,5 +50,5 @@ let _ =
   let threads = Array.init 3 (fun _ -> Thread.create(check_tls) ()) in
   check_tls ();
   Array.iter Thread.join threads;
-  check_tls_domain_reuse ();
+  check_tls_reuse ();
   check_tls_split ()

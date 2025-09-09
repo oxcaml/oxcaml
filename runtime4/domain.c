@@ -107,6 +107,26 @@ CAMLprim value caml_ml_domain_cpu_relax(value unit)
   return caml_process_pending_actions_with_root(unit);
 }
 
+/* Weak definitions overridden when linked against [threads]. */
+
+CAMLweakdef
+CAMLprim value caml_thread_has_tls_state(value unit)
+{
+  return Val_false;
+}
+
+CAMLweakdef
+CAMLprim value caml_thread_get_state(value unit)
+{
+  caml_failwith("TLS is not supported without the [threads] library.");
+}
+
+CAMLweakdef
+CAMLprim value caml_thread_set_state(value state)
+{
+  caml_failwith("TLS is not supported without the [threads] library.");
+}
+
 /* Dummy implementations to enable [Stdlib.Domain] to link. */
 
 CAMLprim value caml_recommended_domain_count(void)

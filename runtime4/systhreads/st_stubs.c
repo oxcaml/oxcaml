@@ -831,6 +831,13 @@ CAMLprim value caml_thread_id(value th)          /* ML */
   return Ident(th);
 }
 
+/* Is TLS supported */
+
+CAMLprim value caml_thread_has_tls_state(value unit)
+{
+  return Val_true;
+}
+
 /* Return the current TLS state */
 
 CAMLprim value caml_thread_get_state(value unit)

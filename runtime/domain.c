@@ -2229,6 +2229,26 @@ CAMLprim value caml_domain_dls_compare_and_set(value old, value new)
   }
 }
 
+/* Weak definitions overridden when linked against [threads]. */
+
+CAMLweakdef 
+CAMLprim value caml_thread_has_tls_state(value unit)
+{
+  return Val_false;
+}
+
+CAMLweakdef 
+CAMLprim value caml_thread_get_state(value unit)
+{
+  caml_failwith("TLS is not supported without the [threads] library.");
+}
+
+CAMLweakdef 
+CAMLprim value caml_thread_set_state(value state)
+{
+  caml_failwith("TLS is not supported without the [threads] library.");
+}
+
 CAMLprim value caml_recommended_domain_count(value unused)
 {
   intnat n = -1;

@@ -8,6 +8,11 @@
  { native; }
 *)
 
+external has_tls_state
+    : unit -> bool @@ portable = "caml_thread_has_tls_state"
+
+let () = assert (has_tls_state ())
+
 let k1 = Thread.TLS.new_key (fun () -> 10)
 let k2 = Thread.TLS.new_key (fun () -> 1.0)
 
