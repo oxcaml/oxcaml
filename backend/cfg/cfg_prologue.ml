@@ -284,16 +284,6 @@ end
 module Stack_offset_adjustment_forward = struct
   type context = { backward : Prologue_needed.After.t }
 
-  module Domain : Cfg_dataflow.Domain_S with type t = bool = struct
-    type t = bool
-
-    let bot = false
-
-    let join = ( || )
-
-    let less_equal a b = b || not a
-  end
-
   module Transfer :
     Cfg_dataflow.Forward_transfer
       with type domain = bool
@@ -307,19 +297,19 @@ module Stack_offset_adjustment_forward = struct
         exceptional : domain
       }
 
+    let transfer domain (instr : _ Cfg.instruction) block { backward } =
+      if instr.Cfg.stack_offset <> 0
+         && Prologue_needed.After.needs_prologue backward block.Cfg.start
+      then true
+      else domain
+
     let basic :
         domain ->
         Cfg.basic Cfg.instruction ->
         Cfg.basic_block ->
         context ->
         domain =
-     fun domain instr block { backward; _ } ->
-      (* If this instruction has non-zero stack_offset and needs prologue
-         backwards, force domain to true *)
-      if instr.stack_offset <> 0
-         && Prologue_needed.After.needs_prologue backward block.start
-      then true
-      else domain
+      transfer
 
     let terminator :
         domain ->
@@ -327,19 +317,13 @@ module Stack_offset_adjustment_forward = struct
         Cfg.basic_block ->
         context ->
         image =
-     fun domain instr block { backward; _ } ->
-      (* Check if terminator's block has non-zero stack_offset *)
-      let adjusted_domain =
-        if instr.stack_offset <> 0
-           && Prologue_needed.After.needs_prologue backward block.start
-        then true
-        else domain
-      in
+     fun domain instr block { backward } ->
+      let adjusted_domain = transfer domain instr block { backward } in
       { normal = adjusted_domain; exceptional = adjusted_domain }
   end
 
   module T = struct
-    include Cfg_dataflow.Forward (Domain) (Transfer)
+    include Cfg_dataflow.Forward (Bool_domain) (Transfer)
   end
 
   include (T : module type of T with type context := context)
@@ -380,16 +364,6 @@ end
 module Stack_offset_adjustment_backward = struct
   type context = { forward : bool Label.Tbl.t }
 
-  module Domain : Cfg_dataflow.Domain_S with type t = bool = struct
-    type t = bool
-
-    let bot = false
-
-    let join = ( || )
-
-    let less_equal a b = b || not a
-  end
-
   module Transfer :
     Cfg_dataflow.Backward_transfer
       with type domain = bool
@@ -408,8 +382,6 @@ module Stack_offset_adjustment_backward = struct
         context ->
         (domain, error) result =
      fun domain instr block { forward } ->
-      (* If this instruction has non-zero stack_offset and block needs prologue
-         forwards, force domain to true *)
       if instr.stack_offset <> 0
          && Prologue_needed.Before.needs_prologue forward block.start
       then Ok true
@@ -436,7 +408,7 @@ module Stack_offset_adjustment_backward = struct
   end
 
   module T = struct
-    include Cfg_dataflow.Backward (Domain) (Transfer)
+    include Cfg_dataflow.Backward (Bool_domain) (Transfer)
   end
 
   include (T : module type of T with type context := context)
