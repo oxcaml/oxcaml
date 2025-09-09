@@ -307,7 +307,13 @@ let base_templ () : Cfg_desc.t * (unit -> InstructionId.t) =
               { id = make_id ();
                 desc =
                   Call
-                    { op = { callee = Indirect; ty_args = [] };
+                    { op =
+                        { callee = Indirect;
+                          callsite_types =
+                            { args = []; res = Cmm.Extended_machtype.typ_val };
+                          funcdef_types =
+                            { args = []; res = Cmm.Extended_machtype.typ_val }
+                        };
                       label_after = move_tmp_res_label
                     };
                 arg = arg_locs;

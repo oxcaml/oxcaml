@@ -1345,7 +1345,7 @@ module F = struct
       let is_eq = float_comp t Cmm.CFeq i typ in
       ins_branch_cond t is_eq eq uo
     | Call { op; label_after } ->
-      (* reject_addr_regs i.arg "call"; *)
+      reject_addr_regs i.arg "call";
       call t i op;
       ins_branch t label_after
     | Prim { op; label_after } -> (
@@ -1357,7 +1357,7 @@ module F = struct
         ins_branch t label_after)
     | Tailcall_self { destination } -> ins_branch t destination
     | Tailcall_func op ->
-      (* reject_addr_regs i.arg "tailcall func"; *)
+      reject_addr_regs i.arg "tailcall func";
       call ~tail:true t i op
     | Call_no_return { func_symbol; alloc; stack_ofs; stack_align; _ } ->
       extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
