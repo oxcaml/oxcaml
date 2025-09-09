@@ -48,7 +48,7 @@ let target_ocaml_int_to_jsir_const targetint : Jsir.constant =
   Int targetint
 
 let float32_to_jsir_const float32 : Jsir.constant =
-  (* Since float32 are just represented as normal floats in JSIR, we first
+  (* Since float32s are just represented as normal floats in JSIR, we first
      convert to [Float_by_bit_pattern] and use its bit pattern. *)
   Numeric_types.Float32_by_bit_pattern.to_float float32
   |> Numeric_types.Float_by_bit_pattern.create
