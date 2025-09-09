@@ -506,7 +506,8 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     (* Unsupported in bytecode *)
     primitive_not_supported ()
   | Read_offset _ ->
-    (* CR selee: look before merge *)
+    (* CR selee: This is for block indices, which likely requires changes to
+       JSOO to support. We will leave this for now. *)
     primitive_not_supported ()
 
 let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
@@ -575,7 +576,8 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     unit ~env ~res
   | Atomic_exchange_field _ -> use_prim' (Extern "caml_atomic_exchange_field")
   | Write_offset _ ->
-    (* CR selee: look before merge *)
+    (* CR selee: This is for block indices, which likely requires changes to
+       JSOO to support. We will leave this for now. *)
     primitive_not_supported ()
 
 let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
