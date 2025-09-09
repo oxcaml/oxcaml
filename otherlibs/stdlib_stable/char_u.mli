@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ portable
+
 (** Converting between other types *)
 
 external of_int8_u : int8# -> char# = "%identity"

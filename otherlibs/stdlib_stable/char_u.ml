@@ -12,8 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-external of_int8_u : int8# -> char# = "%identity"
-external to_int8_u : char# -> int8# = "%identity"
+external of_int8_u : int8# -> char# @@ portable = "%identity"
+external to_int8_u : char# -> int8# @@ portable = "%identity"
 
 let to_char c = Char.chr (Int8_u.to_int (to_int8_u c))
 
