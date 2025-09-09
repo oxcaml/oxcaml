@@ -2008,7 +2008,7 @@ module Rewriter = struct
       | Invalid ->
         (* Not a closure. For now, we can never change the representation of
            this, so no rewrite is necessary. *)
-        Rule.identity (db, usages)
+        Rule.identity
       | Need_meet ->
         (* Multiple closures are possible. We are never able to use this
            information currently; convert to Unknown. *)
