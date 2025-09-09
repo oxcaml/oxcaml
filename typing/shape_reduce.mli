@@ -65,6 +65,7 @@ end
     - some fuel, which is used to bound recursion when dealing with recursive
       shapes introduced by recursive modules. (FTR: merlin currently uses a
       fuel of 10, which seems to be enough for most practical examples)
+    - a Boolean whether projection rules that Merlin relies on should be enabled
 
     Usage warning: To ensure good performances, every reduction made with the
     same instance of that functor share the same ident-based memoization tables.
