@@ -5,4 +5,3 @@ let inc (k : string) : unit =
   Hashtbl.replace tbl k (v + 1)
 
 let counters () : (string * int) list = Hashtbl.to_seq tbl |> List.of_seq
-

@@ -4,13 +4,21 @@ module type LATTICE = sig
   type t
 
   val bot : t
+
   val top : t
+
   val join : t -> t -> t
+
   val meet : t -> t -> t
+
   val co_sub : t -> t -> t (* residual: join a (co_sub b a) = join a b *)
+
   val to_string : t -> string (* optional, for debug/printing *)
+
   val equal : t -> t -> bool
+
   val hash : t -> int
+
   val find_non_bot_axis : t -> int option
 end
 
@@ -18,27 +26,41 @@ module type ORDERED = sig
   type t
 
   val compare : t -> t -> int
+
   val to_string : t -> string
 end
 
 module Make (C : LATTICE) (V : ORDERED) = struct
   (* --------- variables --------- *)
   type node =
-    | Leaf of { id : int; c : C.t }
-    | Node of { id : int; v : var; lo : node; hi : node }
+    | Leaf of
+        { id : int;
+          c : C.t
+        }
+    | Node of
+        { id : int;
+          v : var;
+          lo : node;
+          hi : node
+        }
 
-  and var = {
-    id : int; (* ZDD order: smaller id = higher *)
-    mutable state : var_state; (* type+state of the variable *)
-  }
+  and var =
+    { id : int; (* ZDD order: smaller id = higher *)
+      mutable state : var_state (* type+state of the variable *)
+    }
 
-  and var_state = Unsolved | Solved of node | Rigid of V.t
+  and var_state =
+    | Unsolved
+    | Solved of node
+    | Rigid of V.t
 
   module Var = struct
     type t = var
 
     let var_id = ref (-1)
+
     let rigid_var_start = 100000000
+
     let rigid_var_id = ref rigid_var_start
 
     module VMap = Map.Make (struct
@@ -94,8 +116,11 @@ module Make (C : LATTICE) (V : ORDERED) = struct
       n
 
   let bot = leaf C.bot
+
   let top = leaf C.top
+
   let is_bot_node n = n == bot
+
   let is_top_node n = n == top
 
   (* --------- unique table for internal nodes --------- *)
@@ -103,12 +128,14 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     type t = int * int * int (* v.id, lo.id, hi.id *)
 
     let equal (a, b, c) (a', b', c') = a = a' && b = b' && c = c'
+
     let hash = Hashtbl.hash
   end
 
   module Unique = Hashtbl.Make (UKey)
 
   let initial_hashtbl_size = 1024
+
   let uniq_tbl : node Unique.t = Unique.create initial_hashtbl_size
 
   (* --------- persistent memos --------- *)
@@ -117,18 +144,23 @@ module Make (C : LATTICE) (V : ORDERED) = struct
       type t = int
 
       let equal = ( = )
+
       let hash n = Hashtbl.hash n
     end)
 
     let create () = Tbl.create 1024
+
     let find_opt tbl n = Tbl.find_opt tbl (node_id n)
+
     let add tbl n r = Tbl.add tbl (node_id n) r
+
     let clear tbl = Tbl.clear tbl
   end
 
   (* Pack two 30-bit ids into one 60-bit int key. *)
   module PairKey = struct
     let bits = 30
+
     let mask = (1 lsl bits) - 1
 
     let[@inline] make_int a b =
@@ -144,12 +176,16 @@ module Make (C : LATTICE) (V : ORDERED) = struct
       type t = int
 
       let equal = ( = )
+
       let hash = Hashtbl.hash
     end)
 
     let create () = Tbl.create initial_hashtbl_size
+
     let find_opt tbl n m = Tbl.find_opt tbl (PairKey.of_nodes n m)
+
     let add tbl n m r = Tbl.add tbl (PairKey.of_nodes n m) r
+
     let clear = Tbl.clear
   end
 
@@ -162,10 +198,10 @@ module Make (C : LATTICE) (V : ORDERED) = struct
   let node_raw (v : var) (lo : node) (hi : node) : node =
     assert (v.id < var_index lo);
     assert (v.id < var_index hi);
-
-    if is_bot_node hi then lo
+    if is_bot_node hi
+    then lo
     else
-      let key = (v.id, node_id lo, node_id hi) in
+      let key = v.id, node_id lo, node_id hi in
       match Unique.find_opt uniq_tbl key with
       | Some n -> n
       | None ->
@@ -176,14 +212,19 @@ module Make (C : LATTICE) (V : ORDERED) = struct
 
   (* Subtract subsets h - l *)
   let memo_subs = NodePairTbl.create ()
+
   let rec down0 = function Leaf { c; _ } -> c | Node { lo; _ } -> down0 lo
 
   let rec canonicalize (h : node) (l : node) : node =
-    if node_id h = node_id l then bot
-    else if is_bot_node l then h
-    else if is_top_node l then bot
-    (* No need to test if h is top or bot because that path is fast anyway *)
-      else
+    if node_id h = node_id l
+    then bot
+    else if is_bot_node l
+    then h
+    else if is_top_node l
+    then
+      bot
+      (* No need to test if h is top or bot because that path is fast anyway *)
+    else
       (* Value at empty set *)
       match NodePairTbl.find_opt memo_subs h l with
       | Some r -> r
@@ -197,14 +238,15 @@ module Make (C : LATTICE) (V : ORDERED) = struct
             | Leaf _ ->
               node_raw nh.v (canonicalize nh.lo l) (canonicalize nh.hi l)
             | Node nl ->
-              if nh.v.id = nl.v.id then
+              if nh.v.id = nl.v.id
+              then
                 let lo' = canonicalize nh.lo nl.lo in
                 (* let hi' = canonicalize (canonicalize nh.hi nl.lo) nl.hi in *)
                 let hi' = canonicalize (canonicalize nh.hi nl.hi) nl.lo in
                 (* let hi' = canonicalize nh.hi (join nl.lo nl.hi) in *)
                 node_raw nh.v lo' hi'
-              else if nh.v.id < nl.v.id then
-                node_raw nh.v (canonicalize nh.lo l) (canonicalize nh.hi l)
+              else if nh.v.id < nl.v.id
+              then node_raw nh.v (canonicalize nh.lo l) (canonicalize nh.hi l)
               else (* h.id > l.id *)
                 canonicalize h nl.lo)
         in
@@ -220,26 +262,34 @@ module Make (C : LATTICE) (V : ORDERED) = struct
   let memo_join = NodePairTbl.create ()
 
   let rec join (a : node) (b : node) =
-    if node_id a = node_id b then a
-    else if is_bot_node a then b
-    else if is_bot_node b then a
-    else if is_top_node a then top
-    else if is_top_node b then top
-    else if node_id a > node_id b then join b a
+    if node_id a = node_id b
+    then a
+    else if is_bot_node a
+    then b
+    else if is_bot_node b
+    then a
+    else if is_top_node a
+    then top
+    else if is_top_node b
+    then top
+    else if node_id a > node_id b
+    then join b a
     else
       match NodePairTbl.find_opt memo_join a b with
       | Some r -> r
       | None ->
         Global_counters.inc "join";
         let r =
-          match (a, b) with
+          match a, b with
           | Leaf x, Leaf y -> leaf (C.join x.c y.c)
           | Node na, Node nb ->
-            if na.v.id = nb.v.id then
+            if na.v.id = nb.v.id
+            then
               (* node na.v (join na.lo nb.lo) (join na.hi nb.hi) *)
               node_raw na.v (join na.lo nb.lo)
                 (join (canonicalize na.hi nb.lo) (canonicalize nb.hi na.lo))
-            else if na.v.id < nb.v.id then
+            else if na.v.id < nb.v.id
+            then
               (* node na.v (join na.lo b) (join na.hi b) *)
               node_raw na.v (join na.lo b) (canonicalize na.hi b)
             else
@@ -258,34 +308,42 @@ module Make (C : LATTICE) (V : ORDERED) = struct
   let memo_meet = NodePairTbl.create ()
 
   let rec meet (a : node) (b : node) =
-    if node_id a = node_id b then a
-    else if is_bot_node a then bot
-    else if is_bot_node b then bot
-    else if is_top_node a then b
-    else if is_top_node b then a
-    else if node_id a > node_id b then meet b a
+    if node_id a = node_id b
+    then a
+    else if is_bot_node a
+    then bot
+    else if is_bot_node b
+    then bot
+    else if is_top_node a
+    then b
+    else if is_top_node b
+    then a
+    else if node_id a > node_id b
+    then meet b a
     else
       match NodePairTbl.find_opt memo_meet a b with
       | Some r -> r
       | None ->
         Global_counters.inc "meet";
         let r =
-          match (a, b) with
+          match a, b with
           | Leaf x, Leaf y -> leaf (C.meet x.c y.c)
           | (Leaf _ as x), Node na | Node na, (Leaf _ as x) ->
             node na.v (meet na.lo x) (meet na.hi x)
           | Node na, Node nb ->
-            if na.v.id = nb.v.id then
+            if na.v.id = nb.v.id
+            then
               let lo = meet na.lo nb.lo in
               (* let hi =
-                join (meet na.hi nb.lo)
-                  (join (meet na.lo nb.hi) (meet na.hi nb.hi)) *)
+                 join (meet na.hi nb.lo)
+                   (join (meet na.lo nb.hi) (meet na.hi nb.hi)) *)
               (* let left = sub_subsets (join na.hi na.lo) lo in
-              let right = sub_subsets (join nb.hi nb.lo) lo in
-              let hi = meet left right in *)
+                 let right = sub_subsets (join nb.hi nb.lo) lo in
+                 let hi = meet left right in *)
               let hi = meet (join na.hi na.lo) (join nb.hi nb.lo) in
               node na.v lo hi
-            else if na.v.id < nb.v.id then
+            else if na.v.id < nb.v.id
+            then
               (* let lo = meet na.lo b in let hi = meet na.hi b in node_raw na.v
                  lo (sub_subsets hi na.lo) *)
               node na.v (meet na.lo b) (meet na.hi b)
@@ -296,8 +354,11 @@ module Make (C : LATTICE) (V : ORDERED) = struct
 
   (* --------- public constructors --------- *)
   let const (c : C.t) = leaf c
+
   let mk_var (v : var) = node v bot top
+
   let rigid (name : V.t) = Var.make_rigid ~name ()
+
   let new_var () = Var.make_var ()
 
   (* --------- restrictions (x ← ⊥ / ⊤) --------- *)
@@ -306,12 +367,16 @@ module Make (C : LATTICE) (V : ORDERED) = struct
       type t = int * int
 
       let equal (a, b) (c, d) = a = c && b = d
+
       let hash = Hashtbl.hash
     end)
 
     let create () = Tbl.create 1024
+
     let find_opt tbl v n = Tbl.find_opt tbl (v.id, node_id n)
+
     let add tbl v n r = Tbl.add tbl (v.id, node_id n) r
+
     let clear tbl = Tbl.clear tbl
   end
 
@@ -325,8 +390,10 @@ module Make (C : LATTICE) (V : ORDERED) = struct
         match w with
         | Leaf _ -> w
         | Node n ->
-          if x.id < n.v.id then w
-          else if n.v.id = x.id then restrict0 x n.lo
+          if x.id < n.v.id
+          then w
+          else if n.v.id = x.id
+          then restrict0 x n.lo
           else node n.v (restrict0 x n.lo) (restrict0 x n.hi)
       in
       VarNodePairTbl.add memo_restrict0 x w r;
@@ -342,8 +409,10 @@ module Make (C : LATTICE) (V : ORDERED) = struct
         match w with
         | Leaf _ -> w
         | Node n ->
-          if x.id < n.v.id then w
-          else if n.v.id = x.id then join n.lo n.hi
+          if x.id < n.v.id
+          then w
+          else if n.v.id = x.id
+          then join n.lo n.hi
           else node n.v (restrict1 x n.lo) (restrict1 x n.hi)
       in
       VarNodePairTbl.add memo_restrict1 x w r;
@@ -361,16 +430,17 @@ module Make (C : LATTICE) (V : ORDERED) = struct
         match w with
         | Leaf _ -> w
         | Node n -> (
-          if n.v.id > Var.rigid_var_start then w
+          if n.v.id > Var.rigid_var_start
+          then w
           else
-            let lo' = force n.lo
-            and hi' = force n.hi in
+            let lo' = force n.lo and hi' = force n.hi in
             match n.v.state with
             | Solved d ->
               let d' = force d in
               join lo' (meet hi' d')
             | Unsolved ->
-              if node_id lo' = node_id n.lo && node_id hi' = node_id n.hi then w
+              if node_id lo' = node_id n.lo && node_id hi' = node_id n.hi
+              then w
               else
                 let d' = force (mk_var n.v) in
                 join lo' (meet hi' d')
@@ -406,6 +476,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
       NodeTbl.clear memo_force
 
   let lfp_queue = Stack.create ()
+
   let gfp_queue = Stack.create ()
 
   let enqueue_lfp (var : var) (rhs_raw : node) : unit =
@@ -438,19 +509,20 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     let t2 = Sys.time () in
     let lfp_ms = (t1 -. t0) *. 1000. in
     let gfp_ms = (t2 -. t1) *. 1000. in
-    if profile_enabled then
+    if profile_enabled
+    then
       Printf.printf "solve_pending: LFPs %.3f ms, GFPs %.3f ms\n" lfp_ms gfp_ms
 
   (* Decompose into linear terms *)
   let decompose_linear ~(universe : var list) (n : node) =
     let rec go vs m ns =
       match vs with
-      | [] -> (m, ns)
+      | [] -> m, ns
       | v :: vs' ->
         go vs' (restrict0 v m) (restrict1 v m :: List.map (restrict0 v) ns)
     in
     let base, linears = go universe (force n) [] in
-    (base, List.rev linears)
+    base, List.rev linears
 
   let leq (a : node) (b : node) =
     let a = force a in
@@ -460,11 +532,10 @@ module Make (C : LATTICE) (V : ORDERED) = struct
   let rec find_non_bot_axis (n : node) =
     match n with
     | Leaf { c; _ } -> C.find_non_bot_axis c
-    | Node n ->
+    | Node n -> (
       match find_non_bot_axis n.lo with
       | Some i -> Some i
-      | None -> find_non_bot_axis n.hi
-
+      | None -> find_non_bot_axis n.hi)
 
   (* --------- polynomial-style pretty printer --------- *)
   (* Prints using the same conventions as lattice_polynomial.pp:
@@ -476,7 +547,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
       (C.t * string list) list =
     let rec aux (acc : string list) (w : node) : (C.t * string list) list =
       match w with
-      | Leaf { c; _ } -> if C.equal c C.bot then [] else [ (c, acc) ]
+      | Leaf { c; _ } -> if C.equal c C.bot then [] else [c, acc]
       | Node n ->
         let acc_hi =
           match n.v.state with
@@ -491,12 +562,13 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     aux [] (force w)
 
   let to_named_terms (w : node) : (C.t * string list) list =
-    to_named_terms_with (fun v -> 
-      match v.state with
-      | Rigid name -> V.to_string name
-      | Unsolved -> "<unsolved-var:" ^ string_of_int v.id ^ ">"
-      | Solved _ -> failwith "solved vars should not appear after force"
-    ) w
+    to_named_terms_with
+      (fun v ->
+        match v.state with
+        | Rigid name -> V.to_string name
+        | Unsolved -> "<unsolved-var:" ^ string_of_int v.id ^ ">"
+        | Solved _ -> failwith "solved vars should not appear after force")
+      w
 
   (* Pretty-print in polynomial style. If [pp_var] is provided, it is used to
      name non-rigid variables when encountered on hi-edges (e.g., unsolved vars
@@ -517,21 +589,22 @@ module Make (C : LATTICE) (V : ORDERED) = struct
         (fun vs c acc -> if C.equal c C.bot then acc else (vs, c) :: acc)
         tbl []
     in
-    if terms = [] then "⊥"
+    if terms = []
+    then "⊥"
     else
       let term_body vs c =
         let is_top = C.equal c C.top in
-        match (vs, is_top) with
-        | [], true -> ("⊤", false)
-        | [], false -> (pp_coeff c, false)
-        | _ :: _, true -> (String.concat " ⊓ " vs, List.length vs > 1)
-        | _ :: _, false -> (pp_coeff c ^ " ⊓ " ^ String.concat " ⊓ " vs, true)
+        match vs, is_top with
+        | [], true -> "⊤", false
+        | [], false -> pp_coeff c, false
+        | _ :: _, true -> String.concat " ⊓ " vs, List.length vs > 1
+        | _ :: _, false -> pp_coeff c ^ " ⊓ " ^ String.concat " ⊓ " vs, true
       in
       let items =
         terms
         |> List.map (fun (vs, c) ->
                let body, has_meet = term_body vs c in
-               (body, has_meet))
+               body, has_meet)
         |> List.sort (fun (a, _) (b, _) -> String.compare a b)
       in
       let n_terms = List.length items in
@@ -598,8 +671,8 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     in
     let rec go indent (n : node) : unit =
       let id = node_id n in
-      if Hashtbl.mem seen id then
-        Buffer.add_string b (Printf.sprintf "%s#%d = <ref>\n" indent id)
+      if Hashtbl.mem seen id
+      then Buffer.add_string b (Printf.sprintf "%s#%d = <ref>\n" indent id)
       else (
         Hashtbl.add seen id true;
         match n with

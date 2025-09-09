@@ -190,7 +190,8 @@ let std_include_flag prefix =
   else (prefix ^ (Filename.quote Config.standard_library))
 
 let std_include_dir () =
-  if !no_std_include then [] else [Config.standard_library]
+  if !no_std_include then []
+  else [Config.standard_library]
 
 let shared = ref false (* -shared *)
 let dlcode = ref true (* not -nodynlink *)

@@ -46,44 +46,44 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
       | "separability" -> Some 10
       | _ -> None
     in
-    match idx with
-    | None -> ()
-    | Some i -> levels.(i) <- top i
+    match idx with None -> () | Some i -> levels.(i) <- top i
   in
   Axis_set.to_seq set
   |> Seq.iter (fun (Axis.Pack ax) -> set_idx_by_name (Axis.name ax));
   encode ~levels
 
-
-
 (* IK-only: compute relevant axes of a constant modality, mirroring
    Jkind.relevant_axes_of_modality. *)
 let relevant_axes_of_modality
-    ~(relevant_for_shallow:[`Relevant | `Irrelevant])
-    (modality : Mode.Modality.Const.t)
-  : Jkind_axis.Axis_set.t =
+    ~(relevant_for_shallow : [`Relevant | `Irrelevant])
+    (modality : Mode.Modality.Const.t) : Jkind_axis.Axis_set.t =
   Jkind_axis.Axis_set.create ~f:(fun ~axis:(Jkind_axis.Axis.Pack axis) ->
       match axis with
       | Jkind_axis.Axis.Modal axis ->
-        (* Convert the value axis into a modality axis to query per-axis constness. *)
+        (* Convert the value axis into a modality axis to query
+           per-axis constness. *)
         let (Mode.Modality.Axis.P axis_for_modality) =
           Mode.Modality.Axis.of_value (Mode.Value.Axis.P axis)
         in
-        let modality_on_axis = Mode.Modality.Const.proj axis_for_modality modality in
-        not (Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis)
+        let modality_on_axis =
+          Mode.Modality.Const.proj axis_for_modality modality
+        in
+        not
+          (Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis)
       | Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality -> true
       | Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability -> (
-          match relevant_for_shallow with `Relevant -> true | `Irrelevant -> false)
+        match relevant_for_shallow with
+        | `Relevant -> true
+        | `Irrelevant -> false)
       | Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability -> (
-          match relevant_for_shallow with `Relevant -> true | `Irrelevant -> false))
+        match relevant_for_shallow with
+        | `Relevant -> true
+        | `Irrelevant -> false))
 
 (* Directly produce an axis-lattice mask from a constant modality. *)
-let mask_of_modality
-    ~(relevant_for_shallow:[`Relevant | `Irrelevant])
-    (modality : Mode.Modality.Const.t)
-  : t =
+let mask_of_modality ~(relevant_for_shallow : [`Relevant | `Irrelevant])
+    (modality : Mode.Modality.Const.t) : t =
   relevant_axes_of_modality ~relevant_for_shallow modality |> of_axis_set
-
 
 (* Conversion between Types.Jkind_mod_bounds.t and Axis_lattice.t *)
 
@@ -100,9 +100,7 @@ let areality_of_level = function
   | _ -> invalid_arg "Axis_lattice.areality_of_level"
 
 let level_of_linearity (x : Mode.Linearity.Const.t) : int =
-  match x with
-  | Mode.Linearity.Const.Many -> 0
-  | Mode.Linearity.Const.Once -> 1
+  match x with Mode.Linearity.Const.Many -> 0 | Mode.Linearity.Const.Once -> 1
 
 let linearity_of_level = function
   | 0 -> Mode.Linearity.Const.Many
@@ -213,19 +211,20 @@ let separability_of_level = function
   | _ -> invalid_arg "Axis_lattice.separability_of_level"
 
 let of_mod_bounds (mb : Types.Jkind_mod_bounds.t) : t =
-  let levels = [|
-    level_of_areality (Types.Jkind_mod_bounds.areality mb);
-    level_of_linearity (Types.Jkind_mod_bounds.linearity mb);
-    level_of_uniqueness_monadic (Types.Jkind_mod_bounds.uniqueness mb);
-    level_of_portability (Types.Jkind_mod_bounds.portability mb);
-    level_of_contention_monadic (Types.Jkind_mod_bounds.contention mb);
-    level_of_yielding (Types.Jkind_mod_bounds.yielding mb);
-    level_of_statefulness (Types.Jkind_mod_bounds.statefulness mb);
-    level_of_visibility_monadic (Types.Jkind_mod_bounds.visibility mb);
-    level_of_externality (Types.Jkind_mod_bounds.externality mb);
-    level_of_nullability (Types.Jkind_mod_bounds.nullability mb);
-    level_of_separability (Types.Jkind_mod_bounds.separability mb);
-  |] in
+  let levels =
+    [| level_of_areality (Types.Jkind_mod_bounds.areality mb);
+       level_of_linearity (Types.Jkind_mod_bounds.linearity mb);
+       level_of_uniqueness_monadic (Types.Jkind_mod_bounds.uniqueness mb);
+       level_of_portability (Types.Jkind_mod_bounds.portability mb);
+       level_of_contention_monadic (Types.Jkind_mod_bounds.contention mb);
+       level_of_yielding (Types.Jkind_mod_bounds.yielding mb);
+       level_of_statefulness (Types.Jkind_mod_bounds.statefulness mb);
+       level_of_visibility_monadic (Types.Jkind_mod_bounds.visibility mb);
+       level_of_externality (Types.Jkind_mod_bounds.externality mb);
+       level_of_nullability (Types.Jkind_mod_bounds.nullability mb);
+       level_of_separability (Types.Jkind_mod_bounds.separability mb)
+    |]
+  in
   encode ~levels
 
 let to_mod_bounds (v : t) : Types.Jkind_mod_bounds.t =
@@ -248,13 +247,11 @@ let to_mod_bounds (v : t) : Types.Jkind_mod_bounds.t =
 (* Lattice constant for non-float value base *)
 let nonfloat_value : t =
   let mb =
-    Types.Jkind_mod_bounds.create
-      ~areality:Mode.Regionality.Const.max
+    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.max
       ~linearity:Mode.Linearity.Const.max
       ~uniqueness:Mode.Uniqueness.Const_op.max
       ~portability:Mode.Portability.Const.max
-      ~contention:Mode.Contention.Const_op.max
-      ~yielding:Mode.Yielding.Const.max
+      ~contention:Mode.Contention.Const_op.max ~yielding:Mode.Yielding.Const.max
       ~statefulness:Mode.Statefulness.Const.max
       ~visibility:Mode.Visibility.Const_op.max
       ~externality:Jkind_axis.Externality.max
@@ -263,18 +260,15 @@ let nonfloat_value : t =
   in
   of_mod_bounds mb
 
-
 (* Convenience constants matching JK builtins for record bases. *)
 
 let immutable_data : t =
   let mb =
-    Types.Jkind_mod_bounds.create
-      ~areality:Mode.Regionality.Const.max
+    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.max
       ~linearity:Mode.Linearity.Const.min
       ~uniqueness:Mode.Uniqueness.Const_op.max
       ~portability:Mode.Portability.Const.min
-      ~contention:Mode.Contention.Const_op.min
-      ~yielding:Mode.Yielding.Const.min
+      ~contention:Mode.Contention.Const_op.min ~yielding:Mode.Yielding.Const.min
       ~statefulness:Mode.Statefulness.Const.min
       ~visibility:Mode.Visibility.Const_op.min
       ~externality:Jkind_axis.Externality.max
@@ -285,13 +279,11 @@ let immutable_data : t =
 
 let mutable_data : t =
   let mb =
-    Types.Jkind_mod_bounds.create
-      ~areality:Mode.Regionality.Const.max
+    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.max
       ~linearity:Mode.Linearity.Const.min
       ~uniqueness:Mode.Uniqueness.Const_op.max
       ~portability:Mode.Portability.Const.min
-      ~contention:Mode.Contention.Const_op.max
-      ~yielding:Mode.Yielding.Const.min
+      ~contention:Mode.Contention.Const_op.max ~yielding:Mode.Yielding.Const.min
       ~statefulness:Mode.Statefulness.Const.min
       ~visibility:Mode.Visibility.Const_op.max
       ~externality:Jkind_axis.Externality.max
@@ -300,16 +292,15 @@ let mutable_data : t =
   in
   of_mod_bounds mb
 
-(* Matches JK Builtin.value: boxed value, Non_null and Separable; no mode-crossing. *)
+(* Matches JK Builtin.value: boxed value, Non_null and Separable;
+   no mode-crossing. *)
 let value : t =
   let mb =
-    Types.Jkind_mod_bounds.create
-      ~areality:Mode.Regionality.Const.max
+    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.max
       ~linearity:Mode.Linearity.Const.max
       ~uniqueness:Mode.Uniqueness.Const_op.max
       ~portability:Mode.Portability.Const.max
-      ~contention:Mode.Contention.Const_op.max
-      ~yielding:Mode.Yielding.Const.max
+      ~contention:Mode.Contention.Const_op.max ~yielding:Mode.Yielding.Const.max
       ~statefulness:Mode.Statefulness.Const.max
       ~visibility:Mode.Visibility.Const_op.max
       ~externality:Jkind_axis.Externality.max
@@ -320,13 +311,11 @@ let value : t =
 
 let arrow : t =
   let mb =
-    Types.Jkind_mod_bounds.create
-      ~areality:Mode.Regionality.Const.max
+    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.max
       ~linearity:Mode.Linearity.Const.max
       ~uniqueness:Mode.Uniqueness.Const_op.min
       ~portability:Mode.Portability.Const.max
-      ~contention:Mode.Contention.Const_op.min
-      ~yielding:Mode.Yielding.Const.max
+      ~contention:Mode.Contention.Const_op.min ~yielding:Mode.Yielding.Const.max
       ~statefulness:Mode.Statefulness.Const.max
       ~visibility:Mode.Visibility.Const_op.min
       ~externality:Jkind_axis.Externality.max
@@ -339,13 +328,11 @@ let arrow : t =
    with nullability Non_null and separability Non_float). *)
 let immediate : t =
   let mb =
-    Types.Jkind_mod_bounds.create
-      ~areality:Mode.Regionality.Const.min
+    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.min
       ~linearity:Mode.Linearity.Const.min
       ~uniqueness:Mode.Uniqueness.Const_op.min
       ~portability:Mode.Portability.Const.min
-      ~contention:Mode.Contention.Const_op.min
-      ~yielding:Mode.Yielding.Const.min
+      ~contention:Mode.Contention.Const_op.min ~yielding:Mode.Yielding.Const.min
       ~statefulness:Mode.Statefulness.Const.min
       ~visibility:Mode.Visibility.Const_op.min
       ~externality:Jkind_axis.Externality.min
@@ -354,12 +341,16 @@ let immediate : t =
   in
   of_mod_bounds mb
 
-(* Matches JK for_object: legacy on comonadic axes, max on monadic axes; Non_null, Non_float. *)
+(* Matches JK for_object: legacy on comonadic axes, max on monadic axes;
+   Non_null, Non_float. *)
 let object_legacy : t =
   let ({ linearity; areality; portability; yielding; statefulness }
-        : Mode.Value.Comonadic.Const.t) = Mode.Value.Comonadic.Const.legacy in
-  let ({ contention; uniqueness; visibility }
-        : Mode.Value.Monadic.Const_op.t) = Mode.Value.Monadic.Const_op.max in
+        : Mode.Value.Comonadic.Const.t) =
+    Mode.Value.Comonadic.Const.legacy
+  in
+  let ({ contention; uniqueness; visibility } : Mode.Value.Monadic.Const_op.t) =
+    Mode.Value.Monadic.Const_op.max
+  in
   let mb =
     Types.Jkind_mod_bounds.create ~linearity ~areality ~uniqueness ~portability
       ~contention ~yielding ~statefulness ~visibility
@@ -369,19 +360,25 @@ let object_legacy : t =
   in
   of_mod_bounds mb
 
-  let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
-    (* Match the ordering used by Jkind_axis.Axis_set.axis_index *)
-    let open Mode.Value.Axis in
-    match axis_number with
-    | 0 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Areality))
-    | 1 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Linearity))
-    | 2 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Uniqueness))
-    | 3 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Portability))
-    | 4 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Contention))
-    | 5 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding))
-    | 6 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness))
-    | 7 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility))
-    | 8 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
-    | 9 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability)
-    | 10 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability)
-    | _ -> failwith "axis_number_to_axis_packed: invalid axis number"
+let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
+  (* Match the ordering used by Jkind_axis.Axis_set.axis_index *)
+  let open Mode.Value.Axis in
+  match axis_number with
+  | 0 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Areality))
+  | 1 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Linearity))
+  | 2 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Uniqueness))
+  | 3 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Portability))
+  | 4 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Contention))
+  | 5 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding))
+  | 6 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness))
+  | 7 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility))
+  | 8 ->
+    Jkind_axis.Axis.Pack
+      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
+  | 9 ->
+    Jkind_axis.Axis.Pack
+      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability)
+  | 10 ->
+    Jkind_axis.Axis.Pack
+      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability)
+  | _ -> failwith "axis_number_to_axis_packed: invalid axis number"
