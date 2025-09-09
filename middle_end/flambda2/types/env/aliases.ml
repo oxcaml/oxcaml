@@ -167,15 +167,12 @@ end = struct
       (fun order aliases res_opt ->
         match res_opt with
         | Some _ -> res_opt
-        | None -> (
-          match Name_mode.compare_partial_order order min_name_mode with
-          | None -> None
-          | Some result ->
-            if result >= 0
-            then
-              let aliases = filter_by_scope order aliases in
-              if Name.Map.is_empty aliases then None else Some aliases
-            else None))
+        | None ->
+          if Name_mode.compare_total_order order min_name_mode >= 0
+          then
+            let aliases = filter_by_scope order aliases in
+            if Name.Map.is_empty aliases then None else Some aliases
+          else None)
       t.aliases None
 
   let mem t elt = Name.Map.mem elt t.all
@@ -907,11 +904,9 @@ let get_canonical_element_exn ~binding_time_resolver ~binding_times_and_modes t
   let canonical = canonical t element in
   match canonical with
   | Is_canonical
-    when match Name_mode.compare_partial_order elt_name_mode min_name_mode with
-         | None -> false
-         | Some c -> c >= 0 ->
+    when Name_mode.compare_total_order elt_name_mode min_name_mode >= 0 ->
     element
-  | Is_canonical | Alias_of_canonical _ -> (
+  | Is_canonical | Alias_of_canonical _ ->
     let canonical_element, name_mode, coercion_from_canonical_to_element =
       match canonical with
       | Is_canonical ->
@@ -924,20 +919,13 @@ let get_canonical_element_exn ~binding_time_resolver ~binding_times_and_modes t
         canonical_element, name_mode, Coercion.inverse coercion_to_canonical
     in
     assert (not (Simple.has_coercion canonical_element));
-    match Name_mode.compare_partial_order name_mode min_name_mode with
-    | None ->
+    if Name_mode.compare_total_order name_mode min_name_mode >= 0
+    then
+      Simple.with_coercion canonical_element coercion_from_canonical_to_element
+    else
       find_earliest_alias t ~canonical_element ~binding_times_and_modes
         ~min_binding_time ~min_name_mode ~binding_time_resolver
         ~coercion_from_canonical_to_element
-    | Some c ->
-      if c >= 0
-      then
-        Simple.with_coercion canonical_element
-          coercion_from_canonical_to_element
-      else
-        find_earliest_alias t ~canonical_element ~binding_times_and_modes
-          ~min_binding_time ~min_name_mode ~binding_time_resolver
-          ~coercion_from_canonical_to_element)
 
 let get_aliases t element =
   match canonical t element with

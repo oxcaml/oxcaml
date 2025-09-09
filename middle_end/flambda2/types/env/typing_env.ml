@@ -563,10 +563,8 @@ let mem ?min_name_mode t name =
       match name_mode, min_name_mode with
       | None, _ -> false
       | Some _, None -> true
-      | Some name_mode, Some min_name_mode -> (
-        match Name_mode.compare_partial_order min_name_mode name_mode with
-        | None -> false
-        | Some c -> c <= 0))
+      | Some name_mode, Some min_name_mode ->
+        Name_mode.compare_total_order min_name_mode name_mode <= 0)
     ~symbol:(fun sym ->
       (* CR mshinwell: This might not take account of symbols in missing .cmx
          files *)
@@ -997,9 +995,7 @@ let aliases_of_simple t ~min_name_mode simple =
            Binding_time.With_name_mode.name_mode
              (binding_time_and_mode_of_simple t alias)
          in
-         match Name_mode.compare_partial_order name_mode min_name_mode with
-         | None -> false
-         | Some c -> c >= 0)
+         Name_mode.compare_total_order name_mode min_name_mode >= 0)
 
 let aliases_of_simple_allowable_in_types t simple =
   aliases_of_simple t ~min_name_mode:Name_mode.in_types simple

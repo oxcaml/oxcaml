@@ -23,10 +23,13 @@ type name_mode = t
 
 (* Semilattice:
  *
- *         Normal
- *       /      \
- *      /        \
- *  In_types   Phantom
+ *   Normal
+ *      |
+ *      |
+ *   Phantom
+ *      |
+ *      |
+ *   In_types
  *)
 
 let join_in_terms t1 t2 =
@@ -51,13 +54,6 @@ let is_in_types t = match t with In_types -> true | Normal | Phantom -> false
 let can_be_in_terms t =
   match t with Normal | Phantom -> true | In_types -> false
 
-let compare_partial_order t1 t2 =
-  match t1, t2 with
-  | Normal, Normal | Phantom, Phantom | In_types, In_types -> Some 0
-  | Normal, (Phantom | In_types) -> Some 1
-  | (Phantom | In_types), Normal -> Some (-1)
-  | Phantom, In_types | In_types, Phantom -> None
-
 include Container_types.Make (struct
   type nonrec t = t
 
@@ -70,21 +66,17 @@ include Container_types.Make (struct
   let hash _ = Misc.fatal_error "Name_mode.hash not yet implemented"
 
   let compare t1 t2 =
-    (* This is a linear extension of the ordering used by
-       [compare_partial_order], above. *)
     match t1, t2 with
     | Normal, Normal | Phantom, Phantom | In_types, In_types -> 0
     | Normal, (Phantom | In_types) -> 1
     | (Phantom | In_types), Normal -> -1
-    | Phantom, In_types -> -1
-    | In_types, Phantom -> 1
+    | Phantom, In_types -> 1
+    | In_types, Phantom -> -1
 
   let equal t1 t2 = compare t1 t2 = 0
 end)
 
 let compare_total_order = compare
-
-let compare _ _ = `Be_explicit_about_total_or_partial_ordering
 
 module Or_absent = struct
   type t =
@@ -124,15 +116,7 @@ module Or_absent = struct
     let equal t1 t2 = compare t1 t2 = 0
   end)
 
-  let compare _ _ = `Be_explicit_about_total_or_partial_ordering
-
-  let compare_partial_order t1 t2 =
-    match t1, t2 with
-    | Absent, Absent -> Some 0
-    | Absent, Present _ -> Some (-1)
-    | Present _, Absent -> Some 1
-    | Present name_mode1, Present name_mode2 ->
-      compare_partial_order name_mode1 name_mode2
+  let compare_total_order = compare
 
   let join_in_terms t1 t2 =
     match t1, t2 with
