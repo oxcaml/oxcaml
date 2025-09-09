@@ -51,12 +51,12 @@ type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
 
 module Dwarf_config_defaults = struct
   let shape_reduce_depth = Some 2
-  let shape_eval_depth = Some 1
-  let max_cms_files_per_unit = Some 0
-  let max_cms_files_per_variable = Some 0
+  let shape_eval_depth = Some 2
+  let max_cms_files_per_unit = Some 20
+  let max_cms_files_per_variable = Some 5
   let max_type_to_shape_depth = Some 10
-  let max_shape_reduce_steps_per_variable = Some 100
-  let max_evaluation_steps_per_variable = Some 1000
+  let max_shape_reduce_steps_per_variable = Some 1000
+  let max_evaluation_steps_per_variable = Some 1_000_000
   let shape_reduce_fuel = Some 10
 end
 type shape_format = Old_merlin | Debugging_shapes
