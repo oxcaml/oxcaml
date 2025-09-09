@@ -31,7 +31,6 @@ type _ t =
   | Instances : unit t
   | Separability : unit t
   | Let_mutable : unit t
-  | Ikinds : unit t
 
 (** Print and parse language extensions; parsing is case-insensitive *)
 val to_string : _ t -> string

@@ -319,7 +319,7 @@ let sub_jkind_l
         ); *)
         Error v
   in
-    let use_ik = Language_extension.is_enabled Ikinds in
+    let use_ik = !Clflags.ikinds in
     if not use_ik then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context sub super
     else
       let solver = make_solver ~context in
@@ -359,7 +359,7 @@ let sub
     (super : Types.jkind_r)
     : bool =
   let _ = (type_equal, origin) in
-  if not (Language_extension.is_enabled Ikinds) then
+  if not (!Clflags.ikinds) then
     Jkind.sub ~type_equal ~context sub super
   else
     let solver = make_solver ~context in
@@ -369,7 +369,7 @@ let sub
 
 let crossing_of_jkind ~(context : Jkind.jkind_context) (jkind : ('l * 'r) Types.jkind)
   : Mode.Crossing.t =
-  if not (Language_extension.is_enabled Ikinds) then
+  if not (!Clflags.ikinds) then
     Jkind.get_mode_crossing ~context jkind
   else
     let solver = make_solver ~context in
@@ -392,7 +392,7 @@ let sub_or_intersect
     (t2 : ('l2 * Allowance.allowed) Types.jkind)
     : sub_or_intersect =
   let _ = origin in
-  if not (Language_extension.is_enabled Ikinds) then
+  if not (!Clflags.ikinds) then
     Jkind.sub_or_intersect ~type_equal ~context t1 t2
   else begin
     let _ik = sub ~type_equal ~context (Jkind.disallow_right t1) (Jkind.disallow_left t2) in
@@ -408,7 +408,7 @@ let sub_or_error
     (t2 : ('l2 * Allowance.allowed) Types.jkind)
     : (unit, Jkind.Violation.t) result =
   let _ = origin in
-  if not (Language_extension.is_enabled Ikinds) then
+  if not (!Clflags.ikinds) then
     Jkind.sub_or_error ~type_equal ~context t1 t2
   else if sub ~type_equal ~context (Jkind.disallow_right t1) (Jkind.disallow_left t2) then
     Ok ()

@@ -2399,8 +2399,8 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
      if tvariant_not_immediate row then (
-       if Language_extension.is_enabled Ikinds && Btype.static_row row then
-         (* Under -extension ikinds: for a static (closed) row, approximate as
+       if !Clflags.ikinds && Btype.static_row row then
+         (* Under -ikinds: for a static (closed) row, approximate as
             immutable_data with a single with-bound to the whole variant type. *)
          Jkind.Builtin.immutable_data ~why:Polymorphic_variant
          |> Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:ty
