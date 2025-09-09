@@ -10,6 +10,7 @@ module type ORDERED = sig
   type t
 
   val compare : t -> t -> int
+
   val to_string : t -> string
 end
 
@@ -28,7 +29,9 @@ module Make (C : LATTICE) (V : ORDERED) = struct
   module SetMap = Map.Make (VarSetKey)
 
   type coeff = C.t
+
   type vars = VarSet.t
+
   type term = vars * coeff
 
   (* Canonical polynomial: map from variable-set to canonical coefficient. *)
@@ -37,6 +40,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
   (* Equality on coefficients via lattice order; avoids requiring physical
      equality. *)
   let eqc (a : coeff) (b : coeff) = C.equal a b
+
   let is_bot c = eqc c C.bot
 
   (* Merge helper: union with coefficient join. *)
@@ -54,6 +58,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     singleton VarSet.empty c
 
   let bot : t = SetMap.empty
+
   let top : t = const C.top
 
   (* Variable as a polynomial: x = (⊤ /\ x) *)
@@ -67,7 +72,8 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     bump "of_terms";
     List.fold_left
       (fun acc (s, c) ->
-        if is_bot c then acc
+        if is_bot c
+        then acc
         else
           let prev =
             match SetMap.find_opt s acc with Some x -> x | None -> C.bot
@@ -87,7 +93,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     let items =
       SetMap.bindings m
       |> List.filter (fun (_s, c) -> not (is_bot c))
-      |> List.map (fun (s, c) -> (VarSet.cardinal s, s, c))
+      |> List.map (fun (s, c) -> VarSet.cardinal s, s, c)
     in
     let cmp (d1, s1, _) (d2, s2, _) =
       let c = Int.compare d1 d2 in
@@ -120,13 +126,13 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     bump "to_list";
     (* Sorted by (cardinality, lexicographic) *)
     let with_deg =
-      SetMap.bindings p |> List.map (fun (s, c) -> (VarSet.cardinal s, s, c))
+      SetMap.bindings p |> List.map (fun (s, c) -> VarSet.cardinal s, s, c)
     in
     let cmp (d1, s1, _) (d2, s2, _) =
       let c = Int.compare d1 d2 in
       if c <> 0 then c else VarSet.compare s1 s2
     in
-    List.sort cmp with_deg |> List.map (fun (_, s, c) -> (s, c))
+    List.sort cmp with_deg |> List.map (fun (_, s, c) -> s, c)
 
   (* Lattice operations on polynomials *)
   let join (p : t) (q : t) : t =
@@ -144,12 +150,14 @@ module Make (C : LATTICE) (V : ORDERED) = struct
           (fun t dt ->
             let u = VarSet.union s t in
             let cd = C.meet cs dt in
-            if not (is_bot cd) then
+            if not (is_bot cd)
+            then
               let prev =
                 match SetMap.find_opt u !acc with Some x -> x | None -> C.bot
               in
               let cd' = C.join prev cd in
-              if is_bot cd' then acc := SetMap.remove u !acc
+              if is_bot cd'
+              then acc := SetMap.remove u !acc
               else acc := SetMap.add u cd' !acc)
           q)
       p;
@@ -161,7 +169,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     (* Both assumed canonical; compare key sets and per-key coefficients via
        lattice-equality. *)
     let rec eq_bindings xs ys =
-      match (xs, ys) with
+      match xs, ys with
       | [], [] -> true
       | (s1, c1) :: xs', (s2, c2) :: ys' ->
         VarSet.compare s1 s2 = 0 && eqc c1 c2 && eq_bindings xs' ys'
@@ -226,8 +234,10 @@ module Make (C : LATTICE) (V : ORDERED) = struct
      is canonical, but may be an over-approximation. *)
   let co_sub_approx (p : t) (q : t) : t =
     bump "co_sub";
-    if SetMap.is_empty p then SetMap.empty
-    else if SetMap.is_empty q then p (* p \ ⊥ = p *)
+    if SetMap.is_empty p
+    then SetMap.empty
+    else if SetMap.is_empty q
+    then p (* p \ ⊥ = p *)
     else
       let raw =
         SetMap.fold
@@ -264,7 +274,8 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     bump "pp";
     let pp_coeff = C.to_string in
     let pp_var = V.to_string in
-    if SetMap.is_empty p then "⊥"
+    if SetMap.is_empty p
+    then "⊥"
     else
       let terms = to_list p in
       let n_terms = List.length terms in
@@ -274,19 +285,19 @@ module Make (C : LATTICE) (V : ORDERED) = struct
           VarSet.elements s |> List.map pp_var |> List.sort String.compare
         in
         let is_top = C.equal c C.top in
-        match (vs, is_top) with
-        | [], true -> ("⊤", false)
-        | [], false -> (pp_coeff c, false)
-        | _ :: _, true -> (String.concat " ⊓ " vs, List.length vs > 1)
+        match vs, is_top with
+        | [], true -> "⊤", false
+        | [], false -> pp_coeff c, false
+        | _ :: _, true -> String.concat " ⊓ " vs, List.length vs > 1
         | _ :: _, false ->
           let body = pp_coeff c ^ " ⊓ " ^ String.concat " ⊓ " vs in
-          (body, true)
+          body, true
       in
       let items =
         terms
         |> List.map (fun (s, c) ->
                let body, has_meet = term_body s c in
-               (body, has_meet))
+               body, has_meet)
         |> List.sort (fun (a, _) (b, _) -> String.compare a b)
       in
       items
@@ -301,6 +312,5 @@ module Make (C : LATTICE) (V : ORDERED) = struct
   (* Backward-compat alias to emphasize approximation semantics. *)
   let co_sub = co_sub_approx
 
-  let find_non_bot_axis (_p : t) : int option =
-    None
+  let find_non_bot_axis (_p : t) : int option = None
 end

@@ -8,20 +8,27 @@ module Make (_ : SHAPE) : sig
 
   (* Shape info *)
   val num_axes : int
+
   val axis_sizes : int array
+
   (* val axis_bits : int array *)
   (* val axis_offsets : int array *)
   (* val total_bits : int *)
 
   (* Lattice constants *)
   val bot : t
+
   val top : t
 
   (* Lattice ops *)
   val join : t -> t -> t
+
   val meet : t -> t -> t
+
   val leq : t -> t -> bool
+
   val equal : t -> t -> bool
+
   val hash : t -> int
 
   val co_sub :
@@ -29,10 +36,12 @@ module Make (_ : SHAPE) : sig
 
   (* Axis accessors *)
   val get_axis : t -> axis:int -> int
+
   val set_axis : t -> axis:int -> level:int -> t
 
   (* Encode/decode whole product *)
   val encode : levels:int array -> t
+
   val decode : t -> int array
 
   val find_non_bot_axis : t -> int option
