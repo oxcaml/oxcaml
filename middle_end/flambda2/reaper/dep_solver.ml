@@ -980,6 +980,24 @@ let get_all_usages :
     let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
     Usages (Datalog.get_table out_tbl db)
 
+let get_direct_usages :
+    Datalog.database -> unit Code_id_or_name.Map.t -> unit Code_id_or_name.Map.t
+    =
+  (* CR-someday ncourant: once the datalog API supports something cleaner, use
+     it. *)
+  let out_tbl, out = rel1_r "out" Cols.[n] in
+  let in_tbl, in_ = rel1_r "in_" Cols.[n] in
+  let open! Syntax in
+  let open! Global_flow_graph in
+  let r =
+    let$ [x; y] = ["x"; "y"] in
+    [in_ x; usages_rel x y] ==> out y
+  in
+  fun db s ->
+    let db = Datalog.set_table in_tbl s db in
+    let db = Datalog.Schedule.run (Datalog.Schedule.saturate [r]) db in
+    Datalog.get_table out_tbl db
+
 let fieldc_map_to_field_map m =
   Global_flow_graph.Field.Encoded.Map.fold
     (fun k r acc -> Field.Map.add (Field.decode k) r acc)
@@ -1751,12 +1769,14 @@ let rewrite_kind_with_subkind uses var kind =
       (Code_id_or_name.Map.singleton var ())
       kind
 
-module TypesRewriter = Flambda2_types.Rewriter.Make (struct
+module Rewriter = struct
   type t0 =
     | Any_usage
     | Usages of unit Code_id_or_name.Map.t
 
   type t = Datalog.database * t0
+
+  type set_of_closures = |
 
   let compare_t0 x y =
     match x, y with
@@ -1768,6 +1788,13 @@ module TypesRewriter = Flambda2_types.Rewriter.Make (struct
 
   let compare (_db1, t1) (_db2, t2) = compare_t0 t1 t2
 
+  let print_t0 ff t =
+    match t with
+    | Any_usage -> Format.fprintf ff "Any_usage"
+    | Usages usages ->
+      Format.fprintf ff "(Usages %a)" Code_id_or_name.Set.print
+        (Code_id_or_name.Map.keys usages)
+
   module T = Container_types.Make (struct
     type nonrec t = t
 
@@ -1777,32 +1804,203 @@ module TypesRewriter = Flambda2_types.Rewriter.Make (struct
 
     let hash _t = failwith "hash"
 
-    let print ff (_db, t) =
-      match t with
-      | Any_usage -> Format.fprintf ff "Any_usage"
-      | Usages usages ->
-        Format.fprintf ff "(Usages %a)" Code_id_or_name.Set.print
-          (Code_id_or_name.Map.keys usages)
+    let print ff (_db, t) = print_t0 ff t
   end)
 
   module Map = T.Map
 
-  type set_of_closures0 =
-    { database : Datalog.database;
-      set_of_closures_usages : t0;
-      by_function_slot_usages : (t0 * Code_id.t option) Function_slot.Map.t
-    }
+  module CNMSet = Stdlib.Set.Make (struct
+    type t = unit Code_id_or_name.Map.t
+
+    let compare = Code_id_or_name.Map.compare Unit.compare
+  end)
+
+  let identify_set_of_closures_with_one_code_id :
+      Datalog.database -> Code_id.t -> unit Code_id_or_name.Map.t list =
+    let open Syntax in
+    let out_tbl, out = rel2_r "out1" Cols.[n; n] in
+    let in_tbl, in_ = rel1_r "in_" Cols.[n] in
+    let r =
+      let$ [ code_id;
+             code_id_of_witness;
+             witness;
+             closure;
+             function_slot;
+             all_closures ] =
+        [ "code_id";
+          "code_id_of_witness";
+          "witness";
+          "closure";
+          "function_slot";
+          "all_closures" ]
+      in
+      [ in_ code_id;
+        rev_constructor_rel code_id code_id_of_witness witness;
+        rev_constructor_rel witness
+          (Term.constant
+             (Field.encode (Field.Code_of_closure Known_arity_code_pointer)))
+          closure;
+        rev_constructor_rel closure function_slot all_closures;
+        filter_field is_function_slot function_slot ]
+      ==> out closure all_closures
+    in
+    fun db code_id ->
+      let db =
+        Datalog.set_table in_tbl
+          (Code_id_or_name.Map.singleton (Code_id_or_name.code_id code_id) ())
+          db
+      in
+      let db = Datalog.Schedule.run (Datalog.Schedule.saturate [r]) db in
+      List.map snd (Code_id_or_name.Map.bindings (Datalog.get_table out_tbl db))
+
+  let identify_set_of_closures_with_code_ids db code_ids =
+    let code_ids =
+      List.filter
+        (fun code_id ->
+          Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
+        code_ids
+    in
+    match code_ids with
+    | [] -> None
+    | code_id :: code_ids ->
+      let r =
+        List.fold_left
+          (fun r code_id ->
+            CNMSet.inter r
+              (CNMSet.of_list
+                 (identify_set_of_closures_with_one_code_id db code_id)))
+          (CNMSet.of_list
+             (identify_set_of_closures_with_one_code_id db code_id))
+          code_ids
+      in
+      if CNMSet.cardinal r = 1 then Some (CNMSet.min_elt r) else None
+
+  type use_of_function_slot =
+    | Never_called
+    | Only_called_with_known_arity
+    | Any_call
+
+  let uses_for_set_of_closures :
+      Datalog.database ->
+      t0 ->
+      Function_slot.t ->
+      'a Function_slot.Map.t ->
+      t0 * (t0 * use_of_function_slot) Function_slot.Map.t =
+    (* CR-someday ncourant: once the datalog API supports something cleaner, use
+       it. *)
+    let out1_tbl, out1 = rel1_r "out1" Cols.[n] in
+    let out2_tbl, out2 = rel2_r "out2" Cols.[f; n] in
+    let out_known_arity_tbl, out_known_arity =
+      rel1_r "out_known_arity" Cols.[f]
+    in
+    let out_unknown_arity_tbl, out_unknown_arity =
+      rel1_r "out_unknown_arity" Cols.[f]
+    in
+    let in_tbl, in_ = rel1_r "in_" Cols.[n] in
+    let in_fs_tbl, in_fs = rel1_r "in_fs" Cols.[f] in
+    let in_all_fs_tbl, in_all_fs = rel1_r "in_all_fs" Cols.[f] in
+    let open! Syntax in
+    let open! Global_flow_graph in
+    let rs =
+      [ (let$ [x; y] = ["x"; "y"] in
+         [in_fs x; in_ y] ==> and_ [out1 y; out2 x y]);
+        (let$ [usage; fs; to_; fs_usage] = ["usage"; "fs"; "to_"; "fs_usage"] in
+         [ out1 usage;
+           field_usages_rel usage fs to_;
+           in_all_fs fs;
+           usages_rel to_ fs_usage ]
+         ==> and_ [out1 fs_usage; out2 fs fs_usage]);
+        (let$ [fs; usage] = ["fs"; "usage"] in
+         [ out2 fs usage;
+           field_usages_top_rel usage
+             (Term.constant
+                (Field.encode (Field.Code_of_closure Known_arity_code_pointer)))
+         ]
+         ==> out_known_arity fs);
+        (let$ [fs; usage] = ["fs"; "usage"] in
+         [ out2 fs usage;
+           field_usages_top_rel usage
+             (Term.constant
+                (Field.encode (Field.Code_of_closure Unknown_arity_code_pointer)))
+         ]
+         ==> out_unknown_arity fs) ]
+    in
+    let q1 =
+      mk_exists_query [] ["x"; "fs"] (fun [] [x; fs] ->
+          [out1 x; field_usages_top_rel x fs])
+    in
+    let q2 =
+      mk_exists_query [] ["x"] (fun [] [x] -> [out1 x; any_usage_pred x])
+    in
+    fun db usages current_function_slot all_function_slots ->
+      let[@local] any () =
+        ( Any_usage,
+          Function_slot.Map.map
+            (fun _ -> Any_usage, Any_call)
+            all_function_slots )
+      in
+      match usages with
+      | Any_usage -> any ()
+      | Usages s ->
+        let db = Datalog.set_table in_tbl s db in
+        let db =
+          Datalog.set_table in_fs_tbl
+            (FieldC.Map.singleton
+               (Field.encode (Function_slot current_function_slot))
+               ())
+            db
+        in
+        let db =
+          Datalog.set_table in_all_fs_tbl
+            (Function_slot.Map.fold
+               (fun fs _ m ->
+                 FieldC.Map.add (Field.encode (Function_slot fs)) () m)
+               all_function_slots FieldC.Map.empty)
+            db
+        in
+        let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
+        if exists_with_parameters q1 [] db || exists_with_parameters q2 [] db
+        then any ()
+        else
+          let uses_for_value_slots = Datalog.get_table out1_tbl db in
+          let uses_for_function_slots = Datalog.get_table out2_tbl db in
+          let known_arity = Datalog.get_table out_known_arity_tbl db in
+          let unkwown_arity = Datalog.get_table out_unknown_arity_tbl db in
+          ( Usages uses_for_value_slots,
+            FieldC.Map.fold
+              (fun fs uses m ->
+                let known_arity_call, unknown_arity_call =
+                  FieldC.Map.mem fs known_arity, FieldC.Map.mem fs unkwown_arity
+                in
+                let calls =
+                  if unknown_arity_call
+                  then Any_call
+                  else if known_arity_call
+                  then Only_called_with_known_arity
+                  else Never_called
+                in
+                let fs =
+                  match[@ocaml.warning "-4"] Field.decode fs with
+                  | Function_slot fs -> fs
+                  | _ -> assert false
+                in
+                Function_slot.Map.add fs (Usages uses, calls) m)
+              uses_for_function_slots Function_slot.Map.empty )
 
   let rewrite (db, usages) typing_env flambda_type =
     let open Flambda2_types.Rewriter in
+    let[@local] forget_type () =
+      Rule.rewrite
+        (Pattern.var (Var.create ()) (db, Any_usage))
+        (Expr.unknown (Flambda2_types.kind flambda_type))
+    in
+    Format.eprintf "REWRITE usages = %a@." print_t0 usages;
     if match usages with
        | Any_usage -> false
        | Usages m -> Code_id_or_name.Map.is_empty m
     then
       (* No usages, this might have been deleted: convert to Unknown *)
-      Rule.rewrite
-        (Pattern.var (Var.create ()) (db, Any_usage))
-        (Expr.unknown (Flambda2_types.kind flambda_type))
+      forget_type ()
     else
       match
         Flambda2_types.meet_single_closures_entry typing_env flambda_type
@@ -1814,24 +2012,173 @@ module TypesRewriter = Flambda2_types.Rewriter.Make (struct
       | Need_meet ->
         (* Multiple closures are possible. We are never able to use this
            information currently; convert to Unknown. *)
-        Rule.rewrite
-          (Pattern.var (Var.create ()) (db, Any_usage))
-          (Expr.unknown (Flambda2_types.kind flambda_type))
-      | Known_result (function_slot, alloc_mode, closures_entry, function_type)
-        ->
-        assert false
+        forget_type ()
+      | Known_result (function_slot, alloc_mode, closures_entry, _function_type)
+        -> (
+        let value_slot_types =
+          Flambda2_types.Closures_entry.value_slot_types closures_entry
+        in
+        let function_slot_types =
+          Flambda2_types.Closures_entry.function_slot_types closures_entry
+        in
+        let usages_for_value_slots, usages_of_function_slots =
+          uses_for_set_of_closures db usages function_slot function_slot_types
+        in
+        let[@local] no_representation_change function_slot value_slots_metadata
+            function_slots_metadata_and_uses =
+          let all_patterns = ref [] in
+          let all_value_slots_in_set =
+            Value_slot.Map.mapi
+              (fun value_slot metadata ->
+                let v = Var.create () in
+                all_patterns
+                  := Pattern.value_slot value_slot
+                       (Pattern.var v (db, metadata))
+                     :: !all_patterns;
+                v)
+              value_slots_metadata
+          in
+          let all_closure_types_in_set =
+            Function_slot.Map.mapi
+              (fun function_slot (metadata, _uses) ->
+                let v = Var.create () in
+                all_patterns
+                  := Pattern.function_slot function_slot
+                       (Pattern.var v (db, metadata))
+                     :: !all_patterns;
+                v)
+              function_slots_metadata_and_uses
+          in
+          let all_function_slots_in_set =
+            Function_slot.Map.mapi
+              (fun function_slot (_, uses) ->
+                match uses with
+                | Never_called -> Or_unknown.Unknown
+                | Only_called_with_known_arity | Any_call ->
+                  let v = Var.create () in
+                  all_patterns
+                    := Pattern.rec_info function_slot
+                         (Pattern.var v (db, Any_usage))
+                       :: !all_patterns;
+                  let function_type =
+                    Flambda2_types.Closures_entry.find_function_type
+                      closures_entry function_slot
+                  in
+                  Or_unknown.map function_type ~f:(fun function_type ->
+                      Expr.Function_type.create
+                        (Function_type.code_id function_type)
+                        ~rec_info:v))
+              function_slots_metadata_and_uses
+          in
+          Rule.rewrite
+            (Pattern.closure !all_patterns)
+            (Expr.exactly_this_closure function_slot ~all_function_slots_in_set
+               ~all_closure_types_in_set ~all_value_slots_in_set alloc_mode)
+        in
+        (* Don't handle representation change for now *)
+        match usages_for_value_slots with
+        | Usages usages_for_value_slots ->
+          let usages_of_value_slots =
+            Value_slot.Map.mapi
+              (fun value_slot _value_slot_type ->
+                match
+                  get_one_field db (Field.Value_slot value_slot)
+                    (Usages usages_for_value_slots)
+                with
+                | Used_as_top -> Any_usage
+                | Used_as_vars vs -> Usages (get_direct_usages db vs))
+              value_slot_types
+          in
+          no_representation_change function_slot usages_of_value_slots
+            usages_of_function_slots
+        | Any_usage ->
+          let is_local_value_slot vs _ =
+            Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
+          in
+          let is_local_function_slot fs _ =
+            Compilation_unit.is_current (Function_slot.get_compilation_unit fs)
+          in
+          if Value_slot.Map.exists is_local_value_slot value_slot_types
+             || Function_slot.Map.exists is_local_function_slot
+                  function_slot_types
+          then (
+            if not
+                 (Value_slot.Map.for_all is_local_value_slot value_slot_types
+                 && Function_slot.Map.for_all is_local_function_slot
+                      function_slot_types)
+            then
+              Misc.fatal_errorf
+                "Some slots in this closure are local while other are not:@\n\
+                 Value slots: %a@\n\
+                 Function slots: %a@." Value_slot.Set.print
+                (Value_slot.Map.keys value_slot_types)
+                Function_slot.Set.print
+                (Function_slot.Map.keys function_slot_types);
+            let code_ids =
+              Function_slot.Map.fold
+                (fun function_slot _ l ->
+                  match
+                    Flambda2_types.Closures_entry.find_function_type
+                      closures_entry function_slot
+                  with
+                  | Unknown -> l
+                  | Known function_type ->
+                    Function_type.code_id function_type :: l)
+                function_slot_types []
+            in
+            let set_of_closures =
+              identify_set_of_closures_with_code_ids db code_ids
+            in
+            match set_of_closures with
+            | None -> forget_type ()
+            | Some set_of_closures ->
+              let fields =
+                get_fields_usage_of_constructors db set_of_closures
+              in
+              Format.eprintf "ZZZ: %a@."
+                (Field.Map.print (fun ff t ->
+                     match t with
+                     | Used_as_top -> Format.fprintf ff "Top"
+                     | Used_as_vars m ->
+                       Code_id_or_name.Map.print Unit.print ff m))
+                fields;
+              no_representation_change function_slot
+                (Value_slot.Map.mapi
+                   (fun value_slot _value_slot_type ->
+                     match
+                       Field.Map.find_opt (Value_slot value_slot) fields
+                     with
+                     | Some Used_as_top -> Any_usage
+                     | Some (Used_as_vars vs) ->
+                       Usages (get_direct_usages db vs)
+                     | None -> Usages Code_id_or_name.Map.empty)
+                   value_slot_types)
+                usages_of_function_slots)
+          else
+            no_representation_change function_slot
+              (Value_slot.Map.map
+                 (fun _value_slot_type -> Any_usage)
+                 value_slot_types)
+              usages_of_function_slots)
 
   let block_slot ?tag:_ (db, t) index _typing_env flambda_type =
-    match t with
-    | Any_usage -> db, Any_usage
-    | Usages usages -> (
-      let field_kind = Flambda2_types.kind flambda_type in
-      let field = Field.Block (Target_ocaml_int.to_int index, field_kind) in
-      match get_one_field db field (Usages usages) with
-      | Used_as_top -> db, Any_usage
-      | Used_as_vars vs ->
-        let (Usages usages) = get_all_usages ~for_unboxing:false db vs in
-        db, Usages usages)
+    let r =
+      match t with
+      | Any_usage -> db, Any_usage
+      | Usages usages -> (
+        let field_kind = Flambda2_types.kind flambda_type in
+        let field = Field.Block (Target_ocaml_int.to_int index, field_kind) in
+        match get_one_field db field (Usages usages) with
+        | Used_as_top -> db, Any_usage
+        | Used_as_vars vs ->
+          let usages = get_direct_usages db vs in
+          db, Usages usages)
+    in
+    Format.eprintf "%a -[%d]-> %a@." print_t0 t
+      (Target_ocaml_int.to_int index)
+      print_t0 (snd r);
+    Format.eprintf "%a@." Flambda2_types.print flambda_type;
+    r
 
   let array_slot (db, _t) _index _typing_env _flambda_type =
     (* Array primitives are opaque. Thus, anything put inside the array when it
@@ -1839,16 +2186,60 @@ module TypesRewriter = Flambda2_types.Rewriter.Make (struct
        result. *)
     db, Any_usage
 
-  let value_slot _t _value_slot _typing_env _flambda_type =
+  let set_of_closures _t _function_slot _typing_env _closures_entry =
     Misc.fatal_error
-      "[value_slot] should never be called, because all set of closures should \
-       be handled by [rewrite]"
-
-  let function_slot _t _function_slot _typing_env _flambda_type =
-    Misc.fatal_error
-      "[function_slot] should never be called, because all set of closures \
+      "[set_of_closures] should never be called, because all set of closures \
        should be handled by [rewrite]"
-end)
+
+  let value_slot (s : set_of_closures) _value_slot _typing_env _flambda_type =
+    match s with _ -> .
+
+  let function_slot (s : set_of_closures) _function_slot _typing_env
+      _flambda_type =
+    match s with _ -> .
+
+  let rec_info _typing_env (s : set_of_closures) _function_slot _code_id
+      _flambda_type =
+    match s with _ -> .
+end
+
+module TypesRewrite = Flambda2_types.Rewriter.Make (Rewriter)
+
+let rewrite_typing_env result ~unit_symbol vars_to_keep typing_env =
+  Format.eprintf "OLD typing env: %a@." Typing_env.print typing_env;
+  let db = result.db in
+  let symbol_metadata sym =
+    if Symbol.equal sym unit_symbol
+       || (not (Compilation_unit.is_current (Symbol.compilation_unit sym)))
+       || is_top db (Code_id_or_name.symbol sym)
+    then db, Rewriter.Any_usage
+    else
+      ( db,
+        Rewriter.Usages
+          (get_direct_usages db
+             (Code_id_or_name.Map.singleton (Code_id_or_name.symbol sym) ())) )
+  in
+  let variable_metadata var =
+    let kind = Variable.kind var in
+    let metadata =
+      if is_top db (Code_id_or_name.var var)
+      then db, Rewriter.Any_usage
+      else
+        ( db,
+          Rewriter.Usages
+            (get_direct_usages db
+               (Code_id_or_name.Map.singleton (Code_id_or_name.var var) ())) )
+    in
+    metadata, kind
+  in
+  let r =
+    TypesRewrite.rewrite typing_env symbol_metadata
+      (List.fold_left
+         (fun m v -> Variable.Map.add v (variable_metadata v) m)
+         Variable.Map.empty vars_to_keep)
+  in
+  Format.eprintf "NEW typing env: %a@." Typing_env.print r;
+  r
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db fields name_prefix =
   Field.Map.filter_map

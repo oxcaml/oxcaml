@@ -76,3 +76,6 @@ val cannot_change_calling_convention : result -> Code_id.t -> bool
 
 val code_id_actually_directly_called :
   result -> Name.t -> Code_id.Set.t Or_unknown.t
+
+val rewrite_typing_env :
+  result -> unit_symbol:Symbol.t -> Variable.t list -> typing_env -> typing_env

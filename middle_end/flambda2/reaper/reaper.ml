@@ -23,7 +23,8 @@ let unit_with_body (unit : Flambda_unit.t) (body : Flambda.Expr.t) =
     ~module_symbol:(Flambda_unit.module_symbol unit)
     ~used_value_slots:(Flambda_unit.used_value_slots unit)
 
-let run ~machine_width ~cmx_loader ~all_code (unit : Flambda_unit.t) =
+let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
+    (unit : Flambda_unit.t) =
   let debug_print = Flambda_features.dump_reaper () in
   let load_code = Flambda_cmx.get_imported_code cmx_loader in
   let get_code_metadata code_id =
@@ -64,4 +65,11 @@ let run ~machine_width ~cmx_loader ~all_code (unit : Flambda_unit.t) =
       (Exported_code.mark_as_imported
          (Flambda_cmx.get_imported_code cmx_loader ()))
   in
-  unit_with_body unit body, free_names, all_code, slot_offsets
+  let final_typing_env =
+    Option.map
+      (Dep_solver.rewrite_typing_env solved_dep
+         ~unit_symbol:(Flambda_unit.module_symbol unit)
+         [])
+      final_typing_env
+  in
+  unit_with_body unit body, free_names, all_code, slot_offsets, final_typing_env
