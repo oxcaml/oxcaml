@@ -117,7 +117,7 @@ end = struct
     else
       let sh =
         shape_subst_uid_with_rec_var ~preserve_uid db.uid
-          (Shape.DeBruijn_index.free_index 0)
+          (Shape.DeBruijn_index.create 0)
           sh
       in
       Shape.mu ?uid:(if preserve_uid then Some db.uid else None) sh

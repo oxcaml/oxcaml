@@ -90,8 +90,8 @@ end
 module DeBruijn_index : sig
   type t
 
-  (* Initial index, pick [0] for the top-level index. *)
-  val free_index : int -> t
+  (* Initial index, pick [0] for the top-level index. Cannot be negative. *)
+  val create : int -> t
 
   val move_under_binder : t -> t
 

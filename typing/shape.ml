@@ -115,9 +115,9 @@ end
 module DeBruijn_index = struct
   type t = int
 
-  let free_index n =
+  let create n =
     if n < 0
-    then Misc.fatal_errorf "De_bruijn_index.free_index: negative index %d" n
+    then Misc.fatal_errorf "De_bruijn_index.create: negative index %d" n
     else n
 
   let move_under_binder n = n + 1
