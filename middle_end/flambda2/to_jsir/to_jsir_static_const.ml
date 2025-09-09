@@ -166,21 +166,22 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       else Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_odd_tag
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
-      ~to_bits:Fun.id ~bits_to_constant:int32_to_jsir_const
+      ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
       ~bits_to_array:(fun bits ->
-        Tuple (tag, Array.map int32_to_jsir_const bits, Array))
+        Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
   | Immutable_int64_array values ->
     let tag = Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
-      ~to_bits:Fun.id ~bits_to_constant:int64_to_jsir_const
+      ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int64_to_jsir_const
       ~bits_to_array:(fun bits ->
-        Tuple (tag, Array.map int64_to_jsir_const bits, Array))
+        Tuple (tag, Array.map To_jsir_shared.int64_to_jsir_const bits, Array))
   | Immutable_nativeint_array values ->
     let tag = Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
-      ~to_bits:Targetint_32_64.to_int32 ~bits_to_constant:int32_to_jsir_const
+      ~to_bits:Targetint_32_64.to_int32
+      ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
       ~bits_to_array:(fun bits ->
-        Tuple (tag, Array.map int32_to_jsir_const bits, Array))
+        Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
   | Immutable_vec128_array _ | Immutable_vec256_array _
   | Immutable_vec512_array _ ->
     (* Need SIMD *)
