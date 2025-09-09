@@ -145,6 +145,15 @@ Caml_inline int Is_block(value x) {
 #define Unsigned_long_val(x) ((uintnat)(x) >> 1)
 #define Unsigned_int_val(x)  ((int) Unsigned_long_val(x))
 
+/* The widening conversion in Val_long will do sign extension, because
+   the signedness of the thing being casted determines the choice on
+   sign extension, not the signedness of the target type. */
+#define Val_int16(x) Val_long((int16_t)(x))
+#define Val_int8(x)  Val_long((int8_t)(x))
+
+#define Int16_val(x) ((int16_t) Long_val(x))
+#define Int8_val(x)  ((int8_t) Long_val(x))
+
 /* Encoded exceptional return values, when functions are suffixed with
    _exn. Encoded exceptions are invalid values and must not be seen
    by the garbage collector. */
@@ -507,7 +516,7 @@ CAMLextern void caml_Store_double_val (value,double);
 /* Arrays of floating-point numbers. */
 #define Double_array_tag 254
 
-/* Unboxed array tags (for mixed blocks) 
+/* Unboxed array tags (for mixed blocks)
    These must stay in sync with Cmm_helpers.Unboxed_array_tags */
 #define Unboxed_product_array_tag 0
 #define Unboxed_int64_array_tag 1
