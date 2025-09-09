@@ -118,7 +118,7 @@ let find_shape env id =
 
 module Make(Params : sig
   val fuel : int
-
+  val projection_rules_for_merlin_enabled : bool
   val read_unit_shape :
     diagnostics:Diagnostics.t -> unit_name:string -> t option
 end) = struct
@@ -435,9 +435,8 @@ end) = struct
              needed for Merlin to work correctly. For DWARF emission, they
              should never be triggered, since we only evaluate shape for
              type expressions (e.g., t.field is not a type).  *)
-          (* CR sspies: Consider explicitly marking these as "virtual" in the
-             future, since they do not exist at runtime. *)
-          | NVariant constrs when Shape.Item.is_constructor item ->
+          | NVariant constrs when Params.projection_rules_for_merlin_enabled &&
+                                  Shape.Item.is_constructor item ->
             let name = Shape.Item.name item in
             (match List.find_opt (fun c -> String.equal c.name name)
                 constrs with
@@ -465,7 +464,8 @@ end) = struct
             | None -> nored())
           | NVariant_unboxed { name; variant_uid; arg_name; arg_uid;
                                arg_shape; arg_layout }
-            when Shape.Item.is_constructor item ->
+            when Params.projection_rules_for_merlin_enabled &&
+                 Shape.Item.is_constructor item ->
             let item_name = Shape.Item.name item in
             if String.equal name item_name then
               match arg_name with
@@ -481,7 +481,8 @@ end) = struct
                     approximated = false }
             else nored()
           | NRecord { fields; kind = _ }
-            when Shape.Item.is_label item || Shape.Item.is_unboxed_label item ->
+            when Params.projection_rules_for_merlin_enabled &&
+            (Shape.Item.is_label item || Shape.Item.is_unboxed_label item) ->
             let field_name = Shape.Item.name item in
             (match List.find_opt (fun (name, _, _, _) ->
                String.equal name field_name) fields with
@@ -725,6 +726,7 @@ end
 module Local_reduce =
   Make(struct
     let fuel = 10
+    let projection_rules_for_merlin_enabled = true
     let read_unit_shape ~diagnostics:_ ~unit_name:_ = None
   end)
 

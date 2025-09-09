@@ -74,6 +74,8 @@ end
 module Make(_ : sig
     val fuel : int
 
+    val projection_rules_for_merlin_enabled : bool
+
     val read_unit_shape :
       diagnostics:Diagnostics.t -> unit_name:string -> Shape.t option
   end) : sig

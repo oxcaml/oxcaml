@@ -1916,6 +1916,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
 module With_cms_reduce = Shape_reduce.Make (struct
   let fuel = 10
 
+  let projection_rules_for_merlin_enabled = false
+
   let cms_file_cache = String.Tbl.create 264
 
   let max_number_of_cms_files = ref 20
