@@ -1154,6 +1154,14 @@ module Json : sig
 
   val array : string list -> string
   (** [array items] creates a JSON array from a list of item strings. *)
+
+  val null : string
+  (** [null] is the JSON null literal. *)
+
+  val option : ('a -> string) -> 'a option -> string
+  (** [option f opt] formats an optional value as JSON.
+      Returns the JSON [null] literal for [None],
+      or applies [f] to the value for [Some v]. *)
 end
 
 (** Non-empty lists *)
@@ -1178,8 +1186,31 @@ module Maybe_bounded : sig
   type t =
     | Unbounded
     | Bounded of { mutable bound: int }
+    (** The [bound] is not included. *)
 
+  (** [decr] decreases the current bound and truncates at zero. As such, [decr]
+      and then [incr] is not always a no-op. *)
   val decr : t -> unit
+
+  (** [incr] increases the current bound. *)
+  val incr : t -> unit
+
   val is_depleted : t -> bool
+
+  (** [is_in_bounds n t] returns [true] if [n] is in bounds.
+      A number counts as in bounds if it is strictly smaller than the bound.
+      For [Unbounded], always returns [true]. *)
+  val is_in_bounds : int -> t -> bool
+
+  (** [is_out_of_bounds n t] returns [true] if [n] is out of bounds.
+      A number counts as out of bounds if it is greater or equal to the bound.
+      For [Unbounded], always returns [false]. *)
+  val is_out_of_bounds : int -> t -> bool
+
+  (** [of_option opt] maps [None] to no bound and [Some n] to the bound [n]
+      (not included). *)
   val of_option : int option -> t
+
+  (** [of_int n] creates a bounded integer with bound [n] (not included). *)
+  val of_int : int -> t
 end

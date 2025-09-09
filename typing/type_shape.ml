@@ -211,6 +211,11 @@ module Type_shape = struct
       | None -> f path ~args
   end
 
+  let is_above_of_type_expr_max_depth depth =
+    match !Clflags.gdwarf_config_max_type_to_shape_depth with
+    | None -> false
+    | Some max_depth -> depth > max_depth
+
   (* Similarly to [value_kind], we track a set of visited types to avoid cycles
      in the lookup and we, additionally, carry a maximal depth for the recursion.
      We allow a deeper bound than [value_kind]. *)
@@ -224,7 +229,7 @@ module Type_shape = struct
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
       Numbers.Int.Map.mem (Types.get_id expr) visited
-      || depth > !Clflags.gdwarf_config_max_type_to_shape_depth
+      || is_above_of_type_expr_max_depth depth
     in
     if cannot_proceed ()
     then
@@ -845,6 +850,11 @@ let find_in_cache t subst_type (subst_constr_mut, subst_constr) =
   then Shape.Cache.find_opt eval_cache t
   else None
 
+let is_above_unfold_and_evaluate_max_depth depth =
+  match !Clflags.gdwarf_config_shape_eval_depth with
+  | None -> false
+  | Some max_depth -> depth >= max_depth
+
 (* To unroll the mutually recursive declarations, we perform a simple call by
    value evaluation and catch cycles for ident binders. *)
 let rec unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
@@ -852,7 +862,7 @@ let rec unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
   D.count_evaluation_step diagnostics;
   if Misc.Maybe_bounded.is_depleted steps_remaining
   then Shape.leaf' None
-  else if depth >= !Clflags.gdwarf_config_shape_eval_depth
+  else if is_above_unfold_and_evaluate_max_depth depth
   then Shape.leaf' None
   else (
     Misc.Maybe_bounded.decr steps_remaining;

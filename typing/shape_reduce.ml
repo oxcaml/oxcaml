@@ -17,6 +17,8 @@
 
 open Shape
 
+module MB = Misc.Maybe_bounded
+
 type result =
   | Resolved of Uid.t
   | Resolved_alias of Uid.t * result
@@ -117,11 +119,11 @@ let find_shape env id =
   Env.shape_of_path ~namespace env (Pident id)
 
 module Make(Params : sig
-  val fuel : unit -> int
+  val fuel : unit -> MB.t
   val projection_rules_for_merlin_enabled : bool
-  val fuel_for_compilation_units : unit -> int
-  val max_shape_reduce_steps_per_variable : unit -> Misc.Maybe_bounded.t
-  val max_compilation_unit_depth : unit -> int
+  val fuel_for_compilation_units : unit -> MB.t
+  val max_shape_reduce_steps_per_variable : unit -> MB.t
+  val max_compilation_unit_depth : unit -> MB.t
   val read_unit_shape :
     diagnostics:Diagnostics.t -> unit_name:string -> t option
 end) = struct
@@ -319,9 +321,9 @@ end) = struct
         res
 
   type env = {
-    fuel: int ref;
-    fuel_for_compilation_units: int ref;
-    max_steps_per_variable: Misc.Maybe_bounded.t;
+    fuel: MB.t;
+    fuel_for_compilation_units: MB.t;
+    max_steps_per_variable: MB.t;
     diagnostics: Diagnostics.t;
     global_env: Env.t;
     local_env: local_env;
@@ -410,19 +412,21 @@ end) = struct
       | None -> dnf
       | Some uid -> Thunk (l, Shape.set_uid_if_none t uid)
     in
-    if !fuel < 0
+    if MB.is_depleted fuel
     then approx_nf (return (NError "NoFuelLeft"))
-    else if Misc.Maybe_bounded.is_depleted max_steps_per_variable
+    else if MB.is_depleted max_steps_per_variable
     then return NLeaf
     else (
-      Misc.Maybe_bounded.decr max_steps_per_variable;
+      MB.decr max_steps_per_variable;
       match t.desc with
       | Comp_unit unit_name ->
-          if !fuel_for_compilation_units < 0
-          || env.local_env.depth >= Params.max_compilation_unit_depth () then
+          let reduce_max_depth = Params.max_compilation_unit_depth () in
+          if MB.is_depleted fuel_for_compilation_units
+          || MB.is_out_of_bounds env.local_env.depth reduce_max_depth
+          then
             return (NComp_unit unit_name)
           else (
-            decr fuel_for_compilation_units;
+            MB.decr fuel_for_compilation_units;
             Diagnostics.count_computation_unit_lookup env.diagnostics;
             begin match
               Params.read_unit_shape ~diagnostics:env.diagnostics ~unit_name
@@ -542,7 +546,7 @@ end) = struct
           | exception Not_found -> return (NVar id)
           | res when res = t -> return (NVar id)
           | res ->
-              decr fuel;
+              MB.decr fuel;
               reduce env res
           end
       | Leaf -> return NLeaf
@@ -681,9 +685,13 @@ end) = struct
   let read_back_memo_table = Local_store.s_table ReadBackMemoTable.create 42
 
   let reduce ?(diagnostics = Diagnostics.no_diagnostics) global_env t =
-    let fuel = ref (Params.fuel ()) in
+    let fuel = Params.fuel () in
+    MB.incr fuel;
+    (* For historic reasons, the fuel bound is inclusive (i.e., upstream only
+       terminates when fuel < 0 rather than fuel <= 0). We account for this
+       difference here. *)
     let fuel_for_compilation_units =
-      ref (Params.fuel_for_compilation_units ())
+      Params.fuel_for_compilation_units ()
     in
     let max_steps_per_variable =
       Params.max_shape_reduce_steps_per_variable ()
@@ -734,11 +742,12 @@ end) = struct
       Internal_error_missing_uid
 
   let reduce_for_uid global_env t =
-    let fuel = ref (Params.fuel ()) in
+    let fuel = Params.fuel () in
+    MB.incr fuel; (* See the comment about [fuel] in [reduce]. *)
     let local_env = { subst = Ident.Map.empty; depth = 0 } in
     let env = {
       fuel;
-      fuel_for_compilation_units = ref (Params.fuel_for_compilation_units ());
+      fuel_for_compilation_units = Params.fuel_for_compilation_units ();
       max_steps_per_variable = Params.max_shape_reduce_steps_per_variable ();
       global_env;
       diagnostics = Diagnostics.no_diagnostics;
@@ -755,11 +764,16 @@ end
 
 module Local_reduce =
   Make(struct
-    let fuel () = 10
-    let fuel_for_compilation_units () = 0
-    let max_shape_reduce_steps_per_variable () = Misc.Maybe_bounded.Unbounded
-    let max_compilation_unit_depth () = 0
+    let fuel () = MB.of_int 10
+
+    let fuel_for_compilation_units () = MB.Unbounded
+
+    let max_shape_reduce_steps_per_variable () = MB.Unbounded
+
+    let max_compilation_unit_depth () = MB.Unbounded
+
     let projection_rules_for_merlin_enabled = true
+
     let read_unit_shape ~diagnostics:_ ~unit_name:_ = None
   end)
 

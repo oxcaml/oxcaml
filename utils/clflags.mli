@@ -61,14 +61,14 @@ type gdwarf_fidelity =
   | Fidelity_very_high | Fidelity_ultra_high
 
 module Dwarf_config_defaults : sig
-  val shape_reduce_depth : int
-  val shape_eval_depth : int
-  val max_cms_files_per_unit : int
-  val max_cms_files_per_variable : int
-  val max_type_to_shape_depth : int
+  val shape_reduce_depth : int option
+  val shape_eval_depth : int option
+  val max_cms_files_per_unit : int option
+  val max_cms_files_per_variable : int option
+  val max_type_to_shape_depth : int option
   val max_shape_reduce_steps_per_variable : int option
   val max_evaluation_steps_per_variable : int option
-  val shape_reduce_fuel : int
+  val shape_reduce_fuel : int option
 end
 
 val objfiles : string list ref
@@ -90,14 +90,14 @@ val debug_full : bool ref
 val dwarf_c_toolchain_flag : string ref
 val dwarf_fission : dwarf_fission ref
 val dwarf_pedantic : bool ref
-val gdwarf_config_shape_reduce_depth : int ref
-val gdwarf_config_shape_eval_depth : int ref
-val gdwarf_config_max_cms_files_per_unit : int ref
-val gdwarf_config_max_cms_files_per_variable : int ref
-val gdwarf_config_max_type_to_shape_depth : int ref
+val gdwarf_config_shape_reduce_depth : int option ref
+val gdwarf_config_shape_eval_depth : int option ref
+val gdwarf_config_max_cms_files_per_unit : int option ref
+val gdwarf_config_max_cms_files_per_variable : int option ref
+val gdwarf_config_max_type_to_shape_depth : int option ref
 val gdwarf_config_max_shape_reduce_steps_per_variable : int option ref
 val gdwarf_config_max_evaluation_steps_per_variable : int option ref
-val gdwarf_config_shape_reduce_fuel : int ref
+val gdwarf_config_shape_reduce_fuel : int option ref
 val gdwarf_fidelity : gdwarf_fidelity option ref
 val gdwarf_fidelity_of_string : string -> gdwarf_fidelity option
 val set_gdwarf_fidelity : gdwarf_fidelity -> unit

@@ -897,40 +897,52 @@ let mk_debug_ocaml f =
   "-debug-ocaml", Arg.Unit f, " Debugging output for the compiler\n\
                                (internal use only)"
 
+let format_int_option opt =
+  match opt with
+  | Some n -> string_of_int n
+  | None -> "none"
+
+let parse_int_option s =
+  match s with
+  | "none" -> None
+  | n -> Some (int_of_string n)
+
 let mk_gdwarf_config_shape_reduce_depth f =
-  "-gdwarf-config-shape-reduce-depth", Arg.Int f,
-  Printf.sprintf "<n>  Maximum depth for shape reduction in DWARF debug info \
-  (default: %d)" Clflags.Dwarf_config_defaults.shape_reduce_depth
+  "-gdwarf-config-shape-reduce-depth", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum depth for shape reduction in DWARF debug \
+  info (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.shape_reduce_depth)
 
 let mk_gdwarf_config_shape_eval_depth f =
-  "-gdwarf-config-shape-eval-depth", Arg.Int f,
-  Printf.sprintf "<n>  Maximum depth for shape evaluation in DWARF debug info \
-  (default: %d)" Clflags.Dwarf_config_defaults.shape_eval_depth
+  "-gdwarf-config-shape-eval-depth", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum depth for shape evaluation in DWARF debug \
+  info (default: %s, use 'none' for unlimited)" 
+    (format_int_option Clflags.Dwarf_config_defaults.shape_eval_depth)
 
 let mk_gdwarf_config_max_cms_files_per_unit f =
-  "-gdwarf-config-max-cms-files-per-unit", Arg.Int f,
-  Printf.sprintf "<n>  Maximum CMS files per compilation unit in DWARF debug \
-  info (default: %d)" Clflags.Dwarf_config_defaults.max_cms_files_per_unit
+  "-gdwarf-config-max-cms-files-per-unit", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum CMS files per compilation unit in \
+  DWARF debug info (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.max_cms_files_per_unit)
 
 let mk_gdwarf_config_max_cms_files_per_variable f =
-  "-gdwarf-config-max-cms-files-per-variable", Arg.Int f,
-  Printf.sprintf "<n>  Maximum CMS files per variable in DWARF debug info \
-  (default: %d)" Clflags.Dwarf_config_defaults.max_cms_files_per_variable
+  "-gdwarf-config-max-cms-files-per-variable", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum CMS files per variable in DWARF debug info \
+  (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.max_cms_files_per_variable)
 
 let mk_gdwarf_config_max_type_to_shape_depth f =
-  "-gdwarf-config-max-type-to-shape-depth", Arg.Int f,
-  Printf.sprintf "<n>  Maximum type-to-shape depth for generating DWARF debug \
-  info (default: %d)" Clflags.Dwarf_config_defaults.max_type_to_shape_depth
+  "-gdwarf-config-max-type-to-shape-depth", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum type-to-shape depth for generating DWARF \
+  debug info (default: %s, use 'none' for unlimited)" 
+    (format_int_option Clflags.Dwarf_config_defaults.max_type_to_shape_depth)
 
 let mk_gdwarf_config_max_shape_reduce_steps_per_variable f =
   "-gdwarf-config-max-shape-reduce-steps-per-variable", Arg.String f,
   Printf.sprintf "<n|none>  Maximum shape reduction steps per variable in \
   DWARF debug info (default: %s, use 'none' for unlimited)"
-    (match
-      Clflags.Dwarf_config_defaults.max_shape_reduce_steps_per_variable
-    with
-     | Some n -> string_of_int n
-     | None -> "none")
+    (format_int_option
+      Clflags.Dwarf_config_defaults.max_shape_reduce_steps_per_variable)
 
 let mk_gdwarf_config_max_evaluation_steps_per_variable f =
   "-gdwarf-config-max-evaluation-steps-per-variable", Arg.String f,
@@ -941,9 +953,10 @@ let mk_gdwarf_config_max_evaluation_steps_per_variable f =
      | None -> "none")
 
 let mk_gdwarf_config_shape_reduce_fuel f =
-  "-gdwarf-config-shape-reduce-fuel", Arg.Int f,
-  Printf.sprintf "<n>  Fuel for shape reduction when producing DWARF debug \
-  info (default: %d)" Clflags.Dwarf_config_defaults.shape_reduce_fuel
+  "-gdwarf-config-shape-reduce-fuel", Arg.String f,
+  Printf.sprintf "<n|none>  Fuel for shape reduction when producing DWARF \
+  debug info (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.shape_reduce_fuel)
 
 let mk_gdwarf_fidelity f =
   "-gdwarf-fidelity", Arg.String f,
@@ -1246,14 +1259,14 @@ module type Optcomp_options = sig
   val _save_ir_before : string -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
-  val _gdwarf_config_shape_reduce_depth : int -> unit
-  val _gdwarf_config_shape_eval_depth : int -> unit
-  val _gdwarf_config_max_cms_files_per_unit : int -> unit
-  val _gdwarf_config_max_cms_files_per_variable : int -> unit
-  val _gdwarf_config_max_type_to_shape_depth : int -> unit
+  val _gdwarf_config_shape_reduce_depth : string -> unit
+  val _gdwarf_config_shape_eval_depth : string -> unit
+  val _gdwarf_config_max_cms_files_per_unit : string -> unit
+  val _gdwarf_config_max_cms_files_per_variable : string -> unit
+  val _gdwarf_config_max_type_to_shape_depth : string -> unit
   val _gdwarf_config_max_shape_reduce_steps_per_variable : string -> unit
   val _gdwarf_config_max_evaluation_steps_per_variable : string -> unit
-  val _gdwarf_config_shape_reduce_fuel : int -> unit
+  val _gdwarf_config_shape_reduce_fuel : string -> unit
   val _gdwarf_fidelity : string -> unit
 end;;
 
@@ -2257,28 +2270,22 @@ module Default = struct
     let _v () = Compenv.print_version_and_library "native-code compiler"
     let _no_probes = clear probes
     let _probes = set probes
-    let _gdwarf_config_shape_reduce_depth n =
-      gdwarf_config_shape_reduce_depth := n
-    let _gdwarf_config_shape_eval_depth n =
-      gdwarf_config_shape_eval_depth := n
-    let _gdwarf_config_max_cms_files_per_unit n =
-      gdwarf_config_max_cms_files_per_unit := n
-    let _gdwarf_config_max_cms_files_per_variable n =
-      gdwarf_config_max_cms_files_per_variable := n
-    let _gdwarf_config_max_type_to_shape_depth n =
-      gdwarf_config_max_type_to_shape_depth := n
+    let _gdwarf_config_shape_reduce_depth s =
+      gdwarf_config_shape_reduce_depth := parse_int_option s
+    let _gdwarf_config_shape_eval_depth s =
+      gdwarf_config_shape_eval_depth := parse_int_option s
+    let _gdwarf_config_max_cms_files_per_unit s =
+      gdwarf_config_max_cms_files_per_unit := parse_int_option s
+    let _gdwarf_config_max_cms_files_per_variable s =
+      gdwarf_config_max_cms_files_per_variable := parse_int_option s
+    let _gdwarf_config_max_type_to_shape_depth s =
+      gdwarf_config_max_type_to_shape_depth := parse_int_option s
     let _gdwarf_config_max_shape_reduce_steps_per_variable s =
-      gdwarf_config_max_shape_reduce_steps_per_variable :=
-        (match s with
-         | "none" -> None
-         | n -> Some (int_of_string n))
+      gdwarf_config_max_shape_reduce_steps_per_variable := parse_int_option s
     let _gdwarf_config_max_evaluation_steps_per_variable s =
-      gdwarf_config_max_evaluation_steps_per_variable :=
-        (match s with
-         | "none" -> None
-         | n -> Some (int_of_string n))
-    let _gdwarf_config_shape_reduce_fuel n =
-      gdwarf_config_shape_reduce_fuel := n
+      gdwarf_config_max_evaluation_steps_per_variable := parse_int_option s
+    let _gdwarf_config_shape_reduce_fuel s =
+      gdwarf_config_shape_reduce_fuel := parse_int_option s
     let _gdwarf_fidelity s =
       match Clflags.gdwarf_fidelity_of_string s with
       | Some fidelity -> Clflags.set_gdwarf_fidelity fidelity

@@ -23,6 +23,7 @@ module Sort = Jkind_types.Sort
 module Layout = Sort.Const
 module S = Shape
 module String = Misc.Stdlib.String
+module MB = Misc.Maybe_bounded
 
 type base_layout = Sort.base
 
@@ -1914,17 +1915,17 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     unknown_base_layouts type_layout
 
 module With_cms_reduce = Shape_reduce.Make (struct
-  let fuel () = !Clflags.gdwarf_config_shape_reduce_fuel
+  let fuel () = MB.of_option !Clflags.gdwarf_config_shape_reduce_fuel
 
   let fuel_for_compilation_units () =
-    !Clflags.gdwarf_config_max_cms_files_per_variable
+    MB.of_option !Clflags.gdwarf_config_max_cms_files_per_variable
   (* Every variable gets to look up at most N compilation units. *)
 
   let max_shape_reduce_steps_per_variable () =
-    Misc.Maybe_bounded.of_option
-      !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable
+    MB.of_option !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable
 
-  let max_compilation_unit_depth () = !Clflags.gdwarf_config_shape_reduce_depth
+  let max_compilation_unit_depth () =
+    MB.of_option !Clflags.gdwarf_config_shape_reduce_depth
 
   let projection_rules_for_merlin_enabled = false
 
@@ -1968,8 +1969,10 @@ module With_cms_reduce = Shape_reduce.Make (struct
       Shape_reduce.Diagnostics.count_cms_file_cached diagnostics;
       shape
     | None ->
-      if !cms_files_read_counter
-         >= !Clflags.gdwarf_config_max_cms_files_per_unit
+      let max_cms_files =
+        MB.of_option !Clflags.gdwarf_config_max_cms_files_per_unit
+      in
+      if MB.is_out_of_bounds !cms_files_read_counter max_cms_files
       then None
       else
         let filename = String.uncapitalize_ascii unit_name in

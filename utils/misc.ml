@@ -1993,6 +1993,10 @@ module Json = struct
   let array items =
     let item_strings = String.concat ",\n" items in
     Printf.sprintf "[\n%s\n]" item_strings
+
+  let null = "null"
+
+  let option f = function None -> null | Some v -> f v
 end
 
 module Nonempty_list = struct
@@ -2023,11 +2027,25 @@ module Maybe_bounded = struct
     | Bounded r when r.bound > 0 -> r.bound <- r.bound - 1
     | Bounded _ -> ()
 
+  let incr = function
+    | Unbounded -> ()
+    | Bounded r -> r.bound <- r.bound + 1
+
   let is_depleted = function
     | Unbounded -> false
     | Bounded r -> r.bound <= 0
 
+  let is_in_bounds n = function
+    | Unbounded -> true
+    | Bounded r -> n < r.bound
+
+  let is_out_of_bounds n = function
+    | Unbounded -> false
+    | Bounded r -> n >= r.bound
+
+  let of_int n = if n < 0 then Bounded { bound = 0 } else Bounded { bound = n }
+
   let of_option = function
     | None -> Unbounded
-    | Some n -> if n < 0 then Bounded { bound = 0 } else Bounded { bound = n }
+    | Some n -> of_int n
 end

@@ -144,13 +144,28 @@ let emit_stats_file t =
       [ Json.field "compilation_parameters"
           (Json.object_
              [ Json.field "gdwarf_config_shape_reduce_depth"
-                 (Json.int !Clflags.gdwarf_config_shape_reduce_depth);
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_shape_reduce_depth);
                Json.field "gdwarf_config_shape_eval_depth"
-                 (Json.int !Clflags.gdwarf_config_shape_eval_depth);
+                 (Json.option Json.int !Clflags.gdwarf_config_shape_eval_depth);
                Json.field "gdwarf_config_max_cms_files_per_unit"
-                 (Json.int !Clflags.gdwarf_config_max_cms_files_per_unit);
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_max_cms_files_per_unit);
                Json.field "gdwarf_config_max_cms_files_per_variable"
-                 (Json.int !Clflags.gdwarf_config_max_cms_files_per_variable) ]);
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_max_cms_files_per_variable);
+               Json.field "gdwarf_config_max_type_to_shape_depth"
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_max_type_to_shape_depth);
+               Json.field "gdwarf_config_max_shape_reduce_steps_per_variable"
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable);
+               Json.field "gdwarf_config_max_evaluation_steps_per_variable"
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_max_evaluation_steps_per_variable);
+               Json.field "gdwarf_config_shape_reduce_fuel"
+                 (Json.option Json.int !Clflags.gdwarf_config_shape_reduce_fuel)
+             ]);
         Json.field "variables" (Json.array variable_jsons) ]
   in
   Printf.fprintf oc "%s\n" main_object;
