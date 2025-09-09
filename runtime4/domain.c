@@ -109,28 +109,32 @@ CAMLprim value caml_ml_domain_cpu_relax(value unit)
 
 /* Weak definitions overridden when linked against [threads]. */
 
-CAMLweakdef
+value (*caml_thread_has_tls_state_stub)(value unit);
 CAMLprim value caml_thread_has_tls_state(value unit)
 {
+  if(caml_thread_has_tls_state_stub) return caml_thread_has_tls_state_stub(unit);
   return Val_false;
 }
 
-CAMLweakdef 
+value (*caml_thread_get_state_stub)(value unit);
 CAMLprim value caml_thread_get_state(value unit)
 {
+  if(caml_thread_get_state_stub) return caml_thread_get_state_stub(unit);
   caml_failwith("caml_thread_get_state: TLS is not supported without the [threads] library.");
 }
 
-CAMLweakdef 
+value (*caml_thread_set_state_stub)(value state);
 CAMLprim value caml_thread_set_state(value state)
 {
+  if(caml_thread_set_state_stub) return caml_thread_set_state_stub(state);
   caml_failwith("caml_thread_set_state: TLS is not supported without the [threads] library.");
 }
 
-CAMLweakdef
-CAMLprim value caml_thread_init_current(value unit)
+value (*caml_thread_init_main_thread_stub)(value unit);
+CAMLprim value caml_thread_init_main_thread(value unit)
 {
-  caml_failwith("caml_thread_init_current: TLS is not supported without the [threads] library.");
+  if(caml_thread_init_main_thread_stub) return caml_thread_init_main_thread_stub(unit);
+  caml_failwith("caml_thread_init_main_thread: TLS is not supported without the [threads] library.");
 }
 
 /* Dummy implementations to enable [Stdlib.Domain] to link. */

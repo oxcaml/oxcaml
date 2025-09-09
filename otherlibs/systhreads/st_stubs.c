@@ -658,7 +658,7 @@ static void caml_thread_domain_spawn_hook(void)
   domain_lockmode = LOCKMODE_DOMAINS;
 }
 
-CAMLprim value caml_thread_init_current(value unit) 
+static value caml_thread_init_current(value unit) 
 {
   if (This_thread != NULL) return Val_unit;
   caml_thread_t new_thread =
@@ -676,6 +676,16 @@ CAMLprim value caml_thread_init_current(value unit)
   new_thread->signal_stack = NULL;
 
   This_thread = new_thread;
+  return Val_unit;
+}
+
+static value caml_thread_init_main_thread(value unit) 
+{
+  // Leaks at most one descriptor per domain
+  caml_thread_init_current(unit);
+  value* leak_main_thread_descr = (value*)caml_stat_alloc(sizeof(value));
+  *leak_main_thread_descr = This_thread->descr;
+  caml_register_generational_global_root(leak_main_thread_descr);
   return Val_unit;
 }
 
@@ -1005,33 +1015,42 @@ CAMLprim value caml_thread_self(value unit)
   return This_thread->descr;
 }
 
+/* Thread-local storage */
+
+static value caml_thread_has_tls_state(value unit)
+{
+  return Val_true;
+}
+
+static value caml_thread_get_state(value unit)
+{
+  return TLS_state(caml_thread_self(unit));
+}
+
+static value caml_thread_set_state(value state)
+{
+  caml_modify(&TLS_state(caml_thread_self(Val_unit)), state);
+  return Val_unit;
+}
+
+extern value (*caml_thread_has_tls_state_stub)(value unit);
+extern value (*caml_thread_get_state_stub)(value unit);
+extern value (*caml_thread_set_state_stub)(value state);
+extern value (*caml_thread_init_main_thread_stub)(value unit);
+
+__attribute__((constructor))
+static void caml_install_tls_functions(void) {
+  caml_thread_has_tls_state_stub = &caml_thread_has_tls_state;
+  caml_thread_get_state_stub = &caml_thread_get_state;
+  caml_thread_set_state_stub = &caml_thread_set_state;
+  caml_thread_init_main_thread_stub = &caml_thread_init_main_thread;
+}
+
 /* Return the identifier of a thread */
 
 CAMLprim value caml_thread_id(value th)
 {
   return Ident(th);
-}
-
-/* Is TLS supported */
-
-CAMLprim value caml_thread_has_tls_state(value unit)
-{
-  return Val_true;
-}
-
-/* Return the current TLS state */
-
-CAMLprim value caml_thread_get_state(value unit)
-{
-  return TLS_state(caml_thread_self(unit));
-}
-
-/* Set the current TLS state */
-
-CAMLprim value caml_thread_set_state(value state)
-{
-  caml_modify(&TLS_state(caml_thread_self(Val_unit)), state);
-  return Val_unit;
 }
 
 /* Print uncaught exception and backtrace */
