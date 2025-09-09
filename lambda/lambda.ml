@@ -2260,6 +2260,14 @@ let layout_of_extern_repr : extern_repr -> _ = function
     layout_boxed_int Boxed_nativeint
   | Same_as_ocaml_repr s -> layout_of_const_sort s
 
+let extern_repr_involves_unboxed_products extern_repr =
+  match extern_repr with
+  | Same_as_ocaml_repr (Product _) -> true
+  | Same_as_ocaml_repr (Base _)
+  | Unboxed_vector _ | Unboxed_float _
+  | Unboxed_or_untagged_integer _ ->
+    false
+
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
 
