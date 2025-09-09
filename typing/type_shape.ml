@@ -759,9 +759,8 @@ let rec decompose_application (t : Shape.t) =
   | Constr (_, _)
   | Tuple _ | Unboxed_tuple _
   | Predef (_, _)
-  | Arrow
-  | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _ | Record _
-  | Mutrec _
+  | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
+  | Record _ | Mutrec _
   | Proj_decl (_, _) ->
     t, []
 
@@ -859,13 +858,16 @@ let rec unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
     Misc.Maybe_bounded.decr steps_remaining;
     match find_in_cache t subst_type subst_constr with
     | Some res -> res
-    | None -> unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type subst_constr t)
+    | None ->
+      unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
+        subst_constr t)
 
-and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type subst_constr
-    (t : Shape.t) =
+and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
+    subst_constr (t : Shape.t) =
   let head, args = decompose_application t in
   let unfold_and_eval =
-    unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type subst_constr
+    unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+      subst_constr
   in
   let unfold_and_eval_list = List.map unfold_and_eval in
   let maybe_evaluated_shape =
@@ -884,8 +886,8 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type subst_c
           update_subst_with_id_arg_binder subst_constr id args rec_binder
         in
         let ts = Ident.Map.find id ts in
-        unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type subst_constr
-          (Shape.app_list ts args)
+        unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+          subst_constr (Shape.app_list ts args)
         |> Recursive_binder.close_term_if_binder_is_used ~preserve_uid:false
              rec_binder
         |> Option.some
@@ -899,9 +901,8 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type subst_c
       | Constr (_, _)
       | Tuple _ | Unboxed_tuple _
       | Predef (_, _)
-      | Arrow
-      | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
-      | Record _
+      | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _
+      | Variant_unboxed _ | Record _
       | Proj_decl (_, _) ->
         if !Clflags.dwarf_pedantic
         then
@@ -921,8 +922,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type subst_c
     | Constr (_, _)
     | Tuple _ | Unboxed_tuple _
     | Predef (_, _)
-    | Arrow
-    | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
+    | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
     | Record _ | Mutrec _ ->
       None
   in
@@ -959,9 +959,8 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type subst_c
         | Constr (_, _)
         | Tuple _ | Unboxed_tuple _
         | Predef (_, _)
-        | Arrow
-        | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
-        | Record _ | Mutrec _
+        | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _
+        | Variant_unboxed _ | Record _ | Mutrec _
         | Proj_decl (_, _) ->
           Shape.app f ~arg)
       | Proj_decl _ ->
@@ -994,17 +993,20 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type subst_c
           arg_layout
       | Proj (t, i) ->
         Shape.proj
-          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type subst_constr t)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+             subst_constr t)
           i
       | Tuple args -> Shape.tuple (unfold_and_eval_list args)
       | Unboxed_tuple args -> Shape.unboxed_tuple (unfold_and_eval_list args)
       | Predef (p, args) -> Shape.predef p (unfold_and_eval_list args)
       | Mu body ->
         Shape.mu
-          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type subst_constr body)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+             subst_constr body)
       | Alias t ->
         Shape.alias
-          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type subst_constr t)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+             subst_constr t)
       | Struct items -> Shape.str (Shape.Item.Map.map unfold_and_eval items)
       (* normal forms for CBV evaluation *)
       | Mutrec _ | Abs _ | Error _ | Comp_unit _ | Rec_var _ | Leaf -> t)
