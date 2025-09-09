@@ -82,6 +82,11 @@ module Uid : sig
   include Identifiable.S with type t := t
 end
 
+(** We use de Bruijn indices for some binders in [Shape.t] below to increase
+    sharing. That is, de Bruijn indices ensure that alpha-equivalent terms are
+    actually equal. This reduces redundancy when we emit shape information into
+    the debug information in later stages of the compiler (see [dwarf_type.ml]),
+    since equal shapes produce the same debug information. *)
 module DeBruijn_index : sig
   type t
 
