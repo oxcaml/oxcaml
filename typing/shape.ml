@@ -467,7 +467,8 @@ module Predef = struct
       | Unboxed_int8, Unboxed_int8 -> true
       | Unboxed_simd s1, Unboxed_simd s2 -> equal_simd_vec_split s1 s2
       | (Unboxed_float | Unboxed_float32 | Unboxed_nativeint
-        | Unboxed_int64 | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 | Unboxed_simd _), _ -> false
+        | Unboxed_int64 | Unboxed_int32 | Unboxed_int16 | Unboxed_int8
+        | Unboxed_simd _), _ -> false
 
     let equal p1 p2 =
       match p1, p2 with
@@ -490,8 +491,8 @@ module Predef = struct
       | Exception, Exception -> true
       | Unboxed u1, Unboxed u2 -> equal_unboxed u1 u2
       | (Array | Bytes | Char | Extension_constructor | Float | Float32
-        | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint | String
-        | Simd _ | Exception | Unboxed _), _ -> false
+        | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint
+        | String | Simd _ | Exception | Unboxed _), _ -> false
 end
 
 type var = Ident.t
