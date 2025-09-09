@@ -2300,7 +2300,11 @@ let mk_is_abstract env p =
   -> false
 
 let mk_jkind_context env jkind_of_type =
-  let lookup_type p = match Env.find_type p env with decl -> Some decl | exception Not_found -> None in
+  let lookup_type p =
+    match Env.find_type p env with
+    | decl -> Some decl
+    | exception Not_found -> None
+  in
   let debug_print_env ppf =
     (* Print a bounded snapshot of types in the environment *)
     let max_items = 120 in
