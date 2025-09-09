@@ -925,12 +925,15 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
          bytecode C stubs and bytecode-compiled JSOO stubs. Suppose an external
          takes an unboxed product, e.g. [#(int * int)]. In bytecode, this is
          passed as a single argument, containing a pointer to a pair; however,
-         in JavaScript, this will be passed as two arguments.
+         in JSIR, this will be passed as two arguments, in the same way as for
+         native compilation.
 
          In addition, if the return type for an external is a nested unboxed
          product such as [#(#(int * int) * int)], bytecode stubs need to return
-         a nested tuple, while JavaScript stubs need to return a single flat
-         (i.e. non-nested) tuple containing the unarised arguments.
+         a nested tuple, while JSIR stubs need to return a single flat
+         (i.e. non-nested) tuple containing the unarised arguments. Unlike the
+         parameter passing case above, this is different from native code
+         compilation, where multiple return values are supported to some extent.
 
          Also note that [@untagged] and [@unboxed] on externals are irrelevant
          for what JS stubs should look like, since there is no tagging in JSIR
