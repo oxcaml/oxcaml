@@ -681,9 +681,20 @@ module Type_decl_shape = struct
       Type_shape.Predef.shape_for_constr_with_predefs shape_for_constr'
     in
     let recursive = ref false in
-    (* We add a small optimization: For the block of declarations, we track via
-       this reference whether there are any recursive occurrences. If not, we
-       do not have to add a mutually recursive binder for the declarations. *)
+    (*= In principle, we could treat all blocks of declarations uniformly: we
+        could add [mutrec ...] around them together with projections for the
+        respective declaration, including for simple, non-recursive declarations
+        like
+          [type direction = Up | Down | Left | Right].
+        It would become
+          [(mutrec direction = Variant Up | Down | Left | Right).direction].
+
+        However, for non-recurisve declarations, this would add a redundant
+        mutually-recursive declaration and projection. So if none of the
+        declarations are recursive/refer to other declarations, we directly
+        use the body of the declarations instead of wrapping them in [mutrec]
+        and a projection. Whether a declaration is recursive is tracked via
+        the reference [recursive]. *)
     let shape_for_constr' =
       shape_for_constr_with_declarations ~recursive decl_lookup_map
         shape_for_constr'
