@@ -1048,12 +1048,10 @@ let rec free_names_transitive_of_type_of_name t name ~result =
 
 and free_names_transitive0 t typ ~result =
   let free_names = TG.free_names typ in
-  let to_traverse = Name_occurrences.diff free_names ~without:result in
-  if Name_occurrences.is_empty to_traverse
-  then result
-  else
-    Name_occurrences.fold_names to_traverse ~init:result ~f:(fun result name ->
-        free_names_transitive_of_type_of_name t name ~result)
+  Name_occurrences.fold_names free_names ~init:result ~f:(fun result name ->
+      if Name_occurrences.mem_name result name
+      then result
+      else free_names_transitive_of_type_of_name t name ~result)
 
 let free_names_transitive t typ =
   free_names_transitive0 t typ ~result:Name_occurrences.empty
