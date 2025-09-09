@@ -3153,8 +3153,9 @@ let combine_constant value_kind loc arg cst partial ctx def
               | _ -> assert false)
             const_lambda_list
         in
+        let max_excl = 1 lsl 7 in
         call_switcher value_kind loc fail arg
-          (-(1 lsl 7)) ((1 lsl 7) - 1) int_lambda_list
+          (-max_excl) (max_excl - 1) int_lambda_list
     | Const_int16 _ ->
         let int_lambda_list =
           List.map
@@ -3163,8 +3164,9 @@ let combine_constant value_kind loc arg cst partial ctx def
               | _ -> assert false)
             const_lambda_list
         in
+        let max_excl = 1 lsl 15 in
         call_switcher value_kind loc fail arg
-          (-(1 lsl 15)) ((1 lsl 15) - 1) int_lambda_list
+          (-max_excl) (max_excl - 1) int_lambda_list
     | Const_char _ ->
         let int_lambda_list =
           List.map
