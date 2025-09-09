@@ -46,20 +46,6 @@ let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
         let value_var = To_jsir_env.get_var_exn env v in
         env, To_jsir_result.add_instr_exn res (Assign (symbol_var, value_var)))
 
-let float32_to_jsir_const float32 : Jsir.constant =
-  Float32
-    (Numeric_types.Float32_by_bit_pattern.to_bits float32 |> Int64.of_int32)
-
-let float_to_jsir_const float : Jsir.constant =
-  Float32 (Numeric_types.Float_by_bit_pattern.to_bits float)
-
-let int32_to_jsir_const int32 : Jsir.constant = Int32 int32
-
-let int64_to_jsir_const int64 : Jsir.constant = Int64 int64
-
-let nativeint_to_jsir_const nativeint : Jsir.constant =
-  NativeInt (Targetint_32_64.to_int32 nativeint)
-
 let simple_block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
   let fields = List.map Simple.With_debuginfo.simple fields in
   let all_consts = List.for_all Simple.is_const fields in
@@ -130,15 +116,20 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     simple_block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not:NotArray
       fields
   | Boxed_float32 value ->
-    const_or_var ~env ~res ~symbol ~to_jsir_const:float32_to_jsir_const value
+    const_or_var ~env ~res ~symbol
+      ~to_jsir_const:To_jsir_shared.float32_to_jsir_const value
   | Boxed_float value ->
-    const_or_var ~env ~res ~symbol ~to_jsir_const:float_to_jsir_const value
+    const_or_var ~env ~res ~symbol
+      ~to_jsir_const:To_jsir_shared.float_to_jsir_const value
   | Boxed_int32 value ->
-    const_or_var ~env ~res ~symbol ~to_jsir_const:int32_to_jsir_const value
+    const_or_var ~env ~res ~symbol
+      ~to_jsir_const:To_jsir_shared.int32_to_jsir_const value
   | Boxed_int64 value ->
-    const_or_var ~env ~res ~symbol ~to_jsir_const:int64_to_jsir_const value
+    const_or_var ~env ~res ~symbol
+      ~to_jsir_const:To_jsir_shared.int64_to_jsir_const value
   | Boxed_nativeint value ->
-    const_or_var ~env ~res ~symbol ~to_jsir_const:nativeint_to_jsir_const value
+    const_or_var ~env ~res ~symbol
+      ~to_jsir_const:To_jsir_shared.nativeint_to_jsir_const value
   | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _ ->
     (* Need SIMD *)
     static_const_not_supported ()
@@ -175,21 +166,22 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       else Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_odd_tag
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
-      ~to_bits:Fun.id ~bits_to_constant:int32_to_jsir_const
+      ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
       ~bits_to_array:(fun bits ->
-        Tuple (tag, Array.map int32_to_jsir_const bits, Array))
+        Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
   | Immutable_int64_array values ->
     let tag = Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
-      ~to_bits:Fun.id ~bits_to_constant:int64_to_jsir_const
+      ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int64_to_jsir_const
       ~bits_to_array:(fun bits ->
-        Tuple (tag, Array.map int64_to_jsir_const bits, Array))
+        Tuple (tag, Array.map To_jsir_shared.int64_to_jsir_const bits, Array))
   | Immutable_nativeint_array values ->
     let tag = Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
-      ~to_bits:Targetint_32_64.to_int32 ~bits_to_constant:int32_to_jsir_const
+      ~to_bits:Targetint_32_64.to_int32
+      ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
       ~bits_to_array:(fun bits ->
-        Tuple (tag, Array.map int32_to_jsir_const bits, Array))
+        Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
   | Immutable_vec128_array _ | Immutable_vec256_array _
   | Immutable_vec512_array _ ->
     (* Need SIMD *)
