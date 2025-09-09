@@ -108,7 +108,6 @@ let preempt_signal =
 let () =
   Sys.set_signal preempt_signal (Sys.Signal_handle preempt);
   thread_initialize ();
-  Domain.TLS.Private.init ();
   Callback.Safe.register "Thread.at_shutdown" (fun () ->
     thread_cleanup();
     (* In case of DLL-embedded OCaml the preempt_signal handler

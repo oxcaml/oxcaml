@@ -90,7 +90,6 @@ let exit () =
 
 let () =
   thread_initialize ();
-  Domain.TLS.Private.init ();
   (* Called back in [caml_shutdown], when the last domain exits. *)
   Callback.Safe.register "Thread.at_shutdown" thread_cleanup
 

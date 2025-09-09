@@ -2240,13 +2240,19 @@ CAMLprim value caml_thread_has_tls_state(value unit)
 CAMLweakdef 
 CAMLprim value caml_thread_get_state(value unit)
 {
-  caml_failwith("TLS is not supported without the [threads] library.");
+  caml_failwith("caml_thread_get_state: TLS is not supported without the [threads] library.");
 }
 
 CAMLweakdef 
 CAMLprim value caml_thread_set_state(value state)
 {
-  caml_failwith("TLS is not supported without the [threads] library.");
+  caml_failwith("caml_thread_set_state: TLS is not supported without the [threads] library.");
+}
+
+CAMLweakdef
+CAMLprim value caml_thread_init_current(value unit)
+{
+  caml_failwith("caml_thread_init_current: TLS is not supported without the [threads] library.");
 }
 
 CAMLprim value caml_recommended_domain_count(value unused)

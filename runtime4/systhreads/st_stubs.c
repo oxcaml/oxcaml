@@ -135,6 +135,9 @@ static caml_thread_t all_threads = NULL;
 /* The descriptor for the currently executing thread */
 static caml_thread_t curr_thread = NULL;
 
+/* Whether the thread system has been initialized */
+static int caml_threads_initialized = 0;
+
 /* The master lock protecting the OCaml runtime system */
 static struct caml_locking_scheme* _Atomic caml_locking_scheme;
 
@@ -537,12 +540,28 @@ static void caml_thread_reinitialize(void)
   }
 }
 
+/* Set up a thread info block for the current thread */
+
+CAMLprim value caml_thread_init_current(value unit) 
+{
+  if (curr_thread != NULL) return Val_unit;
+  curr_thread =
+    (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
+  curr_thread->descr = caml_thread_new_descriptor(Val_unit);
+  curr_thread->next = curr_thread;
+  curr_thread->prev = curr_thread;
+  all_threads = curr_thread;
+  curr_thread->backtrace_last_exn = Val_unit;
+  return Val_unit;
+}
+
 /* Initialize the thread machinery */
 
 CAMLprim value caml_thread_initialize(value unit)   /* ML */
 {
   /* Protect against repeated initialization (PR#3532) */
-  if (curr_thread != NULL) return Val_unit;
+  if (caml_threads_initialized) return Val_unit;
+  caml_threads_initialized = 1;
   /* OS-specific initialization */
   st_initialize();
   /* Initialize and acquire the master lock */
@@ -552,13 +571,7 @@ CAMLprim value caml_thread_initialize(value unit)   /* ML */
   st_tls_newkey(&thread_descriptor_key);
   st_tls_newkey(&last_channel_locked_key);
   /* Set up a thread info block for the current thread */
-  curr_thread =
-    (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
-  curr_thread->descr = caml_thread_new_descriptor(Val_unit);
-  curr_thread->next = curr_thread;
-  curr_thread->prev = curr_thread;
-  all_threads = curr_thread;
-  curr_thread->backtrace_last_exn = Val_unit;
+  caml_thread_init_current(unit);
 #ifdef NATIVE_CODE
   curr_thread->exit_buf = &caml_termination_jmpbuf;
 #endif

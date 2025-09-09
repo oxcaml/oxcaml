@@ -584,12 +584,18 @@ module TLS0 = struct
 
   module Private = struct
       type keys = Impl.key_value list
-      (* If threads are supported, the [Thread] module will call [init]. *)
-      let[@inline] init () = if has_tls_state then Impl.init ()
+      external init_current_thread 
+        : unit -> unit @@ portable = "caml_thread_init_current"
+      let[@inline] init () = 
+        if has_tls_state then (init_current_thread (); Impl.init ())
       let[@inline] get_initial_keys () = 
         if has_tls_state then Impl.get_initial_keys () else []
       let[@inline] set_initial_keys keys = 
         if has_tls_state then Impl.set_initial_keys keys
+
+      (* If TLS is supported, we need to initialize it here, since [Thread]
+         might never be loaded. *)
+      let () = init ()
   end
 end
 

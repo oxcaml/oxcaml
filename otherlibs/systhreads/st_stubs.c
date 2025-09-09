@@ -658,13 +658,32 @@ static void caml_thread_domain_spawn_hook(void)
   domain_lockmode = LOCKMODE_DOMAINS;
 }
 
+CAMLprim value caml_thread_init_current(value unit) 
+{
+  if (This_thread != NULL) return Val_unit;
+  caml_thread_t new_thread =
+    (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
+
+  new_thread->domain_id = Caml_state->id;
+  new_thread->descr = caml_thread_new_descriptor(Val_unit);
+  new_thread->next = new_thread;
+  new_thread->prev = new_thread;
+  new_thread->backtrace_last_exn = Val_unit;
+  new_thread->memprof = caml_memprof_main_thread(Caml_state);
+  new_thread->dynamic = Caml_state->dynamic_bindings;
+  CAMLassert(new_thread->dynamic);
+  new_thread->is_main = 1;
+  new_thread->signal_stack = NULL;
+
+  This_thread = new_thread;
+  return Val_unit;
+}
+
 /* FIXME: this should return an encoded exception for use in
    domain_thread_func, but the latter is not ready to handle it
    yet. */
 static void caml_thread_domain_initialize_hook(void)
 {
-  caml_thread_t new_thread;
-
   atomic_store_release(&Tick_thread_stop, 0);
   /* OS-specific initialization */
   st_initialize();
@@ -681,27 +700,14 @@ static void caml_thread_domain_initialize_hook(void)
   ls->reinitialize_after_fork = (void (*)(void*))&default_reinitialize_after_fork;
   ls->can_skip_yield = (int (*)(void*))&default_can_skip_yield;
   ls->yield = (void (*)(void*))&st_thread_yield;
-
+ 
   Locking_scheme(Caml_state->id) = ls;
 
-  new_thread =
-    (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
+  caml_thread_init_current(Val_unit);
 
-  new_thread->domain_id = Caml_state->id;
-  new_thread->descr = caml_thread_new_descriptor(Val_unit);
-  new_thread->next = new_thread;
-  new_thread->prev = new_thread;
-  new_thread->backtrace_last_exn = Val_unit;
-  new_thread->memprof = caml_memprof_main_thread(Caml_state);
-  new_thread->dynamic = Caml_state->dynamic_bindings;
-  CAMLassert(new_thread->dynamic);
-  new_thread->is_main = 1;
-  new_thread->signal_stack = NULL;
-
-  This_thread = new_thread;
-  Active_thread = new_thread;
-  caml_memprof_enter_thread(new_thread->memprof);
-  caml_dynamic_enter_thread(new_thread->dynamic);
+  Active_thread = This_thread;
+  caml_memprof_enter_thread(Active_thread->memprof);
+  caml_dynamic_enter_thread(Active_thread->dynamic);
 }
 
 static void thread_yield(void);
