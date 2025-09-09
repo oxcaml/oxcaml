@@ -58,7 +58,7 @@ type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
 type shape_format = Old_merlin | Debugging_shapes
 type gdwarf_fidelity =
   | Fidelity_low | Fidelity_medium | Fidelity_high
-  | Fidelity_very_high | Fidelity_ultra_high
+  | Fidelity_very_high | Fidelity_ultra_high | Fidelity_unlimited
 
 module Dwarf_config_defaults : sig
   val shape_reduce_depth : int option

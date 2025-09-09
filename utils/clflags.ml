@@ -63,6 +63,7 @@ type shape_format = Old_merlin | Debugging_shapes
 type gdwarf_fidelity =
   | Fidelity_low | Fidelity_medium
   | Fidelity_high | Fidelity_very_high | Fidelity_ultra_high
+  | Fidelity_unlimited
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
@@ -268,6 +269,7 @@ let gdwarf_fidelity_of_string s =
   | "high" -> Some Fidelity_high
   | "very-high" -> Some Fidelity_very_high
   | "ultra-high" -> Some Fidelity_ultra_high
+  | "unlimited" -> Some Fidelity_unlimited
   | _ -> None
 
 let set_gdwarf_fidelity fidelity =
@@ -315,6 +317,15 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_max_cms_files_per_unit := Some 1000;
       gdwarf_config_max_cms_files_per_variable := Some 50;
       gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := None
+  | Fidelity_unlimited ->
+      gdwarf_config_shape_eval_depth := None;
+      gdwarf_config_shape_reduce_depth := None;
+      gdwarf_config_max_cms_files_per_unit := None;
+      gdwarf_config_max_cms_files_per_variable := None;
+      gdwarf_config_max_type_to_shape_depth := None;
       gdwarf_config_max_shape_reduce_steps_per_variable := None;
       gdwarf_config_max_evaluation_steps_per_variable := None;
       gdwarf_config_shape_reduce_fuel := None

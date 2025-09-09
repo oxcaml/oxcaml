@@ -961,8 +961,9 @@ let mk_gdwarf_config_shape_reduce_fuel f =
 let mk_gdwarf_fidelity f =
   "-gdwarf-fidelity", Arg.String f,
   "<level>  Set fidelity level of the DWARF debug information \
-  (low|medium|high|very-high|ultra-high). Higher values produce more detailed \
-  debug information at the expense of increased compilation times.\n\
+  (low|medium|high|very-high|ultra-high|unlimited). Higher values produce \
+  more detailed debug information at the expense of increased compilation \
+  times.\n\
   \t- low is fast, but it does not support recursive types or retrieving \
       declaration information from other files\n\
   \t- medium is a reasonable default (it does support recursive declarations), \
