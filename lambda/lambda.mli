@@ -589,6 +589,8 @@ val generic_value : value_kind
 *)
 val layout_of_extern_repr : extern_repr -> layout
 
+val extern_repr_involves_unboxed_products : extern_repr -> bool
+
 type structured_constant =
     Const_base of constant
   | Const_block of int * structured_constant list
