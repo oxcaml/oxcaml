@@ -38,27 +38,42 @@ let bind_expr_to_var ~env ~res fvar expr =
   let _jvar, env, res = bind_expr_to_var' ~env ~res fvar expr in
   env, res
 
+let target_ocaml_int_to_jsir_const targetint : Jsir.constant =
+  let repr = Target_ocaml_int.to_targetint targetint |> Targetint_32_64.repr in
+  let targetint =
+    match repr with
+    | Int32 int32 -> Targetint.of_int32 int32
+    | Int64 int64 -> Targetint.of_int64 int64
+  in
+  Int targetint
+
+let float32_to_jsir_const float32 : Jsir.constant =
+  (* Since float32 are just represented as normal floats in JSIR, we first
+     convert to [Float_by_bit_pattern] and use its bit pattern. *)
+  Numeric_types.Float32_by_bit_pattern.to_float float32
+  |> Numeric_types.Float_by_bit_pattern.create
+  |> Numeric_types.Float_by_bit_pattern.to_bits
+  |> fun bits : Jsir.constant -> Float32 bits
+
+let float_to_jsir_const float : Jsir.constant =
+  Float (Numeric_types.Float_by_bit_pattern.to_bits float)
+
+let int32_to_jsir_const int32 : Jsir.constant = Int32 int32
+
+let int64_to_jsir_const int64 : Jsir.constant = Int64 int64
+
+let nativeint_to_jsir_const nativeint : Jsir.constant =
+  Int32 (Targetint_32_64.to_int32 nativeint)
+
 let reg_width_const const : Jsir.constant =
   match Reg_width_const.descr const with
   | Naked_immediate targetint | Tagged_immediate targetint ->
-    let repr =
-      Target_ocaml_int.to_targetint targetint |> Targetint_32_64.repr
-    in
-    let targetint =
-      match repr with
-      | Int32 int32 -> Targetint.of_int32 int32
-      | Int64 int64 -> Targetint.of_int64 int64
-    in
-    Jsir.Int targetint
-  | Naked_float32 float32 ->
-    Jsir.Float32
-      (Int64.of_int32 (Numeric_types.Float32_by_bit_pattern.to_bits float32))
-  | Naked_float float ->
-    Jsir.Float (Numeric_types.Float_by_bit_pattern.to_bits float)
-  | Naked_int32 int32 -> Jsir.Int32 int32
-  | Naked_int64 int64 -> Jsir.Int64 int64
-  | Naked_nativeint nativeint ->
-    Jsir.NativeInt (Targetint_32_64.to_int32 nativeint)
+    target_ocaml_int_to_jsir_const targetint
+  | Naked_float32 float32 -> float32_to_jsir_const float32
+  | Naked_float float -> float_to_jsir_const float
+  | Naked_int32 int32 -> int32_to_jsir_const int32
+  | Naked_int64 int64 -> int64_to_jsir_const int64
+  | Naked_nativeint nativeint -> nativeint_to_jsir_const nativeint
   | Null -> Jsir.Null
   | Naked_int8 _ | Naked_int16 _ | Naked_vec128 _ | Naked_vec256 _
   | Naked_vec512 _ ->

@@ -44,6 +44,20 @@ val bind_expr_to_var' :
   Jsir.expr ->
   Jsir.Var.t * To_jsir_env.t * To_jsir_result.t
 
+(** Convert various integer types into a [Jsir.constant]. *)
+val target_ocaml_int_to_jsir_const : Target_ocaml_int.t -> Jsir.constant
+
+val float32_to_jsir_const :
+  Numeric_types.Float32_by_bit_pattern.t -> Jsir.constant
+
+val float_to_jsir_const : Numeric_types.Float_by_bit_pattern.t -> Jsir.constant
+
+val int32_to_jsir_const : Int32.t -> Jsir.constant
+
+val int64_to_jsir_const : Int64.t -> Jsir.constant
+
+val nativeint_to_jsir_const : Targetint_32_64.t -> Jsir.constant
+
 (** Convert a Flambda [Reg_width_const.t] into a [Jsir.constant]. *)
 val reg_width_const : Reg_width_const.t -> Jsir.constant
 
