@@ -2320,7 +2320,8 @@ let mk_jkind_context env jkind_of_type =
       | Types.Type_abstract _, Some _ -> Format.fprintf ppf "abbrev"
       | Types.Type_variant _, _ -> Format.fprintf ppf "variant"
       | Types.Type_record _, _ -> Format.fprintf ppf "record"
-      | Types.Type_record_unboxed_product _, _ -> Format.fprintf ppf "record(unboxed)"
+      | Types.Type_record_unboxed_product _, _ ->
+        Format.fprintf ppf "record(unboxed)"
       | Types.Type_open, _ -> Format.fprintf ppf "open"
     in
     let pp_item ppf (name, path, decl) =
@@ -2328,9 +2329,13 @@ let mk_jkind_context env jkind_of_type =
         name Path.print path pp_kind decl
     in
     let items = List.rev !items in
-    Format.fprintf ppf "@[<v2>Environment types (showing %d/%d):@,%a@]@."
-      (List.length items) !count
-      (Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,") pp_item)
+    Format.fprintf ppf
+      "@[<v2>Environment types (showing %d/%d):@,%a@]@."
+      (List.length items)
+      !count
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
+         pp_item)
       items
   in
   { Jkind.jkind_of_type;
@@ -2399,14 +2404,16 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
      if tvariant_not_immediate row then (
-       if Language_extension.is_enabled Ikinds && Btype.static_row row then
-         (* Under -extension ikinds: for a static (closed) row, approximate as
-            immutable_data with a single with-bound to the whole variant type. *)
+       if !Clflags.ikinds && Btype.static_row row then
+         (* Under -ikinds: for a static (closed) row, approximate as
+            immutable_data with a single with-bound to the whole
+            variant type. *)
          Jkind.Builtin.immutable_data ~why:Polymorphic_variant
          |> Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:ty
          |> Jkind.mark_best
        else
-         (* Open/non-static rows (or when ikinds is disabled): conservative non-float. *)
+         (* Open/non-static rows (or when ikinds is disabled):
+            conservative non-float. *)
          Jkind.for_non_float ~why:Polymorphic_variant
      ) else
        Jkind.Builtin.immediate ~why:Immediate_polymorphic_variant
@@ -7424,8 +7431,12 @@ let check_decl_jkind env decl jkind =
     | _ -> decl.type_jkind
   in
   match Ikind.sub_jkind_l
-          ~origin:(Format.asprintf "ctype:decl %a" Location.print_loc decl.type_loc)
-          ~type_equal ~context decl_jkind jkind with
+          ~origin:(Format.asprintf "ctype:decl %a"
+                     Location.print_loc decl.type_loc)
+          ~type_equal
+          ~context
+          decl_jkind
+          jkind with
   | Ok () -> Ok ()
   | Error _ as err ->
     match decl.type_manifest with
@@ -7433,8 +7444,12 @@ let check_decl_jkind env decl jkind =
     | Some ty ->
       let ty_jkind = type_jkind env ty in
       match Ikind.sub_jkind_l
-              ~origin:(Format.asprintf "ctype:manifest %a" Location.print_loc decl.type_loc)
-              ~type_equal ~context ty_jkind jkind with
+              ~origin:(Format.asprintf "ctype:manifest %a"
+                         Location.print_loc decl.type_loc)
+              ~type_equal
+              ~context
+              ty_jkind
+              jkind with
       | Ok () -> Ok ()
       | Error _ as err -> err
 
@@ -7445,7 +7460,9 @@ let constrain_decl_jkind env decl jkind =
   (* This case is sad, because it can't refine type variables. Hence
      the need for reimplementation. Hopefully no one hits this for
      a while. *)
-  | None -> Ikind.with_origin_tag "ctype:constrain_decl_jkind" (fun () -> check_decl_jkind env decl jkind)
+  | None ->
+    Ikind.with_origin_tag "ctype:constrain_decl_jkind" (fun () ->
+        check_decl_jkind env decl jkind)
   | Some jkind ->
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in

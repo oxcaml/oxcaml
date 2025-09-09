@@ -190,9 +190,9 @@ type jkind_context =
     is_abstract : Path.t -> bool;
         (* Check if a type path refers to an abstract type *)
     lookup_type : Path.t -> Types.type_declaration option;
-        normalize_path : Path.t -> Path.t;
+    normalize_path : Path.t -> Path.t;
         (** Debug: pretty-print a snapshot of the typing environment. *)
-    debug_print_env : Format.formatter -> unit;
+    debug_print_env : Format.formatter -> unit
         (* Lookup a type in the environment. Returns the full
            [Types.type_declaration] if found, or [None] otherwise. *)
   }

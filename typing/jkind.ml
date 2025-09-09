@@ -797,7 +797,7 @@ module With_bounds = struct
       in
       Format.(
         fprintf ppf "%a"
-      (pp_print_list (fun ppf -> fprintf ppf "with@ %s"))
+          (pp_print_list (fun ppf -> fprintf ppf "with@ %s"))
           type_exprs)
 
   let to_seq (type l r) (t : (l * r) t) =
@@ -805,8 +805,8 @@ module With_bounds = struct
     | No_with_bounds -> Seq.empty
     | With_bounds tys -> With_bounds_types.to_seq tys
 
-  let type_info_relevant_axes ({ With_bounds_type_info.relevant_axes } :
-                                  With_bounds_type_info.t) :
+  let type_info_relevant_axes
+      ({ With_bounds_type_info.relevant_axes } : With_bounds_type_info.t) :
       Axis_set.t =
     relevant_axes
 end
@@ -819,7 +819,7 @@ type jkind_context =
     is_abstract : Path.t -> bool;
     lookup_type : Path.t -> Types.type_declaration option;
     normalize_path : Path.t -> Path.t;
-    debug_print_env : Format.formatter -> unit;
+    debug_print_env : Format.formatter -> unit
   }
 
 module Layout_and_axes = struct
@@ -3773,20 +3773,20 @@ let sub_or_error ~type_equal ~context t1 t2 =
          (Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
 let require_le ~context sub super sub_result =
-Sub_result.require_le sub_result
-|> Result.map_error (fun reasons ->
-        (* When we report an error, we want to show the best-normalized
-          version of sub, but the original super. When this check fails, it
-          is usually the case that the super was written by the user and the
-          sub was inferred. Thus, we should display the user-written jkind,
-          but simplify the inferred one, since the inferred one is probably
-          overly complex. *)
-        (* CR layouts v2.8: It would be useful report to the user why this
-          violation occurred, specifically which axes the violation is
-          along. *)
-        let best_sub = normalize ~mode:Require_best ~context sub in
-        Violation.of_ ~context
-          (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
+  Sub_result.require_le sub_result
+  |> Result.map_error (fun reasons ->
+         (* When we report an error, we want to show the best-normalized
+            version of sub, but the original super. When this check fails, it
+            is usually the case that the super was written by the user and the
+            sub was inferred. Thus, we should display the user-written jkind,
+            but simplify the inferred one, since the inferred one is probably
+            overly complex. *)
+         (* CR layouts v2.8: It would be useful report to the user why this
+            violation occurred, specifically which axes the violation is
+            along. *)
+         let best_sub = normalize ~mode:Require_best ~context sub in
+         Violation.of_ ~context
+           (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
 
 let sub_jkind_l_layout ~context sub super =
   let open Misc.Stdlib.Monad.Result.Syntax in
@@ -3807,7 +3807,7 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
   in
   match allow_any_crossing with
   | true -> Ok ()
-  | false -> 
+  | false ->
     let best_super =
       (* MB_EXPAND_R *)
       normalize ~mode:Require_best ~context super

@@ -150,6 +150,7 @@ let dump_linear = ref false             (* -dlinear *)
 let keep_startup_file = ref false       (* -dstartup *)
 let debug_ocaml = ref false             (* -debug-ocaml *)
 let llvm_backend = ref false            (* -llvm-backend *)
+let ikinds = ref false                  (* -ikinds: enable ikinds kind checker *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
@@ -189,7 +190,8 @@ let std_include_flag prefix =
   else (prefix ^ (Filename.quote Config.standard_library))
 
 let std_include_dir () =
-  if !no_std_include then [] else [Config.standard_library]
+  if !no_std_include then []
+  else [Config.standard_library]
 
 let shared = ref false (* -shared *)
 let dlcode = ref true (* not -nodynlink *)
