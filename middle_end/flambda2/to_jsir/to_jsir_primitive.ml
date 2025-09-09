@@ -368,15 +368,10 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
           "caml_ba_uint8_" ^ op_name)
     in
     use_prim' (Extern extern_name)
-  | Bigarray_load (dims, kind, _layout) ->
-    let extern_prefix =
-      match kind with
-      | Float32_t -> "caml_ba_float32_get_"
-      | Float16 | Float32 | Float64 | Sint8 | Uint8 | Sint16 | Uint16 | Int32
-      | Int64 | Int_width_int | Targetint_width_int | Complex32 | Complex64 ->
-        "caml_ba_get_"
-    in
-    use_prim' (Extern (extern_prefix ^ Int.to_string dims))
+  | Bigarray_load (_dims, _kind, _layout) ->
+    (* The index calculation is already done in Flambda, so we are free to
+       ignore the parameters. *)
+    use_prim' (Extern "caml_ba_get_raw_unsafe")
   | Phys_equal comparison ->
     let prim : Jsir.prim = match comparison with Eq -> Eq | Neq -> Neq in
     use_prim' prim
@@ -551,15 +546,10 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       | Bigstring, Sixty_four -> "caml_ba_uint8_set64"
     in
     use_prim' (Extern extern_name)
-  | Bigarray_set (dims, kind, _layout) ->
-    let extern_prefix =
-      match kind with
-      | Float32_t -> "caml_ba_float32_set_"
-      | Float16 | Float32 | Float64 | Sint8 | Uint8 | Sint16 | Uint16 | Int32
-      | Int64 | Int_width_int | Targetint_width_int | Complex32 | Complex64 ->
-        "caml_ba_set_"
-    in
-    use_prim' (Extern (extern_prefix ^ Int.to_string dims))
+  | Bigarray_set (_dims, _kind, _layout) ->
+    (* The index calculation is already done in Flambda, so we are free to
+       ignore the parameters. *)
+    use_prim' (Extern "caml_ba_set_raw_unsafe")
   | Atomic_field_int_arith op ->
     let extern_name =
       match op with
