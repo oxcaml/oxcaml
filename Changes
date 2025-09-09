@@ -404,6 +404,10 @@ OCaml 5.4.0 (9 October 2025)
   fails. Similarly for anonymous functor calls (of the form `F(struct ... end))
   (Clement Blaudeau, review by Gabriel Scherer)
 
+- #13747: Document support for native debugging with GDB and LLDB.
+   (Tim McGilchrist, review by Daniel Bünzli, Samuel Hym, Olivier Nicole
+   and Antonin Décimo)
+
 ### Compiler user-interface and warnings:
 
 - #13817: align spellchecking hints with the possibly misspelled identifier/
