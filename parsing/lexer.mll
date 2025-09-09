@@ -554,8 +554,11 @@ let oct_literal =
   '0' ['o' 'O'] ['0'-'7'] ['0'-'7' '_']*
 let bin_literal =
   '0' ['b' 'B'] ['0'-'1'] ['0'-'1' '_']*
+let unsigned_decimal_literal =
+  '0' ['u' 'U'] ['0'-'9'] ['0'-'9' '_']*
 let int_literal =
-  decimal_literal | hex_literal | oct_literal | bin_literal
+  decimal_literal | hex_literal | oct_literal | bin_literal |
+  unsigned_decimal_literal
 let float_literal =
   ['0'-'9'] ['0'-'9' '_']*
   ('.' ['0'-'9' '_']* )?

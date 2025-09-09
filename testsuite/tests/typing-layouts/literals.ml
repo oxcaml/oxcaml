@@ -169,6 +169,56 @@ Line 1, characters 36-51:
 Error: Integer literal exceeds the range of representable integers of type "int32#"
 |}]
 
+(*****************************)
+(* Unsigned decimal literals *)
+
+let x = 0u42
+let x = 0U42
+let x = 0u9223372036854775807
+let x = -0u9223372036854775807
+let x = 0u4294967295l
+let x = -0u4294967295l
+let x = 0u18446744073709551615L
+let x = -0u18446744073709551615L
+let x () = #0u18446744073709551615L
+let x () = -#0u18446744073709551615L
+[%%expect{|
+val x : int = 42
+val x : int = 42
+val x : int = -1
+val x : int = 1
+val x : int32 = -1l
+val x : int32 = 1l
+val x : int64 = -1L
+val x : int64 = 1L
+val x : unit -> int64# = <fun>
+val x : unit -> int64# = <fun>
+|}]
+
+let x = 0u9223372036854775808
+[%%expect{|
+Line 1, characters 8-29:
+1 | let x = 0u9223372036854775808
+            ^^^^^^^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int"
+|}]
+
+let x = 0u18446744073709551616L
+[%%expect{|
+Line 1, characters 8-31:
+1 | let x = 0u18446744073709551616L
+            ^^^^^^^^^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int64"
+|}]
+
+let x = 0u4294967296l
+[%%expect{|
+Line 1, characters 8-21:
+1 | let x = 0u4294967296l
+            ^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int32"
+|}]
+
 (*****************************************)
 (* Patterns *)
 
