@@ -578,10 +578,11 @@ module Type_decl_shape = struct
   *)
 
   let rec is_closed_type_shape shape =
-    (* [is_closed_type_shape] can be called frequently. It approximates whether
-       a shape is closed via a quick check. In particular, it does not keep
-       track of the currently bound variables. It returns false for, for
-       example, abstractions and application, and various variable cases. *)
+    (* [is_closed_type_shape] can be called frequently. It conservatively
+       approximates whether a shape is closed via a quick check. In particular,
+       it does not keep track of the currently bound variables. It returns false
+       for, for example, abstractions and application, and various variable
+       cases. *)
     let open Shape in
     match shape.desc with
     | Leaf -> true
@@ -681,20 +682,20 @@ module Type_decl_shape = struct
       Type_shape.Predef.shape_for_constr_with_predefs shape_for_constr'
     in
     let recursive = ref false in
-    (*= In principle, we could treat all blocks of declarations uniformly: we
-        could add [mutrec ...] around them together with projections for the
-        respective declaration, including for simple, non-recursive declarations
-        like
+    (* In principle, we could treat all blocks of declarations uniformly: we
+       could add [mutrec ...] around them together with projections for the
+       respective declaration, including for simple, non-recursive declarations
+       like
           [type direction = Up | Down | Left | Right].
-        It would become
+       It would become
           [(mutrec direction = Variant Up | Down | Left | Right).direction].
 
-        However, for non-recurisve declarations, this would add a redundant
-        mutually-recursive declaration and projection. So if none of the
-        declarations are recursive/refer to other declarations, we directly
-        use the body of the declarations instead of wrapping them in [mutrec]
-        and a projection. Whether a declaration is recursive is tracked via
-        the reference [recursive]. *)
+       However, for non-recurisve declarations, this would add a redundant
+       mutually-recursive declaration and projection. So if none of the
+       declarations are recursive/refer to other declarations, we directly
+       use the body of the declarations instead of wrapping them in [mutrec]
+       and a projection. Whether a declaration is recursive is tracked via
+       the reference [recursive]. *)
     let shape_for_constr' =
       shape_for_constr_with_declarations ~recursive decl_lookup_map
         shape_for_constr'
@@ -769,20 +770,22 @@ let update_subst_with_mutrec_decl (subst_constr, subst_constr_mut) t map =
 let eval_cache = Shape.Cache.create 256
 
 let add_to_cache t res subst_type (subst_constr_mut, subst_constr) =
-  (*= Due to internal sharing in memory, type shapes can become too large to
-      traverse recursively. As such, we cannot check here whether the shape [t]
-      is actually closed. We approximate this by checking whether it is being
-      evaluated in an empty environment, since an empty environment will always
-      lead to the same result (regardless of whether the shape is actually
-      closed). In an empty environment
-      - [subst_type] is empty, meaning there are no free type variables to
-        substitute.
-      - [subst_constr_mut] is empty, meaning there are no mutually-recursive
-        declarations that we could insert for [Constr]-entries, and
-      - [subst_constr] is empty, meaning there are no recursive occurrences
-        of a particular [Constr (id, args)] to be substituted with a recursive
-        variable.
-  *)
+  (* Due to internal sharing in memory, type shapes can become too large to
+     traverse recursively. As such, we cannot check here whether the shape [t]
+     is actually closed. We approximate this by checking whether it is being
+     evaluated in an empty environment, since an empty environment will always
+     lead to the same result (regardless of whether the shape is actually
+     closed). In an empty environment:
+
+     - [subst_type] is empty, meaning there are no free type variables to
+       substitute,
+
+     - [subst_constr_mut] is empty, meaning there are no mutually-recursive
+       declarations that we could insert for [Constr]-entries, and
+
+     - [subst_constr] is empty, meaning there are no recursive occurrences
+       of a particular [Constr (id, args)] to be substituted with a recursive
+       variable. *)
   if Ident.Map.is_empty subst_type
      && Ident.Map.is_empty subst_constr_mut
      && Ident.Map.is_empty subst_constr
