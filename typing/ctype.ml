@@ -2300,7 +2300,45 @@ let mk_is_abstract env p =
   -> false
 
 let mk_jkind_context env jkind_of_type =
-  { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
+  let lookup_type p = match Env.find_type p env with decl -> Some decl | exception Not_found -> None in
+  let debug_print_env ppf =
+    (* Print a bounded snapshot of types in the environment *)
+    let max_items = 120 in
+    let count = ref 0 in
+    let items = ref [] in
+    let add_item name path (decl : Types.type_declaration) acc =
+      if !count < max_items then begin
+        incr count;
+        items := (name, path, decl) :: !items
+      end;
+      acc
+    in
+    ignore (Env.fold_types add_item None env ());
+    let pp_kind ppf (decl : Types.type_declaration) =
+      match decl.type_kind, decl.type_manifest with
+      | Types.Type_abstract _, None -> Format.fprintf ppf "abstract"
+      | Types.Type_abstract _, Some _ -> Format.fprintf ppf "abbrev"
+      | Types.Type_variant _, _ -> Format.fprintf ppf "variant"
+      | Types.Type_record _, _ -> Format.fprintf ppf "record"
+      | Types.Type_record_unboxed_product _, _ -> Format.fprintf ppf "record(unboxed)"
+      | Types.Type_open, _ -> Format.fprintf ppf "open"
+    in
+    let pp_item ppf (name, path, decl) =
+      Format.fprintf ppf "- %s (%a): %a"
+        name Path.print path pp_kind decl
+    in
+    let items = List.rev !items in
+    Format.fprintf ppf "@[<v2>Environment types (showing %d/%d):@,%a@]@."
+      (List.length items) !count
+      (Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,") pp_item)
+      items
+  in
+  { Jkind.jkind_of_type;
+    is_abstract = mk_is_abstract env;
+    lookup_type;
+    normalize_path = (fun p -> Env.normalize_type_path None env p);
+    debug_print_env;
+  }
 
 (* This uses the forward ref - only needed inside estimate_type_jkind *)
 let mk_jkind_context_check_principal_ref env =
@@ -2360,9 +2398,18 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
-     if tvariant_not_immediate row
-     then Jkind.for_non_float ~why:Polymorphic_variant
-     else Jkind.Builtin.immediate ~why:Immediate_polymorphic_variant
+     if tvariant_not_immediate row then (
+       if Language_extension.is_enabled Ikinds && Btype.static_row row then
+         (* Under -extension ikinds: for a static (closed) row, approximate as
+            immutable_data with a single with-bound to the whole variant type. *)
+         Jkind.Builtin.immutable_data ~why:Polymorphic_variant
+         |> Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:ty
+         |> Jkind.mark_best
+       else
+         (* Open/non-static rows (or when ikinds is disabled): conservative non-float. *)
+         Jkind.for_non_float ~why:Polymorphic_variant
+     ) else
+       Jkind.Builtin.immediate ~why:Immediate_polymorphic_variant
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
     let context = mk_jkind_context_check_principal_ref env in
@@ -2516,7 +2563,7 @@ let constrain_type_jkind ~fixed env ty jkind =
 
     | _ ->
        match
-         Jkind.sub_or_intersect ~type_equal ~context ty's_jkind jkind
+         Ikind.sub_or_intersect ~type_equal ~context ty's_jkind jkind
        with
        | Sub -> Ok ()
        | Disjoint sub_failure_reasons ->
@@ -5135,7 +5182,7 @@ let zap_modalities_to_floor_if_at_least level =
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
-  Jkind.get_mode_crossing ~context jkind
+  Ikind.crossing_of_jkind ~context jkind
 
 let crossing_of_ty env ?modalities ty =
   let crossing =
@@ -7376,14 +7423,18 @@ let check_decl_jkind env decl jkind =
       Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
     | _ -> decl.type_jkind
   in
-  match Jkind.sub_jkind_l ~type_equal ~context decl_jkind jkind with
+  match Ikind.sub_jkind_l
+          ~origin:(Format.asprintf "ctype:decl %a" Location.print_loc decl.type_loc)
+          ~type_equal ~context decl_jkind jkind with
   | Ok () -> Ok ()
   | Error _ as err ->
     match decl.type_manifest with
     | None -> err
     | Some ty ->
       let ty_jkind = type_jkind env ty in
-      match Jkind.sub_jkind_l ~type_equal ~context ty_jkind jkind with
+      match Ikind.sub_jkind_l
+              ~origin:(Format.asprintf "ctype:manifest %a" Location.print_loc decl.type_loc)
+              ~type_equal ~context ty_jkind jkind with
       | Ok () -> Ok ()
       | Error _ as err -> err
 
@@ -7394,12 +7445,12 @@ let constrain_decl_jkind env decl jkind =
   (* This case is sad, because it can't refine type variables. Hence
      the need for reimplementation. Hopefully no one hits this for
      a while. *)
-  | None -> check_decl_jkind env decl jkind
+  | None -> Ikind.with_origin_tag "ctype:constrain_decl_jkind" (fun () -> check_decl_jkind env decl jkind)
   | Some jkind ->
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      Jkind.sub_or_error ~type_equal ~context decl.type_jkind jkind
+      Ikind.sub_or_error ~type_equal ~context decl.type_jkind jkind
     with
     | Ok () as ok -> ok
     | Error _ as err ->

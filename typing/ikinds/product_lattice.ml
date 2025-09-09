@@ -1,0 +1,74 @@
+module type SHAPE = sig
+  val axis_sizes : int array (* n_i >= 1 *)
+end
+
+(* Simple array-based product lattice for debugging/prototyping. *)
+module Make (S : SHAPE) = struct
+  type t = int array
+
+  let axis_sizes = Array.copy S.axis_sizes
+  let num_axes = Array.length axis_sizes
+
+  let bot = Array.make num_axes 0
+  let top = Array.init num_axes (fun i -> axis_sizes.(i) - 1)
+
+  let join (a : t) (b : t) : t =
+    Array.init num_axes (fun i -> max a.(i) b.(i))
+
+  let meet (a : t) (b : t) : t =
+    Array.init num_axes (fun i -> min a.(i) b.(i))
+
+  let leq (a : t) (b : t) : bool =
+    let ok = ref true in
+    for i = 0 to num_axes - 1 do
+      if a.(i) > b.(i) then ok := false
+    done;
+    !ok
+
+  let equal (a : t) (b : t) : bool =
+    let eq = ref true in
+    for i = 0 to num_axes - 1 do
+      if a.(i) <> b.(i) then eq := false
+    done;
+    !eq
+
+  let hash (a : t) = Hashtbl.hash (Array.to_list a)
+
+  (* Axis-wise residual: zero out an axis if b's level >= a's level *)
+  let co_sub (a : t) (b : t) : t =
+    Array.init num_axes (fun i -> if b.(i) >= a.(i) then 0 else a.(i))
+
+  let get_axis (v : t) ~axis:i : int =
+    if i < 0 || i >= num_axes then invalid_arg "get_axis: axis out of range";
+    v.(i)
+
+  let set_axis (v : t) ~axis:i ~level:lev : t =
+    if i < 0 || i >= num_axes then invalid_arg "set_axis: axis out of range";
+    if lev < 0 || lev >= axis_sizes.(i) then invalid_arg "set_axis: level out of range";
+    let a = Array.copy v in
+    a.(i) <- lev;
+    a
+
+  let encode ~levels : t =
+    if Array.length levels <> num_axes then invalid_arg "encode: wrong arity";
+    Array.init num_axes (fun i ->
+        let lev = levels.(i) in
+        if lev < 0 || lev >= axis_sizes.(i) then invalid_arg "encode: level out of range";
+        lev)
+
+  let decode (v : t) : int array = Array.copy v
+
+  let find_non_bot_axis (v : t) : int option =
+    let rec find_non_bot_axis_rec (v : t) (i : int) : int option =
+      if i >= num_axes then None
+      else if v.(i) > 0 then Some i
+      else find_non_bot_axis_rec v (i + 1)
+    in
+    find_non_bot_axis_rec v 0
+
+  let pp (v : t) : string =
+    let parts = v |> Array.to_list |> List.map string_of_int |> String.concat "," in
+    Printf.sprintf "[%s]" parts
+
+  let to_string = pp
+end

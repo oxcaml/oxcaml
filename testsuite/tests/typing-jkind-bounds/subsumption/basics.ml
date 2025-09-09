@@ -1,5 +1,5 @@
 (* TEST
-    flags = "-extension layouts_alpha";
+    flags = "-extension layouts_alpha -extension ikinds";
     expect;
 *)
 
@@ -36,23 +36,13 @@ end = struct
   type t : immediate with string
 end
 [%%expect {|
-Lines 3-5, characters 6-3:
-3 | ......struct
+Line 4, characters 2-32:
 4 |   type t : immediate with string
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : immutable_data end
-       is not included in
-         sig type t : immediate end
-       Type declarations do not match:
-         type t : immutable_data
-       is not included in
-         type t : immediate
-       The kind of the first is immutable_data
-         because of the definition of t at line 4, characters 2-32.
-       But the kind of the first must be a subkind of immediate
-         because of the definition of t at line 2, characters 2-20.
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data
+         because of the annotation on the declaration of the type t.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
 |}]
 
 module M : sig
@@ -194,7 +184,6 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
-         yielding: mod unyielding with 'a ≰ mod unyielding
 |}]
 
 module M : sig
@@ -259,13 +248,7 @@ type v : immutable_data with u = { value : t }
 [%%expect {|
 type u
 type t = private u
-Line 3, characters 0-46:
-3 | type v : immutable_data with u = { value : t }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "v" is immutable_data with t
-         because it's a boxed record type.
-       But the kind of type "v" must be a subkind of immutable_data with u
-         because of the annotation on the declaration of the type v.
+type v = { value : t; }
 |}]
 
 type t : immediate with t = [`foo | `bar]
@@ -278,14 +261,7 @@ type u : immutable_data with t = [`foo of t]
 (* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect {|
 type t
-Line 2, characters 0-44:
-2 | type u : immutable_data with t = [`foo of t]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[ `foo of t ]" is value mod non_float
-         because it's a polymorphic variant type.
-       But the kind of type "[ `foo of t ]" must be a subkind of
-           immutable_data with t
-         because of the definition of u at line 2, characters 0-44.
+type u = [ `foo of t ]
 |}]
 
 type (_, _) eq = Eq : ('a, 'a) eq
@@ -353,4 +329,48 @@ Error: Signature mismatch:
          because of the definition of t at line 2, characters 2-36.
        But the kind of the first must be a subkind of immutable_data with 'a
          because of the definition of t at line 2, characters 2-36.
+|}]
+
+(* Benjamin's example *)
+module type S = sig
+  type 'a t1
+  type 'a t2
+  type 'a t : immutable_data with 'a t1 t2 * unit t2
+end
+
+module M : S = struct
+  type 'a t1 = 'a
+  type 'a t2 = 'a
+  type 'a t = 'a t2 t1 * unit t1
+end
+[%%expect{|
+module type S =
+  sig
+    type 'a t1
+    type 'a t2
+    type 'a t : immutable_data with 'a t1 t2 with unit t2
+  end
+module M : S
+|}]
+
+(* Various types of rose trees *)
+module type S = sig
+  type 'a rose : immutable_data with 'a
+  type 'a lily : immutable_data with 'a
+  type 'a tulip : immutable_data
+end
+
+module M : S = struct
+  type 'a rose = Leaf of 'a | Node of ('a * 'a) rose
+  type 'a lily = Node of ('a * ('a list) lily) list
+  type 'a tulip = Node of ('a list) tulip list
+end
+[%%expect{|
+module type S =
+  sig
+    type 'a rose : immutable_data with 'a
+    type 'a lily : immutable_data with 'a
+    type 'a tulip : immutable_data
+  end
+module M : S
 |}]

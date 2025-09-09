@@ -1504,7 +1504,7 @@ let narrow_to_manifest_jkind env loc decl =
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
         match
-          Jkind.sub_jkind_l ~type_equal ~context
+          Ikind.sub_jkind_l ~origin:(Format.asprintf "typedecl:manifest_vs_decl %a" Location.print_loc decl.type_loc) ~type_equal ~context
             manifest_jkind decl.type_jkind
         with
         | Ok () -> ()
@@ -2768,7 +2768,7 @@ let normalize_decl_jkinds env decls =
       match
         (* CR layouts v2.8: Consider making a function that doesn't compute
            histories for this use-case, which doesn't need it. *)
-        Jkind.sub_jkind_l
+        Ikind.sub_jkind_l ~origin:(Format.asprintf "typedecl:normalize %a (%a)" Path.print path Location.print_loc decl.type_loc)
           ~type_equal
           ~context
           ~allow_any_crossing
