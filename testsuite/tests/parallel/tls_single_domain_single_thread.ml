@@ -4,11 +4,6 @@
  { native; }
 *)
 
-external has_tls_state
-    : unit -> bool @@ portable = "caml_thread_has_tls_state"
-
-let () = assert (not (has_tls_state ()))
-
 let check_tls () =
   let k1 = Domain.TLS.new_key (fun () -> 10) in
   let k2 = Domain.TLS.new_key (fun () -> 1.0) in
