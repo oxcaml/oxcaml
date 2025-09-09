@@ -63,8 +63,12 @@ end = struct
     Array.blit st 0 new_st 0 size;
     new_st
 
-  external compare_and_set 
+  external compare_and_set_field
     : t array -> int -> t -> t -> bool @@ portable = "%atomic_cas_field"
+
+  let compare_and_set st idx old new_ = 
+    (* In Flambda 2 there is a strict distinction between arrays and blocks. *)
+    compare_and_set_field (Sys.opaque_identity st) idx old new_
 end
 
 module Runtime_4 = struct
