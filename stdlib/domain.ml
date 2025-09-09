@@ -595,7 +595,8 @@ module TLS0 = struct
 
       (* If TLS is supported, we need to initialize it here, since [Thread]
          might never be loaded. *)
-      let[@inline] init_main_thread () = if has_tls_state then (init_main_thread (); init ())
+      let[@inline] init_main_thread () = 
+        if has_tls_state then (init_main_thread (); init ())
       let () = init_main_thread ()
   end
 end
