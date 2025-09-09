@@ -195,7 +195,6 @@ type jkind_context =
     normalize_path : Path.t -> Path.t;
         (* Debug: pretty-print a snapshot of the typing environment. *)
     debug_print_env : Format.formatter -> unit
-
   }
 
 (******************************)
