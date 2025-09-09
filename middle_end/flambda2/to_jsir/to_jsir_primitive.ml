@@ -112,7 +112,17 @@ let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
 
 let get_tag ~env ~res x =
   let x, res = prim_arg ~env ~res x in
-  use_prim0 ~env ~res (Extern "%direct_obj_tag") [x]
+  (* CR selee: We'd prefer to use "%direct_obj_tag" here which is much faster,
+     but this causes issues when we use [Js.Unsafe.*] functions (in the JSOO
+     runtime library). When constructing an [any array], Flambda will first use
+     this function to check during runtime whether [any] is actually a boxed
+     float, to determine whether it should create a float array or a normal
+     array. Unfortunately [any] can be [undefined] (in JS), so checking field 0
+     raises an error. Using [caml_obj_tag] mitigates this issue since it is
+     significantly more robust, but at the cost of tag-checking being much more
+     expensive. At some point there should be a better fix for this (or a
+     refactor of the [Js.Unsafe] module). *)
+  use_prim0 ~env ~res (Extern "caml_obj_tag") [x]
 
 let check_tag ~env ~res x ~tag =
   let tag_var, env, res = get_tag ~env ~res x in
