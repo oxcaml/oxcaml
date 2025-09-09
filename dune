@@ -233,10 +233,10 @@
   lattice_intf
   global_counters
   product_lattice
-  lattice_polynomial
   ldd
   ldd_jkind_solver
   axis_lattice
+  axis_lattice_bitfield
   ikind
   typetexp
   patterns
