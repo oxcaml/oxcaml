@@ -216,17 +216,33 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
         (Flambda_features.dump_simplify ())
         ppf flambda;
       print_flexpect "simplify" ppf ~raw_flambda flambda;
-      let flambda, free_names, all_code, slot_offsets, last_pass_name =
+      let ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            last_pass_name ) =
         if Flambda_features.enable_reaper ()
         then (
-          let flambda, free_names, all_code, slot_offsets =
+          let flambda, free_names, all_code, slot_offsets, final_typing_env =
             Profile.record_call ~accumulate:true "reaper" (fun () ->
                 Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
-                  flambda)
+                  ~final_typing_env flambda)
           in
           print_flexpect "reaper" ppf ~raw_flambda flambda;
-          flambda, free_names, all_code, slot_offsets, "reaper")
-        else flambda, free_names, all_code, slot_offsets, last_pass_name
+          ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            "reaper" ))
+        else
+          ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            last_pass_name )
       in
       print_flambda last_pass_name
         (Flambda_features.dump_flambda ())
