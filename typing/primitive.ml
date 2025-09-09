@@ -757,6 +757,50 @@ let prim_has_valid_reprs ~loc prim =
         is (Same_as_ocaml_repr C.bits32);
         any;
         is (Same_as_ocaml_repr C.value)]
+    | "%array_safe_get_indexed_by_int16#" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits16);
+        any]
+    | "%array_safe_set_indexed_by_int16#" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits16);
+        any;
+        is (Same_as_ocaml_repr C.value)]
+    | "%array_unsafe_get_indexed_by_int16#" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits16);
+        any]
+    | "%array_unsafe_set_indexed_by_int16#" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits16);
+        any;
+        is (Same_as_ocaml_repr C.value)]
+    | "%array_safe_get_indexed_by_int8#" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits8);
+        any]
+    | "%array_safe_set_indexed_by_int8#" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits8);
+        any;
+        is (Same_as_ocaml_repr C.value)]
+    | "%array_unsafe_get_indexed_by_int8#" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits8);
+        any]
+    | "%array_unsafe_set_indexed_by_int8#" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits8);
+        any;
+        is (Same_as_ocaml_repr C.value)]
     | "%array_safe_get_indexed_by_nativeint#" ->
       check [
         is (Same_as_ocaml_repr C.value);

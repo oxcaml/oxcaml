@@ -742,6 +742,50 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
           (gen_array_set_kind (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_int32)),
         3)
+    | "%array_safe_get_indexed_by_int16#" ->
+      Primitive
+        ((Parrayrefs (gen_array_ref_kind mode,
+                      Punboxed_or_untagged_integer_index Untagged_int16,
+                      Mutable)), 2)
+    | "%array_safe_set_indexed_by_int16#" ->
+      Primitive
+        (Parraysets
+          (gen_array_set_kind (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Untagged_int16),
+         3)
+    | "%array_unsafe_get_indexed_by_int16#" ->
+      Primitive
+        (Parrayrefu (gen_array_ref_kind mode,
+                     Punboxed_or_untagged_integer_index Untagged_int16,
+                     Mutable), 2)
+    | "%array_unsafe_set_indexed_by_int16#" ->
+      Primitive
+        ((Parraysetu
+          (gen_array_set_kind (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Untagged_int16)),
+        3)
+    | "%array_safe_get_indexed_by_int8#" ->
+      Primitive
+        ((Parrayrefs (gen_array_ref_kind mode,
+                      Punboxed_or_untagged_integer_index Untagged_int8,
+                      Mutable)), 2)
+    | "%array_safe_set_indexed_by_int8#" ->
+      Primitive
+        (Parraysets
+          (gen_array_set_kind (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Untagged_int8),
+         3)
+    | "%array_unsafe_get_indexed_by_int8#" ->
+      Primitive
+        (Parrayrefu (gen_array_ref_kind mode,
+                     Punboxed_or_untagged_integer_index Untagged_int8,
+                     Mutable), 2)
+    | "%array_unsafe_set_indexed_by_int8#" ->
+      Primitive
+        ((Parraysetu
+          (gen_array_set_kind (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Untagged_int8)),
+        3)
     | "%array_safe_get_indexed_by_nativeint#" ->
       Primitive
         ((Parrayrefs (gen_array_ref_kind mode,
