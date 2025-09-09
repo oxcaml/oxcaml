@@ -930,8 +930,8 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
 
          In addition, if the return type for an external is a nested unboxed
          product such as [#(#(int * int) * int)], bytecode stubs need to return
-         a nested tuple, while JSIR stubs need to return a single flat
-         (i.e. non-nested) tuple containing the unarised arguments. Unlike the
+         a nested tuple, while JSIR stubs need to return a single flat (i.e.
+         non-nested) tuple containing the unarised arguments. Unlike the
          parameter passing case above, this is different from native code
          compilation, where multiple return values are supported to some extent.
 
