@@ -14,36 +14,22 @@ module Make (S : SHAPE) = struct
 
   let top = Array.init num_axes (fun i -> axis_sizes.(i) - 1)
 
-  let join (a : t) (b : t) : t = Array.init num_axes (fun i -> max a.(i) b.(i))
+  let join (a : t) (b : t) : t = Array.map2 max a b
 
-  let meet (a : t) (b : t) : t = Array.init num_axes (fun i -> min a.(i) b.(i))
+  let meet (a : t) (b : t) : t = Array.map2 min a b
 
-  let leq (a : t) (b : t) : bool =
-    let ok = ref true in
-    for i = 0 to num_axes - 1 do
-      if a.(i) > b.(i) then ok := false
-    done;
-    !ok
+  let leq (a : t) (b : t) : bool = Array.for_all2 (fun ai bi -> ai <= bi) a b
 
-  let equal (a : t) (b : t) : bool =
-    let eq = ref true in
-    for i = 0 to num_axes - 1 do
-      if a.(i) <> b.(i) then eq := false
-    done;
-    !eq
+  let equal (a : t) (b : t) : bool = Array.for_all2 ( = ) a b
 
   let hash (a : t) = Hashtbl.hash (Array.to_list a)
 
   (* Axis-wise residual: zero out an axis if b's level >= a's level *)
-  let co_sub (a : t) (b : t) : t =
-    Array.init num_axes (fun i -> if b.(i) >= a.(i) then 0 else a.(i))
+  let co_sub (a : t) (b : t) : t = Array.map2 (fun ai bi -> if bi >= ai then 0 else ai) a b
 
-  let get_axis (v : t) ~axis:i : int =
-    if i < 0 || i >= num_axes then invalid_arg "get_axis: axis out of range";
-    v.(i)
+  let get_axis (v : t) ~axis:i : int = v.(i)
 
   let set_axis (v : t) ~axis:i ~level:lev : t =
-    if i < 0 || i >= num_axes then invalid_arg "set_axis: axis out of range";
     if lev < 0 || lev >= axis_sizes.(i)
     then invalid_arg "set_axis: level out of range";
     let a = Array.copy v in
@@ -52,23 +38,20 @@ module Make (S : SHAPE) = struct
 
   let encode ~levels : t =
     if Array.length levels <> num_axes then invalid_arg "encode: wrong arity";
-    Array.init num_axes (fun i ->
-        let lev = levels.(i) in
+    Array.mapi (fun i lev ->
         if lev < 0 || lev >= axis_sizes.(i)
         then invalid_arg "encode: level out of range";
-        lev)
+        lev) levels
 
   let decode (v : t) : int array = Array.copy v
 
   let find_non_bot_axis (v : t) : int option =
-    let rec find_non_bot_axis_rec (v : t) (i : int) : int option =
-      if i >= num_axes
-      then None
-      else if v.(i) > 0
-      then Some i
-      else find_non_bot_axis_rec v (i + 1)
+    let rec loop i =
+      if i >= num_axes then None
+      else if v.(i) > 0 then Some i
+      else loop (i + 1)
     in
-    find_non_bot_axis_rec v 0
+    loop 0
 
   let pp (v : t) : string =
     let parts =
