@@ -1381,6 +1381,28 @@ val x : float32 = 3.1400001s
 val x : unit -> float32# = <fun>
 |}]
 
+(*****************************)
+(* unsigned decimal literals *)
+
+let x = 0u42
+let x = 0U42
+let x = 0u9223372036854775807
+let x = -0u9223372036854775807
+let x = 0u18446744073709551615L
+let x = -0u18446744073709551615L
+let x () = #0u18446744073709551615L
+let x () = -#0u18446744073709551615L
+[%%expect{|
+val x : int = 42
+val x : int = 42
+val x : int = -1
+val x : int = 1
+val x : int64 = -1L
+val x : int64 = 1L
+val x : unit -> int64# = <fun>
+val x : unit -> int64# = <fun>
+|}]
+
 (********)
 (* simd *)
 (* CR mslater: Move documentation to GitHub *)
