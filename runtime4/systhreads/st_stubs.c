@@ -557,11 +557,10 @@ static value caml_thread_init_current(value unit)
 
 static value caml_thread_init_main_thread(value unit)
 {
-  // Leaks at most one descriptor
-  static value caml_main_thread_descr;
+  if (curr_thread != NULL) return Val_unit;
   caml_thread_init_current(unit);
-  caml_main_thread_descr = curr_thread->descr;
-  caml_register_generational_global_root(&caml_main_thread_descr);
+  // Leaks at most one descriptor
+  caml_register_generational_global_root(&curr_thread->descr);
   return Val_unit;
 }
 
@@ -580,6 +579,9 @@ CAMLprim value caml_thread_initialize(value unit)   /* ML */
   /* Initialize the keys */
   st_tls_newkey(&thread_descriptor_key);
   st_tls_newkey(&last_channel_locked_key);
+  /* If curr_thread was initialized by caml_thread_init_main_thread, we must
+     unregister the descr, which will now be scanned by caml_scan_roots_hook */
+  if(curr_thread) caml_remove_generational_global_root(&curr_thread->descr);
   /* Set up a thread info block for the current thread */
   caml_thread_init_current(unit);
 #ifdef NATIVE_CODE

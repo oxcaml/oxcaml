@@ -658,7 +658,7 @@ static void caml_thread_domain_spawn_hook(void)
   domain_lockmode = LOCKMODE_DOMAINS;
 }
 
-static value caml_thread_init_current(value unit) 
+static value caml_thread_init_current(value unit)
 {
   if (This_thread != NULL) return Val_unit;
   caml_thread_t new_thread =
@@ -679,13 +679,12 @@ static value caml_thread_init_current(value unit)
   return Val_unit;
 }
 
-static value caml_thread_init_main_thread(value unit) 
+static value caml_thread_init_main_thread(value unit)
 {
-  // Leaks at most one descriptor per domain
+  if (This_thread != NULL) return Val_unit;
   caml_thread_init_current(unit);
-  value* leak_main_thread_descr = (value*)caml_stat_alloc(sizeof(value));
-  *leak_main_thread_descr = This_thread->descr;
-  caml_register_generational_global_root(leak_main_thread_descr);
+  // Leaks at most one descriptor per domain
+  caml_register_generational_global_root(&This_thread->descr);
   return Val_unit;
 }
 
@@ -710,9 +709,12 @@ static void caml_thread_domain_initialize_hook(void)
   ls->reinitialize_after_fork = (void (*)(void*))&default_reinitialize_after_fork;
   ls->can_skip_yield = (int (*)(void*))&default_can_skip_yield;
   ls->yield = (void (*)(void*))&st_thread_yield;
- 
+
   Locking_scheme(Caml_state->id) = ls;
 
+  /* If This_thread was initialized by caml_thread_init_main_thread, we must
+     unregister the descr, which will now be scanned by caml_scan_roots_hook */
+  if(This_thread) caml_remove_generational_global_root(&This_thread->descr);
   caml_thread_init_current(Val_unit);
 
   Active_thread = This_thread;

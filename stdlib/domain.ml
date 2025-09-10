@@ -569,11 +569,9 @@ module TLS0 = struct
 
   type 'a key = 'a Impl.key
 
-  external is_boot_compiler
-    : unit -> bool @@ portable = "caml_is_boot_compiler"
   external has_tls_state
     : unit -> bool @@ portable = "caml_thread_has_tls_state"
-  let has_tls_state = has_tls_state () && not (is_boot_compiler ())
+  let has_tls_state = has_tls_state ()
 
   let[@inline] new_key ?split_from_parent init =
     if has_tls_state
