@@ -1072,7 +1072,8 @@ val make_formatter :
 *)
 
 val make_synchronized_formatter :
-  (string -> int -> int -> unit) -> (unit -> unit) -> formatter Domain.Safe.TLS.key
+  (string -> int -> int -> unit)
+  -> (unit -> unit) -> formatter Domain.Safe.TLS.key
   @@ nonportable
 [@@alert unstable][@@alert "-unstable"]
 [@@alert unsafe_multidomain "Use [Format.Safe.make_synchronized_formatter]."]
@@ -1475,8 +1476,8 @@ val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
     via modes. *)
 module Safe : sig
   (** Like {!make_synchronized_formatter}, but can be called from any thread.
-      The provided closures must be [portable] as they will be called from other threads
-      that access the returned [Domain.Safe.TLS.key]. *)
+      The provided closures must be [portable] as they will be called from other
+      threads that access the returned [Domain.Safe.TLS.key]. *)
   val make_synchronized_formatter :
     (string -> int -> int -> unit) @ portable
     -> (unit -> unit) @ portable
