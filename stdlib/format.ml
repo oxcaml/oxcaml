@@ -1080,10 +1080,15 @@ let unsafe_unwrap_tls k =
   .global.many.aliased
   |> Obj.magic_uncontended
 
+(* These functions are unsafe. *)
 let get_std_formatter () = unsafe_unwrap_tls std_formatter_key
 let get_err_formatter () = unsafe_unwrap_tls err_formatter_key
 let get_str_formatter () = snd (unsafe_unwrap_tls str_buf_and_formatter_key)
 let get_stdbuf () = fst (unsafe_unwrap_tls str_buf_and_formatter_key)
+let std_formatter = get_std_formatter ()
+let err_formatter = get_err_formatter ()
+let str_formatter = get_str_formatter ()
+let stdbuf = get_stdbuf ()
 
 (* [flush_buffer_formatter buf ppf] flushes formatter [ppf],
    then returns the contents of buffer [buf] that is reset.
@@ -1189,10 +1194,12 @@ let formatter_of_symbolic_output_buffer sob =
 
 *)
 
-let[@inline] apply1 f v : unit = 
-  TLS.access std_formatter_key (fun fmt : unit -> f fmt v)
-let[@inline] apply2 f v w : unit = 
-  TLS.access std_formatter_key (fun fmt : unit -> f fmt v w)
+let[@inline] apply1 (type (a : immutable_data)) f v : a = 
+  (TLS.access std_formatter_key (fun fmt -> {global={aliased=f fmt v}}))
+  .global.aliased
+let[@inline] apply2 (type (a : immutable_data)) f v w : a = 
+  (TLS.access std_formatter_key (fun fmt -> {global={aliased=f fmt v w}}))
+  .global.aliased
 
 let open_hbox = apply1 pp_open_hbox
 and open_vbox = apply1 pp_open_vbox
@@ -1200,9 +1207,10 @@ and open_hvbox = apply1 pp_open_hvbox
 and open_hovbox = apply1 pp_open_hovbox
 and open_box = apply1 pp_open_box
 and close_box = apply1 pp_close_box
-and open_stag stag () = 
+and open_stag stag = 
+  (* CR mslater: ? *)
+  let stag = Obj.magic_portable stag in
   TLS.access std_formatter_key (fun fmt : unit ->
-    (* CR mslater: ? *)
     pp_open_stag fmt (Obj.magic_uncontended stag)); ()
 and close_stag = apply1 pp_close_stag
 and print_as = apply2 pp_print_as
@@ -1229,23 +1237,27 @@ and print_tbreak = apply2 pp_print_tbreak
 and set_tab = apply1 pp_set_tab
 and print_tab = apply1 pp_print_tab
 
-and set_margin = apply1 pp_set_margin
+and set_margin = apply1 (fun fmt i -> pp_set_margin fmt i)
 and get_margin = apply1 pp_get_margin
 
-and set_max_indent = apply1 pp_set_max_indent
+and set_max_indent = apply1 (fun fmt i -> pp_set_max_indent fmt i)
 and get_max_indent = apply1 pp_get_max_indent
 
 and set_geometry ~max_indent ~margin =
-  pp_set_geometry (TLS.get std_formatter_key) ~max_indent ~margin
+  TLS.access std_formatter_key 
+    (fun fmt : unit -> pp_set_geometry fmt ~max_indent ~margin); ()
 and safe_set_geometry ~max_indent ~margin =
-  pp_safe_set_geometry (TLS.get std_formatter_key) ~max_indent ~margin
+  TLS.access std_formatter_key 
+    (fun fmt : unit -> pp_safe_set_geometry fmt ~max_indent ~margin); ()
 and get_geometry = apply1 pp_get_geometry
 and update_geometry update =
-  let geometry = pp_get_geometry (TLS.get std_formatter_key) () in
-  let updated = update geometry in
-  pp_set_full_geometry (TLS.get std_formatter_key) updated
+  let geometry = TLS.access std_formatter_key 
+    (fun fmt -> {global=pp_get_geometry fmt ()}) in
+  let updated = update geometry.global in
+  TLS.access std_formatter_key 
+    (fun fmt : unit -> pp_set_full_geometry fmt updated); ()
 
-and set_max_boxes = apply1 pp_set_max_boxes
+and set_max_boxes = apply1 (fun fmt i -> pp_set_max_boxes fmt i)
 and get_max_boxes = apply1 pp_get_max_boxes
 and over_max_boxes = apply1 pp_over_max_boxes
 
@@ -1254,14 +1266,40 @@ and get_ellipsis_text = apply1 pp_get_ellipsis_text
 
 and set_formatter_out_channel = apply1 pp_set_formatter_out_channel
 
-and set_formatter_out_functions = apply1 pp_set_formatter_out_functions
-and get_formatter_out_functions = apply1 pp_get_formatter_out_functions
+and set_formatter_out_functions fs =
+  (* Safe because get/set out functions is nonportable. *) 
+  let fs = Obj.magic_portable fs in 
+  apply1 pp_set_formatter_out_functions fs
+and get_formatter_out_functions () =
+  (TLS.access std_formatter_key (fun fmt -> 
+    let out_functions = pp_get_formatter_out_functions fmt () in
+    (* Safe because get/set out functions is nonportable. *)
+    {global={aliased={many=Obj.magic_portable out_functions}}}))
+  .global.aliased.many
 
-and set_formatter_output_functions = apply2 pp_set_formatter_output_functions
-and get_formatter_output_functions = apply1 pp_get_formatter_output_functions
+and set_formatter_output_functions f1 f2 =
+  (* Safe because get/set output functions is nonportable. *)
+  let f1 = Obj.magic_portable f1 in
+  let f2 = Obj.magic_portable f2 in 
+  apply2 pp_set_formatter_output_functions f1 f2
+and get_formatter_output_functions () = 
+  (TLS.access std_formatter_key (fun fmt -> 
+    let out_functions = pp_get_formatter_output_functions fmt () in
+    (* Safe because get/set output functions is nonportable. *)
+    {global={aliased={many=Obj.magic_portable out_functions}}}))
+  .global.aliased.many
 
-and set_formatter_stag_functions = apply1 pp_set_formatter_stag_functions
-and get_formatter_stag_functions = apply1 pp_get_formatter_stag_functions
+and set_formatter_stag_functions fs = 
+  (* Safe because get/set stag functions is nonportable. *) 
+  let fs = Obj.magic_portable fs in 
+  apply1 pp_set_formatter_stag_functions fs
+and get_formatter_stag_functions () =
+  (TLS.access std_formatter_key (fun fmt -> 
+    let out_functions = pp_get_formatter_stag_functions fmt () in
+    (* Safe because get/set stag functions is nonportable. *) 
+    {global={aliased={many=Obj.magic_portable out_functions}}}))
+  .global.aliased.many
+
 and set_print_tags = apply1 pp_set_print_tags
 and get_print_tags = apply1 pp_get_print_tags
 and set_mark_tags = apply1 pp_set_mark_tags
@@ -1446,13 +1484,19 @@ let ifprintf _ppf (Format (fmt, _)) =
 let fprintf ppf = kfprintf ignore ppf
 
 let printf (Format (fmt, _)) =
-  make_printf
-    (fun acc -> output_acc (TLS.get std_formatter_key) acc)
+  make_printf (fun acc -> 
+    (* CR mslater: ? *)
+    let acc = Obj.magic_portable acc in
+    TLS.access std_formatter_key (fun fmt : unit ->
+      output_acc fmt acc); ())
     End_of_acc fmt
 
 let eprintf (Format (fmt, _)) =
-  make_printf
-    (fun acc -> output_acc (TLS.get err_formatter_key) acc)
+  make_printf (fun acc ->
+    (* CR mslater: ? *)
+    let acc = Obj.magic_portable acc in
+    TLS.access err_formatter_key (fun fmt : unit ->
+      output_acc fmt acc); ())
     End_of_acc fmt
 
 let kdprintf k (Format (fmt, _)) =
@@ -1492,20 +1536,23 @@ let make_synchronized_formatter = make_synchronized_formatter_unsafe
 (* Flushing standard formatters at end of execution. *)
 
 let flush_standard_formatters () =
-  pp_print_flush (TLS.get std_formatter_key) ();
-  pp_print_flush (TLS.get err_formatter_key) ()
+  TLS.access std_formatter_key (fun fmt -> pp_print_flush fmt ());
+  TLS.access err_formatter_key (fun fmt -> pp_print_flush fmt ());
+  ()
 
 let () = at_exit flush_standard_formatters
 
 let () = Domain.before_first_spawn (fun () ->
   flush_standard_formatters ();
-  let fs = pp_get_formatter_out_functions std_formatter () in
-  pp_set_formatter_out_functions std_formatter
-    {fs with out_string = buffered_out_string std_buf_key;
-             out_flush = buffered_out_flush Stdlib.stdout std_buf_key};
-
-  let fs = pp_get_formatter_out_functions err_formatter () in
-  pp_set_formatter_out_functions err_formatter
-    {fs with out_string = buffered_out_string err_buf_key;
-             out_flush = buffered_out_flush Stdlib.stderr err_buf_key};
+  TLS.access std_formatter_key (fun fmt ->
+    let fs = pp_get_formatter_out_functions fmt () in
+    pp_set_formatter_out_functions fmt
+      {fs with out_string = buffered_out_string std_buf_key;
+              out_flush = buffered_out_flush Stdlib.stdout std_buf_key});
+  TLS.access err_formatter_key (fun fmt ->
+    let fs = pp_get_formatter_out_functions fmt () in
+    pp_set_formatter_out_functions fmt
+      {fs with out_string = buffered_out_string err_buf_key;
+              out_flush = buffered_out_flush Stdlib.stderr err_buf_key});
+  ()
 )
