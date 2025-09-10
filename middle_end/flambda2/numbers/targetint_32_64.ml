@@ -28,10 +28,10 @@ module Int32 = struct
   include Int32
 
   let of_int_exn =
-    match Sys.word_size with
+    match Sys.int_size with
     (* size of [int] on the host *)
-    | 32 -> Int32.of_int
-    | 64 ->
+    | 31 -> Int32.of_int
+    | 63 ->
       fun n ->
         if n < Int32.to_int Int32.min_int || n > Int32.to_int Int32.max_int
         then Misc.fatal_errorf "Targetint_32_64.of_int_exn: 0x%x out of range" n

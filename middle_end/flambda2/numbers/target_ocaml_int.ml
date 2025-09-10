@@ -80,9 +80,20 @@ module Int32_base = struct
 
   let to_int = Int32.to_int
 
-  let to_int_exn = Int32.to_int
+  let to_int_option t =
+    let t_as_int64 = Int64.of_int32 t in
+    let min_int64 = Int64.of_int Stdlib.min_int in
+    let max_int64 = Int64.of_int Stdlib.max_int in
+    if Stdlib.( >= ) (Int64.compare t_as_int64 min_int64) 0
+       && Stdlib.( <= ) (Int64.compare t_as_int64 max_int64) 0
+    then Some (Int32.to_int t)
+    else None
 
-  let to_int_option t = Some (Int32.to_int t)
+  let to_int_exn t =
+    match to_int_option t with
+    | Some i -> i
+    | None ->
+      Misc.fatal_errorf "Target_ocaml_int.to_int_exn: %ld out of range" t
 
   let to_int32 t = t
 
@@ -186,9 +197,19 @@ module Int64_base = struct
 
   let to_int = Int64.to_int
 
-  let to_int_exn = Int64.to_int
+  let to_int_option t =
+    let min_int64 = Int64.of_int Stdlib.min_int in
+    let max_int64 = Int64.of_int Stdlib.max_int in
+    if Stdlib.( >= ) (Int64.compare t min_int64) 0
+       && Stdlib.( <= ) (Int64.compare t max_int64) 0
+    then Some (Int64.to_int t)
+    else None
 
-  let to_int_option t = Some (Int64.to_int t)
+  let to_int_exn t =
+    match to_int_option t with
+    | Some i -> i
+    | None ->
+      Misc.fatal_errorf "Target_ocaml_int.to_int_exn: %Ld out of range" t
 
   let to_int32 = Int64.to_int32
 
