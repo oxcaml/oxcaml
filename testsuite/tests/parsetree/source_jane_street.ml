@@ -1077,6 +1077,7 @@ val test_int32 : string -> Int32_u.t -> unit = <fun>
 val test_int64 : string -> Int64_u.t -> unit = <fun>
 val test_int : string -> int# -> unit = <fun>
 val test_nativeint : string -> Nativeint_u.t -> unit = <fun>
+val test_char : string -> char# -> unit = <fun>
 |}]
 
 (* Expressions *)
@@ -1168,6 +1169,8 @@ val x : unit = ()
 twenty_five_in_octal: 25
 val x : unit = ()
 forty_two_in_binary: 42
+val x : unit = ()
+untagged char: 'c'
 val x : unit = ()
 |}]
 

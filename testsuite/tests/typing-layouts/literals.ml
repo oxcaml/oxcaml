@@ -34,11 +34,13 @@ module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
 module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
 val test_float : string -> Float_u.t -> unit = <fun>
 val test_int32 : string -> Int32_u.t -> unit = <fun>
 val test_int64 : string -> Int64_u.t -> unit = <fun>
 val test_nativeint : string -> Nativeint_u.t -> unit = <fun>
 val test_int : string -> int# -> unit = <fun>
+val test_char : string -> char# -> unit = <fun>
 |}]
 
 (*****************************************)
@@ -201,10 +203,22 @@ Error: Integer literal exceeds the range of representable integers of type "int#
 
 let () = test_char "untagged char" #'c'
 [%%expect{|
+untagged char: 'c'
 |}]
 
-let () = test_char "untagged escape char" #'\o000'
+let () = test_char "untagged octal char" #'\o000'
 [%%expect{|
+untagged octal char: '\000'
+|}]
+
+let () = test_char "untagged hex char" #'\xFF'
+[%%expect{|
+untagged hex char: '\255'
+|}]
+
+let () = test_char "untagged decimal char" #'\222'
+[%%expect{|
+untagged decimal char: '\222'
 |}]
 
 (*****************************************)

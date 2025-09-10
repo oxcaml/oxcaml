@@ -152,7 +152,9 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     register_const acc dbg (SC.boxed_nativeint (Const c)) "nativeint"
   | Const_base (Const_untagged_char c) ->
     ( acc,
-      reg_width (RWC.naked_immediate (Target_ocaml_int.of_char c)),
+      reg_width
+        (RWC.naked_immediate
+           (Target_ocaml_int.of_char (Acc.machine_width acc) c)),
       "untagged_char" )
   | Const_base (Const_untagged_int c) ->
     ( acc,
