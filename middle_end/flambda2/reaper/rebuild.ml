@@ -546,6 +546,15 @@ let rewrite_static_const (env : env) (sc : SC.t) =
     SC.immutable_float32_array (rewrite_or_variables Float32.zero env fields)
   | Immutable_value_array fields ->
     SC.immutable_value_array (rewrite_simples_with_debuginfo env fields)
+  | Immutable_int_array fields ->
+    SC.immutable_int_array
+      (rewrite_or_variables Target_ocaml_int.zero env fields)
+  | Immutable_int8_array fields ->
+    SC.immutable_int8_array
+      (rewrite_or_variables Numeric_types.Int8.zero env fields)
+  | Immutable_int16_array fields ->
+    SC.immutable_int16_array
+      (rewrite_or_variables Numeric_types.Int16.zero env fields)
   | Immutable_int32_array fields ->
     SC.immutable_int32_array (rewrite_or_variables Int32.zero env fields)
   | Immutable_int64_array fields ->
@@ -1948,7 +1957,8 @@ and rebuild_static_const_or_code env res
     | Block _ | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
     | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
     | Immutable_float_block _ | Immutable_float_array _
-    | Immutable_float32_array _ | Immutable_int32_array _
+    | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
+    | Immutable_int16_array _ | Immutable_int32_array _
     | Immutable_int64_array _ | Immutable_nativeint_array _
     | Immutable_vec128_array _ | Immutable_vec256_array _
     | Immutable_vec512_array _ | Immutable_value_array _ | Empty_array _

@@ -122,6 +122,9 @@ module Array_kind = struct
     | Values
     | Naked_floats
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -136,6 +139,9 @@ module Array_kind = struct
     | Naked_floats -> Format.pp_print_string ppf "Naked_floats"
     | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
     | Values -> Format.pp_print_string ppf "Values"
+    | Naked_ints -> Format.pp_print_string ppf "Naked_ints"
+    | Naked_int8s -> Format.pp_print_string ppf "Naked_int8s"
+    | Naked_int16s -> Format.pp_print_string ppf "Naked_int16s"
     | Naked_int32s -> Format.pp_print_string ppf "Naked_int32s"
     | Naked_int64s -> Format.pp_print_string ppf "Naked_int64s"
     | Naked_nativeints -> Format.pp_print_string ppf "Naked_nativeints"
@@ -155,6 +161,9 @@ module Array_kind = struct
     | Values -> [K.With_subkind.any_value]
     | Naked_floats -> [K.With_subkind.naked_float]
     | Naked_float32s -> [K.With_subkind.naked_float32]
+    | Naked_ints -> [K.With_subkind.naked_immediate]
+    | Naked_int8s -> [K.With_subkind.naked_int8]
+    | Naked_int16s -> [K.With_subkind.naked_int16]
     | Naked_int32s -> [K.With_subkind.naked_int32]
     | Naked_int64s -> [K.With_subkind.naked_int64]
     | Naked_nativeints -> [K.With_subkind.naked_nativeint]
@@ -180,9 +189,9 @@ module Array_kind = struct
 
   let rec width_in_scalars t =
     match t with
-    | Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-    | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-    | Naked_vec512s ->
+    | Immediates | Values | Naked_floats | Naked_float32s | Naked_ints
+    | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
+    | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
       1
     | Unboxed_product kinds ->
       List.fold_left
@@ -196,6 +205,9 @@ module Array_load_kind = struct
     | Values
     | Naked_floats
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -209,6 +221,9 @@ module Array_load_kind = struct
     | Values -> Format.pp_print_string ppf "Values"
     | Naked_floats -> Format.fprintf ppf "Naked_floats"
     | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
+    | Naked_ints -> Format.pp_print_string ppf "Naked_ints"
+    | Naked_int8s -> Format.pp_print_string ppf "Naked_int8s"
+    | Naked_int16s -> Format.pp_print_string ppf "Naked_int16s"
     | Naked_int32s -> Format.pp_print_string ppf "Naked_int32s"
     | Naked_int64s -> Format.pp_print_string ppf "Naked_int64s"
     | Naked_nativeints -> Format.pp_print_string ppf "Naked_nativeints"
@@ -224,6 +239,9 @@ module Array_load_kind = struct
     | Values -> Flambda_kind.With_subkind.any_value
     | Naked_floats -> Flambda_kind.With_subkind.naked_float
     | Naked_float32s -> Flambda_kind.With_subkind.naked_float32
+    | Naked_ints -> Flambda_kind.With_subkind.naked_immediate
+    | Naked_int8s -> Flambda_kind.With_subkind.naked_int8
+    | Naked_int16s -> Flambda_kind.With_subkind.naked_int16
     | Naked_int32s -> Flambda_kind.With_subkind.naked_int32
     | Naked_int64s -> Flambda_kind.With_subkind.naked_int64
     | Naked_nativeints -> Flambda_kind.With_subkind.naked_nativeint
@@ -238,6 +256,9 @@ module Array_set_kind = struct
     | Values of Init_or_assign.t
     | Naked_floats
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -253,6 +274,9 @@ module Array_set_kind = struct
         init_or_assign
     | Naked_floats -> Format.fprintf ppf "Naked_floats"
     | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
+    | Naked_ints -> Format.pp_print_string ppf "Naked_ints"
+    | Naked_int8s -> Format.pp_print_string ppf "Naked_int8s"
+    | Naked_int16s -> Format.pp_print_string ppf "Naked_int16s"
     | Naked_int32s -> Format.pp_print_string ppf "Naked_int32s"
     | Naked_int64s -> Format.pp_print_string ppf "Naked_int64s"
     | Naked_nativeints -> Format.pp_print_string ppf "Naked_nativeints"
@@ -268,6 +292,9 @@ module Array_set_kind = struct
     | Values _ -> Flambda_kind.With_subkind.any_value
     | Naked_floats -> Flambda_kind.With_subkind.naked_float
     | Naked_float32s -> Flambda_kind.With_subkind.naked_float32
+    | Naked_ints -> Flambda_kind.With_subkind.naked_immediate
+    | Naked_int8s -> Flambda_kind.With_subkind.naked_int8
+    | Naked_int16s -> Flambda_kind.With_subkind.naked_int16
     | Naked_int32s -> Flambda_kind.With_subkind.naked_int32
     | Naked_int64s -> Flambda_kind.With_subkind.naked_int64
     | Naked_nativeints -> Flambda_kind.With_subkind.naked_nativeint
@@ -350,6 +377,9 @@ module Duplicate_array_kind = struct
     | Values
     | Naked_floats of { length : Target_ocaml_int.t option }
     | Naked_float32s of { length : Target_ocaml_int.t option }
+    | Naked_ints of { length : Target_ocaml_int.t option }
+    | Naked_int8s of { length : Target_ocaml_int.t option }
+    | Naked_int16s of { length : Target_ocaml_int.t option }
     | Naked_int32s of { length : Target_ocaml_int.t option }
     | Naked_int64s of { length : Target_ocaml_int.t option }
     | Naked_nativeints of { length : Target_ocaml_int.t option }
@@ -370,6 +400,24 @@ module Duplicate_array_kind = struct
     | Naked_float32s { length; } ->
       Format.fprintf ppf
         "@[<hov 1>(Naked_float32s@ \
+          @[<hov 1>(length@ %a)@]\
+          )@]"
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
+    | Naked_ints { length; } ->
+      Format.fprintf ppf
+        "@[<hov 1>(Naked_ints@ \
+          @[<hov 1>(length@ %a)@]\
+          )@]"
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
+    | Naked_int8s { length; } ->
+      Format.fprintf ppf
+        "@[<hov 1>(Naked_int8s@ \
+          @[<hov 1>(length@ %a)@]\
+          )@]"
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
+    | Naked_int16s { length; } ->
+      Format.fprintf ppf
+        "@[<hov 1>(Naked_int16s@ \
           @[<hov 1>(length@ %a)@]\
           )@]"
         (Misc.Stdlib.Option.print Target_ocaml_int.print) length
@@ -413,22 +461,17 @@ module Duplicate_array_kind = struct
   let compare t1 t2 =
     match t1, t2 with
     | Immediates, Immediates | Values, Values -> 0
-    | Naked_floats { length = length1 }, Naked_floats { length = length2 } ->
-      Option.compare Target_ocaml_int.compare length1 length2
+    | Naked_floats { length = length1 }, Naked_floats { length = length2 }
     | Naked_float32s { length = length1 }, Naked_float32s { length = length2 }
-      ->
-      Option.compare Target_ocaml_int.compare length1 length2
-    | Naked_int32s { length = length1 }, Naked_int32s { length = length2 } ->
-      Option.compare Target_ocaml_int.compare length1 length2
-    | Naked_int64s { length = length1 }, Naked_int64s { length = length2 } ->
-      Option.compare Target_ocaml_int.compare length1 length2
+    | Naked_ints { length = length1 }, Naked_ints { length = length2 }
+    | Naked_int8s { length = length1 }, Naked_int8s { length = length2 }
+    | Naked_int16s { length = length1 }, Naked_int16s { length = length2 }
+    | Naked_int32s { length = length1 }, Naked_int32s { length = length2 }
+    | Naked_int64s { length = length1 }, Naked_int64s { length = length2 }
     | ( Naked_nativeints { length = length1 },
-        Naked_nativeints { length = length2 } ) ->
-      Option.compare Target_ocaml_int.compare length1 length2
-    | Naked_vec128s { length = length1 }, Naked_vec128s { length = length2 } ->
-      Option.compare Target_ocaml_int.compare length1 length2
-    | Naked_vec256s { length = length1 }, Naked_vec256s { length = length2 } ->
-      Option.compare Target_ocaml_int.compare length1 length2
+        Naked_nativeints { length = length2 } )
+    | Naked_vec128s { length = length1 }, Naked_vec128s { length = length2 }
+    | Naked_vec256s { length = length1 }, Naked_vec256s { length = length2 }
     | Naked_vec512s { length = length1 }, Naked_vec512s { length = length2 } ->
       Option.compare Target_ocaml_int.compare length1 length2
     | Immediates, _ -> -1
@@ -439,6 +482,12 @@ module Duplicate_array_kind = struct
     | _, Naked_floats _ -> 1
     | Naked_float32s _, _ -> -1
     | _, Naked_float32s _ -> 1
+    | Naked_ints _, _ -> -1
+    | _, Naked_ints _ -> 1
+    | Naked_int8s _, _ -> -1
+    | _, Naked_int8s _ -> 1
+    | Naked_int16s _, _ -> -1
+    | _, Naked_int16s _ -> 1
     | Naked_int32s _, _ -> -1
     | _, Naked_int32s _ -> 1
     | Naked_int64s _, _ -> -1
@@ -634,9 +683,10 @@ let reading_from_an_array (array_kind : Array_kind.t)
     (mutable_or_immutable : Mutability.t) =
   let effects : Effects.t =
     match array_kind with
-    | Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-    | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-    | Naked_vec512s | Unboxed_product _ ->
+    | Immediates | Values | Naked_floats | Naked_float32s | Naked_ints
+    | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
+    | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+    | Unboxed_product _ ->
       No_effects
   in
   let coeffects =

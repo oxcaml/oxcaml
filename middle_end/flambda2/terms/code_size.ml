@@ -173,11 +173,10 @@ let block_load (kind : Flambda_primitive.Block_access_kind.t) =
 let array_load (kind : Flambda_primitive.Array_load_kind.t) =
   match kind with
   | Immediates -> 1 (* cadda + load *)
-  | Naked_floats | Values -> 1
-  | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
-    (* more computation is needed because of the representation using a custom
-       block *)
+  | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints | Values -> 1
+  | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s | Naked_vec128s
+  | Naked_vec256s | Naked_vec512s ->
+    (* more computation is needed because of the non-word width *)
     2
 
 let block_set (kind : Flambda_primitive.Block_access_kind.t)
@@ -195,9 +194,9 @@ let array_set (kind : Flambda_primitive.Array_set_kind.t) =
   match kind with
   | Values (Assignment Heap) -> does_not_need_caml_c_call_extcall_size
   | Values (Assignment Local | Initialization) -> 1
-  | Immediates | Naked_floats -> 1
-  | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+  | Immediates | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints -> 1
+  | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s | Naked_vec128s
+  | Naked_vec256s | Naked_vec512s ->
     2 (* as above *)
 
 let string_or_bigstring_load ~machine_width kind width =
@@ -401,10 +400,10 @@ let unary_prim_size ~machine_width prim =
         ( Immediates | Values | Naked_floats | Naked_int64s | Naked_nativeints
         | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ) ->
       array_length_size
-    | Array_kind (Naked_int32s | Naked_float32s) ->
-      (* There is a dynamic check here to see if the array has an odd or even
-         number of elements *)
-      array_length_size + 2 (* compare + load *)
+    | Array_kind (Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_float32s)
+      ->
+      (* There is some arithmetic here to see how many elements in the last word *)
+      array_length_size + 3 (* lsl + land + sub *)
     | Float_array_opt_dynamic -> array_length_size + 3 (* a bit approximate *))
   | Bigarray_length _ -> 2 (* cadda + load *)
   | String_length _ -> 5

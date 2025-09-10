@@ -1237,6 +1237,8 @@ let can_group discr pat =
   match (discr.pat_desc, (Simple.head pat).pat_desc) with
   | Any, Any
   | Constant (Const_int _), Constant (Const_int _)
+  | Constant (Const_int8 _), Constant (Const_int8 _)
+  | Constant (Const_int16 _), Constant (Const_int16 _)
   | Constant (Const_char _), Constant (Const_char _)
   | Constant (Const_string _), Constant (Const_string _)
   | Constant (Const_float _), Constant (Const_float _)
@@ -1246,6 +1248,9 @@ let can_group discr pat =
   | Constant (Const_int32 _), Constant (Const_int32 _)
   | Constant (Const_int64 _), Constant (Const_int64 _)
   | Constant (Const_nativeint _), Constant (Const_nativeint _)
+  | Constant (Const_untagged_int _), Constant (Const_untagged_int _)
+  | Constant (Const_untagged_int8 _), Constant (Const_untagged_int8 _)
+  | Constant (Const_untagged_int16 _), Constant (Const_untagged_int16 _)
   | Constant (Const_unboxed_int32 _), Constant (Const_unboxed_int32 _)
   | Constant (Const_unboxed_int64 _), Constant (Const_unboxed_int64 _)
   | Constant (Const_unboxed_nativeint _), Constant (Const_unboxed_nativeint _)->
@@ -1270,11 +1275,11 @@ let can_group discr pat =
   | ( _,
       ( Any
       | Constant
-          ( Const_int _ | Const_char _ | Const_string _ | Const_float _
-          | Const_float32 _ | Const_unboxed_float _ | Const_unboxed_float32 _
-          | Const_int32 _ | Const_int64 _ | Const_nativeint _
-          | Const_unboxed_int32 _ | Const_unboxed_int64 _
-          | Const_unboxed_nativeint _ )
+          ( Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _ | Const_string _ 
+          | Const_float _ | Const_float32 _ | Const_unboxed_float _ 
+          | Const_unboxed_float32 _ | Const_int32 _ | Const_int64 _ | Const_nativeint _
+          | Const_untagged_int _ | Const_untagged_int8 _ | Const_untagged_int16 _
+          | Const_unboxed_int32 _ | Const_unboxed_int64 _ | Const_unboxed_nativeint _ )
       | Construct _ | Tuple _ | Unboxed_tuple _ | Record _
       | Record_unboxed_product _ | Array _ | Variant _ | Lazy ) ) ->
       false
@@ -3138,6 +3143,24 @@ let combine_constant value_kind loc arg cst partial ctx def
             const_lambda_list
         in
         call_switcher value_kind loc fail arg min_int max_int int_lambda_list
+    | Const_int8 _ ->
+        let int_lambda_list =
+          List.map
+            (function
+              | Const_int8 n, l -> (n, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        call_switcher value_kind loc fail arg (-128) 127 int_lambda_list
+    | Const_int16 _ ->
+        let int_lambda_list =
+          List.map
+            (function
+              | Const_int16 n, l -> (n, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        call_switcher value_kind loc fail arg (-32_768) 32_767 int_lambda_list
     | Const_char _ ->
         let int_lambda_list =
           List.map
@@ -3181,6 +3204,12 @@ let combine_constant value_kind loc arg cst partial ctx def
     | Const_nativeint _ ->
         make_scalar_test_sequence
           (Scalar.integral (Value (Boxable (Nativeint Any_locality_mode))))
+    | Const_untagged_int _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int))) 
+    | Const_untagged_int8 _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int8)))
+    | Const_untagged_int16 _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int16)))
     | Const_unboxed_int32 _ ->
         make_scalar_test_sequence
           (Scalar.integral (Naked (Boxable (Int32 Any_locality_mode))))

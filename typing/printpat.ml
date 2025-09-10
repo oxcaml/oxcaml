@@ -32,9 +32,17 @@ let pretty_const c = match c with
 | Const_float32 f -> Printf.sprintf "%s" f
 | Const_unboxed_float f -> Printf.sprintf "%s" (Misc.format_as_unboxed_literal f)
 | Const_unboxed_float32 f -> Printf.sprintf "%ss" (Misc.format_as_unboxed_literal f)
+| Const_int8 i -> Printf.sprintf "%ds" i
+| Const_int16 i -> Printf.sprintf "%dS" i
 | Const_int32 i -> Printf.sprintf "%ldl" i
 | Const_int64 i -> Printf.sprintf "%LdL" i
 | Const_nativeint i -> Printf.sprintf "%ndn" i
+| Const_untagged_int i ->
+  Printf.sprintf "%s" (Misc.format_as_unboxed_literal (Int.to_string i))
+| Const_untagged_int8 i ->
+  Printf.sprintf "%ss" (Misc.format_as_unboxed_literal (Int.to_string i))
+| Const_untagged_int16 i ->
+  Printf.sprintf "%sS" (Misc.format_as_unboxed_literal (Int.to_string i))
 | Const_unboxed_int32 i ->
   Printf.sprintf "%sl" (Misc.format_as_unboxed_literal (Int32.to_string i))
 | Const_unboxed_int64 i ->

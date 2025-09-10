@@ -72,6 +72,7 @@ let machtype_of_kind (kind : Flambda_kind.With_subkind.t) =
     | Anything | Boxed_float32 | Boxed_float | Boxed_int32 | Boxed_int64
     | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Variant _
     | Float_block _ | Float_array | Immediate_array | Unboxed_float32_array
+    | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
     | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
     | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
     | Value_array | Generic_array | Unboxed_product_array ->
@@ -96,6 +97,7 @@ let extended_machtype_of_kind (kind : Flambda_kind.With_subkind.t) =
     | Anything | Boxed_float | Boxed_float32 | Boxed_int32 | Boxed_int64
     | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Variant _
     | Float_block _ | Float_array | Immediate_array | Unboxed_float32_array
+    | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
     | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
     | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
     | Value_array | Generic_array | Unboxed_product_array ->
@@ -121,6 +123,7 @@ let memory_chunk_of_kind (kind : Flambda_kind.With_subkind.t) : Cmm.memory_chunk
     | Anything | Boxed_float | Boxed_float32 | Boxed_int32 | Boxed_int64
     | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Variant _
     | Float_block _ | Float_array | Immediate_array | Unboxed_float32_array
+    | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
     | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
     | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
     | Value_array | Generic_array | Unboxed_product_array ->
@@ -407,6 +410,10 @@ module Update_kind = struct
   let pointers = { kind = Pointer; stride = Arch.size_addr }
 
   let tagged_immediates = { kind = Immediate; stride = Arch.size_addr }
+
+  let naked_int8s = { kind = Naked_int8; stride = 1 }
+
+  let naked_int16s = { kind = Naked_int16; stride = 2 }
 
   let naked_int32s = { kind = Naked_int32; stride = 4 }
 
