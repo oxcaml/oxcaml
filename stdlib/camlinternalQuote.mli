@@ -1,3 +1,5 @@
+type 'a lam
+
 module Loc : sig
   type t
 
@@ -31,7 +33,13 @@ module Var : sig
     val name : t -> Name.t
   end
 
-  module Type : sig
+  module Type_constr : sig
+    type t
+
+    val name : t -> Name.t
+  end
+
+  module Type_var : sig
     type t
 
     val name : t -> Name.t
@@ -53,14 +61,26 @@ module Constant : sig
 
   val float : string -> t
 
+  val float32 : string -> t
+
   val int32 : int32 -> t
 
   val int64 : int64 -> t
 
   val nativeint : nativeint -> t
+
+  val unboxed_float : string -> t
+
+  val unboxed_float32 : string -> t
+
+  val unboxed_int32 : int32 -> t
+
+  val unboxed_int64 : int64 -> t
+
+  val unboxed_nativeint : nativeint -> t
 end
 
-module Ident : sig
+module Identifier : sig
   module Module : sig
     type t
 
@@ -84,7 +104,7 @@ module Ident : sig
 
     val dot : Module.t -> string -> t
 
-    val var : Var.Type.t -> Loc.t -> t
+    val var : Var.Type_constr.t -> Loc.t -> t
 
     val int : t
 
@@ -217,8 +237,6 @@ module Label : sig
     val labelled : string -> t
   end
 
-  val nonoptional : Nonoptional.t -> t
-
   val no_label : t
 
   val labelled : string -> t
@@ -228,6 +246,118 @@ end
 
 module Variant : sig
   type t
+
+  val of_string : string -> t
+end
+
+module Method : sig
+  type t
+
+  val of_string : string -> t
+end
+
+module Fragment : sig
+  type t
+
+  val name : string -> t
+
+  val dot : t -> string -> t
+end
+
+module Module : sig
+  type t
+
+  val ident : Identifier.Module.t -> t
+
+  val apply : t -> t -> t
+
+  val apply_unit : t -> t
+end
+
+module Constructor : sig
+  type t
+
+  val ident : Identifier.Constructor.t -> t
+
+  val of_string : string -> t
+end
+
+module Field : sig
+  type t
+
+  val ident : Identifier.Field.t -> t
+
+  val of_string : string -> t
+end
+
+module Module_type : sig
+  type t
+
+  val ident : Identifier.Module_type.t -> t
+
+  val of_string : string -> t
+end
+
+module rec Variant_type : sig
+  module Variant_form : sig
+    type t
+
+    val fixed : t
+
+    val open_ : t
+
+    val closed : string list -> t
+  end
+
+  module Row_field : sig
+    type t
+
+    val inherit_ : Type.t -> t
+
+    val tag : Variant.t -> bool -> Type.t list -> t
+  end
+
+  type t
+
+  val of_row_fields_list : Row_field.t list -> Variant_form.t -> t
+end
+
+and Object_field : sig
+  type t
+
+  val inherit_ : Type.t -> t
+
+  val tag : Name.t -> Type.t -> t
+end
+
+and Type : sig
+  type t
+
+  val var : Var.Type_var.t option -> t
+
+  val arrow : Label.t -> t -> t -> t
+
+  val tuple : (Label.Nonoptional.t * t) list -> t
+
+  val unboxed_tuple : (Label.Nonoptional.t * t) list -> t
+
+  val constr : Identifier.Type.t -> t list -> t
+
+  val object_ : Object_field.t list -> bool -> t
+
+  val class_ : Name.t -> t list -> t
+
+  val alias : t -> Var.Type_var.t -> t
+
+  val variant : Variant_type.t -> t
+
+  val poly : Loc.t -> Name.t list -> (Var.Type_var.t list -> t) lam -> t
+
+  val package : Module_type.t -> (Fragment.t * t) list -> t
+
+  val quote : t -> t
+
+  val call_pos : t
 end
 
 module Pat : sig
@@ -241,15 +371,17 @@ module Pat : sig
 
   val constant : Constant.t -> t
 
-  val interval : Constant.t -> Constant.t -> t
-
   val tuple : (Label.Nonoptional.t * t) list -> t
 
-  val construct : Ident.Constructor.t -> t option -> t
+  val unboxed_tuple : (Label.Nonoptional.t * t) list -> t
 
-  val variant : string -> t option -> t
+  val construct : Constructor.t -> t option -> t
 
-  val record : (Ident.Field.t * t) list -> bool -> t
+  val variant : Variant.t -> t option -> t
+
+  val record : (Field.t * t) list -> bool -> t
+
+  val unboxed_record : (Field.t * t) list -> bool -> t
 
   val array : t list -> t
 
@@ -257,35 +389,39 @@ module Pat : sig
 
   val lazy_ : t -> t
 
+  val any_module : t
+
   val unpack : Var.Module.t -> t
 
   val exception_ : t -> t
+
+  val constraint_ : t -> Type.t -> t
 end
 
-module Fragment : sig
-  type t
-end
-
-module Type : sig
+module Exp_attribute : sig
   type t
 
-  val any : t
+  val inline : t
 
-  val var : Var.Type.t -> t
+  val inlined : t
 
-  val arrow : Label.t -> t -> t -> t
+  val specialise : t
 
-  val tuple : (Label.Nonoptional.t * t) list -> t
+  val specialised : t
 
-  val constr : Ident.Constructor.t -> t list -> t
+  val unrolled : t
 
-  val alias : t -> Var.Type.t -> t
+  val nontail : t
 
-  val variant : Variant.t -> t
+  val tail : t
 
-  val poly : Loc.t -> Name.t list -> (Var.Type.t list -> t) -> t
+  val poll : t
 
-  val package : Ident.Module.t -> (Fragment.t * t) list -> t
+  val loop : t
+
+  val tail_mod_cons : t
+
+  val quotation : t
 end
 
 module rec Case : sig
@@ -293,27 +429,27 @@ module rec Case : sig
 
   val nonbinding : Loc.t -> Pat.t -> Exp.t -> t
 
-  val simple : Loc.t -> Name.t -> (Var.Value.t -> Exp.t) -> t
+  val simple : Loc.t -> Name.t -> (Var.Value.t -> Exp.t) lam -> t
 
   val pattern :
     Loc.t ->
     bound_values:Name.t list ->
     bound_modules:Name.t list ->
-    (Var.Value.t list -> Var.Module.t list -> Pat.t * Exp.t) ->
+    (Var.Value.t list -> Var.Module.t list -> Pat.t * Exp.t) lam ->
     t
 
   val guarded :
     Loc.t ->
     bound_values:Name.t list ->
     bound_modules:Name.t list ->
-    (Var.Value.t list -> Var.Module.t list -> Pat.t * Exp.t * Exp.t) ->
+    (Var.Value.t list -> Var.Module.t list -> Pat.t * Exp.t * Exp.t) lam ->
     t
 
   val refutation :
     Loc.t ->
     bound_values:Name.t list ->
     bound_modules:Name.t list ->
-    (Var.Value.t list -> Var.Module.t list -> Pat.t) ->
+    (Var.Value.t list -> Var.Module.t list -> Pat.t) lam ->
     t
 end
 
@@ -328,88 +464,157 @@ end
 and Function : sig
   type t
 
+  val body : Exp.t -> Type_constraint.t option -> t
+
+  val cases : Case.t list -> Type_constraint.t option -> t
+
+  val param :
+    Label.t ->
+    Exp.t option ->
+    Loc.t ->
+    Name.t list ->
+    (Var.Value.t list -> Pat.t * t) lam ->
+    t
+
+  val param_module_nonbinding : Label.t -> Loc.t -> Pat.t -> t -> t
+
+  val param_module :
+    Label.t -> Loc.t -> Name.t -> (Var.Module.t -> Pat.t * t) lam -> t
+
+  val newtype : Loc.t -> Name.t -> (Var.Type_constr.t -> t) lam -> t
+end
+
+and Comprehension : sig
+  type t
+
   val body : Exp.t -> t
 
-  val cases : Case.t list -> t
+  val when_clause : Exp.t -> t -> t
 
-  val param_nonbinding : Loc.t -> Label.t -> Exp.t option -> Pat.t -> t -> t
+  val for_range :
+    Loc.t -> Name.t -> Exp.t -> Exp.t -> bool -> (Var.Value.t -> t) lam -> t
 
-  val param_simple :
-    Label.t -> Exp.t option -> Loc.t -> Name.t -> (Var.Value.t -> t) -> t
+  val for_in :
+    Loc.t -> Exp.t -> Name.t list -> (Var.Value.t list -> Pat.t * t) lam -> t
+end
 
-  val newtype : Loc.t -> Name.t -> (Var.Type.t -> t) -> t
+and Exp_desc : sig
+  type t
+
+  val ident : Identifier.Value.t -> t
+
+  val constant : Constant.t -> t
+
+  val let_rec_simple :
+    Loc.t -> Name.t list -> (Var.Value.t list -> Exp.t list * Exp.t) lam -> t
+
+  val let_ :
+    Loc.t ->
+    Name.t list ->
+    Name.t list ->
+    Exp.t list ->
+    (Var.Value.t list -> Var.Module.t list -> Pat.t * Exp.t) lam ->
+    t
+
+  val function_ : Function.t -> t
+
+  val apply : Exp.t -> (Label.t * Exp.t) list -> t
+
+  val match_ : Exp.t -> Case.t list -> t
+
+  val try_ : Exp.t -> Case.t list -> t
+
+  val tuple : (Label.Nonoptional.t * Exp.t) list -> t
+
+  val construct : Constructor.t -> Exp.t option -> t
+
+  val variant : Variant.t -> Exp.t option -> t
+
+  val record : (Field.t * Exp.t) list -> Exp.t option -> t
+
+  val field : Exp.t -> Field.t -> t
+
+  val setfield : Exp.t -> Field.t -> Exp.t -> t
+
+  val array : Exp.t list -> t
+
+  val ifthenelse : Exp.t -> Exp.t -> Exp.t option -> t
+
+  val sequence : Exp.t -> Exp.t -> t
+
+  val while_ : Exp.t -> Exp.t -> t
+
+  val for_nonbinding : Loc.t -> Pat.t -> Exp.t -> Exp.t -> bool -> Exp.t -> t
+
+  val for_simple :
+    Loc.t -> Name.t -> Exp.t -> Exp.t -> bool -> (Var.Value.t -> Exp.t) lam -> t
+
+  val send : Exp.t -> Method.t -> t
+
+  val assert_ : Exp.t -> t
+
+  val lazy_ : Exp.t -> t
+
+  val letmodule_nonbinding : Module.t -> Exp.t -> t
+
+  val letmodule : Loc.t -> Name.t -> Module.t -> (Var.Module.t -> Exp.t) lam -> t
+
+  val constraint_ : Exp.t -> Type_constraint.t -> t
+
+  val new_ : Identifier.Value.t -> t
+
+  val pack : Module.t -> t
+
+  val unreachable : t
+
+  val src_pos : t
+
+  val stack : Exp.t -> t
+
+  val extension_constructor : Name.t -> t
+
+  val let_exception : Name.t -> Exp.t -> t
+
+  val let_op : Identifier.Value.t list -> Exp.t list -> Case.t -> t
+
+  val exclave : Exp.t -> t
+
+  val list_comprehension : Comprehension.t -> t
+
+  val array_comprehension : Comprehension.t -> t
+
+  val unboxed_tuple : (Label.Nonoptional.t * Exp.t) list -> t
+
+  val unboxed_record_product : (Field.t * Exp.t) list -> Exp.t option -> t
+
+  val unboxed_field : Exp.t -> Field.t -> t
+
+  val quote : Exp.t -> t
+
+  val antiquote : Exp.t -> t
+
+  val splice : Code.t -> t
+
+  val print : Format.formatter -> t -> unit
 end
 
 and Exp : sig
   type t
 
-  val ident : Ident.Value.t -> t
+  val mk : Exp_desc.t -> Exp_attribute.t list -> t
 
-  val constant : Constant.t -> t
-
-  val let_nonbinding : Loc.t -> Pat.t -> t -> t -> t
-
-  val let_simple : Loc.t -> Name.t -> t -> (Var.Value.t -> t) -> t
-
-  val let_rec_simple :
-    Loc.t -> Name.t list -> (Var.Value.t list -> t list * t) -> t
-
-  val let_ : Loc.t -> Name.t list -> t -> (Var.Value.t list -> Pat.t * t) -> t
-
-  val function_ : Function.t -> t
-
-  val apply : t -> (Label.t * t) list -> t
-
-  val match_ : t -> Case.t list -> t
-
-  val try_ : t -> Case.t list -> t
-
-  val tuple : (Label.Nonoptional.t * t) list -> t
-
-  val construct : Ident.Constructor.t -> t option -> t
-
-  val variant : Name.t -> t option -> t
-
-  val record : (Ident.Field.t * t) list -> t option -> t
-
-  val field : t -> Ident.Field.t -> t
-
-  val setfield : t -> Ident.Field.t -> t -> t
-
-  val array : t list -> t
-
-  val ifthenelse : t -> t -> t option -> t
-
-  val sequence : t -> t -> t
-
-  val while_ : t -> t -> t
-
-  val for_nonbinding : Loc.t -> Pat.t -> t -> t -> bool -> t -> t
-
-  val for_simple : Loc.t -> Name.t -> t -> t -> bool -> (Var.Value.t -> t) -> t
-
-  val assert_ : t -> t
-
-  val lazy_ : t -> t
-
-  val open_ : bool -> Ident.Module.t -> t -> t
-
-  val constraint_ : t -> Type_constraint.t -> t
-
-  val quote : t -> t
-
-  val escape : t -> t
-
-  val splice : Code.t -> t
+  val print : Format.formatter -> t -> unit
 end
 
 and Code : sig
   type t
 
-  val of_exp : Exp.t -> Loc.t -> t
+  val to_exp : t -> Exp.t
+
+  val of_exp : Loc.t -> Exp.t -> t
 
   val of_exp_with_type_vars :
-    Loc.t -> Name.t list -> (Var.Type.t list -> Exp.t) -> t
+    Loc.t -> Name.t list -> (Var.Type_var.t list -> Exp.t) lam -> t
 
   module Closed : sig
     type exp = t
@@ -420,4 +625,6 @@ and Code : sig
 
     val open_ : t -> exp
   end
+
+  val print : Format.formatter -> t -> unit
 end

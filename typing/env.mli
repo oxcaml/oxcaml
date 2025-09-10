@@ -279,6 +279,8 @@ type lookup_error =
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of
       [`Escape of escaping_context | `Shared of shared_context | `Closure]
+  | Incompatible_stage of Longident.t * Location.t * int * Location.t * int
+  | No_constructor_in_stage of Longident.t * Location.t * int
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
@@ -543,6 +545,14 @@ val add_closure_lock : closure_context
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
+val add_local_env_lock : t -> t
+val add_quotation_lock : t -> t
+val add_splice_lock : t -> t
+
+val without_open_quotations : t -> bool
+val has_open_quotations : t -> bool
+val stage : t -> int
+val quotation_locks_offset : locks -> int option
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit

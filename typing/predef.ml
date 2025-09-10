@@ -51,7 +51,7 @@ and ident_extension_constructor = ident_create "extension_constructor"
 and ident_floatarray = ident_create "floatarray"
 and ident_lexing_position = ident_create "lexing_position"
 and ident_atomic_loc = ident_create "atomic_loc"
-and ident_code = ident_create "code"
+and ident_code = ident_create "expr"
 
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
@@ -665,6 +665,11 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type1 ident_code
        ~variance:Variance.covariant
        ~separability:Separability.Ind
+       ~jkind:(fun param ->
+         Jkind.Builtin.immutable_data ~why:Tquote |>
+           Jkind.add_with_bounds
+             ~modality:Mode.Modality.Value.Const.id
+             ~type_expr:param)
   |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit
        ~kind:(variant [cstr ident_void []])

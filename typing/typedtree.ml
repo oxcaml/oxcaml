@@ -752,6 +752,8 @@ and core_type_desc =
   | Ttyp_poly of (string * Parsetree.jkind_annotation option) list * core_type
   | Ttyp_package of package_type
   | Ttyp_open of Path.t * Longident.t loc * core_type
+  | Ttyp_quote of core_type
+  | Ttyp_splice of core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
 
@@ -1398,7 +1400,7 @@ let rec fold_antiquote_exp f  acc exp =
       let acc = Array.fold_left (fold_antiquote_field f) acc fields in
       Option.fold
         ~none:acc
-        ~some:(fun (e, _) -> fold_antiquote_exp f acc e)
+        ~some:(fun (e, _, _) -> fold_antiquote_exp f acc e)
         extended_expression
   | Texp_record_unboxed_product { fields; extended_expression; _} ->
       let acc = Array.fold_left (fold_antiquote_field f) acc fields in
@@ -1406,7 +1408,7 @@ let rec fold_antiquote_exp f  acc exp =
         ~none:acc
         ~some:(fun (e, _) -> fold_antiquote_exp f acc e)
         extended_expression
-  | Texp_field (exp, _, _, _, _) ->
+  | Texp_field (exp, _, _, _, _, _) ->
       fold_antiquote_exp f acc exp
   | Texp_unboxed_field (exp, _, _, _, _) ->
       fold_antiquote_exp f acc exp
@@ -1460,6 +1462,11 @@ let rec fold_antiquote_exp f  acc exp =
       let acc = fold_antiquote_exp f acc exp1 in
       fold_antiquote_exp f acc exp2
   | Texp_hole _ -> acc
+  | Texp_letmutable (_, exp) -> fold_antiquote_exp f acc exp
+  | Texp_mutvar _ -> acc
+  | Texp_setmutvar (_, _, exp) -> fold_antiquote_exp f acc exp
+  | Texp_atomic_loc (exp, _, _, _, _) -> fold_antiquote_exp f acc exp
+  | Texp_idx (_, _) -> acc
   | Texp_quotation exp ->
       fold_antiquote_exp (fold_antiquote_exp f) acc exp
   | Texp_antiquotation exp -> f acc exp

@@ -415,6 +415,11 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                  in
                  Oval_lazy v
                end
+
+          | Tconstr (path, [_], _)
+            when Path.same path Predef.path_code ->
+            Oval_code (O.obj obj : CamlinternalQuote_bootstrap.Code.t)
+
           | Tconstr(path, ty_list, _) -> begin
               try
                 let decl = Env.find_type path env in
@@ -595,7 +600,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 find (row_fields row)
           | Tobject (_, _) ->
               Oval_stuff "<obj>"
-          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _  ->
+          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _
+          | Tquote _ | Tsplice _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty

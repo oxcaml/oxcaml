@@ -155,6 +155,8 @@ module Type_shape = struct
             of_type_expr_go ~depth ~visited ret uid_of_path )
       | Tunivar { name; _ } -> Ts_var (name, Layout_to_be_determined)
       | Tof_kind _ -> Ts_other Layout_to_be_determined
+      | Tquote _ -> Ts_other Layout_to_be_determined
+      | Tsplice _ -> Ts_other Layout_to_be_determined
       | Tpackage _ ->
         Shape.Ts_other
           Layout_to_be_determined (* CR sspies: Support first-class modules. *)

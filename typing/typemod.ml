@@ -123,6 +123,8 @@ type error =
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
   | Submode_failed of Mode.Value.error
+  | Quotation_structure
+  | Quotation_signature
   | Item_weaker_than_structure of Mode.Value.error
   | Unsupported_modal_module of unsupported_modal_module
   | Legacy_module of legacy_module * Mode.Value.error
@@ -293,7 +295,7 @@ let initial_env ~loc ~initially_opened_module
         (open_module env m, units)
   in
   let env = List.fold_left add_units env units in
-  List.fold_left open_module env open_implicit_modules
+  Env.add_local_env_lock (List.fold_left open_module env open_implicit_modules)
 
 let type_open_descr ?used_slot ?toplevel env sod =
   let (path, _, newenv) =
@@ -1846,6 +1848,8 @@ and transl_modtype_aux env smty =
       mkmty (Tmty_alias (path, lid)) (Mty_alias path) env loc
         smty.pmty_attributes
   | Pmty_signature ssg ->
+      if Env.has_open_quotations env then
+        raise(Error(loc, env, Quotation_signature));
       let sg = transl_signature env ssg in
       mkmty (Tmty_signature sg) (Mty_signature sg.sig_type) env loc
         smty.pmty_attributes
@@ -2906,6 +2910,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       type_module_path_aux ~alias ~hold_locks sttn env path mode_with_locks lid
         smod
   | Pmod_structure sstr ->
+      if Env.has_open_quotations env then
+        raise (Error (smod.pmod_loc, env, Quotation_structure));
       let (str, sg, mode, names, shape, _finalenv) =
         type_structure funct_body anchor env ?expected_mode sstr in
       let md =
@@ -4831,6 +4837,16 @@ let report_error ~loc _env = function
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
         print_legacy_module reason
+  | Quotation_structure ->
+      Location.errorf ~loc
+        "Module definitions using %a@ blocks are not allowed \
+         inside quotations."
+        Style.inline_code "struct..end"
+  | Quotation_signature ->
+      Location.errorf ~loc
+        "Module type definitions using %a@ are not allowed \
+         inside quotations."
+        Style.inline_code "sig..end"
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env_error env

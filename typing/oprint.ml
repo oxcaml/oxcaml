@@ -289,6 +289,7 @@ let print_out_value ppf tree =
     | Oval_unboxed_tuple tree_list ->
         fprintf ppf "@[<1>#(%a)@]" (print_labeled_tree_list print_tree_1 ",")
           tree_list
+    | Oval_code e -> CamlinternalQuote_bootstrap.Code.print ppf e
     | tree -> fprintf ppf "@[<1>(%a)@]" (cautious print_tree_1) tree
   and print_fields first ppf =
     function
@@ -563,6 +564,12 @@ and print_out_type_3 ppf =
   | Otyp_of_kind jk ->
     fprintf ppf "(type@ :@ %a)" print_out_jkind jk
   | Otyp_ret _ -> assert false
+  | Otyp_quote t ->
+      fprintf ppf "@[<1><[@ %a@ ]>@]"
+        print_out_type_0 t
+  | Otyp_splice t ->
+      fprintf ppf "@[<1>$@ (%a)@]"
+        print_out_type_0 t
 and print_out_type ppf typ =
   print_out_type_0 ppf typ
 and print_simple_out_type ppf typ =

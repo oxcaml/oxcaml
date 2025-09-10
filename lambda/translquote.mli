@@ -1,3 +1,9 @@
+module Code : sig
+  type t
+end
 
 val transl_quote :
-  (Typedtree.expression -> Lambda.t) -> Typedtree.expression -> Lambda.t
+  (Typedtree.expression -> Lambda.lambda) ->
+  Typedtree.expression ->
+  Location.t ->
+  Lambda.lambda

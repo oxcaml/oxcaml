@@ -177,6 +177,8 @@
   printf.mli
   queue.ml
   queue.mli
+  quote.ml
+  quote.mli
   random.ml
   random.mli
   result.ml
@@ -354,6 +356,9 @@
   .stdlib.objs/byte/stdlib__Queue.cmi
   .stdlib.objs/byte/stdlib__Queue.cmt
   .stdlib.objs/byte/stdlib__Queue.cmti
+  .stdlib.objs/byte/stdlib__Quote.cmi
+  .stdlib.objs/byte/stdlib__Quote.cmt
+  .stdlib.objs/byte/stdlib__Quote.cmti
   .stdlib.objs/byte/stdlib__Random.cmi
   .stdlib.objs/byte/stdlib__Random.cmt
   .stdlib.objs/byte/stdlib__Random.cmti
@@ -441,6 +446,7 @@
   .stdlib.objs/native/stdlib__Hashtbl.cmx
   .stdlib.objs/native/stdlib__Filename.cmx
   .stdlib.objs/native/stdlib__Queue.cmx
+  .stdlib.objs/native/stdlib__Quote.cmx
   .stdlib.objs/native/stdlib__StdLabels.cmx
   .stdlib.objs/native/stdlib__Weak.cmx
   .stdlib.objs/native/stdlib__Float.cmx

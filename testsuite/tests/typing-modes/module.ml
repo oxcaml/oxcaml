@@ -510,6 +510,6 @@ module type S = sig
     @@ portable
 end
 [%%expect{|
-Uncaught exception: File "typing/env.ml", line 2139, characters 13-19: Assertion failed
+Uncaught exception: File "typing/env.ml", line 2144, characters 13-19: Assertion failed
 
 |}]

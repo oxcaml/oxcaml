@@ -330,8 +330,11 @@ module History = struct
     | Class_term_argument
     | Debug_printer_argument
     | Recmod_fun_arg
-    | Array_type_kind
     | Quotation_result
+    | Antiquotation_result
+    | Tquote
+    | Tsplice
+    | Array_type_kind
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =
