@@ -168,7 +168,8 @@ let all_profile_granularity_levels =
 let set_profile_granularity v =
   match List.assoc_opt v profile_granularity_level_mapping with
   | Some granularity -> profile_granularity := granularity
-  | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
+  | None -> 
+    raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
 
 let native_code = ref false             (* set to true under ocamlopt *)
 
