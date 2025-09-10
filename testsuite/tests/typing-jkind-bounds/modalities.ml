@@ -1,5 +1,5 @@
 (* TEST
-    flags = "-extension layouts_alpha";
+    flags = "-extension layouts_alpha -ikinds";
     expect;
 *)
 let use_uncontended : 'a @ uncontended -> unit = fun _ -> ()

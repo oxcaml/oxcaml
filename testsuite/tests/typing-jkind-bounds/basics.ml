@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension small_numbers";
+ flags = "-extension small_numbers -ikinds";
  expect;
 *)
 
@@ -1676,7 +1676,13 @@ end = struct
   type t : value mod non_float
 end
 [%%expect{|
-module M : sig type t : value mod non_float end
+Line 2, characters 2-36:
+2 |   type t : immediate with extensible
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value mod non_float
+         because of the annotation on the declaration of the type t.
+       But the kind of type "t" must be a subkind of value mod non_float
+         because of the annotation on the declaration of the type t.
 |}]
 
 (*********************************)
@@ -1731,7 +1737,13 @@ end = struct
   type t : value mod non_float
 end
 [%%expect{|
-module M : sig type t : value mod non_float end
+Line 2, characters 2-36:
+2 |   type t : immediate with extensible
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value mod non_float
+         because of the annotation on the declaration of the type t.
+       But the kind of type "t" must be a subkind of value mod non_float
+         because of the annotation on the declaration of the type t.
 |}]
 
 (**************************)

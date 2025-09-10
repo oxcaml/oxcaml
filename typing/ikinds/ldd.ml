@@ -638,6 +638,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
         C.join lo' hi')
 
   let round_up (n : node) =
+    solve_pending ();
     let n = force n in
     round_up' n
 

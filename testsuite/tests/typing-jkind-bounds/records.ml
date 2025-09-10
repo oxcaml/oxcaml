@@ -1,4 +1,5 @@
 (* TEST
+   flags += " -ikinds";
    expect;
 *)
 
@@ -161,9 +162,6 @@ Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended
-         portability: mod portable with 'a ≰ mod portable
-         statefulness: mod stateless with 'a ≰ mod stateless
-         visibility: mod read_write ≰ mod immutable
 |}]
 
 type t : immutable_data = { x : int ref }
@@ -330,7 +328,6 @@ Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended with 'a
-         visibility: mod read_write ≰ mod immutable with 'a
 |}]
 
 type 'a t : immutable_data with 'a = { x : 'a -> 'a }
@@ -517,12 +514,6 @@ let foo (t : ('a : immutable_data) t @ nonportable contended once) =
 [%%expect {|
 type 'a t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
-|}, Principal{|
-type 'a t = { x : 'a; }
-Line 3, characters 15-16:
-3 |   use_portable t;
-                   ^
-Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
@@ -550,12 +541,6 @@ let foo (t : _ t @ nonportable contended once) =
 [%%expect {|
 type ('a : immutable_data) t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
-|}, Principal{|
-type ('a : immutable_data) t = { x : 'a; }
-Line 3, characters 15-16:
-3 |   use_portable t;
-                   ^
-Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
