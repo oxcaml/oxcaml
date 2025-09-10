@@ -1683,7 +1683,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     List.map (List.map (fun arg : H.simple_or_prim -> Simple arg)) args
   in
   let size_int = Target_system.Machine_width.size_in_bytes machine_width in
-  assert (size_int mod 8 = 0);
   match prim, args with
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
