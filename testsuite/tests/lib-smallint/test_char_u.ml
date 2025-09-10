@@ -49,3 +49,7 @@ let () =
 let () = test_binary Char.equal Char_u.equal Bool.equal
 
 let () = test_binary Char.compare Char_u.compare (fun a b -> a * b > 0 || a = b)
+
+let () = test_unary (Char.seeded_hash 1234) (Char_u.seeded_hash 1234) Int.equal
+
+let () = test_unary Char.hash Char_u.hash Int.equal

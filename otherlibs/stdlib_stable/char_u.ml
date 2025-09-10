@@ -35,6 +35,6 @@ let equal c d = Int8_u.equal (to_int8_u c) (to_int8_u d)
 
 let compare c d = Int8_u.unsigned_compare (to_int8_u c) (to_int8_u d)
 
-let seeded_hash seed c = Int8_u.seeded_hash seed (to_int8_u c)
+let seeded_hash seed c = Int.seeded_hash seed (code c)
 
-let hash c = Int8_u.hash (to_int8_u c)
+let hash c = Int.hash (code c)
