@@ -162,7 +162,8 @@ let profile_granularity_level_mapping = [
   "block", Block_level;
 ]
 
-let all_profile_granularity_levels = List.map fst profile_granularity_level_mapping
+let all_profile_granularity_levels = 
+  List.map fst profile_granularity_level_mapping
 
 let set_profile_granularity v =
   match List.assoc_opt v profile_granularity_level_mapping with
