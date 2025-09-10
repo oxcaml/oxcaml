@@ -859,8 +859,8 @@ module type S = sig
   module Crossing : sig
     module Monadic : sig
       module Atom : sig
-        (** The mode crossing capability on an axis whose carrier type is ['a].
-      Currently it has only one constructor and is thus unboxed. *)
+        (** The mode crossing capability on a monadic axis whose carrier type is
+      ['a]. Currently it has only one constructor and is thus unboxed. *)
         type 'a t =
           | Modality of 'a Modality.Monadic.Atom.t
               (** The mode crossing caused by a modality atom on an axis whose
@@ -873,10 +873,13 @@ module type S = sig
         [@@unboxed]
       end
 
+      (** The mode crossing capability on the whole monadic fragment. *)
       type t
 
       include Lattice with type t := t
 
+      (** Create a mode crossing on the monadic fragment from the collection of mode
+      crossings on each monadic axes. *)
       val create :
         uniqueness:Uniqueness.Const.t Atom.t ->
         contention:Contention.Const.t Atom.t ->
@@ -886,13 +889,21 @@ module type S = sig
 
     module Comonadic : sig
       module Atom : sig
-        type 'a t = Modality of 'a Modality.Comonadic.Atom.t [@@unboxed]
+        (** The mode crossing capability on a comonadic axis whose carrier type is
+      ['a]. Currently it has only one constructor and is thus unboxed. *)
+        type 'a t =
+          | Modality of 'a Modality.Comonadic.Atom.t
+              (** See comment on the similar constructor in [Monadic.Atom.t] *)
+        [@@unboxed]
       end
 
+      (** The mode crossing capability on the whole comonadic fragment. *)
       type t
 
       include Lattice with type t := t
 
+      (** Create a mode crossing on the comonadic fragment from the collection
+      of mode crossings on each comonadic axes. *)
       val create :
         regionality:Regionality.Const.t Atom.t ->
         linearity:Linearity.Const.t Atom.t ->
@@ -902,10 +913,13 @@ module type S = sig
         t
     end
 
-    (** The mode crossing capability on all axes *)
+    (** The mode crossing capability on all axes, split into monadic and
+        comonadic fragments. *)
     type t = (Monadic.t, Comonadic.t) monadic_comonadic
 
     module Axis : sig
+      (** ['a t] specifies an axis whose mode crossing capability is represented
+          as ['a] *)
       type 'a t =
         | Monadic : 'a Value.Monadic.Axis.t -> 'a Monadic.Atom.t t
         | Comonadic : 'a Value.Comonadic.Axis.t -> 'a Comonadic.Atom.t t
@@ -920,6 +934,10 @@ module type S = sig
     module Per_axis :
       Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
 
+    (** Convenience for creating a mode crossing capability on all axes, using a
+    boolean for each axis where [true] means full crossing and [false] means no
+    crossing. Alternatively, call [Monadic.create] and [Comonadic.create] and
+    pack the results into a record of type [t]. *)
     val create :
       regionality:bool ->
       linearity:bool ->
@@ -931,6 +949,7 @@ module type S = sig
       visibility:bool ->
       t
 
+    (** Project a mode crossing (of all axes) onto the specified axis. *)
     val proj : 'a Axis.t -> t -> 'a
 
     include Lattice with type t := t
