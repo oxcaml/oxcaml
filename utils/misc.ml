@@ -2029,19 +2029,31 @@ module Maybe_bounded = struct
 
   let incr = function
     | Unbounded -> ()
-    | Bounded r -> r.bound <- r.bound + 1
+    | Bounded r ->
+      if Int.equal r.bound Int.max_int
+      then
+        let msg = Format.asprintf "incr called with max_int (%d)" Int.max_int in
+        raise (Invalid_argument msg)
+      else
+        r.bound <- r.bound + 1
 
   let is_depleted = function
     | Unbounded -> false
     | Bounded r -> r.bound <= 0
 
-  let is_in_bounds n = function
-    | Unbounded -> true
-    | Bounded r -> n < r.bound
+  let is_in_bounds n t =
+    if n < 0 then false
+    else
+      match t with
+      | Unbounded -> true
+      | Bounded r -> n < r.bound
 
-  let is_out_of_bounds n = function
-    | Unbounded -> false
-    | Bounded r -> n >= r.bound
+  let is_out_of_bounds n t =
+    if n < 0 then true
+    else
+      match t with
+      | Unbounded -> false
+      | Bounded r -> n >= r.bound
 
   let of_int n = if n < 0 then Bounded { bound = 0 } else Bounded { bound = n }
 

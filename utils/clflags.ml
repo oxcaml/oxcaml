@@ -285,14 +285,23 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_max_evaluation_steps_per_variable := Some 1000;
       gdwarf_config_shape_reduce_fuel := Some 10
   | Fidelity_medium ->
-      gdwarf_config_shape_eval_depth := Some 2;
-      gdwarf_config_shape_reduce_depth := Some 2;
-      gdwarf_config_max_cms_files_per_unit := Some 20;
-      gdwarf_config_max_cms_files_per_variable := Some 5;
-      gdwarf_config_max_type_to_shape_depth := Some 10;
-      gdwarf_config_max_shape_reduce_steps_per_variable := Some (1000);
-      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000);
-      gdwarf_config_shape_reduce_fuel := Some 10
+      (* The default. *)
+      gdwarf_config_shape_eval_depth :=
+        Dwarf_config_defaults.shape_eval_depth;
+      gdwarf_config_shape_reduce_depth :=
+        Dwarf_config_defaults.shape_reduce_depth;
+      gdwarf_config_max_cms_files_per_unit :=
+        Dwarf_config_defaults.max_cms_files_per_unit;
+      gdwarf_config_max_cms_files_per_variable :=
+        Dwarf_config_defaults.max_cms_files_per_variable;
+      gdwarf_config_max_type_to_shape_depth :=
+        Dwarf_config_defaults.max_type_to_shape_depth;
+      gdwarf_config_max_shape_reduce_steps_per_variable :=
+        Dwarf_config_defaults.max_shape_reduce_steps_per_variable;
+      gdwarf_config_max_evaluation_steps_per_variable :=
+        Dwarf_config_defaults.max_evaluation_steps_per_variable;
+      gdwarf_config_shape_reduce_fuel :=
+        Dwarf_config_defaults.shape_reduce_fuel
   | Fidelity_high ->
       gdwarf_config_shape_eval_depth := Some 3;
       gdwarf_config_shape_reduce_depth := Some 3;
