@@ -1481,6 +1481,34 @@ module Safe : sig
     (string -> int -> int -> unit) @ portable
     -> (unit -> unit) @ portable
     -> formatter Domain.Safe.TLS.key
+
+  (** Like {!get_std_formatter}, but can be called from any thread. *)
+  val with_std_formatter 
+    : (formatter -> 'a @ contended local once portable unique) 
+      @ local once portable unyielding
+    -> 'a @ contended local once portable unique
+    @@ portable
+
+  (** Like {!get_err_formatter}, but can be called from any thread. *)
+  val with_err_formatter 
+    : (formatter -> 'a @ contended local once portable unique) 
+      @ local once portable unyielding
+    -> 'a @ contended local once portable unique
+    @@ portable
+
+  (** Like {!get_stdbuf}, but can be called from any thread. *)
+  val with_stdbuf 
+    : (Buffer.t -> 'a @ contended local once portable unique) 
+      @ local once portable unyielding
+    -> 'a @ contended local once portable unique
+    @@ portable
+
+  (** Like {!get_str_formatter}, but can be called from any thread. *)
+  val with_str_formatter 
+    : (formatter -> 'a @ contended local once portable unique) 
+      @ local once portable unyielding
+    -> 'a @ contended local once portable unique
+    @@ portable
 end
 
 (** {1:examples Examples}

@@ -1530,6 +1530,14 @@ let asprintf fmt = kasprintf id fmt
 
 module Safe = struct
   let make_synchronized_formatter = make_synchronized_formatter_safe
+  let with_std_formatter f = exclave_ TLS.access std_formatter_key f
+  let with_err_formatter f = exclave_ TLS.access err_formatter_key f
+  let with_stdbuf f = exclave_
+    TLS.access str_buf_and_formatter_key (fun (buf,_) -> exclave_ f buf) 
+    [@nontail]
+  let with_str_formatter f = exclave_
+    TLS.access str_buf_and_formatter_key (fun (_,fmt) -> exclave_ f fmt) 
+    [@nontail]
 end
 let make_synchronized_formatter = make_synchronized_formatter_unsafe
 
