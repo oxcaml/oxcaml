@@ -313,10 +313,14 @@ Error: In this definition, expected parameter variances are not satisfied.
 let idx_array x = (.(x))
 let idx_array_L x = (.L(x))
 let idx_array_l x = (.l(x))
+let idx_array_S x = (.S(x))
+let idx_array_s x = (.s(x))
 let idx_array_n x = (.n(x))
 let idx_iarray x = (.:(x))
 let idx_iarray_L x = (.:L(x))
 let idx_iarray_l x = (.:l(x))
+let idx_iarray_S x = (.:S(x))
+let idx_iarray_s x = (.:s(x))
 let idx_iarray_n x = (.:n(x))
 let idx_imm x = (.idx_imm(x))
 let idx_mut x = (.idx_mut(x))
@@ -329,6 +333,11 @@ val idx_array_L :
 val idx_array_l :
   ('a : value_or_null mod non_float). int32# -> ('a array, 'a) idx_mut =
   <fun>
+val idx_array_S :
+  ('a : value_or_null mod non_float). int16# -> ('a array, 'a) idx_mut =
+  <fun>
+val idx_array_s :
+  ('a : value_or_null mod non_float). int8# -> ('a array, 'a) idx_mut = <fun>
 val idx_array_n :
   ('a : value_or_null mod non_float). nativeint# -> ('a array, 'a) idx_mut =
   <fun>
@@ -339,6 +348,12 @@ val idx_iarray_L :
   <fun>
 val idx_iarray_l :
   ('a : value_or_null mod non_float). int32# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_iarray_S :
+  ('a : value_or_null mod non_float). int16# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_iarray_s :
+  ('a : value_or_null mod non_float). int8# -> ('a iarray, 'a) idx_imm =
   <fun>
 val idx_iarray_n :
   ('a : value_or_null mod non_float). nativeint# -> ('a iarray, 'a) idx_imm =

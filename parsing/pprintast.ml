@@ -2244,6 +2244,8 @@ and block_access ctxt f = function
       | Index_int -> ""
       | Index_unboxed_int64 -> "L"
       | Index_unboxed_int32 -> "l"
+      | Index_unboxed_int16 -> "S"
+      | Index_unboxed_int8 -> "s"
       | Index_unboxed_nativeint -> "n"
     in
     pp f "%s%s(%a)" dotop suffix (expression ctxt) index

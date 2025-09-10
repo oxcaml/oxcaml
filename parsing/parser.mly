@@ -3092,6 +3092,8 @@ block_access:
       match $2 with
       | "L" -> Baccess_array (Mutable, Index_unboxed_int64, i)
       | "l" -> Baccess_array (Mutable, Index_unboxed_int32, i)
+      | "S" -> Baccess_array (Mutable, Index_unboxed_int16, i)
+      | "s" -> Baccess_array (Mutable, Index_unboxed_int8, i)
       | "n" -> Baccess_array (Mutable, Index_unboxed_nativeint, i)
       | "idx_imm" -> Baccess_block (Immutable, i)
       | "idx_mut" -> Baccess_block (Mutable, i)
@@ -3103,6 +3105,8 @@ block_access:
       match $1, $2 with
       | ":", "L" -> Baccess_array (Immutable, Index_unboxed_int64, i)
       | ":", "l" -> Baccess_array (Immutable, Index_unboxed_int32, i)
+      | ":", "S" -> Baccess_array (Immutable, Index_unboxed_int16, i)
+      | ":", "s" -> Baccess_array (Immutable, Index_unboxed_int8, i)
       | ":", "n" -> Baccess_array (Immutable, Index_unboxed_nativeint, i)
       | _ ->
         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))

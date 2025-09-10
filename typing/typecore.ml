@@ -7440,6 +7440,8 @@ and type_block_access env expected_base_ty principal
       | Index_int -> Predef.type_int
       | Index_unboxed_int64 -> Predef.type_unboxed_int64
       | Index_unboxed_int32 -> Predef.type_unboxed_int32
+      | Index_unboxed_int16 -> Predef.type_unboxed_int16
+      | Index_unboxed_int8 -> Predef.type_unboxed_int8
       | Index_unboxed_nativeint -> Predef.type_unboxed_nativeint
     in
     let index =
