@@ -46,3 +46,11 @@ end
 module Shared : sig
   type ('a : value_or_null) t = { shared : 'a @@ shared } [@@unboxed]
 end
+
+module Many : sig
+  type ('a : value_or_null) t = { many : 'a @@ many } [@@unboxed]
+end
+
+module Unyielding : sig
+  type ('a : value_or_null) t = { unyielding : 'a @@ unyielding } [@@unboxed]
+end
