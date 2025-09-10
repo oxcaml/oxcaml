@@ -148,8 +148,11 @@ let block_like ~env ~res symbol (const : Static_const.t) =
   | Immutable_float32_array values ->
     let tag =
       if length_is_even values
-      then Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_even_tag
-      else Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_odd_tag
+      then
+        Cmm_helpers.Unboxed_or_untagged_array_tags
+        .unboxed_float32_array_zero_tag
+      else
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_float32_array_one_tag
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:(fun float ->
@@ -162,21 +165,27 @@ let block_like ~env ~res symbol (const : Static_const.t) =
   | Immutable_int32_array values ->
     let tag =
       if length_is_even values
-      then Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_even_tag
-      else Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_odd_tag
+      then
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_zero_tag
+      else
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_one_tag
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
   | Immutable_int64_array values ->
-    let tag = Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag in
+    let tag =
+      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
+    in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int64_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int64_to_jsir_const bits, Array))
   | Immutable_nativeint_array values ->
-    let tag = Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag in
+    let tag =
+      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
+    in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Targetint_32_64.to_int32
       ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
@@ -191,12 +200,14 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       match kind with
       | Values_or_immediates_or_naked_floats -> 0
       | Naked_float32s ->
-        Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_even_tag
+        Cmm_helpers.Unboxed_or_untagged_array_tags
+        .unboxed_float32_array_zero_tag
       | Naked_int32s ->
-        Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_even_tag
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_zero_tag
       | Naked_nativeints ->
-        Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag
-      | Naked_int64s -> Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
+      | Naked_int64s ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
       | Unboxed_products -> 0
       | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         (* No SIMD *)
