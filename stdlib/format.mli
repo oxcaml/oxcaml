@@ -994,28 +994,24 @@ val synchronized_formatter_of_out_channel :
 *)
 
 val std_formatter : formatter @@ nonportable
-[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** The initial thread's standard formatter to write to standard output.
 
   It is defined as {!formatter_of_out_channel} {!Stdlib.stdout}.
 *)
 
 val get_std_formatter : unit -> formatter @@ nonportable
-[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** [get_std_formatter ()] returns the current thread's standard formatter used
     to write to standard output.
     @since 5.0
 *)
 
 val err_formatter : formatter @@ nonportable
-[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** The initial thread's formatter to write to standard error.
 
   It is defined as {!formatter_of_out_channel} {!Stdlib.stderr}.
 *)
 
 val get_err_formatter : unit -> formatter @@ nonportable
-[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** [get_err_formatter ()] returns the current thread's formatter used to write
    to standard error.
    @since 5.0
@@ -1029,24 +1025,20 @@ val formatter_of_buffer : Buffer.t -> formatter
 *)
 
 val stdbuf : Buffer.t @@ nonportable
-[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** The initial thread's string buffer in which [str_formatter] writes. *)
 
 val get_stdbuf : unit -> Buffer.t @@ nonportable
-[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** [get_stdbuf ()] returns the current thread's string buffer in which the
     current thread's string formatter writes.
     @since 5.0 *)
 
 val str_formatter : formatter @@ nonportable
-[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** The initial thread's formatter to output to the {!stdbuf} string buffer.
 
   [str_formatter] is defined as {!formatter_of_buffer} {!stdbuf}.
 *)
 
 val get_str_formatter : unit -> formatter @@ nonportable
-[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** The current thread's formatter to output to the current threads string
     buffer.
     @since 5.0

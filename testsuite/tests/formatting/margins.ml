@@ -1,5 +1,4 @@
 (* TEST
- flags += "-alert -unsafe_multidomain";
  toplevel;
 *)
 

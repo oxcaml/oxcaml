@@ -1,5 +1,4 @@
 (* TEST
- flags += "-alert -unsafe_multidomain";
  include ocamlcommon;
  readonly_files = "source.ml source_jane_street.ml";
 *)

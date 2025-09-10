@@ -1033,11 +1033,12 @@ and str_formatter = formatter_of_buffer stdbuf
 (* Initialise thread local state *)
 
 module TLS = struct
-  (* CR-someday mslater: directly accessing TLS like this is unsafe.
-     The usage in this file is safe because the accessors do not
+  (* CR-someday mslater: directly manipulating TLS is unsafe.
+     Usage in this file is safe because the accessors do not
      yield and the contents are never shared with other threads.
-     The functions that expose the TLS contents to users are
-     marked unsafe. Switching to FLS would fix this. *)
+     The formatters exposed in the API are safe to use because 
+     they are nonportable, i.e. cannot be shared with other 
+     threads. Switching to FLS would be better. *)
   let new_key = Domain.Safe.TLS.new_key
   let get = Obj.magic_portable Domain.TLS.get
   let set = Obj.magic_portable Domain.TLS.set
