@@ -67,7 +67,9 @@ let foo () =
 Line 3, characters 17-18:
 3 |     use_portable l
                      ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (* thunk is evaluated only when [uncontended] lazy is forced, so the thunk can be
@@ -103,7 +105,9 @@ let foo (x @ nonportable) =
 Line 3, characters 29-30:
 3 |     | lazy r -> use_portable x
                                  ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (* forcing a lazy is not concurrency-safe; therefore, we require uncontended

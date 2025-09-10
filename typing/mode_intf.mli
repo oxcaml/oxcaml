@@ -682,7 +682,11 @@ module type S = sig
   val regional_to_global : ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
-  val alloc_as_value : ('l * 'r) Alloc.t -> ('l * 'r) Value.t
+  val alloc_as_value :
+    ?hint_monadic:('l * 'r) neg Hint.morph ->
+    ?hint_comonadic:('l * 'r) pos Hint.morph ->
+    ('l * 'r) Alloc.t ->
+    ('l * 'r) Value.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
   val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t

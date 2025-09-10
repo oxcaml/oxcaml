@@ -49,7 +49,9 @@ val run_unyielding : (string -> unit) @ local unyielding -> unit = <fun>
 Line 3, characters 46-47:
 3 | let () = with_effect (fun k -> run_unyielding k)
                                                   ^
-Error: This value is "yielding" but is expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding"
+       because it is the argument for a parameter
+       which is expected to be "unyielding".
 |}]
 
 let run_default : (string -> unit) @ local -> unit = fun f -> f "some string"
@@ -160,7 +162,9 @@ external requires_unyielding : 'a @ local unyielding -> unit = "%ignore"
 Line 7, characters 57-58:
 7 | let _ = with_global_effect (fun k -> requires_unyielding k)
                                                              ^
-Error: This value is "yielding" but is expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding"
+       because it is the argument for a parameter
+       which is expected to be "unyielding".
 |}]
 
 external returns_unyielding : 'a -> 'a @ local unyielding = "%identity"
@@ -205,7 +209,9 @@ let f2 (x @ local) = exclave_ requires_unyielding x
 Line 1, characters 50-51:
 1 | let f2 (x @ local) = exclave_ requires_unyielding x
                                                       ^
-Error: This value is "yielding" but is expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding"
+       because it is the argument for a parameter
+       which is expected to be "unyielding".
 |}]
 
 let f3 (x @ yielding) = requires_unyielding x
@@ -213,7 +219,9 @@ let f3 (x @ yielding) = requires_unyielding x
 Line 1, characters 44-45:
 1 | let f3 (x @ yielding) = requires_unyielding x
                                                 ^
-Error: This value is "yielding" but is expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding"
+       because it is the argument for a parameter
+       which is expected to be "unyielding".
 |}]
 
 let f4 (x @ local unyielding) = exclave_ requires_unyielding x
