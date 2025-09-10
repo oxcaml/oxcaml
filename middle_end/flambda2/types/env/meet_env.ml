@@ -52,7 +52,7 @@ let use_meet_env_strict t ~f : _ Or_bottom.t =
 let map_typing_env t ~f = with_typing_env t (f (typing_env t))
 
 let replace_concrete_equation t name ty =
-  match TG.must_be_singleton ty with
+  match TG.must_be_singleton ty ~machine_width:(TE.machine_width t) with
   | None ->
     (* [ty] must be a concrete type. *)
     (match TG.get_alias_opt ty with

@@ -36,6 +36,7 @@ val make_decisions :
   DE.t * Decisions.t
 
 val compute_extra_params_and_args :
+  machine_width:Target_system.Machine_width.t ->
   Decisions.t ->
   arg_types_by_use_id:Continuation_uses.arg_types_by_use_id ->
   EPA.t ->

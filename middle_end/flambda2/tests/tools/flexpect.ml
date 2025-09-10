@@ -45,7 +45,7 @@ let run_expect_test ~get_module_info ~extension ~filename
   (* CR ncourant: test reaper as well *)
   let ({ unit = actual_fl; _ } : Simplify.simplify_result) =
     Simplify.run ~cmx_loader ~round:0 before_fl
-      ~code_slot_offsets:Code_id.Map.empty
+      ~code_slot_offsets:Code_id.Map.empty ~machine_width:Sixty_four
   in
   let expected_fl = Fexpr_to_flambda.conv comp_unit expected in
   match Compare.flambda_units actual_fl expected_fl with

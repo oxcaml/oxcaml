@@ -22,6 +22,7 @@ val create :
   required_names:Name.Set.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
+  machine_width:Target_system.Machine_width.t ->
   t
 
 val make_result : t -> Flow_types.Mutable_unboxing_result.t * Simple.Set.t

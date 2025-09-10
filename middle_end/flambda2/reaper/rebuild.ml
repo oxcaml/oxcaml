@@ -62,7 +62,8 @@ let print_param_decision ppf param_decision =
       fields
 
 type env =
-  { uses : DS.result;
+  { machine_width : Target_system.Machine_width.t;
+    uses : DS.result;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
@@ -113,7 +114,8 @@ let is_name_used (env : env) name =
 (* XXX so which is it? *)
 let poison_value = 0 (* 123456789 *)
 
-let poison kind = Simple.const_int_of_kind kind poison_value
+let poison ~machine_width kind =
+  Simple.const_int_of_kind ~machine_width kind poison_value
 
 let rec fold_unboxed_with_kind (f : K.t -> 'a -> 'b -> 'b)
     (fields : 'a DS.unboxed_fields Field.Map.t) acc =
@@ -321,7 +323,7 @@ let name_poison env name =
       then K.value
       else Misc.fatal_errorf "Unbound name %a" Name.print name
   in
-  poison kind
+  poison ~machine_width:env.machine_width kind
 
 let rewrite_simple (env : env) simple =
   Simple.pattern_match simple
@@ -525,7 +527,8 @@ let rewrite_static_const (env : env) (sc : SC.t) =
   | Boxed_int32 n -> SC.boxed_int32 (rewrite_or_variable Int32.zero env n)
   | Boxed_int64 n -> SC.boxed_int64 (rewrite_or_variable Int64.zero env n)
   | Boxed_nativeint n ->
-    SC.boxed_nativeint (rewrite_or_variable Targetint_32_64.zero env n)
+    SC.boxed_nativeint
+      (rewrite_or_variable (Targetint_32_64.zero env.machine_width) env n)
   | Boxed_vec128 n ->
     SC.boxed_vec128
       (rewrite_or_variable Vector_types.Vec128.Bit_pattern.zero env n)
@@ -549,7 +552,7 @@ let rewrite_static_const (env : env) (sc : SC.t) =
     SC.immutable_int64_array (rewrite_or_variables Int64.zero env fields)
   | Immutable_nativeint_array fields ->
     SC.immutable_nativeint_array
-      (rewrite_or_variables Targetint_32_64.zero env fields)
+      (rewrite_or_variables (Targetint_32_64.zero env.machine_width) env fields)
   | Immutable_vec128_array fields ->
     SC.immutable_vec128_array
       (rewrite_or_variables Vector_types.Vec128.Bit_pattern.zero env fields)
@@ -593,7 +596,7 @@ let rebuild_named_default_case env (named : Named.t) =
         Named.create_prim
           (P.Unary
              ( Block_load
-                 { field = Target_ocaml_int.of_int field;
+                 { field = Target_ocaml_int.of_int env.machine_width field;
                    kind;
                    mut = Immutable
                  },
@@ -726,7 +729,10 @@ let make_apply_wrapper env
             | Delete, _ -> Ok (i + 1, rev_args)
             | Keep (_, _), Keep (v, _) -> Ok (i + 1, Simple.var v :: rev_args)
             | Keep (_, kind), Delete ->
-              Ok (i + 1, poison (KS.kind kind) :: rev_args)
+              Ok
+                ( i + 1,
+                  poison ~machine_width:env.machine_width (KS.kind kind)
+                  :: rev_args )
             | Unbox fields_apply, Unbox fields_func ->
               Ok
                 ( i + 1,
@@ -1029,7 +1035,7 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
             Named.create_prim
               (P.Unary
                  ( Block_load
-                     { field = Target_ocaml_int.of_int field;
+                     { field = Target_ocaml_int.of_int env.machine_width field;
                        kind;
                        mut = Immutable
                      },
@@ -1084,16 +1090,18 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
                   let arg = List.nth args nth in
                   if K.equal field_kind (get_simple_kind env arg)
                   then arg
-                  else poison field_kind
-                else poison field_kind
+                  else poison ~machine_width:env.machine_width field_kind
+                else poison ~machine_width:env.machine_width field_kind
               in
               if simple_is_unboxable env arg
               then Right (get_simple_unboxable env arg)
               else Left arg
-            | Is_int -> Left Simple.untagged_const_false
+            | Is_int -> Left (Simple.untagged_const_false env.machine_width)
             | Get_tag ->
               let tag, _ = P.Block_kind.to_shape kind in
-              Left (Simple.untagged_const_int (Tag.to_targetint_31_63 tag))
+              Left
+                (Simple.untagged_const_int
+                   (Tag.to_targetint_31_63 env.machine_width tag))
             | Value_slot _ | Function_slot _ | Code_of_closure | Apply _
             | Code_id_of_call_witness _ ->
               assert false
@@ -1257,8 +1265,10 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
             let tag =
               match kind with
               | Values (tag, _) | Mixed (tag, _) ->
-                Tag.to_targetint_31_63 (Tag.Scannable.to_tag tag)
-              | Naked_floats -> Tag.to_targetint_31_63 Tag.double_array_tag
+                Tag.to_targetint_31_63 env.machine_width
+                  (Tag.Scannable.to_tag tag)
+              | Naked_floats ->
+                Tag.to_targetint_31_63 env.machine_width Tag.double_array_tag
             in
             match uf with
             | Not_unboxed (ff, _) ->
@@ -1267,7 +1277,9 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
           | Is_int -> (
             match uf with
             | Not_unboxed (ff, _) ->
-              Int.Map.add ff (rewrite_simple env Simple.const_one) mp
+              Int.Map.add ff
+                (rewrite_simple env (Simple.const_one env.machine_width))
+                mp
             | Unboxed _ -> Misc.fatal_errorf "trying to unbox simple")
           | Value_slot _ | Function_slot _ | Code_of_closure | Apply _
           | Code_id_of_call_witness _ ->
@@ -1277,7 +1289,7 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     let args =
       List.init size (fun i ->
           match Int.Map.find_opt i mp with
-          | None -> Simple.const_zero
+          | None -> Simple.const_zero env.machine_width
           | Some x -> x)
     in
     let named =
@@ -1362,7 +1374,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
         let f = GFG.Field.Block (i, kind) in
         if DS.field_used env.uses bound_name f
         then rewrite_simple env field
-        else poison kind)
+        else poison ~machine_width:env.machine_width kind)
       fields
   in
   RE.create_let bp
@@ -1883,7 +1895,7 @@ type result =
     slot_offsets : Slot_offsets.t
   }
 
-let rebuild ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
+let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
     ~fixed_arity_continuations kinds (solved_dep : DS.result) get_code_metadata
     holed =
@@ -1982,7 +1994,8 @@ let rebuild ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       continuation_info
   in
   let env =
-    { uses = solved_dep;
+    { machine_width;
+      uses = solved_dep;
       code_deps;
       get_code_metadata;
       cont_params_to_keep;

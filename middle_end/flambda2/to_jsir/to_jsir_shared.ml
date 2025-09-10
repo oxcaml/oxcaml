@@ -39,7 +39,10 @@ let bind_expr_to_var ~env ~res fvar expr =
   env, res
 
 let target_ocaml_int_to_jsir_const targetint : Jsir.constant =
-  let repr = Target_ocaml_int.to_targetint targetint |> Targetint_32_64.repr in
+  let repr =
+    Target_ocaml_int.to_targetint Thirty_two_no_gc_tag_bit targetint
+    |> Targetint_32_64.repr
+  in
   let targetint =
     match repr with
     | Int32 int32 -> Targetint.of_int32 int32

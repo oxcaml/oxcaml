@@ -813,7 +813,9 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
             Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
         }
     in
-    Simplified_named.create_with_known_free_names ~find_code_characteristics
+    let machine_width = DE.machine_width (DA.denv dacc) in
+    Simplified_named.create_with_known_free_names ~machine_width
+      ~find_code_characteristics
       (Named.create_set_of_closures set_of_closures)
       ~free_names:(Named.free_names named)
   in

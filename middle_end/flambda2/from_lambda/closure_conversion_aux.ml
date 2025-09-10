@@ -360,7 +360,8 @@ module Acc = struct
     }
 
   type t =
-    { declared_symbols : (Symbol.t * Static_const.t) list;
+    { machine_width : Target_system.Machine_width.t;
+      declared_symbols : (Symbol.t * Static_const.t) list;
       lifted_sets_of_closures :
         (Symbol.t Function_slot.Lmap.t * Flambda.Set_of_closures.t) list;
       shareable_constants : Symbol.t Static_const.Map.t;
@@ -385,6 +386,8 @@ module Acc = struct
     t, name
 
   let cost_metrics t = t.cost_metrics
+
+  let machine_width t = t.machine_width
 
   let increment_metrics metrics t =
     { t with cost_metrics = Cost_metrics.( + ) t.cost_metrics metrics }
@@ -445,8 +448,9 @@ module Acc = struct
         externals := Symbol.Map.add symbol approx !externals;
         approx
 
-  let create ~cmx_loader =
-    { declared_symbols = [];
+  let create ~cmx_loader ~machine_width =
+    { machine_width;
+      declared_symbols = [];
       lifted_sets_of_closures = [];
       shareable_constants = Static_const.Map.empty;
       symbol_approximations = Symbol.Map.empty;
@@ -1072,7 +1076,9 @@ module Let_with_acc = struct
     else
       let cost_metrics_of_defining_expr =
         match (named : Named.t) with
-        | Prim (prim, _) -> Code_size.prim prim |> Cost_metrics.from_size
+        | Prim (prim, _) ->
+          Code_size.prim ~machine_width:(Acc.machine_width acc) prim
+          |> Cost_metrics.from_size
         | Simple simple -> Code_size.simple simple |> Cost_metrics.from_size
         | Static_consts _consts -> Cost_metrics.zero
         | Set_of_closures set_of_closures ->

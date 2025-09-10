@@ -229,7 +229,10 @@ module Acc : sig
 
   type t
 
-  val create : cmx_loader:Flambda_cmx.loader -> t
+  val create :
+    cmx_loader:Flambda_cmx.loader ->
+    machine_width:Target_system.Machine_width.t ->
+    t
 
   val manufacture_symbol_short_name : t -> t * Linkage_name.t
 
@@ -245,6 +248,8 @@ module Acc : sig
   val code_map : t -> Code.t Code_id.Map.t
 
   val free_names : t -> Name_occurrences.t
+
+  val machine_width : t -> Target_system.Machine_width.t
 
   val seen_a_function : t -> bool
 

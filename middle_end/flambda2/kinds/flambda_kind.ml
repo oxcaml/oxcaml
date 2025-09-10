@@ -947,7 +947,7 @@ module With_subkind = struct
     | Naked_vec256 -> boxed_vec256
     | Naked_vec512 -> boxed_vec512
 
-  let rec from_lambda_value_kind (vk : Lambda.value_kind) =
+  let rec from_lambda_value_kind (vk : Lambda.value_kind) ~machine_width =
     let value_subkind : Non_null_value_subkind.t =
       match vk.raw_kind with
       | Pgenval -> Anything
@@ -976,7 +976,9 @@ module With_subkind = struct
         | [], _ :: _ | _ :: _, [] | _ :: _, _ :: _ ->
           let consts =
             Target_ocaml_int.Set.of_list
-              (List.map (fun const -> Target_ocaml_int.of_int const) consts)
+              (List.map
+                 (fun const -> Target_ocaml_int.of_int machine_width const)
+                 consts)
           in
           let non_consts =
             List.fold_left
@@ -989,7 +991,8 @@ module With_subkind = struct
                     match (shape : Lambda.constructor_shape) with
                     | Constructor_uniform fields ->
                       ( Scannable Value_only,
-                        List.map from_lambda_value_kind fields )
+                        List.map (from_lambda_value_kind ~machine_width) fields
+                      )
                     | Constructor_mixed mixed_block_shape ->
                       let mixed_block_shape =
                         Mixed_block_lambda_shape.of_mixed_block_elements
@@ -1003,7 +1006,7 @@ module With_subkind = struct
                           .t ->
                           t = function
                         | Value (value_kind : Lambda.value_kind) ->
-                          from_lambda_value_kind value_kind
+                          from_lambda_value_kind value_kind ~machine_width
                         | Float_boxed _ | Float64 -> naked_float
                         | Float32 -> naked_float32
                         | Bits8 -> naked_int8
@@ -1066,9 +1069,10 @@ module With_subkind = struct
     in
     create value value_subkind nullable
 
-  let from_lambda_values_and_unboxed_numbers_only (layout : Lambda.layout) =
+  let from_lambda_values_and_unboxed_numbers_only (layout : Lambda.layout)
+      ~machine_width =
     match layout with
-    | Pvalue vk -> from_lambda_value_kind vk
+    | Pvalue vk -> from_lambda_value_kind vk ~machine_width
     | Punboxed_float Unboxed_float64 -> naked_float
     | Punboxed_float Unboxed_float32 -> naked_float32
     | Punboxed_or_untagged_integer Untagged_int8 -> naked_int8

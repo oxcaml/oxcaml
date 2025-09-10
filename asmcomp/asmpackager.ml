@@ -85,11 +85,12 @@ let check_units members =
 type flambda2 =
   ppf_dump:Format.formatter ->
   prefixname:string ->
+  machine_width:Target_system.Machine_width.t ->
   keep_symbol_tables:bool ->
   Lambda.program ->
   Cmm.phrase list
 
-let make_package_object unix ~ppf_dump members target coercion
+let make_package_object ~machine_width unix ~ppf_dump members target coercion
       ~(flambda2 : flambda2) =
   let pack_name =
     Printf.sprintf "pack(%s)"
@@ -139,7 +140,7 @@ let make_package_object unix ~ppf_dump members target coercion
       }
     in
     let pipeline : Asmgen.pipeline =
-      Direct_to_cmm (flambda2 ~keep_symbol_tables:true)
+      Direct_to_cmm (flambda2 ~machine_width ~keep_symbol_tables:true)
     in
     Asmgen.compile_implementation ~pipeline unix
       ~sourcefile:(Unit_info.Artifact.source_file target)
@@ -222,19 +223,21 @@ let build_package_cmx members cmxfile ~main_module_block_size =
 
 (* Make the .cmx and the .o for the package *)
 
-let package_object_files unix ~ppf_dump files target
+let package_object_files ~machine_width unix ~ppf_dump files target
                          targetcmx coercion ~flambda2 =
   let pack_path = Unit_info.Artifact.modname target in
   let members = map_left_right (read_member_info pack_path) files in
   check_units members;
   let main_module_block_size =
-    make_package_object unix ~ppf_dump members target coercion ~flambda2
+    make_package_object ~machine_width unix ~ppf_dump members target coercion
+      ~flambda2
   in
   build_package_cmx members targetcmx ~main_module_block_size
 
 (* The entry point *)
 
-let package_files unix ~ppf_dump initial_env files targetcmx ~flambda2 =
+let package_files ~machine_width unix ~ppf_dump initial_env files targetcmx
+      ~flambda2 =
   let files =
     List.map
       (fun f ->
@@ -256,7 +259,7 @@ let package_files unix ~ppf_dump initial_env files targetcmx ~flambda2 =
   Misc.try_finally (fun () ->
       let coercion =
         Typemod.package_units initial_env files cmi comp_unit in
-      package_object_files unix ~ppf_dump files obj targetcmx
+      package_object_files ~machine_width unix ~ppf_dump files obj targetcmx
         coercion ~flambda2
     )
     ~exceptionally:(fun () ->

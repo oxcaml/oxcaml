@@ -19,20 +19,24 @@ type t =
     continuation_shortcuts : Continuation_shortcut.t Continuation.Map.t;
     apply_cont_rewrites : Apply_cont_rewrite.t Continuation.Map.t;
     (* this [are_rebuilding_terms] is **only** used for printing *)
-    are_rebuilding_terms : Are_rebuilding_terms.t
+    are_rebuilding_terms : Are_rebuilding_terms.t;
+    machine_width : Target_system.Machine_width.t
   }
 
-let create are_rebuilding_terms =
+let create are_rebuilding_terms ~machine_width =
   { continuations = Continuation.Map.empty;
     continuation_shortcuts = Continuation.Map.empty;
     apply_cont_rewrites = Continuation.Map.empty;
-    are_rebuilding_terms
+    are_rebuilding_terms;
+    machine_width
   }
+
+let machine_width t = t.machine_width
 
 let [@ocamlformat "disable"] print ppf
     { continuations;
       apply_cont_rewrites; are_rebuilding_terms ;
-      continuation_shortcuts } =
+      continuation_shortcuts; machine_width = _ } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(continuations@ %a)@]@ \
       @[<hov 1>(continuation_shortcuts@ %a)@]@ \

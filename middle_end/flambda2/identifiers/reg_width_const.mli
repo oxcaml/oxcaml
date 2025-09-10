@@ -30,6 +30,6 @@ val is_tagged_immediate : t -> Target_ocaml_int.t option
 
 (** Create a numeric constant of the given kind ([Region] and [Rec_info] are
     forbidden). *)
-val of_int_of_kind : Flambda_kind.t -> int -> t
+val of_int_of_kind : Target_system.Machine_width.t -> Flambda_kind.t -> int -> t
 
 val kind : t -> Flambda_kind.t

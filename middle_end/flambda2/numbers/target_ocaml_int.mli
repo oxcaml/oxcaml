@@ -22,38 +22,40 @@ type t
 
 include Container_types.S with type t := t
 
+val machine_width : t -> Target_system.Machine_width.t
+
 (** The minimum integer representable on the target. *)
-val min_value : t
+val min_value : Target_system.Machine_width.t -> t
 
 (** The maximum integer representable on the target. *)
-val max_value : t
+val max_value : Target_system.Machine_width.t -> t
 
 (** The OCaml integer -1 *)
-val minus_one : t
+val minus_one : Target_system.Machine_width.t -> t
 
 (** The OCaml integer 0. *)
-val zero : t
+val zero : Target_system.Machine_width.t -> t
 
 (** The OCaml integer 1. *)
-val one : t
+val one : Target_system.Machine_width.t -> t
 
 (** The OCaml integer 10. *)
-val ten : t
+val ten : Target_system.Machine_width.t -> t
 
 (** The OCaml integer 0xff. *)
-val hex_ff : t
+val hex_ff : Target_system.Machine_width.t -> t
 
 (** The set {-1, 0, 1}. *)
-val zero_one_and_minus_one : Set.t
+val zero_one_and_minus_one : Target_system.Machine_width.t -> Set.t
 
 (** Boolean values. *)
-val bool : bool -> t
+val bool : Target_system.Machine_width.t -> bool -> t
 
-val bool_true : t
+val bool_true : Target_system.Machine_width.t -> t
 
-val bool_false : t
+val bool_false : Target_system.Machine_width.t -> t
 
-val all_bools : Set.t
+val all_bools : Target_system.Machine_width.t -> Set.t
 
 (** Comparison functions. *)
 val ( <= ) : t -> t -> bool
@@ -68,15 +70,15 @@ val bottom_byte_to_int : t -> int
 
 (** Returns the OCaml integer corresponding to the ASCII code of the given
     character. *)
-val of_char : char -> t
+val of_char : Target_system.Machine_width.t -> char -> t
 
 (** Convert the given integer (type [int]) to a OCaml integer (type [t]), modulo
     the target word size minus one (for the tag bit). *)
-val of_int : int -> t
+val of_int : Target_system.Machine_width.t -> int -> t
 
 (** Returns [None] iff the given [int] cannot be represented as a target
     "int"-width integer, else returns the same as {!of_int}. *)
-val of_int_option : int -> t option
+val of_int_option : Target_system.Machine_width.t -> int -> t option
 
 (** Convert the given OCaml integer (type [t]) to an integer (type [int]),
     modulo the [int] size, i.e. high-order bits are lost during the conversion. *)
@@ -94,7 +96,7 @@ val to_int_exn : t -> int
 
 (** Convert the given 32-bit integer (type [int32]) to a OCaml integer, modulo
     the size of a OCaml integer. *)
-val of_int32 : int32 -> t
+val of_int32 : Target_system.Machine_width.t -> int32 -> t
 
 (** Convert the given OCaml integer to a 32-bit integer (type [int32]). On
     64-bit platforms, the 64-bit native integer is taken modulo 2{^ 32}, i.e.
@@ -103,24 +105,24 @@ val to_int32 : t -> int32
 
 (** Convert the given 64-bit integer (type [int64]) to a target native integer,
     modulo the size of a OCaml integer. *)
-val of_int64 : int64 -> t
+val of_int64 : Target_system.Machine_width.t -> int64 -> t
 
 (** Convert the given OCaml integer to a 64-bit integer (type [int64]). *)
 val to_int64 : t -> int64
 
 (** Convert the given target native integer (type [Targetint_32_64.t]) to an
     OCaml integer, modulo the size of an OCaml integer. *)
-val of_targetint : Targetint_32_64.t -> t
+val of_targetint : Target_system.Machine_width.t -> Targetint_32_64.t -> t
 
 (** Convert the given OCaml integer (type [t]) to a target native integer (type
     [Targetint_32_64.t]). *)
-val to_targetint : t -> Targetint_32_64.t
+val to_targetint : Target_system.Machine_width.t -> t -> Targetint_32_64.t
 
 (** Convert the given floating-point number to an OCaml integer, discarding the
     fractional part (truncate towards 0). The result of the conversion is
     undefined if, after truncation, the number is outside the range
     \[{!Targetint_31_63.min_value}, {!Targetint_31_63.max_value}\]. *)
-val of_float : float -> t
+val of_float : Target_system.Machine_width.t -> float -> t
 
 (** Convert the given OCaml integer to a floating-point number. *)
 val to_float : t -> float
@@ -182,9 +184,9 @@ val max : t -> t -> t
 
 val is_non_negative : t -> bool
 
-val of_int8 : Numeric_types.Int8.t -> t
+val of_int8 : Target_system.Machine_width.t -> Numeric_types.Int8.t -> t
 
-val of_int16 : Numeric_types.Int16.t -> t
+val of_int16 : Target_system.Machine_width.t -> Numeric_types.Int16.t -> t
 
 module Pair : sig
   type nonrec t = t * t

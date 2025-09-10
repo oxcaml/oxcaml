@@ -57,10 +57,7 @@ let exttype_of_kind (k : Flambda_kind.t) : Cmm.exttype =
   | Naked_number Naked_int32 -> XInt32
   | Naked_number Naked_int16 -> XInt16
   | Naked_number Naked_int8 -> XInt8
-  | Naked_number (Naked_immediate | Naked_nativeint) -> (
-    match Targetint_32_64.num_bits with
-    | Thirty_two -> XInt32
-    | Sixty_four -> XInt64)
+  | Naked_number (Naked_immediate | Naked_nativeint) -> XInt64
   | Naked_number Naked_vec128 -> XVec128
   | Naked_number Naked_vec256 -> XVec256
   | Naked_number Naked_vec512 -> XVec512
@@ -158,7 +155,7 @@ let targetint ~dbg t =
   | Int32 i -> int32 ~dbg i
   | Int64 i -> int64 ~dbg i
 
-let tag_targetint t = Targetint_32_64.(add (shift_left t 1) one)
+let tag_targetint t = Targetint_32_64.(add (shift_left t 1) (one Sixty_four))
 
 (* We shouldn't really be converting to [nativeint] but the definition of the
    Cmm term language currently requires this. *)
@@ -189,9 +186,10 @@ let name env name = name0 env name
 
 let const ~dbg cst =
   match Reg_width_const.descr cst with
-  | Naked_immediate i -> targetint ~dbg (Target_ocaml_int.to_targetint i)
+  | Naked_immediate i ->
+    targetint ~dbg (Target_ocaml_int.to_targetint Sixty_four i)
   | Tagged_immediate i ->
-    targetint ~dbg (tag_targetint (Target_ocaml_int.to_targetint i))
+    targetint ~dbg (tag_targetint (Target_ocaml_int.to_targetint Sixty_four i))
   | Naked_float32 f ->
     float32 ~dbg (Numeric_types.Float32_by_bit_pattern.to_float f)
   | Naked_float f -> float ~dbg (Numeric_types.Float_by_bit_pattern.to_float f)
@@ -223,7 +221,7 @@ let const ~dbg cst =
     in
     vec512 ~dbg { word0; word1; word2; word3; word4; word5; word6; word7 }
   | Naked_nativeint t -> targetint ~dbg t
-  | Null -> targetint ~dbg Targetint_32_64.zero
+  | Null -> targetint ~dbg (Targetint_32_64.zero Sixty_four)
 
 let simple ?consider_inlining_effectful_expressions ~dbg env res s =
   Simple.pattern_match s
@@ -249,11 +247,11 @@ let name_static res name =
 let const_static cst : Cmm.data_item list =
   match Reg_width_const.descr cst with
   | Naked_immediate i ->
-    [cint (nativeint_of_targetint (Target_ocaml_int.to_targetint i))]
+    [cint (nativeint_of_targetint (Target_ocaml_int.to_targetint Sixty_four i))]
   | Tagged_immediate i ->
     [ cint
         (nativeint_of_targetint
-           (tag_targetint (Target_ocaml_int.to_targetint i))) ]
+           (tag_targetint (Target_ocaml_int.to_targetint Sixty_four i))) ]
   | Naked_float f -> [cfloat (Numeric_types.Float_by_bit_pattern.to_float f)]
   | Naked_float32 f ->
     (* Statically-allocated float32 values are zero padded. We must explicitly

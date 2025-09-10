@@ -25,23 +25,23 @@ module Const : sig
 
   include Container_types.S with type t := t
 
-  val const_true : t
+  val const_true : Target_system.Machine_width.t -> t
 
-  val const_false : t
+  val const_false : Target_system.Machine_width.t -> t
 
-  val untagged_const_true : t
+  val untagged_const_true : Target_system.Machine_width.t -> t
 
-  val untagged_const_false : t
+  val untagged_const_false : Target_system.Machine_width.t -> t
 
-  val untagged_const_zero : t
+  val untagged_const_zero : Target_system.Machine_width.t -> t
 
   val untagged_const_int : Target_ocaml_int.t -> t
 
-  val const_zero : t
+  val const_zero : Target_system.Machine_width.t -> t
 
-  val const_one : t
+  val const_one : Target_system.Machine_width.t -> t
 
-  val const_unit : t
+  val const_unit : Target_system.Machine_width.t -> t
 
   val const_int : Target_ocaml_int.t -> t
 

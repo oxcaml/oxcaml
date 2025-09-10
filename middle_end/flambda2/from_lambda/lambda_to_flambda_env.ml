@@ -70,6 +70,7 @@ end
 
 type t =
   { current_unit : Compilation_unit.t;
+    machine_width : Target_system.Machine_width.t;
     current_values_of_mutables_in_scope :
       ((Ident.t * Flambda_debug_uid.t * Flambda_kind.With_subkind.full_kind)
        list
@@ -92,7 +93,8 @@ type t =
     ident_stamp_upon_starting : int
   }
 
-let create ~current_unit ~return_continuation ~exn_continuation ~my_region =
+let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
+    ~my_region =
   let mutables_needed_by_continuations =
     Continuation.Map.of_list
       [return_continuation, Ident.Set.empty; exn_continuation, Ident.Set.empty]
@@ -100,6 +102,7 @@ let create ~current_unit ~return_continuation ~exn_continuation ~my_region =
   let id = Ident.create_local "unused" in
   let ident_stamp_upon_starting = Ident.stamp id in
   { current_unit;
+    machine_width;
     current_values_of_mutables_in_scope = Ident.Map.empty;
     mutables_needed_by_continuations;
     unboxed_product_components_in_scope = Ident.Map.empty;
@@ -116,6 +119,8 @@ let create ~current_unit ~return_continuation ~exn_continuation ~my_region =
   }
 
 let current_unit t = t.current_unit
+
+let machine_width t = t.machine_width
 
 let ident_stamp_upon_starting t = t.ident_stamp_upon_starting
 

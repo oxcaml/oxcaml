@@ -70,9 +70,9 @@ module Component_for_creation = struct
     | Singleton : KS.t -> [> ] t
     | Unboxed_product : _ t list -> [`Complex] t
 
-  let rec from_lambda (layout : Lambda.layout) =
+  let rec from_lambda (layout : Lambda.layout) ~machine_width =
     match layout with
-    | Pvalue vk -> Singleton (KS.from_lambda_value_kind vk)
+    | Pvalue vk -> Singleton (KS.from_lambda_value_kind vk ~machine_width)
     | Punboxed_float Unboxed_float64 -> Singleton KS.naked_float
     | Punboxed_float Unboxed_float32 -> Singleton KS.naked_float32
     | Punboxed_or_untagged_integer Untagged_int8 -> Singleton KS.naked_int8
@@ -85,7 +85,8 @@ module Component_for_creation = struct
     | Punboxed_vector Unboxed_vec128 -> Singleton KS.naked_vec128
     | Punboxed_vector Unboxed_vec256 -> Singleton KS.naked_vec256
     | Punboxed_vector Unboxed_vec512 -> Singleton KS.naked_vec512
-    | Punboxed_product layouts -> Unboxed_product (List.map from_lambda layouts)
+    | Punboxed_product layouts ->
+      Unboxed_product (List.map (from_lambda ~machine_width) layouts)
     | Ptop | Pbottom ->
       Misc.fatal_errorf
         "Cannot convert %a to Flambda_arity.Component_for_creation"
@@ -154,8 +155,10 @@ let group_by_parameter t l =
   in
   unflatten shape l
 
-let from_lambda_list layouts =
-  layouts |> List.map Component_for_creation.from_lambda |> create
+let from_lambda_list layouts ~machine_width =
+  layouts
+  |> List.map (Component_for_creation.from_lambda ~machine_width)
+  |> create
 
 let partially_apply t ~num_non_unarized_params_provided =
   if num_non_unarized_params_provided < 0
