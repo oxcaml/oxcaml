@@ -141,14 +141,24 @@ CAMLprim value caml_int_of_string(value s)
     return Val_long(parse_intnat(s, 8 * sizeof(value) - 1, INT_ERRMSG));
 }
 
+CAMLprim int16_t caml_int16_of_string_untagged(value s)
+{
+    return (int16_t)parse_intnat(s, 16, INT16_ERRMSG);
+}
+
 CAMLprim value caml_int16_of_string(value s)
 {
-    return Val_int16(parse_intnat(s, 16, INT16_ERRMSG));
+    return Val_int16(caml_int16_of_string_untagged(s));
+}
+
+CAMLprim int8_t caml_int8_of_string_untagged(value s)
+{
+    return (int8_t)parse_intnat(s, 8, INT8_ERRMSG);
 }
 
 CAMLprim value caml_int8_of_string(value s)
 {
-    return Val_int8(parse_intnat(s, 8, INT8_ERRMSG));
+    return Val_int8(caml_int8_of_string_untagged(s));
 }
 
 #define FORMAT_BUFFER_SIZE 32
