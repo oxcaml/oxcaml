@@ -10,17 +10,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Compiler settings passed to eval_quotation *)
 type compiler_settings = {
-  debug: bool;
-  unsafe: bool;
-  noassert: bool;
-  native_code: bool;
+  debug : bool;
+  unsafe : bool;
+  noassert : bool;
+  native_code : bool;
 }
+(** Compiler settings passed to eval *)
 
-(** Evaluate a quoted OCaml expression at runtime
-    @param settings Compiler settings to use for compilation
-    @param code The quoted code to compile and evaluate
-    @param unit Unit parameter
-    @return The result of evaluating the quoted code *)
 val eval : compiler_settings -> CamlinternalQuote.Code.t -> 'b
+(** Evaluate a quoted OCaml expression at runtime. *)
