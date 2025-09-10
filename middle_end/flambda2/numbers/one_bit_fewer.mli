@@ -1,6 +1,8 @@
 module type S = sig
   type t
 
+  val machine_width : t -> Target_system.Machine_width.t
+
   val compare : t -> t -> int
 
   val equal : t -> t -> bool

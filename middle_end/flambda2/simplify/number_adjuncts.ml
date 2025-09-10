@@ -886,7 +886,7 @@ module For_nativeints : Boxable_int_number_kind = struct
     include Targetint_32_64
 
     let strictly_negative t =
-      let zero_val = zero (machine_width t) in
+      let zero_val = zero_like t in
       compare t zero_val < 0
 
     let compare_unsigned t1 t2 =
@@ -898,33 +898,24 @@ module For_nativeints : Boxable_int_number_kind = struct
 
     let and_ = logand
 
-    let div t1 t2 =
-      assert (
-        Target_system.Machine_width.equal (machine_width t1) (machine_width t2));
-      if equal t2 (zero (machine_width t1)) then None else Some (div t1 t2)
+    let div t1 t2 = if equal t2 (zero_like t1) then None else Some (div t1 t2)
 
-    let mod_ t1 t2 =
-      assert (
-        Target_system.Machine_width.equal (machine_width t1) (machine_width t2));
-      if equal t2 (zero (machine_width t1)) then None else Some (rem t1 t2)
+    let mod_ t1 t2 = if equal t2 (zero_like t1) then None else Some (rem t1 t2)
 
     let integer_bit_width = if Target_system.is_32_bit () then 32 else 64
 
     let shift_left t shift =
-      with_shift shift
-        (zero (machine_width t))
+      with_shift shift (zero_like t)
         (fun shift -> shift_left t shift)
         ~integer_bit_width
 
     let shift_right t shift =
-      with_shift shift
-        (zero (machine_width t))
+      with_shift shift (zero_like t)
         (fun shift -> shift_right t shift)
         ~integer_bit_width
 
     let shift_right_logical t shift =
-      with_shift shift
-        (zero (machine_width t))
+      with_shift shift (zero_like t)
         (fun shift -> shift_right_logical t shift)
         ~integer_bit_width
 

@@ -41,11 +41,6 @@ let current_section_is_text () =
   | None -> not_initialized ()
   | Some section -> Asm_section.section_is_text section
 
-let _big_endian () =
-  match !big_endian_ref with
-  | None -> not_initialized ()
-  | Some big_endian -> big_endian
-
 let emit_comments () =
   let emit_assembly_comments =
     match !emit_assembly_comments_ref with
@@ -491,9 +486,6 @@ module Directive = struct
     | Space { bytes } -> bprintf buf "\tBYTE\t%d DUP (?)" bytes
     | New_label (label, Code) -> bprintf buf "%s:" label
     | New_label (label, Machine_width_data) ->
-      (* Only 64-bit supported in To_cmm match TS.machine_width () with |
-         Thirty_two | Thirty_two_no_gc_tag_bit -> bprintf buf "%s LABEL DWORD"
-         label | Sixty_four -> *)
       bprintf buf "%s LABEL QWORD" label
     | New_line -> ()
     | Cfi_adjust_cfa_offset _ -> unsupported "Cfi_adjust_cfa_offset"
@@ -663,11 +655,7 @@ let const ?comment constant
   let constant = Directive.Constant_with_width.create constant width in
   emit (Const { constant; comment })
 
-let const_machine_width ?comment constant =
-  (* Only 64-bit supported in To_cmm match TS.machine_width () with | Thirty_two
-     | Thirty_two_no_gc_tag_bit -> const ?comment constant Thirty_two |
-     Sixty_four -> *)
-  const ?comment constant Sixty_four
+let const_machine_width ?comment constant = const ?comment constant Sixty_four
 
 let float32_core f f_int32 =
   let comment =
@@ -680,21 +668,10 @@ let float32 f = float32_core f (Int32.bits_of_float f)
 let float32_from_bits f = float32_core (Int32.float_of_bits f) f
 
 let float64_core f f_int64 =
-  (* Only 64-bit supported in To_cmm match TS.machine_width () with | Sixty_four
-     -> *)
   let comment =
     if !Clflags.keep_asm_file then Some (Printf.sprintf "%.17g" f) else None
   in
   const ?comment (Signed_int f_int64) Sixty_four
-(* | Thirty_two | Thirty_two_no_gc_tag_bit -> let comment_lo = if
-   !Clflags.keep_asm_file then Some (Printf.sprintf "low part of %.17g" f) else
-   None in let comment_hi = if !Clflags.keep_asm_file then Some (Printf.sprintf
-   "high part of %.17g" f) else None in let lo = Signed_int (Int64.logand
-   f_int64 0xffff_ffffL) in let hi = Signed_int (Int64.shift_right_logical
-   f_int64 32) in if big_endian () then ( const ?comment:comment_hi hi
-   Thirty_two; const ?comment:comment_lo lo Thirty_two) else ( const
-   ?comment:comment_lo lo Thirty_two; const ?comment:comment_hi hi
-   Thirty_two) *)
 
 let float64 f = float64_core f (Int64.bits_of_float f)
 

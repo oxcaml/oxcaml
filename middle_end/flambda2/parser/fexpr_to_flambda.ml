@@ -244,16 +244,16 @@ let find_region env (r : Fexpr.region) =
 
 let find_code_id env code_id = fresh_or_existing_code_id env code_id
 
-(* TODO: This should not be hardcoded - machine_width should flow through
-   properly *)
+(* CR mshinwell: This should not be hardcoded - machine_width should flow
+   through properly *)
 let machine_width = Target_system.Machine_width.Sixty_four
 
 let targetint (i : Fexpr.targetint) : Targetint_32_64.t =
   Targetint_32_64.of_int64 machine_width i
 
 let targetint_31_63 (i : Fexpr.targetint) : Target_ocaml_int.t =
-  (* TODO: machine_width should be passed through properly here *)
-  Target_ocaml_int.of_int64 Target_system.Machine_width.Sixty_four i
+  (* CR mshinwell: machine_width should be passed through properly here *)
+  Target_ocaml_int.of_int64 machine_width i
 
 let vec128 bits : Vector_types.Vec128.Bit_pattern.t =
   Vector_types.Vec128.Bit_pattern.of_bits bits
@@ -268,8 +268,8 @@ let tag_scannable (tag : Fexpr.tag_scannable) : Tag.Scannable.t =
   Tag.Scannable.create_exn tag
 
 let immediate i =
-  (* TODO: This should not be hardcoded - machine_width should flow through
-     properly *)
+  (* CR mshinwell: This should not be hardcoded - machine_width should flow
+     through properly *)
   i
   |> Targetint_32_64.of_string machine_width
   |> Target_ocaml_int.of_targetint machine_width
@@ -426,9 +426,9 @@ let block_access_kind (ak : Fexpr.block_access_kind) :
     match s with
     | None -> Unknown
     | Some s ->
-      (* TODO: Should get machine_width from fexpr context when available *)
-      Known
-        (s |> Target_ocaml_int.of_int64 Target_system.Machine_width.Sixty_four)
+      (* CR mshinwell: Should get machine_width from fexpr context when
+         available *)
+      Known (s |> Target_ocaml_int.of_int64 machine_width)
   in
   match ak with
   | Values { field_kind; tag; size = s } ->
@@ -743,9 +743,9 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     let arms =
       List.map
         (fun (case, apply) ->
-          (* TODO: Should get machine_width from fexpr context when available *)
-          ( Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four case,
-            apply_cont env apply ))
+          (* CR mshinwell: Should get machine_width from fexpr context when
+             available *)
+          Target_ocaml_int.of_int machine_width case, apply_cont env apply)
         cases
       |> Target_ocaml_int.Map.of_list
     in

@@ -33,10 +33,14 @@ type t
 
 type targetint = t
 
-val machine_width : t -> Target_system.Machine_width.t
-
 (** The target integer 0. *)
 val zero : Target_system.Machine_width.t -> t
+
+(** The target integer 0, taking the machine width from the argument.  (Note
+    that no function is provided to extract a [Machine_width] given a [t],
+    because we can't distinguish between the [Thirty_two] and
+    [Thirty_two_no_gc_bit] cases.) *)
+val zero_like : t -> t
 
 (** The target integer 1. *)
 val one : Target_system.Machine_width.t -> t

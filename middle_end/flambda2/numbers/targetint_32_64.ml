@@ -99,14 +99,6 @@ module Int64 = struct
   external swap_byte_endianness : t -> t = "%bswap_int64"
 end
 
-(* Helper function to extract machine width from a t value *)
-let machine_width t =
-  match t with
-  | Int32 _ ->
-    MW.Thirty_two
-    (* For targetint_32_64, Int32 always means traditional 32-bit *)
-  | Int64 _ -> MW.Sixty_four
-
 (* Print function *)
 let print ppf t =
   match t with
@@ -118,6 +110,9 @@ let zero machine_width =
   match machine_width with
   | MW.Thirty_two | MW.Thirty_two_no_gc_tag_bit -> Int32 Int32.zero
   | MW.Sixty_four -> Int64 Int64.zero
+
+let zero_like t =
+  match t with Int32 _ -> Int32 Int32.zero | Int64 _ -> Int64 Int64.zero
 
 let one machine_width =
   match machine_width with

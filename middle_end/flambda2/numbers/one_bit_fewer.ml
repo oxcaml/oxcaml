@@ -15,6 +15,8 @@
 module type S = sig
   type t
 
+  val machine_width : t -> Target_system.Machine_width.t
+
   val compare : t -> t -> int
 
   val equal : t -> t -> bool
@@ -121,6 +123,8 @@ module Make (I : S) : S with type t = I.t = struct
      range of numbers representable in {n-1} bits. *)
   type t = I.t
 
+  let machine_width = I.machine_width
+
   let compare = I.compare
 
   let equal = I.equal
@@ -157,7 +161,7 @@ module Make (I : S) : S with type t = I.t = struct
 
   let ( > ) = I.( > )
 
-  let _is_in_range machine_width n =
+  let is_in_range machine_width n =
     I.( >= ) n (min_value machine_width) && I.( <= ) n (max_value machine_width)
 
   let bottom_byte_to_int = I.bottom_byte_to_int
@@ -203,10 +207,7 @@ module Make (I : S) : S with type t = I.t = struct
 
   let get_least_significant_16_bits_then_byte_swap t =
     let res = I.get_least_significant_16_bits_then_byte_swap t in
-    (* TODO: The range check would require machine_width, which is not available
-       here. The operation itself is safe as it only operates on the bottom 16
-       bits. *)
-    (* assert (is_in_range machine_width res); *)
+    assert (is_in_range (machine_width t) res);
     res
 
   let add x y = sign_extend (I.add x y)

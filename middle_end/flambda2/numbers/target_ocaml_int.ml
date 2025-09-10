@@ -25,6 +25,8 @@ type t =
 module Int32_base = struct
   type t = int32
 
+  let machine_width _t = MW.Thirty_two
+
   let compare = Int32.compare
 
   let equal = Int32.equal
@@ -128,6 +130,8 @@ end
 (* Wrapper module for Int64 to work with One_bit_fewer *)
 module Int64_base = struct
   type t = int64
+
+  let machine_width _t = MW.Sixty_four
 
   let compare = Int64.compare
 

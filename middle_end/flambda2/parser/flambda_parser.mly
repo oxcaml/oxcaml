@@ -433,7 +433,8 @@ unop:
     mut = mutability;
     kind = block_access_kind;
     LPAREN; field = tag; RPAREN;
-    { (* TODO: Should get machine_width from fexpr context when available *)
+    { (* CR mshinwell: Should get machine_width from fexpr context when
+         available *)
       let mw = Target_system.Machine_width.Sixty_four in
       Block_load { kind; mut; field = Target_ocaml_int.of_int mw field } }
 
@@ -586,7 +587,8 @@ binop_app:
     LPAREN; field = tag; RPAREN;
     init = init_or_assign;
     v = simple;
-    { let mw = Target_system.Machine_width.Sixty_four in
+    { (* CR mshinwell: pass machine width through properly *)
+      let mw = Target_system.Machine_width.Sixty_four in
       let field = Target_ocaml_int.of_int mw field in
       Binary (Block_set { kind; init; field }, block, v) }
            (* TODO: Should get machine_width from fexpr context *)

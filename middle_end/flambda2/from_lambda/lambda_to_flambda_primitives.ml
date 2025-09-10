@@ -1300,7 +1300,7 @@ let rec array_load_unsafe ~machine_width ~array ~index
     let index : H.expr_primitive =
       let multiplier =
         List.length unarized
-        |> Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four
+        |> Target_ocaml_int.of_int machine_width
         |> Simple.const_int
       in
       Binary (Int_arith (Tagged_immediate, Mul), index, Simple multiplier)
@@ -1376,7 +1376,7 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
     let index : H.expr_primitive =
       let multiplier =
         List.length unarized
-        |> Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four
+        |> Target_ocaml_int.of_int machine_width
         |> Simple.const_int
       in
       Binary (Int_arith (Tagged_immediate, Mul), index, Simple multiplier)
