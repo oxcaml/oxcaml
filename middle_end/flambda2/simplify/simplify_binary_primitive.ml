@@ -1003,9 +1003,6 @@ let simplify_array_load (array_kind : P.Array_kind.t)
     | Values -> K.value
     | Naked_floats -> K.naked_float
     | Naked_float32s -> K.naked_float32
-    | Naked_ints -> K.naked_immediate
-    | Naked_int8s -> K.naked_int8
-    | Naked_int16s -> K.naked_int16
     | Naked_int32s -> K.naked_int32
     | Naked_int64s -> K.naked_int64
     | Naked_nativeints -> K.naked_nativeint

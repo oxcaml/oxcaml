@@ -2795,18 +2795,13 @@ let array_element_size_in_bytes (array_kind : array_kind) =
     (* float32# arrays are packed *)
     4
   | Punboxedfloatarray Unboxed_float64 -> 8
-  | Punboxedoruntaggedintarray Untagged_int8 ->
-    (* int8# arrays are packed *)
-    1
-  | Punboxedoruntaggedintarray Untagged_int16 ->
-    (* int16# arrays are packed *)
-    2
+  | Punboxedoruntaggedintarray (Untagged_int8 | Untagged_int16 | Untagged_int)
+    ->
+    Misc.unboxed_small_int_arrays_are_not_implemented ()
   | Punboxedoruntaggedintarray Unboxed_int32 ->
     (* int32# arrays are packed *)
     4
-  | Punboxedoruntaggedintarray
-      (Untagged_int | Unboxed_int64 | Unboxed_nativeint) ->
-    8
+  | Punboxedoruntaggedintarray (Unboxed_int64 | Unboxed_nativeint) -> 8
   | Punboxedvectorarray Unboxed_vec128 -> 16
   | Punboxedvectorarray Unboxed_vec256 -> 32
   | Punboxedvectorarray Unboxed_vec512 -> 64

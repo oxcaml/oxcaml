@@ -347,9 +347,6 @@ type alloc_block_kind =
   | Alloc_block_kind_boxed_int of Primitive.boxed_integer
   | Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array
-  | Alloc_block_kind_int_u_array
-  | Alloc_block_kind_int8_u_array
-  | Alloc_block_kind_int16_u_array
   | Alloc_block_kind_int32_u_array
   | Alloc_block_kind_int64_u_array
   | Alloc_block_kind_vec128_u_array

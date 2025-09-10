@@ -3207,7 +3207,7 @@ let combine_constant value_kind loc arg cst partial ctx def
         make_scalar_test_sequence
           (Scalar.integral (Value (Boxable (Nativeint Any_locality_mode))))
     | Const_untagged_int _ ->
-        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int))) 
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int)))
     | Const_untagged_int8 _ ->
         make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int8)))
     | Const_untagged_int16 _ ->

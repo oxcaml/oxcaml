@@ -1199,13 +1199,7 @@ module Tables = struct
         let _startpos = _startpos_cont_ in
         let _endpos = _endpos_args_ in
         let _v : 'tv_apply_cont_expr = 
-<<<<<<< HEAD
 # 943 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 936 "flambda_parser.mly"
-=======
-# 942 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( { cont; args; trap_action } )
 # 1205 "flambda_parser_in.ml"
          in
@@ -1279,13 +1273,7 @@ module Tables = struct
         let _startpos = _startpos_call_kind_ in
         let _endpos = _endpos_e_ in
         let _v : 'tv_apply_expr = 
-<<<<<<< HEAD
 # 869 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 862 "flambda_parser.mly"
-=======
-# 868 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
      ( let (func, arities) = func in {
        func;
           continuation = r;
@@ -1461,13 +1449,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_atomic_expr = 
-<<<<<<< HEAD
 # 801 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 794 "flambda_parser.mly"
-=======
-# 800 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
             ( Invalid { message = "halt-and-catch-fire" } )
 # 1455 "flambda_parser_in.ml"
          in
@@ -1492,13 +1474,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_atomic_expr = 
-<<<<<<< HEAD
 # 802 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 795 "flambda_parser.mly"
-=======
-# 801 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                     ( Invalid { message =  "treat-as-unreachable" } )
 # 1480 "flambda_parser_in.ml"
          in
@@ -1534,13 +1510,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_message_ in
         let _v : 'tv_atomic_expr = 
-<<<<<<< HEAD
 # 803 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 796 "flambda_parser.mly"
-=======
-# 802 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                   ( Invalid { message } )
 # 1516 "flambda_parser_in.ml"
          in
@@ -1572,13 +1542,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_ac_ in
         let _v : 'tv_atomic_expr = 
-<<<<<<< HEAD
 # 804 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 797 "flambda_parser.mly"
-=======
-# 803 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                    ( Apply_cont ac )
 # 1548 "flambda_parser_in.ml"
          in
@@ -1617,13 +1581,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_cases_ in
         let _v : 'tv_atomic_expr = 
-<<<<<<< HEAD
 # 805 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 798 "flambda_parser.mly"
-=======
-# 804 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                    ( Switch {scrutinee; cases} )
 # 1587 "flambda_parser_in.ml"
          in
@@ -1655,13 +1613,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_e_ in
         let _v : 'tv_atomic_expr = 
-<<<<<<< HEAD
 # 806 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 799 "flambda_parser.mly"
-=======
-# 805 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                              ( Apply e )
 # 1619 "flambda_parser_in.ml"
          in
@@ -1700,13 +1652,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__3_ in
         let _v : 'tv_atomic_expr = 
-<<<<<<< HEAD
 # 807 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 800 "flambda_parser.mly"
-=======
-# 806 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                              ( e )
 # 1658 "flambda_parser_in.ml"
          in
@@ -1731,13 +1677,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_begin_region = 
-<<<<<<< HEAD
 # 663 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 656 "flambda_parser.mly"
-=======
-# 662 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                       ( Begin_region { ghost = false } )
 # 1683 "flambda_parser_in.ml"
          in
@@ -1762,13 +1702,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_begin_region = 
-<<<<<<< HEAD
 # 664 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 657 "flambda_parser.mly"
-=======
-# 663 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                             ( Begin_region { ghost = true } )
 # 1708 "flambda_parser_in.ml"
          in
@@ -1793,13 +1727,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_begin_region = 
-<<<<<<< HEAD
 # 665 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 658 "flambda_parser.mly"
-=======
-# 664 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                           ( Begin_try_region { ghost = false } )
 # 1733 "flambda_parser_in.ml"
          in
@@ -1824,13 +1752,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_begin_region = 
-<<<<<<< HEAD
 # 666 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 659 "flambda_parser.mly"
-=======
-# 665 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                 ( Begin_try_region { ghost = true } )
 # 1758 "flambda_parser_in.ml"
          in
@@ -2455,9 +2377,6 @@ module Tables = struct
       | Values -> Values
       | Naked_floats -> Naked_floats
       | Naked_float32s -> Naked_float32s
-      | Naked_ints -> Naked_ints
-      | Naked_int8s -> Naked_int8s
-      | Naked_int16s -> Naked_int16s
       | Naked_int32s -> Naked_int32s
       | Naked_int64s -> Naked_int64s
       | Naked_nativeints -> Naked_nativeints
@@ -2527,13 +2446,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_arg2_ in
         let _v : 'tv_binop_app = 
-<<<<<<< HEAD
 # 621 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 614 "flambda_parser.mly"
-=======
-# 617 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Binary (Int_arith (i, c), arg1, arg2) )
 # 2452 "flambda_parser_in.ml"
          in
@@ -2601,13 +2514,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_arg2_ in
         let _v : 'tv_binop_app = 
-<<<<<<< HEAD
 # 625 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 618 "flambda_parser.mly"
-=======
-# 621 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Binary (Int_comp (i, c s), arg1, arg2) )
 # 2520 "flambda_parser_in.ml"
          in
@@ -2664,13 +2571,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_arg2_ in
         let _v : 'tv_binop_app = 
-<<<<<<< HEAD
 # 628 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 621 "flambda_parser.mly"
-=======
-# 624 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Binary (Int_shift (i, s), arg1, arg2) )
 # 2577 "flambda_parser_in.ml"
          in
@@ -2695,13 +2596,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_blank_or_kinds_with_subkinds_ = 
-<<<<<<< HEAD
 # 1067 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1060 "flambda_parser.mly"
-=======
-# 1066 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
           ( None )
 # 2602 "flambda_parser_in.ml"
          in
@@ -2730,13 +2625,7 @@ module Tables = struct
         let _startpos = _startpos_a_ in
         let _endpos = _endpos_a_ in
         let _v : 'tv_blank_or_kinds_with_subkinds_ = 
-<<<<<<< HEAD
 # 1068 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1061 "flambda_parser.mly"
-=======
-# 1067 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
           ( Some a )
 # 2631 "flambda_parser_in.ml"
          in
@@ -2761,13 +2650,7 @@ module Tables = struct
         let _startpos = _startpos_r_ in
         let _endpos = _endpos_r_ in
         let _v : 'tv_block = 
-<<<<<<< HEAD
 # 670 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 663 "flambda_parser.mly"
-=======
-# 669 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                      ( Variadic (r, []) )
 # 2656 "flambda_parser_in.ml"
          in
@@ -2848,13 +2731,7 @@ module Tables = struct
 # 2732 "flambda_parser_in.ml"
            in
           (
-<<<<<<< HEAD
 # 673 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 666 "flambda_parser.mly"
-=======
-# 672 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Variadic (Make_block (t, m, alloc), elts) )
 # 2737 "flambda_parser_in.ml"
            : 'tv_block)
@@ -3135,13 +3012,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_bytes_or_bigstring_set = 
-<<<<<<< HEAD
 # 632 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 625 "flambda_parser.mly"
-=======
-# 628 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                    ( Bytes )
 # 3018 "flambda_parser_in.ml"
          in
@@ -3166,13 +3037,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_bytes_or_bigstring_set = 
-<<<<<<< HEAD
 # 633 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 626 "flambda_parser.mly"
-=======
-# 629 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                        ( Bigstring )
 # 3043 "flambda_parser_in.ml"
          in
@@ -3201,13 +3066,7 @@ module Tables = struct
         let _startpos = _startpos_alloc_ in
         let _endpos = _endpos_alloc_ in
         let _v : 'tv_call_kind = 
-<<<<<<< HEAD
 # 882 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 875 "flambda_parser.mly"
-=======
-# 881 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                              ( Function (Indirect alloc) )
 # 3072 "flambda_parser_in.ml"
          in
@@ -3271,13 +3130,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__6_ in
         let _v : 'tv_call_kind = 
-<<<<<<< HEAD
 # 888 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 881 "flambda_parser.mly"
-=======
-# 887 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Function (Direct { code_id; function_slot; alloc }) )
 # 3136 "flambda_parser_in.ml"
          in
@@ -3309,13 +3162,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_noalloc_ in
         let _v : 'tv_call_kind = 
-<<<<<<< HEAD
 # 890 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 883 "flambda_parser.mly"
-=======
-# 889 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( C_call { alloc = not noalloc } )
 # 3168 "flambda_parser_in.ml"
          in
@@ -3557,13 +3404,7 @@ module Tables = struct
         let _startpos = _startpos_v_ in
         let _endpos = _endpos_v_ in
         let _v : 'tv_code_id = 
-<<<<<<< HEAD
 # 1099 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1092 "flambda_parser.mly"
-=======
-# 1098 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                  ( v )
 # 3410 "flambda_parser_in.ml"
          in
@@ -3588,13 +3429,7 @@ module Tables = struct
         let _startpos = _startpos_i_ in
         let _endpos = _endpos_i_ in
         let _v : 'tv_code_size = 
-<<<<<<< HEAD
 # 1103 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1096 "flambda_parser.mly"
-=======
-# 1102 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                   ( i )
 # 3435 "flambda_parser_in.ml"
          in
@@ -3619,13 +3454,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_coercion = 
-<<<<<<< HEAD
 # 1079 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1072 "flambda_parser.mly"
-=======
-# 1078 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
            ( Id )
 # 3460 "flambda_parser_in.ml"
          in
@@ -3679,13 +3508,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_to__ in
         let _v : 'tv_coercion = 
-<<<<<<< HEAD
 # 1081 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1074 "flambda_parser.mly"
-=======
-# 1080 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Change_depth { from; to_; } )
 # 3514 "flambda_parser_in.ml"
          in
@@ -3718,13 +3541,7 @@ module Tables = struct
       (Fexpr.const)
 # 3543 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1053 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1046 "flambda_parser.mly"
-=======
-# 1052 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
             ( make_const_int c )
 # 3547 "flambda_parser_in.ml"
          in
@@ -3757,13 +3574,7 @@ module Tables = struct
       (Fexpr.const)
 # 3576 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1054 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1047 "flambda_parser.mly"
-=======
-# 1053 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Naked_float c )
 # 3580 "flambda_parser_in.ml"
          in
@@ -3785,13 +3596,7 @@ module Tables = struct
       (Fexpr.is_cont_recursive)
 # 3598 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 960 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 953 "flambda_parser.mly"
-=======
-# 959 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Nonrecursive )
 # 3602 "flambda_parser_in.ml"
          in
@@ -3827,13 +3632,7 @@ module Tables = struct
       (Fexpr.is_cont_recursive)
 # 3634 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 962 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 955 "flambda_parser.mly"
-=======
-# 961 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( (Recursive params : Fexpr.is_cont_recursive) )
 # 3638 "flambda_parser_in.ml"
          in
@@ -3862,13 +3661,7 @@ module Tables = struct
       (Fexpr.continuation)
 # 3663 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1127 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1120 "flambda_parser.mly"
-=======
-# 1126 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                         ( Named e )
 # 3667 "flambda_parser_in.ml"
          in
@@ -3901,13 +3694,7 @@ module Tables = struct
       (Fexpr.continuation)
 # 3696 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1128 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1121 "flambda_parser.mly"
-=======
-# 1127 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                              ( Special s )
 # 3700 "flambda_parser_in.ml"
          in
@@ -3964,13 +3751,7 @@ module Tables = struct
         let _startpos = _startpos_name_ in
         let _endpos = _endpos_handler_ in
         let _v : 'tv_continuation_binding = 
-<<<<<<< HEAD
 # 974 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 967 "flambda_parser.mly"
-=======
-# 973 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( { name; params; handler; sort } )
 # 3757 "flambda_parser_in.ml"
          in
@@ -3995,13 +3776,7 @@ module Tables = struct
         let _startpos = _startpos_l_ in
         let _endpos = _endpos_l_ in
         let _v : 'tv_continuation_body = 
-<<<<<<< HEAD
 # 796 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 789 "flambda_parser.mly"
-=======
-# 795 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                     ( l )
 # 3782 "flambda_parser_in.ml"
          in
@@ -4026,13 +3801,7 @@ module Tables = struct
         let _startpos = _startpos_a_ in
         let _endpos = _endpos_a_ in
         let _v : 'tv_continuation_body = 
-<<<<<<< HEAD
 # 797 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 790 "flambda_parser.mly"
-=======
-# 796 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                     ( a )
 # 3807 "flambda_parser_in.ml"
          in
@@ -4064,13 +3833,7 @@ module Tables = struct
           let _endpos = _endpos_e_ in
           let _startpos = _startpos_e_ in
           (
-<<<<<<< HEAD
 # 1123 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1116 "flambda_parser.mly"
-=======
-# 1122 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( make_located e (_startpos, _endpos) )
 # 3839 "flambda_parser_in.ml"
            : 'tv_continuation_id)
@@ -4093,13 +3856,7 @@ module Tables = struct
       (Fexpr.continuation_sort option)
 # 3858 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 966 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 959 "flambda_parser.mly"
-=======
-# 965 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( None )
 # 3862 "flambda_parser_in.ml"
          in
@@ -4128,13 +3885,7 @@ module Tables = struct
       (Fexpr.continuation_sort option)
 # 3887 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 967 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 960 "flambda_parser.mly"
-=======
-# 966 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
             ( Some Exn )
 # 3891 "flambda_parser_in.ml"
          in
@@ -4163,13 +3914,7 @@ module Tables = struct
       (Fexpr.continuation_sort option)
 # 3916 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 968 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 961 "flambda_parser.mly"
-=======
-# 967 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                            ( Some Define_root_symbol )
 # 3920 "flambda_parser_in.ml"
          in
@@ -4203,199 +3948,11 @@ module Tables = struct
         let _v : (
 # 252 "flambda_parser.mly"
       (Fexpr.standard_int_or_float)
-<<<<<<< HEAD
 # 3952 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 3949 "flambda_parser_in.ml"
-        ) = 
-# 515 "flambda_parser.mly"
-                       ( Tagged_immediate )
-# 3953 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 252 "flambda_parser.mly"
-      (Fexpr.standard_int_or_float)
-# 3978 "flambda_parser_in.ml"
-        ) = 
-# 516 "flambda_parser.mly"
-            ( Naked_immediate )
-# 3982 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 252 "flambda_parser.mly"
-      (Fexpr.standard_int_or_float)
-# 4007 "flambda_parser_in.ml"
-        ) = 
-# 517 "flambda_parser.mly"
-              ( Naked_float )
-# 4011 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 252 "flambda_parser.mly"
-      (Fexpr.standard_int_or_float)
-# 4036 "flambda_parser_in.ml"
-=======
-# 3952 "flambda_parser_in.ml"
-        ) = 
-# 515 "flambda_parser.mly"
-                       ( Tagged_immediate )
-# 3956 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 252 "flambda_parser.mly"
-      (Fexpr.standard_int_or_float)
-# 3981 "flambda_parser_in.ml"
-        ) = 
-# 516 "flambda_parser.mly"
-            ( Naked_immediate )
-# 3985 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 252 "flambda_parser.mly"
-      (Fexpr.standard_int_or_float)
-# 4010 "flambda_parser_in.ml"
-        ) = 
-# 517 "flambda_parser.mly"
-              ( Naked_float )
-# 4014 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 252 "flambda_parser.mly"
-      (Fexpr.standard_int_or_float)
-# 4039 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 518 "flambda_parser.mly"
-<<<<<<< HEAD
                        ( Tagged_immediate )
 # 3956 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-              ( Naked_int32 )
-# 4040 "flambda_parser_in.ml"
-=======
-              ( Naked_int32 )
-# 4043 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -4420,25 +3977,11 @@ module Tables = struct
         let _v : (
 # 252 "flambda_parser.mly"
       (Fexpr.standard_int_or_float)
-<<<<<<< HEAD
 # 3981 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 4065 "flambda_parser_in.ml"
-=======
-# 4068 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 519 "flambda_parser.mly"
-<<<<<<< HEAD
             ( Naked_immediate )
 # 3985 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-              ( Naked_int64 )
-# 4069 "flambda_parser_in.ml"
-=======
-              ( Naked_int64 )
-# 4072 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -4463,13 +4006,7 @@ module Tables = struct
         let _v : (
 # 252 "flambda_parser.mly"
       (Fexpr.standard_int_or_float)
-<<<<<<< HEAD
 # 4010 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 4094 "flambda_parser_in.ml"
-=======
-# 4097 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 520 "flambda_parser.mly"
               ( Naked_float )
@@ -4576,13 +4113,7 @@ module Tables = struct
         let _startpos = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
         let _endpos = _startpos in
         let _v : 'tv_ctors = 
-<<<<<<< HEAD
 # 743 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 736 "flambda_parser.mly"
-=======
-# 742 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( [], [] )
 # 4119 "flambda_parser_in.ml"
          in
@@ -4607,13 +4138,7 @@ module Tables = struct
         let _startpos = _startpos_ctors_ in
         let _endpos = _endpos_ctors_ in
         let _v : 'tv_ctors = 
-<<<<<<< HEAD
 # 744 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 737 "flambda_parser.mly"
-=======
-# 743 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                            ( ctors )
 # 4144 "flambda_parser_in.ml"
          in
@@ -4638,13 +4163,7 @@ module Tables = struct
         let _startpos = _startpos_tag_ in
         let _endpos = _endpos_tag_ in
         let _v : 'tv_ctors_nonempty = 
-<<<<<<< HEAD
 # 746 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 739 "flambda_parser.mly"
-=======
-# 745 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                     ( [ tag ], [] )
 # 4169 "flambda_parser_in.ml"
          in
@@ -4683,13 +4202,7 @@ module Tables = struct
         let _startpos = _startpos_tag_ in
         let _endpos = _endpos_ctors_ in
         let _v : 'tv_ctors_nonempty = 
-<<<<<<< HEAD
 # 748 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 741 "flambda_parser.mly"
-=======
-# 747 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
       ( let (c, nc) = ctors in (tag :: c, nc) )
 # 4208 "flambda_parser_in.ml"
          in
@@ -4714,13 +4227,7 @@ module Tables = struct
         let _startpos = _startpos_nonconsts_ in
         let _endpos = _endpos_nonconsts_ in
         let _v : 'tv_ctors_nonempty = 
-<<<<<<< HEAD
 # 749 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 742 "flambda_parser.mly"
-=======
-# 748 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                         ( [], nonconsts )
 # 4233 "flambda_parser_in.ml"
          in
@@ -4924,13 +4431,7 @@ module Tables = struct
         let _startpos = _startpos_l_ in
         let _endpos = _endpos_l_ in
         let _v : 'tv_expr = 
-<<<<<<< HEAD
 # 775 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 768 "flambda_parser.mly"
-=======
-# 774 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                        ( l )
 # 4437 "flambda_parser_in.ml"
          in
@@ -4955,13 +4456,7 @@ module Tables = struct
         let _startpos = _startpos_i_ in
         let _endpos = _endpos_i_ in
         let _v : 'tv_expr = 
-<<<<<<< HEAD
 # 776 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 769 "flambda_parser.mly"
-=======
-# 775 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                    ( i )
 # 4462 "flambda_parser_in.ml"
          in
@@ -4990,13 +4485,7 @@ module Tables = struct
       (Fexpr.field_of_block)
 # 4487 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1034 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1027 "flambda_parser.mly"
-=======
-# 1033 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                ( Symbol s )
 # 4491 "flambda_parser_in.ml"
          in
@@ -5025,13 +4514,7 @@ module Tables = struct
       (Fexpr.field_of_block)
 # 4516 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1035 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1028 "flambda_parser.mly"
-=======
-# 1034 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                  ( Dynamically_computed v )
 # 4520 "flambda_parser_in.ml"
          in
@@ -5063,13 +4546,7 @@ module Tables = struct
           let _endpos = _endpos_i_ in
           let _startpos = _startpos_i_ in
           (
-<<<<<<< HEAD
 # 1036 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1029 "flambda_parser.mly"
-=======
-# 1035 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
             ( Tagged_immediate ( make_tagged_immediate ~loc:(_startpos, _endpos) i ) )
 # 4552 "flambda_parser_in.ml"
            : (
@@ -5137,199 +4614,11 @@ module Tables = struct
         let _v : (
 # 256 "flambda_parser.mly"
       (unit Fexpr.comparison_behaviour)
-<<<<<<< HEAD
 # 4618 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 4615 "flambda_parser_in.ml"
-        ) = 
-# 565 "flambda_parser.mly"
-             ( Yielding_bool Eq )
-# 4619 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 256 "flambda_parser.mly"
-      (unit Fexpr.comparison_behaviour)
-# 4644 "flambda_parser_in.ml"
-        ) = 
-# 566 "flambda_parser.mly"
-                ( Yielding_bool Neq )
-# 4648 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 256 "flambda_parser.mly"
-      (unit Fexpr.comparison_behaviour)
-# 4673 "flambda_parser_in.ml"
-        ) = 
-# 567 "flambda_parser.mly"
-            ( Yielding_bool ( Lt ()) )
-# 4677 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 256 "flambda_parser.mly"
-      (unit Fexpr.comparison_behaviour)
-# 4702 "flambda_parser_in.ml"
-=======
-# 4618 "flambda_parser_in.ml"
-        ) = 
-# 565 "flambda_parser.mly"
-             ( Yielding_bool Eq )
-# 4622 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 256 "flambda_parser.mly"
-      (unit Fexpr.comparison_behaviour)
-# 4647 "flambda_parser_in.ml"
-        ) = 
-# 566 "flambda_parser.mly"
-                ( Yielding_bool Neq )
-# 4651 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 256 "flambda_parser.mly"
-      (unit Fexpr.comparison_behaviour)
-# 4676 "flambda_parser_in.ml"
-        ) = 
-# 567 "flambda_parser.mly"
-            ( Yielding_bool ( Lt ()) )
-# 4680 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 256 "flambda_parser.mly"
-      (unit Fexpr.comparison_behaviour)
-# 4705 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 568 "flambda_parser.mly"
-<<<<<<< HEAD
              ( Yielding_bool Eq )
 # 4622 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-               ( Yielding_bool ( Gt ()) )
-# 4706 "flambda_parser_in.ml"
-=======
-               ( Yielding_bool ( Gt ()) )
-# 4709 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -5354,25 +4643,11 @@ module Tables = struct
         let _v : (
 # 256 "flambda_parser.mly"
       (unit Fexpr.comparison_behaviour)
-<<<<<<< HEAD
 # 4647 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 4731 "flambda_parser_in.ml"
-=======
-# 4734 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 569 "flambda_parser.mly"
-<<<<<<< HEAD
                 ( Yielding_bool Neq )
 # 4651 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-                 ( Yielding_bool (Le()) )
-# 4735 "flambda_parser_in.ml"
-=======
-                 ( Yielding_bool (Le()) )
-# 4738 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -5397,25 +4672,11 @@ module Tables = struct
         let _v : (
 # 256 "flambda_parser.mly"
       (unit Fexpr.comparison_behaviour)
-<<<<<<< HEAD
 # 4676 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 4760 "flambda_parser_in.ml"
-=======
-# 4763 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 570 "flambda_parser.mly"
-<<<<<<< HEAD
             ( Yielding_bool ( Lt ()) )
 # 4680 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-                    ( Yielding_bool (Ge ()) )
-# 4764 "flambda_parser_in.ml"
-=======
-                    ( Yielding_bool (Ge ()) )
-# 4767 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -5440,13 +4701,7 @@ module Tables = struct
         let _v : (
 # 256 "flambda_parser.mly"
       (unit Fexpr.comparison_behaviour)
-<<<<<<< HEAD
 # 4705 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 4789 "flambda_parser_in.ml"
-=======
-# 4792 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 571 "flambda_parser.mly"
                ( Yielding_bool ( Gt ()) )
@@ -5568,13 +4823,7 @@ module Tables = struct
       (float Fexpr.or_variable)
 # 4825 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1014 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1007 "flambda_parser.mly"
-=======
-# 1013 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Const f )
 # 4829 "flambda_parser_in.ml"
          in
@@ -5603,13 +4852,7 @@ module Tables = struct
       (float Fexpr.or_variable)
 # 4854 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1015 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1008 "flambda_parser.mly"
-=======
-# 1014 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                  ( Var v )
 # 4858 "flambda_parser_in.ml"
          in
@@ -5659,13 +4902,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_alloc_ in
         let _v : 'tv_fun_decl = 
-<<<<<<< HEAD
 # 858 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 851 "flambda_parser.mly"
-=======
-# 857 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( { code_id; function_slot; alloc; } )
 # 4908 "flambda_parser_in.ml"
          in
@@ -5690,13 +4927,7 @@ module Tables = struct
         let _startpos = _startpos_s_ in
         let _endpos = _endpos_s_ in
         let _v : 'tv_func_name_with_optional_arities = 
-<<<<<<< HEAD
 # 1058 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1051 "flambda_parser.mly"
-=======
-# 1057 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                ( s, None )
 # 4933 "flambda_parser_in.ml"
          in
@@ -5767,13 +4998,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__7_ in
         let _v : 'tv_func_name_with_optional_arities = 
-<<<<<<< HEAD
 # 1063 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1056 "flambda_parser.mly"
-=======
-# 1062 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( s, Some ({ params_arity; ret_arity } : function_arities) )
 # 5004 "flambda_parser_in.ml"
          in
@@ -5798,13 +5023,7 @@ module Tables = struct
         let _startpos = _startpos_v_ in
         let _endpos = _endpos_v_ in
         let _v : 'tv_function_slot = 
-<<<<<<< HEAD
 # 1106 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1099 "flambda_parser.mly"
-=======
-# 1105 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                  ( v )
 # 5029 "flambda_parser_in.ml"
          in
@@ -5822,13 +5041,7 @@ module Tables = struct
         let _startpos = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
         let _endpos = _startpos in
         let _v : 'tv_function_slot_opt = 
-<<<<<<< HEAD
 # 1110 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1103 "flambda_parser.mly"
-=======
-# 1109 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( None )
 # 5047 "flambda_parser_in.ml"
          in
@@ -5860,13 +5073,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_cid_ in
         let _v : 'tv_function_slot_opt = 
-<<<<<<< HEAD
 # 1111 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1104 "flambda_parser.mly"
-=======
-# 1110 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                             ( Some cid )
 # 5079 "flambda_parser_in.ml"
          in
@@ -6155,297 +5362,9 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__4_ in
         let _v : 'tv_inline = 
-<<<<<<< HEAD
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 887 "flambda_parser.mly"
-                                        ( Always_inline )
-# 5365 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = _4;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__4_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__4_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _;
-            CamlinternalMenhirLib.EngineTypes.semv = _3;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos__3_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos__3_;
-            CamlinternalMenhirLib.EngineTypes.next = {
-              CamlinternalMenhirLib.EngineTypes.state = _;
-              CamlinternalMenhirLib.EngineTypes.semv = _2;
-              CamlinternalMenhirLib.EngineTypes.startp = _startpos__2_;
-              CamlinternalMenhirLib.EngineTypes.endp = _endpos__2_;
-              CamlinternalMenhirLib.EngineTypes.next = {
-                CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-                CamlinternalMenhirLib.EngineTypes.semv = _1;
-                CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-                CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-                CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-              };
-            };
-          };
-        } = _menhir_stack in
-        let _4 : unit = Obj.magic _4 in
-        let _3 : unit = Obj.magic _3 in
-        let _2 : unit = Obj.magic _2 in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__4_ in
-        let _v : 'tv_inline = 
-# 888 "flambda_parser.mly"
-                                           ( Available_inline )
-# 5411 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = _4;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__4_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__4_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _;
-            CamlinternalMenhirLib.EngineTypes.semv = _3;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos__3_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos__3_;
-            CamlinternalMenhirLib.EngineTypes.next = {
-              CamlinternalMenhirLib.EngineTypes.state = _;
-              CamlinternalMenhirLib.EngineTypes.semv = _2;
-              CamlinternalMenhirLib.EngineTypes.startp = _startpos__2_;
-              CamlinternalMenhirLib.EngineTypes.endp = _endpos__2_;
-              CamlinternalMenhirLib.EngineTypes.next = {
-                CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-                CamlinternalMenhirLib.EngineTypes.semv = _1;
-                CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-                CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-                CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-              };
-            };
-          };
-        } = _menhir_stack in
-        let _4 : unit = Obj.magic _4 in
-        let _3 : unit = Obj.magic _3 in
-        let _2 : unit = Obj.magic _2 in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__4_ in
-        let _v : 'tv_inline = 
-# 889 "flambda_parser.mly"
-                                       ( Never_inline )
-# 5457 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = _4;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__4_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__4_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _;
-            CamlinternalMenhirLib.EngineTypes.semv = i;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos_i_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos_i_;
-            CamlinternalMenhirLib.EngineTypes.next = {
-              CamlinternalMenhirLib.EngineTypes.state = _;
-              CamlinternalMenhirLib.EngineTypes.semv = _2;
-              CamlinternalMenhirLib.EngineTypes.startp = _startpos__2_;
-              CamlinternalMenhirLib.EngineTypes.endp = _endpos__2_;
-              CamlinternalMenhirLib.EngineTypes.next = {
-                CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-                CamlinternalMenhirLib.EngineTypes.semv = _1;
-                CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-                CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-                CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-              };
-            };
-          };
-        } = _menhir_stack in
-        let _4 : unit = Obj.magic _4 in
-        let i : 'tv_plain_int = Obj.magic i in
-        let _2 : unit = Obj.magic _2 in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__4_ in
-        let _v : 'tv_inline = 
-# 890 "flambda_parser.mly"
-                                             ( Inline_attribute.Unroll i )
-# 5503 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = _4;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__4_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__4_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _;
-            CamlinternalMenhirLib.EngineTypes.semv = _3;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos__3_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos__3_;
-            CamlinternalMenhirLib.EngineTypes.next = {
-              CamlinternalMenhirLib.EngineTypes.state = _;
-              CamlinternalMenhirLib.EngineTypes.semv = _2;
-              CamlinternalMenhirLib.EngineTypes.startp = _startpos__2_;
-              CamlinternalMenhirLib.EngineTypes.endp = _endpos__2_;
-              CamlinternalMenhirLib.EngineTypes.next = {
-                CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-                CamlinternalMenhirLib.EngineTypes.semv = _1;
-                CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-                CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-                CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-              };
-            };
-          };
-        } = _menhir_stack in
-        let _4 : unit = Obj.magic _4 in
-        let _3 : unit = Obj.magic _3 in
-        let _2 : unit = Obj.magic _2 in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__4_ in
-        let _v : 'tv_inline = 
-# 891 "flambda_parser.mly"
-                                         ( Default_inline )
-# 5549 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = _4;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__4_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__4_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _;
-            CamlinternalMenhirLib.EngineTypes.semv = _3;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos__3_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos__3_;
-            CamlinternalMenhirLib.EngineTypes.next = {
-              CamlinternalMenhirLib.EngineTypes.state = _;
-              CamlinternalMenhirLib.EngineTypes.semv = _2;
-              CamlinternalMenhirLib.EngineTypes.startp = _startpos__2_;
-              CamlinternalMenhirLib.EngineTypes.endp = _endpos__2_;
-              CamlinternalMenhirLib.EngineTypes.next = {
-                CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-                CamlinternalMenhirLib.EngineTypes.semv = _1;
-                CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-                CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-                CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-              };
-            };
-          };
-        } = _menhir_stack in
-        let _4 : unit = Obj.magic _4 in
-        let _3 : unit = Obj.magic _3 in
-        let _2 : unit = Obj.magic _2 in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__4_ in
-        let _v : 'tv_inlined = 
-=======
-# 893 "flambda_parser.mly"
-                                        ( Always_inline )
-# 5368 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = _4;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__4_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__4_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _;
-            CamlinternalMenhirLib.EngineTypes.semv = _3;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos__3_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos__3_;
-            CamlinternalMenhirLib.EngineTypes.next = {
-              CamlinternalMenhirLib.EngineTypes.state = _;
-              CamlinternalMenhirLib.EngineTypes.semv = _2;
-              CamlinternalMenhirLib.EngineTypes.startp = _startpos__2_;
-              CamlinternalMenhirLib.EngineTypes.endp = _endpos__2_;
-              CamlinternalMenhirLib.EngineTypes.next = {
-                CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-                CamlinternalMenhirLib.EngineTypes.semv = _1;
-                CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-                CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-                CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-              };
-            };
-          };
-        } = _menhir_stack in
-        let _4 : unit = Obj.magic _4 in
-        let _3 : unit = Obj.magic _3 in
-        let _2 : unit = Obj.magic _2 in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__4_ in
-        let _v : 'tv_inline = 
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
 # 894 "flambda_parser.mly"
-<<<<<<< HEAD
                                         ( Always_inline )
 # 5368 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-                                         ( Always_inlined )
-# 5595 "flambda_parser_in.ml"
-=======
-                                           ( Available_inline )
-# 5414 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -6490,7 +5409,6 @@ module Tables = struct
         let _endpos = _endpos__4_ in
         let _v : 'tv_inline = 
 # 895 "flambda_parser.mly"
-<<<<<<< HEAD
                                            ( Available_inline )
 # 5414 "flambda_parser_in.ml"
          in
@@ -6631,105 +5549,6 @@ module Tables = struct
 # 898 "flambda_parser.mly"
                                          ( Default_inline )
 # 5552 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-                                       ( Hint_inlined )
-# 5641 "flambda_parser_in.ml"
-=======
-                                       ( Never_inline )
-# 5460 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = _4;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__4_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__4_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _;
-            CamlinternalMenhirLib.EngineTypes.semv = i;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos_i_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos_i_;
-            CamlinternalMenhirLib.EngineTypes.next = {
-              CamlinternalMenhirLib.EngineTypes.state = _;
-              CamlinternalMenhirLib.EngineTypes.semv = _2;
-              CamlinternalMenhirLib.EngineTypes.startp = _startpos__2_;
-              CamlinternalMenhirLib.EngineTypes.endp = _endpos__2_;
-              CamlinternalMenhirLib.EngineTypes.next = {
-                CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-                CamlinternalMenhirLib.EngineTypes.semv = _1;
-                CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-                CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-                CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-              };
-            };
-          };
-        } = _menhir_stack in
-        let _4 : unit = Obj.magic _4 in
-        let i : 'tv_plain_int = Obj.magic i in
-        let _2 : unit = Obj.magic _2 in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__4_ in
-        let _v : 'tv_inline = 
-# 896 "flambda_parser.mly"
-                                             ( Inline_attribute.Unroll i )
-# 5506 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = _4;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__4_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__4_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _;
-            CamlinternalMenhirLib.EngineTypes.semv = _3;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos__3_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos__3_;
-            CamlinternalMenhirLib.EngineTypes.next = {
-              CamlinternalMenhirLib.EngineTypes.state = _;
-              CamlinternalMenhirLib.EngineTypes.semv = _2;
-              CamlinternalMenhirLib.EngineTypes.startp = _startpos__2_;
-              CamlinternalMenhirLib.EngineTypes.endp = _endpos__2_;
-              CamlinternalMenhirLib.EngineTypes.next = {
-                CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-                CamlinternalMenhirLib.EngineTypes.semv = _1;
-                CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-                CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-                CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-              };
-            };
-          };
-        } = _menhir_stack in
-        let _4 : unit = Obj.magic _4 in
-        let _3 : unit = Obj.magic _3 in
-        let _2 : unit = Obj.magic _2 in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__4_ in
-        let _v : 'tv_inline = 
-# 897 "flambda_parser.mly"
-                                         ( Default_inline )
-# 5552 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -6773,7 +5592,6 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__4_ in
         let _v : 'tv_inlined = 
-<<<<<<< HEAD
 # 901 "flambda_parser.mly"
                                          ( Always_inlined )
 # 5598 "flambda_parser_in.ml"
@@ -6867,103 +5685,6 @@ module Tables = struct
         let _endpos = _endpos__4_ in
         let _v : 'tv_inlined = 
 # 903 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 896 "flambda_parser.mly"
-=======
-# 900 "flambda_parser.mly"
-                                         ( Always_inlined )
-# 5598 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = _4;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__4_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__4_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _;
-            CamlinternalMenhirLib.EngineTypes.semv = _3;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos__3_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos__3_;
-            CamlinternalMenhirLib.EngineTypes.next = {
-              CamlinternalMenhirLib.EngineTypes.state = _;
-              CamlinternalMenhirLib.EngineTypes.semv = _2;
-              CamlinternalMenhirLib.EngineTypes.startp = _startpos__2_;
-              CamlinternalMenhirLib.EngineTypes.endp = _endpos__2_;
-              CamlinternalMenhirLib.EngineTypes.next = {
-                CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-                CamlinternalMenhirLib.EngineTypes.semv = _1;
-                CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-                CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-                CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-              };
-            };
-          };
-        } = _menhir_stack in
-        let _4 : unit = Obj.magic _4 in
-        let _3 : unit = Obj.magic _3 in
-        let _2 : unit = Obj.magic _2 in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__4_ in
-        let _v : 'tv_inlined = 
-# 901 "flambda_parser.mly"
-                                       ( Hint_inlined )
-# 5644 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = _4;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__4_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__4_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _;
-            CamlinternalMenhirLib.EngineTypes.semv = _3;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos__3_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos__3_;
-            CamlinternalMenhirLib.EngineTypes.next = {
-              CamlinternalMenhirLib.EngineTypes.state = _;
-              CamlinternalMenhirLib.EngineTypes.semv = _2;
-              CamlinternalMenhirLib.EngineTypes.startp = _startpos__2_;
-              CamlinternalMenhirLib.EngineTypes.endp = _endpos__2_;
-              CamlinternalMenhirLib.EngineTypes.next = {
-                CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-                CamlinternalMenhirLib.EngineTypes.semv = _1;
-                CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-                CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-                CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-              };
-            };
-          };
-        } = _menhir_stack in
-        let _4 : unit = Obj.magic _4 in
-        let _3 : unit = Obj.magic _3 in
-        let _2 : unit = Obj.magic _2 in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__4_ in
-        let _v : 'tv_inlined = 
-# 902 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                         ( Never_inlined )
 # 5690 "flambda_parser_in.ml"
          in
@@ -7009,13 +5730,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__4_ in
         let _v : 'tv_inlined = 
-<<<<<<< HEAD
 # 904 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 897 "flambda_parser.mly"
-=======
-# 903 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                              ( Unroll i )
 # 5736 "flambda_parser_in.ml"
          in
@@ -7061,13 +5776,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__4_ in
         let _v : 'tv_inlined = 
-<<<<<<< HEAD
 # 905 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 898 "flambda_parser.mly"
-=======
-# 904 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                           ( Default_inlined )
 # 5782 "flambda_parser_in.ml"
          in
@@ -7113,13 +5822,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__4_ in
         let _v : 'tv_inlining_state = 
-<<<<<<< HEAD
 # 909 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 902 "flambda_parser.mly"
-=======
-# 908 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     (
       (* CR poechsel: Parse the inlining arguments *)
       { depth }
@@ -7168,13 +5871,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__4_ in
         let _v : 'tv_inlining_state_depth = 
-<<<<<<< HEAD
 # 915 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 908 "flambda_parser.mly"
-=======
-# 914 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                             ( i )
 # 5877 "flambda_parser_in.ml"
          in
@@ -7199,13 +5896,7 @@ module Tables = struct
         let _startpos = _startpos_w_ in
         let _endpos = _endpos_w_ in
         let _v : 'tv_inner_expr = 
-<<<<<<< HEAD
 # 785 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 778 "flambda_parser.mly"
-=======
-# 784 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                    ( w )
 # 5902 "flambda_parser_in.ml"
          in
@@ -7230,13 +5921,7 @@ module Tables = struct
         let _startpos = _startpos_a_ in
         let _endpos = _endpos_a_ in
         let _v : 'tv_inner_expr = 
-<<<<<<< HEAD
 # 786 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 779 "flambda_parser.mly"
-=======
-# 785 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                     ( a )
 # 5927 "flambda_parser_in.ml"
          in
@@ -7263,199 +5948,11 @@ module Tables = struct
         let _v : (
 # 260 "flambda_parser.mly"
       (Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour)
-<<<<<<< HEAD
 # 5952 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 5949 "flambda_parser_in.ml"
-        ) = 
-# 556 "flambda_parser.mly"
-         ( fun s -> Yielding_bool (Lt s) )
-# 5953 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 260 "flambda_parser.mly"
-      (Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour)
-# 5978 "flambda_parser_in.ml"
-        ) = 
-# 557 "flambda_parser.mly"
-            ( fun s -> Yielding_bool (Gt s) )
-# 5982 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 260 "flambda_parser.mly"
-      (Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour)
-# 6007 "flambda_parser_in.ml"
-        ) = 
-# 558 "flambda_parser.mly"
-              ( fun s -> Yielding_bool (Le s) )
-# 6011 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 260 "flambda_parser.mly"
-      (Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour)
-# 6036 "flambda_parser_in.ml"
-=======
-# 5952 "flambda_parser_in.ml"
-        ) = 
-# 556 "flambda_parser.mly"
-         ( fun s -> Yielding_bool (Lt s) )
-# 5956 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 260 "flambda_parser.mly"
-      (Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour)
-# 5981 "flambda_parser_in.ml"
-        ) = 
-# 557 "flambda_parser.mly"
-            ( fun s -> Yielding_bool (Gt s) )
-# 5985 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 260 "flambda_parser.mly"
-      (Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour)
-# 6010 "flambda_parser_in.ml"
-        ) = 
-# 558 "flambda_parser.mly"
-              ( fun s -> Yielding_bool (Le s) )
-# 6014 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 260 "flambda_parser.mly"
-      (Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour)
-# 6039 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 559 "flambda_parser.mly"
-<<<<<<< HEAD
          ( fun s -> Yielding_bool (Lt s) )
 # 5956 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-                 ( fun s -> Yielding_bool (Ge s) )
-# 6040 "flambda_parser_in.ml"
-=======
-                 ( fun s -> Yielding_bool (Ge s) )
-# 6043 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -7480,25 +5977,11 @@ module Tables = struct
         let _v : (
 # 260 "flambda_parser.mly"
       (Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour)
-<<<<<<< HEAD
 # 5981 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 6065 "flambda_parser_in.ml"
-=======
-# 6068 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 560 "flambda_parser.mly"
-<<<<<<< HEAD
             ( fun s -> Yielding_bool (Gt s) )
 # 5985 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-          ( fun _ -> Yielding_bool Eq )
-# 6069 "flambda_parser_in.ml"
-=======
-          ( fun _ -> Yielding_bool Eq )
-# 6072 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -7523,25 +6006,11 @@ module Tables = struct
         let _v : (
 # 260 "flambda_parser.mly"
       (Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour)
-<<<<<<< HEAD
 # 6010 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 6094 "flambda_parser_in.ml"
-=======
-# 6097 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 561 "flambda_parser.mly"
-<<<<<<< HEAD
               ( fun s -> Yielding_bool (Le s) )
 # 6014 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-             ( fun _ -> Yielding_bool Neq )
-# 6098 "flambda_parser_in.ml"
-=======
-             ( fun _ -> Yielding_bool Neq )
-# 6101 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -7566,13 +6035,7 @@ module Tables = struct
         let _v : (
 # 260 "flambda_parser.mly"
       (Fexpr.signed_or_unsigned -> Fexpr.signed_or_unsigned Fexpr.comparison_behaviour)
-<<<<<<< HEAD
 # 6039 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 6123 "flambda_parser_in.ml"
-=======
-# 6126 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 562 "flambda_parser.mly"
                  ( fun s -> Yielding_bool (Ge s) )
@@ -7769,13 +6232,7 @@ module Tables = struct
       (Fexpr.kind_with_subkind)
 # 6234 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 714 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 707 "flambda_parser.mly"
-=======
-# 713 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                             ( Naked_number nnk )
 # 6238 "flambda_parser_in.ml"
          in
@@ -7808,13 +6265,7 @@ module Tables = struct
       (Fexpr.kind_with_subkind)
 # 6267 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 715 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 708 "flambda_parser.mly"
-=======
-# 714 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                       ( Value subkind )
 # 6271 "flambda_parser_in.ml"
          in
@@ -7843,13 +6294,7 @@ module Tables = struct
       (Fexpr.kind_with_subkind)
 # 6296 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 716 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 709 "flambda_parser.mly"
-=======
-# 715 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                ( Region )
 # 6300 "flambda_parser_in.ml"
          in
@@ -7878,13 +6323,7 @@ module Tables = struct
       (Fexpr.kind_with_subkind)
 # 6325 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 717 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 710 "flambda_parser.mly"
-=======
-# 716 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                  ( Rec_info )
 # 6329 "flambda_parser_in.ml"
          in
@@ -7902,13 +6341,7 @@ module Tables = struct
         let _startpos = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
         let _endpos = _startpos in
         let _v : 'tv_kind_with_subkind_opt = 
-<<<<<<< HEAD
 # 1044 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1037 "flambda_parser.mly"
-=======
-# 1043 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( None )
 # 6347 "flambda_parser_in.ml"
          in
@@ -7944,13 +6377,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_kind_ in
         let _v : 'tv_kind_with_subkind_opt = 
-<<<<<<< HEAD
 # 1045 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1038 "flambda_parser.mly"
-=======
-# 1044 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                     ( Some kind )
 # 6383 "flambda_parser_in.ml"
          in
@@ -7968,13 +6395,7 @@ module Tables = struct
         let _startpos = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
         let _endpos = _startpos in
         let _v : 'tv_kinded_args = 
-<<<<<<< HEAD
 # 978 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 971 "flambda_parser.mly"
-=======
-# 977 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( [] )
 # 6401 "flambda_parser_in.ml"
          in
@@ -8013,13 +6434,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__3_ in
         let _v : 'tv_kinded_args = 
-<<<<<<< HEAD
 # 979 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 972 "flambda_parser.mly"
-=======
-# 978 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                                          ( vs )
 # 6440 "flambda_parser_in.ml"
          in
@@ -8051,13 +6466,7 @@ module Tables = struct
         let _startpos = _startpos_param_ in
         let _endpos = _endpos_kind_ in
         let _v : 'tv_kinded_variable = 
-<<<<<<< HEAD
 # 1040 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1033 "flambda_parser.mly"
-=======
-# 1039 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                    ( { param; kind } )
 # 6472 "flambda_parser_in.ml"
          in
@@ -8086,13 +6495,7 @@ module Tables = struct
       (Fexpr.kind_with_subkind list)
 # 6497 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 720 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 713 "flambda_parser.mly"
-=======
-# 719 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
              ( [] )
 # 6501 "flambda_parser_in.ml"
          in
@@ -8121,13 +6524,7 @@ module Tables = struct
       (Fexpr.kind_with_subkind list)
 # 6526 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 721 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 714 "flambda_parser.mly"
-=======
-# 720 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                           ( ks )
 # 6530 "flambda_parser_in.ml"
          in
@@ -8156,13 +6553,7 @@ module Tables = struct
       (Fexpr.kind_with_subkind list)
 # 6555 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 739 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 732 "flambda_parser.mly"
-=======
-# 738 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                            ( sks )
 # 6559 "flambda_parser_in.ml"
          in
@@ -8208,13 +6599,7 @@ module Tables = struct
         let _startpos = _startpos_bindings_ in
         let _endpos = _endpos_body_ in
         let _v : 'tv_let__continuation_body_ = 
-<<<<<<< HEAD
 # 834 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 827 "flambda_parser.mly"
-=======
-# 833 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( ({ bindings; value_slots; body } : let_) )
 # 6605 "flambda_parser_in.ml"
          in
@@ -8260,13 +6645,7 @@ module Tables = struct
         let _startpos = _startpos_bindings_ in
         let _endpos = _endpos_body_ in
         let _v : 'tv_let__expr_ = 
-<<<<<<< HEAD
 # 834 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 827 "flambda_parser.mly"
-=======
-# 833 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( ({ bindings; value_slots; body } : let_) )
 # 6651 "flambda_parser_in.ml"
          in
@@ -8309,13 +6688,7 @@ module Tables = struct
         let _startpos = _startpos_var_ in
         let _endpos = _endpos_defining_expr_ in
         let _v : 'tv_let_binding = 
-<<<<<<< HEAD
 # 839 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 832 "flambda_parser.mly"
-=======
-# 838 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( { var; defining_expr } )
 # 6694 "flambda_parser_in.ml"
          in
@@ -8347,13 +6720,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_l_ in
         let _v : 'tv_let_expr_continuation_body_ = 
-<<<<<<< HEAD
 # 780 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 773 "flambda_parser.mly"
-=======
-# 779 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                            ( Let l )
 # 6726 "flambda_parser_in.ml"
          in
@@ -8378,13 +6745,7 @@ module Tables = struct
         let _startpos = _startpos_ls_ in
         let _endpos = _endpos_ls_ in
         let _v : 'tv_let_expr_continuation_body_ = 
-<<<<<<< HEAD
 # 781 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 774 "flambda_parser.mly"
-=======
-# 780 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                           ( Let_symbol ls )
 # 6751 "flambda_parser_in.ml"
          in
@@ -8416,13 +6777,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_l_ in
         let _v : 'tv_let_expr_expr_ = 
-<<<<<<< HEAD
 # 780 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 773 "flambda_parser.mly"
-=======
-# 779 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                            ( Let l )
 # 6783 "flambda_parser_in.ml"
          in
@@ -8447,13 +6802,7 @@ module Tables = struct
         let _startpos = _startpos_ls_ in
         let _endpos = _endpos_ls_ in
         let _v : 'tv_let_expr_expr_ = 
-<<<<<<< HEAD
 # 781 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 774 "flambda_parser.mly"
-=======
-# 780 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                           ( Let_symbol ls )
 # 6808 "flambda_parser_in.ml"
          in
@@ -8588,13 +6937,7 @@ module Tables = struct
       (Fexpr.loopify_attribute)
 # 6939 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 924 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 917 "flambda_parser.mly"
-=======
-# 923 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                ( Always_loopify )
 # 6943 "flambda_parser_in.ml"
          in
@@ -8623,13 +6966,7 @@ module Tables = struct
       (Fexpr.loopify_attribute)
 # 6968 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 925 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 918 "flambda_parser.mly"
-=======
-# 924 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Never_loopify )
 # 6972 "flambda_parser_in.ml"
          in
@@ -8658,13 +6995,7 @@ module Tables = struct
       (Fexpr.loopify_attribute)
 # 6997 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 926 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 919 "flambda_parser.mly"
-=======
-# 925 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
              ( Already_loopified )
 # 7001 "flambda_parser_in.ml"
          in
@@ -8700,13 +7031,7 @@ module Tables = struct
       (Fexpr.loopify_attribute)
 # 7033 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 927 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 920 "flambda_parser.mly"
-=======
-# 926 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                             ( Default_loopify_and_tailrec )
 # 7037 "flambda_parser_in.ml"
          in
@@ -8735,13 +7060,7 @@ module Tables = struct
       (Fexpr.loopify_attribute)
 # 7062 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 928 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 921 "flambda_parser.mly"
-=======
-# 927 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                 ( Default_loopify_and_not_tailrec )
 # 7066 "flambda_parser_in.ml"
          in
@@ -8759,13 +7078,7 @@ module Tables = struct
         let _startpos = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
         let _endpos = _startpos in
         let _v : 'tv_loopify_opt = 
-<<<<<<< HEAD
 # 919 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 912 "flambda_parser.mly"
-=======
-# 918 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( None )
 # 7084 "flambda_parser_in.ml"
          in
@@ -8815,13 +7128,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__4_ in
         let _v : 'tv_loopify_opt = 
-<<<<<<< HEAD
 # 920 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 913 "flambda_parser.mly"
-=======
-# 919 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                             ( Some l )
 # 7134 "flambda_parser_in.ml"
          in
@@ -9256,13 +7563,7 @@ module Tables = struct
       (Flambda_kind.Naked_number_kind.t)
 # 7565 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 699 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 692 "flambda_parser.mly"
-=======
-# 698 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
             ( Naked_immediate )
 # 7569 "flambda_parser_in.ml"
          in
@@ -9291,13 +7592,7 @@ module Tables = struct
       (Flambda_kind.Naked_number_kind.t)
 # 7594 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 700 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 693 "flambda_parser.mly"
-=======
-# 699 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Naked_float )
 # 7598 "flambda_parser_in.ml"
          in
@@ -9326,13 +7621,7 @@ module Tables = struct
       (Flambda_kind.Naked_number_kind.t)
 # 7623 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 701 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 694 "flambda_parser.mly"
-=======
-# 700 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Naked_int32 )
 # 7627 "flambda_parser_in.ml"
          in
@@ -9361,13 +7650,7 @@ module Tables = struct
       (Flambda_kind.Naked_number_kind.t)
 # 7652 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 702 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 695 "flambda_parser.mly"
-=======
-# 701 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Naked_int64 )
 # 7656 "flambda_parser_in.ml"
          in
@@ -9396,13 +7679,7 @@ module Tables = struct
       (Flambda_kind.Naked_number_kind.t)
 # 7681 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 703 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 696 "flambda_parser.mly"
-=======
-# 702 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                   ( Naked_nativeint )
 # 7685 "flambda_parser_in.ml"
          in
@@ -9431,13 +7708,7 @@ module Tables = struct
       (Fexpr.named)
 # 7710 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 677 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 670 "flambda_parser.mly"
-=======
-# 676 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                ( Simple s )
 # 7714 "flambda_parser_in.ml"
          in
@@ -9477,13 +7748,7 @@ module Tables = struct
       (Fexpr.named)
 # 7750 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 678 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 671 "flambda_parser.mly"
-=======
-# 677 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                         ( Prim (Unary (u, a)) )
 # 7754 "flambda_parser_in.ml"
          in
@@ -9512,13 +7777,7 @@ module Tables = struct
       (Fexpr.named)
 # 7779 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 679 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 672 "flambda_parser.mly"
-=======
-# 678 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                   ( Prim b )
 # 7783 "flambda_parser_in.ml"
          in
@@ -9547,13 +7806,7 @@ module Tables = struct
       (Fexpr.named)
 # 7808 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 680 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 673 "flambda_parser.mly"
-=======
-# 679 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                    ( Prim t )
 # 7812 "flambda_parser_in.ml"
          in
@@ -9582,13 +7835,7 @@ module Tables = struct
       (Fexpr.named)
 # 7837 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 681 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 674 "flambda_parser.mly"
-=======
-# 680 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Prim b )
 # 7841 "flambda_parser_in.ml"
          in
@@ -9617,13 +7864,7 @@ module Tables = struct
       (Fexpr.named)
 # 7866 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 682 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 675 "flambda_parser.mly"
-=======
-# 681 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                  ( Closure c )
 # 7870 "flambda_parser_in.ml"
          in
@@ -9663,13 +7904,7 @@ module Tables = struct
       (Fexpr.named)
 # 7906 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 688 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 681 "flambda_parser.mly"
-=======
-# 687 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                      ( Rec_info ri )
 # 7910 "flambda_parser_in.ml"
          in
@@ -9758,13 +7993,7 @@ module Tables = struct
         let _startpos = _startpos_tag_ in
         let _endpos = _endpos_kinds_ in
         let _v : 'tv_nonconst_ctor = 
-<<<<<<< HEAD
 # 754 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 747 "flambda_parser.mly"
-=======
-# 753 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                             ( tag, kinds )
 # 7999 "flambda_parser_in.ml"
          in
@@ -9789,13 +8018,7 @@ module Tables = struct
         let _startpos = _startpos_ctors_ in
         let _endpos = _endpos_ctors_ in
         let _v : 'tv_nonconst_ctors_nonempty = 
-<<<<<<< HEAD
 # 751 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 744 "flambda_parser.mly"
-=======
-# 750 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                          ( ctors )
 # 8024 "flambda_parser_in.ml"
          in
@@ -10125,85 +8348,9 @@ module Tables = struct
         let _startpos = _startpos_i_ in
         let _endpos = _endpos_i_ in
         let _v : 'tv_plain_int = 
-<<<<<<< HEAD
 # 1030 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1023 "flambda_parser.mly"
-=======
-# 1029 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
           ( make_plain_int i )
-<<<<<<< HEAD
 # 8354 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 8351 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = saw;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos_saw_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos_saw_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-            CamlinternalMenhirLib.EngineTypes.semv = _1;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-            CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-          };
-        } = _menhir_stack in
-        let saw : 'tv_string_accessor_width = Obj.magic saw in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos_saw_ in
-        let _v : 'tv_prefix_binop = 
-# 449 "flambda_parser.mly"
-    ( String_or_bigstring_load (Bigstring, saw) )
-# 8383 "flambda_parser_in.ml"
-=======
-# 8354 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _;
-          CamlinternalMenhirLib.EngineTypes.semv = saw;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos_saw_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos_saw_;
-          CamlinternalMenhirLib.EngineTypes.next = {
-            CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-            CamlinternalMenhirLib.EngineTypes.semv = _1;
-            CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-            CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-            CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-          };
-        } = _menhir_stack in
-        let saw : 'tv_string_accessor_width = Obj.magic saw in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos_saw_ in
-        let _v : 'tv_prefix_binop = 
-# 449 "flambda_parser.mly"
-    ( String_or_bigstring_load (Bigstring, saw) )
-# 8386 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -10234,16 +8381,8 @@ module Tables = struct
         let _endpos = _endpos_saw_ in
         let _v : 'tv_prefix_binop = 
 # 452 "flambda_parser.mly"
-<<<<<<< HEAD
     ( String_or_bigstring_load (Bigstring, saw) )
 # 8386 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-    ( String_or_bigstring_load (Bytes, saw) )
-# 8415 "flambda_parser_in.ml"
-=======
-    ( String_or_bigstring_load (Bytes, saw) )
-# 8418 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -10380,13 +8519,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_raise_kind = 
-<<<<<<< HEAD
 # 955 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 948 "flambda_parser.mly"
-=======
-# 954 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                 ( Regular )
 # 8525 "flambda_parser_in.ml"
          in
@@ -10411,13 +8544,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_raise_kind = 
-<<<<<<< HEAD
 # 956 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 949 "flambda_parser.mly"
-=======
-# 955 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                 ( Reraise )
 # 8550 "flambda_parser_in.ml"
          in
@@ -10442,13 +8569,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_raise_kind = 
-<<<<<<< HEAD
 # 957 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 950 "flambda_parser.mly"
-=======
-# 956 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                 ( No_trace )
 # 8575 "flambda_parser_in.ml"
          in
@@ -10481,13 +8602,7 @@ module Tables = struct
       (Fexpr.rec_info)
 # 8604 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1093 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1086 "flambda_parser.mly"
-=======
-# 1092 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                        ( ri )
 # 8608 "flambda_parser_in.ml"
          in
@@ -10527,13 +8642,7 @@ module Tables = struct
       (Fexpr.rec_info)
 # 8644 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1094 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1087 "flambda_parser.mly"
-=======
-# 1093 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                  ( Succ ri )
 # 8648 "flambda_parser_in.ml"
          in
@@ -10580,13 +8689,7 @@ module Tables = struct
       (Fexpr.rec_info)
 # 8691 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1095 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1088 "flambda_parser.mly"
-=======
-# 1094 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                   ( Unroll (d, ri) )
 # 8695 "flambda_parser_in.ml"
          in
@@ -10615,13 +8718,7 @@ module Tables = struct
       (Fexpr.rec_info)
 # 8720 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1085 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1078 "flambda_parser.mly"
-=======
-# 1084 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                   ( Depth i )
 # 8724 "flambda_parser_in.ml"
          in
@@ -10650,13 +8747,7 @@ module Tables = struct
       (Fexpr.rec_info)
 # 8749 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1086 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1079 "flambda_parser.mly"
-=======
-# 1085 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
             ( Infinity )
 # 8753 "flambda_parser_in.ml"
          in
@@ -10685,13 +8776,7 @@ module Tables = struct
       (Fexpr.rec_info)
 # 8778 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1087 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1080 "flambda_parser.mly"
-=======
-# 1086 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                       ( Do_not_inline )
 # 8782 "flambda_parser_in.ml"
          in
@@ -10720,13 +8805,7 @@ module Tables = struct
       (Fexpr.rec_info)
 # 8807 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1088 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1081 "flambda_parser.mly"
-=======
-# 1087 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                   ( Var dv )
 # 8811 "flambda_parser_in.ml"
          in
@@ -10773,13 +8852,7 @@ module Tables = struct
       (Fexpr.rec_info)
 # 8854 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1089 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1082 "flambda_parser.mly"
-=======
-# 1088 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                   ( ri )
 # 8858 "flambda_parser_in.ml"
          in
@@ -10859,13 +8932,7 @@ module Tables = struct
       (Fexpr.region)
 # 8934 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 932 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 925 "flambda_parser.mly"
-=======
-# 931 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                  ( Named v )
 # 8938 "flambda_parser_in.ml"
          in
@@ -10894,13 +8961,7 @@ module Tables = struct
       (Fexpr.region)
 # 8963 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 933 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 926 "flambda_parser.mly"
-=======
-# 932 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                  ( Toplevel )
 # 8967 "flambda_parser_in.ml"
          in
@@ -10929,13 +8990,7 @@ module Tables = struct
         let _startpos = _startpos_c_ in
         let _endpos = _endpos_c_ in
         let _v : 'tv_result_continuation = 
-<<<<<<< HEAD
 # 937 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 930 "flambda_parser.mly"
-=======
-# 936 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                      ( Return c )
 # 8996 "flambda_parser_in.ml"
          in
@@ -10960,13 +9015,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__1_ in
         let _v : 'tv_result_continuation = 
-<<<<<<< HEAD
 # 938 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 931 "flambda_parser.mly"
-=======
-# 937 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Never_returns )
 # 9021 "flambda_parser_in.ml"
          in
@@ -10984,13 +9033,7 @@ module Tables = struct
         let _startpos = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
         let _endpos = _startpos in
         let _v : 'tv_return_arity = 
-<<<<<<< HEAD
 # 757 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 750 "flambda_parser.mly"
-=======
-# 756 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( None )
 # 9039 "flambda_parser_in.ml"
          in
@@ -11026,13 +9069,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_k_ in
         let _v : 'tv_return_arity = 
-<<<<<<< HEAD
 # 758 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 751 "flambda_parser.mly"
-=======
-# 757 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                   ( Some k )
 # 9075 "flambda_parser_in.ml"
          in
@@ -11972,13 +10009,7 @@ module Tables = struct
         let _startpos = _startpos_s_ in
         let _endpos = _endpos_s_ in
         let _v : 'tv_simple = 
-<<<<<<< HEAD
 # 1072 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1065 "flambda_parser.mly"
-=======
-# 1071 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                ( Symbol s )
 # 10015 "flambda_parser_in.ml"
          in
@@ -12003,13 +10034,7 @@ module Tables = struct
         let _startpos = _startpos_v_ in
         let _endpos = _endpos_v_ in
         let _v : 'tv_simple = 
-<<<<<<< HEAD
 # 1073 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1066 "flambda_parser.mly"
-=======
-# 1072 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                  ( Var v )
 # 10040 "flambda_parser_in.ml"
          in
@@ -12038,13 +10063,7 @@ module Tables = struct
         let _startpos = _startpos_c_ in
         let _endpos = _endpos_c_ in
         let _v : 'tv_simple = 
-<<<<<<< HEAD
 # 1074 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1067 "flambda_parser.mly"
-=======
-# 1073 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Const c )
 # 10069 "flambda_parser_in.ml"
          in
@@ -12083,13 +10102,7 @@ module Tables = struct
         let _startpos = _startpos_s_ in
         let _endpos = _endpos_c_ in
         let _v : 'tv_simple = 
-<<<<<<< HEAD
 # 1075 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1068 "flambda_parser.mly"
-=======
-# 1074 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                     ( Coerce (s, c) )
 # 10108 "flambda_parser_in.ml"
          in
@@ -12107,13 +10120,7 @@ module Tables = struct
         let _startpos = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
         let _endpos = _startpos in
         let _v : 'tv_simple_args = 
-<<<<<<< HEAD
 # 1048 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1041 "flambda_parser.mly"
-=======
-# 1047 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( [] )
 # 10126 "flambda_parser_in.ml"
          in
@@ -12152,13 +10159,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__3_ in
         let _v : 'tv_simple_args = 
-<<<<<<< HEAD
 # 1049 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1042 "flambda_parser.mly"
-=======
-# 1048 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                               ( s )
 # 10165 "flambda_parser_in.ml"
          in
@@ -12251,13 +10252,7 @@ module Tables = struct
       (Fexpr.special_continuation)
 # 10254 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1132 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1125 "flambda_parser.mly"
-=======
-# 1131 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
              ( Done )
 # 10258 "flambda_parser_in.ml"
          in
@@ -12286,13 +10281,7 @@ module Tables = struct
       (Fexpr.special_continuation)
 # 10283 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1133 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1126 "flambda_parser.mly"
-=======
-# 1132 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Error )
 # 10287 "flambda_parser_in.ml"
          in
@@ -12312,199 +10301,11 @@ module Tables = struct
         let _v : (
 # 272 "flambda_parser.mly"
       (Fexpr.standard_int)
-<<<<<<< HEAD
 # 10305 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 10302 "flambda_parser_in.ml"
-        ) = 
-# 508 "flambda_parser.mly"
-    ( Tagged_immediate )
-# 10306 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 272 "flambda_parser.mly"
-      (Fexpr.standard_int)
-# 10331 "flambda_parser_in.ml"
-        ) = 
-# 509 "flambda_parser.mly"
-            ( Naked_immediate )
-# 10335 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 272 "flambda_parser.mly"
-      (Fexpr.standard_int)
-# 10360 "flambda_parser_in.ml"
-        ) = 
-# 510 "flambda_parser.mly"
-              ( Naked_int32 )
-# 10364 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 272 "flambda_parser.mly"
-      (Fexpr.standard_int)
-# 10389 "flambda_parser_in.ml"
-=======
-# 10305 "flambda_parser_in.ml"
-        ) = 
-# 508 "flambda_parser.mly"
-    ( Tagged_immediate )
-# 10309 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 272 "flambda_parser.mly"
-      (Fexpr.standard_int)
-# 10334 "flambda_parser_in.ml"
-        ) = 
-# 509 "flambda_parser.mly"
-            ( Naked_immediate )
-# 10338 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 272 "flambda_parser.mly"
-      (Fexpr.standard_int)
-# 10363 "flambda_parser_in.ml"
-        ) = 
-# 510 "flambda_parser.mly"
-              ( Naked_int32 )
-# 10367 "flambda_parser_in.ml"
-         in
-        {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = Obj.repr _v;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        });
-      (fun _menhir_env ->
-        let _menhir_stack = _menhir_env.CamlinternalMenhirLib.EngineTypes.stack in
-        let {
-          CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
-          CamlinternalMenhirLib.EngineTypes.semv = _1;
-          CamlinternalMenhirLib.EngineTypes.startp = _startpos__1_;
-          CamlinternalMenhirLib.EngineTypes.endp = _endpos__1_;
-          CamlinternalMenhirLib.EngineTypes.next = _menhir_stack;
-        } = _menhir_stack in
-        let _1 : unit = Obj.magic _1 in
-        let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
-        let _startpos = _startpos__1_ in
-        let _endpos = _endpos__1_ in
-        let _v : (
-# 272 "flambda_parser.mly"
-      (Fexpr.standard_int)
-# 10392 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 511 "flambda_parser.mly"
-<<<<<<< HEAD
     ( Tagged_immediate )
 # 10309 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-              ( Naked_int64 )
-# 10393 "flambda_parser_in.ml"
-=======
-              ( Naked_int64 )
-# 10396 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -12529,13 +10330,7 @@ module Tables = struct
         let _v : (
 # 272 "flambda_parser.mly"
       (Fexpr.standard_int)
-<<<<<<< HEAD
 # 10334 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 10418 "flambda_parser_in.ml"
-=======
-# 10421 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 512 "flambda_parser.mly"
             ( Naked_immediate )
@@ -12733,13 +10528,7 @@ module Tables = struct
 # 10529 "flambda_parser_in.ml"
            in
           (
-<<<<<<< HEAD
 # 990 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 983 "flambda_parser.mly"
-=======
-# 989 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( (Block { tag; mutability = m; elements } : static_data) )
 # 10534 "flambda_parser_in.ml"
            : (
@@ -12777,13 +10566,7 @@ module Tables = struct
       (Fexpr.static_data)
 # 10568 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 991 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 984 "flambda_parser.mly"
-=======
-# 990 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( Boxed_float (Const f) )
 # 10572 "flambda_parser_in.ml"
          in
@@ -12816,13 +10599,7 @@ module Tables = struct
       (Fexpr.static_data)
 # 10601 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 992 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 985 "flambda_parser.mly"
-=======
-# 991 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
             ( make_boxed_const_int i )
 # 10605 "flambda_parser_in.ml"
          in
@@ -12869,13 +10646,7 @@ module Tables = struct
       (Fexpr.static_data)
 # 10648 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 993 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 986 "flambda_parser.mly"
-=======
-# 992 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                               ( k v )
 # 10652 "flambda_parser_in.ml"
          in
@@ -12927,13 +10698,7 @@ module Tables = struct
 # 10699 "flambda_parser_in.ml"
            in
           (
-<<<<<<< HEAD
 # 997 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 990 "flambda_parser.mly"
-=======
-# 996 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Immutable_float_block fs )
 # 10704 "flambda_parser_in.ml"
            : (
@@ -12990,13 +10755,7 @@ module Tables = struct
 # 10756 "flambda_parser_in.ml"
            in
           (
-<<<<<<< HEAD
 # 1001 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 994 "flambda_parser.mly"
-=======
-# 1000 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Immutable_float_array fs )
 # 10761 "flambda_parser_in.ml"
            : (
@@ -13041,13 +10800,7 @@ module Tables = struct
       (Fexpr.static_data)
 # 10802 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1002 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 995 "flambda_parser.mly"
-=======
-# 1001 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                    ( Empty_array kind )
 # 10806 "flambda_parser_in.ml"
          in
@@ -13087,13 +10840,7 @@ module Tables = struct
       (Fexpr.static_data)
 # 10842 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1003 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 996 "flambda_parser.mly"
-=======
-# 1002 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                             ( Mutable_string { initial_value = s } )
 # 10846 "flambda_parser_in.ml"
          in
@@ -13126,13 +10873,7 @@ module Tables = struct
       (Fexpr.static_data)
 # 10875 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1004 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 997 "flambda_parser.mly"
-=======
-# 1003 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                ( Immutable_string s )
 # 10879 "flambda_parser_in.ml"
          in
@@ -13179,13 +10920,7 @@ module Tables = struct
       (Fexpr.static_data_binding)
 # 10922 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 984 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 977 "flambda_parser.mly"
-=======
-# 983 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( { symbol = s; defining_expr = sp } )
 # 10926 "flambda_parser_in.ml"
          in
@@ -13221,13 +10956,7 @@ module Tables = struct
       (Fexpr.variable -> Fexpr.static_data)
 # 10958 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1008 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1001 "flambda_parser.mly"
-=======
-# 1007 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                         ( fun v -> Boxed_float (Var v) )
 # 10962 "flambda_parser_in.ml"
          in
@@ -13263,13 +10992,7 @@ module Tables = struct
       (Fexpr.variable -> Fexpr.static_data)
 # 10994 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1009 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1002 "flambda_parser.mly"
-=======
-# 1008 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                         ( fun v -> Boxed_int32 (Var v) )
 # 10998 "flambda_parser_in.ml"
          in
@@ -13305,13 +11028,7 @@ module Tables = struct
       (Fexpr.variable -> Fexpr.static_data)
 # 11030 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1010 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1003 "flambda_parser.mly"
-=======
-# 1009 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                         ( fun v -> Boxed_int64 (Var v) )
 # 11034 "flambda_parser_in.ml"
          in
@@ -13347,13 +11064,7 @@ module Tables = struct
       (Fexpr.variable -> Fexpr.static_data)
 # 11066 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 1011 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1004 "flambda_parser.mly"
-=======
-# 1010 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                             ( fun v -> Boxed_nativeint (Var v) )
 # 11070 "flambda_parser_in.ml"
          in
@@ -13469,13 +11180,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11182 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 724 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 717 "flambda_parser.mly"
-=======
-# 723 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
             ( Anything )
 # 11186 "flambda_parser_in.ml"
          in
@@ -13511,13 +11216,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11218 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 725 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 718 "flambda_parser.mly"
-=======
-# 724 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                         ( Boxed_float )
 # 11222 "flambda_parser_in.ml"
          in
@@ -13553,13 +11252,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11254 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 726 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 719 "flambda_parser.mly"
-=======
-# 725 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                         ( Boxed_int32 )
 # 11258 "flambda_parser_in.ml"
          in
@@ -13595,13 +11288,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11290 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 727 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 720 "flambda_parser.mly"
-=======
-# 726 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                         ( Boxed_int64 )
 # 11294 "flambda_parser_in.ml"
          in
@@ -13637,13 +11324,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11326 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 728 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 721 "flambda_parser.mly"
-=======
-# 727 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                             ( Boxed_nativeint )
 # 11330 "flambda_parser_in.ml"
          in
@@ -13679,13 +11360,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11362 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 729 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 722 "flambda_parser.mly"
-=======
-# 728 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                        ( Tagged_immediate )
 # 11366 "flambda_parser_in.ml"
          in
@@ -13728,13 +11403,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11405 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 730 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 723 "flambda_parser.mly"
-=======
-# 729 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                              ( Float_block { num_fields } )
 # 11409 "flambda_parser_in.ml"
          in
@@ -13777,13 +11446,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11448 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 732 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 725 "flambda_parser.mly"
-=======
-# 731 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( let consts, non_consts = ctors in Variant { consts; non_consts; })
 # 11452 "flambda_parser_in.ml"
          in
@@ -13819,13 +11482,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11484 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 733 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 726 "flambda_parser.mly"
-=======
-# 732 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                         ( Float_array )
 # 11488 "flambda_parser_in.ml"
          in
@@ -13861,13 +11518,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11520 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 734 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 727 "flambda_parser.mly"
-=======
-# 733 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                       ( Immediate_array )
 # 11524 "flambda_parser_in.ml"
          in
@@ -13903,13 +11554,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11556 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 735 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 728 "flambda_parser.mly"
-=======
-# 734 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                       ( Value_array )
 # 11560 "flambda_parser_in.ml"
          in
@@ -13945,13 +11590,7 @@ module Tables = struct
       (Fexpr.subkind)
 # 11592 "flambda_parser_in.ml"
         ) = 
-<<<<<<< HEAD
 # 736 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 729 "flambda_parser.mly"
-=======
-# 735 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                       ( Generic_array )
 # 11596 "flambda_parser_in.ml"
          in
@@ -13989,13 +11628,7 @@ module Tables = struct
 # 11629 "flambda_parser_in.ml"
            in
           (
-<<<<<<< HEAD
 # 696 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 689 "flambda_parser.mly"
-=======
-# 695 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                          ( cs )
 # 11634 "flambda_parser_in.ml"
            : 'tv_switch)
@@ -14035,13 +11668,7 @@ module Tables = struct
         let _startpos = _startpos_i_ in
         let _endpos = _endpos_ac_ in
         let _v : 'tv_switch_case = 
-<<<<<<< HEAD
 # 692 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 685 "flambda_parser.mly"
-=======
-# 691 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                 ( i,ac )
 # 11674 "flambda_parser_in.ml"
          in
@@ -14073,13 +11700,7 @@ module Tables = struct
           let _endpos = _endpos_e_ in
           let _startpos = _startpos_e_ in
           (
-<<<<<<< HEAD
 # 1115 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1108 "flambda_parser.mly"
-=======
-# 1114 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                ( make_located e (_startpos, _endpos) )
 # 11706 "flambda_parser_in.ml"
            : 'tv_symbol)
@@ -14261,13 +11882,7 @@ module Tables = struct
           let _endpos = _endpos_tag_ in
           let _startpos = _startpos_tag_ in
           (
-<<<<<<< HEAD
 # 1021 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1014 "flambda_parser.mly"
-=======
-# 1020 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
             ( make_tag ~loc:(make_loc (_startpos, _endpos)) tag )
 # 11888 "flambda_parser_in.ml"
            : 'tv_tag)
@@ -14314,13 +11929,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__4_ in
         let _v : 'tv_tag_opt = 
-<<<<<<< HEAD
 # 1025 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1018 "flambda_parser.mly"
-=======
-# 1024 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                       ( Some tag )
 # 11935 "flambda_parser_in.ml"
          in
@@ -14338,13 +11947,7 @@ module Tables = struct
         let _startpos = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
         let _endpos = _startpos in
         let _v : 'tv_tag_opt = 
-<<<<<<< HEAD
 # 1026 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1019 "flambda_parser.mly"
-=======
-# 1025 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( None )
 # 11953 "flambda_parser_in.ml"
          in
@@ -14373,13 +11976,7 @@ module Tables = struct
         let _startpos = _startpos_i_ in
         let _endpos = _endpos_i_ in
         let _v : 'tv_targetint = 
-<<<<<<< HEAD
 # 1018 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1011 "flambda_parser.mly"
-=======
-# 1017 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
           ( make_targetint i )
 # 11982 "flambda_parser_in.ml"
          in
@@ -14464,13 +12061,7 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos_v_ in
         let _v : 'tv_ternop_app = 
-<<<<<<< HEAD
 # 639 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 632 "flambda_parser.mly"
-=======
-# 635 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     (
       let array_set_kind : array_set_kind =
         match ak with
@@ -14478,9 +12069,6 @@ module Tables = struct
         | Values -> Values ia
         | Naked_floats -> Naked_floats
         | Naked_float32s -> Naked_float32s
-        | Naked_ints -> Naked_ints
-        | Naked_int8s -> Naked_int8s
-        | Naked_int16s -> Naked_int16s
         | Naked_int32s -> Naked_int32s
         | Naked_int64s -> Naked_int64s
         | Naked_nativeints -> Naked_nativeints
@@ -14492,13 +12080,7 @@ module Tables = struct
       in
       Ternary (Array_set (ak, array_set_kind), arr, ix, v)
     )
-<<<<<<< HEAD
 # 12084 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12081 "flambda_parser_in.ml"
-=======
-# 12087 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -14570,21 +12152,9 @@ module Tables = struct
         let _startpos = _startpos_blv_ in
         let _endpos = _endpos_v_ in
         let _v : 'tv_ternop_app = 
-<<<<<<< HEAD
 # 659 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 652 "flambda_parser.mly"
-=======
-# 658 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Ternary (Bytes_or_bigstring_set (blv, saw), block, ix, v) )
-<<<<<<< HEAD
 # 12158 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12155 "flambda_parser_in.ml"
-=======
-# 12161 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -14624,13 +12194,7 @@ module Tables = struct
         let exn_handler : (
 # 251 "flambda_parser.mly"
       (Fexpr.continuation)
-<<<<<<< HEAD
 # 12198 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12195 "flambda_parser_in.ml"
-=======
-# 12201 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic exn_handler in
         let _2 : unit = Obj.magic _2 in
         let _1 : unit = Obj.magic _1 in
@@ -14638,21 +12202,9 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__4_ in
         let _v : 'tv_trap_action = 
-<<<<<<< HEAD
 # 947 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 940 "flambda_parser.mly"
-=======
-# 946 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                          ( Push { exn_handler } )
-<<<<<<< HEAD
 # 12208 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12205 "flambda_parser_in.ml"
-=======
-# 12211 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -14698,13 +12250,7 @@ module Tables = struct
         let exn_handler : (
 # 251 "flambda_parser.mly"
       (Fexpr.continuation)
-<<<<<<< HEAD
 # 12254 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12251 "flambda_parser_in.ml"
-=======
-# 12257 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic exn_handler in
         let raise_kind : 'tv_option_raise_kind_ = Obj.magic raise_kind in
         let _2 : unit = Obj.magic _2 in
@@ -14713,21 +12259,9 @@ module Tables = struct
         let _startpos = _startpos__1_ in
         let _endpos = _endpos__5_ in
         let _v : 'tv_trap_action = 
-<<<<<<< HEAD
 # 951 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 944 "flambda_parser.mly"
-=======
-# 950 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Pop { exn_handler; raise_kind } )
-<<<<<<< HEAD
 # 12265 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12262 "flambda_parser_in.ml"
-=======
-# 12268 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -14752,23 +12286,11 @@ module Tables = struct
         let _v : (
 # 279 "flambda_parser.mly"
       (Fexpr.unary_int_arith_op)
-<<<<<<< HEAD
 # 12290 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12287 "flambda_parser_in.ml"
-=======
-# 12293 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 390 "flambda_parser.mly"
               ( Swap_byte_endianness )
-<<<<<<< HEAD
 # 12294 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12291 "flambda_parser_in.ml"
-=======
-# 12297 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -14795,13 +12317,7 @@ module Tables = struct
         let kind : (
 # 245 "flambda_parser.mly"
       (Fexpr.array_kind_for_length)
-<<<<<<< HEAD
 # 12321 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12318 "flambda_parser_in.ml"
-=======
-# 12324 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic kind in
         let _1 : unit = Obj.magic _1 in
         let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
@@ -14810,23 +12326,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12330 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12327 "flambda_parser_in.ml"
-=======
-# 12333 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 393 "flambda_parser.mly"
                                                     ( Array_length kind )
-<<<<<<< HEAD
 # 12334 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12331 "flambda_parser_in.ml"
-=======
-# 12337 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -14851,23 +12355,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12359 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12356 "flambda_parser_in.ml"
-=======
-# 12362 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 394 "flambda_parser.mly"
                      ( Boolean_not )
-<<<<<<< HEAD
 # 12363 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12360 "flambda_parser_in.ml"
-=======
-# 12366 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -14894,13 +12386,7 @@ module Tables = struct
         let alloc : (
 # 242 "flambda_parser.mly"
       (Fexpr.alloc_mode_for_allocations)
-<<<<<<< HEAD
 # 12390 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12387 "flambda_parser_in.ml"
-=======
-# 12393 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic alloc in
         let _1 : unit = Obj.magic _1 in
         let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
@@ -14909,23 +12395,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12399 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12396 "flambda_parser_in.ml"
-=======
-# 12402 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 396 "flambda_parser.mly"
     ( Box_number (Naked_float, alloc) )
-<<<<<<< HEAD
 # 12403 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12400 "flambda_parser_in.ml"
-=======
-# 12406 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -14952,13 +12426,7 @@ module Tables = struct
         let alloc : (
 # 242 "flambda_parser.mly"
       (Fexpr.alloc_mode_for_allocations)
-<<<<<<< HEAD
 # 12430 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12427 "flambda_parser_in.ml"
-=======
-# 12433 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic alloc in
         let _1 : unit = Obj.magic _1 in
         let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
@@ -14967,23 +12435,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12439 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12436 "flambda_parser_in.ml"
-=======
-# 12442 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 398 "flambda_parser.mly"
     ( Box_number (Naked_int32, alloc) )
-<<<<<<< HEAD
 # 12443 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12440 "flambda_parser_in.ml"
-=======
-# 12446 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15010,13 +12466,7 @@ module Tables = struct
         let alloc : (
 # 242 "flambda_parser.mly"
       (Fexpr.alloc_mode_for_allocations)
-<<<<<<< HEAD
 # 12470 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12467 "flambda_parser_in.ml"
-=======
-# 12473 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic alloc in
         let _1 : unit = Obj.magic _1 in
         let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
@@ -15025,23 +12475,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12479 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12476 "flambda_parser_in.ml"
-=======
-# 12482 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 400 "flambda_parser.mly"
     ( Box_number (Naked_int64, alloc) )
-<<<<<<< HEAD
 # 12483 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12480 "flambda_parser_in.ml"
-=======
-# 12486 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15068,13 +12506,7 @@ module Tables = struct
         let alloc : (
 # 242 "flambda_parser.mly"
       (Fexpr.alloc_mode_for_allocations)
-<<<<<<< HEAD
 # 12510 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12507 "flambda_parser_in.ml"
-=======
-# 12513 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic alloc in
         let _1 : unit = Obj.magic _1 in
         let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
@@ -15083,23 +12515,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12519 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12516 "flambda_parser_in.ml"
-=======
-# 12522 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 402 "flambda_parser.mly"
     ( Box_number (Naked_nativeint, alloc) )
-<<<<<<< HEAD
 # 12523 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12520 "flambda_parser_in.ml"
-=======
-# 12526 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15124,23 +12544,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12548 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12545 "flambda_parser_in.ml"
-=======
-# 12551 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 403 "flambda_parser.mly"
                       ( String_length Bytes )
-<<<<<<< HEAD
 # 12552 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12549 "flambda_parser_in.ml"
-=======
-# 12555 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15165,23 +12573,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12577 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12574 "flambda_parser_in.ml"
-=======
-# 12580 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 404 "flambda_parser.mly"
                     ( End_region { ghost = false } )
-<<<<<<< HEAD
 # 12581 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12578 "flambda_parser_in.ml"
-=======
-# 12584 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15206,23 +12602,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12606 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12603 "flambda_parser_in.ml"
-=======
-# 12609 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 405 "flambda_parser.mly"
                           ( End_region { ghost = true } )
-<<<<<<< HEAD
 # 12610 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12607 "flambda_parser_in.ml"
-=======
-# 12613 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15247,23 +12631,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12635 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12632 "flambda_parser_in.ml"
-=======
-# 12638 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 406 "flambda_parser.mly"
                         ( End_try_region { ghost = false } )
-<<<<<<< HEAD
 # 12639 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12636 "flambda_parser_in.ml"
-=======
-# 12642 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15288,23 +12660,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12664 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12661 "flambda_parser_in.ml"
-=======
-# 12667 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 407 "flambda_parser.mly"
                               ( End_try_region { ghost = true } )
-<<<<<<< HEAD
 # 12668 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12665 "flambda_parser_in.ml"
-=======
-# 12671 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15329,23 +12689,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12693 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12690 "flambda_parser_in.ml"
-=======
-# 12696 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 408 "flambda_parser.mly"
                  ( Get_tag )
-<<<<<<< HEAD
 # 12697 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12694 "flambda_parser_in.ml"
-=======
-# 12700 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15370,23 +12718,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12722 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12719 "flambda_parser_in.ml"
-=======
-# 12725 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 409 "flambda_parser.mly"
                              ( Is_flat_float_array )
-<<<<<<< HEAD
 # 12726 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12723 "flambda_parser_in.ml"
-=======
-# 12729 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15411,23 +12747,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12751 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12748 "flambda_parser_in.ml"
-=======
-# 12754 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 410 "flambda_parser.mly"
                 ( Is_int )
-<<<<<<< HEAD
 # 12755 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12752 "flambda_parser_in.ml"
-=======
-# 12758 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15460,24 +12784,12 @@ module Tables = struct
         let o : (
 # 279 "flambda_parser.mly"
       (Fexpr.unary_int_arith_op)
-<<<<<<< HEAD
 # 12788 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12785 "flambda_parser_in.ml"
-=======
-# 12791 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic o in
         let i : (
 # 272 "flambda_parser.mly"
       (Fexpr.standard_int)
-<<<<<<< HEAD
 # 12793 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12790 "flambda_parser_in.ml"
-=======
-# 12796 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic i in
         let _1 : unit = Obj.magic _1 in
         let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
@@ -15486,23 +12798,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12802 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12799 "flambda_parser_in.ml"
-=======
-# 12805 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 412 "flambda_parser.mly"
     ( Int_arith (i, o) )
-<<<<<<< HEAD
 # 12806 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12803 "flambda_parser_in.ml"
-=======
-# 12809 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15554,25 +12854,13 @@ module Tables = struct
         let dst : (
 # 252 "flambda_parser.mly"
       (Fexpr.standard_int_or_float)
-<<<<<<< HEAD
 # 12858 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12855 "flambda_parser_in.ml"
-=======
-# 12861 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic dst in
         let _4 : unit = Obj.magic _4 in
         let src : (
 # 252 "flambda_parser.mly"
       (Fexpr.standard_int_or_float)
-<<<<<<< HEAD
 # 12864 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12861 "flambda_parser_in.ml"
-=======
-# 12867 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic src in
         let _2 : unit = Obj.magic _2 in
         let _1 : unit = Obj.magic _1 in
@@ -15582,23 +12870,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12874 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12871 "flambda_parser_in.ml"
-=======
-# 12877 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 416 "flambda_parser.mly"
     ( Num_conv { src; dst } )
-<<<<<<< HEAD
 # 12878 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12875 "flambda_parser_in.ml"
-=======
-# 12881 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15623,23 +12899,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12903 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12900 "flambda_parser_in.ml"
-=======
-# 12906 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 417 "flambda_parser.mly"
                 ( Opaque_identity )
-<<<<<<< HEAD
 # 12907 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12904 "flambda_parser_in.ml"
-=======
-# 12910 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15685,23 +12949,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 12953 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12950 "flambda_parser_in.ml"
-=======
-# 12956 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 419 "flambda_parser.mly"
     ( Project_value_slot { project_from; value_slot } )
-<<<<<<< HEAD
 # 12957 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 12954 "flambda_parser_in.ml"
-=======
-# 12960 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15761,23 +13013,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 13017 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13014 "flambda_parser_in.ml"
-=======
-# 13020 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 423 "flambda_parser.mly"
     ( Project_function_slot { move_from; move_to } )
-<<<<<<< HEAD
 # 13021 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13018 "flambda_parser_in.ml"
-=======
-# 13024 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15802,23 +13042,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 13046 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13043 "flambda_parser_in.ml"
-=======
-# 13049 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 424 "flambda_parser.mly"
                        ( String_length String )
-<<<<<<< HEAD
 # 13050 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13047 "flambda_parser_in.ml"
-=======
-# 13053 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15843,23 +13071,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 13075 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13072 "flambda_parser_in.ml"
-=======
-# 13078 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 425 "flambda_parser.mly"
                  ( Tag_immediate )
-<<<<<<< HEAD
 # 13079 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13076 "flambda_parser_in.ml"
-=======
-# 13082 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15884,23 +13100,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 13104 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13101 "flambda_parser_in.ml"
-=======
-# 13107 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 426 "flambda_parser.mly"
                      ( Unbox_number Naked_float )
-<<<<<<< HEAD
 # 13108 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13105 "flambda_parser_in.ml"
-=======
-# 13111 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15925,23 +13129,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 13133 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13130 "flambda_parser_in.ml"
-=======
-# 13136 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 427 "flambda_parser.mly"
                      ( Unbox_number Naked_int32 )
-<<<<<<< HEAD
 # 13137 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13134 "flambda_parser_in.ml"
-=======
-# 13140 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -15966,23 +13158,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 13162 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13159 "flambda_parser_in.ml"
-=======
-# 13165 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 428 "flambda_parser.mly"
                      ( Unbox_number Naked_int64 )
-<<<<<<< HEAD
 # 13166 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13163 "flambda_parser_in.ml"
-=======
-# 13169 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -16007,23 +13187,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 13191 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13188 "flambda_parser_in.ml"
-=======
-# 13194 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 429 "flambda_parser.mly"
                          ( Unbox_number Naked_nativeint )
-<<<<<<< HEAD
 # 13195 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13192 "flambda_parser_in.ml"
-=======
-# 13198 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -16048,23 +13216,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 13220 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13217 "flambda_parser_in.ml"
-=======
-# 13223 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 430 "flambda_parser.mly"
                       ( Unbox_number Naked_vec128 )
-<<<<<<< HEAD
 # 13224 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13221 "flambda_parser_in.ml"
-=======
-# 13227 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -16089,23 +13245,11 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 13249 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13246 "flambda_parser_in.ml"
-=======
-# 13252 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 431 "flambda_parser.mly"
                    ( Untag_immediate )
-<<<<<<< HEAD
 # 13253 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13250 "flambda_parser_in.ml"
-=======
-# 13256 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -16160,13 +13304,7 @@ module Tables = struct
         let mut : (
 # 265 "flambda_parser.mly"
       (Fexpr.mutability)
-<<<<<<< HEAD
 # 13308 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13305 "flambda_parser_in.ml"
-=======
-# 13311 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = Obj.magic mut in
         let _1 : unit = Obj.magic _1 in
         let _endpos__0_ = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
@@ -16175,28 +13313,14 @@ module Tables = struct
         let _v : (
 # 280 "flambda_parser.mly"
       (Fexpr.unop)
-<<<<<<< HEAD
 # 13317 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 13314 "flambda_parser_in.ml"
-=======
-# 13320 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
         ) = 
 # 436 "flambda_parser.mly"
-<<<<<<< HEAD
     ( (* CR mshinwell: Should get machine_width from fexpr context when
          available *)
       let mw = Target_system.Machine_width.Sixty_four in
       Block_load { kind; mut; field = Target_ocaml_int.of_int mw field } )
 # 13324 "flambda_parser_in.ml"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-    ( Block_load { kind; mut; field = Target_ocaml_int.of_int field } )
-# 13318 "flambda_parser_in.ml"
-=======
-    ( Block_load { kind; mut; field = Target_ocaml_int.of_int field } )
-# 13324 "flambda_parser_in.ml"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
          in
         {
           CamlinternalMenhirLib.EngineTypes.state = _menhir_s;
@@ -16233,13 +13357,7 @@ module Tables = struct
         let _startpos = _startpos_var_ in
         let _endpos = _endpos_value_ in
         let _v : 'tv_value_slot = 
-<<<<<<< HEAD
 # 851 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 844 "flambda_parser.mly"
-=======
-# 850 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
                                                             ( { var; value; } )
 # 13363 "flambda_parser_in.ml"
          in
@@ -16271,13 +13389,7 @@ module Tables = struct
           let _endpos = _endpos_e_ in
           let _startpos = _startpos_e_ in
           (
-<<<<<<< HEAD
 # 1137 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1130 "flambda_parser.mly"
-=======
-# 1136 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( make_located e (_startpos, _endpos) )
 # 13395 "flambda_parser_in.ml"
            : 'tv_value_slot_for_projection)
@@ -16310,13 +13422,7 @@ module Tables = struct
           let _endpos = _endpos_e_ in
           let _startpos = _startpos_e_ in
           (
-<<<<<<< HEAD
 # 1119 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1112 "flambda_parser.mly"
-=======
-# 1118 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
               ( make_located e (_startpos, _endpos) )
 # 13428 "flambda_parser_in.ml"
            : 'tv_variable)
@@ -16373,13 +13479,7 @@ module Tables = struct
 # 13480 "flambda_parser_in.ml"
            in
           (
-<<<<<<< HEAD
 # 792 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 785 "flambda_parser.mly"
-=======
-# 791 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Let_cont { recursive; body; bindings } )
 # 13485 "flambda_parser_in.ml"
            : 'tv_where_expr)
@@ -16398,13 +13498,7 @@ module Tables = struct
         let _startpos = _menhir_stack.CamlinternalMenhirLib.EngineTypes.endp in
         let _endpos = _startpos in
         let _v : 'tv_with_value_slots_opt = 
-<<<<<<< HEAD
 # 843 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 836 "flambda_parser.mly"
-=======
-# 842 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( None )
 # 13504 "flambda_parser_in.ml"
          in
@@ -16456,13 +13550,7 @@ module Tables = struct
 # 13551 "flambda_parser_in.ml"
            in
           (
-<<<<<<< HEAD
 # 847 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 840 "flambda_parser.mly"
-=======
-# 846 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
     ( Some elements )
 # 13556 "flambda_parser_in.ml"
            : 'tv_with_value_slots_opt)
@@ -16527,13 +13615,7 @@ module Incremental = struct
   
 end
 
-<<<<<<< HEAD
 # 1140 "flambda_parser.mly"
-||||||| parent of 52312abd (Add variant constructors and fix compilation errors)
-# 1133 "flambda_parser.mly"
-=======
-# 1139 "flambda_parser.mly"
->>>>>>> 52312abd (Add variant constructors and fix compilation errors)
   
 
 # 13622 "flambda_parser_in.ml"

@@ -14,29 +14,16 @@
    The test also checks that arrays have the correct tags and headers. *)
 
 (* Tag definitions from Cmm_helpers.Unboxed_array_tags *)
-let _unboxed_product_array_tag = 0
+let unboxed_product_array_tag = 0
 let unboxed_int64_array_tag = 1
-let unboxed_int32_array_zero_tag = 2
-let unboxed_int32_array_one_tag = 3
-let untagged_int16_array_zero_tag = 4
-let untagged_int16_array_three_tag = 5
-let untagged_int16_array_two_tag = 6
-let untagged_int16_array_one_tag = 7
-let untagged_int8_array_zero_tag = 8
-let untagged_int8_array_seven_tag = 9
-let untagged_int8_array_six_tag = 10
-let untagged_int8_array_five_tag = 11
-let untagged_int8_array_four_tag = 12
-let untagged_int8_array_three_tag = 13
-let untagged_int8_array_two_tag = 14
-let untagged_int8_array_one_tag = 15
-let unboxed_float32_array_zero_tag = 16
-let unboxed_float32_array_one_tag = 17
-let unboxed_vec128_array_tag = 18
-let unboxed_vec256_array_tag = 19
-let unboxed_vec512_array_tag = 20
-let unboxed_nativeint_array_tag = 21
-let untagged_int_array_tag = 22
+let unboxed_int32_array_even_tag = 2
+let unboxed_int32_array_odd_tag = 3
+let unboxed_float32_array_even_tag = 4
+let unboxed_float32_array_odd_tag = 5
+let unboxed_vec128_array_tag = 6
+let unboxed_vec256_array_tag = 7
+let unboxed_vec512_array_tag = 8
+let unboxed_nativeint_array_tag = 9
 
 (* Helper to check allocation behavior *)
 let[@inline never] check_allocation name expected_allocation f =
@@ -141,7 +128,7 @@ let test_int32_arrays () =
   let tag1 = Obj.tag (Obj.repr arr1) in
   let expected_tag1 =
     match Sys.backend_type with
-    | Native -> unboxed_int32_array_one_tag
+    | Native -> unboxed_int32_array_odd_tag
     | Bytecode | Other _ -> 0
   in
   assert (tag1 = expected_tag1);
@@ -157,7 +144,7 @@ let test_int32_arrays () =
   let tag2 = Obj.tag (Obj.repr arr2) in
   let expected_tag2 =
     match Sys.backend_type with
-    | Native -> unboxed_int32_array_zero_tag
+    | Native -> unboxed_int32_array_even_tag
     | Bytecode | Other _ -> 0
   in
   assert (tag2 = expected_tag2);
@@ -173,7 +160,7 @@ let test_int32_arrays () =
   let tag3 = Obj.tag (Obj.repr arr3) in
   let expected_tag3 =
     match Sys.backend_type with
-    | Native -> unboxed_int32_array_one_tag
+    | Native -> unboxed_int32_array_odd_tag
     | Bytecode | Other _ -> 0
   in
   assert (tag3 = expected_tag3);
@@ -195,7 +182,7 @@ let test_float32_arrays () =
   let tag1 = Obj.tag (Obj.repr arr1) in
   let expected_tag1 =
     match Sys.backend_type with
-    | Native -> unboxed_float32_array_one_tag
+    | Native -> unboxed_float32_array_odd_tag
     | Bytecode | Other _ -> 0
   in
   assert (tag1 = expected_tag1);
@@ -212,7 +199,7 @@ let test_float32_arrays () =
   let tag2 = Obj.tag (Obj.repr arr2) in
   let expected_tag2 =
     match Sys.backend_type with
-    | Native -> unboxed_float32_array_zero_tag
+    | Native -> unboxed_float32_array_even_tag
     | Bytecode | Other _ -> 0
   in
   assert (tag2 = expected_tag2);
@@ -229,7 +216,7 @@ let test_float32_arrays () =
   let tag3 = Obj.tag (Obj.repr arr3) in
   let expected_tag3 =
     match Sys.backend_type with
-    | Native -> unboxed_float32_array_one_tag
+    | Native -> unboxed_float32_array_odd_tag
     | Bytecode | Other _ -> 0
   in
   assert (tag3 = expected_tag3);

@@ -308,9 +308,6 @@ let array_kind ~space ppf (ak : array_kind) =
     | Immediates -> Some "imm"
     | Naked_floats -> Some "float"
     | Naked_float32s -> Some "float32"
-    | Naked_ints -> Some "int"
-    | Naked_int8s -> Some "int8"
-    | Naked_int16s -> Some "int16"
     | Naked_int32s -> Some "int32"
     | Naked_int64s -> Some "int64"
     | Naked_nativeints -> Some "nativeint"
@@ -326,9 +323,6 @@ let empty_array_kind ~space ppf (ak : empty_array_kind) =
     match ak with
     | Values_or_immediates_or_naked_floats -> None
     | Naked_float32s -> Some "float32"
-    | Naked_ints -> Some "int"
-    | Naked_int8s -> Some "int8"
-    | Naked_int16s -> Some "int16"
     | Naked_int32s -> Some "int32"
     | Naked_int64s -> Some "int64"
     | Naked_nativeints -> Some "nativeint"
@@ -664,9 +658,8 @@ let ternop ppf t a1 a2 a3 =
     let ia =
       match set_kind with
       | Values ia -> ia
-      | Immediates | Naked_floats | Naked_float32s | Naked_ints | Naked_int8s
-      | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
-      | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+      | Immediates | Naked_floats | Naked_float32s | Naked_int32s | Naked_int64s
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         Initialization (* Will be ignored anyway *)
     in
     Format.fprintf ppf "@[<2>%%array_set%a%a@ %a.(%a) %a %a@]"

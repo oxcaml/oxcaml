@@ -1728,9 +1728,6 @@ end = struct
           | Boxed_int64 -> "boxed_int64")
       | Alloc_block_kind_float_array -> pp "unboxed_float64_array"
       | Alloc_block_kind_float32_u_array -> pp "unboxed_float32_array"
-      | Alloc_block_kind_int_u_array -> pp "untagged_int_array"
-      | Alloc_block_kind_int8_u_array -> pp "untagged_int8_array"
-      | Alloc_block_kind_int16_u_array -> pp "untagged_int16_array"
       | Alloc_block_kind_int32_u_array -> pp "unboxed_int32_array"
       | Alloc_block_kind_int64_u_array -> pp "unboxed_int64_array"
       | Alloc_block_kind_vec128_u_array -> pp "unboxed_vec128_array"
