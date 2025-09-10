@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-alert -unsafe_multidomain";
  include ocamlcommon;
  include unix;
  arguments = "${ocamlsrcdir}";
