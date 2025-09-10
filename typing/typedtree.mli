@@ -31,6 +31,7 @@ module Uid = Shape.Uid
 type constant =
     Const_int of int
   | Const_char of char
+  | Const_untagged_char of char
   | Const_string of string * Location.t * string option
   | Const_float of string
   | Const_float32 of string

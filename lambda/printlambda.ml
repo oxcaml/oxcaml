@@ -1103,6 +1103,7 @@ let debug_uid ppf duid =
 let rec struct_const ppf = function
   | Const_base(Const_int n) -> fprintf ppf "%i" n
   | Const_base(Const_char c) -> fprintf ppf "%C" c
+  | Const_base(Const_untagged_char c) -> fprintf ppf "#%C" c
   | Const_base(Const_string (s, _, _)) -> fprintf ppf "%S" s
   | Const_immstring s -> fprintf ppf "#%S" s
   | Const_base(Const_float f) -> fprintf ppf "%s" f

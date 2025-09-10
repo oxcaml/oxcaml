@@ -153,6 +153,7 @@ let all_coherent column =
     | Constant c1, Constant c2 -> begin
         match c1, c2 with
         | Const_char _, Const_char _
+        | Const_untagged_char _, Const_untagged_char _
         | Const_int _, Const_int _
         | Const_int8 _, Const_int8 _
         | Const_int16 _, Const_int16 _
@@ -171,6 +172,7 @@ let all_coherent column =
         | Const_unboxed_float32 _, Const_unboxed_float32 _
         | Const_string _, Const_string _ -> true
         | ( Const_char _
+          | Const_untagged_char _
           | Const_int _
           | Const_int8 _
           | Const_int16 _
@@ -314,6 +316,7 @@ let const_compare x y =
     |Const_int32 _
     |Const_int64 _
     |Const_nativeint _
+    |Const_untagged_char _
     |Const_untagged_int _
     |Const_untagged_int8 _
     |Const_untagged_int16 _
@@ -2300,7 +2303,7 @@ let inactive ~partial pat =
             | Const_int _ | Const_char _ | Const_float _ | Const_float32 _
             | Const_unboxed_float _ | Const_unboxed_float32 _
             | Const_int8 _ | Const_int16 _ | Const_int32 _ | Const_int64 _
-            | Const_nativeint _
+            | Const_nativeint _ | Const_untagged_char _
             | Const_untagged_int8 _ | Const_untagged_int16 _
             | Const_unboxed_int32 _ | Const_unboxed_int64 _
             | Const_untagged_int _ | Const_unboxed_nativeint _

@@ -756,6 +756,7 @@ let rec can_be_overwritten = function
 let type_constant: Typedtree.constant -> type_expr = function
     Const_int _ -> instance Predef.type_int
   | Const_char _ -> instance Predef.type_char
+  | Const_untagged_char _ -> instance Predef.type_unboxed_char
   | Const_string _ -> instance Predef.type_string
   | Const_float _ -> instance Predef.type_float
   | Const_float32 _ -> instance Predef.type_float32
@@ -853,6 +854,7 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
         Error (Unknown_literal (i, suffix))
     end
   | Pconst_char c -> Ok (Const_char c)
+  | Pconst_untagged_char c -> Ok (Const_untagged_char c)
   | Pconst_string (s,loc,d) -> Ok (Const_string (s,loc,d))
   | Pconst_float (f,None)-> Ok (Const_float f)
   | Pconst_float (f,Some 's') ->
@@ -892,6 +894,7 @@ let constant_or_raise env loc cst =
   match constant cst with
   | Ok c ->
       (match c with
+       | Const_untagged_char _
        | Const_untagged_int _
        | Const_untagged_int8 _
        | Const_untagged_int16 _

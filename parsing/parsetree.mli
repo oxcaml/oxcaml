@@ -37,6 +37,7 @@ type constant =
           rejected by the typechecker
       *)
   | Pconst_char of char  (** Character such as ['c']. *)
+  | Pconst_untagged_char of char  (** Untagged character such as [#'c']. *)
   | Pconst_string of string * Location.t * string option
       (** Constant string such as ["constant"] or
           [{delim|other constant|delim}].

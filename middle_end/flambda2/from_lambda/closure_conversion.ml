@@ -150,6 +150,10 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       Targetint_32_64.of_int64 (Acc.machine_width acc) (Int64.of_nativeint c)
     in
     register_const acc dbg (SC.boxed_nativeint (Const c)) "nativeint"
+  | Const_base (Const_untagged_char c) ->
+    ( acc,
+      reg_width (RWC.naked_immediate (Target_ocaml_int.of_char c)),
+      "untagged_char" )
   | Const_base (Const_untagged_int c) ->
     ( acc,
       reg_width
@@ -240,11 +244,12 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       | Const_base (Const_float f) -> Const_base (Const_unboxed_float f)
       | Const_base
           ( Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _
-          | Const_string _ | Const_float32 _ | Const_unboxed_float _
-          | Const_unboxed_float32 _ | Const_int32 _ | Const_int64 _
-          | Const_nativeint _ | Const_untagged_int _ | Const_untagged_int8 _
-          | Const_untagged_int16 _ | Const_unboxed_int32 _
-          | Const_unboxed_int64 _ | Const_unboxed_nativeint _ )
+          | Const_untagged_char _ | Const_string _ | Const_float32 _
+          | Const_unboxed_float _ | Const_unboxed_float32 _ | Const_int32 _
+          | Const_int64 _ | Const_nativeint _ | Const_untagged_int _
+          | Const_untagged_int8 _ | Const_untagged_int16 _
+          | Const_unboxed_int32 _ | Const_unboxed_int64 _
+          | Const_unboxed_nativeint _ )
       | Const_block _ | Const_mixed_block _ | Const_float_array _
       | Const_immstring _ | Const_float_block _ | Const_null ->
         Misc.fatal_errorf
