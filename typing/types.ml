@@ -62,7 +62,7 @@ module Jkind_mod_bounds = struct
 
   let crossing t = t.crossing
 
-  let[@inline] modal ax t = t |> crossing |> Crossing.proj ax
+  let[@inline] modal ax t = t |> crossing |> (Crossing.proj [@inlined hint]) ax
   let areality = Crossing.Axis.Comonadic Areality
   let linearity = Crossing.Axis.Comonadic Linearity
   let uniqueness = Crossing.Axis.Monadic Uniqueness
@@ -94,9 +94,9 @@ module Jkind_mod_bounds = struct
 
   let[@inline] set_max_in_set t max_axes =
     let open Jkind_axis.Axis_set in
-    let modal ax =
+    let[@inline] modal ax =
       if mem max_axes (Modal ax)
-      then Crossing.Per_axis.max ax
+      then (Crossing.Per_axis.max [@inlined hint]) ax
       else modal ax t
     in
     (* a little optimization *)
@@ -143,7 +143,7 @@ module Jkind_mod_bounds = struct
     let open Jkind_axis.Axis_set in
     let modal ax =
       if mem min_axes (Modal ax)
-      then Crossing.Per_axis.min ax
+      then (Crossing.Per_axis.min [@inlined hint]) ax
       else modal ax t
     in
     (* a little optimization *)
@@ -190,7 +190,8 @@ module Jkind_mod_bounds = struct
     let open Jkind_axis.Axis_set in
     let modal ax =
       not (mem axes (Modal ax)) ||
-      Crossing.Per_axis.(le ax (max ax) (modal ax t))
+      Crossing.Per_axis.((le [@inlined hint]) ax ((max [@inlined hint]) ax)
+        (modal ax t))
     in
     modal areality &&
     modal linearity &&

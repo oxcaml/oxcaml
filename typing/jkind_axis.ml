@@ -222,20 +222,26 @@ module Per_axis = struct
       | Nullability -> Nullability.max
       | Separability -> Separability.max
 
-    let le : type a. a t -> a -> a -> bool = function
-      | Externality -> Externality.le
-      | Nullability -> Nullability.le
-      | Separability -> Separability.le
+    let le : type a. a t -> a -> a -> bool =
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.le a b
+      | Nullability -> Nullability.le a b
+      | Separability -> Separability.le a b
 
-    let meet : type a. a t -> a -> a -> a = function
-      | Externality -> Externality.meet
-      | Nullability -> Nullability.meet
-      | Separability -> Separability.meet
+    let meet : type a. a t -> a -> a -> a =
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.meet a b
+      | Nullability -> Nullability.meet a b
+      | Separability -> Separability.meet a b
 
-    let join : type a. a t -> a -> a -> a = function
-      | Externality -> Externality.join
-      | Nullability -> Nullability.join
-      | Separability -> Separability.join
+    let join : type a. a t -> a -> a -> a =
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.join a b
+      | Nullability -> Nullability.join a b
+      | Separability -> Separability.join a b
 
     let print : type a. a t -> Format.formatter -> a -> unit = function
       | Externality -> Externality.print
@@ -251,25 +257,31 @@ module Per_axis = struct
       | _ -> None
   end
 
-  let min : type a. a t -> a = function
-    | Modal ax -> Mode.Crossing.Per_axis.min ax
-    | Nonmodal ax -> Nonmodal.min ax
+  let min : type a. a t -> a = function[@inline available]
+    | Modal ax -> (Mode.Crossing.Per_axis.min [@inlined hint]) ax
+    | Nonmodal ax -> (Nonmodal.min [@inlined hint]) ax
 
-  let max : type a. a t -> a = function
-    | Modal ax -> Mode.Crossing.Per_axis.max ax
-    | Nonmodal ax -> Nonmodal.max ax
+  let max : type a. a t -> a = function[@inline available]
+    | Modal ax -> (Mode.Crossing.Per_axis.max [@inlined hint]) ax
+    | Nonmodal ax -> (Nonmodal.max [@inlined hint]) ax
 
-  let le : type a. a t -> a -> a -> bool = function
-    | Modal ax -> Mode.Crossing.Per_axis.le ax
-    | Nonmodal ax -> Nonmodal.le ax
+  let le : type a. a t -> a -> a -> bool =
+   fun [@inline available] ax a b ->
+    match ax with
+    | Modal ax -> (Mode.Crossing.Per_axis.le [@inlined hint]) ax a b
+    | Nonmodal ax -> (Nonmodal.le [@inlined hint]) ax a b
 
-  let meet : type a. a t -> a -> a -> a = function
-    | Modal ax -> Mode.Crossing.Per_axis.meet ax
-    | Nonmodal ax -> Nonmodal.meet ax
+  let meet : type a. a t -> a -> a -> a =
+   fun [@inline available] ax a b ->
+    match ax with
+    | Modal ax -> (Mode.Crossing.Per_axis.meet [@inlined hint]) ax a b
+    | Nonmodal ax -> (Nonmodal.meet [@inlined hint]) ax a b
 
-  let join : type a. a t -> a -> a -> a = function
-    | Modal ax -> Mode.Crossing.Per_axis.join ax
-    | Nonmodal ax -> Nonmodal.join ax
+  let join : type a. a t -> a -> a -> a =
+   fun [@inline available] ax a b ->
+    match ax with
+    | Modal ax -> (Mode.Crossing.Per_axis.join [@inlined hint]) ax a b
+    | Nonmodal ax -> (Nonmodal.join [@inlined hint]) ax a b
 
   let print : type a. a t -> Format.formatter -> a -> unit = function
     | Modal ax -> Mode.Crossing.Per_axis.print ax
