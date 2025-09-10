@@ -281,6 +281,7 @@ type trec2 = [ `A | `B of 'a list ] as 'a
 
 type trec_fails : immutable_data = [ `C | `D of 'a * unit -> 'a ] as 'a
 
+(* CR jujacobs: this used to fail, but is now accepted. Bug! *)
 [%%expect{|
 type trec_fails = [ `C | `D of 'a * unit -> 'a ] as 'a
 |}]
@@ -294,8 +295,7 @@ type trec_succeeds = [ `C | `D of 'a * unit -> 'a ] as 'a
 type trec_rec_fails : immutable_data =
   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
 
-(* CR jujacobs: this used to fail, but is now accepted. Should it? 
-   It was not marked with a CR before. *)
+(* CR jujacobs: this used to fail, but is now accepted. Bug! *)
 [%%expect{|
 type trec_rec_fails =
     [ `X of [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b | `Y of 'b ]
