@@ -1331,7 +1331,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_quotation exp -> transl_quote (transl_exp ~scopes sort) exp e.exp_loc
   (* TODO: update scopes *)
   | Texp_antiquotation _ -> failwith "Cannot unqoute outside of a quotation context."
-  | Texp_eval_quotation (_, sort) ->
+  | Texp_eval (_, sort) ->
       let loc = of_location ~scopes e.exp_loc in
       let quote_ident = Ident.create_local "quote" in
       let ret_sort = Jkind.Sort.default_for_transl_and_get sort in
@@ -1367,12 +1367,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             layout = layout_block;
             attributes = default_param_attribute;
             mode = alloc_local;
-          };
-          { name = Ident.create_local "unit";
-            debug_uid = debug_uid_none;
-            layout = layout_unit;
-            attributes = default_param_attribute;
-            mode = alloc_heap;
           };
         ]
         ~return:result_layout
