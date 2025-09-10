@@ -529,7 +529,7 @@ and expression_desc =
   | Texp_hole of unique_use (** _ *)
   | Texp_quotation of expression
   | Texp_antiquotation of expression
-  | Texp_eval_quotation of core_type * Jkind.sort
+  | Texp_eval of core_type * Jkind.sort
 
 and function_curry =
   | More_args of { partial_mode : Mode.Alloc.l }

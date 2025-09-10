@@ -346,7 +346,7 @@ type error =
   | Quotation_object
   | Open_inside_quotation
   | Unsupported_quotation_construct
-  | Eval_quote_format
+  | Eval_format
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

@@ -346,9 +346,9 @@ type tracing_probe =
 val get_tracing_probe_payload :
   Parsetree.payload -> (tracing_probe, unit) result
 
-(* Gets the payload of a [eval] extension node which evaluates quotes, for example:
-   [%eval: int] *)
-val get_eval_quote_payload :
+(* Gets the payload of a [eval] extension node which evaluates quotes,
+   for example: [%eval: int] *)
+val get_eval_payload :
   Parsetree.payload -> (Parsetree.core_type, unit) result
 
 val has_atomic: Parsetree.attributes -> bool

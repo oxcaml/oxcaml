@@ -1753,7 +1753,7 @@ and Exp_desc : sig
 
   val splice : Location.t -> Code.t -> t'
 
-  val eval_quote : Location.t -> Type.t -> t'
+  val eval : Location.t -> Type.t -> t'
 end = struct
   type s = lambda
 
@@ -1894,7 +1894,7 @@ end = struct
 
   let splice loc a1 = apply1 "Exp_desc" "splice" loc (extract a1)
 
-  let eval_quote loc a1 = apply1 "Exp_desc" "eval_quote" loc (extract a1)
+  let eval loc a1 = apply1 "Exp_desc" "eval" loc (extract a1)
 end
 
 and Exp : sig
@@ -3061,8 +3061,7 @@ and quote_expression_desc transl stage e =
     | Texp_atomic_loc _ ->
       fatal_error "Cannot quote Texp_atomic_loc constructs yet."
     | Texp_idx _ -> fatal_error "Cannot quote Texp_idx constructs yet."
-    | Texp_eval_quotation (typ, _) ->
-      Exp_desc.eval_quote loc (quote_core_type typ)
+    | Texp_eval (typ, _) -> Exp_desc.eval loc (quote_core_type typ)
   in
   List.iter update_env_without_extra e.exp_extra;
   List.fold_right

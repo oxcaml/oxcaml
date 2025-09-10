@@ -300,7 +300,7 @@ type error =
   | Quotation_object
   | Open_inside_quotation
   | Unsupported_quotation_construct
-  | Eval_quote_format
+  | Eval_format
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -4368,7 +4368,7 @@ let rec is_nonexpansive exp =
   | Texp_src_pos
   | Texp_quotation _
   | Texp_array (_, _, [], _)
-  | Texp_eval_quotation _ -> true
+  | Texp_eval _ -> true
   | Texp_let(_rec_flag, pat_exp_list, body) ->
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
       is_nonexpansive body
@@ -4949,7 +4949,7 @@ let check_partial_application ~statement exp =
             | Texp_extension_constructor _ | Texp_ifthenelse (_, _, None)
             | Texp_probe _ | Texp_probe_is_enabled _ | Texp_src_pos
             | Texp_function _ | Texp_quotation _ | Texp_antiquotation _
-            | Texp_eval_quotation _ ->
+            | Texp_eval _ ->
                 check_statement ()
             | Texp_match (_, _, cases, _) ->
                 List.iter (fun {c_rhs; _} -> check c_rhs) cases
@@ -7251,8 +7251,8 @@ and type_expect_
           raise (Error (loc, env, Invalid_atomic_loc_payload))
       end
   | Pexp_extension ({ txt = ("eval" | "ocaml.eval"); _ }, payload) ->
-    begin match Builtin_attributes.get_eval_quote_payload payload with
-    | Error () -> raise (Error (loc, env, Eval_quote_format))
+    begin match Builtin_attributes.get_eval_payload payload with
+    | Error () -> raise (Error (loc, env, Eval_format))
     | Ok typ ->
       let typ = Typetexp.transl_simple_type env ~new_var_jkind:Any ~closed:true Alloc.Const.legacy typ in
       let sort = match type_sort ~why:Function_result ~fixed:false env typ.ctyp_type with
@@ -7263,15 +7263,11 @@ and type_expect_
         (Tarrow
           ((Nolabel, Alloc.legacy, Alloc.legacy)
           , newmono (Predef.type_code (newgenty (Tquote typ.ctyp_type)))
-          , newty(Tarrow
-            ((Nolabel, Alloc.legacy, Alloc.legacy)
-            , newmono Predef.type_unit
-            , typ.ctyp_type
-            , commu_ok))
+          , typ.ctyp_type
           , commu_ok))
       in
       rue {
-        exp_desc = Texp_eval_quotation (typ, sort);
+        exp_desc = Texp_eval (typ, sort);
         exp_loc = loc; exp_extra = [];
         exp_type = eval_type;
         exp_attributes = sexp.pexp_attributes;
@@ -11820,7 +11816,7 @@ let report_error ~loc env =
   | Unsupported_quotation_construct ->
       Location.errorf ~loc
         "This quotation construct is not presently supported."
-  | Eval_quote_format ->
+  | Eval_format ->
       Location.errorf ~loc
         "The eval extension takes a single type as its argument, for example %a."
          Style.inline_code "[%eval: int]"

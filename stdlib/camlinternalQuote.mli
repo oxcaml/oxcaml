@@ -596,7 +596,7 @@ and Exp_desc : sig
 
   val splice : Code.t -> t
 
-  val eval_quote : Type.t -> t
+  val eval : Type.t -> t
 end
 
 and Exp : sig
