@@ -207,6 +207,11 @@ Line 2, characters 8-13:
 Error: Found 32-bit float literal #0.0s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
 |}];;
 
+type t = char#;;
+[%%expect{|
+type t = char#
+|}];;
+
 type t = int8;;
 [%%expect{|
 Line 1, characters 9-13:
@@ -223,6 +228,11 @@ Line 1, characters 9-14:
              ^^^^^
 Error: Unbound type constructor "int16"
 Hint: Did you mean "int", "int32" or "int64"?
+|}];;
+
+let f () = #'a';;
+[%%expect{|
+Error: Found untagged char literal...
 |}];;
 
 let _ = 1s;;

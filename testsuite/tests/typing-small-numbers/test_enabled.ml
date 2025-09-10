@@ -498,6 +498,70 @@ let _ : int =
 - : int = 2
 |}]
 
+(* Untagged char *)
+let ignore (_ : char#) = ()
+[%%expect{|
+val ignore : char# -> unit = <fun>
+|}]
+
+type t = char#
+[%%expect{|
+type t = char#
+|}]
+
+let () = ignore #'a'
+[%%expect{|
+|}]
+
+let () = ignore #'\xFF'
+[%%expect{|
+|}]
+
+let () = ignore #'\o000'
+[%%expect{|
+|}]
+
+let () = ignore #'\123'
+[%%expect{|
+|}]
+
+let _ : int =
+  match #'a' with
+  | _ -> 0
+;;
+[%%expect{|
+- : int = 0
+|}]
+
+let _ : int =
+  match #'a' with
+  | #'a' -> 0
+  | _ -> 1
+;;
+[%%expect{|
+- : int = 0
+|}]
+
+let _ : int =
+  match #'A' with
+  | #'a' -> 0
+  | #'A' -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 1
+|}]
+
+let _ : int =
+  match #'z' with
+  | #'a' -> 0
+  | #'A' -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 2
+|}]
+
 (* Untagged int8 *)
 
 let ignore (_ : int8#) = ()

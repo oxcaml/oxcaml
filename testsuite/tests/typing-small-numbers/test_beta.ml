@@ -188,6 +188,11 @@ Line 1:
 Error: float32 literal patterns are not supported.
 |}];;
 
+type t = char#;;
+[%%expect{|
+type t = char#
+|}];;
+
 type t = int8;;
 [%%expect{|
 type t = int8
@@ -197,6 +202,11 @@ type t = int16;;
 [%%expect{|
 type t = int16
 |}];;
+
+let c () = #'a';;
+[%%expect{|
+val c : unit -> char# = <fun>
+|}]
 
 let i8 = -1s;;
 [%%expect{|
