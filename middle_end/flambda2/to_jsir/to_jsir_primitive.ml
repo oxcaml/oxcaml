@@ -589,16 +589,24 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
       | Immediates | Values -> 0
       | Naked_int32s ->
         if List.length xs mod 2 = 0
-        then Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_even_tag
-        else Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_odd_tag
-      | Naked_int64s -> Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag
+        then
+          Cmm_helpers.Unboxed_or_untagged_array_tags
+          .unboxed_int32_array_zero_tag
+        else
+          Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_one_tag
+      | Naked_int64s ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
       | Naked_nativeints ->
-        Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
       | Naked_floats -> Tag.double_array_tag |> Tag.to_int
       | Naked_float32s ->
         if List.length xs mod 2 = 0
-        then Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_even_tag
-        else Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_odd_tag
+        then
+          Cmm_helpers.Unboxed_or_untagged_array_tags
+          .unboxed_float32_array_zero_tag
+        else
+          Cmm_helpers.Unboxed_or_untagged_array_tags
+          .unboxed_float32_array_one_tag
       | Unboxed_product _ -> 0
       | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         (* No SIMD *)
