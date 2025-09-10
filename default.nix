@@ -19,7 +19,7 @@ let
   inherit (pkgs) lib fetchpatch;
 
   # Select stdenv based on whether asan is enabled
-  myStdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
+  stdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
 
   # Build configure flags based on features
   configureFlags =
@@ -44,7 +44,7 @@ let
 
   upstream = pkgs.ocaml-ng.ocamlPackages_4_14;
 
-  ocaml = (upstream.ocaml.override { stdenv = myStdenv; }).overrideAttrs {
+  ocaml = (upstream.ocaml.override { inherit stdenv; }).overrideAttrs {
     # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
     # compiler that we use to bootstrap ourselves on ARM64
     patches = [ ./arm64-issue-debug-upstream.patch ];
@@ -167,7 +167,7 @@ let
     };
   };
 in
-myStdenv.mkDerivation {
+stdenv.mkDerivation {
   pname = "oxcaml";
   version = "5.2.0+ox";
   inherit src configureFlags;
@@ -177,6 +177,11 @@ myStdenv.mkDerivation {
 
   enableParallelBuilding = true;
   separateDebugInfo = !dev;
+
+  # Disable _multioutConfig hook which adds --libdir=$out/lib into
+  # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure
+  # step, which expects --libdir to be $out/lib/ocaml
+  setOutputFlags = false;
 
   nativeBuildInputs =
     [
@@ -232,15 +237,11 @@ myStdenv.mkDerivation {
   '';
 
   shellHook = ''
-    export out="$(pwd)/_install"
-    configureFlags+=" --prefix=$out"
-    export PS1="$name$ "
+    prefix="$(pwd)/_install"
 
     cat >&2 << EOF
-    OxCaml Development Environment
-    ==============================
-
-    Configure Flags: $configureFlags
+    OxCaml $version Development Environment
+    ===============================''${version//?/=}
 
     Available commands:
       configurePhase           - Pre-build setup
