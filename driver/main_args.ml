@@ -739,7 +739,7 @@ let mk_dump_into_csv f =
   "-dump-into-csv", Arg.Unit f, " Dump profile information to profile.csv"
 
 let mk_ikinds f =
-  "-ikinds", Arg.Unit f, ""
+  "-ikinds", Arg.Unit f, " Enable ikinds-based kind checker (experimental)"
 
 let mk_extension f =
   let available_extensions =
@@ -947,6 +947,7 @@ module type Common_options = sig
   val _absname : unit -> unit
   val _no_absname : unit -> unit
   val _alert : string -> unit
+  val _ikinds : unit -> unit
   val _I : string -> unit
   val _H : string -> unit
   val _I_paths : string -> unit
@@ -1239,7 +1240,7 @@ struct
     mk_custom F._custom;
     mk_disable_all_extensions F._disable_all_extensions;
     (* Enable ikinds via dedicated flag *)
-    mk_ikinds (fun () -> Clflags.ikinds := true);
+    mk_ikinds F._ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_dllib F._dllib;
     mk_dllpath F._dllpath;
@@ -1381,7 +1382,7 @@ struct
     mk_no_app_funct F._no_app_funct;
     mk_directory F._directory;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_ikinds (fun () -> Clflags.ikinds := true);
+    mk_ikinds F._ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -1479,7 +1480,7 @@ struct
     mk_config_var F._config_var;
     mk_dtypes F._annot;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_ikinds (fun () -> Clflags.ikinds := true);
+    mk_ikinds F._ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -1669,7 +1670,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_no_app_funct F._no_app_funct;
     mk_directory F._directory;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_ikinds (fun () -> Clflags.ikinds := true);
+    mk_ikinds F._ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -1865,6 +1866,7 @@ module Default = struct
   module Common = struct
     let _absname = set Clflags.absname
     let _alert = Warnings.parse_alert_option
+    let _ikinds = set Clflags.ikinds
     let _alias_deps = clear transparent_modules
     let _app_funct = set applicative_functors
     let _labels = clear classic
