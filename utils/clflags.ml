@@ -150,11 +150,14 @@ let dump_linear = ref false             (* -dlinear *)
 let keep_startup_file = ref false       (* -dstartup *)
 let debug_ocaml = ref false             (* -debug-ocaml *)
 let llvm_backend = ref false            (* -llvm-backend *)
-let ikinds = ref false                  (* -ikinds: enable ikinds kind checker *)
+let ikinds = ref false                  
+  (* -ikinds: enable ikinds kind checker *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
-let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
-let profile_granularity : profile_granularity_level ref = ref File_level (* -dgranularity *)
+let profile_columns : profile_column list ref = ref [] 
+  (* -dprofile/-dtimings/-dcounters *)
+let profile_granularity : profile_granularity_level ref = ref File_level 
+  (* -dgranularity *)
 
 let profile_granularity_level_mapping = [
   "file", File_level;
@@ -725,8 +728,10 @@ let create_usage_msg program =
 let print_arguments program =
   Arg.usage !arg_spec (create_usage_msg program)
 
-let zero_alloc_check = ref Zero_alloc_annotations.Check.Check_default  (* -zero-alloc-check *)
-let zero_alloc_assert = ref Zero_alloc_annotations.Assert.Assert_default (* -zero-alloc-assert all *)
+let zero_alloc_check = ref Zero_alloc_annotations.Check.Check_default  
+  (* -zero-alloc-check *)
+let zero_alloc_assert = ref Zero_alloc_annotations.Assert.Assert_default 
+  (* -zero-alloc-assert all *)
 
 let no_auto_include_otherlibs = ref false      (* -no-auto-include-otherlibs *)
 
