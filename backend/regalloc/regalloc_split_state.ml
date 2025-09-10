@@ -691,7 +691,7 @@ let compute_definitions :
           let definitions_at_beginning =
             Label.Set.fold
               (fun successor_label definitions_at_beginning ->
-                (if debug && Lazy.force invariants
+                (if true
                 then
                   let successor_block =
                     Cfg_with_infos.get_block_exn cfg_with_infos successor_label
