@@ -1675,6 +1675,7 @@ module M : sig
 end = struct
   type t : value mod non_float
 end
+(* CR jujacobs: this should be accepted, but it's not with -ikinds. Bug! *)
 [%%expect{|
 Line 2, characters 2-36:
 2 |   type t : immediate with extensible
@@ -1736,6 +1737,7 @@ module M : sig
 end = struct
   type t : value mod non_float
 end
+(* CR jujacobs: this should be accepted, but it's not with -ikinds. Bug! *)
 [%%expect{|
 Line 2, characters 2-36:
 2 |   type t : immediate with extensible
