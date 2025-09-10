@@ -99,12 +99,12 @@ let temp_file_key = Domain.DLS.new_key (fun _ ->
     case the current domain exits. *)
 
 (** Domain-local Storage *)
-module DLS : sig 
+module DLS : sig
 
     type 'a key : value mod portable contended
     (** Type of a DLS key *)
 
-    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key 
+    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
         @@ nonportable
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.new_key]."]
     (** [new_key f] returns a new key bound to initialiser [f] for accessing
@@ -186,7 +186,7 @@ module TLS : sig
     (** For use by the threading library. *)
     module Private : sig @@ portable
         type keys
-        val init : unit -> unit 
+        val init : unit -> unit
         val get_initial_keys : unit -> keys
         val set_initial_keys : keys -> unit
     end
@@ -207,7 +207,7 @@ module Safe : sig @@ portable
       : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
       -> (unit -> 'a) @ portable
       -> 'a key
-    (** Like {!DLS.new_key}, but safe to use in the presence of multiple 
+    (** Like {!DLS.new_key}, but safe to use in the presence of multiple
         domains. *)
 
     val get : ('a : value mod portable). 'a key -> 'a @ contended
@@ -228,7 +228,7 @@ module Safe : sig @@ portable
       : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
       -> (unit -> 'a) @ portable
       -> 'a key
-    (** Like {!TLS.new_key}, but safe to use in the presence of multiple 
+    (** Like {!TLS.new_key}, but safe to use in the presence of multiple
         domains. *)
 
     val get : ('a : value mod portable). 'a key -> 'a @ contended
@@ -236,13 +236,6 @@ module Safe : sig @@ portable
 
     val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
     (** Like {!TLS.set}, but safe to use in the presence of multiple domains. *)
-
-    val access 
-      : 'a key 
-      -> ('a -> 'b @ contended local once portable unique) 
-         @ local once portable unyielding 
-      -> 'b @ contended local once portable unique
-    (** Compute a value using the contents of TLS. *)
   end
 
   val spawn : (unit -> 'a) @ portable once -> 'a t

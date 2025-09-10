@@ -760,7 +760,7 @@ type stag += String_tag of tag
 *)
 
 val pp_open_stag : formatter -> stag -> unit
-val open_stag : stag -> unit
+val open_stag : stag -> unit @@ nonportable
 (** [pp_open_stag ppf t] opens the semantic tag named [t].
 
   The [print_open_stag] tag-printing function of the formatter is called with
@@ -994,28 +994,28 @@ val synchronized_formatter_of_out_channel :
 *)
 
 val std_formatter : formatter @@ nonportable
-[@@alert unsafe_multidomain "Use [Format.Safe.with_std_formatter]."]
+[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** The initial thread's standard formatter to write to standard output.
 
   It is defined as {!formatter_of_out_channel} {!Stdlib.stdout}.
 *)
 
 val get_std_formatter : unit -> formatter @@ nonportable
-[@@alert unsafe_multidomain "Use [Format.Safe.with_std_formatter]."]
+[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** [get_std_formatter ()] returns the current thread's standard formatter used
     to write to standard output.
     @since 5.0
 *)
 
 val err_formatter : formatter @@ nonportable
-[@@alert unsafe_multidomain "Use [Format.Safe.with_err_formatter]."]
+[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** The initial thread's formatter to write to standard error.
 
   It is defined as {!formatter_of_out_channel} {!Stdlib.stderr}.
 *)
 
 val get_err_formatter : unit -> formatter @@ nonportable
-[@@alert unsafe_multidomain "Use [Format.Safe.with_err_formatter]."]
+[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** [get_err_formatter ()] returns the current thread's formatter used to write
    to standard error.
    @since 5.0
@@ -1029,24 +1029,24 @@ val formatter_of_buffer : Buffer.t -> formatter
 *)
 
 val stdbuf : Buffer.t @@ nonportable
-[@@alert unsafe_multidomain "Use [Format.Safe.with_stdbuf]."]
+[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** The initial thread's string buffer in which [str_formatter] writes. *)
 
 val get_stdbuf : unit -> Buffer.t @@ nonportable
-[@@alert unsafe_multidomain "Use [Format.Safe.with_stdbuf]."]
+[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** [get_stdbuf ()] returns the current thread's string buffer in which the
     current thread's string formatter writes.
     @since 5.0 *)
 
 val str_formatter : formatter @@ nonportable
-[@@alert unsafe_multidomain "Use [Format.Safe.with_str_formatter]."]
+[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** The initial thread's formatter to output to the {!stdbuf} string buffer.
 
   [str_formatter] is defined as {!formatter_of_buffer} {!stdbuf}.
 *)
 
 val get_str_formatter : unit -> formatter @@ nonportable
-[@@alert unsafe_multidomain "Use [Format.Safe.with_str_formatter]."]
+[@@alert unsafe_multidomain "Directly accessing TLS is unsafe."]
 (** The current thread's formatter to output to the current threads string
     buffer.
     @since 5.0
@@ -1071,10 +1071,8 @@ val make_formatter :
   returns a formatter to the {!Stdlib.out_channel} [oc].
 *)
 
-val make_synchronized_formatter 
-  : (string -> int -> int -> unit) 
-  -> (unit -> unit) 
-  -> formatter Domain.Safe.TLS.key
+val make_synchronized_formatter :
+  (string -> int -> int -> unit) -> (unit -> unit) -> formatter Domain.Safe.TLS.key
   @@ nonportable
 [@@alert unstable][@@alert "-unstable"]
 [@@alert unsafe_multidomain "Use [Format.Safe.make_synchronized_formatter]."]
@@ -1477,40 +1475,12 @@ val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
     via modes. *)
 module Safe : sig
   (** Like {!make_synchronized_formatter}, but can be called from any thread.
-      The provided closures must be [portable] as they will be called from 
-      other threads that access the returned [Domain.Safe.TLS.key]. *)
+      The provided closures must be [portable] as they will be called from other threads
+      that access the returned [Domain.Safe.TLS.key]. *)
   val make_synchronized_formatter :
     (string -> int -> int -> unit) @ portable
     -> (unit -> unit) @ portable
     -> formatter Domain.Safe.TLS.key
-
-  (** Like {!get_std_formatter}, but can be called from any thread. *)
-  val with_std_formatter 
-    : (formatter -> 'a @ contended local once portable unique) 
-      @ local once portable unyielding
-    -> 'a @ contended local once portable unique
-    @@ portable
-
-  (** Like {!get_err_formatter}, but can be called from any thread. *)
-  val with_err_formatter 
-    : (formatter -> 'a @ contended local once portable unique) 
-      @ local once portable unyielding
-    -> 'a @ contended local once portable unique
-    @@ portable
-
-  (** Like {!get_stdbuf}, but can be called from any thread. *)
-  val with_stdbuf 
-    : (Buffer.t -> 'a @ contended local once portable unique) 
-      @ local once portable unyielding
-    -> 'a @ contended local once portable unique
-    @@ portable
-
-  (** Like {!get_str_formatter}, but can be called from any thread. *)
-  val with_str_formatter 
-    : (formatter -> 'a @ contended local once portable unique) 
-      @ local once portable unyielding
-    -> 'a @ contended local once portable unique
-    @@ portable
 end
 
 (** {1:examples Examples}

@@ -44,7 +44,7 @@ end = struct
   type t = Obj.t
   let none = Obj.magic_portable (Obj.repr (ref 0))
   let fresh () = Array.make 7 (Obj.magic_uncontended none)
-  let[@inline] some v = 
+  let[@inline] some v =
    (* [Sys.opaque_identity] ensures that flambda does not look at the type of
     * [x], which may be a [float] and conclude that the [st] is a float array.
     * We do not want OCaml's float array optimisation kicking in here. *)
@@ -66,7 +66,7 @@ end = struct
   external compare_and_set_field
     : t array -> int -> t -> t -> bool @@ portable = "%atomic_cas_field"
 
-  let compare_and_set st idx old new_ = 
+  let compare_and_set st idx old new_ =
     (* In Flambda 2 there is a strict distinction between arrays and blocks. *)
     compare_and_set_field (Sys.opaque_identity st) idx old new_
 end
@@ -536,7 +536,7 @@ module TLS0 = struct
       let st = maybe_grow idx in
       Array.unsafe_set st idx (Obj_opt.some x)
 
-    let[@inline never] init_idx (type a) idx (init : _ -> a) = 
+    let[@inline never] init_idx (type a) idx (init : _ -> a) =
       let v : a = init () in
       let new_obj = Obj_opt.some v in
       let st = get_tls_state () in
@@ -569,33 +569,35 @@ module TLS0 = struct
 
   type 'a key = 'a Impl.key
 
+  external is_boot_compiler
+    : unit -> bool @@ portable = "caml_is_boot_compiler"
   external has_tls_state
     : unit -> bool @@ portable = "caml_thread_has_tls_state"
-  let has_tls_state = has_tls_state ()
+  let has_tls_state = has_tls_state () && not (is_boot_compiler ())
 
-  let[@inline] new_key ?split_from_parent init = 
-    if has_tls_state 
-    then Impl.new_key ?split_from_parent init 
-    else DLS.new_key ?split_from_parent init 
-  let[@inline] get key = 
+  let[@inline] new_key ?split_from_parent init =
+    if has_tls_state
+    then Impl.new_key ?split_from_parent init
+    else DLS.new_key ?split_from_parent init
+  let[@inline] get key =
     if has_tls_state then Impl.get key else DLS.get key
-  let[@inline] set key v = 
+  let[@inline] set key v =
     if has_tls_state then Impl.set key v else DLS.set key v
 
   module Private = struct
       type keys = Impl.key_value list
-      external init_main_thread 
+      external init_main_thread
         : unit -> unit @@ portable = "caml_thread_init_main_thread"
-      let[@inline] init () = 
+      let[@inline] init () =
         if has_tls_state then Impl.init ()
-      let[@inline] get_initial_keys () = 
+      let[@inline] get_initial_keys () =
         if has_tls_state then Impl.get_initial_keys () else []
-      let[@inline] set_initial_keys keys = 
+      let[@inline] set_initial_keys keys =
         if has_tls_state then Impl.set_initial_keys keys
 
       (* If TLS is supported, we need to initialize it here, since [Thread]
          might never be loaded. *)
-      let[@inline] init_main_thread () = 
+      let[@inline] init_main_thread () =
         if has_tls_state then (init_main_thread (); init ())
       let () = init_main_thread ()
   end
@@ -604,16 +606,13 @@ end
 module Safe = struct
   (* Note the exposed signature of [get] and [set] add modes for safety. *)
   module DLS = DLS
-  module TLS = struct 
-    include TLS0
-    let[@inline] access key f = exclave_ f (get key)
-  end
-  
-  let spawn f = 
+  module TLS = TLS0
+
+  let spawn f =
     let tls_keys = TLS.Private.get_initial_keys () in
-    spawn (fun () -> 
-      TLS.Private.init_main_thread (); 
-      TLS.Private.set_initial_keys tls_keys; 
+    spawn (fun () ->
+      TLS.Private.init_main_thread ();
+      TLS.Private.set_initial_keys tls_keys;
       f ()) [@nontail]
 
   let at_exit = at_exit

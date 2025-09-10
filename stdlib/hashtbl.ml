@@ -65,11 +65,12 @@ let is_randomized () = Atomic.get randomized
 module Rng : sig
   val bits : unit -> int
 end = struct
-  (* CR-someday mslater: using FLS would allow determinism. *)
-  let key = Domain.Safe.TLS.new_key Random.State.make_self_init
-  let[@inline] bits () : int =
-    Domain.Safe.TLS.access key (fun state : int -> Random.State.bits state)
-    [@nontail]
+  (* CR-someday mslater: this is safe since we cannot switch threads while
+     accessing the state, the state is not shared with other threads, and
+     we don't care about determinism. Using FLS would be better. *)
+  let key = Domain.Safe.DLS.new_key Random.State.make_self_init
+  let[@inline] bits () =
+    Random.State.bits (Obj.magic_uncontended (Domain.Safe.DLS.get key))
 end
 
 (* Functions which appear before the functorial interface must either be

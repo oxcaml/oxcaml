@@ -333,16 +333,16 @@ let remove_extension name =
 external open_desc: string -> open_flag list -> int -> int @@ portable = "caml_sys_open"
 external close_desc: int -> unit @@ portable = "caml_sys_close"
 
-module TLS = Domain.Safe.TLS
+module DLS = Domain.Safe.DLS
 
 module Rng : sig
   val bits : unit -> int
 end = struct
-  (* CR-someday mslater: using FLS would allow determinism. *)
-  let key = TLS.new_key Random.State.make_self_init
-  let[@inline] bits () : int =
-    Domain.Safe.TLS.access key (fun state : int -> Random.State.bits state)
-    [@nontail]
+  (* CR-someday mslater: this is safe since we cannot switch threads while
+     accessing the state, the state is not shared with other threads, and
+     we don't care about determinism. Using FLS would be better. *)
+  let key = DLS.new_key Random.State.make_self_init
+  let[@inline] bits () = Random.State.bits (Obj.magic_uncontended (DLS.get key))
 end
 
 let temp_file_name temp_dir prefix suffix =
@@ -350,13 +350,13 @@ let temp_file_name temp_dir prefix suffix =
   concat temp_dir (Printf.sprintf "%s%06x%s" prefix rnd suffix)
 
 let current_temp_dir_name =
-  TLS.new_key
+  DLS.new_key
     ~split_from_parent:(fun (filename : string) () -> filename)
     (fun () -> temp_dir_name)
 
-let set_temp_dir_name (s : string) = TLS.set current_temp_dir_name s
+let set_temp_dir_name (s : string) = DLS.set current_temp_dir_name s
 
-let get_temp_dir_name () = TLS.get current_temp_dir_name
+let get_temp_dir_name () = DLS.get current_temp_dir_name
 
 let temp_file ?(temp_dir = get_temp_dir_name ()) prefix suffix =
   let rec try_name counter =

@@ -20,14 +20,7 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
-external iarray_length 
-  : 'a iarray -> int @@ portable = "%array_length"
-external iarray_of_array 
-  : 'a array -> 'a iarray @@ portable = "%array_to_iarray"
-external iarray_get 
-  : 'a iarray -> int -> 'a @@ portable = "%array_safe_get"
-external random_seed 
-  : unit -> int iarray @@ portable = "caml_sys_random_seed"
+external random_seed: unit -> int array @@ portable = "caml_sys_random_seed"
 
 module State = struct
 
@@ -105,11 +98,10 @@ module State = struct
      sequence with MD5 (Digest.bytes).  MD5 gives only 128 bits while
      we need 256 bits, so we hash twice with different suffixes. *)
   let reinit s seed =
-    let n = iarray_length seed in
+    let n = Array.length seed in
     let b = Bytes.create (n * 8 + 1) in
     for i = 0 to n-1 do
-      let s = iarray_get seed i in
-      Bytes.set_int64_le b (i * 8) (Int64.of_int s)
+      Bytes.set_int64_le b (i * 8) (Int64.of_int seed.(i))
     done;
     Bytes.set b (n * 8) '\x01';
     let d1 = Digest.bytes b in
@@ -125,8 +117,6 @@ module State = struct
 
   let make_self_init () =
     make (random_seed ())
-
-  let make seed = make (iarray_of_array seed)
 
   let min_int31 = -0x4000_0000
       (* = -2{^30}, which is [min_int] for 31-bit integers *)
@@ -351,35 +341,23 @@ let mk_default () =
            (-8591268803865043407L)
            6388613595849772044L
 
-open Modes.Global
-open Modes.Aliased
-open Modes.Many
-(* CR-someday mslater: using FLS is required for determinism. *)
 module TLS = Domain.Safe.TLS
 
 let random_key =
   TLS.new_key
     ~split_from_parent:(fun s ->
       let s = State.split s in
-      (* Safe because [State.split] is a deep copy. *)
+      (* Safe since [Sate.split] does a deep copy. *)
       (fun () -> Obj.magic_uncontended s))
     mk_default
 
-let[@inline] apply0 (type (a : value mod portable contended many)) 
-                    (f : _ -> a) () : a =
-  (TLS.access random_key (fun state -> {global={aliased=f state}}))
-  .global.aliased
-
-let[@inline] apply1 (type (a : value mod portable contended many)) 
-                    (f : _ -> _ -> a) (v : a) : a =
-  (TLS.access random_key (fun state -> {global={aliased=f state v}}))
-  .global.aliased
-
-let[@inline] apply_in_range (type (a : value mod portable contended many)) 
-                            (f : _ -> min:a -> max:a -> a) 
-                            ~(min : a) ~(max : a) : a =
-  (TLS.access random_key (fun state -> {global={aliased=f state ~min ~max}}))
-  .global.aliased
+(* CR-someday mslater: this is safe since we do not yield while accessing
+   the state and the state is never shared with other threads. However, using
+   FLS would be required for determinism in the presence of fibers. *)
+let[@inline] apply0 f () = f (Obj.magic_uncontended (TLS.get random_key))
+let[@inline] apply1 f v =  f (Obj.magic_uncontended (TLS.get random_key)) v
+let[@inline] apply_in_range f ~min ~max =
+  f (Obj.magic_uncontended (TLS.get random_key)) ~min ~max
 
 let bits = apply0 State.bits
 let int = apply1 State.int
@@ -396,36 +374,15 @@ let bool = apply0 State.bool
 let bits32 = apply0 State.bits32
 let bits64 = apply0 State.bits64
 let nativebits = apply0 State.nativebits
-
-let full_init (seed : int iarray) = 
-  
-  TLS.access random_key (fun state -> State.reinit state seed);
-  ()
-
-let init seed = full_init [: seed :]
+let full_init seed = apply1 State.reinit seed
+let init seed = full_init [| seed |]
 let self_init () = full_init (random_seed ())
-let full_init seed = full_init (iarray_of_array seed)
 
 (* Splitting *)
 
-let split () =
-  (* Safe because [State.split] is a deep copy. *)
-  (TLS.access random_key 
-    (fun state : State.t Modes.Many.t Modes.Global.t -> 
-      {global={many=Obj.magic_unique (State.split state)}})).global.many
-  |> Obj.magic_uncontended
+let split = apply0 State.split
 
 (* Manipulating the current state. *)
 
-let get_state () =
-  (* Safe because [State.copy] is a deep copy. *)
-  (TLS.access random_key 
-    (fun state : State.t Modes.Many.t Modes.Global.t -> 
-      {global={many=Obj.magic_unique (State.copy state)}})).global.many
-  |> Obj.magic_uncontended
-
-let set_state (s : State.t) = 
-  (* Safe because [State.assign] only reads [s]. *)
-  TLS.access random_key 
-    (fun state -> State.assign state (Obj.magic_uncontended s));
-  ()
+let get_state = apply0 State.copy
+let set_state s = apply1 State.assign s

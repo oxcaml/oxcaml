@@ -15,9 +15,6 @@
 (**************************************************************************)
 
 open! Stdlib
-open Modes.Global
-open Modes.Many
-open Modes.Aliased
 
 [@@@ocaml.flambda_o3]
 
@@ -1024,42 +1021,62 @@ let formatter_of_buffer b =
 let pp_buffer_size = 512
 let pp_make_buffer () = Buffer.create pp_buffer_size
 
-module TLS = Domain.Safe.TLS
+(* The standard (shared) buffer. *)
+let stdbuf = pp_make_buffer ()
+
+(* Predefined formatters standard formatter to print
+   to [Stdlib.stdout], [Stdlib.stderr], and {!stdbuf}. *)
+let std_formatter = formatter_of_out_channel Stdlib.stdout
+and err_formatter = formatter_of_out_channel Stdlib.stderr
+and str_formatter = formatter_of_buffer stdbuf
+
+(* Initialise thread local state *)
+
+module TLS = struct
+  (* CR-someday mslater: directly accessing TLS like this is unsafe.
+     The usage in this file is safe because the accessors do not
+     yield and the contents are never shared with other threads.
+     The functions that expose the TLS contents to users are
+     marked unsafe. Switching to FLS would fix this. *)
+  let new_key = Domain.Safe.TLS.new_key
+  let get = Obj.magic_portable Domain.TLS.get
+  let set = Obj.magic_portable Domain.TLS.set
+end
+
+let stdbuf_key = TLS.new_key pp_make_buffer
+let _ = TLS.set stdbuf_key stdbuf
+
+let str_formatter_key = TLS.new_key (fun () ->
+  formatter_of_buffer (TLS.get stdbuf_key))
+let _ = TLS.set str_formatter_key str_formatter
 
 let buffered_out_string key (str : string) (ofs : int) (len : int) : unit =
-  TLS.access key (fun buf -> Buffer.add_substring buf str ofs len); ()
+  Buffer.add_substring (TLS.get key) str ofs len
 
 let buffered_out_flush oc key () : unit =
-  TLS.access key (fun buf ->
-    let len = Buffer.length buf in
-    let str = Buffer.contents buf in
-    output_substring oc str 0 len ;
-    Stdlib.flush oc;
-    Buffer.clear buf); ()
+  let buf = TLS.get key in
+  let len = Buffer.length buf in
+  let str = Buffer.contents buf in
+  output_substring oc str 0 len ;
+  Stdlib.flush oc;
+  Buffer.clear buf
 
-let str_buf_and_formatter_key = TLS.new_key 
-  (fun () -> 
-    let buf = pp_make_buffer () in
-    buf, formatter_of_buffer buf)
+let std_buf_key = TLS.new_key (fun () -> Buffer.create pp_buffer_size)
 
-let std_buf_key = TLS.new_key pp_make_buffer
-let std_formatter_key = TLS.new_key 
-  ~split_from_parent:(fun _ -> fun () ->
-    let ppf =
-      pp_make_formatter (buffered_out_string std_buf_key)
-        (buffered_out_flush Stdlib.stdout std_buf_key) ignore ignore ignore
-    in
-    ppf.pp_out_newline <- display_newline ppf;
-    ppf.pp_out_spaces <- display_blanks ppf;
-    ppf.pp_out_indent <- display_indent ppf;
-    ppf)
-  (fun () -> formatter_of_out_channel Stdlib.stdout)
+let err_buf_key = TLS.new_key (fun () -> Buffer.create pp_buffer_size)
 
-let () = Domain.Safe.at_exit 
-  (fun () -> TLS.access std_formatter_key (fun st -> pp_print_flush st ()) 
-    [@nontail]) [@nontail]
+let std_formatter_key = TLS.new_key (fun () ->
+  let ppf =
+    pp_make_formatter (buffered_out_string std_buf_key)
+      (buffered_out_flush Stdlib.stdout std_buf_key) ignore ignore ignore
+  in
+  ppf.pp_out_newline <- display_newline ppf;
+  ppf.pp_out_spaces <- display_blanks ppf;
+  ppf.pp_out_indent <- display_indent ppf;
+  Domain.Safe.at_exit (Obj.magic_portable (pp_print_flush ppf));
+  ppf)
+let _ = TLS.set std_formatter_key std_formatter
 
-let err_buf_key = TLS.new_key pp_make_buffer
 let err_formatter_key = TLS.new_key (fun () ->
   let ppf =
     pp_make_formatter (buffered_out_string err_buf_key)
@@ -1068,27 +1085,14 @@ let err_formatter_key = TLS.new_key (fun () ->
   ppf.pp_out_newline <- display_newline ppf;
   ppf.pp_out_spaces <- display_blanks ppf;
   ppf.pp_out_indent <- display_indent ppf;
+  Domain.Safe.at_exit (Obj.magic_portable (pp_print_flush ppf));
   ppf)
+let _ = TLS.set err_formatter_key err_formatter
 
-let () = Domain.Safe.at_exit 
-  (fun () -> TLS.access err_formatter_key (fun st -> pp_print_flush st ()) 
-    [@nontail]) [@nontail]
-
-let unsafe_unwrap_tls k = 
-  (TLS.access k (fun x -> 
-    {global={many={aliased=Obj.magic_portable x}}}))
-  .global.many.aliased
-  |> Obj.magic_uncontended
-
-(* These functions are unsafe. *)
-let get_std_formatter () = unsafe_unwrap_tls std_formatter_key
-let get_err_formatter () = unsafe_unwrap_tls err_formatter_key
-let get_str_formatter () = snd (unsafe_unwrap_tls str_buf_and_formatter_key)
-let get_stdbuf () = fst (unsafe_unwrap_tls str_buf_and_formatter_key)
-let std_formatter = get_std_formatter ()
-let err_formatter = get_err_formatter ()
-let str_formatter = get_str_formatter ()
-let stdbuf = get_stdbuf ()
+let get_std_formatter () = TLS.get std_formatter_key
+let get_err_formatter () = TLS.get err_formatter_key
+let get_str_formatter () = TLS.get str_formatter_key
+let get_stdbuf () = TLS.get stdbuf_key
 
 (* [flush_buffer_formatter buf ppf] flushes formatter [ppf],
    then returns the contents of buffer [buf] that is reset.
@@ -1102,9 +1106,9 @@ let flush_buffer_formatter buf ppf =
 
 (* Flush [str_formatter] and get the contents of [stdbuf]. *)
 let flush_str_formatter () =
-  (TLS.access str_buf_and_formatter_key 
-  (fun (buf,fmt) -> {global={aliased=flush_buffer_formatter buf fmt}}))
-  .global.aliased
+  let stdbuf = TLS.get stdbuf_key in
+  let str_formatter = TLS.get str_formatter_key in
+  flush_buffer_formatter stdbuf str_formatter
 
 let make_synchronized_formatter_safe output flush =
   TLS.new_key (fun () ->
@@ -1194,12 +1198,8 @@ let formatter_of_symbolic_output_buffer sob =
 
 *)
 
-let[@inline] apply1 (type (a : immutable_data)) f v : a = 
-  (TLS.access std_formatter_key (fun fmt -> {global={aliased=f fmt v}}))
-  .global.aliased
-let[@inline] apply2 (type (a : immutable_data)) f v w : a = 
-  (TLS.access std_formatter_key (fun fmt -> {global={aliased=f fmt v w}}))
-  .global.aliased
+let[@inline] apply1 f v = f (TLS.get std_formatter_key) v
+let[@inline] apply2 f v w = f (TLS.get std_formatter_key) v w
 
 let open_hbox = apply1 pp_open_hbox
 and open_vbox = apply1 pp_open_vbox
@@ -1207,11 +1207,7 @@ and open_hvbox = apply1 pp_open_hvbox
 and open_hovbox = apply1 pp_open_hovbox
 and open_box = apply1 pp_open_box
 and close_box = apply1 pp_close_box
-and open_stag stag = 
-  (* CR mslater: ? *)
-  let stag = Obj.magic_portable stag in
-  TLS.access std_formatter_key (fun fmt : unit ->
-    pp_open_stag fmt (Obj.magic_uncontended stag)); ()
+and open_stag = apply1 pp_open_stag
 and close_stag = apply1 pp_close_stag
 and print_as = apply2 pp_print_as
 and print_string = apply1 pp_print_string
@@ -1237,27 +1233,23 @@ and print_tbreak = apply2 pp_print_tbreak
 and set_tab = apply1 pp_set_tab
 and print_tab = apply1 pp_print_tab
 
-and set_margin = apply1 (fun fmt i -> pp_set_margin fmt i)
+and set_margin = apply1 pp_set_margin
 and get_margin = apply1 pp_get_margin
 
-and set_max_indent = apply1 (fun fmt i -> pp_set_max_indent fmt i)
+and set_max_indent = apply1 pp_set_max_indent
 and get_max_indent = apply1 pp_get_max_indent
 
 and set_geometry ~max_indent ~margin =
-  TLS.access std_formatter_key 
-    (fun fmt : unit -> pp_set_geometry fmt ~max_indent ~margin); ()
+  pp_set_geometry (TLS.get std_formatter_key) ~max_indent ~margin
 and safe_set_geometry ~max_indent ~margin =
-  TLS.access std_formatter_key 
-    (fun fmt : unit -> pp_safe_set_geometry fmt ~max_indent ~margin); ()
+  pp_safe_set_geometry (TLS.get std_formatter_key) ~max_indent ~margin
 and get_geometry = apply1 pp_get_geometry
 and update_geometry update =
-  let geometry = TLS.access std_formatter_key 
-    (fun fmt -> {global=pp_get_geometry fmt ()}) in
-  let updated = update geometry.global in
-  TLS.access std_formatter_key 
-    (fun fmt : unit -> pp_set_full_geometry fmt updated); ()
+  let geometry = pp_get_geometry (TLS.get std_formatter_key) () in
+  let updated = update geometry in
+  pp_set_full_geometry (TLS.get std_formatter_key) updated
 
-and set_max_boxes = apply1 (fun fmt i -> pp_set_max_boxes fmt i)
+and set_max_boxes = apply1 pp_set_max_boxes
 and get_max_boxes = apply1 pp_get_max_boxes
 and over_max_boxes = apply1 pp_over_max_boxes
 
@@ -1266,40 +1258,14 @@ and get_ellipsis_text = apply1 pp_get_ellipsis_text
 
 and set_formatter_out_channel = apply1 pp_set_formatter_out_channel
 
-and set_formatter_out_functions fs =
-  (* Safe because get/set out functions is nonportable. *) 
-  let fs = Obj.magic_portable fs in 
-  apply1 pp_set_formatter_out_functions fs
-and get_formatter_out_functions () =
-  (TLS.access std_formatter_key (fun fmt -> 
-    let out_functions = pp_get_formatter_out_functions fmt () in
-    (* Safe because get/set out functions is nonportable. *)
-    {global={aliased={many=Obj.magic_portable out_functions}}}))
-  .global.aliased.many
+and set_formatter_out_functions = apply1 pp_set_formatter_out_functions
+and get_formatter_out_functions = apply1 pp_get_formatter_out_functions
 
-and set_formatter_output_functions f1 f2 =
-  (* Safe because get/set output functions is nonportable. *)
-  let f1 = Obj.magic_portable f1 in
-  let f2 = Obj.magic_portable f2 in 
-  apply2 pp_set_formatter_output_functions f1 f2
-and get_formatter_output_functions () = 
-  (TLS.access std_formatter_key (fun fmt -> 
-    let out_functions = pp_get_formatter_output_functions fmt () in
-    (* Safe because get/set output functions is nonportable. *)
-    {global={aliased={many=Obj.magic_portable out_functions}}}))
-  .global.aliased.many
+and set_formatter_output_functions = apply2 pp_set_formatter_output_functions
+and get_formatter_output_functions = apply1 pp_get_formatter_output_functions
 
-and set_formatter_stag_functions fs = 
-  (* Safe because get/set stag functions is nonportable. *) 
-  let fs = Obj.magic_portable fs in 
-  apply1 pp_set_formatter_stag_functions fs
-and get_formatter_stag_functions () =
-  (TLS.access std_formatter_key (fun fmt -> 
-    let out_functions = pp_get_formatter_stag_functions fmt () in
-    (* Safe because get/set stag functions is nonportable. *) 
-    {global={aliased={many=Obj.magic_portable out_functions}}}))
-  .global.aliased.many
-
+and set_formatter_stag_functions = apply1 pp_set_formatter_stag_functions
+and get_formatter_stag_functions = apply1 pp_get_formatter_stag_functions
 and set_print_tags = apply1 pp_set_print_tags
 and get_print_tags = apply1 pp_get_print_tags
 and set_mark_tags = apply1 pp_set_mark_tags
@@ -1484,19 +1450,13 @@ let ifprintf _ppf (Format (fmt, _)) =
 let fprintf ppf = kfprintf ignore ppf
 
 let printf (Format (fmt, _)) =
-  make_printf (fun acc -> 
-    (* CR mslater: ? *)
-    let acc = Obj.magic_portable acc in
-    TLS.access std_formatter_key (fun fmt : unit ->
-      output_acc fmt acc); ())
+  make_printf
+    (fun acc -> output_acc (TLS.get std_formatter_key) acc)
     End_of_acc fmt
 
 let eprintf (Format (fmt, _)) =
-  make_printf (fun acc ->
-    (* CR mslater: ? *)
-    let acc = Obj.magic_portable acc in
-    TLS.access err_formatter_key (fun fmt : unit ->
-      output_acc fmt acc); ())
+  make_printf
+    (fun acc -> output_acc (TLS.get err_formatter_key) acc)
     End_of_acc fmt
 
 let kdprintf k (Format (fmt, _)) =
@@ -1530,37 +1490,26 @@ let asprintf fmt = kasprintf id fmt
 
 module Safe = struct
   let make_synchronized_formatter = make_synchronized_formatter_safe
-  let with_std_formatter f = exclave_ TLS.access std_formatter_key f
-  let with_err_formatter f = exclave_ TLS.access err_formatter_key f
-  let with_stdbuf f = exclave_
-    TLS.access str_buf_and_formatter_key (fun (buf,_) -> exclave_ f buf) 
-    [@nontail]
-  let with_str_formatter f = exclave_
-    TLS.access str_buf_and_formatter_key (fun (_,fmt) -> exclave_ f fmt) 
-    [@nontail]
 end
 let make_synchronized_formatter = make_synchronized_formatter_unsafe
 
 (* Flushing standard formatters at end of execution. *)
 
 let flush_standard_formatters () =
-  TLS.access std_formatter_key (fun fmt -> pp_print_flush fmt ());
-  TLS.access err_formatter_key (fun fmt -> pp_print_flush fmt ());
-  ()
+  pp_print_flush (TLS.get std_formatter_key) ();
+  pp_print_flush (TLS.get err_formatter_key) ()
 
 let () = at_exit flush_standard_formatters
 
 let () = Domain.before_first_spawn (fun () ->
   flush_standard_formatters ();
-  TLS.access std_formatter_key (fun fmt ->
-    let fs = pp_get_formatter_out_functions fmt () in
-    pp_set_formatter_out_functions fmt
-      {fs with out_string = buffered_out_string std_buf_key;
-              out_flush = buffered_out_flush Stdlib.stdout std_buf_key});
-  TLS.access err_formatter_key (fun fmt ->
-    let fs = pp_get_formatter_out_functions fmt () in
-    pp_set_formatter_out_functions fmt
-      {fs with out_string = buffered_out_string err_buf_key;
-              out_flush = buffered_out_flush Stdlib.stderr err_buf_key});
-  ()
+  let fs = pp_get_formatter_out_functions std_formatter () in
+  pp_set_formatter_out_functions std_formatter
+    {fs with out_string = buffered_out_string std_buf_key;
+             out_flush = buffered_out_flush Stdlib.stdout std_buf_key};
+
+  let fs = pp_get_formatter_out_functions err_formatter () in
+  pp_set_formatter_out_functions err_formatter
+    {fs with out_string = buffered_out_string err_buf_key;
+             out_flush = buffered_out_flush Stdlib.stderr err_buf_key};
 )

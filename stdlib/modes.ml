@@ -32,10 +32,6 @@ module Aliased = struct
   type 'a t = { aliased : 'a @@ aliased } [@@unboxed]
 end
 
-module Many = struct
-  type 'a t = { many : 'a @@ many } [@@unboxed]
-end
-
 module Shared = struct
   type 'a t = { shared : 'a @@ shared } [@@unboxed]
 end
