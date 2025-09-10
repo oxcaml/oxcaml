@@ -461,9 +461,12 @@ module Mod_bounds = struct
 
   let less_or_equal t1 t2 =
     let[@inline] modal_less_or_equal ax : Sub_result.t =
-      let a = t1 |> crossing |> Crossing.proj ax in
-      let b = t2 |> crossing |> Crossing.proj ax in
-      match Crossing.Per_axis.le ax a b, Crossing.Per_axis.le ax b a with
+      let a = t1 |> crossing |> (Crossing.proj [@inlined hint]) ax in
+      let b = t2 |> crossing |> (Crossing.proj [@inlined hint]) ax in
+      match
+        ( (Crossing.Per_axis.le [@inlined hint]) ax a b,
+          (Crossing.Per_axis.le [@inlined hint]) ax b a )
+      with
       | true, true -> Equal
       | true, false -> Less
       | false, _ -> Not_le [Axis_disagreement (Pack (Modal ax))]
@@ -502,7 +505,7 @@ module Mod_bounds = struct
 
   let[@inline] get (type a) ~(axis : a Axis.t) t : a =
     match axis with
-    | Modal ax -> t |> crossing |> Crossing.proj ax
+    | Modal ax -> t |> crossing |> (Crossing.proj [@inlined hint]) ax
     | Nonmodal Externality -> externality t
     | Nonmodal Nullability -> nullability t
     | Nonmodal Separability -> separability t
@@ -513,7 +516,9 @@ module Mod_bounds = struct
       if b then Axis_set.add axis_set ax else axis_set
     in
     let[@inline] add_crossing_if ax axis_set =
-      if Crossing.Per_axis.(le ax (max ax) (Crossing.proj ax (crossing t)))
+      if Crossing.Per_axis.(
+           (le [@inlined hint]) ax ((max [@inlined hint]) ax)
+             ((Crossing.proj [@inlined hint]) ax (crossing t)))
       then Axis_set.add axis_set (Modal ax)
       else axis_set
     in
@@ -1038,7 +1043,7 @@ module Layout_and_axes = struct
               let value_for_axis (type a) ~(axis : a Axis.t) : a =
                 if Axis_set.mem relevant_axes axis
                 then
-                  Per_axis.join axis (Mod_bounds.get ~axis b1)
+                  (Per_axis.join [@inlined hint]) axis (Mod_bounds.get ~axis b1)
                     (Mod_bounds.get ~axis b2)
                 else Mod_bounds.get ~axis b1
               in
