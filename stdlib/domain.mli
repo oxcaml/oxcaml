@@ -236,6 +236,13 @@ module Safe : sig @@ portable
 
     val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
     (** Like {!TLS.set}, but safe to use in the presence of multiple domains. *)
+
+    val access 
+      : 'a key 
+      -> ('a -> 'b @ contended local once portable unique) 
+         @ local once portable unyielding 
+      -> 'b @ contended local once portable unique
+    (** Compute a value using the contents of TLS. *)
   end
 
   val spawn : (unit -> 'a) @ portable once -> 'a t

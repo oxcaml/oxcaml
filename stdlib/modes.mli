@@ -41,6 +41,10 @@ module Aliased : sig
   type 'a t = { aliased : 'a @@ aliased } [@@unboxed]
 end
 
+module Many : sig
+  type 'a t = { many : 'a @@ many } [@@unboxed]
+end
+
 module Shared : sig
   type 'a t = { shared : 'a @@ shared } [@@unboxed]
 end

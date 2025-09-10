@@ -209,4 +209,11 @@ module TLS : sig @@ portable
 
    val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
    (** Like {!DLS.set}, but sets the value for the current thread. *)
+
+   val access 
+   : 'a key 
+   -> ('a -> 'b @ contended local once portable unique) 
+      @ local once portable unyielding 
+   -> 'b @ contended local once portable unique
+   (** Compute a value using the contents of TLS. *)
 end

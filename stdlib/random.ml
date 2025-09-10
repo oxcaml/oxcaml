@@ -17,11 +17,17 @@
 (* Pseudo-random number generator *)
 
 open! Stdlib
-module DLS = Domain.Safe.DLS
 
 [@@@ocaml.flambda_o3]
 
-external random_seed: unit -> int array @@ portable = "caml_sys_random_seed"
+external iarray_length 
+  : 'a iarray -> int @@ portable = "%array_length"
+external iarray_of_array 
+  : 'a array -> 'a iarray @@ portable = "%array_to_iarray"
+external iarray_get 
+  : 'a iarray -> int -> 'a @@ portable = "%array_safe_get"
+external random_seed 
+  : unit -> int iarray @@ portable = "caml_sys_random_seed"
 
 module State = struct
 
@@ -99,10 +105,11 @@ module State = struct
      sequence with MD5 (Digest.bytes).  MD5 gives only 128 bits while
      we need 256 bits, so we hash twice with different suffixes. *)
   let reinit s seed =
-    let n = Array.length seed in
+    let n = iarray_length seed in
     let b = Bytes.create (n * 8 + 1) in
     for i = 0 to n-1 do
-      Bytes.set_int64_le b (i * 8) (Int64.of_int seed.(i))
+      let s = iarray_get seed i in
+      Bytes.set_int64_le b (i * 8) (Int64.of_int s)
     done;
     Bytes.set b (n * 8) '\x01';
     let d1 = Digest.bytes b in
@@ -118,6 +125,8 @@ module State = struct
 
   let make_self_init () =
     make (random_seed ())
+
+  let make seed = make (iarray_of_array seed)
 
   let min_int31 = -0x4000_0000
       (* = -2{^30}, which is [min_int] for 31-bit integers *)
@@ -341,23 +350,36 @@ let mk_default () =
            586573249833713189L
            (-8591268803865043407L)
            6388613595849772044L
+
+open Modes.Global
+open Modes.Aliased
+open Modes.Many
+(* CR-someday mslater: using FLS is required for determinism. *)
+module TLS = Domain.Safe.TLS
+
 let random_key =
-  DLS.new_key
+  TLS.new_key
     ~split_from_parent:(fun s ->
       let s = State.split s in
-      (* Safe because [s] is an independent copy. *)
+      (* Safe because [State.split] is a deep copy. *)
       (fun () -> Obj.magic_uncontended s))
     mk_default
 
-(* CR-someday mslater: using DLS means all threads in a domain share state.
-   This is safe because we cannot switch threads during [bits]. However, this
-   means the sequence is nondeterministic in the presence of threads. We could
-   use TLS instead, but we cannot depend on [Thread] in the stdlib. Ideally,
-   this should use FLS, which would be deterministic and non-magical. *)
-let[@inline] apply0 f () = f (Obj.magic_uncontended (DLS.get random_key))
-let[@inline] apply1 f v =  f (Obj.magic_uncontended (DLS.get random_key)) v
-let[@inline] apply_in_range f ~min ~max =
-  f (Obj.magic_uncontended (DLS.get random_key)) ~min ~max
+let[@inline] apply0 (type (a : value mod portable contended many)) 
+                    (f : _ -> a) () : a =
+  (TLS.access random_key (fun state -> {global={aliased=f state}}))
+  .global.aliased
+
+let[@inline] apply1 (type (a : value mod portable contended many)) 
+                    (f : _ -> _ -> a) (v : a) : a =
+  (TLS.access random_key (fun state -> {global={aliased=f state v}}))
+  .global.aliased
+
+let[@inline] apply_in_range (type (a : value mod portable contended many)) 
+                            (f : _ -> min:a -> max:a -> a) 
+                            ~(min : a) ~(max : a) : a =
+  (TLS.access random_key (fun state -> {global={aliased=f state ~min ~max}}))
+  .global.aliased
 
 let bits = apply0 State.bits
 let int = apply1 State.int
@@ -374,15 +396,36 @@ let bool = apply0 State.bool
 let bits32 = apply0 State.bits32
 let bits64 = apply0 State.bits64
 let nativebits = apply0 State.nativebits
-let full_init seed = apply1 State.reinit seed
-let init seed = full_init [| seed |]
+
+let full_init (seed : int iarray) = 
+  
+  TLS.access random_key (fun state -> State.reinit state seed);
+  ()
+
+let init seed = full_init [: seed :]
 let self_init () = full_init (random_seed ())
+let full_init seed = full_init (iarray_of_array seed)
 
 (* Splitting *)
 
-let split = apply0 State.split
+let split () =
+  (* Safe because [State.split] is a deep copy. *)
+  (TLS.access random_key 
+    (fun state : State.t Modes.Many.t Modes.Global.t -> 
+      {global={many=Obj.magic_unique (State.split state)}})).global.many
+  |> Obj.magic_uncontended
 
 (* Manipulating the current state. *)
 
-let get_state = apply0 State.copy
-let set_state s = apply1 State.assign s
+let get_state () =
+  (* Safe because [State.copy] is a deep copy. *)
+  (TLS.access random_key 
+    (fun state : State.t Modes.Many.t Modes.Global.t -> 
+      {global={many=Obj.magic_unique (State.copy state)}})).global.many
+  |> Obj.magic_uncontended
+
+let set_state (s : State.t) = 
+  (* Safe because [State.assign] only reads [s]. *)
+  TLS.access random_key 
+    (fun state -> State.assign state (Obj.magic_uncontended s));
+  ()

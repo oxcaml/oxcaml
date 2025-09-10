@@ -604,7 +604,10 @@ end
 module Safe = struct
   (* Note the exposed signature of [get] and [set] add modes for safety. *)
   module DLS = DLS
-  module TLS = TLS0
+  module TLS = struct 
+    include TLS0
+    let[@inline] access key f = exclave_ f (get key)
+  end
   
   let spawn f = 
     let tls_keys = TLS.Private.get_initial_keys () in
