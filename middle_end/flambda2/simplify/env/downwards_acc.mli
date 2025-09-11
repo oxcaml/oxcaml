@@ -139,14 +139,6 @@ val with_continuation_lifting_budget : t -> int -> t
 
 val decrease_continuation_lifting_budget : t -> int -> t
 
-val get_continuation_specialization_budget : t -> int
-
-val reset_continuation_specialization_budget : t -> t
-
-val with_continuation_specialization_budget : t -> int -> t
-
-val decrease_continuation_specialization_budget : t -> int -> t
-
 val prepare_for_speculative_inlining : t -> t
 
 val continuations_to_specialize : t -> Continuation.Set.t
