@@ -178,6 +178,7 @@ module Flambda2 = struct
     let reaper_change_calling_conventions = true
     let unicode = true
     let kind_checks = false
+    let match_in_match = false
   end
 
   type flags = {
@@ -197,6 +198,7 @@ module Flambda2 = struct
     reaper_change_calling_conventions : bool;
     unicode : bool;
     kind_checks : bool;
+    match_in_match : bool;
   }
 
   let default = {
@@ -217,6 +219,7 @@ module Flambda2 = struct
       Default.reaper_change_calling_conventions;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
+    match_in_match = Default.match_in_match;
   }
 
   let oclassic = {
@@ -235,7 +238,7 @@ module Flambda2 = struct
 
   let o3 = {
     o2 with
-    function_result_types = Functors_only
+    function_result_types = Functors_only;
   }
 
   let o4 = {
@@ -263,6 +266,7 @@ module Flambda2 = struct
   let reaper_unbox = ref Default
   let reaper_max_unbox_size = ref Default
   let reaper_change_calling_conventions = ref Default
+  let match_in_match = ref Default
 
   module Dump = struct
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
@@ -292,8 +296,8 @@ module Flambda2 = struct
       let can_inline_recursive_functions = false
       let max_function_simplify_run = 2
       let shorten_symbol_names = false
-      let cont_lifting_budget = 0 (* possible future value: 200 *)
-      let cont_spec_budget = 0 (* possible future value: 20 *)
+      let cont_lifting_budget = 0
+      let cont_spec_threshold = -1.
     end
 
     type flags = {
@@ -307,7 +311,7 @@ module Flambda2 = struct
       max_function_simplify_run : int;
       shorten_symbol_names : bool;
       cont_lifting_budget : int;
-      cont_spec_budget : int;
+      cont_spec_threshold : float;
     }
 
     let default = {
@@ -321,7 +325,7 @@ module Flambda2 = struct
       max_function_simplify_run = Default.max_function_simplify_run;
       shorten_symbol_names = Default.shorten_symbol_names;
       cont_lifting_budget = Default.cont_lifting_budget;
-      cont_spec_budget = Default.cont_spec_budget;
+      cont_spec_threshold = Default.cont_spec_threshold;
     }
 
     let oclassic = {
@@ -333,9 +337,16 @@ module Flambda2 = struct
     let o2 = {
       default with
       fallback_inlining_heuristic = false;
+      cont_lifting_budget = 100;
+      cont_spec_threshold = 0.;
     }
 
-    let o3 = default
+    let o3 = {
+      default with
+      cont_lifting_budget = 1_000;
+      (* in the worst case : 1_000 budget -> ~+18% compilation time *)
+      cont_spec_threshold = 0.;
+    }
 
     let o4 = default
 
@@ -352,7 +363,7 @@ module Flambda2 = struct
     let max_function_simplify_run = ref Default
     let shorten_symbol_names = ref Default
     let cont_lifting_budget = ref Default
-    let cont_spec_budget = ref Default
+    let cont_spec_threshold = ref Default
   end
 
   module Debug = struct

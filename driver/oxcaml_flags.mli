@@ -154,6 +154,7 @@ module Flambda2 : sig
     val reaper_change_calling_conventions : bool
     val unicode : bool
     val kind_checks : bool
+    val match_in_match : bool
   end
 
   (* CR-someday lmaurer: We could eliminate most of the per-flag boilerplate using GADTs
@@ -176,6 +177,7 @@ module Flambda2 : sig
     reaper_change_calling_conventions : bool;
     unicode : bool;
     kind_checks : bool;
+    match_in_match : bool;
   }
 
   val default_for_opt_level : opt_level or_default -> flags
@@ -197,6 +199,7 @@ module Flambda2 : sig
   val reaper_change_calling_conventions : bool or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
+  val match_in_match : bool or_default ref
 
   module Dump : sig
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
@@ -227,7 +230,7 @@ module Flambda2 : sig
       val max_function_simplify_run : int
       val shorten_symbol_names : bool
       val cont_lifting_budget : int
-      val cont_spec_budget : int
+      val cont_spec_threshold : float
     end
 
     type flags = {
@@ -241,7 +244,7 @@ module Flambda2 : sig
       max_function_simplify_run : int;
       shorten_symbol_names : bool;
       cont_lifting_budget : int;
-      cont_spec_budget : int;
+      cont_spec_threshold : float;
     }
 
     val default_for_opt_level : opt_level or_default -> flags
@@ -256,7 +259,7 @@ module Flambda2 : sig
     val max_function_simplify_run : int or_default ref
     val shorten_symbol_names : bool or_default ref
     val cont_lifting_budget : int or_default ref
-    val cont_spec_budget : int or_default ref
+    val cont_spec_threshold : float or_default ref
   end
 
   module Debug : sig
