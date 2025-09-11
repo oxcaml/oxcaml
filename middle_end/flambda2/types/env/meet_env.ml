@@ -303,3 +303,7 @@ let cut env ~cut_after = TE.cut (typing_env env) ~cut_after
 
 let cut_as_extension env ~cut_after =
   TE.cut_as_extension (typing_env env) ~cut_after
+
+let add_variable_definition env var kind name_mode =
+  map_typing_env env ~f:(fun env ->
+      TE.add_variable_definition env var kind name_mode)
