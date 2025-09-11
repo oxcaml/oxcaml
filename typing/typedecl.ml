@@ -1499,28 +1499,30 @@ let narrow_to_manifest_jkind env loc decl =
        [constrain_type_jkind] over the [l]-ness of its bound. But probably not
        until we have proper subsumption working, as this hack will likely hold
        up for a little while. Internal ticket 5115. *)
-    begin match Jkind.try_allow_r decl.type_jkind with
-    | None -> begin
+    begin match !Clflags.ikinds, Jkind.try_allow_r decl.type_jkind with
+    | true, _ | false, None ->
+        (* Under -ikinds, or when [decl.type_jkind] cannot allow-right
+           (e.g. due to with-bounds/Best), route through Ikind. *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
-        match
-          Ikind.sub_jkind_l
-            ~origin:(Format.asprintf
-                       "typedecl:manifest_vs_decl %a"
-                       Location.print_loc decl.type_loc)
-            ~type_equal
-            ~context
-            manifest_jkind
-            decl.type_jkind
-        with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v)))
-      end
-    | Some type_jkind -> begin
-        match Ctype.constrain_type_jkind env ty type_jkind with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v)))
-      end
+        (match
+           Ikind.sub_jkind_l
+             ~origin:(Format.asprintf
+                        "typedecl:manifest_vs_decl %a"
+                        Location.print_loc decl.type_loc)
+             ~type_equal
+             ~context
+             manifest_jkind
+             decl.type_jkind
+         with
+         | Ok () -> ()
+         | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v))))
+    | false, Some type_jkind ->
+        (* Legacy path: refine via [constrain_type_jkind] when ikinds disabled
+           and we can allow-right. *)
+        (match Ctype.constrain_type_jkind env ty type_jkind with
+         | Ok () -> ()
+         | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v))))
     end;
     { decl with type_jkind = manifest_jkind }
 
