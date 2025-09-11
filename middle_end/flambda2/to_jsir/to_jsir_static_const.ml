@@ -195,10 +195,10 @@ let block_like ~env ~res symbol (const : Static_const.t) =
        CR-someday selee: Technically the tag should differ based on the array
        type, but there is no way to differentiate between a normal array and a
        float array anyway (in [Empty_array_kind.t]) and so even [ocamlopt]
-       doesn't put the float array tag, and our implementation here is also the
-       behaviour of upstream JSOO. This therefore seems unimportant enough to
-       warrant a new JSOO primitive taking in a tag, but maybe it's still worth
-       fixing in the future. *)
+       doesn't put the float array tag; moreover, our implementation here is
+       also the behaviour of upstream JSOO. This therefore doesn't seem
+       important enough to warrant a new JSOO primitive taking in a tag, but
+       maybe it's still worth fixing in the future just for uniformity. *)
     bind_expr_to_symbol ~env ~res symbol
       (Prim (Extern "caml_make_vect", [Pc (Int Targetint.zero); Pc Null]))
   | Mutable_string { initial_value } ->
