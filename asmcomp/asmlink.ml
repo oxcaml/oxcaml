@@ -527,7 +527,9 @@ let call_linker file_list_rev startup_file output_name =
     else Ccomp.Exe
   in
   (* Determine if we need to use a temporary file for objcopy workflow *)
+  (* We disable the objcopy workflow if the output is piped to /dev/null. *)
   let needs_objcopy_workflow =
+    not (String.equal output_name "/dev/null") &&
     !Clflags.dwarf_fission = Clflags.Fission_objcopy &&
     not (Target_system.is_macos ()) &&
     mode = Ccomp.Exe &&
@@ -591,7 +593,8 @@ let call_linker file_list_rev startup_file output_name =
     | Fission_dsymutil ->
       if not (Target_system.is_macos ()) then
         raise (Error(Dwarf_fission_dsymutil_not_macos))
-      else if mode = Ccomp.Exe &&
+      else if not (String.equal output_name "/dev/null") &&
+              mode = Ccomp.Exe &&
               not !Dwarf_flags.restrict_to_upstream_dwarf then
         (* Run dsymutil on the executable *)
         let dsymutil_cmd =
