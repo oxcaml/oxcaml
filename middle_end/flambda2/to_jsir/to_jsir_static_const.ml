@@ -190,7 +190,15 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     (* [Empty_array takes in the kind because native code has different
        representation for arrays of unboxed numbers such as int32 and int64;
        however, in JSIR, they are uniformly represented as JavaScript arrays,
-       and so the kind can safely be ignored. *)
+       and so the kind can safely be ignored.
+
+       CR-someday selee: Technically the tag should differ based on the array
+       type, but there is no way to differentiate between a normal array and a
+       float array anyway (in [Empty_array_kind.t]) and so even [ocamlopt]
+       doesn't put the float array tag, and our implementation here is also the
+       behaviour of upstream JSOO. This therefore seems unimportant enough to
+       warrant a new JSOO primitive taking in a tag, but maybe it's still worth
+       fixing in the future. *)
     bind_expr_to_symbol ~env ~res symbol
       (Prim (Extern "caml_make_vect", [Pc (Int Targetint.zero); Pc Null]))
   | Mutable_string { initial_value } ->
