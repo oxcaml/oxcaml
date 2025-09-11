@@ -557,10 +557,17 @@ static value caml_thread_init_current(value unit)
 
 static value caml_thread_init_main_thread(value unit)
 {
-  if (curr_thread != NULL) return Val_unit;
+  if (caml_threads_initialized) return Val_unit;
   caml_thread_init_current(unit);
-  // Leaks at most one descriptor
   caml_register_generational_global_root(&curr_thread->descr);
+  return Val_unit;
+}
+
+static value caml_thread_destroy_main_thread(value unit)
+{
+  if (caml_threads_initialized) return Val_unit;
+  caml_remove_generational_global_root(&curr_thread->descr);
+  caml_stat_free(curr_thread);
   return Val_unit;
 }
 
@@ -570,7 +577,6 @@ CAMLprim value caml_thread_initialize(value unit)   /* ML */
 {
   /* Protect against repeated initialization (PR#3532) */
   if (caml_threads_initialized) return Val_unit;
-  caml_threads_initialized = 1;
   /* OS-specific initialization */
   st_initialize();
   /* Initialize and acquire the master lock */
@@ -611,6 +617,7 @@ CAMLprim value caml_thread_initialize(value unit)   /* ML */
   /* Set up fork() to reinitialize the thread machinery in the child
      (PR#4577) */
   st_atfork(caml_thread_reinitialize);
+  caml_threads_initialized = 1;
   return Val_unit;
 }
 
@@ -871,6 +878,7 @@ extern value (*caml_thread_has_tls_state_stub)(value unit);
 extern value (*caml_thread_get_state_stub)(value unit);
 extern value (*caml_thread_set_state_stub)(value state);
 extern value (*caml_thread_init_main_thread_stub)(value unit);
+extern value (*caml_thread_destroy_main_thread_stub)(value unit);
 
 __attribute__((constructor))
 static void caml_install_tls_functions(void) {
@@ -878,6 +886,7 @@ static void caml_install_tls_functions(void) {
   caml_thread_get_state_stub = &caml_thread_get_state;
   caml_thread_set_state_stub = &caml_thread_set_state;
   caml_thread_init_main_thread_stub = &caml_thread_init_main_thread;
+  caml_thread_destroy_main_thread_stub = &caml_thread_destroy_main_thread;
 }
 
 /* Return the identifier of a thread */

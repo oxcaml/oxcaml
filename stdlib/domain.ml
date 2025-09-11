@@ -584,8 +584,7 @@ module TLS0 = struct
 
   module Private = struct
       type keys = Impl.key_value list
-      external init_main_thread
-        : unit -> unit @@ portable = "caml_thread_init_main_thread"
+
       let[@inline] init () =
         if has_tls_state then Impl.init ()
       let[@inline] get_initial_keys () =
@@ -593,10 +592,18 @@ module TLS0 = struct
       let[@inline] set_initial_keys keys =
         if has_tls_state then Impl.set_initial_keys keys
 
-      (* If TLS is supported, we need to initialize it here, since [Thread]
-         might never be loaded. *)
+      external init_main_thread
+        : unit -> unit @@ portable = "caml_thread_init_main_thread"
+      external destroy_main_thread
+        : unit -> unit @@ portable = "caml_thread_destroy_main_thread"
+
       let[@inline] init_main_thread () =
         if has_tls_state then (init_main_thread (); init ())
+      let[@inline] destroy_main_thread () =
+        if has_tls_state then destroy_main_thread ()
+
+      (* Initialize TLS state for the main thread, since [Thread] might never 
+         be loaded. We don't destroy it since existing exit fns may use TLS. *)
       let () = init_main_thread ()
   end
 end
@@ -609,7 +616,10 @@ module Safe = struct
   let spawn f =
     let tls_keys = TLS.Private.get_initial_keys () in
     spawn (fun () ->
+      (* Initialize and destroy TLS state for the main thread, since [Thread] 
+         might never be loaded. *)
       TLS.Private.init_main_thread ();
+      at_exit TLS.Private.destroy_main_thread;
       TLS.Private.set_initial_keys tls_keys;
       f ()) [@nontail]
 

@@ -137,6 +137,13 @@ CAMLprim value caml_thread_init_main_thread(value unit)
   caml_failwith("caml_thread_init_main_thread: TLS is not supported without the [threads] library.");
 }
 
+value (*caml_thread_destroy_main_thread_stub)(value unit);
+CAMLprim value caml_thread_destroy_main_thread(value unit)
+{
+  if(caml_thread_destroy_main_thread_stub) return caml_thread_destroy_main_thread_stub(unit);
+  caml_failwith("caml_thread_destroy_main_thread: TLS is not supported without the [threads] library.");
+}
+
 /* Dummy implementations to enable [Stdlib.Domain] to link. */
 
 CAMLprim value caml_recommended_domain_count(void)

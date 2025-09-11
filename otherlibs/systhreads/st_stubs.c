@@ -681,10 +681,17 @@ static value caml_thread_init_current(value unit)
 
 static value caml_thread_init_main_thread(value unit)
 {
-  if (This_thread != NULL) return Val_unit;
+  if (threads_initialized) return Val_unit;
   caml_thread_init_current(unit);
-  // Leaks at most one descriptor per domain
   caml_register_generational_global_root(&This_thread->descr);
+  return Val_unit;
+}
+
+static value caml_thread_destroy_main_thread(value unit)
+{
+  if (threads_initialized) return Val_unit;
+  caml_remove_generational_global_root(&This_thread->descr);
+  caml_stat_free(This_thread);
   return Val_unit;
 }
 
@@ -1039,6 +1046,7 @@ extern value (*caml_thread_has_tls_state_stub)(value unit);
 extern value (*caml_thread_get_state_stub)(value unit);
 extern value (*caml_thread_set_state_stub)(value state);
 extern value (*caml_thread_init_main_thread_stub)(value unit);
+extern value (*caml_thread_destroy_main_thread_stub)(value unit);
 
 __attribute__((constructor))
 static void caml_install_tls_functions(void) {
@@ -1046,6 +1054,7 @@ static void caml_install_tls_functions(void) {
   caml_thread_get_state_stub = &caml_thread_get_state;
   caml_thread_set_state_stub = &caml_thread_set_state;
   caml_thread_init_main_thread_stub = &caml_thread_init_main_thread;
+  caml_thread_destroy_main_thread_stub = &caml_thread_destroy_main_thread;
 }
 
 /* Return the identifier of a thread */
