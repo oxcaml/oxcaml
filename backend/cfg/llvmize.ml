@@ -26,6 +26,1435 @@ type error = Asm_generation of (string * int)
 
 exception Error of error
 
+let fail name = Misc.fatal_errorf "Llvmize.%s" name
+
+let fail_msg ?name fmt =
+  let name = match name with Some name -> "." ^ name | None -> "" in
+  Format.kasprintf (fun msg -> Misc.fatal_errorf "Llvmize%s: %s" name msg) fmt
+
+let fail_if_not ?msg name cond =
+  if not cond
+  then match msg with None -> fail name | Some msg -> fail_msg ~name "%s" msg
+
+(* Common formatting operations *)
+module F = struct
+  include Format
+
+  (* The basics *)
+
+  let pp_indent ppf () = fprintf ppf "  "
+
+  let pp_comma ppf () = fprintf ppf ", "
+
+  let pp_comment ppf s = fprintf ppf "; %s" s
+
+  let pp_line ?(num_indents = 0) ?comment ppf =
+    (pp_print_list pp_indent) ppf (List.init num_indents (fun _ -> ()));
+    kfprintf
+      (fun ppf ->
+        match comment with
+        | None -> fprintf ppf "\n"
+        | Some comment -> fprintf ppf " %s\n" comment)
+      ppf
+
+  let pp_ins ppf = pp_line ~num_indents:1 ppf
+
+  (* Comment insertion *)
+
+  let do_if_comments_enabled f = if !Oxcaml_flags.dasm_comments then f ()
+
+  let pp_dbginfo ppf dbg =
+    if Debuginfo.is_none dbg
+    then ()
+    else fprintf ppf "[ %a ]" Debuginfo.print_compact dbg
+
+  let pp_dbg_comment ~newline ppf name dbg =
+    do_if_comments_enabled (fun () ->
+        match newline with
+        | true -> pp_line ppf "; %s %a" name pp_dbginfo dbg
+        | false -> fprintf ppf "; %s %a" name pp_dbginfo dbg)
+
+  let pp_dbg_instr_aux pp_instr ppf ins =
+    do_if_comments_enabled (fun () ->
+        pp_indent ppf ();
+        (* Replace newlines since this is a line comment *)
+        let instr_str =
+          asprintf "%a" pp_instr ins
+          |> String.map (function '\n' -> ' ' | c -> c)
+        in
+        pp_line ppf "; %s %a" instr_str pp_dbginfo ins.Cfg.dbg)
+
+  let pp_dbg_instr_basic = pp_dbg_instr_aux Cfg.print_basic
+
+  let pp_dbg_instr_terminator = pp_dbg_instr_aux Cfg.print_terminator
+end
+
+module Llvm_ir = struct
+  module Type = struct
+    type t =
+      (* Integral types *)
+      | Int of { width_in_bits : int }
+      | Ptr of { addrspace : string option }
+      (* Floating point types *)
+      | Float (* 32-bit *)
+      | Double (* 64 bit *)
+      (* Aggregate types *)
+      | Struct of t list
+      | Array of
+          { size : int;
+            elem_type : t
+          }
+      | Vector of
+          { size : int;
+            elem_type : t
+          }
+      (* Non-first-class types *)
+      | Label
+      | Token
+      | Metadata
+
+    let i128 = Int { width_in_bits = 128 }
+
+    let i64 = Int { width_in_bits = 64 }
+
+    let i32 = Int { width_in_bits = 32 }
+
+    let i16 = Int { width_in_bits = 16 }
+
+    let i8 = Int { width_in_bits = 8 }
+
+    let i1 = Int { width_in_bits = 1 }
+
+    let float = Float
+
+    let double = Double
+
+    let ptr = Ptr { addrspace = None }
+
+    let val_ptr = Ptr { addrspace = Some "1" }
+
+    let doublex2 = Vector { size = 2; elem_type = double }
+
+    let label = Label
+
+    let of_machtype_component (c : Cmm.machtype_component) =
+      match c with
+      | Int -> i64
+      | Val -> val_ptr
+      | Addr ->
+        val_ptr
+        (* We interpret [Addr]s as [val_ptr]s to let the RS4GC pass in LLVM to
+           handle derived pointers for us. *)
+      | Float -> double
+      | Float32 -> float
+      | Vec128 | Vec256 | Vec512 | Valx2 ->
+        fail_msg ~name:"Type.of_machtype_component" "not_implemented"
+
+    let of_reg (reg : Reg.t) = of_machtype_component reg.typ
+
+    let of_float_width (width : Cmm.float_width) =
+      match width with Float64 -> Double | Float32 -> Float
+
+    let rec pp_t ppf t =
+      let open F in
+      match t with
+      | Int { width_in_bits } -> fprintf ppf "i%d" width_in_bits
+      | Float -> fprintf ppf "float"
+      | Double -> fprintf ppf "double"
+      | Ptr { addrspace } -> (
+        fprintf ppf "ptr";
+        match addrspace with
+        | Some addrspace -> fprintf ppf " addrspace(%s)" addrspace
+        | None -> ())
+      | Struct typs ->
+        fprintf ppf "{ %a }"
+          (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ", ") pp_t)
+          typs
+      | Array { size; elem_type } ->
+        fprintf ppf "[ %d x %a ]" size pp_t elem_type
+      | Vector { size; elem_type } ->
+        fprintf ppf "< %d x %a >" size pp_t elem_type
+      | Label -> fprintf ppf "label"
+      | Token -> fprintf ppf "token"
+      | Metadata -> fprintf ppf "metadata"
+
+    let to_string t = Format.asprintf "%a" pp_t t
+
+    let rec equal t1 t2 =
+      match t1, t2 with
+      | Int { width_in_bits = x }, Int { width_in_bits = y } -> x = y
+      | Ptr { addrspace = x }, Ptr { addrspace = y } ->
+        Option.equal String.equal x y
+      | Float, Float | Double, Double -> true
+      | Struct xs, Struct ys -> List.equal equal xs ys
+      | ( Array { size = size1; elem_type = typ1 },
+          Array { size = size2; elem_type = typ2 } ) ->
+        size1 = size2 && equal typ1 typ2
+      | ( Vector { size = size1; elem_type = typ1 },
+          Vector { size = size2; elem_type = typ2 } ) ->
+        size1 = size2 && equal typ1 typ2
+      | Label, Label | Token, Token | Metadata, Metadata -> true
+      | ( ( Int _ | Float | Double | Ptr _ | Struct _ | Array _ | Vector _
+          | Label | Token | Metadata ),
+          _ ) ->
+        false
+
+    let get_struct_elements = function
+      | Struct elems -> Some elems
+      | Int _ | Ptr _ | Float | Double | Array _ | Vector _ | Label | Token
+      | Metadata ->
+        None
+
+    let rec extract_struct t indices =
+      match indices with
+      | [] -> Some t
+      | i :: rest -> (
+        match get_struct_elements t with
+        | Some elems ->
+          Option.bind (List.nth_opt elems i) (fun elem ->
+              extract_struct elem rest)
+        | None -> None)
+
+    let elem_type = function
+      | Array { elem_type; _ } | Vector { elem_type; _ } -> Some elem_type
+      | Int _ | Ptr _ | Float | Double | Struct _ | Label | Token | Metadata ->
+        None
+
+    let is_ptr = function
+      | Ptr _ -> true
+      | Int _ | Float | Double | Struct _ | Array _ | Vector _ | Label | Token
+      | Metadata ->
+        false
+
+    let is_int = function
+      | Int _ -> true
+      | Ptr _ | Float | Double | Struct _ | Array _ | Vector _ | Label | Token
+      | Metadata ->
+        false
+
+    let is_floating_point = function
+      | Float | Double -> true
+      | Ptr _ | Int _ | Struct _ | Array _ | Vector _ | Label | Token | Metadata
+        ->
+        false
+
+    let is_vector = function
+      | Vector _ -> true
+      | Int _ | Ptr _ | Float | Double | Struct _ | Array _ | Label | Token
+      | Metadata ->
+        false
+
+    module Or_void = struct
+      type nonrec t = t option
+
+      let pp_t ppf t =
+        match t with Some t -> pp_t ppf t | None -> Format.fprintf ppf "void"
+    end
+  end
+
+  module Ident = struct
+    type t =
+      | Local of string
+      | Global of string
+
+    let local s = Local s
+
+    let global s = Global s
+
+    let pp_t ppf t =
+      let open F in
+      match t with
+      | Local s -> fprintf ppf "%%%s" s
+      | Global s ->
+        let encoded = Asm_targets.(Asm_symbol.create s |> Asm_symbol.encode) in
+        fprintf ppf "@%s" encoded
+
+    let to_string t = Format.asprintf "%a" pp_t t
+
+    let to_label_string_exn = function
+      | Local s -> s ^ ":"
+      | Global _ -> fail "Type.to_label_string_exn"
+
+    let to_string_hum t =
+      match t with Local s -> "%" ^ s | Global s -> "@" ^ s
+
+    module Gen = struct
+      type ident = t
+
+      type t = { mutable next : int }
+
+      (* Local identifiers are only valid within function scope, so we can reset
+         it to 0 every time *)
+      let create () = { next = 0 }
+
+      let get_fresh t =
+        let res = t.next in
+        t.next <- succ res;
+        local (Int.to_string res)
+    end
+
+    module With_type = struct
+      type ident = t
+
+      type t = Type.t * ident
+    end
+  end
+
+  module Value = struct
+    type value =
+      | Ident of Ident.t
+      | Immediate of string
+      | Blockaddress of
+          { func : Ident.t;
+            block : Ident.t
+          }
+
+    type t = Type.t * value
+
+    let of_ident ~typ ident = typ, Ident ident
+
+    let of_int ?(typ = Type.i64) i = typ, Immediate (Int.to_string i)
+
+    let poison typ = typ, Immediate "poison"
+
+    let blockaddress ~func ~block = Type.ptr, Blockaddress { func; block }
+
+    let get_type (typ, _) = typ
+
+    let get_ident_exn (_, value) =
+      match value with
+      | Ident ident -> ident
+      | Immediate _ | Blockaddress _ -> fail "Value.get_ident_exn"
+
+    let pp_value ppf value =
+      let open F in
+      match value with
+      | Ident ident -> Ident.pp_t ppf ident
+      | Immediate s -> fprintf ppf "%s" s
+      | Blockaddress { func; block } ->
+        fprintf ppf "blockaddress(%a, %a)" Ident.pp_t func Ident.pp_t block
+
+    let pp_t ppf (typ, value) =
+      Format.fprintf ppf "%a %a" Type.pp_t typ pp_value value
+
+    let to_string t = Format.asprintf "%a" pp_t t
+  end
+
+  module Fn_attr = struct
+    type t =
+      | Cold
+      | Gc of string
+      | Gc_leaf_function
+      | Noinline
+      | Returns_twice
+      | Statepoint_id of int
+
+    let to_string = function
+      | Cold -> "cold"
+      | Gc s -> Format.sprintf {|gc "%s"|} s
+      | Gc_leaf_function -> {|"gc-leaf-function"="true"|}
+      | Noinline -> "noinline"
+      | Returns_twice -> "returns_twice"
+      | Statepoint_id i -> Format.sprintf {|"statepoint-id"="%d"|} i
+
+    let pp_t ppf t = Format.pp_print_string ppf (to_string t)
+  end
+
+  module Calling_conventions = struct
+    type t =
+      | Default (* Default C calling convention *)
+      | Ocaml (* See backend/<arch>/proc.ml for details *)
+      | Ocaml_c_call
+    (* Same as [Default] but passes the function address and stack offset (if
+       there are stack arguments) through rax and r13. *)
+
+    let to_string = function
+      | Default -> ""
+      | Ocaml -> "cc 104"
+      | Ocaml_c_call -> "cc 105"
+
+    let pp_t ppf t = Format.pp_print_string ppf (to_string t)
+
+    let equal t1 t2 =
+      match t1, t2 with
+      | Default, Default | Ocaml, Ocaml | Ocaml_c_call, Ocaml_c_call -> true
+      | Default, _ | Ocaml, _ | Ocaml_c_call, _ -> false
+  end
+
+  module Instruction = struct
+    type unary_op = Fneg
+
+    type binary_op =
+      (* Integer *)
+      | Add
+      | Sub
+      | Mul
+      | Udiv
+      | Sdiv
+      | Urem
+      | Srem
+      (* Float *)
+      | Fadd
+      | Fsub
+      | Fmul
+      | Fdiv
+      | Frem
+      (* Bitwise *)
+      | Shl
+      | Lshr
+      | Ashr
+      | And
+      | Or
+      | Xor
+
+    type atomicrmw_op =
+      | Atomicrmw_add
+      | Atomicrmw_sub
+      | Atomicrmw_and
+      | Atomicrmw_or
+      | Atomicrmw_xor
+      | Atomicrmw_xchg
+
+    type convert_op =
+      (* Int *)
+      | Sext
+      | Zext
+      | Trunc
+      (* Float *)
+      | Fpext
+      | Fptrunc
+      (* Int <-> Float *)
+      | Fptoui
+      | Fptosi
+      | Uitofp
+      | Sitofp
+      (* Ptr *)
+      | Inttoptr
+      | Ptrtoint
+      | Ptrtoaddr
+      | Addrspacecast
+      (* Magic *)
+      | Bitcast
+
+    type icmp_cond =
+      | Ieq
+      | Ine
+      | Iugt
+      | Iuge
+      | Iult
+      | Iule
+      | Isgt
+      | Isge
+      | Islt
+      | Isle
+
+    type fcmp_cond =
+      | Ffalse
+      | Foeq
+      | Fogt
+      | Foge
+      | Folt
+      | Fole
+      | Fone
+      | Ford
+      | Fueq
+      | Fugt
+      | Fuge
+      | Fult
+      | Fule
+      | Fune
+      | Funo
+      | Ftrue
+
+    let binary_op_to_string = function
+      | Add -> "add"
+      | Sub -> "sub"
+      | Mul -> "mul"
+      | Udiv -> "udiv"
+      | Sdiv -> "sdiv"
+      | Urem -> "urem"
+      | Srem -> "srem"
+      | Fadd -> "fadd"
+      | Fsub -> "fsub"
+      | Fmul -> "fmul"
+      | Fdiv -> "fdiv"
+      | Frem -> "frem"
+      | Shl -> "shl"
+      | Lshr -> "lshl"
+      | Ashr -> "ashr"
+      | And -> "and"
+      | Or -> "or"
+      | Xor -> "xor"
+
+    let unary_op_to_string = function Fneg -> "fneg"
+
+    let convert_op_to_string = function
+      | Sext -> "sext"
+      | Zext -> "zext"
+      | Trunc -> "trunc"
+      | Fpext -> "fpext"
+      | Fptrunc -> "fptrunc"
+      | Fptoui -> "fptoui"
+      | Fptosi -> "fptosi"
+      | Uitofp -> "uitofp"
+      | Sitofp -> "sitofp"
+      | Inttoptr -> "inttoptr"
+      | Ptrtoint -> "ptrtoint"
+      | Ptrtoaddr -> "ptrtoaddr"
+      | Addrspacecast -> "addrspacecast"
+      | Bitcast -> "bitcast"
+
+    let icmp_cond_to_string = function
+      | Ieq -> "eq"
+      | Ine -> "ne"
+      | Iugt -> "ugt"
+      | Iuge -> "uge"
+      | Iult -> "ult"
+      | Iule -> "ule"
+      | Isgt -> "sgt"
+      | Isge -> "sge"
+      | Islt -> "slt"
+      | Isle -> "sle"
+
+    let icmp_cond_of_ocaml (cond : Operation.integer_comparison) =
+      match cond with
+      | Ceq -> Ieq
+      | Cne -> Ine
+      | Clt -> Islt
+      | Cgt -> Isgt
+      | Cle -> Isle
+      | Cge -> Isge
+      | Cult -> Iult
+      | Cugt -> Iugt
+      | Cule -> Iule
+      | Cuge -> Iuge
+
+    let fcmp_cond_to_string = function
+      | Ffalse -> "false"
+      | Foeq -> "oeq"
+      | Fogt -> "ogt"
+      | Foge -> "oge"
+      | Folt -> "olt"
+      | Fole -> "ole"
+      | Fone -> "one"
+      | Ford -> "ord"
+      | Fueq -> "ueq"
+      | Fugt -> "ugt"
+      | Fuge -> "uge"
+      | Fult -> "ult"
+      | Fule -> "ule"
+      | Fune -> "une"
+      | Funo -> "uno"
+      | Ftrue -> "true"
+
+    let fcmp_cond_of_ocaml (cond : Operation.float_comparison) =
+      match cond with
+      | CFeq -> Foeq
+      | CFneq -> Fune
+      | CFlt -> Folt
+      | CFnlt -> Fuge
+      | CFgt -> Fogt
+      | CFngt -> Fule
+      | CFle -> Fole
+      | CFnle -> Fugt
+      | CFge -> Foge
+      | CFnge -> Fult
+
+    let atomicrmw_op_to_string = function
+      | Atomicrmw_add -> "add"
+      | Atomicrmw_sub -> "sub"
+      | Atomicrmw_and -> "and"
+      | Atomicrmw_or -> "or"
+      | Atomicrmw_xor -> "xor"
+      | Atomicrmw_xchg -> "xchg"
+
+    type op =
+      (* Terminator *)
+      | Ret of Value.t
+      | Br of Value.t
+      | Br_cond of
+          { cond : Value.t;
+            ifso : Value.t;
+            ifnot : Value.t
+          }
+      | Switch of
+          { discr : Value.t;
+            default : Value.t;
+            branches : (Value.t * Value.t) list (* (index, label) *)
+          }
+      | Unreachable
+      (* Basic *)
+      | Unary of
+          { op : unary_op;
+            arg : Value.t
+          }
+      | Binary of
+          { op : binary_op;
+            arg1 : Value.t;
+            arg2 : Value.t
+          }
+      | Convert of
+          { op : convert_op;
+            arg : Value.t;
+            to_ : Type.t
+          }
+      | Icmp of
+          { cond : icmp_cond;
+            arg1 : Value.t;
+            arg2 : Value.t
+          }
+      | Fcmp of
+          { cond : fcmp_cond;
+            arg1 : Value.t;
+            arg2 : Value.t
+          }
+      (* Vector ops *)
+      | Extractelement of
+          { vector : Value.t;
+            index : Value.t
+          }
+      | Insertelement of
+          { vector : Value.t;
+            index : Value.t;
+            to_insert : Value.t
+          }
+      (* Struct/array ops *)
+      | Extractvalue of
+          { aggregate : Value.t;
+            indices : int list
+          }
+      | Insertvalue of
+          { aggregate : Value.t;
+            indices : int list;
+            to_insert : Value.t
+          }
+      (* Memory *)
+      | Alloca of Type.t
+      | Load of
+          { ptr : Value.t;
+            typ : Type.t
+          }
+      | Store of
+          { ptr : Value.t;
+            to_store : Value.t
+          }
+      | Getelementptr of
+          { base_type : Type.t;
+            base_ptr : Value.t;
+            indices : Value.t list
+          }
+      (* Atomics *)
+      (* CR yusumez: Implement ordering constraints instead of hard-coding them *)
+      | Cmpxchg of
+          { ptr : Value.t;
+            compare_with : Value.t;
+            set_if_equal : Value.t
+          }
+      | Atomicrmw of
+          { op : atomicrmw_op;
+            ptr : Value.t;
+            arg : Value.t
+          }
+      (* Control flow *)
+      | Select of
+          { cond : Value.t;
+            ifso : Value.t;
+            ifnot : Value.t
+          }
+      | Call of
+          { func : Ident.t;
+            args : Value.t list;
+            res_type : Type.Or_void.t;
+            attrs : Fn_attr.t list;
+            cc : Calling_conventions.t;
+            musttail : bool
+          }
+
+    type t =
+      { op : op;
+        res : Ident.t option
+      }
+
+    let assert' name cond = fail_if_not ("Instruction." ^ name) cond
+
+    let op_res_type = function
+      (* Terminators return no value *)
+      | Ret _ | Br _ | Br_cond _ | Switch _ | Unreachable -> None
+      (* Basic operations *)
+      | Unary { arg; _ } -> Some (Value.get_type arg)
+      | Binary { arg1; _ } -> Some (Value.get_type arg1)
+      | Convert { to_; _ } -> Some to_
+      | Icmp _ | Fcmp _ -> Some Type.i1
+      (* Vector operations *)
+      | Extractelement { vector; _ } -> Type.elem_type (Value.get_type vector)
+      | Insertelement { vector; _ } -> Some (Value.get_type vector)
+      (* Aggregate operations *)
+      | Extractvalue { aggregate; indices } ->
+        let typ = Type.extract_struct (Value.get_type aggregate) indices in
+        assert' "op_res_type" (Option.is_some typ);
+        typ
+      | Insertvalue { aggregate; _ } -> Some (Value.get_type aggregate)
+      (* Memory operations *)
+      | Alloca _typ -> Some Type.ptr
+      | Load { typ; _ } -> Some typ
+      | Store _ -> None
+      | Getelementptr _ -> Some Type.ptr
+      (* Atomics *)
+      | Cmpxchg { compare_with; _ } ->
+        let elem_type = Value.get_type compare_with in
+        Some (Type.Struct [elem_type; Type.i1])
+      | Atomicrmw { arg; _ } -> Some (Value.get_type arg)
+      (* Control flow *)
+      | Select { ifso; _ } -> Some (Value.get_type ifso)
+      | Call { res_type; _ } -> res_type
+
+    let with_res op ident =
+      assert' "with_res" (Option.is_some (op_res_type op));
+      { op; res = Some ident }
+
+    let without_res op =
+      assert' "without_res" (Option.is_none (op_res_type op));
+      { op; res = None }
+
+    let get_res_value { op; res } =
+      match res with
+      | Some res ->
+        Option.map (fun typ -> Value.of_ident ~typ res) (op_res_type op)
+      | None -> None
+
+    (* CR yusumez: add checks as necessary *)
+
+    let ret v = Ret v
+
+    let br v =
+      assert' "br" (Value.get_type v |> Type.(equal label));
+      Br v
+
+    let br_cond ~cond ~ifso ~ifnot =
+      assert' "br_cond" (Value.get_type cond |> Type.(equal i1));
+      assert' "br_cond" (Value.get_type ifso |> Type.(equal label));
+      assert' "br_cond" (Value.get_type ifnot |> Type.(equal label));
+      Br_cond { cond; ifso; ifnot }
+
+    let switch ~discr ~default ~branches =
+      assert' "switch" (Value.get_type discr |> Type.is_int);
+      assert' "switch" (Value.get_type default |> Type.(equal label));
+      assert' "switch"
+        (List.for_all
+           (fun (index, label) ->
+             Value.get_type index |> Type.is_int
+             && Value.get_type label |> Type.equal Type.label)
+           branches);
+      Switch { discr; default; branches }
+
+    let unreachable = Unreachable
+
+    let unary op ~arg = Unary { op; arg }
+
+    let binary op ~arg1 ~arg2 = Binary { op; arg1; arg2 }
+
+    let convert op ~arg ~to_ = Convert { op; arg; to_ }
+
+    let icmp cond ~arg1 ~arg2 =
+      let arg1_type = Value.get_type arg1 in
+      let arg2_type = Value.get_type arg2 in
+      assert' "icmp" (Type.equal arg1_type arg2_type);
+      assert' "icmp" (Type.is_int arg1_type || Type.is_ptr arg1_type);
+      Icmp { cond; arg1; arg2 }
+
+    let fcmp cond ~arg1 ~arg2 =
+      let arg1_type = Value.get_type arg1 in
+      let arg2_type = Value.get_type arg2 in
+      assert' "fcmp" (Type.equal arg1_type arg2_type);
+      assert' "fcmp" (Type.is_floating_point arg1_type);
+      Fcmp { cond; arg1; arg2 }
+
+    let extractelement ~vector ~index =
+      assert' "extractelement" (Value.get_type index |> Type.is_int);
+      Extractelement { vector; index }
+
+    let insertelement ~vector ~index ~to_insert =
+      assert' "insertelement" (Value.get_type index |> Type.is_int);
+      Insertelement { vector; index; to_insert }
+
+    let extractvalue ~aggregate ~indices = Extractvalue { aggregate; indices }
+
+    let insertvalue ~aggregate ~indices ~to_insert =
+      Insertvalue { aggregate; indices; to_insert }
+
+    let alloca typ = Alloca typ
+
+    let load ~ptr ~typ =
+      assert' "load" (Value.get_type ptr |> Type.is_ptr);
+      Load { ptr; typ }
+
+    let store ~ptr ~to_store =
+      assert' "store" (Value.get_type ptr |> Type.is_ptr);
+      Store { ptr; to_store }
+
+    let getelementptr ~base_type ~base_ptr ~indices =
+      assert' "getelementptr" (Value.get_type base_ptr |> Type.is_ptr);
+      assert' "getelementptr"
+        (List.for_all
+           (fun index -> Value.get_type index |> Type.is_int)
+           indices);
+      Getelementptr { base_type; base_ptr; indices }
+
+    let cmpxchg ~ptr ~compare_with ~set_if_equal =
+      assert' "cmpxchg" (Value.get_type ptr |> Type.is_ptr);
+      let compare_type = Value.get_type compare_with in
+      let set_type = Value.get_type set_if_equal in
+      assert' "cmpxchg" (Type.equal compare_type set_type);
+      Cmpxchg { ptr; compare_with; set_if_equal }
+
+    let atomicrmw op ~ptr ~arg =
+      assert' "atomicrmw" (Value.get_type ptr |> Type.is_ptr);
+      Atomicrmw { op; ptr; arg }
+
+    let select ~cond ~ifso ~ifnot =
+      assert' "select" (Value.get_type cond |> Type.(equal i1));
+      let ifso_type = Value.get_type ifso in
+      let ifnot_type = Value.get_type ifnot in
+      assert' "select" (Type.equal ifso_type ifnot_type);
+      Select { cond; ifso; ifnot }
+
+    let call ~func ~args ~res_type ~attrs ~cc ~musttail =
+      Call { func; args; res_type; attrs; cc; musttail }
+
+    (* Note: this function handles indentation and newlines itself *)
+    let pp_t ?comment ppf { op; res } =
+      let open F in
+      let pp_res ppf () = Ident.pp_t ppf (Option.get res) in
+      let ins ?(num_indents = 1) fmt = pp_line ~num_indents ?comment ppf fmt in
+      match[@warning "-fragile-match"] op with
+      | Ret v -> ins "ret %a" Value.pp_t v
+      | Br v -> ins "br %a" Value.pp_t v
+      | Br_cond { cond; ifso; ifnot } ->
+        ins "br %a, %a, %a" Value.pp_t cond Value.pp_t ifso Value.pp_t ifnot
+      | Switch { discr; default; branches } ->
+        ins "switch %a, %a [" Value.pp_t discr Value.pp_t default;
+        List.iter
+          (fun (index, label) ->
+            ins ~num_indents:2 "%a, %a" Value.pp_t index Value.pp_t label)
+          branches;
+        ins "]"
+      | Unreachable -> ins "unreachable"
+      | Unary { op; arg } ->
+        ins "%a = %s %a" pp_res () (unary_op_to_string op) Value.pp_t arg
+      | Binary { op; arg1; arg2 } ->
+        ins "%a = %s %a, %a" pp_res () (binary_op_to_string op) Value.pp_t arg1
+          Value.pp_t arg2
+      | Convert { op; arg; to_ } ->
+        ins "%a = %s %a to %a" pp_res () (convert_op_to_string op) Value.pp_t
+          arg Type.pp_t to_
+      | Icmp { cond; arg1; arg2 } ->
+        ins "%a = icmp %s %a, %a" pp_res () (icmp_cond_to_string cond)
+          Value.pp_t arg1 Value.pp_t arg2
+      | Fcmp { cond; arg1; arg2 } ->
+        ins "%a = icmp %s %a, %a" pp_res () (fcmp_cond_to_string cond)
+          Value.pp_t arg1 Value.pp_t arg2
+      | Extractelement { vector; index } ->
+        ins "%a = extractelement %a, %a" pp_res () Value.pp_t vector Value.pp_t
+          index
+      | Insertelement { vector; index; to_insert } ->
+        ins "%a = insertelement %a, %a, %a" pp_res () Value.pp_t vector
+          Value.pp_t to_insert Value.pp_t index
+      | Extractvalue { aggregate; indices } ->
+        ins "%a = extractvalue %a, %a" pp_res () Value.pp_t aggregate
+          (pp_print_list ~pp_sep:pp_comma pp_print_int)
+          indices
+      | Insertvalue { aggregate; indices; to_insert } ->
+        ins "%a = insertvalue %a, %a, %a" pp_res () Value.pp_t aggregate
+          Value.pp_t to_insert
+          (pp_print_list ~pp_sep:pp_comma pp_print_int)
+          indices
+      | Alloca typ -> ins "%a = alloca %a" pp_res () Type.pp_t typ
+      | Load { ptr; typ } ->
+        ins "%a = load %a, %a" pp_res () Type.pp_t typ Value.pp_t ptr
+      | Store { ptr; to_store } ->
+        ins "store %a, %a" Value.pp_t to_store Value.pp_t ptr
+      | Getelementptr { base_type; base_ptr; indices } ->
+        ins "%a = getelementptr %a, %a, %a" pp_res () Type.pp_t base_type
+          Value.pp_t base_ptr
+          (pp_print_list ~pp_sep:pp_comma Value.pp_t)
+          indices
+      | Cmpxchg { ptr; compare_with; set_if_equal } ->
+        ins "%a = cmpxchg %a, %a, %a acq_rel monotonic" pp_res () Value.pp_t ptr
+          Value.pp_t compare_with Value.pp_t set_if_equal
+      | Atomicrmw { op; ptr; arg } ->
+        ins "%a = atomicrmw %s %a, %a acq_rel" pp_res ()
+          (atomicrmw_op_to_string op)
+          Value.pp_t ptr Value.pp_t arg
+      | Select { cond; ifso; ifnot } ->
+        ins "%a = select %a, %a, %a" pp_res () Value.pp_t cond Value.pp_t ifso
+          Value.pp_t ifnot
+      | Call { func; args; res_type; attrs; cc; musttail } -> (
+        let pp_musttail ppf () = if musttail then fprintf ppf "musttail " in
+        let pp_args ppf () =
+          (pp_print_list ~pp_sep:pp_comma Value.pp_t) ppf args
+        in
+        let pp_attrs ppf () =
+          (pp_print_list ~pp_sep:pp_comma Fn_attr.pp_t) ppf attrs
+        in
+        let pp_call ppf () =
+          fprintf ppf "%acall %a %a %a(%a) %a" pp_musttail ()
+            Calling_conventions.pp_t cc Type.Or_void.pp_t res_type Ident.pp_t
+            func pp_args () pp_attrs ()
+        in
+        match res with
+        | Some res -> ins "%a = %a" Ident.pp_t res pp_call ()
+        | None -> ins "%a" pp_call ())
+  end
+
+  module Function = struct
+    (* CR yusumez: Consider a more structured representation *)
+    type slot =
+      | Comment of string
+      | Label_def of Ident.t
+      | Instruction of
+          { instr : Instruction.t;
+            comment : string option
+          }
+
+    type t =
+      { name : Ident.t;
+        args : (Type.t * Ident.t) list;
+            (* Not using [Value.t] to have explicit identifiers *)
+        res : Type.Or_void.t;
+        cc : Calling_conventions.t;
+        attrs : Fn_attr.t list;
+        private_ : bool;
+        gc : string option;
+        dbg : Debuginfo.t;
+        mutable body_rev : slot list
+      }
+
+    let add_instruction ?comment t instr =
+      t.body_rev <- Instruction { instr; comment } :: t.body_rev
+
+    let add_label_def t label = t.body_rev <- Label_def label :: t.body_rev
+
+    let add_comment t comment = t.body_rev <- Comment comment :: t.body_rev
+
+    let pp_t ppf { name; args; res; cc; attrs; private_; gc; dbg; body_rev } =
+      let open F in
+      (* Definition line *)
+      pp_dbg_comment ~newline:true ppf (Ident.to_string_hum name) dbg;
+      let pp_private ppf () = if private_ then fprintf ppf "private" in
+      let pp_args =
+        pp_print_list ~pp_sep:pp_comma (fun ppf (typ, ident) ->
+            fprintf ppf "%a %a" Type.pp_t typ Ident.pp_t ident)
+      in
+      let pp_attrs = pp_print_list ~pp_sep:pp_comma Fn_attr.pp_t in
+      let pp_gc = pp_print_option (fun ppf s -> fprintf ppf "%S" s) in
+      pp_line ppf "define %a %a %a %a(%a) %a %a {" pp_private ()
+        Calling_conventions.pp_t cc Type.Or_void.pp_t res Ident.pp_t name
+        pp_args args pp_attrs attrs pp_gc gc;
+      (* Body *)
+      let body = List.rev body_rev in
+      List.iter
+        (function
+          | Instruction { instr; comment } ->
+            Instruction.pp_t ?comment ppf instr
+          | Comment s -> pp_ins ppf "%s" s
+          | Label_def ident -> pp_ins ppf "%s" (Ident.to_label_string_exn ident))
+        body;
+      pp_line ppf "}";
+      pp_line ppf ""
+
+    (* This module handles the creation of [Function.t]s *)
+    module Emitter = struct
+      type funcdef = t
+
+      type t =
+        { ident_gen : Ident.Gen.t;
+          funcdef : funcdef
+        }
+
+      let create ~name ~args ~res ~cc ~attrs ~gc ~dbg ~private_ =
+        let ident_gen = Ident.Gen.create () in
+        let name = Ident.global name in
+        let args =
+          List.map (fun typ -> typ, Ident.Gen.get_fresh ident_gen) args
+        in
+        (* First unnamed local identifier after parameters is reserved for the
+           entry label. *)
+        Ident.Gen.get_fresh ident_gen |> ignore;
+        let funcdef =
+          { name; args; res; cc; attrs; private_; gc; dbg; body_rev = [] }
+        in
+        { ident_gen; funcdef }
+
+      let get_args t = t.funcdef.args
+
+      let get_res_type t = t.funcdef.res
+
+      let ins ?res_ident t op =
+        let res_ident =
+          match res_ident with
+          | Some ident -> ident
+          | None -> Ident.Gen.get_fresh t.ident_gen
+        in
+        let instr = Instruction.with_res op res_ident in
+        add_instruction t.funcdef instr;
+        Instruction.get_res_value instr |> Option.get
+
+      let ins_no_res t op =
+        let instr = Instruction.without_res op in
+        add_instruction t.funcdef instr
+
+      let comment t s = add_comment t s
+
+      let label_def t ident = add_label_def t ident
+
+      let get_fun t = t.funcdef
+    end
+  end
+
+  module Data = struct
+    type t
+  end
+end
+
+module Llvm_ir_of_cfg = struct
+  module LL = Llvm_ir
+
+  (* Design decisions:
+
+     - We use [Llvm_ir] as our interface to generate LLVM IR. Modules contained
+     in it are supposed to be modular enough to be able to change their
+     implementations without much trouble. Examples include:
+
+     * adding support for metadata like !dbg
+
+     * changing the representation of [LL.Function.t] to be an actual CFG rather
+     than a linear stream
+
+     * generating bitcode instead of textual IR
+
+     - The emitting logic here is solely responsible for the overhead of
+     translation. This includes:
+
+     * actually translating Cfg instructions
+
+     * keeping track of registers as alloca's
+
+     SPECIFICS:
+
+     - Labels are always Cmm.label's
+
+     - We only declare intrinsics as functions
+
+     - *)
+
+  (* Types *)
+
+  type fun_type_sig =
+    { args : LL.Type.t list;
+      res : LL.Type.t option
+    }
+
+  type c_call_wrapper =
+    { args : LL.Type.t list;
+      res : LL.Type.t list;
+      c_fun_name : string
+    }
+
+  type trap_block_info =
+    { trap_block : Ident.t;
+      stacksave_ptr : Ident.t;
+      payload : Ident.t
+    }
+
+  type fun_info =
+    { emitter : LL.Function.Emitter.t;
+          (* Emitter responsible for producing LLVM IR of a function *)
+      fun_ret_type : Cmm.machtype;
+      reg2alloca : LL.Value.t Reg.Tbl.t;
+          (* Map [Reg.t]'s from OCaml to alloca'd identifiers in LLVM IR *)
+      fun_has_try : bool; (* Whether the function contains trap blocks *)
+      trap_blocks : trap_block_info Label.Tbl.t
+          (* Identifiers created during a [Pushtrap] instruction needed for
+             [Poptrap] and trap handler entry *)
+    }
+
+  type t =
+    { llvmir_filename : string;
+      oc : Out_channel.t;
+      ppf : Format.formatter;
+      ppf_dump : Format.formatter;
+      mutable sourcefile : string option; (* gets set in [begin_assembly] *)
+      mutable asm_filename : string option; (* gets set in [open_out] *)
+      mutable current_fun_info : fun_info option;
+          (* Maintains the state of the current function (reset for every
+             function) *)
+      mutable function_defs : LL.Function.t list;
+      mutable data_defs : LL.Data.t list;
+      mutable defined_symbols : String.Set.t;
+          (* Global symbols defined so far *)
+      mutable referenced_symbols : String.Set.t;
+          (* Global symbols referenced so far *)
+      mutable called_intrinsics : fun_type_sig String.Map.t;
+          (* Names + signatures (args, ret) of LLVM intrinsics called so far.
+             Note that external functions are treated as symbols and are not
+             declared to avoid type mismatches, but intrinsics must be declared
+             with their signatures. *)
+      mutable c_call_wrappers : c_call_wrapper String.Map.t;
+          (* Wrappers for noalloc C calls. This is currently needed since
+             manipulating the stack inline is broken. *)
+      mutable stack_offset : int
+          (* Accumulate [Stackoffset]s to be able to calculate the # of trap
+             blocks at a given instruction via [i.stack_offset] *)
+    }
+
+  (* current_fun_info interface *)
+
+  let create_fun_info ~emitter ~fun_ret_type ~fun_has_try =
+    { emitter;
+      fun_ret_type;
+      reg2alloca = Reg.Tbl.create 0;
+      fun_has_try;
+      trap_blocks = Label.Tbl.create 0
+    }
+
+  let get_fun_info t =
+    match t.current_fun_info with
+    | Some fun_info -> fun_info
+    | None -> fail_msg ~name:"get_fun_info" "not_available"
+
+  let reset_fun_info t ~emitter ~fun_ret_type ~fun_has_try =
+    t.current_fun_info
+      <- Some (create_fun_info ~emitter ~fun_ret_type ~fun_has_try)
+
+  let get_alloca_for_reg t reg =
+    let fun_info = get_fun_info t in
+    match Reg.Tbl.find_opt fun_info.reg2alloca reg with
+    | Some v -> v
+    | None -> fail_msg ~name:"get_alloca_for_reg" "reg not found"
+
+  let set_alloca_for_reg t reg alloca =
+    let fun_info = get_fun_info t in
+    Reg.Tbl.add fun_info.reg2alloca reg alloca
+
+  (* t interface *)
+
+  let create ~llvmir_filename ~ppf_dump =
+    let oc = Out_channel.open_text llvmir_filename in
+    let ppf = Format.formatter_of_out_channel oc in
+    { llvmir_filename;
+      asm_filename = None;
+      sourcefile = None;
+      oc;
+      ppf;
+      ppf_dump;
+      current_fun_info = None;
+      function_defs = [];
+      data_defs = [];
+      defined_symbols = String.Set.empty;
+      referenced_symbols = String.Set.empty;
+      called_intrinsics = String.Map.empty;
+      c_call_wrappers = String.Map.empty;
+      stack_offset = 0
+    }
+
+  let add_called_intrinsic t name ~args ~res =
+    fail_if_not ~msg:"expected intrinsic" "add_called_intrinsic"
+      (String.begins_with name ~prefix:"llvm");
+    match String.Map.find_opt name t.called_intrinsics with
+    | None -> ()
+    | Some { args = args'; res = res' } ->
+      let all_equal =
+        List.equal LL.Type.equal args args'
+        && Option.equal LL.Type.equal res res'
+      in
+      fail_if_not ~msg:"incompatible signatures" "add_called_intrinsic"
+        all_equal
+
+  let add_c_call_wrapper t c_fun_name ~args ~res =
+    let wrapper_name = "c_call_wrapper" ^ c_fun_name in
+    (match String.Map.find_opt wrapper_name t.c_call_wrappers with
+    | None -> ()
+    | Some { c_fun_name = c_fun_name'; args = args'; res = res' } ->
+      let all_equal =
+        String.equal c_fun_name c_fun_name'
+        && List.equal LL.Type.equal args args'
+        && List.equal LL.Type.equal res res'
+      in
+      fail_if_not ~msg:"incompatible signatures" "add_c_call_wrapper" all_equal);
+    t.c_call_wrappers
+      <- String.Map.add wrapper_name { c_fun_name; args; res } t.c_call_wrappers;
+    wrapper_name
+
+  let add_referenced_symbol t sym_name =
+    t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
+
+  (* CR yusumez: Consider making a new GCStrategy for OxCaml in LLVM *)
+  let gc_name = "statepoint-example"
+
+  (* Runtime registers. These are registers that get threaded through function
+     arguments and returns and are pinned to particular physical registers via
+     the calling convention. Note that we treat them similarly to [Reg.t]s,
+     where we alloca them in the entry block and access them through
+     load/stores. to be simplified by mem2reg in LLVM. We assume they are [i64]s
+     while threading through functions. *)
+
+  let domainstate_ptr = LL.Value.of_ident ~typ:LL.Type.ptr (LL.Ident.local "ds")
+
+  let allocation_ptr =
+    LL.Value.of_ident ~typ:LL.Type.ptr (LL.Ident.local "alloc")
+
+  let runtime_regs = [domainstate_ptr; allocation_ptr]
+
+  let runtime_reg_idents = List.map LL.Value.get_ident_exn runtime_regs
+
+  (* Registers living in the domain state are already stored in the appropriate
+     address as arguments or when returned, so we don't touch them while doing a
+     call / return *)
+  (* CR yusumez: We don't expect to get arguments from the stack, but this might
+     happen if we have too many arguments. There might be a way to limit this in
+     the frontend. *)
+  let reg_list_for_call regs =
+    Array.to_list regs |> List.filter (fun reg -> not (Reg.is_domainstate reg))
+
+  let make_ret_type ret_types =
+    let runtime_reg_types = List.map (fun _ -> LL.Type.i64) runtime_regs in
+    LL.Type.(Struct [Struct runtime_reg_types; Struct ret_types])
+
+  let make_ret_type_of_machtype ret_machtype =
+    let actual_ret_types =
+      Array.to_list ret_machtype |> List.map LL.Type.of_machtype_component
+    in
+    make_ret_type actual_ret_types
+
+  module V = LL.Value
+  module T = LL.Type
+  module E = LL.Function.Emitter
+  module I = LL.Instruction
+
+  let emit_ins ?res_ident t op =
+    let fun_info = get_fun_info t in
+    E.ins ?res_ident fun_info.emitter op
+
+  let emit_ins_no_res t op =
+    let fun_info = get_fun_info t in
+    E.ins_no_res fun_info.emitter op
+
+  (* Common helpers *)
+
+  let cast t arg to_ =
+    let from = V.get_type arg in
+    if T.equal from to_
+    then arg
+    else if T.is_int from && T.is_ptr to_
+    then emit_ins t (I.convert Inttoptr ~arg ~to_)
+    else if T.is_ptr from && T.is_int to_
+    then emit_ins t (I.convert Ptrtoint ~arg ~to_)
+    else if T.is_ptr from && T.is_ptr to_
+    then emit_ins t (I.convert Addrspacecast ~arg ~to_)
+    else fail_msg ~name:"cast" "unexpected types: %a, %a" T.pp_t from T.pp_t to_
+
+  let do_offset ?(int_type = T.i64) t arg res_type offset =
+    if offset = 0
+    then cast t arg res_type
+    else
+      let base = cast t arg int_type in
+      let offset_val =
+        emit_ins t (I.binary Add ~arg1:base ~arg2:(V.of_int offset))
+      in
+      cast t offset_val res_type
+
+  (* CR yusumez: Do we need explicit casts, or can we get away with directly
+     loading/storing incompatible types (given that the ptr type doesn't have
+     the underlying type attached to it) *)
+
+  let load_reg_to_temp ?typ t reg =
+    let ptr = get_alloca_for_reg t reg in
+    let typ = Option.value typ ~default:(T.of_reg reg) in
+    emit_ins t (I.load ~ptr ~typ)
+
+  let store_into_reg t reg to_store =
+    let ptr = get_alloca_for_reg t reg in
+    emit_ins_no_res t (I.store ~ptr ~to_store)
+
+  let load_domainstate_addr ?(typ = T.ptr) ?(offset = 0) t ds_field =
+    let ds = emit_ins t (I.load ~ptr:domainstate_ptr ~typ:T.i64) in
+    let offset = offset + (Domainstate.idx_of_field ds_field * 8) in
+    do_offset t ds typ offset
+
+  let load_address t addr_mode base typ =
+    let offset = Arch.addressing_displacement_for_llvmize addr_mode in
+    do_offset t base typ offset
+
+  let assemble_struct t root_type vals_to_insert =
+    let insert cur_struct (indices, to_insert) =
+      emit_ins t (I.insertvalue ~aggregate:cur_struct ~indices ~to_insert)
+    in
+    let init = V.poison root_type in
+    List.fold_left insert init vals_to_insert
+
+  let extract_struct t root_struct indices_to_extract =
+    List.map
+      (fun indices ->
+        emit_ins t (I.extractvalue ~aggregate:root_struct ~indices))
+      indices_to_extract
+
+  let prepare_call_args t args =
+    List.map (fun ptr -> emit_ins t (I.load ~ptr ~typ:T.i64)) runtime_regs
+    @ args
+
+  let prepare_call_args_from_regs t regs =
+    prepare_call_args t (List.map (load_reg_to_temp t) regs)
+
+  let extract_call_res t call_res_struct num_res_values =
+    (* Runtime regs *)
+    let runtime_reg_indices = List.mapi (fun i _ -> [0; i]) runtime_regs in
+    let extracted_values =
+      extract_struct t call_res_struct runtime_reg_indices
+    in
+    List.iter2
+      (fun ptr to_store -> emit_ins_no_res t (I.store ~ptr ~to_store))
+      runtime_regs extracted_values;
+    (* Actual return values *)
+    let res_value_indices = List.init num_res_values (fun i -> [1; i]) in
+    extract_struct t call_res_struct res_value_indices
+
+  let extract_call_res_into_regs t call_res_struct res_regs =
+    let vals = extract_call_res t call_res_struct (List.length res_regs) in
+    List.iter2 (store_into_reg t) res_regs vals
+
+  let assemble_return t res_type values =
+    let runtime_values =
+      List.mapi
+        (fun i ptr -> [0; i], emit_ins t (I.load ~ptr ~typ:T.i64))
+        runtime_regs
+    in
+    let actual_values = List.mapi (fun i v -> [1; i], v) values in
+    assemble_struct t res_type (runtime_values @ actual_values)
+
+  let call_llvm_intrinsic t name args res_type =
+    let arg_types = List.map fst args in
+    let intrinsic_name = "llvm." ^ name in
+    let func = LL.Ident.global intrinsic_name in
+    add_called_intrinsic t intrinsic_name ~args:arg_types ~res:res_type;
+    emit_ins t
+      (I.call ~func ~args ~res_type ~attrs:[] ~cc:Default ~musttail:false)
+
+  let call_simple ?(attrs = []) ~cc t name args res_types =
+    let args = prepare_call_args t args in
+    let res_type = Some (make_ret_type res_types) in
+    let func = LL.Ident.global name in
+    let res =
+      emit_ins t (I.call ~func ~args ~res_type ~attrs ~cc ~musttail:false)
+    in
+    extract_call_res t res (List.length res_types)
+
+  (* This tells the frametable printer in LLVM to adjust its frame size
+     appropriately. This is because it doesn't properly track trap blocks (which
+     count as "dynamic objects" on the stack). Note that we multiply by 2 since
+     our trap blocks are 4 words wide as opposed to 2 for the normal compiler
+     (without frame pointers). OCaml functions aren't supposed to pass arguments
+     via the stack, but C calls might, so we need to account for [Stackoffset]
+     instructions *)
+  let statepoint_id_attr_for_stack_adjustment ?(offset = 0) t
+      (i : 'a Cfg.instruction) =
+    LL.Fn_attr.Statepoint_id (((i.stack_offset - t.stack_offset) * 2) + offset)
+
+  (* Stuff with instructions *)
+
+  let int_comp t cond (i : _ Cfg.instruction) ~imm =
+    let typ = T.i64 in
+    let cond = I.icmp_cond_of_ocaml cond in
+    match imm with
+    | None ->
+      let arg1 = load_reg_to_temp ~typ t i.arg.(0) in
+      let arg2 = load_reg_to_temp ~typ t i.arg.(1) in
+      emit_ins t (I.icmp cond ~arg1 ~arg2)
+    | Some n ->
+      let arg1 = load_reg_to_temp ~typ t i.arg.(0) in
+      let arg2 = V.of_int ~typ n in
+      emit_ins t (I.icmp cond ~arg1 ~arg2)
+
+  let float_comp t cond (i : _ Cfg.instruction) typ =
+    let cond = I.fcmp_cond_of_ocaml cond in
+    let arg1 = load_reg_to_temp ~typ t i.arg.(0) in
+    let arg2 = load_reg_to_temp ~typ t i.arg.(1) in
+    emit_ins t (I.fcmp cond ~arg1 ~arg2)
+
+  let odd_test t (i : _ Cfg.instruction) =
+    let arg = load_reg_to_temp ~typ:T.i64 t i.arg.(0) in
+    emit_ins t (I.convert Trunc ~arg ~to_:T.i1)
+
+  let test t (op : Operation.test) (i : _ Cfg.instruction) =
+    match op with
+    | Itruetest -> int_comp t Cne i ~imm:(Some 0)
+    | Ifalsetest -> int_comp t Ceq i ~imm:(Some 0)
+    | Iinttest int_comp_op -> int_comp t int_comp_op i ~imm:None
+    | Iinttest_imm (int_comp_op, imm) ->
+      int_comp t int_comp_op i ~imm:(Some imm)
+    | Ifloattest (width, float_comp_op) ->
+      let typ = T.of_float_width width in
+      float_comp t float_comp_op i typ
+    | Ioddtest -> odd_test t i
+    | Ieventest ->
+      let is_odd = odd_test t i in
+      emit_ins t (I.binary Xor ~arg1:is_odd ~arg2:(V.of_int ~typ:T.i1 1))
+
+  let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
+      (op : Cfg.func_call_operation) =
+    let args_begin, args_end =
+      (* [Indirect] has the function in i.arg.(0) *)
+      match op.callee with
+      | Direct _ -> 0, Array.length i.arg
+      | Indirect -> 1, Array.length i.arg - 1
+    in
+    let arg_regs = Array.sub i.arg args_begin args_end |> reg_list_for_call in
+    let args = prepare_call_args_from_regs t arg_regs in
+    let res_regs = reg_list_for_call i.res in
+    let res_type =
+      (* This will always be [Some] *)
+      if tail
+      then E.get_res_type (get_fun_info t).emitter
+      else Some (make_ret_type (List.map T.of_reg res_regs))
+    in
+    let func =
+      match op.callee with
+      | Direct { sym_name; sym_global = _ } ->
+        add_referenced_symbol t sym_name;
+        LL.Ident.global sym_name
+      | Indirect -> load_reg_to_temp ~typ:T.ptr t i.arg.(0) |> V.get_ident_exn
+    in
+    let attrs = [statepoint_id_attr_for_stack_adjustment t i] in
+    let res =
+      emit_ins t (I.call ~func ~args ~res_type ~attrs ~cc:Ocaml ~musttail:tail)
+    in
+    if tail
+    then emit_ins_no_res t (I.ret res)
+    else extract_call_res_into_regs t res res_regs
+
+  let return t (i : Cfg.terminator Cfg.instruction) =
+    let res_regs = reg_list_for_call i.res in
+    let res_type = E.get_res_type (get_fun_info t).emitter |> Option.get in
+    (* Note: type information is not propagated to the backend for functions
+       that never return, like [raise], so there might be type mismatches. If
+       that is the case, this point is unreachable. *)
+    let res_type_elems =
+      Option.bind (T.extract_struct res_type [1]) T.get_struct_elements
+      |> Option.get
+    in
+    if List.length res_type_elems <> List.length res_regs
+    then emit_ins_no_res t I.unreachable
+    else
+      let res_values =
+        List.map2
+          (fun reg typ ->
+            (* let typ = match T.extract_struct res_type [1; i] with |
+               load_reg_to_temp) res_regs in *)
+            ())
+          res_regs
+      in
+      assemble_return t res_type
+end
+
 (* CR yusumez: Maybe have the type of an identifier as part of this type?! *)
 module Ident : sig
   (** LLVM identifiers that start with "%".  This includes
