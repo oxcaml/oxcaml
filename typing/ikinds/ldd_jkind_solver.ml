@@ -60,7 +60,8 @@ struct
       modality : lat -> kind -> kind;
       constr : constr -> kind list -> kind;
       kind_of : ty -> kind;
-      rigid : ty -> kind
+      rigid : ty -> kind;
+      pp_kind : kind -> string
     }
 
   type ckind = ops -> kind
@@ -194,7 +195,13 @@ struct
       let k' = List.fold_left LSolver.join base ks' in
       (* Return that kind *)
       k'
-    and ops = { const; join; meet; modality; constr; kind_of; rigid } in
+    and ops =
+      let pp_kind (k : kind) =
+        (* Print without solving pending fixpoints; pp() forces locally. *)
+        LSolver.pp k
+      in
+      { const; join; meet; modality; constr; kind_of; rigid; pp_kind }
+    in
     let constr_kind_poly c =
       let base, coeffs = constr_kind c in
       (* Ensure any pending fixpoints are installed before inspecting. *)
@@ -230,10 +237,9 @@ struct
   let clear_memos () : unit = LSolver.clear_memos ()
 
   let pp (p : poly) : string =
-    LSolver.solve_pending ();
+    (* Do not solve pending here; pp() forces locally. *)
     LSolver.pp p
 
   let pp_debug (p : poly) : string =
-    LSolver.solve_pending ();
     LSolver.pp_debug p
 end
