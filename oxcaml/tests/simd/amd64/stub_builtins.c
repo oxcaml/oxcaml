@@ -1,5 +1,4 @@
 #include <assert.h>
-
 #define BUILTIN(name) void name() { assert(0); }
 
 BUILTIN(caml_sse_load_aligned);

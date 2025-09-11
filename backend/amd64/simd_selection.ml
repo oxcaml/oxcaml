@@ -27,27 +27,26 @@ exception Error of error
 
 module Seq = Simd.Seq
 
-let instr instr ?i args =
-  Some (Operation.Specific (Isimd (Simd.instruction instr i)), args)
+let cfg_operation simd args = Some (Operation.Specific (Isimd simd), args)
 
-let seq seq ?i args =
-  Some (Operation.Specific (Isimd (Simd.sequence seq i)), args)
+let instr instr ?i args = cfg_operation (Simd.instruction instr i) args
+
+let seq seq ?i args = cfg_operation (Simd.sequence seq i) args
 
 let sse_or_avx sse vex ?i args =
   let sse_or_avx = if Arch.Extension.enabled AVX then vex else sse in
-  Some (Operation.Specific (Isimd (Simd.instruction sse_or_avx i)), args)
+  cfg_operation (Simd.instruction sse_or_avx i) args
 
 let seq_or_avx sse vex ?i args =
   let seq = if Arch.Extension.enabled AVX then vex else sse in
-  Some (Operation.Specific (Isimd (Simd.sequence seq i)), args)
+  cfg_operation (Simd.sequence seq i) args
 
 let seq_or_avx_zeroed ~dbg seq instr ?i args =
   if Arch.Extension.enabled AVX
   then
-    Some
-      ( Operation.Specific (Isimd (Simd.instruction instr i)),
-        Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args )
-  else Some (Operation.Specific (Isimd (Simd.sequence seq i)), args)
+    cfg_operation (Simd.instruction instr i)
+      (Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args)
+  else cfg_operation (Simd.sequence seq i) args
 
 let bad_immediate fmt =
   Format.kasprintf (fun msg -> raise (Error (Bad_immediate msg))) fmt
