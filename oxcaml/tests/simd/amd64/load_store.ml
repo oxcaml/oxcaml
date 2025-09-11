@@ -23,7 +23,7 @@ module Sse = struct
   [@@noalloc] [@@builtin]
 
   let () = 
-    let mem = aligned_alloc ~align:#16n ~size:#17n in
+    let mem = aligned_alloc ~align:#16n ~size:#32n in
     let x = int64x2_of_int64s 1L 2L in 
     let _ = store_unaligned mem x in
     let x' = load_unaligned mem in
@@ -51,7 +51,7 @@ module Avx = struct
   [@@noalloc] [@@builtin]
 
   let () = 
-    let mem = aligned_alloc ~align:#32n ~size:#33n in
+    let mem = aligned_alloc ~align:#32n ~size:#64n in
     let x = int64x4_of_int64s 1L 2L 3L 4L in 
     let _ = store_unaligned mem x in
     let x' = load_unaligned mem in
