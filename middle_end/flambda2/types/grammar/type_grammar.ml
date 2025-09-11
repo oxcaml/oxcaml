@@ -46,6 +46,88 @@ type is_null =
   | Not_null
   | Maybe_null of { is_null : Variable.t option }
 
+module Relation : sig
+  type t
+
+  val is_null : t
+
+  val is_int : t
+
+  val get_tag : t
+
+  val of_const :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Reg_width_const.t ->
+    Target_ocaml_int.t Or_bottom.t
+
+  include Container_types.S with type t := t
+
+  type descr =
+    | Is_null
+    | Is_int
+    | Get_tag
+
+  val descr : t -> descr
+end = struct
+  type t = int
+
+  let is_null = 0
+
+  let is_int = 1
+
+  let get_tag = 2
+
+  type descr =
+    | Is_null
+    | Is_int
+    | Get_tag
+
+  let descr = function
+    | 0 -> Is_null
+    | 1 -> Is_int
+    | 2 -> Get_tag
+    | _ -> Misc.fatal_error "Invalid relation"
+
+  let to_string t =
+    match descr t with
+    | Is_null -> "%is_null"
+    | Is_int -> "%is_int"
+    | Get_tag -> "%get_tag"
+
+  let of_const ~machine_width t const : _ Or_bottom.t =
+    match descr t with
+    | Is_null -> Ok (Target_ocaml_int.bool machine_width (RWC.is_null const))
+    | Is_int ->
+      Ok (Target_ocaml_int.bool machine_width (not (RWC.is_null const)))
+    | Get_tag -> Bottom
+
+  module T0 = struct
+    let compare = Numeric_types.Int.compare
+
+    let equal = Numeric_types.Int.equal
+
+    let hash = Numeric_types.Int.hash
+
+    let print ppf t = Format.pp_print_string ppf (to_string t)
+  end
+
+  include T0
+
+  module T = struct
+    type nonrec t = t
+
+    include T0
+  end
+
+  module Tree = Patricia_tree.Make (struct
+    let print = print
+  end)
+
+  module Set = Tree.Set
+  module Map = Tree.Map
+end
+
 (* The grammar of Flambda types. *)
 type t =
   | Value of head_of_kind_value TD.t
@@ -131,9 +213,11 @@ and head_of_kind_value_non_null =
    particularly useful if we switch several times on the same scrutinee. *)
 and head_of_kind_naked_immediate =
   | Naked_immediates of Target_ocaml_int.Set.t
-  | Is_int of t
-  | Get_tag of t
-  | Is_null of t
+  | Inverse_relations of Name.Set.t Relation.Map.t
+  | Naked_immediates_and_inverse_relations of
+      { naked_immediates : Target_ocaml_int.Set.t;
+        inverse_relations : Name.Set.t Relation.Map.t
+      }
 
 and head_of_kind_naked_float32 = Float32.Set.t
 
@@ -308,6 +392,31 @@ let row_like_for_blocks_is_bottom { known_tags; other_tags; alloc_mode = _ } =
 let or_unknown_is_bottom is_bottom (or_unknown : _ Or_unknown.t) =
   match or_unknown with Known x -> is_bottom x | Unknown -> false
 
+let naked_immediates :
+    head_of_kind_naked_immediate -> Target_ocaml_int.Set.t Or_unknown.t =
+  function
+  | Naked_immediates naked_immediates
+  | Naked_immediates_and_inverse_relations { naked_immediates; _ } ->
+    Known naked_immediates
+  | Inverse_relations _ -> Unknown
+
+let inverse_relations :
+    head_of_kind_naked_immediate -> Name.Set.t Relation.Map.t = function
+  | Naked_immediates _ -> Relation.Map.empty
+  | Inverse_relations inverse_relations
+  | Naked_immediates_and_inverse_relations { inverse_relations; _ } ->
+    inverse_relations
+
+let create_head_of_kind_naked_immediate ~naked_immediates ~inverse_relations =
+  match (naked_immediates : _ Or_unknown.t) with
+  | Unknown -> Inverse_relations inverse_relations
+  | Known naked_immediates ->
+    if Relation.Map.is_empty inverse_relations
+    then Naked_immediates naked_immediates
+    else
+      Naked_immediates_and_inverse_relations
+        { naked_immediates; inverse_relations }
+
 let rec free_names0 ~follow_value_slots t =
   let[@inline] type_descr_free_names ~free_names_head ty =
     if follow_value_slots
@@ -420,10 +529,17 @@ and free_names_head_of_kind_value_non_null ~follow_value_slots head =
       (free_names0 ~follow_value_slots length)
       fields
 
+and free_names_inverse_relations0 ~follow_value_slots:_ inverse_relations =
+  Relation.Map.fold
+    (fun _ names free_names ->
+      Name.Set.fold
+        (fun name free_names ->
+          Name_occurrences.add_name free_names name Name_mode.in_types)
+        names free_names)
+    inverse_relations Name_occurrences.empty
+
 and free_names_head_of_kind_naked_immediate0 ~follow_value_slots head =
-  match head with
-  | Naked_immediates _ -> Name_occurrences.empty
-  | Is_int ty | Get_tag ty | Is_null ty -> free_names0 ~follow_value_slots ty
+  free_names_inverse_relations0 ~follow_value_slots (inverse_relations head)
 
 and free_names_head_of_kind_naked_float32 _ = Name_occurrences.empty
 
@@ -827,18 +943,32 @@ and apply_renaming_head_of_kind_value_non_null head renaming =
           alloc_mode
         }
 
+and apply_renaming_inverse_relations inverse_relations renaming =
+  Relation.Map.map_sharing
+    (fun names ->
+      let changed = ref false in
+      let names' =
+        Name.Set.fold
+          (fun name names ->
+            let name' = Renaming.apply_name renaming name in
+            if name' != name then changed := true;
+            Name.Set.add name' names)
+          names Name.Set.empty
+      in
+      if !changed then names' else names)
+    inverse_relations
+
 and apply_renaming_head_of_kind_naked_immediate head renaming =
-  match head with
-  | Naked_immediates _ -> head
-  | Is_int ty ->
-    let ty' = apply_renaming ty renaming in
-    if ty == ty' then head else Is_int ty'
-  | Get_tag ty ->
-    let ty' = apply_renaming ty renaming in
-    if ty == ty' then head else Get_tag ty'
-  | Is_null ty ->
-    let ty' = apply_renaming ty renaming in
-    if ty == ty' then head else Is_null ty'
+  let inverse_relations = inverse_relations head in
+  let inverse_relations' =
+    apply_renaming_inverse_relations inverse_relations renaming
+  in
+  if inverse_relations' == inverse_relations
+  then head
+  else
+    create_head_of_kind_naked_immediate
+      ~naked_immediates:(naked_immediates head)
+      ~inverse_relations:inverse_relations'
 
 and apply_renaming_head_of_kind_naked_float32 head _ = head
 
@@ -1197,12 +1327,15 @@ and print_head_of_kind_value_non_null ppf head =
       (Array.to_list fields)
 
 and print_head_of_kind_naked_immediate ppf head =
-  match head with
-  | Naked_immediates is ->
-    Format.fprintf ppf "@[<hov 1>(%a)@]" Target_ocaml_int.Set.print is
-  | Is_int ty -> Format.fprintf ppf "@[<hov 1>(Is_int@ %a)@]" print ty
-  | Get_tag ty -> Format.fprintf ppf "@[<hov 1>(Get_tag@ %a)@]" print ty
-  | Is_null ty -> Format.fprintf ppf "@[<hov 1>(Is_null@ %a)@]" print ty
+  Or_unknown.print Target_ocaml_int.Set.print ppf (naked_immediates head);
+  Relation.Map.iter
+    (fun relation names ->
+      Name.Set.iter
+        (fun name ->
+          Format.fprintf ppf "@ @[<hov 1>(%a@ %a)@]" Relation.print relation
+            Name.print name)
+        names)
+    (inverse_relations head)
 
 and print_head_of_kind_naked_float32 ppf head =
   Format.fprintf ppf "@[(Naked_float32@ (%a))@]" Float32.Set.print head
@@ -1471,10 +1604,16 @@ and ids_for_export_head_of_kind_value_non_null head =
       (fun ids field -> Ids_for_export.union ids (ids_for_export field))
       (ids_for_export length) fields
 
+and ids_for_export_inverse_relations inverse_relations =
+  Relation.Map.fold
+    (fun _ names ids_for_export ->
+      Name.Set.fold
+        (fun name ids_for_export -> Ids_for_export.add_name ids_for_export name)
+        names ids_for_export)
+    inverse_relations Ids_for_export.empty
+
 and ids_for_export_head_of_kind_naked_immediate head =
-  match head with
-  | Naked_immediates _ -> Ids_for_export.empty
-  | Is_int t | Get_tag t | Is_null t -> ids_for_export t
+  ids_for_export_inverse_relations (inverse_relations head)
 
 and ids_for_export_head_of_kind_naked_float32 _ = Ids_for_export.empty
 
@@ -2300,28 +2439,44 @@ and remove_unused_value_slots_and_shortcut_aliases_head_of_kind_value_non_null
           alloc_mode
         }
 
+and remove_unused_value_slots_and_shortcut_aliases_inverse_relations
+    inverse_relations ~used_value_slots:_ ~canonicalise =
+  Relation.Map.filter_map_sharing
+    (fun _ names ->
+      let changed = ref false in
+      let names' =
+        Name.Set.fold
+          (fun name names ->
+            Simple.pattern_match
+              (canonicalise (Simple.name name))
+              ~const:(fun _ ->
+                (* CR bclement: We should arguably update the set of known
+                   naked_immediates *)
+                changed := true;
+                names)
+              ~name:(fun name' ~coercion:_ ->
+                if name' != name then changed := true;
+                Name.Set.add name' names))
+          names Name.Set.empty
+      in
+      if !changed
+      then if Name.Set.is_empty names' then None else Some names'
+      else Some names)
+    inverse_relations
+
 and remove_unused_value_slots_and_shortcut_aliases_head_of_kind_naked_immediate
     head ~used_value_slots ~canonicalise =
-  match head with
-  | Naked_immediates _ -> head
-  | Is_int ty ->
-    let ty' =
-      remove_unused_value_slots_and_shortcut_aliases ty ~used_value_slots
-        ~canonicalise
-    in
-    if ty == ty' then head else Is_int ty'
-  | Get_tag ty ->
-    let ty' =
-      remove_unused_value_slots_and_shortcut_aliases ty ~used_value_slots
-        ~canonicalise
-    in
-    if ty == ty' then head else Get_tag ty'
-  | Is_null ty ->
-    let ty' =
-      remove_unused_value_slots_and_shortcut_aliases ty ~used_value_slots
-        ~canonicalise
-    in
-    if ty == ty' then head else Is_null ty'
+  let inverse_relations = inverse_relations head in
+  let inverse_relations' =
+    remove_unused_value_slots_and_shortcut_aliases_inverse_relations
+      inverse_relations ~used_value_slots ~canonicalise
+  in
+  if inverse_relations' == inverse_relations
+  then head
+  else
+    create_head_of_kind_naked_immediate
+      ~naked_immediates:(naked_immediates head)
+      ~inverse_relations:inverse_relations'
 
 and remove_unused_value_slots_and_shortcut_aliases_head_of_kind_naked_float32
     head ~used_value_slots:_ ~canonicalise:_ =
@@ -3010,18 +3165,51 @@ and project_head_of_kind_value_non_null ~to_project ~expand head =
           alloc_mode
         }
 
+and project_inverse_relations ~to_project ~expand inverse_relations =
+  Relation.Map.filter_map_sharing
+    (fun _ names ->
+      let changed = ref false in
+      let names' =
+        Name.Set.fold
+          (fun name names ->
+            Name.pattern_match name
+              ~symbol:(fun _ -> Name.Set.add name names)
+              ~var:(fun var ->
+                if not (Variable.Set.mem var to_project)
+                then Name.Set.add name names
+                else
+                  match get_alias_opt (expand var) with
+                  | None ->
+                    changed := true;
+                    names
+                  | Some simple ->
+                    Simple.pattern_match simple
+                      ~const:(fun _ ->
+                        (* CR bclement: we should arguably update the set of
+                           known naked_immediates *)
+                        changed := true;
+                        names)
+                      ~name:(fun name' ~coercion:_ ->
+                        if name' != name then changed := true;
+                        Name.Set.add name' names)))
+          names Name.Set.empty
+      in
+      if !changed
+      then if Name.Set.is_empty names' then None else Some names'
+      else Some names)
+    inverse_relations
+
 and project_head_of_kind_naked_immediate ~to_project ~expand head =
-  match head with
-  | Naked_immediates _ -> head
-  | Is_int ty ->
-    let ty' = project_variables_out ~to_project ~expand ty in
-    if ty == ty' then head else Is_int ty'
-  | Get_tag ty ->
-    let ty' = project_variables_out ~to_project ~expand ty in
-    if ty == ty' then head else Get_tag ty'
-  | Is_null ty ->
-    let ty' = project_variables_out ~to_project ~expand ty in
-    if ty == ty' then head else Is_null ty'
+  let inverse_relations = inverse_relations head in
+  let inverse_relations' =
+    project_inverse_relations ~to_project ~expand inverse_relations
+  in
+  if inverse_relations' == inverse_relations
+  then head
+  else
+    create_head_of_kind_naked_immediate
+      ~naked_immediates:(naked_immediates head)
+      ~inverse_relations:inverse_relations'
 
 and project_head_of_kind_naked_float32 ~to_project:_ ~expand:_ head = head
 
@@ -4049,14 +4237,56 @@ let tagged_immediate_alias_to ~naked_immediate : t =
   tag_immediate
     (Naked_immediate (TD.create_equals (Simple.var naked_immediate)))
 
-let is_int_for_scrutinee ~scrutinee : t =
-  Naked_immediate (TD.create (Is_int (alias_type_of K.value scrutinee)))
+let is_int_for_scrutinee ~machine_width ~scrutinee : t =
+  let descr =
+    Simple.pattern_match scrutinee
+      ~const:(fun _ ->
+        TD.create_equals (Simple.untagged_const_true machine_width))
+      ~name:(fun name ~coercion:_ ->
+        let head =
+          create_head_of_kind_naked_immediate
+            ~naked_immediates:(Known (Target_ocaml_int.all_bools machine_width))
+            ~inverse_relations:
+              (Relation.Map.singleton Relation.is_int (Name.Set.singleton name))
+        in
+        TD.create head)
+  in
+  Naked_immediate descr
 
 let get_tag_for_block ~block : t =
-  Naked_immediate (TD.create (Get_tag (alias_type_of K.value block)))
+  let descr =
+    Simple.pattern_match block
+      ~const:(fun _ ->
+        (* CR bclement: it's not clear that it is safe to use bottom here,
+           because we are a bit loose about creating [get_tag] relations of
+           things that might not be blocks. *)
+        TD.unknown)
+      ~name:(fun name ~coercion:_ ->
+        let head =
+          create_head_of_kind_naked_immediate ~naked_immediates:Unknown
+            ~inverse_relations:
+              (Relation.Map.singleton Relation.get_tag (Name.Set.singleton name))
+        in
+        TD.create head)
+  in
+  Naked_immediate descr
 
-let is_null ~scrutinee : t =
-  Naked_immediate (TD.create (Is_null (alias_type_of K.value scrutinee)))
+let is_null ~machine_width ~scrutinee : t =
+  let descr =
+    Simple.pattern_match scrutinee
+      ~const:(fun const ->
+        TD.create_equals
+          (Simple.untagged_const_bool machine_width (RWC.is_null const)))
+      ~name:(fun name ~coercion:_ ->
+        let head =
+          create_head_of_kind_naked_immediate
+            ~naked_immediates:(Known (Target_ocaml_int.all_bools machine_width))
+            ~inverse_relations:
+              (Relation.Map.singleton Relation.is_null (Name.Set.singleton name))
+        in
+        TD.create head)
+  in
+  Naked_immediate descr
 
 let boxed_float32_alias_to ~naked_float32 =
   box_float32 (Naked_float32 (TD.create_equals (Simple.var naked_float32)))
@@ -4328,6 +4558,31 @@ end
 module Head_of_kind_naked_immediate = struct
   type t = head_of_kind_naked_immediate
 
+  type descr =
+    { naked_immediates : Target_ocaml_int.Set.t Or_unknown.t;
+      inverse_relations : Name.Set.t Relation.Map.t
+    }
+
+  let descr head =
+    { naked_immediates = naked_immediates head;
+      inverse_relations = inverse_relations head
+    }
+
+  let from_descr { naked_immediates; inverse_relations } : _ Or_bottom.t =
+    match naked_immediates with
+    | Known imms when Target_ocaml_int.Set.is_empty imms -> Bottom
+    | Known _ | Unknown ->
+      Ok
+        (create_head_of_kind_naked_immediate ~naked_immediates
+           ~inverse_relations)
+
+  let from_descr_non_empty { naked_immediates; inverse_relations } =
+    match naked_immediates with
+    | Known imms when Target_ocaml_int.Set.is_empty imms ->
+      Misc.fatal_error "Head_of_kind_naked_immediates.from_descr_non_empty"
+    | Known _ | Unknown ->
+      create_head_of_kind_naked_immediate ~naked_immediates ~inverse_relations
+
   let create_naked_immediate imm =
     Naked_immediates (Target_ocaml_int.Set.singleton imm)
 
@@ -4342,12 +4597,6 @@ module Head_of_kind_naked_immediate = struct
       Misc.fatal_error
         "Head_of_kind_naked_immediates.create_naked_immediates_non_empty";
     Naked_immediates imms
-
-  let create_is_int ty = Is_int ty
-
-  let create_get_tag ty = Get_tag ty
-
-  let create_is_null ty = Is_null ty
 end
 
 module Make_head_of_kind_naked_number (N : Container_types.S) = struct
@@ -4446,13 +4695,17 @@ let rec must_be_singleton t ~machine_width : RWC.t option =
                   Reg_width_const.print const)))))
   | Naked_immediate ty -> (
     match TD.descr ty with
-    | Unknown | Bottom | Ok (No_alias (Is_int _ | Get_tag _ | Is_null _)) ->
-      None
+    | Unknown | Bottom -> None
     | Ok (Equals simple) -> Simple.must_be_const simple
-    | Ok (No_alias (Naked_immediates is)) -> (
-      match Target_ocaml_int.Set.get_singleton is with
-      | Some i -> Some (RWC.naked_immediate i)
-      | None -> None))
+    | Ok (No_alias head) -> (
+      (* It should be fine to discard the inverse relations here because the
+         [meet] will have propagated them already. *)
+      match naked_immediates head with
+      | Unknown -> None
+      | Known is -> (
+        match Target_ocaml_int.Set.get_singleton is with
+        | Some i -> Some (RWC.naked_immediate i)
+        | None -> None)))
   | Naked_float32 ty -> (
     match TD.descr ty with
     | Unknown | Bottom -> None
