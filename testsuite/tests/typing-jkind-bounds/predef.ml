@@ -183,7 +183,6 @@ Error: The kind of type "'a ref" is mutable_data with 'a @@ unyielding many.
 
        The first mode-crosses less than the second along:
          portability: mod portable with 'a ≰ mod portable
-         statefulness: mod stateless with 'a ≰ mod stateless
 |}]
 
 type t_test = int ref require_portable

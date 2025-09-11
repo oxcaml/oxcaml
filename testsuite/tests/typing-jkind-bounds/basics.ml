@@ -1494,8 +1494,15 @@ type 'a t = 'a
 |}]
 
 type 'a t : value mod global = 'a
+(* CR jujacobs: this used to be accepted: bounds should propagate to type argument *)
 [%%expect {|
-type ('a : value mod global) t = 'a
+Line 1, characters 0-33:
+1 | type 'a t : value mod global = 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a" is value
+         because of the definition of t at line 1, characters 0-33.
+       But the kind of type "'a" must be a subkind of value mod global
+         because of the definition of t at line 1, characters 0-33.
 |}]
 
 type 'a t : word = 'a
@@ -1505,7 +1512,7 @@ Line 1, characters 0-21:
     ^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-21.
-       But the layout of type "'a" must overlap with word
+       But the layout of type "'a" must be a sublayout of word
          because of the definition of t at line 1, characters 0-21.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
@@ -1522,8 +1529,15 @@ type 'a t = private 'a
 |}]
 
 type 'a t : value mod global = private 'a
+(* CR jujacobs: this used to be accepted: bounds should propagate to type argument *)
 [%%expect {|
-type ('a : value mod global) t = private 'a
+Line 1, characters 0-41:
+1 | type 'a t : value mod global = private 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a" is value
+         because of the definition of t at line 1, characters 0-41.
+       But the kind of type "'a" must be a subkind of value mod global
+         because of the definition of t at line 1, characters 0-41.
 |}]
 
 type 'a t : word = private 'a
@@ -1533,7 +1547,7 @@ Line 1, characters 0-29:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-29.
-       But the layout of type "'a" must overlap with word
+       But the layout of type "'a" must be a sublayout of word
          because of the definition of t at line 1, characters 0-29.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
@@ -1836,4 +1850,16 @@ module type S2 = S with type 'a t = 'a
 [%%expect{|
 module type S = sig type 'a t : value mod portable with 'a end
 module type S2 = sig type 'a t = 'a end
+|}]
+
+(* Function types *)
+type t : immutable_data = int -> int
+[%%expect {|
+Line 1, characters 0-36:
+1 | type t : immutable_data = int -> int
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int -> int" is value mod aliased immutable non_float
+         because it's a function type.
+       But the kind of type "int -> int" must be a subkind of immutable_data
+         because of the definition of t at line 1, characters 0-36.
 |}]

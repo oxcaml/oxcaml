@@ -1,5 +1,5 @@
 (* TEST
-    flags += " -ikinds";
+    flags += "-ikinds";
     expect;
 *)
 
@@ -19,25 +19,21 @@ val use_many : 'a -> unit = <fun>
 (* Simple cases : closed polymorphic variants with fields *)
 
 type 'a t : immutable_data with 'a = [ `A of 'a ]
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type 'a t = [ `A of 'a ]
 |}]
 
 type 'a u : mutable_data with 'a = [ `B of 'a ref ]
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type 'a u = [ `B of 'a ref ]
 |}]
 
 type 'a v : value mod contended with 'a = [ `C of 'a | `D of 'a -> 'a | `E of 'a option ]
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type 'a v = [ `C of 'a | `D of 'a -> 'a | `E of 'a option ]
 |}]
 
 type 'a w : value mod contended with 'a = [ 'a t | 'a v ]
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type 'a w = [ `A of 'a | `C of 'a | `D of 'a -> 'a | `E of 'a option ]
 |}]
@@ -45,7 +41,6 @@ type 'a w = [ `A of 'a | `C of 'a | `D of 'a -> 'a | `E of 'a option ]
 let cross_contention (x : int t @ contended) = use_uncontended x
 let cross_portability (x : int t @ nonportable) = use_portable x
 let cross_linearity (x : int t @ once) = use_many x
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 val cross_contention : int t @ contended -> unit = <fun>
 val cross_portability : int t -> unit = <fun>
@@ -268,26 +263,30 @@ Error: This alias is bound to type "[< `Foo of int ]"
 
 (* Recursive polymorphic variants. *)
 type trec1 : immutable_data = [ `A of string | `B of 'a ] as 'a
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type trec1 = [ `A of string | `B of 'a ] as 'a
 |}]
 
 type trec2 : immutable_data = [ `A | `B of 'a list ] as 'a
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type trec2 = [ `A | `B of 'a list ] as 'a
 |}]
 
 type trec_fails : immutable_data = [ `C | `D of 'a * unit -> 'a ] as 'a
 
-(* CR jujacobs: this used to fail, but is now accepted. Bug! *)
 [%%expect{|
-type trec_fails = [ `C | `D of 'a * unit -> 'a ] as 'a
+Line 1, characters 0-71:
+1 | type trec_fails : immutable_data = [ `C | `D of 'a * unit -> 'a ] as 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" is
+           immutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" must be a subkind of
+         immutable_data
+         because of the definition of trec_fails at line 1, characters 0-71.
 |}]
 
 type trec_succeeds : value mod immutable = [ `C | `D of 'a * unit -> 'a ] as 'a
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type trec_succeeds = [ `C | `D of 'a * unit -> 'a ] as 'a
 |}]
@@ -295,16 +294,24 @@ type trec_succeeds = [ `C | `D of 'a * unit -> 'a ] as 'a
 type trec_rec_fails : immutable_data =
   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
 
-(* CR jujacobs: this used to fail, but is now accepted. Bug! *)
 [%%expect{|
-type trec_rec_fails =
-    [ `X of [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b | `Y of 'b ]
-    as 'a
+Lines 1-2, characters 0-80:
+1 | type trec_rec_fails : immutable_data =
+2 |   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
+Error: The kind of type "[ `X of
+                            [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b
+                        | `Y of 'b ] as 'a" is immutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `X of
+                                [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ]
+                                as 'b
+                            | `Y of 'b ] as 'a" must be a subkind of
+           immutable_data
+         because of the definition of trec_rec_fails at lines 1-2, characters 0-80.
 |}]
 
 type trec_rec_succeeds : value mod immutable =
   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
-(* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type trec_rec_succeeds =
     [ `X of [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b | `Y of 'b ]
@@ -481,4 +488,102 @@ Error: The kind of type "t4" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t4" must be a subkind of immediate with M1.t
          because of the annotation on the declaration of the type t4.
+|}]
+
+
+type fails : immutable_data = int -> int
+[%%expect{|
+Line 1, characters 0-40:
+1 | type fails : immutable_data = int -> int
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int -> int" is value mod aliased immutable non_float
+         because it's a function type.
+       But the kind of type "int -> int" must be a subkind of immutable_data
+         because of the definition of fails at line 1, characters 0-40.
+|}]
+
+type should_fail : immutable_data = [`A of int -> int]
+[%%expect{|
+Line 1, characters 0-54:
+1 | type should_fail : immutable_data = [`A of int -> int]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of int -> int ]" is immutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of int -> int ]" must be a subkind of
+           immutable_data
+         because of the definition of should_fail at line 1, characters 0-54.
+|}]
+
+type should_also_fail : immutable_data = [`A of int -> int | `B of 'a] as 'a
+[%%expect{|
+Line 1, characters 0-76:
+1 | type should_also_fail : immutable_data = [`A of int -> int | `B of 'a] as 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of int -> int | `B of 'a ] as 'a" is
+           immutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of int -> int | `B of 'a ] as 'a" must be a subkind of
+         immutable_data
+         because of the definition of should_also_fail at line 1, characters 0-76.
+|}]
+
+type r
+
+type should_fail_too : immutable_data with r = [`A of int ref]
+[%%expect{|
+type r
+Line 3, characters 0-62:
+3 | type should_fail_too : immutable_data with r = [`A of int ref]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of int ref ]" is immutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of int ref ]" must be a subkind of
+           immutable_data with r
+         because of the definition of should_fail_too at line 3, characters 0-62.
+|}]
+
+type should_likewise_fail : immutable_data = (int ref * (int -> int))
+[%%expect{|
+Line 1, characters 0-69:
+1 | type should_likewise_fail : immutable_data = (int ref * (int -> int))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int ref * (int -> int)" is value mod non_float
+         because it's a tuple type.
+       But the kind of type "int ref * (int -> int)" must be a subkind of
+           immutable_data
+         because of the definition of should_likewise_fail at line 1, characters 0-69.
+|}]
+
+type and_even_this_should_fail : immutable_data = [`A of [`B of int ref]]
+[%%expect{|
+Line 1, characters 0-73:
+1 | type and_even_this_should_fail : immutable_data = [`A of [`B of int ref]]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of [ `B of int ref ] ]" is immutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of [ `B of int ref ] ]" must be a subkind of
+           immutable_data
+         because of the definition of and_even_this_should_fail at line 1, characters 0-73.
+|}]
+
+type this_should_succeed : immutable_data = ((int * int) * (int * int))
+[%%expect{|
+type this_should_succeed = (int * int) * (int * int)
+|}]
+
+type this_too : immutable_data = (int * int) list
+[%%expect{|
+type this_too = (int * int) list
+|}]
+
+type this_too : immutable_data = (int -> int) list
+[%%expect{|
+Line 1, characters 0-50:
+1 | type this_too : immutable_data = (int -> int) list
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "(int -> int) list" is value mod immutable non_float
+         because it's a boxed variant type.
+       But the kind of type "(int -> int) list" must be a subkind of
+           immutable_data
+         because of the definition of this_too at line 1, characters 0-50.
 |}]
