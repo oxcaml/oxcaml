@@ -28,8 +28,9 @@
 
 open! Jsoo_imports.Import
 
-let static_const_not_supported () =
-  Misc.fatal_error "This static_const is not yet supported."
+let static_const_not_supported const =
+  Misc.fatal_errorf "The static_const %a is not yet supported."
+    Static_const.print const
 
 let bind_expr_to_symbol ~env ~res symbol expr =
   (* This should already be populated by To_jsir.let_expr_normal *)
@@ -132,7 +133,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       ~to_jsir_const:To_jsir_shared.nativeint_to_jsir_const value
   | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _ ->
     (* Need SIMD *)
-    static_const_not_supported ()
+    static_const_not_supported const
   | Immutable_float_block values ->
     numeric_block_or_array ~env ~res ~symbol values
       ~tag:(Tag.to_int Tag.double_array_tag)
@@ -185,7 +186,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
   | Immutable_vec128_array _ | Immutable_vec256_array _
   | Immutable_vec512_array _ ->
     (* Need SIMD *)
-    static_const_not_supported ()
+    static_const_not_supported const
   | Empty_array kind ->
     let tag =
       match kind with
@@ -200,13 +201,13 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       | Unboxed_products -> 0
       | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         (* No SIMD *)
-        static_const_not_supported ()
+        static_const_not_supported const
     in
     bind_expr_to_symbol ~env ~res symbol
       (Prim (Extern "caml_make_vect", [Pc (Int (Targetint.of_int tag)); Pc Null]))
   | Mutable_string { initial_value } ->
     ignore initial_value;
-    static_const_not_supported ()
+    static_const_not_supported const
   | Immutable_string value ->
     bind_expr_to_symbol ~env ~res symbol (Constant (String value))
 
