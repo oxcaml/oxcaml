@@ -47,7 +47,8 @@ let prim_args ~env ~res simples =
       arg :: args, res)
     simples ([], res)
 
-let with_int_prefix ~(kind : Flambda_kind.Standard_int.t) ~percent_for_imms op =
+let with_int_prefix_exn ~(kind : Flambda_kind.Standard_int.t) ~percent_for_imms
+    op =
   let prefix =
     match kind, percent_for_imms with
     | (Tagged_immediate | Naked_immediate), true -> "%int"
@@ -90,7 +91,7 @@ let use_prim' ~env ~res prim simples =
   let args, res = prim_args ~env ~res simples in
   use_prim ~env ~res prim args
 
-let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
+let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
   let use_prim' prim = use_prim ~env ~res prim [] in
   match f with
   | Invalid _ -> use_prim' (Extern "caml_invalid_primitive")
@@ -120,7 +121,7 @@ let check_tag ~env ~res x ~tag =
   let var = Jsir.Var.fresh () in
   Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
 
-let block_access_kind (kind : Flambda_primitive.Block_access_kind.t) :
+let block_access_kind_exn (kind : Flambda_primitive.Block_access_kind.t) :
     Jsir.field_type =
   match kind with
   | Values _ -> Non_float
@@ -169,7 +170,7 @@ let check_my_closure ~env x =
          closure variable or symbol)"
         Reg_width_const.print const)
 
-let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
+let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
   let use_prim' prim = use_prim' ~env ~res prim [x] in
   match f with
   | Block_load { kind; mut = _; field } ->
@@ -177,7 +178,8 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     let expr, res =
       match prim_arg ~env ~res x with
       | Pv v, res ->
-        ( Jsir.Field (v, Target_ocaml_int.to_int field, block_access_kind kind),
+        ( Jsir.Field
+            (v, Target_ocaml_int.to_int field, block_access_kind_exn kind),
           res )
       | Pc _, _res -> Misc.fatal_error "Block_load on constant"
     in
@@ -317,7 +319,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     let var = Jsir.Var.fresh () in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
 
-let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
+let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   let use_prim' prim = use_prim' ~env ~res prim [x; y] in
   match f with
   | Block_set { kind; init = _; field } ->
@@ -330,8 +332,8 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     ( None,
       env,
       To_jsir_result.add_instr_exn res
-        (Set_field (x, Target_ocaml_int.to_int field, block_access_kind kind, y))
-    )
+        (Set_field
+           (x, Target_ocaml_int.to_int field, block_access_kind_exn kind, y)) )
   | Array_load (kind, load_kind, _mut) -> (
     match kind, load_kind with
     | ( ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
@@ -385,7 +387,9 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Or -> "or"
       | Xor -> "xor"
     in
-    let extern_name = with_int_prefix ~kind op_name ~percent_for_imms:true in
+    let extern_name =
+      with_int_prefix_exn ~kind op_name ~percent_for_imms:true
+    in
     use_prim' (Extern extern_name)
   | Int_shift (kind, op) ->
     let op_name =
@@ -401,7 +405,9 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         (* CR selee: smallints *)
         raise Primitive_not_supported
     in
-    let extern_name = with_int_prefix ~kind op_name ~percent_for_imms:true in
+    let extern_name =
+      with_int_prefix_exn ~kind op_name ~percent_for_imms:true
+    in
     use_prim' (Extern extern_name)
   | Int_comp (kind, behaviour) -> (
     match behaviour with
@@ -457,7 +463,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       match signed_or_unsigned with
       | Signed ->
         let extern_name =
-          with_int_prefix ~kind "compare" ~percent_for_imms:false
+          with_int_prefix_exn ~kind "compare" ~percent_for_imms:false
         in
         use_prim' (Extern extern_name)
       | Unsigned ->
@@ -503,7 +509,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
        JSOO to support. We will leave this for now. *)
     raise Primitive_not_supported
 
-let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
+let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   let use_prim' prim = use_prim' ~env ~res prim [x; y; z] in
   match f with
   | Array_set (kind, set_kind) -> (
@@ -568,14 +574,15 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
        JSOO to support. We will leave this for now. *)
     raise Primitive_not_supported
 
-let quaternary ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y z =
+let quaternary_exn ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y
+    z =
   let use_prim' prim = use_prim' ~env ~res prim [w; x; y; z] in
   match f with
   | Atomic_compare_and_set_field _ -> use_prim' (Extern "caml_atomic_cas_field")
   | Atomic_compare_exchange_field _ ->
     use_prim' (Extern "caml_atomic_compare_exchange_field")
 
-let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
+let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   match f with
   | Begin_region _ | Begin_try_region _ -> no_op ~env ~res
   | Make_block (kind, mut, _alloc_mode) ->
@@ -624,12 +631,12 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
 let primitive ~env ~res (prim : Flambda_primitive.t) =
   try
     match prim with
-    | Nullary f -> nullary ~env ~res f
-    | Unary (f, x) -> unary ~env ~res f x
-    | Binary (f, x, y) -> binary ~env ~res f x y
-    | Ternary (f, x, y, z) -> ternary ~env ~res f x y z
-    | Quaternary (f, w, x, y, z) -> quaternary ~env ~res f w x y z
-    | Variadic (f, xs) -> variadic ~env ~res f xs
+    | Nullary f -> nullary_exn ~env ~res f
+    | Unary (f, x) -> unary_exn ~env ~res f x
+    | Binary (f, x, y) -> binary_exn ~env ~res f x y
+    | Ternary (f, x, y, z) -> ternary_exn ~env ~res f x y z
+    | Quaternary (f, w, x, y, z) -> quaternary_exn ~env ~res f w x y z
+    | Variadic (f, xs) -> variadic_exn ~env ~res f xs
   with Primitive_not_supported ->
     Misc.fatal_errorf
       "The primitive %a is not supported for JavaScript/WASM compilation."
