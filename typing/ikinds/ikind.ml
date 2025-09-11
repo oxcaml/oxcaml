@@ -192,9 +192,8 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
                      per-constructor args. *)
                   let base = ops.const Axis_lattice.immutable_data in
                   let mask =
-                    Axis_lattice.top
-                    (* Axis_lattice.mask_of_modality *)
-                    (* ~relevant_for_shallow:`Irrelevant Mode.Modality.Const.id *)
+                    Axis_lattice.mask_of_modality
+                      ~relevant_for_shallow:`Irrelevant Mode.Modality.Const.id
                   in
                   Btype.fold_row
                     (fun acc ty ->
