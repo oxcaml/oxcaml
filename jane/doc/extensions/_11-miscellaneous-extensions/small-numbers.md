@@ -113,3 +113,31 @@ Coming soon
 ### Small int arrays
 
 Coming soon
+
+## Untagged Char
+
+When small numbers are enabled, the type `char#` is available.
+
+Literals are prefixed with `#`:
+```
+#'a'     : char#
+#'\123'  : char#
+#'\o123' : char#
+#'\xff'  : char#
+```
+
+Untagged char literals can be used in patterns, but not in ranges:
+```
+match x with
+| #'a' -> f ()       (* allowed *)
+| #'a'..#'z' -> g () (* not allowed *)
+```
+
+### Operations
+
+Operations on untagged chars are available via the `Stdlib_stable.Char_u`
+library.
+
+### Representation
+
+Untagged chars have the same layout as `int8#`.

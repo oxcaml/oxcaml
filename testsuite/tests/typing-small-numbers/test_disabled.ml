@@ -232,7 +232,10 @@ Hint: Did you mean "int", "int16x8", "int32", "int64" or "int8x16"?
 
 let f () = #'a';;
 [%%expect{|
-Error: Found untagged char literal...
+Line 1, characters 11-15:
+1 | let f () = #'a';;
+               ^^^^
+Error: Found untagged char literal #'a', but char# is not enabled. You must enable -extension small_numbers to use this feature.
 |}];;
 
 
