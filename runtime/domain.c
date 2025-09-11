@@ -164,8 +164,8 @@ struct dom_internal {
      caml_interrupt_all_signal_safe. The innermost atomic is also for
      cross-domain communication.*/
   _Atomic(atomic_uintnat *) interrupt_word;
-  caml_plat_mutex lock;
-  caml_plat_cond cond;
+  caml_plat_mutex interrupt_lock;
+  caml_plat_cond interrupt_cond;
 
   int running;
   int terminating;
@@ -337,7 +337,7 @@ int caml_incoming_interrupts_queued(void)
   return domain_has_pending(domain_self);
 }
 
-/* must NOT be called with s->lock held */
+/* must NOT be called with s->interrupt_lock held */
 static void stw_handler(caml_domain_state* domain);
 static int handle_incoming(dom_internal *d)
 {
@@ -369,9 +369,9 @@ int caml_send_interrupt(dom_internal *target)
 
   /* Signal the condition variable, in case the target is
      itself waiting for an interrupt to be processed elsewhere */
-  caml_plat_lock_blocking(&target->lock);
-  caml_plat_broadcast(&target->cond); // OPT before/after unlock? elide?
-  caml_plat_unlock(&target->lock);
+  caml_plat_lock_blocking(&target->interrupt_lock);
+  caml_plat_broadcast(&target->interrupt_cond); // OPT before/after unlock? elide?
+  caml_plat_unlock(&target->interrupt_lock);
 
   interrupt_domain(target);
 
@@ -1003,8 +1003,8 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
     dom->id = i;
 
     dom->interrupt_word = NULL;
-    caml_plat_mutex_init(&dom->lock);
-    caml_plat_cond_init(&dom->cond);
+    caml_plat_mutex_init(&dom->interrupt_lock);
+    caml_plat_cond_init(&dom->interrupt_cond);
     dom->running = 0;
     dom->terminating = 0;
     dom->unique_id = 0;
@@ -1098,12 +1098,12 @@ static void* backup_thread_func(void* v)
         /* Wait safely if there is nothing to do.
          * Will be woken from caml_leave_blocking_section
          */
-        caml_plat_lock_blocking(&di->lock);
+        caml_plat_lock_blocking(&di->interrupt_lock);
         msg = atomic_load_acquire (&di->backup_thread_msg);
         if (msg == BT_IN_BLOCKING_SECTION &&
             !caml_incoming_interrupts_queued())
-          caml_plat_wait(&di->cond, &di->lock);
-        caml_plat_unlock(&di->lock);
+          caml_plat_wait(&di->interrupt_cond, &di->interrupt_lock);
+        caml_plat_unlock(&di->interrupt_lock);
         break;
       case BT_ENTERING_OCAML:
         /* Main thread wants to enter OCaml
@@ -1266,15 +1266,15 @@ static void* domain_thread_func(void* v)
   p->newdom = domain_self;
 
   /* handshake with the parent domain */
-  caml_plat_lock_blocking(&p->parent->lock);
+  caml_plat_lock_blocking(&p->parent->interrupt_lock);
   if (domain_self) {
     p->status = Dom_started;
     p->unique_id = domain_self->unique_id;
   } else {
     p->status = Dom_failed;
   }
-  caml_plat_broadcast(&p->parent->cond);
-  caml_plat_unlock(&p->parent->lock);
+  caml_plat_broadcast(&p->parent->interrupt_cond);
+  caml_plat_unlock(&p->parent->interrupt_lock);
   /* Cannot access p below here. */
 
   if (domain_self) {
@@ -1351,17 +1351,17 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
 
   /* While waiting for the child thread to start up, we need to service any
      stop-the-world requests as they come in. */
-  caml_plat_lock_blocking(&domain_self->lock);
+  caml_plat_lock_blocking(&domain_self->interrupt_lock);
   while (p.status == Dom_starting) {
     if (caml_incoming_interrupts_queued()) {
-      caml_plat_unlock(&domain_self->lock);
+      caml_plat_unlock(&domain_self->interrupt_lock);
       handle_incoming(domain_self);
-      caml_plat_lock_blocking(&domain_self->lock);
+      caml_plat_lock_blocking(&domain_self->interrupt_lock);
     } else {
-      caml_plat_wait(&domain_self->cond, &domain_self->lock);
+      caml_plat_wait(&domain_self->interrupt_cond, &domain_self->interrupt_lock);
     }
   }
-  caml_plat_unlock(&domain_self->lock);
+  caml_plat_unlock(&domain_self->interrupt_lock);
 
   if (p.status == Dom_started) {
     /* successfully created a domain.
@@ -2113,9 +2113,9 @@ static void domain_terminate (void)
       /* signal the condition variable
        * because the backup thread may be waiting on it
        */
-      caml_plat_lock_blocking(&domain_self->lock);
-      caml_plat_broadcast(&domain_self->cond);
-      caml_plat_unlock(&domain_self->lock);
+      caml_plat_lock_blocking(&domain_self->interrupt_lock);
+      caml_plat_broadcast(&domain_self->interrupt_cond);
+      caml_plat_unlock(&domain_self->interrupt_lock);
 
       CAMLassert (domain_self->backup_thread_running);
       domain_self->backup_thread_running = 0;
