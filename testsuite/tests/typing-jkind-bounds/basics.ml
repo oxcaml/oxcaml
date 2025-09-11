@@ -1505,6 +1505,20 @@ Error: The kind of type "'a" is value
          because of the definition of t at line 1, characters 0-33.
 |}]
 
+type ('a : immutable_data) t
+type 'a u = 'a t
+[%%expect {|
+type ('a : immutable_data) t
+type ('a : immutable_data) u = 'a t
+|}]
+
+type ('a : immutable_data) t
+type ('a : value) u = 'a t
+[%%expect {|
+type ('a : immutable_data) t
+type ('a : immutable_data) u = 'a t
+|}]
+
 type 'a t : word = 'a
 [%%expect {|
 Line 1, characters 0-21:
