@@ -37,7 +37,8 @@ let __ikind_debug : bool = false
 let __ikind_log_depth = ref 0
 
 let log ?pp (msg : string) (f : unit -> 'a) : 'a =
-  if not __ikind_debug then f ()
+  if not __ikind_debug
+  then f ()
   else
     let indent = String.make (!__ikind_log_depth * 2) ' ' in
     let suffix =
@@ -49,39 +50,38 @@ let log ?pp (msg : string) (f : unit -> 'a) : 'a =
     incr __ikind_log_depth;
     match f () with
     | r ->
-        decr __ikind_log_depth;
-        let indent' = String.make (!__ikind_log_depth * 2) ' ' in
-        (match pp with
-        | None -> Format.eprintf "%s[ikind] end %s@." indent' msg
-        | Some to_string ->
-            let s = to_string r in
-            Format.eprintf "%s[ikind] end %s => %s@." indent' msg s);
-        r
+      decr __ikind_log_depth;
+      let indent' = String.make (!__ikind_log_depth * 2) ' ' in
+      (match pp with
+      | None -> Format.eprintf "%s[ikind] end %s@." indent' msg
+      | Some to_string ->
+        let s = to_string r in
+        Format.eprintf "%s[ikind] end %s => %s@." indent' msg s);
+      r
     | exception exn ->
-        decr __ikind_log_depth;
-        let indent' = String.make (!__ikind_log_depth * 2) ' ' in
-        Format.eprintf "%s[ikind] end %s@." indent' msg;
-        raise exn
+      decr __ikind_log_depth;
+      let indent' = String.make (!__ikind_log_depth * 2) ' ' in
+      Format.eprintf "%s[ikind] end %s@." indent' msg;
+      raise exn
 
 let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
  fun (ops : JK.ops) ->
   log ~pp:ops.pp_kind "ckind_of_jkind" (fun () ->
-  (* Base is the modality bounds stored on this jkind. *)
-  let base = ops.const (Axis_lattice.of_mod_bounds j.jkind.mod_bounds) in
-  (* For each with-bound (ty, axes), contribute
-     modality(axes_mask, kind_of ty). *)
-  let contribs =
-    Jkind.With_bounds.to_seq j.jkind.with_bounds
-    |> List.of_seq
-    |> List.map (fun (ty, info) ->
-           let axes = Jkind.With_bounds.type_info_relevant_axes info in
-           let mask = Axis_lattice.of_axis_set axes in
-           log ~pp:ops.pp_kind "with-bound"
-             (fun () ->
-               let kty = ops.kind_of ty in
-               ops.modality mask kty))
-  in
-  ops.join (base :: contribs))
+      (* Base is the modality bounds stored on this jkind. *)
+      let base = ops.const (Axis_lattice.of_mod_bounds j.jkind.mod_bounds) in
+      (* For each with-bound (ty, axes), contribute
+         modality(axes_mask, kind_of ty). *)
+      let contribs =
+        Jkind.With_bounds.to_seq j.jkind.with_bounds
+        |> List.of_seq
+        |> List.map (fun (ty, info) ->
+               let axes = Jkind.With_bounds.type_info_relevant_axes info in
+               let mask = Axis_lattice.of_axis_set axes in
+               log ~pp:ops.pp_kind "with-bound" (fun () ->
+                   let kty = ops.kind_of ty in
+                   ops.modality mask kty))
+      in
+      ops.join (base :: contribs))
 
 let ckind_of_jkind_l (j : Types.jkind_l) : JK.ckind = ckind_of_jkind j
 
@@ -104,103 +104,118 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
     | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
       ->
       log ~pp:ops.pp_kind "Tvar/Tunivar" (fun () ->
-        (* TODO: allow general jkinds here (including with-bounds) *)
-        let jkind_l = Jkind.disallow_right jkind in
-        let ckind = ckind_of_jkind_l jkind_l in
-        ops.meet (ops.rigid ty) (ckind ops))
+          (* TODO: allow general jkinds here (including with-bounds) *)
+          let jkind_l = Jkind.disallow_right jkind in
+          let ckind = ckind_of_jkind_l jkind_l in
+          ops.meet (ops.rigid ty) (ckind ops))
     | Types.Tconstr (p, args, _abbrev_memo) ->
       let p_str = Format.asprintf "%a" Path.print p in
-      log ~pp:ops.pp_kind (Printf.sprintf "Tconstr %s (%d args)" p_str (List.length args)) (fun () ->
-        let arg_kinds =
-          List.mapi
-            (fun i t ->
-              log ~pp:ops.pp_kind (Printf.sprintf "arg %d" i) (fun () -> ops.kind_of t))
-            args
-        in
-        let p' = context.normalize_path p in
-        ops.constr p' arg_kinds)
-    | Types.Ttuple elts ->
-      log ~pp:ops.pp_kind (Printf.sprintf "Ttuple %d elts" (List.length elts)) (fun () ->
-      (* Boxed tuples: immutable_data base + per-element contributions
-         under id modality. *)
-        let base = ops.const Axis_lattice.immutable_data in
-        let contribs =
-          List.map
-            (fun (_lbl, t) ->
-              let mask =
-                Axis_lattice.mask_of_modality ~relevant_for_shallow:`Irrelevant
-                  Mode.Modality.Const.id
-              in
-              log ~pp:ops.pp_kind "tuple elt"
-                (fun () -> ops.modality mask (ops.kind_of t)))
-            elts
-        in
-        ops.join (base :: contribs))
-    | Types.Tunboxed_tuple elts ->
-      log ~pp:ops.pp_kind (Printf.sprintf "Tunboxed_tuple %d elts" (List.length elts)) (fun () ->
-        (* Unboxed tuples: per-element contributions; shallow axes relevant only
-           for arity = 1. *)
-        let contribs =
-          let relevant_for_shallow =
-            match List.length elts with 1 -> `Relevant | _ -> `Irrelevant
+      log ~pp:ops.pp_kind
+        (Printf.sprintf "Tconstr %s (%d args)" p_str (List.length args))
+        (fun () ->
+          let arg_kinds =
+            List.mapi
+              (fun i t ->
+                log ~pp:ops.pp_kind (Printf.sprintf "arg %d" i) (fun () ->
+                    ops.kind_of t))
+              args
           in
-          List.map
-            (fun (_lbl, t) ->
-              let mask =
-                Axis_lattice.mask_of_modality ~relevant_for_shallow
-                  Mode.Modality.Const.id
-              in
-              log ~pp:ops.pp_kind "unboxed tuple elt"
-                (fun () -> ops.modality mask (ops.kind_of t)))
-            elts
-        in
-        ops.join contribs)
+          let p' = context.normalize_path p in
+          ops.constr p' arg_kinds)
+    | Types.Ttuple elts ->
+      log ~pp:ops.pp_kind
+        (Printf.sprintf "Ttuple %d elts" (List.length elts))
+        (fun () ->
+          (* Boxed tuples: immutable_data base + per-element contributions
+             under id modality. *)
+          let base = ops.const Axis_lattice.immutable_data in
+          let contribs =
+            List.map
+              (fun (_lbl, t) ->
+                let mask =
+                  Axis_lattice.mask_of_modality
+                    ~relevant_for_shallow:`Irrelevant Mode.Modality.Const.id
+                in
+                log ~pp:ops.pp_kind "tuple elt" (fun () ->
+                    ops.modality mask (ops.kind_of t)))
+              elts
+          in
+          ops.join (base :: contribs))
+    | Types.Tunboxed_tuple elts ->
+      log ~pp:ops.pp_kind
+        (Printf.sprintf "Tunboxed_tuple %d elts" (List.length elts))
+        (fun () ->
+          (* Unboxed tuples: per-element contributions; shallow axes relevant only
+             for arity = 1. *)
+          let contribs =
+            let relevant_for_shallow =
+              match List.length elts with 1 -> `Relevant | _ -> `Irrelevant
+            in
+            List.map
+              (fun (_lbl, t) ->
+                let mask =
+                  Axis_lattice.mask_of_modality ~relevant_for_shallow
+                    Mode.Modality.Const.id
+                in
+                log ~pp:ops.pp_kind "unboxed tuple elt" (fun () ->
+                    ops.modality mask (ops.kind_of t)))
+              elts
+          in
+          ops.join contribs)
     | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
       log ~pp:ops.pp_kind "Tarrow" (fun () ->
-        (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
-        ops.const Axis_lattice.arrow)
+          (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
+          ops.const Axis_lattice.arrow)
     | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind_of"
     | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind_of"
-    | Types.Tpoly _ -> log ~pp:ops.pp_kind "Tpoly" (fun () -> ops.const Axis_lattice.value)
-    | Types.Tof_kind jkind -> log ~pp:ops.pp_kind "Tof_kind" (fun () -> ckind_of_jkind jkind ops)
-    | Types.Tobject _ -> log ~pp:ops.pp_kind "Tobject" (fun () -> ops.const Axis_lattice.object_legacy)
-    | Types.Tfield _ -> 
+    | Types.Tpoly _ ->
+      log ~pp:ops.pp_kind "Tpoly" (fun () -> ops.const Axis_lattice.value)
+    | Types.Tof_kind jkind ->
+      log ~pp:ops.pp_kind "Tof_kind" (fun () -> ckind_of_jkind jkind ops)
+    | Types.Tobject _ ->
+      log ~pp:ops.pp_kind "Tobject" (fun () ->
+          ops.const Axis_lattice.object_legacy)
+    | Types.Tfield _ ->
       failwith "Tfield shouldn't appear in kind_of"
       (* ops.const Axis_lattice.value *)
-    | Types.Tnil -> 
+    | Types.Tnil ->
       failwith "Tnil shouldn't appear in kind_of"
       (* ops.const Axis_lattice.value *)
     | Types.Tvariant row ->
       log ~pp:ops.pp_kind "Tvariant" (fun () ->
-        if Btype.tvariant_not_immediate row
-        then
-          if Btype.static_row row
+          if Btype.tvariant_not_immediate row
           then
-            log ~pp:ops.pp_kind "closed boxed" (fun () ->
-              (* Closed, boxed polymorphic variant: immutable_data base plus
-                 per-constructor args. *)
-              let base = ops.const Axis_lattice.immutable_data in
-              let mask = Axis_lattice.top 
-                (* Axis_lattice.mask_of_modality *)
-                  (* ~relevant_for_shallow:`Irrelevant Mode.Modality.Const.id *)
-              in
-              Btype.fold_row
-                (fun acc ty ->
-                  let k = log ~pp:ops.pp_kind "constructor arg" (fun () ->
-                    let k_ty = ops.kind_of ty in
-                    ops.modality mask k_ty)
+            if Btype.static_row row
+            then
+              log ~pp:ops.pp_kind "closed boxed" (fun () ->
+                  (* Closed, boxed polymorphic variant: immutable_data base plus
+                     per-constructor args. *)
+                  let base = ops.const Axis_lattice.immutable_data in
+                  let mask =
+                    Axis_lattice.top
+                    (* Axis_lattice.mask_of_modality *)
+                    (* ~relevant_for_shallow:`Irrelevant Mode.Modality.Const.id *)
                   in
-                  ops.join [k; acc]
-                ) base row)
+                  Btype.fold_row
+                    (fun acc ty ->
+                      let k =
+                        log ~pp:ops.pp_kind "constructor arg" (fun () ->
+                            let k_ty = ops.kind_of ty in
+                            ops.modality mask k_ty)
+                      in
+                      ops.join [k; acc])
+                    base row)
+            else
+              log ~pp:ops.pp_kind "open boxed" (fun () ->
+                  (* Open row: conservative non-float value (boxed). *)
+                  ops.const Axis_lattice.nonfloat_value)
           else
-            log ~pp:ops.pp_kind "open boxed" (fun () ->
-              (* Open row: conservative non-float value (boxed). *)
-              ops.const Axis_lattice.nonfloat_value)
-        else
-          log ~pp:ops.pp_kind "immediate" (fun () ->
-            (* All-constant (immediate) polymorphic variant. *)
-            ops.const Axis_lattice.immediate))
-    | Types.Tpackage _ -> log ~pp:ops.pp_kind "Tpackage" (fun () -> ops.const Axis_lattice.nonfloat_value)
+            log ~pp:ops.pp_kind "immediate" (fun () ->
+                (* All-constant (immediate) polymorphic variant. *)
+                ops.const Axis_lattice.immediate))
+    | Types.Tpackage _ ->
+      log ~pp:ops.pp_kind "Tpackage" (fun () ->
+          ops.const Axis_lattice.nonfloat_value)
   in
   decr kind_of_depth;
   res
@@ -224,121 +239,21 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
       match decl.type_kind with
       | Types.Type_abstract _ ->
         log "lookup Type_abstract" (fun () ->
-          let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
-          JK.Ty { args = decl.type_params; kind; abstract = true })
+            let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
+            JK.Ty { args = decl.type_params; kind; abstract = true })
       | Types.Type_record (lbls, _rep, _umc_opt) ->
         log "lookup Type_record" (fun () ->
-        (* Build from components: base (non-float value) + per-label contributions. *)
-        let base_lat =
-          if has_mutable_label lbls
-          then Axis_lattice.mutable_data
-          else Axis_lattice.immutable_data
-        in
-        let kind : JK.ckind =
-         fun (ops : JK.ops) ->
-          log ~pp:ops.pp_kind "record kind" (fun () ->
-            let base = ops.const base_lat in
-            let contribs =
-              List.map
-                (fun (lbl : Types.label_declaration) ->
-                  let mask =
-                    Axis_lattice.mask_of_modality
-                      ~relevant_for_shallow:`Irrelevant lbl.ld_modalities
-                  in
-                  log ~pp:ops.pp_kind
-                    (Printf.sprintf "label %s" (Ident.name lbl.ld_id))
-                    (fun () -> ops.modality mask (ops.kind_of lbl.ld_type)))
-                lbls
+            (* Build from components: base (non-float value) + per-label contributions. *)
+            let base_lat =
+              if has_mutable_label lbls
+              then Axis_lattice.mutable_data
+              else Axis_lattice.immutable_data
             in
-            ops.join (base :: contribs))
-        in
-        JK.Ty { args = decl.type_params; kind; abstract = false })
-      | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
-        log "lookup Type_record_unboxed_product" (fun () ->
-        (* Unboxed products: non-float base; shallow axes relevant only
-           for arity = 1. *)
-        let base_lat =
-          if has_mutable_label lbls
-          then Axis_lattice.mutable_data
-          else Axis_lattice.nonfloat_value
-        in
-        let kind : JK.ckind =
-         fun (ops : JK.ops) ->
-          log ~pp:ops.pp_kind "record_unboxed_product kind" (fun () ->
-            let base = ops.const base_lat in
-            let contribs =
-              let relevant_for_shallow =
-                match List.length lbls with 1 -> `Relevant | _ -> `Irrelevant
-              in
-              List.map
-                (fun (lbl : Types.label_declaration) ->
-                  let mask =
-                    Axis_lattice.mask_of_modality ~relevant_for_shallow
-                      lbl.ld_modalities
-                  in
-                  log ~pp:ops.pp_kind
-                    (Printf.sprintf "label %s" (Ident.name lbl.ld_id))
-                    (fun () -> ops.modality mask (ops.kind_of lbl.ld_type)))
-                lbls
-            in
-            ops.join (base :: contribs))
-        in
-        JK.Ty { args = decl.type_params; kind; abstract = false })
-      | Types.Type_variant (cstrs, _rep, _umc_opt) ->
-        log "lookup Type_variant" (fun () ->
-        (* Choose base: immediate for void-only variants; mutable if any
-           record constructor has a mutable field; otherwise immutable. *)
-        let all_args_void =
-          List.for_all
-            (fun (c : Types.constructor_declaration) ->
-              match c.cd_args with
-              | Types.Cstr_tuple args ->
-                List.for_all
-                  (fun (arg : Types.constructor_argument) ->
-                    Jkind_types.Sort.Const.all_void arg.ca_sort)
-                  args
-              | Types.Cstr_record lbls ->
-                List.for_all
-                  (fun (lbl : Types.label_declaration) ->
-                    Jkind_types.Sort.Const.all_void lbl.ld_sort)
-                  lbls)
-            cstrs
-        in
-        let has_mutable =
-          List.exists
-            (fun (c : Types.constructor_declaration) ->
-              match c.cd_args with
-              | Types.Cstr_tuple _ -> false
-              | Types.Cstr_record lbls -> has_mutable_label lbls)
-            cstrs
-        in
-        let base_lat =
-          if all_args_void
-          then Axis_lattice.immediate
-          else if has_mutable
-          then Axis_lattice.mutable_data
-          else Axis_lattice.immutable_data
-        in
-        let kind : JK.ckind =
-         fun (ops : JK.ops) ->
-          log ~pp:ops.pp_kind "variant kind" (fun () ->
-            let base = ops.const base_lat in
-            let contribs =
-              List.concat_map
-                (fun (c : Types.constructor_declaration) ->
-                  match c.cd_args with
-                  | Types.Cstr_tuple args ->
-                    List.mapi
-                      (fun i (arg : Types.constructor_argument) ->
-                        let mask =
-                          Axis_lattice.mask_of_modality
-                            ~relevant_for_shallow:`Irrelevant arg.ca_modalities
-                        in
-                        log ~pp:ops.pp_kind
-                          (Printf.sprintf "cstr arg %d" i)
-                          (fun () -> ops.modality mask (ops.kind_of arg.ca_type)))
-                      args
-                  | Types.Cstr_record lbls ->
+            let kind : JK.ckind =
+             fun (ops : JK.ops) ->
+              log ~pp:ops.pp_kind "record kind" (fun () ->
+                  let base = ops.const base_lat in
+                  let contribs =
                     List.map
                       (fun (lbl : Types.label_declaration) ->
                         let mask =
@@ -346,28 +261,139 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                             ~relevant_for_shallow:`Irrelevant lbl.ld_modalities
                         in
                         log ~pp:ops.pp_kind
-                          (Printf.sprintf "cstr label %s" (Ident.name lbl.ld_id))
-                          (fun () -> ops.modality mask (ops.kind_of lbl.ld_type)))
+                          (Printf.sprintf "label %s" (Ident.name lbl.ld_id))
+                          (fun () ->
+                            ops.modality mask (ops.kind_of lbl.ld_type)))
+                      lbls
+                  in
+                  ops.join (base :: contribs))
+            in
+            JK.Ty { args = decl.type_params; kind; abstract = false })
+      | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
+        log "lookup Type_record_unboxed_product" (fun () ->
+            (* Unboxed products: non-float base; shallow axes relevant only
+               for arity = 1. *)
+            let base_lat =
+              if has_mutable_label lbls
+              then Axis_lattice.mutable_data
+              else Axis_lattice.nonfloat_value
+            in
+            let kind : JK.ckind =
+             fun (ops : JK.ops) ->
+              log ~pp:ops.pp_kind "record_unboxed_product kind" (fun () ->
+                  let base = ops.const base_lat in
+                  let contribs =
+                    let relevant_for_shallow =
+                      match List.length lbls with
+                      | 1 -> `Relevant
+                      | _ -> `Irrelevant
+                    in
+                    List.map
+                      (fun (lbl : Types.label_declaration) ->
+                        let mask =
+                          Axis_lattice.mask_of_modality ~relevant_for_shallow
+                            lbl.ld_modalities
+                        in
+                        log ~pp:ops.pp_kind
+                          (Printf.sprintf "label %s" (Ident.name lbl.ld_id))
+                          (fun () ->
+                            ops.modality mask (ops.kind_of lbl.ld_type)))
+                      lbls
+                  in
+                  ops.join (base :: contribs))
+            in
+            JK.Ty { args = decl.type_params; kind; abstract = false })
+      | Types.Type_variant (cstrs, _rep, _umc_opt) ->
+        log "lookup Type_variant" (fun () ->
+            (* Choose base: immediate for void-only variants; mutable if any
+               record constructor has a mutable field; otherwise immutable. *)
+            let all_args_void =
+              List.for_all
+                (fun (c : Types.constructor_declaration) ->
+                  match c.cd_args with
+                  | Types.Cstr_tuple args ->
+                    List.for_all
+                      (fun (arg : Types.constructor_argument) ->
+                        Jkind_types.Sort.Const.all_void arg.ca_sort)
+                      args
+                  | Types.Cstr_record lbls ->
+                    List.for_all
+                      (fun (lbl : Types.label_declaration) ->
+                        Jkind_types.Sort.Const.all_void lbl.ld_sort)
                       lbls)
                 cstrs
             in
-            ops.join (base :: contribs))
-        in
-        JK.Ty { args = decl.type_params; kind; abstract = false })
+            let has_mutable =
+              List.exists
+                (fun (c : Types.constructor_declaration) ->
+                  match c.cd_args with
+                  | Types.Cstr_tuple _ -> false
+                  | Types.Cstr_record lbls -> has_mutable_label lbls)
+                cstrs
+            in
+            let base_lat =
+              if all_args_void
+              then Axis_lattice.immediate
+              else if has_mutable
+              then Axis_lattice.mutable_data
+              else Axis_lattice.immutable_data
+            in
+            let kind : JK.ckind =
+             fun (ops : JK.ops) ->
+              log ~pp:ops.pp_kind "variant kind" (fun () ->
+                  let base = ops.const base_lat in
+                  let contribs =
+                    List.concat_map
+                      (fun (c : Types.constructor_declaration) ->
+                        match c.cd_args with
+                        | Types.Cstr_tuple args ->
+                          List.mapi
+                            (fun i (arg : Types.constructor_argument) ->
+                              let mask =
+                                Axis_lattice.mask_of_modality
+                                  ~relevant_for_shallow:`Irrelevant
+                                  arg.ca_modalities
+                              in
+                              log ~pp:ops.pp_kind
+                                (Printf.sprintf "cstr arg %d" i) (fun () ->
+                                  ops.modality mask (ops.kind_of arg.ca_type)))
+                            args
+                        | Types.Cstr_record lbls ->
+                          List.map
+                            (fun (lbl : Types.label_declaration) ->
+                              let mask =
+                                Axis_lattice.mask_of_modality
+                                  ~relevant_for_shallow:`Irrelevant
+                                  lbl.ld_modalities
+                              in
+                              log ~pp:ops.pp_kind
+                                (Printf.sprintf "cstr label %s"
+                                   (Ident.name lbl.ld_id))
+                                (fun () ->
+                                  ops.modality mask (ops.kind_of lbl.ld_type)))
+                            lbls)
+                      cstrs
+                  in
+                  ops.join (base :: contribs))
+            in
+            JK.Ty { args = decl.type_params; kind; abstract = false })
       | Types.Type_open ->
         log "lookup Type_open" (fun () ->
-          let kind : JK.ckind =
-            fun ops -> log ~pp:ops.pp_kind "Type_open kind" (fun () -> ops.const Axis_lattice.value)
-          in
-          JK.Ty { args = decl.type_params; kind; abstract = false }))
+            let kind : JK.ckind =
+             fun ops ->
+              log ~pp:ops.pp_kind "Type_open kind" (fun () ->
+                  ops.const Axis_lattice.value)
+            in
+            JK.Ty { args = decl.type_params; kind; abstract = false }))
     | Some body_ty ->
       log "lookup manifest body" (fun () ->
-        (* Concrete: compute kind of body. *)
-        let args = decl.type_params in
-        let kind : JK.ckind =
-          fun ops -> log ~pp:ops.pp_kind "manifest kind" (fun () -> ops.kind_of body_ty)
-        in
-        JK.Ty { args; kind; abstract = false }))
+          (* Concrete: compute kind of body. *)
+          let args = decl.type_params in
+          let kind : JK.ckind =
+           fun ops ->
+            log ~pp:ops.pp_kind "manifest kind" (fun () -> ops.kind_of body_ty)
+          in
+          JK.Ty { args; kind; abstract = false }))
 
 (* Package the above into a full solver environment. *)
 let make_solver ~(context : Jkind.jkind_context) : JK.solver =
@@ -389,11 +415,11 @@ let sub_jkind_l ?allow_any_crossing ?origin
       (* On layout failure, show normalized polys for both sides. *)
       (let solver = make_solver ~context in
        ignore
-         (log ~pp:JK.pp "sub poly (layout failure)"
-            (fun () -> JK.normalize solver (ckind_of_jkind_l sub)));
+         (log ~pp:JK.pp "sub poly (layout failure)" (fun () ->
+              JK.normalize solver (ckind_of_jkind_l sub)));
        ignore
-         (log ~pp:JK.pp "super poly (layout failure)"
-            (fun () -> JK.normalize solver (ckind_of_jkind_l super))));
+         (log ~pp:JK.pp "super poly (layout failure)" (fun () ->
+              JK.normalize solver (ckind_of_jkind_l super))));
       Error v
   in
   let use_ik = !Clflags.ikinds in
@@ -419,12 +445,12 @@ let sub_jkind_l ?allow_any_crossing ?origin
         in
         (* Also show the normalized ikind polys for both sides. *)
         let _ = violating_axis_name in
-        (ignore
-           (log ~pp:JK.pp "sub poly"
-              (fun () -> JK.normalize solver (ckind_of_jkind_l sub))));
-        (ignore
-           (log ~pp:JK.pp "super poly"
-              (fun () -> JK.normalize solver (ckind_of_jkind_l super))));
+        ignore
+          (log ~pp:JK.pp "sub poly" (fun () ->
+               JK.normalize solver (ckind_of_jkind_l sub)));
+        ignore
+          (log ~pp:JK.pp "super poly" (fun () ->
+               JK.normalize solver (ckind_of_jkind_l super)));
         (* Do not try to adjust allowances; Violation.Not_a_subjkind
            accepts an r-jkind. *)
         Error

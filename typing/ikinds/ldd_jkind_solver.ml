@@ -240,6 +240,5 @@ struct
     (* Do not solve pending here; pp() forces locally. *)
     LSolver.pp p
 
-  let pp_debug (p : poly) : string =
-    LSolver.pp_debug p
+  let pp_debug (p : poly) : string = LSolver.pp_debug p
 end
