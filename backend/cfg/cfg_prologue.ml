@@ -721,6 +721,12 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   | _ ->
     add_prologue_if_required cfg_with_infos
       ~f:find_prologue_and_epilogues_at_entry);
+  let suffix =
+    if !Oxcaml_flags.cfg_prologue_shrink_wrap then "shrink" else "original"
+  in
+  Cfg_with_layout.save_as_dot ~show_exn:true ~show_instr:true
+    (Cfg_with_infos.cfg_with_layout cfg_with_infos)
+    suffix;
   cfg_with_infos
 
 let validate : Cfg_with_infos.t -> Cfg_with_infos.t =
