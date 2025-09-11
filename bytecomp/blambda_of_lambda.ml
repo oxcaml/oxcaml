@@ -522,6 +522,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [index] ->
         let index =
           match ik with
+          (* [int8#]/[int16#] are already tagged ints on bytecode *)
           | Punboxed_or_untagged_integer_index
               (Untagged_int8 | Untagged_int16 | Untagged_int)
           | Ptagged_int_index ->
