@@ -456,6 +456,12 @@ let call_linker_shared ?(native_toplevel = false) file_list output_name =
   if not (exitcode = 0)
   then raise(Error(Linking_error exitcode))
 
+
+(* The compiler allows [-o /dev/null], which can be used for testing linking.
+   In this case, we should not use the DWARF fission workflow during linking. *)
+let not_output_to_dev_null output_name =
+  not (String.equal output_name "/dev/null")
+
 let link_shared unix ~ppf_dump objfiles output_name =
   Profile.(record_call (annotate_file_name output_name)) (fun () ->
     if !Oxcaml_flags.use_cached_generic_functions then
@@ -529,7 +535,7 @@ let call_linker file_list_rev startup_file output_name =
   (* Determine if we need to use a temporary file for objcopy workflow *)
   (* We disable the objcopy workflow if the output is piped to /dev/null. *)
   let needs_objcopy_workflow =
-    not (String.equal output_name "/dev/null") &&
+    not_output_to_dev_null output_name &&
     !Clflags.dwarf_fission = Clflags.Fission_objcopy &&
     not (Target_system.is_macos ()) &&
     mode = Ccomp.Exe &&
@@ -593,7 +599,7 @@ let call_linker file_list_rev startup_file output_name =
     | Fission_dsymutil ->
       if not (Target_system.is_macos ()) then
         raise (Error(Dwarf_fission_dsymutil_not_macos))
-      else if not (String.equal output_name "/dev/null") &&
+      else if not_output_to_dev_null output_name &&
               mode = Ccomp.Exe &&
               not !Dwarf_flags.restrict_to_upstream_dwarf then
         (* Run dsymutil on the executable *)
