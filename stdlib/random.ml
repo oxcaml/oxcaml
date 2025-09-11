@@ -352,8 +352,8 @@ let random_key =
     mk_default
 
 (* CR-someday mslater: this is safe since we do not yield while accessing
-   the state and the state is never shared with other threads. However, using
-   FLS would be required for determinism in the presence of fibers. *)
+   the state and we do not borrow the state. Note using FLS would be 
+   required for determinism in the presence of fibers. *)
 let[@inline] apply0 f () = f (Obj.magic_uncontended (TLS.get random_key))
 let[@inline] apply1 f v =  f (Obj.magic_uncontended (TLS.get random_key)) v
 let[@inline] apply_in_range f ~min ~max =
