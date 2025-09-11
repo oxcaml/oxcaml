@@ -337,11 +337,11 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   | Array_load (kind, load_kind, _mut) -> (
     match kind, load_kind with
     | ( ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-        | Naked_int64s | Naked_nativeints ),
+        | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
         ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
         | Naked_int64s | Naked_nativeints ) ) ->
       use_prim' Array_get
-    | (Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _), _
+    | (Naked_vec128s | Naked_vec256s | Naked_vec512s), _
     | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
       (* No SIMD *)
       primitive_not_supported ())
@@ -511,7 +511,7 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   | Array_set (kind, set_kind) -> (
     match kind, set_kind with
     | ( ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-        | Naked_int64s | Naked_nativeints ),
+        | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
         ( Immediates | Values _ | Naked_floats | Naked_float32s | Naked_int32s
         | Naked_int64s | Naked_nativeints ) ) ->
       let arr, res =
@@ -524,7 +524,7 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       ( None,
         env,
         To_jsir_result.add_instr_exn res (Array_set (arr, index, new_value)) )
-    | (Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _), _
+    | (Naked_vec128s | Naked_vec256s | Naked_vec512s), _
     | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
       (* No SIMD *)
       primitive_not_supported ())
