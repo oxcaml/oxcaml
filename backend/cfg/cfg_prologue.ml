@@ -755,3 +755,38 @@ let validate : Cfg_with_infos.t -> Cfg_with_infos.t =
       cfg_with_infos
     | Error () -> Misc.fatal_error "Cfg_prologue: dataflow analysis failed")
   | false -> cfg_with_infos
+
+let count : Cfg_with_infos.t -> Cfg_with_infos.t =
+ fun cfg_with_infos ->
+  let cfg = Cfg_with_infos.cfg cfg_with_infos in
+  let visited = ref Label.Set.empty in
+  let rec dfs label has_prol =
+    visited := Label.Set.add label !visited;
+    let block = Cfg.get_block_exn cfg label in
+    let has_prol =
+      has_prol
+      || DLL.exists block.body ~f:(fun instr -> instr.Cfg.desc = Cfg.Prologue)
+    in
+    let paths = ref 0 in
+    let prologue_paths = ref 0 in
+    let succs = Cfg.successor_labels ~normal:true ~exn:true block in
+    if Label.Set.is_empty succs then paths := 1;
+    if has_prol && Label.Set.is_empty succs then prologue_paths := 1;
+    Label.Set.iter
+      (fun succ_label ->
+        if not (Label.Set.mem succ_label !visited)
+        then (
+          let succ_paths, succ_prologue_paths = dfs succ_label has_prol in
+          paths := !paths + succ_paths;
+          prologue_paths := !prologue_paths + succ_prologue_paths))
+      succs;
+    !paths, !prologue_paths
+  in
+  let paths, prologue_paths = dfs (Cfg.entry_label cfg) false in
+  let prologue_file =
+    Out_channel.open_gen [Open_append; Open_creat] 0o666
+      "/home/cfalas/local/pathcount.csv"
+  in
+  Printf.fprintf prologue_file "%s,%d,%d\n" cfg.fun_name prologue_paths paths;
+  close_out prologue_file;
+  cfg_with_infos
