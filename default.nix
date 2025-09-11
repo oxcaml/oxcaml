@@ -253,4 +253,8 @@ stdenv.mkDerivation {
       make test-one TEST=...   - Run a single test
     EOF
   '';
+
+  meta =
+    { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
+
 }
