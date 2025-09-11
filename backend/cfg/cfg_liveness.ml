@@ -86,7 +86,7 @@ module Transfer :
          given DomainState argument and parameter pair have different stamps. *)
       instruction
         ~can_raise:(Cfg.can_raise_terminator instr.desc)
-        ~exn Domain.bot instr
+        ~exn domain instr
     | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
     | Switch _ | Return | Raise _ | Tailcall_func _ | Call_no_return _ | Call _
     | Prim _ ->
