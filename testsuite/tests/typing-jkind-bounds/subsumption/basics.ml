@@ -335,12 +335,35 @@ Error: Signature mismatch:
 module type S = sig
   type 'a t1
   type 'a t2
+  type 'a t : immutable_data with 'a t1 t2 * unit t1
+end
+
+module M : S = struct
+  type 'a t1
+  type 'a t2
+  type 'a t = 'a t2 t1 * unit t2
+end
+[%%expect{|
+module type S =
+  sig
+    type 'a t1
+    type 'a t2
+    type 'a t : immutable_data with 'a t1 t2 with unit t1
+  end
+module M : S
+|}]
+
+
+(* Benjamin's example failing version *)
+module type S = sig
+  type 'a t1
+  type 'a t2
   type 'a t : immutable_data with 'a t1 t2 * unit t2
 end
 
 module M : S = struct
-  type 'a t1 = 'a
-  type 'a t2 = 'a
+  type 'a t1
+  type 'a t2
   type 'a t = 'a t2 t1 * unit t1
 end
 [%%expect{|
@@ -350,8 +373,65 @@ module type S =
     type 'a t2
     type 'a t : immutable_data with 'a t1 t2 with unit t2
   end
-module M : S
+Lines 7-11, characters 15-3:
+ 7 | ...............struct
+ 8 |   type 'a t1
+ 9 |   type 'a t2
+10 |   type 'a t = 'a t2 t1 * unit t1
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t1 type 'a t2 type 'a t = 'a t2 t1 * unit t1 end
+       is not included in
+         S
+       Type declarations do not match:
+         type 'a t = 'a t2 t1 * unit t1
+       is not included in
+         type 'a t : immutable_data with 'a t1 t2 with unit t2
+       The kind of the first is immutable_data with 'a t2 t1 with unit t1
+         because it's a tuple type.
+       But the kind of the first must be a subkind of
+           immutable_data with 'a t1 t2 with unit t2
+         because of the definition of t at line 4, characters 2-52.
 |}]
+
+(* Benjamin's example failing version 2 *)
+module type S = sig
+  type 'a t1
+  type 'a t2
+  type 'a t : immutable_data with 'a t1 t2
+end
+
+module M : S = struct
+  type 'a t1
+  type 'a t2
+  type 'a t = 'a t2 t1
+end
+[%%expect{|
+module type S =
+  sig type 'a t1 type 'a t2 type 'a t : immutable_data with 'a t1 t2 end
+Lines 7-11, characters 15-3:
+ 7 | ...............struct
+ 8 |   type 'a t1
+ 9 |   type 'a t2
+10 |   type 'a t = 'a t2 t1
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t1 type 'a t2 type 'a t = 'a t2 t1 end
+       is not included in
+         S
+       Type declarations do not match:
+         type 'a t = 'a t2 t1
+       is not included in
+         type 'a t : immutable_data with 'a t1 t2
+       The kind of the first is value
+         because of the definition of t1 at line 8, characters 2-12.
+       But the kind of the first must be a subkind of
+           immutable_data with 'a t1 t2
+         because of the definition of t at line 4, characters 2-42.
+|}]
+
 
 (* Various types of rose trees *)
 module type S = sig
