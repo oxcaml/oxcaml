@@ -187,24 +187,13 @@ let block_like ~env ~res symbol (const : Static_const.t) =
   | Immutable_vec512_array _ ->
     (* Need SIMD *)
     static_const_not_supported const
-  | Empty_array kind ->
-    let tag =
-      match kind with
-      | Values_or_immediates_or_naked_floats -> 0
-      | Naked_float32s ->
-        Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_even_tag
-      | Naked_int32s ->
-        Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_even_tag
-      | Naked_nativeints ->
-        Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag
-      | Naked_int64s -> Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag
-      | Unboxed_products -> 0
-      | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
-        (* No SIMD *)
-        static_const_not_supported const
-    in
+  | Empty_array _kind ->
+    (* [Empty_array takes in the kind because native code has different
+       representation for arrays of unboxed numbers such as int32 and int64;
+       however, in JSIR, they are uniformly represented as JavaScript arrays,
+       and so the kind can safely be ignored. *)
     bind_expr_to_symbol ~env ~res symbol
-      (Prim (Extern "caml_make_vect", [Pc (Int (Targetint.of_int tag)); Pc Null]))
+      (Prim (Extern "caml_make_vect", [Pc (Int Targetint.zero); Pc Null]))
   | Mutable_string { initial_value } ->
     ignore initial_value;
     static_const_not_supported const
