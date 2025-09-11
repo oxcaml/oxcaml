@@ -71,6 +71,12 @@ module Make (C : LATTICE) (V : ORDERED) = struct
 
     let rigid_tbl : t VMap.t ref = ref VMap.empty
 
+    let reset_rigids () =
+      (* Clear all cached rigid variables and reset the counter so we don't
+         retain solver-global state across runs. *)
+      rigid_tbl := VMap.empty;
+      rigid_var_id := rigid_var_start
+
     let make state =
       match state with
       | Rigid _ ->
@@ -652,7 +658,9 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     VarNodePairTbl.clear memo_restrict0;
     VarNodePairTbl.clear memo_restrict1;
     NodePairTbl.clear memo_subs;
-    NodeTbl.clear memo_round_up'
+    NodeTbl.clear memo_round_up';
+    (* Also clear rigids to avoid unbounded growth across solvers. *)
+    Var.reset_rigids ()
 
   (* --------- structural debug printer --------- *)
   (* Prints full DAG structure with node ids, var ids/states, and shared-node
