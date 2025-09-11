@@ -707,8 +707,9 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
       "[Are_lifting_cont] values in the dacc cannot be [Lifting_out_of _] when \
        going downwards through a [Switch] expression. See the explanation in \
        [are_lifting_conts.mli]."
-  | Not_lifting _ -> dacc, `Not_lifting
+  | Not_lifting _ -> dacc, None, `Not_lifting
   | Analyzing { continuation; uses; is_exn_handler } -> (
+    let cont = Some continuation in
     (* Some preliminary requirements. We do **not** specialize continuations if
        one of the following conditions are true:
 
@@ -725,11 +726,11 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
        because partial evaluation would be better. *)
     let n_uses = Continuation_uses.number_of_uses uses in
     if n_uses <= 1
-    then dacc, `Single_use
+    then dacc, cont, `Single_use
     else if is_exn_handler
-    then dacc, `Exn_handler
+    then dacc, cont, `Exn_handler
     else if DE.at_unit_toplevel (DA.denv dacc)
-    then dacc, `Toplevel
+    then dacc, cont, `Toplevel
     else
       let denv = DA.denv dacc in
       match DE.specialization_cost denv with
@@ -743,7 +744,7 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
           | Contains_static_consts | Contains_set_of_closures ->
             `Cannot_specialize
         in
-        dacc, result
+        dacc, cont, result
       | Can_specialize spec_cost as spec_cost' -> (
         (* We should never reach here if specialization is disabled, since we
            should never have created a `Can_specialize` value for the
@@ -763,7 +764,7 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
         in
         (* is_lifting_allowed_by_budget ? *)
         if not (lifting_budget > 0 && lifting_cost <= lifting_budget)
-        then dacc, `Insuficient_lifting_budget
+        then dacc, cont, `Insuficient_lifting_budget
         else
           (* Main Criterion: whether all callsites (but one) of the continuation
              determine the value of the scrutinee (and therefore the specialized
@@ -806,7 +807,7 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
           match join_analysis_result with
           | ( `No_reason_to_spec | `Too_many_unknown_uses | `All_unknown
             | `Not_enough_join_info ) as res ->
-            dacc, res
+            dacc, cont, res
           | `Spec (join_analysis, specialized, generic) ->
             (* Specialization benefit estimation: we use heuristics similar to
                that of inlining to estimate the benefit based on code size and
@@ -845,7 +846,7 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
                 Inlining_report.Context.print_cost_metrics cost_metrics;
             if Float.compare threshold 0. < 0
                || Float.compare final_cost threshold > 0
-            then dacc, `Too_costly
+            then dacc, cont, `Too_costly
             else
               let dacc =
                 DA.decrease_continuation_lifting_budget dacc lifting_cost
@@ -855,26 +856,61 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
                   (Are_lifting_conts.lift_continuations_out_of continuation)
               in
               let dacc = DA.add_continuation_to_specialize dacc continuation in
-              dacc, `Specialized))
+              dacc, cont, `Specialized))
 
 let decide_continuation_specialization ~dacc ~switch ~scrutinee =
   Profile.record_with_counters ~accumulate:true "continuation_specialization"
     (fun () -> decide_continuation_specialization0 ~dacc ~switch ~scrutinee)
     ()
-    ~counter_f:(fun (_, result) ->
+    ~counter_f:(fun (_, continuation, result) ->
+      let print_debug result_string =
+        if debug ()
+        then
+          Format.eprintf "Specialization decision for '%a': %s@."
+            (Format.pp_print_option Continuation.print)
+            continuation result_string
+      in
       let counters = Profile.Counters.create () in
       match result with
-      | `Disabled | `Single_use | `Exn_handler | `Toplevel | `All_unknown
-      | `No_reason_to_spec | `Not_lifting ->
+      | `Disabled ->
+        print_debug "disabled";
         counters
-      | `Cannot_specialize -> Profile.Counters.incr "cannot_spec" counters
+      | `Single_use ->
+        print_debug "single-use";
+        counters
+      | `Exn_handler ->
+        print_debug "exception handler";
+        counters
+      | `Toplevel ->
+        print_debug "top-level";
+        counters
+      | `All_unknown ->
+        print_debug "all unknown";
+        counters
+      | `No_reason_to_spec ->
+        print_debug "no reason to spec";
+        counters
+      | `Not_lifting ->
+        print_debug "not lifting";
+        counters
+      | `Cannot_specialize ->
+        print_debug "cannot specialize";
+        Profile.Counters.incr "cannot_spec" counters
       | `Insuficient_lifting_budget ->
+        print_debug "not enough lifting budget";
         Profile.Counters.incr "no_lifting_budget" counters
-      | `Not_enough_join_info -> Profile.Counters.incr "no_join_info" counters
+      | `Not_enough_join_info ->
+        print_debug "not enough join info";
+        Profile.Counters.incr "no_join_info" counters
       | `Too_many_unknown_uses ->
+        print_debug "too many unknown uses";
         Profile.Counters.incr "too_much_unknown" counters
-      | `Too_costly -> Profile.Counters.incr "not_beneficial" counters
-      | `Specialized -> Profile.Counters.incr "specialized" counters)
+      | `Too_costly ->
+        print_debug "too costly";
+        Profile.Counters.incr "not_beneficial" counters
+      | `Specialized ->
+        print_debug "specialized";
+        Profile.Counters.incr "specialized" counters)
 
 let simplify_switch0 dacc switch ~down_to_up =
   let scrutinee = Switch.scrutinee switch in
@@ -898,7 +934,9 @@ let simplify_switch0 dacc switch ~down_to_up =
   let condition_dbg =
     DE.add_inlined_debuginfo (DA.denv dacc) (Switch.condition_dbg switch)
   in
-  let dacc, _ = decide_continuation_specialization ~dacc ~switch ~scrutinee in
+  let dacc, _, _ =
+    decide_continuation_specialization ~dacc ~switch ~scrutinee
+  in
   down_to_up dacc
     ~rebuild:
       (rebuild_switch ~original:switch ~arms ~condition_dbg ~scrutinee
