@@ -29,8 +29,6 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         | Imulsubf | Inegmulsubf | Isqrtf | Ifar_alloc _
         | Ishiftarith (_, _)
         | Ibswap _ | Isignext _ | Isimd _ ))
-  | Op Maybe_poll ->
-    assert false
   | Op
       ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
       | Dls_get | Poll | Const_int _ | Const_float32 _ | Const_float _
@@ -47,6 +45,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     ->
     (* no rewrite *)
     May_still_have_spilled_registers
+  | Op Maybe_poll -> assert false
 
 let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
   match term.desc with
