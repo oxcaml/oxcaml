@@ -1,5 +1,7 @@
 (* Minimal kind constructor over real Types.type_expr, inspired by infer6. *)
 
+Clflags.ikinds := true;
+
 module TyM = struct
   type t = Types.type_expr
 
@@ -98,7 +100,7 @@ let kind_of_depth = ref 0
 let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
  fun (ops : JK.ops) ->
   incr kind_of_depth;
-  if !kind_of_depth > 50 then failwith "kind_of_depth too deep" else ();
+  if !kind_of_depth > 5000 then failwith "kind_of_depth too deep" else ();
   let res =
     match Types.get_desc ty with
     | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
@@ -421,8 +423,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
               JK.normalize solver (ckind_of_jkind_l super))));
       Error v
   in
-  let use_ik = !Clflags.ikinds in
-  if not use_ik
+  if not !Clflags.ikinds
   then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context sub super
   else
     let solver = make_solver ~context in
@@ -474,9 +475,10 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     | None -> true
     | Some _violating_axis -> false
 
+(* CR jujacobs: this is really slow when enabled. Fix performance. *)
 let crossing_of_jkind ~(context : Jkind.jkind_context)
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
-  if not !Clflags.ikinds
+  if not (false && !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.get_mode_crossing ~context jkind
   else
     let solver = make_solver ~context in
@@ -486,20 +488,23 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
 
 (* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
    Keep Jkind as the single source for classification and error reporting. *)
+(* CR jujacobs: fix this *)
 type sub_or_intersect = Jkind.sub_or_intersect =
   | Sub
   | Disjoint of Jkind.Sub_failure_reason.t Misc.Nonempty_list.t
   | Has_intersection of Jkind.Sub_failure_reason.t Misc.Nonempty_list.t
 
+(* CR jujacobs: performance issue here. *)
 let sub_or_intersect ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context)
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
   let _ = origin in
-  if not !Clflags.ikinds
+  if not (false && !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.sub_or_intersect ~type_equal ~context t1 t2
   else
+    (* CR jujacobs: enable this *)
     let _ik =
       sub ~type_equal ~context (Jkind.disallow_right t1)
         (Jkind.disallow_left t2)
