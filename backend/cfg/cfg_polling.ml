@@ -181,7 +181,7 @@ module Polls_before_prtc_transfer = struct
       domain -> Cfg.basic Cfg.instruction -> context -> (domain, error) result =
    fun dom instr { future_funcnames = _; optimistic_prologue_poll_instr_id } ->
     match instr.desc with
-    | Op (Poll { enabled = true }) ->
+    | Op Poll ->
       if InstructionId.equal instr.id optimistic_prologue_poll_instr_id
       then Ok dom
       else Ok Always_polls
@@ -197,8 +197,7 @@ module Polls_before_prtc_transfer = struct
         | Intop_atomic _
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Specific _ | Name_for_debugger _
-        | Poll { enabled = false } )
+        | Specific _ | Name_for_debugger _ | Maybe_poll )
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
       Ok dom
@@ -319,9 +318,8 @@ let instr_cfg_with_layout :
       then (
         let after = Cfg.get_block_exn cfg src in
         let poll =
-          Cfg.make_instruction
-            ~desc:(Cfg.Op (Poll { enabled = true }))
-            ~id:(next_instruction_id ()) ~dbg:after.terminator.dbg
+          Cfg.make_instruction ~desc:(Cfg.Op Poll) ~id:(next_instruction_id ())
+            ~dbg:after.terminator.dbg
             ~stack_offset:after.terminator.stack_offset ()
         in
         (* Check if the terminator is Tailcall_self *)
@@ -341,17 +339,10 @@ let instr_cfg_with_layout :
                 then (
                   found := true;
                   match instr.desc with
-                  | Cfg.Op (Operation.Poll { enabled }) ->
-                    if enabled
-                    then
-                      Misc.fatal_errorf
-                        "Cfg_polling: Poll instruction %a is already enabled"
-                        InstructionId.print poll_id;
+                  | Cfg.Op Maybe_poll ->
                     (* Create new instruction with enabled = true *)
                     let new_instr : Cfg.basic Cfg.instruction =
-                      { instr with
-                        desc = Cfg.Op (Operation.Poll { enabled = true })
-                      }
+                      { instr with desc = Cfg.Op Operation.Poll }
                     in
                     DLL.set_value cell new_instr
                   | Cfg.Op
@@ -362,11 +353,11 @@ let instr_cfg_with_layout :
                       | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
                       | Probe_is_enabled _ | Opaque | Begin_region | End_region
                       | Specific _ | Name_for_debugger _ | Dls_get | Pause
-                      | Alloc _ )
+                      | Alloc _ | Poll )
                   | Cfg.Reloadretaddr | Cfg.Pushtrap _ | Cfg.Poptrap _
                   | Cfg.Prologue | Cfg.Epilogue | Cfg.Stack_check _ ->
-                    (* Not a Poll instruction, just skip it *)
-                    ()));
+                    Misc.fatal_errorf "Cfg_polling: unexpected instruction %a"
+                      InstructionId.print poll_id));
             if not !found
             then
               Misc.fatal_errorf
@@ -413,10 +404,9 @@ let add_poll_or_alloc_basic :
     | Stackoffset _ | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
     | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
     | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-    | Name_for_debugger _ | Dls_get | Pause
-    | Poll { enabled = false } ->
+    | Name_for_debugger _ | Dls_get | Pause | Maybe_poll ->
       points
-    | Poll { enabled = true } -> (Poll, instr.dbg) :: points
+    | Poll -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->

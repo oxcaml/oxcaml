@@ -335,7 +335,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (Alloc
              { bytes = 0; dbginfo = [placeholder_for_alloc_block_kind]; mode }),
         args )
-    | Cpoll -> SU.basic_op (Poll { enabled = true }), args
+    | Cpoll -> SU.basic_op Poll, args
     | Cpause -> SU.basic_op Pause, args
     | Caddi -> select_arith_comm Iadd args
     | Csubi -> select_arith Isub args
@@ -1270,9 +1270,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               (* Insert poll instruction before the tailcall *)
               Cfg.Associated_poll
                 { instruction_id =
-                    SU.insert_op_debug_returning_id env sub_cfg
-                      (Poll { enabled = true })
-                      dbg [||] [||]
+                    SU.insert_op_debug_returning_id env sub_cfg Maybe_poll dbg
+                      [||] [||]
                 }
             else Cfg.Polling_disabled
           in
@@ -1512,9 +1511,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let body = Sub_cfg.make_empty () in
     SU.insert_moves env body loc_arg rarg;
     let prologue_poll_instr_id =
-      insert_op_debug_returning_id env body
-        (Operation.Poll { enabled = true })
-        Debuginfo.none [||] [||]
+      insert_op_debug_returning_id env body Operation.Poll Debuginfo.none [||]
+        [||]
     in
     emit_tail env body f.Cmm.fun_body;
     let cfg =

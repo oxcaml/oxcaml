@@ -1138,8 +1138,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _
       | Probe_is_enabled _ | Opaque | Begin_region | End_region | Pause
-      | Name_for_debugger _ | Dls_get
-      | Poll { enabled = _ } ->
+      | Name_for_debugger _ | Dls_get | Maybe_poll | Poll ->
         assert false
     in
     assert (arg_count = 0 && res_count = 1);
@@ -1194,9 +1193,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
       | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
       | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-      | End_region | Name_for_debugger _ | Dls_get
-      | Poll { enabled = _ }
-      | Pause ->
+      | End_region | Name_for_debugger _ | Dls_get | Maybe_poll | Poll | Pause
+        ->
         assert false
     in
     let consts = List.map extract_intop_imm_int cfg_ops in
@@ -1237,9 +1235,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
         | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
         | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-        | End_region | Name_for_debugger _ | Dls_get
-        | Poll { enabled = _ }
-        | Pause ->
+        | End_region | Name_for_debugger _ | Dls_get | Maybe_poll | Poll | Pause
+          ->
           assert false
       in
       let get_scale op =
@@ -1371,8 +1368,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
           | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-          | End_region | Name_for_debugger _ | Dls_get
-          | Poll { enabled = _ }
+          | End_region | Name_for_debugger _ | Dls_get | Maybe_poll | Poll
           | Pause ->
             assert false
         in
@@ -1485,6 +1481,5 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
   | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _
   | Csel _ | Probe_is_enabled _ | Opaque | Pause | Begin_region | End_region
-  | Name_for_debugger _ | Dls_get
-  | Poll { enabled = _ } ->
+  | Name_for_debugger _ | Dls_get | Maybe_poll | Poll ->
     None

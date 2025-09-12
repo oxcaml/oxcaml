@@ -308,15 +308,14 @@ module Transfer = struct
               avail_across results
           in
           Some (ok avail_across), ok avail_after
+        | Op Maybe_poll -> assert false
         | Op
             ( Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
             | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
             | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
             | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
             | Probe_is_enabled _ | Opaque | Begin_region | End_region
-            | Specific _ | Dls_get
-            | Poll { enabled = _ }
-            | Alloc _ | Pause )
+            | Specific _ | Dls_get | Poll | Alloc _ | Pause )
         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
         | Stack_check _ ->
           let is_op_end_region = Cfg.is_end_region in
@@ -386,12 +385,13 @@ let get_name_for_debugger_regs (b : Cfg.basic) =
   match b with
   | Op (Name_for_debugger { regs; _ }) -> Some regs
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
+  | Op Maybe_poll ->
+    assert false
   | Op
       ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-      | Poll { enabled = _ }
-      | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-      | Load _
+      | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _
       | Intop_imm (_, _)

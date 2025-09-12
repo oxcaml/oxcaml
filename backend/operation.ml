@@ -305,7 +305,8 @@ type t =
         regs : Reg.t array
       }
   | Dls_get
-  | Poll of { enabled : bool }
+  | Maybe_poll
+  | Poll
   | Pause
   | Alloc of
       { bytes : int;
@@ -348,10 +349,8 @@ let is_pure = function
   | Specific s -> Arch.operation_is_pure s
   | Name_for_debugger _ -> false
   | Dls_get -> true
-  | Poll { enabled } ->
-    (* CR xclerc for xclerc: I am not sure this is correct, as `is_pure` is (or
-       has been) used to prevent moves. *)
-    not enabled
+  | Maybe_poll -> false
+  | Poll -> false
   | Pause -> false
   | Alloc _ -> false
 
@@ -434,7 +433,8 @@ let dump ppf op =
   | End_region -> Format.fprintf ppf "endregion"
   | Name_for_debugger _ -> Format.fprintf ppf "name_for_debugger"
   | Dls_get -> Format.fprintf ppf "dls_get"
-  | Poll { enabled } -> Format.fprintf ppf "poll %B" enabled
+  | Maybe_poll -> Format.fprintf ppf "maybe_poll"
+  | Poll -> Format.fprintf ppf "poll"
   | Pause -> Format.fprintf ppf "pause"
   | Alloc { bytes; dbginfo = _; mode = Heap } ->
     Format.fprintf ppf "alloc %i" bytes

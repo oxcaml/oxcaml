@@ -39,12 +39,12 @@ let rec find_next_allocation : cell option -> allocation option =
         | Stackoffset _ | Load _ | Store _ | Intop _ | Intop_imm _
         | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
         | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region
-        | End_region | Specific _ | Name_for_debugger _ | Dls_get
-        | Poll { enabled = _ }
-        | Pause )
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll | Pause
+          )
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
-      find_next_allocation (DLL.next cell))
+      find_next_allocation (DLL.next cell)
+    | Op Maybe_poll -> assert false)
 
 (* [find_compatible_allocations cell ~curr_mode ~curr_size] returns the
    allocations compatible with mode [curr_mode] and total size [curr_size]. *)
@@ -83,7 +83,8 @@ let find_compatible_allocations :
         match curr_mode with
         | Local -> return ()
         | Heap -> loop allocations (DLL.next cell) ~curr_mode ~curr_size)
-      | Op (Poll { enabled = true }) -> return ()
+      | Op Maybe_poll -> assert false
+      | Op Poll -> return ()
       | Reloadretaddr | Poptrap _ | Prologue | Epilogue | Pushtrap _
       | Stack_check _ ->
         (* CR-soon xclerc for xclerc: is it too conservative? (note: only the
@@ -104,8 +105,7 @@ let find_compatible_allocations :
               ( ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl
                 | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ ),
                 _ )
-          | Intop_atomic _
-          | Poll { enabled = false } ) ->
+          | Intop_atomic _ ) ->
         loop allocations (DLL.next cell) ~curr_mode ~curr_size)
   in
   loop [] cell ~curr_mode ~curr_size

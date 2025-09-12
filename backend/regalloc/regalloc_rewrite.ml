@@ -88,9 +88,8 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
     | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
     | Stack_check _
     | Op
-        ( Move | Opaque | Begin_region | End_region | Dls_get
-        | Poll { enabled = _ }
-        | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+        ( Move | Opaque | Begin_region | End_region | Dls_get | Poll | Pause
+        | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
         | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
         | Load _
         | Store (_, _, _)
@@ -101,6 +100,7 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
         | Specific _ | Name_for_debugger _ | Alloc _ ) ->
       ()
+    | Op Maybe_poll -> assert false
   in
   DLL.iter_cell block.body ~f:update_info_using_inst;
   if Reg.Tbl.length replacements <> 0

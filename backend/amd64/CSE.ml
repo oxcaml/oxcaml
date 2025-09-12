@@ -55,8 +55,9 @@ let class_of_operation (op : Operation.t)
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Intop_imm _ | Intop_atomic _
   | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-  | Begin_region | End_region | Poll { enabled = _ } | Dls_get
+  | Begin_region | End_region | Poll | Dls_get
     -> Use_default
+  | Maybe_poll -> assert false
 
 let is_cheap_operation _op
     : Cfg_cse_target_intf.is_cheap_operation_result =

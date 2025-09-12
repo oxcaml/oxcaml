@@ -114,6 +114,7 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | End_region -> fprintf ppf "endregion %a" reg arg.(0)
   | Specific op -> Arch.print_specific_operation reg op ppf arg
   | Dls_get -> fprintf ppf "dls_get"
-  | Poll { enabled } -> fprintf ppf "poll call (enabled=%B)" enabled
+  | Maybe_poll -> fprintf ppf "maybe poll call"
+  | Poll -> fprintf ppf "poll call"
   | Pause -> fprintf ppf "pause"
   | Probe_is_enabled { name } -> fprintf ppf "probe_is_enabled \"%s\"" name

@@ -532,9 +532,9 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
     | Lprologue | Lepilogue_open | Lepilogue_close
     | Lop
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Poll { enabled = _ }
-        | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Load _
+        | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Load _
         | Store (_, _, _)
         | Intop _
         | Intop_imm (_, _)
@@ -546,6 +546,9 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
     | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
     | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lraise _ ->
       loop i.next fs max_fs nontail_flag
+    | Lop Maybe_poll ->
+      (* should no longer be present *)
+      assert false
     | Lstackcheck _ ->
       (* should not be already present *)
       assert false

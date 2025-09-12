@@ -318,7 +318,8 @@ end = struct
     | Specific _, _
     | Name_for_debugger _, _
     | Dls_get, _
-    | Poll { enabled = _ }, _
+    | Maybe_poll, _
+    | Poll, _
     | Alloc _, _ ->
       false
 
@@ -801,9 +802,8 @@ end = struct
                         | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _
                           ),
                         _ )
-                  | Opaque | Begin_region | End_region | Dls_get
-                  | Poll { enabled = _ }
-                  | Pause | Const_int _ | Const_float32 _ | Const_float _
+                  | Opaque | Begin_region | End_region | Dls_get | Maybe_poll
+                  | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
                   | Const_symbol _ | Const_vec128 _ | Const_vec256 _
                   | Const_vec512 _ | Stackoffset _ | Load _
                   | Store (_, _, _)
@@ -1038,9 +1038,8 @@ end = struct
           | Begin_region | End_region ->
             (* conservative, don't reorder around region begin/end. *)
             create Arbitrary
-          | Name_for_debugger _ | Dls_get
-          | Poll { enabled = _ }
-          | Opaque | Pause | Probe_is_enabled _ ->
+          | Name_for_debugger _ | Dls_get | Maybe_poll | Poll | Opaque | Pause
+          | Probe_is_enabled _ ->
             (* CR xclerc for gyorsh: vectorize currently stands between
                selection and polling, so that this point the `enabled` field
                cannot be trusted if it is `false`. Should we move vectorize to
@@ -2311,8 +2310,7 @@ end = struct
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
         | Stackoffset _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
         | Csel _ | Probe_is_enabled _ | Opaque | Pause | Begin_region
-        | End_region | Name_for_debugger _ | Dls_get
-        | Poll { enabled = _ } ->
+        | End_region | Name_for_debugger _ | Dls_get | Maybe_poll | Poll ->
           None)
 
     let from_block (block : Block.t) deps : t list =

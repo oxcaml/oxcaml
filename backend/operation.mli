@@ -161,7 +161,8 @@ type t =
         regs : Reg.t array
       }
   | Dls_get
-  | Poll of { enabled : bool }
+  | Maybe_poll
+  | Poll
   | Pause
   | Alloc of
       { bytes : int;
