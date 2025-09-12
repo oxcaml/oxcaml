@@ -391,6 +391,9 @@ let instr_cfg_with_layout :
             in
             (* All the inserted blocks are safe since they contain a poll
                instruction *)
+            (* CR xclerc for xclerc: should we also update the safe_map when
+               adding the instruction to an existing block. That should not
+               matter, but should be double checked. *)
             List.iter inserted_blocks ~f:(fun block ->
                 Label.Tbl.replace safe_map block.Cfg.start true)));
         true)
