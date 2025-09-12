@@ -105,7 +105,9 @@ module Runtime_4 = struct
         else maybe_grow idx
       end
 
-    let[@inline] set (type a) (idx, _init) (x : a) =
+    (* Disable inlining to assure poll points are never inserted between grow
+       and set, which could cause us to drop the update. *)
+    let[@inline never] set (type a) (idx, _init) (x : a) =
       (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
       Array.unsafe_set st idx (Obj_opt.some x)
@@ -134,6 +136,7 @@ module Runtime_4 = struct
         else assert false
       end
 
+    (* Inlining is ok because it's safe to return a stale value. *)
     let[@inline] get (type a) ((idx, init) : a key) : a =
       (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
@@ -286,7 +289,9 @@ module Runtime_5 = struct
         else maybe_grow idx
       end
 
-    let[@inline] set (type a) (idx, _init) (x : a) =
+    (* Disable inlining to assure poll points are never inserted between grow
+       and set, which could cause us to drop the update. *)
+    let[@inline never] set (type a) (idx, _init) (x : a) =
       (* Assures [idx] is in range. *)
       let st = maybe_grow idx in
       Array.unsafe_set st idx (Obj_opt.some x)
@@ -315,6 +320,7 @@ module Runtime_5 = struct
         else assert false
       end
 
+    (* Inlining is ok because it's safe to return a stale value. *)
     let[@inline] get (type a) ((idx, init) : a key) : a =
       (* Assures [idx] is in range. *)
       let st = maybe_grow idx in

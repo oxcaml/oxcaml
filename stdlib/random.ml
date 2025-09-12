@@ -347,7 +347,8 @@ let random_key =
   TLS.new_key
     ~split_from_parent:(fun s ->
       let s = State.split s in
-      (* Safe since [Sate.split] does a deep copy. *)
+      (* Safe because [Sate.split] returns a deep copy that's only
+         accessible to the new thread. *)
       (fun () -> Obj.magic_uncontended s))
     mk_default
 
