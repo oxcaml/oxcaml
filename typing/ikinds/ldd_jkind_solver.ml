@@ -53,6 +53,19 @@ struct
 
   type kind = LSolver.node
 
+  (* Hash tables avoiding polymorphic structural comparison on deep values. *)
+  module TyTbl = Hashtbl.Make (struct
+    type t = ty
+    let equal a b = Ty.compare a b = 0
+    let hash t = Hashtbl.hash (Ty.to_string t)
+  end)
+
+  module ConstrTbl = Hashtbl.Make (struct
+    type t = constr
+    let equal a b = Constr.compare a b = 0
+    let hash x = Hashtbl.hash (Constr.to_string x)
+  end)
+
   type ops =
     { const : lat -> kind;
       join : kind list -> kind;
@@ -100,23 +113,23 @@ struct
     let meet a b = LSolver.meet a b in
     let rigid t = LSolver.var (LSolver.rigid (RigidName.Ty t)) in
     (* Create hash table mapping ty to kind for memoization *)
-    let ty_to_kind = Hashtbl.create 0 in
+    let ty_to_kind = TyTbl.create 0 in
     (* And hash table mapping constructor to coefficients *)
-    let constr_to_coeffs = Hashtbl.create 0 in
+    let constr_to_coeffs = ConstrTbl.create 0 in
     (* Define kind_of and constr ops *)
     let rec kind_of (t : ty) : kind =
-      match Hashtbl.find_opt ty_to_kind t with
+      match TyTbl.find_opt ty_to_kind t with
       | Some k -> k
       | None ->
         (* Pre-insert lattice solver var for this type *)
         let v = LSolver.new_var () in
-        Hashtbl.add ty_to_kind t (LSolver.var v);
+        TyTbl.add ty_to_kind t (LSolver.var v);
         let kind = env.kind_of t ops in
         (* Always solve LFPs here to avoid correctness issues *)
         LSolver.solve_lfp v kind;
         kind
     and constr_kind c =
-      match Hashtbl.find_opt constr_to_coeffs c with
+      match ConstrTbl.find_opt constr_to_coeffs c with
       | Some base_and_coeffs -> base_and_coeffs
       | None -> (
         match env.lookup c with
@@ -128,14 +141,14 @@ struct
           let coeffs =
             List.init (List.length args) (fun _ -> LSolver.new_var ())
           in
-          Hashtbl.add constr_to_coeffs c
+          ConstrTbl.add constr_to_coeffs c
             (LSolver.var base, List.map LSolver.var coeffs);
           (* Recursively compute the kind of the body *)
           let rigid_vars =
             List.map (fun ty -> LSolver.rigid (RigidName.Ty ty)) args
           in
           List.iter2
-            (fun ty var -> Hashtbl.add ty_to_kind ty (LSolver.var var))
+            (fun ty var -> TyTbl.add ty_to_kind ty (LSolver.var var))
             args rigid_vars;
           (* Compute body kind *)
           let kind' = kind ops in
