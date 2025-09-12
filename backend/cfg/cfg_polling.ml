@@ -317,11 +317,6 @@ let instr_cfg_with_layout :
       if needs_poll
       then (
         let after = Cfg.get_block_exn cfg src in
-        let poll =
-          Cfg.make_instruction ~desc:(Cfg.Op Poll) ~id:(next_instruction_id ())
-            ~dbg:after.terminator.dbg
-            ~stack_offset:after.terminator.stack_offset ()
-        in
         (* Check if the terminator is Tailcall_self *)
         (match after.terminator.desc with
         | Tailcall_self { destination = _; associated_poll } -> (
@@ -367,6 +362,11 @@ let instr_cfg_with_layout :
         | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
         | Call_no_return _ | Call _ | Prim _ -> (
           (* For other terminators, add the poll instruction as before *)
+          let poll =
+            Cfg.make_instruction ~desc:(Cfg.Op Poll)
+              ~id:(next_instruction_id ()) ~dbg:after.terminator.dbg
+              ~stack_offset:after.terminator.stack_offset ()
+          in
           match
             ( Label.Set.cardinal
                 (Cfg.successor_labels after ~normal:true ~exn:false),

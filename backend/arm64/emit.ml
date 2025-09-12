@@ -1114,8 +1114,7 @@ module BR = Branch_relaxation.Make (struct
 
     let classify_instr = function
       | Lop Maybe_poll -> assert false
-      | Lop (Alloc _) -> Some Bcc
-      | Lop Poll -> Some Bcc
+      | Lop (Alloc _) | Lop Poll -> Some Bcc
       (* The various "far" variants in [specific_operation] don't need to return
          [Some] here, since their code sequences never contain any conditional
          branches that might need relaxing. *)

@@ -1040,10 +1040,6 @@ end = struct
             create Arbitrary
           | Name_for_debugger _ | Dls_get | Maybe_poll | Poll | Opaque | Pause
           | Probe_is_enabled _ ->
-            (* CR xclerc for gyorsh: vectorize currently stands between
-               selection and polling, so that this point the `enabled` field
-               cannot be trusted if it is `false`. Should we move vectorize to
-               after polling? *)
             (* conservative, don't reorder around this instruction. *)
             (* CR-someday gyorsh: Poll insertion pass is after the vectorizer.
                Currently, it inserts instruction at the end of a block, so it

@@ -123,6 +123,7 @@ let check_tailrec t _label block =
   (* check all Tailrec Self agree on the successor label *)
   match block.Cfg.terminator.desc with
   | Tailcall_self { destination; associated_poll = _ } -> (
+    (* CR xclerc: we could also check `associated_poll`. *)
     match t.tailrec_entry_label with
     | None -> t.tailrec_entry_label <- Some destination
     | Some l ->
