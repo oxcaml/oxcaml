@@ -158,8 +158,10 @@ module For_float32s : Boxable_number_kind
 
    [1]
    https://sourceware.org/glibc/manual/2.42/html_node/Errors-in-Math-Functions.html
-   [2] https://dl.acm.org/doi/pdf/10.1145/221332.221334 [3]
-   https://inria.hal.science/hal-03141101 *)
+
+   [2] https://dl.acm.org/doi/pdf/10.1145/221332.221334
+
+   [3] https://inria.hal.science/hal-03141101 *)
 
 module For_floats : Boxable_number_kind
 
