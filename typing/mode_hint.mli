@@ -1,5 +1,11 @@
 open Allowance
 
+type ('d0, 'd1) polarity =
+  | Monadic : ('l * 'r, 'r * 'l) polarity
+  | Comonadic : ('l * 'r, 'l * 'r) polarity
+  constraint 'd0 = _ * _ constraint 'd1 = _ * _
+[@@warning "-62"]
+
 type mutable_part =
   | Record_field of string
   | Array_elements
@@ -58,5 +64,7 @@ type 'd morph =
   | Captured_by_partial_application : (disallowed * 'r) morph
   | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph
+  | Argument_to_parameter : ('l * disallowed, 'd) polarity -> 'd morph
+  | Parameter_to_argument : (disallowed * 'r, 'd) polarity -> 'd morph
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]

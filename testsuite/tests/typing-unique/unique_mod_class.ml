@@ -148,7 +148,9 @@ module M : sig val foo : string end
 Line 7, characters 12-17:
 7 |   unique_id M.foo
                 ^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 

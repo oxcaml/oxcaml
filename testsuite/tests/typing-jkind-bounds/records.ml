@@ -395,7 +395,9 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -403,7 +405,9 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 type t = { mutable x : int }
@@ -420,7 +424,9 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -428,7 +434,9 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 let foo (t : t @ contended) = use_uncontended t
@@ -436,7 +444,9 @@ let foo (t : t @ contended) = use_uncontended t
 Line 1, characters 46-47:
 1 | let foo (t : t @ contended) = use_uncontended t
                                                   ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 type 'a t = { x : 'a }
@@ -454,7 +464,9 @@ let foo (t : int t @ local) = use_global t [@nontail]
 Line 1, characters 41-42:
 1 | let foo (t : int t @ local) = use_global t [@nontail]
                                              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -462,7 +474,9 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -473,7 +487,9 @@ type 'a t = { x : 'a; }
 Line 3, characters 47-48:
 3 | let foo (t : _ t @ nonportable) = use_portable t
                                                    ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
@@ -481,7 +497,9 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ once) = use_many t
@@ -489,7 +507,9 @@ let foo (t : _ t @ once) = use_many t
 Line 1, characters 36-37:
 1 | let foo (t : _ t @ once) = use_many t
                                         ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
@@ -497,7 +517,9 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -505,7 +527,9 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -522,7 +546,9 @@ type 'a t = { x : 'a; }
 Line 3, characters 15-16:
 3 |   use_portable t;
                    ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
@@ -530,7 +556,9 @@ let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
 Line 1, characters 59-60:
 1 | let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
                                                                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
@@ -538,7 +566,9 @@ let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
 Line 1, characters 61-62:
 1 | let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
                                                                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 type ('a : immutable_data) t = { x : 'a }
@@ -555,7 +585,9 @@ type ('a : immutable_data) t = { x : 'a; }
 Line 3, characters 15-16:
 3 |   use_portable t;
                    ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
@@ -563,7 +595,9 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -571,7 +605,9 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -586,7 +622,9 @@ let foo (t : (unit -> unit) t @ nonportable) = use_portable t
 Line 1, characters 60-61:
 1 | let foo (t : (unit -> unit) t @ nonportable) = use_portable t
                                                                 ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (**** Test 4: Record types satisfy type constraints when appropriate ****)

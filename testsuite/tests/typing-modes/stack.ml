@@ -16,7 +16,9 @@ Line 1, characters 12-31:
                 ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f = ref (stack_ (42, 42))
@@ -26,7 +28,9 @@ Line 1, characters 12-29:
                 ^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f () =
@@ -50,7 +54,9 @@ Line 2, characters 14-47:
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f () =
@@ -74,7 +80,9 @@ Line 2, characters 14-54:
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 
@@ -85,7 +93,9 @@ Line 1, characters 12-27:
                 ^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f = ignore_local (stack_ (2, 3))
@@ -111,7 +121,9 @@ Line 1, characters 12-29:
                 ^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f = ignore_local (stack_ (Bar 42))
@@ -134,7 +146,9 @@ Line 1, characters 12-30:
                 ^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f = ignore_local (stack_ (`Bar 42))
@@ -163,7 +177,9 @@ Line 3, characters 12-34:
                 ^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f = ignore_local (stack_ {x = "hello"})
@@ -191,7 +207,9 @@ Line 2, characters 20-32:
                         ^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f (r : r) = ignore_local (stack_ r.x) [@nontail]
@@ -206,7 +224,9 @@ Line 1, characters 12-33:
                 ^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f = ignore_local (stack_ [| 42; 56 |])
@@ -265,7 +285,9 @@ Line 2, characters 16-34:
                     ^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f2 () =
@@ -277,7 +299,9 @@ Line 2, characters 24-42:
                             ^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted expression is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let f3 () =
@@ -299,7 +323,9 @@ let f4 (local_ x) =
 Line 2, characters 16-17:
 2 |     List.length x
                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 (* Allocations that are not supported for stack *)

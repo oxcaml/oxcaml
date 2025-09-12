@@ -139,7 +139,9 @@ val float_u_escape : local_ float# -> (float#, float#) Float_u.pair = <fun>
 Line 2, characters 27-28:
 2 |   fun x -> Float_u.mk_pair x x [@nontail]
                                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let hidden_float_u_escape :
@@ -154,7 +156,9 @@ val hidden_float_u_escape :
 Line 3, characters 27-28:
 3 |   fun x -> Float_u.mk_pair x x [@nontail]
                                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let float_u_record_escape : local_ _ -> float_u_record * float_u_record =

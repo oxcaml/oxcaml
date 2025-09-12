@@ -62,7 +62,9 @@ let foo x =
 Line 5, characters 8-9:
 5 |     ref y
             ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 (* following we check error detection *)

@@ -432,7 +432,9 @@ val reset_ref : int ref @ unique -> unit = <fun>
 Line 6, characters 12-13:
 6 |   reset_ref x;
                 ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* Test 13.2: Unique mutable variable *)
@@ -445,7 +447,9 @@ let x_13_2 =
 Line 3, characters 12-13:
 3 |   reset_ref x;
                 ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* Test 13.3: [let mutable x @ m] checks only that the initial value of x has
@@ -495,7 +499,9 @@ Line 4, characters 19-20:
 Error: This value is "nonportable"
        because it closes over the value "x_13_3" (at Line 3, characters 17-23)
        which is expected to be "uncontended".
-       However, the highlighted expression is expected to be "portable".
+       However, the highlighted expression is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (* [f] remains non-portable even if a portable function is reassigned *)
@@ -511,7 +517,9 @@ Line 5, characters 19-20:
 Error: This value is "nonportable"
        because it closes over the value "x_13_3" (at Line 3, characters 17-23)
        which is expected to be "uncontended".
-       However, the highlighted expression is expected to be "portable".
+       However, the highlighted expression is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 

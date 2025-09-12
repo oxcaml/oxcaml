@@ -37,7 +37,9 @@ let foo (t : int option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : int option @ aliased) =
@@ -47,7 +49,9 @@ let foo (t : int option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t;
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* crosses contention but not portability or linearity *)
@@ -63,7 +67,9 @@ let foo (t : ('a -> 'a) option @ nonportable) =
 Line 2, characters 15-16:
 2 |   use_portable t
                    ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 let foo (t : ('a -> 'a) option @ once) =
@@ -73,7 +79,9 @@ let foo (t : ('a -> 'a) option @ once) =
 Line 2, characters 11-12:
 2 |   use_many t
                ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (t : ('a -> 'a) option @ local) =
@@ -83,7 +91,9 @@ let foo (t : ('a -> 'a) option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : ('a -> 'a) option @ aliased) =
@@ -93,7 +103,9 @@ let foo (t : ('a -> 'a) option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* references crosses portability but not contention *)
@@ -103,7 +115,9 @@ let foo (t : int ref option @ contended) =
 Line 2, characters 20-21:
 2 |     use_uncontended t
                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : int ref option @ nonportable once) =
@@ -120,7 +134,9 @@ let foo (t : int ref option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : int ref option @ aliased) =
@@ -130,7 +146,9 @@ let foo (t : int ref option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* shouldn't cross anything *)
@@ -141,7 +159,9 @@ let foo (t : ('a -> 'a) ref option @ contended) =
 Line 2, characters 18-19:
 2 |   use_uncontended t
                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : ('a -> 'a) ref option @ nonportable) =
@@ -151,7 +171,9 @@ let foo (t : ('a -> 'a) ref option @ nonportable) =
 Line 2, characters 15-16:
 2 |   use_portable t
                    ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 let foo (t : ('a -> 'a ref) option @ once) =
@@ -161,7 +183,9 @@ let foo (t : ('a -> 'a ref) option @ once) =
 Line 2, characters 11-12:
 2 |   use_many t
                ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (t : ('a -> 'a) ref option @ local) =
@@ -171,7 +195,9 @@ let foo (t : ('a -> 'a) ref option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : ('a -> 'a) ref option @ aliased) =
@@ -181,7 +207,9 @@ let foo (t : ('a -> 'a) ref option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* crosses nothing *)
@@ -191,7 +219,9 @@ let foo (t : 'a option @ contended) =
 Line 2, characters 20-21:
 2 |     use_uncontended t
                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : 'a option @ nonportable) =
@@ -200,7 +230,9 @@ let foo (t : 'a option @ nonportable) =
 Line 2, characters 17-18:
 2 |     use_portable t
                      ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 let foo (t : 'a option @ once) =
@@ -210,7 +242,9 @@ let foo (t : 'a option @ once) =
 Line 2, characters 11-12:
 2 |   use_many t
                ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (t : 'a option @ local) =
@@ -220,7 +254,9 @@ let foo (t : 'a option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : 'a option @ aliased) =
@@ -230,7 +266,9 @@ let foo (t : 'a option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* looks at kinds *)
@@ -256,7 +294,9 @@ val foo : ('a : value mod contended portable). 'a option @ contended -> unit =
 Line 2, characters 18-19:
 2 |   use_uncontended t;
                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (type a : value mod contended portable) (t : a option @ once) =
@@ -266,7 +306,9 @@ let foo (type a : value mod contended portable) (t : a option @ once) =
 Line 2, characters 11-12:
 2 |   use_many t
                ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (t : ('a : value mod contended portable) option @ local) =
@@ -276,7 +318,9 @@ let foo (t : ('a : value mod contended portable) option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (type a : value mod aliased) (t : a option @ aliased) =
@@ -286,7 +330,9 @@ let foo (type a : value mod aliased) (t : a option @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (********************************************)
@@ -307,7 +353,9 @@ let foo (t : int list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : int list @ aliased) =
@@ -317,7 +365,9 @@ let foo (t : int list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t;
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* crosses contention but not portability or linearity *)
@@ -333,7 +383,9 @@ let foo (t : ('a -> 'a) list @ nonportable) =
 Line 2, characters 15-16:
 2 |   use_portable t
                    ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 let foo (t : ('a -> 'a) list @ once) =
@@ -343,7 +395,9 @@ let foo (t : ('a -> 'a) list @ once) =
 Line 2, characters 11-12:
 2 |   use_many t
                ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (t : ('a -> 'a) list @ local) =
@@ -353,7 +407,9 @@ let foo (t : ('a -> 'a) list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : ('a -> 'a) list @ aliased) =
@@ -363,7 +419,9 @@ let foo (t : ('a -> 'a) list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* references crosses portability but not contention *)
@@ -373,7 +431,9 @@ let foo (t : int ref list @ contended) =
 Line 2, characters 20-21:
 2 |     use_uncontended t
                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : int ref list @ nonportable once) =
@@ -390,7 +450,9 @@ let foo (t : int ref list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : int ref list @ aliased) =
@@ -400,7 +462,9 @@ let foo (t : int ref list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* shouldn't cross anything *)
@@ -411,7 +475,9 @@ let foo (t : ('a -> 'a) ref list @ contended) =
 Line 2, characters 18-19:
 2 |   use_uncontended t
                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : ('a -> 'a) ref list @ nonportable) =
@@ -421,7 +487,9 @@ let foo (t : ('a -> 'a) ref list @ nonportable) =
 Line 2, characters 15-16:
 2 |   use_portable t
                    ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 let foo (t : ('a -> 'a ref) list @ once) =
@@ -431,7 +499,9 @@ let foo (t : ('a -> 'a ref) list @ once) =
 Line 2, characters 11-12:
 2 |   use_many t
                ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (t : ('a -> 'a) ref list @ local) =
@@ -441,7 +511,9 @@ let foo (t : ('a -> 'a) ref list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : ('a -> 'a) ref list @ aliased) =
@@ -451,7 +523,9 @@ let foo (t : ('a -> 'a) ref list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* crosses nothing *)
@@ -461,7 +535,9 @@ let foo (t : 'a list @ contended) =
 Line 2, characters 20-21:
 2 |     use_uncontended t
                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : 'a list @ nonportable) =
@@ -470,7 +546,9 @@ let foo (t : 'a list @ nonportable) =
 Line 2, characters 17-18:
 2 |     use_portable t
                      ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 let foo (t : 'a list @ once) =
@@ -480,7 +558,9 @@ let foo (t : 'a list @ once) =
 Line 2, characters 11-12:
 2 |   use_many t
                ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (t : 'a list @ local) =
@@ -490,7 +570,9 @@ let foo (t : 'a list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : 'a list @ aliased) =
@@ -500,7 +582,9 @@ let foo (t : 'a list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (* looks at kinds *)
@@ -521,7 +605,9 @@ let foo (type a : value mod contended portable) (t : a list @ once) =
 Line 2, characters 11-12:
 2 |   use_many t
                ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 let foo (type a : value mod contended portable) (t : a list @ local) =
@@ -531,7 +617,9 @@ let foo (type a : value mod contended portable) (t : a list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (type a : value mod contended portable) (t : a list @ aliased) =
@@ -541,7 +629,9 @@ let foo (type a : value mod contended portable) (t : a list @ aliased) =
 Line 2, characters 13-14:
 2 |   use_unique t
                  ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (****************************)
@@ -705,7 +795,9 @@ let foo (t : t @ nonportable) = use_portable t
 Line 1, characters 45-46:
 1 | let foo (t : t @ nonportable) = use_portable t
                                                  ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (*********************)
@@ -724,7 +816,9 @@ let foo (t : int t @ nonportable) = use_portable t
 Line 1, characters 49-50:
 1 | let foo (t : int t @ nonportable) = use_portable t
                                                      ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (*********************)
@@ -743,7 +837,9 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ nonportable) = use_portable t
@@ -751,7 +847,9 @@ let foo (t : int t @ nonportable) = use_portable t
 Line 1, characters 49-50:
 1 | let foo (t : int t @ nonportable) = use_portable t
                                                      ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (*********************)
@@ -789,7 +887,9 @@ val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ nonportable) = use_portable t
@@ -797,7 +897,9 @@ let foo (t : int t @ nonportable) = use_portable t
 Line 1, characters 49-50:
 1 | let foo (t : int t @ nonportable) = use_portable t
                                                      ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (*********************)
@@ -845,7 +947,9 @@ let foo (t : (_, _) t @ contended) = use_uncontended t
 Line 1, characters 53-54:
 1 | let foo (t : (_, _) t @ contended) = use_uncontended t
                                                          ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : (_, int) t @ contended) = use_uncontended t
@@ -853,7 +957,9 @@ let foo (t : (_, int) t @ contended) = use_uncontended t
 Line 1, characters 55-56:
 1 | let foo (t : (_, int) t @ contended) = use_uncontended t
                                                            ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 (********************************************************)
@@ -878,7 +984,9 @@ let foo (t : T.t @ nonportable) = use_portable t
 Line 1, characters 47-48:
 1 | let foo (t : T.t @ nonportable) = use_portable t
                                                    ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (*********************)
@@ -901,7 +1009,9 @@ let foo (t : _ T.t @ contended) = use_uncontended t
 Line 1, characters 50-51:
 1 | let foo (t : _ T.t @ contended) = use_uncontended t
                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : int T.t @ nonportable) = use_portable t
@@ -909,7 +1019,9 @@ let foo (t : int T.t @ nonportable) = use_portable t
 Line 1, characters 51-52:
 1 | let foo (t : int T.t @ nonportable) = use_portable t
                                                        ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (*************************)
@@ -932,7 +1044,9 @@ let foo (t : _ t @ nonportable) = use_portable t
 Line 1, characters 47-48:
 1 | let foo (t : _ t @ nonportable) = use_portable t
                                                    ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -940,7 +1054,9 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (*********************)
@@ -965,7 +1081,9 @@ val foo : ('a : immutable_data). 'a t -> unit = <fun>
 Line 1, characters 47-48:
 1 | let foo (t : _ t @ nonportable) = use_portable t
                                                    ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -973,7 +1091,9 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 (***********************)
@@ -1130,7 +1250,9 @@ let foo (t : int t @ local) = use_global t [@nontail]
 Line 1, characters 41-42:
 1 | let foo (t : int t @ local) = use_global t [@nontail]
                                              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -1138,7 +1260,9 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
@@ -1146,7 +1270,9 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ nonportable) = use_portable t
@@ -1154,7 +1280,9 @@ let foo (t : _ t @ nonportable) = use_portable t
 Line 1, characters 47-48:
 1 | let foo (t : _ t @ nonportable) = use_portable t
                                                    ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 let foo (t : _ t @ once) = use_many t
@@ -1162,7 +1290,9 @@ let foo (t : _ t @ once) = use_many t
 Line 1, characters 36-37:
 1 | let foo (t : _ t @ once) = use_many t
                                         ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 (************)
@@ -1181,7 +1311,9 @@ let foo (t : (int, int, _, int) t @ nonportable) = use_portable t
 Line 1, characters 64-65:
 1 | let foo (t : (int, int, _, int) t @ nonportable) = use_portable t
                                                                     ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 (*********************************************)
