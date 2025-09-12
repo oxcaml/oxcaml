@@ -572,17 +572,9 @@ let mode_lazy expected_mode =
       expected_mode
   in
   let mode_crossing =
-    Crossing.of_bounds {
-      comonadic = {
-        Value.Comonadic.Const.max with
-        (* The thunk is evaluated only once, so we only require it to be [once],
-          even if the [lazy] is [many]. *)
-        linearity = Many;
-        (* The thunk is evaluated only when the [lazy] is [uncontended], so we
-          only require it to be [nonportable], even if the [lazy] is [portable].
-          *)
-        portability = Portable };
-      monadic = Value.Monadic.Const.min }
+    Crossing.create ~linearity:true ~portability:true
+      ~regionality:false ~uniqueness:false ~contention:false ~statefulness:false
+      ~visibility:false ~yielding:false
   in
   let closure_mode =
     expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing

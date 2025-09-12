@@ -85,14 +85,7 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** The mod-bounds of a jkind *)
 module Jkind_mod_bounds : sig
-  module Areality = Mode.Regionality.Const
-  module Linearity = Mode.Linearity.Const
-  module Uniqueness = Mode.Uniqueness.Const_op
-  module Portability = Mode.Portability.Const
-  module Contention = Mode.Contention.Const_op
-  module Yielding = Mode.Yielding.Const
-  module Statefulness = Mode.Statefulness.Const
-  module Visibility = Mode.Visibility.Const_op
+  module Crossing = Mode.Crossing
   module Externality = Jkind_axis.Externality
   module Nullability = Jkind_axis.Nullability
   module Separability = Jkind_axis.Separability
@@ -100,39 +93,18 @@ module Jkind_mod_bounds : sig
   type t
 
   val create :
-    areality:Areality.t ->
-    linearity:Linearity.t ->
-    uniqueness:Uniqueness.t ->
-    portability:Portability.t ->
-    contention:Contention.t ->
-    yielding:Yielding.t ->
-    statefulness:Statefulness.t ->
-    visibility:Visibility.t ->
+    Crossing.t->
     externality:Externality.t ->
     nullability:Nullability.t ->
     separability:Separability.t ->
     t
 
-  val areality : t -> Areality.t
-  val linearity : t -> Linearity.t
-  val uniqueness : t -> Uniqueness.t
-  val portability : t -> Portability.t
-  val contention : t -> Contention.t
-  val yielding : t -> Yielding.t
-  val statefulness : t -> Statefulness.t
-  val visibility : t -> Visibility.t
+  val crossing : t -> Crossing.t
   val externality : t -> Externality.t
   val nullability : t -> Nullability.t
   val separability : t -> Separability.t
 
-  val set_areality : Areality.t -> t -> t
-  val set_linearity : Linearity.t -> t -> t
-  val set_uniqueness : Uniqueness.t -> t -> t
-  val set_portability : Portability.t -> t -> t
-  val set_contention : Contention.t -> t -> t
-  val set_yielding : Yielding.t -> t -> t
-  val set_statefulness : Statefulness.t -> t -> t
-  val set_visibility : Visibility.t -> t -> t
+  val set_crossing : Crossing.t -> t -> t
   val set_externality : Externality.t -> t -> t
   val set_nullability : Nullability.t -> t -> t
   val set_separability : Separability.t -> t -> t

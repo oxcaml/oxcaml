@@ -100,7 +100,7 @@
    -safe-string
    -strict-formats
    -w
-   -67
+   -67-47
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
    ))
  (ocamlopt_flags
