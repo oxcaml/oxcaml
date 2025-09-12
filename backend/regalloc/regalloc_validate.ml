@@ -580,7 +580,10 @@ end = struct
     (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
       when Stdlib.compare rk1 rk2 = 0 ->
       ()
-    | Tailcall_self { destination = l1 }, Tailcall_self { destination = l2 } ->
+    | ( Tailcall_self { destination = l1; _ },
+        Tailcall_self { destination = l2; _ } ) ->
+      (* CR-someday xclerc for xclerc: should no matter, but maybe also compare
+         the `associated_poll` fields*)
       compare_label l1 l2
     | Tailcall_func call1, Tailcall_func call2
     (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
