@@ -2600,6 +2600,7 @@ end = struct
         | Name_for_debugger _ | Stackoffset _ | Probe_is_enabled _ | Opaque
         | Begin_region | End_region | Intop_atomic _ | Store _ | Pause ->
           next
+        | Maybe_poll -> assert false
         | Poll ->
           (* Ignore poll points even though they may trigger an allocations,
              because otherwise all loops would be considered allocating when

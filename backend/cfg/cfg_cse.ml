@@ -317,6 +317,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
         Op_load
           (match mutability with Mutable -> Mutable | Immutable -> Immutable)
     | Store (_, _, asg) -> Op_store asg
+    | Maybe_poll -> assert false
     | Alloc _ | Poll -> assert false (* treated specially *)
     | Intop _ -> Op_pure
     | Intop_imm (_, _) -> Op_pure
@@ -343,6 +344,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Specific _ | Name_for_debugger _ | Probe_is_enabled _ | Begin_region
     | End_region | Dls_get ->
       false
+    | Maybe_poll -> assert false
 
   let kill_loads (n : numbering) : numbering = remove_mutable_load_numbering n
 
@@ -379,6 +381,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
       let n1 = kill_addr_regs (kill_loads n) in
       let n2 = set_unknown_regs n1 i.res in
       n2
+    | Op Maybe_poll -> assert false
     | Op
         (( Const_int _ | Begin_region | End_region | Dls_get | Const_float32 _
          | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _

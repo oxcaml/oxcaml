@@ -223,6 +223,7 @@ let pseudoregs_for_operation op arg res =
   | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get ->
     raise Use_default_exn
+  | Maybe_poll -> assert false
 
 let is_immediate (op : Operation.integer_operation) n :
     Cfg_selectgen_target_intf.is_immediate_result =

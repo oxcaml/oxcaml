@@ -372,6 +372,8 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
          ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After vectorize")
   ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
        (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_polling_cleanup"
+       Cfg_polling.remove_all_maybe_polls
   ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
        (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc" Cfg_comballoc.run

@@ -161,6 +161,7 @@ type t =
         regs : Reg.t array
       }
   | Dls_get
+  | Maybe_poll
   | Poll
   | Pause
   | Alloc of

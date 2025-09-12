@@ -146,7 +146,7 @@ let linearize_terminator cfg_with_layout (func : string) start
     | Tailcall_func Indirect -> [L.Lcall_op Ltailcall_ind], None
     | Tailcall_func (Direct func_symbol) ->
       [L.Lcall_op (Ltailcall_imm { func = func_symbol })], None
-    | Tailcall_self { destination } ->
+    | Tailcall_self { destination; associated_poll = _ } ->
       ( [ L.Lcall_op
             (Ltailcall_imm { func = { sym_name = func; sym_global = Local } })
         ],

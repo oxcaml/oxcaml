@@ -45,6 +45,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     ->
     (* no rewrite *)
     May_still_have_spilled_registers
+  | Op Maybe_poll -> assert false
 
 let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
   match term.desc with

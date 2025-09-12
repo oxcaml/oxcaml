@@ -2,6 +2,8 @@
 
 (** Analyses related to the insertion of [Poll] operations. *)
 
+val is_disabled : fun_name:string -> bool
+
 val instrument_fundecl :
   future_funcnames:Misc.Stdlib.String.Set.t ->
   Cfg_with_layout.t ->
@@ -13,3 +15,5 @@ val requires_prologue_poll :
   optimistic_prologue_poll_instr_id:InstructionId.t ->
   Cfg.t ->
   bool
+
+val remove_all_maybe_polls : Cfg_with_layout.t -> Cfg_with_layout.t
