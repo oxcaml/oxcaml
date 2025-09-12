@@ -321,6 +321,19 @@ val set_save_ir_before : Compiler_pass.t -> bool -> unit
 val should_save_ir_after : Compiler_pass.t -> bool
 val should_save_ir_before : Compiler_pass.t -> bool
 
+module Register_allocator : sig
+  type t =
+    | Cfg
+    | Irc
+    | Ls
+    | Gi
+  val equal : t -> t -> bool
+  val to_string : t -> string
+  val of_string : string -> t option
+  val assoc_list : (string * t) list
+  val format : Format.formatter -> t -> unit
+end
+
 val is_flambda2 : unit -> bool
 
 val arg_spec : (string * Arg.spec * string) list ref

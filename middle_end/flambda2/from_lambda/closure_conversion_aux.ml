@@ -874,6 +874,12 @@ module Function_decls = struct
 
     let poll_attribute t = t.attr.poll
 
+    let regalloc_attribute t = t.attr.regalloc
+
+    let regalloc_param_attribute t = t.attr.regalloc_param
+
+    let cold t = t.attr.cold
+
     let loop t = t.attr.loop
 
     let is_a_functor t = t.attr.is_a_functor

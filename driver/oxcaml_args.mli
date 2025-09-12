@@ -30,7 +30,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics : unit -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
-  val regalloc : string -> unit
+  val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
   val regalloc_param : string -> unit
   val regalloc_validate : unit -> unit

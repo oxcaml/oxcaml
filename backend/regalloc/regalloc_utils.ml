@@ -14,9 +14,14 @@ let fatal fmt =
   !fatal_callback ();
   Misc.fatal_errorf fmt
 
+let function_specific_params : string list ref = ref []
+
 let find_param_value param_name =
-  !Oxcaml_flags.regalloc_params
-  |> List.rev
+  (* Concatenate function-specific params with global params *)
+  let all_params =
+    List.rev !Oxcaml_flags.regalloc_params @ !function_specific_params
+  in
+  all_params
   |> List.find_map ~f:(fun param ->
          match String.split_on_char ':' param with
          | [] -> None

@@ -49,6 +49,10 @@ type basic_block =
 type codegen_option =
   | Reduce_code_size
   | No_CSE
+  | Use_linscan_regalloc
+  | Use_regalloc of Clflags.Register_allocator.t
+  | Use_regalloc_param of string list
+  | Cold
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
@@ -75,7 +79,11 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
     | Check_zero_alloc { strict; loc; custom_error_msg } ->
       Check_zero_alloc { strict; loc; custom_error_msg }
       :: of_cmm_codegen_option tl
-    | Use_linscan_regalloc -> of_cmm_codegen_option tl)
+    | Use_linscan_regalloc -> Use_linscan_regalloc :: of_cmm_codegen_option tl
+    | Use_regalloc regalloc -> Use_regalloc regalloc :: of_cmm_codegen_option tl
+    | Use_regalloc_param params ->
+      Use_regalloc_param params :: of_cmm_codegen_option tl
+    | Cold -> Cold :: of_cmm_codegen_option tl)
 
 type t =
   { blocks : basic_block Label.Tbl.t;
