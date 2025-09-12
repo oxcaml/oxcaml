@@ -1268,11 +1268,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             if not (Cfg_polling.is_disabled ~fun_name:!SU.current_function_name)
             then
               (* Insert poll instruction before the tailcall *)
-              Some
-                (SU.insert_op_debug_returning_id env sub_cfg
-                   (Poll { enabled = true })
-                   dbg [||] [||])
-            else None
+              Cfg.Associated_poll
+                { instruction_id =
+                    SU.insert_op_debug_returning_id env sub_cfg
+                      (Poll { enabled = true })
+                      dbg [||] [||]
+                }
+            else Cfg.Polling_disabled
           in
           let call =
             Cfg.Tailcall_self

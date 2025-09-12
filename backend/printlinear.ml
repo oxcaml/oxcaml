@@ -85,7 +85,8 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
   | Lepilogue_close -> fprintf ppf "epilogue_close"
   | Lop op ->
     (match[@warning "-4"] op with
-    | Alloc _ | Poll _ -> fprintf ppf "@[<1>{%a}@]@," regsetaddr i.live
+    | Alloc _ | Poll { enabled = true } ->
+      fprintf ppf "@[<1>{%a}@]@," regsetaddr i.live
     | _ -> ());
     operation op i.arg ppf i.res
   | Lcall_op op ->

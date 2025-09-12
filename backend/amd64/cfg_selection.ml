@@ -221,7 +221,9 @@ let pseudoregs_for_operation op arg res =
   | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-  | Begin_region | End_region | Poll _ | Dls_get ->
+  | Begin_region | End_region
+  | Poll { enabled = _ }
+  | Dls_get ->
     raise Use_default_exn
 
 let is_immediate (op : Operation.integer_operation) n :

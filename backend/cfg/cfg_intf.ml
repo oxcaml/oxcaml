@@ -127,6 +127,10 @@ module S = struct
       label_after : Label.t
     }
 
+  type associated_poll =
+    | Polling_disabled
+    | Associated_poll of { instruction_id : InstructionId.t }
+
   (* Properties of the representation of successors:
    * - Tests of different types are not mixed. For example, a test that
    *   compares between variables of type int cannot be combined with a
@@ -151,7 +155,7 @@ module S = struct
     | Raise of Lambda.raise_kind
     | Tailcall_self of
         { destination : Label.t;
-          associated_poll : InstructionId.t option
+          associated_poll : associated_poll
         }
     | Tailcall_func of func_call_operation
     | Call_no_return of external_call_operation

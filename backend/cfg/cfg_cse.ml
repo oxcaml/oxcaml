@@ -317,7 +317,8 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
         Op_load
           (match mutability with Mutable -> Mutable | Immutable -> Immutable)
     | Store (_, _, asg) -> Op_store asg
-    | Alloc _ | Poll _ -> assert false (* treated specially *)
+    | Poll { enabled = false } -> Op_pure
+    | Alloc _ | Poll { enabled = true } -> assert false (* treated specially *)
     | Intop _ -> Op_pure
     | Intop_imm (_, _) -> Op_pure
     | Intop_atomic _ -> Op_store true
@@ -337,7 +338,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Const_int _ -> true
     | Move | Spill | Reload | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Opaque | Stackoffset _
-    | Load _ | Store _ | Alloc _ | Poll _ | Pause | Intop _
+    | Load _ | Store _ | Alloc _
+    | Poll { enabled = _ }
+    | Pause | Intop _
     | Intop_imm (_, _)
     | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
     | Specific _ | Name_for_debugger _ | Probe_is_enabled _ | Begin_region
@@ -366,7 +369,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
       (* We don't want to reorder loads across Pause, since it's used to spin on
          memory locations. *)
       kill_loads n
-    | Op (Alloc _) | Op (Poll _) ->
+    | Op (Alloc _) | Op (Poll { enabled = true }) ->
       (* For allocations, we must avoid extending the live range of a
          pseudoregister across the allocation if this pseudoreg is a derived
          heap pointer (a pointer into the heap that does not point to the
@@ -389,7 +392,8 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          | Intop_atomic _
          | Floatop (_, _)
          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-         | Specific _ | Name_for_debugger _ ) as op) -> (
+         | Specific _ | Name_for_debugger _
+         | Poll { enabled = false } ) as op) -> (
       match class_of_operation op with
       | (Op_pure | Op_load _) as op_class -> (
         let n1, varg = valnum_regs n i.arg in

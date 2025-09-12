@@ -181,7 +181,7 @@ module Polls_before_prtc_transfer = struct
       domain -> Cfg.basic Cfg.instruction -> context -> (domain, error) result =
    fun dom instr { future_funcnames = _; optimistic_prologue_poll_instr_id } ->
     match instr.desc with
-    | Op (Poll _) ->
+    | Op (Poll { enabled = true }) ->
       if InstructionId.equal instr.id optimistic_prologue_poll_instr_id
       then Ok dom
       else Ok Always_polls
@@ -197,7 +197,8 @@ module Polls_before_prtc_transfer = struct
         | Intop_atomic _
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Specific _ | Name_for_debugger _ )
+        | Specific _ | Name_for_debugger _
+        | Poll { enabled = false } )
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
       Ok dom
@@ -333,10 +334,11 @@ let instr_cfg_with_layout :
           match after.terminator.desc with
           | Tailcall_self { destination = _; associated_poll } -> (
             match associated_poll with
-            | None ->
-              (* No associated poll, add the poll instruction as normal *)
-              DLL.add_end after.body poll
-            | Some poll_id ->
+            | Polling_disabled ->
+              Misc.fatal_errorf
+                "Cfg_polling: trying to insert a poll instruction inside a \
+                 function where polling is disabled"
+            | Associated_poll { instruction_id = poll_id } ->
               (* Find the poll instruction with this ID and enable it *)
               let found = ref false in
               DLL.iter_cell after.body ~f:(fun cell ->
@@ -410,9 +412,10 @@ let add_poll_or_alloc_basic :
     | Stackoffset _ | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
     | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
     | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-    | Name_for_debugger _ | Dls_get | Pause ->
+    | Name_for_debugger _ | Dls_get | Pause
+    | Poll { enabled = false } ->
       points
-    | Poll _ -> (Poll, instr.dbg) :: points
+    | Poll { enabled = true } -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->

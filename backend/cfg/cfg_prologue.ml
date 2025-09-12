@@ -90,14 +90,15 @@ module Instruction_requirements = struct
       | Op (Stackoffset _) -> Requirements Requires_prologue
       (* Allocations and polls are implemented by calling a function when
          emitted, and therefore need a prologue for the function call. *)
-      | Op (Alloc _ | Poll _) -> Requirements Requires_prologue
+      | Op (Alloc _ | Poll { enabled = true }) -> Requirements Requires_prologue
       | Op
           ( Move | Spill | Reload | Const_int _ | Const_float32 _
           | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
           | Const_vec512 _ | Load _ | Store _ | Intop _ | Intop_imm _
           | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
           | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region
-          | End_region | Specific _ | Name_for_debugger _ | Dls_get | Pause )
+          | End_region | Specific _ | Name_for_debugger _ | Dls_get | Pause
+          | Poll { enabled = false } )
       | Pushtrap _ | Poptrap _ | Reloadretaddr | Stack_check _ ->
         Requirements No_requirements
 end

@@ -293,7 +293,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_at_reloadretaddr
   | Pushtrap _ ->
     destroyed_at_pushtrap
-  | Op (Poll _) -> destroyed_at_alloc_or_poll
+  | Op (Poll { enabled }) -> if enabled then destroyed_at_alloc_or_poll else [||]
   | Op (Alloc _) ->
     destroyed_at_alloc_or_poll
   | Op(Load {memory_chunk = Single { reg = Float64 }; _ }
