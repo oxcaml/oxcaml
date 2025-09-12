@@ -102,205 +102,515 @@ module Instruction_requirements = struct
         Requirements No_requirements
 end
 
-let prologue_needed_block (block : Cfg.basic_block) ~fun_name =
-  (* CR-soon cfalas: Move to [Proc] so that it's arch-dependent and
-     frame_pointers only affects the output for amd64. *)
-  Config.with_frame_pointers || block.is_trap_handler
-  || DLL.exists block.Cfg.body ~f:(fun instr ->
-         match Instruction_requirements.basic instr with
-         | Requirements Requires_prologue -> true
-         | Prologue | Epilogue
-         | Requirements (No_requirements | Requires_no_prologue) ->
-           false)
-  ||
-  match Instruction_requirements.terminator block.terminator fun_name with
-  | Requires_prologue -> true
-  | No_requirements | Requires_no_prologue -> false
+module Bool_domain : Cfg_dataflow.Domain_S with type t = bool = struct
+  type t = bool
 
-(* CR-someday cfalas: This implementation can take O(n^2) memory if there are
-   many blocks which need an epilogue. Ideally we should be able to re-use some
-   of the epilogues stored for the children instead of storing a fresh copy for
-   each block to bring this worst-case down. *)
-module Reachable_epilogues = struct
-  type t = Label.Set.t Label.Tbl.t
+  (* An empty block doesn't need a prologue. *)
+  let bot = false
 
-  let build (cfg : Cfg.t) : t =
-    let t = Label.Tbl.map cfg.blocks (fun _ -> Label.Set.empty) in
-    let visited = ref Label.Set.empty in
-    let rec collect label =
-      if not (Label.Set.mem label !visited)
-      then (
-        visited := Label.Set.add label !visited;
-        let block = Cfg.get_block_exn cfg label in
-        (match
-           Instruction_requirements.terminator block.terminator cfg.fun_name
-         with
-        | Requires_no_prologue ->
-          Label.Tbl.replace t label (Label.Set.singleton label)
-        | No_requirements | Requires_prologue -> ());
-        Label.Set.iter
-          (fun succ_label ->
-            collect succ_label;
-            Label.Tbl.replace t label
-              (Label.Set.union (Label.Tbl.find t label)
-                 (Label.Tbl.find t succ_label)))
-          (Cfg.successor_labels ~normal:true ~exn:true block))
-    in
-    collect cfg.entry_label;
-    t
+  (* If any of the predecessors of a block need a prologue, then we consider the
+     block to also need a prologue. *)
+  let join = ( || )
 
-  let from_block (t : t) (label : Label.t) = Label.Tbl.find t label
+  let less_equal a b = b || not a
 end
 
-(* CR-soon cfalas: consider moving this to [Cfg] *)
-let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
-  let visited = ref Label.Set.empty in
-  let rec collect label =
-    if not (Label.Set.mem label !visited)
-    then (
-      visited := Label.Set.add label !visited;
+module Prologue_needed = struct
+  module After = struct
+    type context = { fun_name : string }
+
+    module Transfer :
+      Cfg_dataflow.Backward_transfer
+        with type domain = bool
+         and type context = context
+         and type error = unit = struct
+      type domain = bool
+
+      type error = unit
+
+      type nonrec context = context
+
+      let transfer : domain -> Instruction_requirements.t -> domain =
+       fun domain requirements ->
+        match domain, requirements with
+        | _, Requires_prologue -> true
+        | domain, (No_requirements | Requires_no_prologue) -> domain
+
+      let basic :
+          domain ->
+          Cfg.basic Cfg.instruction ->
+          Cfg.basic_block ->
+          context ->
+          (domain, error) result =
+       fun domain instr _ _ ->
+        match domain, Instruction_requirements.basic instr with
+        | _, (Prologue | Epilogue) ->
+          Misc.fatal_error
+            "found prologue or epilogue instruction before prologue addition \
+             phase"
+        | domain, Requirements requirements -> Ok (transfer domain requirements)
+
+      let terminator :
+          domain ->
+          exn:domain ->
+          Cfg.terminator Cfg.instruction ->
+          Cfg.basic_block ->
+          context ->
+          (domain, error) result =
+       fun domain ~exn:_ instr _ { fun_name } ->
+        let res =
+          transfer domain (Instruction_requirements.terminator instr fun_name)
+        in
+        Ok res
+
+      let exception_ : domain -> context -> (domain, error) result =
+       fun _ _ -> Ok true
+    end
+
+    module T = struct
+      include Cfg_dataflow.Backward (Bool_domain) (Transfer)
+    end
+
+    include (T : module type of T with type context := context)
+
+    type t = Cfg.t * bool InstructionId.Tbl.t
+
+    let build (cfg : Cfg.t) : t =
+      match run cfg ~init:false ~map:Instr { fun_name = cfg.fun_name } with
+      | Ok res_at_exit -> cfg, res_at_exit
+      | Aborted _ | Max_iterations_reached ->
+        Misc.fatal_error "Cfg_prologue: unreachable code"
+
+    let needs_prologue (t : t) (label : Label.t) =
+      let cfg, tbl = t in
       let block = Cfg.get_block_exn cfg label in
-      Label.Set.iter
-        (fun succ_label -> collect succ_label)
-        (Cfg.successor_labels ~normal:true ~exn:true block))
-  in
-  collect block.start;
-  !visited
+      let first_instr =
+        Option.value
+          (Option.map (fun inst -> inst.Cfg.id) (DLL.hd block.body))
+          ~default:block.terminator.id
+      in
+      InstructionId.Tbl.find tbl first_instr
+  end
 
-let can_place_prologues (prologue_labels : Label.Set.t) (cfg : Cfg.t)
-    (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
-    (epilogue_blocks : Label.Set.t) =
-  (* Moving a prologue to a loop might cause it to execute multiple times, which
-     is both inefficient as well as possibly incorrect.
+  (* The dataflow analysis here is used to determine whether a block on any path
+     leading to a block in the CFG needs a prologue. This then allows us to
+     check whether we can stop shrink-wrapping if all descendant leaf blocks
+     need a prologue *)
+  module Before = struct
+    type context = { fun_name : string }
 
-     Having a non-zero stack offset means that the prologue is added after a
-     [Pushtrap] or [Stackoffset] which shouldn't be allowed. This is because the
-     prologue is added at the stack pointer, which would overlap with the
-     handler pushed by a [Pushtrap]. *)
-  if Label.Set.exists
-       (fun label ->
-         let block = Cfg.get_block_exn cfg label in
-         Cfg_loop_infos.is_in_loop loop_infos label || block.stack_offset <> 0)
-       prologue_labels
-  then
-    false
-    (* Check that there are no prologues which might execute after another
-       prologue has already executed.
+    module Transfer :
+      Cfg_dataflow.Forward_transfer
+        with type domain = bool
+         and type context = context = struct
+      type domain = bool
 
-       This might happen when duplicating a prologue in the following CFG:
+      type nonrec context = context
 
-     * Block A: Condition with branch to Block B / C
-     * Block B: Contains an instruction requiring a prologue, with terminator
-       that jumps to Block C
-     * Block C: Return
+      type image =
+        { normal : domain;
+          exceptional : domain
+        }
 
-       If we duplicate the prologue to both B and C (which are both children of
-       A), the prologue will execute twice on the A->B->C path.
+      let transfer : domain -> Instruction_requirements.t -> domain =
+       fun domain requirements ->
+        match domain, requirements with
+        | _, Requires_prologue -> true
+        | domain, (No_requirements | Requires_no_prologue) -> domain
 
-       This check will also prevent us from having a
-       Prologue..Epilogue..Prologue..Epilogue structure. However, we probably
-       shouldn't emit such structures anyway. *)
-  else if Label.Set.exists
-            (fun prologue ->
-              let descendants =
-                descendants cfg (Cfg.get_block_exn cfg prologue)
-              in
-              let descendant_prologues =
-                Label.Set.inter prologue_labels descendants
-              in
-              let descendant_prologues =
-                Label.Set.remove prologue descendant_prologues
-              in
-              not (Label.Set.is_empty descendant_prologues))
-            prologue_labels
-  then false
-  else
-    (* Check that the blocks requiring an epilogue are dominated by the prologue
-       block. Consider the CFG from the example above. If we try to place the
-       prologue in block B, the prologue would not dominate the epilogue in
-       block C, so in some cases the epilogue would be executed without a
-       prologue on the stack, which would be illegal. *)
-    (* CR-soon cfalas: This condition has the correct effect, but can be
-       slightly misleading in diamond cases. For example, consider a CFG with
-       blocks A-D, and edges A->B, A->C, B->D, C->D. The current implementation
-       will not allow us to move the prologue from A to B and C, because neither
-       B nor C dominate D. In these cases, we are allowed to duplicate the
-       prologue, but we still don't want to, as this only happens when *all* of
-       the children of A require a prologue, in which case we can save space by
-       placing the prologue at A without an impact on performance. *)
-    Label.Set.for_all
-      (fun epilogue_label ->
-        Label.Set.exists
-          (fun prologue_label ->
-            Cfg_dominators.is_dominating doms prologue_label epilogue_label)
-          prologue_labels)
-      epilogue_blocks
+      let basic domain instr _ _ =
+        match domain, Instruction_requirements.basic instr with
+        | _, (Prologue | Epilogue) ->
+          Misc.fatal_error
+            "found prologue or epilogue instruction before prologue addition \
+             phase"
+        | domain, Requirements requirements -> transfer domain requirements
 
-let find_prologue_and_epilogues_shrink_wrapped
-    (cfg_with_infos : Cfg_with_infos.t) =
-  let rec visit (tree : Cfg_dominators.dominator_tree) (cfg : Cfg.t)
-      (doms : Cfg_dominators.t) (loop_infos : Cfg_loop_infos.t)
-      (reachable_epilogues : Reachable_epilogues.t) : Label.Set.t * Label.Set.t
-      =
-    let block = Cfg.get_block_exn cfg tree.label in
-    let epilogue_blocks =
-      Reachable_epilogues.from_block reachable_epilogues tree.label
-    in
-    (* If the current block needs a prologue, we can't propagate the prologue
-       downwards. If it's cold or all paths lead to an exception, there's no
-       reason to do so, as performance is not important. *)
-    let all_exceptional_paths =
-      Label.Set.for_all
-        (fun label ->
+      let terminator domain instr _block { fun_name } =
+        let res =
+          transfer domain (Instruction_requirements.terminator instr fun_name)
+        in
+        { normal = res; exceptional = res }
+    end
+
+    module T = struct
+      include Cfg_dataflow.Forward (Bool_domain) (Transfer)
+    end
+
+    include (T : module type of T with type context := context)
+
+    type t = bool Label.Tbl.t
+
+    let build (cfg : Cfg.t) : t =
+      match
+        run ~init:false ~handlers_are_entry_points:true cfg
+          { fun_name = cfg.fun_name }
+      with
+      | Ok res_at_entry ->
+        (* The result returned by the forward analysis is the state at the entry
+           of each block, but we want the state just before the terminator, i.e.
+           after the entire body of the block. *)
+        (* CR-someday cfalas: to avoid having to recompute this, we can change
+           [Cfg_dataflow] so that we can choose whether we want the results
+           returned to be at the block input or at the block output (or before
+           the terminator). This can be done for both forward and backward
+           analysis. *)
+        let res_at_exit = Label.Tbl.copy res_at_entry in
+        let context = { fun_name = cfg.fun_name } in
+        Label.Tbl.iter
+          (fun label at_entry ->
+            let block = Cfg.get_block_exn cfg label in
+            let at_exit =
+              DLL.fold_left
+                ~f:(fun acc instr -> Transfer.basic acc instr block context)
+                ~init:at_entry block.body
+            in
+            let at_exit =
+              (Transfer.terminator at_exit block.terminator block context)
+                .normal
+            in
+            Label.Tbl.replace res_at_exit label at_exit)
+          res_at_entry;
+        res_at_exit
+      | Error () -> Misc.fatal_error "Cfg_prologue: unreachable code"
+
+    let needs_prologue (t : t) (label : Label.t) = Label.Tbl.find t label
+  end
+end
+
+(* Module to adjust the forward analysis results based on stack_offset
+   constraints. If a block has non-zero stack_offset and needs a prologue
+   backwards, it must also be marked as needing one forwards. *)
+module Stack_offset_adjustment_forward = struct
+  type context = { backward : Prologue_needed.After.t }
+
+  module Transfer :
+    Cfg_dataflow.Forward_transfer
+      with type domain = bool
+       and type context = context = struct
+    type domain = bool
+
+    type nonrec context = context
+
+    type image =
+      { normal : domain;
+        exceptional : domain
+      }
+
+    let transfer domain (instr : _ Cfg.instruction) block { backward } =
+      if instr.Cfg.stack_offset <> 0
+         && Prologue_needed.After.needs_prologue backward block.Cfg.start
+      then true
+      else domain
+
+    let basic :
+        domain ->
+        Cfg.basic Cfg.instruction ->
+        Cfg.basic_block ->
+        context ->
+        domain =
+      transfer
+
+    let terminator :
+        domain ->
+        Cfg.terminator Cfg.instruction ->
+        Cfg.basic_block ->
+        context ->
+        image =
+     fun domain instr block { backward } ->
+      let adjusted_domain = transfer domain instr block { backward } in
+      { normal = adjusted_domain; exceptional = adjusted_domain }
+  end
+
+  module T = struct
+    include Cfg_dataflow.Forward (Bool_domain) (Transfer)
+  end
+
+  include (T : module type of T with type context := context)
+
+  let build (cfg : Cfg.t) (backward : Prologue_needed.After.t)
+      (initial_forward : bool Label.Tbl.t) : bool Label.Tbl.t =
+    (* Run forward dataflow to propagate the adjustments *)
+    match run cfg ~init:false ~handlers_are_entry_points:true { backward } with
+    | Ok res_at_entry ->
+      (* Combine with initial adjustments *)
+      let res_at_exit = Label.Tbl.copy res_at_entry in
+      let context = { backward } in
+      Label.Tbl.iter
+        (fun label at_entry ->
           let block = Cfg.get_block_exn cfg label in
-          match[@ocaml.warning "-4"] block.terminator.desc with
-          | Raise _ -> true
-          | _ -> false)
-        epilogue_blocks
-    in
-    if prologue_needed_block block ~fun_name:cfg.fun_name
-       || block.cold || all_exceptional_paths
-    then Label.Set.singleton tree.label, epilogue_blocks
-    else
-      let children_prologue_block =
-        List.map
-          (fun tree -> visit tree cfg doms loop_infos reachable_epilogues)
-          tree.children
+          let at_exit =
+            DLL.fold_left
+              ~f:(fun acc instr -> Transfer.basic acc instr block context)
+              ~init:at_entry block.body
+          in
+          let at_exit =
+            (Transfer.terminator at_exit block.terminator block context).normal
+          in
+          Label.Tbl.replace res_at_exit label at_exit)
+        res_at_entry;
+      Label.Tbl.iter
+        (fun label init_val ->
+          if init_val then Label.Tbl.replace res_at_exit label true)
+        initial_forward;
+      res_at_exit
+    | Error () ->
+      Misc.fatal_error "Stack_offset_adjustment_forward: dataflow failed"
+end
+
+(* Module to adjust the backward analysis results based on stack_offset
+   constraints. If a block has non-zero stack_offset and needs a prologue
+   forwards, it should propagate that backwards. *)
+module Stack_offset_adjustment_backward = struct
+  type context = { forward : bool Label.Tbl.t }
+
+  module Transfer :
+    Cfg_dataflow.Backward_transfer
+      with type domain = bool
+       and type context = context
+       and type error = unit = struct
+    type domain = bool
+
+    type error = unit
+
+    type nonrec context = context
+
+    let basic :
+        domain ->
+        Cfg.basic Cfg.instruction ->
+        Cfg.basic_block ->
+        context ->
+        (domain, error) result =
+     fun domain instr block { forward } ->
+      if instr.stack_offset <> 0
+         && Prologue_needed.Before.needs_prologue forward block.start
+      then Ok true
+      else Ok domain
+
+    let terminator :
+        domain ->
+        exn:domain ->
+        Cfg.terminator Cfg.instruction ->
+        Cfg.basic_block ->
+        context ->
+        (domain, error) result =
+     fun domain ~exn:_ instr block { forward } ->
+      let adjusted_domain =
+        if instr.stack_offset <> 0
+           && Prologue_needed.Before.needs_prologue forward block.start
+        then true
+        else domain
       in
-      let child_prologue_blocks, child_epilogue_blocks =
-        List.fold_left
-          (fun (child_prologues, child_epilogues) (all_prologues, all_epilogues) ->
-            ( Label.Set.union all_prologues child_prologues,
-              Label.Set.union all_epilogues child_epilogues ))
-          (Label.Set.empty, Label.Set.empty)
-          children_prologue_block
-      in
-      if can_place_prologues child_prologue_blocks cfg doms loop_infos
-           child_epilogue_blocks
-      then child_prologue_blocks, child_epilogue_blocks
-      else Label.Set.singleton tree.label, epilogue_blocks
+      Ok adjusted_domain
+
+    let exception_ : domain -> context -> (domain, error) result =
+     fun _ _ -> Ok true
+  end
+
+  module T = struct
+    include Cfg_dataflow.Backward (Bool_domain) (Transfer)
+  end
+
+  include (T : module type of T with type context := context)
+
+  let build (cfg : Cfg.t) (forward : bool Label.Tbl.t)
+      (initial_backward : Prologue_needed.After.t) : Prologue_needed.After.t =
+    let _, initial_backward_tbl = initial_backward in
+    (* Run backward dataflow with the adjusted forward results *)
+    match run cfg ~init:false ~map:Instr { forward } with
+    | Ok result ->
+      (* Combine with initial backward analysis - if either says true, use
+         true *)
+      InstructionId.Tbl.iter
+        (fun id value -> if value then InstructionId.Tbl.replace result id true)
+        initial_backward_tbl;
+      cfg, result
+    | Aborted _ | Max_iterations_reached ->
+      Misc.fatal_error "Stack_offset_adjustment_backward: dataflow failed"
+end
+
+let add_instr_on_edge ~(src : Label.t) ~(dst : Label.t)
+    (cfg_with_layout : Cfg_with_layout.t) desc =
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let src_block = Cfg.get_block_exn cfg src in
+  let dst_block = Cfg.get_block_exn cfg dst in
+  let terminator_as_basic terminator =
+    { terminator with Cfg.desc = Cfg.Prologue }
   in
-  (* [Proc.prologue_required] is cheap and should provide an over-estimate of
-     when we would need a prologue (in some cases [Proc.prologue_required] will
-     return [true] because it uses the value of [cfg.fun_contains_calls] which
-     was computed before CFG simplification, which can remove calls if they are
-     dead, making the prologue unnecessary). *)
-  let cfg = Cfg_with_infos.cfg cfg_with_infos in
+  let next_instr =
+    Option.value (DLL.hd dst_block.body)
+      ~default:(terminator_as_basic dst_block.terminator)
+  in
+  let instr =
+    Cfg.make_instruction_from_copy next_instr ~desc
+      ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+      ()
+  in
+  if List.length (Cfg.predecessor_labels dst_block) = 1
+  then
+    (* We can place the prologue/epilogue at the beginning of the dst block *)
+    DLL.add_begin dst_block.body instr
+  else if Label.Set.cardinal
+            (Cfg.successor_labels src_block ~normal:true ~exn:true)
+          = 1
+          && instr.desc = Cfg.Prologue
+  then DLL.add_end src_block.body instr
+  else
+    (* Insert a block in the middle *)
+    let inserted_blocks =
+      Cfg_with_layout.insert_block cfg_with_layout (DLL.make_single instr)
+        ~after:src_block ~before:(Some dst_block)
+        ~next_instruction_id:(fun () ->
+          InstructionId.get_and_incr cfg.next_instruction_id)
+    in
+    assert (List.length inserted_blocks = 1)
+
+module Edge = struct
+  module T = struct
+    type t = Label.t * Label.t
+
+    let compare (left_src, left_dst) (right_src, right_dst) =
+      let c = Label.compare left_src right_src in
+      if c <> 0 then c else Label.compare left_dst right_dst
+  end
+
+  include T
+  module Set = Set.Make (T)
+end
+
+let find_prologue_and_epilogues_alt (cfg_with_infos : Cfg_with_infos.t) =
+  let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let terminator_as_basic terminator =
+    { terminator with Cfg.desc = Cfg.Prologue }
+  in
   if Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
        ~fun_num_stack_slots:cfg.fun_num_stack_slots
   then (
-    let doms = Cfg_with_infos.dominators cfg_with_infos in
-    (* note: the other entries in the forest are dead code *)
-    let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
-    let loop_infos = Cfg_with_infos.loop_infos cfg_with_infos in
-    let reachable_epilogues = Reachable_epilogues.build cfg in
-    let prologue_blocks, epilogue_blocks =
-      visit tree cfg doms loop_infos reachable_epilogues
+    (* Find intersection of backwards and forwards analysis *)
+    let backward = Prologue_needed.After.build cfg in
+    let forward = Prologue_needed.Before.build cfg in
+    (* Adjust the analyses to account for stack_offset constraints *)
+    let adjusted_forward =
+      Stack_offset_adjustment_forward.build cfg backward forward
     in
-    assert (
-      can_place_prologues prologue_blocks cfg doms loop_infos epilogue_blocks);
-    prologue_blocks, epilogue_blocks)
-  else Label.Set.empty, Label.Set.empty
+    let adjusted_backward =
+      Stack_offset_adjustment_backward.build cfg adjusted_forward backward
+    in
+    let blocks = Label.Tbl.copy cfg.blocks in
+    let forward, backward = adjusted_forward, adjusted_backward in
+    let prologue_edges, epilogue_edges =
+      Label.Tbl.fold
+        (fun label block (prol, epil) ->
+          let predecessors = Label.Set.of_list (Cfg.predecessor_labels block) in
+          let successors = Cfg.successor_labels block ~normal:true ~exn:true in
+          if Prologue_needed.Before.needs_prologue forward label
+             && Prologue_needed.After.needs_prologue backward label
+          then
+            let prol =
+              Label.Set.fold
+                (fun p acc ->
+                  if (not (Prologue_needed.Before.needs_prologue forward p))
+                     && Prologue_needed.After.needs_prologue backward p
+                  then (p, label) :: acc
+                  else acc)
+                predecessors prol
+            in
+            if Label.Set.is_empty successors
+               && Instruction_requirements.terminator block.Cfg.terminator
+                    cfg.fun_name
+                  = Instruction_requirements.Requires_no_prologue
+            then (
+              DLL.add_end block.Cfg.body
+                (Cfg.make_instruction_from_copy block.Cfg.terminator
+                   ~desc:Cfg.Epilogue
+                   ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+                   ());
+              prol, epil)
+            else
+              ( prol,
+                Label.Set.fold
+                  (fun succ acc ->
+                    if Prologue_needed.Before.needs_prologue forward succ
+                       && not
+                            (Prologue_needed.After.needs_prologue backward succ)
+                    then (label, succ) :: acc
+                    else acc)
+                  successors epil )
+          else prol, epil)
+        blocks ([], [])
+    in
+    let epilogue_edges = ref (Edge.Set.of_list epilogue_edges) in
+    let q = Queue.of_seq (Edge.Set.to_seq !epilogue_edges) in
+    while not (Queue.is_empty q) do
+      let _, dst = Queue.take q in
+      (* If all predecessors of dst have an epilogue, move epilogue down *)
+      let dst_block = Cfg.get_block_exn cfg dst in
+      let preds = Cfg.predecessor_labels dst_block in
+      let succs = Cfg.successor_labels dst_block ~normal:true ~exn:true in
+      if Label.Set.cardinal succs <= List.length preds
+         && List.for_all (fun p -> Edge.Set.mem (p, dst) !epilogue_edges) preds
+      then (
+        List.iter
+          (fun p -> epilogue_edges := Edge.Set.remove (p, dst) !epilogue_edges)
+          preds;
+        if Label.Set.is_empty succs
+        then
+          let next_instr = terminator_as_basic dst_block.terminator in
+          DLL.add_end dst_block.body
+            (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Epilogue
+               ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+               ())
+        else
+          Label.Set.iter
+            (fun succ ->
+              epilogue_edges := Edge.Set.add (dst, succ) !epilogue_edges;
+              Queue.add (dst, succ) q)
+            succs)
+    done;
+    let prologue_edges = ref (Edge.Set.of_list prologue_edges) in
+    let q = Queue.of_seq (Edge.Set.to_seq !prologue_edges) in
+    while not (Queue.is_empty q) do
+      let src, _ = Queue.take q in
+      (* If all successors of src have a prologue, move prologue up *)
+      let src_block = Cfg.get_block_exn cfg src in
+      let succs = Cfg.successor_labels src_block ~normal:true ~exn:true in
+      let preds = Cfg.predecessor_labels src_block in
+      if Label.Set.cardinal succs >= List.length preds
+         && Label.Set.for_all
+              (fun succ -> Edge.Set.mem (src, succ) !prologue_edges)
+              succs
+      then (
+        Label.Set.iter
+          (fun succ ->
+            prologue_edges := Edge.Set.remove (src, succ) !prologue_edges)
+          succs;
+        if List.length preds > 0
+        then
+          List.iter
+            (fun p ->
+              prologue_edges := Edge.Set.add (p, src) !prologue_edges;
+              Queue.add (p, src) q)
+            preds
+        else
+          let next_instr =
+            Option.value (DLL.hd src_block.body)
+              ~default:(terminator_as_basic src_block.terminator)
+          in
+          DLL.add_begin src_block.body
+            (Cfg.make_instruction_from_copy next_instr ~desc:Cfg.Prologue
+               ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+               ()))
+    done;
+    Edge.Set.iter
+      (fun (src, dst) ->
+        add_instr_on_edge ~src ~dst cfg_with_layout Cfg.Epilogue)
+      !epilogue_edges;
+    Edge.Set.iter
+      (fun (src, dst) ->
+        add_instr_on_edge ~src ~dst cfg_with_layout Cfg.Prologue)
+      !prologue_edges;
+    ())
 
 let find_prologue_and_epilogues_at_entry (cfg_with_infos : Cfg_with_infos.t) =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
@@ -436,13 +746,20 @@ module Validator = struct
         (InstructionId.to_string_padded instr.id)
         msg
 
-    let basic : domain -> Cfg.basic Cfg.instruction -> context -> domain =
-     fun domain instr _ ->
+    let basic :
+        domain ->
+        Cfg.basic Cfg.instruction ->
+        Cfg.basic_block ->
+        context ->
+        domain =
+     fun domain instr _block _ ->
       State_set.map
         (fun domain ->
           match domain, Instruction_requirements.basic instr with
           | No_prologue_on_stack, Prologue when instr.stack_offset <> 0 ->
             error_with_instruction "prologue has a non-zero stack offset" instr
+          | Prologue_on_stack, Epilogue when instr.stack_offset <> 0 ->
+            error_with_instruction "epilogue has a non-zero stack offset" instr
           | No_prologue_on_stack, Prologue -> Prologue_on_stack
           | No_prologue_on_stack, Epilogue ->
             error_with_instruction
@@ -467,8 +784,12 @@ module Validator = struct
         domain
 
     let terminator :
-        domain -> Cfg.terminator Cfg.instruction -> context -> image =
-     fun domain instr { fun_name } ->
+        domain ->
+        Cfg.terminator Cfg.instruction ->
+        Cfg.basic_block ->
+        context ->
+        image =
+     fun domain instr _block { fun_name } ->
       let res =
         State_set.map
           (fun domain ->
@@ -506,9 +827,9 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
   | true
     when Label.Tbl.length cfg.blocks
-         <= !Oxcaml_flags.cfg_prologue_shrink_wrap_threshold ->
-    add_prologue_if_required cfg_with_infos
-      ~f:find_prologue_and_epilogues_shrink_wrapped
+         <= !Oxcaml_flags.cfg_prologue_shrink_wrap_threshold
+         && not Config.with_frame_pointers ->
+    find_prologue_and_epilogues_alt cfg_with_infos
   | _ ->
     add_prologue_if_required cfg_with_infos
       ~f:find_prologue_and_epilogues_at_entry);

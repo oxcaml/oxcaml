@@ -287,9 +287,15 @@ module type Forward_transfer = sig
       exceptional : domain
     }
 
-  val basic : domain -> Cfg.basic Cfg.instruction -> context -> domain
+  val basic :
+    domain -> Cfg.basic Cfg.instruction -> Cfg.basic_block -> context -> domain
 
-  val terminator : domain -> Cfg.terminator Cfg.instruction -> context -> image
+  val terminator :
+    domain ->
+    Cfg.terminator Cfg.instruction ->
+    Cfg.basic_block ->
+    context ->
+    image
 end
 
 module type Forward_S = sig
@@ -351,7 +357,7 @@ module Forward (D : Domain_S) (T : Forward_transfer with type domain = D.t) :
         transfer_image =
      fun ~update_instr value block context ->
       let transfer f g acc (instr : _ Cfg.instruction) =
-        let res = f acc instr context in
+        let res = f acc instr block context in
         update_instr instr.id (g res);
         res
       in
@@ -404,12 +410,17 @@ module type Backward_transfer = sig
   type context
 
   val basic :
-    domain -> Cfg.basic Cfg.instruction -> context -> (domain, error) result
+    domain ->
+    Cfg.basic Cfg.instruction ->
+    Cfg.basic_block ->
+    context ->
+    (domain, error) result
 
   val terminator :
     domain ->
     exn:domain ->
     Cfg.terminator Cfg.instruction ->
+    Cfg.basic_block ->
     context ->
     (domain, error) result
 
@@ -509,11 +520,11 @@ module Backward (D : Domain_S) (T : Backward_transfer with type domain = D.t) :
       in
       let value =
         transfer block.terminator
-          (T.terminator normal ~exn block.terminator context)
+          (T.terminator normal ~exn block.terminator block context)
       in
       let value =
         DLL.fold_right block.body ~init:value ~f:(fun instr value ->
-            transfer instr (T.basic value instr context))
+            transfer instr (T.basic value instr block context))
       in
       let value =
         if block.is_trap_handler

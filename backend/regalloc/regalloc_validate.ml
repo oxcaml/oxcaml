@@ -1178,7 +1178,7 @@ module Transfer (Desc_val : Description_value) :
              ~loc_arg:(Location.of_regs_exn loc_instr.arg)
              equations)
 
-  let basic t instr () : (domain, error) result =
+  let basic t instr _block () : (domain, error) result =
     match Description.find_basic description instr with
     | None ->
       (match instr.desc with
@@ -1200,7 +1200,7 @@ module Transfer (Desc_val : Description_value) :
           ~destroyed:(Proc.destroyed_at_basic instr.desc |> Location.of_regs_exn)
       )
 
-  let terminator t ~exn instr () =
+  let terminator t ~exn instr _block () =
     match Description.find_terminator description instr with
     | Some instr_before ->
       (* CR-soon azewierzejew: This is kind of fragile for [Tailcall (Self _)]

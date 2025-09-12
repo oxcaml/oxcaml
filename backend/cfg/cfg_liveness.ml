@@ -50,8 +50,12 @@ module Transfer :
     { before; across }
 
   let basic :
-      domain -> Cfg.basic Cfg.instruction -> context -> (domain, error) result =
-   fun ({ before; across = _ } as domain) instr () ->
+      domain ->
+      Cfg.basic Cfg.instruction ->
+      Cfg.basic_block ->
+      context ->
+      (domain, error) result =
+   fun ({ before; across = _ } as domain) instr _ () ->
     Result.ok
     @@
     match instr.desc with
@@ -69,9 +73,10 @@ module Transfer :
       domain ->
       exn:domain ->
       Cfg.terminator Cfg.instruction ->
+      Cfg.basic_block ->
       context ->
       (domain, error) result =
-   fun domain ~exn instr () ->
+   fun domain ~exn instr _ () ->
     Result.ok
     @@
     match instr.desc with

@@ -178,8 +178,12 @@ module Polls_before_prtc_transfer = struct
   type error = |
 
   let basic :
-      domain -> Cfg.basic Cfg.instruction -> context -> (domain, error) result =
-   fun dom instr { future_funcnames = _; optimistic_prologue_poll_instr_id } ->
+      domain ->
+      Cfg.basic Cfg.instruction ->
+      Cfg.basic_block ->
+      context ->
+      (domain, error) result =
+   fun dom instr _ { future_funcnames = _; optimistic_prologue_poll_instr_id } ->
     match instr.desc with
     | Op Poll ->
       if InstructionId.equal instr.id optimistic_prologue_poll_instr_id
@@ -206,9 +210,11 @@ module Polls_before_prtc_transfer = struct
       domain ->
       exn:domain ->
       Cfg.terminator Cfg.instruction ->
+      Cfg.basic_block ->
       context ->
       (domain, error) result =
-   fun dom ~exn term { future_funcnames; optimistic_prologue_poll_instr_id = _ } ->
+   fun dom ~exn term _
+       { future_funcnames; optimistic_prologue_poll_instr_id = _ } ->
     match term.desc with
     | Never -> assert false
     | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
