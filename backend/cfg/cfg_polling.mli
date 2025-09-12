@@ -15,3 +15,5 @@ val requires_prologue_poll :
   optimistic_prologue_poll_instr_id:InstructionId.t ->
   Cfg.t ->
   bool
+
+val remove_all_maybe_polls : Cfg_with_layout.t -> Cfg_with_layout.t

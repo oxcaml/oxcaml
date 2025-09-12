@@ -506,9 +506,6 @@ let instrument_fundecl :
     let added_poll =
       instr_cfg_with_layout cfg_with_layout ~safe_map ~back_edges
     in
-    Cfg.iter_blocks cfg ~f:(fun _label block ->
-        DLL.filter_left block.body ~f:(fun instr ->
-            not (Cfg.is_maybe_poll instr)));
     (match cfg.fun_poll with
     | Error_poll -> (
       match find_poll_alloc_or_calls cfg with
@@ -545,3 +542,10 @@ let requires_prologue_poll :
     with
     | Might_not_poll -> true
     | Always_polls -> false
+
+let remove_all_maybe_polls : Cfg_with_layout.t -> Cfg_with_layout.t =
+ fun cfg_with_layout ->
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  Cfg.iter_blocks cfg ~f:(fun _label block ->
+      DLL.filter_left block.body ~f:(fun instr -> not (Cfg.is_maybe_poll instr)));
+  cfg_with_layout
