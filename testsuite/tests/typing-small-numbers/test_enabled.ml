@@ -562,6 +562,46 @@ let _ : int =
 - : int = 2
 |}]
 
+let _ : int =
+  match #'z' with
+  | #'a'..#'z' -> 0
+  | #'A' -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 0
+|}]
+
+let _ : int =
+  match #'m' with
+  | #'a'..#'z' -> 0
+  | #'A' -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 0
+|}]
+
+let _ : int =
+  match #'A' with
+  | #'a'..#'z' -> 0
+  | #'A' -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 1
+|}]
+
+let _ : int =
+  match #'B' with
+  | #'a'..#'z' -> 0
+  | #'A' -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 2
+|}]
+
 (* Untagged int8 *)
 
 let ignore (_ : int8#) = ()
