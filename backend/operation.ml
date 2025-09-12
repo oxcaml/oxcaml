@@ -348,7 +348,10 @@ let is_pure = function
   | Specific s -> Arch.operation_is_pure s
   | Name_for_debugger _ -> false
   | Dls_get -> true
-  | Poll { enabled } -> not enabled
+  | Poll { enabled } ->
+    (* CR xclerc for xclerc: I am not sure this is correct, as `is_pure` is (or
+       has been) used to prevent moves. *)
+    not enabled
   | Pause -> false
   | Alloc _ -> false
 
