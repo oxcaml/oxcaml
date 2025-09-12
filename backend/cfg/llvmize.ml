@@ -26,6 +26,8 @@ type error = Asm_generation of (string * int)
 
 exception Error of error
 
+(* Convenient ways to fail *)
+
 let fail name = Misc.fatal_errorf "Llvmize.%s" name
 
 let fail_msg ?name fmt =
@@ -35,6 +37,17 @@ let fail_msg ?name fmt =
 let fail_if_not ?msg name cond =
   if not cond
   then match msg with None -> fail name | Some msg -> fail_msg ~name "%s" msg
+
+let not_implemented_aux print_ins ?msg i =
+  fail_msg "Llvmize: unimplemented instruction: %a %a" print_ins i
+    (Format.pp_print_option
+       ~none:(fun ppf () -> Format.fprintf ppf "(no msg)")
+       (fun ppf msg -> Format.fprintf ppf "(%s)" msg))
+    msg
+
+let not_implemented_basic = not_implemented_aux Cfg.print_basic
+
+let not_implemented_terminator = not_implemented_aux Cfg.print_terminator
 
 (* Common formatting operations *)
 module F = struct
@@ -58,6 +71,8 @@ module F = struct
       ppf
 
   let pp_ins ppf = pp_line ~num_indents:1 ppf
+
+  let pp_str_if str ppf b = if b then fprintf ppf "%s" str
 
   (* Comment insertion *)
 
@@ -136,6 +151,8 @@ module Llvm_ir = struct
     let doublex2 = Vector { size = 2; elem_type = double }
 
     let label = Label
+
+    let metadata = Metadata
 
     let of_machtype_component (c : Cmm.machtype_component) =
       match c with
@@ -247,6 +264,8 @@ module Llvm_ir = struct
     module Or_void = struct
       type nonrec t = t option
 
+      let void = None
+
       let pp_t ppf t =
         match t with Some t -> pp_t ppf t | None -> Format.fprintf ppf "void"
     end
@@ -260,6 +279,8 @@ module Llvm_ir = struct
     let local s = Local s
 
     let global s = Global s
+
+    let of_label label = local ("L" ^ Label.to_string label)
 
     let pp_t ppf t =
       let open F in
@@ -301,40 +322,88 @@ module Llvm_ir = struct
   end
 
   module Value = struct
+    (* CR yusumez: Split [Immediate] to multiple variants like [Poison],
+       [Zeroinitializer], [Int], etc. *)
+
     type value =
       | Ident of Ident.t
       | Immediate of string
+      | Struct_constant of t list
       | Blockaddress of
           { func : Ident.t;
             block : Ident.t
           }
 
-    type t = Type.t * value
-
-    let of_ident ~typ ident = typ, Ident ident
-
-    let of_int ?(typ = Type.i64) i = typ, Immediate (Int.to_string i)
-
-    let poison typ = typ, Immediate "poison"
-
-    let blockaddress ~func ~block = Type.ptr, Blockaddress { func; block }
+    and t = Type.t * value
 
     let get_type (typ, _) = typ
 
     let get_ident_exn (_, value) =
       match value with
       | Ident ident -> ident
-      | Immediate _ | Blockaddress _ -> fail "Value.get_ident_exn"
+      | Immediate _ | Blockaddress _ | Struct_constant _ ->
+        fail "Value.get_ident_exn"
 
-    let pp_value ppf value =
+    let get_value (_, value) = value
+
+    let of_ident ~typ ident = typ, Ident ident
+
+    let of_symbol ?(typ = Type.ptr) symbol = typ, Ident (Ident.global symbol)
+
+    let of_int ?(typ = Type.i64) i = typ, Immediate (Int.to_string i)
+
+    let of_nativeint ?(typ = Type.i64) i =
+      typ, Immediate (Nativeint.to_string i)
+
+    let of_float32_bits bits =
+      (* Note that "%#x" formats 0 as "0", not "0x0"... *)
+      Type.float, Immediate (Format.sprintf "0x%lx" bits)
+
+    let of_float64_bits bits =
+      Type.double, Immediate (Format.sprintf "0x%Lx" bits)
+
+    let of_label label = of_ident ~typ:Type.label (Ident.of_label label)
+
+    let of_string_constant s =
+      let open F in
+      ( Type.Array { size = String.length s; elem_type = Type.i8 },
+        Immediate
+          (asprintf "%a"
+             (fun ppf () ->
+               fprintf ppf "c\"";
+               String.iter (fun c -> fprintf ppf "\\%02x" (Char.code c)) s;
+               fprintf ppf "\"")
+             ()) )
+
+    let poison typ = typ, Immediate "poison"
+
+    let zeroinitializer typ = typ, Immediate "zeroinitializer"
+
+    let imm typ s = typ, Immediate s
+
+    let struct_constant ts =
+      Type.Struct (List.map get_type ts), Struct_constant ts
+
+    let blockaddress ~func ~block = Type.ptr, Blockaddress { func; block }
+
+    let rec pp_value ppf value =
       let open F in
       match value with
       | Ident ident -> Ident.pp_t ppf ident
       | Immediate s -> fprintf ppf "%s" s
+      | Struct_constant ts ->
+        fprintf ppf "{ ";
+        let pp_elem ppf t =
+          match get_value t with
+          | Ident _ | Immediate _ | Blockaddress _ -> pp_t ppf t
+          | Struct_constant _ ->
+            fail_msg ~name:"Value.pp_value" "struct constants cannot nest"
+        in
+        (pp_print_list ~pp_sep:pp_comma pp_elem) ppf ts
       | Blockaddress { func; block } ->
         fprintf ppf "blockaddress(%a, %a)" Ident.pp_t func Ident.pp_t block
 
-    let pp_t ppf (typ, value) =
+    and pp_t ppf (typ, value) =
       Format.fprintf ppf "%a %a" Type.pp_t typ pp_value value
 
     let to_string t = Format.asprintf "%a" pp_t t
@@ -669,6 +738,13 @@ module Llvm_ir = struct
             cc : Calling_conventions.t;
             musttail : bool
           }
+      | Inline_asm of
+          { asm : string;
+            constraints : string;
+            args : Value.t list;
+            res_type : Type.Or_void.t;
+            sideeffect : bool
+          }
 
     type t =
       { op : op;
@@ -707,6 +783,7 @@ module Llvm_ir = struct
       (* Control flow *)
       | Select { ifso; _ } -> Some (Value.get_type ifso)
       | Call { res_type; _ } -> res_type
+      | Inline_asm { res_type; _ } -> res_type
 
     let with_res op ident =
       assert' "with_res" (Option.is_some (op_res_type op));
@@ -821,11 +898,17 @@ module Llvm_ir = struct
     let call ~func ~args ~res_type ~attrs ~cc ~musttail =
       Call { func; args; res_type; attrs; cc; musttail }
 
+    let inline_asm ~args ~res_type ~asm ~constraints ~sideeffect =
+      Inline_asm { args; res_type; asm; constraints; sideeffect }
+
     (* Note: this function handles indentation and newlines itself *)
     let pp_t ?comment ppf { op; res } =
       let open F in
-      let pp_res ppf () = Ident.pp_t ppf (Option.get res) in
       let ins ?(num_indents = 1) fmt = pp_line ~num_indents ?comment ppf fmt in
+      let ins_res ?(num_indents = 1) fmt =
+        pp_line ~num_indents ?comment ppf ("%a = " ^^ fmt) Ident.pp_t
+          (Option.get res)
+      in
       match[@warning "-fragile-match"] op with
       | Ret v -> ins "ret %a" Value.pp_t v
       | Br v -> ins "br %a" Value.pp_t v
@@ -840,69 +923,74 @@ module Llvm_ir = struct
         ins "]"
       | Unreachable -> ins "unreachable"
       | Unary { op; arg } ->
-        ins "%a = %s %a" pp_res () (unary_op_to_string op) Value.pp_t arg
+        ins_res "%s %a" (unary_op_to_string op) Value.pp_t arg
       | Binary { op; arg1; arg2 } ->
-        ins "%a = %s %a, %a" pp_res () (binary_op_to_string op) Value.pp_t arg1
-          Value.pp_t arg2
+        ins_res "%s %a, %a" (binary_op_to_string op) Value.pp_t arg1
+          Value.pp_value (Value.get_value arg2)
       | Convert { op; arg; to_ } ->
-        ins "%a = %s %a to %a" pp_res () (convert_op_to_string op) Value.pp_t
-          arg Type.pp_t to_
+        ins_res "%s %a to %a" (convert_op_to_string op) Value.pp_t arg Type.pp_t
+          to_
       | Icmp { cond; arg1; arg2 } ->
-        ins "%a = icmp %s %a, %a" pp_res () (icmp_cond_to_string cond)
-          Value.pp_t arg1 Value.pp_t arg2
+        ins_res "icmp %s %a, %a" (icmp_cond_to_string cond) Value.pp_t arg1
+          Value.pp_t arg2
       | Fcmp { cond; arg1; arg2 } ->
-        ins "%a = icmp %s %a, %a" pp_res () (fcmp_cond_to_string cond)
-          Value.pp_t arg1 Value.pp_t arg2
+        ins_res "icmp %s %a, %a" (fcmp_cond_to_string cond) Value.pp_t arg1
+          Value.pp_t arg2
       | Extractelement { vector; index } ->
-        ins "%a = extractelement %a, %a" pp_res () Value.pp_t vector Value.pp_t
-          index
+        ins_res "extractelement %a, %a" Value.pp_t vector Value.pp_t index
       | Insertelement { vector; index; to_insert } ->
-        ins "%a = insertelement %a, %a, %a" pp_res () Value.pp_t vector
-          Value.pp_t to_insert Value.pp_t index
+        ins_res "insertelement %a, %a, %a" Value.pp_t vector Value.pp_t
+          to_insert Value.pp_t index
       | Extractvalue { aggregate; indices } ->
-        ins "%a = extractvalue %a, %a" pp_res () Value.pp_t aggregate
+        ins_res "extractvalue %a, %a" Value.pp_t aggregate
           (pp_print_list ~pp_sep:pp_comma pp_print_int)
           indices
       | Insertvalue { aggregate; indices; to_insert } ->
-        ins "%a = insertvalue %a, %a, %a" pp_res () Value.pp_t aggregate
-          Value.pp_t to_insert
+        ins_res "insertvalue %a, %a, %a" Value.pp_t aggregate Value.pp_t
+          to_insert
           (pp_print_list ~pp_sep:pp_comma pp_print_int)
           indices
-      | Alloca typ -> ins "%a = alloca %a" pp_res () Type.pp_t typ
-      | Load { ptr; typ } ->
-        ins "%a = load %a, %a" pp_res () Type.pp_t typ Value.pp_t ptr
+      | Alloca typ -> ins_res "alloca %a" Type.pp_t typ
+      | Load { ptr; typ } -> ins_res "load %a, %a" Type.pp_t typ Value.pp_t ptr
       | Store { ptr; to_store } ->
         ins "store %a, %a" Value.pp_t to_store Value.pp_t ptr
       | Getelementptr { base_type; base_ptr; indices } ->
-        ins "%a = getelementptr %a, %a, %a" pp_res () Type.pp_t base_type
-          Value.pp_t base_ptr
+        ins_res "getelementptr %a, %a, %a" Type.pp_t base_type Value.pp_t
+          base_ptr
           (pp_print_list ~pp_sep:pp_comma Value.pp_t)
           indices
       | Cmpxchg { ptr; compare_with; set_if_equal } ->
-        ins "%a = cmpxchg %a, %a, %a acq_rel monotonic" pp_res () Value.pp_t ptr
-          Value.pp_t compare_with Value.pp_t set_if_equal
+        ins_res "cmpxchg %a, %a, %a acq_rel monotonic" Value.pp_t ptr Value.pp_t
+          compare_with Value.pp_t set_if_equal
       | Atomicrmw { op; ptr; arg } ->
-        ins "%a = atomicrmw %s %a, %a acq_rel" pp_res ()
+        ins_res "atomicrmw %s %a, %a acq_rel"
           (atomicrmw_op_to_string op)
           Value.pp_t ptr Value.pp_t arg
       | Select { cond; ifso; ifnot } ->
-        ins "%a = select %a, %a, %a" pp_res () Value.pp_t cond Value.pp_t ifso
-          Value.pp_t ifnot
+        ins_res "select %a, %a, %a" Value.pp_t cond Value.pp_t ifso Value.pp_t
+          ifnot
       | Call { func; args; res_type; attrs; cc; musttail } -> (
-        let pp_musttail ppf () = if musttail then fprintf ppf "musttail " in
-        let pp_args ppf () =
-          (pp_print_list ~pp_sep:pp_comma Value.pp_t) ppf args
-        in
-        let pp_attrs ppf () =
-          (pp_print_list ~pp_sep:pp_comma Fn_attr.pp_t) ppf attrs
-        in
         let pp_call ppf () =
-          fprintf ppf "%acall %a %a %a(%a) %a" pp_musttail ()
+          fprintf ppf "%acall %a %a %a(%a) %a" (pp_str_if "musttail") musttail
             Calling_conventions.pp_t cc Type.Or_void.pp_t res_type Ident.pp_t
-            func pp_args () pp_attrs ()
+            func
+            (pp_print_list ~pp_sep:pp_comma Value.pp_t)
+            args
+            (pp_print_list ~pp_sep:pp_comma Fn_attr.pp_t)
+            attrs
         in
         match res with
-        | Some res -> ins "%a = %a" Ident.pp_t res pp_call ()
+        | Some _ -> ins_res "%a" pp_call ()
+        | None -> ins "%a" pp_call ())
+      | Inline_asm { args; res_type; asm; constraints; sideeffect } -> (
+        let pp_call ppf () =
+          fprintf ppf {|call %a asm %a "%s", "%s"(%a)|} Type.Or_void.pp_t
+            res_type (pp_str_if "sideeffect") sideeffect asm constraints
+            (pp_print_list ~pp_sep:pp_comma Value.pp_t)
+            args
+        in
+        match res with
+        | Some _ -> ins_res "%a" pp_call ()
         | None -> ins "%a" pp_call ())
   end
 
@@ -985,9 +1073,13 @@ module Llvm_ir = struct
         in
         { ident_gen; funcdef }
 
+      let get_fun t = t.funcdef
+
       let get_args t = t.funcdef.args
 
       let get_res_type t = t.funcdef.res
+
+      let get_fun_ident t = t.funcdef.name
 
       let ins ?res_ident t op =
         let res_ident =
@@ -1003,16 +1095,34 @@ module Llvm_ir = struct
         let instr = Instruction.without_res op in
         add_instruction t.funcdef instr
 
-      let comment t s = add_comment t s
+      let comment t s = add_comment t.funcdef s
 
-      let label_def t ident = add_label_def t ident
-
-      let get_fun t = t.funcdef
+      let label_def t ident = add_label_def t.funcdef ident
     end
   end
 
   module Data = struct
-    type t
+    (* CR yusumez: Do we want to decouple constants from identifiers? *)
+    type data =
+      | Constant of string * Value.t
+      | External of string
+
+    type t = data list
+
+    let pp_data ppf = function
+    | Constant (name)
+
+    let pp_t ppf t = List.iter (F.pp_line ppf "%a" Value.pp_t) t
+
+    module Emitter = struct
+      type data = t
+
+      type t = { mutable data : data }
+
+      let create () = []
+
+      let add_data value = t.data <- value :: t.data
+    end
   end
 end
 
@@ -1061,9 +1171,9 @@ module Llvm_ir_of_cfg = struct
     }
 
   type trap_block_info =
-    { trap_block : Ident.t;
-      stacksave_ptr : Ident.t;
-      payload : Ident.t
+    { trap_block : LL.Value.t;
+      stacksave_ptr : LL.Value.t;
+      payload : LL.Value.t
     }
 
   type fun_info =
@@ -1239,6 +1349,10 @@ module Llvm_ir_of_cfg = struct
     let fun_info = get_fun_info t in
     E.ins_no_res fun_info.emitter op
 
+  let emit_label t label_value =
+    let fun_info = get_fun_info t in
+    E.label_def fun_info.emitter (V.get_ident_exn label_value)
+
   (* Common helpers *)
 
   let cast t arg to_ =
@@ -1267,13 +1381,20 @@ module Llvm_ir_of_cfg = struct
      loading/storing incompatible types (given that the ptr type doesn't have
      the underlying type attached to it) *)
 
+  (* Loading directly with the given type will put an explicit cast after the
+     mem2reg pass, so we don't need a cast here. *)
   let load_reg_to_temp ?typ t reg =
     let ptr = get_alloca_for_reg t reg in
     let typ = Option.value typ ~default:(T.of_reg reg) in
     emit_ins t (I.load ~ptr ~typ)
 
+  (* Although the same applies here as above, the cast happening any time later
+     for a store back would be problematic (e.g. consider setting a [ptr
+     addrspace(1)] as an [i64]. if it gets cast after a function call, it won't
+     be marked as live, which is bad). So, we put the cast explicitly. *)
   let store_into_reg t reg to_store =
     let ptr = get_alloca_for_reg t reg in
+    let to_store = cast t to_store (T.of_reg reg) in
     emit_ins_no_res t (I.store ~ptr ~to_store)
 
   let load_domainstate_addr ?(typ = T.ptr) ?(offset = 0) t ds_field =
@@ -1284,6 +1405,10 @@ module Llvm_ir_of_cfg = struct
   let load_address t addr_mode base typ =
     let offset = Arch.addressing_displacement_for_llvmize addr_mode in
     do_offset t base typ offset
+
+  let load_address_from_reg t addr_mode reg =
+    let base = load_reg_to_temp t reg in
+    load_address t addr_mode base (T.of_reg reg)
 
   let assemble_struct t root_type vals_to_insert =
     let insert cur_struct (indices, to_insert) =
@@ -1297,6 +1422,8 @@ module Llvm_ir_of_cfg = struct
       (fun indices ->
         emit_ins t (I.extractvalue ~aggregate:root_struct ~indices))
       indices_to_extract
+
+  (* Helpers for calls *)
 
   let prepare_call_args t args =
     List.map (fun ptr -> emit_ins t (I.load ~ptr ~typ:T.i64)) runtime_regs
@@ -1331,14 +1458,8 @@ module Llvm_ir_of_cfg = struct
     let actual_values = List.mapi (fun i v -> [1; i], v) values in
     assemble_struct t res_type (runtime_values @ actual_values)
 
-  let call_llvm_intrinsic t name args res_type =
-    let arg_types = List.map fst args in
-    let intrinsic_name = "llvm." ^ name in
-    let func = LL.Ident.global intrinsic_name in
-    add_called_intrinsic t intrinsic_name ~args:arg_types ~res:res_type;
-    emit_ins t
-      (I.call ~func ~args ~res_type ~attrs:[] ~cc:Default ~musttail:false)
-
+  (* Prepare and extract arguments following the OCaml calling convention in
+     LLVM, handling the threading of runtime registers. *)
   let call_simple ?(attrs = []) ~cc t name args res_types =
     let args = prepare_call_args t args in
     let res_type = Some (make_ret_type res_types) in
@@ -1359,7 +1480,50 @@ module Llvm_ir_of_cfg = struct
       (i : 'a Cfg.instruction) =
     LL.Fn_attr.Statepoint_id (((i.stack_offset - t.stack_offset) * 2) + offset)
 
-  (* Stuff with instructions *)
+  let gc_attr ~can_call_gc t i =
+    if can_call_gc
+    then [statepoint_id_attr_for_stack_adjustment t i]
+    else [LL.Fn_attr.Gc_leaf_function]
+
+  (* Helpers for LLVM intrinsics *)
+
+  let call_llvm_intrinsic_aux ~emit_ins t name args res_type =
+    let arg_types = List.map fst args in
+    let intrinsic_name = "llvm." ^ name in
+    let func = LL.Ident.global intrinsic_name in
+    add_called_intrinsic t intrinsic_name ~args:arg_types ~res:res_type;
+    emit_ins t
+      (I.call ~func ~args ~res_type ~attrs:[] ~cc:Default ~musttail:false)
+
+  let call_llvm_intrinsic t name args res_type =
+    call_llvm_intrinsic_aux
+      ~emit_ins:(fun t -> emit_ins t)
+      t name args (Some res_type)
+
+  let call_llvm_intrinsic_no_res t name args =
+    call_llvm_intrinsic_aux ~emit_ins:emit_ins_no_res t name args None
+
+  let read_rsp t =
+    call_llvm_intrinsic t "read_register.i64"
+      [V.imm T.metadata {|!{!"rsp\00"}|}]
+      T.i64
+
+  let write_rsp t v =
+    let v = cast t v T.i64 in
+    call_llvm_intrinsic_no_res t "write_register.i64"
+      [V.imm T.metadata {|!{!"rsp\00"}|}; v]
+
+  (* Other miscellaneous stuff... *)
+
+  let reject_addr_regs (regs : Reg.t array) msg =
+    if Array.to_list regs
+       |> List.map (fun (reg : Reg.t) -> Cmm.is_addr reg.typ)
+       |> List.fold_left ( || ) false
+    then fail_msg ~name:"reject_addr_regs" "%s" msg
+
+  let br_label t label = emit_ins_no_res t (I.br (V.of_label label))
+
+  (* Terminator instructions *)
 
   let int_comp t cond (i : _ Cfg.instruction) ~imm =
     let typ = T.i64 in
@@ -1423,7 +1587,7 @@ module Llvm_ir_of_cfg = struct
         LL.Ident.global sym_name
       | Indirect -> load_reg_to_temp ~typ:T.ptr t i.arg.(0) |> V.get_ident_exn
     in
-    let attrs = [statepoint_id_attr_for_stack_adjustment t i] in
+    let attrs = gc_attr ~can_call_gc:true t i in
     let res =
       emit_ins t (I.call ~func ~args ~res_type ~attrs ~cc:Ocaml ~musttail:tail)
     in
@@ -1446,13 +1610,775 @@ module Llvm_ir_of_cfg = struct
     else
       let res_values =
         List.map2
-          (fun reg typ ->
-            (* let typ = match T.extract_struct res_type [1; i] with |
-               load_reg_to_temp) res_regs in *)
-            ())
-          res_regs
+          (fun reg typ -> load_reg_to_temp ~typ t reg)
+          res_regs res_type_elems
       in
-      assemble_return t res_type
+      let res = assemble_return t res_type res_values in
+      emit_ins_no_res t (I.ret res)
+
+  let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
+      ~stack_ofs ~stack_align =
+    let func_ptr = V.of_symbol func_symbol in
+    let make_ocaml_c_call caml_c_call_symbol args res_types =
+      add_referenced_symbol t caml_c_call_symbol;
+      add_referenced_symbol t func_symbol;
+      call_simple
+        ~attrs:(gc_attr ~can_call_gc:true t i)
+        ~cc:Ocaml_c_call t caml_c_call_symbol args res_types
+      (* CR yusumez: Record frame table here *)
+    in
+    let call_func args res_types =
+      if stack_ofs > 0
+      then
+        (* [caml_c_call_stack_args_llvm_backend] is a wrapper around
+           [caml_c_call_stack_args] which computes the address range of the
+           arguments on the stack given the offset. *)
+        let args = [func_ptr; V.of_int stack_ofs] @ args in
+        let caml_c_call_stack_args =
+          "caml_c_call_stack_args_llvm_backend"
+          ^
+          match (stack_align : Cmm.stack_align) with
+          | Align_16 -> ""
+          | Align_32 -> "_avx"
+          | Align_64 -> "_avx512"
+        in
+        make_ocaml_c_call caml_c_call_stack_args args res_types
+      else if alloc
+      then
+        (* [caml_c_call] doesn't use the second argument since nothing is passed
+           on the stack *)
+        let args = [func_ptr; V.poison T.i64] @ args in
+        make_ocaml_c_call "caml_c_call" args res_types
+      else
+        (* Wrap C calls to avoid reloading from the stack after overwriting the
+           stack pointer *)
+        let wrapper_symbol =
+          add_c_call_wrapper t func_symbol ~args:(List.map V.get_type args)
+            ~res:res_types
+        in
+        call_simple
+          ~attrs:(gc_attr ~can_call_gc:false t i)
+          ~cc:Ocaml t wrapper_symbol args res_types
+    in
+    let arg_regs = reg_list_for_call i.arg in
+    let args = List.map (load_reg_to_temp t) arg_regs in
+    let res_regs = reg_list_for_call i.res in
+    let res_types = List.map T.of_reg res_regs in
+    let res_values = call_func args res_types in
+    List.iter2 (store_into_reg t) res_regs res_values
+
+  let raise_ t (i : Cfg.terminator Cfg.instruction)
+      (raise_kind : Lambda.raise_kind) =
+    let call_raise raise_fn_name =
+      let payload = load_reg_to_temp t i.arg.(0) in
+      add_referenced_symbol t raise_fn_name;
+      call_simple
+        ~attrs:(gc_attr ~can_call_gc:true t i)
+        ~cc:Ocaml t raise_fn_name [payload] []
+      |> ignore
+    in
+    match raise_kind with
+    | Raise_notrace ->
+      (* Get sp for trap block *)
+      let exn_sp_ptr = load_domainstate_addr t Domain_exn_handler in
+      let trap_block = emit_ins t (I.load ~ptr:exn_sp_ptr ~typ:T.ptr) in
+      (* Get contents of the trap block *)
+      let prev_exn_sp = emit_ins t (I.load ~ptr:trap_block ~typ:T.i64) in
+      let handler_addr =
+        let ptr = do_offset t trap_block T.ptr 8 in
+        emit_ins t (I.load ~ptr ~typ:T.i64)
+      in
+      (* Pop trap block from linked list in the domain *)
+      emit_ins_no_res t (I.store ~ptr:exn_sp_ptr ~to_store:prev_exn_sp);
+      (* Get payload *)
+      let payload = load_reg_to_temp t i.arg.(0) in
+      (* Pop trap block from stack + set my sp *)
+      let new_sp = do_offset t trap_block T.i64 16 in
+      write_rsp t new_sp;
+      (* Put payload in RAX and jump to handler *)
+      emit_ins_no_res t
+        (I.inline_asm ~asm:"movq $0, %rax; jmpq *$1" ~constraints:"r,r,~{rax}"
+           ~args:[payload; handler_addr] ~res_type:T.Or_void.void
+           ~sideeffect:true);
+      emit_ins_no_res t I.unreachable
+    | Raise_regular ->
+      let backtrace_pos = load_domainstate_addr t Domain_backtrace_pos in
+      emit_ins_no_res t (I.store ~ptr:backtrace_pos ~to_store:(V.of_int 0));
+      call_raise "caml_raise_exn"
+    | Raise_reraise -> call_raise "caml_reraise_exn"
+
+  let terminator t (i : Cfg.terminator Cfg.instruction) =
+    E.comment (get_fun_info t).emitter
+      (Format.asprintf "%a" F.pp_dbg_instr_terminator i);
+    match i.desc with
+    | Never -> fail "terminator.Never"
+    | Always lbl -> br_label t lbl
+    | Parity_test { ifso; ifnot } ->
+      emit_ins_no_res t
+        (I.br_cond ~cond:(odd_test t i) ~ifso:(V.of_label ifso)
+           ~ifnot:(V.of_label ifnot))
+    | Truth_test { ifso; ifnot } ->
+      emit_ins_no_res t
+        (I.br_cond ~cond:(test t Itruetest i) ~ifso:(V.of_label ifso)
+           ~ifnot:(V.of_label ifnot))
+    | Return -> return t i
+    | Int_test { lt; eq; gt; is_signed; imm } ->
+      let open struct
+        type comp =
+          | Lt
+          | Gt
+      end in
+      let make_comp (comp : comp) : Cmm.integer_comparison =
+        match is_signed, comp with
+        | Signed, Lt -> Clt
+        | Signed, Gt -> Cgt
+        | Unsigned, Lt -> Cult
+        | Unsigned, Gt -> Cugt
+      in
+      let lt = V.of_label lt in
+      let eq = V.of_label eq in
+      let gt = V.of_label gt in
+      let ge = Cmm.new_label () |> V.of_label in
+      let is_lt = int_comp t (make_comp Lt) i ~imm in
+      emit_ins_no_res t (I.br_cond ~cond:is_lt ~ifso:lt ~ifnot:ge);
+      emit_label t ge;
+      let is_gt = int_comp t (make_comp Gt) i ~imm in
+      emit_ins_no_res t (I.br_cond ~cond:is_gt ~ifso:gt ~ifnot:eq)
+    | Float_test { width; lt; eq; gt; uo } ->
+      let typ = T.of_float_width width in
+      let lt = V.of_label lt in
+      let eq = V.of_label eq in
+      let gt = V.of_label gt in
+      let uo = V.of_label uo in
+      let ge = V.of_label (Cmm.new_label ()) in
+      let eq_or_uo = V.of_label (Cmm.new_label ()) in
+      let is_lt = float_comp t Cmm.CFlt i typ in
+      emit_ins_no_res t (I.br_cond ~cond:is_lt ~ifso:lt ~ifnot:ge);
+      emit_label t ge;
+      let is_gt = float_comp t Cmm.CFgt i typ in
+      emit_ins_no_res t (I.br_cond ~cond:is_gt ~ifso:gt ~ifnot:eq_or_uo);
+      emit_label t eq_or_uo;
+      let is_eq = float_comp t Cmm.CFeq i typ in
+      emit_ins_no_res t (I.br_cond ~cond:is_eq ~ifso:eq ~ifnot:uo)
+    | Switch labels ->
+      let discr = load_reg_to_temp ~typ:T.i64 t i.arg.(0) in
+      let default = V.of_label (Cmm.new_label ()) in
+      let branches =
+        List.mapi
+          (fun i label -> V.of_int i, V.of_label label)
+          (Array.to_list labels)
+      in
+      emit_ins_no_res t (I.switch ~discr ~default ~branches);
+      (* note: [Switch] does not take a default label, as switches are assumed
+         to be exhaustive. Since it is mandatory in LLVM, we will use a label
+         with an [unreachable] instruction for every instance of this
+         instruction. *)
+      emit_label t default;
+      emit_ins_no_res t I.unreachable
+    | Raise raise_kind -> raise_ t i raise_kind
+    | Call { op; label_after } ->
+      reject_addr_regs i.arg "call";
+      call t i op;
+      br_label t label_after
+    | Tailcall_self { destination } -> br_label t destination
+    | Tailcall_func op ->
+      reject_addr_regs i.arg "tailcall func";
+      call ~tail:true t i op
+    | Call_no_return { func_symbol; alloc; stack_ofs; stack_align; _ } ->
+      extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
+      emit_ins_no_res t I.unreachable
+    | Prim { op; label_after } -> (
+      reject_addr_regs i.arg "prim";
+      match op with
+      | Probe _ -> not_implemented_terminator ~msg:"probe" i
+      | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
+        extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
+        br_label t label_after)
+
+  (* Basic instructions *)
+
+  let int_op t (i : Cfg.basic Cfg.instruction)
+      (op : Operation.integer_operation) ~imm =
+    let do_binary op =
+      let typ = T.i64 in
+      reject_addr_regs i.res "int_op";
+      match imm with
+      | None ->
+        let arg1 = load_reg_to_temp ~typ t i.arg.(0) in
+        let arg2 = load_reg_to_temp ~typ t i.arg.(1) in
+        emit_ins t (I.binary op ~arg1 ~arg2)
+      | Some n ->
+        let arg1 = load_reg_to_temp ~typ t i.arg.(0) in
+        let arg2 = V.of_int ~typ n in
+        emit_ins t (I.binary op ~arg1 ~arg2)
+    in
+    let do_unary_intrinsic op_name =
+      let typ = T.i64 in
+      let arg = load_reg_to_temp ~typ t i.arg.(0) in
+      call_llvm_intrinsic t (op_name ^ "." ^ T.to_string typ) [arg] typ
+    in
+    let do_gep ~negate_arg =
+      let base_ptr = load_reg_to_temp t i.arg.(0) in
+      fail_if_not "int_op.do_gep" (T.is_ptr (V.get_type base_ptr));
+      let offset =
+        match imm with
+        | None ->
+          let temp = load_reg_to_temp ~typ:T.i64 t i.arg.(1) in
+          if negate_arg
+          then emit_ins t (I.binary Sub ~arg1:(V.of_int 0) ~arg2:temp)
+          else temp
+        | Some n -> V.of_int ~typ:T.i64 (if negate_arg then -n else n)
+      in
+      emit_ins t (I.getelementptr ~base_type:T.i8 ~base_ptr ~indices:[offset])
+    in
+    let do_imulh ~signed =
+      (* Assuming operands are i64 *)
+      let arg1 = load_reg_to_temp ~typ:T.i64 t i.arg.(0) in
+      let arg2 =
+        match imm with
+        | None -> load_reg_to_temp ~typ:T.i64 t i.arg.(1)
+        | Some n -> V.of_int n
+      in
+      (* Extend args to i128 *)
+      let extend_value arg =
+        let ext_op = if signed then I.Sext else I.Zext in
+        emit_ins t (I.convert ext_op ~arg ~to_:T.i128)
+      in
+      let arg1 = extend_value arg1 in
+      let arg2 = extend_value arg2 in
+      (* Multiply as i128 *)
+      let res_ext = emit_ins t (I.binary Mul ~arg1 ~arg2) in
+      (* Shift the bits we care about *)
+      let shifted =
+        emit_ins t (I.binary Lshr ~arg1:res_ext ~arg2:(V.of_int ~typ:T.i128 64))
+      in
+      emit_ins t (I.convert Trunc ~arg:shifted ~to_:T.i64)
+    in
+    let res =
+      match op with
+      | Iadd ->
+        if Cmm.is_addr i.res.(0).typ
+        then do_gep ~negate_arg:false
+        else do_binary Add
+      | Isub ->
+        if Cmm.is_addr i.res.(0).typ
+        then do_gep ~negate_arg:true
+        else do_binary Sub
+      | Imul -> do_binary Mul
+      | Imulh { signed } -> do_imulh ~signed
+      | Idiv -> do_binary Sdiv
+      | Imod -> do_binary Srem
+      | Iand -> do_binary And
+      | Ior -> do_binary Or
+      | Ixor -> do_binary Xor
+      | Ilsl -> do_binary Shl
+      | Ilsr -> do_binary Lshr
+      | Iasr -> do_binary Ashr
+      | Icomp comp ->
+        let bool_res = int_comp t comp i ~imm in
+        (* convert i1 -> i64 *)
+        emit_ins t (I.convert Zext ~arg:bool_res ~to_:T.i64)
+      | Iclz _ -> do_unary_intrinsic "ctlz"
+      | Ictz _ -> do_unary_intrinsic "cttz"
+      | Ipopcnt -> do_unary_intrinsic "ctpop"
+    in
+    store_into_reg t i.res.(0) res
+
+  let float_op t (i : Cfg.basic Cfg.instruction) (width : Cmm.float_width)
+      (op : Operation.float_operation) =
+    let typ = T.of_float_width width in
+    let do_binary op =
+      let arg1 = load_reg_to_temp ~typ t i.arg.(0) in
+      let arg2 = load_reg_to_temp ~typ t i.arg.(1) in
+      emit_ins t (I.binary op ~arg1 ~arg2)
+    in
+    let do_unary_intrinsic op_name =
+      let arg = load_reg_to_temp ~typ t i.arg.(0) in
+      call_llvm_intrinsic t (op_name ^ "." ^ T.to_string typ) [arg] typ
+    in
+    let res =
+      match op with
+      | Iaddf -> do_binary Fadd
+      | Isubf -> do_binary Fsub
+      | Imulf -> do_binary Fmul
+      | Idivf -> do_binary Fdiv
+      | Inegf ->
+        let arg = load_reg_to_temp ~typ t i.arg.(0) in
+        emit_ins t (I.unary Fneg ~arg)
+      | Iabsf -> do_unary_intrinsic "fabs"
+      | Icompf comp ->
+        let bool_res = float_comp t comp i typ in
+        (* convert i1 -> i64 *)
+        emit_ins t (I.convert Zext ~arg:bool_res ~to_:T.i64)
+    in
+    store_into_reg t i.res.(0) res
+
+  (* CR yusumez: Put these into the appropriate arch-specific files *)
+
+  (* CR yusumez: add a generic Cfg instruction for bswap *)
+  let bswap t (i : Cfg.basic Cfg.instruction) (bitwidth : Arch.bswap_bitwidth) =
+    let typ =
+      match bitwidth with
+      | Sixteen -> T.i16
+      | Thirtytwo -> T.i32
+      | Sixtyfour -> T.i64
+    in
+    let do_trunc arg =
+      if T.equal typ T.i64
+      then arg
+      else emit_ins t (I.convert Trunc ~arg ~to_:T.i64)
+    in
+    let do_zext arg =
+      if T.equal typ T.i64
+      then arg
+      else emit_ins t (I.convert Zext ~arg ~to_:T.i64)
+    in
+    let arg = load_reg_to_temp t i.arg.(0) in
+    let trunced = do_trunc arg in
+    let bswapped =
+      call_llvm_intrinsic t ("bswap." ^ T.to_string typ) [trunced] typ
+    in
+    let zexted = do_zext bswapped in
+    store_into_reg t i.res.(0) zexted
+
+  let intrinsic t (i : Cfg.basic Cfg.instruction) intrinsic_name =
+    (* CR yusumez: I really don't like the -fragile-match... *)
+    let do_conv arg (to_ : T.t) =
+      let from : T.t = V.get_type arg in
+      match[@warning "-fragile-match"] from, to_ with
+      | _ when T.equal from to_ -> arg
+      | Double, Vector { size = _; elem_type = Double } ->
+        emit_ins t
+          (I.insertelement ~vector:(V.poison to_) ~index:(V.of_int 0)
+             ~to_insert:arg)
+      | Vector { size = _; elem_type = Double }, Double ->
+        emit_ins t (I.extractelement ~vector:arg ~index:(V.of_int 0))
+      | Int { width_in_bits = 64 }, Int { width_in_bits = 32 } ->
+        emit_ins t (I.convert Trunc ~arg ~to_)
+      | _ -> Misc.fatal_error "Llvmize: unexpected reg types in intrinsic"
+    in
+    let do_intrinsic_call name arg_types res_type =
+      (* Sometimes, we get unit arguments for intrinsics with no arguments. We
+         use [map2_prefix] to ignore them. *)
+      let args, _ =
+        List.map2_prefix
+          (fun arg_type reg ->
+            let temp = load_reg_to_temp t reg in
+            do_conv temp arg_type)
+          arg_types (Array.to_list i.arg)
+      in
+      let res = call_llvm_intrinsic t name args res_type in
+      let conved_res = do_conv res (T.of_reg i.res.(0)) in
+      store_into_reg t i.res.(0) conved_res
+    in
+    match intrinsic_name with
+    | "caml_sse2_float64_min" ->
+      do_intrinsic_call "x86.sse2.min.sd" [T.doublex2; T.doublex2] T.doublex2
+    | "caml_sse2_float64_max" ->
+      do_intrinsic_call "x86.sse2.max.sd" [T.doublex2; T.doublex2] T.doublex2
+    | "caml_rdtsc_unboxed" -> do_intrinsic_call "readcyclecounter" [] T.i64
+    | "caml_rdpmc_unboxed" -> do_intrinsic_call "x86.rdpmc" [T.i32] T.i64
+    | _ -> not_implemented_basic ~msg:"specific intrinsic" i
+
+  let specific t (i : Cfg.basic Cfg.instruction) (op : Arch.specific_operation)
+      =
+    match[@warning "-fragile-match"] op with
+    | Ibswap { bitwidth } -> bswap t i bitwidth
+    | Illvm_intrinsic intrinsic_name -> intrinsic t i intrinsic_name
+    | Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Isextend32
+    | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
+    | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ ->
+      not_implemented_basic ~msg:"specific" i
+
+  (* CR yusumez: Implement atomic operations properly, since the current
+     implementation is most likely incorrect. Check how the C++ memory model (or
+     whatever LLVM supports the closest to ours) matches with OCaml's (memory.c
+     is a nice place to start) *)
+  let atomic t (i : Cfg.basic Cfg.instruction) (op : Cmm.atomic_op) ~size ~addr
+      =
+    (* CR yusumez: potential val mismatch? (test this) *)
+    let ptr_arg_idx =
+      match op with
+      | Compare_set -> 2
+      | Fetch_and_add -> 1
+      | Add | Sub | Land | Lor | Lxor -> 1
+      | Exchange -> 1
+      | Compare_exchange -> 2
+    in
+    let typ =
+      match (size : Cmm.atomic_bitwidth) with
+      | Thirtytwo -> T.i32
+      | Sixtyfour | Word -> T.i64
+    in
+    let arg = load_reg_to_temp ~typ t i.arg.(ptr_arg_idx - 1) in
+    let ptr = load_address_from_reg t addr i.arg.(ptr_arg_idx) in
+    let do_atomicrmw ?(set_res = false) op =
+      let res = emit_ins t (I.atomicrmw op ~ptr ~arg) in
+      if set_res then store_into_reg t i.res.(0) res
+    in
+    let do_cmpxchg () =
+      let compare_with = load_reg_to_temp ~typ t i.arg.(0) in
+      let res = emit_ins t (I.cmpxchg ~ptr ~compare_with ~set_if_equal:arg) in
+      match extract_struct t res [[0] (* loaded *); [1] (* success *)] with
+      | [loaded; success] -> loaded, success
+      | [] | _ :: _ -> fail "atomic.do_cmpxchg"
+    in
+    match op with
+    | Fetch_and_add -> do_atomicrmw ~set_res:true Atomicrmw_add
+    | Add -> do_atomicrmw Atomicrmw_add
+    | Sub -> do_atomicrmw Atomicrmw_sub
+    | Land -> do_atomicrmw Atomicrmw_and
+    | Lor -> do_atomicrmw Atomicrmw_or
+    | Lxor -> do_atomicrmw Atomicrmw_xor
+    | Exchange -> do_atomicrmw ~set_res:true Atomicrmw_xchg
+    | Compare_set ->
+      let _, success = do_cmpxchg () in
+      (* convert i1 -> i64 *)
+      let res = emit_ins t (I.convert Zext ~arg:success ~to_:typ) in
+      store_into_reg t i.res.(0) res
+    | Compare_exchange ->
+      let loaded, success = do_cmpxchg () in
+      let orig = load_reg_to_temp ~typ t i.res.(0) in
+      let selected =
+        emit_ins t (I.select ~cond:success ~ifso:orig ~ifnot:loaded)
+      in
+      store_into_reg t i.res.(0) selected
+
+  let load t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
+      (addr_mode : Arch.addressing_mode) =
+    let ptr = load_address_from_reg t addr_mode i.arg.(0) in
+    let basic typ =
+      let loaded = emit_ins t (I.load ~ptr ~typ) in
+      store_into_reg t i.res.(0) loaded
+    in
+    let extend op ~from ~to_ =
+      let loaded = emit_ins t (I.load ~ptr ~typ:from) in
+      let extended = emit_ins t (I.convert op ~arg:loaded ~to_) in
+      store_into_reg t i.res.(0) extended
+    in
+    match memory_chunk with
+    | Word_int -> basic T.i64
+    | Word_val -> basic T.val_ptr
+    | Byte_unsigned -> extend Zext ~from:T.i8 ~to_:T.i64
+    | Byte_signed -> extend Sext ~from:T.i8 ~to_:T.i64
+    | Sixteen_unsigned -> extend Zext ~from:T.i16 ~to_:T.i64
+    | Sixteen_signed -> extend Sext ~from:T.i16 ~to_:T.i64
+    | Thirtytwo_unsigned -> extend Zext ~from:T.i32 ~to_:T.i64
+    | Thirtytwo_signed -> extend Sext ~from:T.i32 ~to_:T.i64
+    | Single { reg = Float32 } -> basic T.float
+    | Double -> basic T.double
+    | Single { reg = Float64 } -> extend Fpext ~from:T.float ~to_:T.double
+    | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
+    | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
+      not_implemented_basic ~msg:"load vector" i
+
+  let store t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
+      (addr_mode : Arch.addressing_mode) =
+    let ptr = load_address_from_reg t addr_mode i.arg.(1) in
+    let basic typ =
+      let to_store = load_reg_to_temp t i.arg.(0) in
+      fail_if_not ~msg:"unexpected type" "store"
+        (T.equal typ (V.get_type to_store));
+      emit_ins_no_res t (I.store ~ptr ~to_store)
+    in
+    let trunc op to_ =
+      let arg = load_reg_to_temp t i.arg.(0) in
+      let to_store = emit_ins t (I.convert op ~arg ~to_) in
+      emit_ins_no_res t (I.store ~ptr ~to_store)
+    in
+    match memory_chunk with
+    | Word_int -> basic T.i64
+    | Word_val -> basic T.val_ptr
+    | Byte_unsigned | Byte_signed -> trunc Trunc T.i8
+    | Sixteen_unsigned | Sixteen_signed -> trunc Trunc T.i16
+    | Thirtytwo_signed | Thirtytwo_unsigned -> trunc Trunc T.i32
+    | Single { reg = Float32 } -> basic T.float
+    | Double -> basic T.double
+    | Single { reg = Float64 } -> trunc Fptrunc T.float
+    | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
+    | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
+      not_implemented_basic ~msg:"store vector" i
+
+  let local_alloc t (i : Cfg.basic Cfg.instruction) num_bytes =
+    (* Make space on the local stack *)
+    let local_sp_ptr = load_domainstate_addr t Domain_local_sp in
+    let local_sp = emit_ins t (I.load ~ptr:local_sp_ptr ~typ:T.i64) in
+    let new_local_sp =
+      emit_ins t (I.binary Sub ~arg1:local_sp ~arg2:(V.of_int num_bytes))
+    in
+    emit_ins_no_res t (I.store ~ptr:local_sp_ptr ~to_store:new_local_sp);
+    (* Check if new_local_sp exceeds local_limit *)
+    let local_limit_ptr = load_domainstate_addr t Domain_local_limit in
+    let local_limit = emit_ins t (I.load ~ptr:local_limit_ptr ~typ:T.i64) in
+    let skip_realloc =
+      emit_ins t (I.icmp Islt ~arg1:local_limit ~arg2:new_local_sp)
+    in
+    (* Let LLVM know calling realloc isn't likely *)
+    let skip_realloc_expect =
+      call_llvm_intrinsic t "expect.i1"
+        [skip_realloc; V.of_int ~typ:T.i1 1]
+        T.i1
+    in
+    (* Branch appropriately *)
+    let call_realloc = V.of_label (Cmm.new_label ()) in
+    let after_realloc = V.of_label (Cmm.new_label ()) in
+    emit_ins_no_res t
+      (I.br_cond ~cond:skip_realloc_expect ~ifso:after_realloc
+         ~ifnot:call_realloc);
+    (* Call realloc *)
+    emit_label t call_realloc;
+    (* CR yusumez: Handle SIMD regs appropriately once we have them *)
+    (* CR yusumez: Fix calling conventions in LLVM for this (and the heap one)
+       to mark registers saved/clobbered as in Proc.destroyed_at_alloc_or_poll.
+       We might also want to thread runtime registers through them (especially
+       for heap allocations since they adjust R15) *)
+    add_referenced_symbol t "caml_call_local_realloc";
+    call_simple
+      ~attrs:(gc_attr ~can_call_gc:false t i @ [LL.Fn_attr.Cold])
+      ~cc:Ocaml t "caml_call_local_realloc" [] []
+    |> ignore;
+    emit_ins_no_res t (I.br after_realloc);
+    (* After alloc *)
+    emit_label t after_realloc;
+    let local_top_ptr = load_domainstate_addr t Domain_local_top in
+    let local_top = emit_ins t (I.load ~ptr:local_top_ptr ~typ:T.i64) in
+    (* Calculate the address of the object on the local stack *)
+    let new_local_sp_addr =
+      emit_ins t (I.binary Add ~arg1:new_local_sp ~arg2:local_top)
+    in
+    (* Skip the header word *)
+    let res = do_offset t new_local_sp_addr T.val_ptr 8 in
+    store_into_reg t i.res.(0) res
+
+  let heap_alloc t (i : Cfg.basic Cfg.instruction) num_bytes =
+    (* Make space on the minor heap *)
+    let alloc_ptr = emit_ins t (I.load ~ptr:allocation_ptr ~typ:T.i64) in
+    let new_alloc_ptr =
+      emit_ins t (I.binary Sub ~arg1:alloc_ptr ~arg2:(V.of_int num_bytes))
+    in
+    emit_ins_no_res t (I.store ~ptr:allocation_ptr ~to_store:new_alloc_ptr);
+    (* Check if we exceeded the limit *)
+    let domain_young_limit =
+      let ptr = load_domainstate_addr t Domain_young_limit in
+      emit_ins t (I.load ~ptr ~typ:T.i64)
+    in
+    let skip_gc =
+      emit_ins t (I.icmp Iult ~arg1:domain_young_limit ~arg2:new_alloc_ptr)
+    in
+    (* Let LLVM know calling GC isn't likely *)
+    let skip_gc_expect =
+      call_llvm_intrinsic t "expect.i1" [skip_gc; V.of_int ~typ:T.i1 1] T.i1
+    in
+    (* Branch appropriately *)
+    let call_gc = V.of_label (Cmm.new_label ()) in
+    let after_gc = V.of_label (Cmm.new_label ()) in
+    emit_ins_no_res t
+      (I.br_cond ~cond:skip_gc_expect ~ifso:after_gc ~ifnot:call_gc);
+    (* Call GC *)
+    emit_label t call_gc;
+    add_referenced_symbol t "caml_call_gc";
+    call_simple
+      ~attrs:(gc_attr ~can_call_gc:true t i @ [LL.Fn_attr.Cold])
+      ~cc:Ocaml t "caml_call_gc" [] []
+    |> ignore;
+    emit_ins_no_res t (I.br after_gc);
+    (* After GC *)
+    emit_label t after_gc;
+    (* Load alloc ptr again since GC call might have changed it *)
+    let alloc_ptr = emit_ins t (I.load ~ptr:allocation_ptr ~typ:T.i64) in
+    (* Skip the header word *)
+    let res = do_offset t alloc_ptr T.val_ptr 8 in
+    store_into_reg t i.res.(0) res
+
+  let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
+    match op with
+    | Move -> load_reg_to_temp t i.arg.(0) |> store_into_reg t i.res.(0)
+    | Opaque ->
+      let temp = load_reg_to_temp t i.arg.(0) in
+      let opaque_temp =
+        emit_ins t
+          (I.inline_asm ~asm:"" ~constraints:"=r,0" ~args:[temp]
+             ~res_type:(Some (V.get_type temp))
+             ~sideeffect:false)
+      in
+      store_into_reg t i.res.(0) opaque_temp
+    | Const_int n -> store_into_reg t i.res.(0) (V.of_nativeint n)
+    | Const_symbol { sym_name; sym_global = _ } ->
+      add_referenced_symbol t sym_name;
+      store_into_reg t i.res.(0) (V.of_symbol sym_name)
+    | Const_float32 bits -> store_into_reg t i.res.(0) (V.of_float32_bits bits)
+    | Const_float bits -> store_into_reg t i.res.(0) (V.of_float64_bits bits)
+    | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
+      not_implemented_basic ~msg:"const_vec" i
+    (* CR yusumez: What do we do with mutability / is_atomic / is_modify? *)
+    | Load { memory_chunk; addressing_mode; mutability = _; is_atomic = _ } ->
+      load t i memory_chunk addressing_mode
+    | Store (memory_chunk, addressing_mode, _is_modify) ->
+      store t i memory_chunk addressing_mode
+    | Intop op -> int_op t i op ~imm:None
+    | Intop_imm (op, n) -> int_op t i op ~imm:(Some n)
+    | Floatop (width, op) -> float_op t i width op
+    | Stackoffset n -> t.stack_offset <- t.stack_offset + n
+    | Begin_region ->
+      let local_sp_ptr = load_domainstate_addr t Domain_local_sp in
+      let local_sp = emit_ins t (I.load ~ptr:local_sp_ptr ~typ:T.i64) in
+      store_into_reg t i.res.(0) local_sp
+    | End_region ->
+      let local_sp_ptr = load_domainstate_addr t Domain_local_sp in
+      let saved_local_sp = load_reg_to_temp t i.arg.(0) in
+      emit_ins_no_res t (I.store ~ptr:local_sp_ptr ~to_store:saved_local_sp)
+    | Alloc { bytes; dbginfo = _; mode = Local } -> local_alloc t i bytes
+    | Alloc { bytes; dbginfo = _; mode = Heap } -> heap_alloc t i bytes
+    | Csel test_op ->
+      let typ = T.of_reg i.res.(0) in
+      let len = Array.length i.arg in
+      let ifso = load_reg_to_temp ~typ t i.arg.(len - 2) in
+      let ifnot = load_reg_to_temp ~typ t i.arg.(len - 1) in
+      let cond = test t test_op i in
+      let res = emit_ins t (I.select ~cond ~ifso ~ifnot) in
+      store_into_reg t i.res.(0) res
+    | Static_cast cast_op -> (
+      let do_conv op ~from ~to_ =
+        let arg = load_reg_to_temp ~typ:from t i.arg.(0) in
+        let converted = emit_ins t (I.convert op ~arg ~to_) in
+        store_into_reg t i.res.(0) converted
+      in
+      match cast_op with
+      | Float_of_int width ->
+        do_conv Sitofp ~from:T.i64 ~to_:(T.of_float_width width)
+      | Int_of_float width ->
+        do_conv Fptosi ~from:(T.of_float_width width) ~to_:T.i64
+      | Float_of_float32 -> do_conv Fpext ~from:T.float ~to_:T.double
+      | Float32_of_float -> do_conv Fptrunc ~from:T.double ~to_:T.float
+      | V128_of_scalar _ | Scalar_of_v128 _ | V256_of_scalar _
+      | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
+        not_implemented_basic ~msg:"static cast" i)
+    | Reinterpret_cast cast_op -> (
+      match cast_op with
+      | Int_of_value | Value_of_int | Float_of_int64 | Int64_of_float
+      | Float32_of_int32 | Int32_of_float32 | Float_of_float32
+      | Float32_of_float ->
+        let arg = load_reg_to_temp t i.arg.(0) in
+        let converted =
+          emit_ins t (I.convert Bitcast ~arg ~to_:(T.of_reg i.res.(0)))
+        in
+        store_into_reg t i.res.(0) converted
+      | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ->
+        not_implemented_basic ~msg:"vector reinterpret cast" i)
+    | Specific op -> specific t i op
+    | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
+    | Pause -> call_llvm_intrinsic_no_res t "x86.sse2.pause" []
+    | Poll -> () (* CR yusumez: insert poll call *)
+    | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
+    | Probe_is_enabled _ | Name_for_debugger _ | Dls_get ->
+      not_implemented_basic i
+
+  let basic t (i : Cfg.basic Cfg.instruction) =
+    E.comment (get_fun_info t).emitter
+      (Format.asprintf "%a" F.pp_dbg_instr_basic i);
+    match i.desc with
+    | Op op -> basic_op t i op
+    | Prologue | Epilogue | Reloadretaddr -> () (* LLVM handles these for us *)
+    | Stack_check _ ->
+      if Config.no_stack_checks || not !Oxcaml_flags.cfg_stack_checks
+      then () (* Don't emit stack checks *)
+      else not_implemented_basic ~msg:"stack check" i
+    | Poptrap { lbl_handler } -> (
+      match Label.Tbl.find_opt (get_fun_info t).trap_blocks lbl_handler with
+      | None -> fail_msg "unbalanced trap pop"
+      | Some { trap_block; stacksave_ptr; payload = _ } ->
+        (* Restore previous exn handler sp (top word on trap block) *)
+        let exn_sp_ptr = load_domainstate_addr t Domain_exn_handler in
+        let prev_exn_sp = emit_ins t (I.load ~ptr:trap_block ~typ:T.i64) in
+        emit_ins_no_res t (I.store ~ptr:exn_sp_ptr ~to_store:prev_exn_sp);
+        (* Pop! *)
+        call_llvm_intrinsic_no_res t "stackrestore" [stacksave_ptr])
+    | Pushtrap { lbl_handler } -> (
+      (* Exception control flow is implemented in a way that emulates setjmp in
+         C. Namely. we call a function that "returns twice", first falling
+         through to the try block, second when an exception happens. This
+         ensures that LLVM is aware of potential control flow to the handler so
+         that it doesn't eliminate it as dead code or does other funny things
+         moving blocks around.
+
+         The wrapper function follows the OCaml calling conventions to handle
+         spilling/reloading registers. Note that here, we assume spill locations
+         are consistent across calls within the try block. We could solidify
+         this assumption via using native instructions like [invoke] or
+         [callbr].
+
+         Due to an unfortunate series of interactions with LLVM (allocating
+         after the entry block causes LLVM to force the use of frame pointers,
+         and it fails to save RBP across OCaml calls when this happens), this
+         only can work with frame pointers enabled.
+
+         Because of this, trap blocks allocated by this backend are 4 words
+         wide, as opposed to 2, to account for RBP (and padding for alignment).
+         These two words are placed below the normal trap block so that the top
+         two words are handled as expected by the runtime and functions compiled
+         without the LLVM backend. Pushtrap sets this up, while they get torn
+         down at trap handler entry.
+
+         Currently, this implementation does not work for some cases since the
+         two points during execution at which control flow can arrive after the
+         dummy call don't agree in whether RBP needs restoring or not. So, we
+         get cases where LLVM reloads stuff from the stack using RBP before it
+         gets restored in the handler (since we need to do the check + jump to
+         the handler first). *)
+      call_simple
+        ~attrs:[Returns_twice; Gc_leaf_function]
+        ~cc:Ocaml t "wrap_try" [] [T.i32]
+      |> ignore (* Note that we don't need the returned identifier here. *);
+      (* Record label here - we will jump here for the handler *)
+      let try_and_exn_entry = V.of_label (Cmm.new_label ()) in
+      emit_label t try_and_exn_entry;
+      (* Extract the result of the call, or the exception payload. *)
+      let payload =
+        emit_ins t
+          (I.inline_asm ~asm:"mov %rax, $0" ~constraints:"=r" ~args:[]
+             ~res_type:(Some T.i64) ~sideeffect:true)
+      in
+      (* If it's nonzero, we have an exception. Otherwise, go to the try
+         block. *)
+      let payload_is_zero =
+        emit_ins t (I.icmp Ieq ~arg1:payload ~arg2:(V.of_int 0))
+      in
+      let try_label = V.of_label (Cmm.new_label ()) in
+      let exn_label = V.of_label lbl_handler in
+      emit_ins_no_res t
+        (I.br_cond ~cond:payload_is_zero ~ifso:try_label ~ifnot:exn_label);
+      (* Enter try block from this point onwards. *)
+      emit_label t try_label;
+      (* Save state of stack *)
+      let stacksave_ptr = call_llvm_intrinsic t "stacksave" [] T.ptr in
+      (* Allocate trap block on stack. It will get allocated at the top of the
+         stack. The layout is [prev_sp; handler_addr; saved_rbp; padding] *)
+      let trap_block = emit_ins t (I.alloca T.(Struct [i64; i64; i64; i64])) in
+      (* Slots on the trap block *)
+      let rbp_slot = do_offset t trap_block T.ptr 16 in
+      let handler_slot = do_offset t trap_block T.ptr 8 in
+      let prev_sp_slot = do_offset t trap_block T.ptr 0 in
+      (* Push my trap block to the exn handler list *)
+      let exn_sp_ptr = load_domainstate_addr t Domain_exn_handler in
+      let prev_exn_sp = emit_ins t (I.load ~ptr:exn_sp_ptr ~typ:T.i64) in
+      emit_ins_no_res t (I.store ~ptr:exn_sp_ptr ~to_store:trap_block);
+      (* Fill up the slots *)
+      emit_ins_no_res t
+        (I.store ~ptr:handler_slot
+           ~to_store:
+             (V.blockaddress
+                ~func:(E.get_fun_ident (get_fun_info t).emitter)
+                ~block:(V.get_ident_exn try_and_exn_entry)));
+      emit_ins_no_res t
+        (I.inline_asm ~asm:"mov %rbp, ($0)" ~constraints:"r" ~args:[rbp_slot]
+           ~res_type:T.Or_void.void ~sideeffect:true);
+      emit_ins_no_res t (I.store ~ptr:prev_sp_slot ~to_store:prev_exn_sp);
+      (* Save the trap block in [t] *)
+      match Label.Tbl.find_opt (get_fun_info t).trap_blocks lbl_handler with
+      | Some _ -> fail_msg "multiple pushtraps for the same handler"
+      | None ->
+        Label.Tbl.add (get_fun_info t).trap_blocks lbl_handler
+          { trap_block; stacksave_ptr; payload })
 end
 
 (* CR yusumez: Maybe have the type of an identifier as part of this type?! *)
