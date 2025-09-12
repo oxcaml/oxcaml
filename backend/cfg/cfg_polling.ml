@@ -324,77 +324,75 @@ let instr_cfg_with_layout :
             ~id:(next_instruction_id ()) ~dbg:after.terminator.dbg
             ~stack_offset:after.terminator.stack_offset ()
         in
-        (match
-           ( Label.Set.cardinal
-               (Cfg.successor_labels after ~normal:true ~exn:false),
-             after.exn )
-         with
-        | 1, None -> (
-          (* Check if the terminator is Tailcall_self *)
-          match after.terminator.desc with
-          | Tailcall_self { destination = _; associated_poll } -> (
-            match associated_poll with
-            | Polling_disabled ->
+        (* Check if the terminator is Tailcall_self *)
+        (match after.terminator.desc with
+        | Tailcall_self { destination = _; associated_poll } -> (
+          match associated_poll with
+          | Polling_disabled ->
+            Misc.fatal_errorf
+              "Cfg_polling: trying to insert a poll instruction inside a \
+               function where polling is disabled"
+          | Associated_poll { instruction_id = poll_id } ->
+            (* Find the poll instruction with this ID and enable it *)
+            let found = ref false in
+            DLL.iter_cell after.body ~f:(fun cell ->
+                let instr : Cfg.basic Cfg.instruction = DLL.value cell in
+                if InstructionId.equal instr.id poll_id
+                then (
+                  found := true;
+                  match instr.desc with
+                  | Cfg.Op (Operation.Poll { enabled }) ->
+                    if enabled
+                    then
+                      Misc.fatal_errorf
+                        "Cfg_polling: Poll instruction %a is already enabled"
+                        InstructionId.print poll_id;
+                    (* Create new instruction with enabled = true *)
+                    let new_instr : Cfg.basic Cfg.instruction =
+                      { instr with
+                        desc = Cfg.Op (Operation.Poll { enabled = true })
+                      }
+                    in
+                    DLL.set_value cell new_instr
+                  | Cfg.Op
+                      ( Move | Spill | Reload | Const_int _ | Const_float32 _
+                      | Const_float _ | Const_symbol _ | Const_vec128 _
+                      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
+                      | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
+                      | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+                      | Probe_is_enabled _ | Opaque | Begin_region | End_region
+                      | Specific _ | Name_for_debugger _ | Dls_get | Pause
+                      | Alloc _ )
+                  | Cfg.Reloadretaddr | Cfg.Pushtrap _ | Cfg.Poptrap _
+                  | Cfg.Prologue | Cfg.Epilogue | Cfg.Stack_check _ ->
+                    (* Not a Poll instruction, just skip it *)
+                    ()));
+            if not !found
+            then
               Misc.fatal_errorf
-                "Cfg_polling: trying to insert a poll instruction inside a \
-                 function where polling is disabled"
-            | Associated_poll { instruction_id = poll_id } ->
-              (* Find the poll instruction with this ID and enable it *)
-              let found = ref false in
-              DLL.iter_cell after.body ~f:(fun cell ->
-                  let instr : Cfg.basic Cfg.instruction = DLL.value cell in
-                  if InstructionId.equal instr.id poll_id
-                  then (
-                    found := true;
-                    match instr.desc with
-                    | Cfg.Op (Operation.Poll { enabled }) ->
-                      if enabled
-                      then
-                        Misc.fatal_errorf
-                          "Cfg_polling: Poll instruction %a is already enabled"
-                          InstructionId.print poll_id;
-                      (* Create new instruction with enabled = true *)
-                      let new_instr : Cfg.basic Cfg.instruction =
-                        { instr with
-                          desc = Cfg.Op (Operation.Poll { enabled = true })
-                        }
-                      in
-                      DLL.set_value cell new_instr
-                    | Cfg.Op
-                        ( Move | Spill | Reload | Const_int _ | Const_float32 _
-                        | Const_float _ | Const_symbol _ | Const_vec128 _
-                        | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-                        | Load _ | Store _ | Intop _ | Intop_imm _
-                        | Intop_atomic _ | Floatop _ | Csel _
-                        | Reinterpret_cast _ | Static_cast _
-                        | Probe_is_enabled _ | Opaque | Begin_region
-                        | End_region | Specific _ | Name_for_debugger _
-                        | Dls_get | Pause | Alloc _ )
-                    | Cfg.Reloadretaddr | Cfg.Pushtrap _ | Cfg.Poptrap _
-                    | Cfg.Prologue | Cfg.Epilogue | Cfg.Stack_check _ ->
-                      (* Not a Poll instruction, just skip it *)
-                      ()));
-              if not !found
-              then
-                Misc.fatal_errorf
-                  "Cfg_polling: Could not find associated_poll instruction %a"
-                  InstructionId.print poll_id)
-          | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
-          | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
-          | Call_no_return _ | Call _ | Prim _ ->
-            (* For other terminators, add the poll instruction as before *)
-            DLL.add_end after.body poll)
-        | _ ->
-          let before = Some (Cfg.get_block_exn cfg dst) in
-          let instrs = DLL.of_list [poll] in
-          let inserted_blocks =
-            Cfg_with_layout.insert_block cfg_with_layout instrs ~after ~before
-              ~next_instruction_id
-          in
-          (* All the inserted blocks are safe since they contain a poll
-             instruction *)
-          List.iter inserted_blocks ~f:(fun block ->
-              Label.Tbl.replace safe_map block.Cfg.start true));
+                "Cfg_polling: Could not find associated_poll instruction %a"
+                InstructionId.print poll_id)
+        | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+        | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
+        | Call_no_return _ | Call _ | Prim _ -> (
+          (* For other terminators, add the poll instruction as before *)
+          match
+            ( Label.Set.cardinal
+                (Cfg.successor_labels after ~normal:true ~exn:false),
+              after.exn )
+          with
+          | 1, None -> DLL.add_end after.body poll
+          | _ ->
+            let before = Some (Cfg.get_block_exn cfg dst) in
+            let instrs = DLL.of_list [poll] in
+            let inserted_blocks =
+              Cfg_with_layout.insert_block cfg_with_layout instrs ~after ~before
+                ~next_instruction_id
+            in
+            (* All the inserted blocks are safe since they contain a poll
+               instruction *)
+            List.iter inserted_blocks ~f:(fun block ->
+                Label.Tbl.replace safe_map block.Cfg.start true)));
         true)
       else added_poll)
     back_edges false
