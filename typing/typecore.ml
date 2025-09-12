@@ -11581,8 +11581,8 @@ let report_error ~loc env =
           (Style.as_inline_code longident) name ]
       | Application _ | Other -> sub
     in
-    Location.errorf ~loc ~sub "%a" Value.report_error e
-  | Submode_failed_alloc e -> Location.errorf ~loc "%a" Alloc.report_error e
+    Location.errorf ~loc ~sub "%a" (Value.report_error ~for_include:false) e
+  | Submode_failed_alloc e -> Location.errorf ~loc "%a" (Alloc.report_error ~for_include:false) e
   | Curried_application_complete (lbl, e, loc_kind) ->
       let Mode.Alloc.Error (ax, {left; _}) = Mode.Alloc.to_simple_error e in
       let sub =
