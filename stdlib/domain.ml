@@ -377,6 +377,8 @@ module Runtime_5 = struct
 
     let body () =
       match
+        (* Always record backtraces, even on new domains *)
+        Printexc.record_backtrace true;
         DLS.create_dls ();
         DLS.set_initial_keys pk;
         let res = f () in
