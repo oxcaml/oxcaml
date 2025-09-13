@@ -21,7 +21,7 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-	lib = pkgs.lib;
+        lib = pkgs.lib;
         oxcaml = pkgs.callPackage ./default.nix { src = self; };
       in
       {
@@ -33,6 +33,11 @@
             framePointers = true;
             runtime5 = true;
           };
+          oxcaml-asan = oxcaml.override { addressSanitizer = true; };
+          oxcaml-asan-r5 = oxcaml.override {
+            addressSanitizer = true;
+            runtime5 = true;
+          };
           default = oxcaml;
         };
 
@@ -42,6 +47,8 @@
             oxcaml-fp
             oxcaml-r5
             oxcaml-fp-r5
+            oxcaml-asan
+            oxcaml-asan-r5
             ;
         };
 
