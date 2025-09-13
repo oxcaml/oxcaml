@@ -4,7 +4,7 @@
   addressSanitizer ? false,
   dev ? false,
   flambdaInvariants ? false,
-  framePointers ? false,
+  framePointers ? addressSanitizer,
   multidomain ? false,
   ocamltest ? true,
   pollInsertion ? false,
