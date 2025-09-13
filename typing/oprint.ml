@@ -738,19 +738,29 @@ let print_type_parameter ?(non_gen=false) ppf s =
   if s = "_" then fprintf ppf "_" else ty_var ~non_gen ppf s
 
 let type_parameter ~in_parens ppf
-    {ot_non_gen=non_gen; ot_name=ty; ot_variance=var,inj;
-     ot_jkind=lay; }
+    {ot_non_gen=non_gen; ot_name=ty; ot_variance=var; ot_injectivity=inj;
+     ot_rec=rec_; ot_jkind=lay; }
   =
   let open Asttypes in
-  let format_string : _ format = "%s%s%a%a" in
-  let format_string : _ format = match lay with
-    | Some _ when not in_parens -> "(" ^^ format_string ^^ ")"
-    | _ -> format_string
+  let var_string =
+    match var with
+    | Covariant -> "+"
+    | Contravariant -> "-"
+    | NoVariance -> ""
+  in
+  let inj_string = match inj with Injective -> "!" | NoInjectivity -> "" in
+  let rec_string = if rec_ then " [@rec]" else "" in
+  let format_string : _ format = "%s%s%a%s%a" in
+  let needs_parens = (rec_ || Option.is_some lay) && not in_parens in
+  let format_string : _ format = 
+    if needs_parens then "(" ^^ format_string ^^ ")"
+    else format_string
   in
   fprintf ppf format_string
-    (match var with Covariant -> "+" | Contravariant -> "-" | NoVariance ->  "")
-    (match inj with Injective -> "!" | NoInjectivity -> "")
+    var_string
+    inj_string
     (print_type_parameter ~non_gen) ty
+    rec_string
     print_out_jkind_annot lay
 
 let print_out_class_params ppf =
