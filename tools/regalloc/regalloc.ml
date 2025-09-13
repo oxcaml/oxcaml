@@ -235,11 +235,205 @@ let should_use_linscan config cfg_with_layout =
        ~len:config.linscan_threshold
      > 0
 
-let select_allocator config cfg_with_layout =
+let custom_strategy in_stats =
+  let in_num_blocks = float in_stats.num_blocks in
+  let in_num_destruction_points = float in_stats.num_destruction_points in
+  let in_num_regs = float in_stats.num_regs in
+  let in_num_instrs = float in_stats.num_instrs in
+  let in_is_entry_function = if in_stats.is_entry_function then 1.0 else 0.0 in
+  if in_num_destruction_points <= 1.5
+  then begin
+    if in_num_regs <= 14.5
+    then begin
+      if in_num_regs <= 11.5
+      then begin
+        if in_num_destruction_points <= 0.5
+        then begin
+          if in_num_blocks <= 2.5
+          then begin
+            LS
+          end
+          else begin
+            LS
+          end
+        end
+        else begin
+          if in_num_regs <= 10.5
+          then begin
+            LS
+          end
+          else begin
+            LS
+          end
+        end
+      end
+      else begin
+        if in_num_blocks <= 2.5
+        then begin
+          if in_num_instrs <= 23.5
+          then begin
+            LS
+          end
+          else begin
+            LS
+          end
+        end
+        else begin
+          if in_num_instrs <= 19.5
+          then begin
+            LS
+          end
+          else begin
+            LS
+          end
+        end
+      end
+    end
+    else begin
+      if in_num_blocks <= 2.5
+      then begin
+        if in_num_regs <= 23.5
+        then begin
+          if in_num_instrs <= 25.5
+          then begin
+            LS
+          end
+          else begin
+            LS
+          end
+        end
+        else begin
+          if in_num_instrs <= 56.5
+          then begin
+            IRC
+          end
+          else begin
+            LS
+          end
+        end
+      end
+      else begin
+        if in_num_blocks <= 12.5
+        then begin
+          if in_is_entry_function <= 0.5
+          then begin
+            LS
+          end
+          else begin
+            IRC
+          end
+        end
+        else begin
+          if in_num_destruction_points <= 0.5
+          then begin
+            LS
+          end
+          else begin
+            LS
+          end
+        end
+      end
+    end
+  end
+  else begin
+    if in_num_destruction_points <= 2.5
+    then begin
+      if in_num_regs <= 10.5
+      then begin
+        if in_num_blocks <= 4.5
+        then begin
+          if in_num_instrs <= 10.5
+          then begin
+            IRC
+          end
+          else begin
+            LS
+          end
+        end
+        else begin
+          if in_num_instrs <= 19.5
+          then begin
+            IRC
+          end
+          else begin
+            LS
+          end
+        end
+      end
+      else begin
+        if in_num_regs <= 43.5
+        then begin
+          if in_num_regs <= 24.5
+          then begin
+            LS
+          end
+          else begin
+            IRC
+          end
+        end
+        else begin
+          if in_num_regs <= 89.5
+          then begin
+            LS
+          end
+          else begin
+            IRC
+          end
+        end
+      end
+    end
+    else begin
+      if in_num_regs <= 38.5
+      then begin
+        if in_num_instrs <= 62.5
+        then begin
+          if in_num_blocks <= 12.5
+          then begin
+            IRC
+          end
+          else begin
+            IRC
+          end
+        end
+        else begin
+          if in_num_destruction_points <= 3.5
+          then begin
+            IRC
+          end
+          else begin
+            IRC
+          end
+        end
+      end
+      else begin
+        if in_num_destruction_points <= 4.5
+        then begin
+          if in_num_regs <= 82.5
+          then begin
+            LS
+          end
+          else begin
+            IRC
+          end
+        end
+        else begin
+          if in_num_instrs <= 1060.5
+          then begin
+            IRC
+          end
+          else begin
+            LS
+          end
+        end
+      end
+    end
+  end
+
+let select_allocator config in_stats cfg_with_layout =
   match config.strategy with
   | Allocator allocator -> allocator
   | Default -> if should_use_linscan config cfg_with_layout then LS else IRC
-  | Custom -> fatal "not implemented"
+  | Custom -> custom_strategy in_stats
 
 let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
     (cmm_label : Label.t) (reg_stamp : int) (relocatable_regs : Reg.t list) =
@@ -263,7 +457,7 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
     | true -> Some (Regalloc_validate.Description.create cfg_with_layout)
   in
   let start_time = cpu_time () in
-  let allocator = select_allocator config cfg_with_layout in
+  let allocator = select_allocator config in_stats cfg_with_layout in
   let (_, rounds_ref) : Cfg_with_infos.t * int ref =
     match allocator with
     | GI -> Regalloc_gi.run cfg_with_infos, Regalloc_gi.For_testing.rounds
