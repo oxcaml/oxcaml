@@ -154,8 +154,12 @@ static_assert(
 #define BT_TERMINATE 2
 #define BT_INIT 3
 
-/* control of STW interrupts */
-struct interruptor {
+struct dom_internal {
+  /* readonly fields, initialised and never modified */
+  int id;
+  caml_domain_state* state;
+
+  /* control of STW interrupts */
   /* The outermost atomic is for synchronization with
      caml_interrupt_all_signal_safe. The innermost atomic is also for
      cross-domain communication.*/
@@ -165,25 +169,11 @@ struct interruptor {
 
   int running;
   int terminating;
+  /* indicates whether there is an interrupt pending */
+  atomic_uintnat pending;
+
   /* unlike the domain ID, this ID number is not reused */
   uintnat unique_id;
-
-  /* indicates whether there is an interrupt pending */
-  atomic_uintnat interrupt_pending;
-};
-
-Caml_inline int interruptor_has_pending(struct interruptor *s)
-{ return atomic_load_acquire(&s->interrupt_pending) != 0; }
-Caml_inline void interruptor_set_handled(struct interruptor *s)
-{ atomic_store_release(&s->interrupt_pending, 0); }
-Caml_inline void interruptor_set_pending(struct interruptor *s)
-{ atomic_store_release(&s->interrupt_pending, 1); }
-
-struct dom_internal {
-  /* readonly fields, initialised and never modified */
-  int id;
-  caml_domain_state* state;
-  struct interruptor interruptor;
 
   /* backup thread */
   int backup_thread_running;
@@ -196,7 +186,15 @@ struct dom_internal {
   uintnat minor_heap_area_start;
   uintnat minor_heap_area_end;
 };
+
 typedef struct dom_internal dom_internal;
+
+Caml_inline int domain_has_pending(dom_internal *d)
+{ return atomic_load_acquire(&d->pending) != 0; }
+Caml_inline void domain_set_handled(dom_internal *d)
+{ atomic_store_release(&d->pending, 0); }
+Caml_inline void domain_set_pending(dom_internal *d)
+{ atomic_store_release(&d->pending, 1); }
 
 static struct {
   /* enter barrier for STW sections, participating domains arrive into
@@ -283,7 +281,7 @@ static void add_next_to_stw_domains(void)
      async-signal-safe and one cannot CAMLassert inside it. */
   bool prev_has_interrupt_word = true;
   for (int i = 0; i < caml_params->max_domains; i++) {
-    bool has_interrupt_word = all_domains[i].interruptor.interrupt_word != NULL;
+    bool has_interrupt_word = all_domains[i].interrupt_word != NULL;
     if (i < stw_domains.participating_domains) CAMLassert(has_interrupt_word);
     if (!prev_has_interrupt_word) CAMLassert(!has_interrupt_word);
     prev_has_interrupt_word = has_interrupt_word;
@@ -323,9 +321,9 @@ CAMLexport caml_domain_state* caml_get_domain_state(void)
 }
 #endif
 
-Caml_inline void interrupt_domain(struct interruptor* s)
+Caml_inline void interrupt_domain(dom_internal *d)
 {
-  atomic_uintnat * interrupt_word = atomic_load_relaxed(&s->interrupt_word);
+  atomic_uintnat * interrupt_word = atomic_load_relaxed(&d->interrupt_word);
   atomic_store_release(interrupt_word, UINTNAT_MAX);
 }
 
@@ -336,24 +334,24 @@ Caml_inline void interrupt_domain_local(caml_domain_state* dom_st)
 
 int caml_incoming_interrupts_queued(void)
 {
-  return interruptor_has_pending(&domain_self->interruptor);
+  return domain_has_pending(domain_self);
 }
 
 /* must NOT be called with s->lock held */
 static void stw_handler(caml_domain_state* domain);
-static int handle_incoming(struct interruptor* s)
+static int handle_incoming(dom_internal *d)
 {
-  int handled = interruptor_has_pending(s);
+  int handled = domain_has_pending(d);
   if (handled) {
-    CAMLassert (s->running);
-    interruptor_set_handled(s);
+    CAMLassert (d->running);
+    domain_set_handled(d);
 
     stw_handler(domain_self->state);
   }
   return handled;
 }
 
-static void handle_incoming_otherwise_relax (struct interruptor* self)
+static void handle_incoming_otherwise_relax (dom_internal *self)
 {
   if (!handle_incoming(self))
     cpu_relax();
@@ -361,13 +359,13 @@ static void handle_incoming_otherwise_relax (struct interruptor* self)
 
 void caml_handle_incoming_interrupts(void)
 {
-  handle_incoming(&domain_self->interruptor);
+  handle_incoming(domain_self);
 }
 
-int caml_send_interrupt(struct interruptor* target)
+int caml_send_interrupt(dom_internal *target)
 {
   /* signal that there is an interrupt pending */
-  interruptor_set_pending(target);
+  domain_set_pending(target);
 
   /* Signal the condition variable, in case the target is
      itself waiting for an interrupt to be processed elsewhere */
@@ -563,7 +561,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 {
   dom_internal* d = 0;
   caml_domain_state* domain_state;
-  struct interruptor* s;
   uintnat stack_wsize = caml_get_init_stack_wsize(STACK_SIZE_MAIN);
 
   CAMLassert (domain_self == 0);
@@ -605,9 +602,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     goto fail_domain;
   }
 
-  s = &d->interruptor;
-  CAMLassert(!s->running);
-  CAMLassert(!interruptor_has_pending(s));
+  CAMLassert(!d->running);
+  CAMLassert(!domain_has_pending(d));
 
   /* If the chosen domain slot has not been previously used, allocate a fresh
      domain state. Otherwise, reuse it.
@@ -646,12 +642,12 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->young_limit = 0;
 
   domain_state->id = d->id;
-  domain_state->unique_id = s->unique_id;
+  domain_state->unique_id = d->unique_id;
 
   /* Synchronized with [caml_interrupt_all_signal_safe], so that the
      initializing write of young_limit happens before any
      interrupt. */
-  atomic_store_explicit(&s->interrupt_word, &domain_state->young_limit,
+  atomic_store_explicit(&d->interrupt_word, &domain_state->young_limit,
                         memory_order_release);
 
   /* Tell memprof system about the new domain before either (a) new
@@ -669,7 +665,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     goto fail_dynamic;
   }
 
-  CAMLassert(!interruptor_has_pending(s));
+  CAMLassert(!domain_has_pending(d));
 
   domain_state->allocated_dependent_bytes = 0;
   domain_state->minor_dependent_bsz = 0;
@@ -724,9 +720,9 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   /* No remaining failure cases: domain creation is going to succeed,
    * so we can update globally-visible state without needing to unwind
    * it. */
-  s->unique_id = fresh_domain_unique_id();
-  domain_state->unique_id = s->unique_id;
-  s->running = 1;
+  d->unique_id = fresh_domain_unique_id();
+  domain_state->unique_id = d->unique_id;
+  d->running = 1;
   (void)caml_atomic_counter_incr(&caml_num_domains_running);
 
   domain_state->c_stack = NULL;
@@ -803,7 +799,7 @@ fail_minor_tables:
 fail_dynamic:
   caml_memprof_delete_domain(domain_state);
 fail_memprof:
-  atomic_store_explicit(&s->interrupt_word, NULL, memory_order_release);
+  atomic_store_explicit(&d->interrupt_word, NULL, memory_order_release);
   caml_stat_free(d->state);
   d->state = NULL;
   domain_self = NULL;
@@ -888,14 +884,14 @@ static void unreserve_minor_heaps_from_stw_single(void) {
 
     CAMLassert(
       /* this domain is not running */
-      !dom->interruptor.running
+      !dom->running
       || (
         /* or its minor heap must already be uninitialized */
         dom->state != NULL
         && dom->state->young_start == NULL
         && dom->state->young_end == NULL
       ));
-    /* Note: interruptor.running does not guarantee that dom->state is
+    /* Note: dom.running does not guarantee that dom->state is
        correctly initialized, but domain initialization cannot run
        concurrently with STW sections so we cannot observe partial
        initialization states. */
@@ -1006,13 +1002,13 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
 
     dom->id = i;
 
-    dom->interruptor.interrupt_word = NULL;
-    caml_plat_mutex_init(&dom->interruptor.lock);
-    caml_plat_cond_init(&dom->interruptor.cond);
-    dom->interruptor.running = 0;
-    dom->interruptor.terminating = 0;
-    dom->interruptor.unique_id = 0;
-    dom->interruptor.interrupt_pending = 0;
+    dom->interrupt_word = NULL;
+    caml_plat_mutex_init(&dom->lock);
+    caml_plat_cond_init(&dom->cond);
+    dom->running = 0;
+    dom->terminating = 0;
+    dom->unique_id = 0;
+    dom->pending = 0;
 
     caml_plat_mutex_init(&dom->domain_lock);
     caml_plat_cond_init(&dom->domain_cond);
@@ -1079,7 +1075,6 @@ static void* backup_thread_func(void* v)
 {
   dom_internal* di = (dom_internal*)v;
   uintnat msg;
-  struct interruptor* s = &di->interruptor;
 
   domain_self = di;
   caml_state = di->state;
@@ -1103,12 +1098,12 @@ static void* backup_thread_func(void* v)
         /* Wait safely if there is nothing to do.
          * Will be woken from caml_leave_blocking_section
          */
-        caml_plat_lock_blocking(&s->lock);
+        caml_plat_lock_blocking(&di->lock);
         msg = atomic_load_acquire (&di->backup_thread_msg);
         if (msg == BT_IN_BLOCKING_SECTION &&
             !caml_incoming_interrupts_queued())
-          caml_plat_wait(&s->cond, &s->lock);
-        caml_plat_unlock(&s->lock);
+          caml_plat_wait(&di->cond, &di->lock);
+        caml_plat_unlock(&di->lock);
         break;
       case BT_ENTERING_OCAML:
         /* Main thread wants to enter OCaml
@@ -1271,15 +1266,15 @@ static void* domain_thread_func(void* v)
   p->newdom = domain_self;
 
   /* handshake with the parent domain */
-  caml_plat_lock_blocking(&p->parent->interruptor.lock);
+  caml_plat_lock_blocking(&p->parent->lock);
   if (domain_self) {
     p->status = Dom_started;
-    p->unique_id = domain_self->interruptor.unique_id;
+    p->unique_id = domain_self->unique_id;
   } else {
     p->status = Dom_failed;
   }
-  caml_plat_broadcast(&p->parent->interruptor.cond);
-  caml_plat_unlock(&p->parent->interruptor.lock);
+  caml_plat_broadcast(&p->parent->cond);
+  caml_plat_unlock(&p->parent->lock);
   /* Cannot access p below here. */
 
   if (domain_self) {
@@ -1287,7 +1282,7 @@ static void* domain_thread_func(void* v)
 
     CAML_GC_MESSAGE(DOMAIN,
                     "Domain starting (unique ID %"ARCH_INTNAT_PRINTF_FORMAT"u)\n",
-                    domain_self->interruptor.unique_id);
+                    domain_self->unique_id);
     CAML_EV_LIFECYCLE(EV_DOMAIN_SPAWN, getpid());
     /* FIXME: ignoring errors during domain initialization is unsafe
        and/or can deadlock. */
@@ -1356,18 +1351,17 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
 
   /* While waiting for the child thread to start up, we need to service any
      stop-the-world requests as they come in. */
-  struct interruptor *interruptor = &domain_self->interruptor;
-  caml_plat_lock_blocking(&interruptor->lock);
+  caml_plat_lock_blocking(&domain_self->lock);
   while (p.status == Dom_starting) {
     if (caml_incoming_interrupts_queued()) {
-      caml_plat_unlock(&interruptor->lock);
-      handle_incoming(interruptor);
-      caml_plat_lock_blocking(&interruptor->lock);
+      caml_plat_unlock(&domain_self->lock);
+      handle_incoming(domain_self);
+      caml_plat_lock_blocking(&domain_self->lock);
     } else {
-      caml_plat_wait(&interruptor->cond, &interruptor->lock);
+      caml_plat_wait(&domain_self->cond, &domain_self->lock);
     }
   }
-  caml_plat_unlock(&interruptor->lock);
+  caml_plat_unlock(&domain_self->lock);
 
   if (p.status == Dom_started) {
     /* successfully created a domain.
@@ -1390,7 +1384,7 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
 CAMLprim value caml_ml_domain_id(value unit)
 {
   CAMLnoalloc;
-  return Val_long(domain_self->interruptor.unique_id);
+  return Val_long(domain_self->unique_id);
 }
 
 CAMLprim value caml_ml_domain_index(value unit)
@@ -1708,7 +1702,7 @@ int caml_try_run_on_all_domains_with_spin_work(
   {
     int domains_participating = 0;
     for(i=0; i<caml_params->max_domains; i++) {
-      if(all_domains[i].interruptor.running)
+      if(all_domains[i].running)
         domains_participating++;
     }
     CAMLassert(domains_participating == stw_domains.participating_domains);
@@ -1720,8 +1714,8 @@ int caml_try_run_on_all_domains_with_spin_work(
   for(i = 0; i < stw_domains.participating_domains; i++) {
     dom_internal * d = stw_domains.domains[i];
     stw_request.participating[i] = d->state;
-    CAMLassert(!interruptor_has_pending(&d->interruptor));
-    if (d->state != domain_state) caml_send_interrupt(&d->interruptor);
+    CAMLassert(!domain_has_pending(d));
+    if (d->state != domain_state) caml_send_interrupt(d);
   }
 
 
@@ -1806,11 +1800,11 @@ void caml_interrupt_all_signal_safe(void)
        [interrupt_word] directly without synchronisation other than
        with other people who access the same [interrupt_word].*/
     atomic_uintnat * interrupt_word =
-      atomic_load_acquire(&d->interruptor.interrupt_word);
+      atomic_load_acquire(&d->interrupt_word);
     /* Early exit: if the current domain was never initialized, then
        neither have been any of the remaining ones. */
     if (interrupt_word == NULL) return;
-    interrupt_domain(&d->interruptor);
+    interrupt_domain(d);
   }
 }
 
@@ -1820,10 +1814,10 @@ void caml_external_interrupt_all_signal_safe(uintnat flags)
        d < &all_domains[caml_params->max_domains];
        d++) {
     atomic_uintnat * interrupt_word =
-      atomic_load_acquire(&d->interruptor.interrupt_word);
+      atomic_load_acquire(&d->interrupt_word);
     if (interrupt_word == NULL) return;
     atomic_fetch_or(&d->state->requested_external_interrupt, flags);
-    interrupt_domain(&d->interruptor);
+    interrupt_domain(d);
   }
 }
 
@@ -1850,7 +1844,7 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
   /* For non-delayable asynchronous actions, we immediately interrupt
      the domain again. */
   dom_internal * d = &all_domains[dom_st->id];
-  if (interruptor_has_pending(&d->interruptor)
+  if (domain_has_pending(d)
       || dom_st->requested_minor_gc
       || dom_st->requested_major_slice
       || dom_st->major_slice_epoch < atomic_load (&caml_major_slice_epoch)) {
@@ -2052,7 +2046,7 @@ static void caml_atfork_default(void)
 CAMLexport void (*caml_atfork_hook)(void) = caml_atfork_default;
 
 static inline int domain_terminating(dom_internal *d) {
-  return d->interruptor.terminating;
+  return d->terminating;
 }
 
 int caml_domain_terminating (caml_domain_state *dom_st)
@@ -2068,11 +2062,10 @@ int caml_domain_is_terminating (void)
 static void domain_terminate (void)
 {
   caml_domain_state* domain_state = domain_self->state;
-  struct interruptor* s = &domain_self->interruptor;
   int finished = 0;
 
   CAML_GC_MESSAGE(DOMAIN, "Domain terminating.\n");
-  s->terminating = 1;
+  domain_self->terminating = 1;
 
   /* Join ongoing systhreads, if necessary, and then run user-defined
      termination hooks. No OCaml code can run on this domain after
@@ -2111,18 +2104,18 @@ static void domain_terminate (void)
         domain_state->sweeping_done) {
 
       finished = 1;
-      s->terminating = 0;
-      s->running = 0;
+      domain_self->terminating = 0;
+      domain_self->running = 0;
 
       /* Remove this domain from stw_domains */
       remove_from_stw_domains(domain_self);
 
-      /* signal the interruptor condition variable
+      /* signal the condition variable
        * because the backup thread may be waiting on it
        */
-      caml_plat_lock_blocking(&s->lock);
-      caml_plat_broadcast(&s->cond);
-      caml_plat_unlock(&s->lock);
+      caml_plat_lock_blocking(&domain_self->lock);
+      caml_plat_broadcast(&domain_self->cond);
+      caml_plat_unlock(&domain_self->lock);
 
       CAMLassert (domain_self->backup_thread_running);
       domain_self->backup_thread_running = 0;
@@ -2146,8 +2139,7 @@ static void domain_terminate (void)
    * handed over to surviving domains. */
   caml_memprof_delete_domain(domain_state);
 
-  /* We can not touch domain_self->interruptor after here
-     because it may be reused */
+  /* We can not touch domain_self after here because it may be reused */
   caml_remove_generational_global_root(&domain_state->dls_root);
   caml_remove_generational_global_root(&domain_state->backtrace_last_exn);
   caml_stat_free(domain_state->final_info);
@@ -2194,8 +2186,7 @@ static void domain_terminate (void)
 
 CAMLprim value caml_ml_domain_cpu_relax(value t)
 {
-  struct interruptor* self = &domain_self->interruptor;
-  handle_incoming_otherwise_relax (self);
+  handle_incoming_otherwise_relax (domain_self);
 
 #ifndef POLL_INSERTION
   return caml_process_pending_actions_with_root(t);
