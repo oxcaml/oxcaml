@@ -212,7 +212,7 @@ let pseudoregs_for_operation op arg res =
   | Intop_imm ((Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz _ | Ictz _), _)
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
-      | Istore_int (_, _, _)
+      | Istore_int { const = _; addr = _; is_assignment = _ }
       | Ilfence | Isfence | Imfence
       | Ioffset_loc (_, _)
       | Irdtsc | Icldemote _ | Iprefetch _ )
@@ -277,9 +277,14 @@ let select_store ~is_assign addr (exp : Cmm.expression) :
   match exp with
   | Cconst_int (n, _dbg) when int_is_immediate n ->
     Rewritten
-      (Specific (Istore_int (Nativeint.of_int n, addr, is_assign)), Ctuple [])
+      ( Specific
+          (Istore_int
+             { const = Nativeint.of_int n; addr; is_assignment = is_assign }),
+        Ctuple [] )
   | Cconst_natint (n, _dbg) when is_immediate_natint n ->
-    Rewritten (Specific (Istore_int (n, addr, is_assign)), Ctuple [])
+    Rewritten
+      ( Specific (Istore_int { const = n; addr; is_assignment = is_assign }),
+        Ctuple [] )
   | Cconst_int _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
   | Cconst_natint (_, _)
   | Cconst_float32 (_, _)
