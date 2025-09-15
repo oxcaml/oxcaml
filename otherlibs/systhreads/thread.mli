@@ -161,7 +161,7 @@ val wait_pid : int -> int * Unix.process_status
   Per-thread signal masks are supported only by the system thread library
   under Unix, but not under Win32, nor by the VM thread library. *)
 
-val sigmask : Unix.sigprocmask_command -> int list -> int list
+val sigmask : Unix.sigprocmask_command -> int list -> int list @@ nonportable
 (** [sigmask cmd sigs] changes the set of blocked signals for the
    calling thread.
    If [cmd] is [SIG_SETMASK], blocked signals are set to those in
@@ -170,7 +170,13 @@ val sigmask : Unix.sigprocmask_command -> int list -> int list
    the set of blocked signals.
    If [cmd] is [SIG_UNBLOCK], the signals in [sigs] are removed
    from the set of blocked signals.
-   [sigmask] returns the set of previously blocked signals for the thread. *)
+   [sigmask] returns the set of previously blocked signals for the thread.
+
+   This function is nonportable because signal handlers themselves are not
+   required to be portable - we mask all signals on domains other than the main
+   domain so that signal handlers are only executed on the main domain, and it
+   is unsafe to unmask signals on domains other than the main domain.
+*)
 
 
 val wait_signal : int list -> int
