@@ -226,7 +226,7 @@ stdenv.mkDerivation rec {
     autoconf --force
   '';
 
-  checkPhase = lib.optionalString ocamltest ''
+  checkPhase = ''
     make ci
   '';
 
