@@ -434,7 +434,6 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       Function_decl_inlining_decision.make_decision ~inlining_arguments
         ~inline:(Code.inline code) ~stub:(Code.stub code) ~cost_metrics
         ~is_a_functor:(Code.is_a_functor code) ~recursive
-        ~is_my_closure_used:(Code.is_my_closure_used code)
     in
     Inlining_report.record_decision_at_function_definition ~absolute_history
       ~code_metadata:(Code.code_metadata code) ~pass:After_simplify
