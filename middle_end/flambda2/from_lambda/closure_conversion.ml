@@ -153,8 +153,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
   | Const_base (Const_untagged_char c) ->
     ( acc,
       reg_width
-        (RWC.naked_immediate
-           (Target_ocaml_int.of_char (Acc.machine_width acc) c)),
+        (RWC.naked_int8 (Numeric_types.Int8.unsigned_of_int_exn (Char.code c))),
       "untagged_char" )
   | Const_base (Const_untagged_int c) ->
     ( acc,
