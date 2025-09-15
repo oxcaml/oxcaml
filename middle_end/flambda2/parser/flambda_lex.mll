@@ -301,7 +301,7 @@ rule token = parse
     (((identchar* | quoted_ident) as cunit_ident)
      ('/' ((identchar* | quoted_ident) as cunit_linkage_name))?
      '.')?
-    ((identchar* | quoted_ident) as ident)
+    ((identchar+ | quoted_ident) as ident)
          { symbol cunit_ident cunit_linkage_name ident }
   | '%' (identchar+ as p)
          { prim ~lexbuf p }
