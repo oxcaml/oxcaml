@@ -111,6 +111,7 @@ let keyword_table =
 
     (* Constructors for static constants *)
     "Block", STATIC_CONST_BLOCK;
+    "Value_array", STATIC_CONST_VALUE_ARRAY;
     "Float_array", STATIC_CONST_FLOAT_ARRAY;
     "Float_block", STATIC_CONST_FLOAT_BLOCK;
     "Empty_array", STATIC_CONST_EMPTY_ARRAY;
