@@ -1689,18 +1689,22 @@ let close_exact_or_unknown_apply acc env
       ~current_ghost_region
   in
   let dbg = Debuginfo.from_location loc in
-  let acc, call_kind, can_erase_callee =
+  let acc, call_kind, can_erase_callee, is_my_closure_potentially_used =
     match kind with
     | Function -> (
       match (callee_approx : Env.value_approximation option) with
       | Some (Closure_approximation { code_id; code = code_or_meta; _ }) ->
         let meta = Code_or_metadata.code_metadata code_or_meta in
+        let is_my_closure_used = Code_metadata.is_my_closure_used meta in
         if Code_metadata.is_tupled meta
         then
           (* CR keryan : We could do better here since we know the arity, but we
              would have to untuple the arguments and we lack information for
              now *)
-          acc, Call_kind.indirect_function_call_unknown_arity mode, false
+          ( acc,
+            Call_kind.indirect_function_call_unknown_arity mode,
+            false,
+            is_my_closure_used )
         else
           let result_arity_from_code = Code_metadata.result_arity meta in
           if (* See comment about when this check can be done, in
@@ -1717,11 +1721,14 @@ let close_exact_or_unknown_apply acc env
               Flambda_arity.print return_arity Debuginfo.print_compact dbg
               Code_metadata.print meta;
           let can_erase_callee =
-            Flambda_features.classic_mode ()
-            && not (Code_metadata.is_my_closure_used meta)
+            Flambda_features.classic_mode () && not is_my_closure_used
           in
-          acc, Call_kind.direct_function_call code_id mode, can_erase_callee
-      | None -> acc, Call_kind.indirect_function_call_unknown_arity mode, false
+          ( acc,
+            Call_kind.direct_function_call code_id mode,
+            can_erase_callee,
+            is_my_closure_used )
+      | None ->
+        acc, Call_kind.indirect_function_call_unknown_arity mode, false, true
       | Some
           ( Value_unknown | Value_symbol _ | Value_const _
           | Block_approximation _ ) ->
@@ -1730,7 +1737,8 @@ let close_exact_or_unknown_apply acc env
       let acc, obj = find_simple acc env obj in
       ( acc,
         Call_kind.method_call (Call_kind.Method_kind.from_lambda kind) ~obj mode,
-        false )
+        false,
+        true )
   in
   let acc, apply_exn_continuation =
     close_exn_continuation acc env exn_continuation
@@ -1754,7 +1762,7 @@ let close_exact_or_unknown_apply acc env
   in
   if Flambda_features.classic_mode ()
   then
-    if !Clflags.jsir
+    if !Clflags.jsir && is_my_closure_potentially_used
     then
       let apply =
         Apply.with_inlined_attribute apply
