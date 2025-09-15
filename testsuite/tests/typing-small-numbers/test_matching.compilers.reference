@@ -1,2 +1,37 @@
-val x : int = 0
+val zero : int = 0
+val one : int = 1
+Line 5, characters 4-8:
+5 |   | #'c' -> 4
+        ^^^^
+Warning 11 [redundant-case]: this match case is unused.
+
+val three : int = 3
+val thirty : int = 30
+val forty : int = 40
+val fifty : int = 50
+val eighty : int = 80
+val one_hundred : int = 100
+Line 5, characters 4-14:
+5 |   | #'f'..#'t' -> 300
+        ^^^^^^^^^^
+Warning 11 [redundant-case]: this match case is unused.
+
+val two_hundred : int = 200
+Lines 3-4, characters 2-21:
+3 | ..match #'m' with
+4 |   | #'a'..#'z' -> 500
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+_
+
+val five_hundred : int = 500
+Lines 3-5, characters 2-27:
+3 | ..match #'\x99' with
+4 |   | #'\x00'..#'\x80' -> 600
+5 |   | #'\x81'..#'\xff' -> 700
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+_
+
+val seven_hundred : int = 700
 
