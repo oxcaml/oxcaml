@@ -78,7 +78,9 @@ boot_targets = \
   $(boot_ocamlmklib) \
   $(boot_ocamldep) \
   $(boot_ocamlobjinfo) \
-  ocamltest/ocamltest.native
+  $(boot_js_of_ocaml) \
+  $(boot_jsoo_minify) \
+  ocamltest/ocamltest.native \
 
 boot-compiler: _build/_bootinstall
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
@@ -101,7 +103,7 @@ runtime-stdlib: boot-compiler
 # This target is a polling version of "make runtime-stdlib"
 .PHONY: runtime-stdlib-hacking
 runtime-stdlib-hacking: boot-compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build -w $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
+	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build -w $(ws_runstd) --only-packages=ocaml_runtime_stdlib,js_of_ocaml-compiler @install
 
 compiler: runtime-stdlib
 	RUNTIME_DIR=$(RUNTIME_DIR) SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
@@ -192,11 +194,13 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	ln -sf ../../default/$(boot_ocamlopt) _build/_bootinstall/bin/ocamlopt.opt
 	ln -sf ../../default/$(boot_ocamlc) _build/_bootinstall/bin/ocamlc.opt
 	ln -sf ../../default/$(boot_ocamlj) _build/_bootinstall/bin/ocamlj.opt
+	ln -sf ../../default/$(boot_js_of_ocaml) _build/_bootinstall/bin/js_of_ocaml.opt
+	ln -sf ../../default/$(boot_jsoo_minify) _build/_bootinstall/bin/jsoo_minify.opt
 	ln -sf ../../default/$(boot_ocamlmklib) _build/_bootinstall/bin/ocamlmklib.opt
 	ln -sf ../../default/$(boot_ocamldep) _build/_bootinstall/bin/ocamldep.opt
 	ln -sf ../../default/$(boot_ocamlobjinfo) _build/_bootinstall/bin/ocamlobjinfo.opt
 	ln -sf "`which ocamllex`" _build/_bootinstall/bin/ocamllex.opt
-	for prog in ocamlopt ocamlj ocamlc ocamllex ocamldep ocamlmklib; do \
+	for prog in ocamlopt ocamlc ocamlj js_of_ocaml jsoo_minify ocamllex ocamldep ocamlmklib; do \
 	  ln -sf "$$prog.opt" "_build/_bootinstall/bin/$$prog"; \
 	done
 
@@ -483,7 +487,8 @@ boot-_install: runtime-stdlib
 	# can't use a hard link here because ocamllex comes from the system and
 	# is possibly on a different device
 	ln -sf $(realpath _build/_bootinstall/bin/ocamllex.opt) _install/bin/ocamllex.opt
-	$(cpl) _build/_bootinstall/bin/ocaml{c,opt,mklib,dep,objinfo}.opt _install/bin/
+	$(cpl) _build/_bootinstall/bin/ocaml{j,c,opt,mklib,dep,objinfo}.opt _install/bin/
+	$(cpl) _build/_bootinstall/bin/{js_of_ocaml,jsoo_minify} _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
 	$(cpl) -R _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/* \
     _install/lib/ocaml/
