@@ -66,9 +66,7 @@ type t =
   ; target_env : Target_env.t
   ; (* toplevel *)
     dynlink : bool
-  ; linkall : bool
   ; toplevel : bool
-  ; export_file : string option
   ; no_cmis : bool
   ; (* filesystem *)
     include_dirs : string list
@@ -202,13 +200,6 @@ let options =
     in
     Arg.(value & flag & info [ "toplevel" ] ~docs:toplevel_section ~doc)
   in
-  let export_file =
-    let doc =
-      "File containing the list of unit to export in a toplevel, with Dynlink or with \
-       --linkall. If absent, all units will be exported."
-    in
-    Arg.(value & opt (some string) None & info [ "export" ] ~docs:toplevel_section ~doc)
-  in
   let dynlink =
     let doc =
       "Enable dynlink of bytecode files.  Use this if you want to be able to use the \
@@ -216,13 +207,6 @@ let options =
        'js_of_ocaml-compiler.dynlink'."
     in
     Arg.(value & flag & info [ "dynlink" ] ~doc)
-  in
-  let linkall =
-    let doc =
-      "Link all primitives and compilation units. Exported compilation units can be \
-       configured with '--export'."
-    in
-    Arg.(value & flag & info [ "linkall" ] ~doc)
   in
   let no_cmis =
     let doc = "Do not include cmis when compiling toplevel." in
@@ -283,9 +267,7 @@ let options =
       set_param
       set_env
       dynlink
-      linkall
       toplevel
-      export_file
       wrap_with_fun
       include_dirs
       fs_files
@@ -353,10 +335,8 @@ let options =
       ; static_env
       ; wrap_with_fun
       ; dynlink
-      ; linkall
       ; target_env
       ; toplevel
-      ; export_file
       ; include_dirs
       ; runtime_files
       ; no_runtime
@@ -379,9 +359,7 @@ let options =
       $ set_param
       $ set_env
       $ dynlink
-      $ linkall
       $ toplevel
-      $ export_file
       $ wrap_with_function
       $ include_dirs
       $ fs_files
@@ -606,10 +584,8 @@ let options_runtime_only =
       ; static_env
       ; wrap_with_fun
       ; dynlink = false
-      ; linkall = false
       ; target_env
       ; toplevel
-      ; export_file = None
       ; include_dirs
       ; runtime_files
       ; no_runtime

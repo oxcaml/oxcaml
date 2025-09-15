@@ -4,7 +4,7 @@
 }:
 with pkgs;
 let
-  ocamlPackages = pkgs.ocaml-ng.ocamlPackages_latest.overrideScope (
+  ocamlPackages = pkgs.ocaml-ng.ocamlPackages_4_14.overrideScope (
     self: super: {
       dune_3 =
         if lib.versionAtLeast super.dune_3.version "3.19" then

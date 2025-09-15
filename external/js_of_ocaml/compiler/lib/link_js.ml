@@ -312,7 +312,7 @@ let link
             u.Unit_info.provides));
 
   let build_info_emitted = ref false in
-  List.iter files ~f:(fun (file, ic, (build_info_for_file, units)) ->
+  List.iter files ~f:(fun (file, ic, (build_info_for_file, _units)) ->
       Dune_action_trace.add_trace_event_if_enabled
         ~event_tracing_context
         ~category:"jsoo.link.driver"

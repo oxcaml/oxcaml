@@ -21,10 +21,6 @@
 open! Stdlib
 open Code
 
-let debug_parser = Debug.find "parser"
-
-let debug_sourcemap = Debug.find "sourcemap"
-
 let times = Debug.find "times"
 
 let predefined_exceptions =
@@ -35,7 +31,7 @@ module Debug = struct
 
   type ml_unit =
     { module_name : string
-    ; paths : string list
+    ; paths : path list
     }
   [@@ocaml.warning "-unused-field"]
 
@@ -103,7 +99,7 @@ type cmja_compilation_unit =
 
 type cmja_library = { lib_units : cmja_compilation_unit list }
 
-let from_cmj ic ~name ~log_times =
+let from_cmj ic ~name =
   let timer = Timer.make () in
   let { program; last_var; imported_compilation_units; exported_compilation_unit } :
       cmj_body =
@@ -111,7 +107,7 @@ let from_cmj ic ~name ~log_times =
   in
   Code.invariant program;
   Code.Var.set_last ~min:last_var;
-  if log_times then Format.eprintf "  parsing: %a (%s)@." Timer.print timer name;
+  if times () then Format.eprintf "  parsing: %a (%s)@." Timer.print timer name;
   let code : one =
     (* CR-soon selee: currently [ocamlj] does not pass any debug-related information.
        This should be changed in the [.cmj] file format. *)
@@ -124,21 +120,20 @@ let from_cmj ic ~name ~log_times =
   in
   { name; info = uinfo; contents = code }
 
-let from_cmja ic ~log_times =
+let from_cmja ic =
   (* CR jvanburen: stop loading everything at once *)
   let toc_pos = input_binary_int ic in
   seek_in ic toc_pos;
   let { lib_units } : cmja_library = input_value ic in
   List.map lib_units ~f:(fun { cu_name; cu_pos; cu_codesize = _ } ->
       seek_in ic cu_pos;
-      from_cmj ic ~name:cu_name ~log_times)
+      from_cmj ic ~name:cu_name)
 
 let load
     ~filename
     ~include_dirs:(_ : string list)
     ~include_cmis:(_ : bool)
-    ~debug:(_ : bool)
-    ~log_times =
+    ~debug:(_ : bool) =
   let ic = open_in_bin filename in
   Fun.protect
     (fun () ->
@@ -152,8 +147,8 @@ let load
         when Config.Flag.check_magic ()
              && not (Magic_number.equal magic (Magic_number.current kind)) ->
           bad_magic_number ()
-      | `Cmj -> `Cmj (from_cmj ic ~name ~log_times)
-      | `Cmja -> `Cmja (from_cmja ic ~log_times))
+      | `Cmj -> `Cmj (from_cmj ic ~name)
+      | `Cmja -> `Cmja (from_cmja ic))
     ~finally:(fun () -> close_in ic)
 
 let predefined_exceptions () =

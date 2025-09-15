@@ -49,7 +49,6 @@ val load :
   -> include_dirs:string list (** unused *)
   -> include_cmis:bool (** unused *)
   -> debug:bool (** unused *)
-  -> log_times:bool
   -> [ `Cmj of compilation_unit | `Cmja of compilation_unit list ]
 
 val predefined_exceptions : unit -> Code.program * Unit_info.t

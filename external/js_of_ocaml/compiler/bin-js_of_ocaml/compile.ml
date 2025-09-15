@@ -141,7 +141,6 @@ let run
     ; static_env
     ; wrap_with_fun
     ; dynlink
-    ; linkall
     ; target_env
     ; toplevel
     ; no_cmis
@@ -149,7 +148,6 @@ let run
     ; fs_files
     ; fs_output
     ; fs_external
-    ; export_file
     ; keep_unit_names
     ; include_runtime
     ; effects
@@ -371,7 +369,6 @@ let run
           ~include_dirs
           ~include_cmis
           ~debug:need_debug
-          ~log_times:(times ())
       with
       | `Cmj cmj ->
           output_gen

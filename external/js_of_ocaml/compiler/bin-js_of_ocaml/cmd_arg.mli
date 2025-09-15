@@ -39,9 +39,7 @@ type t =
   ; target_env : Target_env.t
   ; (* toplevel *)
     dynlink : bool
-  ; linkall : bool
   ; toplevel : bool
-  ; export_file : string option
   ; no_cmis : bool
   ; (* filesystem *)
     include_dirs : string list
