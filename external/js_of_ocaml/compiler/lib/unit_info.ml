@@ -46,22 +46,19 @@ let of_primitives ~aliases l =
   ; effects_without_cps = false
   }
 
-let of_cmo (cmo : Cmo_format.compilation_unit) =
-  let open Ocaml_compiler in
-  (* A packed librariy register global for packed modules. *)
-  let provides = StringSet.of_list (Cmo_format.name cmo :: Cmo_format.provides cmo) in
-  let requires = StringSet.of_list (Cmo_format.requires cmo) in
-  let requires = StringSet.diff requires provides in
-  let effects_without_cps =
-    (match Config.effects () with
-    | `Disabled | `Jspi -> true
-    | `Cps | `Double_translation -> false)
-    && List.exists (Cmo_format.primitives cmo) ~f:(function
-         | "%resume" | "%reperform" | "%perform" -> true
-         | _ -> false)
+let of_compilation_units ~exported ~imported =
+  let provides = StringSet.singleton (Compilation_unit.name_as_string exported) in
+  let requires =
+    StringSet.of_list (List.map imported ~f:Compilation_unit.name_as_string)
   in
-  let force_link = Cmo_format.force_link cmo in
-  { provides; requires; aliases = []; primitives = []; force_link; effects_without_cps }
+  let requires = StringSet.diff requires provides in
+  { provides
+  ; requires
+  ; aliases = []
+  ; primitives = [] (* CR-soon selee: these should be populated properly, too *)
+  ; force_link = false
+  ; effects_without_cps = false
+  }
 
 let union t1 t2 =
   let provides = StringSet.union t1.provides t2.provides in

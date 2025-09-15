@@ -25,7 +25,7 @@ module Debug : sig
 
   val is_empty : summary -> bool
 
-  val default_summary : summary
+  val default_summary : unit -> summary
 
   val paths : summary -> units:StringSet.t -> StringSet.t
 end
@@ -36,51 +36,20 @@ type one =
   ; debug : Debug.summary
   }
 
-module Toc : sig
-  type t
+type compilation_unit =
+  { name : string
+  ; info : Unit_info.t
+  ; contents : one
+  }
 
-  val read : in_channel -> t
-end
+val primitives : one -> string list
 
-val read_primitives : Toc.t -> in_channel -> string list
-
-val from_exe :
-     ?includes:string list
-  -> linkall:bool
-  -> link_info:bool
-  -> include_cmis:bool
-  -> ?exported_unit:string list
-  -> ?debug:bool
-  -> in_channel
-  -> one
-
-val from_cmo :
-     ?includes:string list
-  -> ?include_cmis:bool
-  -> ?debug:bool
-  -> Cmo_format.compilation_unit
-  -> in_channel
-  -> one
-
-val from_cma :
-     ?includes:string list
-  -> ?include_cmis:bool
-  -> ?debug:bool
-  -> Cmo_format.library
-  -> in_channel
-  -> one
-
-val from_channel :
-     in_channel
-  -> [ `Cmo of Cmo_format.compilation_unit | `Cma of Cmo_format.library | `Exe ]
-
-val from_string :
-  prims:string array -> debug:Instruct.debug_event list array -> string -> Code.program
+val load :
+     filename:string
+  -> include_dirs:string list (** unused *)
+  -> include_cmis:bool (** unused *)
+  -> debug:bool (** unused *)
+  -> log_times:bool
+  -> [ `Cmj of compilation_unit | `Cmja of compilation_unit list ]
 
 val predefined_exceptions : unit -> Code.program * Unit_info.t
-
-val link_info :
-     symbols:Ocaml_compiler.Symtable.GlobalMap.t
-  -> primitives:StringSet.t
-  -> crcs:(string * Digest.t option) list
-  -> Code.program

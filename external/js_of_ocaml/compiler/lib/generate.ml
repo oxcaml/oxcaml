@@ -466,6 +466,7 @@ let rec constant_rec ~ctx x level instrs =
       | Byte x -> Share.get_byte_string str_js_byte x ctx.Ctx.share, instrs
       | Utf (Utf8 x) -> Share.get_utf_string str_js_utf8 x ctx.Ctx.share, instrs)
   | Float f -> float_const f, instrs
+  | Float32 f -> float_const f, instrs
   | Float_array a ->
       ( Mlvalue.Array.make
           ~tag:Obj.double_array_tag
@@ -523,6 +524,7 @@ let rec constant_rec ~ctx x level instrs =
           Mlvalue.Block.make ~tag ~args:l, instrs)
   | Int i -> targetint i, instrs
   | Int32 i | NativeInt i -> targetint (Targetint.of_int32_exn i), instrs
+  | Null -> s_var "null", instrs
 
 let constant ~ctx x level =
   let expr, instr = constant_rec ~ctx x level [] in
@@ -1141,6 +1143,7 @@ let register_bin_math_prim name prim =
       J.call (J.dot (s_var "Math") prim) [ cx; cy ] loc)
 
 let _ =
+  register_un_prim "%identity" `Pure (fun cx _ -> cx);
   register_un_prim_ctx "%caml_format_int_special" `Pure (fun ctx cx loc ->
       let s = J.EBin (J.Plus, str_js_utf8 "", cx) in
       ocaml_string ~ctx ~loc s);
@@ -1149,6 +1152,8 @@ let _ =
     [ "caml_array_unsafe_get"
     ; "caml_array_unsafe_get_float"
     ; "caml_floatarray_unsafe_get"
+    ; "caml_array_unsafe_get_indexed_by_int32"
+    ; "caml_array_unsafe_get_indexed_by_nativeint"
     ]
     `Mutable
     (fun cx cy _ -> Mlvalue.Array.field cx cy);
@@ -1158,6 +1163,8 @@ let _ =
     ; "caml_int32_to_float"
     ; "caml_nativeint_of_int"
     ; "caml_nativeint_to_int"
+    ; "caml_checked_nativeint_to_int"
+    ; "caml_checked_int32_to_int"
     ; "caml_nativeint_to_int32"
     ; "caml_nativeint_of_int32"
     ; "caml_nativeint_to_float"
@@ -1226,6 +1233,14 @@ let _ =
   register_bin_prim "caml_le_float" `Pure (fun cx cy _ -> bool (J.EBin (J.Le, cx, cy)));
   register_bin_prim "caml_gt_float" `Pure (fun cx cy _ -> bool (J.EBin (J.Lt, cy, cx)));
   register_bin_prim "caml_lt_float" `Pure (fun cx cy _ -> bool (J.EBin (J.Lt, cx, cy)));
+  register_bin_prim "caml_eq_float32" `Pure (fun cx cy _ ->
+      bool (J.EBin (J.EqEq, cx, cy)));
+  register_bin_prim "caml_neq_float32" `Pure (fun cx cy _ ->
+      bool (J.EBin (J.NotEq, cx, cy)));
+  register_bin_prim "caml_ge_float32" `Pure (fun cx cy _ -> bool (J.EBin (J.Le, cy, cx)));
+  register_bin_prim "caml_le_float32" `Pure (fun cx cy _ -> bool (J.EBin (J.Le, cx, cy)));
+  register_bin_prim "caml_gt_float32" `Pure (fun cx cy _ -> bool (J.EBin (J.Lt, cy, cx)));
+  register_bin_prim "caml_lt_float32" `Pure (fun cx cy _ -> bool (J.EBin (J.Lt, cx, cy)));
   register_bin_prim "caml_add_float" `Pure (fun cx cy _ -> J.EBin (J.Plus, cx, cy));
   register_bin_prim "caml_sub_float" `Pure (fun cx cy _ -> J.EBin (J.Minus, cx, cy));
   register_bin_prim "caml_mul_float" `Pure (fun cx cy _ -> J.EBin (J.Mul, cx, cy));
@@ -1237,6 +1252,8 @@ let _ =
     ; "caml_array_unsafe_set_float"
     ; "caml_floatarray_unsafe_set"
     ; "caml_array_unsafe_set_addr"
+    ; "caml_array_unsafe_set_indexed_by_int32"
+    ; "caml_array_unsafe_set_indexed_by_nativeint"
     ]
     `Mutator
     (fun cx cy cz _ -> J.EBin (J.Eq, Mlvalue.Array.field cx cy, cz));
@@ -1282,7 +1299,9 @@ let _ =
       bool (J.EBin (J.EqEqEq, cx, cy)));
   register_bin_prim "caml_js_instanceof" `Mutator (fun cx cy _ ->
       bool (J.EBin (J.InstanceOf, cx, cy)));
-  register_un_prim "caml_js_typeof" `Mutator (fun cx _ -> J.EUn (J.Typeof, cx))
+  register_un_prim "caml_js_typeof" `Mutator (fun cx _ -> J.EUn (J.Typeof, cx));
+  register_un_prim "caml_with_async_exns" `Mutator (fun closure loc ->
+      J.call closure [ int 0 ] loc)
 
 (****)
 (* when raising ocaml exception and [improved_stacktrace] is enabled,
@@ -1519,12 +1538,15 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
         | Extern "caml_alloc_dummy_function", _ -> assert false
         | Extern ("%resume" | "%perform" | "%reperform"), _ ->
             assert (not (cps_transform ()));
+            (* CR-soon mshinwell: This is a temporary hack for the period when the
+               [Effect] module is in [Stdlib], but no code is actually using it. *)
+            (*
             if not !(ctx.effect_warning)
             then (
               warn
                 "Warning: your program contains effect handlers; you should probably run \
                  js_of_ocaml with option '--effects=cps'@.";
-              ctx.effect_warning := true);
+              ctx.effect_warning := true); *)
             let name = "jsoo_effect_not_supported" in
             let prim = Share.get_prim (runtime_fun ctx) name ctx.Ctx.share in
             let* () = info ~need_loc:true (kind (Primitive.kind name)) in

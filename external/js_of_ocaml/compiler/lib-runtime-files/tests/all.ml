@@ -21,6 +21,7 @@ let%expect_test _ =
     +dynlink.js
     +effect.js
     +fail.js
+    +float32.js
     +format.js
     +fs.js
     +fs_fake.js
@@ -40,10 +41,12 @@ let%expect_test _ =
     +mlBytes.js
     +nat.js
     +obj.js
+    +ocamlj.js
     +parsing.js
     +prng.js
     +runtime_events.js
     +stdlib.js
+    +stdlib_modern.js
     +str.js
     +sync.js
     +sys.js
@@ -64,6 +67,7 @@ let%expect_test _ =
     +domain.js
     +effect.js
     +fail.js
+    +float32.js
     +format.js
     +fs.js
     +fs_fake.js
@@ -83,6 +87,7 @@ let%expect_test _ =
     +mlBytes.js
     +nat.js
     +obj.js
+    +ocamlj.js
     +parsing.js
     +prng.js
     +runtime_events.js
@@ -97,4 +102,6 @@ let%expect_test _ =
   printl extra;
   [%expect {|
     +dynlink.js
-    +toplevel.js |}]
+    +stdlib_modern.js
+    +toplevel.js
+    |}]

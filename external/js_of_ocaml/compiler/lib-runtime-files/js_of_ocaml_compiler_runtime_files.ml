@@ -33,6 +33,7 @@ let runtime =
     ; graphics
     ; hash
     ; ieee_754
+    ; float32
     ; int64
     ; ints
     ; io
@@ -44,6 +45,7 @@ let runtime =
     ; mlBytes
     ; nat
     ; obj
+    ; ocamlj
     ; parsing
     ; stdlib
     ; sys

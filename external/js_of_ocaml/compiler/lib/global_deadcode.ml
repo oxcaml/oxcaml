@@ -434,7 +434,7 @@ let solver vars uses defs live_vars scoped_live_vars =
     + They are returned; or
     + They are applied to a function.
  *)
-let zero prog sentinal live_table =
+let zero prog pure_funs sentinal live_table =
   let compact_vars vars =
     let i = ref (Array.length vars - 1) in
     while !i >= 0 && Var.equal vars.(!i) sentinal do
@@ -483,13 +483,17 @@ let zero prog sentinal live_table =
       (* Zero out return values in last instruction, otherwise do nothing. *)
       match block.branch with
       | Return x ->
-          let tc =
-            (* We don't want to break tailcalls. *)
+          let live_tc =
+            (* Don't break tailcalls, it's needed for generate_closure
+               and effects passes.  If the (tail)call is dead, it will
+               be eliminated later by the deadcode pass, don't make it live again by
+               returning its result. *)
             match List.last body with
-            | Some (Let (x', Apply _)) when Code.Var.equal x' x -> true
+            | Some (Let (x', (Apply _ as e))) ->
+                Code.Var.equal x x' && (is_live x' || not (Pure_fun.pure_expr pure_funs e))
             | Some _ | None -> false
           in
-          if tc then Return x else Return (zero_var x)
+          if live_tc then Return x else Return (zero_var x)
       | Raise (_, _)
       | Stop | Branch _
       | Cond (_, _, _)
@@ -581,7 +585,7 @@ let f p ~deadcode_sentinal global_info =
     Print.print_uses uses;
     Print.print_live_tbl live_table);
   (* Zero out dead fields *)
-  let p = zero p deadcode_sentinal live_table in
+  let p = zero p pure_funs deadcode_sentinal live_table in
   if debug ()
   then (
     Format.eprintf "After Zeroing:@.";

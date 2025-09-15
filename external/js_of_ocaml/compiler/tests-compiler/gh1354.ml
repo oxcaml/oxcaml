@@ -63,7 +63,7 @@ with Exit ->
         _b_ = _a_,
         _d_ =
           [0, [4, 0, 0, 0, [12, 10, 0]], runtime.caml_string_of_jsbytes("%d\n")];
-       try{0; _b_ = _a_ + 1 | 0; throw caml_maybe_attach_backtrace(Stdlib[3], 1);}
+       try{0; _b_ = _a_ + 1 | 0; throw caml_maybe_attach_backtrace(Stdlib[3], 0);}
        catch(_e_){
         var _c_ = caml_wrap_exception(_e_);
         if(_c_ !== Stdlib[3]) throw caml_maybe_attach_backtrace(_c_, 0);
@@ -145,11 +145,11 @@ with Exit ->
          0;
          _f_ = _g_;
          _a_ = _g_;
-         throw caml_maybe_attach_backtrace(Stdlib[3], 1);
+         throw caml_maybe_attach_backtrace(Stdlib[3], 0);
         }
         catch(_j_){
          caml_call3(Stdlib_Printf[3], _i_, _f_ | 0, _d_);
-         throw caml_maybe_attach_backtrace(Stdlib[3], 1);
+         throw caml_maybe_attach_backtrace(Stdlib[3], 0);
         }
        }
        catch(_i_){
@@ -222,11 +222,11 @@ with Exit ->
          0;
          _d_ = _e_;
          _b_ = _e_;
-         throw caml_maybe_attach_backtrace(Stdlib[3], 1);
+         throw caml_maybe_attach_backtrace(Stdlib[3], 0);
         }
         catch(_h_){
          caml_call2(Stdlib_Printf[3], _g_, _d_);
-         throw caml_maybe_attach_backtrace(Stdlib[3], 1);
+         throw caml_maybe_attach_backtrace(Stdlib[3], 0);
         }
        }
        catch(_g_){

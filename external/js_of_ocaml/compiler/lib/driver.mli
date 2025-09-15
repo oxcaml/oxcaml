@@ -47,13 +47,6 @@ val f' :
   -> Code.program
   -> unit
 
-val from_string :
-     prims:string array
-  -> debug:Instruct.debug_event list array
-  -> string
-  -> Pretty_print.t
-  -> unit
-
 val link_and_pack :
      ?standalone:bool
   -> ?wrap_with_fun:[ `Iife | `Anonymous | `Named of string ]

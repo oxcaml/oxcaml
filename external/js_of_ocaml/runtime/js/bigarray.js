@@ -43,6 +43,7 @@ function caml_ba_get_size(dims) {
 }
 
 //Provides: caml_unpackFloat16
+//Alias: caml_double_of_float16
 var caml_unpackFloat16 = (function () {
   var pow = Math.pow;
 
@@ -73,6 +74,7 @@ var caml_unpackFloat16 = (function () {
 })();
 
 //Provides: caml_packFloat16
+//Alias: caml_float16_of_double
 var caml_packFloat16 = (function () {
   const INVERSE_OF_EPSILON = 1 / Number.EPSILON;
 
@@ -548,7 +550,14 @@ function caml_ba_get_generic(ba, i) {
   return ba.get(ofs);
 }
 
+//Provides: caml_ba_get_raw_unsafe
+function caml_ba_get_raw_unsafe(ba, i) {
+  return ba.get(i);
+}
+
 //Provides: caml_ba_uint8_get16
+//Alias: caml_ba_uint8_get16_indexed_by_int32
+//Alias: caml_ba_uint8_get16_indexed_by_nativeint
 //Requires: caml_array_bound_error
 function caml_ba_uint8_get16(ba, i0) {
   var ofs = ba.offset(i0);
@@ -558,7 +567,15 @@ function caml_ba_uint8_get16(ba, i0) {
   return b1 | (b2 << 8);
 }
 
+//Provides: caml_ba_uint8_get16_indexed_by_int64
+//Requires: caml_checked_int64_to_int, caml_ba_uint8_get16
+function caml_ba_uint8_get16_indexed_by_int64(s, i) {
+  return caml_ba_uint8_get16(s, caml_checked_int64_to_int(i))
+}
+
 //Provides: caml_ba_uint8_get32
+//Alias: caml_ba_uint8_get32_indexed_by_int32
+//Alias: caml_ba_uint8_get32_indexed_by_nativeint
 //Requires: caml_array_bound_error
 function caml_ba_uint8_get32(ba, i0) {
   var ofs = ba.offset(i0);
@@ -570,7 +587,15 @@ function caml_ba_uint8_get32(ba, i0) {
   return (b1 << 0) | (b2 << 8) | (b3 << 16) | (b4 << 24);
 }
 
+//Provides: caml_ba_uint8_get32_indexed_by_int64
+//Requires: caml_checked_int64_to_int, caml_ba_uint8_get32
+function caml_ba_uint8_get32_indexed_by_int64(s, i) {
+  return caml_ba_uint8_get32(s, caml_checked_int64_to_int(i))
+}
+
 //Provides: caml_ba_uint8_get64
+//Alias: caml_ba_uint8_get64_indexed_by_int32
+//Alias: caml_ba_uint8_get64_indexed_by_nativeint
 //Requires: caml_array_bound_error, caml_int64_of_bytes
 function caml_ba_uint8_get64(ba, i0) {
   var ofs = ba.offset(i0);
@@ -584,6 +609,12 @@ function caml_ba_uint8_get64(ba, i0) {
   var b7 = ba.get(ofs + 6);
   var b8 = ba.get(ofs + 7);
   return caml_int64_of_bytes([b8, b7, b6, b5, b4, b3, b2, b1]);
+}
+
+//Provides: caml_ba_uint8_get64_indexed_by_int64
+//Requires: caml_checked_int64_to_int, caml_ba_uint8_get64
+function caml_ba_uint8_get64_indexed_by_int64(s, i) {
+  return caml_ba_uint8_get64(s, caml_checked_int64_to_int(i))
 }
 
 //Provides: caml_ba_get_1
@@ -608,7 +639,15 @@ function caml_ba_set_generic(ba, i, v) {
   return 0;
 }
 
+//Provides: caml_ba_set_raw_unsafe
+function caml_ba_set_raw_unsafe(ba, i, v) {
+  ba.set(i, v);
+  return 0;
+}
+
 //Provides: caml_ba_uint8_set16
+//Alias: caml_ba_uint8_set16_indexed_by_int32
+//Alias: caml_ba_uint8_set16_indexed_by_nativeint
 //Requires: caml_array_bound_error
 function caml_ba_uint8_set16(ba, i0, v) {
   var ofs = ba.offset(i0);
@@ -618,7 +657,15 @@ function caml_ba_uint8_set16(ba, i0, v) {
   return 0;
 }
 
+//Provides: caml_ba_uint8_set16_indexed_by_int64
+//Requires: caml_checked_int64_to_int, caml_ba_uint8_set16
+function caml_ba_uint8_set16_indexed_by_int64(s, i, v) {
+  return caml_ba_uint8_set16(s, caml_checked_int64_to_int(i), v)
+}
+
 //Provides: caml_ba_uint8_set32
+//Alias: caml_ba_uint8_set32_indexed_by_int32
+//Alias: caml_ba_uint8_set32_indexed_by_nativeint
 //Requires: caml_array_bound_error
 function caml_ba_uint8_set32(ba, i0, v) {
   var ofs = ba.offset(i0);
@@ -630,7 +677,15 @@ function caml_ba_uint8_set32(ba, i0, v) {
   return 0;
 }
 
+//Provides: caml_ba_uint8_set32_indexed_by_int64
+//Requires: caml_checked_int64_to_int, caml_ba_uint8_set32
+function caml_ba_uint8_set32_indexed_by_int64(s, i, v) {
+  return caml_ba_uint8_set32(s, caml_checked_int64_to_int(i), v)
+}
+
 //Provides: caml_ba_uint8_set64
+//Alias: caml_ba_uint8_set64_indexed_by_int32
+//Alias: caml_ba_uint8_set64_indexed_by_nativeint
 //Requires: caml_array_bound_error, caml_int64_to_bytes
 function caml_ba_uint8_set64(ba, i0, v) {
   var ofs = ba.offset(i0);
@@ -638,6 +693,12 @@ function caml_ba_uint8_set64(ba, i0, v) {
   var v = caml_int64_to_bytes(v);
   for (var i = 0; i < 8; i++) ba.set(ofs + i, v[7 - i]);
   return 0;
+}
+
+//Provides: caml_ba_uint8_set64_indexed_by_int64
+//Requires: caml_checked_int64_to_int, caml_ba_uint8_set64
+function caml_ba_uint8_set64_indexed_by_int64(s, i, v) {
+  return caml_ba_uint8_set64(s, caml_checked_int64_to_int(i), v)
 }
 
 //Provides: caml_ba_set_1

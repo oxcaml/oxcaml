@@ -95,7 +95,7 @@ module Flag = struct
 
   let safe_string = o ~name:"safestring" ~default:true
 
-  let use_js_string = o ~name:"use-js-string" ~default:true
+  let use_js_string = o ~name:"use-js-string" ~default:false
 
   let check_magic = o ~name:"check-magic-number" ~default:true
 
@@ -221,7 +221,7 @@ let effects_ : [< `None | effects_backend ] ref = ref `None
 
 let effects () =
   match !effects_ with
-  | `None -> failwith "effects was not set"
+  | `None -> `Disabled
   | (`Jspi | `Cps | `Disabled | `Double_translation) as b -> b
 
 let set_effects_backend (backend : effects_backend) =

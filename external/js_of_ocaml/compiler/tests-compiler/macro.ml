@@ -84,7 +84,7 @@ let%expect_test "BLOCK(0779, a)" =
 
 let%expect_test "TAG(a)" =
   print_macro_transformed "TAG(a)";
-  [%expect {| a[0]; |}]
+  [%expect {| a?.[0]; |}]
 
 let%expect_test "LENGTH(a)" =
   print_macro_transformed "LENGTH(a)";

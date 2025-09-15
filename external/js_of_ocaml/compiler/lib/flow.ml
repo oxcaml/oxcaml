@@ -56,6 +56,8 @@ module Info = struct
   let update_def { info_defs; _ } x exp =
     let idx = Code.Var.idx x in
     info_defs.(idx) <- Expr exp
+
+  let info_defs_length { info_defs; _ } = Array.length info_defs
 end
 
 let undefined = Phi Var.Set.empty
@@ -363,46 +365,57 @@ let the_def_of info x =
 let the_const_of ~eq info x =
   match x with
   | Pv x ->
-      get_approx
-        info
-        (fun x ->
-          match info.info_defs.(Var.idx x) with
-          | Expr
-              (Constant
-                 (( Float _
-                  | Int _
-                  | Int32 _
-                  | Int64 _
-                  | NativeInt _
-                  | NativeString _
-                  | Float_array _ ) as c)) -> Some c
-          | Expr (Constant (String _ as c))
-            when not (Var.ISet.mem info.info_possibly_mutable x) -> Some c
-          | Expr (Constant c) when Config.Flag.safe_string () -> Some c
-          | _ -> None)
-        None
-        (fun u v ->
-          match u, v with
-          | Some i, Some j when eq i j -> u
-          | _ -> None)
-        x
+      (* TODO: Consider doing something to actually propagate constants
+         here. *)
+      (* If this variable was minted after we constructed the info table, conservatively
+         assume we know nothing. Transformations of array-access primitives in
+         [specialize_js.ml] mint variables in this way. *)
+      if Var.idx x >= Array.length info.Info.info_defs
+      then None
+      else
+        get_approx
+          info
+          (fun x ->
+            match info.info_defs.(Var.idx x) with
+            | Expr
+                (Constant
+                   (( Float _
+                    | Int _
+                    | Int32 _
+                    | Int64 _
+                    | NativeInt _
+                    | NativeString _
+                    | Float_array _ ) as c)) -> Some c
+            | Expr (Constant (String _ as c))
+              when not (Var.ISet.mem info.info_possibly_mutable x) -> Some c
+            | Expr (Constant c) when Config.Flag.safe_string () -> Some c
+            | _ -> None)
+          None
+          (fun u v ->
+            match u, v with
+            | Some i, Some j when eq i j -> u
+            | _ -> None)
+          x
   | Pc c -> Some c
 
 let the_int info x =
   match x with
   | Pv x ->
-      get_approx
-        info
-        (fun x ->
-          match info.info_defs.(Var.idx x) with
-          | Expr (Constant (Int c)) -> Some c
-          | _ -> None)
-        None
-        (fun u v ->
-          match u, v with
-          | Some i, Some j when Targetint.equal i j -> u
-          | _ -> None)
-        x
+      if Var.idx x >= Array.length info.Info.info_defs
+      then None
+      else
+        get_approx
+          info
+          (fun x ->
+            match info.info_defs.(Var.idx x) with
+            | Expr (Constant (Int c)) -> Some c
+            | _ -> None)
+          None
+          (fun u v ->
+            match u, v with
+            | Some i, Some j when Targetint.equal i j -> u
+            | _ -> None)
+          x
   | Pc (Int c) -> Some c
   | Pc _ -> None
 

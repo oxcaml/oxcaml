@@ -27,6 +27,12 @@ function caml_array_sub(a, i, len) {
   return a2;
 }
 
+//Provides: caml_array_sub_local mutable
+//Requires: caml_array_sub
+function caml_array_sub_local(a, i, len) {
+  return caml_array_sub(a, i, len);
+}
+
 //Provides: caml_floatarray_sub mutable
 //Requires: caml_array_sub
 //Version: >= 5.3
@@ -53,6 +59,12 @@ function caml_array_append(a1, a2) {
   for (; i < l1; i++) a[i] = a1[i];
   for (; i < l; i++, j++) a[i] = a2[j];
   return a;
+}
+
+//Provides: caml_array_append_local mutable
+//Requires: caml_array_append
+function caml_array_append_local(a1, a2) {
+  return caml_array_append(a1, a2);
 }
 
 //Provides: caml_floatarray_append mutable
@@ -237,4 +249,20 @@ function caml_floatarray_make_unboxed(len, init) {
 //Version: >= 5.3
 function caml_uniform_array_make(len, init) {
   return caml_array_make(len, init);
+}
+
+//Provides: caml_floatarray_create_local const (const)
+//Requires: caml_floatarray_create
+function caml_floatarray_create_local(x) {
+  return caml_floatarray_create(x);
+}
+
+// Provides: caml_iarray_of_array const
+function caml_iarray_of_array(a) {
+  return a;
+}
+
+// Provides: caml_array_of_iarray const
+function caml_array_of_iarray(a) {
+  return a;
 }

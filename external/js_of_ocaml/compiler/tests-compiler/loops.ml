@@ -178,7 +178,7 @@ let for_for_while () =
        }
        else{
         try{caml_div(k, j);}
-        catch(exn){throw caml_maybe_attach_backtrace(Stdlib[8], 1);}
+        catch(exn){throw caml_maybe_attach_backtrace(Stdlib[8], 0);}
         id[1]++;
        }
       var _a_ = k + 1 | 0;
@@ -444,12 +444,12 @@ let add_substitute =
      var lim$1 = caml_ml_string_length(s), previous = 32, i$4 = 0;
      for(;;){
       if(i$4 >= lim$1){
-       var _b_ = 92 === previous ? 1 : 0;
+       var _b_ = previous === 92 ? 1 : 0;
        return _b_ ? caml_call2(add_char, b, previous) : _b_;
       }
       var previous$0 = caml_string_get(s, i$4);
       if(36 === previous$0)
-       if(92 === previous){
+       if(previous === 92){
         caml_call2(add_char, b, previous$0);
         var i$5 = i$4 + 1 | 0;
         previous = 32;
@@ -457,7 +457,7 @@ let add_substitute =
        }
        else{
         var start$0 = i$4 + 1 | 0;
-        if(lim$1 <= start$0) throw caml_maybe_attach_backtrace(Stdlib[8], 1);
+        if(lim$1 <= start$0) throw caml_maybe_attach_backtrace(Stdlib[8], 0);
         var opening = caml_string_get(s, start$0);
         a:
         {
@@ -497,7 +497,7 @@ let add_substitute =
          }
          var lim = caml_ml_string_length(s), k = k$2, stop = new_start;
          for(;;){
-          if(lim <= stop) throw caml_maybe_attach_backtrace(Stdlib[8], 1);
+          if(lim <= stop) throw caml_maybe_attach_backtrace(Stdlib[8], 0);
           if(caml_string_get(s, stop) === opening){
            var i = stop + 1 | 0, k$0 = k + 1 | 0;
            k = k$0;
@@ -522,7 +522,7 @@ let add_substitute =
         previous = 32;
         i$4 = next_i;
        }
-      else if(92 === previous){
+      else if(previous === 92){
        caml_call2(add_char, b, 92);
        caml_call2(add_char, b, previous$0);
        var i$6 = i$4 + 1 | 0;
@@ -605,10 +605,11 @@ let () = print_endline (trim " ")
         var b = r;
         break a;
        }
-       throw caml_maybe_attach_backtrace([0, Invalid_argument, s], 1);
+       throw caml_maybe_attach_backtrace([0, Invalid_argument, s], 0);
       }
       var b = empty;
      }
      return caml_string_of_bytes(copy(b));
     }
-    //end |}]
+    //end
+    |}]

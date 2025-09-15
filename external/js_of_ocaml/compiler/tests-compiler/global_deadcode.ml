@@ -78,7 +78,7 @@ let%expect_test "Eliminates unused functions from functor" =
     function find(x, param$0){
      var param = param$0;
      for(;;){
-      if(! param) throw caml_maybe_attach_backtrace(Not_found, 1);
+      if(! param) throw caml_maybe_attach_backtrace(Not_found, 0);
       var r = param[3], v = param[2], l = param[1], c = caml_call2(Ord[1], x, v);
       if(0 === c) return v;
       param = 0 <= c ? r : l;

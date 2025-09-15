@@ -50,11 +50,11 @@ let%expect_test "static eval of string get" =
     //end
     function my_tag(x){return runtime.caml_obj_tag([0, x, 0]);}
     //end
-    function my_size(x){return x.length - 1;}
+    function my_size(x){return caml_call1(Stdlib_Obj[2], x);}
     //end
-    function my_field(x, i){return x[i + 1];}
+    function my_field(x, i){return caml_call2(Stdlib_Obj[5], x, i);}
     //end
-    function my_set_field(x, i, o){x[i + 1] = o; return 0;}
+    function my_set_field(x, i, o){return caml_call3(Stdlib_Obj[6], x, i, o);}
     //end
     function my_new_block(x, l){return runtime.caml_obj_block(x + 1 | 0, 3);}
     //end

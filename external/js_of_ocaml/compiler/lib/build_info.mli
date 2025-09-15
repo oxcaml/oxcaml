@@ -27,6 +27,8 @@ type kind =
   | `Exe
   | `Cmo
   | `Cma
+  | `Cmj
+  | `Cmja
   | `Unknown
   ]
 

@@ -113,7 +113,7 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
      }
      try{
       if(caml_string_equal(s, cst$0))
-       throw caml_maybe_attach_backtrace(Stdlib[8], 1);
+       throw caml_maybe_attach_backtrace(Stdlib[8], 0);
       var _h_ = 7, m = _h_;
      }
      catch(exn){
@@ -138,7 +138,7 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
                cst_toto,
                function(_i_){caml_pop_trap(); return cont([0, [0, _i_, n, m]]);});
      var _g_ = Stdlib[8], raise = caml_pop_trap();
-     return raise(caml_maybe_attach_backtrace(_g_, 1));
+     return raise(caml_maybe_attach_backtrace(_g_, 0));
     }
     //end
     function cond1(b, cont){

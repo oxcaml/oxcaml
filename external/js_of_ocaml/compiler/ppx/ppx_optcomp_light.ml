@@ -148,7 +148,8 @@ let keep loc (attrs : attributes) =
   | [] -> true
   | _ -> (
       try
-        let keep_one { attr_payload; attr_loc; _ } =
+        let keep_one ({ attr_payload; attr_loc; _ } as attr) =
+          Ppxlib.Attribute.mark_as_handled_manually attr;
           let e =
             match attr_payload with
             | PStr [ { pstr_desc = Pstr_eval (e, []); _ } ] -> e
@@ -166,7 +167,7 @@ let keep loc (attrs : attributes) =
                 Bool false
             | { pexp_desc = Pexp_constant (Pconst_integer (d, None)); _ } ->
                 Int (int_of_string d)
-            | { pexp_desc = Pexp_tuple l; _ } -> Tuple (List.map l ~f:eval)
+            | { pexp_desc = Pexp_tuple l; _ } -> Tuple (List.map l ~f:(fun l -> eval l))
             | { pexp_desc = Pexp_apply (op, [ (Nolabel, a); (Nolabel, b) ]); pexp_loc; _ }
               -> (
                 let op = get_bin_op op in

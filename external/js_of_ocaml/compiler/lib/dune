@@ -7,6 +7,7 @@
   compiler-libs.bytecomp
   menhirLib
   sedlex
+  time_now
   yojson)
  (flags
   (:standard -w -7-37 -safe-string))

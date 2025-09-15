@@ -89,6 +89,9 @@
             (field (ref $function_2))
             (field (mut (ref null $cps_closure))))))
 
+   (type $null (struct))
+   (global $null (export "null") (ref eq) (struct.new $null))
+
    (global $forcing_tag i32 (i32.const 244))
    (global $cont_tag (export "cont_tag") i32 (i32.const 245))
    (global $lazy_tag (export "lazy_tag") i32 (i32.const 246))
@@ -100,6 +103,21 @@
    (global $float_tag i32 (i32.const 253))
    (global $double_array_tag (export "double_array_tag") i32 (i32.const 254))
    (global $custom_tag i32 (i32.const 255))
+
+   (func (export "caml_obj_is_stack")
+      (param (ref eq)) (result (ref eq))
+      (ref.i31 (i32.const 0)))
+
+   (func (export "caml_succ_scannable_prefix_len")
+      (param (ref eq)) (result (ref eq))
+      (ref.i31 (i32.const 0)))
+
+   (@string $unique_words_unsupported "Obj.uniquely_reachable_words is not available in wasm.")
+
+   (func (export "caml_obj_uniquely_reachable_words")
+      (param (ref eq)) (result (ref eq))
+      (call $caml_failwith (global.get $unique_words_unsupported))
+      (ref.i31 (i32.const 0)))
 
    (func $caml_is_closure (export "caml_is_closure")
       (param $v (ref eq)) (result i32)
@@ -243,6 +261,8 @@
       (local.get $res))
 
    (func (export "caml_obj_tag") (param $v (ref eq)) (result (ref eq))
+      (if (ref.eq (local.get $v) (global.get $null))
+         (then (return (ref.i31 (i32.const 1010)))))
       (if (ref.test (ref i31) (local.get $v))
          (then (return (ref.i31 (i32.const 1000)))))
       (drop (block $not_block (result (ref eq))
@@ -362,7 +382,8 @@
       (array.new $int_array (i32.const 0) (i32.const 8)))
 
    (func (export "caml_get_public_method")
-      (param $obj (ref eq)) (param (ref eq)) (param (ref eq)) (result (ref eq))
+      (param $obj (ref eq)) (param $vtag (ref eq)) (param (ref eq))
+      (result (ref eq))
       (local $meths (ref $block))
       (local $tag i32) (local $cacheid i32) (local $ofs i32)
       (local $li i32) (local $mi i32) (local $hi i32)
@@ -371,7 +392,6 @@
          (ref.cast (ref $block)
             (array.get $block
                (ref.cast (ref $block) (local.get $obj)) (i32.const 1))))
-      (local.set $tag (i31.get_s (ref.cast (ref i31) (local.get 1))))
       (local.set $cacheid (i31.get_u (ref.cast (ref i31) (local.get 2))))
       (local.set $len (array.len (global.get $method_cache)))
       (if (i32.ge_s (local.get $cacheid) (local.get $len))
@@ -387,14 +407,16 @@
             (global.set $method_cache (local.get $a))))
       (local.set $ofs
          (array.get $int_array (global.get $method_cache) (local.get $cacheid)))
-      (if (i32.eq (local.get $tag)
-             (i31.get_s
-                (ref.cast (ref i31)
-                   (array.get $block (local.get $meths) (local.get $ofs)))))
+      (if (i32.lt_u (local.get $ofs) (array.len (local.get $meths)))
          (then
-            (return
-               (array.get $block
-                  (local.get $meths) (i32.sub (local.get $ofs) (i32.const 1))))))
+            (if (ref.eq (local.get $vtag)
+                   (array.get $block (local.get $meths) (local.get $ofs)))
+               (then
+                  (return
+                     (array.get $block
+                        (local.get $meths)
+                        (i32.sub (local.get $ofs) (i32.const 1))))))))
+      (local.set $tag (i31.get_s (ref.cast (ref i31) (local.get $vtag))))
       (local.set $li (i32.const 3))
       (local.set $hi
          (i32.add
@@ -426,11 +448,9 @@
       (array.set $int_array (global.get $method_cache) (local.get $cacheid)
          (i32.add (local.get $li) (i32.const 1)))
       (if (result (ref eq))
-          (i32.eq (local.get $tag)
-             (i31.get_s
-                (ref.cast (ref i31)
-                   (array.get $block (local.get $meths)
-                      (i32.add (local.get $li) (i32.const 1))))))
+          (ref.eq (local.get $vtag)
+             (array.get $block (local.get $meths)
+                (i32.add (local.get $li) (i32.const 1))))
          (then
             (array.get $block (local.get $meths) (local.get $li)))
          (else
@@ -491,4 +511,22 @@
          (call $caml_callback_1 (local.get $f) (local.get $x))
          (local.get $y)))
 ))
+
+   (func (export "caml_is_null") (param $x (ref eq)) (result (ref eq))
+      (if (result (ref eq)) (ref.eq (local.get $x) (global.get $null))
+        (then (ref.i31 (i32.const 1)))
+        (else (ref.i31 (i32.const 0)))))
+
+   (data $int_as_pointer_not_implemented "caml_int_as_pointer is not supported")
+
+   (func (export "caml_int_as_pointer") (param $x (ref eq)) (result (ref eq))
+      (if (result (ref eq))
+         (i32.eq (i31.get_s (ref.cast (ref i31) (local.get $x))) (i32.const 0))
+         (then (global.get $null))
+         (else
+          (call $caml_failwith
+            (array.new_data $bytes $int_as_pointer_not_implemented
+              (i32.const 0) (i32.const 35)))
+           (ref.i31 (i32.const 0)))))
+
 )

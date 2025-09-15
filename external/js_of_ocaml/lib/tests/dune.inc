@@ -29,10 +29,14 @@
  (preprocess
   (pps ppx_js_internal ppx_expect)))
 
+;; remove test_fun_call in favor of test_fun_call2 and test_poly_compare with
+;; test_poly_equal respectively, which support wasm. Original commit:
+;; https://github.com/ocaml-wasm/wasm_of_ocaml/commit/a759bbbae2dfd77de77d12362140c14521f72432
+
 (library
  ;; lib/tests/test_fun_call.ml
  (name test_fun_call_75)
- (enabled_if (<> %{profile} with-effects))
+ (enabled_if false)
  (modules test_fun_call)
  (libraries js_of_ocaml unix)
  (inline_tests (modes js))
@@ -72,7 +76,7 @@
 (library
  ;; lib/tests/test_poly_compare.ml
  (name test_poly_compare_75)
- (enabled_if true)
+ (enabled_if false)
  (modules test_poly_compare)
  (libraries js_of_ocaml unix)
  (inline_tests (modes js))

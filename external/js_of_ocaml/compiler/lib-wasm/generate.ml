@@ -99,32 +99,53 @@ module Generate (Target : Target_sig.S) = struct
 
   let specialized_primitives =
     let h = String.Hashtbl.create 18 in
+    let caml_accessors =
+      let ( let* ) l f = List.concat_map l ~f in
+      let* index_type, index_suffix =
+        [ Value, ""
+        ; Int32, "_indexed_by_int32"
+        ; Int64, "_indexed_by_int64"
+        ; Nativeint, "_indexed_by_nativeint"
+        ]
+      in
+      let* data_type, data_type_name =
+        [ Value, "16"; Int32, "32"; Int64, "64"; Value, "f32" ]
+      in
+      let* array_type_name, accessors =
+        [ "string", [ `Get ]; "bytes", [ `Get; `Set ]; "ba_uint8", [ `Get; `Set ] ]
+      in
+      let* op = accessors in
+      [ (match op with
+        | `Get ->
+            ( "caml_" ^ array_type_name ^ "_get" ^ data_type_name ^ index_suffix
+            , (`Mutator, [ Value; index_type ], data_type) )
+        | `Set ->
+            ( "caml_" ^ array_type_name ^ "_set" ^ data_type_name ^ index_suffix
+            , (`Mutator, [ Value; index_type; data_type ], Value) ))
+      ]
+    in
     List.iter
       ~f:(fun (nm, typ) -> String.Hashtbl.add h nm typ)
-      [ "caml_int32_bswap", (`Pure, [ Int32 ], Int32)
-      ; "caml_nativeint_bswap", (`Pure, [ Nativeint ], Nativeint)
-      ; "caml_int64_bswap", (`Pure, [ Int64 ], Int64)
-      ; "caml_int32_compare", (`Pure, [ Int32; Int32 ], Value)
-      ; "caml_nativeint_compare", (`Pure, [ Nativeint; Nativeint ], Value)
-      ; "caml_int64_compare", (`Pure, [ Int64; Int64 ], Value)
-      ; "caml_string_get32", (`Mutator, [ Value; Value ], Int32)
-      ; "caml_string_get64", (`Mutator, [ Value; Value ], Int64)
-      ; "caml_bytes_get32", (`Mutator, [ Value; Value ], Int32)
-      ; "caml_bytes_get64", (`Mutator, [ Value; Value ], Int64)
-      ; "caml_bytes_set32", (`Mutator, [ Value; Value; Int32 ], Value)
-      ; "caml_bytes_set64", (`Mutator, [ Value; Value; Int64 ], Value)
-      ; "caml_lxm_next", (`Pure, [ Value ], Int64)
-      ; "caml_ba_uint8_get32", (`Mutator, [ Value; Value ], Int32)
-      ; "caml_ba_uint8_get64", (`Mutator, [ Value; Value ], Int64)
-      ; "caml_ba_uint8_set32", (`Mutator, [ Value; Value; Int32 ], Value)
-      ; "caml_ba_uint8_set64", (`Mutator, [ Value; Value; Int64 ], Value)
-      ; "caml_nextafter_float", (`Pure, [ Float; Float ], Float)
-      ; "caml_classify_float", (`Pure, [ Float ], Value)
-      ; "caml_ldexp_float", (`Pure, [ Float; Value ], Float)
-      ; "caml_erf_float", (`Pure, [ Float ], Float)
-      ; "caml_erfc_float", (`Pure, [ Float ], Float)
-      ; "caml_float_compare", (`Pure, [ Float; Float ], Value)
-      ];
+      (caml_accessors
+      @ [ "caml_int32_bswap", (`Pure, [ Int32 ], Int32)
+        ; "caml_nativeint_bswap", (`Pure, [ Nativeint ], Nativeint)
+        ; "caml_int64_bswap", (`Pure, [ Int64 ], Int64)
+        ; "caml_int32_compare", (`Pure, [ Int32; Int32 ], Value)
+        ; "caml_checked_int32_to_int", (`Pure, [ Int32 ], Value)
+        ; "caml_checked_nativeint_to_int", (`Pure, [ Int32 ], Value)
+        ; "caml_checked_int64_to_int32", (`Pure, [ Int64 ], Int32)
+        ; "caml_nativeint_compare", (`Pure, [ Nativeint; Nativeint ], Value)
+        ; "caml_int64_compare", (`Pure, [ Int64; Int64 ], Value)
+        ; "caml_float16_of_double", (`Pure, [ Float ], Int32)
+        ; "caml_double_of_float16", (`Pure, [ Int32 ], Float)
+        ; "caml_lxm_next", (`Pure, [ Value ], Int64)
+        ; "caml_nextafter_float", (`Pure, [ Float; Float ], Float)
+        ; "caml_classify_float", (`Pure, [ Float ], Value)
+        ; "caml_ldexp_float", (`Pure, [ Float; Value ], Float)
+        ; "caml_erf_float", (`Pure, [ Float ], Float)
+        ; "caml_erfc_float", (`Pure, [ Float ], Float)
+        ; "caml_float_compare", (`Pure, [ Float; Float ], Value)
+        ]);
     h
 
   let float_bin_op' op f g =
@@ -233,8 +254,38 @@ module Generate (Target : Target_sig.S) = struct
   let () =
     register_bin_prim "caml_array_unsafe_get" `Mutable Memory.gen_array_get;
     register_bin_prim "caml_floatarray_unsafe_get" `Mutable Memory.float_array_get;
+    register_bin_prim "caml_array_unsafe_get_indexed_by_int32" `Mutable (fun x y ->
+        let conv = Memory.unbox_int32 in
+        Memory.gen_array_get x (Value.val_int (conv y)));
+    (* I do not know why there was an error message when I turned
+       gave [`Mutate] to [caml_array_unsafe_get_indexed_by_int64] unlike the other functions.
+       I do not fully understand this. *)
+    register_bin_prim "caml_array_unsafe_get_indexed_by_int64" `Mutator (fun x y ->
+        let conv i =
+          let* i = Memory.unbox_int64 i in
+          return (W.I32WrapI64 i)
+        in
+        Memory.gen_array_get x (Value.val_int (conv y)));
+    register_bin_prim "caml_array_unsafe_get_indexed_by_nativeint" `Mutable (fun x y ->
+        let conv = Memory.unbox_nativeint in
+        Memory.gen_array_get x (Value.val_int (conv y)));
     register_tern_prim "caml_array_unsafe_set" (fun x y z ->
         seq (Memory.gen_array_set x y z) Value.unit);
+    let unboxed_indexed_array_access conv x y z =
+      seq (Memory.gen_array_set x (Value.val_int (conv y)) z) Value.unit
+    in
+    register_tern_prim "caml_array_unsafe_set_indexed_by_int32" (fun x y z ->
+        let conv = Memory.unbox_int32 in
+        unboxed_indexed_array_access conv x y z);
+    register_tern_prim "caml_array_unsafe_set_indexed_by_int64" (fun x y z ->
+        let conv i =
+          let* i = Memory.unbox_int64 i in
+          return (W.I32WrapI64 i)
+        in
+        unboxed_indexed_array_access conv x y z);
+    register_tern_prim "caml_array_unsafe_set_indexed_by_nativeint" (fun x y z ->
+        let conv = Memory.unbox_nativeint in
+        unboxed_indexed_array_access conv x y z);
     register_tern_prim "caml_array_unsafe_set_addr" (fun x y z ->
         seq (Memory.array_set x y z) Value.unit);
     register_tern_prim "caml_floatarray_unsafe_set" (fun x y z ->

@@ -59,7 +59,7 @@ type t =
   ; no_runtime : bool
   ; include_runtime : bool
   ; output_file : [ `Name of string | `Stdout ] * bool
-  ; bytecode : [ `File of string | `Stdin | `None ]
+  ; input : [ `Filename of string | `None ]
   ; params : (string * string) list
   ; static_env : (string * string) list
   ; wrap_with_fun : [ `Iife | `Named of string | `Anonymous ]
@@ -115,10 +115,7 @@ let options =
     Arg.(value & opt (some string) None & info [ "o" ] ~docv:"FILE" ~doc)
   in
   let input_file =
-    let doc =
-      "Compile the bytecode program [$(docv)]. "
-      ^ "Use '-' to read from the standard input instead."
-    in
+    let doc = "Compile the JSOO file (.cmj) or archive (.cmja) [$(docv)]." in
     Arg.(required & pos ~rev:true 0 (some string) None & info [] ~docv:"PROGRAM" ~doc)
   in
   let keep_unit_names =
@@ -314,19 +311,12 @@ let options =
     let chop_extension s = try Filename.chop_extension s with Invalid_argument _ -> s in
     let runtime_files = js_files in
     let fs_external = fs_external || (toplevel && no_cmis) in
-    let bytecode =
-      match input_file with
-      | "-" -> `Stdin
-      | x -> `File x
-    in
+    let input = `Filename input_file in
     let output_file =
       match output_file with
       | Some "-" -> `Stdout, true
       | Some s -> `Name s, true
-      | None -> (
-          match bytecode with
-          | `File s -> `Name (chop_extension s ^ ".js"), false
-          | `Stdin -> `Stdout, false)
+      | None -> `Name (chop_extension input_file ^ ".js"), false
     in
     let source_map =
       if (not no_sourcemap) && (sourcemap || sourcemap_inline_in_js)
@@ -376,7 +366,7 @@ let options =
       ; fs_external
       ; no_cmis
       ; output_file
-      ; bytecode
+      ; input
       ; source_map
       ; keep_unit_names
       ; effects
@@ -629,7 +619,7 @@ let options_runtime_only =
       ; fs_external
       ; no_cmis
       ; output_file
-      ; bytecode = `None
+      ; input = `None
       ; source_map
       ; keep_unit_names = false
       ; effects

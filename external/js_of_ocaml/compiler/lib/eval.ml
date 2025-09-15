@@ -281,9 +281,20 @@ let eval_prim x =
       | "caml_nativeint_compare", [ NativeInt i; NativeInt j ] ->
           Some (Int (Targetint.of_int_exn (Int32.compare i j)))
       | "caml_nativeint_to_int", [ Int32 i ] -> Some (Int (Targetint.of_int32_truncate i))
+      | "caml_checked_nativeint_to_int", [ Int32 i ] ->
+          Some (Int (Targetint.of_int32_truncate i))
+      | "caml_checked_int32_to_int", [ Int32 i ] ->
+          Some (Int (Targetint.of_int32_truncate i))
       | "caml_nativeint_of_int", [ Int i ] -> nativeint (Targetint.to_int32 i)
       (* int64 *)
-      | "caml_int64_bits_of_float", [ Float f ] -> int64 f
+      (* [Float_u.Option.none ()] is a very specific, sentinel NaN.
+         This [js_of_ocaml] compile time eval will end up turning the specific sentinel NaN into
+         [NaN], making [Float_u.Option.(is_none (none ()))] return false.
+
+         [none ()] calls [caml_int64_bits_of_float], so making this function
+         no longer available at comp-time eval stops the over-optimization that breaks [is_none].
+      *)
+      (* | "caml_int64_bits_of_float", [ Float f ] -> int64 f *)
       | "caml_int64_float_of_bits", [ Int64 i ] -> Some (Float i)
       | "caml_int64_of_float", [ Float f ] ->
           int64 (Int64.of_float (Int64.float_of_bits f))
@@ -453,9 +464,13 @@ let constant_js_equal a b =
   | Int i, Int j -> Some (Targetint.equal i j)
   | Float a, Float b ->
       Some (Float.ieee_equal (Int64.float_of_bits a) (Int64.float_of_bits b))
+  | Float32 a, Float32 b ->
+      Some (Float.ieee_equal (Int64.float_of_bits a) (Int64.float_of_bits b))
+  | Float32 _, Float _ | Float _, Float32 _ -> None
   | NativeString a, NativeString b -> Some (Native_string.equal a b)
   | String a, String b when Config.Flag.use_js_string () -> Some (String.equal a b)
-  | Int _, Float _ | Float _, Int _ -> None
+  | Null, Null -> Some true
+  | Int _, (Float _ | Float32 _) | (Float _ | Float32 _), Int _ -> None
   (* All other values may be distinct objects and thus different by [caml_js_equals]. *)
   | String _, _
   | _, String _
@@ -470,22 +485,26 @@ let constant_js_equal a b =
   | NativeInt _, _
   | _, NativeInt _
   | Tuple _, _
-  | _, Tuple _ -> None
+  | _, Tuple _
+  | Null, _
+  | _, Null -> None
 
 (* [eval_prim] does not distinguish the two constants *)
 let constant_equal a b =
   match a, b with
   | Int i, Int j -> Targetint.equal i j
   | Float a, Float b -> Int64.equal a b
+  | Float32 a, Float32 b -> Int64.equal a b
   | NativeString a, NativeString b -> Native_string.equal a b
   | String a, String b -> String.equal a b
   | Int32 a, Int32 b -> Int32.equal a b
   | NativeInt a, NativeInt b -> Int32.equal a b
   | Int64 a, Int64 b -> Int64.equal a b
+  | Null, Null -> true
   (* We don't need to compare other constants, so let's just return false. *)
   | Tuple _, Tuple _ -> false
   | Float_array _, Float_array _ -> false
-  | (Int _ | Float _ | Int64 _ | Int32 _ | NativeInt _), _ -> false
+  | (Int _ | Float _ | Float32 _ | Int64 _ | Int32 _ | NativeInt _ | Null), _ -> false
   | (String _ | NativeString _), _ -> false
   | (Float_array _ | Tuple _), _ -> false
 
@@ -635,7 +654,7 @@ let eval_instr update_count inline_constant ~target info i =
         else None
       in
       match res with
-      | Some c ->
+      | Some c when Var.idx x < Info.info_defs_length info ->
           let c = Constant c in
           Flow.Info.update_def info x c;
           incr update_count;
@@ -685,11 +704,13 @@ let the_cond_of info x =
     (fun x ->
       match Flow.Info.def info x with
       | Some (Constant (Int x)) -> if Targetint.is_zero x then Zero else Non_zero
+      | Some (Constant Null) -> Zero
       | Some
           (Constant
              ( Int32 _
              | NativeInt _
              | Float _
+             | Float32 _
              | Tuple _
              | String _
              | NativeString _

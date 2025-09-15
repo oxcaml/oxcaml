@@ -374,7 +374,7 @@ let compile_ocaml_to_bc ?(debug = true) ?(unix = false) file =
       ~fail:true
       ~cmd:
         (Format.sprintf
-           "%s -no-check-prims %s %s %s -o %s"
+           "%s -no-check-prims -alert -unsafe_multidomain %s %s %s -o %s"
            ocamlc
            (if debug then "-g" else "")
            (if unix then "-I +unix unix.cma" else "")

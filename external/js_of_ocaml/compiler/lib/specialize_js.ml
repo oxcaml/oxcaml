@@ -30,6 +30,12 @@ let debug_stats = Debug.find "stats-debug"
 
 let specialize_instr opt_count ~target info i =
   match i, target with
+  | Let (x, Prim (Extern "caml_make_unboxed_int32_vect_bytecode", [ y ])), _ ->
+      Let (x, Prim (Extern "caml_make_vect", [ y; Pc (Int32 0l) ]))
+  | Let (x, Prim (Extern "caml_make_unboxed_int64_vect_bytecode", [ y ])), _ ->
+      Let (x, Prim (Extern "caml_make_vect", [ y; Pc (Int64 0L) ]))
+  | Let (x, Prim (Extern "caml_make_unboxed_nativeint_vect_bytecode", [ y ])), _ ->
+      Let (x, Prim (Extern "caml_make_vect", [ y; Pc (NativeInt 0l) ]))
   | Let (x, Prim (Extern "caml_format_int", [ y; z ])), `JavaScript -> (
       (* We can implement the special case where the format string is "%s" in JavaScript
          in a concise and efficient way with [""+x]. It does not make as much sense in
@@ -297,6 +303,31 @@ let specialize_instrs ~target opt_count info l =
             ( x
             , Prim
                 ( Extern
+                    (( "caml_array_get_indexed_by_int32"
+                     | "caml_array_get_indexed_by_int64"
+                     | "caml_array_get_indexed_by_nativeint" ) as prim)
+                , [ y; z ] ) ) ->
+            let conv =
+              match prim with
+              | "caml_array_get_indexed_by_int32" -> "caml_checked_int32_to_int"
+              | "caml_array_get_indexed_by_int64" -> "caml_checked_int64_to_int"
+              | "caml_array_get_indexed_by_nativeint" -> "caml_checked_nativeint_to_int"
+              | _ -> assert false
+            in
+            let z' = Code.Var.fresh () in
+            let r =
+              Let (z', Prim (Extern conv, [ z ]))
+              (* The recursive call to [aux] will optimize [caml_array_get] into
+               a nominally "unsafe" (but guarded) access.
+            *)
+              :: Let (x, Prim (Extern "caml_array_get", [ y; Pv z' ]))
+              :: r
+            in
+            aux info checks r acc
+        | Let
+            ( x
+            , Prim
+                ( Extern
                     (( "caml_array_get"
                      | "caml_array_get_float"
                      | "caml_floatarray_get"
@@ -339,6 +370,31 @@ let specialize_instrs ~target opt_count info l =
               incr opt_count;
               let acc = instr y' :: Let (y', Prim (Extern check, [ Pv y; z ])) :: acc in
               aux info ((y, idx) :: checks) r acc
+        | Let
+            ( x
+            , Prim
+                ( Extern
+                    (( "caml_array_set_indexed_by_int32"
+                     | "caml_array_set_indexed_by_int64"
+                     | "caml_array_set_indexed_by_nativeint" ) as prim)
+                , [ y; z; w ] ) ) ->
+            let conv =
+              match prim with
+              | "caml_array_set_indexed_by_int32" -> "caml_checked_int32_to_int"
+              | "caml_array_set_indexed_by_int64" -> "caml_checked_int64_to_int"
+              | "caml_array_set_indexed_by_nativeint" -> "caml_checked_nativeint_to_int"
+              | _ -> assert false
+            in
+            let z' = Code.Var.fresh () in
+            let r =
+              Let (z', Prim (Extern conv, [ z ]))
+              (* The recursive call to [aux] will optimize [caml_array_set] into
+               a nominally "unsafe" (but guarded) access.
+            *)
+              :: Let (x, Prim (Extern "caml_array_set", [ y; Pv z'; w ]))
+              :: r
+            in
+            aux info checks r acc
         | Let
             ( x
             , Prim

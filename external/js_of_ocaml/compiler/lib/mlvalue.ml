@@ -38,7 +38,17 @@ module Block = struct
     let tag_elt = J.Element (J.ENum (J.Num.of_targetint (Targetint.of_int_exn tag))) in
     J.EArr (tag_elt :: args)
 
-  let tag e = J.EAccess (e, ANormal, zero)
+  let tag e =
+    (* CR-someday selee: We use optional chaining because issues can arise when
+       we use [Js.Unsafe.*] functions with JSIR. When constructing an [any array],
+       Flambda will first use this function to check during runtime whether [any]
+       is actually a boxed float, to determine whether it should create a float array
+       or a normal array. Unfortunately [any] can be [undefined] (in JS), so checking
+       field 0 raises an error.
+
+       A more principled fix would probably be to refactor [Js.Unsafe], but this is
+       a much larger change. *)
+    J.EAccess (e, ANullish, zero)
 
   let field e idx =
     let adjusted = J.ENum (J.Num.of_targetint (Targetint.of_int_exn (idx + 1))) in

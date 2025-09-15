@@ -84,7 +84,7 @@ let () =
       Format.eprintf "%s: Error: Bytecode version mismatch.@." Sys.argv.(0);
       let k =
         match Magic_number.kind h with
-        | (`Cmo | `Cma | `Exe) as x -> x
+        | (`Cmo | `Cma | `Cmj | `Cmja | `Exe) as x -> x
         | `Other _ -> assert false
       in
       let comp =

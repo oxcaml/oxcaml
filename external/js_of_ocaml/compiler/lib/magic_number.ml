@@ -37,6 +37,8 @@ let kind_of_string = function
   | "Caml2012T" -> "cmt"
   | "Caml1999M" -> "impl"
   | "Caml1999N" -> "intf"
+  | "Caml1999J" -> "cmj"
+  | "Caml1999K" -> "cmja"
   | _ -> raise Not_found
 
 let of_string s =
@@ -50,9 +52,8 @@ let of_string s =
 
 let kind (s, _) =
   match kind_of_string s with
-  | "exe" -> `Exe
-  | "cmo" -> `Cmo
-  | "cma" -> `Cma
+  | "cmj" -> `Cmj
+  | "cmja" -> `Cmja
   | other -> `Other other
 
 let to_string (k, v) = Printf.sprintf "%s%03d" k v
@@ -64,29 +65,15 @@ let compare (p1, n1) (p2, n2) =
 
 let equal a b = compare a b = 0
 
-let v =
-  let current = Ocaml_version.current in
-  match current with
-  | 4 :: 13 :: _ -> 30
-  | 4 :: 14 :: _ -> 31
-  | 5 :: 00 :: _ -> 32
-  | 5 :: 01 :: _ -> 33
-  | 5 :: 02 :: _ -> 34
-  | 5 :: 03 :: _ -> 35
-  | _ ->
-      if Ocaml_version.compare current [ 4; 13 ] < 0
-      then failwith "OCaml version unsupported. Upgrade to OCaml 4.13 or newer."
-      else (
-        assert (Ocaml_version.compare current [ 5; 4 ] >= 0);
-        failwith "OCaml version unsupported. Upgrade js_of_ocaml.")
+(* Make sure this corresponds with whatever version of oxcaml we're using *)
+let v = 567
 
-let current_exe = "Caml1999X", v
+let current_cmj = "Caml1999J", v
 
-let current_cmo = "Caml1999O", v
-
-let current_cma = "Caml1999A", v
+let current_cmja = "Caml1999K", v
 
 let current = function
-  | `Exe -> current_exe
-  | `Cmo -> current_cmo
-  | `Cma -> current_cma
+  | `Cmj -> current_cmj
+  | `Cmja -> current_cmja
+
+let from_channel_exn ic = of_string (really_input_string ic size)

@@ -38,10 +38,27 @@ function caml_alloc_dummy_infix() {
   };
 }
 
+//Provides: caml_obj_is_stack
+function caml_obj_is_stack(x) {
+  return 0;
+}
+
+//Provides: caml_succ_scannable_prefix_len
+function caml_succ_scannable_prefix_len(x) {
+  return 0;
+}
+
+//Provides: caml_obj_uniquely_reachable_words
+//Requires: caml_failwith
+function caml_obj_uniquely_reachable_words(x) {
+  caml_failwith("Obj.uniquely_reachable_words is not available in javascript.");
+}
+
 //Provides: caml_obj_tag
 //Requires: caml_is_ml_bytes, caml_is_ml_string
 function caml_obj_tag(x) {
-  if (Array.isArray(x) && x[0] === x[0] >>> 0) return x[0];
+  if (x === null) return 1010;
+  else if (Array.isArray(x) && x[0] === x[0] >>> 0) return x[0];
   else if (caml_is_ml_bytes(x)) return 252;
   else if (caml_is_ml_string(x)) return 252;
   else if (x instanceof Function || typeof x === "function") return 247;
@@ -243,4 +260,17 @@ function caml_is_continuation_tag(t) {
 //Requires: caml_string_of_jsstring
 function caml_custom_identifier(o) {
   return caml_string_of_jsstring(o.caml_custom);
+}
+
+//Provides: caml_int_as_pointer
+//Requires: caml_failwith
+function caml_int_as_pointer(i) {
+  // Special-case null pointers for [or_null].
+  if (i == 0) return null;
+  caml_failwith("%int_as_pointer is not supported in javascript.");
+}
+
+//Provides: caml_is_null
+function caml_is_null(o) {
+  return o === null;
 }

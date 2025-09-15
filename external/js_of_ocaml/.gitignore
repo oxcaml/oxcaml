@@ -56,3 +56,8 @@ toplevel/examples/lwt_toplevel_bin/toplevel.js
 toplevel/examples/lwt_toplevel_bin/eval.js
 
 janestreet
+.local-merlin-binaries
+.local-ocaml-lib
+_install
+*.orig
+*.rej

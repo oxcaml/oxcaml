@@ -20,6 +20,7 @@
   md5.js
   mlBytes.js
   nat.js
+  ocamlj.js
   parsing.js
   stdlib.js
   toplevel.js

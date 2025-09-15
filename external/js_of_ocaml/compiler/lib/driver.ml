@@ -677,13 +677,3 @@ let f'
     formatter
     p =
   full_no_source_map ~formatter ~standalone ~wrap_with_fun ~profile ~link p
-
-let from_string ~prims ~debug s formatter =
-  let p = Parse_bytecode.from_string ~prims ~debug s in
-  full_no_source_map
-    ~formatter
-    ~standalone:false
-    ~wrap_with_fun:`Anonymous
-    ~profile:O1
-    ~link:`No
-    p

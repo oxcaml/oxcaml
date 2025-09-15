@@ -66,8 +66,7 @@ let () =
         else exit 0
     | Error `Term -> exit 1
     | Error `Parse -> exit Cmdliner.Cmd.Exit.cli_error
-    | Error `Exn -> ()
-    (* should not happen *)
+    | Error `Exn -> () (* should not happen *)
   with
   | (Match_failure _ | Assert_failure _ | Not_found) as exc ->
       let backtrace = Printexc.get_backtrace () in
@@ -79,14 +78,14 @@ let () =
       prerr_string backtrace;
       exit Cmdliner.Cmd.Exit.internal_error
   | Magic_number.Bad_magic_number s ->
-      Format.eprintf "%s: Error: Not an ocaml bytecode file@." Sys.argv.(0);
+      Format.eprintf "%s: Error: Not an recognized file format@." Sys.argv.(0);
       Format.eprintf "%s: Error: Invalid magic number %S@." Sys.argv.(0) s;
       exit 1
   | Magic_number.Bad_magic_version h ->
-      Format.eprintf "%s: Error: Bytecode version mismatch.@." Sys.argv.(0);
+      Format.eprintf "%s: Error: Magic number version mismatch.@." Sys.argv.(0);
       let k =
         match Magic_number.kind h with
-        | (`Cmo | `Cma | `Exe) as x -> x
+        | (`Cmj | `Cmja) as x -> x
         | `Other _ -> assert false
       in
       let comp =
@@ -95,13 +94,9 @@ let () =
         else "a newer"
       in
       Format.eprintf
-        "%s: Error: Your ocaml bytecode and the js_of_ocaml compiler have to be compiled \
-         with the same version of ocaml.@."
+        "%s: Error: Your JSIR file and the js_of_ocaml compiler have to be compiled for \
+         the same version of ocaml.@."
         Sys.argv.(0);
-      Format.eprintf
-        "%s: Error: The Js_of_ocaml compiler has been compiled with ocaml version %s.@."
-        Sys.argv.(0)
-        Sys.ocaml_version;
       Format.eprintf
         "%s: Error: Its seems that your ocaml bytecode has been compiled with %s version \
          of ocaml.@."

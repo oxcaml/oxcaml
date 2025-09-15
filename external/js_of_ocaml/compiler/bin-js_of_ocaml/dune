@@ -6,7 +6,6 @@
   jsoo_cmdline
   js_of_ocaml-compiler
   cmdliner
-  compiler-libs.common
   js_of_ocaml-compiler.runtime-files
   (select
    findlib_support.ml

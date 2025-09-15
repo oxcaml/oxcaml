@@ -149,9 +149,7 @@ let f ~function_arity p =
 
 (***)
 
-(* For switches, at this point, we know that this it is sufficient to
-   check the [pc]. *)
-let equal (pc, _) (pc', _) = pc = pc'
+let equal (pc, vs) (pc', vs') = pc = pc' && List.equal ~eq:Var.equal vs vs'
 
 let find_outlier_index arr =
   let len = Array.length arr in

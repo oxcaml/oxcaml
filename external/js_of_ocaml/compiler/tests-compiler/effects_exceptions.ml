@@ -67,7 +67,7 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
      }
      try{
       if(caml_string_equal(s, cst$0))
-       throw caml_maybe_attach_backtrace(Stdlib[8], 1);
+       throw caml_maybe_attach_backtrace(Stdlib[8], 0);
       var _c_ = 7, m = _c_;
      }
      catch(exn){
@@ -92,7 +92,7 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
                cst_toto,
                function(_d_){caml_pop_trap(); return cont([0, [0, _d_, n, m]]);});
      var _b_ = Stdlib[8], raise = caml_pop_trap();
-     return raise(caml_maybe_attach_backtrace(_b_, 1));
+     return raise(caml_maybe_attach_backtrace(_b_, 0));
     }
     //end
     |}];
@@ -115,7 +115,7 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
                    var
                     exn = match[2],
                     raise = caml_pop_trap(),
-                    exn$0 = caml_maybe_attach_backtrace(exn, 1);
+                    exn$0 = caml_maybe_attach_backtrace(exn, 0);
                    return raise(exn$0);
                   });
         }

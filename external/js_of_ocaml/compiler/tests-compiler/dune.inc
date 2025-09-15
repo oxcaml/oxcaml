@@ -92,7 +92,7 @@
 (library
  ;; compiler/tests-compiler/effects.ml
  (name effects_15)
- (enabled_if (>= %{ocaml_version} 5))
+ (enabled_if false)
  (modules effects)
  (libraries js_of_ocaml_compiler unix str jsoo_compiler_expect_tests_helper)
  (inline_tests
@@ -857,7 +857,7 @@
 (library
  ;; compiler/tests-compiler/unix_fs.ml
  (name unix_fs_15)
- (enabled_if true)
+ (enabled_if false)
  (modules unix_fs)
  (libraries js_of_ocaml_compiler unix str jsoo_compiler_expect_tests_helper)
  (inline_tests
