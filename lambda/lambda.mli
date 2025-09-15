@@ -625,6 +625,13 @@ type inlined_attribute =
 val equal_inline_attribute : inline_attribute -> inline_attribute -> bool
 val equal_inlined_attribute : inlined_attribute -> inlined_attribute -> bool
 
+type expose_attribute =
+  | Always_expose (* [@expose] or [@expose always] *)
+  | Never_expose (* [@expose never] *)
+  | Default_expose (* no [@expose] attribute *)
+
+val equal_expose_attribute : expose_attribute -> expose_attribute -> bool
+
 type probe_desc = { name: string; enabled_at_init: bool; }
 type probe = probe_desc option
 
@@ -730,6 +737,7 @@ type static_label = Static_label.t
 
 type function_attribute = {
   inline : inline_attribute;
+  expose : expose_attribute;
   specialise : specialise_attribute;
   local: local_attribute;
   zero_alloc : zero_alloc_attribute;

@@ -1015,6 +1015,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
             ~newer_version_of ~params_arity ~param_modes
             ~first_complex_local_param:(Flambda_arity.num_params params_arity)
             ~result_arity ~result_types:Unknown ~result_mode ~stub:false ~inline
+            ~expose:Default_expose (* TODO *)
             ~zero_alloc_attribute:Default_zero_alloc
               (* CR gyorsh: should [check] be set properly? *)
             ~is_a_functor:false ~is_opaque:false ~recursive

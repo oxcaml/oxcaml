@@ -50,6 +50,8 @@ module type Code_metadata_accessors_result_type = sig
 
   val inline : 'a t -> Inline_attribute.t
 
+  val expose : 'a t -> Expose_attribute.t
+
   val zero_alloc_attribute : 'a t -> Zero_alloc_attribute.t
 
   val poll_attribute : 'a t -> Poll_attribute.t
@@ -97,6 +99,7 @@ type 'a create_type =
   result_mode:Lambda.locality_mode ->
   stub:bool ->
   inline:Inline_attribute.t ->
+  expose:Expose_attribute.t ->
   zero_alloc_attribute:Zero_alloc_attribute.t ->
   poll_attribute:Poll_attribute.t ->
   is_a_functor:bool ->

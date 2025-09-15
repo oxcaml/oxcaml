@@ -2419,6 +2419,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~result_arity:return ~result_types:Unknown
       ~result_mode:(Function_decl.result_mode decl)
       ~stub:true ~inline:Inline_attribute.Default_inline
+      ~expose:Expose_attribute.Default_expose
       ~poll_attribute:
         (Poll_attribute.from_lambda (Function_decl.poll_attribute decl))
       ~zero_alloc_attribute:
@@ -2752,6 +2753,10 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     then Never_inline
     else Inline_attribute.from_lambda (Function_decl.inline decl)
   in
+  let expose : Expose_attribute.t =
+    (* TODO: should we do the same thing as for inline *)
+    Expose_attribute.from_lambda (Function_decl.expose decl)
+  in
   let free_names_of_body = Acc.free_names acc in
   let params_and_body =
     Function_params_and_body.create ~return_continuation
@@ -2816,7 +2821,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~param_modes:main_code_unarized_param_modes
       ~first_complex_local_param:first_complex_local_param_main_code
       ~result_arity:result_arity_main_code ~result_types:Unknown ~result_mode
-      ~stub ~inline
+      ~stub ~inline ~expose
       ~poll_attribute:
         (Poll_attribute.from_lambda (Function_decl.poll_attribute decl))
       ~zero_alloc_attribute:
@@ -2976,6 +2981,7 @@ let close_functions acc external_env ~current_region function_declarations =
             ~param_modes ~result_arity ~result_types:Unknown
             ~result_mode:(Function_decl.result_mode decl)
             ~stub:(Function_decl.stub decl) ~inline:Never_inline
+            ~expose:Default_expose (* TODO think *)
             ~zero_alloc_attribute ~poll_attribute
             ~is_a_functor:(Function_decl.is_a_functor decl)
             ~is_opaque:(Function_decl.is_opaque decl)
@@ -3308,6 +3314,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
   let attr =
     Lambda.
       { inline = Default_inline;
+        expose = Default_expose;
         specialise = Default_specialise;
         local = Default_local;
         zero_alloc = Default_zero_alloc;

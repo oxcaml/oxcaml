@@ -716,6 +716,21 @@ let equal_inlined_attribute (x : inlined_attribute) (y : inlined_attribute) =
     | Hint_inlined | Unroll _ | Default_inlined), _ ->
     false
 
+type expose_attribute =
+  | Always_expose (* [@expose] or [@expose always] *)
+  | Never_expose (* [@expose never] *)
+  | Default_expose (* no [@expose] attribute *)
+
+let equal_expose_attribute (x : expose_attribute) (y : expose_attribute) =
+  match x, y with
+  | Always_expose, Always_expose
+  | Never_expose, Never_expose
+  | Default_expose, Default_expose
+    ->
+    true
+  | (Always_expose | Never_expose | Default_expose), _ ->
+    false
+
 type probe_desc = { name: string; enabled_at_init: bool; }
 type probe = probe_desc option
 
@@ -806,6 +821,7 @@ type static_label = Static_label.t
 
 type function_attribute = {
   inline : inline_attribute;
+  expose : expose_attribute;
   specialise : specialise_attribute;
   local: local_attribute;
   zero_alloc : zero_alloc_attribute;
@@ -1077,6 +1093,7 @@ let layout_bottom = Pbottom
 
 let default_function_attribute = {
   inline = Default_inline;
+  expose = Default_expose;
   specialise = Default_specialise;
   local = Default_local;
   zero_alloc = Default_zero_alloc ;

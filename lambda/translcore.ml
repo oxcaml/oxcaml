@@ -1240,6 +1240,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let body = Lambda.rename map lam in
       let attr =
         { inline = Never_inline;
+          expose = Default_expose;
           specialise = Always_specialise;
           local = Never_local;
           zero_alloc = Default_zero_alloc;

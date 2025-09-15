@@ -408,6 +408,8 @@ module Function_decls : sig
 
     val inline : t -> Lambda.inline_attribute
 
+    val expose : t -> Lambda.expose_attribute
+
     val specialise : t -> Lambda.specialise_attribute
 
     val poll_attribute : t -> Lambda.poll_attribute

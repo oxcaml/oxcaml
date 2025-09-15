@@ -1041,6 +1041,11 @@ let function_attribute ppf t =
   | Never_inline -> fprintf ppf "never_inline@ "
   | Unroll i -> fprintf ppf "unroll(%i)@ " i
   end;
+  begin match t.expose with
+  | Default_expose -> ()
+  | Always_expose -> fprintf ppf "always_expose@ "
+  | Never_expose -> fprintf ppf "never_expose@ "
+  end;
   begin match t.specialise with
   | Default_specialise -> ()
   | Always_specialise -> fprintf ppf "always_specialise@ "
