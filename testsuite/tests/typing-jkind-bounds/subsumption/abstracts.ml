@@ -172,3 +172,146 @@ type t : value mod portable = (int * int)
 [%%expect{|
 type t = int * int
 |}]
+
+
+(* Failure case extracted from DLS *)
+
+module Portable = struct
+  type 'a t = { portable : 'a @@ portable } [@@unboxed]
+end
+
+module type S = sig
+  type 'a key : value mod portable contended
+end
+
+module M : S = struct
+  type 'a key = int * (unit -> 'a) Portable.t
+end
+[%%expect{|
+module Portable :
+  sig type 'a t = { portable : 'a @@ portable; } [@@unboxed] end
+module type S = sig type 'a key : value mod contended portable end
+module M : S
+|}]
+
+
+module Portable = struct
+  type 'a t = { portable : 'a @@ portable }
+end
+
+module type S = sig
+  type 'a key : value mod portable contended
+end
+
+module M : S = struct
+  type 'a key = int * (unit -> 'a) Portable.t
+end
+[%%expect{|
+module Portable : sig type 'a t = { portable : 'a @@ portable; } end
+module type S = sig type 'a key : value mod contended portable end
+module M : S
+|}]
+
+
+module Portable = struct
+  type 'a t = { portable : 'a @@ portable }
+end
+
+module type S = sig
+  type 'a key : value mod portable contended
+end
+
+module M : S = struct
+  type 'a key = int * int Portable.t
+end
+[%%expect{|
+module Portable : sig type 'a t = { portable : 'a @@ portable; } end
+module type S = sig type 'a key : value mod contended portable end
+module M : S
+|}]
+
+module Portable = struct
+  type 'a t = { portable : 'a @@ portable contended }
+end
+
+module type S = sig
+  type 'a key : value mod portable contended
+end
+
+module M : S = struct
+  type 'a key = int * (unit -> 'a) Portable.t
+end
+[%%expect{|
+module Portable :
+  sig type 'a t = { portable : 'a @@ portable contended; } end
+module type S = sig type 'a key : value mod contended portable end
+module M : S
+|}]
+
+
+module Portable = struct
+  type 'a t = { portable : 'a @@ portable }
+end
+
+module type S = sig
+  type 'a key : value mod portable
+end
+
+type t
+
+module M : S = struct
+  type 'a key = int * t Portable.t
+end
+
+[%%expect{|
+module Portable : sig type 'a t = { portable : 'a @@ portable; } end
+module type S = sig type 'a key : value mod portable end
+type t
+module M : S
+|}]
+
+module Contended = struct
+  type 'a t = { contended : 'a @@ contended }
+end
+
+module type S = sig
+  type 'a key : value mod contended
+end
+
+type t
+
+module M : S = struct
+  type 'a key = int * t Contended.t
+end
+
+[%%expect{|
+module Contended : sig type 'a t = { contended : 'a @@ contended; } end
+module type S = sig type 'a key : value mod contended end
+type t
+module M : S
+|}]
+
+module type S = sig
+  type 'a key : value mod contended portable
+end
+
+type t
+
+module M : S = struct
+  type 'a key = int * t Contended.t Portable.t
+end
+
+[%%expect{|
+module type S = sig type 'a key : value mod contended portable end
+type t
+module M : S
+|}]
+
+
+module M : S = struct
+  type 'a key = int * t Portable.t Contended.t
+end
+
+[%%expect{|
+module M : S
+|}]

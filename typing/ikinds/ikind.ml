@@ -20,7 +20,7 @@ module ConstrM = struct
   let to_string (p : t) : string = Format.asprintf "%a" Path.print p
 end
 
-module JK = Ldd_jkind_solver.Make (Axis_lattice_bits) (TyM) (ConstrM)
+module JK = Ldd_jkind_solver.Make (Axis_lattice) (TyM) (ConstrM)
 
 (* Optional ambient tag to disambiguate higher-level call sites
    (e.g. includecore). Other modules can bracket calls with
@@ -70,9 +70,7 @@ let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
  fun (ops : JK.ops) ->
   log ~pp:ops.pp_kind "ckind_of_jkind" (fun () ->
       (* Base is the modality bounds stored on this jkind. *)
-      let base =
-        ops.const (Axis_lattice_bits.of_mod_bounds j.jkind.mod_bounds)
-      in
+      let base = ops.const (Axis_lattice.of_mod_bounds j.jkind.mod_bounds) in
       (* For each with-bound (ty, axes), contribute
          modality(axes_mask, kind_of ty). *)
       let contribs =
@@ -80,7 +78,7 @@ let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
         |> List.of_seq
         |> List.map (fun (ty, info) ->
                let axes = Jkind.With_bounds.type_info_relevant_axes info in
-               let mask = Axis_lattice_bits.of_axis_set axes in
+               let mask = Axis_lattice.of_axis_set axes in
                log ~pp:ops.pp_kind "with-bound" (fun () ->
                    let kty = ops.kind_of ty in
                    ops.modality mask kty))
@@ -94,7 +92,7 @@ let ckind_of_jkind_r (j : Types.jkind_r) : JK.ckind =
   (* For r-jkinds used in sub checks, with-bounds are not present
      on the right (see Jkind_desc.sub's precondition). So only the
      base mod-bounds matter. *)
-  let base = ops.const (Axis_lattice_bits.of_mod_bounds j.jkind.mod_bounds) in
+  let base = ops.const (Axis_lattice.of_mod_bounds j.jkind.mod_bounds) in
   base
 
 let kind_of_depth = ref 0
@@ -138,12 +136,12 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
         (fun () ->
           (* Boxed tuples: immutable_data base + per-element contributions
              under id modality. *)
-          let base = ops.const Axis_lattice_bits.immutable_data in
+          let base = ops.const Axis_lattice.immutable_data in
           let contribs =
             List.map
               (fun (_lbl, t) ->
                 let mask =
-                  Axis_lattice_bits.mask_of_modality
+                  Axis_lattice.mask_of_modality
                     ~relevant_for_shallow:`Irrelevant Mode.Modality.Const.id
                 in
                 log ~pp:ops.pp_kind "tuple elt" (fun () ->
@@ -164,7 +162,7 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
             List.map
               (fun (_lbl, t) ->
                 let mask =
-                  Axis_lattice_bits.mask_of_modality ~relevant_for_shallow
+                  Axis_lattice.mask_of_modality ~relevant_for_shallow
                     Mode.Modality.Const.id
                 in
                 log ~pp:ops.pp_kind "unboxed tuple elt" (fun () ->
@@ -175,22 +173,22 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
     | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
       log ~pp:ops.pp_kind "Tarrow" (fun () ->
           (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
-          ops.const Axis_lattice_bits.arrow)
+          ops.const Axis_lattice.arrow)
     | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind_of"
     | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind_of"
     | Types.Tpoly _ ->
-      log ~pp:ops.pp_kind "Tpoly" (fun () -> ops.const Axis_lattice_bits.value)
+      log ~pp:ops.pp_kind "Tpoly" (fun () -> ops.const Axis_lattice.value)
     | Types.Tof_kind jkind ->
       log ~pp:ops.pp_kind "Tof_kind" (fun () -> ckind_of_jkind jkind ops)
     | Types.Tobject _ ->
       log ~pp:ops.pp_kind "Tobject" (fun () ->
-          ops.const Axis_lattice_bits.object_legacy)
+          ops.const Axis_lattice.object_legacy)
     | Types.Tfield _ ->
       failwith "Tfield shouldn't appear in kind_of"
-      (* ops.const Axis_lattice_bits.value *)
+      (* ops.const Axis_lattice.value *)
     | Types.Tnil ->
       failwith "Tnil shouldn't appear in kind_of"
-      (* ops.const Axis_lattice_bits.value *)
+      (* ops.const Axis_lattice.value *)
     | Types.Tvariant row ->
       log ~pp:ops.pp_kind "Tvariant" (fun () ->
           if Btype.tvariant_not_immediate row
@@ -200,9 +198,9 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
               log ~pp:ops.pp_kind "closed boxed" (fun () ->
                   (* Closed, boxed polymorphic variant: immutable_data base plus
                      per-constructor args. *)
-                  let base = ops.const Axis_lattice_bits.immutable_data in
+                  let base = ops.const Axis_lattice.immutable_data in
                   let mask =
-                    Axis_lattice_bits.mask_of_modality
+                    Axis_lattice.mask_of_modality
                       ~relevant_for_shallow:`Irrelevant Mode.Modality.Const.id
                   in
                   Btype.fold_row
@@ -217,14 +215,14 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
             else
               log ~pp:ops.pp_kind "open boxed" (fun () ->
                   (* Open row: conservative non-float value (boxed). *)
-                  ops.const Axis_lattice_bits.nonfloat_value)
+                  ops.const Axis_lattice.nonfloat_value)
           else
             log ~pp:ops.pp_kind "immediate" (fun () ->
                 (* All-constant (immediate) polymorphic variant. *)
-                ops.const Axis_lattice_bits.immediate))
+                ops.const Axis_lattice.immediate))
     | Types.Tpackage _ ->
       log ~pp:ops.pp_kind "Tpackage" (fun () ->
-          ops.const Axis_lattice_bits.nonfloat_value)
+          ops.const Axis_lattice.nonfloat_value)
   in
   decr kind_of_depth;
   res
@@ -267,8 +265,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
               (* Build from components: base (non-float value) + per-label contributions. *)
               let base_lat =
                 if has_mutable_label lbls
-                then Axis_lattice_bits.mutable_data
-                else Axis_lattice_bits.immutable_data
+                then Axis_lattice.mutable_data
+                else Axis_lattice.immutable_data
               in
               let kind : JK.ckind =
                fun (ops : JK.ops) ->
@@ -278,7 +276,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                       List.map
                         (fun (lbl : Types.label_declaration) ->
                           let mask =
-                            Axis_lattice_bits.mask_of_modality
+                            Axis_lattice.mask_of_modality
                               ~relevant_for_shallow:`Irrelevant
                               lbl.ld_modalities
                           in
@@ -297,8 +295,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                  for arity = 1. *)
               let base_lat =
                 if has_mutable_label lbls
-                then Axis_lattice_bits.mutable_data
-                else Axis_lattice_bits.nonfloat_value
+                then Axis_lattice.mutable_data
+                else Axis_lattice.nonfloat_value
               in
               let kind : JK.ckind =
                fun (ops : JK.ops) ->
@@ -313,8 +311,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                       List.map
                         (fun (lbl : Types.label_declaration) ->
                           let mask =
-                            Axis_lattice_bits.mask_of_modality
-                              ~relevant_for_shallow lbl.ld_modalities
+                            Axis_lattice.mask_of_modality ~relevant_for_shallow
+                              lbl.ld_modalities
                           in
                           log ~pp:ops.pp_kind
                             (Printf.sprintf "label %s" (Ident.name lbl.ld_id))
@@ -355,10 +353,10 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
               in
               let base_lat =
                 if all_args_void
-                then Axis_lattice_bits.immediate
+                then Axis_lattice.immediate
                 else if has_mutable
-                then Axis_lattice_bits.mutable_data
-                else Axis_lattice_bits.immutable_data
+                then Axis_lattice.mutable_data
+                else Axis_lattice.immutable_data
               in
               let kind : JK.ckind =
                fun (ops : JK.ops) ->
@@ -372,7 +370,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                             List.mapi
                               (fun i (arg : Types.constructor_argument) ->
                                 let mask =
-                                  Axis_lattice_bits.mask_of_modality
+                                  Axis_lattice.mask_of_modality
                                     ~relevant_for_shallow:`Irrelevant
                                     arg.ca_modalities
                                 in
@@ -384,7 +382,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                             List.map
                               (fun (lbl : Types.label_declaration) ->
                                 let mask =
-                                  Axis_lattice_bits.mask_of_modality
+                                  Axis_lattice.mask_of_modality
                                     ~relevant_for_shallow:`Irrelevant
                                     lbl.ld_modalities
                                 in
@@ -404,7 +402,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
               let kind : JK.ckind =
                fun ops ->
                 log ~pp:ops.pp_kind "Type_open kind" (fun () ->
-                    ops.const Axis_lattice_bits.value)
+                    ops.const Axis_lattice.value)
               in
               JK.Ty { args = decl.type_params; kind; abstract = false }))
       | Some body_ty ->
@@ -463,7 +461,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
       | None -> Ok ()
       | Some violating_axis ->
         let violating_axis_name =
-          Axis_lattice_bits.axis_number_to_axis_packed violating_axis
+          Axis_lattice.axis_number_to_axis_packed violating_axis
         in
         (* Also show the normalized ikind polys for both sides. *)
         let _ = violating_axis_name in
@@ -506,7 +504,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
     try
       let solver = make_solver ~context in
       let lat = JK.round_up solver (ckind_of_jkind jkind) in
-      let mb = Axis_lattice_bits.to_mod_bounds lat in
+      let mb = Axis_lattice.to_mod_bounds lat in
       Jkind.Mod_bounds.to_mode_crossing mb
     with Kind_of_limit_reached ->
       Format.eprintf "Kind_of_limit_reached";
