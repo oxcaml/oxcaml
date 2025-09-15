@@ -1,0 +1,20 @@
+(lang dune 3.17)
+
+;; Install the following opam switches, copy this file as
+;; dune-workspace and run:
+;;
+;; $ dune build @install
+;;
+;; This will build js_of_ocaml against all these version of OCaml
+
+(context
+ (opam
+  (switch 4.13.1)))
+
+(context
+ (opam
+  (switch 4.14.0)))
+
+(context
+ (opam
+  (switch 5.0.0)))
