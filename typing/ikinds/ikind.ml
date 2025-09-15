@@ -1,5 +1,7 @@
 (* Minimal kind constructor over real Types.type_expr, inspired by infer6. *)
 
+(* Clflags.ikinds := true *)
+
 module TyM = struct
   type t = Types.type_expr
 
@@ -106,7 +108,7 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
   incr kind_of_depth;
   if !kind_of_depth > 5000 then failwith "kind_of_depth too deep" else ();
   incr kind_of_counter;
-  if !kind_of_counter > 10000000 then __ikind_debug := true else ();
+  (* if !kind_of_counter > 10000000 then __ikind_debug := true else (); *)
   let res =
     match Types.get_desc ty with
     | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
@@ -233,6 +235,8 @@ let has_mutable_label lbls =
       match lbl.ld_mutable with Immutable -> false | Mutable _ -> true)
     lbls
 
+let always_use_stored_jkind = false
+
 let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     JK.constr_decl =
   match context.lookup_type p with
@@ -240,167 +244,179 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     failwith
       (Format.asprintf "Ikind.lookup: unknown constructor %a" Path.print p)
   | Some decl -> (
-    match decl.type_manifest with
-    | None -> (
-      (* No manifest: may still be concrete (record/variant/...). Build ckind. *)
-      match decl.type_kind with
-      | Types.Type_abstract _ ->
-        log "lookup Type_abstract" (fun () ->
-            let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
-            JK.Ty { args = decl.type_params; kind; abstract = true })
-      | Types.Type_record (lbls, _rep, _umc_opt) ->
-        log "lookup Type_record" (fun () ->
-            (* Build from components: base (non-float value) + per-label contributions. *)
-            let base_lat =
-              if has_mutable_label lbls
-              then Axis_lattice_bits.mutable_data
-              else Axis_lattice_bits.immutable_data
-            in
-            let kind : JK.ckind =
-             fun (ops : JK.ops) ->
-              log ~pp:ops.pp_kind "record kind" (fun () ->
-                  let base = ops.const base_lat in
-                  let contribs =
-                    List.map
-                      (fun (lbl : Types.label_declaration) ->
-                        let mask =
-                          Axis_lattice_bits.mask_of_modality
-                            ~relevant_for_shallow:`Irrelevant lbl.ld_modalities
-                        in
-                        log ~pp:ops.pp_kind
-                          (Printf.sprintf "label %s" (Ident.name lbl.ld_id))
-                          (fun () ->
-                            ops.modality mask (ops.kind_of lbl.ld_type)))
-                      lbls
-                  in
-                  ops.join (base :: contribs))
-            in
-            JK.Ty { args = decl.type_params; kind; abstract = false })
-      | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
-        log "lookup Type_record_unboxed_product" (fun () ->
-            (* Unboxed products: non-float base; shallow axes relevant only
-               for arity = 1. *)
-            let base_lat =
-              if has_mutable_label lbls
-              then Axis_lattice_bits.mutable_data
-              else Axis_lattice_bits.nonfloat_value
-            in
-            let kind : JK.ckind =
-             fun (ops : JK.ops) ->
-              log ~pp:ops.pp_kind "record_unboxed_product kind" (fun () ->
-                  let base = ops.const base_lat in
-                  let contribs =
-                    let relevant_for_shallow =
-                      match List.length lbls with
-                      | 1 -> `Relevant
-                      | _ -> `Irrelevant
+    if always_use_stored_jkind
+    then
+      let abstract =
+        match decl.type_manifest, decl.type_kind with
+        | None, Types.Type_abstract _ -> true
+        | _ -> false
+      in
+      let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
+      JK.Ty { args = decl.type_params; kind; abstract }
+    else
+      match decl.type_manifest with
+      | None -> (
+        (* No manifest: may still be concrete (record/variant/...). Build ckind. *)
+        match decl.type_kind with
+        | Types.Type_abstract _ ->
+          log "lookup Type_abstract" (fun () ->
+              let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
+              JK.Ty { args = decl.type_params; kind; abstract = true })
+        | Types.Type_record (lbls, _rep, _umc_opt) ->
+          log "lookup Type_record" (fun () ->
+              (* Build from components: base (non-float value) + per-label contributions. *)
+              let base_lat =
+                if has_mutable_label lbls
+                then Axis_lattice_bits.mutable_data
+                else Axis_lattice_bits.immutable_data
+              in
+              let kind : JK.ckind =
+               fun (ops : JK.ops) ->
+                log ~pp:ops.pp_kind "record kind" (fun () ->
+                    let base = ops.const base_lat in
+                    let contribs =
+                      List.map
+                        (fun (lbl : Types.label_declaration) ->
+                          let mask =
+                            Axis_lattice_bits.mask_of_modality
+                              ~relevant_for_shallow:`Irrelevant
+                              lbl.ld_modalities
+                          in
+                          log ~pp:ops.pp_kind
+                            (Printf.sprintf "label %s" (Ident.name lbl.ld_id))
+                            (fun () ->
+                              ops.modality mask (ops.kind_of lbl.ld_type)))
+                        lbls
                     in
-                    List.map
-                      (fun (lbl : Types.label_declaration) ->
-                        let mask =
-                          Axis_lattice_bits.mask_of_modality
-                            ~relevant_for_shallow lbl.ld_modalities
-                        in
-                        log ~pp:ops.pp_kind
-                          (Printf.sprintf "label %s" (Ident.name lbl.ld_id))
-                          (fun () ->
-                            ops.modality mask (ops.kind_of lbl.ld_type)))
-                      lbls
-                  in
-                  ops.join (base :: contribs))
-            in
-            JK.Ty { args = decl.type_params; kind; abstract = false })
-      | Types.Type_variant (cstrs, _rep, _umc_opt) ->
-        log "lookup Type_variant" (fun () ->
-            (* Choose base: immediate for void-only variants; mutable if any
-               record constructor has a mutable field; otherwise immutable. *)
-            let all_args_void =
-              List.for_all
-                (fun (c : Types.constructor_declaration) ->
-                  match c.cd_args with
-                  | Types.Cstr_tuple args ->
-                    List.for_all
-                      (fun (arg : Types.constructor_argument) ->
-                        Jkind_types.Sort.Const.all_void arg.ca_sort)
-                      args
-                  | Types.Cstr_record lbls ->
-                    List.for_all
-                      (fun (lbl : Types.label_declaration) ->
-                        Jkind_types.Sort.Const.all_void lbl.ld_sort)
-                      lbls)
-                cstrs
-            in
-            let has_mutable =
-              List.exists
-                (fun (c : Types.constructor_declaration) ->
-                  match c.cd_args with
-                  | Types.Cstr_tuple _ -> false
-                  | Types.Cstr_record lbls -> has_mutable_label lbls)
-                cstrs
-            in
-            let base_lat =
-              if all_args_void
-              then Axis_lattice_bits.immediate
-              else if has_mutable
-              then Axis_lattice_bits.mutable_data
-              else Axis_lattice_bits.immutable_data
-            in
-            let kind : JK.ckind =
-             fun (ops : JK.ops) ->
-              log ~pp:ops.pp_kind "variant kind" (fun () ->
-                  let base = ops.const base_lat in
-                  let contribs =
-                    List.concat_map
-                      (fun (c : Types.constructor_declaration) ->
-                        match c.cd_args with
-                        | Types.Cstr_tuple args ->
-                          List.mapi
-                            (fun i (arg : Types.constructor_argument) ->
-                              let mask =
-                                Axis_lattice_bits.mask_of_modality
-                                  ~relevant_for_shallow:`Irrelevant
-                                  arg.ca_modalities
-                              in
-                              log ~pp:ops.pp_kind
-                                (Printf.sprintf "cstr arg %d" i) (fun () ->
-                                  ops.modality mask (ops.kind_of arg.ca_type)))
-                            args
-                        | Types.Cstr_record lbls ->
-                          List.map
-                            (fun (lbl : Types.label_declaration) ->
-                              let mask =
-                                Axis_lattice_bits.mask_of_modality
-                                  ~relevant_for_shallow:`Irrelevant
-                                  lbl.ld_modalities
-                              in
-                              log ~pp:ops.pp_kind
-                                (Printf.sprintf "cstr label %s"
-                                   (Ident.name lbl.ld_id))
-                                (fun () ->
-                                  ops.modality mask (ops.kind_of lbl.ld_type)))
-                            lbls)
-                      cstrs
-                  in
-                  ops.join (base :: contribs))
-            in
-            JK.Ty { args = decl.type_params; kind; abstract = false })
-      | Types.Type_open ->
-        log "lookup Type_open" (fun () ->
+                    ops.join (base :: contribs))
+              in
+              JK.Ty { args = decl.type_params; kind; abstract = false })
+        | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
+          log "lookup Type_record_unboxed_product" (fun () ->
+              (* Unboxed products: non-float base; shallow axes relevant only
+                 for arity = 1. *)
+              let base_lat =
+                if has_mutable_label lbls
+                then Axis_lattice_bits.mutable_data
+                else Axis_lattice_bits.nonfloat_value
+              in
+              let kind : JK.ckind =
+               fun (ops : JK.ops) ->
+                log ~pp:ops.pp_kind "record_unboxed_product kind" (fun () ->
+                    let base = ops.const base_lat in
+                    let contribs =
+                      let relevant_for_shallow =
+                        match List.length lbls with
+                        | 1 -> `Relevant
+                        | _ -> `Irrelevant
+                      in
+                      List.map
+                        (fun (lbl : Types.label_declaration) ->
+                          let mask =
+                            Axis_lattice_bits.mask_of_modality
+                              ~relevant_for_shallow lbl.ld_modalities
+                          in
+                          log ~pp:ops.pp_kind
+                            (Printf.sprintf "label %s" (Ident.name lbl.ld_id))
+                            (fun () ->
+                              ops.modality mask (ops.kind_of lbl.ld_type)))
+                        lbls
+                    in
+                    ops.join (base :: contribs))
+              in
+              JK.Ty { args = decl.type_params; kind; abstract = false })
+        | Types.Type_variant (cstrs, _rep, _umc_opt) ->
+          log "lookup Type_variant" (fun () ->
+              (* Choose base: immediate for void-only variants; mutable if any
+                 record constructor has a mutable field; otherwise immutable. *)
+              let all_args_void =
+                List.for_all
+                  (fun (c : Types.constructor_declaration) ->
+                    match c.cd_args with
+                    | Types.Cstr_tuple args ->
+                      List.for_all
+                        (fun (arg : Types.constructor_argument) ->
+                          Jkind_types.Sort.Const.all_void arg.ca_sort)
+                        args
+                    | Types.Cstr_record lbls ->
+                      List.for_all
+                        (fun (lbl : Types.label_declaration) ->
+                          Jkind_types.Sort.Const.all_void lbl.ld_sort)
+                        lbls)
+                  cstrs
+              in
+              let has_mutable =
+                List.exists
+                  (fun (c : Types.constructor_declaration) ->
+                    match c.cd_args with
+                    | Types.Cstr_tuple _ -> false
+                    | Types.Cstr_record lbls -> has_mutable_label lbls)
+                  cstrs
+              in
+              let base_lat =
+                if all_args_void
+                then Axis_lattice_bits.immediate
+                else if has_mutable
+                then Axis_lattice_bits.mutable_data
+                else Axis_lattice_bits.immutable_data
+              in
+              let kind : JK.ckind =
+               fun (ops : JK.ops) ->
+                log ~pp:ops.pp_kind "variant kind" (fun () ->
+                    let base = ops.const base_lat in
+                    let contribs =
+                      List.concat_map
+                        (fun (c : Types.constructor_declaration) ->
+                          match c.cd_args with
+                          | Types.Cstr_tuple args ->
+                            List.mapi
+                              (fun i (arg : Types.constructor_argument) ->
+                                let mask =
+                                  Axis_lattice_bits.mask_of_modality
+                                    ~relevant_for_shallow:`Irrelevant
+                                    arg.ca_modalities
+                                in
+                                log ~pp:ops.pp_kind
+                                  (Printf.sprintf "cstr arg %d" i) (fun () ->
+                                    ops.modality mask (ops.kind_of arg.ca_type)))
+                              args
+                          | Types.Cstr_record lbls ->
+                            List.map
+                              (fun (lbl : Types.label_declaration) ->
+                                let mask =
+                                  Axis_lattice_bits.mask_of_modality
+                                    ~relevant_for_shallow:`Irrelevant
+                                    lbl.ld_modalities
+                                in
+                                log ~pp:ops.pp_kind
+                                  (Printf.sprintf "cstr label %s"
+                                     (Ident.name lbl.ld_id))
+                                  (fun () ->
+                                    ops.modality mask (ops.kind_of lbl.ld_type)))
+                              lbls)
+                        cstrs
+                    in
+                    ops.join (base :: contribs))
+              in
+              JK.Ty { args = decl.type_params; kind; abstract = false })
+        | Types.Type_open ->
+          log "lookup Type_open" (fun () ->
+              let kind : JK.ckind =
+               fun ops ->
+                log ~pp:ops.pp_kind "Type_open kind" (fun () ->
+                    ops.const Axis_lattice_bits.value)
+              in
+              JK.Ty { args = decl.type_params; kind; abstract = false }))
+      | Some body_ty ->
+        log "lookup manifest body" (fun () ->
+            (* Concrete: compute kind of body. *)
+            let args = decl.type_params in
             let kind : JK.ckind =
              fun ops ->
-              log ~pp:ops.pp_kind "Type_open kind" (fun () ->
-                  ops.const Axis_lattice_bits.value)
+              log ~pp:ops.pp_kind "manifest kind" (fun () ->
+                  ops.kind_of body_ty)
             in
-            JK.Ty { args = decl.type_params; kind; abstract = false }))
-    | Some body_ty ->
-      log "lookup manifest body" (fun () ->
-          (* Concrete: compute kind of body. *)
-          let args = decl.type_params in
-          let kind : JK.ckind =
-           fun ops ->
-            log ~pp:ops.pp_kind "manifest kind" (fun () -> ops.kind_of body_ty)
-          in
-          JK.Ty { args; kind; abstract = false }))
+            JK.Ty { args; kind; abstract = false }))
 
 (* Package the above into a full solver environment. *)
 let make_solver ~(context : Jkind.jkind_context) : JK.solver =
