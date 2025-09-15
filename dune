@@ -233,7 +233,9 @@
   lattice_intf
   global_counters
   product_lattice
+  ldd_memo
   ldd
+  ldd_no_memo
   ldd_jkind_solver
   axis_lattice
   axis_lattice_bits
