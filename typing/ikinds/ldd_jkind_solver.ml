@@ -56,13 +56,17 @@ struct
   (* Hash tables avoiding polymorphic structural comparison on deep values. *)
   module TyTbl = Hashtbl.Make (struct
     type t = ty
+
     let equal a b = Ty.compare a b = 0
+
     let hash t = Hashtbl.hash (Ty.to_string t)
   end)
 
   module ConstrTbl = Hashtbl.Make (struct
     type t = constr
+
     let equal a b = Constr.compare a b = 0
+
     let hash x = Hashtbl.hash (Constr.to_string x)
   end)
 

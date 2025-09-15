@@ -3,7 +3,9 @@ let num_axes = 11
 
 (* widths[i] = 2 for size-3 axes, 1 for size-2 *)
 let widths =
-  Array.map (function 3 -> 2 | 2 -> 1 | _ -> invalid_arg "bad axis size") axis_sizes
+  Array.map
+    (function 3 -> 2 | 2 -> 1 | _ -> invalid_arg "bad axis size")
+    axis_sizes
 
 (* consecutive packing offsets *)
 let offsets =
@@ -21,7 +23,8 @@ let hi_mask   = Array.init num_axes (fun i ->
                   if has_hi.(i) = 1 then (1 lsl (offsets.(i) + 1)) else 0)
 let axis_mask = Array.init num_axes (fun i -> lo_mask.(i) lor hi_mask.(i))
 
-(* OR of all low bits (for size-2 axes that’s their only bit). For this layout: 0xD5BD. *)
+(* OR of all low bits (for size-2 axes that’s their only bit).
+   For this layout: 0xD5BD. *)
 let lows = Array.fold_left (lor) 0 lo_mask
 
 type t = int
@@ -45,7 +48,8 @@ let get_axis (v:t) ~axis:i : int =
 
 (* Branchless set:
     low_bit  = (lev | (lev >> 1)) & 1  (0→0, 1→1, 2→1)
-    high_bit = (lev >> 1) & has_hi     (0→0, 1→0, 2→1; zeroed for 1-bit axes)
+    high_bit = (lev >> 1) & has_hi
+      (0→0, 1→0, 2→1; zeroed for 1-bit axes)
     No range checks—caller keeps lev in-range. *)
 let set_axis (v:t) ~axis:i ~level:lev : t =
   let off = offsets.(i) in
@@ -77,9 +81,11 @@ let pp (v:t) : string =
 let to_string = pp
 
 (* Axis-wise residual:
-    r = a & ~b zeroes axes where b >= a; only invalid per-axis pattern is 10 (from 11 - 01).
-    (r >> 1) copies surviving high bits down to their own low slots; AND with ~ (lows >> 1)
-    kills spillovers from low bits into neighbors; OR repairs 10 -> 11. *)
+    r = a & ~b zeroes axes where b >= a; only invalid per-axis
+    pattern is 10 (from 11 - 01).
+    (r >> 1) copies surviving high bits down to their own low slots;
+    AND with ~ (lows >> 1) kills spillovers from low bits into neighbors;
+    OR repairs 10 -> 11. *)
 
 let lnot_lsr_1_lows = lnot (lows lsr 1)
 let co_sub (a:t) (b:t) : t =
@@ -128,7 +134,8 @@ let relevant_axes_of_modality
           Mode.Modality.Const.proj axis_for_modality modality
         in
         not
-          (Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis)
+          (Mode.Modality.Per_axis.is_constant
+             axis_for_modality modality_on_axis)
       | Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality -> true
       | Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability -> (
         match relevant_for_shallow with
@@ -199,7 +206,9 @@ let contention_of_level_monadic = function
   | _ -> invalid_arg "Axis_lattice_bits.contention_of_level_monadic"
 
 let level_of_yielding (x : Mode.Yielding.Const.t) : int =
-  match x with Mode.Yielding.Const.Unyielding -> 0 | Mode.Yielding.Const.Yielding -> 1
+  match x with
+  | Mode.Yielding.Const.Unyielding -> 0
+  | Mode.Yielding.Const.Yielding -> 1
 
 let yielding_of_level = function
   | 0 -> Mode.Yielding.Const.Unyielding

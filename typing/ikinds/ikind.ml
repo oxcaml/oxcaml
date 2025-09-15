@@ -1,6 +1,6 @@
 (* Minimal kind constructor over real Types.type_expr, inspired by infer6. *)
 
-Clflags.ikinds := true;
+Clflags.ikinds := true
 
 module TyM = struct
   type t = Types.type_expr
