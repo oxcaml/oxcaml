@@ -1,7 +1,5 @@
 (* Minimal kind constructor over real Types.type_expr, inspired by infer6. *)
 
-Clflags.ikinds := true
-
 module TyM = struct
   type t = Types.type_expr
 
@@ -34,12 +32,12 @@ let with_origin_tag (tag : string) (f : unit -> 'a) : 'a =
 
 (* Debug logging helper with indentation (2 spaces per level).
    Enable by setting IKIND_DEBUG=1|true|yes in the environment. *)
-let __ikind_debug : bool = false
+let __ikind_debug : bool ref = ref false
 
 let __ikind_log_depth = ref 0
 
 let log ?pp (msg : string) (f : unit -> 'a) : 'a =
-  if not __ikind_debug
+  if not !__ikind_debug
   then f ()
   else
     let indent = String.make (!__ikind_log_depth * 2) ' ' in
@@ -97,10 +95,16 @@ let ckind_of_jkind_r (j : Types.jkind_r) : JK.ckind =
 
 let kind_of_depth = ref 0
 
+let kind_of_counter = ref 0
+
+exception Kind_of_limit_reached
+
 let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
  fun (ops : JK.ops) ->
   incr kind_of_depth;
   if !kind_of_depth > 5000 then failwith "kind_of_depth too deep" else ();
+  incr kind_of_counter;
+  if !kind_of_counter > 10000000 then __ikind_debug := true else ();
   let res =
     match Types.get_desc ty with
     | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
@@ -478,13 +482,17 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
 (* CR jujacobs: this is really slow when enabled. Fix performance. *)
 let crossing_of_jkind ~(context : Jkind.jkind_context)
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
-  if not (false && !Clflags.ikinds) (* CR jujacobs: fix this *)
+  if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.get_mode_crossing ~context jkind
   else
-    let solver = make_solver ~context in
-    let lat = JK.round_up solver (ckind_of_jkind jkind) in
-    let mb = Axis_lattice.to_mod_bounds lat in
-    Jkind.Mod_bounds.to_mode_crossing mb
+    try
+      let solver = make_solver ~context in
+      let lat = JK.round_up solver (ckind_of_jkind jkind) in
+      let mb = Axis_lattice.to_mod_bounds lat in
+      Jkind.Mod_bounds.to_mode_crossing mb
+    with Kind_of_limit_reached ->
+      Format.eprintf "Kind_of_limit_reached";
+      assert false
 
 (* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
    Keep Jkind as the single source for classification and error reporting. *)
@@ -501,7 +509,7 @@ let sub_or_intersect ?origin
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
   let _ = origin in
-  if not (false && !Clflags.ikinds) (* CR jujacobs: fix this *)
+  if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.sub_or_intersect ~type_equal ~context t1 t2
   else
     (* CR jujacobs: enable this *)

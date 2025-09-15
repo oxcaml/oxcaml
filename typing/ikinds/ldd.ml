@@ -486,8 +486,8 @@ module Make (C : LATTICE) (V : ORDERED) = struct
   let gfp_queue = Stack.create ()
 
   let enqueue_lfp (var : var) (rhs_raw : node) : unit =
-    (* Stack.push (var, rhs_raw) lfp_queue *)
-    solve_lfp var rhs_raw
+    Stack.push (var, rhs_raw) lfp_queue
+  (* solve_lfp var rhs_raw *)
 
   let enqueue_gfp (var : var) (rhs_raw : node) : unit =
     Stack.push (var, rhs_raw) gfp_queue

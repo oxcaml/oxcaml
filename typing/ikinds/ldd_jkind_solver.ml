@@ -96,20 +96,17 @@ struct
       lookup : constr -> constr_decl
     }
 
+  type left_right =
+    | Left
+    | Right
+
   type solver =
-    { ops : ops;
+    { ops : mode:left_right -> ops;
       constr_kind_poly : constr -> poly * poly list
     }
 
   let make_solver (env : env) : solver =
     LSolver.clear_memos ();
-    let enqueue_lfp_enabled =
-      match Sys.getenv_opt "JKINDS_ENQUEUE_LFP" with
-      | Some s ->
-        let s = String.lowercase_ascii s in
-        s = "1" || s = "true" || s = "yes"
-      | None -> false
-    in
     (* Define all the trivial ops *)
     let const l = LSolver.const l in
     let join ks = List.fold_left LSolver.join LSolver.bot ks in
@@ -121,18 +118,18 @@ struct
     (* And hash table mapping constructor to coefficients *)
     let constr_to_coeffs = ConstrTbl.create 0 in
     (* Define kind_of and constr ops *)
-    let rec kind_of (t : ty) : kind =
+    let rec kind_of ~mode (t : ty) : kind =
       match TyTbl.find_opt ty_to_kind t with
       | Some k -> k
       | None ->
         (* Pre-insert lattice solver var for this type *)
         let v = LSolver.new_var () in
         TyTbl.add ty_to_kind t (LSolver.var v);
-        let kind = env.kind_of t ops in
+        let kind = env.kind_of t (ops ~mode) in
         (* Always solve LFPs here to avoid correctness issues *)
         LSolver.solve_lfp v kind;
         kind
-    and constr_kind c =
+    and constr_kind ~mode c =
       match ConstrTbl.find_opt constr_to_coeffs c with
       | Some base_and_coeffs -> base_and_coeffs
       | None -> (
@@ -155,7 +152,10 @@ struct
             (fun ty var -> TyTbl.add ty_to_kind ty (LSolver.var var))
             args rigid_vars;
           (* Compute body kind *)
-          let kind' = kind ops in
+          (* CR jujacobs: we shouldn't need to compute the kind if
+             we are in Right mode and abstract=true, but currently this is
+             needed to correctly populate the cache. *)
+          let kind' = kind (ops ~mode) in
           (* Extract coeffs' from kind' *)
           let base', coeffs' =
             LSolver.decompose_linear ~universe:rigid_vars kind'
@@ -169,41 +169,44 @@ struct
           if abstract
           then (
             (* We need to assert that kind' is less than or equal to the base *)
-            LSolver.enqueue_gfp base
-              (LSolver.meet base'
-                 (LSolver.var (LSolver.rigid (RigidName.atomic c 0))));
-            List.iteri
-              (fun i (coeff, coeff') ->
-                let rhs = LSolver.join coeff' base' in
-                let bound =
-                  LSolver.meet rhs
-                    (LSolver.var (LSolver.rigid (RigidName.atomic c (i + 1))))
-                in
-                LSolver.enqueue_gfp coeff bound)
-              (List.combine coeffs coeffs'))
-          else if (* We need to solve for the coeffs *)
-                  enqueue_lfp_enabled
-          then (
-            LSolver.enqueue_lfp base base';
-            List.iter2
-              (fun coeff coeff' -> LSolver.enqueue_lfp coeff coeff')
-              coeffs coeffs')
+            match mode with
+            | Left ->
+              LSolver.enqueue_gfp base base';
+              List.iteri
+                (fun _i (coeff, coeff') ->
+                  let rhs = LSolver.join coeff' base' in
+                  LSolver.enqueue_gfp coeff rhs)
+                (List.combine coeffs coeffs')
+            | Right ->
+              LSolver.enqueue_gfp base
+                (LSolver.meet base'
+                   (LSolver.var (LSolver.rigid (RigidName.atomic c 0))));
+              List.iteri
+                (fun i (coeff, coeff') ->
+                  let rhs = LSolver.join coeff' base' in
+                  let bound =
+                    LSolver.meet rhs
+                      (LSolver.var (LSolver.rigid (RigidName.atomic c (i + 1))))
+                  in
+                  LSolver.enqueue_gfp coeff bound)
+                (List.combine coeffs coeffs'))
           else (
             LSolver.solve_lfp base base';
             List.iter2
               (fun coeff coeff' -> LSolver.solve_lfp coeff coeff')
               coeffs coeffs');
           LSolver.var base, List.map LSolver.var coeffs)
-    and constr c ks =
-      let base, coeffs = constr_kind c in
+    and constr ~mode c ks =
+      let base, coeffs = constr_kind ~mode c in
       (* Meet each arg with the corresponding coeff *)
       let ks' =
-        (* Meet each provided argument with its coeff; missing args are ⊥. *)
         let nth_opt lst i = try Some (List.nth lst i) with _ -> None in
         List.mapi
           (fun i coeff ->
             let k =
-              match nth_opt ks i with Some k -> k | None -> LSolver.bot
+              match nth_opt ks i with
+              | Some k -> k
+              | None -> failwith "Missing arg"
             in
             LSolver.meet k coeff)
           coeffs
@@ -212,15 +215,23 @@ struct
       let k' = List.fold_left LSolver.join base ks' in
       (* Return that kind *)
       k'
-    and ops =
+    and ops ~mode =
       let pp_kind (k : kind) =
         (* Print without solving pending fixpoints; pp() forces locally. *)
         LSolver.pp k
       in
-      { const; join; meet; modality; constr; kind_of; rigid; pp_kind }
+      { const;
+        join;
+        meet;
+        modality;
+        constr = constr ~mode;
+        kind_of = kind_of ~mode;
+        rigid;
+        pp_kind
+      }
     in
-    let constr_kind_poly c =
-      let base, coeffs = constr_kind c in
+    let constr_kind_poly ~mode c =
+      let base, coeffs = constr_kind ~mode c in
       (* Ensure any pending fixpoints are installed before inspecting. *)
       LSolver.solve_pending ();
       let base_norm = base in
@@ -230,25 +241,26 @@ struct
       in
       base_norm, coeffs_minus_base
     in
-    { ops; constr_kind_poly }
+    { ops; constr_kind_poly = constr_kind_poly ~mode:Right }
 
-  let normalize (solver : solver) (k : ckind) : poly = k solver.ops
+  let normalize (solver : solver) (k : ckind) : poly =
+    k (solver.ops ~mode:Right)
 
   let constr_kind_poly (solver : solver) (c : constr) : poly * poly list =
     solver.constr_kind_poly c
 
   let leq (solver : solver) (k1 : ckind) (k2 : ckind) : bool =
-    let k1' = k1 solver.ops in
-    let k2' = k2 solver.ops in
+    let k2' = k2 (solver.ops ~mode:Right) in
+    let k1' = k1 (solver.ops ~mode:Left) in
     LSolver.leq k1' k2'
 
   let leq_with_reason (solver : solver) (k1 : ckind) (k2 : ckind) : int option =
-    let k1' = k1 solver.ops in
-    let k2' = k2 solver.ops in
+    let k2' = k2 (solver.ops ~mode:Right) in
+    let k1' = k1 (solver.ops ~mode:Left) in
     LSolver.leq_with_reason k1' k2'
 
   let round_up (solver : solver) (k : ckind) : lat =
-    let k' = k solver.ops in
+    let k' = k (solver.ops ~mode:Left) in
     LSolver.round_up k'
 
   let clear_memos () : unit = LSolver.clear_memos ()
