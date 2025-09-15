@@ -51,6 +51,16 @@
 
 (copy_files ../Makefile.config)
 
+(include ocamlj.inc)
+
+(rule
+  (mode promote)
+  (alias runtest)
+  (target ocamlj.inc)
+  (deps (source_tree .))
+  (action (with-stdout-to %{target} (run ./gen_ocamlj_rules.sh)) ))
+
+
 (install
  (files
   Makefile.config
