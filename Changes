@@ -744,6 +744,10 @@ OCaml 5.4.0
   to nonsensical "type t is not compatible with type t" submessage
   (Florian Angeletti, report by Basile Clément, review by Gabriel Scherer)
 
+- #14238: Fix certain variadic macros in misc.h which could trigger C warnings
+  under certain conditions in prerelease versions of OCaml 5.4.
+  (Antonin Décimo, review by Nicolás Ojeda Bär)
+
 OCaml 5.3.0 (8 January 2025)
 ----------------------------
 
