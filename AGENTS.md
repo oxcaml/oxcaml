@@ -21,6 +21,9 @@ The user has to start a passive watcher in a separate terminal for this to work:
   `make hacking-emacs-poller`
 Runs Dune in passive watch mode for the boot workspace with RPC server.
 
+IMPORTANT: YOU MUST ALWAYS BUILD AFTER YOUR CHANGES JUST LIKE A SOFTWARE ENGINEER!
+Ensure that all the code type checks and builds using `make hacking-emacs-builder`.
+
 # Testing the compiler
 
 Run the compiler produced by `make hacking-emacs-poller`/`builder` on a file using `_build/_bootinstall/bin/ocamlc <the-file>`.

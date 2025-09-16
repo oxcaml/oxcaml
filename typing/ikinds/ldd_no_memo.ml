@@ -36,13 +36,9 @@ end
 module Make (C : LATTICE) (V : ORDERED) = struct
   (* --------- variables --------- *)
   type node =
-    | Leaf of
-        { id : int;
-          c : C.t
-        }
+    | Leaf of C.t
     | Node of
-        { id : int;
-          v : var;
+        { v : var;
           lo : node;
           hi : node
         }
@@ -102,52 +98,32 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     let _id v = v.id
   end
 
-  (* --------- stable node ids --------- *)
-  let next_node_id = ref (-1)
-
-  let fresh_id () =
-    incr next_node_id;
-    !next_node_id
-
-  let node_id = function Leaf n -> n.id | Node n -> n.id
-
   (* --------- leaf and constants (no interning) --------- *)
-  let leaf (c : C.t) : node = Leaf { id = fresh_id (); c }
+  let leaf (c : C.t) : node = Leaf c
 
   let bot = leaf C.bot
 
   let top = leaf C.top
 
-  let is_bot_node = function Leaf { c; _ } -> C.equal c C.bot | _ -> false
+  let is_bot_node = function Leaf c -> C.equal c C.bot | _ -> false
 
-  let is_top_node = function Leaf { c; _ } -> C.equal c C.top | _ -> false
+  let is_top_node = function Leaf c -> C.equal c C.top | _ -> false
 
   (* For asserting that var ids are strictly increasing down the tree. *)
   let var_index (n : node) : int =
     match n with Leaf _ -> 999999999 | Node n -> n.v.id
 
-  (* Structural equality of nodes (used sparingly; no hash-consing). *)
-  let rec equal_node (a : node) (b : node) : bool =
-    if a == b
-    then true
-    else
-      match a, b with
-      | Leaf x, Leaf y -> C.equal x.c y.c
-      | Node na, Node nb ->
-        na.v.id = nb.v.id && equal_node na.lo nb.lo && equal_node na.hi nb.hi
-      | _ -> false
-
-  let rec down0 = function Leaf { c; _ } -> c | Node { lo; _ } -> down0 lo
+  let rec down0 = function Leaf c -> c | Node { lo; _ } -> down0 lo
 
   (* Construct a node; must be in canonical form: hi = hi - lo. *)
   let node_raw (v : var) (lo : node) (hi : node) : node =
     assert (v.id < var_index lo);
     assert (v.id < var_index hi);
-    if is_bot_node hi then lo else Node { id = fresh_id (); v; lo; hi }
+    if is_bot_node hi then lo else Node { v; lo; hi }
 
   (* Subtract subsets h - l (no memoization). *)
   let rec canonicalize (h : node) (l : node) : node =
-    if equal_node h l
+    if h == l
     then bot
     else if is_bot_node l
     then h
@@ -155,7 +131,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     then bot
     else
       match h with
-      | Leaf x -> leaf (C.co_sub x.c (down0 l))
+      | Leaf c -> leaf (C.co_sub c (down0 l))
       | Node nh -> (
         match l with
         | Leaf _ -> node_raw nh.v (canonicalize nh.lo l) (canonicalize nh.hi l)
@@ -175,7 +151,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
 
   (* --------- boolean algebra over nodes (no memoization) --------- *)
   let rec join (a : node) (b : node) =
-    if equal_node a b
+    if a == b
     then a
     else if is_bot_node a
     then b
@@ -187,7 +163,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     then top
     else
       match a, b with
-      | Leaf x, Leaf y -> leaf (C.join x.c y.c)
+      | Leaf c1, Leaf c2 -> leaf (C.join c1 c2)
       | Node na, Node nb ->
         if na.v.id = nb.v.id
         then
@@ -200,7 +176,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
       | Node na, Leaf _ -> node_raw na.v (join na.lo b) (canonicalize na.hi b)
 
   let rec meet (a : node) (b : node) =
-    if equal_node a b
+    if a == b
     then a
     else if is_bot_node a
     then bot
@@ -212,7 +188,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     then a
     else
       match a, b with
-      | Leaf x, Leaf y -> leaf (C.meet x.c y.c)
+      | Leaf c1, Leaf c2 -> leaf (C.meet c1 c2)
       | (Leaf _ as x), Node na | Node na, (Leaf _ as x) ->
         node na.v (meet na.lo x) (meet na.hi x)
       | Node na, Node nb ->
@@ -270,7 +246,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
           let d' = force d in
           join lo' (meet hi' d')
         | Unsolved ->
-          if equal_node lo' n.lo && equal_node hi' n.hi
+          if lo' == n.lo && hi' == n.hi
           then w
           else
             let d' = force (mk_var n.v) in
@@ -352,11 +328,11 @@ module Make (C : LATTICE) (V : ORDERED) = struct
   let leq (a : node) (b : node) =
     let a = force a in
     let b = force b in
-    equal_node (join a b) b
+    is_bot_node (sub_subsets a b)
 
   let rec find_non_bot_axis (n : node) =
     match n with
-    | Leaf { c; _ } -> C.find_non_bot_axis c
+    | Leaf c -> C.find_non_bot_axis c
     | Node n -> (
       match find_non_bot_axis n.lo with
       | Some i -> Some i
@@ -367,7 +343,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
       (C.t * string list) list =
     let rec aux (acc : string list) (w : node) : (C.t * string list) list =
       match w with
-      | Leaf { c; _ } -> if C.equal c C.bot then [] else [c, acc]
+      | Leaf c -> if C.equal c C.bot then [] else [c, acc]
       | Node n ->
         let acc_hi =
           match n.v.state with
@@ -439,7 +415,7 @@ module Make (C : LATTICE) (V : ORDERED) = struct
 
   let rec round_up' (n : node) =
     match n with
-    | Leaf { c; _ } -> c
+      | Leaf c -> c
     | Node n ->
       let lo' = round_up' n.lo in
       let hi' = round_up' n.hi in
@@ -457,30 +433,48 @@ module Make (C : LATTICE) (V : ORDERED) = struct
   let pp_debug (w : node) : string =
     let pp_coeff = C.to_string in
     let b = Buffer.create 1024 in
-    let seen = Hashtbl.create 97 in
+    let module NodeTbl = Hashtbl.Make (struct
+      type t = node
+
+      let equal = ( == )
+
+      let hash = Hashtbl.hash
+    end) in
+    let id_tbl = NodeTbl.create 97 in
+    let printed : (int, unit) Hashtbl.t = Hashtbl.create 97 in
+    let next_id = ref 0 in
+    let get_id (n : node) : int =
+      match NodeTbl.find_opt id_tbl n with
+      | Some id -> id
+      | None ->
+        let id = !next_id in
+        incr next_id;
+        NodeTbl.add id_tbl n id;
+        id
+    in
     let pp_var_info (v : var) : string =
       let state_s =
         match v.state with
         | Unsolved -> "Unsolved"
         | Rigid name -> "Rigid(" ^ V.to_string name ^ ")"
-        | Solved n -> "Solved(#" ^ string_of_int (node_id n) ^ ")"
+        | Solved n -> "Solved(#" ^ string_of_int (get_id n) ^ ")"
       in
       Printf.sprintf "v#%d:%s" v.id state_s
     in
     let rec go indent (n : node) : unit =
-      let id = node_id n in
-      if Hashtbl.mem seen id
+      let id = get_id n in
+      if Hashtbl.mem printed id
       then Buffer.add_string b (Printf.sprintf "%s#%d = <ref>\n" indent id)
       else (
-        Hashtbl.add seen id true;
+        Hashtbl.add printed id ();
         match n with
-        | Leaf { id; c } ->
+        | Leaf c ->
           Buffer.add_string b
             (Printf.sprintf "%sLeaf#%d c=%s\n" indent id (pp_coeff c))
-        | Node { id; v; lo; hi } ->
+        | Node { v; lo; hi } ->
           Buffer.add_string b
             (Printf.sprintf "%sNode#%d %s lo=#%d hi=#%d\n" indent id
-               (pp_var_info v) (node_id lo) (node_id hi));
+               (pp_var_info v) (get_id lo) (get_id hi));
           let indent' = indent ^ "  " in
           go indent' lo;
           go indent' hi)
@@ -488,4 +482,3 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     go "" w;
     Buffer.contents b
 end
-
