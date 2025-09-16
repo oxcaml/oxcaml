@@ -62,7 +62,7 @@ type t = Foo : ('a : immutable_data). 'a -> t
 |}]
 
 let foo (t : t @ contended) = use_uncontended t
-(* CR layouts v2.8: This should be accepted. Internal ticket c. *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect {|
 Line 1, characters 46-47:
 1 | let foo (t : t @ contended) = use_uncontended t
