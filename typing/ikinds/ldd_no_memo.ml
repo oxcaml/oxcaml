@@ -426,6 +426,29 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     let n = force n in
     round_up' n
 
+  let map_rigid (f : V.t -> node) (n : node) : node =
+    let rec aux (n : node) : node =
+      match n with
+      | Leaf _ -> n
+      | Node { v; lo; hi } -> (
+        match v.state with
+        | Rigid name ->
+          let lo' = aux lo in
+          let hi' = aux hi in
+          let replacement = f name in
+          join lo' (meet hi' replacement)
+        | Unsolved ->
+          let lo' = aux lo in
+          let hi' = aux hi in
+          if lo' == lo && hi' == hi
+          then n
+          else
+            let var_node = mk_var v in
+            join lo' (meet hi' var_node)
+        | Solved _ -> assert false)
+    in
+    aux (force n)
+
   (* Clear all memo tables (none here); reset rigids to avoid unbounded growth.*)
   let clear_memos () : unit = Var.reset_rigids ()
 

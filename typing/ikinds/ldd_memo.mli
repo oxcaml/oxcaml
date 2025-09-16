@@ -74,6 +74,9 @@ module Make (C : LATTICE) (V : ORDERED) : sig
 
   val round_up : node -> C.t
 
+  (* Apply [f] to every rigid variable, replacing it with the returned node. *)
+  val map_rigid : (V.t -> node) -> node -> node
+
   (* Clear all memo tables *)
   val clear_memos : unit -> unit
 
@@ -82,4 +85,3 @@ module Make (C : LATTICE) (V : ORDERED) : sig
 
   val pp_debug : node -> string
 end
-

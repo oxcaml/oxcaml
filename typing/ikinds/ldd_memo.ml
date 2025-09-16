@@ -648,6 +648,38 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     let n = force n in
     round_up' n
 
+  let map_rigid (f : V.t -> node) (n : node) : node =
+    let memo = NodeTbl.create () in
+    let rec aux (n : node) : node =
+      match NodeTbl.find_opt memo n with
+      | Some r -> r
+      | None ->
+        Global_counters.inc "map_rigid";
+        let r =
+          match n with
+          | Leaf _ -> n
+          | Node { v; lo; hi } -> (
+            match v.state with
+            | Rigid name ->
+              let lo' = aux lo in
+              let hi' = aux hi in
+              let replacement = f name in
+              join lo' (meet hi' replacement)
+            | Unsolved ->
+              let lo' = aux lo in
+              let hi' = aux hi in
+              if node_id lo' = node_id lo && node_id hi' = node_id hi
+              then n
+              else
+                let var_node = mk_var v in
+                join lo' (meet hi' var_node)
+            | Solved _ -> assert false)
+        in
+        NodeTbl.add memo n r;
+        r
+    in
+    aux (force n)
+
   (* Clear all memo tables *)
   let clear_memos () : unit =
     LeafTbl.clear leaf_tbl;
@@ -699,4 +731,3 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     go "" w;
     Buffer.contents b
 end
-
