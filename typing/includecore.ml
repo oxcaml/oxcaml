@@ -1438,7 +1438,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
            manifest fixes the problem. *)
         if Option.is_none decl2.type_manifest then
           (* Note that [decl2.type_jkind] is an upper bound *)
-          match Ikind.with_origin_tag "includecore:check_decl_jkind" (fun () ->
+          match Ikinds.with_origin_tag "includecore:check_decl_jkind" (fun () ->
                   Ctype.check_decl_jkind env decl1 decl2.type_jkind) with
            | Ok _ -> None
            | Error v -> Some (Jkind v)

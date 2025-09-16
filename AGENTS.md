@@ -10,7 +10,7 @@ We are mainly working with typing/ikinds, and sometimes with jkind.ml and ctype.
 - typing/ikinds/product_lattice(.ml/.mli): Simple array‑based product lattice functor (prototype) with encode/decode and per‑axis ops; parameterized by axis sizes.
 - typing/ikinds/axis_lattice(.ml/.mli): Product lattice for jkinds axes with conversions to/from modality bounds and common lattice constants; interface exposes lattice ops and axis mapping.
 - typing/ikinds/axis_lattice_bits(.ml/.mli): Bitset-backed axis lattice offering the same API as axis_lattice for faster operations.
-- typing/ikinds/ikind.ml: Kind construction driver using Ldd_jkind_solver + Axis_lattice to compute kinds from Types.type_expr.
+- typing/ikinds/ikinds.ml: Kind construction driver using Ldd_jkind_solver + Axis_lattice to compute kinds from Types.type_expr.
 
 # Diagnostics
 
@@ -47,5 +47,4 @@ We are primarily interested in the `testsuite/tests/typing-jkind-bounds/**` test
 # Formatting
 
 Run formatter: `make fmt`
-
 

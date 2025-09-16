@@ -240,7 +240,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
   match context.lookup_type p with
   | None ->
     failwith
-      (Format.asprintf "Ikind.lookup: unknown constructor %a" Path.print p)
+      (Format.asprintf "Ikinds.lookup: unknown constructor %a" Path.print p)
   | Some decl -> (
     if always_use_stored_jkind
     then

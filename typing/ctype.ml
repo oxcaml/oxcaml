@@ -2574,7 +2574,7 @@ let constrain_type_jkind ~fixed env ty jkind =
 
     | _ ->
        match
-         Ikind.sub_or_intersect ~type_equal ~context ty's_jkind jkind
+         Ikinds.sub_or_intersect ~type_equal ~context ty's_jkind jkind
        with
        | Sub -> Ok ()
        | Disjoint sub_failure_reasons ->
@@ -5193,7 +5193,7 @@ let zap_modalities_to_floor_if_at_least level =
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
-  Ikind.crossing_of_jkind ~context jkind
+  Ikinds.crossing_of_jkind ~context jkind
 
 let crossing_of_ty env ?modalities ty =
   let crossing =
@@ -7434,7 +7434,7 @@ let check_decl_jkind env decl jkind =
       Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
     | _ -> decl.type_jkind
   in
-  match Ikind.sub_jkind_l
+  match Ikinds.sub_jkind_l
           ~origin:(Format.asprintf "ctype:decl %a"
                      Location.print_loc decl.type_loc)
           ~type_equal
@@ -7447,7 +7447,7 @@ let check_decl_jkind env decl jkind =
     | None -> err
     | Some ty ->
       let ty_jkind = type_jkind env ty in
-      match Ikind.sub_jkind_l
+      match Ikinds.sub_jkind_l
               ~origin:(Format.asprintf "ctype:manifest %a"
                          Location.print_loc decl.type_loc)
               ~type_equal
@@ -7465,13 +7465,13 @@ let constrain_decl_jkind env decl jkind =
      the need for reimplementation. Hopefully no one hits this for
      a while. *)
   | None ->
-    Ikind.with_origin_tag "ctype:constrain_decl_jkind" (fun () ->
+    Ikinds.with_origin_tag "ctype:constrain_decl_jkind" (fun () ->
         check_decl_jkind env decl jkind)
   | Some jkind ->
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      Ikind.sub_or_error ~type_equal ~context decl.type_jkind jkind
+      Ikinds.sub_or_error ~type_equal ~context decl.type_jkind jkind
     with
     | Ok () as ok -> ok
     | Error _ as err ->

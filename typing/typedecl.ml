@@ -1502,11 +1502,11 @@ let narrow_to_manifest_jkind env loc decl =
     begin match !Clflags.ikinds, Jkind.try_allow_r decl.type_jkind with
     | true, _ | false, None ->
         (* Under -ikinds, or when [decl.type_jkind] cannot allow-right
-           (e.g. due to with-bounds/Best), route through Ikind. *)
+           (e.g. due to with-bounds/Best), route through Ikinds. *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
         (match
-           Ikind.sub_jkind_l
+           Ikinds.sub_jkind_l
              ~origin:(Format.asprintf
                         "typedecl:manifest_vs_decl %a"
                         Location.print_loc decl.type_loc)
@@ -2776,7 +2776,7 @@ let normalize_decl_jkinds env decls =
       match
         (* CR layouts v2.8: Consider making a function that doesn't compute
            histories for this use-case, which doesn't need it. *)
-        Ikind.sub_jkind_l
+        Ikinds.sub_jkind_l
           ~origin:(Format.asprintf
                      "typedecl:normalize %a (%a)"
                      Path.print path
