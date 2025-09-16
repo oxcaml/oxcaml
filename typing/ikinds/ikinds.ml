@@ -150,8 +150,8 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
       log ~pp:ops.pp_kind
         (Printf.sprintf "Tunboxed_tuple %d elts" (List.length elts))
         (fun () ->
-          (* Unboxed tuples: per-element contributions; shallow axes relevant only
-             for arity = 1. *)
+          (* Unboxed tuples: per-element contributions; shallow axes relevant
+             only for arity = 1. *)
           let contribs =
             let relevant_for_shallow =
               match List.length elts with 1 -> `Relevant | _ -> `Irrelevant
@@ -251,7 +251,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     else
       match decl.type_manifest with
       | None -> (
-        (* No manifest: may still be concrete (record/variant/...). Build ckind. *)
+        (* No manifest: may still be concrete (record/variant/...). Build
+           ckind. *)
         match decl.type_kind with
         | Types.Type_abstract _ ->
           log "lookup Type_abstract" (fun () ->
@@ -259,7 +260,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
               JK.Ty { args = decl.type_params; kind; abstract = true })
         | Types.Type_record (lbls, _rep, _umc_opt) ->
           log "lookup Type_record" (fun () ->
-              (* Build from components: base (non-float value) + per-label contributions. *)
+              (* Build from components: base (non-float value) + per-label
+                 contributions. *)
               let base_lat =
                 if has_mutable_label lbls
                 then Axis_lattice.mutable_data
@@ -373,7 +375,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                                 in
                                 log ~pp:ops.pp_kind
                                   (Printf.sprintf "cstr arg %d" i) (fun () ->
-                                    ops.modality mask (ops.kind_of arg.ca_type)))
+                                    ops.modality mask
+                                      (ops.kind_of arg.ca_type)))
                               args
                           | Types.Cstr_record lbls ->
                             List.map
@@ -387,7 +390,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                                   (Printf.sprintf "cstr label %s"
                                      (Ident.name lbl.ld_id))
                                   (fun () ->
-                                    ops.modality mask (ops.kind_of lbl.ld_type)))
+                                    ops.modality mask
+                                      (ops.kind_of lbl.ld_type)))
                               lbls)
                         cstrs
                     in
@@ -545,7 +549,8 @@ let sub_or_error ?origin
     (* Delegate to Jkind for detailed error reporting. *)
     Jkind.sub_or_error ~type_equal ~context t1 t2
 
-(* Developer probe stub: set IKIND_POLY_PROBE to enable future tests. No-op by default. *)
+(* Developer probe stub: set IKIND_POLY_PROBE to enable future tests. No-op by
+   default. *)
 let () =
   match Sys.getenv_opt "IKIND_POLY_PROBE" with
   | Some v when v = "1" || String.lowercase_ascii v = "true" ->

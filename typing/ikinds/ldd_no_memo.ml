@@ -260,7 +260,8 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     let b = force b in
     canonicalize a b
 
-  (* --------- solve-on-install (no queues for LFP; GFP uses a stack) --------- *)
+  (* --------- solve-on-install (no queues for LFP; GFP uses a stack)
+       --------- *)
   let solve_lfp (var : var) (rhs_raw : node) : unit =
     match var.state with
     | Rigid _ -> invalid_arg "solve_lfp: rigid variable"
@@ -449,7 +450,8 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     in
     aux (force n)
 
-  (* Clear all memo tables (none here); reset rigids to avoid unbounded growth.*)
+  (* Clear all memo tables (none here); reset rigids to avoid unbounded
+     growth. *)
   let clear_memos () : unit = Var.reset_rigids ()
 
   (* --------- structural debug printer --------- *)
