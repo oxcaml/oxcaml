@@ -1256,30 +1256,10 @@ result: 7
 - : unit = ()
 |}]
 
-(* Ranges of `char#`, `int8`, and `int8#` are allowed. *)
+(* Ranges of `char#` are allowed. *)
 let x =
   match #'c' with
   | #'a'..#'z' -> 10
-  | _ -> 20
-;;
-
-[%%expect{|
-val x : int = 10
-|}]
-
-let x =
-  match 10s with
-  | 5s..15s -> 10
-  | _ -> 20
-;;
-
-[%%expect{|
-val x : int = 10
-|}]
-
-let x =
-  match #10s with
-  | #5s..#15s -> 10
   | _ -> 20
 ;;
 

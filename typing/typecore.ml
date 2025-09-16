@@ -11325,7 +11325,8 @@ let report_error ~loc env =
         reason_str
   | Invalid_interval ->
       Location.errorf ~loc
-        "@[Only character intervals are supported in patterns.@]"
+        "@[Only character intervals and untagged character intervals \
+         are supported in patterns.@]"
   | Invalid_for_loop_index ->
       Location.errorf ~loc
         "@[Invalid for-loop index: only variables and %a are allowed.@]"
