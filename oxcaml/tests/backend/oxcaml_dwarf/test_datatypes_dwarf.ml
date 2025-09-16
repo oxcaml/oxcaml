@@ -25,6 +25,18 @@ let _ = f_complex_variant (Pair (42, 1.5))
 let _ = f_complex_variant (Record { x = 10; y = 2.5 })
 let _ = f_complex_variant (Mixed { a = 100; b = #3.14; c = true })
 
+(* Test that the same type works across multiple functions when cached *)
+let[@inline never] [@local never] f_complex_variant_second (x: complex_variant) = x
+let _ = f_complex_variant_second (Single 456)
+let _ = f_complex_variant_second (Pair (999, 9.99))
+let _ = f_complex_variant_second (Record { x = 20; y = 5.0 })
+
+(* Test that the same type works across multiple functions when cached *)
+let[@inline never] [@local never] f_complex_variant_third (x: complex_variant) = x
+let _ = f_complex_variant_third Empty
+let _ = f_complex_variant_third (Mixed { a = 200; b = #1.41; c = false })
+let _ = f_complex_variant_third (Pair (777, 7.77))
+
 (* Regular records *)
 type basic_record = { x: int; y: float }
 type mixed_record = { a: int; b: float#; c: bool; d: int32 }
