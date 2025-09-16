@@ -241,11 +241,8 @@ module Expert = struct
            !Oxcaml_flags.opt_level)
 
   let fallback_inlining_heuristic () =
-    if !Clflags.jsir
-    then true
-    else
-      !Oxcaml_flags.Flambda2.Expert.fallback_inlining_heuristic
-      |> with_default ~f:(fun d -> d.fallback_inlining_heuristic)
+    !Oxcaml_flags.Flambda2.Expert.fallback_inlining_heuristic
+    |> with_default ~f:(fun d -> d.fallback_inlining_heuristic)
 
   let inline_effects_in_cmm () =
     !Oxcaml_flags.Flambda2.Expert.inline_effects_in_cmm
