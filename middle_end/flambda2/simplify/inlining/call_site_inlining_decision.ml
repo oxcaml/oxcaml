@@ -192,8 +192,8 @@ let get_rec_info dacc ~function_type =
   | Need_meet -> Rec_info_expr.unknown
   | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline
 
-let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
-    Call_site_inlining_decision_type.t =
+let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity
+    ~code_or_metadata : Call_site_inlining_decision_type.t =
   let must_inline = DE.must_inline (DA.denv dacc) in
   let fail_if_must_inline () =
     if must_inline
@@ -209,9 +209,6 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     fail_if_must_inline ();
     Never_inlined_attribute
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
-    let code_or_metadata =
-      DE.find_code_exn (DA.denv dacc) (FT.code_id function_type)
-    in
     if not (Code_or_metadata.code_present code_or_metadata)
     then (
       fail_if_must_inline ();
@@ -308,6 +305,12 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
 
 let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =
-  if !Clflags.jsir
+  let code_or_metadata =
+    DE.find_code_exn (DA.denv dacc) (FT.code_id function_type)
+  in
+  let metadata = Code_or_metadata.code_metadata code_or_metadata in
+  if !Clflags.jsir && Code_metadata.is_my_closure_used metadata
   then Jsir_inlining_disabled
-  else make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity
+  else
+    make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity
+      ~code_or_metadata
