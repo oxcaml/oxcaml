@@ -406,36 +406,6 @@
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
 
-(rule
- (target js_of_ocaml.exe)
- (enabled_if
-  (or
-   (= %{context_name} "main")
-   (= %{context_name} "runtime_stdlib")))
- (action
-  (copy %{project_root}/_build/default/external/js_of_ocaml/compiler/bin-js_of_ocaml/js_of_ocaml.exe %{target})))
-
-(rule
- (target jsoo_minify.exe)
- (enabled_if
-  (or
-   (= %{context_name} "main")
-   (= %{context_name} "runtime_stdlib")))
- (action
-  (copy %{project_root}/_build/default/external/js_of_ocaml/compiler/bin-jsoo_minify/jsoo_minify.exe %{target})))
-
-(rule
- (target runtime.js)
- (enabled_if
-    (or
-    (= %{context_name} "main")
-    (= %{context_name} "runtime_stdlib")))
- (deps (:jsoo js_of_ocaml.exe))
- (action
-  (with-stdout-to
-   %{target}
-   (run %{jsoo} print-standard-runtime))))
-
 (install
  (files ocamlyacc)
  (section bin)
@@ -460,19 +430,8 @@
 
 (install
  (files
-  (boot_ocamlj.exe as ocamlj.opt)
-  )
+  (boot_ocamlj.exe as ocamlj.opt))
  (section bin)
- (package ocaml))
-
-(install
- (files
-  runtime.js)
- (enabled_if
-  (or
-   (= %{context_name} "main")
-   (= %{context_name} "runtime_stdlib")))
- (section lib)
  (package ocaml))
 
 ; For the moment we don't install optmain.{cmo,cmx,o} and opttopstart.{cmx,o}.

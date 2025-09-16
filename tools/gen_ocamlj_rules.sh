@@ -123,9 +123,4 @@ cat <<EOF
  (deps std_exit.cmj)
  (action
   (run %{bin:js_of_ocaml} ${JSOO_FLAGS} -o %{target} %{deps})))
-
-(rule
- (target runtime.js)
- (action
-  (with-stdout-to %{target} (run %{bin:js_of_ocaml} print-standard-runtime))))
 EOF

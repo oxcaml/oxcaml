@@ -194,13 +194,13 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	ln -sf ../../default/$(boot_ocamlopt) _build/_bootinstall/bin/ocamlopt.opt
 	ln -sf ../../default/$(boot_ocamlc) _build/_bootinstall/bin/ocamlc.opt
 	ln -sf ../../default/$(boot_ocamlj) _build/_bootinstall/bin/ocamlj.opt
-	ln -sf ../../default/$(boot_js_of_ocaml) _build/_bootinstall/bin/js_of_ocaml.opt
-	ln -sf ../../default/$(boot_jsoo_minify) _build/_bootinstall/bin/jsoo_minify.opt
+	ln -sf ../../default/$(boot_js_of_ocaml) _build/_bootinstall/bin/js_of_ocaml
+	ln -sf ../../default/$(boot_jsoo_minify) _build/_bootinstall/bin/jsoo_minify
 	ln -sf ../../default/$(boot_ocamlmklib) _build/_bootinstall/bin/ocamlmklib.opt
 	ln -sf ../../default/$(boot_ocamldep) _build/_bootinstall/bin/ocamldep.opt
 	ln -sf ../../default/$(boot_ocamlobjinfo) _build/_bootinstall/bin/ocamlobjinfo.opt
 	ln -sf "`which ocamllex`" _build/_bootinstall/bin/ocamllex.opt
-	for prog in ocamlopt ocamlc ocamlj js_of_ocaml jsoo_minify ocamllex ocamldep ocamlmklib; do \
+	for prog in ocamlopt ocamlc ocamlj ocamllex ocamldep ocamlmklib; do \
 	  ln -sf "$$prog.opt" "_build/_bootinstall/bin/$$prog"; \
 	done
 
@@ -217,6 +217,7 @@ cpl=$(if $(filter linux,$(SYSTEM)),cp -l,cp -L)
 _install: compiler
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
+	$(cpl) _build/_bootinstall/bin/{js_of_ocaml,jsoo_minify} _install/bin/
 	$(cpl) _build/runtime_stdlib_install/bin/* _install/bin/
 	$(cpl) _build/install/main/bin/* _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
