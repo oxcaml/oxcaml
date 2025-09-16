@@ -1999,21 +1999,21 @@ and join_head_of_kind_naked_immediate env
     else Unknown
   | Is_null ty, Naked_immediates is_null | Naked_immediates is_null, Is_null ty
     -> (
-    if I.Set.is_empty is_null
-    then Known (TG.Head_of_kind_naked_immediate.create_is_null ty)
-    else
+    match I.Set.choose_opt is_null with
+    | None -> Known (TG.Head_of_kind_naked_immediate.create_is_null ty)
+    | Some arbitrary_int -> (
+      let machine_width = I.machine_width arbitrary_int in
       (* Slightly better than Unknown *)
       let head =
         TG.Head_of_kind_naked_immediate.create_naked_immediates
-          (I.Set.add
-             (I.zero Target_system.Machine_width.Sixty_four)
-             (I.Set.add (I.one Target_system.Machine_width.Sixty_four) is_null))
+          (I.Set.add (I.zero machine_width)
+             (I.Set.add (I.one machine_width) is_null))
       in
       match head with
       | Ok head -> Known head
       | Bottom ->
         Misc.fatal_error
-          "Did not expect [Bottom] from [create_naked_immediates]")
+          "Did not expect [Bottom] from [create_naked_immediates]"))
   | (Is_int _ | Get_tag _ | Is_null _), (Is_int _ | Get_tag _ | Is_null _) ->
     Unknown
 
