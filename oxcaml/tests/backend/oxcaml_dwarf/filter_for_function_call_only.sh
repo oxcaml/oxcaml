@@ -12,10 +12,10 @@ sed \
   -e 's|argv=0x[0-9a-f]*|argv=<ADDRESS>|g' \
   -e 's|@0x[0-9a-f]*|@<ADDRESS>|g' \
   -e "s|'$PWD[^']*'|'<BUILD_DIR>'|g" \
-  -e 's| at [a-zA-Z0-9_/.-]*\.ml:[0-9]*:[0-9]*.*$||g' \
-  -e 's| at [a-zA-Z0-9_/.-]*\.mli:[0-9]*:[0-9]*.*$||g' \
-  -e 's| at [a-zA-Z0-9_/.-]*\.c:[0-9]*:[0-9]*.*$||g' \
-  -e 's| at [a-zA-Z0-9_/.-]*\.h:[0-9]*:[0-9]*.*$||g' \
+  -e 's| at [a-zA-Z0-9_/.-]*\.ml:[0-9]*:[0-9]*$||g' \
+  -e 's| at [a-zA-Z0-9_/.-]*\.mli:[0-9]*:[0-9]*$||g' \
+  -e 's| at [a-zA-Z0-9_/.-]*\.c:[0-9]*:[0-9]*$||g' \
+  -e 's| at [a-zA-Z0-9_/.-]*\.h:[0-9]*:[0-9]*$||g' \
   -e 's|caml_start_program.*|<Startup code ...>|g' | \
 grep -v \
   -e '^(lldb) ' \
