@@ -716,6 +716,12 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       Immutable StrictOpt, make_float_vect ~loc array_size.var
     | Fixed_size, Punboxedfloatarray Unboxed_float32 ->
       Immutable StrictOpt, make_unboxed_float32_vect ~loc array_size.var
+    | Fixed_size, Punboxedoruntaggedintarray Untagged_int ->
+      Immutable StrictOpt, make_untagged_int_vect ~loc array_size.var
+    | Fixed_size, Punboxedoruntaggedintarray Untagged_int8 ->
+      Immutable StrictOpt, make_untagged_int8_vect ~loc array_size.var
+    | Fixed_size, Punboxedoruntaggedintarray Untagged_int16 ->
+      Immutable StrictOpt, make_untagged_int16_vect ~loc array_size.var
     | Fixed_size, Punboxedoruntaggedintarray Unboxed_int32 ->
       Immutable StrictOpt, make_unboxed_int32_vect ~loc array_size.var
     | Fixed_size, Punboxedoruntaggedintarray Unboxed_int64 ->
@@ -737,6 +743,12 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       Mutable, Resizable_array.make ~loc array_kind (unboxed_float 0.)
     | Dynamic_size, Punboxedfloatarray Unboxed_float32 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_float32 0.)
+    | Dynamic_size, Punboxedoruntaggedintarray Untagged_int ->
+      Mutable, Resizable_array.make ~loc array_kind (untagged_int 0)
+    | Dynamic_size, Punboxedoruntaggedintarray Untagged_int8 ->
+      Mutable, Resizable_array.make ~loc array_kind (untagged_int8 0)
+    | Dynamic_size, Punboxedoruntaggedintarray Untagged_int16 ->
+      Mutable, Resizable_array.make ~loc array_kind (untagged_int16 0)
     | Dynamic_size, Punboxedoruntaggedintarray Unboxed_int32 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_int32 0l)
     | Dynamic_size, Punboxedoruntaggedintarray Unboxed_int64 ->
@@ -745,10 +757,6 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       ( Mutable,
         Resizable_array.make ~loc array_kind (unboxed_nativeint Targetint.zero)
       )
-    | ( _,
-        Punboxedoruntaggedintarray
-          (Untagged_int8 | Untagged_int16 | Untagged_int) ) ->
-      Misc.unboxed_small_int_arrays_are_not_implemented ()
     | Dynamic_size, Punboxedvectorarray Unboxed_vec128
     | Dynamic_size, Punboxedvectorarray Unboxed_vec256
     | Dynamic_size, Punboxedvectorarray Unboxed_vec512 ->
