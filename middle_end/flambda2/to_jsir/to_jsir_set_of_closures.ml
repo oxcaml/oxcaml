@@ -33,6 +33,10 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
   let decls =
     Function_declarations.funs_in_order fun_decls |> Function_slot.Lmap.bindings
   in
+  (* JSOO is expects that variables are bound before they are used (statically),
+     except that closures can refer to themselves and consecutive closures can
+     refer to one-another. This means that we should bind the value slots before
+     defining the functions using those variables.*)
   let env, res =
     Value_slot.Map.fold
       (fun slot simple (env, res) ->
