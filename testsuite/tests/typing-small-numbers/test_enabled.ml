@@ -628,6 +628,46 @@ let _ : int =
 - : int = 2
 |}]
 
+let _ : int =
+  match #'z' with
+  | #'a'..#'z' -> 0
+  | #'A' -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 0
+|}]
+
+let _ : int =
+  match #'m' with
+  | #'a'..#'z' -> 0
+  | #'A' -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 0
+|}]
+
+let _ : int =
+  match #'A' with
+  | #'a'..#'z' -> 0
+  | #'A' -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 1
+|}]
+
+let _ : int =
+  match #'B' with
+  | #'a'..#'z' -> 0
+  | #'A' -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 2
+|}]
+
 (* Partial match *)
 let _ : int =
   match #'b' with
@@ -645,6 +685,7 @@ Here is an example of a case that is not matched:
 
 - : int = 1
 |}]
+
 
 (* Untagged int8 *)
 

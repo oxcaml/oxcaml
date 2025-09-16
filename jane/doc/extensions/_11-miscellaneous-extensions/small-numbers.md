@@ -100,6 +100,19 @@ Literals use `s` for `int8` and `S` for `int16`:
 #42S : int16#
 ```
 
+Like other int literals, small int literals can be used in patterns.
+Additionally, int8 literals may be used in ranges.
+```
+match x with
+| #0s -> f ()
+| #1s..#10s -> f ()
+| _ -> g ()
+
+match y with
+| #0S -> f ()
+| _ -> g ()
+```
+
 ### Operations
 
 Operations on small integers are available via the `Stdlib_stable.Int8`,
@@ -126,11 +139,12 @@ Literals are prefixed with `#`:
 #'\xff'  : char#
 ```
 
-Untagged char literals can be used in patterns, but not in ranges:
+Like regular char literals, untagged char literals can be used in patterns and
+in ranges:
 ```
 match x with
-| #'a' -> f ()       (* allowed *)
-| #'a'..#'z' -> g () (* not allowed *)
+| #'a' -> f ()
+| #'a'..#'z' -> g ()
 ```
 
 ### Operations
