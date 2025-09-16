@@ -27,10 +27,10 @@ let log : type a. ?no_eol:unit -> (a, Format.formatter, unit) format -> a =
  fun ?no_eol fmt -> (Lazy.force log_function).log ?no_eol fmt
 
 let instr_prefix (instr : Cfg.basic Cfg.instruction) =
-  InstructionId.to_string instr.id
+  Printf.sprintf "#%04d" (InstructionId.to_int_unsafe instr.id)
 
 let term_prefix (term : Cfg.terminator Cfg.instruction) =
-  InstructionId.to_string term.id
+  Printf.sprintf "#%04d" (InstructionId.to_int_unsafe term.id)
 
 let instr_prefix_with_ls_order (ls_order_mapping : InstructionId.t -> int)
     (instr : Cfg.basic Cfg.instruction) =
