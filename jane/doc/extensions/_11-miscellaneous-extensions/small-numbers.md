@@ -100,19 +100,6 @@ Literals use `s` for `int8` and `S` for `int16`:
 #42S : int16#
 ```
 
-Like other int literals, small int literals can be used in patterns.
-Additionally, int8 literals may be used in ranges.
-```
-match x with
-| #0s -> f ()
-| #1s..#10s -> f ()
-| _ -> g ()
-
-match y with
-| #0S -> f ()
-| _ -> g ()
-```
-
 ### Operations
 
 Operations on small integers are available via the `Stdlib_stable.Int8`,
