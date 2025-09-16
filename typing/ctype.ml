@@ -2345,7 +2345,6 @@ let mk_jkind_context env jkind_of_type =
   { Jkind.jkind_of_type;
     is_abstract = mk_is_abstract env;
     lookup_type;
-    normalize_path = (fun p -> Env.normalize_type_path None env p);
     debug_print_env;
   }
 

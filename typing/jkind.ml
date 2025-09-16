@@ -818,7 +818,6 @@ type jkind_context =
   { jkind_of_type : Types.type_expr -> Types.jkind_l option;
     is_abstract : Path.t -> bool;
     lookup_type : Path.t -> Types.type_declaration option;
-    normalize_path : Path.t -> Path.t;
     debug_print_env : Format.formatter -> unit
   }
 
