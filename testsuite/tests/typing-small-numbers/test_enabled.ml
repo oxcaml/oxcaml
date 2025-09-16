@@ -686,7 +686,6 @@ Here is an example of a case that is not matched:
 - : int = 1
 |}]
 
-
 (* Untagged int8 *)
 
 let ignore (_ : int8#) = ()
