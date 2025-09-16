@@ -100,6 +100,7 @@ let kind_of_counter = ref 0
 
 let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
  fun (ops : JK.ops) ->
+  ignore context;
   incr kind_of_depth;
   if !kind_of_depth > 5000 then failwith "kind_of_depth too deep" else ();
   incr kind_of_counter;
@@ -125,8 +126,7 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
                     ops.kind_of t))
               args
           in
-          let p' = context.normalize_path p in
-          ops.constr p' arg_kinds)
+          ops.constr p arg_kinds)
     | Types.Ttuple elts ->
       log ~pp:ops.pp_kind
         (Printf.sprintf "Ttuple %d elts" (List.length elts))
@@ -230,7 +230,7 @@ let has_mutable_label lbls =
       match lbl.ld_mutable with Immutable -> false | Mutable _ -> true)
     lbls
 
-let always_use_stored_jkind = true
+let always_use_stored_jkind = false
 
 let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     JK.constr_decl =
