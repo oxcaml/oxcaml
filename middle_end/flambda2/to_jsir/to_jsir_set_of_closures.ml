@@ -33,12 +33,6 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
   let decls =
     Function_declarations.funs_in_order fun_decls |> Function_slot.Lmap.bindings
   in
-  (* CR selee: It should be sufficient to have these variables bound before the
-     call site of the closures being defined, but it seems that having the
-     closure expression before the bindings interact badly with the JSOO
-     simplifier when self-recursive functions become tail-call optimised.
-     Swapping the order resolved the issue, but we should dig into the intended
-     semantics of JSIR more. *)
   let env, res =
     Value_slot.Map.fold
       (fun slot simple (env, res) ->
