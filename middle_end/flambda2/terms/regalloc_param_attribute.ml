@@ -17,18 +17,23 @@
 type t = Lambda.regalloc_param_attribute
 
 let print ppf t =
-  match t with
-  | [] -> Format.pp_print_string ppf "[]"
-  | params ->
+  match (t : t) with
+  | Default_regalloc_params -> Format.pp_print_string ppf "[]"
+  | Regalloc_params params ->
     Format.fprintf ppf "[%a]"
       (Format.pp_print_list
          ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
          (fun ppf s -> Format.fprintf ppf "%S" s))
       params
 
-let equal t1 t2 = List.equal String.equal t1 t2
+let equal (t1 : t) (t2 : t) =
+  match t1, t2 with
+  | Default_regalloc_params, Default_regalloc_params -> true
+  | Regalloc_params l1, Regalloc_params l2 -> List.equal String.equal l1 l2
+  | (Default_regalloc_params | Regalloc_params _), _ -> false
 
-let is_default t = match t with [] -> true | _ -> false
+let is_default (t : t) =
+  match t with Default_regalloc_params -> true | Regalloc_params _ -> false
 
 let from_lambda (attr : Lambda.regalloc_param_attribute) = attr
 

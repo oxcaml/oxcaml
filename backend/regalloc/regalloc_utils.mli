@@ -8,7 +8,9 @@ val on_fatal : f:(unit -> unit) -> unit
 
 val fatal : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
-val function_specific_params : string list ref
+val set_function_specific_params : string list -> unit
+
+val get_function_specific_params : unit -> string list
 
 val find_param_value : string -> string option
 

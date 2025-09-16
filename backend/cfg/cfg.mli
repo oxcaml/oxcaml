@@ -70,6 +70,8 @@ type codegen_option =
   | Reduce_code_size
   | No_CSE
   | Use_linscan_regalloc
+    (* CR-soon xclerc for xclerc: remove the `Use_linscan_regalloc`, and use
+       `Use_regalloc_param` instead. *)
   | Use_regalloc of Clflags.Register_allocator.t
   | Use_regalloc_param of string list
   | Cold

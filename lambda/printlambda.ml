@@ -1064,12 +1064,12 @@ let function_attribute ppf t =
   | Error_poll -> fprintf ppf "error_poll@ "
   end;
   begin match t.regalloc with
-  | None -> ()
-  | Some regalloc -> fprintf ppf "%a@ " Clflags.Register_allocator.format regalloc
+  | Default_regalloc -> ()
+  | Regalloc regalloc -> fprintf ppf "%a@ " Clflags.Register_allocator.format regalloc
   end;
   begin match t.regalloc_param with
-  | [] -> ()
-  | params ->
+  | Default_regalloc_params -> ()
+  | Regalloc_params params ->
       List.iter (fun param -> fprintf ppf "regalloc_param(%S)@ " param) params
   end;
   if t.cold then fprintf ppf "cold@ "

@@ -669,9 +669,13 @@ type loop_attribute =
   | Never_loop (* [@loop never] *)
   | Default_loop (* no [@loop] attribute *)
 
-type regalloc_attribute = Clflags.Register_allocator.t option
+type regalloc_attribute =
+  | Default_regalloc
+  | Regalloc of Clflags.Register_allocator.t
   
-type regalloc_param_attribute = string list
+type regalloc_param_attribute =
+  | Default_regalloc_params
+  | Regalloc_params of string list
 (* [@regalloc_param] attributes - can have multiple with string payloads *)
 
 type curried_function_kind = { nlocal: int } [@@unboxed]

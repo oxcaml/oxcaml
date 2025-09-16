@@ -333,12 +333,19 @@ let reorder_blocks_random ppf_dump cl =
     pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
       "After reorder_blocks_random" cl
 
-type register_allocator =
-  | GI
-  | IRC
-  | LS
+let register_allocator_gi cfg_with_infos =
+  cfg_with_infos_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
+    cfg_with_infos
 
-let register_allocator fd : register_allocator =
+let register_allocator_irc cfg_with_infos =
+  cfg_with_infos_profile ~accumulate:true "cfg_irc" Regalloc_irc.run
+    cfg_with_infos
+
+let register_allocator_ls cfg_with_infos =
+  cfg_with_infos_profile ~accumulate:true "cfg_ls" Regalloc_ls.run
+    cfg_with_infos
+
+let register_allocator fd : Cfg_with_infos.t -> Cfg_with_infos.t =
   (* First check for per-function regalloc attribute in codegen_options *)
   let rec find_regalloc_option = function
     | [] -> None
@@ -351,10 +358,13 @@ let register_allocator fd : register_allocator =
       ~default:!Oxcaml_flags.regalloc
   in
   match (regalloc : Clflags.Register_allocator.t) with
-  | Cfg -> if should_use_linscan fd then LS else IRC
-  | Irc -> IRC
-  | Ls -> LS
-  | Gi -> GI
+  | Cfg ->
+    if should_use_linscan fd
+    then register_allocator_ls
+    else register_allocator_irc
+  | Irc -> register_allocator_irc
+  | Ls -> register_allocator_ls
+  | Gi -> register_allocator_gi
 
 let available_regs ~stack_slots ~f x =
   (* Skip DWARF variable range generation for complicated functions to avoid
@@ -369,7 +379,6 @@ let available_regs ~stack_slots ~f x =
   else f x
 
 let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
-  let register_allocator = register_allocator fd_cmm in
   let module CSE = Cfg_cse.Cse_generic (CSE) in
   cfg_with_layout
   ++ (fun cfg_with_layout ->
@@ -396,14 +405,7 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
            Regalloc_validate.Description.create
              (Cfg_with_infos.cfg_with_layout cfg_with_infos)
          in
-         cfg_with_infos
-         ++ (match register_allocator with
-            | GI ->
-              cfg_with_infos_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
-            | IRC ->
-              cfg_with_infos_profile ~accumulate:true "cfg_irc" Regalloc_irc.run
-            | LS ->
-              cfg_with_infos_profile ~accumulate:true "cfg_ls" Regalloc_ls.run)
+         cfg_with_infos ++ register_allocator fd_cmm
          ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
               (Regalloc_validate.run cfg_description))
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run

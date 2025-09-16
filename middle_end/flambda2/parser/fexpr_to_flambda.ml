@@ -1020,9 +1020,9 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
             ~is_a_functor:false ~is_opaque:false ~recursive
             ~cost_metrics (* CR poechsel: grab inlining arguments from fexpr. *)
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
-            ~poll_attribute:Default ~regalloc_attribute:None
-            ~regalloc_param_attribute:[] ~cold:false ~dbg:Debuginfo.none
-            ~is_tupled ~is_my_closure_used
+            ~poll_attribute:Default ~regalloc_attribute:Default_regalloc
+            ~regalloc_param_attribute:Default_regalloc_params ~cold:false
+            ~dbg:Debuginfo.none ~is_tupled ~is_my_closure_used
             ~inlining_decision:Never_inline_attribute
             ~absolute_history:
               (Inlining_history.Absolute.empty

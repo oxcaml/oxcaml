@@ -2534,7 +2534,7 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN TILDEMINUS
 ##
 ## Ends in an error in state: 428.
 ##
-## kinded_args -> LPAREN . separated_nonempty_list(COMMA,kinded_variable) RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND IDENT EQUAL EOF BIGARROW ]
+## kinded_args -> LPAREN . separated_nonempty_list(COMMA,kinded_variable) RPAREN [ IDENT EQUAL ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN

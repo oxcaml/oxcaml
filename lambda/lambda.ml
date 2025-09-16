@@ -759,9 +759,13 @@ type loop_attribute =
   | Never_loop (* [@loop never] *)
   | Default_loop (* no [@loop] attribute *)
 
-type regalloc_attribute = Clflags.Register_allocator.t option
+type regalloc_attribute =
+  | Default_regalloc
+  | Regalloc of Clflags.Register_allocator.t
 
-type regalloc_param_attribute = string list
+type regalloc_param_attribute =
+  | Default_regalloc_params
+  | Regalloc_params of string list
 (* [@regalloc_param] attributes - can have multiple with string payloads *)
 
 type curried_function_kind = { nlocal : int } [@@unboxed]
@@ -1090,8 +1094,8 @@ let default_function_attribute = {
   zero_alloc = Default_zero_alloc ;
   poll = Default_poll;
   loop = Default_loop;
-  regalloc = None;
-  regalloc_param = [];
+  regalloc = Default_regalloc;
+  regalloc_param = Default_regalloc_params;
   cold = false;
   is_a_functor = false;
   is_opaque = false;

@@ -16,14 +16,19 @@
 
 type t = Lambda.regalloc_attribute
 
-let print ppf t =
+let print ppf (t : t) =
   match t with
-  | None -> Format.pp_print_string ppf "default"
-  | Some regalloc -> Clflags.Register_allocator.format ppf regalloc
+  | Default_regalloc -> Format.pp_print_string ppf "default"
+  | Regalloc regalloc -> Clflags.Register_allocator.format ppf regalloc
 
-let equal t1 t2 = Option.equal Clflags.Register_allocator.equal t1 t2
+let equal (t1 : t) (t2 : t) =
+  match t1, t2 with
+  | Default_regalloc, Default_regalloc -> true
+  | Regalloc r1, Regalloc r2 -> Clflags.Register_allocator.equal r1 r2
+  | (Default_regalloc | Regalloc _), _ -> false
 
-let is_default t = Option.is_none t
+let is_default (t : t) =
+  match t with Default_regalloc -> true | Regalloc _ -> false
 
 let from_lambda (attr : Lambda.regalloc_attribute) = attr
 

@@ -188,13 +188,13 @@ let parse_loop_attribute attr =
 
 let parse_regalloc_attribute attr : regalloc_attribute =
   match attr with
-  | None -> None
+  | None -> Default_regalloc
   | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
       parse_id_payload txt loc
-        ~default:None
-        ~empty:None
+        ~default:Default_regalloc
+        ~empty:Default_regalloc
         (List.map
-          (fun (name, regalloc) -> name, Some regalloc)
+          (fun (name, regalloc) -> name, Regalloc regalloc)
           Clflags.Register_allocator.assoc_list)
         payload
 
@@ -251,7 +251,9 @@ let get_regalloc_attribute l =
 
 let get_regalloc_param_attributes l =
   let attrs = select_attributes is_regalloc_param_attribute l in
-  List.filter_map (fun attr -> parse_regalloc_param_attribute (Some attr)) attrs
+  match List.filter_map (fun attr -> parse_regalloc_param_attribute (Some attr)) attrs with
+  | [] -> Default_regalloc_params
+  | (_ :: _) as params -> Regalloc_params params
 
 let get_cold_attribute l =
   find_attribute is_cold_attribute l <> None
@@ -382,11 +384,11 @@ let add_regalloc_attribute expr loc attributes =
   match expr with
   | Lfunction({ attr = { stub = false } as attr } as funct) ->
     begin match get_regalloc_attribute attributes with
-    | None -> expr
-    | (Some _) as regalloc ->
+    | Default_regalloc -> expr
+    | (Regalloc _) as regalloc ->
       begin match attr.regalloc with
-      | None -> ()
-      | Some _ ->
+      | Default_regalloc -> ()
+      | Regalloc _ ->
           Location.prerr_warning loc
             (Warnings.Duplicated_attribute "regalloc")
       end;
@@ -400,9 +402,14 @@ let add_regalloc_param_attribute expr _loc attributes =
   | Lfunction({ attr } as funct) ->
     let params = get_regalloc_param_attributes attributes in
     begin match params with
-    | [] -> expr
-    | _ ->
-      let attr = { attr with regalloc_param = attr.regalloc_param @ params } in
+    | Default_regalloc_params -> expr
+    | Regalloc_params params ->
+      let existing =
+        match attr.regalloc_param with
+        | Default_regalloc_params -> []
+        | Regalloc_params existing -> existing
+      in
+      let attr = { attr with regalloc_param = Regalloc_params (existing @ params) } in
       lfunction_with_attr ~attr funct
     end
   | _ -> expr
