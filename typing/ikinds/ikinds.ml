@@ -1,5 +1,4 @@
-(* Minimal kind constructor over real Types.type_expr, inspired by infer6. *)
-
+(* This forces ikinds globally on. *)
 (* Clflags.ikinds := true *)
 
 module TyM = struct
@@ -98,8 +97,6 @@ let ckind_of_jkind_r (j : Types.jkind_r) : JK.ckind =
 let kind_of_depth = ref 0
 
 let kind_of_counter = ref 0
-
-exception Kind_of_limit_reached
 
 let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
  fun (ops : JK.ops) ->
@@ -501,14 +498,10 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.get_mode_crossing ~context jkind
   else
-    try
-      let solver = make_solver ~context in
-      let lat = JK.round_up solver (ckind_of_jkind jkind) in
-      let mb = Axis_lattice.to_mod_bounds lat in
-      Jkind.Mod_bounds.to_mode_crossing mb
-    with Kind_of_limit_reached ->
-      Format.eprintf "Kind_of_limit_reached";
-      assert false
+    let solver = make_solver ~context in
+    let lat = JK.round_up solver (ckind_of_jkind jkind) in
+    let mb = Axis_lattice.to_mod_bounds lat in
+    Jkind.Mod_bounds.to_mode_crossing mb
 
 (* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
    Keep Jkind as the single source for classification and error reporting. *)
