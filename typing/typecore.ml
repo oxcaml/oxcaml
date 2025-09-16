@@ -3041,12 +3041,6 @@ and type_pat_aux
       | Const_untagged_char c1, Const_untagged_char c2 ->
         expand_interval (Char.code c1) (Char.code c2)
           ~make:(fun i -> Pconst_untagged_char (Char.chr i))
-      | Const_int8 i1, Const_int8 i2 ->
-        expand_interval i1 i2
-          ~make:(fun i -> Pconst_integer (Int.to_string i, Some 's'))
-      | Const_untagged_int8 i1, Const_untagged_int8 i2 ->
-        expand_interval i1 i2
-          ~make:(fun i -> Pconst_unboxed_integer (Int.to_string i, 's'))
       | _ ->
         raise (Error (loc, !!penv, Invalid_interval))
       end
