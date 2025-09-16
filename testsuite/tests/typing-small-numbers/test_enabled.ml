@@ -344,6 +344,25 @@ let _ : int =
 - : int = 2
 |}]
 
+(* Partial match *)
+let _ : int =
+  match 1s with
+  | 0s -> 0
+  | 1s -> 1
+;;
+[%%expect{|
+Lines 2-4, characters 2-11:
+2 | ..match 1s with
+3 |   | 0s -> 0
+4 |   | 1s -> 1
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+2s
+
+- : int = 1
+|}]
+
+
 (* Tagged int16 *)
 
 type t = int16
@@ -498,6 +517,24 @@ let _ : int =
 - : int = 2
 |}]
 
+(* Partial match *)
+let _ : int =
+  match 1S with
+  | 0S -> 0
+  | 1S -> 1
+;;
+[%%expect{|
+Lines 2-4, characters 2-11:
+2 | ..match 1S with
+3 |   | 0S -> 0
+4 |   | 1S -> 1
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+2S
+
+- : int = 1
+|}]
+
 (* Untagged char *)
 let ignore (_ : char#) = ()
 [%%expect{|
@@ -560,6 +597,24 @@ let _ : int =
 ;;
 [%%expect{|
 - : int = 2
+|}]
+
+(* Partial match *)
+let _ : int =
+  match #'b' with
+  | #'a' -> 0
+  | #'b' -> 1
+;;
+[%%expect{|
+Lines 2-4, characters 2-13:
+2 | ..match #'b' with
+3 |   | #'a' -> 0
+4 |   | #'b' -> 1
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+#'c'
+
+- : int = 1
 |}]
 
 (* Untagged int8 *)
@@ -643,6 +698,24 @@ let _ : int =
 - : int = 2
 |}]
 
+(* Partial match *)
+let _ : int =
+  match #1s with
+  | #0s -> 0
+  | #1s -> 1
+;;
+[%%expect{|
+Lines 2-4, characters 2-12:
+2 | ..match #1s with
+3 |   | #0s -> 0
+4 |   | #1s -> 1
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+#2s
+
+- : int = 1
+|}]
+
 (* Untagged int16 *)
 
 let ignore (_ : int16#) = ()
@@ -722,4 +795,22 @@ let _ : int =
 ;;
 [%%expect{|
 - : int = 2
+|}]
+
+(* Partial match *)
+let _ : int =
+  match #1S with
+  | #0S -> 0
+  | #1S -> 1
+;;
+[%%expect{|
+Lines 2-4, characters 2-12:
+2 | ..match #1S with
+3 |   | #0S -> 0
+4 |   | #1S -> 1
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+#2S
+
+- : int = 1
 |}]
