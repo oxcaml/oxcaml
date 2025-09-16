@@ -1,0 +1,12 @@
+(copy_files ../stdlib/*.{ml,mli})
+
+(dynamic_include ../duneconf/stdlib-js.inc)
+
+(install
+ (files
+  (glob_files *.cmj)
+  (glob_files *.cmjx)
+  (glob_files *.cmja)
+  (glob_files *.js))
+ (section lib)
+ (package ocaml_runtime_stdlib))

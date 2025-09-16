@@ -22,8 +22,9 @@
 *.lib
 *.dll
 *.la
-*.cm[ioxats]
+*.cm[ioxatsj]
 *.cmx[as]
+*.cmj[xa]
 *.cmti
 *.cmsi
 *.annot

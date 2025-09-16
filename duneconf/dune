@@ -1,0 +1,20 @@
+(rule
+ (target stdlib-js.inc)
+ (deps
+  (:gen_ocamlj_rules ../tools/gen_ocamlj_rules.sh)
+  (source_tree ../stdlib))
+ (enabled_if
+  (= %{context_name} "runtime_stdlib"))
+ (action
+  (with-stdout-to
+   %{target}
+   (chdir
+    %{workspace_root}/stdlib
+    (run %{gen_ocamlj_rules})))))
+
+(rule
+ (target stdlib-js.inc)
+ (enabled_if
+  (<> %{context_name} "runtime_stdlib"))
+ (action
+  (write-file %{target} "")))
