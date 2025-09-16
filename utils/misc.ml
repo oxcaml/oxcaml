@@ -25,9 +25,6 @@ let fatal_errorf fmt =
 
 let fatal_error msg = fatal_errorf "%s" msg
 
-let unboxed_small_int_arrays_are_not_implemented () =
-  fatal_error "unboxed int8/int16 and untagged int arrays are not implemented"
-
 let splices_should_not_exist_after_eval () =
   fatal_error "slambda splices should not exist in lambda after slambda eval"
 

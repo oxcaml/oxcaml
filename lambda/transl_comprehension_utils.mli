@@ -153,6 +153,15 @@ module Lambda_utils : sig
     (** Like [make_float_vect] but for unboxed float32 arrays. *)
     val make_unboxed_float32_vect : loc:scoped_location -> lambda -> lambda
 
+    (** Like [make_float_vect] but for untagged int arrays. *)
+    val make_untagged_int_vect : loc:scoped_location -> lambda -> lambda
+
+    (** Like [make_float_vect] but for untagged int8 arrays. *)
+    val make_untagged_int8_vect : loc:scoped_location -> lambda -> lambda
+
+    (** Like [make_float_vect] but for untagged int16 arrays. *)
+    val make_untagged_int16_vect : loc:scoped_location -> lambda -> lambda
+
     (** Like [make_float_vect] but for unboxed int32 arrays. *)
     val make_unboxed_int32_vect : loc:scoped_location -> lambda -> lambda
 

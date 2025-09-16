@@ -1916,6 +1916,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
   | Boxed_float32 | Boxed_float | Boxed_int32 | Boxed_int64 | Boxed_nativeint
   | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Float_block _ | Float_array
   | Immediate_array | Value_array | Generic_array | Unboxed_float32_array
+  | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
   | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
   | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
   | Unboxed_product_array ->
