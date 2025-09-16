@@ -312,23 +312,7 @@ end = struct
 end
 (* CR layouts v2.8: This should get accepted. But we should wait until we have kind_of *)
 [%%expect {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type 'a t = 'a
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a end
-       is not included in
-         sig type 'a t : immutable_data with 'a end
-       Type declarations do not match:
-         type 'a t = 'a
-       is not included in
-         type 'a t : immutable_data with 'a
-       The kind of the first is value
-         because of the definition of t at line 2, characters 2-36.
-       But the kind of the first must be a subkind of immutable_data with 'a
-         because of the definition of t at line 2, characters 2-36.
+module M : sig type 'a t : immutable_data with 'a end
 |}]
 
 (* Benjamin's example *)
