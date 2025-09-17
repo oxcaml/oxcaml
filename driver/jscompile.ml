@@ -29,7 +29,13 @@ let interface ~source_file ~output_prefix =
     info
 
 let run_jsoo_exn ~args =
-  let prog = Filename.concat Config.bindir "js_of_ocaml" in
+  let prog =
+    (* Use jsoo from our PATH when we're bootstrapping *)
+    match Sys.ocaml_release with
+    | { extra = Some (Plus, "ox") ; _ } ->
+      Filename.concat Config.bindir "js_of_ocaml"
+    | _ -> "js_of_ocaml"
+  in
   let cmdline = Filename.quote_command prog args in
   match Ccomp.command cmdline with
   | 0 -> ()
