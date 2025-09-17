@@ -387,17 +387,19 @@ let prelude :
   on_fatal ~f:on_fatal_callback;
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   (* Extract function-specific regalloc params from codegen_options *)
-  set_function_specific_params
-    (List.concat_map cfg.fun_codegen_options ~f:(function
+  let params =
+    List.concat_map cfg.fun_codegen_options ~f:(function
       | Cfg.Use_regalloc_param params -> params
       | Cfg.Reduce_code_size | Cfg.No_CSE | Cfg.Use_linscan_regalloc
       | Cfg.Use_regalloc _ | Cfg.Cold | Cfg.Assume_zero_alloc _
       | Cfg.Check_zero_alloc _ ->
-        []));
+        [])
+  in
+  set_function_specific_params params;
   if debug
   then (
     Utils.log "run (%S)" cfg.fun_name;
-    match get_function_specific_params () with
+    match params with
     | [] -> ()
     | params ->
       Utils.log "function_specific_params: %s" (String.concat ", " params));

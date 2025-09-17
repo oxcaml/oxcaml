@@ -10,8 +10,6 @@ val fatal : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 val set_function_specific_params : string list -> unit
 
-val get_function_specific_params : unit -> string list
-
 val find_param_value : string -> string option
 
 val debug : bool
