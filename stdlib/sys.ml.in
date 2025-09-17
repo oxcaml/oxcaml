@@ -70,6 +70,16 @@ let max_unboxed_int32_array_length =
   | Native -> max_array_length * (word_size / 32)
   | Bytecode | Other _ -> max_array_length
 
+let max_untagged_int16_array_length =
+  match backend_type with
+  | Native -> max_array_length * (word_size / 16)
+  | Bytecode | Other _ -> max_array_length
+
+let max_untagged_int8_array_length =
+  match backend_type with
+  | Native -> max_array_length * (word_size / 8)
+  | Bytecode | Other _ -> max_array_length
+
 let max_unboxed_nativeint_array_length =
   match backend_type with
   | Native -> max_array_length

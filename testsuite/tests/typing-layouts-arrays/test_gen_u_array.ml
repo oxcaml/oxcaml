@@ -513,7 +513,7 @@ module Test (A : S) : sig end = struct
     r := I.add!r (I.of_int 1);
   in
   A.iter2 f a b;
-  let c = A.make 456 (I.of_int 0) in
+  let c = A.make 126 (I.of_int 0) in
   check_inval (A.iter2 (fun _ _ -> assert false) a) c;
   check_inval (A.iter2 (fun _ _ -> assert false) c) a;
 
@@ -528,8 +528,8 @@ module Test (A : S) : sig end = struct
   A.iter2 f a b;
 
   (* [map2], test result and order of evaluation *)
-  let a = A.init 456 I.of_int in
-  let b = A.init 456 (fun i -> I.(mul (of_int i) (I.of_int 2))) in
+  let a = A.init 126 I.of_int in
+  let b = A.init 126 (fun i -> I.(mul (of_int i) (I.of_int 2))) in
   let r = ref (I.of_int 0) in
   let f x y =
     assert_eq x !r;
@@ -539,12 +539,12 @@ module Test (A : S) : sig end = struct
   in
   let c = A.map2 f a b in
   check_i c;
-  let d = A.make 455 (I.of_int 0) in
+  let d = A.make 125 (I.of_int 0) in
   check_inval (A.map2 (fun _ _ -> assert false) a) d;
   check_inval (A.map2 (fun _ _ -> assert false) d) a;
 
-  let a = A.init 457 I.of_int in
-  let b = A.init 457 (fun i -> I.(mul (of_int i) (I.of_int 2))) in
+  let a = A.init 127 I.of_int in
+  let b = A.init 127 (fun i -> I.(mul (of_int i) (I.of_int 2))) in
   let r = ref (I.of_int 0) in
   let f x y =
     assert_eq x !r;
@@ -556,7 +556,7 @@ module Test (A : S) : sig end = struct
   check_i c;
 
   (* [for_all], test result and order of evaluation *)
-  let a = A.init 777 I.of_int in
+  let a = A.init 117 I.of_int in
   let r = ref (I.of_int 0) in
   let f x =
     assert_eq x !r;
@@ -567,7 +567,7 @@ module Test (A : S) : sig end = struct
   let f x = assert_eq x (I.of_int 0); false in
   assert (not (A.for_all f a));
 
-  let a = A.init 778 I.of_int in
+  let a = A.init 118 I.of_int in
   let r = ref (I.of_int 0) in
   let f x =
     assert_eq x !r;
@@ -579,7 +579,7 @@ module Test (A : S) : sig end = struct
   assert (not (A.for_all f a));
 
   (* [exists], test result and order of evaluation *)
-  let a = A.init 777 I.of_int in
+  let a = A.init 117 I.of_int in
   let r = ref (I.of_int 0) in
   let f x =
     assert_eq x !r;
@@ -590,7 +590,7 @@ module Test (A : S) : sig end = struct
   let f x = assert_eq x (I.of_int 0); true in
   assert (A.exists f a);
 
-  let a = A.init 778 I.of_int in
+  let a = A.init 118 I.of_int in
   let r = ref (I.of_int 0) in
   let f x =
     assert_eq x !r;
@@ -602,22 +602,22 @@ module Test (A : S) : sig end = struct
   assert (A.exists f a);
 
   (* [mem] *)
-  let a = A.init 777 I.of_int in
+  let a = A.init 117 I.of_int in
   assert (A.mem (I.of_int 0) a);
-  assert (A.mem (I.of_int 776) a);
+  assert (A.mem (I.of_int 116) a);
   assert (not (A.mem ((I.of_int (-1))) a));
-  assert (not (A.mem (I.of_int 777) a));
+  assert (not (A.mem (I.of_int 117) a));
   let check v =
     A.set a 100 v;
     assert (A.mem v a);
   in
   List.iter check [I.max_val; I.min_val; (I.of_int (-1)); (I.of_int 0)];
 
-  let a = A.init 778 I.of_int in
+  let a = A.init 118 I.of_int in
   assert (A.mem (I.of_int 0) a);
-  assert (A.mem (I.of_int 777) a);
+  assert (A.mem (I.of_int 117) a);
   assert (not (A.mem ((I.of_int (-1))) a));
-  assert (not (A.mem (I.of_int 778) a));
+  assert (not (A.mem (I.of_int 118) a));
   let check v =
     A.set a 101 v;
     assert (A.mem v a);
@@ -625,7 +625,7 @@ module Test (A : S) : sig end = struct
   List.iter check [I.max_val; I.min_val; (I.of_int (-1)); (I.of_int 0)];
 
   (* [find_opt], test result and order of evaluation *)
-  let a = A.init 777 I.of_int in
+  let a = A.init 117 I.of_int in
   let r = ref (I.of_int 0) in
   let f x =
     assert_eq x !r;
@@ -637,7 +637,7 @@ module Test (A : S) : sig end = struct
   assert (Option.is_some (A.find_opt f a));
 
   (* [find_index], test result and order of evaluation *)
-  let a = A.init 777 I.of_int in
+  let a = A.init 117 I.of_int in
   let r = ref (I.of_int 0) in
   let f x =
     assert_eq x !r;
@@ -649,7 +649,7 @@ module Test (A : S) : sig end = struct
   assert (Option.get (A.find_index f a) = 0);
 
   (* [find_map], test result and order of evaluation *)
-  let a = A.init 777 I.of_int in
+  let a = A.init 117 I.of_int in
   let r = ref (I.of_int 0) in
   let f x =
     assert_eq x !r;
@@ -661,7 +661,7 @@ module Test (A : S) : sig end = struct
   assert (Option.get (A.find_map f a) = "abc");
 
   (* [find_mapi], test result and order of evaluation *)
-  let a = A.init 777 I.of_int in
+  let a = A.init 117 I.of_int in
   let r = ref (I.of_int 0) in
   let r_i = ref 0 in
   let f i x =
@@ -914,14 +914,14 @@ module Test (A : S) : sig end = struct
       assert_eq x (I.of_int 0); assert_eq y (I.of_int 0); false in
     assert (not (A.for_all2 f a a) = (A.length a > 0))
   in
-  let a = A.init 777 I.of_int in
+  let a = A.init 117 I.of_int in
   test a;
-  let a = A.init 778 I.of_int in
+  let a = A.init 118 I.of_int in
   test a;
   let a = A.init 0 I.of_int in
   test a;
-  let a = A.init 778 I.of_int in
-  let b = A.init 778 (fun _ -> I.of_int 0) in
+  let a = A.init 118 I.of_int in
+  let b = A.init 118 (fun _ -> I.of_int 0) in
   assert (A.for_all2 (fun a b -> I.compare a b >= 0) a b);
   assert (not (A.for_all2 (fun a b -> I.compare a b >= 0) b a));
   check_inval (fun x -> A.for_all2 (fun _ _ -> true) (A.make 100 x) (A.make 101 x))
@@ -942,14 +942,14 @@ module Test (A : S) : sig end = struct
     assert (A.exists2 f a a = (A.length a > 0))
 
   in
-  let a = A.init 777 I.of_int in
+  let a = A.init 117 I.of_int in
   test a;
-  let a = A.init 778 I.of_int in
+  let a = A.init 118 I.of_int in
   test a;
   let a = A.init 0 I.of_int in
   test a;
-  let a = A.init 778 I.of_int in
-  let b = A.init 778 (fun _ -> I.of_int 0) in
+  let a = A.init 118 I.of_int in
+  let b = A.init 118 (fun _ -> I.of_int 0) in
   assert (A.exists2 (fun a b -> I.compare a b > 0) a b);
   assert (not (A.exists2 (fun a b -> I.compare a b > 0) b a));
   check_inval (fun x -> A.exists2 (fun _ _ -> true) (A.make 100 x) (A.make 101 x))

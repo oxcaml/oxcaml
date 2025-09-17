@@ -36,6 +36,8 @@ static const mlsize_t mlsize_t_max = -1;
 #define Max_unboxed_float_array_wosize     (Max_array_wosize / (sizeof(double) / sizeof(intnat)))
 #define Max_unboxed_int64_array_wosize     (Max_array_wosize / (sizeof(int64_t) / sizeof(intnat)))
 #define Max_unboxed_int32_array_wosize     (Max_array_wosize * (sizeof(intnat) / sizeof(int32_t)))
+#define Max_untagged_int16_array_wosize    (Max_array_wosize * (sizeof(intnat) / sizeof(int16_t)))
+#define Max_untagged_int8_array_wosize     (Max_array_wosize * (sizeof(intnat) / sizeof(int8_t)))
 #define Max_unboxed_nativeint_array_wosize (Max_array_wosize)
 
 
@@ -586,6 +588,100 @@ CAMLprim value caml_make_float_vect(value len)
 #endif
 }
 
+static value caml_make_untagged_int8_vect0(value len, int local)
+{
+  mlsize_t num_elements = Long_val(len);
+  if (num_elements > Max_untagged_int8_array_wosize)
+    caml_invalid_argument("Array.make");
+
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
+
+  mlsize_t num_fields = (num_elements + 7) / 8;
+
+  /* Use appropriate array tag based on length mod 8 */
+  mlsize_t rem = num_elements % 8;
+  tag_t tag =
+    rem == 0 ? Untagged_int8_array_zero_tag :
+    rem == 1 ? Untagged_int8_array_one_tag :
+    rem == 2 ? Untagged_int8_array_two_tag :
+    rem == 3 ? Untagged_int8_array_three_tag :
+    rem == 4 ? Untagged_int8_array_four_tag :
+    rem == 5 ? Untagged_int8_array_five_tag :
+    rem == 6 ? Untagged_int8_array_six_tag :
+               Untagged_int8_array_seven_tag;
+
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
+
+  if (local)
+    return caml_alloc_local_reserved(num_fields, tag, reserved);
+  else
+    return caml_alloc_with_reserved(num_fields, tag, reserved);
+}
+
+CAMLprim value caml_make_untagged_int8_vect(value len)
+{
+  return caml_make_untagged_int8_vect0(len, 0);
+}
+
+CAMLprim value caml_make_local_untagged_int8_vect(value len)
+{
+  return caml_make_untagged_int8_vect0(len, 1);
+}
+
+CAMLprim value caml_make_untagged_int8_vect_bytecode(value len)
+{
+  return caml_make_vect(len, 1); // CR jrayman: is this right?
+}
+
+static value caml_make_untagged_int16_vect0(value len, int local)
+{
+  mlsize_t num_elements = Long_val(len);
+  if (num_elements > Max_untagged_int16_array_wosize)
+    caml_invalid_argument("Array.make");
+
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
+
+  mlsize_t num_fields = (num_elements + 3) / 4;
+
+  /* Use appropriate array tag based on length mod 4 */
+  mlsize_t rem = num_elements % 4;
+  tag_t tag =
+    rem == 0 ? Untagged_int16_array_zero_tag :
+    rem == 1 ? Untagged_int16_array_one_tag :
+    rem == 2 ? Untagged_int16_array_two_tag :
+               Untagged_int16_array_three_tag;
+
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
+
+  if (local)
+    return caml_alloc_local_reserved(num_fields, tag, reserved);
+  else
+    return caml_alloc_with_reserved(num_fields, tag, reserved);
+}
+
+CAMLprim value caml_make_untagged_int16_vect(value len)
+{
+  return caml_make_untagged_int16_vect0(len, 0);
+}
+
+CAMLprim value caml_make_local_untagged_int16_vect(value len)
+{
+  return caml_make_untagged_int16_vect0(len, 1);
+}
+
+CAMLprim value caml_make_untagged_int16_vect_bytecode(value len)
+{
+  return caml_make_vect(len, 1); // CR jrayman: is this right?
+}
+
 static value caml_make_unboxed_int32_vect0(value len, int local)
 {
   /* This is only used on 64-bit targets. */
@@ -802,6 +898,24 @@ CAMLprim value caml_floatarray_blit(value a1, value ofs1, value a2, value ofs2,
   memmove((double *)a2 + Long_val(ofs2),
           (double *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(double));
+  return Val_unit;
+}
+
+CAMLprim value caml_untagged_int8_vect_blit(value a1, value ofs1, value a2,
+                                            value ofs2, value n)
+{
+  memmove((int8_t *)a2 + Long_val(ofs2),
+          (int8_t *)a1 + Long_val(ofs1),
+          Long_val(n) * sizeof(int8_t));
+  return Val_unit;
+}
+
+CAMLprim value caml_untagged_int16_vect_blit(value a1, value ofs1, value a2,
+                                             value ofs2, value n)
+{
+  memmove((int16_t *)a2 + Long_val(ofs2),
+          (int16_t *)a1 + Long_val(ofs1),
+          Long_val(n) * sizeof(int16_t));
   return Val_unit;
 }
 
