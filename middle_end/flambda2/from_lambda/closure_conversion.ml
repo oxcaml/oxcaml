@@ -1730,7 +1730,6 @@ let close_exact_or_unknown_apply acc env
       match (callee_approx : Env.value_approximation option) with
       | Some (Closure_approximation { code_id; code = code_or_meta; _ }) ->
         let meta = Code_or_metadata.code_metadata code_or_meta in
-        let is_my_closure_used = Code_metadata.is_my_closure_used meta in
         if Code_metadata.is_tupled meta
         then
           (* CR keryan : We could do better here since we know the arity, but we
@@ -1753,7 +1752,8 @@ let close_exact_or_unknown_apply acc env
               Flambda_arity.print return_arity Debuginfo.print_compact dbg
               Code_metadata.print meta;
           let can_erase_callee =
-            Flambda_features.classic_mode () && not is_my_closure_used
+            Flambda_features.classic_mode ()
+            && not (Code_metadata.is_my_closure_used meta)
           in
           acc, Call_kind.direct_function_call code_id mode, can_erase_callee
       | None -> acc, Call_kind.indirect_function_call_unknown_arity mode, false
@@ -2755,7 +2755,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
        we do not try to reproduce this particular property and can mark as
        inlinable such functions. *)
     if contains_subfunctions
-    && Flambda_features.Expert.fallback_inlining_heuristic ()
+       && Flambda_features.Expert.fallback_inlining_heuristic ()
     then Never_inline
     else if !Clflags.jsir && slots_are_used ()
     then Never_inline
