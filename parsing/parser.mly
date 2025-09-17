@@ -2860,33 +2860,33 @@ fun_expr:
 %inline expr:
   | or_function(fun_expr) { $1 }
 ;
-%inline fun_expr_attrs(expr_type):
-  | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN expr_type
+%inline fun_expr_attrs):
+  | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN seq_expr
       {
         let name, modes = $4 in
         let body = maybe_pmod_constraint modes $5 in
         Pexp_letmodule(name, body, $7), $3 }
-  | LET EXCEPTION ext_attributes let_exception_declaration IN expr_type
+  | LET EXCEPTION ext_attributes let_exception_declaration IN seq_expr
       { Pexp_letexception($4, $6), $3 }
-  | LET OPEN override_flag ext_attributes module_expr IN expr_type
+  | LET OPEN override_flag ext_attributes module_expr IN seq_expr
       { let open_loc = make_loc ($startpos($2), $endpos($5)) in
         let od = Opn.mk $5 ~override:$3 ~loc:open_loc in
         Pexp_open(od, $7), $4 }
-  | MATCH ext_attributes expr_type WITH match_cases
+  | MATCH ext_attributes seq_expr WITH match_cases
       { Pexp_match($3, $5), $2 }
-  | TRY ext_attributes expr_type WITH match_cases
+  | TRY ext_attributes seq_expr WITH match_cases
       { Pexp_try($3, $5), $2 }
-  | TRY ext_attributes expr_type WITH error
+  | TRY ext_attributes seq_expr WITH error
       { syntax_error() }
-  | OVERWRITE ext_attributes expr_type WITH expr
+  | OVERWRITE ext_attributes seq_expr WITH expr
       { Pexp_overwrite($3, $5), $2 }
-  | IF ext_attributes expr_type THEN expr ELSE expr
+  | IF ext_attributes seq_expr THEN expr ELSE expr
       { Pexp_ifthenelse($3, $5, Some $7), $2 }
-  | IF ext_attributes expr_type THEN expr
+  | IF ext_attributes seq_expr THEN expr
       { Pexp_ifthenelse($3, $5, None), $2 }
-  | WHILE ext_attributes expr_type do_done_expr
+  | WHILE ext_attributes seq_expr do_done_expr
       { Pexp_while($3, $4), $2 }
-  | FOR ext_attributes pattern EQUAL expr_type direction_flag expr_type
+  | FOR ext_attributes pattern EQUAL seq_expr direction_flag expr_type
     do_done_expr
       { Pexp_for($3, $5, $7, $6, $8), $2 }
   | ASSERT ext_attributes simple_expr %prec below_HASH
@@ -4738,7 +4738,7 @@ tuple_type:
     - object types                < x: t; ... >
     - variant types               [ `A ]
     - extension                   [%foo ...]
-    - quoted types                << t >>
+    - quoted types                <[ t ]>
 
   We support local opens on the following classes of types:
     - parenthesised
