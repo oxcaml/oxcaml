@@ -22,9 +22,7 @@ let get_function_specific_params () = !function_specific_params
 
 let find_param_value param_name =
   (* Concatenate function-specific params with global params *)
-  let all_params =
-    List.rev !Oxcaml_flags.regalloc_params @ !function_specific_params
-  in
+  let all_params = !function_specific_params @ !Oxcaml_flags.regalloc_params in
   all_params
   |> List.find_map ~f:(fun param ->
          match String.split_on_char ':' param with
