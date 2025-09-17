@@ -1,3 +1,11 @@
+(executable
+ (name revert_newlines))
+
+(rule
+ (target revert-newlines)
+ (deps   revert_newlines.exe)
+ (action (copy %{deps} %{target})))
+
 (env (_
  (binaries merlin-wrapper ocamlc-wrapper revert-newlines)
  (env-vars

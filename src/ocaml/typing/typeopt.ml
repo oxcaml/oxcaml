@@ -98,11 +98,11 @@ let maybe_pointer_type env ty =
 
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
-(* CR layouts v2.8: Calling [type_sort] in [typeopt] is not ideal and
-    this function should be removed at some point. To do that, there
-    needs to be a way to store sort vars on [Tconstr]s. That means
-    either introducing a [Tpoly_constr], allow type parameters with
-    sort info, or do something else. *)
+(* CR layouts v2.8: Calling [type_sort] in [typeopt] is not ideal
+   and this function should be removed at some point. To do that, there
+   needs to be a way to store sort vars on [Tconstr]s. That means
+   either introducing a [Tpoly_constr], allow type parameters with
+   sort info, or do something else. Internal ticket 5093. *)
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
 let type_sort ~why env _loc ty =
@@ -583,7 +583,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
          by the parameters of the declaration. The code below loses this
          connection and will continue processing with e.g. ['a : value]
          instead of [string] when looking at a [string list]. This should
-         probably just call a [type_jkind] function. *)
+         probably just call a [type_jkind] function. Internal ticket 5101. *)
       let decl =
         try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
       in

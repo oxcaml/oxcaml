@@ -630,7 +630,9 @@ let ocaml_ignored_flags =
     "-cfg-prologue-validate";
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
-    "-no-cfg-prologue-shrink-wrap"
+    "-no-cfg-prologue-shrink-wrap";
+    "-gdwarf-pedantic";
+    "-ddwarf-metrics"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -710,7 +712,16 @@ let ocaml_ignored_parametrized_flags =
     "-shape-format";
     "-gdwarf-compression";
     "-gdwarf-fission";
-    "-cfg-prologue-shrink-wrap-threshold"
+    "-cfg-prologue-shrink-wrap-threshold";
+    "-gdwarf-config-shape-reduce-depth";
+    "-gdwarf-config-shape-eval-depth";
+    "-gdwarf-config-max-cms-files-per-unit";
+    "-gdwarf-config-max-cms-files-per-variable";
+    "-gdwarf-config-max-type-to-shape-depth";
+    "-gdwarf-config-max-shape-reduce-steps-per-variable";
+    "-gdwarf-config-max-evaluation-steps-per-variable";
+    "-gdwarf-config-shape-reduce-fuel";
+    "-gdwarf-fidelity"
   ]
 
 let ocaml_warnings_spec ~error =

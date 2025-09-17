@@ -21,8 +21,8 @@
 *)
 
 val init : unit -> unit
-val token: Lexing.lexbuf -> Parser.token
-val skip_hash_bang: Lexing.lexbuf -> unit
+val token : Lexing.lexbuf -> Parser.token
+val skip_hash_bang : Lexing.lexbuf -> unit
 
 type error =
   | Illegal_character of char
@@ -44,9 +44,16 @@ val in_string : unit -> bool
 val is_keyword : string -> bool
 
 val print_warnings : bool ref
-val handle_docstrings: bool ref
+val handle_docstrings : bool ref
 val comments : unit -> (string * Location.t) list
 val token_with_comments : Lexing.lexbuf -> Parser.token
+
+(* Syntax mode configuration *)
+module Syntax_mode : sig
+  val quotations : bool ref
+end
+
+val reset_syntax_mode : unit -> unit
 
 (*
   [set_preprocessor init preprocessor] registers [init] as the function

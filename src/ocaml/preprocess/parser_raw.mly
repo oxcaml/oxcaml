@@ -1072,6 +1072,7 @@ let merloc startpos ?endpos x =
 %token BARRBRACKET [@symbol "|]"]
 %token BEGIN [@symbol "begin"]
 %token <char> CHAR [@cost 2] [@recovery '_']
+%token <char> HASH_CHAR [@cost 2] [@recovery '_']
 %token CLASS [@symbol "class"]
 %token COLON [@symbol ":"]
 %token COLONCOLON [@symbol "::"]
@@ -1281,7 +1282,8 @@ The precedences must be listed from low to high.
 %nonassoc below_DOT
 %nonassoc DOT DOTHASH DOTOP
 /* Finally, the first tokens of simple_expr are above everything else. */
-%nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT HASH_FLOAT INT HASH_INT OBJECT
+%nonassoc BACKQUOTE BANG BEGIN CHAR HASH_CHAR FALSE FLOAT HASH_FLOAT
+          INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
           NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR UNDERSCORE
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN
@@ -3246,6 +3248,8 @@ block_access:
       match $2 with
       | "L" -> Baccess_array (Mutable, Index_unboxed_int64, i)
       | "l" -> Baccess_array (Mutable, Index_unboxed_int32, i)
+      | "S" -> Baccess_array (Mutable, Index_unboxed_int16, i)
+      | "s" -> Baccess_array (Mutable, Index_unboxed_int8, i)
       | "n" -> Baccess_array (Mutable, Index_unboxed_nativeint, i)
       | "idx_imm" -> Baccess_block (Immutable, i)
       | "idx_mut" -> Baccess_block (Mutable, i)
@@ -3257,6 +3261,8 @@ block_access:
       match $1, $2 with
       | ":", "L" -> Baccess_array (Immutable, Index_unboxed_int64, i)
       | ":", "l" -> Baccess_array (Immutable, Index_unboxed_int32, i)
+      | ":", "S" -> Baccess_array (Immutable, Index_unboxed_int16, i)
+      | ":", "s" -> Baccess_array (Immutable, Index_unboxed_int8, i)
       | ":", "n" -> Baccess_array (Immutable, Index_unboxed_nativeint, i)
       | _ ->
         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
@@ -5139,6 +5145,7 @@ value_constant:
 unboxed_constant:
   | HASH_INT          { unboxed_int $sloc $sloc Positive $1 }
   | HASH_FLOAT        { unboxed_float Positive $1 }
+  | HASH_CHAR         { Pconst_untagged_char $1 }
 ;
 constant:
     value_constant    { $1 }

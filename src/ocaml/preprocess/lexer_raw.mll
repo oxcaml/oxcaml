@@ -201,6 +201,14 @@ let in_comment state = state.comment_start_loc <> []
 
 let at_beginning_of_line pos = (pos.pos_cnum = pos.pos_bol)
 
+(* Syntax mode configuration for the #syntax directive *)
+module Syntax_mode = struct
+  let quotations = ref Config.syntax_quotations
+end
+
+let _reset_syntax_mode () =
+  Syntax_mode.quotations := Config.syntax_quotations
+
 (* See the comment on the [directive] lexer. *)
 type directive_lexing_already_consumed =
    | Hash
@@ -478,6 +486,24 @@ let int ~maybe_hash lit modifier =
   | unexpected -> fatal_error ("expected # or empty string: " ^ unexpected)
 ;;
 
+let produce_and_backtrack lexbuf token back =
+  lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos - back;
+  let curpos = lexbuf.lex_curr_p in
+  lexbuf.lex_curr_p <- { curpos with pos_cnum = curpos.pos_cnum - back };
+  return token
+
+let char ~maybe_hash lit =
+  match maybe_hash with
+  | "#" -> HASH_CHAR (lit)
+  | "" -> CHAR (lit)
+  | unexpected -> fatal_error ("expected # or empty string: " ^ unexpected)
+
+let skip_hash ~maybe_hash =
+  match maybe_hash with
+  | "#" -> 1
+  | "" -> 0
+  | unexpected -> fatal_error ("expected # or empty string: " ^ unexpected)
+
 (* Error report *)
 
 open Format
@@ -732,21 +758,30 @@ rule token state = parse
         >>= fun (str, loc) ->
         let idloc = compute_quoted_string_idloc orig_loc 3 id in
         return (QUOTED_STRING_ITEM (id, idloc, str, loc, Some delim)) }
-  | "\'" newline "\'"
+  | ('#'? as maybe_hash)
+    "\'" newline "\'"
     { update_loc lexbuf None 1 false 1;
       (* newline is ('\013'* '\010') *)
-      return (CHAR '\n') }
-  | "\'" ([^ '\\' '\'' '\010' '\013'] as c) "\'"
-    { return (CHAR c) }
-  | "\'\\" (['\\' '\'' '\"' 'n' 't' 'b' 'r' ' '] as c) "\'"
-    { return (CHAR (char_for_backslash c)) }
-  | "\'\\" 'o' ['0'-'3'] ['0'-'7'] ['0'-'7'] "\'"
-    { char_for_octal_code state lexbuf 3 >>= fun c -> return (CHAR c) }
-  | "\'\\" ['0'-'9'] ['0'-'9'] ['0'-'9'] "\'"
-    { char_for_decimal_code state lexbuf 2 >>= fun c -> return (CHAR c) }
-  | "\'\\" 'x' ['0'-'9' 'a'-'f' 'A'-'F'] ['0'-'9' 'a'-'f' 'A'-'F'] "\'"
-    { return (CHAR (char_for_hexadecimal_code lexbuf 3)) }
-  | "\'" ("\\" [^ '#'] as esc)
+      return (char ~maybe_hash '\n') }
+  | ('#'? as maybe_hash)
+    "\'" ([^ '\\' '\'' '\010' '\013'] as c) "\'"
+    { return (char ~maybe_hash c) }
+  | ('#'? as maybe_hash)
+    "\'\\" (['\\' '\'' '\"' 'n' 't' 'b' 'r' ' '] as c) "\'"
+    { return (char ~maybe_hash (char_for_backslash c)) }
+  | ('#'? as maybe_hash)
+    "\'\\" 'o' ['0'-'3'] ['0'-'7'] ['0'-'7'] "\'"
+    { char_for_octal_code state lexbuf (3 + skip_hash ~maybe_hash)
+      >>= fun c -> return (char ~maybe_hash c) }
+  | ('#'? as maybe_hash)
+    "\'\\" ['0'-'9'] ['0'-'9'] ['0'-'9'] "\'"
+    { char_for_decimal_code state lexbuf (2 + skip_hash ~maybe_hash)
+      >>= fun c -> return (char ~maybe_hash c) }
+  | ('#'? as maybe_hash)
+    "\'\\" 'x' ['0'-'9' 'a'-'f' 'A'-'F'] ['0'-'9' 'a'-'f' 'A'-'F'] "\'"
+    { return (char ~maybe_hash
+              (char_for_hexadecimal_code lexbuf (3 + skip_hash ~maybe_hash))) }
+  | '#'? "\'" ("\\" [^ '#'] as esc)
       { fail lexbuf (Illegal_escape (esc, None)) }
   | "(*"
       { let start_loc = Location.curr lexbuf in
@@ -768,14 +803,11 @@ rule token state = parse
         Buffer.reset state.buffer;
         return (COMMENT (s, { loc with Location.loc_end = end_loc.Location.loc_end }))
       }
-  | "*)"
-      { let loc = Location.curr lexbuf in
-        Location.prerr_warning loc Warnings.Comment_not_end;
-        lexbuf.Lexing.lex_curr_pos <- lexbuf.Lexing.lex_curr_pos - 1;
-        let curpos = lexbuf.lex_curr_p in
-        lexbuf.lex_curr_p <- { curpos with pos_cnum = curpos.pos_cnum - 1 };
-        return STAR
-      }
+  | "*)" {
+      let loc = Location.curr lexbuf in
+      Location.prerr_warning loc Warnings.Comment_not_end;
+      produce_and_backtrack lexbuf STAR 1
+    }
   | "#"
       { if not (at_beginning_of_line lexbuf.lex_start_p)
         then return HASH
@@ -793,7 +825,12 @@ rule token state = parse
   | "*"  { return STAR }
   | ","  { return COMMA }
   | "->" { return MINUSGREATER }
-  | "$"  { return DOLLAR }
+  | "$" {
+      if !(Syntax_mode.quotations) then
+        return DOLLAR
+      else
+        return (INFIXOP0 "$")
+    }
   | "."  { return DOT }
   | ".." { return DOTDOT }
   | ".#" { return DOTHASH }
@@ -805,7 +842,13 @@ rule token state = parse
   | ";"  { return SEMI }
   | ";;" { return SEMISEMI }
   | "<"  { return LESS }
-  | "<[" { return LESSLBRACKET }
+  | "<[" {
+      if !(Syntax_mode.quotations) then
+        return LESSLBRACKET
+      else
+        (* Put back the '[' and return just LESS *)
+        produce_and_backtrack lexbuf LESS 1
+    }
   | "<-" { return LESSMINUS }
   | "="  { return EQUAL }
   | "["  { return LBRACKET }
@@ -814,7 +857,13 @@ rule token state = parse
   | "[<" { return LBRACKETLESS }
   | "[>" { return LBRACKETGREATER }
   | "]"  { return RBRACKET }
-  | "]>" { return RBRACKETGREATER }
+  | "]>" {
+      if !(Syntax_mode.quotations) then
+        return RBRACKETGREATER
+      else
+        (* Put back the '>' and return just RBRACKET *)
+        produce_and_backtrack lexbuf RBRACKET 1
+    }
   | "{"  { return LBRACE }
   | "{<" { return LBRACELESS }
   | "|"  { return BAR }
@@ -880,13 +929,11 @@ rule token state = parse
    the line was already consumed, either just the '#' or the '#4'. That's
    indicated by the [already_consumed] argument. The caller is responsible
    for checking that the '#' appears in column 0.
-
-   The [directive] lexer always attempts to read the line number from the
-   lexbuf. It expects to receive a line number from exactly one source (either
-   the lexbuf or the [already_consumed] argument, but not both) and will fail if
-   this isn't the case.
 *)
 and directive state already_consumed = parse
+  (* Expects to receive a line number from exactly one source (either the lexbuf or
+     the [already_consumed] argument, but not both) and will fail if this isn't
+     the case. *)
   | ([' ' '\t']* (['0'-'9']+? as line_num_opt) [' ' '\t']*
      ("\"" ([^ '\010' '\013' '\"' ] * as name) "\"") as directive)
         [^ '\010' '\013'] *
@@ -913,7 +960,26 @@ and directive state already_consumed = parse
             update_loc lexbuf (Some name) (line_num - 1) true 0;
             token state lexbuf
       }
-
+  | "syntax" [' ' '\t']+ (lowercase identchar* as mode) [' ' '\t']+
+    (lowercase identchar* as toggle) [^ '\010' '\013']*
+      { let toggle =
+          match toggle with
+          | "on" -> true
+          | "off" -> false
+          | _ ->
+              directive_error lexbuf
+                ("syntax directive can only be toggled on or off; "
+                 ^ toggle ^ " not recognized")
+                ~already_consumed ~directive:"syntax"
+        in
+        match mode with
+        | "quotations" ->
+            Syntax_mode.quotations := toggle;
+            token state lexbuf
+        | _ ->
+            directive_error lexbuf ("unknown syntax mode " ^ mode)
+              ~already_consumed ~directive:"syntax"
+      }
 and comment state = parse
     "(*"
       { state.comment_start_loc <- (Location.curr lexbuf) :: state.comment_start_loc;

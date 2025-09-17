@@ -40,7 +40,7 @@ type typedtree_items =
   | Interface_items of
       { items : (Parsetree.signature_item, Typedtree.signature_item) item list;
         psig_modalities : Parsetree.modalities;
-        sig_modalities : Mode.Modality.Value.Const.t;
+        sig_modalities : Mode.Modality.Const.t;
         sig_sloc : Location.t
       }
   | Implementation_items of

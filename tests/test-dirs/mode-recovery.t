@@ -57,8 +57,11 @@ Error from a closure lock
   > EOF
 
 The error is reported
-  $ $MERLIN single errors -filename closure1.ml < closure1.ml | jq .value[].message -r
-  The value count is local, so cannot be used inside a function that might escape.
+  $ $MERLIN single errors -filename closure1.ml < closure1.ml \
+  >   | revert-newlines \
+  >   | jq .value[].message -r
+  The value count is local but is expected to be global
+  because it is used inside a function which is expected to be global.
 
 We can locate the value that was used incorrectly
   $ $MERLIN single locate -position 8:37 -filename closure1.ml < closure1.ml | jq .value.pos -c
@@ -80,9 +83,16 @@ Error from closure lock
   > EOF
 
 The error is reported and foo still has mode nonportable
-  $ $MERLIN single errors -filename closure2.ml < closure2.ml | jq .value[].message -r
-  The value foo is nonportable, so cannot be used inside a function that is portable.
-  The value bar is nonportable, so cannot be used inside a function that is portable.
+  $ $MERLIN single errors -filename closure2.ml < closure2.ml \
+  >   | revert-newlines \
+  >   | jq .value[].message -r
+  The value foo is nonportable
+  because it closes over the value y (at File "closure2.ml", line 3, characters 2-3)
+  which is expected to be uncontended.
+  However, the highlighted expression is expected to be portable
+  because it is used inside a function which is expected to be portable.
+  The value bar is nonportable but is expected to be portable
+  because it is used inside a function which is expected to be portable.
 
 We can locate the values that were used incorrectly
   $ $MERLIN single locate -position 7:13 -filename closrue2.ml < closure2.ml | jq .value.pos -c

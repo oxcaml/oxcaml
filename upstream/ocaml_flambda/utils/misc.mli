@@ -542,6 +542,12 @@ module Int_literal_converter : sig
         this function accepts the string representation of [max_int + 1]
         and returns [min_int] in this case. *)
 
+  val int8 : string -> int
+    (** Likewise, at type [int8] *)
+
+  val int16 : string -> int
+    (** Likewise, at type [int16] *)
+
   val int32 : string -> int32
     (** Likewise, at type [int32] *)
 
@@ -1131,6 +1137,39 @@ type alerts = string Stdlib.String.Map.t
 
 val remove_double_underscores : string -> string
 
+(** {1 JSON utilities} *)
+module Json : sig
+  (** Simple (and not very robust) JSON generation utilities.
+
+      Everything is string based, creating lots of intermediate strings.
+      Moreover, [Json.string] uses a custom string encoding based on the code
+      for the format specifier [%S], but with escapes for [\u00HH] instead of
+      OCaml's [\DDD]. *)
+
+  val field : string -> string -> string
+  (** [field name value] creates a JSON field with the given name and value. *)
+
+  val string : string -> string
+  (** [string value] formats a string value as a JSON string. *)
+
+  val int : int -> string
+  (** [int value] formats an integer value as a JSON number. *)
+
+  val object_ : string list -> string
+  (** [object_ fields] creates a JSON object from a list of field strings. *)
+
+  val array : string list -> string
+  (** [array items] creates a JSON array from a list of item strings. *)
+
+  val null : string
+  (** [null] is the JSON null literal. *)
+
+  val option : ('a -> string) -> 'a option -> string
+  (** [option f opt] formats an optional value as JSON.
+      Returns the JSON [null] literal for [None],
+      or applies [f] to the value for [Some v]. *)
+end
+
 (** Non-empty lists *)
 module Nonempty_list : sig
   type nonrec 'a t = ( :: ) of 'a * 'a list
@@ -1147,4 +1186,41 @@ module Nonempty_list : sig
     unit
 
   val (@) : 'a t -> 'a t -> 'a t
+end
+
+(** A bounded non-negative integer. The possible ranges are [0 ..< n],
+    represented by [Bounded { bound = n}] and [0 ..< ∞] represented by
+    [Unbounded]. *)
+module Maybe_bounded : sig
+  type t =
+    | Unbounded
+    | Bounded of { mutable bound: int }
+    (** The [bound] is not included. *)
+
+  (** [decr] decreases the current bound and truncates at zero. As such, [decr]
+      and then [incr] is not always a no-op. *)
+  val decr : t -> unit
+
+  (** [incr] increases the current bound. Raises an exception when attempting
+      to increment [max_int]. *)
+  val incr : t -> unit
+
+  val is_depleted : t -> bool
+
+  (** [is_in_bounds n t] returns [true] if [n] is in bounds.
+      A number counts as in bounds if it is non-negative and strictly smaller
+      than the bound. For [Unbounded], returns [true] if [n >= 0]. *)
+  val is_in_bounds : int -> t -> bool
+
+  (** [is_out_of_bounds n t] returns [true] if [n] is out of bounds. A number is
+      out of bounds if it is negative or greater than or equal to the bound. For
+      [Unbounded], returns [false] if [n < 0] and [true] otherwise. *)
+  val is_out_of_bounds : int -> t -> bool
+
+  (** [of_option opt] maps [None] to no bound and [Some n] to the bound [n]
+      (not inclusive). *)
+  val of_option : int option -> t
+
+  (** [of_int n] creates a bounded integer with bound [n] (not inclusive). *)
+  val of_int : int -> t
 end

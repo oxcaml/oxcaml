@@ -15,23 +15,22 @@ val transl_modalities :
   maturity:Language_extension.maturity ->
   Types.mutability ->
   Parsetree.modalities ->
-  Mode.Modality.Value.Const.t
+  Mode.Modality.Const.t
 
-val let_mutable_modalities : Mode.Modality.Value.Const.t
+val let_mutable_modalities : Mode.Modality.Const.t
 
 (** The (default) modalities for an atomic mutable field *)
-val atomic_mutable_modalities : Mode.Modality.Value.Const.t
+val atomic_mutable_modalities : Mode.Modality.Const.t
 
-val untransl_modality :
-  'a Mode.Modality.Atom.t -> Parsetree.modality Location.loc
+val untransl_modality : Mode.Modality.atom -> Parsetree.modality Location.loc
 
 (** Un-interpret modalities back to parsetree. Takes the mutability and
     attributes on the field and remove mutable-implied modalities accordingly.
     *)
 val untransl_modalities :
-  Types.mutability -> Mode.Modality.Value.Const.t -> Parsetree.modalities
+  Types.mutability -> Mode.Modality.Const.t -> Parsetree.modalities
 
 (** Interpret a mod-bounds. *)
 val transl_mod_bounds : Parsetree.modes -> Types.Jkind_mod_bounds.t
 
-val idx_expected_modalities : mut:bool -> Mode.Modality.Value.Const.t
+val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t

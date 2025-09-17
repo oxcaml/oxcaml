@@ -37,7 +37,7 @@ type value_mismatch =
   | Not_a_primitive
   | Type of Errortrace.moregen_error
   | Zero_alloc of Zero_alloc.error
-  | Modality of Mode.Modality.Value.error
+  | Modality of Mode.Modality.error
   | Mode of Mode.Value.error
 
 exception Dont_match of value_mismatch
@@ -64,7 +64,7 @@ type label_mismatch =
   | Type of Errortrace.equality_error
   | Mutability of position
   | Atomicity of position
-  | Modality of Mode.Modality.Value.equate_error
+  | Modality of Mode.Modality.equate_error
 
 type record_change =
   (Types.label_declaration as 'ld, 'ld, label_mismatch) Diffing_with_keys.change
@@ -83,7 +83,7 @@ type constructor_mismatch =
   | Inline_record of record_change list
   | Kind of position
   | Explicit_return_type of position
-  | Modality of int * Mode.Modality.Value.equate_error
+  | Modality of int * Mode.Modality.equate_error
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -158,11 +158,12 @@ val child_modes: string -> mmodes -> mmodes
     modes suitable for the inclusion check of the parent item, and both hands'
     modalities between the parent and the child. *)
 val child_modes_with_modalities:
-  string -> modalities:(Mode.Modality.Value.t * Mode.Modality.Value.t) ->
-  mmodes -> (mmodes, Mode.Modality.Value.error) Result.t
+  string -> modalities:(Mode.Modality.t * Mode.Modality.t) ->
+  mmodes -> (mmodes, Mode.Modality.error) Result.t
 
 (** Claim the current item is included by the RHS and its mode checked. *)
-val check_modes : Env.t -> ?crossing:Mode.Crossing.t -> item:Env.lock_item ->
+val check_modes : Env.t -> ?crossing:Mode.Crossing.t ->
+  item:Mode.Hint.lock_item ->
   ?typ:type_expr -> mmodes -> (unit, Mode.Value.error) Result.t
 
 val value_descriptions:
@@ -196,7 +197,7 @@ val report_type_mismatch :
   Format.formatter -> type_mismatch -> unit
 
 val report_modality_sub_error :
-  string -> string -> Format.formatter -> Mode.Modality.Value.error -> unit
+  string -> string -> Format.formatter -> Mode.Modality.error -> unit
 
 val report_mode_sub_error :
   string -> string -> Format.formatter -> Mode.Value.error -> unit

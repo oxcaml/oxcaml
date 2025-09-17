@@ -145,10 +145,11 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
 
 let register_allocation () =
   let m, _ =
-    Alloc.(newvar_below
-      (max_with_comonadic Areality Locality.global))
+    Value.(newvar_below (of_const
+      ~hint_comonadic:Module_allocated_on_heap
+      { Const.max with areality = Global }))
   in
-  m, alloc_as_value m
+  value_to_alloc_r2g m, m
 
 open Typedtree
 
@@ -629,8 +630,7 @@ let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
   let sg_item = function
     | Sig_value (id, desc, vis) ->
         let val_modalities =
-          desc.val_modalities
-          |> zap_modality |> Mode.Modality.Value.of_const
+          desc.val_modalities |> zap_modality |> Mode.Modality.of_const
         in
         let val_zero_alloc =
           Zero_alloc.create_const (Zero_alloc.get desc.val_zero_alloc)
@@ -643,7 +643,7 @@ let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
             md.md_type
         in
         let md_modalities =
-          md.md_modalities |> zap_modality |> Mode.Modality.Value.of_const
+          md.md_modalities |> zap_modality |> Mode.Modality.of_const
         in
         let md = {md with md_type; md_modalities} in
         Sig_module (id, pres, md, re, vis)
@@ -665,7 +665,7 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
       | Named (id, mty) ->
           let mty =
             remove_modality_and_zero_alloc_variables_mty env
-              ~zap_modality:Mode.Modality.Value.to_const_exn mty
+              ~zap_modality:Mode.Modality.to_const_exn mty
           in
           Named (id, mty)
       | Unit -> Unit
@@ -677,7 +677,7 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
   | Mty_strengthen (mty, path, alias) ->
       let mty =
         remove_modality_and_zero_alloc_variables_mty env
-        ~zap_modality:Mode.Modality.Value.to_const_exn mty
+          ~zap_modality:Mode.Modality.to_const_exn mty
       in
       Mty_strengthen (mty, path, alias)
   | Mty_for_hole -> mty
@@ -815,7 +815,7 @@ module Merge = struct
         let newsg =
           if destructive then
             remove_modality_and_zero_alloc_variables_sg sig_env
-              ~zap_modality:Mode.Modality.Value.zap_to_id newsg
+              ~zap_modality:Mode.Modality.zap_to_id newsg
           else
             newsg
         in
@@ -1022,7 +1022,7 @@ module Merge = struct
             let mty = Mtype.scrape_for_type_of ~remove_aliases sig_env mty in
             let mty =
               remove_modality_and_zero_alloc_variables_mty sig_env
-                ~zap_modality:Mode.Modality.Value.zap_to_id mty
+                ~zap_modality:Mode.Modality.zap_to_id mty
             in
             let md'' = { md' with md_type = mty } in
             let newmd =
@@ -1102,7 +1102,8 @@ module Merge = struct
              repeated later -- and with better handling for errors -- we just
              drop any error here. *)
           ignore
-            (* CR layouts v2.8: Does this type_jkind need to be instantiated? *)
+            (* CR layouts v2.8: Does this type_jkind need to be instantiated?
+               Internal ticket 5095. *)
             (Ctype.constrain_decl_jkind env tdecl sig_decl.type_jkind);
           check_type_decl sig_env sg_for_env loc id None tdecl sig_decl;
           let tdecl = { tdecl with type_manifest = None } in
@@ -1182,9 +1183,9 @@ let rec apply_modalities_signature ~recursive env modalities sg =
   | Sig_value (id, vd, vis) ->
       let val_modalities =
         vd.val_modalities
-        |> Mode.Modality.Value.to_const_exn
-        |> (fun then_ -> Mode.Modality.Value.Const.concat ~then_ modalities)
-        |> Mode.Modality.Value.of_const
+        |> Mode.Modality.to_const_exn
+        |> (fun then_ -> Mode.Modality.Const.concat ~then_ modalities)
+        |> Mode.Modality.of_const
       in
       let vd = {vd with val_modalities} in
       Sig_value (id, vd, vis)
@@ -1228,7 +1229,7 @@ let check_unsupported_modal_module ~env reason modes =
   | None -> ()
   | Some loc -> raise(Error(loc, env, Unsupported_modal_module reason))
 
-let transl_modalities ?(default_modalities = Mode.Modality.Value.Const.id)
+let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   modalities =
   match modalities with
   | [] -> default_modalities
@@ -1257,10 +1258,9 @@ let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
 
   We still don't support [pmd_modalities] on functors.
   *)
-  match Mode.Modality.Value.Const.is_id modalities with
-  | true -> mty, Mode.Modality.Value.id
-  | false ->
-      apply_modalities_module_type env modalities mty, Mode.Modality.Value.id
+  match Mode.Modality.Const.is_id modalities with
+  | true -> mty, Mode.Modality.id
+  | false -> apply_modalities_module_type env modalities mty, Mode.Modality.id
 
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
@@ -1343,7 +1343,7 @@ let rec approx_modtype env smty =
 and approx_module_declaration env pmd =
   {
     Types.md_type = approx_modtype env pmd.pmd_type;
-    md_modalities = Mode.Modality.Value.id;
+    md_modalities = Mode.Modality.id;
     md_attributes = pmd.pmd_attributes;
     md_loc = pmd.pmd_loc;
     md_uid = Uid.internal_not_actually_unique;
@@ -1874,7 +1874,7 @@ and transl_modtype_aux env smty =
               let id, newenv =
                 let arg_md =
                   { md_type = arg.mty_type;
-                    md_modalities = Mode.Modality.Value.id;
+                    md_modalities = Mode.Modality.id;
                     md_attributes = [];
                     md_loc = param.loc;
                     md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -2009,7 +2009,7 @@ and transl_signature ?(keep_warnings = false) env sig_acc {psg_items; psg_modali
         sincl.pincl_attributes
     in
     let sg =
-      match Mode.Modality.Value.Const.is_id modalities with
+      match Mode.Modality.Const.is_id modalities with
       | true -> sg
       | false -> apply_modalities_signature ~recursive env modalities sg
     in
@@ -2038,7 +2038,7 @@ and transl_signature ?(keep_warnings = false) env sig_acc {psg_items; psg_modali
           | [] -> sig_modalities
           | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
         in
-        let modalities = Mode.Modality.Value.of_const modalities in
+        let modalities = Mode.Modality.of_const modalities in
         let (tdesc, newenv) =
           Typedecl.transl_value_decl env ~modalities item.psig_loc sdesc
         in
@@ -2177,7 +2177,7 @@ and transl_signature ?(keep_warnings = false) env sig_acc {psg_items; psg_modali
             md
           else
             { md_type = Mty_alias path;
-              md_modalities = Mode.Modality.Value.id;
+              md_modalities = Mode.Modality.id;
               md_attributes = pms.pms_attributes;
               md_loc = pms.pms_loc;
               md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -2883,11 +2883,10 @@ let infer_modalities ~loc ~env ~md_mode ~mode =
       mode.Mode.comonadic
       md_mode.Mode.comonadic with
       | Ok () -> ()
-      | Error (Error (ax, e)) ->
-          raise (Error (loc, env, Item_weaker_than_structure
-            (Error (Comonadic ax, e))))
+      | Error e ->
+          raise (Error (loc, env, Item_weaker_than_structure (Comonadic e)))
     end;
-    Mode.Modality.Value.infer ~md_mode ~mode
+    Mode.Modality.infer ~md_mode ~mode
 
 (** Given a signature [sg] to be included in a structure. The signature contains
   modalities relative to [mode], this function returns a signature with
@@ -2895,12 +2894,12 @@ let infer_modalities ~loc ~env ~md_mode ~mode =
 let rebase_modalities ~loc ~env ~md_mode ~mode sg =
   List.map (function
     | Sig_value (id, vd, vis) ->
-        let mode = Mode.Modality.Value.apply vd.val_modalities mode in
+        let mode = Mode.Modality.apply vd.val_modalities mode in
         let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
         let vd = {vd with val_modalities} in
         Sig_value (id, vd, vis)
     | Sig_module (id, pres, md, rec_, vis) ->
-        let mode = Mode.Modality.Value.apply md.md_modalities mode in
+        let mode = Mode.Modality.apply md.md_modalities mode in
         let md_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
         let md = {md with md_modalities} in
         Sig_module (id, pres, md, rec_, vis)
@@ -2986,7 +2985,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
               let md_uid =  Uid.mk ~current_unit:(Env.get_unit_name ()) in
               let arg_md =
                 { md_type = mty.mty_type;
-                  md_modalities = Modality.Value.id;
+                  md_modalities = Modality.id;
                   md_attributes = [];
                   md_loc = param.loc;
                   md_uid;
@@ -3730,7 +3729,7 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) funct_body anchor
         in
         let (decls, newenv) =
           transl_recmodule_modtypes env
-            ~sig_modalities:Mode.Modality.Value.Const.id
+            ~sig_modalities:Mode.Modality.Const.id
             (List.map (fun (name, smty, smode, _smodl, attrs, loc) ->
                  ({pmd_name=name; pmd_type=smty;
                    pmd_attributes=attrs; pmd_loc=loc; pmd_modalities=[]}
@@ -3767,7 +3766,7 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) funct_body anchor
                    let mdecl =
                      {
                        md_type = mty.mty_type;
-                       md_modalities = Modality.Value.id;
+                       md_modalities = Modality.id;
                        md_attributes = attrs;
                        md_loc = loc;
                        md_uid = uid;
@@ -4171,7 +4170,7 @@ let () =
 let gen_annot target annots =
   let annot = Unit_info.annot target in
   Cmt2annot.gen_annot (Some (Unit_info.Artifact.filename annot))
-    ~sourcefile:(Unit_info.Artifact.source_file annot)
+    ~sourcefile:(Unit_info.Artifact.original_source_file annot)
     ~use_summaries:false
     annots
 *)
@@ -4238,7 +4237,7 @@ let check_argument_type_if_given env sourcefile actual_sig arg_module_opt =
            }
 
 let type_implementation target modulename initial_env ast =
-  let sourcefile = Unit_info.source_file target in
+  let sourcefile = Unit_info.original_source_file target in
   let error e =
     raise (Error (Location.in_file sourcefile, initial_env, e))
   in
@@ -4291,7 +4290,7 @@ let type_implementation target modulename initial_env ast =
         let shape = Shape_reduce.local_reduce Env.empty shape in
         Printtyp.wrap_printing_env ~error:false initial_env
           (fun () -> fprintf std_formatter "%a@."
-              (Printtyp.printed_signature @@ Unit_info.source_file target)
+              (Printtyp.printed_signature sourcefile)
               simple_sg
           );
         (* gen_annot target (Cmt_format.Implementation str); *)
@@ -4375,7 +4374,7 @@ let type_implementation target modulename initial_env ast =
           }
         end else begin
           Location.prerr_warning
-            (Location.in_file (Unit_info.source_file target))
+            (Location.in_file sourcefile)
             Warnings.Missing_mli;
           let coercion, shape =
               Includemod.compunit initial_env ~mark:true
@@ -4498,7 +4497,7 @@ let package_signatures units =
       let sg = Subst.signature Make_local subst sg in
       let md =
         { md_type=Mty_signature sg;
-          md_modalities=Modality.Value.id;
+          md_modalities=Modality.id;
           md_attributes=[];
           md_loc=Location.none;
           md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -4910,7 +4909,8 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
-  | Item_weaker_than_structure (Error (ax, {left; right})) ->
+  | Item_weaker_than_structure e ->
+      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
       let d =
         match ax with
         | Comonadic Areality -> Format.dprintf "a structure"
@@ -4923,7 +4923,8 @@ let report_error ~loc _env = function
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
         d
-  | Submode_failed (Error (ax, {left; right})) ->
+  | Submode_failed e ->
+      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
       Location.errorf ~loc
         "This is %a, but expected to be %a."
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
@@ -4932,7 +4933,8 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "Mode annotations on %a are not supported yet."
         print_unsupported_modal_module e
-  | Legacy_module (reason, Error (ax, {left; right})) ->
+  | Legacy_module (reason, e) ->
+      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
       Location.errorf ~loc
         "This is %a, but expected to be %a because it is a %a."
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left

@@ -50,7 +50,7 @@ module Reduce_conf (Loaded_shapes : sig
   val shapes : (Compilation_unit.t, Shape.t) Hashtbl.t
 end) =
 struct
-  let fuel = 10
+  let fuel () = Misc_stdlib.Maybe_bounded.of_int 10
 
   let try_load ~unit_name () =
     match
@@ -83,9 +83,15 @@ struct
       | Some artifact -> Merlin_analysis.Locate.Artifact.impl_shape artifact
     end
 
-  let read_unit_shape ~unit_name =
+  let read_unit_shape ~diagnostics:_ ~unit_name =
     Log.debug "Read unit shape: %s\n%!" unit_name;
     try_load ~unit_name ()
+
+  let projection_rules_for_merlin_enabled = true
+  let fuel_for_compilation_units () : Misc_stdlib.Maybe_bounded.t = Unbounded
+  let max_shape_reduce_steps_per_variable () : Misc_stdlib.Maybe_bounded.t =
+    Unbounded
+  let max_compilation_unit_depth () : Misc_stdlib.Maybe_bounded.t = Unbounded
 end
 
 let init_load_path_once ~do_not_use_cmt_loadpath =

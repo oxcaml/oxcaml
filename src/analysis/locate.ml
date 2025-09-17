@@ -880,8 +880,8 @@ let get_linked_uids ~config ~comp_unit decl_uid =
 let find_definition_uid ~config ~env ~(decl : Env_lookup.item) path =
   let namespace = decl.namespace in
   let module Reduce = Shape_reduce.Make (struct
-    let fuel = 10
-    let read_unit_shape ~unit_name =
+    let fuel () = Misc_stdlib.Maybe_bounded.of_int 10
+    let read_unit_shape ~diagnostics:_ ~unit_name =
       log ~title:"read_unit_shape" "inspecting %s" unit_name;
       match
         load_cmt
@@ -895,6 +895,12 @@ let find_definition_uid ~config ~env ~(decl : Env_lookup.item) path =
       | Error () ->
         log ~title:"read_unit_shape" "failed to find %s" unit_name;
         None
+
+    let projection_rules_for_merlin_enabled = true
+    let fuel_for_compilation_units () : Misc_stdlib.Maybe_bounded.t = Unbounded
+    let max_shape_reduce_steps_per_variable () : Misc_stdlib.Maybe_bounded.t =
+      Unbounded
+    let max_compilation_unit_depth () : Misc_stdlib.Maybe_bounded.t = Unbounded
   end) in
   let shape = Env.shape_of_path ~namespace env path in
   log ~title:"shape_of_path" "initial: %a" Logger.fmt

@@ -298,3 +298,41 @@ module Nonempty_list : sig
 
   val (@) : 'a t -> 'a t -> 'a t
 end
+
+(** A bounded non-negative integer. The possible ranges are [0 ..< n],
+    represented by [Bounded { bound = n}] and [0 ..< ∞] represented by
+    [Unbounded]. *)
+module Maybe_bounded : sig
+  type t =
+    | Unbounded
+    | Bounded of { mutable bound: int }
+    (** The [bound] is not included. *)
+
+  (** [decr] decreases the current bound and truncates at zero. As such, [decr]
+      and then [incr] is not always a no-op. *)
+  val decr : t -> unit
+
+  (** [incr] increases the current bound. Raises an exception when attempting
+      to increment [max_int]. *)
+  val incr : t -> unit
+
+  val is_depleted : t -> bool
+
+  (** [is_in_bounds n t] returns [true] if [n] is in bounds.
+      A number counts as in bounds if it is non-negative and strictly smaller
+      than the bound. For [Unbounded], returns [true] if [n >= 0]. *)
+  val is_in_bounds : int -> t -> bool
+
+  (** [is_out_of_bounds n t] returns [true] if [n] is out of bounds. A number is
+      out of bounds if it is negative or greater than or equal to the bound. For
+      [Unbounded], returns [false] if [n < 0] and [true] otherwise. *)
+  val is_out_of_bounds : int -> t -> bool
+
+  (** [of_option opt] maps [None] to no bound and [Some n] to the bound [n]
+      (not inclusive). *)
+  val of_option : int option -> t
+
+  (** [of_int n] creates a bounded integer with bound [n] (not inclusive). *)
+  val of_int : int -> t
+end
+

@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-# Tmerlin-wrapper, which the tests use to call ocamlmerlin, replaces \n occurrences
-# inside string literals with actual newlines for readability. This results in invalid
-# json, which jq cannot handle. This script undoes that the replacement of \n occurrences.
-
-tr '\n' '\a' |
-  sed ':a;s/\(^[^\"]*\"\([^\"]*\"[^\"]*\"\)*[^\"]*\)\a/\1\\n/;ta' |
-  sed 's/\a/\n/g'

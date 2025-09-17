@@ -112,8 +112,12 @@ let save_cms target modname binary_annots initial_env shape
     Misc.output_to_file_via_temporary
        ~mode:[Open_binary] (Unit_info.Artifact.filename target)
        (fun _temp_file_name oc ->
-
-        let sourcefile = Unit_info.Artifact.source_file target in
+        (* We use the raw_source_file because the original_source_file may not
+           exist (or may have changed), so computing the digest may fail or
+           produce inconsistent results. Merlin expects the cms_sourcefile to be
+           the file we computed the digest of, which is why we use the
+           raw_source_file for that as well. *)
+        let sourcefile = Unit_info.Artifact.raw_source_file target in
         let source_digest = Option.map Digest.file sourcefile in
         let cms_ident_occurrences, cms_initial_env =
           if !Clflags.store_occurrences then

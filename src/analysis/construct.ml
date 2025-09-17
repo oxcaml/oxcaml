@@ -521,7 +521,7 @@ module Gen = struct
                   val_loc = Location.none;
                   val_attributes = [];
                   val_zero_alloc = Zero_alloc.default;
-                  val_modalities = Mode.Modality.Value.id;
+                  val_modalities = Mode.Modality.id;
                   val_uid = Uid.mk ~current_unit:(Env.get_unit_name ())
                 }
               in

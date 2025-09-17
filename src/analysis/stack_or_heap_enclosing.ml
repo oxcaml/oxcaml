@@ -43,7 +43,7 @@ let from_nodes ~lsp_compat ~pos ~path =
          value binding. However, the LSP hover at this point will describe just the
          pattern, so we don't override the location in the [lsp_compat] regime. *)
       let loc = if lsp_compat then None else Some vb_loc in
-      ret ?loc (Alloc_mode alloc_mode.mode)
+      ret ?loc (Alloc_mode alloc_mode)
     | Expression { exp_desc; _ }, _ -> (
       match exp_desc with
       | Texp_function { alloc_mode; body; _ } -> (
@@ -76,8 +76,8 @@ let from_nodes ~lsp_compat ~pos ~path =
         in
         match body_loc with
         | Some loc when cursor_is_inside loc -> None
-        | _ -> ret (Alloc_mode alloc_mode.mode))
-      | Texp_array (_, _, _, alloc_mode) -> ret (Alloc_mode alloc_mode.mode)
+        | _ -> ret (Alloc_mode alloc_mode))
+      | Texp_array (_, _, _, alloc_mode) -> ret (Alloc_mode alloc_mode)
       | Texp_construct
           ({ loc; txt = _lident }, { cstr_repr; _ }, args, maybe_alloc_mode)
         -> (
@@ -89,7 +89,7 @@ let from_nodes ~lsp_compat ~pos ~path =
           if lsp_compat && cursor_is_inside loc then Some loc else None
         in
         match maybe_alloc_mode with
-        | Some alloc_mode -> ret ?loc (Alloc_mode alloc_mode.mode)
+        | Some alloc_mode -> ret ?loc (Alloc_mode alloc_mode)
         | None -> (
           match args with
           | [] -> ret_no_alloc ?loc "constructor without arguments"
@@ -102,18 +102,18 @@ let from_nodes ~lsp_compat ~pos ~path =
       | Texp_record { representation; alloc_mode = maybe_alloc_mode; _ } -> (
         match (maybe_alloc_mode, representation) with
         | _, Record_inlined _ -> None
-        | Some alloc_mode, _ -> ret_alloc alloc_mode.mode
+        | Some alloc_mode, _ -> ret_alloc alloc_mode
         | None, Record_unboxed -> ret_no_alloc "unboxed record"
         | None, (Record_boxed _ | Record_float | Record_ufloat | Record_mixed _)
           -> ret Unexpected_no_alloc)
       | Texp_field (_, _, _, _, boxed_or_unboxed, _) -> (
         match boxed_or_unboxed with
-        | Boxing (alloc_mode, _) -> ret_alloc alloc_mode.mode
+        | Boxing (alloc_mode, _) -> ret_alloc alloc_mode
         | Non_boxing _ -> None)
       | Texp_variant (_, maybe_exp_and_alloc_mode) ->
         maybe_exp_and_alloc_mode
         |> Option.map ~f:(fun (_, (alloc_mode : Typedtree.alloc_mode)) ->
-               alloc_mode.mode)
+               alloc_mode)
         |> ret_maybe_alloc "variant without argument"
       | _ -> None)
     | _ -> None

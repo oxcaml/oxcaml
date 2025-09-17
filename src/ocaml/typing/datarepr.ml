@@ -70,10 +70,11 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       in
       let type_params = TypeSet.elements arg_vars_set in
       let arity = List.length type_params in
-      (* CR layouts v2.8: We could call [Jkind.normalize ~mode:Require_best] on this
-         jkind, and plausibly gain some perf wins by building up smaller jkinds that are
-         cheaper to deal with later. But doing so runs into some confusing mutual
-         recursion that's non-trivial to debug. Reinvestigate later *)
+      (* CR layouts v2.8: We could call [Jkind.normalize ~mode:Require_best] on
+         this jkind, and plausibly gain some perf wins by building up smaller
+         jkinds that are cheaper to deal with later. But doing so runs into some
+         confusing mutual recursion that's non-trivial to debug. Reinvestigate
+         later. Internal ticket 5102.  *)
       let jkind = Jkind.for_boxed_record lbls in
       let tdecl =
         {
@@ -99,7 +100,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
         {
           ca_type = newgenconstr path type_params;
           ca_sort = Jkind.Sort.Const.value;
-          ca_modalities = Mode.Modality.Value.Const.id;
+          ca_modalities = Mode.Modality.Const.id;
           ca_loc = Location.none
         }
       ],
@@ -242,7 +243,7 @@ let dummy_label (type rep) (record_form : rep record_form)
   | Unboxed_product -> Record_unboxed_product
   in
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
-    lbl_mut = Immutable; lbl_modalities = Mode.Modality.Value.Const.id;
+    lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
     lbl_sort = Jkind.Sort.Const.void;
     lbl_pos = -1; lbl_all = [||];
     lbl_repres = repres;

@@ -91,9 +91,9 @@ let iterator ~current_buffer_path ~index ~stamp ~reduce_for_uid =
 
 let items ~index ~stamp (config : Mconfig.t) items =
   let module Shape_reduce = Shape_reduce.Make (struct
-    let fuel = 10
+    let fuel () = Misc_stdlib.Maybe_bounded.of_int 10
 
-    let read_unit_shape ~unit_name =
+    let read_unit_shape ~diagnostics:_ ~unit_name =
       log ~title:"read_unit_shape" "inspecting %s" unit_name;
       let read unit_name =
         let cms = Format.sprintf "%s.cms" unit_name in
@@ -112,6 +112,12 @@ let items ~index ~stamp (config : Mconfig.t) items =
       | None ->
         log ~title:"read_unit_shape" "failed to find %s" unit_name;
         None
+
+    let projection_rules_for_merlin_enabled = true
+    let fuel_for_compilation_units () : Misc_stdlib.Maybe_bounded.t = Unbounded
+    let max_shape_reduce_steps_per_variable () : Misc_stdlib.Maybe_bounded.t =
+      Unbounded
+    let max_compilation_unit_depth () : Misc_stdlib.Maybe_bounded.t = Unbounded
   end) in
   let current_buffer_path =
     Filename.concat config.query.directory config.query.filename

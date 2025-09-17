@@ -110,7 +110,7 @@ val type_expr: formatter -> type_expr -> unit
 (** Prints a modality. If it is the identity modality, prints [id], which
     defaults to nothing. *)
 val modality :
-  ?id:(formatter -> unit) -> formatter -> 'a Mode.Modality.Atom.t -> unit
+  ?id:(formatter -> unit) -> 'a Mode.Modality.Axis.t -> formatter -> 'a -> unit
 
 (** [prepare_for_printing] resets the global printing environment, a la [reset],
     and prepares the types for printing by reserving names and marking loops.

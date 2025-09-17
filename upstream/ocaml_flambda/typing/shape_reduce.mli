@@ -27,6 +27,36 @@ type result =
 
 val print_result : Format.formatter -> result -> unit
 
+module Diagnostics : sig
+
+  type t
+
+  val no_diagnostics : t
+
+  val create_diagnostics : unit -> t
+
+  val reduction_steps : t -> int
+
+  val computation_unit_lookups : t -> int
+
+  val cms_files_loaded : t -> int
+
+  val count_cms_file_loaded : t -> unit
+
+  val cms_files_cached : t -> int
+
+  val count_cms_file_cached : t -> unit
+
+  val add_cms_file_missing : t -> string -> unit
+
+  val cms_files_missing : t -> string list
+
+  val add_cms_file_unreadable : t -> string -> unit
+
+  val cms_files_unreadable : t -> string list
+
+end
+
 (** The [Make] functor is used to generate a reduction function for
     shapes.
 
@@ -35,6 +65,7 @@ val print_result : Format.formatter -> result -> unit
     - some fuel, which is used to bound recursion when dealing with recursive
       shapes introduced by recursive modules. (FTR: merlin currently uses a
       fuel of 10, which seems to be enough for most practical examples)
+    - a Boolean whether projection rules that Merlin relies on should be enabled
 
     Usage warning: To ensure good performances, every reduction made with the
     same instance of that functor share the same ident-based memoization tables.
@@ -42,11 +73,20 @@ val print_result : Format.formatter -> result -> unit
     compilation unit to prevent conflicting entries in these memoization tables.
 *)
 module Make(_ : sig
-    val fuel : int
+    val fuel : unit -> Misc.Maybe_bounded.t
 
-    val read_unit_shape : unit_name:string -> Shape.t option
+    val projection_rules_for_merlin_enabled : bool
+
+    val fuel_for_compilation_units : unit -> Misc.Maybe_bounded.t
+
+    val max_shape_reduce_steps_per_variable : unit -> Misc.Maybe_bounded.t
+
+    val max_compilation_unit_depth : unit -> Misc.Maybe_bounded.t
+
+    val read_unit_shape :
+      diagnostics:Diagnostics.t -> unit_name:string -> Shape.t option
   end) : sig
-  val reduce : Env.t -> Shape.t -> Shape.t
+  val reduce : ?diagnostics: Diagnostics.t -> Env.t -> Shape.t -> Shape.t
 
   (** Perform weak reduction and return the head's uid if any. If reduction was
     incomplete the partially reduced shape is returned. *)
@@ -55,7 +95,7 @@ end
 
 (** [local_reduce] will not reduce shapes that require loading external
   compilation units. *)
-val local_reduce : Env.t -> Shape.t -> Shape.t
+val local_reduce :?diagnostics:Diagnostics.t -> Env.t -> Shape.t -> Shape.t
 
 (** [local_reduce_for_uid] will not reduce shapes that require loading external
   compilation units. *)

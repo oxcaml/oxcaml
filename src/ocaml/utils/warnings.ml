@@ -44,6 +44,9 @@ type upstream_compat_warning =
   | Immediate_void_variant
       (* example: [type t = A of void] is immediate, but
          not after erasure, which boxes void, so it can't be erased. *)
+  | Separability_check
+      (* example: [type packed = | Mk of 'a t [@@unboxed]]
+         where ['a t : value mod non_float]. *)
 
 type name_out_of_scope_warning =
   | Name of string
@@ -108,7 +111,9 @@ type t =
   | Inlining_impossible of string           (* 55 *)
   | Unreachable_case                        (* 56 *)
   | Ambiguous_var_in_pattern_guard of string list (* 57 *)
-  | No_cmx_file of string                   (* 58 *)
+  | No_cmx_file of
+      { missing_extension : string;
+        module_name : string }              (* 58 *)
   | Flambda_assignment_to_non_mutable_value (* 59 *)
   | Unused_module of string                 (* 60 *)
   | Unboxable_type_in_prim_decl of string   (* 61 *)
@@ -1179,10 +1184,11 @@ let message = function
          Only the first match will be used to evaluate the guard expression.\n\
          %a"
         vars_explanation Misc.print_see_manual ref_manual
-  | No_cmx_file name ->
+  | No_cmx_file { missing_extension; module_name } ->
       Printf.sprintf
-        "no cmx file was found in path for module %s, \
-         and its interface was not compiled with -opaque" name
+        "no %s file was found in path for module %s, \
+         and its interface was not compiled with -opaque"
+        missing_extension module_name
   | Flambda_assignment_to_non_mutable_value ->
       "A potential assignment to a non-mutable value was detected \n\
         in this source file.  Such assignments may generate incorrect code \n\
@@ -1267,6 +1273,9 @@ let message = function
        because all its constructors have all-void arguments, but after \n\
        erasure for upstream compatibility, void is no longer zero-width, \n\
        so it won't be immediate."
+  | Incompatible_with_upstream Separability_check ->
+      "This type relies on OxCaml's extended separability checking \n\
+       and would not be accepted by upstream OCaml."
   | Unerasable_position_argument -> "this position argument cannot be erased."
   | Unnecessarily_partial_tuple_pattern ->
       "This tuple pattern\n\

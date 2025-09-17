@@ -93,6 +93,7 @@ type token =
   | HASH_SUFFIX
   | HASH_INT of (string * char option)
   | HASH_FLOAT of (string * char option)
+  | HASH_CHAR of (char)
   | HASHOP of (string)
   | HASHLPAREN
   | HASHLBRACE
@@ -290,6 +291,7 @@ module MenhirInterpreter : sig
     | T_HASH_SUFFIX : unit terminal
     | T_HASH_INT : (string * char option) terminal
     | T_HASH_FLOAT : (string * char option) terminal
+    | T_HASH_CHAR : (char) terminal
     | T_HASHOP : (string) terminal
     | T_HASHLPAREN : unit terminal
     | T_HASHLBRACE : unit terminal

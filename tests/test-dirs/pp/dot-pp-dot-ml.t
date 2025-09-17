@@ -12,7 +12,7 @@ First, prepare our preprocessor:
   >     | "-dump-to-file" -> true, Sys.argv.(2)
   >     | filename -> false, filename
   >   in
-  >   let str = Pparse.parse_implementation ~tool_name:"prep" in_file in
+  >   let str = (Pparse.parse_implementation ~tool_name:"prep" in_file).ast in
   >   if to_file then
   >     let out_file = Filename.chop_suffix in_file "ml" ^ "pp.ml" in
   >     Pparse.write_ast Structure out_file str

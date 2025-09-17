@@ -110,6 +110,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_HASH_SUFFIX) -> "# "
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_HASH_INT) -> "HASH_INT"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_HASH_FLOAT) -> "HASH_FLOAT"
+  | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_HASH_CHAR) -> "HASH_CHAR"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_HASHOP) -> "#<op>"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_HASHLPAREN) -> "#("
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_HASHLBRACE) -> "#{"
@@ -526,6 +527,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.T MenhirInterpreter.T_HASH_SUFFIX -> (fun _ -> "# ")
   | MenhirInterpreter.T MenhirInterpreter.T_HASH_INT -> (string_of_INT)
   | MenhirInterpreter.T MenhirInterpreter.T_HASH_FLOAT -> (string_of_FLOAT)
+  | MenhirInterpreter.T MenhirInterpreter.T_HASH_CHAR -> (fun _ -> "HASH_CHAR")
   | MenhirInterpreter.T MenhirInterpreter.T_HASHOP -> (Printf.sprintf "HASHOP(%S)")
   | MenhirInterpreter.T MenhirInterpreter.T_HASHLPAREN -> (fun _ -> "#(")
   | MenhirInterpreter.T MenhirInterpreter.T_HASHLBRACE -> (fun _ -> "#{")
@@ -941,6 +943,7 @@ let print_token = function
   | HASH_SUFFIX -> print_value (MenhirInterpreter.T MenhirInterpreter.T_HASH_SUFFIX) ()
   | HASH_INT v -> print_value (MenhirInterpreter.T MenhirInterpreter.T_HASH_INT) v
   | HASH_FLOAT v -> print_value (MenhirInterpreter.T MenhirInterpreter.T_HASH_FLOAT) v
+  | HASH_CHAR v -> print_value (MenhirInterpreter.T MenhirInterpreter.T_HASH_CHAR) v
   | HASHOP v -> print_value (MenhirInterpreter.T MenhirInterpreter.T_HASHOP) v
   | HASHLPAREN -> print_value (MenhirInterpreter.T MenhirInterpreter.T_HASHLPAREN) ()
   | HASHLBRACE -> print_value (MenhirInterpreter.T MenhirInterpreter.T_HASHLBRACE) ()
@@ -1094,6 +1097,7 @@ let token_of_terminal (type a) (t : a MenhirInterpreter.terminal) (v : a) : toke
   | MenhirInterpreter.T_HASH_SUFFIX -> HASH_SUFFIX
   | MenhirInterpreter.T_HASH_INT -> HASH_INT v
   | MenhirInterpreter.T_HASH_FLOAT -> HASH_FLOAT v
+  | MenhirInterpreter.T_HASH_CHAR -> HASH_CHAR v
   | MenhirInterpreter.T_HASHOP -> HASHOP v
   | MenhirInterpreter.T_HASHLPAREN -> HASHLPAREN
   | MenhirInterpreter.T_HASHLBRACE -> HASHLBRACE

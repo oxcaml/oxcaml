@@ -143,7 +143,7 @@ let get_mod_bound_doc mod_bound =
       | Everything
   end in
   let* parsed =
-    match Typemode.Axis_pair.of_string mod_bound with
+    match Typemode.Modifier_axis_pair.of_string mod_bound with
     | exception Not_found -> (
       match mod_bound with
       | "everything" -> Some Everything
@@ -200,24 +200,17 @@ let get_mod_bound_doc mod_bound =
      }
     : syntax_info)
 
-module Modal_axis_pair = struct
-  type t = P : 'a Mode.Value.Axis.t * 'a -> t
-
-  let of_string s =
-    match Typemode.Axis_pair.of_string s with
-    | exception Not_found -> None
-    | P (Modal axis, mode) -> Some (P (axis, mode))
-    | P (Nonmodal _, _) -> None
-end
-
 let get_mode_doc mode =
   let open Option.Infix in
-  let* (P (axis, mode)) = Modal_axis_pair.of_string mode in
+  let* (P (axis, mode)) =
+    match Typemode.Mode_axis_pair.of_string mode with
+    | exception Not_found -> None
+    | res -> Some res
+  in
   let* description =
     match (axis, mode) with
     | Comonadic Areality, Local ->
       Some "Values with this mode cannot escape the current region"
-    | Comonadic Areality, Regional -> None
     | Comonadic Areality, Global ->
       Some "Values with this mode can escape any region"
     | Monadic Contention, Contended ->
@@ -287,7 +280,11 @@ let get_mode_doc mode =
 
 let get_modality_doc modality =
   let open Option.Infix in
-  let* (P (axis, _)) = Modal_axis_pair.of_string modality in
+  let* (P (axis, _)) =
+    match Typemode.Modality_axis_pair.of_string modality with
+    | exception Not_found -> None
+    | res -> Some res
+  in
   let description =
     (* CR-someday: Detect the context that the modality is within to make this message
        more detailed. Ex: "This field is always stronger than _, even if the record has a

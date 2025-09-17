@@ -163,7 +163,7 @@ and value_description id
     { val_type; val_kind = _; val_loc; val_attributes; val_modalities; _ } =
   let type_ = core_type val_type in
   let snap = Btype.snapshot () in
-  let modalities = Mode.Modality.Value.zap_to_id val_modalities in
+  let modalities = Mode.Modality.zap_to_id val_modalities in
   Btype.backtrack snap;
   { Parsetree.pval_name = var_of_id id;
     pval_type = type_;

@@ -213,7 +213,9 @@ let space ppf () = Format.fprintf ppf "@ "
 module Is_modal = struct
   open Err
   let rec module_type_symptom = function
-    | Mode (Error (ax, _)) -> Some (Mode.Value.Axis.P ax)
+    | Mode e ->
+       let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
+        Some (Mode.Value.Axis.P ax)
     | Signature s -> signature_symptom s
     | Functor _ | Invalid_module_alias _ | After_alias_expansion _ | Mt_core _
       -> None
@@ -234,11 +236,15 @@ module Is_modal = struct
     | Modalities _ -> None
 
   and class_declaration_symptom = function
-    | Class_mode (Error (ax, _)) -> Some (Mode.Value.Axis.P ax)
+    | Class_mode e ->
+        let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
+        Some (Mode.Value.Axis.P ax)
     | Class_type _ -> None
 
   and value_mismatch : Includecore.value_mismatch -> _ = function
-    | Mode (Error (ax, _)) -> Some (Mode.Value.Axis.P ax)
+    | Mode e ->
+        let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
+        Some (Mode.Value.Axis.P ax)
     | _ -> None
 end
 
@@ -289,11 +295,11 @@ let zap_axis_to_ceil
 let print_out_mode
 : type a. ?in_structure:_ -> a Mode.Value.Axis.t -> a -> _
 = fun ?(in_structure=true) ax mode ->
-  let (module L) = Mode.Value.Const.lattice_of_axis ax in
+  let print = Mode.Value.Const.print_axis ax in
   if in_structure then
-    Format.dprintf " (* in a structure at %a *)" L.print mode
+    Format.dprintf " (* in a structure at %a *)" print mode
   else
-    Format.dprintf " (* at %a *)" L.print mode
+    Format.dprintf " (* at %a *)" print mode
 
 let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
   match is_modal with
