@@ -546,6 +546,9 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
     | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
     | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lraise _ ->
       loop i.next fs max_fs nontail_flag
+    | Lop Maybe_poll ->
+      (* should no longer be present *)
+      assert false
     | Lstackcheck _ ->
       (* should not be already present *)
       assert false

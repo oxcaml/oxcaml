@@ -100,6 +100,7 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
         | Specific _ | Name_for_debugger _ | Alloc _ ) ->
       ()
+    | Op Maybe_poll -> assert false
   in
   DLL.iter_cell block.body ~f:update_info_using_inst;
   if Reg.Tbl.length replacements <> 0

@@ -1263,7 +1263,24 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         if String.equal func.sym_name !SU.current_function_name
            && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_self { destination = env.SU.tailrec_label } in
+          (* Check if poll insertion is enabled *)
+          let associated_poll_id =
+            if not (Cfg_polling.is_disabled ~fun_name:!SU.current_function_name)
+            then
+              (* Insert poll instruction before the tailcall *)
+              Cfg.Associated_poll
+                { instruction_id =
+                    SU.insert_op_debug_returning_id env sub_cfg Maybe_poll dbg
+                      [||] [||]
+                }
+            else Cfg.Polling_disabled
+          in
+          let call =
+            Cfg.Tailcall_self
+              { destination = env.SU.tailrec_label;
+                associated_poll = associated_poll_id
+              }
+          in
           let loc_arg' =
             assert (stack_ofs >= 0);
             if stack_ofs = 0 then loc_arg else Proc.loc_parameters (Reg.typv r1)

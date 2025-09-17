@@ -9,7 +9,7 @@ let function_is_assumed_to_never_poll func =
   String.begins_with ~prefix:"caml_apply" func
   || String.begins_with ~prefix:"caml_send" func
 
-let is_disabled fun_name =
+let is_disabled ~fun_name =
   (not Config.poll_insertion)
   || !Oxcaml_flags.disable_poll_insertion
   || function_is_assumed_to_never_poll fun_name
@@ -127,8 +127,8 @@ let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ ->
     false
-  | Raise _ -> false
-  | Tailcall_self _ | Tailcall_func _ | Return -> true
+  | Raise _ | Tailcall_self _ -> false
+  | Tailcall_func _ | Return -> true
   | Call_no_return _ | Call _ | Prim _ -> false
 
 let is_safe_block : Cfg.basic_block -> bool =
@@ -197,7 +197,7 @@ module Polls_before_prtc_transfer = struct
         | Intop_atomic _
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Specific _ | Name_for_debugger _ )
+        | Specific _ | Name_for_debugger _ | Maybe_poll )
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
       Ok dom
@@ -317,29 +317,76 @@ let instr_cfg_with_layout :
       if needs_poll
       then (
         let after = Cfg.get_block_exn cfg src in
-        let poll =
-          { after.terminator with
-            Cfg.id = next_instruction_id ();
-            Cfg.desc = Cfg.Op Poll
-          }
-        in
-        (match
-           ( Label.Set.cardinal
-               (Cfg.successor_labels after ~normal:true ~exn:false),
-             after.exn )
-         with
-        | 1, None -> DLL.add_end after.body poll
-        | _ ->
-          let before = Some (Cfg.get_block_exn cfg dst) in
-          let instrs = DLL.of_list [poll] in
-          let inserted_blocks =
-            Cfg_with_layout.insert_block cfg_with_layout instrs ~after ~before
-              ~next_instruction_id
+        (* Check if the terminator is Tailcall_self *)
+        (match after.terminator.desc with
+        | Tailcall_self { destination = _; associated_poll } -> (
+          match associated_poll with
+          | Polling_disabled ->
+            Misc.fatal_errorf
+              "Cfg_polling: trying to insert a poll instruction inside a \
+               function where polling is disabled"
+          | Associated_poll { instruction_id = poll_id } ->
+            (* Find the poll instruction with this ID and enable it *)
+            let found = ref false in
+            DLL.iter_cell after.body ~f:(fun cell ->
+                let instr : Cfg.basic Cfg.instruction = DLL.value cell in
+                if InstructionId.equal instr.id poll_id
+                then (
+                  found := true;
+                  match instr.desc with
+                  | Cfg.Op Maybe_poll ->
+                    (* Create new instruction with enabled = true *)
+                    let new_instr : Cfg.basic Cfg.instruction =
+                      { instr with desc = Cfg.Op Operation.Poll }
+                    in
+                    DLL.set_value cell new_instr
+                  | Cfg.Op
+                      ( Move | Spill | Reload | Const_int _ | Const_float32 _
+                      | Const_float _ | Const_symbol _ | Const_vec128 _
+                      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
+                      | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
+                      | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+                      | Probe_is_enabled _ | Opaque | Begin_region | End_region
+                      | Specific _ | Name_for_debugger _ | Dls_get | Pause
+                      | Alloc _ | Poll )
+                  | Cfg.Reloadretaddr | Cfg.Pushtrap _ | Cfg.Poptrap _
+                  | Cfg.Prologue | Cfg.Epilogue | Cfg.Stack_check _ ->
+                    Misc.fatal_errorf "Cfg_polling: unexpected instruction %a"
+                      InstructionId.print poll_id));
+            if not !found
+            then
+              Misc.fatal_errorf
+                "Cfg_polling: Could not find associated_poll instruction %a"
+                InstructionId.print poll_id)
+        | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+        | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
+        | Call_no_return _ | Call _ | Prim _ -> (
+          (* For other terminators, add the poll instruction as before *)
+          let poll =
+            Cfg.make_instruction ~desc:(Cfg.Op Poll)
+              ~id:(next_instruction_id ()) ~dbg:after.terminator.dbg
+              ~stack_offset:after.terminator.stack_offset ()
           in
-          (* All the inserted blocks are safe since they contain a poll
-             instruction *)
-          List.iter inserted_blocks ~f:(fun block ->
-              Label.Tbl.replace safe_map block.Cfg.start true));
+          match
+            ( Label.Set.cardinal
+                (Cfg.successor_labels after ~normal:true ~exn:false),
+              after.exn )
+          with
+          | 1, None -> DLL.add_end after.body poll
+          | _ ->
+            let before = Some (Cfg.get_block_exn cfg dst) in
+            let instrs = DLL.of_list [poll] in
+            let inserted_blocks =
+              Cfg_with_layout.insert_block cfg_with_layout instrs ~after ~before
+                ~next_instruction_id
+            in
+            (* All the inserted blocks are safe since they contain a poll
+               instruction *)
+            (* CR xclerc for xclerc: should we also update the safe_map when
+               adding the instruction to an existing block. That should not
+               matter, but should be double checked. *)
+            List.iter inserted_blocks ~f:(fun block ->
+                Label.Tbl.replace safe_map block.Cfg.start true)));
         true)
       else added_poll)
     back_edges false
@@ -357,7 +404,7 @@ let add_poll_or_alloc_basic :
     | Stackoffset _ | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
     | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
     | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-    | Name_for_debugger _ | Dls_get | Pause ->
+    | Name_for_debugger _ | Dls_get | Pause | Maybe_poll ->
       points
     | Poll -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)
@@ -448,7 +495,7 @@ let instrument_fundecl :
     Cfg_with_layout.t =
  fun ~future_funcnames:_ cfg_with_layout ->
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  if is_disabled cfg.fun_name
+  if is_disabled ~fun_name:cfg.fun_name
   then cfg_with_layout
   else
     let safe_map = safe_map_of_cfg cfg in
@@ -486,7 +533,7 @@ let requires_prologue_poll :
     Cfg.t ->
     bool =
  fun ~future_funcnames ~fun_name ~optimistic_prologue_poll_instr_id cfg ->
-  if is_disabled fun_name
+  if is_disabled ~fun_name
   then false
   else
     match
@@ -495,3 +542,10 @@ let requires_prologue_poll :
     with
     | Might_not_poll -> true
     | Always_polls -> false
+
+let remove_all_maybe_polls : Cfg_with_layout.t -> Cfg_with_layout.t =
+ fun cfg_with_layout ->
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  Cfg.iter_blocks cfg ~f:(fun _label block ->
+      DLL.filter_left block.body ~f:(fun instr -> not (Cfg.is_maybe_poll instr)));
+  cfg_with_layout

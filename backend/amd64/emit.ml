@@ -2043,6 +2043,7 @@ let emit_instr ~first ~fallthrough i =
            lr_save_simd = must_save_simd_regs i.live
          }
          :: !local_realloc_sites
+  | Lop Maybe_poll -> assert false
   | Lop Poll ->
     I.cmp (domain_field Domainstate.Domain_young_limit) r15;
     let gc_call_label = L.create Text in

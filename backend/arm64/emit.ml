@@ -1043,6 +1043,7 @@ let num_call_gc_points instr =
     | Lend -> call_gc
     | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag ->
       loop instr.next (call_gc + 1)
+    | Lop Maybe_poll -> assert false
     | Lop Poll -> loop instr.next (call_gc + 1)
     (* The following four should never be seen, since this function is run
        before branch relaxation. *)
@@ -1112,6 +1113,7 @@ module BR = Branch_relaxation.Make (struct
       | CB | Bcc -> 1 * 1024 * 1024 / 4 (* +/- 1Mb *)
 
     let classify_instr = function
+      | Lop Maybe_poll -> assert false
       | Lop (Alloc _) | Lop Poll -> Some Bcc
       (* The various "far" variants in [specific_operation] don't need to return
          [Some] here, since their code sequences never contain any conditional
@@ -1221,6 +1223,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Alloc { mode = Local; _ }) -> 9
     | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag -> 5
     | Lop (Specific (Ifar_alloc _)) when !fastcode_flag -> 6
+    | Lop Maybe_poll -> assert false
     | Lop Poll -> 3
     | Lop Pause -> 1
     | Lop (Specific Ifar_poll) -> 4
@@ -1928,6 +1931,7 @@ let emit_instr i =
       [| DSL.emit_reg i.arg.(0);
          DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
       |]
+  | Lop Maybe_poll -> assert false
   | Lop Poll -> assembly_code_for_poll i ~far:false ~return_label:None
   | Lop Pause -> DSL.ins I.YIELD [||]
   | Lop (Specific Ifar_poll) ->

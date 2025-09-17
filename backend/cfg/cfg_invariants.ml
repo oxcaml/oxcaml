@@ -122,7 +122,8 @@ let check_tailrec_position t =
 let check_tailrec t _label block =
   (* check all Tailrec Self agree on the successor label *)
   match block.Cfg.terminator.desc with
-  | Tailcall_self { destination } -> (
+  | Tailcall_self { destination; associated_poll = _ } -> (
+    (* CR xclerc: we could also check `associated_poll`. *)
     match t.tailrec_entry_label with
     | None -> t.tailrec_entry_label <- Some destination
     | Some l ->
@@ -243,8 +244,8 @@ let check_stack_offset t label (block : Cfg.basic_block) =
             | Const_vec512 _ | Load _ | Store _ | Intop _ | Intop_imm _
             | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
             | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
-            | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll
-            | Pause | Alloc _ )
+            | End_region | Specific _ | Name_for_debugger _ | Dls_get
+            | Maybe_poll | Poll | Pause | Alloc _ )
         | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
           cur_stack_offset)
   in

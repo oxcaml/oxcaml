@@ -170,6 +170,7 @@ let is_move_basic : Cfg.basic -> bool =
     | Specific _ -> false
     | Name_for_debugger _ -> false
     | Dls_get -> false
+    | Maybe_poll -> assert false
     | Poll -> false
     | Pause -> false
     | Alloc _ -> false)

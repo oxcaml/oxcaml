@@ -208,6 +208,8 @@ val is_noop_move : basic instruction -> bool
 
 val is_alloc : basic instruction -> bool
 
+val is_maybe_poll : basic instruction -> bool
+
 val is_poll : basic instruction -> bool
 
 val is_end_region : basic -> bool

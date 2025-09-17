@@ -30,6 +30,7 @@ let rec find_next_allocation : cell option -> allocation option =
   | None -> None
   | Some cell -> (
     let instr = DLL.value cell in
+    (* CR xclerc for xclerc: double check the handling of `Poll`. *)
     match instr.desc with
     | Op (Alloc { bytes; dbginfo; mode }) -> Some { bytes; dbginfo; mode; cell }
     | Op
@@ -42,7 +43,8 @@ let rec find_next_allocation : cell option -> allocation option =
           )
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
-      find_next_allocation (DLL.next cell))
+      find_next_allocation (DLL.next cell)
+    | Op Maybe_poll -> assert false)
 
 (* [find_compatible_allocations cell ~curr_mode ~curr_size] returns the
    allocations compatible with mode [curr_mode] and total size [curr_size]. *)
@@ -81,6 +83,7 @@ let find_compatible_allocations :
         match curr_mode with
         | Local -> return ()
         | Heap -> loop allocations (DLL.next cell) ~curr_mode ~curr_size)
+      | Op Maybe_poll -> assert false
       | Op Poll -> return ()
       | Reloadretaddr | Poptrap _ | Prologue | Epilogue | Pushtrap _
       | Stack_check _ ->
