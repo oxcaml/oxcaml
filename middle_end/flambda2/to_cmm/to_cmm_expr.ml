@@ -328,7 +328,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       env,
       res,
       Ece.all )
-  | Function { function_call = Indirect_known_arity; alloc_mode } ->
+  | Function { function_call = Indirect_known_arity _; alloc_mode } ->
     fail_if_probe apply;
     let callee =
       match callee with

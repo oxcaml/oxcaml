@@ -28,25 +28,48 @@ let get_older_version_of t code_id = Code_id.Map.find_opt code_id t
 
 let add t ~newer ~older = Code_id.Map.add newer older t
 
-let rec all_ids_up_to_root t ~resolver id =
-  match Code_id.Map.find id t with
-  | exception Not_found -> (
-    let comp_unit = Code_id.get_compilation_unit id in
-    if Compilation_unit.equal comp_unit (Compilation_unit.get_current_exn ())
-    then Code_id.Set.singleton id
-    else
-      match resolver comp_unit with
-      | exception _ ->
-        Misc.fatal_errorf "Exception in resolver@ Backtrace is: %s"
-          (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
-      | None -> Code_id.Set.singleton id
-      | Some t -> (
-        (* Inlining the base case, so that we do not recursively loop in case of
-           a code_id that is not bound in the map *)
-        match Code_id.Map.find id t with
-        | exception Not_found -> Code_id.Set.singleton id
-        | older -> Code_id.Set.add id (all_ids_up_to_root t ~resolver older)))
-  | older -> Code_id.Set.add id (all_ids_up_to_root t ~resolver older)
+let rec all_ids_up_to_root0 t ~resolver id all_ids_so_far =
+  if Code_id.Set.mem id all_ids_so_far
+  then all_ids_so_far
+  else
+    let all_ids_so_far = Code_id.Set.add id all_ids_so_far in
+    match Code_id.Map.find id t with
+    | exception Not_found -> (
+      let comp_unit = Code_id.get_compilation_unit id in
+      if Compilation_unit.equal comp_unit (Compilation_unit.get_current_exn ())
+      then all_ids_so_far
+      else
+        match resolver comp_unit with
+        | exception _ ->
+          Misc.fatal_errorf "Exception in resolver@ Backtrace is: %s"
+            (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
+        | None -> all_ids_so_far
+        | Some t -> (
+          (* Inlining the base case, so that we do not recursively loop in case
+             of a code_id that is not bound in the map *)
+          match Code_id.Map.find id t with
+          | exception Not_found -> Code_id.Set.singleton id
+          | older -> all_ids_up_to_root0 t ~resolver older all_ids_so_far))
+    | older -> all_ids_up_to_root0 t ~resolver older all_ids_so_far
+
+let all_ids_up_to_root t ~resolver id =
+  all_ids_up_to_root0 t ~resolver id Code_id.Set.empty
+
+let all_ids_up_to_root_set t ~resolver ids =
+  Code_id.Set.fold
+    (fun code_id all_ids -> all_ids_up_to_root0 t ~resolver code_id all_ids)
+    ids Code_id.Set.empty
+
+let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
+  if Code_id.Set.equal ids1 ids2
+  then Ok ids1
+  else
+    let ids1_to_root = all_ids_up_to_root_set t ~resolver ids1 in
+    let ids2_to_root = all_ids_up_to_root_set t ~resolver ids2 in
+    let ids1_newer_than_ids2 = Code_id.Set.inter ids1 ids2_to_root in
+    let ids2_newer_than_ids1 = Code_id.Set.inter ids2 ids1_to_root in
+    let ids = Code_id.Set.union ids1_newer_than_ids2 ids2_newer_than_ids1 in
+    if Code_id.Set.is_empty ids then Bottom else Ok ids
 
 let _num_ids_up_to_root t ~resolver id =
   Code_id.Set.cardinal (all_ids_up_to_root t ~resolver id)

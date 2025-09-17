@@ -600,7 +600,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         ( Flambda_arity.group_by_parameter (Apply.args_arity apply)
             (Apply.args apply),
           Global_flow_graph.Unknown_arity_code_pointer )
-      | Indirect_known_arity | Direct _ ->
+      | Indirect_known_arity _ | Direct _ ->
         [Apply.args apply], Global_flow_graph.Known_arity_code_pointer
     in
     (* List.iter (fun arg -> Acc.used ~denv arg acc) (Apply.args apply); *)
@@ -682,9 +682,11 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
     else default_acc acc
   | Function
       { function_call =
-          (Indirect_unknown_arity | Indirect_known_arity) as function_call;
+          (Indirect_unknown_arity | Indirect_known_arity _) as function_call;
         _
       } ->
+    (* CR bclement/ncourant: think about indirect calls where we know a set of
+       code ids (this should very rarely happen) *)
     add_call_widget function_call
   | Method _ | C_call _ | Effect _ -> default_acc acc
 

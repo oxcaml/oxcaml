@@ -20,14 +20,17 @@ module Function_call = struct
   type t =
     | Direct of Code_id.t
     | Indirect_unknown_arity
-    | Indirect_known_arity
+    | Indirect_known_arity of Code_id.Set.t Or_unknown.t
 
   let print ppf call =
     match call with
     | Direct code_id ->
       fprintf ppf "@[<hov 1>(Direct %a)@]" Code_id.print code_id
-    | Indirect_unknown_arity -> fprintf ppf "Indirect_unknown_arity"
-    | Indirect_known_arity -> fprintf ppf "Indirect_known_arity"
+    | Indirect_unknown_arity -> fprintf ppf "Indirect_unkknown_arity"
+    | Indirect_known_arity code_ids ->
+      fprintf ppf "@[<hov 1>(Indirect_known_arity@ %a)@]"
+        (Or_unknown.print Code_id.Set.print)
+        code_ids
 end
 
 module Method_kind = struct
@@ -226,8 +229,8 @@ let direct_function_call code_id alloc_mode =
 let indirect_function_call_unknown_arity alloc_mode =
   Function { function_call = Indirect_unknown_arity; alloc_mode }
 
-let indirect_function_call_known_arity alloc_mode =
-  Function { function_call = Indirect_known_arity; alloc_mode }
+let indirect_function_call_known_arity ~code_ids alloc_mode =
+  Function { function_call = Indirect_known_arity code_ids; alloc_mode }
 
 let method_call kind ~obj alloc_mode = Method { kind; obj; alloc_mode }
 
@@ -242,8 +245,15 @@ let free_names t =
     Name_occurrences.add_code_id
       (Alloc_mode.For_applications.free_names alloc_mode)
       code_id Name_mode.normal
+  | Function
+      { function_call = Indirect_known_arity (Known code_ids); alloc_mode } ->
+    let free_names = Alloc_mode.For_applications.free_names alloc_mode in
+    Code_id.Set.fold
+      (fun code_id free_names ->
+        Name_occurrences.add_code_id free_names code_id Name_mode.normal)
+      code_ids free_names
   | Function { function_call = Indirect_unknown_arity; alloc_mode }
-  | Function { function_call = Indirect_known_arity; alloc_mode } ->
+  | Function { function_call = Indirect_known_arity Unknown; alloc_mode } ->
     Alloc_mode.For_applications.free_names alloc_mode
   | C_call
       { needs_caml_c_call = _;
@@ -269,8 +279,24 @@ let apply_renaming t renaming =
     then t
     else Function { function_call = Direct code_id'; alloc_mode = alloc_mode' }
   | Function
+      { function_call = Indirect_known_arity (Known code_ids); alloc_mode } ->
+    let code_ids' =
+      Code_id.Set.map (Renaming.apply_code_id renaming) code_ids
+    in
+    let alloc_mode' =
+      Alloc_mode.For_applications.apply_renaming alloc_mode renaming
+    in
+    if Code_id.Set.equal code_ids code_ids' && alloc_mode == alloc_mode'
+    then t
+    else
+      Function
+        { function_call = Indirect_known_arity (Known code_ids');
+          alloc_mode = alloc_mode'
+        }
+  | Function
       { function_call =
-          (Indirect_unknown_arity | Indirect_known_arity) as function_call;
+          (Indirect_unknown_arity | Indirect_known_arity Unknown) as
+          function_call;
         alloc_mode
       } ->
     let alloc_mode' =
@@ -312,8 +338,15 @@ let ids_for_export t =
     Ids_for_export.add_code_id
       (Alloc_mode.For_applications.ids_for_export alloc_mode)
       code_id
+  | Function
+      { function_call = Indirect_known_arity (Known code_ids); alloc_mode } ->
+    Code_id.Set.fold
+      (fun code_id ids_for_export ->
+        Ids_for_export.add_code_id ids_for_export code_id)
+      code_ids
+      (Alloc_mode.For_applications.ids_for_export alloc_mode)
   | Function { function_call = Indirect_unknown_arity; alloc_mode }
-  | Function { function_call = Indirect_known_arity; alloc_mode } ->
+  | Function { function_call = Indirect_known_arity Unknown; alloc_mode } ->
     Alloc_mode.For_applications.ids_for_export alloc_mode
   | C_call
       { needs_caml_c_call = _;

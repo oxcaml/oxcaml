@@ -994,8 +994,9 @@ module Expr_with_acc = struct
         match Apply.call_kind apply with
         | Function { function_call = Direct _; _ } -> true
         | Function
-            { function_call = Indirect_unknown_arity | Indirect_known_arity; _ }
-          ->
+            { function_call = Indirect_unknown_arity | Indirect_known_arity _;
+              _
+            } ->
           false
         | Method _ | C_call _ | Effect _ -> false)
     in
