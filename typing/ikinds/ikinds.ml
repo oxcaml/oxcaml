@@ -216,6 +216,12 @@ let has_mutable_label lbls =
       match lbl.ld_mutable with Immutable -> false | Mutable _ -> true)
     lbls
 
+let relevance_of_rep = function
+  | `Record Types.Record_unboxed
+  | `Record (Types.Record_inlined (_, _, Types.Variant_unboxed)) -> `Relevant
+  | `Variant Types.Variant_unboxed -> `Relevant
+  | (`Record _ | `Variant _) -> `Irrelevant
+
 let always_use_stored_jkind = false
 
 let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
@@ -244,7 +250,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           log "lookup Type_abstract" (fun () ->
               let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
               JK.Ty { args = decl.type_params; kind; abstract = true })
-        | Types.Type_record (lbls, _rep, _umc_opt) ->
+        | Types.Type_record (lbls, rep, _umc_opt) ->
           log "lookup Type_record" (fun () ->
               (* Build from components: base (non-float value) + per-label
                  contributions. *)
@@ -253,6 +259,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                 then Axis_lattice_bits.mutable_data
                 else Axis_lattice_bits.immutable_data
               in
+              let relevant_for_shallow = relevance_of_rep (`Record rep) in
               let kind : JK.ckind =
                fun (ops : JK.ops) ->
                 log ~pp:ops.pp_kind "record kind" (fun () ->
@@ -262,7 +269,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                         (fun (lbl : Types.label_declaration) ->
                           let mask =
                             Axis_lattice_bits.mask_of_modality
-                              ~relevant_for_shallow:`Irrelevant
+                              ~relevant_for_shallow
                               lbl.ld_modalities
                           in
                           log ~pp:ops.pp_kind
@@ -308,7 +315,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                     ops.join (base :: contribs))
               in
               JK.Ty { args = decl.type_params; kind; abstract = false })
-        | Types.Type_variant (cstrs, _rep, _umc_opt) ->
+        | Types.Type_variant (cstrs, rep, _umc_opt) ->
           log "lookup Type_variant" (fun () ->
               (* Choose base: immediate for void-only variants; mutable if any
                  record constructor has a mutable field; otherwise immutable. *)
@@ -343,6 +350,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                 then Axis_lattice_bits.mutable_data
                 else Axis_lattice_bits.immutable_data
               in
+              let relevant_for_shallow = relevance_of_rep (`Variant rep) in
               let kind : JK.ckind =
                fun (ops : JK.ops) ->
                 log ~pp:ops.pp_kind "variant kind" (fun () ->
@@ -356,7 +364,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                               (fun i (arg : Types.constructor_argument) ->
                                 let mask =
                                   Axis_lattice_bits.mask_of_modality
-                                    ~relevant_for_shallow:`Irrelevant
+                                    ~relevant_for_shallow
                                     arg.ca_modalities
                                 in
                                 log ~pp:ops.pp_kind
@@ -369,7 +377,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                               (fun (lbl : Types.label_declaration) ->
                                 let mask =
                                   Axis_lattice_bits.mask_of_modality
-                                    ~relevant_for_shallow:`Irrelevant
+                                    ~relevant_for_shallow
                                     lbl.ld_modalities
                                 in
                                 log ~pp:ops.pp_kind
