@@ -43,7 +43,7 @@ let instruction ppf = function
   | Ksetglobal cu -> fprintf ppf "\tsetglobal %a" Compilation_unit.print cu
   | Kgetpredef id -> fprintf ppf "\tgetpredef %a" Ident.print id
   | Kconst cst ->
-      fprintf ppf "@[<10>\tconst@ %a@]" Printblambda.structured_constant cst
+      fprintf ppf "@[<10>\tconst@ %a@]" Printlambda.structured_constant cst
   | Kmakeblock(n, m) ->
       fprintf ppf "\tmakeblock %i, %i" n m
   | Kmake_faux_mixedblock(n, m) ->

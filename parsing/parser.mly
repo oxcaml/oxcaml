@@ -2822,7 +2822,7 @@ fun_:
 fun_expr:
     simple_expr %prec below_HASH
       { $1 }
-  | fun_expr_attrs(seq_expr)
+  | fun_expr_attrs
       { let desc, attrs = $1 in
         mkexp_attrs ~loc:$sloc desc attrs }
   | fun_
@@ -2860,7 +2860,7 @@ fun_expr:
 %inline expr:
   | or_function(fun_expr) { $1 }
 ;
-%inline fun_expr_attrs):
+%inline fun_expr_attrs:
   | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN seq_expr
       {
         let name, modes = $4 in
@@ -2886,7 +2886,7 @@ fun_expr:
       { Pexp_ifthenelse($3, $5, None), $2 }
   | WHILE ext_attributes seq_expr do_done_expr
       { Pexp_while($3, $4), $2 }
-  | FOR ext_attributes pattern EQUAL seq_expr direction_flag expr_type
+  | FOR ext_attributes pattern EQUAL seq_expr direction_flag seq_expr
     do_done_expr
       { Pexp_for($3, $5, $7, $6, $8), $2 }
   | ASSERT ext_attributes simple_expr %prec below_HASH

@@ -1898,9 +1898,7 @@ let solve_Ppat_variant ~refine loc env tag no_arg expected_ty =
   let make_row more =
     create_row ~fields ~closed:false ~more ~fixed:None ~name:None
   in
-  let row =
-    make_row (newgenvar (Jkind.Builtin.value ~why:Row_variable))
-  in
+  let row = make_row (newgenvar (Jkind.Builtin.value ~why:Row_variable)) in
   let expected_ty = generic_instance expected_ty in
   (* PR#7404: allow some_private_tag blindly, as it would not unify with
      the abstract row variable *)
@@ -3731,7 +3729,7 @@ let rec check_counter_example_pat
         (fun (p,t) -> check_rec p t.Types.ca_type)
         (List.combine targs ty_args)
         (fun args ->
-           mkp k (Tpat_construct(cstr_lid, constr, args, existential_ctyp)))
+          mkp k (Tpat_construct(cstr_lid, constr, args, existential_ctyp)))
   | Tpat_variant(tag, targ, _) ->
       let constant = (targ = None) in
       let arg_type, row, pat_type =

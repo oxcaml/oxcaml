@@ -53,23 +53,23 @@ let field_offset_for_label lbl =
   | Record_boxed _
   | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
   | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
-    lbl.lbl_pos
+      lbl.lbl_pos
   | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-    lbl.lbl_pos + 1
+      lbl.lbl_pos + 1
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
     (* CR layouts 5.1: For unboxed records, no offset calculation needed in
        regular field access *)
-    lbl.lbl_pos
+      lbl.lbl_pos
   | Record_float ->
-    lbl.lbl_pos
+      lbl.lbl_pos
   | Record_ufloat ->
-    lbl.lbl_pos
+      lbl.lbl_pos
   | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
-    fatal_error "Mixed inlined records not supported for extensible variants"
+      fatal_error "Mixed inlined records not supported for extensible variants"
   | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
   | Record_inlined (_, Constructor_mixed _, Variant_with_null)
   | Record_mixed _ ->
-    lbl.lbl_pos
+      lbl.lbl_pos
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =

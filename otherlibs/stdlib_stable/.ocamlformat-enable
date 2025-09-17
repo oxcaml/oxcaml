@@ -7,3 +7,4 @@ arm64/stdlib_stable.ml
 arm64/float32.mli
 arm64/float32.ml
 generic/stdlib_stable.mli
+generic/stdlib_stable.ml
