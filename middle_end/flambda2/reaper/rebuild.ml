@@ -880,17 +880,18 @@ let decide_whether_apply_needs_calling_convention_change env apply =
   let call_kind = rewrite_call_kind env (Apply.call_kind apply) in
   let code_id_actually_called, call_kind, _should_break_call =
     let called c alloc_mode call_kind was_indirect_unknown_arity =
+      assert (not was_indirect_unknown_arity);
       let code_id =
         Simple.pattern_match c
-          ~const:(fun _ -> None)
+          ~const:(fun _ -> Or_unknown.Unknown)
           ~name:(fun name ~coercion:_ ->
-            DS.code_id_actually_called env.uses name)
+            DS.code_id_actually_directly_called env.uses name)
       in
       match code_id with
-      | None -> None, call_kind, false
-      | Some (code_id, num_already_applied_params) ->
-        if num_already_applied_params <> 0 then failwith "todo";
-        (* XXX *)
+      | Unknown -> None, call_kind, false
+      | Known code_ids ->
+        (* XXX bclement *)
+        let (Some code_id) = Code_id.Set.get_singleton code_ids in
         let new_call_kind = Call_kind.direct_function_call code_id alloc_mode in
         Some code_id, new_call_kind, was_indirect_unknown_arity
     in
@@ -907,10 +908,15 @@ let decide_whether_apply_needs_calling_convention_change env apply =
                     those calls to [Indirect_known_arity]. *)
                  Compilation_unit.is_current (Symbol.compilation_unit s))
                c ->
+        let code_ids = Code_id.Set.singleton code_id in
         let call_kind =
-          if DS.has_use env.uses (Code_id_or_name.code_id code_id)
-          then call_kind
-          else Call_kind.indirect_function_call_known_arity alloc_mode
+          if Code_id.Set.exists
+               (fun code_id ->
+                 Compilation_unit.is_current
+                   (Code_id.get_compilation_unit code_id))
+               code_ids
+          then Call_kind.indirect_function_call_known_arity alloc_mode
+          else call_kind
         in
         called c alloc_mode call_kind false
       | None | Some _ -> Some code_id, call_kind, false)
