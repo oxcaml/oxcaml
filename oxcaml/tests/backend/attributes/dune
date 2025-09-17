@@ -1,0 +1,13 @@
+(rule
+ (targets backend_attributes.output.corrected)
+ (deps backend_attributes.ml grep_dump.ml)
+ (action
+  (with-outputs-to backend_attributes.output.corrected
+   (pipe-outputs
+    (run %{bin:ocamlopt.opt} -c -dcfg -w +A-70 backend_attributes.ml)
+    (run ocaml grep_dump.ml)))))
+
+(rule
+ (alias runtest)
+ (deps backend_attributes.output backend_attributes.output.corrected)
+ (action (diff backend_attributes.output backend_attributes.output.corrected)))
