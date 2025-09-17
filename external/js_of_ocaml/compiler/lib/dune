@@ -3,8 +3,6 @@
  (public_name js_of_ocaml-compiler)
  (synopsis "Js_of_ocaml compiler library")
  (libraries
-  compiler-libs.common
-  compiler-libs.bytecomp
   menhirLib
   sedlex
   time_now
@@ -48,3 +46,9 @@
  (deps ../../../../VERSION)
  (action
   (bash "echo 'let version = \"'$(head -n1 %{deps})'\"' > %{target}")))
+
+(rule
+ (target runtimedef.ml)
+ (deps ../../../../lambda/runtimedef.ml)
+ (action
+  (copy %{deps} %{target})))
