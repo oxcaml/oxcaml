@@ -1,24 +1,7 @@
 (* This forces ikinds globally on. *)
 (* Clflags.ikinds := true *)
 
-module TyM = struct
-  type t = Types.type_expr
-
-  let compare (t1 : t) (t2 : t) =
-    Int.compare (Types.get_id t1) (Types.get_id t2)
-
-  let unique_id (t : t) : int = Types.get_id t
-end
-
-module ConstrM = struct
-  type t = Path.t
-
-  let compare = Path.compare
-
-  let to_string (p : t) : string = Format.asprintf "%a" Path.print p
-end
-
-module JK = Ldd_jkind_solver.Make (Axis_lattice_bits) (TyM) (ConstrM)
+module JK = Ikind.JK
 
 (* Optional ambient tag to disambiguate higher-level call sites
    (e.g. includecore). Other modules can bracket calls with
@@ -518,10 +501,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
 (* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
    Keep Jkind as the single source for classification and error reporting. *)
 (* CR jujacobs: fix this *)
-type sub_or_intersect = Jkind.sub_or_intersect =
-  | Sub
-  | Disjoint of Jkind.Sub_failure_reason.t Misc.Nonempty_list.t
-  | Has_intersection of Jkind.Sub_failure_reason.t Misc.Nonempty_list.t
+type sub_or_intersect = Ikind.sub_or_intersect
 
 (* CR jujacobs: performance issue here. *)
 let sub_or_intersect ?origin

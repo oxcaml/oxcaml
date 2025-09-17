@@ -239,6 +239,7 @@
   ldd_jkind_solver
   axis_lattice
   axis_lattice_bits
+  ikind
   ikinds
   typetexp
   patterns
