@@ -5,5 +5,5 @@ Line 1, characters 23-43:
                            ^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be contravariant,
-       but it is injective covariant.
+       but it is covariant.
 

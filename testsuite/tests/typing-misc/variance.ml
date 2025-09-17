@@ -92,8 +92,8 @@ Line 1, characters 0-24:
 1 | type !'a inj_in = 'a i n
     ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be injective invariant,
-       but it is invariant.
+       The 1st type parameter was expected to be injective,
+       but it is noninjective.
 |}]
 
 type !'a inj_in = 'a n i
@@ -102,8 +102,8 @@ Line 1, characters 0-24:
 1 | type !'a inj_in = 'a n i
     ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be injective invariant,
-       but it is invariant.
+       The 1st type parameter was expected to be injective,
+       but it is noninjective.
 |}]
 
 module Make_covariant(M: sig type 'a t end): sig

@@ -2374,7 +2374,7 @@ let check_well_founded ~abs_env env loc path to_check visited ty0 =
     let rec_ok =
       match get_desc ty with
       | Tconstr(p,_,_) ->
-          !Clflags.recursive_types && Ctype.is_contractive env p
+          !Clflags.recursive_types && Ctype.is_contractive_with_rectypes env p
       | Tobject _ | Tvariant _ -> true
       | _ -> !Clflags.recursive_types
     in
@@ -2383,11 +2383,24 @@ let check_well_founded ~abs_env env loc path to_check visited ty0 =
     match get_desc ty with
     | Tconstr(p, tyl, _) ->
         let to_check = to_check p in
-        if to_check then List.iter (check_subtype parents trace ty) tyl;
+        let check_parameters () =
+          if tyl <> [] then begin
+            let variance = 
+              try (Env.find_type p env).type_variance
+              with Not_found -> List.map (fun _ -> Variance.unknown) tyl
+            in
+            List.iter2 
+              (fun v t ->
+                 if Variance.(mem May_noncontractive v) then
+                   check_subtype parents trace ty t)
+              variance tyl
+          end
+        in
+        if to_check then check_parameters ();
         begin match Ctype.try_expand_once_opt env ty with
         | ty' -> check parents (Expands_to (ty, ty') :: trace) ty'
         | exception Ctype.Cannot_expand ->
-            if not to_check then List.iter (check_subtype parents trace ty) tyl
+            if not to_check then check_parameters ()
         end
     | _ ->
         Btype.iter_type_expr (check_subtype parents trace ty) ty
@@ -3250,19 +3263,24 @@ let transl_type_extension extend env loc styext =
         raise (Error(loc, Not_extensible_type type_path))
   end;
   let type_variance =
-    List.map (fun v ->
-                let (co, cn) = Variance.get_upper v in
-                  (not cn, not co, false))
-             type_decl.type_variance
+    List.map
+      (fun v ->
+         let (co, cn) = Variance.get_upper v in
+         { Typedecl_variance.
+           plus = not cn; minus = not co;
+           bang = false; rec_ = false })
+      type_decl.type_variance
   in
   let err =
     if type_decl.type_arity <> List.length styext.ptyext_params then
       Some Includecore.Arity
     else
       if List.for_all2
-           (fun (c1, n1, _) (c2, n2, _) -> (not c2 || c1) && (not n2 || n1))
+           (fun (v1 : Typedecl_variance.surface_variance)
+                (v2 : Typedecl_variance.surface_variance) ->
+             (not v2.plus || v1.plus) && (not v2.minus || v1.minus))
            type_variance
-           (Typedecl_variance.variance_of_params styext.ptyext_params)
+           (Typedecl_variance.variance_of_pparams styext.ptyext_params)
       then None else Some Includecore.Variance
   in
   begin match err with
@@ -4057,7 +4075,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   end;
   let new_sig_decl = name_recursion sdecl id new_sig_decl in
   let new_type_variance =
-    let required = Typedecl_variance.variance_of_params sdecl.ptype_params in
+    let required = Typedecl_variance.variance_of_pparams sdecl.ptype_params in
     try
       Typedecl_variance.compute_decl env ~check:(Some (id, false)) new_sig_decl
         required
@@ -4094,7 +4112,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
         Option.map (fun d ->
           let type_variance =
             let required =
-              Typedecl_variance.variance_of_params sdecl.ptype_params in
+              Typedecl_variance.variance_of_pparams sdecl.ptype_params in
             try
               Typedecl_variance.compute_decl env ~check:(Some (id, true))
                 d required
@@ -4528,14 +4546,6 @@ let report_error ppf = function
         (Style.as_inline_code Printtyp.longident) lid
         "is private"
   | Variance (Typedecl_variance.Bad_variance (n, v1, v2)) ->
-      let variance (p,n,i) =
-        let inj = if i then "injective " else "" in
-        match p, n with
-          true,  true  -> inj ^ "invariant"
-        | true,  false -> inj ^ "covariant"
-        | false, true  -> inj ^ "contravariant"
-        | false, false -> if inj = "" then "unrestricted" else inj
-      in
       (match n with
        | Variance_variable_error { error; variable; context } ->
            Printtyp.prepare_for_printing [ variable ];
@@ -4598,6 +4608,34 @@ let report_error ppf = function
       (match n with
        | Variance_variable_error { error = No_variable; _ } -> ()
        | _ ->
+           let variance_relevant =
+            (v1.plus && not v2.plus) || (v1.minus && not v2.minus)
+          in
+          let injectivity_relevant = v2.bang && not v1.bang in
+          let contractiveness_relevant = v2.rec_ && not v1.rec_ in
+          let variance {Typedecl_variance.plus; minus; bang; rec_} =
+            let v =
+              if not variance_relevant then []
+              else begin
+               match plus, minus with
+               | true,  true  -> ["invariant"]
+               | true,  false -> ["covariant"]
+               | false, true  -> ["contravariant"]
+               | false, false -> ["unrestricted"]
+             end
+            in
+            let v = 
+              if not injectivity_relevant then v
+              else if bang then "injective" :: v
+              else "noninjective" :: v
+            in
+            let v = 
+              if not contractiveness_relevant then v
+              else if rec_ then "recursive" :: v
+              else "nonrecursive" :: v
+            in
+            String.concat " " v 
+           in
            fprintf ppf " was expected to be %s,@ but it is %s.@]@]"
              (variance v2) (variance v1))
   | Unavailable_type_constructor p ->

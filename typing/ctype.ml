@@ -975,7 +975,7 @@ let rec update_level env level expand ty =
         let needs_expand =
           expand ||
           List.exists2
-            (fun var ty -> var = Variance.null && get_level ty > level)
+            (fun var ty -> Variance.is_null var && get_level ty > level)
             variance tl
         in
         begin try
@@ -1056,11 +1056,11 @@ let rec lower_contravariant env var_level visited contra ty =
             List.map (fun _ -> Variance.unknown) tyl,
             false
         in
-        if List.for_all ((=) Variance.null) variance then () else
+        if List.for_all Variance.is_null variance then () else
           let not_expanded () =
             List.iter2
               (fun v t ->
-                if v = Variance.null then () else
+                if Variance.is_null v then () else
                   if Variance.(mem May_weak v)
                   then lower_rec true t
                   else lower_rec contra t)
@@ -2828,7 +2828,7 @@ let generic_private_abbrev env path =
     | _ -> false
   with Not_found -> false
 
-let is_contractive env p =
+let is_contractive_with_rectypes env p =
   try
     let decl = Env.find_type p env in
     in_pervasives p && decl.type_manifest = None || is_datatype decl
@@ -2842,30 +2842,61 @@ let is_contractive env p =
 
 exception Occur
 
-let rec occur_rec env allow_recursive visited ty0 ty =
+let rec occur_rec_fast allow_recursive visited ty0 ty =
   if eq_type ty ty0 then raise Occur;
   match get_desc ty with
-    Tconstr(p, _tl, _abbrev) ->
-      if allow_recursive && is_contractive env p then () else
-      begin try
-        if TypeSet.mem ty visited then raise Occur;
+  | Tconstr(_, _, _abbrev) ->
+      if TypeSet.mem ty visited then raise Occur;
+      let visited = TypeSet.add ty visited in
+      iter_type_expr (occur_rec_fast allow_recursive visited ty0) ty
+  | Tobject _ | Tvariant _ ->
+      ()
+  | _ ->
+      if allow_recursive || TypeSet.mem ty visited then () else begin
         let visited = TypeSet.add ty visited in
-        iter_type_expr (occur_rec env allow_recursive visited ty0) ty
-      with Occur -> try
-        let ty' = try_expand_head try_expand_safe env ty in
-        (* This call used to be inlined, but there seems no reason for it.
-           Message was referring to change in rev. 1.58 of the CVS repo. *)
-        occur_rec env allow_recursive visited ty0 ty'
-      with Cannot_expand ->
-        raise Occur
+        iter_type_expr (occur_rec_fast allow_recursive visited ty0) ty
+      end
+
+let rec occur_rec_precise env allow_recursive visited ty0 ty =
+  if eq_type ty ty0 then raise Occur;
+  match get_desc ty with
+  | Tconstr(p, tl, _abbrev) ->
+      if allow_recursive
+         && is_contractive_with_rectypes env p then () else begin
+        try
+          if TypeSet.mem ty visited then raise Occur;
+          let visited = TypeSet.add ty visited in
+          if tl <> [] then begin
+            let variance =
+              try (Env.find_type p env).type_variance
+              with Not_found -> List.map (fun _ -> Variance.unknown) tl
+            in
+            List.iter2 
+              (fun v t ->
+                 if Variance.(mem May_noncontractive v) then
+                   occur_rec_precise env allow_recursive visited ty0 t)
+              variance tl
+          end
+        with Occur -> 
+        try
+          let ty' = try_expand_head try_expand_safe env ty in
+          occur_rec_precise env allow_recursive visited ty0 ty'
+        with Cannot_expand ->
+          raise Occur
       end
   | Tobject _ | Tvariant _ ->
       ()
   | _ ->
-      if allow_recursive ||  TypeSet.mem ty visited then () else begin
+      if allow_recursive || TypeSet.mem ty visited then () else begin
         let visited = TypeSet.add ty visited in
-        iter_type_expr (occur_rec env allow_recursive visited ty0) ty
+        iter_type_expr (occur_rec_precise env allow_recursive visited ty0) ty
       end
+
+let occur_rec env allow_recursive ty0 ty =
+  match occur_rec_fast allow_recursive TypeSet.empty ty0 ty with
+  | () -> ()
+  | exception Occur ->
+      occur_rec_precise env allow_recursive TypeSet.empty ty0 ty
 
 let type_changed = ref false (* trace possible changes to the studied type *)
 
@@ -2879,7 +2910,7 @@ let occur uenv ty0 ty =
     while
       type_changed := false;
       if not (eq_type ty0 ty) then
-        occur_rec env allow_recursive TypeSet.empty ty0 ty;
+        occur_rec env allow_recursive ty0 ty;
       !type_changed
     do () (* prerr_endline "changed" *) done;
     merge type_changed old
@@ -2906,22 +2937,28 @@ let rec local_non_recursive_abbrev ~allow_rec strict visited env p ty =
     match get_desc ty with
       Tconstr(p', args, _abbrev) ->
         if Path.same p p' then raise Occur;
-        if allow_rec && not strict && is_contractive env p' then () else
+        if allow_rec
+           && not strict && is_contractive_with_rectypes env p' then () else
         let visited = get_id ty :: visited in
         begin try
           (* try expanding, since [p] could be hidden *)
           local_non_recursive_abbrev ~allow_rec strict visited env p
             (try_expand_head try_expand_safe_opt env ty)
         with Cannot_expand ->
-          let params =
-            try (Env.find_type p' env).type_params
-            with Not_found -> args
+          let params, variance =
+            match Env.find_type p' env with
+            | decl -> decl.type_params, decl.type_variance
+            | exception Not_found ->
+                let variance = List.map (fun _ -> Variance.unknown) args in
+                args, variance
           in
-          List.iter2
-            (fun tv ty ->
-              let strict = strict || not (is_Tvar tv) in
-              local_non_recursive_abbrev ~allow_rec strict visited env p ty)
-            params args
+          Stdlib.List.iter3
+            (fun tv ty v ->
+               if strict || Variance.(mem May_noncontractive v) then begin
+                 let strict = strict || not (is_Tvar tv) in
+                 local_non_recursive_abbrev ~allow_rec strict visited env p ty
+               end)
+            params args variance
         end
     | Tobject _ | Tvariant _ when not strict ->
         ()
@@ -3021,7 +3058,7 @@ let occur_univar ?(inj_only=false) env ty =
                    in this position. Physical expansion, as done in `occur`,
                    would be costly here, since we need to check inside
                    object and variant types too. *)
-                if Variance.(if inj_only then mem Inj v else not (eq v null))
+                if Variance.(if inj_only then mem Inj v else not (is_null v))
                 then occur_rec bound t)
               tl td.type_variance
           with Not_found ->
@@ -3078,7 +3115,7 @@ let univars_escape env univar_pairs vl ty =
             let td = Env.find_type p env in
             List.iter2
               (* see occur_univar *)
-              (fun t v -> if not Variance.(eq v null) then occur t)
+              (fun t v -> if not (Variance.is_null v) then occur t)
               tl td.type_variance
           with Not_found ->
             List.iter occur tl

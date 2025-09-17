@@ -75,6 +75,7 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
   | Instances -> (module Unit)
   | Separability -> (module Unit)
   | Let_mutable -> (module Unit)
+  | Rec_type_parameters -> (module Unit)
 
 (* We'll do this in a more principled way later. *)
 (* CR layouts: Note that layouts is only "mostly" erasable, because of annoying
@@ -88,7 +89,7 @@ let is_erasable : type a. a t -> bool = function
   | Mode | Unique | Overwriting | Layouts -> true
   | Comprehensions | Include_functor | Polymorphic_parameters | Immutable_arrays
   | Module_strengthening | SIMD | Labeled_tuples | Small_numbers | Instances
-  | Separability | Let_mutable ->
+  | Separability | Let_mutable | Rec_type_parameters ->
     false
 
 let maturity_of_unique_for_drf = Stable
@@ -114,6 +115,7 @@ module Exist_pair = struct
     | Pair (Instances, ()) -> Stable
     | Pair (Separability, ()) -> Stable
     | Pair (Let_mutable, ()) -> Stable
+    | Pair (Rec_type_parameters, ()) -> Stable
 
   let is_erasable : t -> bool = function Pair (ext, _) -> is_erasable ext
 
@@ -127,7 +129,8 @@ module Exist_pair = struct
     | Pair
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
            | Immutable_arrays | Module_strengthening | Labeled_tuples
-           | Instances | Overwriting | Separability | Let_mutable ) as ext),
+           | Instances | Overwriting | Separability | Let_mutable
+           | Rec_type_parameters ) as ext),
           _ ) ->
       to_string ext
 
@@ -161,6 +164,7 @@ module Exist_pair = struct
     | "instances" -> Some (Pair (Instances, ()))
     | "separability" -> Some (Pair (Separability, ()))
     | "let_mutable" -> Some (Pair (Let_mutable, ()))
+    | "rec_type_parameters" -> Some (Pair (Rec_type_parameters, ()))
     | _ -> None
 end
 
@@ -183,7 +187,8 @@ let all_extensions =
     Pack Small_numbers;
     Pack Instances;
     Pack Separability;
-    Pack Let_mutable ]
+    Pack Let_mutable;
+    Pack Rec_type_parameters ]
 
 (**********************************)
 (* string conversions *)
@@ -224,10 +229,11 @@ let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
   | Instances, Instances -> Some Refl
   | Separability, Separability -> Some Refl
   | Let_mutable, Let_mutable -> Some Refl
+  | Rec_type_parameters, Rec_type_parameters -> Some Refl
   | ( ( Comprehensions | Mode | Unique | Overwriting | Include_functor
       | Polymorphic_parameters | Immutable_arrays | Module_strengthening
       | Layouts | SIMD | Labeled_tuples | Small_numbers | Instances
-      | Separability | Let_mutable ),
+      | Separability | Let_mutable | Rec_type_parameters ),
       _ ) ->
     None
 

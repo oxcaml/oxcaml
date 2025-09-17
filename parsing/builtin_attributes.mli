@@ -172,6 +172,13 @@ val warning_scope:
     the purposes of misplaced attribute warnings. *)
 val has_attribute : string -> Parsetree.attributes -> bool
 
+(** [attribute_location name attrs] returns [Some loc] if an attribute with name
+    [name] or ["ocaml." ^ name] is present in [attrs], where [loc] is the
+    location of the attribute name.  It marks that attribute used for the
+    purposes of misplaced attribute warnings.  Returns [None] if no such
+    attribute is found. *)
+val attribute_location : string -> Parsetree.attributes -> Location.t option
+
 (** [select_attributes actions attrs] finds the elements of [attrs] that appear
     in [actions] and either returns them or just marks them used, according to
     the corresponding [attr_action].
