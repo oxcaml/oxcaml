@@ -407,8 +407,21 @@ type alloc_dbginfo_item =
 
 type alloc_dbginfo = alloc_dbginfo_item list
 
+type is_global =
+  | Global
+  | Local
+
+type symbol =
+  { sym_name : string;
+    sym_global : is_global
+  }
+
 type operation =
-  | Capply of machtype * Lambda.region_close
+  | Capply of
+      { result_type : machtype;
+        region : Lambda.region_close;
+        callees : symbol list option
+      }
   | Cextcall of
       { func : string;
         ty : machtype;
@@ -486,19 +499,10 @@ type operation =
   | Cpoll
   | Cpause
 
-type is_global =
-  | Global
-  | Local
-
 let equal_is_global g g' =
   match g, g' with
   | Local, Local | Global, Global -> true
   | Local, Global | Global, Local -> false
-
-type symbol =
-  { sym_name : string;
-    sym_global : is_global
-  }
 
 type vec128_bits =
   { word0 : int64; (* Least significant *)
@@ -658,8 +662,7 @@ let iter_shallow_tail f = function
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128 | Csubi128
         | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv
         | Cadda | Cpackf32 | Copaque | Cbeginregion | Cendregion | Cdls_get
-        | Ctls_get | Cpoll | Cpause
-        | Capply (_, _)
+        | Ctls_get | Cpoll | Cpause | Capply _
         | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
@@ -694,7 +697,7 @@ let map_shallow_tail f = function
           | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
           | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
           | Cendregion | Cdls_get | Ctls_get | Cpoll | Cpause
-          | Capply (_, _)
+          | Capply _
           | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _

@@ -632,7 +632,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         | Yes -> add_apply acc
         | No -> ()
         | Auto -> failwith "todo"))
-  | Function { function_call = Indirect_known_arity; _ } ->
+  | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
       Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
         ~returns:return_args ~exn:exn_arg

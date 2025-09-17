@@ -524,7 +524,7 @@ let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
     (* [Indirect] has the function in i.arg.(0) *)
     match op with
     | Direct _ -> 0, Array.length i.arg
-    | Indirect -> 1, Array.length i.arg - 1
+    | Indirect _ -> 1, Array.length i.arg - 1
   in
   let arg_regs = Array.sub i.arg args_begin args_end |> reg_list_for_call in
   let args = prepare_call_args_from_regs t arg_regs in
@@ -540,7 +540,7 @@ let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
     | Direct { sym_name; sym_global = _ } ->
       add_referenced_symbol t sym_name;
       LL.Ident.global sym_name
-    | Indirect -> load_reg_to_temp ~typ:T.ptr t i.arg.(0) |> V.get_ident_exn
+    | Indirect _ -> load_reg_to_temp ~typ:T.ptr t i.arg.(0) |> V.get_ident_exn
   in
   let attrs = gc_attr ~can_call_gc:true t i in
   let res =

@@ -298,7 +298,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     | None ->
       ( C.direct_call ~dbg
           (C.Extended_machtype.to_machtype return_ty)
-          pos (C.symbol ~dbg code_sym) args,
+          pos code_sym args,
         free_vars,
         env,
         res,
@@ -328,7 +328,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       env,
       res,
       Ece.all )
-  | Function { function_call = Indirect_known_arity; alloc_mode } ->
+  | Function { function_call = Indirect_known_arity callees; alloc_mode = _ } ->
     fail_if_probe apply;
     let callee =
       match callee with
@@ -338,15 +338,24 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
+    let callees =
+      match callees with
+      | Unknown -> None
+      | Known code_id_set ->
+        Some
+          (List.map
+             (fun code_id ->
+               To_cmm_result.symbol_of_code_id res code_id
+                 ~currently_in_inlined_body:(Env.currently_in_inlined_body env))
+             (Code_id.Set.elements code_id_set))
+    in
     if not (C.check_arity (Apply.args_arity apply) args)
     then
       Misc.fatal_errorf
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg return_ty pos
-          (C.alloc_mode_for_applications_to_cmx alloc_mode)
-          callee args_ty args,
+      ( C.indirect_full_call ~dbg return_ty pos callee ~callees args_ty args,
         free_vars,
         env,
         res,

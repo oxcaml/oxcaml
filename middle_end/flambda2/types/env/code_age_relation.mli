@@ -38,6 +38,13 @@ val meet :
   Code_id.t ->
   Code_id.t Or_bottom.t
 
+val meet_set :
+  t ->
+  resolver:(Compilation_unit.t -> t option) ->
+  Code_id.Set.t ->
+  Code_id.Set.t ->
+  Code_id.Set.t Or_bottom.t
+
 val union : t -> t -> t
 
 val all_code_ids_for_export : t -> Code_id.Set.t

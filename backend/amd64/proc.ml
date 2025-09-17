@@ -651,7 +651,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     assert (stack_ofs >= 0);
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
-  | Call {op = Indirect | Direct _; _} -> all_phys_regs
+  | Call {op = Indirect _ | Direct _; _} -> all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -674,7 +674,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
       true
     else
       if alloc then true else false
-  | Call {op = Indirect | Direct _; _} ->
+  | Call {op = Indirect _ | Direct _; _} ->
     true
 
 (* Layout of the stack frame *)
