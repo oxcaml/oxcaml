@@ -342,8 +342,10 @@ let mk_default () =
            (-8591268803865043407L)
            6388613595849772044L
 
-(* CR-soon mslater: switch to TLS to remove thread unsafety *)
-(* CR-someday mslater: switch to FLS to remove magic *)
+(* CR-soon mslater: this is safe since the state is only updated by a C call
+   that cannot be preempted, we do not yield, and we do not borrow the state.
+   However, it will not be deterministic in the presence of threads, so it 
+   should be converted to TLS. *)
 let random_key =
   DLS.new_key
     ~split_from_parent:(fun s ->

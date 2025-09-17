@@ -2232,6 +2232,43 @@ CAMLprim value caml_domain_dls_compare_and_set(value old, value new)
   }
 }
 
+/* Weak definitions overridden when linked against [threads]. */
+
+value (*caml_thread_has_tls_state_stub)(value unit);
+CAMLprim value caml_thread_has_tls_state(value unit)
+{
+  if(caml_thread_has_tls_state_stub) return caml_thread_has_tls_state_stub(unit);
+  return Val_false;
+}
+
+value (*caml_thread_get_state_stub)(value unit);
+CAMLprim value caml_thread_get_state(value unit)
+{
+  if(caml_thread_get_state_stub) return caml_thread_get_state_stub(unit);
+  caml_failwith("caml_thread_get_state: TLS is not supported without the [threads] library.");
+}
+
+value (*caml_thread_set_state_stub)(value state);
+CAMLprim value caml_thread_set_state(value state)
+{
+  if(caml_thread_set_state_stub) return caml_thread_set_state_stub(state);
+  caml_failwith("caml_thread_set_state: TLS is not supported without the [threads] library.");
+}
+
+value (*caml_thread_init_main_thread_stub)(value unit);
+CAMLprim value caml_thread_init_main_thread(value unit)
+{
+  if(caml_thread_init_main_thread_stub) return caml_thread_init_main_thread_stub(unit);
+  caml_failwith("caml_thread_init_main_thread: TLS is not supported without the [threads] library.");
+}
+
+value (*caml_thread_destroy_main_thread_stub)(value unit);
+CAMLprim value caml_thread_destroy_main_thread(value unit)
+{
+  if(caml_thread_destroy_main_thread_stub) return caml_thread_destroy_main_thread_stub(unit);
+  caml_failwith("caml_thread_destroy_main_thread: TLS is not supported without the [threads] library.");
+}
+
 CAMLprim value caml_recommended_domain_count(value unused)
 {
   intnat n = -1;

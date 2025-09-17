@@ -84,11 +84,13 @@ struct caml_thread_descr {
   value ident;                  /* Unique integer ID */
   value start_closure;          /* The closure to start this thread */
   value terminated;             /* Triggered event for thread termination */
+  value tls_state;              /* TLS state array */
 };
 
 #define Ident(v) (((struct caml_thread_descr *)(v))->ident)
 #define Start_closure(v) (((struct caml_thread_descr *)(v))->start_closure)
 #define Terminated(v) (((struct caml_thread_descr *)(v))->terminated)
+#define TLS_state(v) (((struct caml_thread_descr *)(v))->tls_state)
 
 /* The infos on threads (allocated via caml_stat_alloc()) */
 
@@ -132,6 +134,9 @@ static caml_thread_t all_threads = NULL;
 
 /* The descriptor for the currently executing thread */
 static caml_thread_t curr_thread = NULL;
+
+/* Whether the thread system has been initialized */
+static int caml_threads_initialized = 0;
 
 /* The master lock protecting the OCaml runtime system */
 static struct caml_locking_scheme* _Atomic caml_locking_scheme;
@@ -474,10 +479,11 @@ static value caml_thread_new_descriptor(value clos)
     /* Create and initialize the termination semaphore */
     mu = caml_threadstatus_new();
     /* Create a descriptor for the new thread */
-    descr = caml_alloc_small(3, 0);
+    descr = caml_alloc_small(4, 0);
     Ident(descr) = Val_long(thread_next_ident);
     Start_closure(descr) = clos;
     Terminated(descr) = mu;
+    TLS_state(descr) = Val_unit;
     thread_next_ident++;
   End_roots();
   return descr;
@@ -534,12 +540,43 @@ static void caml_thread_reinitialize(void)
   }
 }
 
+/* Set up a thread info block for the current thread */
+
+static value caml_thread_init_current(value unit)
+{
+  if (curr_thread != NULL) return Val_unit;
+  curr_thread =
+    (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
+  curr_thread->descr = caml_thread_new_descriptor(Val_unit);
+  curr_thread->next = curr_thread;
+  curr_thread->prev = curr_thread;
+  all_threads = curr_thread;
+  curr_thread->backtrace_last_exn = Val_unit;
+  return Val_unit;
+}
+
+static value caml_thread_init_main_thread(value unit)
+{
+  if (caml_threads_initialized) return Val_unit;
+  caml_thread_init_current(unit);
+  caml_register_generational_global_root(&curr_thread->descr);
+  return Val_unit;
+}
+
+static value caml_thread_destroy_main_thread(value unit)
+{
+  if (caml_threads_initialized) return Val_unit;
+  caml_remove_generational_global_root(&curr_thread->descr);
+  caml_stat_free(curr_thread);
+  return Val_unit;
+}
+
 /* Initialize the thread machinery */
 
 CAMLprim value caml_thread_initialize(value unit)   /* ML */
 {
   /* Protect against repeated initialization (PR#3532) */
-  if (curr_thread != NULL) return Val_unit;
+  if (caml_threads_initialized) return Val_unit;
   /* OS-specific initialization */
   st_initialize();
   /* Initialize and acquire the master lock */
@@ -548,14 +585,11 @@ CAMLprim value caml_thread_initialize(value unit)   /* ML */
   /* Initialize the keys */
   st_tls_newkey(&thread_descriptor_key);
   st_tls_newkey(&last_channel_locked_key);
+  /* If curr_thread was initialized by caml_thread_init_main_thread, we must
+     unregister the descr, which will now be scanned by caml_scan_roots_hook */
+  if(curr_thread) caml_remove_generational_global_root(&curr_thread->descr);
   /* Set up a thread info block for the current thread */
-  curr_thread =
-    (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
-  curr_thread->descr = caml_thread_new_descriptor(Val_unit);
-  curr_thread->next = curr_thread;
-  curr_thread->prev = curr_thread;
-  all_threads = curr_thread;
-  curr_thread->backtrace_last_exn = Val_unit;
+  caml_thread_init_current(unit);
 #ifdef NATIVE_CODE
   curr_thread->exit_buf = &caml_termination_jmpbuf;
 #endif
@@ -583,6 +617,7 @@ CAMLprim value caml_thread_initialize(value unit)   /* ML */
   /* Set up fork() to reinitialize the thread machinery in the child
      (PR#4577) */
   st_atfork(caml_thread_reinitialize);
+  caml_threads_initialized = 1;
   return Val_unit;
 }
 
@@ -819,6 +854,39 @@ CAMLprim value caml_thread_self(value unit)         /* ML */
   if (curr_thread == NULL)
     caml_invalid_argument("Thread.self: not initialized");
   return curr_thread->descr;
+}
+
+/* Thread-local storage */
+
+static value caml_thread_has_tls_state(value unit)
+{
+  return Val_true;
+}
+
+static value caml_thread_get_state(value unit)
+{
+  return TLS_state(caml_thread_self(unit));
+}
+
+static value caml_thread_set_state(value state)
+{
+  caml_modify(&TLS_state(caml_thread_self(Val_unit)), state);
+  return Val_unit;
+}
+
+extern value (*caml_thread_has_tls_state_stub)(value unit);
+extern value (*caml_thread_get_state_stub)(value unit);
+extern value (*caml_thread_set_state_stub)(value state);
+extern value (*caml_thread_init_main_thread_stub)(value unit);
+extern value (*caml_thread_destroy_main_thread_stub)(value unit);
+
+__attribute__((constructor))
+static void caml_install_tls_functions(void) {
+  caml_thread_has_tls_state_stub = &caml_thread_has_tls_state;
+  caml_thread_get_state_stub = &caml_thread_get_state;
+  caml_thread_set_state_stub = &caml_thread_set_state;
+  caml_thread_init_main_thread_stub = &caml_thread_init_main_thread;
+  caml_thread_destroy_main_thread_stub = &caml_thread_destroy_main_thread;
 }
 
 /* Return the identifier of a thread */
