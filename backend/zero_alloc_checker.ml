@@ -2617,8 +2617,8 @@ end = struct
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
         | Dls_get -> next
 
-      let basic next (i : Cfg.basic Cfg.instruction) t : (domain, error) result
-          =
+      let basic next (i : Cfg.basic Cfg.instruction) _ t :
+          (domain, error) result =
         match i.desc with
         | Op op -> Ok (operation t ~next op i.dbg)
         | Pushtrap _ | Poptrap _ ->
@@ -2687,7 +2687,7 @@ end = struct
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
             dbg
 
-      let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
+      let terminator next ~exn (i : Cfg.terminator Cfg.instruction) _ t =
         Ok (terminator next ~exn i t)
 
       let exception_ next _t : (domain, error) result =
