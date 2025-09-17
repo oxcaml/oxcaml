@@ -11,7 +11,7 @@
    %{target}
    (chdir
     %{workspace_root}/stdlib
-    (run %{gen_ocamlj_rules})))))
+    (run bash %{gen_ocamlj_rules})))))
 
 (rule
  (target stdlib-js.inc)
