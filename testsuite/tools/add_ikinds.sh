@@ -12,6 +12,16 @@ if [[ "$MODE" != "add" && "$MODE" != "remove" ]]; then
     exit 1
 fi
 
+if sed --version >/dev/null 2>&1; then
+    sed_inplace() {
+        sed -i "$@"
+    }
+else
+    sed_inplace() {
+        sed -i '' "$@"
+    }
+fi
+
 # Find all .ml files in typing-* directories with TEST blocks
 for file in $(find testsuite/tests -type f -name "*.ml" -path "*/typing-*/*" | xargs grep -l "^(\\* TEST" 2>/dev/null); do
     if [[ "$MODE" == "add" ]]; then
@@ -22,11 +32,11 @@ for file in $(find testsuite/tests -type f -name "*.ml" -path "*/typing-*/*" | x
             # Add -ikinds to existing flags or create new flags line
             if grep -q "flags = " "$file"; then
                 # Update existing flags line to append -ikinds
-                sed -i 's/\(flags = "[^"]*\)"/\1 -ikinds"/' "$file"
+                sed_inplace 's/\(flags = "[^"]*\)"/\1 -ikinds"/' "$file"
                 echo "Updated $file (appended -ikinds to existing flags)"
             else
                 # Add flags line after TEST
-                sed -i '/^(\* TEST$/a\    flags = "-ikinds";' "$file"
+                sed_inplace '/^(\* TEST$/a\    flags = "-ikinds";' "$file"
                 echo "Updated $file (added new flags line with -ikinds)"
             fi
         fi
@@ -36,14 +46,14 @@ for file in $(find testsuite/tests -type f -name "*.ml" -path "*/typing-*/*" | x
             # Check if -ikinds is the only flag
             if grep -q 'flags = "-ikinds";' "$file"; then
                 # Remove the entire flags line if -ikinds is the only flag
-                sed -i '/flags = "-ikinds";/d' "$file"
+                sed_inplace '/flags = "-ikinds";/d' "$file"
                 echo "Removed flags line from $file (-ikinds was the only flag)"
             else
                 # Remove -ikinds from the flags line
                 # Handle cases where -ikinds might be at beginning, middle, or end
-                sed -i 's/\(flags = "[^"]*\) -ikinds"/\1"/' "$file"
-                sed -i 's/\(flags = "\)-ikinds \([^"]*"\)/\1\2/' "$file"
-                sed -i 's/\(flags = "[^"]*\)-ikinds \([^"]*"\)/\1\2/' "$file"
+                sed_inplace 's/\(flags = "[^"]*\) -ikinds"/\1"/' "$file"
+                sed_inplace 's/\(flags = "\)-ikinds \([^"]*"\)/\1\2/' "$file"
+                sed_inplace 's/\(flags = "[^"]*\)-ikinds \([^"]*"\)/\1\2/' "$file"
                 echo "Removed -ikinds from $file (kept other flags)"
             fi
         else
