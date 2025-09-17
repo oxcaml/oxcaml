@@ -25,6 +25,8 @@
 *.cm[ioxatsj]
 *.cmx[as]
 *.cmj[xa]
+*.cmj.js
+*.cmja.js
 *.cmti
 *.cmsi
 *.annot
