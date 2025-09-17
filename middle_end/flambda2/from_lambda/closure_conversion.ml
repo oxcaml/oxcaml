@@ -1832,7 +1832,6 @@ let close_exact_or_unknown_apply acc env
       match (callee_approx : Env.value_approximation option) with
       | Some (Closure_approximation { code_id; code = code_or_meta; _ }) ->
         let meta = Code_or_metadata.code_metadata code_or_meta in
-        let is_my_closure_used = Code_metadata.is_my_closure_used meta in
         if Code_metadata.is_tupled meta
         then
           (* CR keryan : We could do better here since we know the arity, but we
@@ -1867,7 +1866,8 @@ let close_exact_or_unknown_apply acc env
             else acc, Call_kind.direct_function_call code_id, false, true
           else
             let can_erase_callee =
-              Flambda_features.classic_mode () && not is_my_closure_used
+              Flambda_features.classic_mode ()
+              && not (Code_metadata.is_my_closure_used meta)
             in
             acc, Call_kind.direct_function_call code_id, can_erase_callee, false
       | None ->
