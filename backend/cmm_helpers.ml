@@ -72,6 +72,26 @@ module Unboxed_or_untagged_array_tags = struct
   let unboxed_nativeint_array_tag = 21
 
   let untagged_int_array_tag = 22
+
+  let untagged_int8_array_tag n =
+    match n mod 8 with
+    | 0 -> untagged_int8_array_zero_tag
+    | r -> untagged_int8_array_one_tag - (r - 1)
+
+  let untagged_int16_array_tag n =
+    match n mod 4 with
+    | 0 -> untagged_int16_array_zero_tag
+    | r -> untagged_int16_array_one_tag - (r - 1)
+
+  let unboxed_int32_array_tag n =
+    match n mod 2 with
+    | 0 -> unboxed_int32_array_zero_tag
+    | _ -> unboxed_int32_array_one_tag
+
+  let unboxed_float32_array_tag n =
+    match n mod 2 with
+    | 0 -> unboxed_float32_array_zero_tag
+    | _ -> unboxed_float32_array_one_tag
 end
 
 let check_equal_1 name f1 f2 arg1 =
