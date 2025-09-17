@@ -19,7 +19,7 @@ MAIN_ENV_FLAGS='-principal -warn-error +A -w +a-4-9-40-41-42-44-45-48-66-67-70'
 # flags from ./dune:
 OCAML_FLAGS='-strict-sequence -g -absname -bin-annot -nostdlib -safe-string -strict-formats'
 
-OCAMLJ_FLAGS="${RUNTIME_STDLIB_FLAGS} ${MAIN_ENV_FLAGS} ${OCAML_FLAGS} -I %{workspace_root}/stdlib/.stdlib.objs/byte -I . -no-alias-deps -nopervasives -nostdlib"
+OCAMLJ_FLAGS="${RUNTIME_STDLIB_FLAGS} ${MAIN_ENV_FLAGS} ${OCAML_FLAGS} -I %{workspace_root}/stdlib/.stdlib.objs/byte -I %{workspace_root}/stdlib-js -no-alias-deps -nopervasives -nostdlib"
 
 # CR jvanburen: enable sourcemaps when available
 JSOO_FLAGS="--debuginfo --enable=with-js-error --pretty"
@@ -90,8 +90,8 @@ for cu in "${!srcs[@]}"; do
     echo "(rule"
     echo " (targets ${cu}.cmj ${cu}.cmjx)"
     echo " (deps "
-    echo "  ${srcs[$cu]}"
-    echo "  %{workspace_root}/stdlib/.stdlib.objs/byte/${cu}.cmi"
+    echo "  (source_tree ../stdlib)"
+    echo "  ../stdlib/.stdlib.objs/byte/${cu}.cmi"
     # Add module dependencies
     [[ -z ${deps[$cu]} ]] || printf '  %s.cmjx\n' ${deps[$cu]}
     echo " )"
@@ -102,7 +102,7 @@ for cu in "${!srcs[@]}"; do
         maybe_open_stdlib=''
     fi
 
-    echo " (action (run %{bin:ocamlj} ${OCAMLJ_FLAGS}${maybe_open_stdlib} -o ${cu}.cmj -c -impl ${srcs[$cu]})))"
+    echo " (action (chdir ../stdlib (run %{bin:ocamlj} ${OCAMLJ_FLAGS}${maybe_open_stdlib} -o ../stdlib-js/${cu}.cmj -c -impl ${srcs[$cu]}))))"
     echo ""
 done
 
@@ -110,7 +110,7 @@ cat <<EOF
 (rule
  (target stdlib.cmja)
  (deps ${stdlib_cmja_contents})
- (action (run %{bin:ocamlj} ${OCAMLJ_FLAGS} -a -o stdlib.cmja %{deps})))
+ (action (run %{bin:ocamlj} ${OCAMLJ_FLAGS} -a -o %{target} %{deps})))
 
 (rule
  (target stdlib.js)

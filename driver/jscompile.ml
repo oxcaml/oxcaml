@@ -131,7 +131,7 @@ let starting_point_of_compiler_pass start_from =
 let implementation_aux ~start_from ~source_file ~output_prefix
     ~keep_symbol_tables:_
     ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
-  with_info ~source_file ~output_prefix ~dump_ext:"cmo" ~compilation_unit
+  with_info ~source_file ~output_prefix ~dump_ext:"cmj" ~compilation_unit
     ~kind:Impl
   @@ fun info ->
   match start_from with
@@ -172,7 +172,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       in
       emit_jsir info jsir;
       Compilenv.save_unit_info
-        (Unit_info.Artifact.filename (Unit_info.cmx info.target))
+        (Unit_info.Artifact.filename (Unit_info.cmjx info.target))
         ~main_module_block_format
         ~arg_descr:
           (match arg_descr with

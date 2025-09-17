@@ -957,3 +957,17 @@
   otherlibs/dynlink/dynlink.cmxa
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cma
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa))
+
+
+
+; generate the dune rules for compiling stdlib with ocamlj/jsoo.
+(subdir stdlib-js
+  (dynamic_include ../duneconf/stdlib-js.inc)
+  (install
+  (files
+    (glob_files *.cmj)
+    (glob_files *.cmjx)
+    (glob_files *.cmja)
+    (glob_files *.js))
+  (section lib)
+  (package ocaml_runtime_stdlib)))

@@ -39,6 +39,7 @@ drv.overrideAttrs (new: old: {
       }
     ''
     + ''
+      [[ -n ''${PS1-} ]] || PS1=$'\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '
       cat >&2 << EOF
       OxCaml $version Development Environment
       ===============================''${version//?/=}
