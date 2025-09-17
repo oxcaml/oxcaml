@@ -22,7 +22,7 @@ OCAML_FLAGS='-strict-sequence -g -absname -bin-annot -nostdlib -safe-string -str
 OCAMLJ_FLAGS="${RUNTIME_STDLIB_FLAGS} ${MAIN_ENV_FLAGS} ${OCAML_FLAGS} -I %{workspace_root}/stdlib/.stdlib.objs/byte -I . -no-alias-deps -nopervasives -nostdlib"
 
 # CR jvanburen: enable sourcemaps when available
-JSOO_FLAGS="--debuginfo --enable=with-js-error"
+JSOO_FLAGS="--debuginfo --enable=with-js-error --pretty"
 
 # Transform module names or file names into stdlib file names (without extensions).
 # Idempotent.

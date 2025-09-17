@@ -42,3 +42,9 @@
   (:input-file ../../version.ml.in))
  (action
   (copy %{input-file} %{targets})))
+
+(rule
+ (target oxcaml_version.ml)
+ (deps ../../../../VERSION)
+ (action
+  (bash "echo 'let version = \"'$(head -n1 %{deps})'\"' > %{target}")))
