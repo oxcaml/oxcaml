@@ -133,6 +133,15 @@ let classify_node = function
   | Open_declaration _ -> `Module
   | Include_declaration _ -> `Module
   | Include_description _ -> `Module
+  | Mode _ | Modality _ ->
+    (* CR-someday: Have proper completion for modes and modalities *)
+    `Expression
+  | Jkind_annotation _ ->
+    (* CR-someday: Have proper completion for jkinds *)
+    `Type
+  | Attribute _ ->
+    (* CR-someday: Have proper completion for attributes *)
+    `Expression
 
 open Query_protocol.Compl
 

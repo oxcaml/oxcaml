@@ -99,8 +99,18 @@ type shape = { shape_loc : Location_aux.t; shape_sub : shape list }
 
 type error_filter = { lexing : bool; parsing : bool; typing : bool }
 
-type syntax_doc_result =
-  { name : string; description : string; documentation : string }
+module Syntax_doc_result = struct
+  module Level = struct
+    type t = Simple | Advanced
+  end
+
+  type t =
+    { name : string;
+      description : string;
+      documentation : string option;
+      level : Level.t
+    }
+end
 
 type ppxed_source =
   { code : string; attr_start : Lexing.position; attr_end : Lexing.position }
@@ -219,7 +229,7 @@ type _ t =
          t
   | Syntax_document :
       Msource.position
-      -> [ `Found of syntax_doc_result | `No_documentation ] t
+      -> [ `Found of Syntax_doc_result.t | `No_documentation ] t
   | Expand_ppx : Msource.position -> [ `Found of ppxed_source | `No_ppx ] t
   | Locate_type :
       Msource.position

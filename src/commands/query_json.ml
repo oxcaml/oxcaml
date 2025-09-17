@@ -452,11 +452,16 @@ let json_of_response (type a) (query : a t) (response : a) : json =
   end
   | Syntax_document _, resp -> (
     match resp with
-    | `Found info ->
+    | `Found { name; description; documentation; level } ->
       `Assoc
-        [ ("name", `String info.name);
-          ("description", `String info.description);
-          ("url", `String info.documentation)
+        [ ("name", `String name);
+          ("description", `String description);
+          ("url", Json.option (fun s -> `String s) documentation);
+          ( "level",
+            `String
+              (match level with
+              | Simple -> "simple"
+              | Advanced -> "advanced") )
         ]
     | `No_documentation -> `String "No documentation found")
   | Expand_ppx _, resp ->
