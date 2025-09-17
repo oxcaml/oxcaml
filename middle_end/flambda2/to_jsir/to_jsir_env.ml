@@ -142,7 +142,6 @@ let get_exn_handler_exn t cont = Continuation.Map.find cont t.exn_handlers
 let get_var_exn t fvar = Variable.Map.find fvar t.vars
 
 let get_symbol_from_global_data ~compilation_unit ~symbol_name ~res =
-  let res = To_jsir_result.import_compilation_unit res compilation_unit in
   let res, global_data = To_jsir_result.global_data_var res in
   let symbol_name = Jsir.Native_string.of_string symbol_name in
   let var = Jsir.Var.fresh () in
@@ -176,6 +175,7 @@ let get_external_symbol ~res symbol =
     match symbol_is_for_compilation_unit symbol with
     | true ->
       let compilation_unit = Symbol.compilation_unit symbol in
+      let res = To_jsir_result.import_compilation_unit res compilation_unit in
       let compilation_unit_name =
         Compilation_unit.name_as_string compilation_unit
       in
