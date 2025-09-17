@@ -604,29 +604,25 @@ let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
     let tag =
       match kind with
       | Immediates | Gc_ignorable_values | Values -> 0
-      | Naked_ints -> failwith "CR jrayman"
-      | Naked_int8s -> failwith "CR jrayman"
-      | Naked_int16s -> failwith "CR jrayman"
+      | Naked_ints ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int_array_tag
+      | Naked_int8s ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int8_array_tag
+          (List.length xs)
+      | Naked_int16s ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int16_array_tag
+          (List.length xs)
       | Naked_int32s ->
-        if List.length xs mod 2 = 0
-        then
-          Cmm_helpers.Unboxed_or_untagged_array_tags
-          .unboxed_int32_array_zero_tag
-        else
-          Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_one_tag
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_tag
+          (List.length xs)
       | Naked_int64s ->
         Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
       | Naked_nativeints ->
         Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
       | Naked_floats -> Tag.double_array_tag |> Tag.to_int
       | Naked_float32s ->
-        if List.length xs mod 2 = 0
-        then
-          Cmm_helpers.Unboxed_or_untagged_array_tags
-          .unboxed_float32_array_zero_tag
-        else
-          Cmm_helpers.Unboxed_or_untagged_array_tags
-          .unboxed_float32_array_one_tag
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_float32_array_tag
+          (List.length xs)
       | Unboxed_product _ -> 0
       | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         (* No SIMD *)

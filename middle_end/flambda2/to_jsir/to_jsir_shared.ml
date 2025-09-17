@@ -61,6 +61,12 @@ let float32_to_jsir_const float32 : Jsir.constant =
 let float_to_jsir_const float : Jsir.constant =
   Float (Numeric_types.Float_by_bit_pattern.to_bits float)
 
+let int8_to_jsir_const int8 : Jsir.constant =
+  Int (Targetint.of_int (Numeric_types.Int8.to_int int8))
+
+let int16_to_jsir_const int16 : Jsir.constant =
+  Int (Targetint.of_int (Numeric_types.Int16.to_int int16))
+
 let int32_to_jsir_const int32 : Jsir.constant = Int32 int32
 
 let int64_to_jsir_const int64 : Jsir.constant = Int64 int64

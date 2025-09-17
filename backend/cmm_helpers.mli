@@ -63,6 +63,18 @@ module Unboxed_or_untagged_array_tags : sig
   val unboxed_vec256_array_tag : int
 
   val unboxed_vec512_array_tag : int
+
+  (* Given the length of an int8 array, return its tag *)
+  val untagged_int8_array_tag : int -> int
+
+  (* Given the length of an int16 array, return its tag *)
+  val untagged_int16_array_tag : int -> int
+
+  (* Given the length of an int32 array, return its tag *)
+  val unboxed_int32_array_tag : int -> int
+
+  (* Given the length of an float32 array, return its tag *)
+  val unboxed_float32_array_tag : int -> int
 end
 
 val arch_bits : int
