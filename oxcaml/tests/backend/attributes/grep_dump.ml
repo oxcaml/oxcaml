@@ -1,4 +1,4 @@
-#load "str.cma";;
+#load "str.cma"
 
 let is_interesting_line line =
   List.exists
@@ -17,12 +17,12 @@ let () =
     let prev_line = ref "" in
     while true do
       let line = read_line () in
-      if is_interesting_line line then begin
-        if not (is_interesting_line !prev_line) then
-          print_endline (remove_suffix !prev_line);
-        print_endline line;
+      if is_interesting_line line
+      then begin
+        if not (is_interesting_line !prev_line)
+        then print_endline (remove_suffix !prev_line);
+        print_endline line
       end;
       prev_line := line
-    done;
-  with End_of_file ->
-    ()
+    done
+  with End_of_file -> ()
