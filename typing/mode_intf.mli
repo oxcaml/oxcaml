@@ -853,9 +853,22 @@ module type S = sig
     val max : t
   end
 
-  (** Some modes might be indistinguishable for values of some type, in which
-    case the actual/expected mode of values can be adjusted accordingly to make
-    more programs mode-check. The adjustment is called mode crossing. *)
+  (** Some modes on an axis might be indistinguishable for values of some type,
+    in which case the actual mode of values can be strenghthened (or
+    equivalently the expected mode loosened) accordingly to make more programs
+    mode-check. The capabilities/permissions to perform such adjustments are
+    called mode crossing and depicted in this module.
+
+    We define an ordering on the crossings: [t0 <= t1] iff [t0] allows more
+    adjustments than [t1]. By this ordering, the currently representable
+    crossings form a lattice:
+    - The bottom crossing allows any adjustments on this axis, which trivializes
+      the axis.
+    - The top crossing allows no adjustments on this axis, which is the safe
+      default.
+    - Joining two crossings gives a crossing that's less permissive than both.
+    - Meeting two crossings gives a crossing that's more permissive than both.
+    *)
   module Crossing : sig
     module Monadic : sig
       module Atom : sig

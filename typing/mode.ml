@@ -859,19 +859,20 @@ module Lattices = struct
 
   (* Notes on flipping
 
-     Our lattices are categorized into two fragments: monadic and comonadic. Moreover:
+     Our lattices are split into two opposite fragments: monadic and comonadic.
+     Moreover:
      - Morphisms between lattices in the same fragment are always monotone.
      - Morphisms between lattices from opposite fragments are always antitone.
 
-     [Solver_mono] only supports monotone morphisms. To conform to this limitation, we
-     flip all lattices in the monadic fragment, which makes morphisms between opposite
-     fragments monotone. We submit this category of lattices (original comonadic lattices
-     + flipped monadic lattices) to [Solver_mono].
+     [Solver_mono] only supports monotone morphisms. Due to this limitation,
+     here, we flip all lattices in the monadic fragment, which makes morphisms
+     between opposite fragments monotone. We submit this category of lattices
+     (original comonadic lattices + flipped monadic lattices) to [Solver_mono].
 
-     The resulted interface given by [Solver_mono] therefore has the monadic lattices
-     flipped, which is unsuitable for the user of [mode.ml]. Therefore, We build on top of
-     that and provide an interface to the user where monadic lattices are flipped back to
-     its original ordering. See [module Monadic_gen] and [module Monadic].
+     The resulted interface given by [Solver_mono] therefore has the monadic
+     lattices flipped. We build on top of that and provide an interface to the
+     downstream code where monadic lattices are flipped back to its original
+     ordering. See [module Monadic_gen] and [module Monadic].
   *)
   module Uniqueness_op = Opposite (Uniqueness)
   module Contention_op = Opposite (Contention)
@@ -2816,6 +2817,8 @@ module Monadic = struct
         let obj = proj_obj ax in
         C.print obj ppf a
 
+      (* See "Notes on flipping" *)
+
       let le ax a b =
         let obj = (proj_obj [@inlined hint]) ax in
         (C.le [@inlined hint]) obj b a
@@ -4125,6 +4128,23 @@ module Crossing = struct
     module Atom = struct
       type 'a t = Modality of 'a Modality.Atom.t [@@unboxed]
 
+      (* By the ordering of crossings (see comments above) [join_c0 <= join_c1]
+         iff the following holds:
+         For all [a,b], if [join_c1 a <= join_c1 b](E0), then [join_c0 a <=
+         join_c0 b](E1)
+
+         Case analysis by the relation between [c0] and [c1]:
+         - If [c0 >= c1], then [c0] can be written as [join c1 k] for some [k].
+           Then apply [join k] to E0 and we get E1 (by monotonicity of join).
+         - If [c0 <= c1], take [a := c1] and [b := c0]. E0 holds but E1 doesn't.
+         - If neither, then we take [a := c1] and [b := meet a c0]. E0 is
+           satisfied:
+           [join_c1 a = c1 <= c1 = join_c1 (meet a c0) = join_c1 b]. But E1 is
+           not satisfied:
+           [join_c0 a = join c0 c1 </= c0 = join_c0 (meet c0 c1) = join_c0 b]
+
+         Therefore, [join_c0 <= join_c1] iff [c0 >= c1]. *)
+
       let min ax =
         Modality (Join_with ((Mode.Const.Per_axis.max [@inlined hint]) ax))
 
@@ -4193,6 +4213,9 @@ module Crossing = struct
 
     module Atom = struct
       type 'a t = Modality of 'a Modality.Atom.t [@@unboxed]
+
+      (* The ordering of crossing here is derived similarly to the monadic
+         fragment. See comments there. *)
 
       let min ax =
         Modality (Meet_with ((Mode.Const.Per_axis.min [@inlined hint]) ax))

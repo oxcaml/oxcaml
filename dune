@@ -102,6 +102,7 @@
    -w
    -67-47
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
+   ; -47 needed because [@inline available] is not recognized by the system compiler
    ))
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
