@@ -1,3 +1,5 @@
+#directory "../../../../../install/main/lib/ocaml/str"
+
 #load "str.cma"
 
 let is_interesting_line line =
@@ -13,10 +15,11 @@ let remove_suffix line =
   | true -> Str.matched_group 1 line
 
 let () =
+  let chan = open_in Sys.argv.(1) in
   try
     let prev_line = ref "" in
     while true do
-      let line = read_line () in
+      let line = input_line chan in
       if is_interesting_line line
       then begin
         if not (is_interesting_line !prev_line)
@@ -25,4 +28,4 @@ let () =
       end;
       prev_line := line
     done
-  with End_of_file -> ()
+  with End_of_file -> close_in_noerr chan
