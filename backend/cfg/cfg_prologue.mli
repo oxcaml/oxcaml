@@ -3,3 +3,5 @@
 val run : Cfg_with_infos.t -> Cfg_with_infos.t
 
 val validate : Cfg_with_infos.t -> Cfg_with_infos.t
+
+val count : Cfg_with_infos.t -> Cfg_with_infos.t
