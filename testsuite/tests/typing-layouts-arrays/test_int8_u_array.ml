@@ -86,7 +86,6 @@ module Int8_u_array_boxed : Test_gen_u_array.S with type t = int8# array = Test_
 end)
 module _ = Test_gen_u_array.Test (Int8_u_array_boxed)
 
-
 (* Extra tests for array expressions and patterns *)
 module A = Int8_u_array_boxed
 module I = Int8_u_array_boxed.I
@@ -127,7 +126,7 @@ let () =
   (* static blocks *)
   let r = [|
 #0s;#1s;#2s;#3s;#4s;#5s;#6s;#7s;#8s;#9s;#10s;#11s;#12s;#13s;#14s;#15s;#16s;#17s;
-#18s;#19s;#20s;#21s;#22s;#23s;#24s;#25s;#26s;#27s;#28s;#29s;#30s;#31s;#8s;#33s;#34s;#35s;
+#18s;#19s;#20s;#21s;#22s;#23s;#24s;#25s;#26s;#27s;#28s;#29s;#30s;#31s;#32s;#33s;#34s;#35s;
 #36s;#37s;#38s;#39s;#40s;#41s;#42s;#43s;#44s;#45s;#46s;#47s;#48s;#49s;#50s;#51s;#52s;#53s;
 #54s;#55s;#56s;#57s;#58s;#59s;#60s;#61s;#62s;#63s;#64s;#65s;#66s;#67s;#68s;#69s;#70s;#71s;
 #72s;#73s;#74s;#75s;#76s;#77s;#78s;#79s;#80s;#81s;#82s;#83s;#84s;#85s;#86s;#87s;#88s;#89s;
@@ -136,7 +135,7 @@ let () =
   check_i r;
   let r = [|
 #0s;#1s;#2s;#3s;#4s;#5s;#6s;#7s;#8s;#9s;#10s;#11s;#12s;#13s;#14s;#15s;#16s;#17s;
-#18s;#19s;#20s;#21s;#22s;#23s;#24s;#25s;#26s;#27s;#28s;#29s;#30s;#31s;#8s;#33s;#34s;#35s;
+#18s;#19s;#20s;#21s;#22s;#23s;#24s;#25s;#26s;#27s;#28s;#29s;#30s;#31s;#32s;#33s;#34s;#35s;
 #36s;#37s;#38s;#39s;#40s;#41s;#42s;#43s;#44s;#45s;#46s;#47s;#48s;#49s;#50s;#51s;#52s;#53s;
 #54s;#55s;#56s;#57s;#58s;#59s;#60s;#61s;#62s;#63s;#64s;#65s;#66s;#67s;#68s;#69s;#70s;#71s;
 #72s;#73s;#74s;#75s;#76s;#77s;#78s;#79s;#80s;#81s;#82s;#83s;#84s;#85s;#86s;#87s;#88s;#89s;
@@ -158,7 +157,7 @@ let () =
   let r = [|
     f #0s;f #1s;f #2s;f #3s;f #4s;f #5s;f #6s;f #7s;f #8s;f #9s;f #10s;f #11s;f #12s;f #13s;f #14s;
     f #15s;f #16s;f #17s;f #18s;f #19s;f #20s;f #21s;f #22s;f #23s;f #24s;f #25s;f #26s;f #27s;f #28s;f #29s;
-    f #30s;f #31s;f #8s;f #33s;f #34s;f #35s;f #36s;f #37s;f #38s;f #39s;f #40s;f #41s;f #42s;f #43s;f #44s;
+    f #30s;f #31s;f #32s;f #33s;f #34s;f #35s;f #36s;f #37s;f #38s;f #39s;f #40s;f #41s;f #42s;f #43s;f #44s;
     f #45s;f #46s;f #47s;f #48s;f #49s;f #50s;f #51s;f #52s;f #53s;f #54s;f #55s;f #56s;f #57s;f #58s;f #59s;
     f #60s;f #61s;f #62s;f #63s;f #64s;f #65s;f #66s;f #67s;f #68s;f #69s;f #70s;f #71s;f #72s;f #73s;f #74s;
     f #75s;f #76s;f #77s;f #78s;f #79s;f #80s;f #81s;f #82s;f #83s;f #84s;f #85s;f #86s;f #87s;f #88s;f #89s;
@@ -168,7 +167,7 @@ let () =
   let r = [|
     f #0s;f #1s;f #2s;f #3s;f #4s;f #5s;f #6s;f #7s;f #8s;f #9s;f #10s;f #11s;f #12s;f #13s;f #14s;
     f #15s;f #16s;f #17s;f #18s;f #19s;f #20s;f #21s;f #22s;f #23s;f #24s;f #25s;f #26s;f #27s;f #28s;f #29s;
-    f #30s;f #31s;f #8s;f #33s;f #34s;f #35s;f #36s;f #37s;f #38s;f #39s;f #40s;f #41s;f #42s;f #43s;f #44s;
+    f #30s;f #31s;f #32s;f #33s;f #34s;f #35s;f #36s;f #37s;f #38s;f #39s;f #40s;f #41s;f #42s;f #43s;f #44s;
     f #45s;f #46s;f #47s;f #48s;f #49s;f #50s;f #51s;f #52s;f #53s;f #54s;f #55s;f #56s;f #57s;f #58s;f #59s;
     f #60s;f #61s;f #62s;f #63s;f #64s;f #65s;f #66s;f #67s;f #68s;f #69s;f #70s;f #71s;f #72s;f #73s;f #74s;
     f #75s;f #76s;f #77s;f #78s;f #79s;f #80s;f #81s;f #82s;f #83s;f #84s;f #85s;f #86s;f #87s;f #88s;f #89s;
