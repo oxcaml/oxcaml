@@ -536,3 +536,31 @@ Error: The kind of type "(int -> int) list" is value mod immutable non_float
            immutable_data
          because of the definition of this_fails at line 1, characters 0-52.
 |}]
+
+
+(* ok *)
+type 'a t1 : value mod portable =
+  | A
+  | B of 'a t1
+[%%expect{|
+type 'a t1 = A | B of 'a t1
+|}]
+
+(* ok *)
+type 'a t2 : value mod portable =
+  | A
+  | B of t2__unit
+
+and t2__unit = unit t2
+[%%expect{|
+type 'a t2 = A | B of t2__unit
+and t2__unit = unit t2
+|}]
+
+(* out of fuel *)
+type 'a t3 : value mod portable =
+  | A
+  | B of unit t3
+[%%expect{|
+type 'a t3 = A | B of unit t3
+|}]
