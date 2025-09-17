@@ -4,7 +4,7 @@ module Make
 
       val compare : t -> t -> int
 
-      val to_string : t -> string
+      val unique_id : t -> int
     end) (Constr : sig
       type t
 
@@ -27,7 +27,7 @@ struct
   module RigidName = struct
     type t =
       | Atom of atom
-      | Ty of ty
+      | Param of int
 
     let compare (a : t) (b : t) : int =
       match a, b with
@@ -35,14 +35,14 @@ struct
         match Constr.compare a1.constr a2.constr with
         | 0 -> Int.compare a1.arg_index a2.arg_index
         | c -> c)
-      | Ty x, Ty y -> Ty.compare x y
-      | Atom _, Ty _ -> -1
-      | Ty _, Atom _ -> 1
+      | Param x, Param y -> Int.compare x y
+      | Atom _, Param _ -> -1
+      | Param _, Atom _ -> 1
 
     let to_string (a : t) : string =
       match a with
       | Atom a -> Printf.sprintf "%s.%d" (Constr.to_string a.constr) a.arg_index
-      | Ty v -> Printf.sprintf "<%s>" (Ty.to_string v)
+      | Param i -> Printf.sprintf "param%d" i
 
     let atomic constr arg_index = Atom { constr; arg_index }
   end
@@ -59,7 +59,7 @@ struct
 
     let equal a b = Ty.compare a b = 0
 
-    let hash t = Hashtbl.hash (Ty.to_string t)
+    let hash t = Hashtbl.hash (Ty.unique_id t)
   end)
 
   module ConstrTbl = Hashtbl.Make (struct
@@ -112,9 +112,12 @@ struct
     let join ks = List.fold_left LSolver.join LSolver.bot ks in
     let modality l k = LSolver.meet (LSolver.const l) k in
     let meet a b = LSolver.meet a b in
-    let rigid t = LSolver.var (LSolver.rigid (RigidName.Ty t)) in
     (* Create hash table mapping ty to kind for memoization *)
     let ty_to_kind = TyTbl.create 0 in
+    let rigid t =
+      let param = Ty.unique_id t in
+      LSolver.var (LSolver.rigid (RigidName.Param param))
+    in
     (* And hash table mapping constructor to coefficients *)
     let constr_to_coeffs = ConstrTbl.create 0 in
     (* Define kind_of and constr ops *)
@@ -145,9 +148,10 @@ struct
           ConstrTbl.add constr_to_coeffs c
             (LSolver.var base, List.map LSolver.var coeffs);
           (* Recursively compute the kind of the body *)
-          let rigid_vars =
-            List.map (fun ty -> LSolver.rigid (RigidName.Ty ty)) args
-          in
+        let rigid_vars =
+          List.map
+            (fun ty -> LSolver.rigid (RigidName.Param (Ty.unique_id ty))) args
+        in
           List.iter2
             (fun ty var -> TyTbl.add ty_to_kind ty (LSolver.var var))
             args rigid_vars;

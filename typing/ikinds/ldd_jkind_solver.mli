@@ -16,7 +16,7 @@ module Make
 
       val compare : t -> t -> int
 
-      val to_string : t -> string
+      val unique_id : t -> int
     end) (Constr : sig
       type t
 
@@ -53,7 +53,7 @@ module Make
   module RigidName : sig
     type t =
       | Atom of atom
-      | Ty of ty
+      | Param of int
 
     val compare : t -> t -> int
 

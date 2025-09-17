@@ -7,8 +7,7 @@ module TyM = struct
   let compare (t1 : t) (t2 : t) =
     Int.compare (Types.get_id t1) (Types.get_id t2)
 
-  (* Avoid depending on Printtyp to prevent module cycles. *)
-  let to_string (t : t) : string = Format.sprintf "ty#%d" (Types.get_id t)
+  let unique_id (t : t) : int = Types.get_id t
 end
 
 module ConstrM = struct
