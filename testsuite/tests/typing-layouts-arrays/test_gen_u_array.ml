@@ -513,7 +513,7 @@ module Test (A : S) : sig end = struct
     r := I.add!r (I.of_int 1);
   in
   A.iter2 f a b;
-  let c = A.make 126 (I.of_int 0) in
+  let c = A.make 456 (I.of_int 0) in
   check_inval (A.iter2 (fun _ _ -> assert false) a) c;
   check_inval (A.iter2 (fun _ _ -> assert false) c) a;
 
@@ -528,8 +528,8 @@ module Test (A : S) : sig end = struct
   A.iter2 f a b;
 
   (* [map2], test result and order of evaluation *)
-  let a = A.init 126 I.of_int in
-  let b = A.init 126 (fun i -> I.(mul (of_int i) (I.of_int 2))) in
+  let a = A.init 456 I.of_int in
+  let b = A.init 456 (fun i -> I.(mul (of_int i) (I.of_int 2))) in
   let r = ref (I.of_int 0) in
   let f x y =
     assert_eq x !r;
@@ -539,12 +539,12 @@ module Test (A : S) : sig end = struct
   in
   let c = A.map2 f a b in
   check_i c;
-  let d = A.make 125 (I.of_int 0) in
+  let d = A.make 455 (I.of_int 0) in
   check_inval (A.map2 (fun _ _ -> assert false) a) d;
   check_inval (A.map2 (fun _ _ -> assert false) d) a;
 
-  let a = A.init 127 I.of_int in
-  let b = A.init 127 (fun i -> I.(mul (of_int i) (I.of_int 2))) in
+  let a = A.init 457 I.of_int in
+  let b = A.init 457 (fun i -> I.(mul (of_int i) (I.of_int 2))) in
   let r = ref (I.of_int 0) in
   let f x y =
     assert_eq x !r;
