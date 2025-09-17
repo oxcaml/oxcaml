@@ -252,30 +252,12 @@ let immutable_unboxed_int_array env res updates int_type ~symbol ~elts ~to_int64
   let num_fields, update_kind, tag =
     match int_type with
     | Int8_u ->
-      let fields = (1 + num_elts) / 8 in
-      let tag =
-        match num_elts mod 4 with
-        | 0 -> Tags.untagged_int8_array_zero_tag
-        | 1 -> Tags.untagged_int8_array_one_tag
-        | 2 -> Tags.untagged_int8_array_two_tag
-        | 3 -> Tags.untagged_int8_array_three_tag
-        | 4 -> Tags.untagged_int8_array_four_tag
-        | 5 -> Tags.untagged_int8_array_five_tag
-        | 6 -> Tags.untagged_int8_array_six_tag
-        | 7 -> Tags.untagged_int8_array_seven_tag
-        | _ -> assert false
-      in
+      let fields = (7 + num_elts) / 8 in
+      let tag = Tags.untagged_int8_array_tag num_elts in
       fields, UK.naked_int32s, tag
     | Int16_u ->
-      let fields = (1 + num_elts) / 4 in
-      let tag =
-        match num_elts mod 4 with
-        | 0 -> Tags.untagged_int16_array_zero_tag
-        | 1 -> Tags.untagged_int16_array_one_tag
-        | 2 -> Tags.untagged_int16_array_two_tag
-        | 3 -> Tags.untagged_int16_array_three_tag
-        | _ -> assert false
-      in
+      let fields = (3 + num_elts) / 4 in
+      let tag = Tags.untagged_int16_array_tag num_elts in
       fields, UK.naked_int32s, tag
     | Int32_u ->
       let fields = (1 + num_elts) / 2 in
