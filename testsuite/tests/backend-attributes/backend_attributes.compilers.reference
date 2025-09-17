@@ -1,0 +1,153 @@
+*** After selection
+
+cfg for 
+camlBackend_attributes__with_irc_0_2_code
+use_regalloc=irc
+layout.length=2
+blocks.length=2
+
+1:
+(id:6) goto 101
+
+predecessors:
+successors: 101
+exn-successors:
+
+101:
+(id:2) x:V/29 := pin:anon:I/0[%rax]
+(id:4) pin:anon:I/0[%rax] := x:V/29
+(id:8) reload retaddr
+(id:5) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After cfg_prologue
+
+cfg for 
+camlBackend_attributes__with_irc_0_2_code
+use_regalloc=irc
+layout.length=2
+blocks.length=2
+
+1:
+(id:6) goto 101
+
+predecessors:
+successors: 101
+exn-successors:
+
+101:
+(id:2) x:V/29[%rax] := pin:anon:I/0[%rax]
+(id:4) pin:anon:I/0[%rax] := x:V/29[%rax]
+(id:8) reload retaddr
+(id:5) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After selection
+
+cfg for 
+camlBackend_attributes__with_irc_and_param_1_3_code
+use_regalloc=irc
+regalloc_params=IRC_SPILLING_HEURISTICS=flat
+layout.length=2
+blocks.length=2
+
+1:
+(id:6) goto 104
+
+predecessors:
+successors: 104
+exn-successors:
+
+104:
+(id:2) x:V/29 := pin:anon:I/0[%rax]
+(id:4) pin:anon:I/0[%rax] := x:V/29
+(id:8) reload retaddr
+(id:5) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After cfg_prologue
+
+cfg for 
+camlBackend_attributes__with_irc_and_param_1_3_code
+use_regalloc=irc
+regalloc_params=IRC_SPILLING_HEURISTICS=flat
+layout.length=2
+blocks.length=2
+
+1:
+(id:6) goto 104
+
+predecessors:
+successors: 104
+exn-successors:
+
+104:
+(id:2) x:V/29[%rax] := pin:anon:I/0[%rax]
+(id:4) pin:anon:I/0[%rax] := x:V/29[%rax]
+(id:8) reload retaddr
+(id:5) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After selection
+
+cfg for 
+camlBackend_attributes__entry
+layout.length=2
+blocks.length=2
+
+1:
+(id:17) goto 110
+
+predecessors:
+successors: 110
+exn-successors:
+
+110:
+(id:5) anon:I/30 := "camlBackend_attributes"
+(id:6) anon:I/31 := anon:I/30
+(id:7) *ret*:V/29 := anon:I/31
+(id:11) anon:I/32 := 1
+(id:12) pin:anon:I/0[%rax] := anon:I/32
+(id:19) reload retaddr
+(id:13) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After cfg_prologue
+
+cfg for 
+camlBackend_attributes__entry
+layout.length=2
+blocks.length=2
+
+1:
+(id:17) goto 110
+
+predecessors:
+successors: 110
+exn-successors:
+
+110:
+(id:11) anon:I/32[%rax] := 1
+(id:12) pin:anon:I/0[%rax] := anon:I/32[%rax]
+(id:19) reload retaddr
+(id:13) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
