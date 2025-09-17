@@ -19,7 +19,7 @@ module type LATTICE = sig
 
   val hash : t -> int
 
-  val find_non_bot_axis : t -> int option
+  val non_bot_axes : t -> int list
 end
 
 module type ORDERED = sig
@@ -535,13 +535,27 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     let b = force b in
     node_id (join a b) = node_id b
 
-  let rec find_non_bot_axis (n : node) =
-    match n with
-    | Leaf { c; _ } -> C.find_non_bot_axis c
-    | Node n -> (
-      match find_non_bot_axis n.lo with
-      | Some i -> Some i
-      | None -> find_non_bot_axis n.hi)
+  let memo_round_up' = NodeTbl.create ()
+
+  let rec round_up' (n : node) =
+    match NodeTbl.find_opt memo_round_up' n with
+    | Some c -> c
+    | None ->
+        let res =
+          match n with
+          | Leaf { c; _ } -> c
+          | Node node ->
+            let lo' = round_up' node.lo in
+            let hi' = round_up' node.hi in
+            C.join lo' hi'
+        in
+        NodeTbl.add memo_round_up' n res;
+        res
+
+  let round_up (n : node) =
+    solve_pending ();
+    let n = force n in
+    round_up' n
 
   (* --------- polynomial-style pretty printer --------- *)
   (* Prints using the same conventions as lattice_polynomial.pp:
@@ -620,33 +634,14 @@ module Make (C : LATTICE) (V : ORDERED) = struct
       |> String.concat " ⊔ "
 
   let leq_with_reason (a : node) (b : node) =
-    (* Print the two nodes for debugging. *)
     solve_pending ();
     let a = force a in
     let b = force b in
-    (* Format.eprintf "[ldd] leq_with_reason %s@ %s@" (pp a) (pp b); *)
-    (* if leq a b then None *)
-    (* else *)
-    let diff = sub_subsets a b in
-    find_non_bot_axis diff
-
-  let memo_round_up' = NodeTbl.create ()
-
-  let rec round_up' (n : node) =
-    match NodeTbl.find_opt memo_round_up' n with
-    | Some c -> c
-    | None -> (
-      match n with
-      | Leaf { c; _ } -> c
-      | Node n ->
-        let lo' = round_up' n.lo in
-        let hi' = round_up' n.hi in
-        C.join lo' hi')
-
-  let round_up (n : node) =
-    solve_pending ();
-    let n = force n in
-    round_up' n
+    let diff = sub_subsets a b |> force in
+    let witness = round_up' diff in
+    match C.non_bot_axes witness with
+    | [] -> None
+    | axes -> Some axes
 
   let map_rigid (f : V.t -> node) (n : node) : node =
     let memo = NodeTbl.create () in

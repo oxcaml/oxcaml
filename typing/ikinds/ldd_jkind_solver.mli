@@ -85,7 +85,7 @@ module Make
 
   val leq : solver -> ckind -> ckind -> bool
 
-  val leq_with_reason : solver -> ckind -> ckind -> int option
+  val leq_with_reason : solver -> ckind -> ckind -> int list option
 
   val round_up : solver -> ckind -> lat
 

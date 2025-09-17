@@ -44,7 +44,7 @@ module Make (_ : SHAPE) : sig
 
   val decode : t -> int array
 
-  val find_non_bot_axis : t -> int option
+val non_bot_axes : t -> int list
 
   (* Pretty-print; optionally name axes *)
   val pp : t -> string

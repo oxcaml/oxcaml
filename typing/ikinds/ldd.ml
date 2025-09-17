@@ -19,7 +19,7 @@ module type LATTICE = sig
 
   val hash : t -> int
 
-  val find_non_bot_axis : t -> int option
+  val non_bot_axes : t -> int list
 end
 
 module type ORDERED = sig

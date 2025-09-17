@@ -22,7 +22,7 @@ module type LATTICE = sig
 
   val hash : t -> int
 
-  val find_non_bot_axis : t -> int option
+  val non_bot_axes : t -> int list
 end
 
 module type ORDERED = sig
@@ -331,13 +331,18 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     let b = force b in
     is_bot_node (sub_subsets a b)
 
-  let rec find_non_bot_axis (n : node) =
+  let rec round_up' (n : node) =
     match n with
-    | Leaf c -> C.find_non_bot_axis c
-    | Node n -> (
-      match find_non_bot_axis n.lo with
-      | Some i -> Some i
-      | None -> find_non_bot_axis n.hi)
+    | Leaf c -> c
+    | Node n ->
+      let lo' = round_up' n.lo in
+      let hi' = round_up' n.hi in
+      C.join lo' hi'
+
+  let round_up (n : node) =
+    solve_pending ();
+    let n = force n in
+    round_up' n
 
   (* --------- polynomial-style pretty printer --------- *)
   let to_named_terms_with (pp_unsolved : var -> string) (w : node) :
@@ -411,21 +416,11 @@ module Make (C : LATTICE) (V : ORDERED) = struct
     solve_pending ();
     let a = force a in
     let b = force b in
-    let diff = sub_subsets a b in
-    find_non_bot_axis diff
-
-  let rec round_up' (n : node) =
-    match n with
-      | Leaf c -> c
-    | Node n ->
-      let lo' = round_up' n.lo in
-      let hi' = round_up' n.hi in
-      C.join lo' hi'
-
-  let round_up (n : node) =
-    solve_pending ();
-    let n = force n in
-    round_up' n
+    let diff = sub_subsets a b |> force in
+    let witness = round_up' diff in
+    match C.non_bot_axes witness with
+    | [] -> None
+    | axes -> Some axes
 
   let map_rigid (f : V.t -> node) (n : node) : node =
     let rec aux (n : node) : node =

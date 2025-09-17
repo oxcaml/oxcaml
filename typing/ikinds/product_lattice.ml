@@ -48,11 +48,14 @@ module Make (S : SHAPE) = struct
 
   let decode (v : t) : int array = Array.copy v
 
-  let find_non_bot_axis (v : t) : int option =
-    let rec loop i =
-      if i >= num_axes then None else if v.(i) > 0 then Some i else loop (i + 1)
+  let non_bot_axes (v : t) : int list =
+    let rec loop i acc =
+      if i >= num_axes then List.rev acc
+      else
+        let acc' = if v.(i) > 0 then i :: acc else acc in
+        loop (i + 1) acc'
     in
-    loop 0
+    loop 0 []
 
   let pp (v : t) : string =
     let parts =

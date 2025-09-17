@@ -184,6 +184,7 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
+         yielding: mod unyielding with 'a ≰ mod unyielding
 |}]
 
 module M : sig

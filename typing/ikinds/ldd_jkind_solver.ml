@@ -254,7 +254,8 @@ struct
     let k1' = k1 (solver.ops ~mode:Left) in
     LSolver.leq k1' k2'
 
-  let leq_with_reason (solver : solver) (k1 : ckind) (k2 : ckind) : int option =
+  let leq_with_reason (solver : solver) (k1 : ckind) (k2 : ckind) :
+      int list option =
     let k2' = k2 (solver.ops ~mode:Right) in
     let k1' = k1 (solver.ops ~mode:Left) in
     LSolver.leq_with_reason k1' k2'

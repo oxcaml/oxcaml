@@ -68,12 +68,14 @@ let encode ~levels : t =
 let decode (v:t) : int array =
   Array.init num_axes (fun i -> get_axis v ~axis:i)
 
-let find_non_bot_axis (v:t) : int option =
-  let rec loop i =
-    if i = num_axes then None
-    else if (v land axis_mask.(i)) <> 0 then Some i
-    else loop (i + 1)
-  in loop 0
+let non_bot_axes (v : t) : int list =
+  let rec loop i acc =
+    if i = num_axes then List.rev acc
+    else
+      let acc' = if (v land axis_mask.(i)) <> 0 then i :: acc else acc in
+      loop (i + 1) acc'
+  in
+  loop 0 []
 
 let pp (v:t) : string =
   let lv = decode v |> Array.to_list |> List.map string_of_int in

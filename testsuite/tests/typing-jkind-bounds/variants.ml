@@ -166,6 +166,9 @@ Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod read_write ≰ mod immutable
 |}]
 
 type t : immutable_data = Foo | Bar of int ref
@@ -330,6 +333,7 @@ Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended with 'a
+         visibility: mod read_write ≰ mod immutable with 'a
 |}]
 
 type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }

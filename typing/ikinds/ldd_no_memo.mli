@@ -17,9 +17,7 @@ module type LATTICE = sig
 
   val hash : t -> int
 
-  (* If non-bottom, return the index of some non-bottom axis,
-     for diagnostics. *)
-  val find_non_bot_axis : t -> int option
+  val non_bot_axes : t -> int list
 end
 
 module type ORDERED = sig
@@ -69,8 +67,8 @@ module Make (C : LATTICE) (V : ORDERED) : sig
 
   val leq : node -> node -> bool
 
-  (* If [a ⊑ b] fails, return a witness axis index where they differ. *)
-  val leq_with_reason : node -> node -> int option
+  (* If [a ⊑ b] fails, return witness axis indices where they differ. *)
+  val leq_with_reason : node -> node -> int list option
 
   val round_up : node -> C.t
 

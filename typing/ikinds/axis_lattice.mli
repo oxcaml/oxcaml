@@ -10,7 +10,7 @@ val co_sub : t -> t -> t
 val equal : t -> t -> bool
 val hash : t -> int
 val to_string : t -> string
-val find_non_bot_axis : t -> int option
+val non_bot_axes : t -> int list
 
 (* Build a mask from a set of relevant axes. *)
 val of_axis_set : Jkind_axis.Axis_set.t -> t
@@ -36,4 +36,3 @@ val object_legacy : t
 
 (* Map from internal axis number (used in diagnostics) to an axis descriptor. *)
 val axis_number_to_axis_packed : int -> Jkind_axis.Axis.packed
-

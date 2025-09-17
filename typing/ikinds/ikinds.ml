@@ -464,12 +464,12 @@ let sub_jkind_l ?allow_any_crossing ?origin
       in
       match ik_leq with
       | None -> Ok ()
-      | Some violating_axis ->
-        let violating_axis_name =
-          Axis_lattice_bits.axis_number_to_axis_packed violating_axis
+      | Some violating_axes ->
+        let violating_axis_names =
+          List.map Axis_lattice_bits.axis_number_to_axis_packed
+            violating_axes
         in
         (* Also show the normalized ikind polys for both sides. *)
-        let _ = violating_axis_name in
         ignore
           (log ~pp:JK.pp "sub poly" (fun () ->
                JK.normalize solver (ckind_of_jkind_l sub)));
@@ -478,13 +478,18 @@ let sub_jkind_l ?allow_any_crossing ?origin
                JK.normalize solver (ckind_of_jkind_l super)));
         (* Do not try to adjust allowances; Violation.Not_a_subjkind
            accepts an r-jkind. *)
+        let axis_reasons =
+          List.map
+            (fun axis_name ->
+              Jkind.Sub_failure_reason.Axis_disagreement axis_name)
+            violating_axis_names
+        in
         Error
           (Jkind.Violation.of_ ~context
              (Jkind.Violation.Not_a_subjkind
                 ( sub,
                   super,
-                  [ Jkind.Sub_failure_reason.Axis_disagreement
-                      violating_axis_name ] )))
+                  axis_reasons )))
 
 let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) (sub : Types.jkind_l)
@@ -498,7 +503,7 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
       JK.leq_with_reason solver (ckind_of_jkind_l sub) (ckind_of_jkind_r super)
     with
     | None -> true
-    | Some _violating_axis -> false
+    | Some _ -> false
 
 (* CR jujacobs: this is really slow when enabled. Fix performance. *)
 let crossing_of_jkind ~(context : Jkind.jkind_context)

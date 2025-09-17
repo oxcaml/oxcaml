@@ -50,6 +50,10 @@ Error: The kind of type "t" is immutable_data with 'a @@ portable
 
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
+         contention: mod contended with 'a ≰ mod contended
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
 module M : sig
@@ -100,6 +104,9 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          portability: mod portable with 'a ≰ mod portable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
 module M : sig
@@ -349,6 +356,7 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
+         yielding: mod unyielding with 'a ≰ mod unyielding
 |}]
 
 module M : sig
@@ -429,4 +437,5 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended with 'a
+         visibility: mod read_write ≰ mod immutable with 'a
 |}]
