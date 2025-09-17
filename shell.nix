@@ -10,6 +10,7 @@ drv.overrideAttrs (new: old: {
   nativeBuildInputs = ( old.nativeBuildInputs or [] ) ++ [
     git
     less
+    drv.ocamlPackages.dot-merlin-reader
     drv.ocamlPackages.merlin
     drv.ocamlPackages.ocaml-lsp
     drv.ocamlPackages.ocamlformat_0_24_1

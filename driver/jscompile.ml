@@ -28,6 +28,14 @@ let interface ~source_file ~output_prefix =
     ~hook_typed_tree:(fun _ -> ())
     info
 
+let run_jsoo_exn ~args =
+  let prog = Filename.concat Config.bindir "js_of_ocaml" in
+  let cmdline = Filename.quote_command prog args in
+  match Ccomp.command cmdline with
+  | 0 -> ()
+  | _ -> raise (Sys_error cmdline)
+
+
 (** Js_of_ocaml IR compilation backend for .ml files. *)
 
 let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
@@ -91,14 +99,17 @@ let emit_jsir i
           exported_compilation_unit = i.module_name;
         }
       in
-      output_value oc cmj_body)
+      output_value oc cmj_body);
+  run_jsoo_exn
+    ~args:["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
+           "-o"; (Unit_info.Artifact.filename(Unit_info.cmj i.target)) ^".js"]
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
-    ~as_arg_for =
+      ~as_arg_for =
   let argument_coercion =
     match argument_interface with
     | Some { ai_coercion_from_primary; ai_signature = _ } ->
-        Some ai_coercion_from_primary
+      Some ai_coercion_from_primary
     | None -> None
   in
   let raw_lambda =
@@ -113,8 +124,15 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     ~main_module_block_format ~arg_descr;
   jsir
 
+(* Emit javascript directly from .cmj *)
+let emit i =
+  run_jsoo_exn
+    ~args:["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
+           "-o"; (Unit_info.Artifact.filename (Unit_info.cmj i.target)) ^ ".js" ]
+
 type starting_point =
   | Parsing
+  | Emit
   | Instantiation of {
       runtime_args : Translmod.runtime_arg list;
       main_module_block_size : int;
@@ -124,6 +142,7 @@ type starting_point =
 let starting_point_of_compiler_pass start_from =
   match (start_from : Clflags.Compiler_pass.t) with
   | Parsing -> Parsing
+  | Emit -> Emit
   | _ ->
       Misc.fatal_errorf "Cannot start from %s"
         (Clflags.Compiler_pass.to_string start_from)
@@ -146,9 +165,11 @@ let implementation_aux ~start_from ~source_file ~output_prefix
         emit_jsir info jsir
       in
       Compile_common.implementation
-        ~hook_parse_tree:(fun _ -> ())
-        ~hook_typed_tree:(fun _ -> ())
-        info ~backend
+      ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
+      ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
+        Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
+      info ~backend
+  | Emit -> emit info
   | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->

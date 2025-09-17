@@ -352,6 +352,7 @@
   (:include %{project_root}/ocamlopt_flags.sexp))
  (libraries ocamlcommon flambda2)
  (modules
+   jslink
    jsmaindriver
    jscompile
    jslibrarian))
@@ -959,7 +960,6 @@
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa))
 
 
-
 ; generate the dune rules for compiling stdlib with ocamlj/jsoo.
 (subdir stdlib-js
   (dynamic_include ../duneconf/stdlib-js.inc)
@@ -968,6 +968,7 @@
     (glob_files *.cmj)
     (glob_files *.cmjx)
     (glob_files *.cmja)
+    (glob_files *.cmjs)
     (glob_files *.js))
   (section lib)
   (package ocaml_runtime_stdlib)))
