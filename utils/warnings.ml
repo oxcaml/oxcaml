@@ -145,6 +145,7 @@ type t =
       overriden_by : string;
     } (* 213 *)
   | Atomic_float_record_boxed               (* 214 *)
+  | Implied_attribute of { implying: string; implied : string} (* 215 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -237,6 +238,7 @@ let number = function
   | Mod_by_top _ -> 211
   | Modal_axis_specified_twice _ -> 213
   | Atomic_float_record_boxed -> 214
+  | Implied_attribute _ -> 215
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -627,6 +629,10 @@ let descriptions = [
     names = ["atomic-float-record-boxed"];
     description = "Record contains atomic float fields, preventing the flat\n\
                    float record optimization.";
+    since = since 4 14 };
+  { number = 215;
+    names = ["implied-attribute"];
+    description = "An attribute is unused because it is implied by another.";
     since = since 4 14 };
 ]
 
@@ -1309,6 +1315,8 @@ let message = function
        float fields, which prevents the float record optimization. The\n\
        fields of this record will be boxed instead of being\n\
        represented as a flat float array."
+  | Implied_attribute { implying; implied } ->
+    Printf.sprintf "attribute [@%s] is unused because it is implied by [@%s]" implied implying
 ;;
 
 let nerrors = ref 0

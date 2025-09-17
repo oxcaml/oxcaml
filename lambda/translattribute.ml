@@ -428,22 +428,33 @@ let add_cold_attribute expr loc attributes =
       | Never_inline
       | Available_inline
       | Unroll _ ->
-        Location.prerr_warning loc (Warnings.Duplicated_attribute "cold/inline");
+        Location.prerr_warning
+          loc
+          (Warnings.Implied_attribute { implying = "cold"; implied = "inline" });
       | Default_inline -> ()
       end;
       begin match attr.specialise with
       | Always_specialise
       | Never_specialise ->
-        Location.prerr_warning loc (Warnings.Duplicated_attribute "cold/specialise");
+        Location.prerr_warning
+          loc
+          (Warnings.Implied_attribute { implying = "cold"; implied = "specialise" });
       | Default_specialise -> ()
       end;
       begin match attr.local with
       | Always_local
       | Never_local ->
-        Location.prerr_warning loc (Warnings.Duplicated_attribute "cold/local");
+        Location.prerr_warning
+          loc
+          (Warnings.Implied_attribute { implying = "cold"; implied = "local" });
       | Default_local -> ()
       end;
-      let attr = { attr with cold = true; inline = Never_inline; specialise = Never_specialise; local = Never_local; } in
+      let attr =
+        { attr with cold = true;
+          inline = Never_inline;
+          specialise = Never_specialise;
+          local = Never_local; }
+      in
       lfunction_with_attr ~attr funct
     end else
       expr
