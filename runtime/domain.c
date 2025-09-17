@@ -694,7 +694,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     goto fail_shared_heap;
   }
 
-  if (caml_init_major_gc(domain_state) < 0) {
+  if (!caml_alloc_major_gc(domain_state)) {
     goto fail_major_gc;
   }
 
@@ -715,8 +715,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->extern_state = NULL;
   domain_state->intern_state = NULL;
-
-  domain_state->current_stack = caml_alloc_main_stack(stack_wsize);
+  domain_state->current_stack =
+      caml_alloc_main_stack(stack_wsize);
   if(domain_state->current_stack == NULL) {
     goto fail_main_stack;
   }
@@ -771,6 +771,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   }
 
   domain_state->raising_async_exn = 0;
+
+  caml_enroll_major_gc(domain_state);
 
 #ifndef NATIVE_CODE
   domain_state->external_raise = NULL;
@@ -2150,11 +2152,9 @@ static void domain_terminate (void)
      because it may be reused */
   caml_remove_generational_global_root(&domain_state->dls_root);
   caml_remove_generational_global_root(&domain_state->backtrace_last_exn);
-  caml_stat_free(domain_state->final_info);
-  caml_stat_free(domain_state->ephe_info);
   caml_free_intern_state();
   caml_free_extern_state();
-  caml_teardown_major_gc();
+  caml_teardown_major_gc(); /* Includes freeing ephe_info, final_info */
 
   caml_dynamic_delete_thread(domain_state->dynamic_bindings);
   domain_state->dynamic_bindings = NULL;
