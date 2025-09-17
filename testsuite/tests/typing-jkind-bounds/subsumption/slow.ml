@@ -15,8 +15,8 @@ module T0 = struct
   and 'codegen derived = { spec : unit value }
   and 'codegen field = { inner : unit leaf }
   and 'codegen leaf = unit value
-  and 'codegen value = 
-    unit record 
+  and 'codegen value =
+    unit record
     * unit variant
     * unit optional
     * unit indexable
@@ -27,13 +27,14 @@ end
 
 type q
 type r
-type t : immutable_data with r = q T0.value 
-(* The with r is just to make sure ikinds are triggered. 
+type t : immutable_data with r = q T0.value
+(* The with r is just to make sure ikinds are triggered.
    Plain mod bounds still go through the old code path. *)
 
-let _ : _ = 
-  let _ : _ T0.value ref = ref (failwith "") in
-  ()
+let _ : _ =
+  if false then
+    let _ : _ T0.value ref = ref (failwith "") in
+    ()
 [%%expect{|
 module T0 :
   sig
@@ -55,5 +56,5 @@ module T0 :
 type q
 type r
 type t = q T0.value
-Exception: Failure "".
+- : unit = ()
 |}]
