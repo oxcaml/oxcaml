@@ -265,6 +265,8 @@ module rec Type : sig
 
   val resolve : Graph.t -> t -> resolved
 
+  val is_defined : t -> bool
+
 end = struct
 
   open Desc.Type
@@ -351,12 +353,23 @@ end = struct
       end
 
   let normalize root t =
-    match t with
-    | Definition { sort = Sort.Defined } -> normalize_loop root t
-    | Definition { sort = Sort.Declared _ } | Declaration _ ->
-        match Graph.find_type root (raw_path t) with
-        | exception Not_found -> normalize_loop root t
-        | t -> normalize_loop root t
+    (* If [t] is a declaration but it's defined in [root], then we need to look it up in
+       [root] before continuing normalization. *)
+    let need_to_check_root =
+      match t with
+      | Definition { sort = Sort.Defined } -> false
+      | Definition { sort = Sort.Declared ids } ->
+        Ident_set.exists (Graph.is_type_defined root) ids
+      | Declaration { id; _} -> Graph.is_type_defined root id
+    in
+    let t =
+      if need_to_check_root
+      then
+        try Graph.find_type root (raw_path t)
+        with Not_found -> t
+      else t
+    in
+    normalize_loop root t
 
   let origin root t =
     raw_origin (normalize root t)
@@ -388,6 +401,11 @@ end = struct
       end
     | Definition { definition = Alias _ } -> assert false
 
+  let is_defined t =
+    match t with
+    | Declaration _ -> false
+    | Definition _ -> true
+
 end
 
 and Class_type : sig
@@ -416,6 +434,8 @@ and Class_type : sig
   type resolved = int list option * t
 
   val resolve : Graph.t -> t -> resolved
+
+  val is_defined : t -> bool
 
 end = struct
 
@@ -501,12 +521,23 @@ end = struct
       end
 
   let normalize root t =
-    match t with
-    | Definition { sort = Sort.Defined } -> normalize_loop root t
-    | Definition { sort = Sort.Declared _ } | Declaration _ ->
-        match Graph.find_class_type root (raw_path t) with
-        | exception Not_found -> normalize_loop root t
-        | t -> normalize_loop root t
+    (* If [t] is a declaration but it's defined in [root], then we need to look it up in
+       [root] before continuing normalization. *)
+    let need_to_check_root =
+      match t with
+      | Definition { sort = Sort.Defined } -> false
+      | Definition { sort = Sort.Declared ids } ->
+        Ident_set.exists (Graph.is_class_type_defined root) ids
+      | Declaration { id; _} -> Graph.is_class_type_defined root id
+    in
+    let t =
+      if need_to_check_root
+      then
+        try Graph.find_class_type root (raw_path t)
+        with Not_found -> t
+      else t
+    in
+    normalize_loop root t
 
   let origin root t =
     raw_origin (normalize root t)
@@ -534,6 +565,11 @@ end = struct
       end
     | Definition { definition = Alias _ } -> assert false
 
+  let is_defined t =
+    match t with
+    | Declaration _ -> false
+    | Definition _ -> true
+
 end
 
 and Module_type : sig
@@ -558,6 +594,8 @@ and Module_type : sig
   val hidden : t -> bool
 
   val sort : Graph.t -> t -> Sort.t
+
+  val is_defined : t -> bool
 
 end = struct
 
@@ -645,12 +683,23 @@ end = struct
       end
 
   let normalize root t =
-    match t with
-    | Definition { sort = Sort.Defined } -> normalize_loop root t
-    | Definition { sort = Sort.Declared _ } | Declaration _ ->
-        match Graph.find_module_type root (raw_path t) with
-        | exception Not_found -> normalize_loop root t
-        | t -> normalize_loop root t
+    (* If [t] is a declaration but it's defined in [root], then we need to look it up in
+       [root] before continuing normalization. *)
+    let need_to_check_root =
+      match t with
+      | Definition { sort = Sort.Defined } -> false
+      | Definition { sort = Sort.Declared ids } ->
+        Ident_set.exists (Graph.is_module_type_defined root) ids
+      | Declaration { id; _} -> Graph.is_module_type_defined root id
+    in
+    let t =
+      if need_to_check_root
+      then
+        try Graph.find_module_type root (raw_path t)
+        with Not_found -> t
+      else t
+    in
+    normalize_loop root t
 
   let origin root t =
     raw_origin (normalize root t)
@@ -660,6 +709,11 @@ end = struct
 
   let sort root t =
     raw_sort (normalize root t)
+
+  let is_defined t =
+    match t with
+    | Declaration _ -> false
+    | Definition _ -> true
 
 end
 
@@ -716,6 +770,8 @@ and Module : sig
   val raw_path : normalized -> Path.t
 
   val raw_sort : normalized -> Sort.t
+
+  val is_defined : t -> bool
 
 end = struct
 
@@ -854,12 +910,23 @@ end = struct
       end
 
   let normalize root t =
-    match t with
-    | Definition { sort = Sort.Defined } -> normalize_loop root t
-    | Definition { sort = Sort.Declared _ } | Declaration _ ->
-        match Graph.find_module root (raw_path t) with
-        | exception Not_found -> normalize_loop root t
-        | t -> normalize_loop root t
+    (* If [t] is a declaration but it's defined in [root], then we need to look it up in
+       [root] before continuing normalization. *)
+    let need_to_check_root =
+      match t with
+      | Definition { sort = Sort.Defined } -> false
+      | Definition { sort = Sort.Declared ids } ->
+        Ident_set.exists (Graph.is_module_defined root) ids
+      | Declaration { id; _} -> Graph.is_module_defined root id
+    in
+    let t =
+      if need_to_check_root
+      then
+        try Graph.find_module root (raw_path t)
+        with Not_found -> t
+      else t
+    in
+    normalize_loop root t
 
   let unnormalize t = t
 
@@ -1024,6 +1091,11 @@ end = struct
             r.applications <- Path_map.add arg_path md applications;
             md
 
+  let is_defined t =
+    match t with
+    | Declaration _ -> false
+    | Definition _ -> true
+
 end
 
 and Diff : sig
@@ -1136,6 +1208,11 @@ and Graph : sig
   val is_module_type_ident_visible : t -> Ident.t -> bool
 
   val is_module_ident_visible : t -> Ident.t -> bool
+
+  val is_type_defined : t -> Ident.t -> bool
+  val is_class_type_defined : t -> Ident.t -> bool
+  val is_module_type_defined : t -> Ident.t -> bool
+  val is_module_defined : t -> Ident.t -> bool
 
 end = struct
 
@@ -1537,6 +1614,26 @@ end = struct
         failwith
           "Short_paths_graph.Graph.is_module_type_path_visible: \
            invalid module type path"
+
+  let is_type_defined t id =
+    match Ident_map.find id t.types with
+    | exception Not_found -> false
+    | ty -> Type.is_defined ty
+
+  let is_class_type_defined t id =
+    match Ident_map.find id t.class_types with
+    | exception Not_found -> false
+    | cls -> Class_type.is_defined cls
+
+  let is_module_type_defined t id =
+    match Ident_map.find id t.module_types with
+    | exception Not_found -> false
+    | mdty -> Module_type.is_defined mdty
+
+  let is_module_defined t id =
+    match Ident_map.find id t.modules with
+    | exception Not_found -> false
+    | md -> Module.is_defined md
 
 end
 
