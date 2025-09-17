@@ -1947,11 +1947,7 @@ let close_exact_or_unknown_apply acc env
       ~current_region ~current_ghost_region
   in
   let dbg = Debuginfo.from_location loc in
-  let ( acc,
-        call_kind,
-        can_erase_callee,
-        replace_by_invalid,
-        is_my_closure_potentially_used ) =
+  let acc, call_kind, can_erase_callee, replace_by_invalid =
     match kind with
     | Function -> (
       match (callee_approx : Env.value_approximation option) with
@@ -1963,11 +1959,7 @@ let close_exact_or_unknown_apply acc env
           (* CR keryan : We could do better here since we know the arity, but we
              would have to untuple the arguments and we lack information for
              now *)
-          ( acc,
-            Call_kind.indirect_function_call_unknown_arity,
-            false,
-            false,
-            is_my_closure_used )
+          acc, Call_kind.indirect_function_call_unknown_arity, false, false
         else
           let result_arity_from_code = Code_metadata.result_arity meta in
           if
@@ -1993,23 +1985,14 @@ let close_exact_or_unknown_apply acc env
                 Flambda_arity.print result_arity_from_code Flambda_arity.print
                 args_arity Flambda_arity.print return_arity
                 Debuginfo.print_compact dbg Code_metadata.print meta
-            else
-              ( acc,
-                Call_kind.direct_function_call code_id,
-                false,
-                true,
-                is_my_closure_used )
+            else acc, Call_kind.direct_function_call code_id, false, true
           else
             let can_erase_callee =
               Flambda_features.classic_mode () && not is_my_closure_used
             in
-            ( acc,
-              Call_kind.direct_function_call code_id,
-              can_erase_callee,
-              false,
-              is_my_closure_used )
+            acc, Call_kind.direct_function_call code_id, can_erase_callee, false
       | None ->
-        acc, Call_kind.indirect_function_call_unknown_arity, false, false, true
+        acc, Call_kind.indirect_function_call_unknown_arity, false, false
       | Some (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _)
         ->
         assert false (* See [close_apply] *))
@@ -2018,8 +2001,7 @@ let close_exact_or_unknown_apply acc env
       ( acc,
         Call_kind.method_call (Call_kind.Method_kind.from_lambda kind) ~obj,
         false,
-        false,
-        true )
+        false )
   in
   if replace_by_invalid
   then
@@ -2053,35 +2035,34 @@ let close_exact_or_unknown_apply acc env
         ~probe ~position ~yielding
         ~relative_history:(Env.relative_history_from_scoped ~loc env)
     in
-    if Flambda_features.classic_mode ()
+    if not (Flambda_features.classic_mode ())
+    then Expr_with_acc.create_apply acc apply
+    else if Clflags.target_is_jsir ()
     then
-      if Clflags.target_is_jsir () && is_my_closure_potentially_used
-      then
+      let apply =
+        Apply.with_inlined_attribute apply
+          (Inlined_attribute.with_use_info (Apply.inlined apply)
+             Jsir_inlining_disabled)
+      in
+      Expr_with_acc.create_apply acc apply
+    else
+      match Inlining.inlinable env apply callee_approx with
+      | Not_inlinable ->
         let apply =
           Apply.with_inlined_attribute apply
             (Inlined_attribute.with_use_info (Apply.inlined apply)
-               Jsir_inlining_disabled)
+               Unused_because_function_unknown)
         in
         Expr_with_acc.create_apply acc apply
-      else
-        match Inlining.inlinable env apply callee_approx with
-        | Not_inlinable ->
-          let apply =
-            Apply.with_inlined_attribute apply
-              (Inlined_attribute.with_use_info (Apply.inlined apply)
-                 Unused_because_function_unknown)
-          in
-          Expr_with_acc.create_apply acc apply
-        | Inlinable func_desc ->
-          let acc = Acc.mark_continuation_as_untrackable continuation acc in
-          let acc =
-            Acc.mark_continuation_as_untrackable
-              (Exn_continuation.exn_handler apply_exn_continuation)
-              acc
-          in
-          Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
-            ~func_desc
-    else Expr_with_acc.create_apply acc apply
+      | Inlinable func_desc ->
+        let acc = Acc.mark_continuation_as_untrackable continuation acc in
+        let acc =
+          Acc.mark_continuation_as_untrackable
+            (Exn_continuation.exn_handler apply_exn_continuation)
+            acc
+        in
+        Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
+          ~func_desc
 
 let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
   let acc, args = find_simples acc env args in
@@ -3134,6 +3115,15 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let contains_subfunctions = Acc.seen_a_function acc in
   let cost_metrics = Acc.cost_metrics acc in
+  let free_names_of_body = Acc.free_names acc in
+  let slots_are_used () =
+    (not
+       (Name_occurrences.all_function_slots_at_normal_mode free_names_of_body
+       |> Function_slot.Set.is_empty))
+    || not
+         (Name_occurrences.all_value_slots_at_normal_mode free_names_of_body
+         |> Value_slot.Set.is_empty)
+  in
   let inline : Inline_attribute.t =
     (* We make a decision based on [fallback_inlining_heuristic] here to try to
        mimic Closure's behaviour as closely as possible, particularly when there
@@ -3148,9 +3138,10 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       contains_subfunctions
       && Flambda_features.Expert.fallback_inlining_heuristic ()
     then Never_inline
+    else if Clflags.target_is_jsir () && slots_are_used ()
+    then Never_inline
     else Inline_attribute.from_lambda (Function_decl.inline decl)
   in
-  let free_names_of_body = Acc.free_names acc in
   let params_and_body =
     Function_params_and_body.create ~return_continuation
       ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
