@@ -209,9 +209,6 @@ stdenv.mkDerivation rec {
     ocamlPackages.cmdliner
     ocamlPackages.ppxlib
     pkgs.llvm # llvm-objcopy is used for debuginfo
-  ];
-
-  propagatedBuildInputs = [
     ocamlPackages.menhirLib
     ocamlPackages.sedlex
     ocamlPackages.yojson
