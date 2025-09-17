@@ -38,10 +38,10 @@ open! Stdlib
    - {!err_formatter} outputs to {{!Stdlib.stderr}stderr}
 
    Most functions in the {!Format} module come in two variants: a short version
-   that operates on the current thread's standard formatter as obtained using
+   that operates on the current domain's standard formatter as obtained using
    {!get_std_formatter} and the generic version prefixed by [pp_] that takes a
    formatter as its first argument. For the version that operates on the
-   current thread's standard formatter, the call to {!get_std_formatter} is
+   current domain's standard formatter, the call to {!get_std_formatter} is
    delayed until the last argument is received.
 
    More formatters can be created with {!formatter_of_out_channel},
@@ -50,11 +50,11 @@ open! Stdlib
 
    {b Warning}: Since {{!section:formatter}formatters} contain
    mutable state, it is not thread-safe to use the same formatter on multiple
-   threads in parallel without synchronization.
+   domains in parallel without synchronization.
 
-   If multiple threads write to the same output channel using the
+   If multiple domains write to the same output channel using the
    predefined formatters (as obtained by {!get_std_formatter} or
-   {!get_err_formatter}), the output from the threads will be interleaved with
+   {!get_err_formatter}), the output from the domains will be interleaved with
    each other at points where the formatters are flushed, such as with
    {!print_flush}. This synchronization is not performed by formatters obtained
    from {!formatter_of_out_channel} (on the standard out channels or others).
@@ -532,7 +532,7 @@ val safe_set_geometry : max_indent:int -> margin:int -> unit
    and avoids the subtly incorrect
    [pp_set_max_indent ppf max_indent; pp_set_margin ppf margin];
 
-   Outside of this thread, [pp_set_geometry] raises an invalid argument
+   Outside of this domain, [pp_set_geometry] raises an invalid argument
    exception whereas [pp_safe_set_geometry] does nothing.
 
    @since 4.08
@@ -982,37 +982,37 @@ val formatter_of_out_channel : out_channel -> formatter
 *)
 
 val synchronized_formatter_of_out_channel :
-  out_channel -> formatter Domain.Safe.TLS.key
+  out_channel -> formatter Domain.Safe.DLS.key
 [@@alert unstable][@@alert "-unstable"]
 (** [synchronized_formatter_of_out_channel oc] returns the key to the
-    thread-local state that holds the thread-local formatter for writing to the
+    domain-local state that holds the domain-local formatter for writing to the
     corresponding output channel [oc].
 
-    When the formatter is used with multiple threads, the output from the
-    threads will be interleaved with each other at points where the formatter
+    When the formatter is used with multiple domains, the output from the
+    domains will be interleaved with each other at points where the formatter
     is flushed, such as with {!print_flush}.
 *)
 
 val std_formatter : formatter @@ nonportable
-(** The initial thread's standard formatter to write to standard output.
+(** The initial domain's standard formatter to write to standard output.
 
   It is defined as {!formatter_of_out_channel} {!Stdlib.stdout}.
 *)
 
 val get_std_formatter : unit -> formatter @@ nonportable
-(** [get_std_formatter ()] returns the current thread's standard formatter used
+(** [get_std_formatter ()] returns the current domain's standard formatter used
     to write to standard output.
     @since 5.0
 *)
 
 val err_formatter : formatter @@ nonportable
-(** The initial thread's formatter to write to standard error.
+(** The initial domain's formatter to write to standard error.
 
   It is defined as {!formatter_of_out_channel} {!Stdlib.stderr}.
 *)
 
 val get_err_formatter : unit -> formatter @@ nonportable
-(** [get_err_formatter ()] returns the current thread's formatter used to write
+(** [get_err_formatter ()] returns the current domain's formatter used to write
    to standard error.
    @since 5.0
 *)
@@ -1025,27 +1025,27 @@ val formatter_of_buffer : Buffer.t -> formatter
 *)
 
 val stdbuf : Buffer.t @@ nonportable
-(** The initial thread's string buffer in which [str_formatter] writes. *)
+(** The initial domain's string buffer in which [str_formatter] writes. *)
 
 val get_stdbuf : unit -> Buffer.t @@ nonportable
-(** [get_stdbuf ()] returns the current thread's string buffer in which the
-    current thread's string formatter writes.
+(** [get_stdbuf ()] returns the current domain's string buffer in which the
+    current domain's string formatter writes.
     @since 5.0 *)
 
 val str_formatter : formatter @@ nonportable
-(** The initial thread's formatter to output to the {!stdbuf} string buffer.
+(** The initial domain's formatter to output to the {!stdbuf} string buffer.
 
   [str_formatter] is defined as {!formatter_of_buffer} {!stdbuf}.
 *)
 
 val get_str_formatter : unit -> formatter @@ nonportable
-(** The current thread's formatter to output to the current threads string
+(** The current domain's formatter to output to the current domains string
     buffer.
     @since 5.0
 *)
 
 val flush_str_formatter : unit -> string
-(** Returns the material printed with [str_formatter] of the current thread,
+(** Returns the material printed with [str_formatter] of the current domain,
     flushes the formatter and resets the corresponding buffer.
 *)
 
@@ -1064,17 +1064,16 @@ val make_formatter :
 *)
 
 val make_synchronized_formatter :
-  (string -> int -> int -> unit)
-  -> (unit -> unit) -> formatter Domain.Safe.TLS.key
+  (string -> int -> int -> unit) -> (unit -> unit) -> formatter Domain.Safe.DLS.key
   @@ nonportable
 [@@alert unstable][@@alert "-unstable"]
 [@@alert unsafe_multidomain "Use [Format.Safe.make_synchronized_formatter]."]
-(** [make_synchronized_formatter out flush] returns the key to the thread-local
-    state that holds the thread-local formatter that outputs with function
+(** [make_synchronized_formatter out flush] returns the key to the domain-local
+    state that holds the domain-local formatter that outputs with function
     [out], and flushes with function [flush].
 
-    When the formatter is used with multiple threads, the output from the
-    threads will be interleaved with each other at points where the formatter
+    When the formatter is used with multiple domains, the output from the
+    domains will be interleaved with each other at points where the formatter
     is flushed, such as with {!print_flush}.
     @since 5.0
 *)
@@ -1356,8 +1355,8 @@ val printf : ('a, formatter, unit) format -> 'a @@ nonportable
 
     It is defined similarly to [fun fmt -> fprintf (get_std_formatter ()) fmt]
     but delays calling [get_std_formatter] until after the final argument
-    required by the [format] is received. When used with multiple threads, the
-    output from the threads will be interleaved with each other at points where
+    required by the [format] is received. When used with multiple domains, the
+    output from the domains will be interleaved with each other at points where
     the formatter is flushed, such as with {!print_flush}.
 *)
 
@@ -1366,8 +1365,8 @@ val eprintf : ('a, formatter, unit) format -> 'a @@ nonportable
 
     It is defined similarly to [fun fmt -> fprintf (get_err_formatter ()) fmt]
     but delays calling [get_err_formatter] until after the final argument
-    required by the [format] is received. When used with multiple threads, the
-    output from the threads will be interleaved with each other at points where
+    required by the [format] is received. When used with multiple domains, the
+    output from the domains will be interleaved with each other at points where
     the formatter is flushed, such as with {!print_flush}.
 *)
 
@@ -1467,13 +1466,13 @@ val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
 (** Submodule containing non-backwards-compatible functions which enforce thread safety
     via modes. *)
 module Safe : sig
-  (** Like {!make_synchronized_formatter}, but can be called from any thread.
-      The provided closures must be [portable] as they will be called from other
-      threads that access the returned [Domain.Safe.TLS.key]. *)
+  (** Like {!make_synchronized_formatter}, but can be called from any domain.
+      The provided closures must be [portable] as they will be called from other domains
+      that access the returned [Domain.Safe.DLS.key]. *)
   val make_synchronized_formatter :
     (string -> int -> int -> unit) @ portable
     -> (unit -> unit) @ portable
-    -> formatter Domain.Safe.TLS.key
+    -> formatter Domain.Safe.DLS.key
 end
 
 (** {1:examples Examples}

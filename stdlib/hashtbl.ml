@@ -65,10 +65,10 @@ let is_randomized () = Atomic.get randomized
 module Rng : sig
   val bits : unit -> int
 end = struct
-  (* CR-someday mslater: this is safe since [bits] is a C call that cannot 
-     be preempted, we do not yield, and we do not borrow the state. *)
+  (* CR-soon mslater: switch to TLS to remove thread unsafety *)
+  (* CR-someday mslater: switch to FLS to remove magic *)
   let key = Domain.Safe.DLS.new_key Random.State.make_self_init
-  let[@inline] bits () =
+  let[@inline] bits () = 
     Random.State.bits (Obj.magic_uncontended (Domain.Safe.DLS.get key))
 end
 

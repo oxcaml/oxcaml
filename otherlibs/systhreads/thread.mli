@@ -199,24 +199,3 @@ val use_domains : unit -> unit
     used by domains. This ensures that domains can be started from threads
     other than the initial one. It prevents the use of a custom locking
     scheme, such as the one used by pyocaml. *)
-
-(** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value
-    for each thread. Domains contain multiple threads, so [TLS] should be
-    preferred in nearly all cases. *)
-module TLS : sig @@ portable
-
-   type 'a key : value mod portable contended
-   (** Type of a TLS key *)
-
-   val new_key
-   : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
-   -> (unit -> 'a) @ portable
-   -> 'a key
-   (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
-
-   val get : ('a : value mod portable). 'a key -> 'a @ contended
-   (** Like {!DLS.get}, but reads the value for the current thread. *)
-
-   val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
-   (** Like {!DLS.set}, but sets the value for the current thread. *)
-end

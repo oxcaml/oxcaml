@@ -1,4 +1,5 @@
 # 2 "thread.ml"
+
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -17,8 +18,6 @@
 (* User-level threads *)
 
 [@@@ocaml.flambda_o3]
-
-module TLS = Domain.Safe.TLS
 
 type t : value mod contended portable
 
@@ -48,11 +47,8 @@ let set_uncaught_exception_handler (fn @ portable) =
 exception Exit
 
 let create (fn @ once) arg =
-  let tls_keys = Domain.TLS.Private.get_initial_keys () in
   thread_new
     (fun () ->
-      Domain.TLS.Private.init ();
-      Domain.TLS.Private.set_initial_keys tls_keys;
       try
         fn arg;
         ignore (Sys.opaque_identity (check_memprof_cb ()))

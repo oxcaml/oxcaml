@@ -109,7 +109,6 @@ static enum {
 #define Ident(v) Field(v, 0)
 #define Start_closure(v) Field(v, 1)
 #define Terminated(v) Field(v, 2)
-#define TLS_state(v) Field(v, 3)
 
 /* The infos on threads (allocated via caml_stat_alloc()) */
 
@@ -498,8 +497,8 @@ static value caml_thread_new_descriptor(value clos)
   /* Create and initialize the termination semaphore */
   mu = caml_threadstatus_new();
   /* Create a descriptor for the new thread */
-  descr = caml_alloc_4(0, Val_long(atomic_fetch_add(&thread_next_id, +1)),
-                       clos, mu, Val_unit);
+  descr = caml_alloc_3(0, Val_long(atomic_fetch_add(&thread_next_id, +1)),
+                       clos, mu);
   CAMLreturn(descr);
 }
 
@@ -658,48 +657,13 @@ static void caml_thread_domain_spawn_hook(void)
   domain_lockmode = LOCKMODE_DOMAINS;
 }
 
-static value caml_thread_init_current(value unit)
-{
-  if (This_thread != NULL) return Val_unit;
-  caml_thread_t new_thread =
-    (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
-
-  new_thread->domain_id = Caml_state->id;
-  new_thread->descr = caml_thread_new_descriptor(Val_unit);
-  new_thread->next = new_thread;
-  new_thread->prev = new_thread;
-  new_thread->backtrace_last_exn = Val_unit;
-  new_thread->memprof = caml_memprof_main_thread(Caml_state);
-  new_thread->dynamic = Caml_state->dynamic_bindings;
-  CAMLassert(new_thread->dynamic);
-  new_thread->is_main = 1;
-  new_thread->signal_stack = NULL;
-
-  This_thread = new_thread;
-  return Val_unit;
-}
-
-static value caml_thread_init_main_thread(value unit)
-{
-  if (threads_initialized) return Val_unit;
-  caml_thread_init_current(unit);
-  caml_register_generational_global_root(&This_thread->descr);
-  return Val_unit;
-}
-
-static value caml_thread_destroy_main_thread(value unit)
-{
-  if (threads_initialized) return Val_unit;
-  caml_remove_generational_global_root(&This_thread->descr);
-  caml_stat_free(This_thread);
-  return Val_unit;
-}
-
 /* FIXME: this should return an encoded exception for use in
    domain_thread_func, but the latter is not ready to handle it
    yet. */
 static void caml_thread_domain_initialize_hook(void)
 {
+  caml_thread_t new_thread;
+
   atomic_store_release(&Tick_thread_stop, 0);
   /* OS-specific initialization */
   st_initialize();
@@ -719,14 +683,24 @@ static void caml_thread_domain_initialize_hook(void)
 
   Locking_scheme(Caml_state->id) = ls;
 
-  /* If This_thread was initialized by caml_thread_init_main_thread, we must
-     unregister the descr, which will now be scanned by caml_scan_roots_hook */
-  if(This_thread) caml_remove_generational_global_root(&This_thread->descr);
-  caml_thread_init_current(Val_unit);
+  new_thread =
+    (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
 
-  Active_thread = This_thread;
-  caml_memprof_enter_thread(Active_thread->memprof);
-  caml_dynamic_enter_thread(Active_thread->dynamic);
+  new_thread->domain_id = Caml_state->id;
+  new_thread->descr = caml_thread_new_descriptor(Val_unit);
+  new_thread->next = new_thread;
+  new_thread->prev = new_thread;
+  new_thread->backtrace_last_exn = Val_unit;
+  new_thread->memprof = caml_memprof_main_thread(Caml_state);
+  new_thread->dynamic = Caml_state->dynamic_bindings;
+  CAMLassert(new_thread->dynamic);
+  new_thread->is_main = 1;
+  new_thread->signal_stack = NULL;
+
+  This_thread = new_thread;
+  Active_thread = new_thread;
+  caml_memprof_enter_thread(new_thread->memprof);
+  caml_dynamic_enter_thread(new_thread->dynamic);
 }
 
 static void thread_yield(void);
@@ -1022,39 +996,6 @@ CAMLexport int caml_c_thread_unregister(void)
 CAMLprim value caml_thread_self(value unit)
 {
   return This_thread->descr;
-}
-
-/* Thread-local storage */
-
-static value caml_thread_has_tls_state(value unit)
-{
-  return Val_true;
-}
-
-static value caml_thread_get_state(value unit)
-{
-  return TLS_state(caml_thread_self(unit));
-}
-
-static value caml_thread_set_state(value state)
-{
-  caml_modify(&TLS_state(caml_thread_self(Val_unit)), state);
-  return Val_unit;
-}
-
-extern value (*caml_thread_has_tls_state_stub)(value unit);
-extern value (*caml_thread_get_state_stub)(value unit);
-extern value (*caml_thread_set_state_stub)(value state);
-extern value (*caml_thread_init_main_thread_stub)(value unit);
-extern value (*caml_thread_destroy_main_thread_stub)(value unit);
-
-__attribute__((constructor))
-static void caml_install_tls_functions(void) {
-  caml_thread_has_tls_state_stub = &caml_thread_has_tls_state;
-  caml_thread_get_state_stub = &caml_thread_get_state;
-  caml_thread_set_state_stub = &caml_thread_set_state;
-  caml_thread_init_main_thread_stub = &caml_thread_init_main_thread;
-  caml_thread_destroy_main_thread_stub = &caml_thread_destroy_main_thread;
 }
 
 /* Return the identifier of a thread */
