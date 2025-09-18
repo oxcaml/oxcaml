@@ -31,6 +31,7 @@ let get_backend_value_from_env env bytecode_var native_var =
   Ocaml_backends.make_backend_function
     (Environments.safe_lookup bytecode_var env)
     (Environments.safe_lookup native_var env)
+    (Environments.safe_lookup native_var env) (* JavaScript uses same vars as native for now *)
 
 let modules env =
   Actions_helpers.words_of_variable env Ocaml_variables.modules
@@ -907,6 +908,32 @@ let check_ocamlopt_opt_output =
     (make_check_compiler_output
       "check-ocamlopt.opt-output" Ocaml_compilers.ocamlopt_opt)
 
+let no_javascript_compiler _log env =
+  (Result.skip_with_reason "JavaScript compiler disabled", env)
+
+let javascript_action a =
+  if Ocamltest_config.javascript_compiler then a
+  else (Actions.update a no_javascript_compiler)
+
+let setup_ocamlj_opt_build_env =
+  javascript_action
+    (mk_compiler_env_setup
+      "setup-ocamlj.opt-build-env"
+      Ocaml_compilers.ocamlj_opt)
+
+let ocamlj_opt =
+  javascript_action
+    (Actions.make
+      ~name:"ocamlj.opt"
+      ~description:"Compile the program using ocamlj.opt"
+      ~does_something:true
+      (compile Ocaml_compilers.ocamlj_opt))
+
+let check_ocamlj_opt_output =
+  javascript_action
+    (make_check_compiler_output
+      "check-ocamlj.opt-output" Ocaml_compilers.ocamlj_opt)
+
 let really_compare_programs backend comparison_tool log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
   let program2 = Environments.safe_lookup Builtin_variables.program2 env in
@@ -1570,6 +1597,9 @@ let init () =
     setup_ocamlopt_opt_build_env;
     ocamlopt_opt;
     check_ocamlopt_opt_output;
+    setup_ocamlj_opt_build_env;
+    ocamlj_opt;
+    check_ocamlj_opt_output;
     run_expect;
     compare_bytecode_programs;
     compare_binary_files;

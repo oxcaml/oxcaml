@@ -67,6 +67,9 @@ let extension_of_filetype = function
       | (Ocaml_backends.Bytecode, Object) -> "cmo"
       | (Ocaml_backends.Bytecode, Library) -> "cma"
       | (Ocaml_backends.Bytecode, Program) -> "byte"
+      | (Ocaml_backends.Javascript, Object) -> "cmj"
+      | (Ocaml_backends.Javascript, Library) -> "cmja"
+      | (Ocaml_backends.Javascript, Program) -> "js"
     end
   | Text -> "txt"
   | Other s -> s

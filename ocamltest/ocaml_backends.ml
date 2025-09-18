@@ -15,24 +15,28 @@
 
 (* Backends of the OCaml compiler and their properties *)
 
-type t = Native | Bytecode
+type t = Native | Bytecode | Javascript
 
 let is_bytecode t = t=Bytecode
 
 let is_native t = t=Native
 
+let is_javascript t = t=Javascript
+
 let string_of_backend = function
   | Native -> "native"
   | Bytecode -> "bytecode"
+  | Javascript -> "javascript"
 
-(* Creates a function that returns its first argument for Bytecode           *)
-(* and its second argument for Native code                                   *)
-let make_backend_function bytecode_value native_value = function
+(* Creates a function that returns its first argument for Bytecode,          *)
+(* its second argument for Native code, and its third for JavaScript         *)
+let make_backend_function bytecode_value native_value javascript_value = function
   | Bytecode -> bytecode_value
   | Native -> native_value
+  | Javascript -> javascript_value
 
-let module_extension = make_backend_function "cmo" "cmx"
+let module_extension = make_backend_function "cmo" "cmx" "cmj"
 
-let library_extension = make_backend_function "cma" "cmxa"
+let library_extension = make_backend_function "cma" "cmxa" "cmja"
 
-let executable_extension = make_backend_function "byte" "opt"
+let executable_extension = make_backend_function "byte" "opt" "js"

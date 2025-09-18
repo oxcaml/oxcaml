@@ -177,11 +177,29 @@ let asmgen =
   test_actions = asmgen_actions
 }
 
+let javascript =
+  let js_actions =
+  [
+    setup_ocamlj_opt_build_env;
+    ocamlj_opt;
+    check_ocamlj_opt_output;
+    run;
+    check_program_output;
+  ] in
+  {
+    test_name = "javascript";
+    test_run_by_default = true;
+    test_description = "Build JavaScript program, run it and check its output";
+    test_actions =
+      (if Ocamltest_config.javascript_compiler then js_actions else [skip])
+  }
+
 let init () =
   List.iter register
   [
     bytecode;
     native;
+    javascript;
     toplevel;
     nattoplevel;
     expect;

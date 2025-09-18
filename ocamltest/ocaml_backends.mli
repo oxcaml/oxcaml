@@ -15,15 +15,17 @@
 
 (* Backends of the OCaml compiler and their properties *)
 
-type t = Native | Bytecode
+type t = Native | Bytecode | Javascript
 
 val is_bytecode : t -> bool
 
 val is_native : t -> bool
 
+val is_javascript : t -> bool
+
 val string_of_backend : t -> string
 
-val make_backend_function : 'a -> 'a -> t -> 'a
+val make_backend_function : 'a -> 'a -> 'a -> t -> 'a
 
 val module_extension : t -> string
 
