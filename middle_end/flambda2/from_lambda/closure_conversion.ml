@@ -2736,14 +2736,6 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let contains_subfunctions = Acc.seen_a_function acc in
   let cost_metrics = Acc.cost_metrics acc in
   let free_names_of_body = Acc.free_names acc in
-  let slots_are_used () =
-    (not
-       (Name_occurrences.all_function_slots free_names_of_body
-       |> Function_slot.Set.is_empty))
-    || not
-         (Name_occurrences.all_value_slots free_names_of_body
-         |> Value_slot.Set.is_empty)
-  in
   let inline : Inline_attribute.t =
     (* We make a decision based on [fallback_inlining_heuristic] here to try to
        mimic Closure's behaviour as closely as possible, particularly when there
@@ -2757,7 +2749,9 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     if contains_subfunctions
        && Flambda_features.Expert.fallback_inlining_heuristic ()
     then Never_inline
-    else if !Clflags.jsir && slots_are_used ()
+    else if !Clflags.jsir
+            && Name_occurrences.contains_function_or_value_slots
+                 free_names_of_body
     then Never_inline
     else Inline_attribute.from_lambda (Function_decl.inline decl)
   in

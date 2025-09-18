@@ -61,15 +61,8 @@ let make_decision0 ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
 
 let make_decision ~inlining_arguments ~inline ~stub ~cost_metrics ~is_a_functor
     ~recursive ~free_names_of_code : Function_decl_inlining_decision_type.t =
-  let slots_are_used () =
-    (not
-       (Name_occurrences.all_function_slots free_names_of_code
-       |> Function_slot.Set.is_empty))
-    || not
-         (Name_occurrences.all_value_slots free_names_of_code
-         |> Value_slot.Set.is_empty)
-  in
-  if !Clflags.jsir && slots_are_used ()
+  if !Clflags.jsir
+     && Name_occurrences.contains_function_or_value_slots free_names_of_code
   then Jsir_inlining_disabled
   else
     make_decision0 ~inlining_arguments ~inline ~stub ~cost_metrics ~is_a_functor

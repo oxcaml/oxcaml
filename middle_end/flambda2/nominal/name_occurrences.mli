@@ -134,6 +134,8 @@ val value_slots_in_normal_projections : t -> Value_slot.Set.t
 
 val all_value_slots : t -> Value_slot.Set.t
 
+val contains_function_or_value_slots : t -> bool
+
 val symbols : t -> Symbol.Set.t
 
 val code_ids : t -> Code_id.Set.t
