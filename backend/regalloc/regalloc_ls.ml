@@ -93,15 +93,17 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
       incr pos);
   Reg.Tbl.iter (fun reg (range : Range.t) -> add_range reg range) current_ranges;
   if debug && Lazy.force verbose
-  then
+  then (
+    let ls_order_mapping = State.ls_order_mapping state in
     Cfg.iter_blocks_dfs (Cfg_with_layout.cfg cfg_with_layout)
       ~f:(fun _label block ->
         indent ();
         log "(block %a)" Label.format block.start;
-        log_body_and_terminator block.body block.terminator liveness;
+        log_body_and_terminator_with_ls_order ls_order_mapping block.body
+          block.terminator liveness;
         dedent ());
-  State.update_intervals state past_ranges;
-  dedent ()
+    State.update_intervals state past_ranges;
+    dedent ())
 
 type spilling_reg =
   | Spilling of Reg.t
@@ -300,10 +302,12 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
       then (
         let liveness = Cfg_with_infos.liveness cfg_with_infos in
         indent ();
+        let ls_order_mapping = State.ls_order_mapping state in
         Cfg.iter_blocks_dfs (Cfg_with_layout.cfg cfg_with_layout)
           ~f:(fun _label block ->
             log "(block %a)" Label.format block.start;
-            log_body_and_terminator block.body block.terminator liveness);
+            log_body_and_terminator_with_ls_order ls_order_mapping block.body
+              block.terminator liveness);
         dedent ()))
     cfg_with_infos;
   cfg_with_infos
