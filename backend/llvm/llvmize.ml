@@ -731,11 +731,14 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
       let arg2 = V.of_int ~typ n in
       emit_ins t (I.binary op ~arg1 ~arg2)
   in
-  let do_unary_intrinsic op_name =
+  let do_unary_intrinsic_extra_args op_name extra_args =
     let typ = T.i64 in
     let arg = load_reg_to_temp ~typ t i.arg.(0) in
-    call_llvm_intrinsic t (op_name ^ "." ^ T.to_string typ) [arg] typ
+    call_llvm_intrinsic t
+      (op_name ^ "." ^ T.to_string typ)
+      ([arg] @ extra_args) typ
   in
+  let do_unary_intrinsic op_name = do_unary_intrinsic_extra_args op_name [] in
   let do_gep ~negate_arg =
     let base_ptr = load_reg_to_temp t i.arg.(0) in
     fail_if_not "int_op.do_gep" (T.is_ptr (V.get_type base_ptr));
@@ -797,8 +800,10 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
       let bool_res = int_comp t comp i ~imm in
       (* convert i1 -> i64 *)
       emit_ins t (I.convert Zext ~arg:bool_res ~to_:T.i64)
-    | Iclz _ -> do_unary_intrinsic "ctlz"
-    | Ictz _ -> do_unary_intrinsic "cttz"
+    (* ctlz and cttz have a second optional argument that indicates whether 0 is
+       poison or not. We pass false to match OCaml's behaviour. *)
+    | Iclz _ -> do_unary_intrinsic_extra_args "ctlz" [V.of_int ~typ:T.i1 0]
+    | Ictz _ -> do_unary_intrinsic_extra_args "cttz" [V.of_int ~typ:T.i1 0]
     | Ipopcnt -> do_unary_intrinsic "ctpop"
   in
   store_into_reg t i.res.(0) res

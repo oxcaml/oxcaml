@@ -1572,7 +1572,7 @@ L318:
   %35 = or i64 %33, %34
   store i64 %35, ptr %12
   %36 = load i64, ptr %12
-  %37 = call  i64 @llvm.cttz.i64(i64 %36)
+  %37 = call  i64 @llvm.cttz.i64(i64 %36, i1 0)
   store i64 %37, ptr %13
   %38 = load i64, ptr %13
   store i64 %38, ptr %14
@@ -1647,7 +1647,7 @@ L329:
   %32 = and i64 %30, %31
   store i64 %32, ptr %11
   %33 = load i64, ptr %11
-  %34 = call  i64 @llvm.ctlz.i64(i64 %33)
+  %34 = call  i64 @llvm.ctlz.i64(i64 %33, i1 0)
   store i64 %34, ptr %12
   %35 = load i64, ptr %12
   store i64 %35, ptr %13
@@ -1780,9 +1780,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @caml_int_popcnt_untagged_to_untagged = external global ptr
 @caml_raise_exn = external global ptr
 
-declare i64 @llvm.ctlz.i64(i64)
+declare i64 @llvm.ctlz.i64(i64, i1)
 declare i64 @llvm.ctpop.i64(i64)
-declare i64 @llvm.cttz.i64(i64)
+declare i64 @llvm.cttz.i64(i64, i1)
 
 !0 = !{ i32 1, !"oxcaml_module", !"Int_ops" }
 !llvm.module.flags = !{ !0 }
