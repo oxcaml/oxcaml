@@ -92,8 +92,8 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
          present at the end of every "block". *)
       incr pos);
   Reg.Tbl.iter (fun reg (range : Range.t) -> add_range reg range) current_ranges;
-  if debug && Lazy.force verbose
-  then (
+  (if debug && Lazy.force verbose
+  then
     let ls_order_mapping = State.ls_order_mapping state in
     Cfg.iter_blocks_dfs (Cfg_with_layout.cfg cfg_with_layout)
       ~f:(fun _label block ->
@@ -102,8 +102,8 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
         log_body_and_terminator_with_ls_order ls_order_mapping block.body
           block.terminator liveness;
         dedent ()));
-    State.update_intervals state past_ranges;
-    dedent ()
+  State.update_intervals state past_ranges;
+  dedent ()
 
 type spilling_reg =
   | Spilling of Reg.t
