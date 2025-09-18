@@ -117,6 +117,26 @@ let dump ppf t ~msg =
   let open Format in
   fprintf ppf "\ncfg for %s\n" msg;
   fprintf ppf "%s\n" t.cfg.fun_name;
+  let regalloc =
+    List.find_map
+      (function[@ocaml.warning "-4"]
+        | Cfg.Use_regalloc regalloc -> Some regalloc | _ -> None)
+      t.cfg.fun_codegen_options
+  in
+  (match regalloc with
+  | None -> ()
+  | Some regalloc ->
+    fprintf ppf "use_regalloc=%a\n" Clflags.Register_allocator.format regalloc);
+  let regalloc_params =
+    List.find_map
+      (function[@ocaml.warning "-4"]
+        | Cfg.Use_regalloc_param params -> Some params | _ -> None)
+      t.cfg.fun_codegen_options
+  in
+  (match regalloc_params with
+  | None -> ()
+  | Some regalloc_params ->
+    fprintf ppf "regalloc_params=%s\n" (String.concat ", " regalloc_params));
   fprintf ppf "layout.length=%d\n" (DLL.length t.layout);
   fprintf ppf "blocks.length=%d\n" (Label.Tbl.length t.cfg.blocks);
   let print_block label =

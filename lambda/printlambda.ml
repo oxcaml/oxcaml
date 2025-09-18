@@ -1062,7 +1062,17 @@ let function_attribute ppf t =
   begin match t.poll with
   | Default_poll -> ()
   | Error_poll -> fprintf ppf "error_poll@ "
-  end
+  end;
+  begin match t.regalloc with
+  | Default_regalloc -> ()
+  | Regalloc regalloc -> fprintf ppf "%a@ " Clflags.Register_allocator.format regalloc
+  end;
+  begin match t.regalloc_param with
+  | Default_regalloc_params -> ()
+  | Regalloc_params params ->
+      List.iter (fun param -> fprintf ppf "regalloc_param(%S)@ " param) params
+  end;
+  if t.cold then fprintf ppf "cold@ "
 
 let apply_tailcall_attribute ppf = function
   | Default_tailcall -> ()
