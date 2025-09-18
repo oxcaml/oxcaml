@@ -168,9 +168,7 @@ struct
           let base = Ldd.new_var () in
           (* Allocate coefficient vars based on declared arity, not on ks
              length *)
-          let coeffs =
-            List.init (List.length args) (fun _ -> Ldd.new_var ())
-          in
+          let coeffs = List.init (List.length args) (fun _ -> Ldd.new_var ()) in
           ConstrTbl.add constr_to_coeffs c
             (Ldd.var base, List.map Ldd.var coeffs);
           (* Recursively compute the kind of the body *)
@@ -210,8 +208,7 @@ struct
                 (List.combine coeffs coeffs')
             | Right ->
               Ldd.enqueue_gfp base
-                (Ldd.meet base'
-                   (Ldd.var (Ldd.rigid (Ldd.Name.atomic c 0))));
+                (Ldd.meet base' (Ldd.var (Ldd.rigid (Ldd.Name.atomic c 0))));
               List.iteri
                 (fun i (coeff, coeff') ->
                   let rhs = Ldd.join coeff' base' in

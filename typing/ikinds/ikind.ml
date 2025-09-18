@@ -11,23 +11,25 @@ module RigidName = struct
   type constr = Path.t
 
   type t =
-    | Atom of { constr : constr; arg_index : int }
+    | Atom of
+        { constr : constr;
+          arg_index : int
+        }
     | Param of int
 
   let compare a b =
     match a, b with
     | Atom a1, Atom a2 -> (
-        match Path.compare a1.constr a2.constr with
-        | 0 -> Int.compare a1.arg_index a2.arg_index
-        | c -> c)
+      match Path.compare a1.constr a2.constr with
+      | 0 -> Int.compare a1.arg_index a2.arg_index
+      | c -> c)
     | Param x, Param y -> Int.compare x y
     | Atom _, Param _ -> -1
     | Param _, Atom _ -> 1
 
   let to_string = function
     | Atom { constr; arg_index } ->
-        Printf.sprintf "%s.%d" (Format.asprintf "%a" Path.print constr)
-          arg_index
+      Printf.sprintf "%s.%d" (Format.asprintf "%a" Path.print constr) arg_index
     | Param i -> Printf.sprintf "param%d" i
 
   let atomic constr arg_index = Atom { constr; arg_index }
