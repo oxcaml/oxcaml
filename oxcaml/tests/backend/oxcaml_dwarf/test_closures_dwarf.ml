@@ -41,7 +41,10 @@ let _ = f_named_closure_with_capture 200 [4; 5; 6] (multiply_by_factor 3)
 let[@inline never] [@local never] f_closure_with_env (outer : int)
     (inner : string) =
   let captured = outer + String.length inner in
-  let make_adder increment x = x + captured + increment in
+  let make_adder increment =
+    let closure x = x + captured + increment in
+    closure
+  in
   let adder = make_adder 10 in
   adder 42
 
@@ -56,9 +59,13 @@ let[@inline never] [@local never] f_higher_order
   let new_func = transformer base_func in
   new_func value
 
-let compose_with_double f x = f (x * 2)
+let compose_with_double f =
+  let closure x = f (x * 2) in
+  closure
 
-let compose_with_increment f y = f (y + 1)
+let compose_with_increment f =
+  let closure y = f (y + 1) in
+  closure
 
 let square x = x * x
 
@@ -105,9 +112,12 @@ let _ = f_compose double add_one 5
 let _ = f_compose add_one double 7
 
 (* Closure returning closure *)
-let[@inline never] [@local never] f_closure_factory (multiplier : int)
-    (adder : int) (value : int) =
-  (value * multiplier) + adder
+let[@inline never] [@local never] f_closure_factory (multiplier : int) =
+  let closure1 adder =
+    let closure2 value = (value * multiplier) + adder in
+    closure2
+  in
+  closure1
 
 let factory_result = f_closure_factory 3
 
