@@ -838,12 +838,22 @@ let default_iterator =
     attributes = (fun this l -> List.iter (this.attribute this) l);
 
     (* Location inside a mode expression needs to be traversed. *)
-    modes = (fun this m ->
-      List.iter (iter_loc this) m
+    modes = (fun this modes ->
+      match modes with
+      | No_modes -> ()
+      | Modes {modes; crossings; loc} ->
+          List.iter (iter_loc this) modes;
+          List.iter (iter_loc this) crossings;
+          this.location this loc
     );
 
-    modalities = (fun this m ->
-      List.iter (iter_loc this) m
+    modalities = (fun this modalities ->
+      match modalities with
+      | No_modalities -> ()
+      | Modalities {modalities; crossings; loc} ->
+          List.iter (iter_loc this) modalities;
+          List.iter (iter_loc this) crossings;
+          this.location this loc
     );
 
     payload =
@@ -860,9 +870,9 @@ let default_iterator =
          match pjkind_desc with
          | Pjk_default -> ()
          | Pjk_abbreviation (_ : string) -> ()
-         | Pjk_mod (t, mode_list) ->
+         | Pjk_mod (t, crossings) ->
              this.jkind_annotation this t;
-             this.modes this mode_list
+             List.iter (iter_loc this) crossings
          | Pjk_with (t, ty, modalities) ->
              this.jkind_annotation this t;
              this.typ this ty;

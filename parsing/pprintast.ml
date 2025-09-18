@@ -324,14 +324,14 @@ let legacy_mode f { txt = Mode s; _ } =
   in
   pp_print_string f s
 
-let legacy_modes f m =
+let legacy_core_modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") legacy_mode f m
 
-let optional_legacy_modes f m =
-  match m with
+let optional_legacy_modes f core_modes =
+  match core_modes with
   | [] -> ()
   | m ->
-    legacy_modes f m;
+    legacy_core_modes f m;
     pp_print_space f ()
 
 let legacy_modality f m =
@@ -343,81 +343,108 @@ let legacy_modality f m =
   in
   pp_print_string f s
 
-let legacy_modalities f m =
+let legacy_core_modalities f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") legacy_modality f m
 
-let optional_legacy_modalities f m =
-  match m with
+let optional_legacy_modalities f core_modalities =
+  match core_modalities with
   | [] -> ()
   | m ->
-    legacy_modalities f m;
+    legacy_core_modalities f m;
     pp_print_space f ()
 
 (* new mode and modality syntax *)
+
+let crossing f { txt = (Crossing s); _ } =
+  pp_print_string f s
+
+let crossings f m =
+  pp_print_list ~pp_sep:(fun f () -> pp f " ") crossing f m
+
+let optional_mod_crossings f m =
+  match m with
+  | [] -> ()
+  | m -> pp f " mod %a" crossings m
+
 let mode f { txt = Mode s; _ } =
   pp_print_string f s
 
-let modes f m =
+let core_modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") mode f m
 
-let optional_at_modes f m =
+let optional_at_core_modes f m =
   match m with
   | [] -> ()
-  | m -> pp f " %@ %a" modes m
+  | m -> pp f " %@ %a" core_modes m
+
+let optional_mode_annot f m =
+  match m with
+  | No_modes -> ()
+  | Modes { modes; crossings; _ } ->
+    optional_at_core_modes f modes;
+    optional_mod_crossings f crossings
 
 let modality f m =
   let {txt = Modality txt; _} = m in
   pp_print_string f txt
 
-let modalities f m =
+let core_modalities f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") modality f m
 
-let optional_modalities ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m =
+let optional_atat_core_modalities f m =
   match m with
   | [] -> ()
-  | m ->
+  | m -> pp f "%@%@@ %a" core_modalities m
+
+let optional_moda_annot ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m =
+  match m with
+  | No_modalities -> ()
+  | Modalities { modalities; crossings; _ } ->
     pre f ();
-    pp f "%a" modalities m;
+    optional_atat_core_modalities f modalities;
+    optional_mod_crossings f crossings;
     post f ()
 
-let optional_space_atat_modalities f m =
-  let pre f () = Format.fprintf f "@ %@%@@ " in
-  optional_modalities ~pre f m
+let optional_space_modality_annot f m =
+  let pre f () = Format.fprintf f "@ " in
+  optional_moda_annot ~pre f m
 
-let optional_atat_modalities_newline f m =
-  let pre f () = Format.fprintf f "%@%@@ " in
-  optional_modalities ~pre ~post:pp_print_newline f m
+let optional_modality_annot_newline f m =
+  optional_moda_annot ~post:pp_print_newline f m
 
-(** For a list of modes, we either print everything in old syntax (if they
-  are purely old modes), or everything in new syntax. *)
-let print_modes_in_old_syntax =
-  List.for_all (fun m ->
-    let Mode txt = m.txt in
-    match txt with
-    | "local" -> true
-    | _ -> false
-  )
+(** For a list of modes, we either return [Some core_modes] if they are purely
+    old modes, (including empty modes) or [None] to trigger printing everything
+    in the new syntax *)
+let core_modes_in_old_syntax modes =
+  match modes with
+  | No_modes -> Some []
+  | Modes { crossings = _ :: _; _ } -> None
+  | Modes { modes; crossings = []; _ } ->
+    if (List.for_all (fun {txt = Mode txt; _} -> txt = "local") modes)
+      then Some modes else None
 
-(** For a list of modalities, we either print all in old syntax (if they are
-  purely old modalities), or all in new syntax. *)
-let print_modality_in_old_syntax =
-  List.for_all (fun m ->
-    let Modality txt = m.txt in
-    match txt with
-    | "global" -> true
-    | _ -> false
-  )
+(** For a list of modalities, we either return [Some core_modalities] if they
+    are purely old modalities, (including empty) or [None] to trigger printing
+    everything in the new syntax *)
+let print_modality_in_old_syntax modalities =
+  match modalities with
+  | No_modalities -> Some []
+  | Modalities { crossings = _ :: _; _ } -> None
+  | Modalities { modalities; crossings = []; _ } ->
+    if (List.for_all (fun {txt = Modality txt; _} -> txt = "global") modalities)
+      then Some modalities else None
 
 let modalities_type pty ctxt f pca =
   let m = pca.pca_modalities in
-  if print_modality_in_old_syntax m then
+  match print_modality_in_old_syntax m with
+  | None ->
+    pp f "%a%a"
+      (pty ctxt) pca.pca_type
+      optional_space_modality_annot m
+  | Some m ->
     pp f "%a%a"
       optional_legacy_modalities m
       (pty ctxt) pca.pca_type
-  else
-    pp f "%a%a"
-      (pty ctxt) pca.pca_type
-      optional_space_atat_modalities m
 
 let include_kind f = function
   | Functor -> pp f "@ functor"
@@ -432,12 +459,11 @@ let rec class_params_def f =  function
 
 and core_type_with_optional_legacy_modes pty ctxt f (c, m) =
   match m with
-  | [] -> pty ctxt f c
-  | _ :: _ ->
-    if print_modes_in_old_syntax m then
-      pp f "%a%a" optional_legacy_modes m (core_type1 ctxt) c
-    else
-      pp f "%a%a" (core_type1 ctxt) c optional_at_modes m
+  | No_modes -> pty ctxt f c
+  | _ ->
+    match core_modes_in_old_syntax m with
+    | Some m -> pp f "%a%a" optional_legacy_modes m (core_type1 ctxt) c
+    | None -> pp f "%a%a" (core_type1 ctxt) c optional_mode_annot m
 
 and type_with_label ctxt f (label, c, mode) =
   match label with
@@ -454,22 +480,22 @@ and type_with_label ctxt f (label, c, mode) =
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
   | Pjk_default -> pp f "_"
   | Pjk_abbreviation s -> pp f "%s" s
-  | Pjk_mod (t, modes) ->
-    begin match modes with
+  | Pjk_mod (t, crossings) ->
+    begin match crossings with
     | [] -> Misc.fatal_error "malformed jkind annotation"
     | _ :: _ ->
-      Misc.pp_parens_if nested (fun f (t, modes) ->
+      Misc.pp_parens_if nested (fun f (t, crossings) ->
         pp f "%a mod %a"
           (jkind_annotation ~nested:true ctxt) t
-          (pp_print_list ~pp_sep:pp_print_space mode) modes
-      ) f (t, modes)
+          (pp_print_list ~pp_sep:pp_print_space crossing) crossings
+      ) f (t, crossings)
     end
   | Pjk_with (t, ty, modalities) ->
     Misc.pp_parens_if nested (fun f (t, ty, modalities) ->
       pp f "%a with %a%a"
         (jkind_annotation ~nested:true ctxt) t
         (core_type ctxt) ty
-        optional_space_atat_modalities modalities;
+        optional_space_modality_annot modalities;
     ) f (t, ty, modalities)
   | Pjk_kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
   | Pjk_product ts ->
@@ -660,8 +686,8 @@ and return_type ctxt f (x, m) =
 
 and core_type_with_optional_modes  ctxt f (ty, modes) =
   match modes with
-  | [] -> core_type ctxt f ty
-  | _ :: _ -> pp f "%a%a" (core_type2 ctxt) ty optional_at_modes modes
+  | No_modes -> core_type ctxt f ty
+  | _ -> pp f "%a%a" (core_type2 ctxt) ty optional_mode_annot modes
 
 (********************pattern********************)
 (* be cautious when use [pattern], [pattern1] is preferred *)
@@ -820,24 +846,24 @@ and labeled_tuple_pattern ctxt f ~unboxed l closed =
 and pattern2 ctxt f p =
   match p.ppat_desc with
   | Ppat_constraint(p, ct, m) ->
-    begin match ct, print_modes_in_old_syntax m with
-    | Some ct, true ->
+    begin match ct, core_modes_in_old_syntax m with
+    | Some ct, Some m ->
         pp f "@[<2>%a%a@;:@;%a@]"
         optional_legacy_modes m
         (simple_pattern ctxt) p
         (core_type ctxt) ct
-    | Some ct, false ->
+    | Some ct, None ->
         pp f "@[<2>%a@;:@;%a@]"
         (simple_pattern ctxt) p
         (core_type_with_optional_modes ctxt) (ct, m)
-    | None, true ->
+    | None, Some m ->
         pp f "@[<2>%a%a@]"
         optional_legacy_modes m
         (simple_pattern ctxt) p
-    | None, false ->
+    | None, None ->
         pp f "@[<2>%a%a@]"
         (simple_pattern ctxt) p
-        optional_at_modes m
+        optional_mode_annot m
     end
   | _ -> pattern1 ctxt f p
 
@@ -972,7 +998,8 @@ and expression ctxt f x =
     | Pexp_function (params, constraint_, body) ->
         begin match params, constraint_ with
           (* Omit [fun] if there are no params. *)
-          | [], {ret_type_constraint = None; ret_mode_annotations = []; _} ->
+          | [], { ret_type_constraint = None;
+                  ret_mode_annotations = No_modes; _} ->
               (* If function cases are a direct body of a function,
                  the function node should be wrapped in parens so
                  it doesn't become part of the enclosing function. *)
@@ -1184,11 +1211,11 @@ and simple_expr ctxt f x =
     | Pexp_unboxed_tuple l ->
         labeled_tuple_expr ctxt f ~unboxed:true l
     | Pexp_constraint (e, ct, m) ->
-      begin match ct, print_modes_in_old_syntax m with
-      | None, true ->
-        pp f "(%a %a)" legacy_modes m (expression ctxt) e
-      | None, false ->
-        pp f "(%a : _%a)" (expression ctxt) e optional_at_modes m
+      begin match ct, core_modes_in_old_syntax m with
+      | None, Some m ->
+        pp f "(%a %a)" optional_legacy_modes m (expression ctxt) e
+      | None, None ->
+        pp f "(%a : _%a)" (expression ctxt) e optional_mode_annot m
       | Some ct, _ ->
         pp f "(%a : %a)"
           (expression ctxt) e
@@ -1245,7 +1272,7 @@ and value_description ctxt f x =
   (* note: value_description has an attribute field,
            but they're already printed by the callers this method *)
   pp f "@[<hov2>%a%a%a@]" (core_type ctxt) x.pval_type
-    optional_space_atat_modalities x.pval_modalities
+    optional_space_modality_annot x.pval_modalities
     (fun f x ->
        if x.pval_prim <> []
        then pp f "@ =@ %a" (list constant_string) x.pval_prim
@@ -1308,7 +1335,7 @@ and class_type ctxt f x =
         (attributes ctxt) x.pcty_attributes
   | Pcty_arrow (l, co, cl) ->
       pp f "@[<2>%a@;->@;%a@]" (* FIXME remove parens later *)
-        (type_with_label ctxt) (l,co,[])
+        (type_with_label ctxt) (l,co,No_modes)
         (class_type ctxt) cl
   | Pcty_extension e ->
       extension ctxt f e;
@@ -1375,7 +1402,7 @@ and class_field ctxt f x =
            pvb_expr=e;
            pvb_constraint=None;
            pvb_attributes=[];
-           pvb_modes=[];
+           pvb_modes=No_modes;
            pvb_loc=Location.none;
           }
       in
@@ -1459,7 +1486,7 @@ and include_ : 'a. ctxt -> formatter ->
 
 and sig_include ctxt f incl moda =
   include_ ctxt f ~contents:module_type incl;
-  optional_space_atat_modalities f moda
+  optional_space_modality_annot f moda
 
 and kind_abbrev ctxt f name jkind =
   pp f "@[<hov2>kind_abbrev_@ %a@ =@ %a@]"
@@ -1468,13 +1495,13 @@ and kind_abbrev ctxt f name jkind =
 
 and module_type_with_optional_modes ctxt f (mty, mm) =
   match mm with
-  | [] -> module_type ctxt f mty
-  | _ :: _ -> pp f "%a%a" (module_type1 ctxt) mty optional_at_modes mm
+  | No_modes -> module_type ctxt f mty
+  | _ -> pp f "%a%a" (module_type1 ctxt) mty optional_mode_annot mm
 
 and module_type1_with_optional_modes ctxt f (mty, mm) =
   match mm with
-  | [] -> module_type1 ctxt f mty
-  | _ :: _ -> pp f "%a%a" (module_type1 ctxt) mty optional_at_modes mm
+  | No_modes -> module_type1 ctxt f mty
+  | _ -> pp f "%a%a" (module_type1 ctxt) mty optional_mode_annot mm
 
 and module_type ctxt f x =
   if x.pmty_attributes <> [] then begin
@@ -1535,7 +1562,7 @@ and module_type1 ctxt f x =
         pp f "(module %a)" longident_loc li;
     | Pmty_signature {psg_items; psg_modalities} ->
         pp f "@[<hv0>@[<hv2>sig%a@ %a@]@ end@]" (* "@[<hov>sig@ %a@ end@]" *)
-          optional_space_atat_modalities psg_modalities
+          optional_space_modality_annot psg_modalities
           (list (signature_item ctxt)) psg_items (* FIXME wrong indentation*)
     | Pmty_typeof me ->
         pp f "@[<hov2>module@ type@ of@ %a@]" (module_expr ctxt) me
@@ -1543,7 +1570,7 @@ and module_type1 ctxt f x =
     | _ -> paren true (module_type ctxt) f x
 
 and signature ctxt f {psg_items; psg_modalities} =
-  optional_atat_modalities_newline f psg_modalities;
+  optional_modality_annot_newline f psg_modalities;
   signature_items ctxt f psg_items
 
 and signature_items ctxt f items =
@@ -1590,13 +1617,13 @@ and signature_item ctxt f x : unit =
       pp f "@[<hov>module@ %s@ =@ %a%a@]%a"
         (Option.value pmd.pmd_name.txt ~default:"_")
         longident_loc alias
-        optional_space_atat_modalities pmd.pmd_modalities
+        optional_space_modality_annot pmd.pmd_modalities
         (item_attributes ctxt) pmd.pmd_attributes
   | Psig_module pmd ->
       pp f "@[<hov>module@ %s@ :@ %a%a@]%a"
         (Option.value pmd.pmd_name.txt ~default:"_")
         (module_type ctxt) pmd.pmd_type
-        optional_space_atat_modalities pmd.pmd_modalities
+        optional_space_modality_annot pmd.pmd_modalities
         (item_attributes ctxt) pmd.pmd_attributes
   | Psig_modsubst pms ->
       pp f "@[<hov>module@ %s@ :=@ %a@]%a" pms.pms_name.txt
@@ -1636,13 +1663,13 @@ and signature_item ctxt f x : unit =
               pp f "@ @[<hov2>and@ %s:@ %a%a@]%a"
                 (Option.value pmd.pmd_name.txt ~default:"_")
                 (module_type1 ctxt) pmd.pmd_type
-                optional_space_atat_modalities pmd.pmd_modalities
+                optional_space_modality_annot pmd.pmd_modalities
                 (item_attributes ctxt) pmd.pmd_attributes
             else
               pp f "@[<hov2>module@ rec@ %s:@ %a%a@]%a"
                 (Option.value pmd.pmd_name.txt ~default:"_")
                 (module_type1 ctxt) pmd.pmd_type
-                optional_space_atat_modalities pmd.pmd_modalities
+                optional_space_modality_annot pmd.pmd_modalities
                 (item_attributes ctxt) pmd.pmd_attributes;
             string_x_module_type_list f ~first:false tl
       in
@@ -1667,7 +1694,7 @@ and module_expr ctxt f x =
         | None ->
             pp f "@[<hov2>(%a%a)@]"
               (module_expr ctxt) me
-              optional_at_modes mm
+              optional_mode_annot mm
         | Some mt ->
             pp f "@[<hov2>(%a@ :@ %a)@]"
               (module_expr ctxt) me
@@ -1737,9 +1764,9 @@ and poly_type ctxt core_type f (vars, typ) =
 
 and poly_type_with_optional_modes ctxt f (vars, typ, modes) =
   match modes with
-  | [] -> poly_type ctxt core_type f (vars, typ)
-  | _ :: _ -> pp f "%a%a" (poly_type ctxt core_type1) (vars, typ)
-      optional_at_modes modes
+  | No_modes -> poly_type ctxt core_type f (vars, typ)
+  | _ -> pp f "%a%a" (poly_type ctxt core_type1) (vars, typ)
+      optional_mode_annot modes
 
 (* transform [f = fun g h -> ..] to [f g h = ... ] could be improved *)
 and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = modes; _} =
@@ -1812,20 +1839,20 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
         begin match p with
         | {ppat_desc=Ppat_var _; ppat_attributes=[]} ->
           begin match modes with
-          | [] ->
+          | No_modes ->
             pp f "%a@ %a"
               (simple_pattern ctxt) p
               (pp_print_params_then_equals ctxt) x
           | _ ->
             pp f "(%a%a)@ %a"
               (simple_pattern ctxt) p
-              optional_at_modes modes
+              optional_mode_annot modes
               (pp_print_params_then_equals ctxt) x
           end
         | _ ->
           pp f "%a%a@;=@;%a"
             (pattern ctxt) p
-            optional_at_modes modes
+            optional_mode_annot modes
             (expression ctxt) x
         end
       end
@@ -1835,10 +1862,9 @@ and bindings ctxt f (mf,rf,l) =
   let binding kwd mf rf f x =
     (* The other modes are printed inside [binding] *)
     let legacy, x =
-      if print_modes_in_old_syntax x.pvb_modes then
-        x.pvb_modes, {x with pvb_modes = []}
-      else
-        [], x
+      match core_modes_in_old_syntax x.pvb_modes with
+      | Some m -> m, {x with pvb_modes = No_modes}
+      | None -> [], x
     in
     pp f "@[<2>%s %a%a%a%a@]%a" kwd mutable_flag mf rec_flag rf
       optional_legacy_modes legacy
@@ -1975,7 +2001,7 @@ and structure_item ctxt f x =
         | ({pmb_expr={pmod_desc=Pmod_constraint (expr, None, mm)}} as pmb) ->
           pp f "@[<hov2>@ and@ %s%a@ =@ %a@]%a"
             (Option.value pmb.pmb_name.txt ~default:"_")
-            optional_at_modes mm
+            optional_mode_annot mm
             (module_expr ctxt) expr
             (item_attributes ctxt) pmb.pmb_attributes
         | pmb ->
@@ -1995,7 +2021,7 @@ and structure_item ctxt f x =
       | ({pmb_expr={pmod_desc=Pmod_constraint (expr, None, mm)}} as pmb) :: l2 ->
         pp f "@[<hv>@[<hov2>module@ rec@ %s%a@ =@ %a@]%a@ %a@]"
           (Option.value pmb.pmb_name.txt ~default:"_")
-          optional_at_modes mm
+          optional_mode_annot mm
           (module_expr ctxt) expr
           (item_attributes ctxt) pmb.pmb_attributes
           (fun f l2 -> List.iter (aux f) l2) l2
@@ -2067,17 +2093,16 @@ and type_def_list ctxt f (rf, exported, l) =
 and record_declaration ctxt f ~unboxed lbls =
   let type_record_field f pld =
     let legacy, m =
-      if print_modality_in_old_syntax pld.pld_modalities then
-        pld.pld_modalities, []
-      else
-        [], pld.pld_modalities
+      match print_modality_in_old_syntax pld.pld_modalities with
+      | Some m -> m, No_modalities
+      | None -> [], pld.pld_modalities
     in
     pp f "@[<2>%a%a%a:@;%a%a@;%a@]"
       mutable_flag pld.pld_mutable
       optional_legacy_modalities legacy
       ident_of_name pld.pld_name.txt
       (core_type ctxt) pld.pld_type
-      optional_space_atat_modalities m
+      optional_space_modality_annot m
       (attributes ctxt) pld.pld_attributes
   in
   let hash = if unboxed then "#" else "" in
@@ -2348,7 +2373,7 @@ and function_constraint ctxt f x =
       (option ~first:":@;" (core_type ctxt)) ty1
       (core_type ctxt) ty2
   | { ret_type_constraint = None; ret_mode_annotations; _} ->
-    pp f "%a" optional_at_modes ret_mode_annotations
+    pp f "%a" optional_mode_annot ret_mode_annotations
 
 and function_params_then_body ctxt f params constraint_ body ~delimiter =
   let pp_params f =

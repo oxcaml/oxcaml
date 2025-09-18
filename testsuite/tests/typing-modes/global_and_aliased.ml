@@ -18,9 +18,9 @@ type 'a t3 = { x3 : 'a @@ global; } [@@unboxed]
 type 'a t4 : value mod global = { x4 : 'a @@ global unique } [@@unboxed]
 
 [%%expect{|
-Line 1, characters 45-58:
+Line 1, characters 42-58:
 1 | type 'a t4 : value mod global = { x4 : 'a @@ global unique } [@@unboxed]
-                                                 ^^^^^^^^^^^^^
+                                              ^^^^^^^^^^^^^^^^
 Error: The modality "global" can't be used together with "unique"
 |}]
 
@@ -123,9 +123,9 @@ type 'a mut5 = { mutable x5 : 'a @@ local unique; }
 type 'a mut6 = { mutable x6 : 'a @@ unique }
 
 [%%expect{|
-Line 1, characters 36-42:
+Line 1, characters 33-42:
 1 | type 'a mut6 = { mutable x6 : 'a @@ unique }
-                                        ^^^^^^
+                                     ^^^^^^^^^
 Error: The modality "global" can't be used together with "unique"
 |}]
 
