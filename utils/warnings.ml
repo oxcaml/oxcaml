@@ -1316,7 +1316,9 @@ let message = function
        fields of this record will be boxed instead of being\n\
        represented as a flat float array."
   | Implied_attribute { implying; implied } ->
-    Printf.sprintf "attribute [@%s] is unused because it is implied by [@%s]" implied implying
+    Printf.sprintf
+      "attribute [@%s] is unused because it is implied by [@%s]"
+      implied implying
 ;;
 
 let nerrors = ref 0
