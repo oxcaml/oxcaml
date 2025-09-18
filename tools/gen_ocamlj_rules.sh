@@ -110,5 +110,5 @@ cat <<EOF
 (rule
  (target stdlib.cmja)
  (deps ${stdlib_cmja_contents})
- (action (run %{bin:ocamlj} ${OCAMLJ_FLAGS} -a -o %{target} %{deps})))
+ (action (run %{bin:ocamlj} ${OCAMLJ_FLAGS} -linkall -a -o %{target} %{deps})))
 EOF

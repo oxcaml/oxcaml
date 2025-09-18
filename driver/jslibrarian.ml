@@ -21,8 +21,11 @@ let create_archive file_list lib_name =
     ) file_list
   in
   (* Use js_of_ocaml link to create the archive *)
+  (* The -a flag is crucial - it makes js_of_ocaml preserve unitInfo metadata *)
+  let linkall_flag = if !Clflags.link_everything then ["--linkall"] else [] in
+  let debug_flag = if !Clflags.debug then ["--debug-info"] else [] in
   Jscompile.run_jsoo_exn
-    ~args:([ "link"; "--linkall"; "-o"; lib_name ] @ cmjo_files)
+    ~args:([ "link"; "-a" ] @ linkall_flag @ debug_flag @ [ "-o"; lib_name ] @ cmjo_files)
 
 open Format
 module Style = Misc.Style

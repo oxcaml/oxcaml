@@ -199,6 +199,7 @@ AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([enable_syntax_quotations])
 AC_SUBST([CONFIGURE_ARGS])
 AC_SUBST([native_compiler])
+AC_SUBST([javascript_compiler])
 AC_SUBST([default_build_target])
 AC_SUBST([VERSION], [AC_PACKAGE_VERSION])
 AC_SUBST([OCAML_DEVELOPMENT_VERSION], [OCAML__DEVELOPMENT_VERSION])
@@ -1448,6 +1449,7 @@ AS_CASE([$host],
 # Configure native dynlink
 
 natdynlink=false
+javascript_compiler=true
 
 AS_IF([test x"$supports_shared_libraries" = 'xtrue'],
   [AS_CASE(["$host"],

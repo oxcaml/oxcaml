@@ -34,7 +34,11 @@ let run_jsoo_exn ~args =
     match Sys.ocaml_release with
     | { extra = Some (Plus, "ox") ; _ } ->
       Filename.concat Config.bindir "js_of_ocaml"
-    | _ -> "js_of_ocaml"
+    | _ ->
+      (* Try to find js_of_ocaml in the same directory as the current executable *)
+      let exe_dir = Filename.dirname Sys.executable_name in
+      let jsoo_path = Filename.concat exe_dir "js_of_ocaml" in
+      if Sys.file_exists jsoo_path then jsoo_path else "js_of_ocaml"
   in
   let cmdline = Filename.quote_command prog args in
   match Ccomp.command cmdline with
@@ -111,9 +115,10 @@ let emit_jsir i
       (* Clean up the intermediate .cmj file *)
       Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmj i.target)))
     (fun () ->
+      let debug_flag = if !Clflags.debug then ["--debug-info"] else [] in
       run_jsoo_exn
-        ~args:["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
-               "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))])
+        ~args:(["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
+               "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))] @ debug_flag))
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
       ~as_arg_for =
@@ -142,9 +147,10 @@ let emit i =
       (* Clean up the intermediate .cmj file *)
       Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmj i.target)))
     (fun () ->
+      let debug_flag = if !Clflags.debug then ["--debug-info"] else [] in
       run_jsoo_exn
-        ~args:["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
-               "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))])
+        ~args:(["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
+               "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))] @ debug_flag))
 
 type starting_point =
   | Parsing
