@@ -80,6 +80,7 @@ type trap_block_info =
     exn_bucket : LL.Value.t
   }
 
+(* CR yusumez: Refactor into its own sub-module *)
 type fun_info =
   { emitter : LL.Function.Emitter.t;
         (* Emitter responsible for producing LLVM IR of a function *)
@@ -437,9 +438,7 @@ let write_rsp t v =
 (* Other miscellaneous stuff... *)
 
 let reject_addr_regs (regs : Reg.t array) msg =
-  if Array.to_list regs
-     |> List.map (fun (reg : Reg.t) -> Cmm.is_addr reg.typ)
-     |> List.fold_left ( || ) false
+  if Array.exists (fun (reg : Reg.t) -> Cmm.is_addr reg.typ) regs
   then fail_msg ~name:"reject_addr_regs" "%s" msg
 
 let br_label t label = emit_ins_no_res t (I.br (V.of_label label))
@@ -1708,12 +1707,9 @@ let define_auxiliary_functions t =
 
 (* Interface with the rest of the compiler *)
 
-let needs_stack_checks () =
-  (not Config.no_stack_checks) && !Oxcaml_flags.cfg_stack_checks
-
-(* Create LLVM IR file for the current compilation unit. *)
 let init ~output_prefix ~ppf_dump =
-  if needs_stack_checks () then fail_msg "stack checks not supported";
+  fail_if_not ~msg:"stack checks not supported" "init" Config.no_stack_checks;
+  fail_if_not ~msg:"runtime5 required" "init" Config.runtime5;
   let llvmir_filename = output_prefix ^ ".ll" in
   current_compilation_unit := Some (create ~llvmir_filename ~ppf_dump)
 
@@ -1734,8 +1730,6 @@ let remove_file filename =
   with Sys_error _msg -> ()
 
 let invoke_clang_with_llvmir ~output_filename ~input_filename ~extra_flags =
-  (* CR-someday gyorsh: add other optimization flags and control which passes to
-     perform. *)
   let cmd =
     match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
   in
@@ -1801,8 +1795,10 @@ let begin_assembly ~is_startup ~sourcefile =
   t.sourcefile <- sourcefile;
   t.is_startup <- is_startup
 
-(* CR yusumez: lift this to [Llvm_ir] when we have proper metadata support *)
+(* CR yusumez: Lift this to [Llvm_ir] when we have proper metadata support *)
 let write_module_metadata t =
+  (* CR yusumez: Use [Cmm_helpers.make_symbol ""] instead and remove the special
+     handling of "caml" and "__" from LLVM *)
   let module_name =
     if t.is_startup
     then "_startup" (* LLVM will put the "caml" in front *)
