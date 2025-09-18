@@ -11,6 +11,7 @@ sed \
   -e 's|frame #[0-9]*: 0x[0-9a-f]*|frame #N: <ADDRESS>|g' \
   -e 's|argv=0x[0-9a-f]*|argv=<ADDRESS>|g' \
   -e 's|@0x[0-9a-f]*|@<ADDRESS>|g' \
+  -e 's|data=0x[0-9a-f]*|data=<ADDRESS>|g' \
   -e "s|'$PWD[^']*'|'<BUILD_DIR>'|g" \
   -e 's| at [a-zA-Z0-9_/.-]*\.ml:[0-9]*:[0-9]*$||g' \
   -e 's| at [a-zA-Z0-9_/.-]*\.mli:[0-9]*:[0-9]*$||g' \
