@@ -1065,7 +1065,8 @@ let function_attribute ppf t =
   end;
   begin match t.regalloc with
   | Default_regalloc -> ()
-  | Regalloc regalloc -> fprintf ppf "%a@ " Clflags.Register_allocator.format regalloc
+  | Regalloc regalloc ->
+    fprintf ppf "%a@ " Clflags.Register_allocator.format regalloc
   end;
   begin match t.regalloc_param with
   | Default_regalloc_params -> ()

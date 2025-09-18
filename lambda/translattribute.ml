@@ -251,7 +251,11 @@ let get_regalloc_attribute l =
 
 let get_regalloc_param_attributes l =
   let attrs = select_attributes is_regalloc_param_attribute l in
-  match List.filter_map (fun attr -> parse_regalloc_param_attribute (Some attr)) attrs with
+  match
+    List.filter_map
+      (fun attr -> parse_regalloc_param_attribute (Some attr))
+      attrs
+  with
   | [] -> Default_regalloc_params
   | (_ :: _) as params -> Regalloc_params params
 
@@ -409,7 +413,9 @@ let add_regalloc_param_attribute expr _loc attributes =
         | Default_regalloc_params -> []
         | Regalloc_params existing -> existing
       in
-      let attr = { attr with regalloc_param = Regalloc_params (existing @ params) } in
+      let attr = {
+        attr with regalloc_param = Regalloc_params (existing @ params)
+      } in
       lfunction_with_attr ~attr funct
     end
   | _ -> expr
@@ -420,9 +426,8 @@ let add_cold_attribute expr loc attributes =
     if get_cold_attribute attributes then begin
       if attr.cold then Location.prerr_warning loc
             (Warnings.Duplicated_attribute "cold");
-      (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never][@local never]`
-         so we do the equivalent here. *)
-      (* CR xclerc for xclerc: create a new `Warnings` constructor. *)
+      (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never]
+         [@local never]` so we do the equivalent here. *)
       begin match attr.inline with 
       | Always_inline
       | Never_inline
@@ -430,7 +435,8 @@ let add_cold_attribute expr loc attributes =
       | Unroll _ ->
         Location.prerr_warning
           loc
-          (Warnings.Implied_attribute { implying = "cold"; implied = "inline" });
+          (Warnings.Implied_attribute
+            { implying = "cold"; implied = "inline" });
       | Default_inline -> ()
       end;
       begin match attr.specialise with
@@ -438,7 +444,8 @@ let add_cold_attribute expr loc attributes =
       | Never_specialise ->
         Location.prerr_warning
           loc
-          (Warnings.Implied_attribute { implying = "cold"; implied = "specialise" });
+          (Warnings.Implied_attribute
+            { implying = "cold"; implied = "specialise" });
       | Default_specialise -> ()
       end;
       begin match attr.local with
@@ -603,12 +610,17 @@ let add_function_attributes lam loc attr =
   let lam =
     add_opaque_attribute lam loc attr
   in
-  (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never][@local never]`
-     so if all three attributes are set to never, we set `cold` to `true`. *)
+  (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never]
+    [@local never]` so if all three attributes are set to never, we set
+    `cold` to `true`. *)
   let lam =
     match lam with
     | Lfunction({
-      attr = { inline = Never_inline; specialise = Never_specialise; local = Never_local} as attr
+      attr = {
+        inline = Never_inline;
+        specialise = Never_specialise;
+        local = Never_local
+      } as attr
     } as funct) ->
       let attr = { attr with cold = true; } in
       lfunction_with_attr ~attr funct
