@@ -76,7 +76,7 @@ stdlib_cmja_contents=$(
 
         # Make sure to still add $cu to archive, even if it has no deps
         for dep in ${deps[$cu]:-$cu}; do
-            echo "${cu}.cmj ${dep}.cmj"
+            echo "${cu}.cmjo ${dep}.cmjo"
         done
     done | tsort | uniq | tac | tr '\n' ' ')
 
@@ -88,7 +88,7 @@ echo ""
 # Individual compilation rules
 for cu in "${!srcs[@]}"; do
     echo "(rule"
-    echo " (targets ${cu}.cmj ${cu}.cmj.js ${cu}.cmjx)"
+    echo " (targets ${cu}.cmjo ${cu}.cmjx)"
     echo " (deps "
     echo "  (source_tree ../stdlib)"
     echo "  ../stdlib/.stdlib.objs/byte/${cu}.cmi"
@@ -111,16 +111,4 @@ cat <<EOF
  (target stdlib.cmja)
  (deps ${stdlib_cmja_contents})
  (action (run %{bin:ocamlj} ${OCAMLJ_FLAGS} -a -o %{target} %{deps})))
-
-(rule
- (target stdlib.js)
- (deps stdlib.cmja)
- (action
-  (run %{bin:js_of_ocaml} ${JSOO_FLAGS} -o %{target} %{deps})))
-
-(rule
- (target std_exit.js)
- (deps std_exit.cmj)
- (action
-  (run %{bin:js_of_ocaml} ${JSOO_FLAGS} -o %{target} %{deps})))
 EOF

@@ -1,8 +1,6 @@
 (* Format of a library file:
-      magic number (Config.cmja_magic_number)
-      absolute offset of content table
-      blocks of cmj bodies
-      content table = list of compilation units
+   .cmja files are now JavaScript archives created by js_of_ocaml link
+   containing linked JavaScript code from multiple .cmjo files
 *)
 
 val create_archive : string list -> string -> unit

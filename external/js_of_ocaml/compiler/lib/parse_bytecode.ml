@@ -89,15 +89,7 @@ type compilation_unit =
 
 let primitives (_ : one) = []
 
-(* CR jvanburen: make the file format match .cmo/.cma more closely? *)
-
-type cmja_compilation_unit =
-  { cu_name : string
-  ; cu_pos : int
-  ; cu_codesize : int
-  }
-
-type cmja_library = { lib_units : cmja_compilation_unit list }
+(* Note: .cmja files are now JavaScript archives, not binary format *)
 
 let from_cmj ic ~name =
   let timer = Timer.make () in
@@ -120,15 +112,6 @@ let from_cmj ic ~name =
   in
   { name; info = uinfo; contents = code }
 
-let from_cmja ic =
-  (* CR jvanburen: stop loading everything at once *)
-  let toc_pos = input_binary_int ic in
-  seek_in ic toc_pos;
-  let { lib_units } : cmja_library = input_value ic in
-  List.map lib_units ~f:(fun { cu_name; cu_pos; cu_codesize = _ } ->
-      seek_in ic cu_pos;
-      from_cmj ic ~name:cu_name)
-
 let load
     ~filename
     ~include_dirs:(_ : string list)
@@ -148,7 +131,9 @@ let load
              && not (Magic_number.equal magic (Magic_number.current kind)) ->
           bad_magic_number ()
       | `Cmj -> `Cmj (from_cmj ic ~name)
-      | `Cmja -> `Cmja (from_cmja ic))
+      | `Cmja ->
+          (* .cmja files are now JavaScript archives, not binary format *)
+          failwith ".cmja files are now JavaScript archives and should be treated as .js files")
     ~finally:(fun () -> close_in ic)
 
 let predefined_exceptions () =

@@ -966,8 +966,8 @@
   (install
   (files
     (glob_files *.cmjx)
-    stdlib.cmja.js
-    std_exit.cmj.js
+    stdlib.cmja
+    std_exit.cmjo
     )
   (section lib)
   (package ocaml_runtime_stdlib)))

@@ -106,9 +106,14 @@ let emit_jsir i
         }
       in
       output_value oc cmj_body);
-  run_jsoo_exn
-    ~args:["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
-           "-o"; (Unit_info.Artifact.filename(Unit_info.cmj i.target)) ^".js"]
+  Misc.try_finally
+    ~always:(fun () ->
+      (* Clean up the intermediate .cmj file *)
+      Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmj i.target)))
+    (fun () ->
+      run_jsoo_exn
+        ~args:["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
+               "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))])
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
       ~as_arg_for =
@@ -132,9 +137,14 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
 
 (* Emit javascript directly from .cmj *)
 let emit i =
-  run_jsoo_exn
-    ~args:["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
-           "-o"; (Unit_info.Artifact.filename (Unit_info.cmj i.target)) ^ ".js" ]
+  Misc.try_finally
+    ~always:(fun () ->
+      (* Clean up the intermediate .cmj file *)
+      Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmj i.target)))
+    (fun () ->
+      run_jsoo_exn
+        ~args:["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
+               "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))])
 
 type starting_point =
   | Parsing
@@ -156,7 +166,7 @@ let starting_point_of_compiler_pass start_from =
 let implementation_aux ~start_from ~source_file ~output_prefix
     ~keep_symbol_tables:_
     ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
-  with_info ~source_file ~output_prefix ~dump_ext:"cmj" ~compilation_unit
+  with_info ~source_file ~output_prefix ~dump_ext:"cmjo" ~compilation_unit
     ~kind:Impl
   @@ fun info ->
   match start_from with

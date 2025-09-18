@@ -113,7 +113,7 @@ let options =
     Arg.(value & opt (some string) None & info [ "o" ] ~docv:"FILE" ~doc)
   in
   let input_file =
-    let doc = "Compile the JSOO file (.cmj) or archive (.cmja) [$(docv)]." in
+    let doc = "Compile the JSOO IR file (.cmj) [$(docv)]." in
     Arg.(required & pos ~rev:true 0 (some string) None & info [] ~docv:"PROGRAM" ~doc)
   in
   let keep_unit_names =

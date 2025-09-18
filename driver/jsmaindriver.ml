@@ -15,6 +15,11 @@
 
 module Options = Main_args.Make_jscomp_options (Main_args.Default.Jsmain)
 
+let default_js_output output_name =
+  match output_name with
+  | Some s -> s
+  | None -> Config.default_executable_name ^ ".js"
+
 let main argv ppf =
   Clflags.jsir := true;
   let program = "ocamlj" in
@@ -52,7 +57,7 @@ let main argv ppf =
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
     (try
        Compenv.process_deferred_actions
-         (ppf, Jscompile.implementation, Jscompile.interface, ".cmj", ".cmja")
+         (ppf, Jscompile.implementation, Jscompile.interface, ".cmjo", ".cmja")
      with Arg.Bad msg ->
        prerr_endline msg;
        Clflags.print_arguments program;
@@ -89,7 +94,7 @@ let main argv ppf =
     else if !Clflags.instantiate then Misc.fatal_error "instantiation is not supported by ocamlj"
     else if !Clflags.shared then Misc.fatal_error "shared objects are not supported by ocamlj"
     else if not !Compenv.stop_early && !Clflags.objfiles <> [] then (
-      let target = Compenv.extract_output !Clflags.output_name in
+      let target = default_js_output !Clflags.output_name in
       Compmisc.init_path ();
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
           let objs = Compenv.get_objfiles ~with_ocamlparam:true in
