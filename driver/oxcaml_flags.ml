@@ -137,6 +137,8 @@ let keep_llvmir = ref false (* -keep-llvmir *)
 
 let llvm_path = ref None (* -llvm-path *)
 
+let llvm_flags = ref "" (* -llvm-flags *)
+
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
 

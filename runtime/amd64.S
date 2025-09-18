@@ -933,9 +933,10 @@ ENDFUNCTION(G(caml_c_call))
         C stack args        : offset=%r12                               \
        Wrap caml_c_stack_args and prepare stack args for it */          \
     /* Where rsp was right before the call */                           \
-        leaq	8(%rsp), %r13;                                          \
+        leaq	8+FRAME_POINTER_SIZE(%rsp), %r13;                       \
         leaq	(%r13, %r12), %r12;                                     \
         call	G(caml_c_call_stack_args ## suffix);                    \
+        LEAVE_FUNCTION;                                                 \
         ret;                                                            \
     CFI_ENDPROC                 ;                                       \
     ENDFUNCTION(G(caml_c_call_stack_args_llvm_backend ## suffix))       \

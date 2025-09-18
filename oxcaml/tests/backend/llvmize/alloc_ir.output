@@ -1,0 +1,1215 @@
+source_filename = "alloc.ml"
+
+define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__my_fold_HIDE_STAMP(i64 %0, i64 %1, ptr addrspace(1) %2, ptr addrspace(1) %3, ptr addrspace(1) %4) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %6 = alloca ptr addrspace(1)
+  store ptr addrspace(1) %2, ptr %6
+  %7 = alloca ptr addrspace(1)
+  store ptr addrspace(1) %3, ptr %7
+  %8 = alloca ptr addrspace(1)
+  store ptr addrspace(1) %4, ptr %8
+  %9 = alloca ptr addrspace(1)
+  %10 = alloca ptr addrspace(1)
+  %11 = alloca ptr addrspace(1)
+  %12 = alloca ptr addrspace(1)
+  %13 = alloca ptr addrspace(1)
+  %14 = alloca ptr addrspace(1)
+  %15 = alloca ptr addrspace(1)
+  %16 = alloca ptr addrspace(1)
+  %17 = alloca ptr addrspace(1)
+  br label %L1
+L1:
+  br label %L101
+L101:
+  %18 = load ptr addrspace(1), ptr %6
+  store ptr addrspace(1) %18, ptr %9
+  %19 = load ptr addrspace(1), ptr %7
+  store ptr addrspace(1) %19, ptr %10
+  %20 = load ptr addrspace(1), ptr %8
+  store ptr addrspace(1) %20, ptr %11
+  %21 = load i64, ptr %11
+  %22 = trunc i64 %21 to i1
+  br i1 %22, label %L103, label %L105
+L103:
+  %23 = load ptr addrspace(1), ptr %10
+  store ptr addrspace(1) %23, ptr %6
+  %24 = load ptr addrspace(1), ptr %6
+  %25 = load i64, ptr %ds
+  %26 = load i64, ptr %alloc
+  %27 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %25, 0, 0
+  %28 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %27, i64 %26, 0, 1
+  %29 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %28, ptr addrspace(1) %24, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %29
+L105:
+  %30 = load ptr addrspace(1), ptr %11
+  store ptr addrspace(1) %30, ptr %12
+  %31 = load ptr addrspace(1), ptr %12
+  %32 = getelementptr i8, ptr addrspace(1) %31, i64 8
+  store ptr addrspace(1) %32, ptr %12
+  %33 = load ptr addrspace(1), ptr %12
+  %34 = load ptr addrspace(1), ptr addrspace(1) %33
+  store ptr addrspace(1) %34, ptr %13
+  %35 = load ptr addrspace(1), ptr %9
+  store ptr addrspace(1) %35, ptr %6
+  %36 = load ptr addrspace(1), ptr %10
+  store ptr addrspace(1) %36, ptr %7
+  %37 = load ptr addrspace(1), ptr %13
+  store ptr addrspace(1) %37, ptr %8
+  %38 = load ptr addrspace(1), ptr %6
+  %39 = load ptr addrspace(1), ptr %7
+  %40 = load ptr addrspace(1), ptr %8
+  %41 = load i64, ptr %ds
+  %42 = load i64, ptr %alloc
+  %43 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__my_fold_HIDE_STAMP(i64 %41, i64 %42, ptr addrspace(1) %38, ptr addrspace(1) %39, ptr addrspace(1) %40) "statepoint-id"="0"
+  %44 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %43, 0, 0
+  %45 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %43, 0, 1
+  store i64 %44, ptr %ds
+  store i64 %45, ptr %alloc
+  %46 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %43, 1, 0
+  store ptr addrspace(1) %46, ptr %6
+  br label %L107
+L107:
+  %47 = load ptr addrspace(1), ptr %6
+  store ptr addrspace(1) %47, ptr %14
+  %48 = load ptr addrspace(1), ptr %14
+  store ptr addrspace(1) %48, ptr %15
+  %49 = load ptr addrspace(1), ptr %11
+  %50 = load ptr addrspace(1), ptr addrspace(1) %49
+  store ptr addrspace(1) %50, ptr %16
+  %51 = load ptr addrspace(1), ptr %16
+  store ptr addrspace(1) %51, ptr %6
+  %52 = load ptr addrspace(1), ptr %15
+  store ptr addrspace(1) %52, ptr %7
+  %53 = load ptr addrspace(1), ptr %9
+  store ptr addrspace(1) %53, ptr %8
+  %54 = load ptr addrspace(1), ptr %6
+  %55 = load ptr addrspace(1), ptr %7
+  %56 = load ptr addrspace(1), ptr %8
+  %57 = load i64, ptr %ds
+  %58 = load i64, ptr %alloc
+  %59 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @caml_apply2(i64 %57, i64 %58, ptr addrspace(1) %54, ptr addrspace(1) %55, ptr addrspace(1) %56) "statepoint-id"="0"
+  %60 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %59, 0, 0
+  %61 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %59, 0, 1
+  store i64 %60, ptr %ds
+  store i64 %61, ptr %alloc
+  %62 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %59, 1, 0
+  store ptr addrspace(1) %62, ptr %6
+  br label %L110
+L110:
+  %63 = load ptr addrspace(1), ptr %6
+  store ptr addrspace(1) %63, ptr %17
+  %64 = load ptr addrspace(1), ptr %17
+  store ptr addrspace(1) %64, ptr %6
+  %65 = load ptr addrspace(1), ptr %6
+  %66 = load i64, ptr %ds
+  %67 = load i64, ptr %alloc
+  %68 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %66, 0, 0
+  %69 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %68, i64 %67, 0, 1
+  %70 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %69, ptr addrspace(1) %65, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %70
+}
+
+define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__local_iota_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %5 = alloca i64
+  store i64 %2, ptr %5
+  %6 = alloca i64
+  store i64 %3, ptr %6
+  %7 = alloca ptr addrspace(1)
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca ptr addrspace(1)
+  %14 = alloca ptr addrspace(1)
+  %15 = alloca ptr addrspace(1)
+  %16 = alloca i64
+  br label %L1
+L1:
+  br label %L114
+L114:
+  %17 = load i64, ptr %5
+  store i64 %17, ptr %8
+  %18 = load i64, ptr %6
+  store i64 %18, ptr %9
+  %19 = load i64, ptr %9
+  %20 = icmp slt i64 %19, 1
+  br i1 %20, label %L116, label %L125
+L125:
+  %21 = load i64, ptr %9
+  %22 = icmp sgt i64 %21, 1
+  br i1 %22, label %L118, label %L116
+L116:
+  store i64 1, ptr %10
+  %23 = load i64, ptr %10
+  store i64 %23, ptr %5
+  %24 = load ptr addrspace(1), ptr %5
+  %25 = load i64, ptr %ds
+  %26 = load i64, ptr %alloc
+  %27 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %25, 0, 0
+  %28 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %27, i64 %26, 0, 1
+  %29 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %28, ptr addrspace(1) %24, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %29
+L118:
+  %30 = load i64, ptr %9
+  store i64 %30, ptr %11
+  %31 = load i64, ptr %11
+  %32 = add i64 %31, -2
+  store i64 %32, ptr %11
+  %33 = load i64, ptr %8
+  store i64 %33, ptr %12
+  %34 = load i64, ptr %12
+  %35 = add i64 %34, 2
+  store i64 %35, ptr %12
+  %36 = load i64, ptr %12
+  store i64 %36, ptr %5
+  %37 = load i64, ptr %11
+  store i64 %37, ptr %6
+  %38 = load i64, ptr %5
+  %39 = load i64, ptr %6
+  %40 = load i64, ptr %ds
+  %41 = load i64, ptr %alloc
+  %42 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__local_iota_HIDE_STAMP(i64 %40, i64 %41, i64 %38, i64 %39) "statepoint-id"="0"
+  %43 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %42, 0, 0
+  %44 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %42, 0, 1
+  store i64 %43, ptr %ds
+  store i64 %44, ptr %alloc
+  %45 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %42, 1, 0
+  store ptr addrspace(1) %45, ptr %7
+  br label %L120
+L120:
+  %46 = load ptr addrspace(1), ptr %7
+  store ptr addrspace(1) %46, ptr %13
+  %47 = load ptr addrspace(1), ptr %13
+  store ptr addrspace(1) %47, ptr %14
+  %48 = load i64, ptr %ds
+  %49 = add i64 %48, 64
+  %50 = inttoptr i64 %49 to ptr
+  %51 = load i64, ptr %50
+  %52 = sub i64 %51, 24
+  store i64 %52, ptr %50
+  %53 = load i64, ptr %ds
+  %54 = add i64 %53, 80
+  %55 = inttoptr i64 %54 to ptr
+  %56 = load i64, ptr %55
+  %57 = icmp slt i64 %56, %52
+  %58 = call  i1 @llvm.expect.i1(i1 %57, i1 1)
+  br i1 %58, label %L127, label %L126
+L126:
+  %59 = load i64, ptr %ds
+  %60 = load i64, ptr %alloc
+  %61 = call oxcaml_alloccc { { i64, i64 }, {  } } @caml_call_local_realloc(i64 %59, i64 %60) "gc-leaf-function"="true" cold
+  %62 = extractvalue { { i64, i64 }, {  } } %61, 0, 0
+  %63 = extractvalue { { i64, i64 }, {  } } %61, 0, 1
+  store i64 %62, ptr %ds
+  store i64 %63, ptr %alloc
+  br label %L127
+L127:
+  %64 = load i64, ptr %ds
+  %65 = add i64 %64, 72
+  %66 = inttoptr i64 %65 to ptr
+  %67 = load i64, ptr %66
+  %68 = add i64 %52, %67
+  %69 = add i64 %68, 8
+  %70 = inttoptr i64 %69 to ptr addrspace(1)
+  store ptr addrspace(1) %70, ptr %15
+  store i64 2816, ptr %16
+  %71 = load ptr addrspace(1), ptr %15
+  %72 = ptrtoint ptr addrspace(1) %71 to i64
+  %73 = add i64 %72, -8
+  %74 = inttoptr i64 %73 to ptr addrspace(1)
+  %75 = load ptr addrspace(1), ptr %16
+  store ptr addrspace(1) %75, ptr addrspace(1) %74
+  %76 = load ptr addrspace(1), ptr %15
+  %77 = load ptr addrspace(1), ptr %8
+  store ptr addrspace(1) %77, ptr addrspace(1) %76
+  %78 = load ptr addrspace(1), ptr %15
+  %79 = ptrtoint ptr addrspace(1) %78 to i64
+  %80 = add i64 %79, 8
+  %81 = inttoptr i64 %80 to ptr addrspace(1)
+  %82 = load ptr addrspace(1), ptr %14
+  store ptr addrspace(1) %82, ptr addrspace(1) %81
+  %83 = load ptr addrspace(1), ptr %15
+  store ptr addrspace(1) %83, ptr %7
+  %84 = load ptr addrspace(1), ptr %7
+  %85 = load i64, ptr %ds
+  %86 = load i64, ptr %alloc
+  %87 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %85, 0, 0
+  %88 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %87, i64 %86, 0, 1
+  %89 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %88, ptr addrspace(1) %84, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %89
+}
+
+define  oxcamlcc { { i64, i64 }, { i64 } } @camlAlloc__big_local_alloc_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %4 = alloca i64
+  store i64 %2, ptr %4
+  %5 = alloca ptr addrspace(1)
+  %6 = alloca i64
+  %7 = alloca ptr addrspace(1)
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca ptr addrspace(1)
+  %14 = alloca ptr addrspace(1)
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = alloca i64
+  %20 = alloca i64
+  br label %L1
+L1:
+  br label %L129
+L129:
+  %21 = load i64, ptr %4
+  store i64 %21, ptr %8
+  %22 = load i64, ptr %ds
+  %23 = add i64 %22, 64
+  %24 = inttoptr i64 %23 to ptr
+  %25 = load i64, ptr %24
+  store i64 %25, ptr %9
+  %26 = load i64, ptr %9
+  store i64 %26, ptr %10
+  store i64 20001, ptr %11
+  store i64 1, ptr %12
+  %27 = load i64, ptr %12
+  store i64 %27, ptr %4
+  %28 = load i64, ptr %11
+  store i64 %28, ptr %6
+  %29 = load i64, ptr %4
+  %30 = load i64, ptr %6
+  %31 = load i64, ptr %ds
+  %32 = load i64, ptr %alloc
+  %33 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__local_iota_HIDE_STAMP(i64 %31, i64 %32, i64 %29, i64 %30) "statepoint-id"="0"
+  %34 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %33, 0, 0
+  %35 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %33, 0, 1
+  store i64 %34, ptr %ds
+  store i64 %35, ptr %alloc
+  %36 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %33, 1, 0
+  store ptr addrspace(1) %36, ptr %5
+  br label %L132
+L132:
+  %37 = load ptr addrspace(1), ptr %5
+  store ptr addrspace(1) %37, ptr %13
+  %38 = load ptr addrspace(1), ptr %13
+  store ptr addrspace(1) %38, ptr %14
+  store i64 1, ptr %15
+  %39 = ptrtoint ptr @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12 to i64
+  store i64 %39, ptr %16
+  %40 = load i64, ptr %16
+  store i64 %40, ptr %4
+  %41 = load i64, ptr %15
+  store i64 %41, ptr %6
+  %42 = load ptr addrspace(1), ptr %14
+  store ptr addrspace(1) %42, ptr %7
+  %43 = load i64, ptr %4
+  %44 = load i64, ptr %6
+  %45 = load ptr addrspace(1), ptr %7
+  %46 = load i64, ptr %ds
+  %47 = load i64, ptr %alloc
+  %48 = call oxcamlcc { { i64, i64 }, { i64 } } @camlAlloc__my_fold_HIDE_STAMP(i64 %46, i64 %47, i64 %43, i64 %44, ptr addrspace(1) %45) "statepoint-id"="0"
+  %49 = extractvalue { { i64, i64 }, { i64 } } %48, 0, 0
+  %50 = extractvalue { { i64, i64 }, { i64 } } %48, 0, 1
+  store i64 %49, ptr %ds
+  store i64 %50, ptr %alloc
+  %51 = extractvalue { { i64, i64 }, { i64 } } %48, 1, 0
+  store i64 %51, ptr %4
+  br label %L133
+L133:
+  %52 = load i64, ptr %4
+  store i64 %52, ptr %17
+  %53 = load i64, ptr %17
+  store i64 %53, ptr %18
+  %54 = load i64, ptr %ds
+  %55 = add i64 %54, 64
+  %56 = inttoptr i64 %55 to ptr
+  %57 = load i64, ptr %10
+  store i64 %57, ptr %56
+  store i64 1, ptr %19
+  %58 = load i64, ptr %19
+  store i64 %58, ptr %20
+  %59 = load i64, ptr %18
+  store i64 %59, ptr %4
+  %60 = load i64, ptr %4
+  %61 = load i64, ptr %ds
+  %62 = load i64, ptr %alloc
+  %63 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %61, 0, 0
+  %64 = insertvalue { { i64, i64 }, { i64 } } %63, i64 %62, 0, 1
+  %65 = insertvalue { { i64, i64 }, { i64 } } %64, i64 %60, 1, 0
+  ret { { i64, i64 }, { i64 } } %65
+}
+
+define  oxcamlcc { { i64, i64 }, { i64 } } @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %5 = alloca i64
+  store i64 %2, ptr %5
+  %6 = alloca i64
+  store i64 %3, ptr %6
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  br label %L1
+L1:
+  br label %L136
+L136:
+  %11 = load i64, ptr %5
+  store i64 %11, ptr %7
+  %12 = load i64, ptr %6
+  store i64 %12, ptr %8
+  %13 = load i64, ptr %7
+  store i64 %13, ptr %9
+  %14 = load i64, ptr %9
+  %15 = load i64, ptr %8
+  %16 = add i64 %14, %15
+  store i64 %16, ptr %9
+  %17 = load i64, ptr %9
+  store i64 %17, ptr %10
+  %18 = load i64, ptr %10
+  %19 = add i64 %18, -1
+  store i64 %19, ptr %10
+  %20 = load i64, ptr %10
+  store i64 %20, ptr %5
+  %21 = load i64, ptr %5
+  %22 = load i64, ptr %ds
+  %23 = load i64, ptr %alloc
+  %24 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %22, 0, 0
+  %25 = insertvalue { { i64, i64 }, { i64 } } %24, i64 %23, 0, 1
+  %26 = insertvalue { { i64, i64 }, { i64 } } %25, i64 %21, 1, 0
+  ret { { i64, i64 }, { i64 } } %26
+}
+
+define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__heap_iota_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %5 = alloca i64
+  store i64 %2, ptr %5
+  %6 = alloca i64
+  store i64 %3, ptr %6
+  %7 = alloca ptr addrspace(1)
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca ptr addrspace(1)
+  %14 = alloca ptr addrspace(1)
+  %15 = alloca ptr addrspace(1)
+  %16 = alloca i64
+  br label %L1
+L1:
+  br label %L141
+L141:
+  %17 = load i64, ptr %5
+  store i64 %17, ptr %8
+  %18 = load i64, ptr %6
+  store i64 %18, ptr %9
+  %19 = load i64, ptr %9
+  %20 = icmp slt i64 %19, 1
+  br i1 %20, label %L143, label %L152
+L152:
+  %21 = load i64, ptr %9
+  %22 = icmp sgt i64 %21, 1
+  br i1 %22, label %L145, label %L143
+L143:
+  store i64 1, ptr %10
+  %23 = load i64, ptr %10
+  store i64 %23, ptr %5
+  %24 = load ptr addrspace(1), ptr %5
+  %25 = load i64, ptr %ds
+  %26 = load i64, ptr %alloc
+  %27 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %25, 0, 0
+  %28 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %27, i64 %26, 0, 1
+  %29 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %28, ptr addrspace(1) %24, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %29
+L145:
+  %30 = load i64, ptr %9
+  store i64 %30, ptr %11
+  %31 = load i64, ptr %11
+  %32 = add i64 %31, -2
+  store i64 %32, ptr %11
+  %33 = load i64, ptr %8
+  store i64 %33, ptr %12
+  %34 = load i64, ptr %12
+  %35 = add i64 %34, 2
+  store i64 %35, ptr %12
+  %36 = load i64, ptr %12
+  store i64 %36, ptr %5
+  %37 = load i64, ptr %11
+  store i64 %37, ptr %6
+  %38 = load i64, ptr %5
+  %39 = load i64, ptr %6
+  %40 = load i64, ptr %ds
+  %41 = load i64, ptr %alloc
+  %42 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__heap_iota_HIDE_STAMP(i64 %40, i64 %41, i64 %38, i64 %39) "statepoint-id"="0"
+  %43 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %42, 0, 0
+  %44 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %42, 0, 1
+  store i64 %43, ptr %ds
+  store i64 %44, ptr %alloc
+  %45 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %42, 1, 0
+  store ptr addrspace(1) %45, ptr %7
+  br label %L147
+L147:
+  %46 = load ptr addrspace(1), ptr %7
+  store ptr addrspace(1) %46, ptr %13
+  %47 = load ptr addrspace(1), ptr %13
+  store ptr addrspace(1) %47, ptr %14
+  %48 = load i64, ptr %alloc
+  %49 = sub i64 %48, 24
+  store i64 %49, ptr %alloc
+  %50 = load i64, ptr %ds
+  %51 = inttoptr i64 %50 to ptr
+  %52 = load i64, ptr %51
+  %53 = icmp ult i64 %52, %49
+  %54 = call  i1 @llvm.expect.i1(i1 %53, i1 1)
+  br i1 %54, label %L154, label %L153
+L153:
+  %55 = load i64, ptr %ds
+  %56 = load i64, ptr %alloc
+  %57 = call oxcaml_alloccc { { i64, i64 }, {  } } @caml_call_gc(i64 %55, i64 %56) "statepoint-id"="0" cold
+  %58 = extractvalue { { i64, i64 }, {  } } %57, 0, 0
+  %59 = extractvalue { { i64, i64 }, {  } } %57, 0, 1
+  store i64 %58, ptr %ds
+  store i64 %59, ptr %alloc
+  br label %L154
+L154:
+  %60 = load i64, ptr %alloc
+  %61 = add i64 %60, 8
+  %62 = inttoptr i64 %61 to ptr addrspace(1)
+  store ptr addrspace(1) %62, ptr %15
+  store i64 2048, ptr %16
+  %63 = load ptr addrspace(1), ptr %15
+  %64 = ptrtoint ptr addrspace(1) %63 to i64
+  %65 = add i64 %64, -8
+  %66 = inttoptr i64 %65 to ptr addrspace(1)
+  %67 = load ptr addrspace(1), ptr %16
+  store ptr addrspace(1) %67, ptr addrspace(1) %66
+  %68 = load ptr addrspace(1), ptr %15
+  %69 = load ptr addrspace(1), ptr %8
+  store ptr addrspace(1) %69, ptr addrspace(1) %68
+  %70 = load ptr addrspace(1), ptr %15
+  %71 = ptrtoint ptr addrspace(1) %70 to i64
+  %72 = add i64 %71, 8
+  %73 = inttoptr i64 %72 to ptr addrspace(1)
+  %74 = load ptr addrspace(1), ptr %14
+  store ptr addrspace(1) %74, ptr addrspace(1) %73
+  %75 = load ptr addrspace(1), ptr %15
+  store ptr addrspace(1) %75, ptr %7
+  %76 = load ptr addrspace(1), ptr %7
+  %77 = load i64, ptr %ds
+  %78 = load i64, ptr %alloc
+  %79 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %77, 0, 0
+  %80 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %79, i64 %78, 0, 1
+  %81 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %80, ptr addrspace(1) %76, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %81
+}
+
+define  oxcamlcc { { i64, i64 }, { i64 } } @camlAlloc__big_heap_alloc_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %4 = alloca i64
+  store i64 %2, ptr %4
+  %5 = alloca ptr addrspace(1)
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca ptr addrspace(1)
+  %11 = alloca ptr addrspace(1)
+  %12 = alloca ptr addrspace(1)
+  %13 = alloca ptr addrspace(1)
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca ptr addrspace(1)
+  %17 = alloca ptr addrspace(1)
+  %18 = alloca ptr addrspace(1)
+  %19 = alloca ptr addrspace(1)
+  %20 = alloca i64
+  %21 = alloca i64
+  %22 = alloca i64
+  %23 = alloca ptr addrspace(1)
+  br label %L1
+L1:
+  br label %L156
+L156:
+  %24 = load i64, ptr %4
+  store i64 %24, ptr %7
+  store i64 40001, ptr %8
+  store i64 1, ptr %9
+  %25 = load i64, ptr %9
+  store i64 %25, ptr %4
+  %26 = load i64, ptr %8
+  store i64 %26, ptr %6
+  %27 = load i64, ptr %4
+  %28 = load i64, ptr %6
+  %29 = load i64, ptr %ds
+  %30 = load i64, ptr %alloc
+  %31 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__heap_iota_HIDE_STAMP(i64 %29, i64 %30, i64 %27, i64 %28) "statepoint-id"="0"
+  %32 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %31, 0, 0
+  %33 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %31, 0, 1
+  store i64 %32, ptr %ds
+  store i64 %33, ptr %alloc
+  %34 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %31, 1, 0
+  store ptr addrspace(1) %34, ptr %5
+  br label %L158
+L158:
+  %35 = load ptr addrspace(1), ptr %5
+  store ptr addrspace(1) %35, ptr %10
+  %36 = load ptr addrspace(1), ptr %10
+  store ptr addrspace(1) %36, ptr %11
+  store i64 1, ptr %14
+  %37 = load i64, ptr %14
+  store i64 %37, ptr %15
+  %38 = load ptr addrspace(1), ptr %11
+  store ptr addrspace(1) %38, ptr %16
+  %39 = load i64, ptr %15
+  %40 = inttoptr i64 %39 to ptr addrspace(1)
+  store ptr addrspace(1) %40, ptr %12
+  %41 = load ptr addrspace(1), ptr %16
+  store ptr addrspace(1) %41, ptr %13
+  br label %L162
+L162:
+  %42 = load i64, ptr %13
+  %43 = trunc i64 %42 to i1
+  br i1 %43, label %L164, label %L166
+L164:
+  %44 = load ptr addrspace(1), ptr %12
+  store ptr addrspace(1) %44, ptr %5
+  %45 = load i64, ptr %5
+  %46 = load i64, ptr %ds
+  %47 = load i64, ptr %alloc
+  %48 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %46, 0, 0
+  %49 = insertvalue { { i64, i64 }, { i64 } } %48, i64 %47, 0, 1
+  %50 = insertvalue { { i64, i64 }, { i64 } } %49, i64 %45, 1, 0
+  ret { { i64, i64 }, { i64 } } %50
+L166:
+  %51 = load ptr addrspace(1), ptr %13
+  store ptr addrspace(1) %51, ptr %17
+  %52 = load ptr addrspace(1), ptr %17
+  %53 = getelementptr i8, ptr addrspace(1) %52, i64 8
+  store ptr addrspace(1) %53, ptr %17
+  %54 = load ptr addrspace(1), ptr %17
+  %55 = load ptr addrspace(1), ptr addrspace(1) %54
+  store ptr addrspace(1) %55, ptr %18
+  %56 = load ptr addrspace(1), ptr %13
+  %57 = load ptr addrspace(1), ptr addrspace(1) %56
+  store ptr addrspace(1) %57, ptr %19
+  %58 = load ptr addrspace(1), ptr %12
+  %59 = ptrtoint ptr addrspace(1) %58 to i64
+  store i64 %59, ptr %20
+  %60 = load i64, ptr %20
+  %61 = load i64, ptr %19
+  %62 = add i64 %60, %61
+  store i64 %62, ptr %20
+  %63 = load i64, ptr %20
+  store i64 %63, ptr %21
+  %64 = load i64, ptr %21
+  %65 = add i64 %64, -1
+  store i64 %65, ptr %21
+  %66 = load i64, ptr %21
+  store i64 %66, ptr %22
+  %67 = load ptr addrspace(1), ptr %18
+  store ptr addrspace(1) %67, ptr %23
+  %68 = load i64, ptr %22
+  %69 = inttoptr i64 %68 to ptr addrspace(1)
+  store ptr addrspace(1) %69, ptr %12
+  %70 = load ptr addrspace(1), ptr %23
+  store ptr addrspace(1) %70, ptr %13
+  br label %L162
+}
+
+define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__make_ref_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %4 = alloca i64
+  store i64 %2, ptr %4
+  %5 = alloca ptr addrspace(1)
+  %6 = alloca i64
+  %7 = alloca ptr addrspace(1)
+  %8 = alloca i64
+  %9 = alloca i64
+  br label %L1
+L1:
+  br label %L176
+L176:
+  %10 = load i64, ptr %4
+  store i64 %10, ptr %6
+  %11 = load i64, ptr %alloc
+  %12 = sub i64 %11, 16
+  store i64 %12, ptr %alloc
+  %13 = load i64, ptr %ds
+  %14 = inttoptr i64 %13 to ptr
+  %15 = load i64, ptr %14
+  %16 = icmp ult i64 %15, %12
+  %17 = call  i1 @llvm.expect.i1(i1 %16, i1 1)
+  br i1 %17, label %L180, label %L179
+L179:
+  %18 = load i64, ptr %ds
+  %19 = load i64, ptr %alloc
+  %20 = call oxcaml_alloccc { { i64, i64 }, {  } } @caml_call_gc(i64 %18, i64 %19) "statepoint-id"="0" cold
+  %21 = extractvalue { { i64, i64 }, {  } } %20, 0, 0
+  %22 = extractvalue { { i64, i64 }, {  } } %20, 0, 1
+  store i64 %21, ptr %ds
+  store i64 %22, ptr %alloc
+  br label %L180
+L180:
+  %23 = load i64, ptr %alloc
+  %24 = add i64 %23, 8
+  %25 = inttoptr i64 %24 to ptr addrspace(1)
+  store ptr addrspace(1) %25, ptr %7
+  store i64 1024, ptr %8
+  %26 = load ptr addrspace(1), ptr %7
+  %27 = ptrtoint ptr addrspace(1) %26 to i64
+  %28 = add i64 %27, -8
+  %29 = inttoptr i64 %28 to ptr addrspace(1)
+  %30 = load ptr addrspace(1), ptr %8
+  store ptr addrspace(1) %30, ptr addrspace(1) %29
+  store i64 1, ptr %9
+  %31 = load ptr addrspace(1), ptr %7
+  %32 = load ptr addrspace(1), ptr %9
+  store ptr addrspace(1) %32, ptr addrspace(1) %31
+  %33 = load ptr addrspace(1), ptr %7
+  store ptr addrspace(1) %33, ptr %5
+  %34 = load ptr addrspace(1), ptr %5
+  %35 = load i64, ptr %ds
+  %36 = load i64, ptr %alloc
+  %37 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %35, 0, 0
+  %38 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %37, i64 %36, 0, 1
+  %39 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %38, ptr addrspace(1) %34, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %39
+}
+
+define  oxcamlcc { { i64, i64 }, { i64 } } @camlAlloc__heap_ref_incr_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %4 = alloca i64
+  store i64 %2, ptr %4
+  %5 = alloca ptr addrspace(1)
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca ptr addrspace(1)
+  %9 = alloca ptr addrspace(1)
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = alloca i64
+  %20 = alloca i64
+  %21 = alloca i64
+  %22 = alloca ptr addrspace(1)
+  br label %L1
+L1:
+  br label %L182
+L182:
+  %23 = load i64, ptr %4
+  store i64 %23, ptr %6
+  store i64 1, ptr %7
+  %24 = load i64, ptr %7
+  store i64 %24, ptr %4
+  %25 = load i64, ptr %4
+  %26 = load i64, ptr %ds
+  %27 = load i64, ptr %alloc
+  %28 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__make_ref_HIDE_STAMP(i64 %26, i64 %27, i64 %25) "statepoint-id"="0"
+  %29 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %28, 0, 0
+  %30 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %28, 0, 1
+  store i64 %29, ptr %ds
+  store i64 %30, ptr %alloc
+  %31 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %28, 1, 0
+  store ptr addrspace(1) %31, ptr %5
+  br label %L184
+L184:
+  %32 = load ptr addrspace(1), ptr %5
+  store ptr addrspace(1) %32, ptr %8
+  %33 = load ptr addrspace(1), ptr %8
+  store ptr addrspace(1) %33, ptr %9
+  %34 = load ptr addrspace(1), ptr %9
+  %35 = load i64, ptr addrspace(1) %34
+  store i64 %35, ptr %10
+  %36 = load i64, ptr %10
+  store i64 %36, ptr %11
+  %37 = load i64, ptr %11
+  %38 = add i64 %37, 2
+  store i64 %38, ptr %11
+  %39 = load ptr addrspace(1), ptr %9
+  %40 = load i64, ptr %11
+  store i64 %40, ptr addrspace(1) %39
+  store i64 1, ptr %12
+  %41 = load i64, ptr %12
+  store i64 %41, ptr %13
+  %42 = load ptr addrspace(1), ptr %9
+  %43 = load i64, ptr addrspace(1) %42
+  store i64 %43, ptr %14
+  %44 = load i64, ptr %14
+  store i64 %44, ptr %15
+  %45 = load i64, ptr %15
+  %46 = add i64 %45, 2
+  store i64 %46, ptr %15
+  %47 = load ptr addrspace(1), ptr %9
+  %48 = load i64, ptr %15
+  store i64 %48, ptr addrspace(1) %47
+  store i64 1, ptr %16
+  %49 = load i64, ptr %16
+  store i64 %49, ptr %17
+  %50 = load ptr addrspace(1), ptr %9
+  %51 = load i64, ptr addrspace(1) %50
+  store i64 %51, ptr %18
+  %52 = load i64, ptr %18
+  store i64 %52, ptr %19
+  %53 = load i64, ptr %19
+  %54 = add i64 %53, 2
+  store i64 %54, ptr %19
+  %55 = load ptr addrspace(1), ptr %9
+  %56 = load i64, ptr %19
+  store i64 %56, ptr addrspace(1) %55
+  store i64 1, ptr %20
+  %57 = load i64, ptr %20
+  store i64 %57, ptr %21
+  %58 = load ptr addrspace(1), ptr %9
+  %59 = load ptr addrspace(1), ptr addrspace(1) %58
+  store ptr addrspace(1) %59, ptr %22
+  %60 = load ptr addrspace(1), ptr %22
+  store ptr addrspace(1) %60, ptr %5
+  %61 = load i64, ptr %5
+  %62 = load i64, ptr %ds
+  %63 = load i64, ptr %alloc
+  %64 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %62, 0, 0
+  %65 = insertvalue { { i64, i64 }, { i64 } } %64, i64 %63, 0, 1
+  %66 = insertvalue { { i64, i64 }, { i64 } } %65, i64 %61, 1, 0
+  ret { { i64, i64 }, { i64 } } %66
+}
+
+define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__entry(i64 %0, i64 %1) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %3 = alloca ptr addrspace(1)
+  %4 = alloca i64
+  %5 = alloca ptr addrspace(1)
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca ptr addrspace(1)
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca ptr addrspace(1)
+  %16 = alloca ptr addrspace(1)
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = alloca i64
+  %20 = alloca i64
+  %21 = alloca i64
+  %22 = alloca i64
+  %23 = alloca i64
+  %24 = alloca i64
+  %25 = alloca i64
+  %26 = alloca ptr addrspace(1)
+  %27 = alloca ptr addrspace(1)
+  %28 = alloca i64
+  %29 = alloca i64
+  %30 = alloca i64
+  %31 = alloca i64
+  %32 = alloca ptr addrspace(1)
+  %33 = alloca ptr addrspace(1)
+  %34 = alloca i64
+  %35 = alloca i64
+  %36 = alloca i64
+  %37 = alloca i64
+  %38 = alloca i64
+  %39 = alloca i64
+  %40 = alloca i64
+  %41 = alloca i64
+  %42 = alloca i64
+  %43 = alloca i64
+  %44 = alloca i64
+  %45 = alloca i64
+  %46 = alloca ptr addrspace(1)
+  %47 = alloca ptr addrspace(1)
+  %48 = alloca i64
+  %49 = alloca i64
+  %50 = alloca i64
+  %51 = alloca ptr addrspace(1)
+  %52 = alloca ptr addrspace(1)
+  %53 = alloca i64
+  %54 = alloca i64
+  %55 = alloca i64
+  %56 = alloca i64
+  %57 = alloca i64
+  %58 = alloca i64
+  br label %L1
+L1:
+  br label %L199
+L199:
+  store i64 1, ptr %9
+  %59 = load i64, ptr %9
+  store i64 %59, ptr %4
+  %60 = load i64, ptr %4
+  %61 = load i64, ptr %ds
+  %62 = load i64, ptr %alloc
+  %63 = call oxcamlcc { { i64, i64 }, { i64 } } @camlAlloc__big_local_alloc_HIDE_STAMP(i64 %61, i64 %62, i64 %60) "statepoint-id"="0"
+  %64 = extractvalue { { i64, i64 }, { i64 } } %63, 0, 0
+  %65 = extractvalue { { i64, i64 }, { i64 } } %63, 0, 1
+  store i64 %64, ptr %ds
+  store i64 %65, ptr %alloc
+  %66 = extractvalue { { i64, i64 }, { i64 } } %63, 1, 0
+  store i64 %66, ptr %4
+  br label %L201
+L201:
+  %67 = load i64, ptr %4
+  store i64 %67, ptr %10
+  %68 = load i64, ptr %10
+  store i64 %68, ptr %11
+  %69 = ptrtoint ptr @camlAlloc__const_block115 to i64
+  store i64 %69, ptr %12
+  store i64 1, ptr %13
+  %70 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1451$2c4$2d$2d59$5d_521 to i64
+  store i64 %70, ptr %14
+  %71 = load i64, ptr %14
+  store i64 %71, ptr %4
+  %72 = load i64, ptr %13
+  store i64 %72, ptr %6
+  %73 = load i64, ptr %12
+  store i64 %73, ptr %7
+  %74 = load i64, ptr %4
+  %75 = load i64, ptr %6
+  %76 = load i64, ptr %7
+  %77 = load i64, ptr %ds
+  %78 = load i64, ptr %alloc
+  %79 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(i64 %77, i64 %78, i64 %74, i64 %75, i64 %76) "statepoint-id"="0"
+  %80 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %79, 0, 0
+  %81 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %79, 0, 1
+  store i64 %80, ptr %ds
+  store i64 %81, ptr %alloc
+  %82 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %79, 1, 0
+  store ptr addrspace(1) %82, ptr %3
+  br label %L202
+L202:
+  %83 = load ptr addrspace(1), ptr %3
+  store ptr addrspace(1) %83, ptr %15
+  %84 = load ptr addrspace(1), ptr %15
+  store ptr addrspace(1) %84, ptr %16
+  %85 = load ptr addrspace(1), ptr %16
+  %86 = load i64, ptr addrspace(1) %85
+  store i64 %86, ptr %17
+  %87 = load i64, ptr %11
+  store i64 %87, ptr %4
+  %88 = load ptr addrspace(1), ptr %16
+  store ptr addrspace(1) %88, ptr %5
+  %89 = load i64, ptr %4
+  %90 = load ptr addrspace(1), ptr %5
+  %91 = load i64, ptr %ds
+  %92 = load i64, ptr %alloc
+  %93 = load ptr, ptr %17
+  %94 = call oxcamlcc { { i64, i64 }, { i64 } } %93(i64 %91, i64 %92, i64 %89, ptr addrspace(1) %90) "statepoint-id"="0"
+  %95 = extractvalue { { i64, i64 }, { i64 } } %94, 0, 0
+  %96 = extractvalue { { i64, i64 }, { i64 } } %94, 0, 1
+  store i64 %95, ptr %ds
+  store i64 %96, ptr %alloc
+  %97 = extractvalue { { i64, i64 }, { i64 } } %94, 1, 0
+  store i64 %97, ptr %4
+  br label %L203
+L203:
+  %98 = load i64, ptr %4
+  store i64 %98, ptr %18
+  %99 = load i64, ptr %18
+  store i64 %99, ptr %19
+  store i64 1, ptr %20
+  %100 = load i64, ptr %20
+  store i64 %100, ptr %4
+  %101 = load i64, ptr %4
+  %102 = load i64, ptr %ds
+  %103 = load i64, ptr %alloc
+  %104 = call oxcamlcc { { i64, i64 }, { i64 } } @camlAlloc__big_heap_alloc_HIDE_STAMP(i64 %102, i64 %103, i64 %101) "statepoint-id"="0"
+  %105 = extractvalue { { i64, i64 }, { i64 } } %104, 0, 0
+  %106 = extractvalue { { i64, i64 }, { i64 } } %104, 0, 1
+  store i64 %105, ptr %ds
+  store i64 %106, ptr %alloc
+  %107 = extractvalue { { i64, i64 }, { i64 } } %104, 1, 0
+  store i64 %107, ptr %4
+  br label %L205
+L205:
+  %108 = load i64, ptr %4
+  store i64 %108, ptr %21
+  %109 = load i64, ptr %21
+  store i64 %109, ptr %22
+  %110 = ptrtoint ptr @camlAlloc__const_block127 to i64
+  store i64 %110, ptr %23
+  store i64 1, ptr %24
+  %111 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1451$2c4$2d$2d59$5d_521 to i64
+  store i64 %111, ptr %25
+  %112 = load i64, ptr %25
+  store i64 %112, ptr %4
+  %113 = load i64, ptr %24
+  store i64 %113, ptr %6
+  %114 = load i64, ptr %23
+  store i64 %114, ptr %7
+  %115 = load i64, ptr %4
+  %116 = load i64, ptr %6
+  %117 = load i64, ptr %7
+  %118 = load i64, ptr %ds
+  %119 = load i64, ptr %alloc
+  %120 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(i64 %118, i64 %119, i64 %115, i64 %116, i64 %117) "statepoint-id"="0"
+  %121 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %120, 0, 0
+  %122 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %120, 0, 1
+  store i64 %121, ptr %ds
+  store i64 %122, ptr %alloc
+  %123 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %120, 1, 0
+  store ptr addrspace(1) %123, ptr %3
+  br label %L206
+L206:
+  %124 = load ptr addrspace(1), ptr %3
+  store ptr addrspace(1) %124, ptr %26
+  %125 = load ptr addrspace(1), ptr %26
+  store ptr addrspace(1) %125, ptr %27
+  %126 = load ptr addrspace(1), ptr %27
+  %127 = load i64, ptr addrspace(1) %126
+  store i64 %127, ptr %28
+  %128 = load i64, ptr %22
+  store i64 %128, ptr %4
+  %129 = load ptr addrspace(1), ptr %27
+  store ptr addrspace(1) %129, ptr %5
+  %130 = load i64, ptr %4
+  %131 = load ptr addrspace(1), ptr %5
+  %132 = load i64, ptr %ds
+  %133 = load i64, ptr %alloc
+  %134 = load ptr, ptr %28
+  %135 = call oxcamlcc { { i64, i64 }, { i64 } } %134(i64 %132, i64 %133, i64 %130, ptr addrspace(1) %131) "statepoint-id"="0"
+  %136 = extractvalue { { i64, i64 }, { i64 } } %135, 0, 0
+  %137 = extractvalue { { i64, i64 }, { i64 } } %135, 0, 1
+  store i64 %136, ptr %ds
+  store i64 %137, ptr %alloc
+  %138 = extractvalue { { i64, i64 }, { i64 } } %135, 1, 0
+  store i64 %138, ptr %4
+  br label %L207
+L207:
+  %139 = load i64, ptr %4
+  store i64 %139, ptr %29
+  %140 = load i64, ptr %29
+  store i64 %140, ptr %30
+  store i64 1, ptr %31
+  %141 = load i64, ptr %31
+  store i64 %141, ptr %4
+  %142 = load i64, ptr %4
+  %143 = load i64, ptr %ds
+  %144 = load i64, ptr %alloc
+  %145 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__make_ref_HIDE_STAMP(i64 %143, i64 %144, i64 %142) "statepoint-id"="0"
+  %146 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %145, 0, 0
+  %147 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %145, 0, 1
+  store i64 %146, ptr %ds
+  store i64 %147, ptr %alloc
+  %148 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %145, 1, 0
+  store ptr addrspace(1) %148, ptr %3
+  br label %L209
+L209:
+  %149 = load ptr addrspace(1), ptr %3
+  store ptr addrspace(1) %149, ptr %32
+  %150 = load ptr addrspace(1), ptr %32
+  store ptr addrspace(1) %150, ptr %33
+  %151 = load ptr addrspace(1), ptr %33
+  %152 = load i64, ptr addrspace(1) %151
+  store i64 %152, ptr %34
+  %153 = load i64, ptr %34
+  store i64 %153, ptr %35
+  %154 = load i64, ptr %35
+  %155 = add i64 %154, 2
+  store i64 %155, ptr %35
+  %156 = load ptr addrspace(1), ptr %33
+  %157 = load i64, ptr %35
+  store i64 %157, ptr addrspace(1) %156
+  store i64 1, ptr %36
+  %158 = load i64, ptr %36
+  store i64 %158, ptr %37
+  %159 = load ptr addrspace(1), ptr %33
+  %160 = load i64, ptr addrspace(1) %159
+  store i64 %160, ptr %38
+  %161 = load i64, ptr %38
+  store i64 %161, ptr %39
+  %162 = load i64, ptr %39
+  %163 = add i64 %162, 2
+  store i64 %163, ptr %39
+  %164 = load ptr addrspace(1), ptr %33
+  %165 = load i64, ptr %39
+  store i64 %165, ptr addrspace(1) %164
+  store i64 1, ptr %40
+  %166 = load i64, ptr %40
+  store i64 %166, ptr %41
+  %167 = load ptr addrspace(1), ptr %33
+  %168 = load i64, ptr addrspace(1) %167
+  store i64 %168, ptr %42
+  %169 = load i64, ptr %42
+  store i64 %169, ptr %43
+  %170 = load i64, ptr %43
+  %171 = add i64 %170, 2
+  store i64 %171, ptr %43
+  %172 = load ptr addrspace(1), ptr %33
+  %173 = load i64, ptr %43
+  store i64 %173, ptr addrspace(1) %172
+  store i64 1, ptr %44
+  %174 = load i64, ptr %44
+  store i64 %174, ptr %45
+  %175 = load ptr addrspace(1), ptr %33
+  %176 = load ptr addrspace(1), ptr addrspace(1) %175
+  store ptr addrspace(1) %176, ptr %46
+  %177 = load ptr addrspace(1), ptr %46
+  store ptr addrspace(1) %177, ptr %47
+  %178 = ptrtoint ptr @camlAlloc__const_block138 to i64
+  store i64 %178, ptr %48
+  store i64 1, ptr %49
+  %179 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1451$2c4$2d$2d59$5d_521 to i64
+  store i64 %179, ptr %50
+  %180 = load i64, ptr %50
+  store i64 %180, ptr %4
+  %181 = load i64, ptr %49
+  store i64 %181, ptr %6
+  %182 = load i64, ptr %48
+  store i64 %182, ptr %7
+  %183 = load i64, ptr %4
+  %184 = load i64, ptr %6
+  %185 = load i64, ptr %7
+  %186 = load i64, ptr %ds
+  %187 = load i64, ptr %alloc
+  %188 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(i64 %186, i64 %187, i64 %183, i64 %184, i64 %185) "statepoint-id"="0"
+  %189 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %188, 0, 0
+  %190 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %188, 0, 1
+  store i64 %189, ptr %ds
+  store i64 %190, ptr %alloc
+  %191 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %188, 1, 0
+  store ptr addrspace(1) %191, ptr %3
+  br label %L220
+L220:
+  %192 = load ptr addrspace(1), ptr %3
+  store ptr addrspace(1) %192, ptr %51
+  %193 = load ptr addrspace(1), ptr %51
+  store ptr addrspace(1) %193, ptr %52
+  %194 = load ptr addrspace(1), ptr %52
+  %195 = load i64, ptr addrspace(1) %194
+  store i64 %195, ptr %53
+  %196 = load ptr addrspace(1), ptr %47
+  store ptr addrspace(1) %196, ptr %3
+  %197 = load ptr addrspace(1), ptr %52
+  store ptr addrspace(1) %197, ptr %5
+  %198 = load ptr addrspace(1), ptr %3
+  %199 = load ptr addrspace(1), ptr %5
+  %200 = load i64, ptr %ds
+  %201 = load i64, ptr %alloc
+  %202 = load ptr, ptr %53
+  %203 = call oxcamlcc { { i64, i64 }, { i64 } } %202(i64 %200, i64 %201, ptr addrspace(1) %198, ptr addrspace(1) %199) "statepoint-id"="0"
+  %204 = extractvalue { { i64, i64 }, { i64 } } %203, 0, 0
+  %205 = extractvalue { { i64, i64 }, { i64 } } %203, 0, 1
+  store i64 %204, ptr %ds
+  store i64 %205, ptr %alloc
+  %206 = extractvalue { { i64, i64 }, { i64 } } %203, 1, 0
+  store i64 %206, ptr %4
+  br label %L221
+L221:
+  %207 = load i64, ptr %4
+  store i64 %207, ptr %54
+  %208 = load i64, ptr %54
+  store i64 %208, ptr %55
+  %209 = ptrtoint ptr @camlAlloc to i64
+  store i64 %209, ptr %56
+  %210 = load i64, ptr %56
+  store i64 %210, ptr %57
+  %211 = load i64, ptr %57
+  %212 = inttoptr i64 %211 to ptr addrspace(1)
+  store ptr addrspace(1) %212, ptr %8
+  store i64 1, ptr %58
+  %213 = load i64, ptr %58
+  store i64 %213, ptr %4
+  %214 = load ptr addrspace(1), ptr %4
+  %215 = load i64, ptr %ds
+  %216 = load i64, ptr %alloc
+  %217 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %215, 0, 0
+  %218 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %217, i64 %216, 0, 1
+  %219 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %218, ptr addrspace(1) %214, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %219
+}
+
+define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) returns_twice noinline {
+  %3 = insertvalue { { i64, i64 }, { i64 } } poison, i64 0, 1, 0
+  %4 = insertvalue { { i64, i64 }, { i64 } } %3, i64 %0, 0, 0
+  %5 = insertvalue { { i64, i64 }, { i64 } } %4, i64 %1, 0, 1
+  ret { { i64, i64 }, { i64 } } %5
+}
+
+@camlAlloc__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
+@header.camlAlloc = global i64 7936, section ".data", align 8
+@camlAlloc = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlAlloc__my_fold_9, ptr @camlAlloc__local_iota_10, ptr @camlAlloc__big_local_alloc_11, ptr @camlAlloc__heap_iota_13, ptr @camlAlloc__big_heap_alloc_14, ptr @camlAlloc__make_ref_16, ptr @camlAlloc__heap_ref_incr_17 }, section ".data", align 8
+@header.camlAlloc__heap_ref_incr_17 = global i64 3063, section ".data", align 8
+@camlAlloc__heap_ref_incr_17 = global { ptr, i64 } { ptr @camlAlloc__heap_ref_incr_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlAlloc__make_ref_16 = global i64 3063, section ".data", align 8
+@camlAlloc__make_ref_16 = global { ptr, i64 } { ptr @camlAlloc__make_ref_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlAlloc__big_heap_alloc_14 = global i64 3063, section ".data", align 8
+@camlAlloc__big_heap_alloc_14 = global { ptr, i64 } { ptr @camlAlloc__big_heap_alloc_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlAlloc__heap_iota_13 = global i64 4087, section ".data", align 8
+@camlAlloc__heap_iota_13 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlAlloc__heap_iota_HIDE_STAMP }, section ".data", align 8
+@header.camlAlloc__big_local_alloc_11 = global i64 3063, section ".data", align 8
+@camlAlloc__big_local_alloc_11 = global { ptr, i64 } { ptr @camlAlloc__big_local_alloc_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12 = global i64 4087, section ".data", align 8
+@camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12 = global { ptr, i64, ptr } { ptr @caml_curry2L2, i64 180143985094819847, ptr @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_HIDE_STAMP }, section ".data", align 8
+@header.camlAlloc__local_iota_10 = global i64 4087, section ".data", align 8
+@camlAlloc__local_iota_10 = global { ptr, i64, ptr } { ptr @caml_curry2L1, i64 180143985094819847, ptr @camlAlloc__local_iota_HIDE_STAMP }, section ".data", align 8
+@header.camlAlloc__my_fold_9 = global i64 4087, section ".data", align 8
+@camlAlloc__my_fold_9 = global { ptr, i64, ptr } { ptr @caml_curry3L1, i64 252201579132747783, ptr @camlAlloc__my_fold_HIDE_STAMP }, section ".data", align 8
+@header.camlAlloc__const_block115 = global i64 2827, section ".data", align 8
+@camlAlloc__const_block115 = global { ptr, ptr } { ptr @camlAlloc__immstring109, ptr @camlAlloc__const_block113 }, section ".data", align 8
+@header.camlAlloc__immstring109 = global i64 4092, section ".data", align 8
+@camlAlloc__immstring109 = global { [ 17 x i8 ], [ 6 x i8 ], i8 } { [ 17 x i8 ] c"\62\69\67\5f\6c\6f\63\61\6c\5f\61\6c\6c\6f\63\3a\20", [ 6 x i8 ] zeroinitializer, i8 6 }, section ".data", align 8
+@header.camlAlloc__const_block127 = global i64 2827, section ".data", align 8
+@camlAlloc__const_block127 = global { ptr, ptr } { ptr @camlAlloc__immstring125, ptr @camlAlloc__const_block113 }, section ".data", align 8
+@header.camlAlloc__immstring125 = global i64 4092, section ".data", align 8
+@camlAlloc__immstring125 = global { [ 16 x i8 ], [ 7 x i8 ], i8 } { [ 16 x i8 ] c"\62\69\67\5f\68\65\61\70\5f\61\6c\6c\6f\63\3a\20", [ 7 x i8 ] zeroinitializer, i8 7 }, section ".data", align 8
+@header.camlAlloc__const_block138 = global i64 2827, section ".data", align 8
+@camlAlloc__const_block138 = global { ptr, ptr } { ptr @camlAlloc__immstring136, ptr @camlAlloc__const_block113 }, section ".data", align 8
+@header.camlAlloc__immstring136 = global i64 3068, section ".data", align 8
+@camlAlloc__immstring136 = global { [ 15 x i8 ], [ 0 x i8 ], i8 } { [ 15 x i8 ] c"\68\65\61\70\5f\72\65\66\5f\69\6e\63\72\3a\20", [ 0 x i8 ] zeroinitializer, i8 0 }, section ".data", align 8
+@header.camlAlloc__const_block113 = global i64 4868, section ".data", align 8
+@camlAlloc__const_block113 = global { i64, i64, i64, ptr } { i64 1, i64 1, i64 1, ptr @camlAlloc__const_block111 }, section ".data", align 8
+@header.camlAlloc__const_block111 = global i64 2828, section ".data", align 8
+@camlAlloc__const_block111 = global { i64, i64 } { i64 21, i64 1 }, section ".data", align 8
+@camlCamlinternalFormat__make_printf_HIDE_STAMP = external global ptr
+@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1451$2c4$2d$2d59$5d_521 = external global ptr
+@caml_apply2 = external global ptr
+@caml_call_gc = external global ptr
+@caml_call_local_realloc = external global ptr
+@caml_curry2 = external global ptr
+@caml_curry2L1 = external global ptr
+@caml_curry2L2 = external global ptr
+@caml_curry3L1 = external global ptr
+
+declare i1 @llvm.expect.i1(i1, i1)
+
+!0 = !{ i32 1, !"oxcaml_module", !"Alloc" }
+!llvm.module.flags = !{ !0 }
