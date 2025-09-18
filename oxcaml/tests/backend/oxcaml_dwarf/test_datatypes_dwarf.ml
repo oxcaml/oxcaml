@@ -1,6 +1,7 @@
 let[@inline never] [@local never] f_start () = ()
 let _ = f_start ()
 
+
 (* Simple variants *)
 type simple_variant = A | B | C of int | D of float
 
@@ -327,3 +328,31 @@ let[@inline never] [@local never] f_poly_tuple (x: 'a * 'b) = x
 let _ = f_poly_tuple (42, "test")
 let _ = f_poly_tuple (3.14, true)
 let _ = f_poly_tuple ("hello", [1; 2; 3])
+
+(* Bigarrays *)
+let[@inline never] [@local never] f_bigarray1_int (x: (int, Bigarray.int_elt, Bigarray.c_layout) Bigarray.Array1.t) = x
+let bigarray1_int = Bigarray.Array1.create Bigarray.int Bigarray.c_layout 5
+let _ = for i = 0 to 4 do Bigarray.Array1.set bigarray1_int i (i * 10) done
+let _ = f_bigarray1_int bigarray1_int
+
+let[@inline never] [@local never] f_bigarray1_float (x: (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t) = x
+let bigarray1_float = Bigarray.Array1.create Bigarray.float64 Bigarray.c_layout 4
+let _ = for i = 0 to 3 do Bigarray.Array1.set bigarray1_float i (Float.of_int i +. 0.5) done
+let _ = f_bigarray1_float bigarray1_float
+
+let[@inline never] [@local never] f_bigarray2_int (x: (int, Bigarray.int_elt, Bigarray.c_layout) Bigarray.Array2.t) = x
+let bigarray2_int = Bigarray.Array2.create Bigarray.int Bigarray.c_layout 3 3
+let _ = for i = 0 to 2 do for j = 0 to 2 do Bigarray.Array2.set bigarray2_int i j (i + j) done done
+let _ = f_bigarray2_int bigarray2_int
+
+let[@inline never] [@local never] f_bigarray2_float (x: (float, Bigarray.float64_elt, Bigarray.fortran_layout) Bigarray.Array2.t) = x
+let bigarray2_float = Bigarray.Array2.create Bigarray.float64 Bigarray.fortran_layout 2 4
+let _ = for i = 1 to 2 do for j = 1 to 4 do Bigarray.Array2.set bigarray2_float i j (Float.of_int (i * j) *. 0.1) done done
+let _ = f_bigarray2_float bigarray2_float
+
+let[@inline never] [@local never] f_bigarray3_int32 (x: (int32, Bigarray.int32_elt, Bigarray.c_layout) Bigarray.Array3.t) = x
+let bigarray3_int32 = Bigarray.Array3.create Bigarray.int32 Bigarray.c_layout 2 2 2
+let _ = for i = 0 to 1 do for j = 0 to 1 do for k = 0 to 1 do
+  Bigarray.Array3.set bigarray3_int32 i j k (Int32.of_int (i + j + k))
+done done done
+let _ = f_bigarray3_int32 bigarray3_int32

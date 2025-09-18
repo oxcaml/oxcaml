@@ -98,3 +98,8 @@
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_tuple(x=(42, "test") : 'a * 'b @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_tuple(x=(3.14, 1) : 'a * 'b @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_poly_tuple(x=("hello", [1, [2, [...]@<ADDRESS>]]) : 'a * 'b @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray1_int(x=<bigarray1|data=0x5d5710> : (int, Bigarray.int_elt, Bigarray.c_layout) Bigarray.Array1.t @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray1_float(x=<bigarray1|data=0x5d5740> : (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray2_int(x=<bigarray2|data=0x5d5770> : (int, Bigarray.int_elt, Bigarray.c_layout) Bigarray.Array2.t @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray2_float(x=<bigarray2|data=0x5d57c0> : (float, Bigarray.float64_elt, Bigarray.fortran_layout) Bigarray.Array2.t @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray3_int32(x=<bigarray3|data=0x5d5810> : (int32, Bigarray.int32_elt, Bigarray.c_layout) Bigarray.Array3.t @ value)

@@ -134,4 +134,14 @@
 (lldb) c
 (lldb) c
 (lldb) c
+(lldb) b Test_datatypes_dwarf.f_bigarray1_int
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_bigarray1_float
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_bigarray2_int
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_bigarray2_float
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_bigarray3_int32
+(lldb) c
 (lldb) quit
