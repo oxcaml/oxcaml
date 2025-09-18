@@ -8,6 +8,4 @@ let () =
   Format.printf "too_many res: %d\n" too_many_res;
   Out_channel.flush stdout;
   Extcalls.call_int_and_float ()
-(* CR yusumez: This test gives a different result in CI (involving ANSI escape
-   codes for colour?!). *)
 (* Extcalls.call_no_return () *)
