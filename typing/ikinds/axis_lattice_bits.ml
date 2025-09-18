@@ -130,7 +130,7 @@ let relevant_axes_of_modality
       match axis with
       | Jkind_axis.Axis.Modal axis ->
         let (Mode.Modality.Axis.P axis_for_modality) =
-          Mode.Modality.Axis.of_value (Mode.Value.Axis.P axis)
+          Mode.Crossing.Axis.(P axis |> to_modality)
         in
         let modality_on_axis =
           Mode.Modality.Const.proj axis_for_modality modality
@@ -273,16 +273,51 @@ let separability_of_level = function
   | 2 -> Jkind_axis.Separability.Maybe_separable
   | _ -> invalid_arg "Axis_lattice_bits.separability_of_level"
 
+let crossing_of_constants ~areality ~linearity ~uniqueness ~portability
+    ~contention ~yielding ~statefulness ~visibility : Mode.Crossing.t =
+  let open Mode.Crossing in
+  let monadic =
+    Monadic.create
+      ~uniqueness:
+        (Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_with uniqueness))
+      ~contention:
+        (Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_with contention))
+      ~visibility:
+        (Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_with visibility))
+  in
+  let comonadic =
+    Comonadic.create
+      ~regionality:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_with areality))
+      ~linearity:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_with linearity))
+      ~portability:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_with portability))
+      ~yielding:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_with yielding))
+      ~statefulness:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_with statefulness))
+  in
+  { monadic; comonadic }
+
 let of_mod_bounds (mb : Types.Jkind_mod_bounds.t) : t =
   let levels =
-    [| level_of_areality (Types.Jkind_mod_bounds.areality mb);
-       level_of_linearity (Types.Jkind_mod_bounds.linearity mb);
-       level_of_uniqueness_monadic (Types.Jkind_mod_bounds.uniqueness mb);
-       level_of_portability (Types.Jkind_mod_bounds.portability mb);
-       level_of_contention_monadic (Types.Jkind_mod_bounds.contention mb);
-       level_of_yielding (Types.Jkind_mod_bounds.yielding mb);
-       level_of_statefulness (Types.Jkind_mod_bounds.statefulness mb);
-       level_of_visibility_monadic (Types.Jkind_mod_bounds.visibility mb);
+    [| level_of_areality (Types.Jkind_mod_bounds.areality_const mb);
+       level_of_linearity (Types.Jkind_mod_bounds.linearity_const mb);
+       level_of_uniqueness_monadic (Types.Jkind_mod_bounds.uniqueness_const mb);
+       level_of_portability (Types.Jkind_mod_bounds.portability_const mb);
+       level_of_contention_monadic (Types.Jkind_mod_bounds.contention_const mb);
+       level_of_yielding (Types.Jkind_mod_bounds.yielding_const mb);
+       level_of_statefulness (Types.Jkind_mod_bounds.statefulness_const mb);
+       level_of_visibility_monadic (Types.Jkind_mod_bounds.visibility_const mb);
        level_of_externality (Types.Jkind_mod_bounds.externality mb);
        level_of_nullability (Types.Jkind_mod_bounds.nullability mb);
        level_of_separability (Types.Jkind_mod_bounds.separability mb)
@@ -303,96 +338,117 @@ let to_mod_bounds (x : t) : Types.Jkind_mod_bounds.t =
   let externality = externality_of_level lv.(8) in
   let nullability = nullability_of_level lv.(9) in
   let separability = separability_of_level lv.(10) in
-  Types.Jkind_mod_bounds.create ~areality ~linearity ~uniqueness ~portability
-    ~contention ~yielding ~statefulness ~visibility ~externality ~nullability
+  let crossing =
+    crossing_of_constants ~areality ~linearity ~uniqueness ~portability
+      ~contention ~yielding ~statefulness ~visibility
+  in
+  Types.Jkind_mod_bounds.create crossing ~externality ~nullability
     ~separability
 
 (* Canonical lattice constants used by ikinds. *)
 let nonfloat_value : t =
-  let mb =
-    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.max
+  let crossing =
+    crossing_of_constants ~areality:Mode.Regionality.Const.max
       ~linearity:Mode.Linearity.Const.max
-      ~uniqueness:Mode.Uniqueness.Const_op.max
+      ~uniqueness:Mode.Uniqueness.Const.Unique
       ~portability:Mode.Portability.Const.max
-      ~contention:Mode.Contention.Const_op.max ~yielding:Mode.Yielding.Const.max
+      ~contention:Mode.Contention.Const.Uncontended
+      ~yielding:Mode.Yielding.Const.max
       ~statefulness:Mode.Statefulness.Const.max
-      ~visibility:Mode.Visibility.Const_op.max
-      ~externality:Jkind_axis.Externality.max
+      ~visibility:Mode.Visibility.Const.Read_write
+  in
+  let mb =
+    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
   of_mod_bounds mb
 
 let immutable_data : t =
-  let mb =
-    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.max
+  let crossing =
+    crossing_of_constants ~areality:Mode.Regionality.Const.max
       ~linearity:Mode.Linearity.Const.min
-      ~uniqueness:Mode.Uniqueness.Const_op.max
+      ~uniqueness:Mode.Uniqueness.Const.Unique
       ~portability:Mode.Portability.Const.min
-      ~contention:Mode.Contention.Const_op.min ~yielding:Mode.Yielding.Const.min
+      ~contention:Mode.Contention.Const.Contended
+      ~yielding:Mode.Yielding.Const.min
       ~statefulness:Mode.Statefulness.Const.min
-      ~visibility:Mode.Visibility.Const_op.min
-      ~externality:Jkind_axis.Externality.max
+      ~visibility:Mode.Visibility.Const.Immutable
+  in
+  let mb =
+    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
   of_mod_bounds mb
 
 let mutable_data : t =
-  let mb =
-    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.max
+  let crossing =
+    crossing_of_constants ~areality:Mode.Regionality.Const.max
       ~linearity:Mode.Linearity.Const.min
-      ~uniqueness:Mode.Uniqueness.Const_op.max
+      ~uniqueness:Mode.Uniqueness.Const.Unique
       ~portability:Mode.Portability.Const.min
-      ~contention:Mode.Contention.Const_op.max ~yielding:Mode.Yielding.Const.min
+      ~contention:Mode.Contention.Const.Uncontended
+      ~yielding:Mode.Yielding.Const.min
       ~statefulness:Mode.Statefulness.Const.min
-      ~visibility:Mode.Visibility.Const_op.max
-      ~externality:Jkind_axis.Externality.max
+      ~visibility:Mode.Visibility.Const.Read_write
+  in
+  let mb =
+    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
   of_mod_bounds mb
 
 let value : t =
-  let mb =
-    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.max
+  let crossing =
+    crossing_of_constants ~areality:Mode.Regionality.Const.max
       ~linearity:Mode.Linearity.Const.max
-      ~uniqueness:Mode.Uniqueness.Const_op.max
+      ~uniqueness:Mode.Uniqueness.Const.Unique
       ~portability:Mode.Portability.Const.max
-      ~contention:Mode.Contention.Const_op.max ~yielding:Mode.Yielding.Const.max
+      ~contention:Mode.Contention.Const.Uncontended
+      ~yielding:Mode.Yielding.Const.max
       ~statefulness:Mode.Statefulness.Const.max
-      ~visibility:Mode.Visibility.Const_op.max
-      ~externality:Jkind_axis.Externality.max
+      ~visibility:Mode.Visibility.Const.Read_write
+  in
+  let mb =
+    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Separable
   in
   of_mod_bounds mb
 
 let arrow : t =
-  let mb =
-    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.max
+  let crossing =
+    crossing_of_constants ~areality:Mode.Regionality.Const.max
       ~linearity:Mode.Linearity.Const.max
-      ~uniqueness:Mode.Uniqueness.Const_op.min
+      ~uniqueness:Mode.Uniqueness.Const.Aliased
       ~portability:Mode.Portability.Const.max
-      ~contention:Mode.Contention.Const_op.min ~yielding:Mode.Yielding.Const.max
+      ~contention:Mode.Contention.Const.Contended
+      ~yielding:Mode.Yielding.Const.max
       ~statefulness:Mode.Statefulness.Const.max
-      ~visibility:Mode.Visibility.Const_op.min
-      ~externality:Jkind_axis.Externality.max
+      ~visibility:Mode.Visibility.Const.Immutable
+  in
+  let mb =
+    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
   of_mod_bounds mb
 
 let immediate : t =
-  let mb =
-    Types.Jkind_mod_bounds.create ~areality:Mode.Regionality.Const.min
+  let crossing =
+    crossing_of_constants ~areality:Mode.Regionality.Const.min
       ~linearity:Mode.Linearity.Const.min
-      ~uniqueness:Mode.Uniqueness.Const_op.min
+      ~uniqueness:Mode.Uniqueness.Const.Aliased
       ~portability:Mode.Portability.Const.min
-      ~contention:Mode.Contention.Const_op.min ~yielding:Mode.Yielding.Const.min
+      ~contention:Mode.Contention.Const.Contended
+      ~yielding:Mode.Yielding.Const.min
       ~statefulness:Mode.Statefulness.Const.min
-      ~visibility:Mode.Visibility.Const_op.min
-      ~externality:Jkind_axis.Externality.min
+      ~visibility:Mode.Visibility.Const.Immutable
+  in
+  let mb =
+    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.min
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
@@ -403,20 +459,22 @@ let object_legacy : t =
         : Mode.Value.Comonadic.Const.t) =
     Mode.Value.Comonadic.Const.legacy
   in
-  let ({ contention; uniqueness; visibility } : Mode.Value.Monadic.Const_op.t) =
-    Mode.Value.Monadic.Const_op.max
+  let uniqueness = Mode.Uniqueness.Const.Unique in
+  let contention = Mode.Contention.Const.Uncontended in
+  let visibility = Mode.Visibility.Const.Read_write in
+  let crossing =
+    crossing_of_constants ~linearity ~areality ~uniqueness ~portability
+      ~contention ~yielding ~statefulness ~visibility
   in
   let mb =
-    Types.Jkind_mod_bounds.create ~linearity ~areality ~uniqueness ~portability
-      ~contention ~yielding ~statefulness ~visibility
-      ~externality:Jkind_axis.Externality.max
+    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
   of_mod_bounds mb
 
 let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
-  let open Mode.Value.Axis in
+  let open Mode.Crossing.Axis in
   match axis_number with
   | 0 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Areality))
   | 1 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Linearity))
