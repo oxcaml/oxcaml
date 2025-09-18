@@ -70,7 +70,10 @@ let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
  fun (ops : JK.ops) ->
   log ~pp:ops.pp_kind "ckind_of_jkind" (fun () ->
       (* Base is the modality bounds stored on this jkind. *)
-      let base = ops.const (Axis_lattice_bits.of_mod_bounds j.jkind.mod_bounds) in
+      let base =
+        ops.const
+          (Axis_lattice_bits.of_mod_bounds j.jkind.mod_bounds)
+      in
       (* For each with-bound (ty, axes), contribute
          modality(axes_mask, kind_of ty). *)
       let contribs =
@@ -322,8 +325,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                       List.map
                         (fun (lbl : Types.label_declaration) ->
                           let mask =
-                            Axis_lattice_bits.mask_of_modality ~relevant_for_shallow
-                              lbl.ld_modalities
+                            Axis_lattice_bits.mask_of_modality
+                              ~relevant_for_shallow lbl.ld_modalities
                           in
                           log ~pp:ops.pp_kind
                             (Printf.sprintf "label %s" (Ident.name lbl.ld_id))
