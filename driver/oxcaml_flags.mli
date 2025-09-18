@@ -18,7 +18,7 @@
 
 val dump_cfg : bool ref
 val cfg_invariants : bool ref
-val regalloc : string ref
+val regalloc : Clflags.Register_allocator.t ref
 val default_regalloc_linscan_threshold : int
 val regalloc_linscan_threshold : int ref
 val regalloc_params : string list ref
