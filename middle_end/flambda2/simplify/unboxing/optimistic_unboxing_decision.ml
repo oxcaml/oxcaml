@@ -185,6 +185,7 @@ and make_optimistic_fields ~add_tag_to_name ~depth ~recursive tenv param_type
   let shape =
     T.immutable_block ~is_unique:false tag ~shape ~fields:field_types
       (Alloc_mode.For_types.unknown ())
+      ~machine_width:(TE.machine_width tenv)
   in
   match T.meet tenv param_type shape with
   | Bottom -> None

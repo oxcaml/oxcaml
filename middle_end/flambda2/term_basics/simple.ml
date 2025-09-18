@@ -17,32 +17,40 @@
 module RWC = Reg_width_const
 include Int_ids.Simple
 
-let const_bool b = const (if b then RWC.const_true else RWC.const_false)
+let const_bool machine_width b =
+  const
+    (if b then RWC.const_true machine_width else RWC.const_false machine_width)
 
-let const_true = const_bool true
+let const_true machine_width = const_bool machine_width true
 
-let const_false = const_bool false
+let const_false machine_width = const_bool machine_width false
 
-let untagged_const_true = const RWC.untagged_const_true
+let untagged_const_true machine_width =
+  const (RWC.untagged_const_true machine_width)
 
-let untagged_const_false = const RWC.untagged_const_false
+let untagged_const_false machine_width =
+  const (RWC.untagged_const_false machine_width)
 
-let untagged_const_bool b =
-  if b then untagged_const_true else untagged_const_false
+let untagged_const_bool machine_width b =
+  if b
+  then untagged_const_true machine_width
+  else untagged_const_false machine_width
 
-let untagged_const_zero = const RWC.untagged_const_zero
+let untagged_const_zero machine_width =
+  const (RWC.untagged_const_zero machine_width)
 
 let untagged_const_int i = const (RWC.untagged_const_int i)
 
 let const_int i = const (RWC.const_int i)
 
-let const_zero = const RWC.const_zero
+let const_zero machine_width = const (RWC.const_zero machine_width)
 
-let const_one = const RWC.const_one
+let const_one machine_width = const (RWC.const_one machine_width)
 
-let const_unit = const RWC.const_unit
+let const_unit machine_width = const (RWC.const_unit machine_width)
 
-let const_int_of_kind kind i = const (RWC.of_int_of_kind kind i)
+let const_int_of_kind ~machine_width kind i =
+  const (RWC.of_int_of_kind machine_width kind i)
 
 let[@inline always] is_var t =
   pattern_match t

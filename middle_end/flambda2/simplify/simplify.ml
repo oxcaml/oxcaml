@@ -24,7 +24,7 @@ type simplify_result =
     unit : Flambda_unit.t
   }
 
-let run ~cmx_loader ~round ~code_slot_offsets unit =
+let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   let return_continuation = FU.return_continuation unit in
   let exn_continuation = FU.exn_continuation unit in
   let toplevel_my_region = FU.toplevel_my_region unit in
@@ -34,7 +34,8 @@ let run ~cmx_loader ~round ~code_slot_offsets unit =
   let get_imported_names = Flambda_cmx.get_imported_names cmx_loader in
   let get_imported_code = Flambda_cmx.get_imported_code cmx_loader in
   let denv =
-    DE.create ~round ~resolver ~get_imported_names ~get_imported_code
+    DE.create ~round ~machine_width ~resolver ~get_imported_names
+      ~get_imported_code
       ~propagating_float_consts:(Flambda_features.float_const_prop ())
       ~unit_toplevel_return_continuation:return_continuation
       ~unit_toplevel_exn_continuation:exn_continuation ~toplevel_my_region

@@ -75,7 +75,7 @@ end = struct
       Shape.unboxed_tuple ?uid:outer.uid (subst_list shapes)
     | Predef (predef, args) ->
       Shape.predef predef ?uid:outer.uid (subst_list args)
-    | Arrow (arg, ret) -> Shape.arrow ?uid:outer.uid (subst arg) (subst ret)
+    | Arrow -> Shape.arrow ?uid:outer.uid ()
     | Poly_variant fields ->
       Shape.poly_variant ?uid:outer.uid
         (poly_variant_constructors_map subst fields)
@@ -179,6 +179,8 @@ module Type_shape = struct
         Some Unboxed_nativeint
       | p when Path.same p Predef.path_unboxed_int64 -> Some Unboxed_int64
       | p when Path.same p Predef.path_unboxed_int32 -> Some Unboxed_int32
+      | p when Path.same p Predef.path_unboxed_int8 -> Some Unboxed_int8
+      | p when Path.same p Predef.path_unboxed_int16 -> Some Unboxed_int16
       | p -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_path p)
 
     let of_path : Path.t -> t option = function
@@ -191,6 +193,8 @@ module Type_shape = struct
       | p when Path.same p Predef.path_float32 -> Some Float32
       | p when Path.same p Predef.path_floatarray -> Some Floatarray
       | p when Path.same p Predef.path_int -> Some Int
+      | p when Path.same p Predef.path_int8 -> Some Int8
+      | p when Path.same p Predef.path_int16 -> Some Int16
       | p when Path.same p Predef.path_int32 -> Some Int32
       | p when Path.same p Predef.path_int64 -> Some Int64
       | p when Path.same p Predef.path_lazy_t -> Some Lazy_t
@@ -211,6 +215,11 @@ module Type_shape = struct
       | None -> f path ~args
   end
 
+  let is_above_of_type_expr_max_depth depth =
+    match !Clflags.gdwarf_config_max_type_to_shape_depth with
+    | None -> false
+    | Some max_depth -> depth > max_depth
+
   (* Similarly to [value_kind], we track a set of visited types to avoid cycles
      in the lookup and we, additionally, carry a maximal depth for the recursion.
      We allow a deeper bound than [value_kind]. *)
@@ -223,8 +232,8 @@ module Type_shape = struct
     let unknown_shape = Shape.leaf' None in
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
-      Numbers.Int.Map.mem (Types.get_id expr) visited || depth > 10
-      (* CR sspies: Make the depth a command line flag. *)
+      Numbers.Int.Map.mem (Types.get_id expr) visited
+      || is_above_of_type_expr_max_depth depth
     in
     if cannot_proceed ()
     then
@@ -322,10 +331,7 @@ module Type_shape = struct
                 row_fields
             in
             Shape.poly_variant row_fields
-          | Tarrow (_, arg, ret, _) ->
-            Shape.arrow
-              (of_type_expr_go ~depth ~visited arg subst shape_for_constr)
-              (of_type_expr_go ~depth ~visited ret subst shape_for_constr)
+          | Tarrow (_, _, _, _) -> Shape.arrow ()
           | Tunivar _ -> unknown_shape
           | Tof_kind _ -> unknown_shape
           | Tpackage _ -> unknown_shape
@@ -599,7 +605,7 @@ module Type_decl_shape = struct
     | Alias sh -> is_closed_type_shape sh
     | Tuple shapes | Unboxed_tuple shapes ->
       List.for_all is_closed_type_shape shapes
-    | Arrow (arg, ret) -> is_closed_type_shape arg && is_closed_type_shape ret
+    | Arrow -> true
     | Poly_variant constrs ->
       List.for_all
         (fun { pv_constr_name = _; pv_constr_args = shs } ->
@@ -762,9 +768,8 @@ let rec decompose_application (t : Shape.t) =
   | Constr (_, _)
   | Tuple _ | Unboxed_tuple _
   | Predef (_, _)
-  | Arrow (_, _)
-  | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _ | Record _
-  | Mutrec _
+  | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
+  | Record _ | Mutrec _
   | Proj_decl (_, _) ->
     t, []
 
@@ -849,25 +854,34 @@ let find_in_cache t subst_type (subst_constr_mut, subst_constr) =
   then Shape.Cache.find_opt eval_cache t
   else None
 
+let is_above_unfold_and_evaluate_max_depth depth =
+  match !Clflags.gdwarf_config_shape_eval_depth with
+  | None -> false
+  | Some max_depth -> depth >= max_depth
+
 (* To unroll the mutually recursive declarations, we perform a simple call by
    value evaluation and catch cycles for ident binders. *)
-let rec unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-    (t : Shape.t) =
+let rec unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+    subst_constr (t : Shape.t) =
   D.count_evaluation_step diagnostics;
-  if depth >= 5
-     (* CR sspies: This depth limit can currently produce very large shapes, and
-        some additional caching would be appropriate. *)
+  if Misc.Maybe_bounded.is_depleted steps_remaining
   then Shape.leaf' None
-  else
+  else if is_above_unfold_and_evaluate_max_depth depth
+  then Shape.leaf' None
+  else (
+    Misc.Maybe_bounded.decr steps_remaining;
     match find_in_cache t subst_type subst_constr with
     | Some res -> res
-    | None -> unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr t
+    | None ->
+      unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
+        subst_constr t)
 
-and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
-    (t : Shape.t) =
+and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
+    subst_constr (t : Shape.t) =
   let head, args = decompose_application t in
   let unfold_and_eval =
-    unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
+    unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+      subst_constr
   in
   let unfold_and_eval_list = List.map unfold_and_eval in
   let maybe_evaluated_shape =
@@ -886,8 +900,8 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
           update_subst_with_id_arg_binder subst_constr id args rec_binder
         in
         let ts = Ident.Map.find id ts in
-        unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr
-          (Shape.app_list ts args)
+        unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+          subst_constr (Shape.app_list ts args)
         |> Recursive_binder.close_term_if_binder_is_used ~preserve_uid:false
              rec_binder
         |> Option.some
@@ -901,9 +915,8 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
       | Constr (_, _)
       | Tuple _ | Unboxed_tuple _
       | Predef (_, _)
-      | Arrow (_, _)
-      | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
-      | Record _
+      | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _
+      | Variant_unboxed _ | Record _
       | Proj_decl (_, _) ->
         if !Clflags.dwarf_pedantic
         then
@@ -923,8 +936,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
     | Constr (_, _)
     | Tuple _ | Unboxed_tuple _
     | Predef (_, _)
-    | Arrow (_, _)
-    | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
+    | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
     | Record _ | Mutrec _ ->
       None
   in
@@ -950,7 +962,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
         let arg = unfold_and_eval arg in
         match f.Shape.desc with
         | Abs (x, s') ->
-          unfold_and_evaluate ~diagnostics ~depth
+          unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
             (Ident.Map.add x arg subst_type)
             subst_constr s'
         | Var _
@@ -961,9 +973,8 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
         | Constr (_, _)
         | Tuple _ | Unboxed_tuple _
         | Predef (_, _)
-        | Arrow (_, _)
-        | Poly_variant _ | Mu _ | Rec_var _ | Variant _ | Variant_unboxed _
-        | Record _ | Mutrec _
+        | Arrow | Poly_variant _ | Mu _ | Rec_var _ | Variant _
+        | Variant_unboxed _ | Record _ | Mutrec _
         | Proj_decl (_, _) ->
           Shape.app f ~arg)
       | Proj_decl _ ->
@@ -988,8 +999,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
       | Poly_variant constrs ->
         Shape.poly_variant
           (Shape.poly_variant_constructors_map unfold_and_eval constrs)
-      | Arrow (arg, ret) ->
-        Shape.arrow (unfold_and_eval arg) (unfold_and_eval ret)
+      | Arrow -> Shape.arrow ()
       | Variant_unboxed
           { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout } ->
         Shape.variant_unboxed ~variant_uid ~arg_uid name arg_name
@@ -997,17 +1007,20 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
           arg_layout
       | Proj (t, i) ->
         Shape.proj
-          (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr t)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+             subst_constr t)
           i
       | Tuple args -> Shape.tuple (unfold_and_eval_list args)
       | Unboxed_tuple args -> Shape.unboxed_tuple (unfold_and_eval_list args)
       | Predef (p, args) -> Shape.predef p (unfold_and_eval_list args)
       | Mu body ->
         Shape.mu
-          (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr body)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+             subst_constr body)
       | Alias t ->
         Shape.alias
-          (unfold_and_evaluate ~diagnostics ~depth subst_type subst_constr t)
+          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
+             subst_constr t)
       | Struct items -> Shape.str (Shape.Item.Map.map unfold_and_eval items)
       (* normal forms for CBV evaluation *)
       | Mutrec _ | Abs _ | Error _ | Comp_unit _ | Rec_var _ | Leaf -> t)
@@ -1017,7 +1030,11 @@ and unfold_and_evaluate0 ~diagnostics ~depth subst_type subst_constr
 
 let unfold_and_evaluate ?(diagnostics = Evaluation_diagnostics.no_diagnostics) t
     =
-  unfold_and_evaluate ~diagnostics ~depth:0 Ident.Map.empty
+  let steps_remaining =
+    Misc.Maybe_bounded.of_option
+      !Clflags.gdwarf_config_max_evaluation_steps_per_variable
+  in
+  unfold_and_evaluate ~diagnostics ~depth:0 ~steps_remaining Ident.Map.empty
     (Ident.Map.empty, Ident.Map.empty)
     t
 
@@ -1060,7 +1077,7 @@ let rec estimate_layout_from_type_shape (t : Shape.t) : Layout.t option =
     Some arg_layout
     (* CR sspies: [arg_layout] could become unreliable in the future. Consider
        recursively descending in that case. *)
-  | Tuple _ | Arrow _ | Variant _ | Poly_variant _ | Record _ ->
+  | Tuple _ | Arrow | Variant _ | Poly_variant _ | Record _ ->
     Some (Layout.Base Value)
   | Alias t -> estimate_layout_from_type_shape t
   | Mu t ->

@@ -6,6 +6,7 @@ type token =
   | TILDE
   | SYMBOL of (Fexpr.compilation_unit option * string)
   | STRING of (string)
+  | STATIC_CONST_VALUE_ARRAY
   | STATIC_CONST_FLOAT_BLOCK
   | STATIC_CONST_FLOAT_ARRAY
   | STATIC_CONST_EMPTY_ARRAY

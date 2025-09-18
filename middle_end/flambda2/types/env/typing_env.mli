@@ -35,7 +35,9 @@ module Serializable : sig
   val create : Pre_serializable.t -> reachable_names:Name_occurrences.t -> t
 
   val create_from_closure_conversion_approx :
-    'a Value_approximation.t Symbol.Map.t -> t
+    machine_width:Target_system.Machine_width.t ->
+    'a Value_approximation.t Symbol.Map.t ->
+    t
 
   val predefined_exceptions : Symbol.Set.t -> t
 
@@ -80,9 +82,12 @@ end
 val print : Format.formatter -> t -> unit
 
 val create :
+  machine_width:Target_system.Machine_width.t ->
   resolver:(Compilation_unit.t -> Serializable.t option) ->
   get_imported_names:(unit -> Name.Set.t) ->
   t
+
+val machine_width : t -> Target_system.Machine_width.t
 
 val is_bottom : t -> bool
 

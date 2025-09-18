@@ -99,12 +99,13 @@ let temp_file_key = Domain.DLS.new_key (fun _ ->
     case the current domain exits. *)
 
 (** Domain-local Storage *)
-module DLS : sig 
+module DLS : sig
 
     type 'a key : value mod portable contended
     (** Type of a DLS key *)
 
-    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key @@ nonportable
+    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
+      @@ nonportable
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.new_key]."]
     (** [new_key f] returns a new key bound to initialiser [f] for accessing
 ,        domain-local variables.
@@ -176,7 +177,7 @@ module Safe : sig @@ portable
       : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
       -> (unit -> 'a) @ portable
       -> 'a key
-    (** Like {!DLS.new_key}, but safe to use in the presence of multiple 
+    (** Like {!DLS.new_key}, but safe to use in the presence of multiple
         domains. *)
 
     val get : ('a : value mod portable). 'a key -> 'a @ contended

@@ -55,26 +55,22 @@ module Axis : sig
       | Externality : Externality.t t
       | Nullability : Nullability.t t
       | Separability : Separability.t t
-
-    val get : 'a t -> (module Axis_ops with type t = 'a)
   end
 
   (** Represents an axis of a jkind *)
   type 'a t =
-    | Modal : 'a Mode.Value.Axis.t -> 'a t
+    | Modal : 'a Mode.Crossing.Axis.t -> 'a t
     | Nonmodal : 'a Nonmodal.t -> 'a t
 
   type packed = Pack : 'a t -> packed [@@unboxed]
-
-  (* CR zqian: push ['a t] into the module to avoid first-class module. *)
-
-  (** Given a jkind axis, get its interface *)
-  val get : 'a t -> (module Axis_ops with type t = 'a)
 
   val all : packed list
 
   val name : _ t -> string
 end
+
+module Per_axis :
+  Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
 
 module Axis_set : sig
   (** A set of [Axis.t], represented as a bitfield for efficiency. *)

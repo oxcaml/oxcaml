@@ -280,6 +280,8 @@ module Predef = struct
       | Unboxed_nativeint
       | Unboxed_int64
       | Unboxed_int32
+      | Unboxed_int16
+      | Unboxed_int8
       | Unboxed_simd of simd_vec_split
 
     type t =
@@ -291,6 +293,8 @@ module Predef = struct
       | Float32
       | Floatarray
       | Int
+      | Int8
+      | Int16
       | Int32
       | Int64
       | Lazy_t
@@ -348,6 +352,8 @@ module Predef = struct
       | Unboxed_nativeint -> "nativeint"
       | Unboxed_int64 -> "int64"
       | Unboxed_int32 -> "int32"
+      | Unboxed_int16 -> "int16"
+      | Unboxed_int8 -> "int8"
       | Unboxed_simd s -> simd_vec_split_to_string s
 
     let to_string : t -> string = function
@@ -359,6 +365,8 @@ module Predef = struct
       | Float32 -> "float32"
       | Floatarray -> "floatarray"
       | Int -> "int"
+      | Int8 -> "int8"
+      | Int16 -> "int16"
       | Int32 -> "int32"
       | Int64 -> "int64"
       | Lazy_t -> "lazy_t"
@@ -399,6 +407,8 @@ module Predef = struct
       | Unboxed_nativeint -> Word
       | Unboxed_int64 -> Bits64
       | Unboxed_int32 -> Bits32
+      | Unboxed_int16 -> Bits16
+      | Unboxed_int8 -> Bits8
       | Unboxed_simd s -> simd_vec_split_to_layout s
 
     let to_layout : t -> Layout.t = function
@@ -410,6 +420,8 @@ module Predef = struct
       | Float32 -> Base Value
       | Floatarray -> Base Value
       | Int -> Base Value
+      | Int8 -> Base Value
+      | Int16 -> Base Value
       | Int32 -> Base Value
       | Int64 -> Base Value
       | Lazy_t -> Base Value
@@ -450,10 +462,13 @@ module Predef = struct
       | Unboxed_float32, Unboxed_float32
       | Unboxed_nativeint, Unboxed_nativeint
       | Unboxed_int64, Unboxed_int64
-      | Unboxed_int32, Unboxed_int32 -> true
+      | Unboxed_int32, Unboxed_int32
+      | Unboxed_int16, Unboxed_int16
+      | Unboxed_int8, Unboxed_int8 -> true
       | Unboxed_simd s1, Unboxed_simd s2 -> equal_simd_vec_split s1 s2
       | (Unboxed_float | Unboxed_float32 | Unboxed_nativeint
-        | Unboxed_int64 | Unboxed_int32 | Unboxed_simd _), _ -> false
+        | Unboxed_int64 | Unboxed_int32 | Unboxed_int16 | Unboxed_int8
+        | Unboxed_simd _), _ -> false
 
     let equal p1 p2 =
       match p1, p2 with
@@ -465,6 +480,8 @@ module Predef = struct
       | Float32, Float32
       | Floatarray, Floatarray
       | Int, Int
+      | Int8, Int8
+      | Int16, Int16
       | Int32, Int32
       | Int64, Int64
       | Lazy_t, Lazy_t
@@ -474,8 +491,8 @@ module Predef = struct
       | Exception, Exception -> true
       | Unboxed u1, Unboxed u2 -> equal_unboxed u1 u2
       | (Array | Bytes | Char | Extension_constructor | Float | Float32
-        | Floatarray | Int | Int32 | Int64 | Lazy_t | Nativeint | String
-        | Simd _ | Exception | Unboxed _), _ -> false
+        | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint
+        | String | Simd _ | Exception | Unboxed _), _ -> false
 end
 
 type var = Ident.t
@@ -496,7 +513,7 @@ and desc =
   | Tuple of t list
   | Unboxed_tuple of t list
   | Predef of Predef.t * t list
-  | Arrow of t * t
+  | Arrow
   | Poly_variant of t poly_variant_constructors
   | Mu of t
   | Rec_var of int
@@ -615,8 +632,7 @@ let rec equal_desc0 d1 d2 =
     List.equal equal t1 t2
   | Predef (p1, ts1), Predef (p2, ts2) ->
     Predef.equal p1 p2 && List.equal equal ts1 ts2
-  | Arrow (t1, t1'), Arrow (t2, t2') ->
-    equal t1 t2 && equal t1' t2'
+  | Arrow, Arrow -> true
   | Poly_variant pvs1, Poly_variant pvs2 ->
     List.equal equal_poly_variant_constructor pvs1 pvs2
   | Variant c1, Variant c2 ->
@@ -634,7 +650,7 @@ let rec equal_desc0 d1 d2 =
     && List.equal equal_field r1.fields r2.fields
   | (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _
     | Alias _ | Error _ | Variant _ | Variant_unboxed _ | Record _
-    | Predef _ | Arrow _ | Poly_variant _ | Tuple _ | Unboxed_tuple _
+    | Predef _ | Arrow | Poly_variant _ | Tuple _ | Unboxed_tuple _
     | Constr _ | Mutrec _ | Proj_decl _ | Mu _ | Rec_var _), _
     -> false
 
@@ -767,8 +783,8 @@ let rec print fmt t =
               (Format.pp_print_list
                 ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",@ ")
                 print) args) args
-    | Arrow (arg, ret) ->
-      Format.fprintf fmt "Arrow (%a, %a)" print arg print ret
+    | Arrow ->
+      Format.fprintf fmt "Arrow"
     | Poly_variant fields ->
       Format.fprintf fmt "Poly_variant (%a)"
         (Format.pp_print_list
@@ -1002,9 +1018,9 @@ let predef ?uid (p : Predef.t) (ts : t list) =
       List.map (fun t -> t.hash) ts);
     approximated = false }
 
-let arrow ?uid t1 t2 =
-  { uid; desc = Arrow (t1, t2);
-    hash = Hashtbl.hash (hash_arrow, uid, t1.hash, t2.hash);
+let arrow ?uid () =
+  { uid; desc = Arrow;
+    hash = Hashtbl.hash (hash_arrow, uid);
     approximated = false }
 
 let poly_variant ?uid t =
@@ -1126,7 +1142,7 @@ let set_uid_if_none t uid =
   | Tuple ts -> tuple ~uid ts
   | Unboxed_tuple ts -> unboxed_tuple ~uid ts
   | Predef (p, ts) -> predef ~uid p ts
-  | Arrow (t1, t2) -> arrow ~uid t1 t2
+  | Arrow -> arrow ~uid ()
   | Poly_variant t -> poly_variant ~uid t
   | Variant cs -> variant ~uid cs
   | Variant_unboxed t ->

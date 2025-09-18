@@ -201,6 +201,7 @@ let let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler
       (fun (handler_env, params_rev) (id, duid, visible, layout) ->
         let arity_component =
           Flambda_arity.Component_for_creation.from_lambda layout
+            ~machine_width:(Acc.machine_width acc)
         in
         match arity_component with
         | Singleton kind ->
@@ -430,6 +431,7 @@ let maybe_insert_let_cont result_var_name layout k acc env ccenv body =
   | Non_tail k ->
     let arity_component =
       Flambda_arity.Component_for_creation.from_lambda layout
+        ~machine_width:(Acc.machine_width acc)
     in
     let arity = Flambda_arity.create [arity_component] in
     if Flambda_arity.cardinal_unarized arity < 1
@@ -487,7 +489,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     apply_cps_cont_simple k acc env ccenv [IR.Const const]
       (Singleton
          (Flambda_kind.With_subkind.from_lambda_values_and_unboxed_numbers_only
-            (Lambda.structured_constant_layout const)))
+            (Lambda.structured_constant_layout const)
+            ~machine_width:(Acc.machine_width acc)))
   | Lapply
       { ap_func;
         ap_args;
@@ -537,6 +540,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       ~handler:(fun acc env ccenv ->
         let before_unarization =
           Flambda_arity.Component_for_creation.from_lambda layout
+            ~machine_width:(Acc.machine_width acc)
         in
         let env, new_ids_with_kinds =
           Env.register_mutable_variable env id ~before_unarization
@@ -576,7 +580,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     let body acc ccenv = cps acc env ccenv body k k_exn in
     let kind =
       Flambda_kind.With_subkind.from_lambda_values_and_unboxed_numbers_only
-        layout
+        layout ~machine_width:(Acc.machine_width acc)
     in
     CC.close_let acc ccenv
       [id, Flambda_debug_uid.of_lambda_debug_uid duid, kind]
@@ -615,11 +619,14 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                 [ ( id,
                     Flambda_debug_uid.of_lambda_debug_uid duid,
                     Flambda_kind.With_subkind
-                    .from_lambda_values_and_unboxed_numbers_only layout ) ] )
+                    .from_lambda_values_and_unboxed_numbers_only layout
+                      ~machine_width:(Acc.machine_width acc) ) ] )
             | Punboxed_product layouts ->
               let arity_component =
                 Flambda_arity.Component_for_creation.Unboxed_product
-                  (List.map Flambda_arity.Component_for_creation.from_lambda
+                  (List.map
+                     (Flambda_arity.Component_for_creation.from_lambda
+                        ~machine_width:(Acc.machine_width acc))
                      layouts)
               in
               let arity = Flambda_arity.create [arity_component] in
@@ -796,6 +803,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           let args_arity =
             Flambda_arity.from_lambda_list
               (List.map (fun (_, _, layout) -> layout) args)
+              ~machine_width:(Acc.machine_width acc)
           in
           let unarized_per_arg =
             Flambda_arity.unarize_per_parameter args_arity
@@ -825,6 +833,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                   in
                   let before_unarization =
                     Flambda_arity.Component_for_creation.from_lambda layout
+                      ~machine_width:(Acc.machine_width acc)
                   in
                   ( Env.register_unboxed_product_with_kinds handler_env
                       ~unboxed_product:arg ~before_unarization ~fields,
@@ -884,7 +893,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                           Flambda_arity.unarize_t
                             (Flambda_arity.create
                                [ Flambda_arity.Component_for_creation.from_lambda
-                                   layout ])
+                                   layout ~machine_width:(Acc.machine_width acc)
+                               ])
                       }
                     in
                     wrap_return_continuation acc env ccenv apply))
@@ -1237,7 +1247,8 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
               return_arity =
                 Flambda_arity.unarize_t
                   (Flambda_arity.create
-                     [Flambda_arity.Component_for_creation.from_lambda ap_return])
+                     [ Flambda_arity.Component_for_creation.from_lambda
+                         ap_return ~machine_width:(Acc.machine_width acc) ])
             }
           in
           wrap_return_continuation acc env ccenv apply)
@@ -1375,7 +1386,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         } ->
       Some
         (Fields_of_block_with_tag_zero
-           (List.map Flambda_kind.With_subkind.from_lambda_value_kind
+           (List.map
+              (Flambda_kind.With_subkind.from_lambda_value_kind
+                 ~machine_width:(Env.machine_width env))
               field_kinds))
     | Pvalue
         { nullable = Non_nullable;
@@ -1434,6 +1447,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let params_arity =
     Flambda_arity.from_lambda_list
       (List.map (fun (p : L.lparam) -> p.layout) params)
+      ~machine_width:(Env.machine_width env)
   in
   let unarized_per_param = Flambda_arity.unarize_per_parameter params_arity in
   assert (List.compare_lengths params unarized_per_param = 0);
@@ -1501,8 +1515,8 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   in
   let new_env =
     Env.create ~current_unit:(Env.current_unit env)
-      ~return_continuation:body_cont ~exn_continuation:body_exn_cont
-      ~my_region:my_region_stack_elt
+      ~machine_width:(Env.machine_width env) ~return_continuation:body_cont
+      ~exn_continuation:body_exn_cont ~my_region:my_region_stack_elt
   in
   let exn_continuation : IR.exn_continuation =
     { exn_handler = body_exn_cont; extra_args = [] }
@@ -1537,6 +1551,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           in
           let before_unarization =
             Flambda_arity.Component_for_creation.from_lambda layout
+              ~machine_width:(Env.machine_width env)
           in
           unboxed_products
             := Ident.Map.add name (before_unarization, fields) !unboxed_products;
@@ -1551,7 +1566,8 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let return =
     Flambda_arity.unarize_t
       (Flambda_arity.create
-         [Flambda_arity.Component_for_creation.from_lambda return])
+         [ Flambda_arity.Component_for_creation.from_lambda return
+             ~machine_width:(Env.machine_width env) ])
   in
   (* CR ncourant: now that the following two statements are in this order, I
      believe we can remove [removed_params]. *)
@@ -1764,8 +1780,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
 
 (* CR pchambart: define a record `target_config` to hold things like
    `big_endian` *)
-let lambda_to_flambda ~mode ~big_endian ~cmx_loader ~compilation_unit
-    ~module_block_size_in_words (lam : Lambda.lambda) =
+let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
+    ~compilation_unit ~module_block_size_in_words (lam : Lambda.lambda) =
   let return_continuation = Continuation.create ~sort:Define_root_symbol () in
   let exn_continuation = Continuation.create () in
   let toplevel_my_region = Ident.create_local "toplevel_my_region" in
@@ -1773,12 +1789,13 @@ let lambda_to_flambda ~mode ~big_endian ~cmx_loader ~compilation_unit
     Ident.create_local "toplevel_my_ghost_region"
   in
   let env =
-    Env.create ~current_unit:compilation_unit ~return_continuation
-      ~exn_continuation ~my_region:None
+    Env.create ~current_unit:compilation_unit ~machine_width
+      ~return_continuation ~exn_continuation ~my_region:None
   in
   let program acc ccenv =
     cps_tail acc env ccenv lam return_continuation exn_continuation
   in
-  CC.close_program ~mode ~big_endian ~cmx_loader ~compilation_unit
-    ~module_block_size_in_words ~program ~prog_return_cont:return_continuation
-    ~exn_continuation ~toplevel_my_region ~toplevel_my_ghost_region
+  CC.close_program ~mode ~machine_width ~big_endian ~cmx_loader
+    ~compilation_unit ~module_block_size_in_words ~program
+    ~prog_return_cont:return_continuation ~exn_continuation ~toplevel_my_region
+    ~toplevel_my_ghost_region

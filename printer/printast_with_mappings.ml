@@ -70,6 +70,8 @@ let fmt_constant f x =
   | Pconst_unboxed_integer (i,m) ->
       fprintf f "PConst_unboxed_int (%s,%c)" i m;
   | Pconst_char (c) -> fprintf f "PConst_char %02x" (Char.code c);
+  | Pconst_untagged_char (c) ->
+      fprintf f "PConst_untagged_char %02x" (Char.code c);
   | Pconst_string (s, strloc, None) ->
       fprintf f "PConst_string(%S,%a,None)" s fmt_location strloc ;
   | Pconst_string (s, strloc, Some delim) ->
@@ -124,6 +126,8 @@ let fmt_index_kind f = function
   | Index_int -> fprintf f "Index_int"
   | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
   | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
+  | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
+  | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
   | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
 ;;
 

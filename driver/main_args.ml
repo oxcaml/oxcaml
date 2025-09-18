@@ -875,6 +875,9 @@ let mk_dflambda_verbose f =
   "-dflambda-verbose", Arg.Unit f, " Print Flambda 1 terms including around \
       each pass"
 
+let mk_djsir f =
+  "-djsir", Arg.Unit f, " Print Js_of_ocaml IR (JSIR) representation"
+
 let mk_dinstr f =
   "-dinstr", Arg.Unit f, " (undocumented)"
 
@@ -899,6 +902,88 @@ let mk_dstartup f =
 let mk_debug_ocaml f =
   "-debug-ocaml", Arg.Unit f, " Debugging output for the compiler\n\
                                (internal use only)"
+
+let format_int_option opt =
+  match opt with
+  | Some n -> string_of_int n
+  | None -> "none"
+
+let parse_int_option ~parameter s =
+  match s with
+  | "none" -> None
+  | n ->
+    try
+      Some (int_of_string n)
+    with _ ->
+      let msg =
+        Printf.sprintf
+          "Invalid value for %s: %s, allowed are integers or 'none'" parameter s
+      in
+      raise (Arg.Bad msg)
+
+let mk_gdwarf_config_shape_reduce_depth f =
+  "-gdwarf-config-shape-reduce-depth", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum depth for shape reduction in DWARF debug \
+  info (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.shape_reduce_depth)
+
+let mk_gdwarf_config_shape_eval_depth f =
+  "-gdwarf-config-shape-eval-depth", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum depth for shape evaluation in DWARF debug \
+  info (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.shape_eval_depth)
+
+let mk_gdwarf_config_max_cms_files_per_unit f =
+  "-gdwarf-config-max-cms-files-per-unit", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum CMS files per compilation unit in \
+  DWARF debug info (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.max_cms_files_per_unit)
+
+let mk_gdwarf_config_max_cms_files_per_variable f =
+  "-gdwarf-config-max-cms-files-per-variable", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum CMS files per variable in DWARF debug info \
+  (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.max_cms_files_per_variable)
+
+let mk_gdwarf_config_max_type_to_shape_depth f =
+  "-gdwarf-config-max-type-to-shape-depth", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum type-to-shape depth for generating DWARF \
+  debug info (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.max_type_to_shape_depth)
+
+let mk_gdwarf_config_max_shape_reduce_steps_per_variable f =
+  "-gdwarf-config-max-shape-reduce-steps-per-variable", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum shape reduction steps per variable in \
+  DWARF debug info (default: %s, use 'none' for unlimited)"
+    (format_int_option
+      Clflags.Dwarf_config_defaults.max_shape_reduce_steps_per_variable)
+
+let mk_gdwarf_config_max_evaluation_steps_per_variable f =
+  "-gdwarf-config-max-evaluation-steps-per-variable", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum evaluation steps per variable in DWARF \
+  debug info (default: %s, use 'none' for unlimited)"
+    (format_int_option
+      Clflags.Dwarf_config_defaults.max_evaluation_steps_per_variable)
+
+let mk_gdwarf_config_shape_reduce_fuel f =
+  "-gdwarf-config-shape-reduce-fuel", Arg.String f,
+  Printf.sprintf "<n|none>  Fuel for shape reduction when producing DWARF \
+  debug info (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.shape_reduce_fuel)
+
+let mk_gdwarf_fidelity f =
+  "-gdwarf-fidelity", Arg.String f,
+  "<level>  Set fidelity level of the DWARF debug information \
+  (low|medium|high|very-high|ultra-high|unlimited). Higher values produce \
+  more detailed debug information at the expense of increased compilation \
+  times.\n\
+  \t- low is fast, but it does not support recursive types or retrieving \
+      declaration information from other files\n\
+  \t- medium is a reasonable default (it does support recursive declarations), \
+      but it is conservative with respect to retrieving \
+      declarations (including finding them through functor application)\n\
+  \t- high and above should provide good debugging information at increased \
+      compilation times"
 
 let mk_opaque f =
   "-opaque", Arg.Unit f,
@@ -1189,7 +1274,49 @@ module type Optcomp_options = sig
   val _save_ir_before : string -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
+  val _gdwarf_config_shape_reduce_depth : string -> unit
+  val _gdwarf_config_shape_eval_depth : string -> unit
+  val _gdwarf_config_max_cms_files_per_unit : string -> unit
+  val _gdwarf_config_max_cms_files_per_variable : string -> unit
+  val _gdwarf_config_max_type_to_shape_depth : string -> unit
+  val _gdwarf_config_max_shape_reduce_steps_per_variable : string -> unit
+  val _gdwarf_config_max_evaluation_steps_per_variable : string -> unit
+  val _gdwarf_config_shape_reduce_fuel : string -> unit
+  val _gdwarf_fidelity : string -> unit
 end;;
+
+module type Jscomp_options = sig
+  include Core_options
+  include Compiler_options
+
+  (* CR selee: should we include more things from [Native]? Review *)
+  val _inline : string -> unit
+  val _inline_toplevel : string -> unit
+  val _inlining_report : unit -> unit
+  val _dump_pass : string -> unit
+  val _inline_max_depth : string -> unit
+  val _rounds : int -> unit
+  val _inline_max_unroll : string -> unit
+  val _inline_call_cost : string -> unit
+  val _inline_alloc_cost : string -> unit
+  val _inline_prim_cost : string -> unit
+  val _inline_branch_cost : string -> unit
+  val _inline_indirect_cost : string -> unit
+  val _inline_lifting_benefit : string -> unit
+  val _inline_branch_factor : string -> unit
+
+  val _dflambda : unit -> unit
+  val _dflambda_heavy_invariants : unit -> unit
+  val _dflambda_invariants : unit -> unit
+  val _dflambda_let : int -> unit
+  val _dflambda_no_invariants : unit -> unit
+  val _dflambda_verbose : unit -> unit
+  val _djsir : unit -> unit
+  val _drawflambda : unit -> unit
+  val _classic_inlining : unit -> unit
+  val _o2 : unit -> unit
+  val _o3 : unit -> unit
+end
 
 module type Opttop_options = sig
   include Toplevel_options
@@ -1632,6 +1759,22 @@ struct
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
     mk_shape_format F._shape_format;
+    mk_gdwarf_config_shape_reduce_depth
+      F._gdwarf_config_shape_reduce_depth;
+    mk_gdwarf_config_shape_eval_depth
+      F._gdwarf_config_shape_eval_depth;
+    mk_gdwarf_config_max_cms_files_per_unit
+      F._gdwarf_config_max_cms_files_per_unit;
+    mk_gdwarf_config_max_cms_files_per_variable
+      F._gdwarf_config_max_cms_files_per_variable;
+    mk_gdwarf_config_max_type_to_shape_depth
+      F._gdwarf_config_max_type_to_shape_depth;
+    mk_gdwarf_config_max_shape_reduce_steps_per_variable
+      F._gdwarf_config_max_shape_reduce_steps_per_variable;
+    mk_gdwarf_config_max_evaluation_steps_per_variable
+      F._gdwarf_config_max_evaluation_steps_per_variable;
+    mk_gdwarf_config_shape_reduce_fuel F._gdwarf_config_shape_reduce_fuel;
+    mk_gdwarf_fidelity F._gdwarf_fidelity;
 
     mk_args F._args;
     mk_args0 F._args0;
@@ -1748,6 +1891,164 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_debug_ocaml F._debug_ocaml;
 
     mk_eval F._eval;
+  ]
+end;;
+
+module Make_jscomp_options (F : Jscomp_options) =
+struct
+  let list = [
+    (* CR selee: A lot of these are probably useless in our
+       setting. Go through and prune *)
+    mk_a F._a;
+    mk_alert F._alert;
+    mk_absname F._absname;
+    mk_no_absname F._no_absname;
+    mk_annot F._annot;
+    mk_as_argument_for F._as_argument_for;
+    mk_as_parameter F._as_parameter;
+    mk_binannot F._binannot;
+    mk_binannot_cms F._binannot_cms;
+    mk_binannot_occurrences F._binannot_occurrences;
+    mk_c F._c;
+    mk_cc F._cc;
+    mk_cclib F._cclib;
+    mk_ccopt F._ccopt;
+    mk_classic_inlining F._classic_inlining;
+    mk_cmi_file F._cmi_file;
+    mk_color F._color;
+    mk_error_style F._error_style;
+    mk_config F._config;
+    mk_config_var F._config_var;
+    mk_disable_all_extensions F._disable_all_extensions;
+    mk_only_erasable_extensions F._only_erasable_extensions;
+    mk_dtypes F._annot;
+    mk_extension F._extension;
+    mk_no_extension F._no_extension;
+    mk_extension_universe F._extension_universe;
+    mk_for_pack_byt F._for_pack;
+    mk_g_byt F._g;
+    mk_no_g F._no_g;
+    mk_stop_after ~native:false F._stop_after;
+    mk_i F._i;
+    mk_I F._I;
+    mk_H F._H;
+    mk_I_paths F._I_paths;
+    mk_H_paths F._H_paths;
+    mk_impl F._impl;
+    mk_instantiate_byt F._instantiate;
+    mk_intf F._intf;
+    mk_intf_suffix F._intf_suffix;
+    mk_intf_suffix_2 F._intf_suffix;
+    mk_keep_docs F._keep_docs;
+    mk_no_keep_docs F._no_keep_docs;
+    mk_keep_locs F._keep_locs;
+    mk_no_keep_locs F._no_keep_locs;
+    mk_labels F._labels;
+    mk_linkall F._linkall;
+    mk_modern F._labels;
+    mk_alias_deps F._alias_deps;
+    mk_no_alias_deps F._no_alias_deps;
+    mk_app_funct F._app_funct;
+    mk_no_app_funct F._no_app_funct;
+    mk_directory F._directory;
+    mk_noassert F._noassert;
+    mk_noautolink_byt F._noautolink;
+    mk_nolabels F._nolabels;
+    mk_nostdlib F._nostdlib;
+    mk_no_auto_include_otherlibs F._no_auto_include_otherlibs;
+    mk_nocwd F._nocwd;
+    mk_nopervasives F._nopervasives;
+    mk_o F._o;
+    mk_o2 F._o2;
+    mk_o3 F._o3;
+    mk_opaque F._opaque;
+    mk_open F._open;
+    mk_output_obj F._output_obj;
+    mk_pack_byt F._pack;
+    mk_parameter F._parameter;
+    mk_pp F._pp;
+    mk_ppx F._ppx;
+    mk_plugin F._plugin;
+    mk_principal F._principal;
+    mk_no_principal F._no_principal;
+    mk_rectypes F._rectypes;
+    mk_no_rectypes F._no_rectypes;
+    mk_runtime_variant F._runtime_variant;
+    mk_with_runtime F._with_runtime;
+    mk_without_runtime F._without_runtime;
+    mk_safe_string;
+    mk_safer_matching F._safer_matching;
+    mk_short_paths F._short_paths;
+    mk_strict_sequence F._strict_sequence;
+    mk_no_strict_sequence F._no_strict_sequence;
+    mk_strict_formats F._strict_formats;
+    mk_no_strict_formats F._no_strict_formats;
+    mk_thread F._thread;
+    mk_unboxed_types F._unboxed_types;
+    mk_no_unboxed_types F._no_unboxed_types;
+    mk_unsafe F._unsafe;
+    mk_v F._v;
+    mk_verbose F._verbose;
+    mk_verbose_types F._verbose_types;
+    mk_no_verbose_types F._no_verbose_types;
+    mk_version F._version;
+    mk__version F._version;
+    mk_vnum F._vnum;
+    mk_w F._w;
+    mk_warn_error F._warn_error;
+    mk_warn_help F._warn_help;
+    mk_where F._where;
+    mk__ F.anonymous;
+
+    mk_match_context_rows F._match_context_rows;
+    mk_dno_unique_ids F._dno_unique_ids;
+    mk_dunique_ids F._dunique_ids;
+    mk_dno_locations F._dno_locations;
+    mk_dlocations F._dlocations;
+    mk_dsource F._dsource;
+    mk_dparsetree F._dparsetree;
+    mk_dtypedtree F._dtypedtree;
+    mk_dshape F._dshape;
+    mk_drawlambda F._drawlambda;
+    mk_dlambda F._dlambda;
+    mk_dblambda F._dblambda;
+    mk_dletreclambda F._dletreclambda;
+    mk_dtimings F._dtimings;
+    mk_dtimings_precision F._dtimings_precision;
+    mk_dcounters F._dcounters;
+    mk_dprofile F._dprofile;
+    mk_dgranularity F._dgranularity;
+    mk_dump_into_file F._dump_into_file;
+    mk_dump_into_csv F._dump_into_csv;
+    mk_dump_dir F._dump_dir;
+    mk_debug_ocaml F._debug_ocaml;
+
+    mk_args F._args;
+    mk_args0 F._args0;
+
+    mk_inline_branch_factor F._inline_branch_factor;
+    mk_inline F._inline;
+    mk_inline_toplevel F._inline_toplevel;
+    mk_inline_alloc_cost F._inline_alloc_cost;
+    mk_inline_branch_cost F._inline_branch_cost;
+    mk_inline_call_cost F._inline_call_cost;
+    mk_inline_prim_cost F._inline_prim_cost;
+    mk_inline_indirect_cost F._inline_indirect_cost;
+    mk_inline_lifting_benefit F._inline_lifting_benefit;
+    mk_inline_max_depth F._inline_max_depth;
+    mk_inline_max_unroll F._inline_max_unroll;
+    mk_inlining_report F._inlining_report;
+    mk_rounds F._rounds;
+    mk_dump_pass F._dump_pass;
+
+    mk_dflambda F._dflambda;
+    mk_drawflambda F._drawflambda;
+    mk_dflambda_invariants F._dflambda_invariants;
+    mk_dflambda_heavy_invariants F._dflambda_heavy_invariants;
+    mk_dflambda_no_invariants F._dflambda_no_invariants;
+    mk_dflambda_let F._dflambda_let;
+    mk_dflambda_verbose F._dflambda_verbose;
+    mk_djsir F._djsir;
   ]
 end;;
 
@@ -2181,6 +2482,37 @@ module Default = struct
     let _v () = Compenv.print_version_and_library "native-code compiler"
     let _no_probes = clear probes
     let _probes = set probes
+    let _gdwarf_config_shape_reduce_depth s =
+      gdwarf_config_shape_reduce_depth :=
+        parse_int_option ~parameter:"-gdwarf-config-shape-reduce-depth" s
+    let _gdwarf_config_shape_eval_depth s =
+      gdwarf_config_shape_eval_depth :=
+        parse_int_option ~parameter:"-gdwarf-config-shape-eval-depth" s
+    let _gdwarf_config_max_cms_files_per_unit s =
+      gdwarf_config_max_cms_files_per_unit :=
+        parse_int_option ~parameter:"-gdwarf-config-max-cms-files-per-unit" s
+    let _gdwarf_config_max_cms_files_per_variable s =
+      gdwarf_config_max_cms_files_per_variable :=
+        parse_int_option
+          ~parameter:"-gdwarf-config-max-cms-files-per-variable" s
+    let _gdwarf_config_max_type_to_shape_depth s =
+      gdwarf_config_max_type_to_shape_depth :=
+        parse_int_option ~parameter:"-gdwarf-config-max-type-to-shape-depth" s
+    let _gdwarf_config_max_shape_reduce_steps_per_variable s =
+      gdwarf_config_max_shape_reduce_steps_per_variable :=
+        parse_int_option
+          ~parameter:"-gdwarf-config-max-shape-reduce-steps-per-variable" s
+    let _gdwarf_config_max_evaluation_steps_per_variable s =
+      gdwarf_config_max_evaluation_steps_per_variable :=
+        parse_int_option
+          ~parameter:"-gdwarf-config-max-evaluation-steps-per-variable" s
+    let _gdwarf_config_shape_reduce_fuel s =
+      gdwarf_config_shape_reduce_fuel :=
+        parse_int_option ~parameter:"-gdwarf-config-shape-reduce-fuel" s
+    let _gdwarf_fidelity s =
+      match Clflags.gdwarf_fidelity_of_string s with
+      | Some fidelity -> Clflags.set_gdwarf_fidelity fidelity
+      | None -> Misc.fatal_error ("Invalid fidelity level: " ^ s)
   end
 
   module Odoc_args = struct
@@ -2246,4 +2578,80 @@ third-party libraries such as Lwt, but with a different API."
     let _vmthread () = Compenv.fatal vmthread_removed_message
   end
 
+  module Jsmain = struct
+    include Core
+    include Compiler
+
+    let _dump_pass pass = set_dumped_pass pass true
+    let _inline spec =
+      Float_arg_helper.parse spec "Syntax: -inline <n> | <round>=<n>[,...]"
+        inline_threshold
+    let _inline_alloc_cost spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-alloc-cost <n> | <round>=<n>[,...]"
+        inline_alloc_cost
+    let _inline_branch_cost spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-branch-cost <n> | <round>=<n>[,...]"
+        inline_branch_cost
+    let _inline_branch_factor spec =
+      Float_arg_helper.parse spec
+        "Syntax: -inline-branch-factor <n> | <round>=<n>[,...]"
+        inline_branch_factor
+    let _inline_call_cost spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-call-cost <n> | <round>=<n>[,...]" inline_call_cost
+    let _inline_indirect_cost spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-indirect-cost <n> | <round>=<n>[,...]"
+        inline_indirect_cost
+    let _inline_lifting_benefit spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-lifting-benefit <n> | <round>=<n>[,...]"
+        inline_lifting_benefit
+    let _inline_max_depth spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-max-depth <n> | <round>=<n>[,...]" inline_max_depth
+    let _inline_max_unroll spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-max-unroll <n> | <round>=<n>[,...]"
+        inline_max_unroll
+    let _inline_prim_cost spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-prim-cost <n> | <round>=<n>[,...]" inline_prim_cost
+    let _inline_toplevel spec =
+      Int_arg_helper.parse spec
+        "Syntax: -inline-toplevel <n> | <round>=<n>[,...]"
+        inline_toplevel_threshold
+    let _inlining_report () = inlining_report := true
+    let _rounds n = simplify_rounds := (Some n)
+
+    let _dflambda = set dump_flambda
+    let _dflambda_heavy_invariants () =
+      flambda_invariant_checks := Heavy_checks
+    let _dflambda_invariants () =
+      flambda_invariant_checks := Light_checks
+    let _dflambda_let stamp = dump_flambda_let := (Some stamp)
+    let _dflambda_no_invariants () =
+      flambda_invariant_checks := No_checks
+    let _dflambda_verbose () =
+      set dump_flambda (); set dump_flambda_verbose ()
+    let _djsir = set dump_jsir
+    let _drawflambda = set dump_rawflambda
+
+    let _output_complete_obj () =
+      output_c_object := true;
+      output_complete_object := true;
+      (* CR selee: ??? *)
+      custom_runtime := true
+    let _output_obj () =
+      output_c_object := true;
+      (* CR selee: ??? *)
+      custom_runtime := true
+    let _v () = Compenv.print_version_and_library "js-of-ocaml IR compiler"
+
+    let _classic_inlining () = set_oclassic ()
+    let _o2 () = Clflags.set_o2 ()
+    let _o3 () = Clflags.set_o3 ()
+  end
 end

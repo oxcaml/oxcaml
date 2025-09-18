@@ -48,7 +48,22 @@ type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
+
+module Dwarf_config_defaults = struct
+  let shape_reduce_depth = Some 2
+  let shape_eval_depth = Some 2
+  let max_cms_files_per_unit = Some 20
+  let max_cms_files_per_variable = Some 5
+  let max_type_to_shape_depth = Some 10
+  let max_shape_reduce_steps_per_variable = Some 1000
+  let max_evaluation_steps_per_variable = Some 1_000_000
+  let shape_reduce_fuel = Some 10
+end
 type shape_format = Old_merlin | Debugging_shapes
+type gdwarf_fidelity =
+  | Fidelity_low | Fidelity_medium
+  | Fidelity_high | Fidelity_very_high | Fidelity_ultra_high
+  | Fidelity_unlimited
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
@@ -65,6 +80,32 @@ and debug_full = ref false              (* For full DWARF support *)
 and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
 and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)
 and dwarf_pedantic = ref false          (* -gdwarf-pedantic *)
+and gdwarf_config_shape_reduce_depth =
+  ref Dwarf_config_defaults.shape_reduce_depth
+  (* -gdwarf-config-shape-reduce-depth *)
+and gdwarf_config_shape_eval_depth =
+  ref Dwarf_config_defaults.shape_eval_depth
+  (* -gdwarf-config-shape-eval-depth *)
+and gdwarf_config_max_cms_files_per_unit =
+  ref Dwarf_config_defaults.max_cms_files_per_unit
+  (* -gdwarf-config-max-cms-files-per-unit *)
+and gdwarf_config_max_cms_files_per_variable =
+  ref Dwarf_config_defaults.max_cms_files_per_variable
+  (* -gdwarf-config-max-cms-files-per-variable *)
+and gdwarf_config_max_type_to_shape_depth =
+  ref Dwarf_config_defaults.max_type_to_shape_depth
+  (* -gdwarf-config-max-type-to-shape-depth *)
+and gdwarf_config_max_shape_reduce_steps_per_variable =
+  ref Dwarf_config_defaults.max_shape_reduce_steps_per_variable
+  (* -gdwarf-config-max-shape-reduce-steps-per-variable *)
+and gdwarf_config_max_evaluation_steps_per_variable =
+  ref Dwarf_config_defaults.max_evaluation_steps_per_variable
+  (* -gdwarf-config-max-evaluation-steps-per-variable *)
+and gdwarf_config_shape_reduce_fuel =
+  ref Dwarf_config_defaults.shape_reduce_fuel
+  (* -gdwarf-config-shape-reduce-fuel *)
+and gdwarf_fidelity = ref (None : gdwarf_fidelity option)
+  (* -gdwarf-fidelity *)
 and unsafe = ref false                  (* -unsafe *)
 and use_linscan = ref false             (* -linscan *)
 and link_everything = ref false         (* -linkall *)
@@ -137,6 +178,7 @@ and dump_rawflambda = ref false            (* -drawflambda *)
 and dump_flambda = ref false            (* -dflambda *)
 and dump_flambda_let = ref (None : int option) (* -dflambda-let=... *)
 and dump_flambda_verbose = ref false    (* -dflambda-verbose *)
+and dump_jsir = ref false               (* -djsir *)
 and dump_instr = ref false              (* -dinstr *)
 and keep_camlprimc_file = ref false     (* -dcamlprimc *)
 
@@ -170,6 +212,7 @@ let set_profile_granularity v =
   | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
 
 let native_code = ref false             (* set to true under ocamlopt *)
+let jsir = ref false                    (* set to true under ocamlj *)
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
@@ -221,6 +264,83 @@ let rounds () =
   match !simplify_rounds with
   | None -> !default_simplify_rounds
   | Some r -> r
+
+let gdwarf_fidelity_of_string s =
+  match String.lowercase_ascii s with
+  | "low" -> Some Fidelity_low
+  | "medium" -> Some Fidelity_medium
+  | "high" -> Some Fidelity_high
+  | "very-high" -> Some Fidelity_very_high
+  | "ultra-high" -> Some Fidelity_ultra_high
+  | "unlimited" -> Some Fidelity_unlimited
+  | _ -> None
+
+let set_gdwarf_fidelity fidelity =
+  gdwarf_fidelity := Some fidelity;
+  match fidelity with
+  | Fidelity_low ->
+      gdwarf_config_shape_eval_depth := Some 1;
+      gdwarf_config_shape_reduce_depth := Some 2;
+      gdwarf_config_max_cms_files_per_unit := Some 0;
+      gdwarf_config_max_cms_files_per_variable := Some 0;
+      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some 100;
+      gdwarf_config_max_evaluation_steps_per_variable := Some 1000;
+      gdwarf_config_shape_reduce_fuel := Some 10
+  | Fidelity_medium ->
+      (* The default. *)
+      gdwarf_config_shape_eval_depth :=
+        Dwarf_config_defaults.shape_eval_depth;
+      gdwarf_config_shape_reduce_depth :=
+        Dwarf_config_defaults.shape_reduce_depth;
+      gdwarf_config_max_cms_files_per_unit :=
+        Dwarf_config_defaults.max_cms_files_per_unit;
+      gdwarf_config_max_cms_files_per_variable :=
+        Dwarf_config_defaults.max_cms_files_per_variable;
+      gdwarf_config_max_type_to_shape_depth :=
+        Dwarf_config_defaults.max_type_to_shape_depth;
+      gdwarf_config_max_shape_reduce_steps_per_variable :=
+        Dwarf_config_defaults.max_shape_reduce_steps_per_variable;
+      gdwarf_config_max_evaluation_steps_per_variable :=
+        Dwarf_config_defaults.max_evaluation_steps_per_variable;
+      gdwarf_config_shape_reduce_fuel :=
+        Dwarf_config_defaults.shape_reduce_fuel
+  | Fidelity_high ->
+      gdwarf_config_shape_eval_depth := Some 3;
+      gdwarf_config_shape_reduce_depth := Some 3;
+      gdwarf_config_max_cms_files_per_unit := Some 50;
+      gdwarf_config_max_cms_files_per_variable := Some 10;
+      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some (10_000);
+      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000_000);
+      gdwarf_config_shape_reduce_fuel := Some 20
+  | Fidelity_very_high ->
+      gdwarf_config_shape_eval_depth := Some 4;
+      gdwarf_config_shape_reduce_depth := Some 3;
+      gdwarf_config_max_cms_files_per_unit := Some 100;
+      gdwarf_config_max_cms_files_per_variable := Some 10;
+      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := None
+  | Fidelity_ultra_high ->
+      gdwarf_config_shape_eval_depth := Some 5;
+      gdwarf_config_shape_reduce_depth := Some 5;
+      gdwarf_config_max_cms_files_per_unit := Some 1000;
+      gdwarf_config_max_cms_files_per_variable := Some 50;
+      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := None
+  | Fidelity_unlimited ->
+      gdwarf_config_shape_eval_depth := None;
+      gdwarf_config_shape_reduce_depth := None;
+      gdwarf_config_max_cms_files_per_unit := None;
+      gdwarf_config_max_cms_files_per_variable := None;
+      gdwarf_config_max_type_to_shape_depth := None;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := None
 
 let default_inline_threshold = if Config.flambda then 10. else 10. /. 8.
 let inline_toplevel_multiplier = 16
@@ -507,7 +627,7 @@ module Compiler_ir = struct
 end
 
 let is_flambda2 () =
-  Config.flambda2 && !native_code
+  Config.flambda2 && (!native_code || !jsir)
 
 module Opt_flag_handler = struct
   type t = {
@@ -690,6 +810,39 @@ let set_save_ir_after pass enabled =
 
 let set_save_ir_before pass enabled =
   set_save_ir save_ir_before pass enabled
+
+module Register_allocator = struct
+  type t =
+    | Cfg
+    | Irc
+    | Ls
+    | Gi
+
+  let all = [
+    Cfg;
+    Irc;
+    Ls;
+    Gi;
+  ]
+
+  let equal left right =
+    match left, right with
+    | Cfg, Cfg | Irc, Irc | Ls, Ls | Gi, Gi -> true
+    | (Cfg | Irc | Ls | Gi), _ -> false
+  
+  let to_string = function
+    | Cfg -> "cfg"
+    | Irc -> "irc"
+    | Ls -> "ls"
+    | Gi -> "gi"
+
+  let assoc_list = List.map (fun regalloc -> to_string regalloc, regalloc) all
+
+  let of_string s = List.assoc_opt (String.lowercase_ascii s) assoc_list
+  
+  let format ppf regalloc =
+    Format.fprintf ppf "%s" (to_string regalloc)
+end
 
 module String = Misc.Stdlib.String
 

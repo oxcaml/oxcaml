@@ -103,9 +103,29 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
   in
   match const with
   | Const_base (Const_int c) ->
-    acc, reg_width (RWC.tagged_immediate (Target_ocaml_int.of_int c)), "int"
+    ( acc,
+      reg_width
+        (RWC.tagged_immediate
+           (Target_ocaml_int.of_int (Acc.machine_width acc) c)),
+      "int" )
+  | Const_base (Const_int8 c) ->
+    ( acc,
+      reg_width
+        (RWC.tagged_immediate
+           (Target_ocaml_int.of_int (Acc.machine_width acc) c)),
+      "int8" )
+  | Const_base (Const_int16 c) ->
+    ( acc,
+      reg_width
+        (RWC.tagged_immediate
+           (Target_ocaml_int.of_int (Acc.machine_width acc) c)),
+      "int16" )
   | Const_base (Const_char c) ->
-    acc, reg_width (RWC.tagged_immediate (Target_ocaml_int.of_char c)), "char"
+    ( acc,
+      reg_width
+        (RWC.tagged_immediate
+           (Target_ocaml_int.of_char (Acc.machine_width acc) c)),
+      "char" )
   | Const_base (Const_unboxed_float c) ->
     let c = Numeric_types.Float_by_bit_pattern.of_string c in
     acc, reg_width (RWC.naked_float c), "unboxed_float"
@@ -126,15 +146,38 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     register_const acc dbg (SC.boxed_int64 (Const c)) "int64"
   | Const_base (Const_nativeint c) ->
     (* CR pchambart: this should be pushed further to lambda *)
-    let c = Targetint_32_64.of_int64 (Int64.of_nativeint c) in
+    let c =
+      Targetint_32_64.of_int64 (Acc.machine_width acc) (Int64.of_nativeint c)
+    in
     register_const acc dbg (SC.boxed_nativeint (Const c)) "nativeint"
+  | Const_base (Const_untagged_char c) ->
+    ( acc,
+      reg_width
+        (RWC.naked_int8 (Numeric_types.Int8.unsigned_of_int_exn (Char.code c))),
+      "untagged_char" )
+  | Const_base (Const_untagged_int c) ->
+    ( acc,
+      reg_width
+        (RWC.naked_immediate
+           (Target_ocaml_int.of_int (Acc.machine_width acc) c)),
+      "untagged_int" )
+  | Const_base (Const_untagged_int8 c) ->
+    ( acc,
+      reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn c)),
+      "untagged_int8" )
+  | Const_base (Const_untagged_int16 c) ->
+    ( acc,
+      reg_width (RWC.naked_int16 (Numeric_types.Int16.of_int_exn c)),
+      "untagged_int16" )
   | Const_base (Const_unboxed_int32 c) ->
     acc, reg_width (RWC.naked_int32 c), "unboxed_int32"
   | Const_base (Const_unboxed_int64 c) ->
     acc, reg_width (RWC.naked_int64 c), "unboxed_int64"
   | Const_base (Const_unboxed_nativeint c) ->
     (* CR pchambart: this should be pushed further to lambda *)
-    let c = Targetint_32_64.of_int64 (Int64.of_nativeint c) in
+    let c =
+      Targetint_32_64.of_int64 (Acc.machine_width acc) (Int64.of_nativeint c)
+    in
     acc, reg_width (RWC.naked_nativeint c), "unboxed_nativeint"
   | Const_immstring c ->
     register_const acc dbg (SC.immutable_string c) "immstring"
@@ -201,10 +244,13 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       match c with
       | Const_base (Const_float f) -> Const_base (Const_unboxed_float f)
       | Const_base
-          ( Const_int _ | Const_char _ | Const_string _ | Const_float32 _
+          ( Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _
+          | Const_untagged_char _ | Const_string _ | Const_float32 _
           | Const_unboxed_float _ | Const_unboxed_float32 _ | Const_int32 _
-          | Const_int64 _ | Const_nativeint _ | Const_unboxed_int32 _
-          | Const_unboxed_int64 _ | Const_unboxed_nativeint _ )
+          | Const_int64 _ | Const_nativeint _ | Const_untagged_int _
+          | Const_untagged_int8 _ | Const_untagged_int16 _
+          | Const_unboxed_int32 _ | Const_unboxed_int64 _
+          | Const_unboxed_nativeint _ )
       | Const_block _ | Const_mixed_block _ | Const_float_array _
       | Const_immstring _ | Const_float_block _ | Const_null ->
         Misc.fatal_errorf
@@ -564,13 +610,15 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
         } ])
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
 
-let unarize_extern_repr alloc_mode (extern_repr : Lambda.extern_repr) =
+let unarize_extern_repr ~machine_width alloc_mode
+    (extern_repr : Lambda.extern_repr) =
   match extern_repr with
   | Same_as_ocaml_repr (Base Void) -> []
   | Same_as_ocaml_repr (Base _ as sort) ->
     let kind =
       Typeopt.layout_of_non_void_sort sort
       |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only
+           ~machine_width
       |> K.With_subkind.kind
     in
     [{ kind; arg_transformer = None; return_transformer = None }]
@@ -636,7 +684,7 @@ let unarize_extern_repr alloc_mode (extern_repr : Lambda.extern_repr) =
         return_transformer = Some P.Tag_immediate
       } ]
 
-let close_c_call acc env ~loc ~let_bound_ids_with_kinds
+let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
         prim_arity;
         prim_alloc;
@@ -686,13 +734,14 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
     | Some alloc_mode ->
       Alloc_mode.For_allocations.from_lambda alloc_mode ~current_region
   in
+  let machine_width = Acc.machine_width acc in
   let unarized_params =
     List.concat_map
-      (unarize_extern_repr alloc_mode)
+      (unarize_extern_repr alloc_mode ~machine_width)
       (List.map snd prim_native_repr_args)
   in
   let unarized_results =
-    unarize_extern_repr alloc_mode (snd prim_native_repr_res)
+    unarize_extern_repr alloc_mode ~machine_width (snd prim_native_repr_res)
   in
   let args = List.flatten args in
   if List.compare_lengths unarized_params args <> 0
@@ -897,6 +946,66 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
   else
     let code_after_call, handler_params = box_unboxed_returns () in
     wrap_c_call acc ~handler_params ~code_after_call call
+
+let close_c_call acc env ~loc ~let_bound_ids_with_kinds
+    (({ prim_name;
+        prim_arity = _;
+        prim_alloc;
+        prim_c_builtin;
+        prim_effects;
+        prim_coeffects;
+        prim_native_name;
+        prim_native_repr_args;
+        prim_native_repr_res;
+        prim_is_layout_poly
+      } :
+       Lambda.external_call_description) as prim_desc) ~args exn_continuation
+    dbg ~current_region ~current_ghost_region k =
+  let prim_desc =
+    match !Clflags.jsir with
+    | false -> prim_desc
+    | true ->
+      (* [close_c_call0] checks [prim_native_name] to see whether we should
+         invoke the bytecode name or native name; for JavaScript compilation, we
+         should use the bytecode name unless it involves unboxed products, for
+         the following reason:
+
+         The expected type for JS stubs with unboxed products are different from
+         bytecode C stubs and bytecode-compiled JSOO stubs. Suppose an external
+         takes an unboxed product, e.g. [#(int * int)]. In bytecode, this is
+         passed as a single argument, containing a pointer to a pair; however,
+         in JSIR, this will be passed as two arguments, in the same way as for
+         native compilation.
+
+         In addition, if the return type for an external is a nested unboxed
+         product such as [#(#(int * int) * int)], bytecode stubs need to return
+         a nested tuple, while JSIR stubs need to return a single flat (i.e.
+         non-nested) tuple containing the unarised arguments. Unlike the
+         parameter passing case above, this is different from native code
+         compilation, where multiple return values are supported to some extent.
+
+         Also note that [@untagged] and [@unboxed] on externals are irrelevant
+         for what JS stubs should look like, since there is no tagging in JSIR
+         and naked integers look just like boxed ones. *)
+      let has_unboxed_products =
+        List.exists
+          (fun (_mode, repr) ->
+            Lambda.extern_repr_involves_unboxed_products repr)
+          prim_native_repr_args
+        || Lambda.extern_repr_involves_unboxed_products
+             (snd prim_native_repr_res)
+      in
+      let prim_native_name =
+        match has_unboxed_products with false -> "" | true -> prim_native_name
+      in
+      Primitive.make ~name:prim_name ~alloc:prim_alloc ~c_builtin:prim_c_builtin
+        ~effects:prim_effects ~coeffects:prim_coeffects
+        ~native_name:prim_native_name ~native_repr_args:prim_native_repr_args
+        ~native_repr_res:prim_native_repr_res
+        ~is_layout_poly:prim_is_layout_poly
+  in
+  close_c_call0 acc env ~loc ~let_bound_ids_with_kinds prim_desc ~args
+    exn_continuation dbg ~current_region ~current_ghost_region k
 
 let close_exn_continuation acc env (exn_continuation : IR.exn_continuation) =
   let acc, extra_args =
@@ -1679,22 +1788,32 @@ let close_exact_or_unknown_apply acc env
   in
   if Flambda_features.classic_mode ()
   then
-    match Inlining.inlinable env apply callee_approx with
-    | Not_inlinable ->
+    if !Clflags.jsir
+    then
       let apply =
         Apply.with_inlined_attribute apply
           (Inlined_attribute.with_use_info (Apply.inlined apply)
-             Unused_because_function_unknown)
+             Jsir_inlining_disabled)
       in
       Expr_with_acc.create_apply acc apply
-    | Inlinable func_desc ->
-      let acc = Acc.mark_continuation_as_untrackable continuation acc in
-      let acc =
-        Acc.mark_continuation_as_untrackable
-          (Exn_continuation.exn_handler apply_exn_continuation)
-          acc
-      in
-      Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env) ~func_desc
+    else
+      match Inlining.inlinable env apply callee_approx with
+      | Not_inlinable ->
+        let apply =
+          Apply.with_inlined_attribute apply
+            (Inlined_attribute.with_use_info (Apply.inlined apply)
+               Unused_because_function_unknown)
+        in
+        Expr_with_acc.create_apply acc apply
+      | Inlinable func_desc ->
+        let acc = Acc.mark_continuation_as_untrackable continuation acc in
+        let acc =
+          Acc.mark_continuation_as_untrackable
+            (Exn_continuation.exn_handler apply_exn_continuation)
+            acc
+        in
+        Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
+          ~func_desc
   else Expr_with_acc.create_apply acc apply
 
 let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
@@ -1736,7 +1855,7 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
           Apply_cont_with_acc.create acc ?trap_action ~args_approx cont ~args
             ~dbg
         in
-        acc, (Target_ocaml_int.of_int case, action))
+        acc, (Target_ocaml_int.of_int (Acc.machine_width acc) case, action))
       acc sw.consts
   in
   match arms, sw.failaction with
@@ -1768,9 +1887,10 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
     let acc, switch =
       let scrutinee = Simple.var comparison_result in
       let acc, action = action acc in
+      let machine_width = Acc.machine_width acc in
       Expr_with_acc.create_switch acc
-        (Switch.if_then_else ~condition_dbg ~scrutinee ~if_true:action
-           ~if_false:default_action)
+        (Switch.if_then_else ~machine_width ~condition_dbg ~scrutinee
+           ~if_true:action ~if_false:default_action)
     in
     let acc, body =
       Let_with_acc.create acc
@@ -1787,7 +1907,7 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
       | Some (default, dbg, trap_action, args) ->
         Numeric_types.Int.Set.fold
           (fun case (acc, cases) ->
-            let case = Target_ocaml_int.of_int case in
+            let case = Target_ocaml_int.of_int (Acc.machine_width acc) case in
             if Target_ocaml_int.Map.mem case cases
             then acc, cases
             else
@@ -1860,13 +1980,15 @@ let variables_for_unboxing boxed_variable_name (k : Function_decl.unboxing_kind)
           Flambda_debug_uid.none,
           Flambda_kind.With_subkind.naked_float ))
 
-let unboxing_primitive (k : Function_decl.unboxing_kind) boxed_variable i =
+let unboxing_primitive ~machine_width (k : Function_decl.unboxing_kind)
+    boxed_variable i =
   match k with
   | Fields_of_block_with_tag_zero kinds ->
     let block_access_kind : P.Block_access_kind.t =
       Values
         { tag = Known Tag.Scannable.zero;
-          size = Known (Target_ocaml_int.of_int (List.length kinds));
+          size =
+            Known (Target_ocaml_int.of_int machine_width (List.length kinds));
           field_kind = Any_value
         }
     in
@@ -1877,7 +1999,8 @@ let unboxing_primitive (k : Function_decl.unboxing_kind) boxed_variable i =
     Flambda_primitive.Unary (Unbox_number bn, Simple.var boxed_variable)
   | Unboxed_float_record num_fields ->
     let block_access_kind : P.Block_access_kind.t =
-      Naked_floats { size = Known (Target_ocaml_int.of_int num_fields) }
+      Naked_floats
+        { size = Known (Target_ocaml_int.of_int machine_width num_fields) }
     in
     Flambda_primitive.Unary
       ( Block_load { kind = block_access_kind; mut = Immutable; field = i },
@@ -2021,11 +2144,12 @@ let compute_body_of_unboxed_function acc my_region my_closure
                   (Bound_pattern.singleton
                      (Bound_var.create var var_duid Name_mode.normal))
                   (Named.create_prim
-                     (unboxing_primitive k boxed_variable i)
+                     (unboxing_primitive ~machine_width:(Acc.machine_width acc)
+                        k boxed_variable i)
                      Debuginfo.none)
                   ~body:expr,
-                Target_ocaml_int.(add one i) ))
-            ((acc, apply_cont), Target_ocaml_int.zero)
+                Target_ocaml_int.(add (one (Acc.machine_width acc)) i) ))
+            ((acc, apply_cont), Target_ocaml_int.zero (Acc.machine_width acc))
             vars_with_kinds
         in
         acc, expr
@@ -2118,7 +2242,9 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
               (fun (body, free_names_of_body, i) (var, var_duid, _kind) ->
                 let named =
                   Named.create_prim
-                    (unboxing_primitive k (Bound_parameter.var param) i)
+                    (unboxing_primitive ~machine_width:(Acc.machine_width acc) k
+                       (Bound_parameter.var param)
+                       i)
                     Debuginfo.none
                 in
                 ( Expr.create_let
@@ -2129,8 +2255,10 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
                        ~free_names_of_body:(Known free_names_of_body)),
                   Name_occurrences.union (Named.free_names named)
                     (Name_occurrences.remove_var free_names_of_body ~var),
-                  Target_ocaml_int.(add one i) ))
-              (body, free_names_of_body, Target_ocaml_int.zero)
+                  Target_ocaml_int.(add (one (Acc.machine_width acc)) i) ))
+              ( body,
+                free_names_of_body,
+                Target_ocaml_int.zero (Acc.machine_width acc) )
               vars_with_kinds
           in
           body, free_names_of_body
@@ -2292,11 +2420,17 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~stub:true ~inline:Inline_attribute.Default_inline
       ~poll_attribute:
         (Poll_attribute.from_lambda (Function_decl.poll_attribute decl))
+      ~regalloc_attribute:
+        (Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl))
+      ~regalloc_param_attribute:
+        (Regalloc_param_attribute.from_lambda
+           (Function_decl.regalloc_param_attribute decl))
       ~zero_alloc_attribute:
         (Zero_alloc_attribute.from_lambda
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
-      ~is_opaque:false ~recursive ~newer_version_of:None ~cost_metrics
+      ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
+      ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
       ~absolute_history ~relative_history ~loopify:Never_loopify
@@ -2690,10 +2824,16 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~stub ~inline
       ~poll_attribute:
         (Poll_attribute.from_lambda (Function_decl.poll_attribute decl))
+      ~regalloc_attribute:
+        (Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl))
+      ~regalloc_param_attribute:
+        (Regalloc_param_attribute.from_lambda
+           (Function_decl.regalloc_param_attribute decl))
       ~zero_alloc_attribute:
         (Zero_alloc_attribute.from_lambda
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
+      ~cold:(Function_decl.cold decl)
       ~is_opaque:(Function_decl.is_opaque decl)
       ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
@@ -2829,6 +2969,13 @@ let close_functions acc external_env ~current_region function_declarations =
         let poll_attribute =
           Poll_attribute.from_lambda (Function_decl.poll_attribute decl)
         in
+        let regalloc_attribute =
+          Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl)
+        in
+        let regalloc_param_attribute =
+          Regalloc_param_attribute.from_lambda
+            (Function_decl.regalloc_param_attribute decl)
+        in
         let zero_alloc_attribute =
           Zero_alloc_attribute.from_lambda
             (Function_decl.zero_alloc_attribute decl)
@@ -2847,7 +2994,8 @@ let close_functions acc external_env ~current_region function_declarations =
             ~param_modes ~result_arity ~result_types:Unknown
             ~result_mode:(Function_decl.result_mode decl)
             ~stub:(Function_decl.stub decl) ~inline:Never_inline
-            ~zero_alloc_attribute ~poll_attribute
+            ~zero_alloc_attribute ~poll_attribute ~regalloc_attribute
+            ~regalloc_param_attribute ~cold:(Function_decl.cold decl)
             ~is_a_functor:(Function_decl.is_a_functor decl)
             ~is_opaque:(Function_decl.is_opaque decl)
             ~recursive:(Function_decl.recursive decl)
@@ -3183,6 +3331,9 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         local = Default_local;
         zero_alloc = Default_zero_alloc;
         loop = Default_loop;
+        regalloc = Default_regalloc;
+        regalloc_param = Default_regalloc_params;
+        cold = false;
         is_a_functor = false;
         is_opaque = false;
         stub = true;
@@ -3721,7 +3872,10 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
     let block_access : P.Block_access_kind.t =
       Values
         { tag = Known Tag.Scannable.zero;
-          size = Known (Target_ocaml_int.of_int module_block_size_in_words);
+          size =
+            Known
+              (Target_ocaml_int.of_int (Acc.machine_width acc)
+                 module_block_size_in_words);
           field_kind = Any_value
         }
     in
@@ -3729,7 +3883,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       (fun (acc, body) (pos, var, var_duid) ->
         let var = VB.create var var_duid Name_mode.normal in
         let pat = Bound_pattern.singleton var in
-        let pos = Target_ocaml_int.of_int pos in
+        let pos = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
         let block = module_block_simple in
         match simplify_block_load acc env ~block ~field:pos with
         | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
@@ -3764,10 +3918,10 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
     ~handler_params:load_fields_handler_param ~handler:load_fields_body ~body
     ~is_exn_handler:false ~is_cold:false
 
-let close_program (type mode) ~(mode : mode Flambda_features.mode) ~big_endian
-    ~cmx_loader ~compilation_unit ~module_block_size_in_words ~program
-    ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region : mode close_program_result =
+let close_program (type mode) ~(mode : mode Flambda_features.mode)
+    ~machine_width ~big_endian ~cmx_loader ~compilation_unit
+    ~module_block_size_in_words ~program ~prog_return_cont ~exn_continuation
+    ~toplevel_my_region ~toplevel_my_ghost_region : mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
     Symbol.create_wrapped
@@ -3782,7 +3936,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode) ~big_endian
     Env.add_var_like env toplevel_my_ghost_region Not_user_visible
       Flambda_kind.With_subkind.region
   in
-  let acc = Acc.create ~cmx_loader in
+  let acc = Acc.create ~cmx_loader ~machine_width in
   let acc, body =
     wrap_final_module_block acc env ~program ~prog_return_cont
       ~module_block_size_in_words ~return_cont ~module_symbol
@@ -3871,8 +4025,9 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode) ~big_endian
         ~used_slots
     in
     let reachable_names, cmx =
-      Flambda_cmx.prepare_cmx_from_approx ~approxs:symbols_approximations
-        ~module_symbol ~exported_offsets ~used_value_slots all_code
+      Flambda_cmx.prepare_cmx_from_approx ~machine_width:(Acc.machine_width acc)
+        ~approxs:symbols_approximations ~module_symbol ~exported_offsets
+        ~used_value_slots all_code
     in
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation

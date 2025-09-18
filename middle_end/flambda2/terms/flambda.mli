@@ -185,7 +185,8 @@ module Named : sig
 
   (** Return a defining expression for a [Let] which is kind-correct, but not
       necessarily type-correct, at the given kind. *)
-  val dummy_value : Flambda_kind.t -> t
+  val dummy_value :
+    machine_width:Target_system.Machine_width.t -> Flambda_kind.t -> t
 
   (** Return the kind of the expression. Must only be used on expressions
       bound to a singleton pattern (everything except sets of closures and static consts). *)

@@ -413,7 +413,7 @@ let relevant_axes_of_modality ~relevant_for_shallow ~modality =
   Axis_set.create ~f:(fun ~axis:(Pack axis) ->
       match axis with
       | Modal axis ->
-        let (P axis) = Mode.Modality.Axis.of_value (P axis) in
+        let (P axis) = P axis |> Crossing.Axis.to_modality in
         let modality = Mode.Modality.Const.proj axis modality in
         not (Mode.Modality.Per_axis.is_constant axis modality)
       (* The kind-inference.md document (in the repo) discusses both constant
@@ -438,89 +438,53 @@ module Mod_bounds = struct
   include Types.Jkind_mod_bounds
 
   let min =
-    create ~areality:Areality.min ~linearity:Linearity.min
-      ~uniqueness:Uniqueness.min ~portability:Portability.min
-      ~contention:Contention.min ~yielding:Yielding.min
-      ~statefulness:Statefulness.min ~visibility:Visibility.min
-      ~externality:Externality.min ~nullability:Nullability.min
-      ~separability:Separability.min
+    create Crossing.min ~externality:Externality.min
+      ~nullability:Nullability.min ~separability:Separability.min
 
   let max =
-    create ~areality:Areality.max ~linearity:Linearity.max
-      ~uniqueness:Uniqueness.max ~portability:Portability.max
-      ~contention:Contention.max ~yielding:Yielding.max
-      ~statefulness:Statefulness.max ~visibility:Visibility.max
-      ~externality:Externality.max ~nullability:Nullability.max
-      ~separability:Separability.max
+    create Crossing.max ~externality:Externality.max
+      ~nullability:Nullability.max ~separability:Separability.max
 
   let join t1 t2 =
-    let areality = Areality.join (areality t1) (areality t2) in
-    let linearity = Linearity.join (linearity t1) (linearity t2) in
-    let uniqueness = Uniqueness.join (uniqueness t1) (uniqueness t2) in
-    let portability = Portability.join (portability t1) (portability t2) in
-    let contention = Contention.join (contention t1) (contention t2) in
-    let yielding = Yielding.join (yielding t1) (yielding t2) in
-    let statefulness = Statefulness.join (statefulness t1) (statefulness t2) in
-    let visibility = Visibility.join (visibility t1) (visibility t2) in
+    let crossing = Crossing.join (crossing t1) (crossing t2) in
     let externality = Externality.join (externality t1) (externality t2) in
     let nullability = Nullability.join (nullability t1) (nullability t2) in
     let separability = Separability.join (separability t1) (separability t2) in
-    create ~areality ~linearity ~uniqueness ~portability ~contention ~yielding
-      ~statefulness ~visibility ~externality ~nullability ~separability
+    create crossing ~externality ~nullability ~separability
 
   let meet t1 t2 =
-    let areality = Areality.meet (areality t1) (areality t2) in
-    let linearity = Linearity.meet (linearity t1) (linearity t2) in
-    let uniqueness = Uniqueness.meet (uniqueness t1) (uniqueness t2) in
-    let portability = Portability.meet (portability t1) (portability t2) in
-    let contention = Contention.meet (contention t1) (contention t2) in
-    let yielding = Yielding.meet (yielding t1) (yielding t2) in
-    let statefulness = Statefulness.meet (statefulness t1) (statefulness t2) in
-    let visibility = Visibility.meet (visibility t1) (visibility t2) in
+    let crossing = Crossing.meet (crossing t1) (crossing t2) in
     let externality = Externality.meet (externality t1) (externality t2) in
     let nullability = Nullability.meet (nullability t1) (nullability t2) in
     let separability = Separability.meet (separability t1) (separability t2) in
-    create ~areality ~linearity ~uniqueness ~portability ~contention ~yielding
-      ~statefulness ~visibility ~externality ~nullability ~separability
+    create crossing ~externality ~nullability ~separability
 
   let less_or_equal t1 t2 =
+    let[@inline] modal_less_or_equal ax : Sub_result.t =
+      let a = t1 |> crossing |> (Crossing.proj [@inlined hint]) ax in
+      let b = t2 |> crossing |> (Crossing.proj [@inlined hint]) ax in
+      match
+        ( (Crossing.Per_axis.le [@inlined hint]) ax a b,
+          (Crossing.Per_axis.le [@inlined hint]) ax b a )
+      with
+      | true, true -> Equal
+      | true, false -> Less
+      | false, _ -> Not_le [Axis_disagreement (Pack (Modal ax))]
+    in
     let[@inline] axis_less_or_equal ~le ~axis a b : Sub_result.t =
       match le a b, le b a with
       | true, true -> Equal
       | true, false -> Less
       | false, _ -> Not_le [Axis_disagreement axis]
     in
-    Sub_result.combine
-      (axis_less_or_equal ~le:Areality.le
-         ~axis:(Pack (Modal (Comonadic Areality))) (areality t1) (areality t2))
-    @@ Sub_result.combine
-         (axis_less_or_equal ~le:Uniqueness.le
-            ~axis:(Pack (Modal (Monadic Uniqueness))) (uniqueness t1)
-            (uniqueness t2))
-    @@ Sub_result.combine
-         (axis_less_or_equal ~le:Linearity.le
-            ~axis:(Pack (Modal (Comonadic Linearity))) (linearity t1)
-            (linearity t2))
-    @@ Sub_result.combine
-         (axis_less_or_equal ~le:Contention.le
-            ~axis:(Pack (Modal (Monadic Contention))) (contention t1)
-            (contention t2))
-    @@ Sub_result.combine
-         (axis_less_or_equal ~le:Portability.le
-            ~axis:(Pack (Modal (Comonadic Portability))) (portability t1)
-            (portability t2))
-    @@ Sub_result.combine
-         (axis_less_or_equal ~le:Yielding.le
-            ~axis:(Pack (Modal (Comonadic Yielding))) (yielding t1)
-            (yielding t2))
-    @@ Sub_result.combine
-         (axis_less_or_equal ~le:Statefulness.le
-            ~axis:(Pack (Modal (Comonadic Statefulness))) (statefulness t1)
-            (statefulness t2))
-    @@ Sub_result.combine
-         (axis_less_or_equal ~le:Visibility.le
-            ~axis:(Pack (Modal (Monadic Visibility))) (visibility t1)
-            (visibility t2))
+    Sub_result.combine (modal_less_or_equal (Comonadic Areality))
+    @@ Sub_result.combine (modal_less_or_equal (Monadic Uniqueness))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Linearity))
+    @@ Sub_result.combine (modal_less_or_equal (Monadic Contention))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Portability))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Yielding))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
+    @@ Sub_result.combine (modal_less_or_equal (Monadic Visibility))
     @@ Sub_result.combine
          (axis_less_or_equal ~le:Externality.le
             ~axis:(Pack (Nonmodal Externality)) (externality t1)
@@ -534,28 +498,14 @@ module Mod_bounds = struct
          (separability t2)
 
   let equal t1 t2 =
-    Areality.equal (areality t1) (areality t2)
-    && Linearity.equal (linearity t1) (linearity t2)
-    && Uniqueness.equal (uniqueness t1) (uniqueness t2)
-    && Portability.equal (portability t1) (portability t2)
-    && Contention.equal (contention t1) (contention t2)
-    && Yielding.equal (yielding t1) (yielding t2)
-    && Statefulness.equal (statefulness t1) (statefulness t2)
-    && Visibility.equal (visibility t1) (visibility t2)
+    Misc.Le_result.equal ~le:Crossing.le (crossing t1) (crossing t2)
     && Externality.equal (externality t1) (externality t2)
     && Nullability.equal (nullability t1) (nullability t2)
     && Separability.equal (separability t1) (separability t2)
 
   let[@inline] get (type a) ~(axis : a Axis.t) t : a =
     match axis with
-    | Modal (Monadic Uniqueness) -> uniqueness t
-    | Modal (Comonadic Areality) -> areality t
-    | Modal (Monadic Contention) -> contention t
-    | Modal (Comonadic Linearity) -> linearity t
-    | Modal (Comonadic Portability) -> portability t
-    | Modal (Comonadic Yielding) -> yielding t
-    | Modal (Comonadic Statefulness) -> statefulness t
-    | Modal (Monadic Visibility) -> visibility t
+    | Modal ax -> t |> crossing |> (Crossing.proj [@inlined hint]) ax
     | Nonmodal Externality -> externality t
     | Nonmodal Nullability -> nullability t
     | Nonmodal Separability -> separability t
@@ -565,31 +515,22 @@ module Mod_bounds = struct
     let[@inline] add_if b ax axis_set =
       if b then Axis_set.add axis_set ax else axis_set
     in
+    let[@inline] add_crossing_if ax axis_set =
+      if Crossing.Per_axis.(
+           (le [@inlined hint]) ax ((max [@inlined hint]) ax)
+             ((Crossing.proj [@inlined hint]) ax (crossing t)))
+      then Axis_set.add axis_set (Modal ax)
+      else axis_set
+    in
     Axis_set.empty
-    |> add_if
-         (Areality.le Areality.max (areality t))
-         (Modal (Comonadic Areality))
-    |> add_if
-         (Linearity.le Linearity.max (linearity t))
-         (Modal (Comonadic Linearity))
-    |> add_if
-         (Uniqueness.le Uniqueness.max (uniqueness t))
-         (Modal (Monadic Uniqueness))
-    |> add_if
-         (Portability.le Portability.max (portability t))
-         (Modal (Comonadic Portability))
-    |> add_if
-         (Contention.le Contention.max (contention t))
-         (Modal (Monadic Contention))
-    |> add_if
-         (Yielding.le Yielding.max (yielding t))
-         (Modal (Comonadic Yielding))
-    |> add_if
-         (Statefulness.le Statefulness.max (statefulness t))
-         (Modal (Comonadic Statefulness))
-    |> add_if
-         (Visibility.le Visibility.max (visibility t))
-         (Modal (Monadic Visibility))
+    |> add_crossing_if (Comonadic Areality)
+    |> add_crossing_if (Comonadic Linearity)
+    |> add_crossing_if (Monadic Uniqueness)
+    |> add_crossing_if (Comonadic Portability)
+    |> add_crossing_if (Monadic Contention)
+    |> add_crossing_if (Comonadic Yielding)
+    |> add_crossing_if (Comonadic Statefulness)
+    |> add_crossing_if (Monadic Visibility)
     |> add_if
          (Externality.le Externality.max (externality t))
          (Nonmodal Externality)
@@ -601,29 +542,15 @@ module Mod_bounds = struct
          (Nonmodal Separability)
 
   let for_arrow =
-    create ~linearity:Linearity.max ~areality:Areality.max
-      ~uniqueness:Uniqueness.min ~portability:Portability.max
-      ~contention:Contention.min ~yielding:Yielding.max
-      ~statefulness:Statefulness.max ~visibility:Visibility.min
-      ~externality:Externality.max ~nullability:Nullability.Non_null
-      ~separability:Separability.Non_float
+    let crossing =
+      Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
+        ~portability:false ~contention:true ~yielding:false ~statefulness:false
+        ~visibility:true
+    in
+    create crossing ~externality:Externality.max
+      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
 
-  let to_mode_crossing t =
-    Mode.Crossing.of_bounds
-      Types.Jkind_mod_bounds.
-        { comonadic =
-            { areality = areality t;
-              linearity = linearity t;
-              portability = portability t;
-              yielding = yielding t;
-              statefulness = statefulness t
-            };
-          monadic =
-            { uniqueness = uniqueness t;
-              contention = contention t;
-              visibility = visibility t
-            }
-        }
+  let to_mode_crossing t = crossing t
 end
 
 module With_bounds = struct
@@ -1128,22 +1055,33 @@ module Layout_and_axes = struct
               let value_for_axis (type a) ~(axis : a Axis.t) : a =
                 if Axis_set.mem relevant_axes axis
                 then
-                  let (module Bound_ops) = Axis.get axis in
-                  Bound_ops.join (Mod_bounds.get ~axis b1)
+                  (Per_axis.join [@inlined hint]) axis (Mod_bounds.get ~axis b1)
                     (Mod_bounds.get ~axis b2)
                 else Mod_bounds.get ~axis b1
               in
-              Mod_bounds.create
-                ~areality:(value_for_axis ~axis:(Modal (Comonadic Areality)))
-                ~linearity:(value_for_axis ~axis:(Modal (Comonadic Linearity)))
-                ~uniqueness:(value_for_axis ~axis:(Modal (Monadic Uniqueness)))
-                ~portability:
-                  (value_for_axis ~axis:(Modal (Comonadic Portability)))
-                ~contention:(value_for_axis ~axis:(Modal (Monadic Contention)))
-                ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
-                ~statefulness:
-                  (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
-                ~visibility:(value_for_axis ~axis:(Modal (Monadic Visibility)))
+              let monadic =
+                Mod_bounds.Crossing.Monadic.create
+                  ~uniqueness:
+                    (value_for_axis ~axis:(Modal (Monadic Uniqueness)))
+                  ~contention:
+                    (value_for_axis ~axis:(Modal (Monadic Contention)))
+                  ~visibility:
+                    (value_for_axis ~axis:(Modal (Monadic Visibility)))
+              in
+              let comonadic =
+                Mod_bounds.Crossing.Comonadic.create
+                  ~regionality:
+                    (value_for_axis ~axis:(Modal (Comonadic Areality)))
+                  ~linearity:
+                    (value_for_axis ~axis:(Modal (Comonadic Linearity)))
+                  ~portability:
+                    (value_for_axis ~axis:(Modal (Comonadic Portability)))
+                  ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
+                  ~statefulness:
+                    (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
+              in
+              let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
+              Mod_bounds.create crossing
                 ~externality:(value_for_axis ~axis:(Nonmodal Externality))
                 ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
                 ~separability:(value_for_axis ~axis:(Nonmodal Separability))
@@ -1436,15 +1374,14 @@ module Const = struct
       { jkind =
           { layout = Base Value;
             mod_bounds =
-              Mod_bounds.create ~areality:Regionality.Const.max
-                ~linearity:Linearity.Const.min
-                ~portability:Portability.Const.min ~yielding:Yielding.Const.min
-                ~uniqueness:Uniqueness.Const_op.max
-                ~contention:Contention.Const_op.min
-                ~statefulness:Statefulness.Const.min
-                ~visibility:Visibility.Const_op.min ~externality:Externality.max
-                ~nullability:Nullability.Non_null
-                ~separability:Separability.Non_float;
+              (let crossing =
+                 Crossing.create ~regionality:false ~linearity:true
+                   ~portability:true ~yielding:true ~uniqueness:false
+                   ~contention:true ~statefulness:true ~visibility:true
+               in
+               Mod_bounds.create crossing ~externality:Externality.max
+                 ~nullability:Nullability.Non_null
+                 ~separability:Separability.Non_float);
             with_bounds = No_with_bounds
           };
         name = "immutable_data"
@@ -1454,15 +1391,14 @@ module Const = struct
       { jkind =
           { layout = Base Value;
             mod_bounds =
-              Mod_bounds.create ~areality:Regionality.Const.max
-                ~linearity:Linearity.Const.max
-                ~portability:Portability.Const.min ~yielding:Yielding.Const.max
-                ~uniqueness:Uniqueness.Const_op.max
-                ~contention:Contention.Const_op.min
-                ~statefulness:Statefulness.Const.max
-                ~visibility:Visibility.Const_op.max ~externality:Externality.max
-                ~nullability:Nullability.Non_null
-                ~separability:Separability.Non_float;
+              (let crossing =
+                 Crossing.create ~regionality:false ~linearity:false
+                   ~portability:true ~yielding:false ~uniqueness:false
+                   ~contention:true ~statefulness:false ~visibility:false
+               in
+               Mod_bounds.create crossing ~externality:Externality.max
+                 ~nullability:Nullability.Non_null
+                 ~separability:Separability.Non_float);
             with_bounds = No_with_bounds
           };
         name = "exn"
@@ -1472,15 +1408,14 @@ module Const = struct
       { jkind =
           { layout = Base Value;
             mod_bounds =
-              Mod_bounds.create ~areality:Regionality.Const.max
-                ~linearity:Linearity.Const.min
-                ~portability:Portability.Const.min ~yielding:Yielding.Const.min
-                ~uniqueness:Uniqueness.Const_op.max
-                ~contention:Contention.Const_op.min
-                ~statefulness:Statefulness.Const.min
-                ~visibility:Visibility.Const_op.max ~externality:Externality.max
-                ~nullability:Nullability.Non_null
-                ~separability:Separability.Non_float;
+              (let crossing =
+                 Crossing.create ~regionality:false ~linearity:true
+                   ~portability:true ~yielding:true ~uniqueness:false
+                   ~contention:true ~statefulness:true ~visibility:false
+               in
+               Mod_bounds.create crossing ~externality:Externality.max
+                 ~nullability:Nullability.Non_null
+                 ~separability:Separability.Non_float);
             with_bounds = No_with_bounds
           };
         name = "sync_data"
@@ -1490,15 +1425,14 @@ module Const = struct
       { jkind =
           { layout = Base Value;
             mod_bounds =
-              Mod_bounds.create ~areality:Regionality.Const.max
-                ~linearity:Linearity.Const.min
-                ~portability:Portability.Const.min ~yielding:Yielding.Const.min
-                ~contention:Contention.Const_op.max
-                ~uniqueness:Uniqueness.Const_op.max
-                ~statefulness:Statefulness.Const.min
-                ~visibility:Visibility.Const_op.max ~externality:Externality.max
-                ~nullability:Nullability.Non_null
-                ~separability:Separability.Non_float;
+              (let crossing =
+                 Crossing.create ~regionality:false ~linearity:true
+                   ~portability:true ~yielding:true ~contention:false
+                   ~uniqueness:false ~statefulness:true ~visibility:false
+               in
+               Mod_bounds.create crossing ~externality:Externality.max
+                 ~nullability:Nullability.Non_null
+                 ~separability:Separability.Non_float);
             with_bounds = No_with_bounds
           };
         name = "mutable_data"
@@ -1833,17 +1767,16 @@ module Const = struct
       }
 
     let get_modal_bound (type a) ~(axis : a Axis.t) ~(base : a) (actual : a) =
-      let (module A) = Axis.get axis in
       (* CR layouts v2.8: Fix printing! Internal ticket 5096. *)
       let less_or_equal a b =
-        let (module Axis_ops) = Axis.get axis in
-        Axis_ops.less_or_equal a b
+        Misc.Le_result.less_or_equal ~le:(Per_axis.le axis) a b
       in
       match less_or_equal actual base with
       | Less | Equal -> (
         match less_or_equal base actual with
         | Less | Equal -> `Valid None
-        | Not_le -> `Valid (Some (Format.asprintf "%a" A.print actual)))
+        | Not_le ->
+          `Valid (Some (Format.asprintf "%a" (Per_axis.print axis) actual)))
       | Not_le -> `Invalid
 
     let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
@@ -1899,18 +1832,11 @@ module Const = struct
       List.fold_left
         (fun acc (Axis.Pack axis) ->
           match axis with
-          | Modal axis ->
-            let (P (type a) (axis : a Mode.Modality.Axis.t)) =
-              Mode.Modality.Axis.of_value (P axis)
-            in
-            let t : a =
-              match axis with
-              | Monadic ax ->
-                Join_with (Mode.Value.Monadic.Const.Per_axis.max ax)
-              | Comonadic ax ->
-                Meet_with (Mode.Value.Comonadic.Const.Per_axis.min ax)
-            in
-            Modality.Const.set axis t acc
+          | Modal axis -> (
+            match axis, Crossing.Per_axis.min axis with
+            | Monadic ax, Modality t -> Modality.Const.set (Monadic ax) t acc
+            | Comonadic ax, Modality t ->
+              Modality.Const.set (Comonadic ax) t acc)
           | Nonmodal _ ->
             (* TODO: don't know how to print *)
             acc)
@@ -2558,11 +2484,7 @@ let for_unboxed_record lbls =
 
 let for_non_float ~(why : History.value_creation_reason) =
   let mod_bounds =
-    Mod_bounds.create ~areality:Regionality.Const.max
-      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
-      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
-      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
-      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+    Mod_bounds.create Crossing.max ~externality:Externality.max
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
@@ -2574,11 +2496,7 @@ let for_or_null_argument ident =
     Type_argument { parent_path = Path.Pident ident; position = 1; arity = 1 }
   in
   let mod_bounds =
-    Mod_bounds.create ~areality:Regionality.Const.max
-      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
-      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
-      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
-      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+    Mod_bounds.create Crossing.max ~externality:Externality.max
       ~nullability:Nullability.Non_null
       ~separability:Separability.Maybe_separable
   in
@@ -2682,11 +2600,7 @@ let for_boxed_tuple elts =
 
 let for_open_boxed_row =
   let mod_bounds =
-    Mod_bounds.create ~areality:Regionality.Const.max
-      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
-      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
-      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
-      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+    Mod_bounds.create Crossing.max ~externality:Externality.max
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
@@ -2722,31 +2636,25 @@ let for_object =
   (* The crossing of objects are based on the fact that they are
      produced/defined/allocated at legacy, which applies to only the
      comonadic axes. *)
-  let ({ linearity; areality; portability; yielding; statefulness }
-        : Mode.Value.Comonadic.Const.t) =
-    Value.Comonadic.Const.legacy
-  in
-  let ({ contention; uniqueness; visibility } : Mode.Value.Monadic.Const_op.t) =
-    Value.Monadic.Const_op.max
-  in
+  let comonadic = Crossing.Comonadic.legacy in
+  let monadic = Crossing.Monadic.max in
   fresh_jkind
     { layout = Sort (Base Value);
       mod_bounds =
-        Mod_bounds.create ~linearity ~areality ~uniqueness ~portability
-          ~contention ~yielding ~statefulness ~visibility
-          ~externality:Externality.max ~nullability:Non_null
-          ~separability:Separability.Non_float;
+        Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
+          ~nullability:Non_null ~separability:Separability.Non_float;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)
 
 let for_float ident =
+  let crossing =
+    Crossing.create ~regionality:false ~linearity:true ~portability:true
+      ~yielding:true ~uniqueness:false ~contention:true ~statefulness:true
+      ~visibility:true
+  in
   let mod_bounds =
-    Mod_bounds.create ~areality:Regionality.Const.max
-      ~linearity:Linearity.Const.min ~portability:Portability.Const.min
-      ~yielding:Yielding.Const.min ~uniqueness:Uniqueness.Const_op.max
-      ~contention:Contention.Const_op.min ~statefulness:Statefulness.Const.min
-      ~visibility:Visibility.Const_op.min ~externality:Externality.max
+    Mod_bounds.create crossing ~externality:Externality.max
       ~nullability:Nullability.Non_null ~separability:Separability.Separable
   in
   fresh_jkind
@@ -2756,11 +2664,7 @@ let for_float ident =
 
 let for_array_argument =
   let mod_bounds =
-    Mod_bounds.create ~areality:Regionality.Const.max
-      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
-      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
-      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
-      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+    Mod_bounds.create Crossing.max ~externality:Externality.max
       ~nullability:Nullability.Maybe_null ~separability:Separability.Separable
   in
   fresh_jkind
@@ -2823,31 +2727,14 @@ let get_layout jk : Layout.Const.t option = Layout.get_const jk.jkind.layout
 
 let extract_layout jk = jk.jkind.layout
 
-let get_modal_bounds (type l r) ~context (jk : (l * r) jkind) =
+let get_mode_crossing (type l r) ~context (jk : (l * r) jkind) =
   let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
           (_ * allowed) jkind_desc),
         _ ) =
     Layout_and_axes.normalize ~mode:Ignore_best
       ~skip_axes:Axis_set.all_nonmodal_axes ~context jk.jkind
   in
-  Mod_bounds.
-    { comonadic =
-        { areality = areality mod_bounds;
-          linearity = linearity mod_bounds;
-          portability = portability mod_bounds;
-          yielding = yielding mod_bounds;
-          statefulness = statefulness mod_bounds
-        };
-      monadic =
-        { uniqueness = uniqueness mod_bounds;
-          contention = contention mod_bounds;
-          visibility = visibility mod_bounds
-        }
-    }
-
-let get_mode_crossing (type l r) ~context (jk : (l * r) jkind) =
-  let bounds = get_modal_bounds ~context jk in
-  Mode.Crossing.of_bounds bounds
+  Mod_bounds.crossing mod_bounds
 
 let to_unsafe_mode_crossing jkind =
   { unsafe_mod_bounds = Mod_bounds.to_mode_crossing jkind.jkind.mod_bounds;
@@ -3484,9 +3371,8 @@ module Violation = struct
         |> List.iter (fun (Pack axis : Axis.packed) ->
                let pp_bound ppf jkind =
                  let mod_bound = Mod_bounds.get ~axis jkind.mod_bounds in
-                 let (module Axis_ops) = Axis.get axis in
                  let with_bounds =
-                   match Axis_ops.(le max mod_bound) with
+                   match Per_axis.(le axis (max axis) mod_bound) with
                    | true ->
                      (* If the mod_bound is max, then no with-bounds are
                         relevant *)
@@ -3506,7 +3392,9 @@ module Violation = struct
                      (fun acc with_bound ->
                        Outcometree.Ojkind_const_with (acc, with_bound, []))
                      (Outcometree.Ojkind_const_mod
-                        (None, [Format.asprintf "%a" Axis_ops.print mod_bound]))
+                        ( None,
+                          [Format.asprintf "%a" (Per_axis.print axis) mod_bound]
+                        ))
                      with_bounds
                  in
                  !Oprint.out_jkind_const ppf ojkind

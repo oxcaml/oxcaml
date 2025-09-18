@@ -229,23 +229,32 @@ let meet_is_null env t = as_meet_shortcut (prove_is_null_generic env t)
 
 let prove_naked_immediates_generic env t : Target_ocaml_int.Set.t generic_proof
     =
+  let machine_width = TE.machine_width env in
   match expand_head env t with
   | Naked_immediate (Ok (Naked_immediates is)) ->
     if Target_ocaml_int.Set.is_empty is then Invalid else Proved is
   | Naked_immediate (Ok (Is_int scrutinee_ty)) -> (
     match prove_is_int_generic ~variant_only:true env scrutinee_ty with
     | Proved true ->
-      Proved (Target_ocaml_int.Set.singleton Target_ocaml_int.bool_true)
+      Proved
+        (Target_ocaml_int.Set.singleton
+           (Target_ocaml_int.bool_true machine_width))
     | Proved false ->
-      Proved (Target_ocaml_int.Set.singleton Target_ocaml_int.bool_false)
+      Proved
+        (Target_ocaml_int.Set.singleton
+           (Target_ocaml_int.bool_false machine_width))
     | Unknown -> Unknown
     | Invalid -> Invalid)
   | Naked_immediate (Ok (Is_null scrutinee_ty)) -> (
     match prove_is_null_generic env scrutinee_ty with
     | Proved true ->
-      Proved (Target_ocaml_int.Set.singleton Target_ocaml_int.bool_true)
+      Proved
+        (Target_ocaml_int.Set.singleton
+           (Target_ocaml_int.bool_true machine_width))
     | Proved false ->
-      Proved (Target_ocaml_int.Set.singleton Target_ocaml_int.bool_false)
+      Proved
+        (Target_ocaml_int.Set.singleton
+           (Target_ocaml_int.bool_false machine_width))
     | Unknown -> Unknown
     | Invalid -> Invalid)
   | Naked_immediate (Ok (Get_tag block_ty)) -> (
@@ -254,7 +263,9 @@ let prove_naked_immediates_generic env t : Target_ocaml_int.Set.t generic_proof
       let is =
         Tag.Set.fold
           (fun tag is ->
-            Target_ocaml_int.Set.add (Tag.to_targetint_31_63 tag) is)
+            Target_ocaml_int.Set.add
+              (Tag.to_targetint_31_63 machine_width tag)
+              is)
           tags Target_ocaml_int.Set.empty
       in
       Proved is
@@ -475,7 +486,10 @@ let prove_variant_like_generic_value env
     match blocks_imms.blocks with
     | Unknown -> Unknown
     | Known blocks -> (
-      match TG.Row_like_for_blocks.all_tags_and_sizes blocks with
+      match
+        TG.Row_like_for_blocks.all_tags_and_sizes
+          ~machine_width:(TE.machine_width env) blocks
+      with
       | Unknown -> Unknown
       | Known non_const_ctors_with_sizes -> (
         let non_const_ctors_with_sizes =

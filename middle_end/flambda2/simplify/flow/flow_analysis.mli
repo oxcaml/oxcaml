@@ -26,6 +26,7 @@
 val analyze :
   ?speculative:bool ->
   ?print_name:string ->
+  machine_width:Target_system.Machine_width.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   code_age_relation:Code_age_relation.t ->

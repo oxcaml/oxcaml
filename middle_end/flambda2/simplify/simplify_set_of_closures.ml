@@ -489,7 +489,10 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~result_arity ~result_types ~result_mode:(Code.result_mode code)
       ~stub:(Code.stub code) ~inline:(Code.inline code)
       ~zero_alloc_attribute:(Code.zero_alloc_attribute code)
-      ~poll_attribute:(Code.poll_attribute code) ~is_a_functor ~is_opaque
+      ~poll_attribute:(Code.poll_attribute code)
+      ~regalloc_attribute:(Code.regalloc_attribute code)
+      ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
+      ~cold:(Code.cold code) ~is_a_functor ~is_opaque
       ~recursive:(Code.recursive code) ~cost_metrics ~inlining_arguments
       ~dbg:(Code.dbg code) ~is_tupled:(Code.is_tupled code) ~is_my_closure_used
       ~inlining_decision ~absolute_history ~relative_history ~loopify
@@ -812,7 +815,9 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
             Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
         }
     in
-    Simplified_named.create_with_known_free_names ~find_code_characteristics
+    let machine_width = DE.machine_width (DA.denv dacc) in
+    Simplified_named.create_with_known_free_names ~machine_width
+      ~find_code_characteristics
       (Named.create_set_of_closures set_of_closures)
       ~free_names:(Named.free_names named)
   in

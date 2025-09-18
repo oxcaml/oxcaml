@@ -19,7 +19,7 @@ module U = Unboxing_types
 module Decisions = U.Decisions
 
 let refine_decision_based_on_arg_types_at_uses ~pass ~rewrite_ids_seen
-    ~rewrites_ids_known_as_invalid nth_arg arg_type_by_use_id
+    ~rewrites_ids_known_as_invalid ~machine_width nth_arg arg_type_by_use_id
     (decision : U.decision) =
   match decision with
   | Do_not_unbox _ as decision -> decision, rewrites_ids_known_as_invalid
@@ -46,7 +46,8 @@ let refine_decision_based_on_arg_types_at_uses ~pass ~rewrite_ids_seen
           try
             let decision =
               Unboxing_epa.compute_extra_args_for_one_decision_and_use ~pass
-                rewrite_id ~typing_env_at_use unboxed_arg decision
+                rewrite_id ~typing_env_at_use ~machine_width unboxed_arg
+                decision
             in
             decision, invalids
           with Unboxing_epa.Invalid_apply_cont ->
@@ -112,10 +113,11 @@ let make_decisions ~continuation_arg_types denv params params_types :
                be great most of the time. *)
             decision, invalids
           else
+            let machine_width = DE.machine_width denv in
             let decision, invalids =
               refine_decision_based_on_arg_types_at_uses ~rewrite_ids_seen:empty
-                ~rewrites_ids_known_as_invalid:invalids nth arg_type_by_use_id
-                ~pass:Filter decision
+                ~rewrites_ids_known_as_invalid:invalids ~machine_width nth
+                arg_type_by_use_id ~pass:Filter decision
             in
             let decision =
               Is_unboxing_beneficial.filter_non_beneficial_decisions decision
@@ -176,7 +178,7 @@ let make_decisions ~continuation_arg_types denv params params_types =
     "make_unboxing_decisions"
     (fun () -> make_decisions ~continuation_arg_types denv params params_types)
 
-let compute_extra_params_and_args
+let compute_extra_params_and_args ~machine_width
     ({ decisions; rewrite_ids_seen; rewrites_ids_known_as_invalid } :
       Decisions.t) ~arg_types_by_use_id existing_extra_params_and_args =
   let _, extra_params_and_args, _ =
@@ -186,8 +188,8 @@ let compute_extra_params_and_args
         let decision, invalids =
           refine_decision_based_on_arg_types_at_uses
             ~pass:Compute_all_extra_args ~rewrite_ids_seen
-            ~rewrites_ids_known_as_invalid:invalids nth arg_type_by_use_id
-            decision
+            ~rewrites_ids_known_as_invalid:invalids ~machine_width nth
+            arg_type_by_use_id decision
         in
         let extra_params_and_args =
           Unboxing_epa.add_extra_params_and_args extra_params_and_args ~invalids

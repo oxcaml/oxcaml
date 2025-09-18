@@ -1,3 +1,6 @@
+module Int8 = Stdlib_stable.Int8
+module Int16 = Stdlib_stable.Int16
+
 let[@inline never] [@local never] f_start () = ()
 
 let _ = f_start ()
@@ -105,6 +108,30 @@ let _ = f_nativeint (-777n)
 let _ = f_nativeint Nativeint.max_int
 
 let _ = f_nativeint Nativeint.min_int
+
+let[@inline never] [@local never] f_int8 (x : int8) = x
+
+let _ = f_int8 (Int8.of_int 0)
+
+let _ = f_int8 (Int8.of_int 42)
+
+let _ = f_int8 (Int8.of_int (-25))
+
+let _ = f_int8 Int8.max_int
+
+let _ = f_int8 Int8.min_int
+
+let[@inline never] [@local never] f_int16 (x : int16) = x
+
+let _ = f_int16 (Int16.of_int 0)
+
+let _ = f_int16 (Int16.of_int 1000)
+
+let _ = f_int16 (Int16.of_int (-2000))
+
+let _ = f_int16 Int16.max_int
+
+let _ = f_int16 Int16.min_int
 
 let[@inline never] [@local never] f_string (x : string) = x
 
@@ -234,6 +261,14 @@ let _ = f_poly (-456l)
 let _ = f_poly (-789L)
 
 let _ = f_poly (-999n)
+
+let _ = f_poly (Int8.of_int 99)
+
+let _ = f_poly (Int8.of_int (-99))
+
+let _ = f_poly (Int16.of_int 3333)
+
+let _ = f_poly (Int16.of_int (-3333))
 
 let _ = f_poly "polymorphic"
 

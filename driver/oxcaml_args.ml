@@ -46,7 +46,12 @@ let mk_dcfg f = ("-dcfg", Arg.Unit f, " (undocumented)")
 let mk_dcfg_invariants f =
   ("-dcfg-invariants", Arg.Unit f, " Extra sanity checks on Cfg")
 
-let mk_regalloc f = ("-regalloc", Arg.String f, " Select the register allocator")
+let mk_regalloc f =
+  ( "-regalloc",
+    Arg.Symbol
+      ( List.map fst Clflags.Register_allocator.assoc_list,
+        fun s -> f (List.assoc s Clflags.Register_allocator.assoc_list) ),
+    " Select the register allocator" )
 
 let mk_regalloc_linscan_threshold f =
   ( "-regalloc-linscan-threshold",
@@ -945,7 +950,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics : unit -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
-  val regalloc : string -> unit
+  val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
   val regalloc_param : string -> unit
   val regalloc_validate : unit -> unit
@@ -1624,7 +1629,7 @@ module Extra_params = struct
       option := Oxcaml_flags.Set (not b);
       false
     in
-    let set_string option =
+    let _set_string option =
       option := v;
       true
     in
@@ -1665,7 +1670,21 @@ module Extra_params = struct
         let dummy = ref false in
         set' dummy
     | "cfg-invariants" -> set' Oxcaml_flags.cfg_invariants
-    | "regalloc" -> set_string Oxcaml_flags.regalloc
+    | "regalloc" -> (
+        match Clflags.Register_allocator.of_string v with
+        | Some regalloc ->
+            Oxcaml_flags.regalloc := regalloc;
+            true
+        | None ->
+            let possible_values =
+              String.concat ","
+                (List.map fst Clflags.Register_allocator.assoc_list)
+            in
+            raise
+              (Arg.Bad
+                 (Printf.sprintf
+                    "invalid register allocator %S (possible values: %s)" v
+                    possible_values)))
     | "regalloc-linscan-threshold" ->
         set_int' Oxcaml_flags.regalloc_linscan_threshold
     | "regalloc-param" -> add_string Oxcaml_flags.regalloc_params
@@ -1758,6 +1777,12 @@ module Extra_params = struct
     | "gdwarf-pedantic" -> set' Clflags.dwarf_pedantic
     | "gdwarf-max-function-complexity" ->
         set_int' Debugging.dwarf_max_function_complexity
+    | "gdwarf-fidelity" -> (
+        match Clflags.gdwarf_fidelity_of_string v with
+        | Some fidelity ->
+            Clflags.set_gdwarf_fidelity fidelity;
+            true
+        | None -> Misc.fatal_error ("Invalid gdwarf-fidelity value: " ^ v))
     | "llvm-path" ->
         Oxcaml_flags.llvm_path := Some v;
         true

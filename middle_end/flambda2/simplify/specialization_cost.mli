@@ -71,7 +71,8 @@ val cannot_specialize : reason -> t
 (** {2 Updating Costs} *)
 
 (** Add a primitive of the given size to the cost of specialization *)
-val add_prim : Flambda_primitive.t -> t -> t
+val add_prim :
+  machine_width:Target_system.Machine_width.t -> Flambda_primitive.t -> t -> t
 
 (** Add a set of closure containing [~num] closures to the cost of specialization. *)
 val add_set_of_closures : Set_of_closures.t -> t -> t

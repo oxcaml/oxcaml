@@ -589,6 +589,8 @@ val generic_value : value_kind
 *)
 val layout_of_extern_repr : extern_repr -> layout
 
+val extern_repr_involves_unboxed_products : extern_repr -> bool
+
 type structured_constant =
     Const_base of constant
   | Const_block of int * structured_constant list
@@ -667,6 +669,15 @@ type loop_attribute =
   | Never_loop (* [@loop never] *)
   | Default_loop (* no [@loop] attribute *)
 
+type regalloc_attribute =
+  | Default_regalloc
+  | Regalloc of Clflags.Register_allocator.t
+  
+type regalloc_param_attribute =
+  | Default_regalloc_params
+  | Regalloc_params of string list
+(* [@regalloc_param] attributes - can have multiple with string payloads *)
+
 type curried_function_kind = { nlocal: int } [@@unboxed]
 (** A well-formed function parameter list is of the form
      [G @ L @ [ Final_arg ]],
@@ -733,6 +744,9 @@ type function_attribute = {
   zero_alloc : zero_alloc_attribute;
   poll: poll_attribute;
   loop: loop_attribute;
+  regalloc: regalloc_attribute;
+  regalloc_param: regalloc_param_attribute;
+  cold: bool;  (* [@cold] attribute - hints that function is rarely called *)
   is_a_functor: bool;
   is_opaque: bool;
   stub: bool;

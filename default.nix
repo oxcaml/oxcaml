@@ -1,5 +1,5 @@
 {
-  nixpkgs ? import <nixpkgs> { },
+  pkgs ? import <nixpkgs> { },
   src ? ./.,
   addressSanitizer ? false,
   dev ? false,
@@ -16,11 +16,10 @@
   syntaxQuotations ? false,
 }:
 let
-  pkgs = nixpkgs.pkgs or nixpkgs;
   inherit (pkgs) lib fetchpatch;
 
   # Select stdenv based on whether asan is enabled
-  myStdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
+  stdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
 
   # Build configure flags based on features
   configureFlags =
@@ -45,7 +44,7 @@ let
 
   upstream = pkgs.ocaml-ng.ocamlPackages_4_14;
 
-  ocaml = (upstream.ocaml.override { stdenv = myStdenv; }).overrideAttrs {
+  ocaml = (upstream.ocaml.override { inherit stdenv; }).overrideAttrs {
     # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
     # compiler that we use to bootstrap ourselves on ARM64
     patches = [ ./arm64-issue-debug-upstream.patch ];
@@ -168,7 +167,7 @@ let
     };
   };
 in
-myStdenv.mkDerivation {
+stdenv.mkDerivation {
   pname = "oxcaml";
   version = "5.2.0+ox";
   inherit src configureFlags;
@@ -177,6 +176,12 @@ myStdenv.mkDerivation {
   OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
 
   enableParallelBuilding = true;
+  separateDebugInfo = !dev;
+
+  # Disable _multioutConfig hook which adds --libdir=$out/lib into
+  # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure
+  # step, which expects --libdir to be $out/lib/ocaml
+  setOutputFlags = false;
 
   nativeBuildInputs =
     [
@@ -190,6 +195,7 @@ myStdenv.mkDerivation {
       pkgs.parallel
       gfortran # Required for Bigarray Fortran tests
       upstream.ocamlformat_0_24_1 # required for make fmt
+      pkgs.removeReferencesTo
     ]
     ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
     ++ lib.optional oxcamlLldb pkgs.python312;
@@ -226,18 +232,19 @@ myStdenv.mkDerivation {
       rm -f $out/lib/ocaml/expunge
     '';
 
+  postFixup = ''
+    remove-references-to -t ${dune} $out/lib/ocaml/Makefile.config
+  '';
+
   shellHook = ''
-    export out="$(pwd)/_install"
-    configureFlags+=" --prefix=$out"
-    export PS1="$name$ "
+    prefix="$(pwd)/_install"
 
     cat >&2 << EOF
-    OxCaml Development Environment
-    ==============================
-
-    Configure Flags: $configureFlags
+    OxCaml $version Development Environment
+    ===============================''${version//?/=}
 
     Available commands:
+      configurePhase           - Pre-build setup
       make boot-compiler       - Quick build (recommended for development)
       make boot-_install       - Quick install (recommended for development)
       make fmt                 - Auto-format code

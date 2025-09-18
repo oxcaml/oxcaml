@@ -2115,7 +2115,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_PHYS_EQ LPAREN FLOAT COMMA FLOAT TILD
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET TILDEMINUS
 ##
-## Ends in an error in state: 357.
+## Ends in an error in state: 358.
 ##
 ## ternop_app -> bytes_or_bigstring_set . string_accessor_width simple DOT LPAREN simple RPAREN simple [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2127,7 +2127,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET TILDEMINUS
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT TILDEMINUS
 ##
-## Ends in an error in state: 358.
+## Ends in an error in state: 359.
 ##
 ## ternop_app -> bytes_or_bigstring_set string_accessor_width . simple DOT LPAREN simple RPAREN simple [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2139,7 +2139,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT TILDEMINUS
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT TILDEMINUS
 ##
-## Ends in an error in state: 359.
+## Ends in an error in state: 360.
 ##
 ## simple -> simple . TILDE coercion [ TILDE DOT ]
 ## ternop_app -> bytes_or_bigstring_set string_accessor_width simple . DOT LPAREN simple RPAREN simple [ KWD_WITH KWD_IN KWD_AND ]
@@ -2152,7 +2152,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT TILDEMINUS
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT DOT TILDEMINUS
 ##
-## Ends in an error in state: 360.
+## Ends in an error in state: 361.
 ##
 ## ternop_app -> bytes_or_bigstring_set string_accessor_width simple DOT . LPAREN simple RPAREN simple [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2164,7 +2164,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT DOT TILDEMINU
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT DOT LPAREN TILDEMINUS
 ##
-## Ends in an error in state: 361.
+## Ends in an error in state: 362.
 ##
 ## ternop_app -> bytes_or_bigstring_set string_accessor_width simple DOT LPAREN . simple RPAREN simple [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2176,7 +2176,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT DOT LPAREN TI
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT DOT LPAREN FLOAT TILDEMINUS
 ##
-## Ends in an error in state: 362.
+## Ends in an error in state: 363.
 ##
 ## simple -> simple . TILDE coercion [ TILDE RPAREN ]
 ## ternop_app -> bytes_or_bigstring_set string_accessor_width simple DOT LPAREN simple . RPAREN simple [ KWD_WITH KWD_IN KWD_AND ]
@@ -2189,7 +2189,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT DOT LPAREN FL
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT DOT LPAREN FLOAT RPAREN TILDEMINUS
 ##
-## Ends in an error in state: 363.
+## Ends in an error in state: 364.
 ##
 ## ternop_app -> bytes_or_bigstring_set string_accessor_width simple DOT LPAREN simple RPAREN . simple [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2201,7 +2201,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT DOT LPAREN FL
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BIGSTRING_SET INT FLOAT DOT LPAREN FLOAT RPAREN FLOAT TILDEMINUS
 ##
-## Ends in an error in state: 364.
+## Ends in an error in state: 365.
 ##
 ## simple -> simple . TILDE coercion [ TILDE KWD_WITH KWD_IN KWD_AND ]
 ## ternop_app -> bytes_or_bigstring_set string_accessor_width simple DOT LPAREN simple RPAREN simple . [ KWD_WITH KWD_IN KWD_AND ]
@@ -2530,11 +2530,11 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT TILDEMINUS
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN TILDEMINUS
+expect_test_spec: KWD_HCF KWD_WHERE IDENT LPAREN TILDEMINUS
 ##
 ## Ends in an error in state: 428.
 ##
-## kinded_args -> LPAREN . separated_nonempty_list(COMMA,kinded_variable) RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND IDENT EQUAL EOF BIGARROW ]
+## kinded_args -> LPAREN . separated_nonempty_list(COMMA,kinded_variable) RPAREN [ IDENT EQUAL ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN
@@ -2542,7 +2542,7 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN TILDEMINUS
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT TILDEMINUS
+expect_test_spec: KWD_HCF KWD_WHERE IDENT LPAREN IDENT TILDEMINUS
 ##
 ## Ends in an error in state: 429.
 ##
@@ -2554,7 +2554,7 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT TILDEMINUS
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON TILDEMINUS
+expect_test_spec: KWD_HCF KWD_WHERE IDENT LPAREN IDENT COLON TILDEMINUS
 ##
 ## Ends in an error in state: 430.
 ##
@@ -2792,7 +2792,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF KWD_FLOAT PIPE 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON KWD_REC_INFO TILDEMINUS
+expect_test_spec: KWD_HCF KWD_WHERE IDENT LPAREN IDENT COLON KWD_REC_INFO TILDEMINUS
 ##
 ## Ends in an error in state: 477.
 ##
@@ -2805,7 +2805,7 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON KWD_REC_INFO TILD
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COMMA TILDEMINUS
+expect_test_spec: KWD_HCF KWD_WHERE IDENT LPAREN IDENT COMMA TILDEMINUS
 ##
 ## Ends in an error in state: 478.
 ##
@@ -3490,7 +3490,7 @@ expect_test_spec: KWD_HCF TILDEMINUS
 ## Ends in an error in state: 568.
 ##
 ## expr -> inner_expr . [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
-## where_expr -> inner_expr . KWD_WHERE cont_recursive loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
+## where_expr -> inner_expr . KWD_WHERE recursive loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
 ##
 ## The known suffix of the stack is as follows:
 ## inner_expr
@@ -3502,7 +3502,7 @@ expect_test_spec: KWD_HCF KWD_WHERE TILDEMINUS
 ##
 ## Ends in an error in state: 569.
 ##
-## where_expr -> inner_expr KWD_WHERE . cont_recursive loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
+## where_expr -> inner_expr KWD_WHERE . recursive loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
 ##
 ## The known suffix of the stack is as follows:
 ## inner_expr KWD_WHERE
@@ -3514,29 +3514,17 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC TILDEMINUS
 ##
 ## Ends in an error in state: 570.
 ##
-## cont_recursive -> KWD_REC . kinded_args [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND IDENT EOF BIGARROW ]
+## where_expr -> inner_expr KWD_WHERE recursive . loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
 ##
 ## The known suffix of the stack is as follows:
-## KWD_REC
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT RPAREN TILDEMINUS
-##
-## Ends in an error in state: 572.
-##
-## where_expr -> inner_expr KWD_WHERE cont_recursive . loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
-##
-## The known suffix of the stack is as follows:
-## inner_expr KWD_WHERE cont_recursive
+## inner_expr KWD_WHERE recursive
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT TILDEMINUS
 ##
-## Ends in an error in state: 575.
+## Ends in an error in state: 573.
 ##
 ## continuation_binding -> continuation_id . continuation_sort kinded_args EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
 ##
@@ -3548,7 +3536,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT TILDEMINUS
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT KWD_DEFINE_ROOT_SYMBOL TILDEMINUS
 ##
-## Ends in an error in state: 578.
+## Ends in an error in state: 576.
 ##
 ## continuation_binding -> continuation_id continuation_sort . kinded_args EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
 ##
@@ -3560,7 +3548,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT KWD_DEFINE_ROOT_SYMBOL TILDEMINUS
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT LPAREN IDENT RPAREN TILDEMINUS
 ##
-## Ends in an error in state: 579.
+## Ends in an error in state: 577.
 ##
 ## continuation_binding -> continuation_id continuation_sort kinded_args . EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
 ##
@@ -3572,7 +3560,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT LPAREN IDENT RPAREN TILDEMINUS
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL TILDEMINUS
 ##
-## Ends in an error in state: 580.
+## Ends in an error in state: 578.
 ##
 ## continuation_binding -> continuation_id continuation_sort kinded_args EQUAL . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
 ##
@@ -3584,7 +3572,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL TILDEMINUS
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET TILDEMINUS
 ##
-## Ends in an error in state: 581.
+## Ends in an error in state: 579.
 ##
 ## let_expr(continuation_body) -> KWD_LET . let_(continuation_body) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
 ## let_symbol(continuation_body) -> KWD_LET . separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
@@ -3597,7 +3585,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET TILDEMINUS
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILDEMINUS
 ##
-## Ends in an error in state: 583.
+## Ends in an error in state: 581.
 ##
 ## let_symbol(continuation_body) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt . KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
 ##
@@ -3609,7 +3597,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELET
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELETED KWD_IN TILDEMINUS
 ##
-## Ends in an error in state: 584.
+## Ends in an error in state: 582.
 ##
 ## let_symbol(continuation_body) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
 ##
@@ -3621,7 +3609,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELET
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM_BEGIN_GHOST_REGION KWD_WITH LBRACE RBRACE TILDEMINUS
 ##
-## Ends in an error in state: 590.
+## Ends in an error in state: 588.
 ##
 ## let_(continuation_body) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt . KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
 ##
@@ -3633,7 +3621,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM_BEGIN_G
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM_BEGIN_GHOST_REGION KWD_IN TILDEMINUS
 ##
-## Ends in an error in state: 591.
+## Ends in an error in state: 589.
 ##
 ## let_(continuation_body) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
 ##
@@ -3645,7 +3633,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM_BEGIN_G
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BEGIN_GHOST_REGION TILDEMINUS
 ##
-## Ends in an error in state: 593.
+## Ends in an error in state: 591.
 ##
 ## separated_nonempty_list(KWD_AND,let_binding) -> let_binding . [ KWD_WITH KWD_IN ]
 ## separated_nonempty_list(KWD_AND,let_binding) -> let_binding . KWD_AND separated_nonempty_list(KWD_AND,let_binding) [ KWD_WITH KWD_IN ]
@@ -3658,7 +3646,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BEGIN_GHOST_REGION TILDEMINUS
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BEGIN_GHOST_REGION KWD_AND TILDEMINUS
 ##
-## Ends in an error in state: 594.
+## Ends in an error in state: 592.
 ##
 ## separated_nonempty_list(KWD_AND,let_binding) -> let_binding KWD_AND . separated_nonempty_list(KWD_AND,let_binding) [ KWD_WITH KWD_IN ]
 ##
@@ -3670,7 +3658,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BEGIN_GHOST_REGION KWD_AND TILDEMINUS
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF TILDEMINUS
 ##
-## Ends in an error in state: 599.
+## Ends in an error in state: 597.
 ##
 ## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding . [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
 ## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding . KWD_ANDWHERE separated_nonempty_list(KWD_ANDWHERE,continuation_binding) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
@@ -3683,7 +3671,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF TILDEMINUS
 
 expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF KWD_ANDWHERE TILDEMINUS
 ##
-## Ends in an error in state: 600.
+## Ends in an error in state: 598.
 ##
 ## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding KWD_ANDWHERE . separated_nonempty_list(KWD_ANDWHERE,continuation_binding) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
 ##
@@ -3695,7 +3683,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF KWD_ANDWHERE TILDEMINUS
 
 expect_test_spec: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILDEMINUS
 ##
-## Ends in an error in state: 605.
+## Ends in an error in state: 603.
 ##
 ## let_symbol(expr) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt . KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
 ##
@@ -3707,7 +3695,7 @@ expect_test_spec: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILD
 
 expect_test_spec: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_IN TILDEMINUS
 ##
-## Ends in an error in state: 606.
+## Ends in an error in state: 604.
 ##
 ## let_symbol(expr) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN . expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
 ##
@@ -3719,7 +3707,7 @@ expect_test_spec: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_IN TILDEMINUS
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BEGIN_GHOST_REGION KWD_WITH LBRACE RBRACE TILDEMINUS
 ##
-## Ends in an error in state: 609.
+## Ends in an error in state: 607.
 ##
 ## let_(expr) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt . KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
 ##
@@ -3731,7 +3719,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BEGIN_GHOST_REGION KWD_WITH LBRACE RB
 
 expect_test_spec: KWD_LET IDENT EQUAL PRIM_BEGIN_GHOST_REGION KWD_IN TILDEMINUS
 ##
-## Ends in an error in state: 610.
+## Ends in an error in state: 608.
 ##
 ## let_(expr) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN . expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
 ##
@@ -3743,7 +3731,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM_BEGIN_GHOST_REGION KWD_IN TILDEMINUS
 
 expect_test_spec: LPAREN KWD_HCF KWD_WITH
 ##
-## Ends in an error in state: 613.
+## Ends in an error in state: 611.
 ##
 ## atomic_expr -> LPAREN expr . RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
 ##
@@ -3761,7 +3749,7 @@ expect_test_spec: LPAREN KWD_HCF KWD_WITH
 
 expect_test_spec: KWD_HCF RPAREN
 ##
-## Ends in an error in state: 615.
+## Ends in an error in state: 613.
 ##
 ## expect_test_spec -> module_ . BIGARROW module_ EOF [ # ]
 ##
@@ -3773,14 +3761,14 @@ expect_test_spec: KWD_HCF RPAREN
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
 ## In state 568, spurious reduction of production expr -> inner_expr
-## In state 619, spurious reduction of production module_ -> expr
+## In state 617, spurious reduction of production module_ -> expr
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
 expect_test_spec: KWD_HCF BIGARROW TILDEMINUS
 ##
-## Ends in an error in state: 616.
+## Ends in an error in state: 614.
 ##
 ## expect_test_spec -> module_ BIGARROW . module_ EOF [ # ]
 ##
@@ -3792,7 +3780,7 @@ expect_test_spec: KWD_HCF BIGARROW TILDEMINUS
 
 expect_test_spec: KWD_HCF BIGARROW KWD_HCF RPAREN
 ##
-## Ends in an error in state: 617.
+## Ends in an error in state: 615.
 ##
 ## expect_test_spec -> module_ BIGARROW module_ . EOF [ # ]
 ##
@@ -3804,14 +3792,14 @@ expect_test_spec: KWD_HCF BIGARROW KWD_HCF RPAREN
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
 ## In state 568, spurious reduction of production expr -> inner_expr
-## In state 619, spurious reduction of production module_ -> expr
+## In state 617, spurious reduction of production module_ -> expr
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
 flambda_unit: TILDEMINUS
 ##
-## Ends in an error in state: 621.
+## Ends in an error in state: 619.
 ##
 ## flambda_unit' -> . flambda_unit [ # ]
 ##
@@ -3823,7 +3811,7 @@ flambda_unit: TILDEMINUS
 
 flambda_unit: KWD_HCF RPAREN
 ##
-## Ends in an error in state: 622.
+## Ends in an error in state: 620.
 ##
 ## flambda_unit -> module_ . EOF [ # ]
 ##
@@ -3835,7 +3823,7 @@ flambda_unit: KWD_HCF RPAREN
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
 ## In state 568, spurious reduction of production expr -> inner_expr
-## In state 619, spurious reduction of production module_ -> expr
+## In state 617, spurious reduction of production module_ -> expr
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>

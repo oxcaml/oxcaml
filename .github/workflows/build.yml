@@ -182,7 +182,7 @@ jobs:
       id: cache
       with:
         path: ${{ github.workspace }}/ocaml-414/_install
-        key: ${{ matrix.os }}-cache-ocaml-414-dune-3153-menhir-20231231-rev13
+        key: ${{ matrix.os }}-cache-ocaml-414-dune-3153-menhir-20231231-rev14
 
     - name: Checkout OCaml 4.14
       uses: actions/checkout@master
@@ -197,6 +197,7 @@ jobs:
       working-directory: ocaml-414
       run: |
         ./configure --prefix=$GITHUB_WORKSPACE/ocaml-414/_install
+        patch -p1 < $GITHUB_WORKSPACE/oxcaml/arm64-issue-debug-upstream.patch
         make -j $J world.opt
         make install
         # Remove unneeded parts to shrink cache file

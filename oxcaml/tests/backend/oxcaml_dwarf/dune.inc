@@ -3,8 +3,9 @@
  (name test_basic_dwarf)
  (modules test_basic_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 
@@ -51,8 +52,9 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (name test_unboxed_dwarf)
  (modules test_unboxed_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 
@@ -99,8 +101,9 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (name test_datatypes_dwarf)
  (modules test_datatypes_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 
@@ -147,8 +150,9 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (name test_simd_dwarf)
  (modules test_simd_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 
@@ -195,8 +199,9 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (name test_simple_functor_dwarf)
  (modules test_simple_functor_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 
@@ -243,8 +248,9 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (name test_parameters_dwarf)
  (modules test_parameters_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 
@@ -291,8 +297,9 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (name test_callstack_dwarf)
  (modules test_callstack_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 
@@ -339,8 +346,9 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (name test_stepping_dwarf)
  (modules test_stepping_dwarf)
  (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 

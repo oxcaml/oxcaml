@@ -246,6 +246,8 @@ let longident_loc f x = pp f "%a" longident x.txt
 let constant f = function
   | Pconst_char i ->
       pp f "%C"  i
+  | Pconst_untagged_char i ->
+      pp f "#%C"  i
   | Pconst_string (i, _, None) ->
       pp f "%S" i
   | Pconst_string (i, _, Some delim) ->
@@ -2244,6 +2246,8 @@ and block_access ctxt f = function
       | Index_int -> ""
       | Index_unboxed_int64 -> "L"
       | Index_unboxed_int32 -> "l"
+      | Index_unboxed_int16 -> "S"
+      | Index_unboxed_int8 -> "s"
       | Index_unboxed_nativeint -> "n"
     in
     pp f "%s%s(%a)" dotop suffix (expression ctxt) index

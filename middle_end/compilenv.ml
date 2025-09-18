@@ -169,19 +169,28 @@ let get_unit_info comp_unit =
       let (infos, crc) =
         if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
         else begin
+          let missing_extension =
+            match !Clflags.jsir with
+            | false -> "cmx"
+            | true -> "cmjx"
+          in
           try
             let filename =
               Load_path.find_normalized
-                (CU.base_filename comp_unit ^ ".cmx") in
+                (CU.base_filename comp_unit ^ "." ^ missing_extension) in
             let (ui, crc) = read_unit_info filename in
             if not (CU.equal ui.ui_unit comp_unit) then
               raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
             cache_zero_alloc_info ui.ui_zero_alloc_info;
             (Some ui, Some crc)
           with Not_found ->
-            let warn = Warnings.No_cmx_file (Global_module.Name.to_string name) in
-              Location.prerr_warning Location.none warn;
-              (None, None)
+            let warn =
+              Warnings.No_cmx_file
+                { missing_extension
+                ; module_name = Global_module.Name.to_string name }
+            in
+            Location.prerr_warning Location.none warn;
+            (None, None)
           end
       in
       let import = Import_info.create_normal comp_unit ~crc in

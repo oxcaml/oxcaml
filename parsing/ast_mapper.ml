@@ -102,6 +102,7 @@ module C = struct
     | Pconst_integer _
     | Pconst_unboxed_integer _
     | Pconst_char _
+    | Pconst_untagged_char _
     | Pconst_float _
     | Pconst_unboxed_float _
       -> c

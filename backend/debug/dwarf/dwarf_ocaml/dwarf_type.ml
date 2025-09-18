@@ -23,6 +23,7 @@ module Sort = Jkind_types.Sort
 module Layout = Sort.Const
 module S = Shape
 module String = Misc.Stdlib.String
+module MB = Misc.Maybe_bounded
 
 type base_layout = Sort.base
 
@@ -1184,7 +1185,7 @@ let unboxed_base_type_to_simd_vec_split (x : S.Predef.unboxed) =
   match x with
   | Unboxed_simd s -> Some s
   | Unboxed_float | Unboxed_float32 | Unboxed_nativeint | Unboxed_int64
-  | Unboxed_int32 ->
+  | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 ->
     None
 
 type vec_split_properties =
@@ -1427,7 +1428,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Poly_variant fields ->
       type_shape_to_dwarf_die_poly_variant ~reference ?name ~parent_proto_die
         ~fallback_value_die ~constructors:fields ~rec_env ()
-    | Arrow _ ->
+    | Arrow ->
       type_shape_to_dwarf_die_arrow ~reference ?name ~parent_proto_die
         ~fallback_value_die ()
     | Record { fields; kind = Record_boxed | Record_floats } ->
@@ -1720,7 +1721,7 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
     create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
       ()
   | ( ( Bytes | Extension_constructor | Float | Float32 | Floatarray | Int
-      | Int32 | Int64 | Lazy_t | Nativeint | String ),
+      | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint | String ),
       _ ) ->
     create_base_layout_type ~reference Value ?name ~parent_proto_die
       ~fallback_value_die ()
@@ -1808,8 +1809,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       Misc.fatal_errorf "predefined type must have base layout, but got: %a"
         Layout.format type_layout
     else unknown_base_layouts type_layout
-  | Arrow _, Base Value -> known_value
-  | Arrow _, _ ->
+  | Arrow, Base Value -> known_value
+  | Arrow, _ ->
     if !Clflags.dwarf_pedantic
     then
       Misc.fatal_errorf "arrow must have value layout, but got: %a"
@@ -1914,14 +1915,24 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     unknown_base_layouts type_layout
 
 module With_cms_reduce = Shape_reduce.Make (struct
-  let fuel = 10
+  let fuel () = MB.of_option !Clflags.gdwarf_config_shape_reduce_fuel
+
+  let fuel_for_compilation_units () =
+    MB.of_option !Clflags.gdwarf_config_max_cms_files_per_variable
+  (* Every variable gets to look up at most N compilation units. *)
+
+  let max_shape_reduce_steps_per_variable () =
+    MB.of_option !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable
+
+  let max_compilation_unit_depth () =
+    MB.of_option !Clflags.gdwarf_config_shape_reduce_depth
 
   let projection_rules_for_merlin_enabled = false
 
   let cms_file_cache = String.Tbl.create 264
 
-  let max_number_of_cms_files = ref 20
-  (* A single compilation may not read more than 20 .cms files. *)
+  let cms_files_read_counter = ref 0
+  (* Track the number of .cms files read during compilation. *)
   (* CR sspies: Investigate the performance some more and the balance between
      different variables. *)
 
@@ -1958,8 +1969,10 @@ module With_cms_reduce = Shape_reduce.Make (struct
       Shape_reduce.Diagnostics.count_cms_file_cached diagnostics;
       shape
     | None ->
-      if !max_number_of_cms_files <= 0
-         (* CR sspies: This needs a command line flag. *)
+      let max_cms_files =
+        MB.of_option !Clflags.gdwarf_config_max_cms_files_per_unit
+      in
+      if MB.is_out_of_bounds !cms_files_read_counter max_cms_files
       then None
       else
         let filename = String.uncapitalize_ascii unit_name in
@@ -1973,7 +1986,7 @@ module With_cms_reduce = Shape_reduce.Make (struct
         let shape_opt =
           match shape_opt_opt with
           | Some shape_opt ->
-            decr max_number_of_cms_files;
+            incr cms_files_read_counter;
             Shape_reduce.Diagnostics.count_cms_file_loaded diagnostics;
             shape_opt
           | None ->

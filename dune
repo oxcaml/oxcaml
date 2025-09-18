@@ -103,8 +103,9 @@
    -safe-string
    -strict-formats
    -w
-   -67
+   -67-47
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
+   ; -47 needed because [@inline available] is not recognized by the system compiler
    ))
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
@@ -122,6 +123,7 @@
   value_rec_types
   asttypes
   cmo_format
+  cmj_format
   outcometree
   parsetree
   debug_event
@@ -310,6 +312,7 @@
   value_rec_types
   asttypes
   cmo_format
+  cmj_format
   outcometree
   parsetree
   debug_event))
@@ -355,6 +358,27 @@
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (libraries ocamlbytecomp ocamlcommon)
  (modules main_native))
+
+(library
+ (name ocamljcomp)
+ (wrapped false)
+ (flags
+  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
+ (ocamlopt_flags
+  (:include %{project_root}/ocamlopt_flags.sexp))
+ (libraries ocamlcommon flambda2)
+ (modules
+   jsmaindriver
+   jscompile
+   jslibrarian))
+
+(executable
+ (name boot_ocamlj)
+ (modes native)
+ (flags
+  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
+ (libraries ocamljcomp ocamlcommon flambda2)
+ (modules boot_ocamlj))
 
 ; Disabled since there can be only one (data_only_dirs) declaration
 ;(data_only_dirs yacc)
@@ -417,6 +441,12 @@
  (files
   (main.bc as ocamlc.byte)
   (main_native.exe as ocamlc.opt))
+ (section bin)
+ (package ocaml))
+
+(install
+ (files
+  (boot_ocamlj.exe as ocamlj.opt))
  (section bin)
  (package ocaml))
 

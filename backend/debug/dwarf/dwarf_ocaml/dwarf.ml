@@ -141,11 +141,31 @@ let emit_stats_file t =
   (* Create the main JSON object *)
   let main_object =
     Json.object_
-      [ Json.field "compilation_parameters" (Json.object_ []);
-        (* CR sspies: Curretly, we do not have any performance dials yet for the
-           DWARF shape emission (such as depth dials for various recursive
-           traversals). Once they are implemented, add them here to record their
-           values in the debug json files. *)
+      [ Json.field "compilation_parameters"
+          (Json.object_
+             [ Json.field "gdwarf_config_shape_reduce_depth"
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_shape_reduce_depth);
+               Json.field "gdwarf_config_shape_eval_depth"
+                 (Json.option Json.int !Clflags.gdwarf_config_shape_eval_depth);
+               Json.field "gdwarf_config_max_cms_files_per_unit"
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_max_cms_files_per_unit);
+               Json.field "gdwarf_config_max_cms_files_per_variable"
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_max_cms_files_per_variable);
+               Json.field "gdwarf_config_max_type_to_shape_depth"
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_max_type_to_shape_depth);
+               Json.field "gdwarf_config_max_shape_reduce_steps_per_variable"
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable);
+               Json.field "gdwarf_config_max_evaluation_steps_per_variable"
+                 (Json.option Json.int
+                    !Clflags.gdwarf_config_max_evaluation_steps_per_variable);
+               Json.field "gdwarf_config_shape_reduce_fuel"
+                 (Json.option Json.int !Clflags.gdwarf_config_shape_reduce_fuel)
+             ]);
         Json.field "variables" (Json.array variable_jsons) ]
   in
   Printf.fprintf oc "%s\n" main_object;

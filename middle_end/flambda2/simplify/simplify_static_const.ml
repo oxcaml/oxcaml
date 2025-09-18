@@ -56,13 +56,14 @@ let rebuild_naked_number_array dacc ~bind_result_sym kind type_creator creator
     |> List.split
   in
   let dacc =
+    let machine_width = DE.machine_width (DA.denv dacc) in
     bind_result_sym
       (T.immutable_array ~element_kind:(Ok kind) ~fields:field_tys
-         Alloc_mode.For_types.heap)
+         Alloc_mode.For_types.heap ~machine_width)
   in
   creator (DA.are_rebuilding_terms dacc) fields, dacc
 
-let simplify_static_const_block_type ~tag ~fields ~shape
+let simplify_static_const_block_type ~machine_width ~tag ~fields ~shape
     ~(is_mutable : Mutability.t) =
   (* Similar to Simplify_variadic_primitive.simplify_make_block_of_values *)
   let tag = Tag.Scannable.to_tag tag in
@@ -70,10 +71,10 @@ let simplify_static_const_block_type ~tag ~fields ~shape
   match is_mutable with
   | Immutable ->
     T.immutable_block ~is_unique:false tag ~shape ~fields
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width
   | Immutable_unique ->
     T.immutable_block ~is_unique:true tag ~shape ~fields
-      Alloc_mode.For_types.heap
+      Alloc_mode.For_types.heap ~machine_width
   | Mutable -> T.mutable_block Alloc_mode.For_types.heap
 
 let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
@@ -98,6 +99,7 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     let fields, field_tys = List.split fields_with_tys in
     let ty =
       simplify_static_const_block_type ~tag ~fields:field_tys ~shape ~is_mutable
+        ~machine_width:(DE.machine_width (DA.denv dacc))
     in
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_block
@@ -239,9 +241,10 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     in
     let fields, field_tys = List.split fields_with_tys in
     let dacc =
+      let machine_width = DE.machine_width (DA.denv dacc) in
       bind_result_sym
         (T.immutable_array ~element_kind:(Ok KS.any_value) ~fields:field_tys
-           Alloc_mode.For_types.heap)
+           Alloc_mode.For_types.heap ~machine_width)
     in
     ( Rebuilt_static_const.create_immutable_value_array
         (DA.are_rebuilding_terms dacc)
@@ -251,7 +254,9 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
     let dacc =
       bind_result_sym
         (T.array_of_length ~element_kind:Bottom
-           ~length:(T.this_tagged_immediate Target_ocaml_int.zero)
+           ~length:
+             (let machine_width = DE.machine_width (DA.denv dacc) in
+              T.this_tagged_immediate (Target_ocaml_int.zero machine_width))
            Alloc_mode.For_types.heap)
     in
     ( Rebuilt_static_const.create_empty_array
@@ -259,14 +264,18 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
         array_kind,
       dacc )
   | Mutable_string { initial_value } ->
-    let str_ty = T.mutable_string ~size:(String.length initial_value) in
+    let machine_width = DE.machine_width (DA.denv dacc) in
+    let str_ty =
+      T.mutable_string ~size:(String.length initial_value) ~machine_width
+    in
     let dacc = bind_result_sym str_ty in
     ( Rebuilt_static_const.create_mutable_string
         (DA.are_rebuilding_terms dacc)
         ~initial_value,
       dacc )
   | Immutable_string str ->
-    let ty = T.this_immutable_string str in
+    let machine_width = DE.machine_width (DA.denv dacc) in
+    let ty = T.this_immutable_string str ~machine_width in
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_immutable_string
         (DA.are_rebuilding_terms dacc)

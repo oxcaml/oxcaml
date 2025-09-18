@@ -17,6 +17,8 @@
 
 open Shape
 
+module MB = Misc.Maybe_bounded
+
 type result =
   | Resolved of Uid.t
   | Resolved_alias of Uid.t * result
@@ -117,8 +119,11 @@ let find_shape env id =
   Env.shape_of_path ~namespace env (Pident id)
 
 module Make(Params : sig
-  val fuel : int
+  val fuel : unit -> MB.t
   val projection_rules_for_merlin_enabled : bool
+  val fuel_for_compilation_units : unit -> MB.t
+  val max_shape_reduce_steps_per_variable : unit -> MB.t
+  val max_compilation_unit_depth : unit -> MB.t
   val read_unit_shape :
     diagnostics:Diagnostics.t -> unit_name:string -> t option
 end) = struct
@@ -144,7 +149,7 @@ end) = struct
     | NTuple of nf list
     | NUnboxed_tuple of nf list
     | NPredef of Predef.t * nf list
-    | NArrow of nf * nf
+    | NArrow
     | NPoly_variant of nf poly_variant_constructors
     | NVariant of  (delayed_nf * Layout.t) complex_constructors
     | NVariant_unboxed of
@@ -180,7 +185,9 @@ end) = struct
    *)
   and delayed_nf = Thunk of local_env * t
 
-  and local_env = delayed_nf option Ident.Map.t
+  and local_env =
+    { subst: delayed_nf option Ident.Map.t;
+      depth: int }
   (* When reducing in the body of an abstraction [Abs(x, body)], we
      bind [x] to [None] in the environment. [Some v] is used for
      actual substitutions, for example in [App(Abs(x, body), t)], when
@@ -189,7 +196,8 @@ end) = struct
   let approx_nf nf = { nf with approximated = true }
 
   let rec equal_local_env t1 t2 =
-    Ident.Map.equal (Option.equal equal_delayed_nf) t1 t2
+    t1.depth = t2.depth &&
+    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst
 
   and equal_delayed_nf t1 t2 =
     match t1, t2 with
@@ -231,8 +239,7 @@ end) = struct
       List.equal equal_nf args1 args2
     | NPredef (p1, args1), NPredef (p2, args2) ->
       Predef.equal p1 p2 && List.equal equal_nf args1 args2
-    | NArrow (arg1, ret1), NArrow (arg2, ret2) ->
-      equal_nf arg1 arg2 && equal_nf ret1 ret2
+    | NArrow, NArrow -> true
     | NPoly_variant constrs1, NPoly_variant constrs2 ->
       let equal_pv_constructor c1 c2 =
         String.equal c1.pv_constr_name c2.pv_constr_name &&
@@ -266,7 +273,7 @@ end) = struct
         f1 f2
     | ( ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
-        | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
+        | NPredef _ | NArrow | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ | NMutrec _ | NProj_decl _ | NMu _
         | NRec_var _ ), _ ) -> false
 
@@ -314,7 +321,9 @@ end) = struct
         res
 
   type env = {
-    fuel: int ref;
+    fuel: MB.t;
+    fuel_for_compilation_units: MB.t;
+    max_steps_per_variable: MB.t;
     diagnostics: Diagnostics.t;
     global_env: Env.t;
     local_env: local_env;
@@ -323,7 +332,8 @@ end) = struct
   }
 
   let bind env var shape =
-    { env with local_env = Ident.Map.add var shape env.local_env }
+    let subst = Ident.Map.add var shape env.local_env.subst in
+    { env with local_env = { env.local_env with subst } }
 
   let rec reduce_ env t =
     Diagnostics.count_reduction_step env.diagnostics;
@@ -372,8 +382,13 @@ end) = struct
     reduce_ { env with local_env } t
 
   and reduce__
-    ({fuel; global_env; local_env; _} as env) (t : t) =
+    ({fuel; fuel_for_compilation_units; max_steps_per_variable;
+      global_env; local_env; _} as env) (t : t) =
     let reduce env t = reduce_ env t in
+    let reduce_with_increased_depth env t =
+      let local_env = { env.local_env with depth = env.local_env.depth + 1 } in
+      reduce_ { env with local_env } t
+    in
     let delay_reduce env t = Thunk (env.local_env, t) in
     let return desc = { uid = t.uid; desc; approximated = t.approximated } in
     let rec force_aliases nf = match nf.desc with
@@ -397,17 +412,29 @@ end) = struct
       | None -> dnf
       | Some uid -> Thunk (l, Shape.set_uid_if_none t uid)
     in
-    if !fuel < 0 then approx_nf (return (NError "NoFuelLeft"))
-    else
+    if MB.is_depleted fuel
+    then approx_nf (return (NError "NoFuelLeft"))
+    else if MB.is_depleted max_steps_per_variable
+    then return NLeaf
+    else (
+      MB.decr max_steps_per_variable;
       match t.desc with
       | Comp_unit unit_name ->
-          Diagnostics.count_computation_unit_lookup env.diagnostics;
-          begin match
-            Params.read_unit_shape ~diagnostics:env.diagnostics ~unit_name
-          with
-          | Some t -> reduce env t
-          | None -> return (NComp_unit unit_name)
-          end
+          let reduce_max_depth = Params.max_compilation_unit_depth () in
+          if MB.is_depleted fuel_for_compilation_units
+          || MB.is_out_of_bounds env.local_env.depth reduce_max_depth
+          then
+            return (NComp_unit unit_name)
+          else (
+            MB.decr fuel_for_compilation_units;
+            Diagnostics.count_computation_unit_lookup env.diagnostics;
+            begin match
+              Params.read_unit_shape ~diagnostics:env.diagnostics ~unit_name
+            with
+            | Some t ->
+              reduce_with_increased_depth env t
+            | None -> return (NComp_unit unit_name)
+            end)
       | App(f, arg) ->
           let f = reduce env f |> force_aliases in
           begin match f.desc with
@@ -496,7 +523,7 @@ end) = struct
           let body_nf = delay_reduce (bind env var None) body in
           return (NAbs(local_env, var, body, body_nf))
       | Var id ->
-          begin match Ident.Map.find id local_env with
+          begin match Ident.Map.find id local_env.subst with
           (* Note: instead of binding abstraction-bound variables to
              [None], we could unify it with the [Some v] case by
              binding the bound variable [x] to [NVar x].
@@ -519,7 +546,7 @@ end) = struct
           | exception Not_found -> return (NVar id)
           | res when res = t -> return (NVar id)
           | res ->
-              decr fuel;
+              MB.decr fuel;
               reduce env res
           end
       | Leaf -> return NLeaf
@@ -548,10 +575,8 @@ end) = struct
       | Predef (p, args) ->
           let nfs = List.map (reduce env) args in
           return (NPredef (p, nfs))
-      | Arrow (arg, ret) ->
-          let arg_nf = reduce env arg in
-          let ret_nf = reduce env ret in
-          return (NArrow (arg_nf, ret_nf))
+      | Arrow ->
+          return NArrow
       | Poly_variant constrs ->
           let dnf_constrs =
             poly_variant_constructors_map (reduce env) constrs
@@ -574,6 +599,7 @@ end) = struct
                           (name, uid_opt, delay_reduce env t, ly)) fields
           in
           return (NRecord { fields = dnf_fields; kind })
+    )
 
   and read_back env (nf : nf) : t =
   in_read_back_memo_table env.read_back_memo_table nf (read_back_ env) nf
@@ -630,10 +656,8 @@ end) = struct
     | NPredef (p, args) ->
       let t_args = List.map read_back args in
       predef ?uid p t_args
-    | NArrow (arg, ret) ->
-      let t_arg = read_back arg in
-      let t_ret = read_back ret in
-      arrow ?uid t_arg t_ret
+    | NArrow ->
+      arrow ?uid ()
     | NPoly_variant constrs ->
       let t_constrs = poly_variant_constructors_map read_back constrs in
       poly_variant ?uid t_constrs
@@ -661,10 +685,22 @@ end) = struct
   let read_back_memo_table = Local_store.s_table ReadBackMemoTable.create 42
 
   let reduce ?(diagnostics = Diagnostics.no_diagnostics) global_env t =
-    let fuel = ref Params.fuel in
-    let local_env = Ident.Map.empty in
+    let fuel = Params.fuel () in
+    MB.incr fuel;
+    (* For historic reasons, the fuel bound is inclusive (i.e., upstream only
+       terminates when fuel < 0 rather than fuel <= 0). We account for this
+       difference here. *)
+    let fuel_for_compilation_units =
+      Params.fuel_for_compilation_units ()
+    in
+    let max_steps_per_variable =
+      Params.max_shape_reduce_steps_per_variable ()
+    in
+    let local_env = { subst = Ident.Map.empty; depth = 0 } in
     let env = {
       fuel;
+      fuel_for_compilation_units;
+      max_steps_per_variable;
       global_env;
       diagnostics;
       reduce_memo_table = !reduce_memo_table;
@@ -687,7 +723,7 @@ end) = struct
     | NMu _ -> false
     | NRec_var _ -> false
     | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
-    | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _ | NVariant_unboxed _
+    | NPredef _ | NArrow | NPoly_variant _ | NVariant _ | NVariant_unboxed _
     | NRecord _ -> false
 
   let rec reduce_aliases_for_uid env (nf : nf) =
@@ -706,10 +742,13 @@ end) = struct
       Internal_error_missing_uid
 
   let reduce_for_uid global_env t =
-    let fuel = ref Params.fuel in
-    let local_env = Ident.Map.empty in
+    let fuel = Params.fuel () in
+    MB.incr fuel; (* See the comment about [fuel] in [reduce]. *)
+    let local_env = { subst = Ident.Map.empty; depth = 0 } in
     let env = {
       fuel;
+      fuel_for_compilation_units = Params.fuel_for_compilation_units ();
+      max_steps_per_variable = Params.max_shape_reduce_steps_per_variable ();
       global_env;
       diagnostics = Diagnostics.no_diagnostics;
       reduce_memo_table = !reduce_memo_table;
@@ -725,8 +764,16 @@ end
 
 module Local_reduce =
   Make(struct
-    let fuel = 10
+    let fuel () = MB.of_int 10
+
+    let fuel_for_compilation_units () = MB.Unbounded
+
+    let max_shape_reduce_steps_per_variable () = MB.Unbounded
+
+    let max_compilation_unit_depth () = MB.Unbounded
+
     let projection_rules_for_merlin_enabled = true
+
     let read_unit_shape ~diagnostics:_ ~unit_name:_ = None
   end)
 

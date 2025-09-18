@@ -5149,38 +5149,27 @@ let zap_modalities_to_floor_if_modes_enabled_at level =
 
 (** The mode crossing of the memory block of a structure. *)
 let mode_crossing_structure_memaddr =
-  (* CR-someday lmaurer: This is hard to read or maintain. We should have a
-     constructor for [Mode.Crossing.t] that takes a simple [Cross] or
-     [Don't_cross] for each axis. *)
-  Mode.Crossing.of_bounds
-  { monadic = {
-      uniqueness = Unique;
-      contention = Contended;
-      visibility = Immutable
-    };
-    comonadic = {
-      areality = Local;
-      linearity = Many;
-      portability = Portable;
-      yielding = Unyielding;
-      statefulness = Stateless;
-  }}
+  Mode.Crossing.create
+    ~uniqueness:false
+    ~contention:true
+    ~visibility:true
+    ~regionality:false
+    ~linearity:true
+    ~portability:true
+    ~yielding:true
+    ~statefulness:true
 
 (** The mode crossing of a functor. *)
 let mode_crossing_functor =
-  Mode.Crossing.of_bounds
-  { monadic = {
-      uniqueness = Aliased;
-      contention = Contended;
-      visibility = Immutable
-    };
-    comonadic = {
-      areality = Local;
-      linearity = Once;
-      portability = Nonportable;
-      yielding = Yielding;
-      statefulness = Stateful;
-  }}
+  Mode.Crossing.create
+    ~uniqueness:true
+    ~contention:true
+    ~visibility:true
+    ~regionality:false
+    ~linearity:false
+    ~portability:false
+    ~yielding:false
+    ~statefulness:false
 
 (** The mode crossing of any module. *)
 let mode_crossing_module = Mode.Crossing.max

@@ -49,6 +49,7 @@ type t =
         evaluated_to : float;
         threshold : float
       }
+  | Jsir_inlining_disabled
 
 let [@ocamlformat "disable"] print ppf t =
   match t with
@@ -106,6 +107,7 @@ let [@ocamlformat "disable"] print ppf t =
       Cost_metrics.print cost_metrics
       evaluated_to
       threshold
+  | Jsir_inlining_disabled -> Format.fprintf ppf "Jsir_inlining_disabled"
 
 type can_inline =
   | Do_not_inline of { erase_attribute_if_ignored : bool }
@@ -147,6 +149,8 @@ let can_inline (t : t) : can_inline =
   | Attribute_always -> Inline { unroll_to = None; was_inline_always = true }
   | Replay_history_says_must_inline ->
     Inline { unroll_to = None; was_inline_always = false }
+  | Jsir_inlining_disabled ->
+    Do_not_inline { erase_attribute_if_ignored = false }
 
 (* CR mshinwell/gbury: tidy up by using Format.pp_print_text *)
 let report_reason fmt t =
@@ -204,6 +208,9 @@ let report_reason fmt t =
       "the@ function@ was@ inlined@ after@ speculation@ as@ its@ cost@ metrics \
        were=%a,@ which@ was@ evaluated@ to@ %f <= threshold %f"
       Cost_metrics.print cost_metrics evaluated_to threshold
+  | Jsir_inlining_disabled ->
+    Format.fprintf fmt
+      "function@ inlining@ is@ disabled@ for@ Js_of_ocaml@ translation"
 
 let report fmt t =
   Format.fprintf fmt

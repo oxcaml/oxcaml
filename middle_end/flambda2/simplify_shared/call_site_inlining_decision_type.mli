@@ -42,6 +42,7 @@ type t =
         evaluated_to : float;
         threshold : float
       }
+  | Jsir_inlining_disabled
 
 val print : Format.formatter -> t -> unit
 

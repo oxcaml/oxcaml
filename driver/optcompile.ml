@@ -82,6 +82,7 @@ let compile_from_typed i typed ~unix ~pipeline ~as_arg_for =
 type flambda2 =
   ppf_dump:Format.formatter ->
   prefixname:string ->
+  machine_width:Target_system.Machine_width.t ->
   keep_symbol_tables:bool ->
   Lambda.program ->
   Cmm.phrase list
@@ -109,11 +110,11 @@ let starting_point_of_compiler_pass start_from  =
   | _ -> Misc.fatal_errorf "Cannot start from %s"
            (Clflags.Compiler_pass.to_string start_from)
 
-let implementation_aux unix ~(flambda2 : flambda2) ~start_from
+let implementation_aux ~machine_width unix ~(flambda2 : flambda2) ~start_from
       ~source_file ~output_prefix ~keep_symbol_tables
       ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
   let pipeline : Asmgen.pipeline =
-    Direct_to_cmm (flambda2 ~keep_symbol_tables)
+    Direct_to_cmm (flambda2 ~machine_width ~keep_symbol_tables)
   in
   with_info ~source_file ~output_prefix ~dump_ext:"cmx" ~compilation_unit
     ~kind:Impl
@@ -167,19 +168,19 @@ let implementation_aux unix ~(flambda2 : flambda2) ~start_from
     if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
     compile_from_raw_lambda info impl ~unix ~pipeline ~as_arg_for
 
-let implementation unix ~flambda2 ~start_from ~source_file
+let implementation ~machine_width unix ~flambda2 ~start_from ~source_file
       ~output_prefix ~keep_symbol_tables =
   let start_from = start_from |> starting_point_of_compiler_pass in
-  implementation_aux unix ~flambda2 ~start_from ~source_file
+  implementation_aux ~machine_width unix ~flambda2 ~start_from ~source_file
     ~output_prefix ~keep_symbol_tables
     ~compilation_unit:Inferred_from_output_prefix
 
-let instance unix ~flambda2 ~source_file
+let instance ~machine_width unix ~flambda2 ~source_file
       ~output_prefix ~compilation_unit ~runtime_args ~main_module_block_size
       ~arg_descr ~keep_symbol_tables =
   let start_from =
     Instantiation { runtime_args; main_module_block_size; arg_descr }
   in
-  implementation_aux unix ~flambda2 ~start_from ~source_file
+  implementation_aux ~machine_width unix ~flambda2 ~start_from ~source_file
     ~output_prefix ~keep_symbol_tables
     ~compilation_unit:(Exactly compilation_unit)

@@ -25,23 +25,23 @@ module Const : sig
 
   include Container_types.S with type t := t
 
-  val const_true : t
+  val const_true : Target_system.Machine_width.t -> t
 
-  val const_false : t
+  val const_false : Target_system.Machine_width.t -> t
 
-  val untagged_const_true : t
+  val untagged_const_true : Target_system.Machine_width.t -> t
 
-  val untagged_const_false : t
+  val untagged_const_false : Target_system.Machine_width.t -> t
 
-  val untagged_const_zero : t
+  val untagged_const_zero : Target_system.Machine_width.t -> t
 
   val untagged_const_int : Target_ocaml_int.t -> t
 
-  val const_zero : t
+  val const_zero : Target_system.Machine_width.t -> t
 
-  val const_one : t
+  val const_one : Target_system.Machine_width.t -> t
 
-  val const_unit : t
+  val const_unit : Target_system.Machine_width.t -> t
 
   val const_int : Target_ocaml_int.t -> t
 
@@ -105,7 +105,7 @@ module Variable : sig
 
   type exported
 
-  include Container_types.S with type t := t
+  include Container_types.S_plus_iterator with type t := t
 
   module Lmap : Lmap.S with type key := t
 
@@ -131,7 +131,7 @@ module Symbol : sig
 
   type exported
 
-  include Container_types.S with type t := t
+  include Container_types.S_plus_iterator with type t := t
 
   (* CR lmaurer: This treats the [Linkage_name.t] as a string to be prefixed
      rather than the actual linkage name. That's not really consistent with the
@@ -143,6 +143,8 @@ module Symbol : sig
   val unsafe_create : Compilation_unit.t -> Linkage_name.t -> t
 
   val compilation_unit : t -> Compilation_unit.t
+
+  val for_compilation_unit : Compilation_unit.t -> t
 
   val linkage_name : t -> Linkage_name.t
 

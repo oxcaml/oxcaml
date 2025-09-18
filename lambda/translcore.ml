@@ -1244,6 +1244,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           local = Never_local;
           zero_alloc = Default_zero_alloc;
           loop = Never_loop;
+          regalloc = Default_regalloc;
+          regalloc_param = Default_regalloc_params;
+          cold = false;
           is_a_functor = false;
           is_opaque = false;
           stub = false;
@@ -2380,7 +2383,6 @@ and transl_idx ~scopes loc env ba uas =
     end
   | Baccess_array { mut = _; index_kind; index; base_ty; elt_ty; elt_sort } ->
     let index_sort, index_kind = match index_kind with
-      (* CR layouts v8: support small ints *)
       | Index_int ->
         Jkind.Sort.Const.value, Ptagged_int_index
       | Index_unboxed_int64 ->
@@ -2389,6 +2391,12 @@ and transl_idx ~scopes loc env ba uas =
       | Index_unboxed_int32 ->
         Jkind.Sort.Const.bits32,
         Punboxed_or_untagged_integer_index Unboxed_int32
+      | Index_unboxed_int16 ->
+        Jkind.Sort.Const.bits16,
+        Punboxed_or_untagged_integer_index Untagged_int16
+      | Index_unboxed_int8 ->
+        Jkind.Sort.Const.bits8,
+        Punboxed_or_untagged_integer_index Untagged_int8
       | Index_unboxed_nativeint ->
         Jkind.Sort.Const.word,
         Punboxed_or_untagged_integer_index Unboxed_nativeint

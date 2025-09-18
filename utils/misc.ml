@@ -854,6 +854,46 @@ module Int_literal_converter = struct
   let int32 s = cvt_int_aux s Int32.neg Int32.of_string
   let int64 s = cvt_int_aux s Int64.neg Int64.of_string
   let nativeint s = cvt_int_aux s Nativeint.neg Nativeint.of_string
+
+  (* Follows "parse_sign_and_base" in runtime/ints.c *)
+  let parse_signedness s =
+    let char_at i =
+      if String.length s > i
+      then Some s.[i]
+      else None
+    in
+    let p =
+      match char_at 0 with
+      | Some ('-' | '+') -> 1
+      | Some _ | None -> 0
+    in
+    match char_at p with
+    | Some '0' ->
+      begin match char_at (p+1) with
+      | Some ('x' | 'X' | 'o' | 'O' | 'b' | 'B' | 'u' | 'U') -> false
+      | Some _ | None -> true
+      end
+    | Some _ | None -> true
+
+  let cvt_small_int str ~bits =
+    let i = int_of_string str in
+    let max_int = (1 lsl (bits-1)) - 1 in
+    let min_int = -(1 lsl (bits-1)) in
+    let max_uint = (1 lsl bits) - 1 in
+    let lower_limit, upper_limit =
+      if parse_signedness str
+      then min_int, max_int + 1
+      else -max_uint, max_uint
+    in
+    if i < lower_limit || i > upper_limit
+    then failwith "small int overflow";
+    (* handle overflow *)
+    if i > max_int then i - (max_uint + 1)
+    else if i < min_int then i + (max_uint + 1)
+    else i
+
+  let int8 s = cvt_small_int s ~bits:8
+  let int16 s = cvt_small_int s ~bits:16
 end
 
 (* [find_first_mono p] assumes that there exists a natural number
@@ -1993,6 +2033,10 @@ module Json = struct
   let array items =
     let item_strings = String.concat ",\n" items in
     Printf.sprintf "[\n%s\n]" item_strings
+
+  let null = "null"
+
+  let option f = function None -> null | Some v -> f v
 end
 
 module Nonempty_list = struct
@@ -2011,4 +2055,49 @@ module Nonempty_list = struct
 
   let (@) (x :: xs) (y :: ys) =
     x :: List.(xs @ (y :: ys))
+end
+
+module Maybe_bounded = struct
+  type t =
+    | Unbounded
+    | Bounded of { mutable bound: int }
+
+  let decr = function
+    | Unbounded -> ()
+    | Bounded r when r.bound > 0 -> r.bound <- r.bound - 1
+    | Bounded _ -> ()
+
+  let incr = function
+    | Unbounded -> ()
+    | Bounded r ->
+      if Int.equal r.bound Int.max_int
+      then
+        let msg = Format.asprintf "incr called with max_int (%d)" Int.max_int in
+        raise (Invalid_argument msg)
+      else
+        r.bound <- r.bound + 1
+
+  let is_depleted = function
+    | Unbounded -> false
+    | Bounded r -> r.bound <= 0
+
+  let is_in_bounds n t =
+    if n < 0 then false
+    else
+      match t with
+      | Unbounded -> true
+      | Bounded r -> n < r.bound
+
+  let is_out_of_bounds n t =
+    if n < 0 then true
+    else
+      match t with
+      | Unbounded -> false
+      | Bounded r -> n >= r.bound
+
+  let of_int n = if n < 0 then Bounded { bound = 0 } else Bounded { bound = n }
+
+  let of_option = function
+    | None -> Unbounded
+    | Some n -> of_int n
 end
