@@ -1026,7 +1026,7 @@ let mode_annots_from_pat pat =
   let modes =
     match pat.ppat_desc with
     | Ppat_constraint (_, _, modes) -> modes
-    | _ -> []
+    | _ -> No_modes
   in
   Typemode.transl_mode_annots modes
 
@@ -2754,7 +2754,7 @@ and type_pat_aux
       solve_Ppat_array ~refine:false loc penv mutability expected_ty
     in
     let modalities =
-      Typemode.transl_modalities ~maturity:Stable mutability []
+      Typemode.transl_modalities ~maturity:Stable mutability No_modalities
     in
     check_project_mutability ~loc ~env:!!penv Array_elements mutability
       alloc_mode.mode;
@@ -5505,14 +5505,16 @@ let generalize_structure_type_unboxed_access_result
 
 (* value binding elaboration *)
 
-let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=modes; _ } =
+let vb_exp_constraint
+      {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=modes; _ } =
   let open Ast_helper in
-  let loc =
-    Location.merge (pat.ppat_loc :: expr.pexp_loc :: List.map (fun m -> m.loc) modes)
+  let loc = match modes with
+    | No_modes -> Location.merge [ pat.ppat_loc; expr.pexp_loc ]
+    | Modes { loc; _ } -> Location.merge [ pat.ppat_loc; expr.pexp_loc; loc ]
   in
   let maybe_add_modes_constraint expr =
     match modes with
-    | [] -> expr
+    | No_modes -> expr
     | _ -> Exp.constraint_ ~loc expr None modes
   in
   match ct with
@@ -5536,11 +5538,13 @@ let vb_pat_constraint
   let spat =
     let open Ast_helper in
     let loc =
-      Location.merge (pat.ppat_loc :: List.map (fun m -> m.loc) modes)
+      match modes with
+      | No_modes -> pat.ppat_loc
+      | Modes { loc; _ } -> Location.merge [ pat.ppat_loc; loc ]
     in
     let maybe_add_modes_constraint expr =
       match modes with
-      | [] -> expr
+      | No_modes -> expr
       | _ -> Pat.constraint_ ~loc pat None modes
     in
     match vb.pvb_constraint, pat.ppat_desc, exp.pexp_desc with
@@ -7956,7 +7960,7 @@ and type_function
               match pat.ppat_desc with
               | Ppat_constraint (_, Some sty, _) ->
                   let gloc = { default.pexp_loc with loc_ghost = true } in
-                  Ast_helper.Exp.constraint_ default (Some sty) ~loc:gloc []
+                  Ast_helper.(Exp.constraint_ default (Some sty) ~loc:gloc No_modes)
               | _ -> default
             in
             (* Defaults are always global. They can be moved out of the
@@ -8104,15 +8108,17 @@ and type_function
       let ret_mode = Typemode.transl_mode_annots ret_mode_annotations in
       let type_mode =
         match ret_mode_annotations with
-        | _ :: _ ->
-            (* if return mode annotation is present, we use that to interpret the return
-               type annotation (currying mode behavior) *)
-            ret_mode
-        | [] ->
-            (* otherwise, we do not constrain the body mode, and we use the mode of the whole
-            function to interpret the return type *)
+        | Modes {crossings = _ :: _; _} ->
+            Misc.fatal_error "crossings on arrows not yet implemented"
+        | No_modes ->
+            (* if the return mode annotation is absent we do not constrain the body mode,
+              and we use the mode of the whole function to interpret the return type *)
             (* CR zqian: We should infer from [mode], instead of using directly. *)
             mode
+        | Modes {crossings = []; _} ->
+            (* otherwise, if the return mode annotation is present, we use that
+               to interpret the return type annotation (currying mode behavior) *)
+            ret_mode
       in
       match body with
       | Pfunction_body body ->
@@ -10189,7 +10195,8 @@ and type_generic_array
     if Types.is_mutable mutability then Predef.type_array
     else Predef.type_iarray
   in
-  let modalities = Typemode.transl_modalities ~maturity:Stable mutability [] in
+  let modalities =
+    Typemode.transl_modalities ~maturity:Stable mutability No_modalities in
   let argument_mode = mode_modality modalities array_mode in
   let jkind, elt_sort = Jkind.for_array_element_sort () in
   let ty = newgenvar jkind in

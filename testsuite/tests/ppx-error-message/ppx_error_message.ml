@@ -37,7 +37,7 @@ let () =
                       [ Ast_helper.Rf.tag { txt = str; loc } true [] ]
                       Closed
                       None ))
-                    [])
+                    No_modes)
                   (Ast_helper.Attr.mk
                      { txt = "ocaml.error_message"; loc }
                      (PStr
