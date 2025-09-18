@@ -1939,8 +1939,6 @@ let unboxed_mutable_int32_unboxed_product_array_ref arr ~array_index dbg =
                  dbg ))
             ~dbg))
 
-(* CR nmatschke: Why are these word stores and not 8/16-bit stores? *)
-
 let untagged_mutable_int8_unboxed_product_array_set arr ~array_index ~new_value
     dbg =
   bind "arr" arr (fun arr ->
@@ -1994,11 +1992,11 @@ let unboxed_or_untagged_packed_array_set arr ~index ~new_value dbg
 
 let untagged_int8_array_set =
   unboxed_or_untagged_packed_array_set ~log2_size_addr:0
-    ~memory_chunk:Thirtytwo_signed
+    ~memory_chunk:Byte_signed
 
 let untagged_int16_array_set =
   unboxed_or_untagged_packed_array_set ~log2_size_addr:1
-    ~memory_chunk:Thirtytwo_signed
+    ~memory_chunk:Sixteen_signed
 
 let unboxed_int32_array_set =
   unboxed_or_untagged_packed_array_set ~log2_size_addr:2
@@ -4988,6 +4986,20 @@ let atomic_compare_exchange_field ~dbg
   | Pointer ->
     atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value
 
+(* CR jrayman: not crazy about the name [pack_into_word] *)
+let pack_into_word ~bits int_list dbg =
+  let shift a ~amount =
+    if amount = 0 then a else Cop (Clsl, [a; Cconst_int (amount, dbg)], dbg)
+  in
+  let rec loop previously_packed = function
+    | [] -> Misc.fatal_error "Can't pack an empty payload"
+    | [a] -> Cop (Clsl, [a; Cconst_int (previously_packed, dbg)], dbg)
+    | a :: rest ->
+      let a = shift ~amount:previously_packed (zero_extend ~bits ~dbg a) in
+      Cop (Cor, [a; loop (previously_packed + bits) rest], dbg)
+  in
+  loop 0 int_list
+
 type mod8 =
   | Zero
   | One
@@ -5008,89 +5020,26 @@ let make_untagged_int8_array_payload dbg untagged_int8_list =
   let rec aux acc = function
     | [] -> Zero, List.rev acc
     | a :: [] -> One, List.rev (a :: acc)
-    | [a; b] ->
-      let i =
-        Cop
-          ( Cor,
-            [ zero_extend ~bits:8 a ~dbg;
-              Cop (Clsl, [b; Cconst_int (8, dbg)], dbg) ],
-            dbg )
-      in
+    | [_a; _b] as v ->
+      let i = pack_into_word ~bits:8 v dbg in
       Two, List.rev (i :: acc)
-    | [a; b; c] ->
-      let i =
-        Cop
-          ( Cor,
-            [ zero_extend ~bits:8 a ~dbg;
-              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
-              Cop (Clsl, [c; Cconst_int (16, dbg)], dbg) ],
-            dbg )
-      in
+    | [_a; _b; _c] as v ->
+      let i = pack_into_word ~bits:8 v dbg in
       Three, List.rev (i :: acc)
-    | [a; b; c; d] ->
-      let i =
-        Cop
-          ( Cor,
-            [ zero_extend ~bits:8 a ~dbg;
-              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg);
-              Cop (Clsl, [d; Cconst_int (24, dbg)], dbg) ],
-            dbg )
-      in
+    | [_a; _b; _c; _d] as v ->
+      let i = pack_into_word ~bits:8 v dbg in
       Four, List.rev (i :: acc)
-    | [a; b; c; d; e] ->
-      let i =
-        Cop
-          ( Cor,
-            [ zero_extend ~bits:8 a ~dbg;
-              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg);
-              Cop (Clsl, [e; Cconst_int (32, dbg)], dbg) ],
-            dbg )
-      in
+    | [_a; _b; _c; _d; _e] as v ->
+      let i = pack_into_word ~bits:8 v dbg in
       Five, List.rev (i :: acc)
-    | [a; b; c; d; e; f] ->
-      let i =
-        Cop
-          ( Cor,
-            [ zero_extend ~bits:8 a ~dbg;
-              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 e ~dbg; Cconst_int (32, dbg)], dbg);
-              Cop (Clsl, [f; Cconst_int (40, dbg)], dbg) ],
-            dbg )
-      in
+    | [_a; _b; _c; _d; _e; _f] as v ->
+      let i = pack_into_word ~bits:8 v dbg in
       Six, List.rev (i :: acc)
-    | [a; b; c; d; e; f; g] ->
-      let i =
-        Cop
-          ( Cor,
-            [ zero_extend ~bits:8 a ~dbg;
-              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 e ~dbg; Cconst_int (32, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 f ~dbg; Cconst_int (40, dbg)], dbg);
-              Cop (Clsl, [g; Cconst_int (48, dbg)], dbg) ],
-            dbg )
-      in
+    | [_a; _b; _c; _d; _e; _f; _g] as v ->
+      let i = pack_into_word ~bits:8 v dbg in
       Seven, List.rev (i :: acc)
     | a :: b :: c :: d :: e :: f :: g :: h :: r ->
-      let i =
-        Cop
-          ( Cor,
-            [ zero_extend ~bits:8 a ~dbg;
-              Cop (Clsl, [zero_extend ~bits:8 b ~dbg; Cconst_int (8, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 c ~dbg; Cconst_int (16, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 d ~dbg; Cconst_int (24, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 e ~dbg; Cconst_int (32, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 f ~dbg; Cconst_int (40, dbg)], dbg);
-              Cop (Clsl, [zero_extend ~bits:8 g ~dbg; Cconst_int (48, dbg)], dbg);
-              Cop (Clsl, [h; Cconst_int (56, dbg)], dbg) ],
-            dbg )
-      in
+      let i = pack_into_word ~bits:8 [a; b; c; d; e; f; g; h] dbg in
       aux (i :: acc) r
   in
   aux [] untagged_int8_list
@@ -5138,38 +5087,14 @@ let make_untagged_int16_array_payload dbg untagged_int16_list =
   let rec aux acc = function
     | [] -> Zero, List.rev acc
     | a :: [] -> One, List.rev (a :: acc)
-    | [a; b] ->
-      let i =
-        Cop
-          ( Cor,
-            [ zero_extend ~bits:16 a ~dbg;
-              Cop (Clsl, [b; Cconst_int (16, dbg)], dbg) ],
-            dbg )
-      in
+    | [_a; _b] as v ->
+      let i = pack_into_word ~bits:16 v dbg in
       Two, List.rev (i :: acc)
-    | [a; b; c] ->
-      let i =
-        Cop
-          ( Cor,
-            [ zero_extend ~bits:16 a ~dbg;
-              Cop
-                (Clsl, [zero_extend ~bits:16 b ~dbg; Cconst_int (16, dbg)], dbg);
-              Cop (Clsl, [c; Cconst_int (32, dbg)], dbg) ],
-            dbg )
-      in
+    | [_a; _b; _c] as v ->
+      let i = pack_into_word ~bits:16 v dbg in
       Three, List.rev (i :: acc)
     | a :: b :: c :: d :: r ->
-      let i =
-        Cop
-          ( Cor,
-            [ zero_extend ~bits:16 a ~dbg;
-              Cop
-                (Clsl, [zero_extend ~bits:16 b ~dbg; Cconst_int (16, dbg)], dbg);
-              Cop
-                (Clsl, [zero_extend ~bits:16 c ~dbg; Cconst_int (32, dbg)], dbg);
-              Cop (Clsl, [d; Cconst_int (48, dbg)], dbg) ],
-            dbg )
-      in
+      let i = pack_into_word ~bits:16 [a; b; c; d] dbg in
       aux (i :: acc) r
   in
   aux [] untagged_int16_list
