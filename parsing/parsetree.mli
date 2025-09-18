@@ -59,11 +59,44 @@ type constant =
 
 type location_stack = Location.t list
 
+type crossing = | Crossing of string [@@unboxed]
+type crossings = crossing loc list
+
 type modality = | Modality of string [@@unboxed]
-type modalities = modality loc list
+type core_modalities = modality loc list
+type modalities =
+  | No_modalities
+  | Modalities of {
+      modalities : core_modalities;
+      crossings : crossings;
+      loc : Location.t
+    }
+(** [Modalities { modalities = M; crossings = C; loc = L }] represents
+    - [@@ M mod C]  when [M = _ :: _] and [C = _ :: _]
+    - [@@ M]        when [M = _ :: _] and [C = []]
+    - [mod C]       when [M = []] and [C = _ :: _]
+
+    Invariant: [M] and [C] will never both be empty in a [Modalities].
+    If both are empty, then [No_modalities] is to be used.
+  *)
 
 type mode = | Mode of string [@@unboxed]
-type modes = mode loc list
+type core_modes = mode loc list
+type modes =
+  | No_modes
+  | Modes of {
+      modes : core_modes;
+      crossings : crossings;
+      loc : Location.t
+  }
+(** [Modes { modes = M; crossings = C; loc = L }] represents
+    - [@ M mod C]  when [M = _ :: _] and [C = _ :: _]
+    - [@ M]        when [M = _ :: _] and [C = []]
+    - [mod C]      when [M = []] and [C = _ :: _]
+
+    Invariant: [M] and [C] will never both be empty in a [Modes].
+    If both are empty, then [No_modes] is to be used.
+  *)
 
 type include_kind = Structure | Functor
 
@@ -119,6 +152,8 @@ and core_type_desc =
             - [?l:(T1 @ M1) -> (T2 @ M2)] when [lbl] is
                                      {{!arg_label.Optional}[Optional]}.
          *)
+        (* CR modes: crossings should be supported on arrow types, and this documentation
+           should be updated once that is the case *)
   | Ptyp_tuple of (string option * core_type) list
       (** [Ptyp_tuple(tl)] represents a product type:
           - [T1 * ... * Tn]       when [tl] is [(None,T1);...;(None,Tn)]
@@ -334,9 +369,9 @@ and pattern_desc =
       (** Pattern [[| P1; ...; Pn |]] or [[: P1; ...; Pn :]] *)
   | Ppat_or of pattern * pattern  (** Pattern [P1 | P2] *)
   | Ppat_constraint of pattern * core_type option * modes
-      (** [Ppat_constraint(tyopt, modes)] represents:
-          - [(P : ty @@ modes)] when [tyopt] is [Some ty]
-          - [(P @ modes)] when [tyopt] is [None]
+      (** [Ppat_constraint(tyopt, {modes; crossings; _})] represents:
+          - [(P : ty @ modes mod crossings)] when [tyopt] is [Some ty]
+          - [(P @ modes mod crossings)] when [tyopt] is [None]
          *)
   | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
@@ -473,7 +508,8 @@ and expression_desc =
             - [for i = E1 downto E2 do E3 done]
                  when [direction] is {{!Asttypes.direction_flag.Downto}[Downto]}
          *)
-  | Pexp_constraint of expression * core_type option * modes  (** [(E : T @@ modes)] *)
+  | Pexp_constraint of expression * core_type option * modes
+      (** [(E : T @ modes mod crossings)] *)
   | Pexp_coerce of expression * core_type option * core_type
       (** [Pexp_coerce(E, from, T)] represents
             - [(E :> T)]      when [from] is [None],
@@ -630,9 +666,11 @@ and function_constraint =
     *)
     ret_mode_annotations : modes;
     (** The mode annotation placed on a function's body, e.g.
-       [let f x : int -> int @@ local = ...].
+       [let f x : (int -> int) @ local = ...].
        This field constrains the mode of function's body.
     *)
+    (* CR modes: this documentation should be updated once crossings on arrow types
+       are supported *)
     ret_type_constraint : type_constraint option;
     (** The type constraint placed on a function's body. *)
   }
@@ -1079,7 +1117,7 @@ and module_type_desc =
   | Pmty_ident of Longident.t loc  (** [Pmty_ident(S)] represents [S] *)
   | Pmty_signature of signature  (** [sig ... end] *)
   | Pmty_functor of functor_parameter * module_type * modes
-      (** [functor(X : MT1 @@ modes) -> MT2 @ modes] *)
+      (** [functor(X : MT1 @ modes mod crossings) -> MT2 @ modes mod crossings] *)
   | Pmty_with of module_type * with_constraint list  (** [MT with ...] *)
   | Pmty_typeof of module_expr  (** [module type of ME] *)
   | Pmty_extension of extension  (** [[%id]] *)
@@ -1091,8 +1129,8 @@ and functor_parameter =
   | Unit  (** [()] *)
   | Named of string option loc * module_type * modes
       (** [Named(name, MT)] represents:
-            - [(X : MT @@ modes)] when [name] is [Some X],
-            - [(_ : MT @@ modes)] when [name] is [None] *)
+            - [(X : MT @ modes mod crossings)] when [name] is [Some X],
+            - [(_ : MT @ modes mod crossings)] when [name] is [None] *)
 
 and signature =
   {
@@ -1243,9 +1281,10 @@ and module_expr_desc =
   | Pmod_apply of module_expr * module_expr  (** [ME1(ME2)] *)
   | Pmod_apply_unit of module_expr (** [ME1()] *)
   | Pmod_constraint of module_expr * module_type option * modes
-      (** - [(ME : MT @@ modes)]
-          - [(ME @ modes)]
+      (** - [(ME : MT @ modes mod crossings)]
+          - [(ME @ modes mod crossings)]
           - [(ME : MT)]
+          as well as other cases where only one of modes and crossings appears
       *)
   | Pmod_unpack of expression  (** [(val E)] *)
   | Pmod_extension of extension  (** [[%id]] *)
@@ -1343,7 +1382,7 @@ and jkind_annotation_desc =
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)
-  | Pjk_mod of jkind_annotation * modes
+  | Pjk_mod of jkind_annotation * crossings
   | Pjk_with of jkind_annotation * core_type * modalities
   | Pjk_kind_of of core_type
   | Pjk_product of jkind_annotation list
