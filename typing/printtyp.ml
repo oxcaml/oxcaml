@@ -1428,14 +1428,23 @@ let tree_of_modality_old (t: Parsetree.modality loc) =
   | _ -> None
 
 let tree_of_modalities mut t =
-  let t = Typemode.untransl_modalities mut t in
-  match all_or_none tree_of_modality_old t with
-  | Some l -> l
-  | None -> List.map tree_of_modality_new t
+  match Typemode.untransl_modalities mut t with
+  | No_modalities -> []
+  (* CR zeisbach: once this supports crossings, consider factoring this out *)
+  | Modalities { crossings = _ :: _; _ } ->
+    Misc.fatal_error "[untransl_modalities] returned crossings";
+  | Modalities { modalities; _ } ->
+    match all_or_none tree_of_modality_old modalities with
+    | Some l -> l
+    | None -> List.map tree_of_modality_new modalities
 
 let tree_of_modalities_new mut t =
-  let l = Typemode.untransl_modalities mut t in
-  List.map (fun ({txt = Parsetree.Modality s; _}) -> s) l
+  match Typemode.untransl_modalities mut t with
+  | No_modalities -> []
+  | Modalities { crossings = _ :: _; _ } ->
+    Misc.fatal_error "[untransl_modalities] returned crossings";
+  | Modalities { modalities; _ } ->
+    List.map (fun ({txt = Parsetree.Modality s; _}) -> s) modalities
 
 (** [tree_of_mode m l] finds the outcome node in [l] that corresponds to [m].
 Raise if not found. *)
@@ -1480,10 +1489,14 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
 
   let diff = {diff with forkable; yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
-  let l = Typemode.untransl_mode_annots diff in
-  match all_or_none tree_of_mode_old l with
-  | Some l -> l
-  | None -> List.map tree_of_mode_new l
+  match Typemode.untransl_mode_annots diff with
+  | No_modes -> []
+  | Modes { crossings = _ :: _; _ } ->
+    Misc.fatal_error "[untransl_mode_annots] returned crossings";
+  | Modes { modes; _ } ->
+    match all_or_none tree_of_mode_old modes with
+    | Some l -> l
+    | None -> List.map tree_of_mode_new modes
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)

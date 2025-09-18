@@ -969,8 +969,8 @@ let default_mapper =
         match pjkind_desc with
         | Pjk_default -> Pjk_default
         | Pjk_abbreviation (s : string) -> Pjk_abbreviation s
-        | Pjk_mod (t, mode_list) ->
-          Pjk_mod (this.jkind_annotation this t, this.modes this mode_list)
+        | Pjk_mod (t, crossings) ->
+          Pjk_mod (this.jkind_annotation this t, List.map (map_loc this) crossings)
         | Pjk_with (t, ty, modalities) ->
           Pjk_with (
             this.jkind_annotation this t,
@@ -983,11 +983,21 @@ let default_mapper =
       in
       { pjkind_loc; pjkind_desc });
 
-    modes = (fun this m ->
-      List.map (map_loc this) m);
+    modes = (fun this modes ->
+      match modes with
+      | No_modes -> No_modes
+      | Modes { modes; crossings; loc } ->
+        Modes { modes = List.map (map_loc this) modes
+              ; crossings = List.map (map_loc this) crossings
+              ; loc = this.location this loc } );
 
-    modalities = (fun this m ->
-      List.map (map_loc this) m);
+    modalities = (fun this modalities ->
+      match modalities with
+      | No_modalities -> No_modalities
+      | Modalities { modalities; crossings; loc } ->
+        Modalities { modalities = List.map (map_loc this) modalities
+                   ; crossings = List.map (map_loc this) crossings
+                   ; loc = this.location this loc } );
 
     directive_argument =
       (fun this a ->
@@ -1263,7 +1273,7 @@ let apply_lazy ~source ~target mapper =
       with exn ->
         { psg_items = [{psig_desc = Psig_extension (extension_of_exn exn, []);
           psig_loc = Location.none}];
-          psg_modalities = []; psg_loc = Location.none }
+          psg_modalities = No_modalities; psg_loc = Location.none }
     in
     let fields = PpxContext.update_cookies fields in
     let psg_items = Sig.attribute (PpxContext.mk fields) :: psg_items in

@@ -35,7 +35,7 @@ module Example = struct
   let modality         = { txt = Modality "uncontended"
                          ; loc
                          }
-  let modalities       = [ modality ]
+  let modalities       = Ast_helper.Modalities.of_core_modalities [ modality ]
   let class_field      = { pcf_desc = Pcf_initializer expression
                          ; pcf_loc = loc
                          ; pcf_attributes = []
@@ -63,7 +63,7 @@ module Example = struct
                                { pmd_name = located (Some "M")
                                ; pmd_type = module_type
                                ; pmd_attributes = []
-                               ; pmd_modalities = []
+                               ; pmd_modalities = No_modalities
                                ; pmd_loc = loc
                                }
                          ; psig_loc = loc
@@ -74,7 +74,7 @@ module Example = struct
                          ; pvb_attributes = []
                          ; pvb_loc = loc
                          ; pvb_constraint = None
-                         ; pvb_modes = []
+                         ; pvb_modes = No_modes
                          }
   let payload          = PStr structure
   let class_signature  = { pcsig_self = core_type

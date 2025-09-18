@@ -348,6 +348,21 @@ let f ?(local_ x = 42)
       ?(local_ x : ('a : any) 'b . 'a -> 'b @ once portable = assert false)
       ?(local_ x : ('a : any) 'b . ('a -> 'b) @ once portable = assert false)
 
+      (* currently, the combination of legacy mode syntax [local_] and
+         [mod crossings] syntax WILL parse, but it will not round trip,
+         as the legacy mode gets printed as [@ local]. *)
+      (* ?(local_ x @ once portable mod contended aliased = 42) *)
+      ?(x mod contended aliased = 42)
+      ?(x @ once portable mod contended aliased = 42)
+      ?(x : int mod contended aliased = 42)
+      ?(x : int @ once portable mod contended aliased = 42)
+      ?(x : ('a -> 'a) @ once portable mod contended aliased = fun x -> x)
+      ?(x : ('a : any) 'b . 'a @ once portable mod contended aliased = assert false)
+      (* CR modes: this currently does not parse:
+           ?(x : ('a : any) 'b . 'a -> 'b @ once portable mod contended aliased = assert false)
+         see [parsing/mod_contended.ml] for more examples *)
+      ?(x : ('a : any) 'b . ('a -> 'b) @ once portable mod contended aliased = assert false)
+
       ?x:(local_ (y, z) = 42)
       ?x:(local_ (y, z) @ once portable = 42)
       ?x:(local_ (y, z) : int @ once portable = 42)
@@ -355,6 +370,14 @@ let f ?(local_ x = 42)
       ?x:(local_ (y, z) : ('a : any) 'b . 'a @ once portable = 42)
       ?x:(local_ (y, z) : ('a : any) 'b . 'a -> 'b @ once portable = 42)
       ?x:(local_ (y, z) : ('a : any) 'b . ('a -> 'b) @ once portable = 42)
+
+      ?x:((y, z) mod contended aliased = 42)
+      ?x:((y, z) @ once portable mod contended aliased = 42)
+      ?x:((y, z) : int mod contended aliased = 42)
+      ?x:((y, z) : int @ once portable mod contended aliased = 42)
+      ?x:((y, z) : ('a -> 'a) @ once portable mod contended aliased = fun x -> x)
+      ?x:((y, z) : ('a : any) 'b . 'a @ once portable mod contended aliased = assert false)
+      ?x:((y, z) : ('a : any) 'b . ('a -> 'b) @ once portable mod contended aliased = assert false)
 
       ~(local_ x)
       ~(local_ x @ once portable)
@@ -364,6 +387,14 @@ let f ?(local_ x = 42)
       ~(local_ x : ('a : any) 'b . 'a -> 'b @ once portable)
       ~(local_ x : ('a : any) 'b . ('a -> 'b) @ once portable)
 
+      ~(x mod contended aliased)
+      ~(x @ once portable mod contended aliased)
+      ~(x : int mod contended aliased)
+      ~(x : int @ once portable mod contended aliased)
+      ~(x : ('a -> 'a) @ once portable mod contended aliased)
+      ~(x : ('a : any) 'b . 'a @ once portable mod contended aliased)
+      ~(x : ('a : any) 'b . ('a -> 'b) @ once portable mod contended aliased)
+
       ~x:(local_ (y, z))
       ~x:(local_ (y, z) @ once portable)
       ~x:(local_ (y, z) : int @ once portable)
@@ -372,6 +403,14 @@ let f ?(local_ x = 42)
       ~x:(local_ (y, z) : ('a : any) 'b . ('a -> 'b) @ once portable)
       ~x:(local_ (y, z) : ('a : any) 'b . 'a -> 'b @ once portable)
 
+      ~x:((y, z) mod contended aliased)
+      ~x:((y, z) @ once portable mod contended aliased)
+      ~x:((y, z) : int mod contended aliased)
+      ~x:((y, z) : int @ once portable mod contended aliased)
+      ~x:((y, z) : ('a -> 'a) @ once portable mod contended aliased)
+      ~x:((y, z) : ('a : any) 'b . 'a @ once portable mod contended aliased)
+      ~x:((y, z) : ('a : any) 'b . ('a -> 'b) @ once portable mod contended aliased)
+
       (local_ (y, z))
       (local_ (y, z) @ once portable)
       (local_ (y, z) : int @ once portable)
@@ -379,6 +418,14 @@ let f ?(local_ x = 42)
       (local_ (y, z) : ('a : any) 'b . 'a @ once portable)
       (local_ (y, z) : ('a : any) 'b . ('a -> 'b) @ once portable)
       (local_ (y, z) : ('a : any) 'b . 'a -> 'b @ once portable)
+
+      ((y, z) mod contended aliased)
+      ((y, z) @ once portable mod contended aliased)
+      ((y, z) : int mod contended aliased)
+      ((y, z) : int @ once portable mod contended aliased)
+      ((y, z) : ('a -> 'a) @ once portable mod contended aliased)
+      ((y, z) : ('a : any) 'b . 'a @ once portable mod contended aliased)
+      ((y, z) : ('a : any) 'b . ('a -> 'b) @ once portable mod contended aliased)
 
       = ();;
 
@@ -398,25 +445,56 @@ let g () =
   let local_ f a b : (int -> int) @ once portable = 42 in
 
   let (f @ local unique) = 42 in
-  let (f @ local unique) a b @ once portable = 42 in
-  let (f @ local unique) a b : int @ once portable = 42 in
-  let (f @ local unique) a b : (int -> int) @ once portable = 42 in
+  let (f mod contended aliased) = 42 in
+  let (f @ local unique mod contended aliased) = 42 in
+  let (f @ local unique mod contended aliased) a b @ once portable = 42 in
+  let (f @ local unique mod contended aliased) a b mod contended aliased = 42 in
+  let (f @ local unique mod contended aliased) a b @ once portable mod contended aliased = 42 in
+  let (f @ local unique mod contended aliased) a b : int @ once portable = 42 in
+  let (f @ local unique mod contended aliased) a b : int mod contended aliased = 42 in
+  let (f @ local unique mod contended aliased) a b : int @ once portable mod contended aliased = 42 in
+  let (f @ local unique mod contended aliased) a b : (int -> int) @ once portable = 42 in
+  let (f @ local unique mod contended aliased) a b : (int -> int) mod contended aliased = 42 in
+  let (f @ local unique mod contended aliased) a b : (int -> int) @ once portable mod contended aliased = 42 in
 
   let local_ a @ once portable = 42 in
   let local_ a : int @ once portable = 42 in
   let local_ a : (int -> int) @ once portable = 42 in
 
+  let a mod contended aliased = 42 in
+  let (a mod contended) mod aliased = 42 in
+  let a @ once portable mod contended aliased = 42 in
+  let a : int mod contended aliased = 42 in
+  let a : int @ once portable mod contended aliased = 42 in
+  let a : (int -> int) mod contended aliased = 42 in
+  let a : (int -> int) @ once portable mod contended aliased = 42 in
+
   let local_ a : ('a : any) 'b. 'a @ once portable = 42 in
   let local_ a : ('a : any) 'b. 'a -> 'a @ once portable = 42 in
   let local_ a : ('a : any) 'b. ('a -> 'a) @ once portable = 42 in
 
+  let a : ('a : any) 'b. 'a mod contended aliased = 42 in
+  let a : ('a : any) 'b. 'a @ once portable mod contended aliased = 42 in
+  let a : ('a : any) 'b. ('a -> 'a) mod contended aliased = 42 in
+  let a : ('a : any) 'b. ('a -> 'a) @ once portable mod contended aliased = 42 in
+
   let a : type (a : any) b. int @ once portable = 42 in
+  let a : type (a : any) b. int mod contended aliased = 42 in
+  let a : type (a : any) b. int @ once portable mod contended aliased = 42 in
   let a : type (a : any) b. a -> b @ once portable = 42 in
   let a : type (a : any) b. (a -> b) @ once portable = 42 in
+  let a : type (a : any) b. (a -> b) mod contended aliased  = 42 in
+  let a : type (a : any) b. (a -> b) @ once portable mod contended aliased  = 42 in
 
   let (a, b) @ once portable = 42 in
+  let (a, b) mod contended aliased = 42 in
+  let (a, b) @ once portable mod contended aliased = 42 in
   let (a, b) : int @ once portable = 42 in
+  let (a, b) : int mod contended aliased = 42 in
+  let (a, b) : int @ once portable mod contended aliased = 42 in
   let (a, b) : (int -> int) @ once portable = 42 in
+  let (a, b) : (int -> int) mod contended aliased = 42 in
+  let (a, b) : (int -> int) @ once portable mod contended aliased = 42 in
 
   () ;;
 
@@ -431,46 +509,59 @@ Error: This expression has type "int" but an expression was expected of type
 (* expressions *)
 let g () = exclave_ local_
   let f = (() : _ @ unique once) in
+  let f = (() : _ mod contended aliased) in
+  let f = (() : _ @ unique once mod contended aliased) in
   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
+  let f x y mod contended aliased = exclave_ local_ (x + y : _ @ once unique) in
+  let f x y @ local unique mod contended aliased = exclave_ local_ (x + y : _ @ once unique) in
+  let f = (42 : int mod contended aliased) + (42 : int @ once portable mod contended) in
+  let f = (42 : _ mod contended aliased) + (42 : _ @ once portable mod contended) in
   local_ (() : _ @ unique once);;
 
+(* CR modes: currently, this fatal errors after parsing.
+   once mod crossings are implemented, these should changed back to be type errors *)
 [%%expect{|
-Line 2, characters 6-7:
-2 |   let f = (() : _ @ unique once) in
-          ^
-Warning 26 [unused-var]: unused variable f.
+>> Fatal error: crossings as mode annotations are not yet implemented
+Uncaught exception: Misc.Fatal_error
 
-Line 3, characters 6-7:
-3 |   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
-val g : unit -> unit @ local once = <fun>
 |}]
 
 (* type declarations *)
 type record =
   { global_ field0 : int
   ; field1 : int @@ global portable contended
-  ; global_ field2 : int @@ portable contended
-  ; normal_field : int
+  ; field2 : int mod contended aliased
+  ; field3 : int @@ global portable contended mod contended aliased
+  ; global_ field4 : int @@ portable contended
+  ; normal_field5 : int
+  ; normal_field6 : int mod contended aliased
+  ; normal_field7 : (int -> int) mod contended aliased
+  ; normal_field8 : (int -> int) @@ portable contended mod contended aliased
   };;
 
 [%%expect{|
-type record = {
-  global_ field0 : int;
-  field1 : int @@ global portable contended;
-  field2 : int @@ global portable contended;
-  normal_field : int;
-}
+>> Fatal error: crossings as modalities are not yet implemented
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 type 'a parameterized_record =
   { global_ field0 : 'a
   ; field1 : 'a @@ global portable contended
-  ; global_ field2 : 'a @@ portable contended
-  ; normal_field : 'a
+  ; field2 : 'a mod contended aliased
+  ; field3 : 'a @@ global portable contended mod contended aliased
+  ; global_ field4 : 'a @@ portable contended
+  ; normal_field5 : 'a
+  ; normal_field6 : 'a mod contended aliased
+  ; normal_field7 : ('a -> 'a) mod contended aliased
+  ; normal_field8 : ('a -> 'a) @@ portable contended mod contended aliased
   };;
+
+[%%expect{|
+>> Fatal error: crossings as modalities are not yet implemented
+Uncaught exception: Misc.Fatal_error
+
+|}]
 
 type t =
   | Foo of global_ int * int
@@ -480,18 +571,27 @@ type t =
   | Foo4 of global_ (int * int) @@ portable contended
 
 [%%expect{|
-type 'a parameterized_record = {
-  global_ field0 : 'a;
-  field1 : 'a @@ global portable contended;
-  field2 : 'a @@ global portable contended;
-  normal_field : 'a;
-}
 type t =
     Foo of global_ int * int
   | Foo1 of int @@ global portable contended * int
   | Foo2 of global_ int * int @@ global portable contended
   | Foo3 of global_ int * int @@ portable contended
   | Foo4 of (int * int) @@ global portable contended
+|}]
+
+type t =
+  | T1 of int mod contended aliased
+  | T2 of int @@ once portable mod contended aliased
+  | T3 of (int -> int) mod contended aliased
+  | T4 of (int -> int) @@ once portable mod contended aliased
+  | T5 of int @@ once portable mod contended aliased * int mod contended aliased
+  | T6 : int @@ once portable mod contended aliased * int mod contended -> t
+  | T7 : { x : int @@ once portable mod contended aliased } -> t
+
+[%%expect{|
+>> Fatal error: crossings as modalities are not yet implemented
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* arrow types *)
@@ -593,10 +693,28 @@ module type S =
   end
 |}]
 
-external x4 : string -> string @@ portable many = "%identity"
+module type S = sig
+  val x1 : int mod contended aliased
+  val x2 : int @@ once portable mod contended aliased
+  val x3 : (int -> int) mod contended aliased
+  val x4 : (int -> int) @@ once portable mod contended aliased
+end
 
 [%%expect{|
-external x4 : string -> string @@ portable = "%identity"
+>> Fatal error: crossings as modalities are not yet implemented
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+external x1 : (string -> string) @@ portable many = "%identity"
+external x2 : int mod contended aliased = "%identity"
+external x3 : int @@ portable many mod contended aliased = "%identity"
+
+[%%expect{|
+external x1 : string -> string @@ portable = "%identity"
+>> Fatal error: crossings as mode annotations are not yet implemented
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 type t =
@@ -627,6 +745,15 @@ type t2 = {
   mutable x : float @@ local once;
   mutable f : float -> float @@ local once;
 }
+|}]
+
+type t3 = { mutable x : float @@ local once mod contended aliased
+          ; mutable f : (float -> float) @@ local once mod contended aliased }
+
+[%%expect{|
+>> Fatal error: crossings as modalities are not yet implemented
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }

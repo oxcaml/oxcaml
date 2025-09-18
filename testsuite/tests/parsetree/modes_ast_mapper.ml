@@ -2,32 +2,36 @@
  include ocamlcommon;
 *)
 
-let locs_to_string (locs : 'a Location.loc list) (f : 'a -> string) : string =
+let locs_to_string ?(sep = " ") locs f : string =
   List.map
     (fun (m : _ Location.loc) ->
        Format.asprintf "%s [%a]" (f m.txt) Location.print_loc m.loc
     )
     locs
-  |> String.concat " "
+  |> String.concat sep
 
 let mapper: Ast_mapper.mapper =
   let open Ast_mapper in
   { default_mapper with
     modes = (fun sub m ->
       (match m with
-      | [] -> ();
-      | _ ->
-        Format.printf "modes: %s\n"
-          (locs_to_string m (fun (Mode s) -> s))
+      | No_modes -> ();
+      | Modes { modes; crossings; _ } ->
+        Format.printf "modes: %s%s\n"
+          (locs_to_string modes (fun (Mode s) -> s))
+          (locs_to_string ~sep:"" crossings
+            (fun (Crossing s) -> Format.sprintf " mod %s" s));
       );
       default_mapper.modes sub m
     );
     modalities = (fun sub m ->
       (match m with
-        | [] -> ();
-        | _ ->
-          Format.printf "modalities: %s\n"
-            (locs_to_string m (fun (Modality s) -> s))
+        | No_modalities -> ();
+        | Modalities { modalities; crossings; _ } ->
+          Format.printf "modalities: %s%s\n"
+            (locs_to_string modalities (fun (Modality s) -> s))
+            (locs_to_string ~sep:"" crossings
+              (fun (Crossing s) -> Format.sprintf " mod %s" s));
       );
       default_mapper.modalities sub m
     );
