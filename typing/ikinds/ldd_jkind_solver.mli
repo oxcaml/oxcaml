@@ -1,7 +1,7 @@
 (* The JKind solver. *)
 
 (** Functor inputs:
-    - The coefficient lattice [Lat]
+    - A lattice-valued decision diagram implementation [Ldd]
     - The type domain [Ty] with a comparison
     - The constructor domain [Constr] with a comparison
 
@@ -10,15 +10,71 @@
       semantic domain and [ops] provides the constructors. The solver interprets
       [ckind] under a lattice-polynomial backend. *)
 
+module type LDD = sig
+  type lat
+
+  type node
+
+  type var
+
+  type constr
+
+  module Name : sig
+    type t
+
+    val param : int -> t
+
+    val atomic : constr -> int -> t
+  end
+
+  val bot : node
+
+  val const : lat -> node
+
+  val rigid : Name.t -> var
+
+  val new_var : unit -> var
+
+  val var : var -> node
+
+  val join : node -> node -> node
+
+  val meet : node -> node -> node
+
+  val sub_subsets : node -> node -> node
+
+  val solve_lfp : var -> node -> unit
+
+  val enqueue_lfp : var -> node -> unit
+
+  val enqueue_gfp : var -> node -> unit
+
+  val solve_pending : unit -> unit
+
+  val decompose_linear : universe:var list -> node -> node * node list
+
+  val leq : node -> node -> bool
+
+  val leq_with_reason : node -> node -> int list option
+
+  val round_up : node -> lat
+
+  val clear_memos : unit -> unit
+
+  val pp : node -> string
+
+  val pp_debug : node -> string
+end
+
 module Make
-    (Lat : Lattice_intf.LATTICE) (Ty : sig
+    (Ldd : LDD) (Ty : sig
       type t
 
       val compare : t -> t -> int
 
       val unique_id : t -> int
     end) (Constr : sig
-      type t
+      type t = Ldd.constr
 
       val compare : t -> t -> int
 
@@ -28,7 +84,7 @@ module Make
 
   type constr = Constr.t
 
-  type lat = Lat.t
+  type lat = Ldd.lat
 
   type kind
 
@@ -45,22 +101,7 @@ module Make
       pp_kind : kind -> string
     }
 
-  type atom =
-    { constr : constr;
-      arg_index : int
-    }
-
-  module RigidName : sig
-    type t =
-      | Atom of atom
-      | Param of int
-
-    val compare : t -> t -> int
-
-    val to_string : t -> string
-  end
-
-  type poly = Ldd.Make(Lat)(RigidName).node
+  type poly = Ldd.node
 
   type ckind = ops -> kind
 

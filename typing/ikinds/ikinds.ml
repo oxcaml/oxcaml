@@ -1,7 +1,26 @@
 (* This forces ikinds globally on. *)
 (* Clflags.ikinds := true *)
 
-module JK = Ikind.JK
+module Ldd = Ikind.Ldd
+
+module TyM = struct
+  type t = Types.type_expr
+
+  let compare (t1 : t) (t2 : t) =
+    Int.compare (Types.get_id t1) (Types.get_id t2)
+
+  let unique_id (t : t) : int = Types.get_id t
+end
+
+module ConstrM = struct
+  type t = Ldd.constr
+
+  let compare = Path.compare
+
+  let to_string (p : t) : string = Format.asprintf "%a" Path.print p
+end
+
+module JK = Ldd_jkind_solver.Make (Ldd) (TyM) (ConstrM)
 
 (* Optional ambient tag to disambiguate higher-level call sites
    (e.g. includecore). Other modules can bracket calls with
