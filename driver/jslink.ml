@@ -1,21 +1,27 @@
 
 let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
   Profile.(record_call (annotate_file_name output_name)) (fun () ->
-    let jsoo = Filename.concat Config.bindir "js_of_ocaml" in
-    let files =
-      let runtime = Filename.concat Config.standard_library "runtime.js" in
-      let stdlib = Filename.concat Config.standard_library "stdlib.js" in
-      let stdexit = Filename.concat Config.standard_library "std_exit.js" in
-      let objfiles =
-      ListLabels.map objfiles ~f:(fun file ->
-        match Filename.extension file with
-         | ".js" -> file
-         | ".cmja" | ".cmj" -> file ^ ".js"
-         | ".cmjx" -> Filename.remove_extension file ^ ".cmj.js"
-         | _ -> Misc.fatal_errorf "Cannot link, not a javascript file: %s" file)
+      let stdlib = Filename.concat Config.standard_library "stdlib.cmja" in
+      let stdexit = Filename.concat Config.standard_library "std_exit.cmj" in
+      let objfiles, runtime_files =
+        ListLabels.partition_map objfiles ~f:(fun file ->
+          if Filename.check_suffix file ".cmj.js"
+          || Filename.check_suffix file ".cmja.js"
+          then Either.Left file
+          else if Filename.check_suffix file ".js"
+          then Either.Right file
+          else Misc.fatal_errorf "Cannot link, not a javascript file: %s" file)
       in
-      if !Clflags.nopervasives then runtime :: objfiles
-      else runtime :: stdlib :: (objfiles @ [stdexit])
-    in
-    Ccomp.run_command
-      (Filename.quote_command jsoo (["link"; "-o"; output_name ] @ files)))
+      let runtime =
+        output_name ^ ".runtime.js"
+      in
+      Jscompile.run_jsoo_exn ~args:([ "build-runtime"; "-o"; runtime ] @ runtime_files);
+      Misc.try_finally
+        (fun () ->
+          let files =
+            if !Clflags.nopervasives then runtime :: objfiles
+            else runtime :: stdlib :: (objfiles @ [stdexit])
+          in
+          Jscompile.run_jsoo_exn
+            ~args:(["link"; "-o"; output_name ] @ files))
+        ~always:(fun () -> Misc.remove_file output_name))

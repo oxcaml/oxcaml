@@ -165,7 +165,7 @@ let prepare_module output_variable log env input =
   let input_type = snd input in
   let open Ocaml_filetypes in
   match input_type with
-    | Implementation | Interface | C | Obj -> [input]
+    | Implementation | Interface | C | Javascript | Obj -> [input]
     | Binary_interface -> [input]
     | Backend_specific _ -> [input]
     | Lexer ->
@@ -187,6 +187,18 @@ let get_program_file backend env =
   Filename.make_path [test_build_directory; program_filename]
 
 let is_c_file (_filename, filetype) = filetype=Ocaml_filetypes.C
+
+(* Filter modules based on backend - C files for native/bytecode, JS files for JavaScript *)
+let filter_modules_for_backend backend modules =
+  List.filter (fun (_filename, filetype) ->
+    match backend with
+    | Ocaml_backends.Javascript ->
+        (* JS backend: skip C files, keep everything else *)
+        filetype <> Ocaml_filetypes.C
+    | Ocaml_backends.Native | Ocaml_backends.Bytecode ->
+        (* Native/bytecode: skip JS files, keep everything else *)
+        filetype <> Ocaml_filetypes.Javascript
+  ) modules
 
 let cmas_need_dynamic_loading directories libraries =
   let loads_c_code library =
@@ -220,6 +232,8 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
   let prepare = prepare_module output_variable log env in
   let modules =
     List.concatmap prepare (List.map Ocaml_filetypes.filetype all_modules) in
+  (* Filter modules based on backend - only include appropriate stub files *)
+  let modules = filter_modules_for_backend Compiler.target modules in
   let has_c_file = List.exists is_c_file modules in
   let c_headers_flags =
     if has_c_file then Ocaml_flags.c_includes else "" in

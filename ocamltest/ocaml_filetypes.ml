@@ -21,6 +21,7 @@ type t =
   | Implementation
   | Interface
   | C
+  | Javascript
   | C_minus_minus
   | Lexer
   | Grammar
@@ -39,6 +40,7 @@ let string_of_filetype = function
   | Implementation -> "implementation"
   | Interface -> "interface"
   | C -> "C source file"
+  | Javascript -> "JavaScript source file"
   | C_minus_minus -> "C minus minus source"
   | Lexer -> "lexer"
   | Grammar -> "grammar"
@@ -54,6 +56,7 @@ let extension_of_filetype = function
   | Implementation -> "ml"
   | Interface -> "mli"
   | C -> "c"
+  | Javascript -> "js"
   | C_minus_minus -> "cmm"
   | Lexer -> "mll"
   | Grammar -> "mly"
@@ -78,6 +81,7 @@ let filetype_of_extension = function
   | "ml" -> Implementation
   | "mli" -> Interface
   | "c" -> C
+  | "js" -> Javascript
   | "cmm" -> C_minus_minus
   | "mll" -> Lexer
   | "mly" -> Grammar

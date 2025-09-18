@@ -88,7 +88,7 @@ echo ""
 # Individual compilation rules
 for cu in "${!srcs[@]}"; do
     echo "(rule"
-    echo " (targets ${cu}.cmj ${cu}.cmjx)"
+    echo " (targets ${cu}.cmj ${cu}.cmj.js ${cu}.cmjx)"
     echo " (deps "
     echo "  (source_tree ../stdlib)"
     echo "  ../stdlib/.stdlib.objs/byte/${cu}.cmi"
@@ -102,7 +102,7 @@ for cu in "${!srcs[@]}"; do
         maybe_open_stdlib=''
     fi
 
-    echo " (action (chdir ../stdlib (run %{bin:ocamlj} ${OCAMLJ_FLAGS}${maybe_open_stdlib} -o ../stdlib-js/${cu}.cmj -c -impl ${srcs[$cu]}))))"
+    echo " (action (chdir ../stdlib (run %{bin:ocamlj} ${OCAMLJ_FLAGS}${maybe_open_stdlib} -o ../stdlib-js/${cu} -c -impl ${srcs[$cu]}))))"
     echo ""
 done
 
@@ -123,9 +123,4 @@ cat <<EOF
  (deps std_exit.cmj)
  (action
   (run %{bin:js_of_ocaml} ${JSOO_FLAGS} -o %{target} %{deps})))
-
-(rule
- (target runtime.js)
- (action
-  (run %{bin:js_of_ocaml} build-runtime ${JSOO_FLAGS} -o %{target})))
 EOF

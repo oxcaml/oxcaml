@@ -677,6 +677,7 @@ type deferred_action =
   | ProcessImplementation of string
   | ProcessInterface of string
   | ProcessCFile of string
+  | ProcessJavaScriptFile of string
   | ProcessOtherFile of string
   | ProcessObjects of string list
   | ProcessDLLs of string list
@@ -712,6 +713,14 @@ let process_action
       if Ccomp.compile_file ?output:!output_name name <> 0
       then raise (Exit_with_status 2);
       ccobjs := obj_name :: !ccobjs
+  | ProcessJavaScriptFile name ->
+      (* JavaScript stub files are handled by js_of_ocaml during linking *)
+      if !Clflags.jsir then
+        (* For JavaScript backend, add .js files to objfiles for linking *)
+        objfiles := name :: !objfiles
+      else
+        (* For non-JavaScript backends, ignore .js files *)
+        ()
   | ProcessObjects names ->
       ccobjs := names @ !ccobjs
   | ProcessDLLs names ->
@@ -745,6 +754,8 @@ let action_of_file name =
     ProcessInterface name
   else if Filename.check_suffix name ".c" then
     ProcessCFile name
+  else if Filename.check_suffix name ".js" then
+    ProcessJavaScriptFile name
   else
     ProcessOtherFile name
 
@@ -768,6 +779,7 @@ let process_deferred_actions env =
         if !compile_only then begin
           if List.length (List.filter (function
               | ProcessCFile _
+              | ProcessJavaScriptFile _
               | ProcessImplementation _
               | ProcessInterface _ -> true
               | _ -> false) !deferred_actions) > 1 then

@@ -965,10 +965,9 @@
   (dynamic_include ../duneconf/stdlib-js.inc)
   (install
   (files
-    (glob_files *.cmj)
     (glob_files *.cmjx)
-    (glob_files *.cmja)
-    (glob_files *.cmjs)
-    (glob_files *.js))
+    stdlib.cmja.js
+    std_exit.cmj.js
+    )
   (section lib)
   (package ocaml_runtime_stdlib)))
