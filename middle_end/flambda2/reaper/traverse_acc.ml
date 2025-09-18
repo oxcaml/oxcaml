@@ -28,7 +28,6 @@ module Env = struct
     { parent : Rev_expr.rev_expr_holed;
       conts : cont_kind Continuation.Map.t;
       current_code_id : Code_id.t option;
-      should_preserve_direct_calls : bool;
       le_monde_exterieur : Name.t;
       all_constants : Name.t
     }

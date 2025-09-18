@@ -248,7 +248,6 @@ and traverse_let denv acc let_expr : rev_expr =
     { parent = let_acc;
       conts = denv.conts;
       current_code_id = denv.current_code_id;
-      should_preserve_direct_calls = denv.should_preserve_direct_calls;
       le_monde_exterieur = denv.le_monde_exterieur;
       all_constants = denv.all_constants
     }
@@ -442,7 +441,6 @@ and traverse_let_cont_non_recursive denv acc cont ~body handler =
     let denv =
       { parent = Let_cont { cont; handler; parent = denv.parent };
         conts;
-        should_preserve_direct_calls = denv.should_preserve_direct_calls;
         current_code_id = denv.current_code_id;
         le_monde_exterieur = denv.le_monde_exterieur;
         all_constants = denv.all_constants
@@ -453,7 +451,6 @@ and traverse_let_cont_non_recursive denv acc cont ~body handler =
   traverse_cont_handler
     { parent = Hole;
       conts = denv.conts;
-      should_preserve_direct_calls = denv.should_preserve_direct_calls;
       current_code_id = denv.current_code_id;
       le_monde_exterieur = denv.le_monde_exterieur;
       all_constants = denv.all_constants
@@ -502,7 +499,6 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
           traverse
             { parent = Hole;
               conts;
-              should_preserve_direct_calls = denv.should_preserve_direct_calls;
               current_code_id = denv.current_code_id;
               le_monde_exterieur = denv.le_monde_exterieur;
               all_constants = denv.all_constants
@@ -516,7 +512,6 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
   let denv =
     { parent = Let_cont_rec { invariant_params; handlers; parent = denv.parent };
       conts;
-      should_preserve_direct_calls = denv.should_preserve_direct_calls;
       current_code_id = denv.current_code_id;
       le_monde_exterieur = denv.le_monde_exterieur;
       all_constants = denv.all_constants
@@ -669,10 +664,9 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
        calls_are_not_pure } in Acc.add_apply apply_dep acc; if Option.is_some
        (Apply.callee apply) then add_call_widget function_call) else default_acc
        acc *)
-    if Option.is_some (Apply.callee apply) then add_call_widget function_call;
-    if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
-       && (Option.is_none (Apply.callee apply)
-          || denv.should_preserve_direct_calls)
+    if Option.is_some (Apply.callee apply)
+    then add_call_widget function_call
+    else if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
     then
       let apply_dep =
         { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
@@ -685,8 +679,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         }
       in
       Acc.add_apply apply_dep acc
-    else if Option.is_none (Apply.callee apply)
-    then default_acc acc
+    else default_acc acc
   | Function
       { function_call =
           (Indirect_unknown_arity | Indirect_known_arity) as function_call;
@@ -764,19 +757,9 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     };
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
-  let check_zero_alloc =
-    match Code.zero_alloc_attribute code with
-    | Default_zero_alloc ->
-      (* The effect of [Clflags.zero_alloc_assert] has been compiled into
-         [Check] earlier. *)
-      false
-    | Assume _ -> false
-    | Check _ -> true
-  in
   let denv =
     { parent = Hole;
       conts;
-      should_preserve_direct_calls = check_zero_alloc;
       current_code_id = Some code_id;
       le_monde_exterieur;
       all_constants
@@ -893,7 +876,6 @@ let run ~get_code_metadata (unit : Flambda_unit.t) =
     traverse
       { parent = Hole;
         conts;
-        should_preserve_direct_calls = false;
         current_code_id = None;
         le_monde_exterieur = Name.symbol le_monde_exterieur;
         all_constants = Name.symbol all_constants
