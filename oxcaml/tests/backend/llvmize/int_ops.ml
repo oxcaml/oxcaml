@@ -1,6 +1,6 @@
 module D = Int_ops_data
 
-let imm = 4
+(* Binary operations *)
 
 let[@inline never] add () = D.x + D.y
 
@@ -26,6 +26,10 @@ let[@inline never] lsr_ () = D.x lsr D.y
 
 let[@inline never] asr_ () = D.x asr D.y
 
+(* Binary operations with an immedaite operand *)
+
+let imm = 4
+
 let[@inline never] add_imm () = D.x + imm
 
 let[@inline never] sub_imm () = D.x - imm
@@ -47,3 +51,23 @@ let[@inline never] lsl_imm () = D.x lsl imm
 let[@inline never] lsr_imm () = D.x lsr imm
 
 let[@inline never] asr_imm () = D.x asr imm
+
+(* Unary intrinsics *)
+
+external popcnt_intr : (int[@untagged]) -> (int[@untagged])
+  = "" "caml_int_popcnt_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+external ctz_intr : (int[@untagged]) -> (int[@untagged])
+  = "" "caml_int_ctz_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+external clz_intr : (int[@untagged]) -> (int[@untagged])
+  = "" "caml_int_clz_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+let[@inline never] popcnt () = popcnt_intr D.z
+
+let[@inline never] ctz () = ctz_intr D.z
+
+let[@inline never] clz () = clz_intr D.z

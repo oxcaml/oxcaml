@@ -204,7 +204,7 @@ let if_emit_do f x = if should_emit () then f x else ()
 
 let emit_begin_assembly ~sourcefile unix =
   if !Clflags.llvm_backend
-  then Llvmize.begin_assembly ~sourcefile
+  then Llvmize.begin_assembly ~is_startup:false ~sourcefile
   else if_emit_do (fun () -> Emit.begin_assembly unix) ()
 
 let emit_end_assembly ~sourcefile () =

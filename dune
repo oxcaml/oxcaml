@@ -55,6 +55,8 @@
 
 (copy_files# backend/internal_assembler/*.ml{,i})
 
+(copy_files# backend/llvm/*.ml{,i})
+
 (copy_files# backend/peephole/*.ml{,i})
 
 (copy_files# backend/regalloc/*.ml{,i})
@@ -582,6 +584,8 @@
   vectorize
   vectorize_utils
   vectorize_specific
+  ;; backend/llvm
+  llvm_ir
   llvmize
   ;; backend/regalloc
   regalloc_gi

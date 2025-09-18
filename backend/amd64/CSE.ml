@@ -45,6 +45,9 @@ let class_of_operation (op : Operation.t)
       Class (of_simd_class (Simd.Mem.class_of_operation op))
     | Icldemote _
     | Iprefetch _ -> Class Op_other
+    | Illvm_intrinsic intr ->
+      Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+        intr
     end
   | Move | Spill | Reload
   | Floatop _

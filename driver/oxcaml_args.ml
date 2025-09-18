@@ -361,6 +361,11 @@ let mk_keep_llvmir f =
 let mk_llvm_path f =
   ("-llvm-path", Arg.String f, " Specify which LLVM compiler to use")
 
+let mk_llvm_flags f =
+  ( "-llvm-flags",
+    Arg.String f,
+    " Extra flags to pass to LLVM (like -march or -mtune)" )
+
 module Flambda2 = Oxcaml_flags.Flambda2
 
 let mk_flambda2_result_types_functors_only f =
@@ -1002,6 +1007,7 @@ module type Oxcaml_options = sig
   val dllvmir : unit -> unit
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
+  val llvm_flags : string -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val flambda2_join_points : unit -> unit
@@ -1136,6 +1142,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dllvmir F.dllvmir;
       mk_keep_llvmir F.keep_llvmir;
       mk_llvm_path F.llvm_path;
+      mk_llvm_flags F.llvm_flags;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
       mk_flambda2_join_points F.flambda2_join_points;
@@ -1353,6 +1360,7 @@ module Oxcaml_options_impl = struct
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
   let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
+  let llvm_flags s = Oxcaml_flags.llvm_flags := s
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
   let flambda2_join_points = set Flambda2.join_points
@@ -1629,7 +1637,7 @@ module Extra_params = struct
       option := Oxcaml_flags.Set (not b);
       false
     in
-    let _set_string option =
+    let set_string option =
       option := v;
       true
     in
@@ -1787,6 +1795,7 @@ module Extra_params = struct
         Oxcaml_flags.llvm_path := Some v;
         true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
+    | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->
