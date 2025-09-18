@@ -1,4 +1,14 @@
-(* in a "modality position" (Q: is that an alright thing to say?) *)
+(* TEST
+ flags = "-dparsetree";
+ ocamlc_byte_exit_status = "2";
+ setup-ocamlc.byte-build-env;
+ ocamlc.byte;
+ check-ocamlc.byte-output;
+*)
+
+(*****************)
+(* as a modality *)
+
 module type S = sig
   (* value descriptions *)
   val v : int mod contended aliased
@@ -38,7 +48,10 @@ module type S = sig
      not currently intended to be supported *)
 end
 
-(* in "mode position" (Q: again, is that okay??) *)
+(*************)
+(* as a mode *)
+
+(* Q: does it matter these examples are in a structure (aka [structure_item]s) *)
 module M = struct
   (* value bindings *)
   let v mod contended aliased = 42
@@ -72,12 +85,20 @@ module M = struct
   let foo = (42 : _ mod contended aliased) + (42 : _ @ once portable mod contended aliased)
 end
 
+(* let expressions (not just as structure items) *)
+let f () =
+  let v mod contended aliased = 42 in
+  let v : int mod contended aliased = 42 in
+  let v : (int -> int) mod contended aliased = fun _ -> 42 in
+
+  let v @ once portable mod contended aliased = 42
+  and v : int @ once portable mod contended aliased = 42
+  and v : (int -> int) @ once portable mod contended aliased = fun _ -> 42 in
+
+  ()
+
 (* ALSO WORTH TESTING:
     - make sure that comments work; specifically, that doc comments are attached to the
       right thing after parsing
     - make sure that attributes work too
-    - write tests which exercise Pexp_let vs Pstr_value_binding distinction
    Of course, more tests will reveal themselves during implementation *)
-
-
-(* Q: function_constraint mode_annotations: are these just legacy? *)
