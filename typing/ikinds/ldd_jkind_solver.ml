@@ -148,10 +148,11 @@ struct
           ConstrTbl.add constr_to_coeffs c
             (LSolver.var base, List.map LSolver.var coeffs);
           (* Recursively compute the kind of the body *)
-        let rigid_vars =
-          List.map
-            (fun ty -> LSolver.rigid (RigidName.Param (Ty.unique_id ty))) args
-        in
+          let rigid_vars =
+            List.map
+              (fun ty -> LSolver.rigid (RigidName.Param (Ty.unique_id ty)))
+              args
+          in
           List.iter2
             (fun ty var -> TyTbl.add ty_to_kind ty (LSolver.var var))
             args rigid_vars;

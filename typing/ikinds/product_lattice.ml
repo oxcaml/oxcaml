@@ -50,7 +50,8 @@ module Make (S : SHAPE) = struct
 
   let non_bot_axes (v : t) : int list =
     let rec loop i acc =
-      if i >= num_axes then List.rev acc
+      if i >= num_axes
+      then List.rev acc
       else
         let acc' = if v.(i) > 0 then i :: acc else acc in
         loop (i + 1) acc'

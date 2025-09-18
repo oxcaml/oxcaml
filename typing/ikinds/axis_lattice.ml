@@ -216,14 +216,11 @@ let crossing_of_constants ~areality ~linearity ~uniqueness ~portability
   let monadic =
     Monadic.create
       ~uniqueness:
-        (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_with uniqueness))
+        (Monadic.Atom.Modality (Mode.Modality.Monadic.Atom.Join_with uniqueness))
       ~contention:
-        (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_with contention))
+        (Monadic.Atom.Modality (Mode.Modality.Monadic.Atom.Join_with contention))
       ~visibility:
-        (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_with visibility))
+        (Monadic.Atom.Modality (Mode.Modality.Monadic.Atom.Join_with visibility))
   in
   let comonadic =
     Comonadic.create
@@ -279,8 +276,7 @@ let to_mod_bounds (v : t) : Types.Jkind_mod_bounds.t =
     crossing_of_constants ~areality ~linearity ~uniqueness ~portability
       ~contention ~yielding ~statefulness ~visibility
   in
-  Types.Jkind_mod_bounds.create crossing ~externality ~nullability
-    ~separability
+  Types.Jkind_mod_bounds.create crossing ~externality ~nullability ~separability
 
 (* Lattice constant for non-float value base *)
 let nonfloat_value : t =
@@ -295,7 +291,8 @@ let nonfloat_value : t =
       ~visibility:Mode.Visibility.Const.Read_write
   in
   let mb =
-    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
+    Types.Jkind_mod_bounds.create crossing
+      ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
@@ -315,7 +312,8 @@ let immutable_data : t =
       ~visibility:Mode.Visibility.Const.Immutable
   in
   let mb =
-    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
+    Types.Jkind_mod_bounds.create crossing
+      ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
@@ -333,7 +331,8 @@ let mutable_data : t =
       ~visibility:Mode.Visibility.Const.Read_write
   in
   let mb =
-    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
+    Types.Jkind_mod_bounds.create crossing
+      ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
@@ -353,7 +352,8 @@ let value : t =
       ~visibility:Mode.Visibility.Const.Read_write
   in
   let mb =
-    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
+    Types.Jkind_mod_bounds.create crossing
+      ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Separable
   in
@@ -371,7 +371,8 @@ let arrow : t =
       ~visibility:Mode.Visibility.Const.Immutable
   in
   let mb =
-    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
+    Types.Jkind_mod_bounds.create crossing
+      ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
@@ -391,7 +392,8 @@ let immediate : t =
       ~visibility:Mode.Visibility.Const.Immutable
   in
   let mb =
-    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.min
+    Types.Jkind_mod_bounds.create crossing
+      ~externality:Jkind_axis.Externality.min
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
@@ -412,7 +414,8 @@ let object_legacy : t =
       ~contention ~yielding ~statefulness ~visibility
   in
   let mb =
-    Types.Jkind_mod_bounds.create crossing ~externality:Jkind_axis.Externality.max
+    Types.Jkind_mod_bounds.create crossing
+      ~externality:Jkind_axis.Externality.max
       ~nullability:Jkind_axis.Nullability.Non_null
       ~separability:Jkind_axis.Separability.Non_float
   in
