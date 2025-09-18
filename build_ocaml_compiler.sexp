@@ -27,5 +27,6 @@
    address_sanitizer
    stack_checks
    multidomain
+   llvm
    ))
  )
