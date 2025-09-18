@@ -356,3 +356,6 @@ let _ = for i = 0 to 1 do for j = 0 to 1 do for k = 0 to 1 do
   Bigarray.Array3.set bigarray3_int32 i j k (Int32.of_int (i + j + k))
 done done done
 let _ = f_bigarray3_int32 bigarray3_int32
+
+
+(* CR sspies: Add testing for Maps and Hashtables once oxcaml dwarf is enabled on the compiler. *)
