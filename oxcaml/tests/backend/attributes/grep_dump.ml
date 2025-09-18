@@ -1,7 +1,3 @@
-#directory "../../../../../install/main/lib/ocaml/str"
-
-#load "str.cma"
-
 let is_interesting_line line =
   List.exists
     (fun prefix -> String.starts_with ~prefix line)

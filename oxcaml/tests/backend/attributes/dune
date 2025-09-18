@@ -1,14 +1,22 @@
+(executable
+ (name grep_dump)
+ (libraries str)
+ (modules grep_dump))
+
 (rule
  (targets backend_attributes.output.corrected)
- (deps backend_attributes.ml grep_dump.ml)
+ (deps backend_attributes.ml grep_dump.exe)
  (action
   (progn
-   (with-outputs-to backend_attributes.output.raw
+   (with-outputs-to
+    backend_attributes.output.raw
     (run %{bin:ocamlopt.opt} -c -dcfg -w +A-70 backend_attributes.ml))
-   (with-outputs-to backend_attributes.output.corrected
-    (run %{bin:ocaml} grep_dump.ml backend_attributes.output.raw)))))
+   (with-outputs-to
+    backend_attributes.output.corrected
+    (run ./grep_dump.exe backend_attributes.output.raw)))))
 
 (rule
  (alias runtest)
  (deps backend_attributes.output backend_attributes.output.corrected)
- (action (diff backend_attributes.output backend_attributes.output.corrected)))
+ (action
+  (diff backend_attributes.output backend_attributes.output.corrected)))
