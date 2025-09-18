@@ -246,7 +246,10 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
   let non_empty = String.length name > 0 in
   let name =
     Printf.sprintf "caml_make%s_%s%svect%s"
-      (match mode with Alloc_heap -> "" | Alloc_local -> "_local")
+      (match mode with
+      | Alloc_heap -> ""
+      | Alloc_local when !Clflags.jsir -> ""
+      | Alloc_local -> "_local")
       name
       (if non_empty then "_" else "")
       (if non_empty && !Clflags.jsir then "_bytecode" else "")
