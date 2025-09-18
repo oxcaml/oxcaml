@@ -101,9 +101,9 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
         log "(block %a)" Label.format block.start;
         log_body_and_terminator_with_ls_order ls_order_mapping block.body
           block.terminator liveness;
-        dedent ());
+        dedent ()));
     State.update_intervals state past_ranges;
-    dedent ())
+    dedent ()
 
 type spilling_reg =
   | Spilling of Reg.t
