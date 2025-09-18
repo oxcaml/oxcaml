@@ -243,18 +243,19 @@ let crossing_of_constants ~areality ~linearity ~uniqueness ~portability
   { monadic; comonadic }
 
 let of_mod_bounds (mb : Types.Jkind_mod_bounds.t) : t =
+  let open Types.Jkind_mod_bounds in
   let levels =
-    [| level_of_areality (Types.Jkind_mod_bounds.areality_const mb);
-       level_of_linearity (Types.Jkind_mod_bounds.linearity_const mb);
-       level_of_uniqueness_monadic (Types.Jkind_mod_bounds.uniqueness_const mb);
-       level_of_portability (Types.Jkind_mod_bounds.portability_const mb);
-       level_of_contention_monadic (Types.Jkind_mod_bounds.contention_const mb);
-       level_of_yielding (Types.Jkind_mod_bounds.yielding_const mb);
-       level_of_statefulness (Types.Jkind_mod_bounds.statefulness_const mb);
-       level_of_visibility_monadic (Types.Jkind_mod_bounds.visibility_const mb);
-       level_of_externality (Types.Jkind_mod_bounds.externality mb);
-       level_of_nullability (Types.Jkind_mod_bounds.nullability mb);
-       level_of_separability (Types.Jkind_mod_bounds.separability mb)
+    [| level_of_areality (areality_const mb);
+       level_of_linearity (linearity_const mb);
+       level_of_uniqueness_monadic (uniqueness_const mb);
+       level_of_portability (portability_const mb);
+       level_of_contention_monadic (contention_const mb);
+       level_of_yielding (yielding_const mb);
+       level_of_statefulness (statefulness_const mb);
+       level_of_visibility_monadic (visibility_const mb);
+       level_of_externality (externality mb);
+       level_of_nullability (nullability mb);
+       level_of_separability (separability mb)
     |]
   in
   encode ~levels
