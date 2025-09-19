@@ -14,7 +14,7 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
       in
       (* Build the runtime *)
       let runtime = output_name ^ ".runtime.js" in
-      Jscompile.run_jsoo_exn ~args:([ "build-runtime"; "-o"; runtime ] @ runtime_files);
+      Jscompile.run_jsoo_exn ~args:([ "build-runtime"; "--enable=effects,with-js-error"; "-o"; runtime ] @ runtime_files);
       Misc.try_finally
         (fun () ->
           (* Find stdlib and std_exit in include directories or standard library *)
