@@ -532,6 +532,7 @@ let read_one_param ppf position name v =
   | "dump-dir" -> Clflags.dump_dir := Some v
 
   | "extension" -> Language_extension.enable_of_string_exn v
+  | "ikinds" -> set "ikinds" [ Clflags.ikinds ] v
   | "disable-all-extensions" ->
     if check_bool ppf name v then
       Language_extension.set_universe_and_enable_all No_extensions

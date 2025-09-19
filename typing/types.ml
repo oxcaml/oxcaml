@@ -208,6 +208,34 @@ module Jkind_mod_bounds = struct
     (not (mem axes (Nonmodal Separability)) ||
      Separability.(le max (separability t)))
 
+  let extract_monadic axis t =
+    let (Crossing.Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_with value)) = modal axis t
+    in
+    value
+
+  let extract_comonadic axis t =
+    let (Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_with value)) = modal axis t
+    in
+    value
+
+  let areality_const t = extract_comonadic areality t
+
+  let linearity_const t = extract_comonadic linearity t
+
+  let uniqueness_const t = extract_monadic uniqueness t
+
+  let portability_const t = extract_comonadic portability t
+
+  let contention_const t = extract_monadic contention t
+
+  let yielding_const t = extract_comonadic yielding t
+
+  let statefulness_const t = extract_comonadic statefulness t
+
+  let visibility_const t = extract_monadic visibility t
+
   let max =
     { crossing = Mode.Crossing.max;
       externality = Externality.max;

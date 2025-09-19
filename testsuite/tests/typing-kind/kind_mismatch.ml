@@ -1,4 +1,5 @@
 (* TEST
+  flags = "-ikinds";
  expect;
 *)
 

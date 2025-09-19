@@ -122,6 +122,15 @@ module Jkind_mod_bounds : sig
   val is_max_within_set : t -> Jkind_axis.Axis_set.t -> bool
   val is_max : t -> bool
 
+  val areality_const : t -> Mode.Regionality.Const.t
+  val linearity_const : t -> Mode.Linearity.Const.t
+  val uniqueness_const : t -> Mode.Uniqueness.Const.t
+  val portability_const : t -> Mode.Portability.Const.t
+  val contention_const : t -> Mode.Contention.Const.t
+  val yielding_const : t -> Mode.Yielding.Const.t
+  val statefulness_const : t -> Mode.Statefulness.Const.t
+  val visibility_const : t -> Mode.Visibility.Const.t
+
   val debug_print : Format.formatter -> t -> unit
 end
 

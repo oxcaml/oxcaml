@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension small_numbers";
+ flags = "-extension small_numbers -ikinds";
  expect;
 *)
 
@@ -1494,9 +1494,55 @@ type 'a t = 'a
 |}]
 
 type 'a t : value mod global = 'a
+(* CR jujacobs: this used to be accepted: bounds should propagate to type argument *)
 [%%expect {|
-type ('a : value mod global) t = 'a
+Line 1, characters 0-33:
+1 | type 'a t : value mod global = 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a" is value
+         because of the definition of t at line 1, characters 0-33.
+       But the kind of type "'a" must be a subkind of value mod global
+         because of the definition of t at line 1, characters 0-33.
 |}]
+
+type ('a : immutable_data) t
+type 'a u = 'a t
+[%%expect {|
+type ('a : immutable_data) t
+type ('a : immutable_data) u = 'a t
+|}]
+
+type ('a : immutable_data) t
+type ('a : value) u = 'a t
+[%%expect {|
+type ('a : immutable_data) t
+type ('a : immutable_data) u = 'a t
+|}]
+
+type ('a : immutable_data) t
+type 'a u = ('a * int) t
+[%%expect {|
+type ('a : immutable_data) t
+Line 2, characters 13-21:
+2 | type 'a u = ('a * int) t
+                 ^^^^^^^^
+Error: This type "'a * int" should be an instance of type "('b : immutable_data)"
+       The kind of 'a * int is immutable_data with 'a
+         because it's a tuple type.
+       But the kind of 'a * int must be a subkind of immutable_data
+         because of the definition of t at line 1, characters 0-28.
+|}, Principal{|
+type ('a : immutable_data) t
+Line 2, characters 13-21:
+2 | type 'a u = ('a * int) t
+                 ^^^^^^^^
+Error: This type "'a * int" should be an instance of type "('b : immutable_data)"
+       The kind of 'a * int is immutable_data with 'a with int
+         because it's a tuple type.
+       But the kind of 'a * int must be a subkind of immutable_data
+         because of the definition of t at line 1, characters 0-28.
+|}]
+
 
 type 'a t : word = 'a
 [%%expect {|
@@ -1505,7 +1551,7 @@ Line 1, characters 0-21:
     ^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-21.
-       But the layout of type "'a" must overlap with word
+       But the layout of type "'a" must be a sublayout of word
          because of the definition of t at line 1, characters 0-21.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
@@ -1522,8 +1568,15 @@ type 'a t = private 'a
 |}]
 
 type 'a t : value mod global = private 'a
+(* CR jujacobs: this used to be accepted: bounds should propagate to type argument *)
 [%%expect {|
-type ('a : value mod global) t = private 'a
+Line 1, characters 0-41:
+1 | type 'a t : value mod global = private 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a" is value
+         because of the definition of t at line 1, characters 0-41.
+       But the kind of type "'a" must be a subkind of value mod global
+         because of the definition of t at line 1, characters 0-41.
 |}]
 
 type 'a t : word = private 'a
@@ -1533,7 +1586,7 @@ Line 1, characters 0-29:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-29.
-       But the layout of type "'a" must overlap with word
+       But the layout of type "'a" must be a sublayout of word
          because of the definition of t at line 1, characters 0-29.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
@@ -1675,8 +1728,15 @@ module M : sig
 end = struct
   type t : value mod non_float
 end
+(* CR jujacobs: this should be accepted, but it's not with -ikinds. Bug! *)
 [%%expect{|
-module M : sig type t : value mod non_float end
+Line 2, characters 2-36:
+2 |   type t : immediate with extensible
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value mod non_float
+         because of the annotation on the declaration of the type t.
+       But the kind of type "t" must be a subkind of value mod non_float
+         because of the annotation on the declaration of the type t.
 |}]
 
 (*********************************)
@@ -1730,8 +1790,15 @@ module M : sig
 end = struct
   type t : value mod non_float
 end
+(* CR jujacobs: this should be accepted, but it's not with -ikinds. Bug! *)
 [%%expect{|
-module M : sig type t : value mod non_float end
+Line 2, characters 2-36:
+2 |   type t : immediate with extensible
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value mod non_float
+         because of the annotation on the declaration of the type t.
+       But the kind of type "t" must be a subkind of value mod non_float
+         because of the annotation on the declaration of the type t.
 |}]
 
 (**************************)
@@ -1822,4 +1889,16 @@ module type S2 = S with type 'a t = 'a
 [%%expect{|
 module type S = sig type 'a t : value mod portable with 'a end
 module type S2 = sig type 'a t = 'a end
+|}]
+
+(* Function types *)
+type t : immutable_data = int -> int
+[%%expect {|
+Line 1, characters 0-36:
+1 | type t : immutable_data = int -> int
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int -> int" is value mod aliased immutable non_float
+         because it's a function type.
+       But the kind of type "int -> int" must be a subkind of immutable_data
+         because of the definition of t at line 1, characters 0-36.
 |}]
