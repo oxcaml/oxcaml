@@ -1496,7 +1496,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     | Ipackf32 | Isimd _ | Iprefetch _ | Icldemote _ ->
       None
     | Illvm_intrinsic intr ->
-      Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+      Misc.fatal_errorf
+        "Simd_selection: Unexpected llvm_intrinsic %s: not using LLVM backend"
         intr)
   | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
