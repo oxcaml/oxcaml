@@ -117,7 +117,6 @@ module Instruction = struct
       stack_offset = -1;
       id = InstructionId.none;
       irc_work_list = Unknown_list;
-      ls_order = -1;
       available_before = None;
       available_across = None
     }

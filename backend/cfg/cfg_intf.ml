@@ -103,7 +103,6 @@ module S = struct
       mutable live : Reg.Set.t;
       mutable stack_offset : int;
       mutable irc_work_list : irc_work_list;
-      mutable ls_order : int;
       mutable available_before : Reg_availability_set.t option;
       mutable available_across : Reg_availability_set.t option
     }

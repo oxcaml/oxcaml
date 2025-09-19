@@ -552,7 +552,7 @@ let string_of_irc_work_list = function
 
 let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ?(fdo = Fdo_info.none) ?(live = Reg.Set.empty) ~stack_offset ~id
-    ?(irc_work_list = Unknown_list) ?(ls_order = 0) ?(available_before = None)
+    ?(irc_work_list = Unknown_list) ?(available_before = None)
     ?(available_across = None) () =
   { desc;
     arg;
@@ -563,13 +563,12 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     stack_offset;
     id;
     irc_work_list;
-    ls_order;
     available_before;
     available_across
   }
 
 let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
-    ?(res = [||]) ?(irc_work_list = Unknown_list) ?(ls_order = -1) () =
+    ?(res = [||]) ?(irc_work_list = Unknown_list) () =
   { desc;
     arg;
     res;
@@ -579,7 +578,6 @@ let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
     stack_offset = copy.stack_offset;
     id;
     irc_work_list;
-    ls_order;
     available_before = copy.available_before;
     available_across = copy.available_across
   }

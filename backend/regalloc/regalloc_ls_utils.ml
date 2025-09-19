@@ -27,10 +27,18 @@ let log : type a. ?no_eol:unit -> (a, Format.formatter, unit) format -> a =
  fun ?no_eol fmt -> (Lazy.force log_function).log ?no_eol fmt
 
 let instr_prefix (instr : Cfg.basic Cfg.instruction) =
-  Printf.sprintf "#%04d" instr.ls_order
+  Printf.sprintf "#%04d" (InstructionId.to_int_unsafe instr.id)
 
 let term_prefix (term : Cfg.terminator Cfg.instruction) =
-  Printf.sprintf "#%04d" term.ls_order
+  Printf.sprintf "#%04d" (InstructionId.to_int_unsafe term.id)
+
+let instr_prefix_with_ls_order (ls_order_mapping : InstructionId.t -> int)
+    (instr : Cfg.basic Cfg.instruction) =
+  Printf.sprintf "#%04d" (ls_order_mapping instr.id)
+
+let term_prefix_with_ls_order (ls_order_mapping : InstructionId.t -> int)
+    (term : Cfg.terminator Cfg.instruction) =
+  Printf.sprintf "#%04d" (ls_order_mapping term.id)
 
 let log_body_and_terminator :
     Cfg.basic_instruction_list ->
@@ -44,6 +52,26 @@ let log_body_and_terminator :
 let log_cfg_with_infos : Cfg_with_infos.t -> unit =
  fun cfg_with_infos ->
   make_log_cfg_with_infos (Lazy.force log_function) ~instr_prefix ~term_prefix
+    cfg_with_infos
+
+let log_body_and_terminator_with_ls_order :
+    (InstructionId.t -> int) ->
+    Cfg.basic_instruction_list ->
+    Cfg.terminator Cfg.instruction ->
+    liveness ->
+    unit =
+ fun ls_order_mapping body terminator liveness ->
+  make_log_body_and_terminator (Lazy.force log_function)
+    ~instr_prefix:(instr_prefix_with_ls_order ls_order_mapping)
+    ~term_prefix:(term_prefix_with_ls_order ls_order_mapping)
+    body terminator liveness
+
+let log_cfg_with_infos_with_ls_order :
+    (InstructionId.t -> int) -> Cfg_with_infos.t -> unit =
+ fun ls_order_mapping cfg_with_infos ->
+  make_log_cfg_with_infos (Lazy.force log_function)
+    ~instr_prefix:(instr_prefix_with_ls_order ls_order_mapping)
+    ~term_prefix:(term_prefix_with_ls_order ls_order_mapping)
     cfg_with_infos
 
 let iter_instructions_dfs :
