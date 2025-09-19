@@ -1155,7 +1155,7 @@ and glb_scannable_kind kind1 kind2 =
 
 (* The following function computes the greatest lower bound of array kinds:
 
-        gen      unboxed-{float,int8,int16,int32,int64,nativeint}
+        gen      unboxed-{float,int,int8,int16,int32,int64,nativeint}
          |
       /------\
       |      |

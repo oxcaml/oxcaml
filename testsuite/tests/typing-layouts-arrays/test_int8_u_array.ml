@@ -202,6 +202,13 @@ let () =
       assert (b = #2s)
     | _ -> assert false);
 
+  let d = [: #1s; #2s :] in
+  (match d with
+    | [: a; b :] ->
+      assert (a = #1s);
+      assert (b = #2s)
+    | _ -> assert false);
+
   (* let statement pattern *)
   let a = [||] in
   let b = [| #1s |] in
