@@ -80,6 +80,11 @@ let max_untagged_int8_array_length =
   | Native -> max_array_length * (word_size / 8)
   | Bytecode | Other _ -> max_array_length
 
+let max_untagged_int_array_length =
+  match backend_type with
+  | Native -> max_array_length
+  | Bytecode | Other _ -> max_array_length
+
 let max_unboxed_nativeint_array_length =
   match backend_type with
   | Native -> max_array_length

@@ -226,6 +226,10 @@ val max_untagged_int8_array_length : int
 (** Maximum length of a [int8# array].
     In non-native backends, equal to [max_array_length]. *)
 
+val max_untagged_int_array_length : int
+(** Maximum length of a [int8 array].
+    In non-native backends, equal to [max_array_length]. *)
+
 val max_unboxed_nativeint_array_length : int
 (** Maximum length of a [nativeint# array].
     In non-native backends, equal to [max_array_length]. *)

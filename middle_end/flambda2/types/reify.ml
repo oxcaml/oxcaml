@@ -40,6 +40,7 @@ type to_lift =
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.t
   | Immutable_float32_array of { fields : Float32.t list }
   | Immutable_float_array of { fields : Float.t list }
+  | Immutable_int_array of { fields : Target_ocaml_int.t list }
   | Immutable_int8_array of { fields : Int8.t list }
   | Immutable_int16_array of { fields : Int16.t list }
   | Immutable_int32_array of { fields : Int32.t list }
@@ -132,6 +133,14 @@ module Lift_array_of_naked_floats = Make_lift_array_of_naked_numbers (struct
   let prove = Provers.meet_naked_floats
 
   let build_to_lift ~fields = Immutable_float_array { fields }
+end)
+
+module Lift_array_of_naked_ints = Make_lift_array_of_naked_numbers (struct
+  module N = Target_ocaml_int
+
+  let prove = Provers.meet_naked_immediates
+
+  let build_to_lift ~fields = Immutable_int_array { fields }
 end)
 
 module Lift_array_of_naked_int8s = Make_lift_array_of_naked_numbers (struct
@@ -703,13 +712,15 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
           | Naked_number Naked_nativeint ->
             Lift_array_of_naked_nativeints.lift env ~fields
               ~try_canonical_simple
+          | Naked_number Naked_immediate ->
+            Lift_array_of_naked_ints.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_vec128 ->
             Lift_array_of_naked_vec128s.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_vec256 ->
             Lift_array_of_naked_vec256s.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_vec512 ->
             Lift_array_of_naked_vec512s.lift env ~fields ~try_canonical_simple
-          | Naked_number Naked_immediate | Region | Rec_info ->
+          | Region | Rec_info ->
             Misc.fatal_errorf
               "Unexpected kind %a in immutable array case when reifying type:@ \
                %a@ in env:@ %a"

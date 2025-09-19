@@ -4986,8 +4986,7 @@ let atomic_compare_exchange_field ~dbg
   | Pointer ->
     atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value
 
-(* CR jrayman: not crazy about the name [pack_into_word] *)
-let pack_into_word ~bits int_list dbg =
+let pack_small_ints_into_word ~bits int_list dbg =
   let shift a ~amount =
     if amount = 0 then a else Cop (Clsl, [a; Cconst_int (amount, dbg)], dbg)
   in
@@ -5021,25 +5020,25 @@ let make_untagged_int8_array_payload dbg untagged_int8_list =
     | [] -> Zero, List.rev acc
     | a :: [] -> One, List.rev (a :: acc)
     | [_a; _b] as v ->
-      let i = pack_into_word ~bits:8 v dbg in
+      let i = pack_small_ints_into_word ~bits:8 v dbg in
       Two, List.rev (i :: acc)
     | [_a; _b; _c] as v ->
-      let i = pack_into_word ~bits:8 v dbg in
+      let i = pack_small_ints_into_word ~bits:8 v dbg in
       Three, List.rev (i :: acc)
     | [_a; _b; _c; _d] as v ->
-      let i = pack_into_word ~bits:8 v dbg in
+      let i = pack_small_ints_into_word ~bits:8 v dbg in
       Four, List.rev (i :: acc)
     | [_a; _b; _c; _d; _e] as v ->
-      let i = pack_into_word ~bits:8 v dbg in
+      let i = pack_small_ints_into_word ~bits:8 v dbg in
       Five, List.rev (i :: acc)
     | [_a; _b; _c; _d; _e; _f] as v ->
-      let i = pack_into_word ~bits:8 v dbg in
+      let i = pack_small_ints_into_word ~bits:8 v dbg in
       Six, List.rev (i :: acc)
     | [_a; _b; _c; _d; _e; _f; _g] as v ->
-      let i = pack_into_word ~bits:8 v dbg in
+      let i = pack_small_ints_into_word ~bits:8 v dbg in
       Seven, List.rev (i :: acc)
     | a :: b :: c :: d :: e :: f :: g :: h :: r ->
-      let i = pack_into_word ~bits:8 [a; b; c; d; e; f; g; h] dbg in
+      let i = pack_small_ints_into_word ~bits:8 [a; b; c; d; e; f; g; h] dbg in
       aux (i :: acc) r
   in
   aux [] untagged_int8_list
@@ -5088,13 +5087,13 @@ let make_untagged_int16_array_payload dbg untagged_int16_list =
     | [] -> Zero, List.rev acc
     | a :: [] -> One, List.rev (a :: acc)
     | [_a; _b] as v ->
-      let i = pack_into_word ~bits:16 v dbg in
+      let i = pack_small_ints_into_word ~bits:16 v dbg in
       Two, List.rev (i :: acc)
     | [_a; _b; _c] as v ->
-      let i = pack_into_word ~bits:16 v dbg in
+      let i = pack_small_ints_into_word ~bits:16 v dbg in
       Three, List.rev (i :: acc)
     | a :: b :: c :: d :: r ->
-      let i = pack_into_word ~bits:16 [a; b; c; d] dbg in
+      let i = pack_small_ints_into_word ~bits:16 [a; b; c; d] dbg in
       aux (i :: acc) r
   in
   aux [] untagged_int16_list

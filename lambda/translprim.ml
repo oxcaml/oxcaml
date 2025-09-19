@@ -1193,6 +1193,9 @@ let glb_array_type loc t1 t2 =
     Punboxedfloatarray Unboxed_float32
   | Punboxedfloatarray _, _ | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
+  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int),
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray Untagged_int
   | (Pgenarray | Punboxedoruntaggedintarray Untagged_int8),
     Punboxedoruntaggedintarray Untagged_int8 ->
     Punboxedoruntaggedintarray Untagged_int8
@@ -1279,6 +1282,9 @@ let glb_array_ref_type loc t1 t2 =
   | Punboxedfloatarray_ref _, _
   | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
+  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int),
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray_ref Untagged_int
   | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int8),
     Punboxedoruntaggedintarray Untagged_int8 ->
     Punboxedoruntaggedintarray_ref Untagged_int8
@@ -1380,6 +1386,9 @@ let glb_array_set_type loc t1 t2 =
   | Punboxedfloatarray_set _, _
   | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
+  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int),
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray_set Untagged_int
   | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int8),
     Punboxedoruntaggedintarray Untagged_int8 ->
     Punboxedoruntaggedintarray_set Untagged_int8

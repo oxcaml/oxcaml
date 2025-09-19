@@ -886,6 +886,7 @@ type to_lift = private
       { fields : Numeric_types.Float32_by_bit_pattern.t list }
   | Immutable_float_array of
       { fields : Numeric_types.Float_by_bit_pattern.t list }
+  | Immutable_int_array of { fields : Target_ocaml_int.t list }
   | Immutable_int8_array of { fields : Numeric_types.Int8.t list }
   | Immutable_int16_array of { fields : Numeric_types.Int16.t list }
   | Immutable_int32_array of { fields : Int32.t list }
