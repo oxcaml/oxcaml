@@ -54,7 +54,17 @@ end
 (* Q: does it matter these examples are in a structure (aka [structure_item]s) *)
 module M = struct
   (* value bindings *)
+  (* no support for using legacy syntax for modes with the new mod modalities syntax *)
+
+  (* TODO: maybe add more of these tests? *)
+  (* Q: I think this is let_ident_with_modes syntax, but if it had a type constraint in
+     the parens it would be something else (a pattern??) *)
+  let (v mod contended aliased) = 42
+  let (v @ once portable mod contended aliased) = 42
+
   let v mod contended aliased = 42
+  let (v mod contended) mod aliased = 42
+
   let v : int mod contended aliased = 42
   let v : (int -> int) mod contended aliased = fun _ -> 42
 
