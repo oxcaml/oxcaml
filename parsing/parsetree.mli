@@ -699,6 +699,7 @@ and value_description =
      pval_name: string loc;
      pval_type: core_type;
      pval_modalities : modalities;
+     pval_mod_modalities : modalities;
      pval_prim: string list;
      pval_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pval_loc: Location.t;
