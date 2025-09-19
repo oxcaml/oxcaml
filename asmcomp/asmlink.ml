@@ -640,7 +640,10 @@ let link unix ~ppf_dump objfiles output_name =
     let stdexit = "std_exit.cmx" in
     let early_pervasives =
       if !Translcore.uses_eval then
-        [ stdlib; "dynlink/dynlink.cmxa"; "unix/unix.cmxa"; "eval.cmxa" ]
+        (Load_path.add_dir
+          ~hidden:false
+          (Misc.expand_directory Config.standard_library "+unix");
+        [ stdlib; "dynlink/dynlink.cmxa"; "unix/unix.cmxa"; "eval.cmxa" ])
       else
         [ stdlib ]
     in

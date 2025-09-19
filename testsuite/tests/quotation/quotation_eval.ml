@@ -1,4 +1,6 @@
-(* TEST *)
+(* TEST
+  set OCAMLDIR = "${ocamlsrcdir}/";
+*)
 
 let test_simple_eval =
   Printf.printf "\nTest simple eval\n";
