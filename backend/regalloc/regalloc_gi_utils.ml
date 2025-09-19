@@ -18,10 +18,10 @@ let log : type a. ?no_eol:unit -> (a, Format.formatter, unit) format -> a =
  fun ?no_eol fmt -> (Lazy.force log_function).log ?no_eol fmt
 
 let instr_prefix (instr : Cfg.basic Cfg.instruction) =
-  Printf.sprintf "#%04d" instr.ls_order
+  InstructionId.to_string instr.id
 
 let term_prefix (term : Cfg.terminator Cfg.instruction) =
-  Printf.sprintf "#%04d" term.ls_order
+  InstructionId.to_string term.id
 
 let log_body_and_terminator :
     Cfg.basic_instruction_list ->
@@ -318,7 +318,6 @@ let build_intervals : Cfg_with_infos.t -> Interval.t Reg.Tbl.t =
     then
       Array.iter Proc.destroyed_at_raise ~f:(fun reg ->
           update_range reg ~begin_:on ~end_:on);
-    instr.ls_order <- on;
     Array.iter instr.arg ~f:(fun reg -> update_range reg ~begin_:on ~end_:on);
     Array.iter instr.res ~f:(fun reg -> update_range reg ~begin_:off ~end_:off);
     let live = InstructionId.Tbl.find liveness instr.id in

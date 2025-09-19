@@ -274,24 +274,18 @@ let print_dot ?(show_instr = true) ?(show_exn = true)
                   Label.format)
                (Label.Set.to_seq block.predecessors))))
         ppf;
-      let print_id_and_ls_order :
-          type a. a Cfg.instruction -> Format.formatter -> unit =
-       fun i ppf ->
-        if i.ls_order >= 0
-        then
-          Format.dprintf "id:%a ls:%d" InstructionId.format i.id i.ls_order ppf
-        else Format.dprintf "id:%a" InstructionId.format i.id ppf
+      let print_id : type a. a Cfg.instruction -> Format.formatter -> unit =
+       fun i ppf -> Format.dprintf "id:%a" InstructionId.format i.id ppf
       in
       DLL.iter
         ~f:(fun (i : _ Cfg.instruction) ->
           (print_row
-             (print_cell ~align:Right (print_id_and_ls_order i)
-             ++ annotate_instr (`Basic i)))
+             (print_cell ~align:Right (print_id i) ++ annotate_instr (`Basic i)))
             ppf)
         block.body;
       let ti = block.terminator in
       (print_row
-         (print_cell ~align:Right (print_id_and_ls_order ti)
+         (print_cell ~align:Right (print_id ti)
          ++ annotate_instr (`Terminator ti)))
         ppf;
       match annotate_block_end with
@@ -517,7 +511,6 @@ let insert_block :
               stack_offset;
               id = next_instruction_id ();
               irc_work_list = Unknown_list;
-              ls_order = -1;
               available_before;
               available_across
             };
