@@ -88,6 +88,12 @@ let test_empty_arrays () =
   Block_checks.check_empty_array_is_uniform ~array_type:"empty int8#"
     (Obj.repr empty_int8);
 
+  let empty_int =
+    check_allocation "empty int#" false (fun () -> ([| |] : int# array))
+  in
+  Block_checks.check_empty_array_is_uniform ~array_type:"empty int#"
+    (Obj.repr empty_int);
+
   let empty_float32 =
     check_allocation "empty float32#" false (fun () -> ([| |] : float32# array))
   in
@@ -259,6 +265,18 @@ let test_int8_arrays () =
 
   Printf.printf "int8# array tests passed\n"
 
+(* Test int# arrays *)
+let test_int_arrays () =
+  Printf.printf "\nTesting int# arrays:\n";
+
+  test_array "int# [42m]" "int# single"
+    (fun () -> [: #42m :]) untagged_int_array_tag;
+  test_array "int# [1m; 2m]" "int# pair"
+    (fun () -> [: #1m; #2m :]) untagged_int_array_tag;
+  test_array "int# [1m; 2m; 3m]" "int# triple"
+    (fun () -> [: #1m; #2m; #3m :]) untagged_int_array_tag;
+
+  Printf.printf "int# array tests passed\n"
 
 (* Test float32# arrays *)
 let test_float32_arrays () =
@@ -379,6 +397,7 @@ let () =
   test_int32_arrays ();
   test_int16_arrays ();
   test_int8_arrays ();
+  test_int_arrays ();
   test_float32_arrays ();
   test_nativeint_arrays ();
   test_float_arrays ();
