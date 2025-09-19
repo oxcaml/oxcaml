@@ -913,16 +913,10 @@ let decide_whether_apply_needs_calling_convention_change env apply =
                     those calls to [Indirect_known_arity]. *)
                  Compilation_unit.is_current (Symbol.compilation_unit s))
                c ->
-        let code_ids = Code_id.Set.singleton code_id in
         let call_kind =
-          if Code_id.Set.exists
-               (fun code_id ->
-                 Compilation_unit.is_current
-                   (Code_id.get_compilation_unit code_id))
-               code_ids
+          if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
           then
-            Call_kind.indirect_function_call_known_arity
-              ~code_ids:(Known (Code_id.Set.singleton code_id))
+            Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
               alloc_mode
           else call_kind
         in
@@ -932,7 +926,12 @@ let decide_whether_apply_needs_calling_convention_change env apply =
       (* called (Option.get (Apply.callee apply)) alloc_mode call_kind true *)
       None, call_kind, false
     | Function { function_call = Indirect_known_arity _; alloc_mode } ->
-      called (Option.get (Apply.callee apply)) alloc_mode call_kind false
+      called
+        (Option.get (Apply.callee apply))
+        alloc_mode
+        (Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
+           alloc_mode)
+        false
     | C_call _ | Method _ | Effect _ -> None, call_kind, false
   in
   match code_id_actually_called with
