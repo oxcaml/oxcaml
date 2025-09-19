@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+   native;
+   bytecode;
+*)
 
 (* Testing handling of infix_tag by ephemeron *)
 

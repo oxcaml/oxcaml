@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+   native;
+   bytecode;
+*)
 
 let m = 1000
 let m' = 100

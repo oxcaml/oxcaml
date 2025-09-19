@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+   native;
+   bytecode;
+*)
 
 (***
    This test evaluate boolean formula composed by conjunction and
