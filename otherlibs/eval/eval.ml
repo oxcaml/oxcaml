@@ -42,6 +42,7 @@ let eval settings code =
   close_out oc;
 
   (* Build compiler command with settings *)
+  let ocaml_dir = Sys.getenv_opt "OCAMLDIR" |> Option.value ~default:"" in
   let flags = [] in
   let flags = if settings.debug then "-g" :: flags else flags in
   let flags = if settings.unsafe then "-unsafe" :: flags else flags in
@@ -49,10 +50,10 @@ let eval settings code =
   let flags = Array.of_list flags in
   let cmd, args =
     if settings.native_code then
-      ( "ocamlopt",
+      ( ocaml_dir ^ "ocamlopt",
         Array.append [| "ocamlopt"; "-shared"; "-o"; obj_file; ml_file |] flags
       )
-    else ("ocamlc", Array.append [| "ocamlc"; "-c"; ml_file |] flags)
+    else (ocaml_dir ^ "ocamlc", Array.append [| "ocamlc"; "-c"; ml_file |] flags)
   in
 
   (* Compile the code *)
