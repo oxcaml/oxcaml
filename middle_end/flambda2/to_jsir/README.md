@@ -14,6 +14,8 @@ The `to_jsir` pass is responsible for translating the Flambda 2 IR to `js_of_oca
 | `Naked_float`      | Untagged 64-bit float (via `Number`)                                                                                                                                                                               |
 Hence `Tag_immediate` and `Untag_immediate` are identities in JSIR: all integers are tagged. Similarly, `Box_number` and `Unbox_number` are also identities, since everything is represented as the `Number` type (with the exception of `Naked_int64`, which are just three `Number`s under the hood).
 
+Beware - immediates are 32 bits in JavaScript, instead of 63 or 31!
+
 ## Known quirks and limitations
 
 ### Unsupported Flambda features
