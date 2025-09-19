@@ -274,11 +274,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | [] | _ :: _ -> wrong_num_args 3
     in
     match[@ocaml.warning "+fragile-match"] op with
-    | Capply _ -> (
+    | Capply { callees; _ } -> (
       match[@ocaml.warning "-fragile-match"] args with
       | Cconst_symbol (func, _dbg) :: rem ->
         Terminator (Call { op = Direct func; label_after }), rem
-      | _ -> Terminator (Call { op = Indirect; label_after }), args)
+      | _ -> Terminator (Call { op = Indirect callees; label_after }), args)
     | Cextcall { func; alloc; ty; ty_args; returns; builtin; effects } ->
       if builtin && not !Oxcaml_flags.disable_builtin_check
       then raise (Error (Builtin_not_recognized func, dbg));
@@ -875,7 +875,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let label_after = Cmm.new_label () in
       let new_op, new_args = select_operation op simple_args dbg ~label_after in
       match new_op with
-      | Terminator (Call { op = Indirect; label_after } as term) ->
+      | Terminator (Call { op = Indirect _; label_after } as term) ->
         let* r1 = emit_tuple env sub_cfg new_args in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
         let rd = Reg.createv ty in

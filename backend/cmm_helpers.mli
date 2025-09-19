@@ -982,7 +982,7 @@ val direct_call :
   dbg:Debuginfo.t ->
   machtype ->
   Lambda.region_close ->
-  expression ->
+  symbol ->
   expression list ->
   expression
 
@@ -1003,8 +1003,8 @@ val indirect_full_call :
   dbg:Debuginfo.t ->
   Extended_machtype.t ->
   Lambda.region_close ->
-  Cmx_format.alloc_mode ->
   expression ->
+  callees:symbol list option ->
   Extended_machtype.t list ->
   expression list ->
   expression

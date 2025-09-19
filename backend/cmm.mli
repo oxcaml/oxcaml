@@ -366,8 +366,36 @@ type alloc_dbginfo_item =
 
 type alloc_dbginfo = alloc_dbginfo_item list
 
+type is_global =
+  | Global
+  | Local
+
+val equal_is_global : is_global -> is_global -> bool
+
+(* Symbols are marked with whether they are local or global, at both definition
+   and use sites.
+
+   Symbols defined as [Local] may only be referenced within the same file, and
+   all such references must also be [Local].
+
+   Symbols defined as [Global] may be referenced from other files. References
+   from other files must be [Global], but references from the same file may be
+   [Local].
+
+   (Marking symbols in this way speeds up linking, as many references can then
+   be resolved early) *)
+type symbol =
+  { sym_name : string;
+    sym_global : is_global
+  }
+
 type operation =
-  | Capply of machtype * Lambda.region_close
+  | Capply of
+      { result_type : machtype;
+        region : Lambda.region_close;
+        callees : symbol list option
+            (* List of possible callees, or [None] if not known *)
+      }
   | Cextcall of
       { func : string;
         ty : machtype;
@@ -442,29 +470,6 @@ type operation =
   | Cdls_get
   | Cpoll
   | Cpause
-
-type is_global =
-  | Global
-  | Local
-
-val equal_is_global : is_global -> is_global -> bool
-
-(* Symbols are marked with whether they are local or global, at both definition
-   and use sites.
-
-   Symbols defined as [Local] may only be referenced within the same file, and
-   all such references must also be [Local].
-
-   Symbols defined as [Global] may be referenced from other files. References
-   from other files must be [Global], but references from the same file may be
-   [Local].
-
-   (Marking symbols in this way speeds up linking, as many references can then
-   be resolved early) *)
-type symbol =
-  { sym_name : string;
-    sym_global : is_global
-  }
 
 (* SIMD vectors are untyped in the backend. This record holds the bitwise
    representation of a 128-bit value. [word0] is the least significant word. *)

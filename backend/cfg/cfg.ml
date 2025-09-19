@@ -182,7 +182,7 @@ let replace_successor_labels t ~normal ~exn block ~f =
       | Switch labels -> Switch (Array.map f labels)
       | Tailcall_self { destination } ->
         Tailcall_self { destination = f destination }
-      | Tailcall_func Indirect
+      | Tailcall_func (Indirect _)
       | Tailcall_func (Direct _)
       | Return | Raise _ | Call_no_return _ ->
         block.terminator.desc
