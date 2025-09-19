@@ -200,6 +200,13 @@ let () =
       assert (b = #2m)
     | _ -> assert false);
 
+  let d = [: #1m; #2m :] in
+  (match d with
+    | [: a; b :] ->
+      assert (a = #1m);
+      assert (b = #2m)
+    | _ -> assert false);
+
   (* let statement pattern *)
   let a = [||] in
   let b = [| #1m |] in
