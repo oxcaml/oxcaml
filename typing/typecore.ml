@@ -271,7 +271,6 @@ type error =
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
   | Submode_failed of Value.error * submode_reason * Env.shared_context option
-  | Submode_failed_alloc of Alloc.error
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Param_mode_mismatch of Alloc.equate_error
@@ -7260,14 +7259,11 @@ and type_expect_
             Value.(of_const ~hint_comonadic:Stack_expression
               { Const.min with areality = Local })
             expected_mode;
-          match
-            Alloc.submode Alloc.(of_const ~hint_comonadic:Stack_expression
-              { Const.min with areality = Local }) alloc_mode
-          with
-          | Ok () -> ()
-          | Error err ->
-              raise (Error (exp.exp_loc, exp.exp_env,
-                Submode_failed_alloc err))
+          let local =
+            Alloc.(of_const ~hint_comonadic:Stack_expression
+              { Const.min with areality = Local })
+          in
+          Alloc.submode_err (exp.exp_loc, Allocation) local alloc_mode
         end
       | Texp_list_comprehension _ -> unsupported List_comprehension
       | Texp_array_comprehension _ -> unsupported Array_comprehension
@@ -11553,6 +11549,9 @@ let report_error ~loc env =
       (print_modality "not") actual
   | Submode_failed(e, submode_reason, shared_context) ->
     let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
+    (* CR-soon zqian: move the following hints into the new hint system, then
+      we can invoke [submode_err] instead of [submode], and remove this
+      exception. *)
     let sub =
       match ax with
         | Comonadic Linearity | Monadic Uniqueness ->
@@ -11573,8 +11572,19 @@ let report_error ~loc env =
           (Style.as_inline_code longident) name ]
       | Application _ | Other -> sub
     in
-    Location.errorf ~loc ~sub "%a" Value.report_error e
-  | Submode_failed_alloc e -> Location.errorf ~loc "%a" Alloc.report_error e
+    Location.error_of_printer ~loc ~sub (fun ppf e ->
+      let open Format in
+      let {left; right} : Mode_intf.print_error =
+        Value.print_error (loc, Expression) e
+      in
+      pp_print_string ppf "This value is ";
+    (match left ppf with
+    | Mode_with_hint ->
+      fprintf ppf ".@\nHowever, the highlighted expression is expected to be "
+    | Mode -> fprintf ppf "@ but is expected to be ");
+    ignore (right ppf);
+    pp_print_string ppf "."
+      ) e
   | Curried_application_complete (lbl, e, loc_kind) ->
       let Mode.Alloc.Error (ax, {left; _}) = Mode.Alloc.to_simple_error e in
       let sub =
