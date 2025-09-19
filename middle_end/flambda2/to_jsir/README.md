@@ -17,7 +17,7 @@ Hence `Tag_immediate` and `Untag_immediate` are identities in JSIR: all integers
 
 Beware - immediates are 32 bits in JavaScript, instead of 63 or 31!
 
-## Known quirks and limitations
+## Known limitations
 
 ### Unsupported Flambda features
 The following are not yet supported in JSIR translation, and will raise an exception in the compiler when encountered:
