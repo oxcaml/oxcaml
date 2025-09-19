@@ -361,14 +361,16 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
              }
          })
   | Tailcall_func call ->
+    (* CR ncourant: here and below, maybe the callees should be printed when
+       they are known *)
     dump_linear_call_op ppf
       (match call with
-      | Indirect -> Linear.Ltailcall_ind
+      | Indirect _callees -> Linear.Ltailcall_ind
       | Direct func -> Linear.Ltailcall_imm { func })
   | Call { op = call; label_after } ->
     Format.fprintf ppf "%t%a" print_res dump_linear_call_op
       (match call with
-      | Indirect -> Linear.Lcall_ind
+      | Indirect _callees -> Linear.Lcall_ind
       | Direct func -> Linear.Lcall_imm { func });
     Format.fprintf ppf "%sgoto %a" sep Label.format label_after
   | Prim { op = prim; label_after } ->
