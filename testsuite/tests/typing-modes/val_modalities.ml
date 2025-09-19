@@ -166,7 +166,10 @@ Error: Signature mismatch:
          val x : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at nonportable *)
-       The first is "nonportable" but the second is "portable".
+       The first is "nonportable"
+       because it closes over the value "y" (at Line 11, characters 29-30)
+       which is expected to be "uncontended".
+       However, the second is "portable".
 |}, Principal{|
 Lines 8-12, characters 33-5:
  8 | .................................struct
@@ -187,7 +190,10 @@ Error: Signature mismatch:
          val x : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at nonportable *)
-       The first is "nonportable" but the second is "portable".
+       The first is "nonportable"
+       because it closes over the value "y" (at Line 11, characters 29-30)
+       which is expected to be "uncontended".
+       However, the second is "portable".
 |}]
 
 module Module_type_of_monadic = struct

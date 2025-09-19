@@ -352,15 +352,16 @@ let report_modality_sub_error first second ppf e =
     (print_modality "not") left
 
 let report_mode_sub_error got expected ppf e =
-  let Mode.Value.Error(ax, {left; right}) = Mode.Value.to_simple_error e in
-  match ax with
-  | Comonadic Areality -> Format.fprintf ppf "This escapes its region."
-  | _ ->
-    Format.fprintf ppf "%s %a but %s %a."
-      (String.capitalize_ascii got)
-      (Misc.Style.as_inline_code (Value.Const.print_axis ax)) left
-      expected
-      (Misc.Style.as_inline_code (Value.Const.print_axis ax)) right
+  let {left; right} : _ Mode.simple_error =
+    Mode.Value.print_error (Location.none, Unknown) e
+  in
+  Format.fprintf ppf "%s " (String.capitalize_ascii got);
+  begin match left ppf with
+  | Mode -> Format.fprintf ppf " but %s " expected
+  | Mode_with_hint -> Format.fprintf ppf ".@\nHowever, %s " expected
+  end;
+  ignore (right ppf);
+  Format.pp_print_string ppf "."
 
 let report_modality_equate_error first second ppf
   ((equate_step, sub_error) : Modality.equate_error) =
