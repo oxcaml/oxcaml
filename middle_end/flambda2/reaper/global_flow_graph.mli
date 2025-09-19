@@ -29,7 +29,7 @@ module Field : sig
     | Code_of_closure of closure_entry_point (* code_id in a set of closurse *)
     | Is_int (* value checked for [Is_int] *)
     | Get_tag (* tag of the value is read *)
-    | Apply of closure_entry_point * return_kind
+    | Apply of return_kind
     | Code_id_of_call_witness of int
   (* Returns of functions: either exn path or nth value for normal returns *)
 
@@ -41,15 +41,15 @@ module Field : sig
 
   module Map : Container_types.Map with type key = t
 
-  val encode : t -> int
+  module Encoded : Datalog.Column.S
 
-  val decode : int -> t
+  val encode : t -> Encoded.t
+
+  val decode : Encoded.t -> t
 end
 
-module FieldC : Datalog.Column.S with type t = int
-
 module CoField : sig
-  type t = Param of closure_entry_point * int
+  type t = Param of int
 
   val equal : t -> t -> bool
 
@@ -57,12 +57,12 @@ module CoField : sig
 
   module Map : Container_types.Map with type key = t
 
-  val encode : t -> int
+  module Encoded : Datalog.Column.S
 
-  val decode : int -> t
+  val encode : t -> Encoded.t
+
+  val decode : Encoded.t -> t
 end
-
-module CoFieldC : Datalog.Column.S with type t = int
 
 type graph
 
@@ -80,13 +80,17 @@ val alias_rel : (Code_id_or_name.t, Code_id_or_name.t, _) rel2
 
 val use_rel : (Code_id_or_name.t, Code_id_or_name.t, _) rel2
 
-val accessor_rel : (Code_id_or_name.t, int, Code_id_or_name.t, _) rel3
+val accessor_rel :
+  (Code_id_or_name.t, Field.Encoded.t, Code_id_or_name.t, _) rel3
 
-val constructor_rel : (Code_id_or_name.t, int, Code_id_or_name.t, _) rel3
+val constructor_rel :
+  (Code_id_or_name.t, Field.Encoded.t, Code_id_or_name.t, _) rel3
 
-val coaccessor_rel : (Code_id_or_name.t, int, Code_id_or_name.t, _) rel3
+val coaccessor_rel :
+  (Code_id_or_name.t, CoField.Encoded.t, Code_id_or_name.t, _) rel3
 
-val coconstructor_rel : (Code_id_or_name.t, int, Code_id_or_name.t, _) rel3
+val coconstructor_rel :
+  (Code_id_or_name.t, CoField.Encoded.t, Code_id_or_name.t, _) rel3
 
 val propagate_rel :
   (Code_id_or_name.t, Code_id_or_name.t, Code_id_or_name.t, _) rel3
