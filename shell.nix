@@ -3,7 +3,7 @@
   ...
 }@args:
 let
-  drv = (import ./default.nix { inherit pkgs; } // args);
+  drv = import ./default.nix args;
 in
 with pkgs;
 drv.overrideAttrs (new: old: {

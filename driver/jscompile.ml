@@ -115,10 +115,11 @@ let emit_jsir i
       (* Clean up the intermediate .cmj file *)
       Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmj i.target)))
     (fun () ->
-      let debug_flag = if !Clflags.debug then ["--debug-info"] else [] in
+       let debug_flag = if !Clflags.debug then [ "--debug-info"; "--pretty" ] else [] in
       run_jsoo_exn
-        ~args:(["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
-               "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))] @ debug_flag))
+        ~args:(["compile"; "--enable=effects,with-js-error"
+               ; (Unit_info.Artifact.filename (Unit_info.cmj i.target))
+               ; "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))] @ debug_flag))
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
       ~as_arg_for =
@@ -140,21 +141,9 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     ~main_module_block_format ~arg_descr;
   jsir
 
-(* Emit javascript directly from .cmj *)
-let emit i =
-  Misc.try_finally
-    ~always:(fun () ->
-      (* Clean up the intermediate .cmj file *)
-      Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmj i.target)))
-    (fun () ->
-      let debug_flag = if !Clflags.debug then ["--debug-info"] else [] in
-      run_jsoo_exn
-        ~args:(["compile"; (Unit_info.Artifact.filename (Unit_info.cmj i.target));
-               "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))] @ debug_flag))
 
 type starting_point =
   | Parsing
-  | Emit
   | Instantiation of {
       runtime_args : Translmod.runtime_arg list;
       main_module_block_size : int;
@@ -164,7 +153,6 @@ type starting_point =
 let starting_point_of_compiler_pass start_from =
   match (start_from : Clflags.Compiler_pass.t) with
   | Parsing -> Parsing
-  | Emit -> Emit
   | _ ->
       Misc.fatal_errorf "Cannot start from %s"
         (Clflags.Compiler_pass.to_string start_from)
@@ -191,7 +179,6 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
         Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
       info ~backend
-  | Emit -> emit info
   | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->
