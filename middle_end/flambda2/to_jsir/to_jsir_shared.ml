@@ -77,10 +77,17 @@ let reg_width_const const : Jsir.constant =
   | Naked_int32 int32 -> int32_to_jsir_const int32
   | Naked_int64 int64 -> int64_to_jsir_const int64
   | Naked_nativeint nativeint -> nativeint_to_jsir_const nativeint
+  | Naked_int8 int8 ->
+    (* Int8.t values are already sign-extended when created, so we can use directly *)
+    let value = Numeric_types.Int8.to_int int8 in
+    Int (Targetint.of_int value)
+  | Naked_int16 int16 ->
+    (* Int16.t values are already sign-extended when created, so we can use directly *)
+    let value = Numeric_types.Int16.to_int int16 in
+    Int (Targetint.of_int value)
   | Null -> Jsir.Null
-  | Naked_int8 _ | Naked_int16 _ | Naked_vec128 _ | Naked_vec256 _
-  | Naked_vec512 _ ->
-    (* CR selee: smallints and SIMD *)
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ ->
+    (* SIMD not supported *)
     Misc.fatal_errorf "Unsupported constant %a" Int_ids.Const.print const
 
 let simple ~env ~res simple =

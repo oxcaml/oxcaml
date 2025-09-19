@@ -622,8 +622,9 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_nativeint ->
           Eq, Neq, Lt, Ult, Le
         | Naked_int8 | Naked_int16 ->
-          (* Small ints use regular JS comparisons since they're sign-extended *)
-          Eq, Neq, Lt, Ult, Le
+          (* Small ints use regular JS comparisons. For unsigned comparisons,
+             we mask the operands first, then use regular signed comparison *)
+          Eq, Neq, Lt, Lt, Le
         | Naked_int64 ->
           ( Extern "caml_equal",
             Extern "caml_notequal",
@@ -690,11 +691,61 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
           with_int_prefix_exn ~kind "compare" ~percent_for_imms:false
         in
         use_prim' (Extern extern_name)
-      | Unsigned ->
-        (* Also unimplemented in Cmm. See [To_cmm_primitive]. *)
-        (* CR selee: can do this by subtracting [min_int] before doing the
-           compare *)
-        raise Primitive_not_supported))
+      | Unsigned -> (
+        match kind with
+        | Naked_int8 | Naked_int16 ->
+          (* For small ints, mask both operands then do signed comparison *)
+          let mask = match kind with
+            | Naked_int8 -> Targetint.of_int 0xFF
+            | Naked_int16 -> Targetint.of_int 0xFFFF
+            | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+            | Naked_nativeint -> assert false
+          in
+          let x, res = prim_arg ~env ~res x in
+          let y, res = prim_arg ~env ~res y in
+          let x_masked = Jsir.Var.fresh () in
+          let y_masked = Jsir.Var.fresh () in
+          let res = To_jsir_result.add_instr_exn res
+            (Let (x_masked, Prim (Extern "%int_and", [x; Pc (Int mask)]))) in
+          let res = To_jsir_result.add_instr_exn res
+            (Let (y_masked, Prim (Extern "%int_and", [y; Pc (Int mask)]))) in
+          (* Now do signed comparison on masked values *)
+          use_prim ~env ~res (Extern "caml_int_compare") [Pv x_masked; Pv y_masked]
+        | Tagged_immediate | Naked_immediate ->
+          (* For regular ints, use unsigned compare by adding min_int to both operands
+             to shift them into the positive range, then do signed comparison *)
+          let x, res = prim_arg ~env ~res x in
+          let y, res = prim_arg ~env ~res y in
+          let min_int = Targetint.of_int32 Int32.min_int in
+          let x_shifted = Jsir.Var.fresh () in
+          let y_shifted = Jsir.Var.fresh () in
+          let res = To_jsir_result.add_instr_exn res
+            (Let (x_shifted, Prim (Extern "%int_sub", [x; Pc (Int min_int)]))) in
+          let res = To_jsir_result.add_instr_exn res
+            (Let (y_shifted, Prim (Extern "%int_sub", [y; Pc (Int min_int)]))) in
+          use_prim ~env ~res (Extern "caml_int_compare") [Pv x_shifted; Pv y_shifted]
+        | Naked_int32 | Naked_nativeint ->
+          (* For int32/nativeint, use the same approach as regular ints *)
+          let x, res = prim_arg ~env ~res x in
+          let y, res = prim_arg ~env ~res y in
+          let x_shifted = Jsir.Var.fresh () in
+          let y_shifted = Jsir.Var.fresh () in
+          let res = To_jsir_result.add_instr_exn res
+            (Let (x_shifted, Prim (Extern "caml_int32_sub", [x; Pc (Int32 Int32.min_int)]))) in
+          let res = To_jsir_result.add_instr_exn res
+            (Let (y_shifted, Prim (Extern "caml_int32_sub", [y; Pc (Int32 Int32.min_int)]))) in
+          use_prim ~env ~res (Extern "caml_int32_compare") [Pv x_shifted; Pv y_shifted]
+        | Naked_int64 ->
+          (* For int64, use the same min_int trick *)
+          let x, res = prim_arg ~env ~res x in
+          let y, res = prim_arg ~env ~res y in
+          let x_shifted = Jsir.Var.fresh () in
+          let y_shifted = Jsir.Var.fresh () in
+          let res = To_jsir_result.add_instr_exn res
+            (Let (x_shifted, Prim (Extern "caml_int64_sub", [x; Pc (Int64 Int64.min_int)]))) in
+          let res = To_jsir_result.add_instr_exn res
+            (Let (y_shifted, Prim (Extern "caml_int64_sub", [y; Pc (Int64 Int64.min_int)]))) in
+          use_prim ~env ~res (Extern "caml_int64_compare") [Pv x_shifted; Pv y_shifted])))
   | Float_arith (bitwidth, op) ->
     let op_name =
       match op with Add -> "add" | Sub -> "sub" | Mul -> "mul" | Div -> "div"

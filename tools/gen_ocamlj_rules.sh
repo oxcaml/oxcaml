@@ -128,6 +128,8 @@ for cu in "${!srcs[@]}"; do
 
     if [[ ${library} == stdlib && ${deps[$cu]} == *stdlib* ]]; then
         maybe_open_stdlib=' -open Stdlib'
+    elif [[ ${library} != stdlib && ${#deps[@]} -gt 1 ]]; then
+         maybe_open_stdlib=" -open ${library^}__"
     else
         maybe_open_stdlib=''
     fi

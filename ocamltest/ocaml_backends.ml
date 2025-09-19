@@ -35,7 +35,7 @@ let make_backend_function bytecode_value native_value javascript_value = functio
   | Native -> native_value
   | Javascript -> javascript_value
 
-let module_extension = make_backend_function "cmo" "cmx" "cmj"
+let module_extension = make_backend_function "cmo" "cmx" "cmjo"
 
 let library_extension = make_backend_function "cma" "cmxa" "cmja"
 
