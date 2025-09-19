@@ -39,6 +39,7 @@ static const mlsize_t mlsize_t_max = -1;
 #define Max_untagged_int16_array_wosize    (Max_array_wosize * (sizeof(intnat) / sizeof(int16_t)))
 #define Max_untagged_int8_array_wosize     (Max_array_wosize * (sizeof(intnat) / sizeof(int8_t)))
 #define Max_unboxed_nativeint_array_wosize (Max_array_wosize)
+#define Max_untagged_int_array_wosize      (Max_array_wosize)
 
 
 
@@ -637,7 +638,7 @@ CAMLprim value caml_make_local_untagged_int8_vect(value len)
 
 CAMLprim value caml_make_untagged_int8_vect_bytecode(value len)
 {
-  return caml_make_vect(len, 1); // CR jrayman: is this right?
+  return caml_make_vect(len, 1);
 }
 
 static value caml_make_untagged_int16_vect0(value len, int local)
@@ -682,7 +683,7 @@ CAMLprim value caml_make_local_untagged_int16_vect(value len)
 
 CAMLprim value caml_make_untagged_int16_vect_bytecode(value len)
 {
-  return caml_make_vect(len, 1); // CR jrayman: is this right?
+  return caml_make_vect(len, 1);
 }
 
 static value caml_make_unboxed_int32_vect0(value len, int local)
@@ -800,6 +801,43 @@ CAMLprim value caml_make_unboxed_nativeint_vect_bytecode(value len)
   return caml_make_vect(len, caml_copy_nativeint(0));
 }
 
+static value caml_make_untagged_int_vect0(value len, int local)
+{
+  /* This is only used on 64-bit targets. */
+
+  mlsize_t num_elements = Long_val(len);
+  if (num_elements > Max_untagged_int_array_wosize)
+    caml_invalid_argument("Array.make");
+
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
+
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
+
+  if (local)
+    return caml_alloc_local_reserved(num_elements, Untagged_int_array_tag, reserved);
+  else
+    return caml_alloc_with_reserved(num_elements, Untagged_int_array_tag, reserved);
+}
+
+CAMLprim value caml_make_untagged_int_vect(value len)
+{
+  return caml_make_untagged_int_vect0(len, 0);
+}
+
+CAMLprim value caml_make_local_untagged_int_vect(value len)
+{
+  return caml_make_untagged_int_vect0(len, 1);
+}
+
+CAMLprim value caml_make_untagged_int_vect_bytecode(value len)
+{
+  return caml_make_vect(len, 1);
+}
+
 /* This primitive is used internally by the compiler to compile
    explicit array expressions.
    For float arrays when FLAT_FLOAT_ARRAY is true, it takes an array of
@@ -906,6 +944,17 @@ CAMLprim value caml_unboxed_int64_vect_blit(value a1, value ofs1, value a2, valu
 CAMLprim value caml_unboxed_nativeint_vect_blit(value a1, value ofs1, value a2,
                                                 value ofs2, value n)
 {
+  memmove((uintnat *)a2 + Long_val(ofs2),
+          (uintnat *)a1 + Long_val(ofs1),
+          Long_val(n) * sizeof(uintnat));
+  return Val_unit;
+}
+
+CAMLprim value caml_untagged_int_vect_blit(value a1, value ofs1, value a2,
+                                           value ofs2, value n)
+{
+  /* See memory model [MM] notes in memory.c */
+  atomic_thread_fence(memory_order_acquire);
   memmove((uintnat *)a2 + Long_val(ofs2),
           (uintnat *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(uintnat));
