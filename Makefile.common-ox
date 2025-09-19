@@ -115,7 +115,9 @@ compiler: runtime-stdlib
           oxcaml/testsuite/tools/codegen_main.exe \
           oxcaml/testsuite/tools/asmgen_$(ARCH).o \
           testsuite/lib/lib.cm{,x}a \
+          testsuite/lib/lib.cmj{a,x} \
           testsuite/lib/testing.cm{,x}a \
+          testsuite/lib/testing.cmj{a,x} \
           $(ocamldir)/tools/dumpobj.bc
 
 # CR dkalinichenko: [runtest] is built using the main profile,
@@ -276,13 +278,13 @@ install_for_test: _install
 	chmod 755 _runtest/testsuite/tools/codegen
 	cp $(main_build)/oxcaml/testsuite/tools/asmgen_*.o \
           _runtest/testsuite/tools/
-	cp $(main_build)/testsuite/lib/lib.{a,cmxa,cma} \
+	cp $(main_build)/testsuite/lib/lib.{a,cmxa,cma,cmja,cmjx} \
           _runtest/testsuite/lib/
 	cp $(main_build)/testsuite/lib/.lib.objs/byte/lib.cm* \
           _runtest/testsuite/lib/
 	cp $(main_build)/testsuite/lib/.lib.objs/native/lib.cm* \
           _runtest/testsuite/lib/
-	cp $(main_build)/testsuite/lib/testing.{a,cmxa,cma} \
+	cp $(main_build)/testsuite/lib/testing.{a,cmxa,cma,cmja,cmjx} \
           _runtest/testsuite/lib/
 	cp $(main_build)/testsuite/lib/.testing.objs/byte/testing.cm* \
           _runtest/testsuite/lib/

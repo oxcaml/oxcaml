@@ -3,7 +3,6 @@
  include testing;
  binary_modules = "config build_path_prefix_map misc identifiable numbers strongly_connected_components";
  bytecode;
- javascript;
 *)
 
 module Int = Numbers.Int

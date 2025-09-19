@@ -3,7 +3,6 @@
  include testing;
  binary_modules = "config build_path_prefix_map misc";
  bytecode;
- javascript;
 *)
 
 let check_and_count_calls n =
