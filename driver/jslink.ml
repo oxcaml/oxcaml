@@ -18,7 +18,7 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
       Misc.try_finally
         (fun () ->
           (* Find stdlib and std_exit in include directories or standard library *)
-          let search_dirs = !Clflags.include_dirs @ [Config.standard_library] in
+          let search_dirs = "." :: !Clflags.include_dirs @ [Config.standard_library] in
           let find_file name =
             let rec search = function
               | [] -> failwith (Printf.sprintf "Cannot find %s in include directories" name)
@@ -31,7 +31,7 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
           (* Prepare files to link, including stdlib if needed *)
           let files =
             if !Clflags.nopervasives then runtime :: objfiles
-            else runtime :: (find_file stdlib) :: (objfiles @ [find_file stdexit])
+            else runtime :: (find_file stdlib) :: (List.map find_file objfiles @ [find_file stdexit])
           in
           (* Link everything together - no -I flags needed for link command *)
           let debug_flag = if !Clflags.debug then ["--debug-info"] else [] in
