@@ -468,9 +468,10 @@ let operation_allocates = function
   | Ilfence | Isfence | Imfence
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
   | Icldemote _ | Iprefetch _ -> false
-  | Illvm_intrinsic intr ->
-    Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
-      intr
+  | Illvm_intrinsic _intr ->
+      (* Used by the zero_alloc checker that runs before the Llvmize. *)
+      false
+
 
 open X86_ast
 

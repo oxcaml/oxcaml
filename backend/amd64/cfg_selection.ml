@@ -460,6 +460,8 @@ let select_operation
       let bitwidth = select_bitwidth bitwidth in
       Rewritten (specific (Ibswap { bitwidth }), args)
     | Cextcall { func; builtin = true; _ } ->
+      (* Illvm_intrinsic must not allocate on the OCaml heap. See
+         [Arch.operation_allocates]. *)
       Rewritten (specific (Illvm_intrinsic func), args)
     | _ -> Use_default
     (* LLVM backend doesn't need target-specific instructons/operands since they
