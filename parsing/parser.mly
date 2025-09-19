@@ -3886,11 +3886,12 @@ value_description:
   COLON
   ty = possibly_poly(core_type)
   modalities = optional_atat_modalities_expr
+  mod_modalities = optional_mod_modalities_expr
   attrs2 = post_item_attributes
     { let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      Val.mk id ty ~attrs ~modalities ~loc ~docs,
+      Val.mk id ty ~attrs ~modalities ~mod_modalities ~loc ~docs,
       ext }
 ;
 
@@ -3904,13 +3905,14 @@ primitive_declaration:
   COLON
   ty = possibly_poly(core_type)
   modalities = optional_atat_modalities_expr
+  mod_modalities = optional_mod_modalities_expr
   EQUAL
   prim = raw_string+
   attrs2 = post_item_attributes
     { let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      Val.mk id ty ~prim ~attrs ~modalities ~loc ~docs,
+      Val.mk id ty ~prim ~attrs ~modalities ~mod_modalities ~loc ~docs,
       ext }
 ;
 
@@ -4641,6 +4643,17 @@ optional_atat_modalities_expr:
   | %prec below_HASH
     { [] }
   | atat_modalities_expr
+    { $1 }
+;
+
+mod_modalities_expr:
+  | MOD modalities {$2}
+  | MOD error { expecting $loc($2) "modality expression" }
+;
+
+optional_mod_modalities_expr:
+  | { [] }
+  | mod_modalities_expr
     { $1 }
 ;
 
