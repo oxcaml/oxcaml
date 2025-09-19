@@ -1,6 +1,7 @@
 (* TEST
  flags = "-extension include_functor";
  native;
+ javascript;
 *)
 
 (* This duplicates some of the tests from `include_functor.ml` (using just

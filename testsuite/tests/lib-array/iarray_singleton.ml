@@ -1,5 +1,6 @@
 (* TEST
  native;
+ javascript;
 *)
 
 (* this failed at one point on flambda2 with -O3:

@@ -3,6 +3,7 @@
    exit_status = "2";
    { bytecode; }
    { native; }
+   { javascript; }
 *)
 
 open Effect

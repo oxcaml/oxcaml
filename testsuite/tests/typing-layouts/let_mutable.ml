@@ -10,17 +10,26 @@
    flags = "-extension let_mutable";
    bytecode;
  }{
+   flags = "-extension let_mutable";
+   javascript;
+ }{
    flags = "-extension layouts_alpha -extension let_mutable";
    native;
  }{
    flags = "-extension layouts_alpha -extension let_mutable";
    bytecode;
  }{
+   flags = "-extension layouts_alpha -extension let_mutable";
+   javascript;
+ }{
    flags = "-extension layouts_beta -extension let_mutable";
    native;
  }{
    flags = "-extension layouts_beta -extension let_mutable";
    bytecode;
+ }{
+   flags = "-extension layouts_beta -extension let_mutable";
+   javascript;
  }*)
 
 open Stdlib_upstream_compatible

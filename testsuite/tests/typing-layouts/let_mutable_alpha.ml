@@ -8,6 +8,9 @@
  }{
    flags = "-extension layouts_alpha -extension let_mutable";
    bytecode;
+ }{
+   flags = "-extension layouts_alpha -extension let_mutable";
+   javascript;
  }*)
 
 type void : void

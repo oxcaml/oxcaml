@@ -2,6 +2,7 @@
  include config;
  binary_modules = "config build_path_prefix_map misc";
  bytecode;
+ javascript;
 *)
 
 open Misc

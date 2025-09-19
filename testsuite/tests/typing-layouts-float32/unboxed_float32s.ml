@@ -9,11 +9,17 @@
    flags = "-extension layouts_alpha";
    bytecode;
  }{
+   flags = "-extension layouts_alpha";
+   javascript;
+ }{
    flags = "-extension layouts_beta";
    native;
  }{
    flags = "-extension layouts_beta";
    bytecode;
+ }{
+   flags = "-extension layouts_beta";
+   javascript;
  }
 *)
 

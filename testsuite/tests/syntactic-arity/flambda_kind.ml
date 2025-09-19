@@ -3,6 +3,11 @@
    native;
 *)
 
+(* TEST
+   flambda2;
+   javascript;
+*)
+
 (* This is a regression test, see PR #2471 in oxcaml/oxcaml *)
 
 [@@@ocaml.flambda_o3]

@@ -1,5 +1,6 @@
 (* TEST
  readonly_files = "generate_mixed_blocks_code.ml";
+ modules = "stubs.c stubs.js";
  (* Generate the bytecode/native code versions of
     [generate_mixed_blocks_code.ml]. This doesn't actually run the test;
     it just updates the generated test program (which is separately
@@ -31,6 +32,18 @@
    output = "${test_source_directory}/generated_byte_test.ml.corrected";
    run;
    output = "${test_source_directory}/generated_byte_test.ml.corrected";
+   reference = "${test_source_directory}/generated_byte_test.ml";
+   check-program-output;
+ }{
+   (* JavaScript version. Similar to bytecode, doesn't support SIMD. *)
+   setup-ocamlj.opt-build-env;
+   program = "${test_source_directory}/generate.out";
+   all_modules = "generate_mixed_blocks_code.ml";
+   ocamlj.opt;
+   arguments = "300 byte";
+   output = "${test_source_directory}/generated_javascript_test.ml.corrected";
+   run;
+   output = "${test_source_directory}/generated_javascript_test.ml.corrected";
    reference = "${test_source_directory}/generated_byte_test.ml";
    check-program-output;
  }

@@ -1,7 +1,10 @@
 (* TEST
- modules = "external_stubs.c";
+ modules = "external_stubs.c external_stubs.js";
 {
    native;
+ }
+{
+   javascript;
  }
  *)
 

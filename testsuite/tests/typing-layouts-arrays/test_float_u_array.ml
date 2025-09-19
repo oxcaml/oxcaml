@@ -11,6 +11,9 @@
  {
    native;
  }
+ {
+   javascript;
+ }
 *)
 
 open Gen_product_array_helpers

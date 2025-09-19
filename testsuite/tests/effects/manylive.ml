@@ -2,6 +2,7 @@
    runtime5;
    { bytecode; }
    { native; }
+   { javascript; }
 *)
 
 let f x =

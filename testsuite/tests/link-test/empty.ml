@@ -27,5 +27,19 @@
    all_modules = "empty.cmxa empty.cmx";
    ocamlopt.byte;
    check-ocamlopt.byte-output;
+ }{
+   setup-ocamlj.opt-build-env;
+   module = "empty.ml";
+   ocamlj.opt;
+   module = "";
+   flags = "-a";
+   all_modules = "";
+   program = "empty.cmja";
+   ocamlj.opt;
+   flags = "";
+   program = "${test_build_directory}/empty.js";
+   all_modules = "empty.cmja empty.cmj";
+   ocamlj.opt;
+   check-ocamlj.opt-output;
  }
 *)

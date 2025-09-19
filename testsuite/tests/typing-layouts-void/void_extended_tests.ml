@@ -12,6 +12,14 @@
    native;
  }{
    bytecode;
+ }{
+   javascript;
+ }{
+   flags = "-Oclassic";
+   javascript;
+ }{
+   flags = "-O3";
+   javascript;
  }
 *)
 

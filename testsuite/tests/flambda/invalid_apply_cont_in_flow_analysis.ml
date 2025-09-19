@@ -1,6 +1,7 @@
 (* TEST
  flambda2;
  native;
+ javascript;
 *)
 
 [@@@ocaml.flambda_o3]

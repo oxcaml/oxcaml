@@ -7,6 +7,8 @@
    native;
  }{
    bytecode;
+ }{
+   javascript;
  }
 *)
 

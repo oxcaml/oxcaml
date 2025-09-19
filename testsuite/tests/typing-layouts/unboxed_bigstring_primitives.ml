@@ -2,6 +2,8 @@
  flambda2;
  include stdlib_upstream_compatible;
  {
+   javascript;
+ }{
    native;
  }{
    bytecode;
