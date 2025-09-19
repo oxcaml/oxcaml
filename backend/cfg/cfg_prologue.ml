@@ -60,7 +60,7 @@ module Instruction_requirements = struct
       match instr.desc with
       (* These will cause the function to return, and therefore the stack should
          be unwound. *)
-      | Cfg.Return | Tailcall_func Indirect -> Requires_no_prologue
+      | Cfg.Return | Tailcall_func (Indirect _) -> Requires_no_prologue
       | Tailcall_func (Direct func)
         when not (String.equal func.sym_name fun_name) ->
         Requires_no_prologue
