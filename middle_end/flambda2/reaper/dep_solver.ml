@@ -79,9 +79,9 @@ end
 module Cols = struct
   let n = Code_id_or_name.datalog_column_id
 
-  let f = Global_flow_graph.FieldC.datalog_column_id
+  let f = Global_flow_graph.Field.Encoded.datalog_column_id
 
-  let cf = Global_flow_graph.CoFieldC.datalog_column_id
+  let cf = Global_flow_graph.CoField.Encoded.datalog_column_id
 end
 
 let rel1_r name schema =
@@ -862,7 +862,7 @@ let get_all_usages :
     Usages (Datalog.get_table out_tbl db)
 
 let fieldc_map_to_field_map m =
-  Global_flow_graph.FieldC.Map.fold
+  Global_flow_graph.Field.Encoded.Map.fold
     (fun k r acc -> Field.Map.add (Field.decode k) r acc)
     m Field.Map.empty
 
@@ -903,7 +903,7 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
         db rs
     in
     fieldc_map_to_field_map
-      (FieldC.Map.merge
+      (Field.Encoded.Map.merge
          (fun k x y ->
            match x, y with
            | None, None -> assert false

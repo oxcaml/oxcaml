@@ -37,7 +37,7 @@ module Field = struct
       | Code_of_closure of closure_entry_point
       | Is_int
       | Get_tag
-      | Apply of closure_entry_point * return_kind
+      | Apply of return_kind
       | Code_id_of_call_witness of int
 
     let compare_return_kind r1 r2 =
@@ -60,13 +60,7 @@ module Field = struct
           (closure_entry_point_to_int ep2)
       | Is_int, Is_int -> 0
       | Get_tag, Get_tag -> 0
-      | Apply (ep1, r1), Apply (ep2, r2) ->
-        let c =
-          Int.compare
-            (closure_entry_point_to_int ep1)
-            (closure_entry_point_to_int ep2)
-        in
-        if c <> 0 then c else compare_return_kind r1 r2
+      | Apply r1, Apply r2 -> compare_return_kind r1 r2
       | Code_id_of_call_witness c1, Code_id_of_call_witness c2 ->
         Int.compare c1 c2
       | ( Block _,
@@ -118,12 +112,8 @@ module Field = struct
         Format.fprintf ppf "Code %s" (closure_entry_point_to_string ep)
       | Is_int -> Format.fprintf ppf "Is_int"
       | Get_tag -> Format.fprintf ppf "Get_tag"
-      | Apply (ep, Normal i) ->
-        Format.fprintf ppf "Apply (%s, Normal %i)"
-          (closure_entry_point_to_string ep)
-          i
-      | Apply (ep, Exn) ->
-        Format.fprintf ppf "Apply (%s, Exn)" (closure_entry_point_to_string ep)
+      | Apply (Normal i) -> Format.fprintf ppf "Apply (Normal %i)" i
+      | Apply Exn -> Format.fprintf ppf "Apply Exn"
       | Code_id_of_call_witness i ->
         Format.fprintf ppf "Code_id_of_call_witness %d" i
   end
@@ -157,35 +147,26 @@ module Field = struct
     in
     let decode n = Numeric_types.Int.Map.find n !int_to_field in
     encode, decode
+
+  module Encoded = Datalog.Column.Make (struct
+    let name = "field"
+
+    let print ppf i = print ppf (decode i)
+  end)
 end
-
-module FieldC = Datalog.Column.Make (struct
-  let name = "field"
-
-  let print ppf i = Field.print ppf (Field.decode i)
-end)
 
 module CoField = struct
   module M = struct
-    type t = Param of closure_entry_point * int
+    type t = Param of int
 
     let compare t1 t2 =
-      match t1, t2 with
-      | Param (ep1, i1), Param (ep2, i2) ->
-        let c =
-          Int.compare
-            (closure_entry_point_to_int ep1)
-            (closure_entry_point_to_int ep2)
-        in
-        if c <> 0 then c else Int.compare i1 i2
+      match t1, t2 with Param i1, Param i2 -> Int.compare i1 i2
 
     let equal a b = compare a b = 0
 
     let hash = Hashtbl.hash
 
-    let print ppf = function
-      | Param (ep, i) ->
-        Format.fprintf ppf "Param (%s, %d)" (closure_entry_point_to_string ep) i
+    let print ppf = function Param i -> Format.fprintf ppf "Param %d" i
   end
 
   include M
@@ -208,26 +189,26 @@ module CoField = struct
     in
     let decode n = Numeric_types.Int.Map.find n !int_to_field in
     encode, decode
+
+  module Encoded = Datalog.Column.Make (struct
+    let name = "cofield"
+
+    let print ppf i = print ppf (decode i)
+  end)
 end
-
-module CoFieldC = Datalog.Column.Make (struct
-  let name = "cofield"
-
-  let print ppf i = CoField.print ppf (CoField.decode i)
-end)
 
 module Alias_rel = Datalog.Schema.Relation2 (Code_id_or_name) (Code_id_or_name)
 module Use_rel = Datalog.Schema.Relation2 (Code_id_or_name) (Code_id_or_name)
 module Accessor_rel =
-  Datalog.Schema.Relation3 (Code_id_or_name) (FieldC) (Code_id_or_name)
+  Datalog.Schema.Relation3 (Code_id_or_name) (Field.Encoded) (Code_id_or_name)
 module Constructor_rel =
-  Datalog.Schema.Relation3 (Code_id_or_name) (FieldC) (Code_id_or_name)
+  Datalog.Schema.Relation3 (Code_id_or_name) (Field.Encoded) (Code_id_or_name)
 module Propagate_rel =
   Datalog.Schema.Relation3 (Code_id_or_name) (Code_id_or_name) (Code_id_or_name)
 module CoAccessor_rel =
-  Datalog.Schema.Relation3 (Code_id_or_name) (CoFieldC) (Code_id_or_name)
+  Datalog.Schema.Relation3 (Code_id_or_name) (CoField.Encoded) (Code_id_or_name)
 module CoConstructor_rel =
-  Datalog.Schema.Relation3 (Code_id_or_name) (CoFieldC) (Code_id_or_name)
+  Datalog.Schema.Relation3 (Code_id_or_name) (CoField.Encoded) (Code_id_or_name)
 module Any_usage_pred = Datalog.Schema.Relation1 (Code_id_or_name)
 module Any_source_pred = Datalog.Schema.Relation1 (Code_id_or_name)
 module Code_id_my_closure_rel =
@@ -255,13 +236,14 @@ let print_iter_edges ~print_edge graph =
   let iter_nn color m = Code_id_or_name.Map.iter (iter_inner color) m in
   let iter_nfn color m =
     Code_id_or_name.Map.iter
-      (fun target m -> FieldC.Map.iter (fun _ m -> iter_inner color target m) m)
+      (fun target m ->
+        Field.Encoded.Map.iter (fun _ m -> iter_inner color target m) m)
       m
   in
   let iter_ncn color m =
     Code_id_or_name.Map.iter
       (fun target m ->
-        CoFieldC.Map.iter (fun _ m -> iter_inner color target m) m)
+        CoField.Encoded.Map.iter (fun _ m -> iter_inner color target m) m)
       m
   in
   iter_nn "black" graph.alias_rel;
