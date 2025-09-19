@@ -20,6 +20,8 @@ let _ =
   print_endline "OK"
 
 (* TEST
+ native;
+ bytecode;
  flags = "-g";
  ocamlrunparam += ",b=1";
 *)

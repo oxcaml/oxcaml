@@ -15,6 +15,8 @@ let () =
   f ()
 
 (* TEST
+ native;
+ bytecode;
  flags = "-g";
  ocamlrunparam += ",b=1";
  ocamlopt_flags = "-inline 0";

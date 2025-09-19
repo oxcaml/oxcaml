@@ -28,5 +28,7 @@ let () =
      Printexc.print_backtrace stdout
 
 (* TEST
+ native;
+ bytecode;
  flags = "-g";
 *)

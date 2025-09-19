@@ -1,4 +1,6 @@
 (* TEST
+ native;
+ bytecode;
  modules = "test1_.c";
 *)
 

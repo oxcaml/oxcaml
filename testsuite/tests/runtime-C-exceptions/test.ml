@@ -1,4 +1,6 @@
 (* TEST
+ native;
+ bytecode;
  modules = "stub_test.c";
 *)
 

@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+  native;
+  bytecode;
+*)
 
 [@@@ocaml.flambda_oclassic]
 

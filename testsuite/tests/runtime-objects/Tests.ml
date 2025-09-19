@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+   native;
+   bytecode
+*)
 
 (* Marshaling (cf. PR#5436) *)
 

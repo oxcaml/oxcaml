@@ -1,4 +1,6 @@
 (* TEST
+ native;
+ bytecode;
  modules = "test_local_bug_.c";
 *)
 

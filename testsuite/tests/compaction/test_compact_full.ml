@@ -1,4 +1,6 @@
 (* TEST
+   native;
+   bytecode;
 *)
 
 external runtime5 : unit -> bool = "%runtime5"

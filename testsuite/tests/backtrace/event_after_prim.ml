@@ -15,4 +15,6 @@ let () =
 
 (* TEST
  flags = "-g";
+ native;
+ bytecode;
 *)

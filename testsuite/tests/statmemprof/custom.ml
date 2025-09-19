@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+   native;
+   bytecode
+*)
 
 module MP = Gc.Memprof
 let () = Gc.set { (Gc.get ()) with minor_heap_size = 262144 }

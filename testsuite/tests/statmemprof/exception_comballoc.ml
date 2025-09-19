@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+   native;
+   bytecode;
+*)
 
 (* Tests that an exception in the alloc_minor callback, during a
    combined allocation, causes already-run allocation callbacks to
