@@ -597,7 +597,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Specific (Isimd_mem (op,_))) ->
     destroyed_by_simd_mem_op op
   | Op (Specific (Illvm_intrinsic intr)) ->
-      Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+      Misc.fatal_errorf "destroyed_at_basic: Unexpected llvm_intrinsic %s: \
+                         not using LLVM backend"
         intr
   | Op (Move | Spill | Reload
        | Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _

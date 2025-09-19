@@ -456,7 +456,8 @@ let operation_is_pure = function
   | Isimd op -> Simd.is_pure_operation op
   | Isimd_mem (op, _addr) -> Simd.Mem.is_pure_operation op
   | Illvm_intrinsic intr ->
-    Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+      Misc.fatal_errorf "operation_is_pure: Unexpected llvm_intrinsic %s: \
+                         not using LLVM backend"
       intr
 
 (* Keep in sync with [Vectorize_specific] *)
