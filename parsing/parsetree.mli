@@ -1321,6 +1321,7 @@ and value_binding =
     pvb_expr: expression;
     pvb_constraint: value_constraint option;
     pvb_modes: modes;
+    pvb_mod_modalities: modalities;
     pvb_attributes: attributes;
     pvb_loc: Location.t;
   }(** [let pat : type_constraint = exp] *)

@@ -1368,6 +1368,7 @@ and class_field ctxt f x =
            pvb_constraint=None;
            pvb_attributes=[];
            pvb_modes=[];
+           pvb_mod_modalities=[];
            pvb_loc=Location.none;
           }
       in

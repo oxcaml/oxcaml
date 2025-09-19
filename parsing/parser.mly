@@ -655,13 +655,14 @@ let extra_rhs_core_type ct ~pos =
   let docs = rhs_info pos in
   { ct with ptyp_attributes = add_info_attrs docs ct.ptyp_attributes }
 
-let mklb first ~loc (p, e, typ, modes, is_pun) attrs =
+let mklb first ~loc (p, e, typ, modes, mod_modalities, is_pun) attrs =
   {
     lb_pattern = p;
     lb_expression = e;
     lb_constraint=typ;
     lb_is_pun = is_pun;
     lb_modes = modes;
+    lb_mod_modalities = mod_modalities;
     lb_attributes = attrs;
     lb_docs = symbol_docs_lazy loc;
     lb_text = (if first then empty_text_lazy
@@ -688,6 +689,7 @@ let val_of_let_bindings ~loc lbs =
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
            ~modes:lb.lb_modes
+           ~mod_modalities:lb.lb_mod_modalities
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
            ?value_constraint:lb.lb_constraint lb.lb_pattern lb.lb_expression)
@@ -720,7 +722,7 @@ let expr_of_let_bindings ~loc lbs body =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
-          ~modes:lb.lb_modes
+          ~modes:lb.lb_modes ~mod_modalities:lb.lb_mod_modalities
           ?value_constraint:lb.lb_constraint  lb.lb_pattern lb.lb_expression)
       lbs.lbs_bindings
   in
@@ -3242,21 +3244,23 @@ labeled_simple_expr:
 
 %inline empty_list: { [] }
 
+(* Q: rename? ex: [let_ident_with_modes_mod_modalities] *)
 %inline let_ident_with_modes:
     optional_mode_expr_legacy let_ident
-      { ($2, $1) }
-  | LPAREN let_ident at_mode_expr RPAREN
-      { ($2, $3) }
+      { ($2, $1, []) }
+  | LPAREN let_ident at_mode_or_mod_modalities_expr RPAREN
+      { let modes, mod_modalities = $3 in
+        ($2, modes, mod_modalities) }
 
 let_binding_body_no_punning:
     let_ident_with_modes strict_binding_modes
-      { let v, modes = $1 in
-        (v, $2 modes, None, modes) }
+      { let v, modes, mod_modalities = $1 in
+        (v, $2 modes, None, modes, mod_modalities) }
   | let_ident_with_modes constraint_ EQUAL seq_expr
       (* CR zqian: modes are duplicated, and one of them needs to be made ghost
          to make internal tools happy. We should try to avoid that. *)
-      { let v, modes0 = $1 in
-        let typ, modes1 = $2 in
+      { let v, modes0, mod_modalities0 = $1 in
+        let typ, modes1, mod_modalities1 = $2 in
         let t =
           Option.map (function
           | Pconstraint t ->
@@ -3265,14 +3269,15 @@ let_binding_body_no_punning:
           ) typ
         in
         let modes = modes0 @ modes1 in
-        (v, $4, t, modes)
+        let mod_modalities = mod_modalities0 @ mod_modalities1 in
+        (v, $4, t, modes, mod_modalities)
       }
   | let_ident_with_modes COLON strictly_poly_type_with_optional_modes EQUAL seq_expr
-      { let v, modes0 = $1 in
+      { let v, modes0, mod_modalities = $1 in
         let typ, modes1 = $3 in
         let modes = modes0 @ modes1 in
         (v, $5, Some (Pvc_constraint { locally_abstract_univars = []; typ }),
-         modes)
+         modes, mod_modalities)
       }
   | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = core_type  modes1 = empty_list EQUAL e = seq_expr
   | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = tuple_type modes1=at_mode_expr EQUAL e = seq_expr
@@ -3294,25 +3299,25 @@ let_binding_body_no_punning:
       { let exp, poly =
           wrap_type_annotation ~loc:$sloc ~modes:[] ~typloc:$loc(cty) ntys cty e
         in
-        let v, modes0 = $1 in
+        let v, modes0, mod_modalities = $1 in
         let modes = modes0 @ modes1 in
         let loc = ($startpos($1), $endpos(modes1)) in
-        (ghpat_with_modes ~loc ~pat:v ~cty:(Some poly) ~modes:[], exp, None, modes)
+        (ghpat_with_modes ~loc ~pat:v ~cty:(Some poly) ~modes:[], exp, None, modes, mod_modalities)
        }
   | pattern_no_exn EQUAL seq_expr
-      { ($1, $3, None, []) }
+      { ($1, $3, None, [], []) }
   | simple_pattern_not_ident pvc_modes EQUAL seq_expr
       {
         let pvc, modes = $2 in
-        ($1, $4, pvc, modes)
+        ($1, $4, pvc, modes, [])
       }
 ;
 let_binding_body:
   | let_binding_body_no_punning
-      { let p,e,c,modes = $1 in (p,e,c,modes,false) }
+      { let p,e,c,modes,mod_modalities = $1 in (p,e,c,modes,mod_modalities,false) }
 /* BEGIN AVOID */
   | val_ident %prec below_HASH
-      { (mkpatvar ~loc:$loc $1, ghexpvar ~loc:$loc $1, None, [], true) }
+      { (mkpatvar ~loc:$loc $1, ghexpvar ~loc:$loc $1, None, [], [], true) }
   (* The production that allows puns is marked so that [make list-parse-errors]
      does not attempt to exploit it. That would be problematic because it
      would then generate bindings such as [let x], which are rejected by the
@@ -3381,8 +3386,9 @@ strict_binding_modes:
           let ret_type_constraint, ret_mode_annotations =
             match $2 with
             | None -> None, []
-            | Some (ret_type_constraint, ret_mode_annotations) ->
+            | Some (ret_type_constraint, ret_mode_annotations, []) ->
                 ret_type_constraint, ret_mode_annotations
+            | Some (_, _, _ :: _) -> not_expecting $sloc "mod modality annotations"
           in
           {mode_annotations; ret_type_constraint ; ret_mode_annotations }
         in
@@ -3600,9 +3606,10 @@ type_constraint:
 %inline constraint_:
   | type_constraint_with_modes
     { let ty, modes = $1 in
-      Some ty, modes }
-  | at_mode_expr
-    { None, $1 }
+      Some ty, modes, [] }
+  | at_mode_or_mod_modalities_expr
+    { let modes, mod_modalities = $1 in
+      None, modes, mod_modalities }
 ;
 
 (* the thing between the [type] and the [.] in
@@ -4611,6 +4618,13 @@ strict_function_or_labeled_tuple_type:
 at_mode_expr:
   | AT mode_expr {$2}
   | AT error { expecting $loc($2) "mode expression" }
+;
+
+at_mode_or_mod_modalities_expr:
+  | mod_modalities_expr
+    { [], $1 }
+  | AT mode_expr optional_mod_modalities_expr
+    { $2, $3 }
 ;
 
 %inline optional_at_mode_expr:

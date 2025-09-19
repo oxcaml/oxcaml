@@ -425,10 +425,10 @@ module Incl:
 module Vb:
   sig
     val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
-      ?value_constraint:value_constraint -> ?modes:mode with_loc list -> pattern ->
+      ?value_constraint:value_constraint -> ?modes:mode with_loc list ->
+      ?mod_modalities:modality with_loc list -> pattern ->
       expression -> value_binding
   end
-
 
 (** {1 Class language} *)
 
