@@ -57,8 +57,10 @@ Configuration is needed after changing `.in` files or the autoconf script.
 - Run `make fmt` to ensure code formatting
 - Keep lines under 80 characters
 - Don't add excessive comments unless prompted
-- Don't disable warnings or tests unless prompted
+- NEVER disable warnings or tests unless prompted
+- All warnings MUST be resolved before compilation is successful, even if artifacts are present.
 - Use pattern-matching and functional programming idioms
+- non-exhaustive pattern-matching warnings should be fixed by enumerating the other cases where possible.
 - Avoid `assert false` and other unreachable code
 - Rebuild the project often while using the LSP using `make boot-compiler`. When
   you don't rebuild, the LSP may give you stale information from a previous
