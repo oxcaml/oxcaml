@@ -1,0 +1,41 @@
+;**************************************************************************
+;*                                                                        *
+;*                                 OCaml                                  *
+;*                                                                        *
+;*                      Implementation of [%eval]                         *
+;*                                                                        *
+;*   All rights reserved.  This file is distributed under the terms of    *
+;*   the GNU Lesser General Public License version 2.1, with the          *
+;*   special exception on linking described in the file LICENSE.          *
+;*                                                                        *
+;**************************************************************************
+
+(library
+ (name eval)
+ (modes byte native)
+ (libraries dynlink_internal unix)
+ (flags
+  (:standard
+   -strict-sequence
+   -absname
+   -bin-annot
+   -safe-string
+   -strict-formats))
+ (ocamlopt_flags
+  (:include %{project_root}/ocamlopt_flags.sexp))
+ (library_flags
+  (:standard -linkall)))
+
+(install
+ (files
+  (.eval.objs/native/eval.cmx as eval.cmx)
+  eval.cmxa
+  eval.a
+  eval.cmxs
+  eval.cma
+  ; (eval.mli as eval/eval.mli)
+  (.eval.objs/byte/eval.cmi as eval.cmi)
+  (.eval.objs/byte/eval.cmt as eval.cmt)
+  (.eval.objs/byte/eval.cmti as eval.cmti))
+ (section lib)
+ (package ocaml))

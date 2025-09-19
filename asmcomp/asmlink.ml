@@ -619,10 +619,19 @@ let link unix ~ppf_dump objfiles output_name =
   Profile.(record_call (annotate_file_name output_name)) (fun () ->
     let stdlib = "stdlib.cmxa" in
     let stdexit = "std_exit.cmx" in
+    let early_pervasives =
+      if !Translcore.uses_eval then
+        (Load_path.add_dir
+          ~hidden:false
+          (Misc.expand_directory Config.standard_library "+unix");
+        [ stdlib; "dynlink/dynlink.cmxa"; "unix/unix.cmxa"; "eval.cmxa" ])
+      else
+        [ stdlib ]
+    in
     let objfiles =
       if !Clflags.nopervasives then objfiles
-      else if !Clflags.output_c_object then stdlib :: objfiles
-      else stdlib :: (objfiles @ [stdexit]) in
+      else if !Clflags.output_c_object then early_pervasives @ objfiles
+      else early_pervasives @ (objfiles @ [stdexit]) in
     let genfns = Generic_fns.Tbl.make () in
     let ml_objfiles, units_tolink, cached_genfns_imports =
       List.fold_right
