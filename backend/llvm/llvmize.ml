@@ -846,9 +846,9 @@ let bswap t (i : Cfg.basic Cfg.instruction) (bitwidth : Arch.bswap_bitwidth) =
     | Sixtyfour -> T.i64
   in
   let do_trunc arg =
-    if T.equal typ T.i64
+    if T.equal typ (V.get_type arg)
     then arg
-    else emit_ins t (I.convert Trunc ~arg ~to_:T.i64)
+    else emit_ins t (I.convert Trunc ~arg ~to_:typ)
   in
   let do_zext arg =
     if T.equal typ T.i64
