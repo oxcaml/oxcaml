@@ -455,12 +455,14 @@ end
 
 module Val = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(prim = []) ?(modalities=[]) name typ =
+        ?(prim = []) ?(modalities=[])
+        ?(mod_modalities = []) name typ =
     {
      pval_name = name;
      pval_type = typ;
      pval_attributes = add_docs_attrs docs attrs;
      pval_modalities = modalities;
+     pval_mod_modalities = mod_modalities;
      pval_loc = loc;
      pval_prim = prim;
     }
