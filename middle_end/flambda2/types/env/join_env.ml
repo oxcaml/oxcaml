@@ -627,6 +627,8 @@ module Source_env : sig
   val code_age_relation_resolver :
     t -> Compilation_unit.t -> Code_age_relation.t option
 
+  val machine_width : t -> Target_system.Machine_width.t
+
   val exists_in_source_env : t -> Variable.t -> Variable_in_source_env.t option
 
   type candidate_canonical_in_source_env =
@@ -661,6 +663,8 @@ end = struct
 
   let code_age_relation_resolver { source_env } =
     TE.code_age_relation_resolver source_env
+
+  let machine_width { source_env; _ } = TE.machine_width source_env
 
   let exists_in_source_env { source_env } var =
     if TE.mem ~min_name_mode:Name_mode.in_types source_env (Name.var var)
@@ -1329,6 +1333,9 @@ let machine_width t =
 let code_age_relation_resolver t =
   Source_env.code_age_relation_resolver
     (Bindings_in_target_env.source_env t.bindings)
+
+let machine_width t =
+  Source_env.machine_width (Bindings_in_target_env.source_env t.bindings)
 
 type canonical_in_target_env =
   | Canonical_in_source_env of Simple_in_source_env.t
