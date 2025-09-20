@@ -117,7 +117,9 @@ val pattern_l : local_ int pair -> unit = <fun>
 Line 3, characters 26-27:
 3 |   | Pair (y, 0) -> escape y
                               ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let pattern_r (local_ x) =
@@ -131,5 +133,7 @@ val pattern_r : local_ int pair -> unit = <fun>
 Line 3, characters 26-27:
 3 |   | Pair (0, y) -> escape y
                               ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]

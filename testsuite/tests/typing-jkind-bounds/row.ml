@@ -243,7 +243,9 @@ let f (x : [< `A of int | `B of string] @ contended) =
 Line 2, characters 18-19:
 2 |   use_uncontended x
                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 (* CR layouts v2.8: This should also be accepted, but not with a best quality. Internal ticket 4294 *)
