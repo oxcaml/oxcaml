@@ -326,6 +326,33 @@ val f : float# -> float# = <fun>
 Exception: Match_failure ("", 2, 2).
 |}];;
 
+let f x =
+  match x with
+  | #0m -> -#4m
+  | #1m -> -#3m
+  | #2m -> -#2m
+  | #3m -> -#1m
+  | #4m -> #0m
+  | #5m -> #1m
+;;
+test_int "result" (f #10m);;
+(* This is here to test the [partial-match] warning *)
+[%%expect {|
+Lines 2-8, characters 2-14:
+2 | ..match x with
+3 |   | #0m -> -#4m
+4 |   | #1m -> -#3m
+5 |   | #2m -> -#2m
+6 |   | #3m -> -#1m
+7 |   | #4m -> #0m
+8 |   | #5m -> #1m
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+#6m
+
+val f : int# -> int# = <fun>
+Exception: Match_failure ("", 2, 2).
+|}];;
 
 (*****************************************)
 (* Lexing edge cases *)
