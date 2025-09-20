@@ -88,21 +88,10 @@ let is_base_type env ty base_ty_path =
   | Tconstr(p, _, _) -> Path.same p base_ty_path
   | _ -> false
 
-let is_always_gc_ignorable env ty =
-  let ext : Jkind_axis.Externality.t =
-    (* We check that we're compiling to (64-bit) native code before counting
-       External64 types as gc_ignorable, because bytecode is intended to be
-       platform independent. *)
-    if !Clflags.native_code && Sys.word_size = 64
-    then External64
-    else External
-  in
-  Ctype.check_type_externality env ty ext
-
 let maybe_pointer_type env ty =
   let ty = scrape_ty env ty in
   let immediate_or_pointer =
-    match is_always_gc_ignorable env ty with
+    match Ctype.is_always_gc_ignorable env ty with
     | true -> Immediate
     | false -> Pointer
   in
@@ -152,7 +141,7 @@ let classify ~classify_product env ty sort : _ classification =
   | Base Value -> begin
   (* CR or_null: [immediate_or_null] arrays can be intarrays once that is
      supported by the middle-end *)
-  if is_always_gc_ignorable env ty
+  if Ctype.is_always_gc_ignorable env ty
     && Ctype.check_type_nullability env ty Non_null
   then Int
   else match get_desc ty with
@@ -269,7 +258,7 @@ let array_kind_of_elt ~elt_sort env loc ty =
   in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
-    if is_always_gc_ignorable env ty then
+    if Ctype.is_always_gc_ignorable env ty then
       Pgcignorableproductarray (ignorable_product_array_kind loc sorts)
     else
       Pgcscannableproductarray

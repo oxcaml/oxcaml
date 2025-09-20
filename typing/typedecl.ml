@@ -3417,19 +3417,18 @@ type sort_or_poly = Sort of Jkind.Sort.Const.t | Poly
 
 let native_repr_of_type env kind ty sort_or_poly =
   match kind, get_desc (Ctype.expand_head_opt env ty) with
-  | Untagged, Tconstr (_, _, _) when
-         Typeopt.maybe_pointer_type env ty
-         = (Lambda.Immediate, Lambda.Non_nullable)
-      (* Only allow [@untagged] on immediate values. [maybe_pointer_type]
-         currently returns [Immediate] on unboxed number types, which
-         do not support [@untagged].
-      *)
-      && match sort_or_poly with
-         | Poly -> false
-         | Sort (Base Value) -> true
-         | Sort (Base _ | Product _) -> false
-    ->
-    Some (Unboxed_or_untagged_integer Untagged_int)
+  | Untagged, Tconstr (_, _, _) ->
+    let is_immediate = Ctype.is_always_gc_ignorable env ty in
+    let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
+    let is_value =
+      match sort_or_poly with
+      | Poly -> false
+      | Sort (Base Value) -> true
+      | Sort (Base _ | Product _) -> false
+    in
+    if is_immediate && is_non_nullable && is_value
+    then Some (Unboxed_or_untagged_integer Untagged_int)
+    else None
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float ->
     Some (Unboxed_float Boxed_float64)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32 ->
