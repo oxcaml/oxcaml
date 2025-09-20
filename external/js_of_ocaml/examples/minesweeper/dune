@@ -1,0 +1,18 @@
+(executables
+ (names main)
+ (libraries js_of_ocaml-lwt)
+ (modes js wasm)
+ (preprocess
+  (pps js_of_ocaml-ppx)))
+
+(alias
+ (name default)
+ (deps
+  main.bc.js
+  index.html
+  (glob_files sprites/*.{png,svg})))
+
+(alias
+ (name default)
+ (enabled_if %{env:WASM_OF_OCAML=false})
+ (deps main.bc.wasm.js index-wasm.html))

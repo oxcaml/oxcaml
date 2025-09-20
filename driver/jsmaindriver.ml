@@ -50,22 +50,54 @@ let main argv ppf =
     Compmisc.read_clflags_from_env ();
     if !Clflags.plugin then
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
-    try
-      Compenv.process_deferred_actions
-        (ppf, Jscompile.implementation, Jscompile.interface, ".cmj", ".cmja")
-    with Arg.Bad msg ->
-      prerr_endline msg;
-      Clflags.print_arguments program;
-      exit 2
+    (try
+       Compenv.process_deferred_actions
+         (ppf, Jscompile.implementation, Jscompile.interface, ".cmj", ".cmja")
+     with Arg.Bad msg ->
+       prerr_endline msg;
+       Clflags.print_arguments program;
+       exit 2);
+    Compenv.readenv ppf Before_link;
+    if
+      List.length (List.filter (fun x -> !x)
+                     Clflags.[make_package; make_archive; shared; instantiate;
+                      Compenv.stop_early; output_c_object]) > 1
+    then
+    begin
+      let module P = Clflags.Compiler_pass in
+      match !Clflags.stop_after with
+      | None ->
+          Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
+                         -output-obj, -instantiate";
+      | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
+              | P.Simplify_cfg | P.Emit | P.Selection
+              | P.Register_allocation | P.Llvmize) as p) ->
+        assert (P.is_compilation_pass p);
+        Printf.ksprintf Compenv.fatal
+          "Options -i and -stop-after (%s) \
+           are incompatible with -pack, -a, -shared, -output-obj"
+          (String.concat "|"
+             (P.available_pass_names ~filter:(fun _ -> true) ~native:true))
+    end;
+    if !Clflags.make_archive then (
+      Compmisc.init_path ();
+      Jslibrarian.create_archive
+        (Compenv.get_objfiles ~with_ocamlparam:false)
+        (Compenv.extract_output !Clflags.output_name);
+      Warnings.check_fatal ())
+    else if !Clflags.make_package then Misc.fatal_error "packaging is not supported by ocamlj"
+    else if !Clflags.instantiate then Misc.fatal_error "instantiation is not supported by ocamlj"
+    else if !Clflags.shared then Misc.fatal_error "shared objects are not supported by ocamlj"
+    else if not !Compenv.stop_early && !Clflags.objfiles <> [] then (
+      let target = Compenv.extract_output !Clflags.output_name in
+      Compmisc.init_path ();
+      Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
+          let objs = Compenv.get_objfiles ~with_ocamlparam:true in
+          Jslink.link ~ppf_dump objs target);
+      Warnings.check_fatal ())
   with
   | exception Compenv.Exit_with_status n -> n
   | () ->
-      if !Clflags.make_archive then (
-        Compmisc.init_path ();
-        Jslibrarian.create_archive
-          (Compenv.get_objfiles ~with_ocamlparam:false)
-          (Compenv.extract_output !Clflags.output_name);
-        Warnings.check_fatal ());
       (* Prevents outputting when using make install to dump CSVs for whole compiler.
          Example use case: scripts/profile-compiler-build.sh *)
       if not !Clflags.dump_into_csv then

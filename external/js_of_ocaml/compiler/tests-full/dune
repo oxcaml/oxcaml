@@ -1,0 +1,53 @@
+(rule
+ (targets stdlib.cma.js)
+ (enabled_if
+  (and
+   (>= %{ocaml_version} "5.3")
+   (< %{ocaml_version} "5.4")))
+ (action
+  (run
+   %{bin:js_of_ocaml}
+   --pretty
+   --debug
+   var
+   --debuginfo
+   %{lib:stdlib:stdlib.cma}
+   -o
+   %{targets})))
+
+(rule
+ (targets stdlib.cma.output.js)
+ (enabled_if
+  (and
+   (>= %{ocaml_version} "5.3")
+   (< %{ocaml_version} "5.4")))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run tail -n +3 %{dep:stdlib.cma.js}))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (>= %{ocaml_version} "5.3")
+   (< %{ocaml_version} "5.4")))
+ (action
+  (diff stdlib.cma.expected.js stdlib.cma.output.js)))
+
+(rule
+ (targets fs.output.js)
+ (deps file1 file2)
+ (action
+  (run
+   %{bin:js_of_ocaml}
+   build-fs
+   -o
+   %{targets}
+   file1:/static/file1
+   file2:/static/dir/file2)))
+
+(rule
+ (alias runtest)
+ (action
+  (diff fs.expected.js fs.output.js)))

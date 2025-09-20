@@ -1,0 +1,7 @@
+(tests
+ (names test)
+ (libraries)
+ (modes
+  js
+  wasm
+  (best exe)))
