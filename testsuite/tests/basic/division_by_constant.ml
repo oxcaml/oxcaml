@@ -1,6 +1,5 @@
 (* TEST
    { native; }
-   { javascript; }
 *)
 open Nativeint
 
