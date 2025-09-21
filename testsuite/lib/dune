@@ -21,7 +21,7 @@
 (rule
 (target testing.cmja)
 (deps testing.cmjo)
-(action (run %{bin:ocamlj} -a testing.cmjo -o %{target})))
+(action (run %{bin:ocamlj} -linkall -a testing.cmjo -o %{target})))
 
 
 (rule

@@ -29,6 +29,7 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
           in
           let files = runtime :: List.map find_file objfiles in
           let debug_flag = if !Clflags.debug then ["--debug-info"] else [] in
+          let linkall_flag = if !Clflags.link_everything then ["--linkall"] else [] in
           Jscompile.run_jsoo_exn
-            ~args:(["link"; "-o"; output_name ] @ debug_flag @ files))
+            ~args:(["link"; "-o"; output_name ] @ linkall_flag @ debug_flag @ files))
         ~always:(fun () -> Misc.remove_file runtime))
