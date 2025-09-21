@@ -17,6 +17,14 @@
 
 type t = Native | Bytecode | Javascript
 
+(* Backend filtering *)
+module BackendSet = Set.Make(struct
+  type nonrec t = t
+  let compare = compare
+end)
+
+let selected_backends = ref (BackendSet.of_list [Bytecode; Native; Javascript])
+
 let is_bytecode t = t=Bytecode
 
 let is_native t = t=Native
@@ -40,3 +48,28 @@ let module_extension = make_backend_function "cmo" "cmx" "cmjo"
 let library_extension = make_backend_function "cma" "cmxa" "cmja"
 
 let executable_extension = make_backend_function "byte" "opt" "js"
+
+let backend_of_string = function
+  | "bytecode" -> Some Bytecode
+  | "native" -> Some Native
+  | "javascript" -> Some Javascript
+  | _ -> None
+
+let parse_backends_string s =
+  let backend_names = String.split_on_char ',' s in
+  let backends = List.fold_left (fun acc name ->
+    let name = String.trim name in
+    if name = "" then acc
+    else match backend_of_string (String.lowercase_ascii name) with
+    | Some b -> BackendSet.add b acc
+    | None ->
+        Printf.eprintf "Warning: unknown backend '%s' ignored\n%!" name;
+        acc
+  ) BackendSet.empty backend_names in
+  backends
+
+let set_enabled_backends backends =
+  selected_backends := backends
+
+let is_backend_enabled backend =
+  BackendSet.mem backend !selected_backends

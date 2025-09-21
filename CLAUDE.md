@@ -65,6 +65,8 @@ Configuration is needed after changing `.in` files or the autoconf script.
 - Rebuild the project often while using the LSP using `make boot-compiler`. When
   you don't rebuild, the LSP may give you stale information from a previous
   build.
+- `make test` and related functions run the builds too, running `make` or `make boot-compiler` first is redundant
+- Unless you are investigating the build system, you likely want to pass the `--silent` flag to `make` to avoid getting flooded with output.
 
 ## Important Notes
 

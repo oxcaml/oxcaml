@@ -27,6 +27,27 @@ let native_action a =
   if Ocamltest_config.native_compiler then a
   else (Actions.update a no_native_compilers)
 
+let bytecode_action a =
+  Actions.update a (fun log env ->
+    if Ocaml_backends.is_backend_enabled Bytecode then
+      Actions.run log env a
+    else
+      (Result.skip_with_reason "bytecode backend disabled", env))
+
+let native_backend_action a =
+  Actions.update a (fun log env ->
+    if Ocaml_backends.is_backend_enabled Native then
+      Actions.run log env a
+    else
+      (Result.skip_with_reason "native backend disabled", env))
+
+let javascript_backend_action a =
+  Actions.update a (fun log env ->
+    if Ocaml_backends.is_backend_enabled Javascript then
+      Actions.run log env a
+    else
+      (Result.skip_with_reason "javascript backend disabled", env))
+
 let get_backend_value_from_env env bytecode_var native_var =
   Ocaml_backends.make_backend_function
     (Environments.safe_lookup bytecode_var env)
@@ -459,27 +480,31 @@ let mk_toplevel_env_setup name (toplevel : Ocaml_toplevels.toplevel) =
     (setup_toplevel_build_env toplevel)
 
 let setup_ocamlc_byte_build_env =
-  mk_compiler_env_setup
-    "setup-ocamlc.byte-build-env"
-    Ocaml_compilers.ocamlc_byte
+  bytecode_action
+    (mk_compiler_env_setup
+      "setup-ocamlc.byte-build-env"
+      Ocaml_compilers.ocamlc_byte)
 
 let setup_ocamlc_opt_build_env =
-  native_action
-    (mk_compiler_env_setup
-      "setup-ocamlc.opt-build-env"
-      Ocaml_compilers.ocamlc_opt)
+  bytecode_action
+    (native_action
+      (mk_compiler_env_setup
+        "setup-ocamlc.opt-build-env"
+        Ocaml_compilers.ocamlc_opt))
 
 let setup_ocamlopt_byte_build_env =
-  native_action
-    (mk_compiler_env_setup
-      "setup-ocamlopt.byte-build-env"
-      Ocaml_compilers.ocamlopt_byte)
+  native_backend_action
+    (native_action
+      (mk_compiler_env_setup
+        "setup-ocamlopt.byte-build-env"
+        Ocaml_compilers.ocamlopt_byte))
 
 let setup_ocamlopt_opt_build_env =
-  native_action
-    (mk_compiler_env_setup
-      "setup-ocamlopt.opt-build-env"
-      Ocaml_compilers.ocamlopt_opt)
+  native_backend_action
+    (native_action
+      (mk_compiler_env_setup
+        "setup-ocamlopt.opt-build-env"
+        Ocaml_compilers.ocamlopt_opt))
 
 let setup_ocaml_build_env =
   mk_toplevel_env_setup
@@ -528,35 +553,39 @@ let compile (compiler : Ocaml_compilers.compiler) log env =
 (* Compile actions *)
 
 let ocamlc_byte =
-  Actions.make
-    ~name:"ocamlc.byte"
-    ~description:"Compile the program using ocamlc.byte"
-    ~does_something:true
-    (compile Ocaml_compilers.ocamlc_byte)
+  bytecode_action
+    (Actions.make
+      ~name:"ocamlc.byte"
+      ~description:"Compile the program using ocamlc.byte"
+      ~does_something:true
+      (compile Ocaml_compilers.ocamlc_byte))
 
 let ocamlc_opt =
-  native_action
-    (Actions.make
-      ~name:"ocamlc.opt"
-      ~description:"Compile the program using ocamlc.opt"
-      ~does_something:true
-      (compile Ocaml_compilers.ocamlc_opt))
+  bytecode_action
+    (native_action
+      (Actions.make
+        ~name:"ocamlc.opt"
+        ~description:"Compile the program using ocamlc.opt"
+        ~does_something:true
+        (compile Ocaml_compilers.ocamlc_opt)))
 
 let ocamlopt_byte =
-  native_action
-    (Actions.make
-      ~name:"ocamlopt.byte"
-      ~description:"Compile the program using ocamlopt.byte"
-      ~does_something:true
-      (compile Ocaml_compilers.ocamlopt_byte))
+  native_backend_action
+    (native_action
+      (Actions.make
+        ~name:"ocamlopt.byte"
+        ~description:"Compile the program using ocamlopt.byte"
+        ~does_something:true
+        (compile Ocaml_compilers.ocamlopt_byte)))
 
 let ocamlopt_opt =
-  native_action
-    (Actions.make
-      ~name:"ocamlopt.opt"
-      ~description:"Compile the program using ocamlopt.opt"
-      ~does_something:true
-      (compile Ocaml_compilers.ocamlopt_opt))
+  native_backend_action
+    (native_action
+      (Actions.make
+        ~name:"ocamlopt.opt"
+        ~description:"Compile the program using ocamlopt.opt"
+        ~does_something:true
+        (compile Ocaml_compilers.ocamlopt_opt)))
 
 let env_with_lib_unix env =
   let libunixdir = Ocaml_directories.libunix in
@@ -904,23 +933,28 @@ let make_check_toplevel_output name toplevel =
   let (module Toplevel : Ocaml_toplevels.Toplevel) = toplevel in
   make_check_tool_output name (module Toplevel : Ocaml_tools.Tool)
 
-let check_ocamlc_byte_output = make_check_compiler_output
-  "check-ocamlc.byte-output" Ocaml_compilers.ocamlc_byte
+let check_ocamlc_byte_output =
+  bytecode_action
+    (make_check_compiler_output
+      "check-ocamlc.byte-output" Ocaml_compilers.ocamlc_byte)
 
 let check_ocamlc_opt_output =
-  native_action
-    (make_check_compiler_output
-      "check-ocamlc.opt-output" Ocaml_compilers.ocamlc_opt)
+  bytecode_action
+    (native_action
+      (make_check_compiler_output
+        "check-ocamlc.opt-output" Ocaml_compilers.ocamlc_opt))
 
 let check_ocamlopt_byte_output =
-  native_action
-    (make_check_compiler_output
-      "check-ocamlopt.byte-output" Ocaml_compilers.ocamlopt_byte)
+  native_backend_action
+    (native_action
+      (make_check_compiler_output
+        "check-ocamlopt.byte-output" Ocaml_compilers.ocamlopt_byte))
 
 let check_ocamlopt_opt_output =
-  native_action
-    (make_check_compiler_output
-      "check-ocamlopt.opt-output" Ocaml_compilers.ocamlopt_opt)
+  native_backend_action
+    (native_action
+      (make_check_compiler_output
+        "check-ocamlopt.opt-output" Ocaml_compilers.ocamlopt_opt))
 
 let no_javascript_compiler _log env =
   (Result.skip_with_reason "JavaScript compiler disabled", env)
@@ -930,23 +964,26 @@ let javascript_action a =
   else (Actions.update a no_javascript_compiler)
 
 let setup_ocamlj_opt_build_env =
-  javascript_action
-    (mk_compiler_env_setup
-      "setup-ocamlj.opt-build-env"
-      Ocaml_compilers.ocamlj_opt)
+  javascript_backend_action
+    (javascript_action
+      (mk_compiler_env_setup
+        "setup-ocamlj.opt-build-env"
+        Ocaml_compilers.ocamlj_opt))
 
 let ocamlj_opt =
-  javascript_action
-    (Actions.make
-      ~name:"ocamlj.opt"
-      ~description:"Compile the program using ocamlj.opt"
-      ~does_something:true
-      (compile Ocaml_compilers.ocamlj_opt))
+  javascript_backend_action
+    (javascript_action
+      (Actions.make
+        ~name:"ocamlj.opt"
+        ~description:"Compile the program using ocamlj.opt"
+        ~does_something:true
+        (compile Ocaml_compilers.ocamlj_opt)))
 
 let check_ocamlj_opt_output =
-  javascript_action
-    (make_check_compiler_output
-      "check-ocamlj.opt-output" Ocaml_compilers.ocamlj_opt)
+  javascript_backend_action
+    (javascript_action
+      (make_check_compiler_output
+        "check-ocamlj.opt-output" Ocaml_compilers.ocamlj_opt))
 
 let really_compare_programs backend comparison_tool log env =
   let program = Environments.safe_lookup Builtin_variables.program env in

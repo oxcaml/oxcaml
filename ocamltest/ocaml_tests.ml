@@ -34,7 +34,7 @@ let bytecode =
   ] in
 {
   test_name = "bytecode";
-  test_run_by_default = true;
+  test_run_by_default = true;  (* Will be filtered dynamically *)
   test_description = "Build bytecode program, run it and check its output";
   test_actions =
   (if true && Ocamltest_config.native_compiler then
