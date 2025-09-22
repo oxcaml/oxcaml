@@ -26,7 +26,7 @@ module Function_call = struct
     match call with
     | Direct code_id ->
       fprintf ppf "@[<hov 1>(Direct %a)@]" Code_id.print code_id
-    | Indirect_unknown_arity -> fprintf ppf "Indirect_unkknown_arity"
+    | Indirect_unknown_arity -> fprintf ppf "Indirect_unknown_arity"
     | Indirect_known_arity code_ids ->
       fprintf ppf "@[<hov 1>(Indirect_known_arity@ %a)@]"
         (Or_unknown.print Code_id.Set.print)
