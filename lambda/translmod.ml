@@ -1108,7 +1108,7 @@ let add_runtime_parameters lam params =
         { name;
           debug_uid = Lambda.debug_uid_none;
           (* CR sspies: Can we find a better [debug_uid] here? *)
-          layout = Pvalue Lambda.generic_value;
+          layout = layout_module;
           attributes = Lambda.default_param_attribute;
           mode = Lambda.alloc_heap })
       params
@@ -1121,7 +1121,7 @@ let add_runtime_parameters lam params =
   lfunction
     ~params
     ~kind:(Curried { nlocal = 0 })
-    ~return:(Pvalue Lambda.generic_value)
+    ~return:layout_module
     ~attr:{ default_function_attribute with is_a_functor = true; inline }
     ~loc:Loc_unknown
     ~body:lam
@@ -1138,8 +1138,8 @@ let transl_implementation_module ~scopes module_id (str, cc, cc2) =
   | Some cc2 ->
     add_arg_block_to_module_block lam repr cc2
 
-let wrap_toplevel_functor_in_struct code =
-  Lprim(Pmakeblock(0, Immutable, None, Lambda.alloc_heap),
+let wrap_toplevel_functor_in_struct code repr =
+  Lprim(block_of_module_representation repr,
         [ code ],
         Loc_unknown)
 
@@ -1189,7 +1189,7 @@ let transl_implementation compilation_unit impl =
               |> List.split
         in
         let body = add_runtime_parameters body runtime_param_idents in
-        let body = wrap_toplevel_functor_in_struct body in
+        let body = wrap_toplevel_functor_in_struct body repr in
         let format =
           Mb_instantiating_functor { mb_runtime_params;
                                      mb_returned_repr = repr }
@@ -1476,7 +1476,7 @@ let transl_instance_impl
     Lapply {
       ap_func = instantiating_functor_lam;
       ap_args = runtime_args_lam;
-      ap_result_layout = Pvalue Lambda.generic_value;
+      ap_result_layout = layout_module;
       ap_loc = Loc_unknown;
       ap_inlined = Always_inlined; (* Definitely inline!! *)
       ap_tailcall = Default_tailcall;
