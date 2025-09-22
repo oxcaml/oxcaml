@@ -151,6 +151,25 @@ Portability is irrelevant for types that do not contain functions. Values of
 such types *mode cross* on the portability axis; they may be used as portable
 even when they are nonportable.
 
+## Future modes: Forkable
+
+|----------------|
+| unforkable     |
+| `|`            |
+| **forkable**   |
+{: .table }
+
+Forkable is a future axis that tracks whether a function is permitted to access
+shared values in its parent stack. See [parallelism](../../parallelism/01-intro/).
+
+Forkable has different defaults depending on the locality axis: *global* values are
+defaulted to *forkable*, while *local* values are defaulted to *unforkable*.
+More documentation on mode implications is available [here](../../kinds/syntax).
+
+Forkable is irrelevant for types that do not contain functions, and values of such types
+*mode cross* on the forkable axis; they may be used as unforkable even
+when they are forkable.
+
 # Modes for aliasing {#uniqueness-linearity}
 
 ## Past modes: Uniqueness
@@ -227,9 +246,10 @@ Yielding is a future axis that tracks whether a function is permitted to perform
 effects that will be handled in its parent stack. See [the OCaml Manual entry
 for effect handlers](https://ocaml.org/manual/5.3/effects.html).
 
-Yielding has different defaults depending on the locality axis: *global* values are
-defaulted to *unyielding*, while *local* values are defaulted to *yielding*.
-More documentation on mode implications is available [here](../../kinds/syntax).
+Yielding has different defaults depending on the forkable (and hence locality) axes:
+*forkable* values are defaulted to *unyielding*, while *unforkable* values are
+defaulted to *yielding*. More documentation on mode implications is available
+[here](../../kinds/syntax).
 
 Yielding is irrelevant for types that do not contain functions, and values of such types
 *mode cross* on the yielding axis; they may be used as unyielding even

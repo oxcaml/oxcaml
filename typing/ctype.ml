@@ -1686,27 +1686,36 @@ let prim_mode' mvars = function
     Locality.allow_right Locality.local, None
   | Primitive.Prim_poly, _ ->
     match mvars with
-    | Some (mvar_l, mvar_y) -> mvar_l, Some mvar_y
+    | Some (mvar_l, (mvar_f, mvar_y)) -> mvar_l, Some (mvar_f, mvar_y)
     | None -> assert false
 
 (* Exported version. *)
 let prim_mode mvar prim =
-  let mvars = Option.map (fun mvar_l -> mvar_l, Yielding.newvar ()) mvar in
-  fst (prim_mode' mvars prim)
+  let mvar = Option.map
+    (fun mvar_l -> mvar_l, (Forkable.newvar (), Yielding.newvar ())) mvar
+  in
+  fst (prim_mode' mvar prim)
 
 (** Returns a new mode variable whose locality is the given locality and
     whose yieldingness is the given yieldingness, while all other axes are
     from the given [m]. This function is too specific to be put in [mode.ml] *)
-let with_locality_and_yielding (locality, yielding) m =
+let with_locality_and_forkable_yielding (locality, fy) m =
+  let forkable = Option.map fst fy in
+  let yielding = Option.map snd fy in
   let m' = Alloc.newvar () in
   Locality.equate_exn (Alloc.proj_comonadic Areality m') locality;
+  let forkable =
+    Option.value ~default:(Alloc.proj_comonadic Forkable m) forkable
+  in
   let yielding =
     Option.value ~default:(Alloc.proj_comonadic Yielding m) yielding
   in
+  Forkable.equate_exn (Alloc.proj_comonadic Forkable m') forkable;
   Yielding.equate_exn (Alloc.proj_comonadic Yielding m') yielding;
   let c =
     { Alloc.Comonadic.Const.max with
       areality = Locality.Const.min;
+      forkable = Forkable.Const.min;
       yielding = Yielding.Const.min}
   in
   Alloc.submode_exn (Alloc.meet_const c m') m;
@@ -1737,7 +1746,7 @@ let curry_mode alloc arg : Alloc.Const.t =
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
   | l :: locals, Tarrow ((lbl,marg,mret),arg,ret,commu) ->
-     let marg = with_locality_and_yielding
+     let marg = with_locality_and_forkable_yielding
       (prim_mode' (Some (mvar_l, mvar_y)) l) marg
      in
      let macc =
@@ -1749,7 +1758,7 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
      in
      let mret =
        match locals with
-       | [] -> with_locality_and_yielding (loc, yld) mret
+       | [] -> with_locality_and_forkable_yielding (loc, yld) mret
        | _ :: _ ->
           let mret', _ = Alloc.newvar_above macc in (* curried arrow *)
           mret'
@@ -1830,11 +1839,11 @@ let instance_prim_mode (desc : Primitive.description) ty =
   if is_poly desc.prim_native_repr_res ||
        List.exists is_poly desc.prim_native_repr_args then
     let mode_l = Locality.newvar () in
-    let mode_y = Yielding.newvar () in
-    let finalret = prim_mode' (Some (mode_l, mode_y)) desc.prim_native_repr_res in
+    let mode_fy = Forkable.newvar (), Yielding.newvar () in
+    let finalret = prim_mode' (Some (mode_l, mode_fy)) desc.prim_native_repr_res in
     instance_prim_locals desc.prim_native_repr_args
-      mode_l mode_y (Alloc.disallow_right Alloc.legacy) finalret ty,
-    Some mode_l, Some mode_y
+      mode_l mode_fy (Alloc.disallow_right Alloc.legacy) finalret ty,
+    Some mode_l, Some mode_fy
   else
     ty, None, None
 
@@ -5110,6 +5119,7 @@ let mode_crossing_structure_memaddr =
     ~regionality:false
     ~linearity:true
     ~portability:true
+    ~forkable:true
     ~yielding:true
     ~statefulness:true
 
@@ -5122,6 +5132,7 @@ let mode_crossing_functor =
     ~regionality:false
     ~linearity:false
     ~portability:false
+    ~forkable:false
     ~yielding:false
     ~statefulness:false
 

@@ -51,6 +51,8 @@ module Mode_axis_pair = struct
     | "contended" -> monadic Contention Contended
     | "shared" -> monadic Contention Shared
     | "uncontended" -> monadic Contention Uncontended
+    | "unforkable" -> comonadic Forkable Unforkable
+    | "forkable" -> comonadic Forkable Forkable
     | "yielding" -> comonadic Yielding Yielding
     | "unyielding" -> comonadic Yielding Unyielding
     | "stateless" -> comonadic Statefulness Stateless
@@ -107,6 +109,7 @@ module Transled_modifiers = struct
       portability :
         Mode.Portability.Const.t Comonadic.Atom.t Location.loc option;
       contention : Mode.Contention.Const.t Monadic.Atom.t Location.loc option;
+      forkable : Mode.Forkable.Const.t Comonadic.Atom.t Location.loc option;
       yielding : Mode.Yielding.Const.t Comonadic.Atom.t Location.loc option;
       statefulness :
         Mode.Statefulness.Const.t Comonadic.Atom.t Location.loc option;
@@ -122,6 +125,7 @@ module Transled_modifiers = struct
       uniqueness = None;
       portability = None;
       contention = None;
+      forkable = None;
       yielding = None;
       statefulness = None;
       visibility = None;
@@ -137,6 +141,7 @@ module Transled_modifiers = struct
     | Modal (Monadic Uniqueness) -> t.uniqueness
     | Modal (Comonadic Portability) -> t.portability
     | Modal (Monadic Contention) -> t.contention
+    | Modal (Comonadic Forkable) -> t.forkable
     | Modal (Comonadic Yielding) -> t.yielding
     | Modal (Comonadic Statefulness) -> t.statefulness
     | Modal (Monadic Visibility) -> t.visibility
@@ -152,6 +157,7 @@ module Transled_modifiers = struct
     | Modal (Monadic Uniqueness) -> { t with uniqueness = value }
     | Modal (Comonadic Portability) -> { t with portability = value }
     | Modal (Monadic Contention) -> { t with contention = value }
+    | Modal (Comonadic Forkable) -> { t with forkable = value }
     | Modal (Comonadic Yielding) -> { t with yielding = value }
     | Modal (Comonadic Statefulness) -> { t with statefulness = value }
     | Modal (Monadic Visibility) -> { t with visibility = value }
@@ -191,6 +197,8 @@ let transl_mod_bounds annots =
               Some { txt = Per_axis.min (Modal (Comonadic Portability)); loc };
             contention =
               Some { txt = Per_axis.min (Modal (Monadic Contention)); loc };
+            forkable =
+              Some { txt = Per_axis.min (Modal (Comonadic Forkable)); loc };
             yielding =
               Some { txt = Per_axis.min (Modal (Comonadic Yielding)); loc };
             externality = Some { txt = Externality.min; loc };
@@ -207,14 +215,26 @@ let transl_mod_bounds annots =
   in
   let empty_modifiers = Transled_modifiers.empty in
   let modifiers = List.fold_left step empty_modifiers annots in
-  (* Since [yielding] is the default mode in presence of [local],
-     the [global] modifier must also apply [unyielding] unless specified. *)
+  (* Since [unforkable] is the default mode in presence of [local],
+     the [global] modifier must also apply [forkable] unless specified. *)
   let modifiers =
     match
-      ( Transled_modifiers.get ~axis:(Modal (Comonadic Yielding)) modifiers,
+      ( Transled_modifiers.get ~axis:(Modal (Comonadic Forkable)) modifiers,
         Transled_modifiers.get ~axis:(Modal (Comonadic Areality)) modifiers )
     with
     | None, Some { txt = Modality (Meet_with Global); _ } ->
+      let set = Transled_modifiers.set ~axis:(Modal (Comonadic Forkable)) in
+      set modifiers
+        (Some { txt = Modality (Meet_with Forkable); loc = Location.none })
+    | _, _ -> modifiers
+  in
+  (* Likewise, [forkable] => [unyielding]. *)
+  let modifiers =
+    match
+      ( Transled_modifiers.get ~axis:(Modal (Comonadic Yielding)) modifiers,
+        Transled_modifiers.get ~axis:(Modal (Comonadic Forkable)) modifiers )
+    with
+    | None, Some { txt = Modality (Meet_with Forkable); _ } ->
       let set = Transled_modifiers.set ~axis:(Modal (Comonadic Yielding)) in
       set modifiers
         (Some { txt = Modality (Meet_with Unyielding); loc = Location.none })
@@ -260,6 +280,7 @@ let transl_mod_bounds annots =
   let uniqueness = modal (Monadic Uniqueness) modifiers.uniqueness in
   let portability = modal (Comonadic Portability) modifiers.portability in
   let contention = modal (Monadic Contention) modifiers.contention in
+  let forkable = modal (Comonadic Forkable) modifiers.forkable in
   let yielding = modal (Comonadic Yielding) modifiers.yielding in
   let statefulness = modal (Comonadic Statefulness) modifiers.statefulness in
   let visibility = modal (Monadic Visibility) modifiers.visibility in
@@ -280,19 +301,26 @@ let transl_mod_bounds annots =
   in
   let comonadic =
     Mode.Crossing.Comonadic.create ~regionality ~linearity ~portability
-      ~yielding ~statefulness
+      ~forkable ~yielding ~statefulness
   in
   let crossing : Crossing.t = { monadic; comonadic } in
   create crossing ~externality ~nullability ~separability
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
-  (* [yielding] has a different default depending on whether [areality]
+  (* [forkable] has a different default depending on whether [areality]
      is [global] or [local]. *)
-  let yielding =
-    match annots.yielding, annots.areality with
+  let forkable =
+    match annots.forkable, annots.areality with
     | (Some _ as y), _ | y, None -> y
-    | None, Some Locality.Const.Global -> Some Yielding.Const.Unyielding
-    | None, Some Locality.Const.Local -> Some Yielding.Const.Yielding
+    | None, Some Locality.Const.Global -> Some Forkable.Const.Forkable
+    | None, Some Locality.Const.Local -> Some Forkable.Const.Unforkable
+  in
+  (* Likewise for [yielding]. *)
+  let yielding =
+    match annots.yielding, annots.forkable with
+    | (Some _ as y), _ | y, None -> y
+    | None, Some Forkable.Const.Forkable -> Some Yielding.Const.Unyielding
+    | None, Some Forkable.Const.Unforkable -> Some Yielding.Const.Yielding
   in
   (* Likewise for [contention]. *)
   let contention =
@@ -311,7 +339,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     | None, Some Statefulness.Const.(Observing | Stateful) ->
       Some Portability.Const.Nonportable
   in
-  { annots with yielding; contention; portability }
+  { annots with forkable; yielding; contention; portability }
 
 let transl_mode_annots annots : Alloc.Const.Option.t =
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
@@ -328,14 +356,22 @@ let transl_mode_annots annots : Alloc.Const.Option.t =
 
 let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
   let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
-  (* Untranslate [areality] and [yielding]. *)
+  (* Untranslate [areality] and [forkable]. *)
   let areality = print_to_string_opt Mode.Locality.Const.print modes.areality in
-  let yielding =
-    (* Since [yielding] has non-standard defaults, we special-case
+  let forkable =
+    (* Since [forkable] has non-standard defaults, we special-case
        whether we want to print it here. *)
-    match modes.yielding, modes.areality with
-    | Some Yielding.Const.Yielding, Some Locality.Const.Local
-    | Some Yielding.Const.Unyielding, Some Locality.Const.Global ->
+    match modes.forkable, modes.areality with
+    | Some Forkable.Const.Unforkable, Some Locality.Const.Local
+    | Some Forkable.Const.Forkable, Some Locality.Const.Global ->
+      None
+    | _, _ -> print_to_string_opt Mode.Forkable.Const.print modes.forkable
+  in
+  (* Untranslate [forkable] and [yielding]. *)
+  let yielding =
+    match modes.yielding, modes.forkable with
+    | Some Yielding.Const.Yielding, Some Forkable.Const.Unforkable
+    | Some Yielding.Const.Unyielding, Some Forkable.Const.Forkable ->
       None
     | _, _ -> print_to_string_opt Mode.Yielding.Const.print modes.yielding
   in
@@ -378,6 +414,7 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
       linearity;
       portability;
       contention;
+      forkable;
       yielding;
       statefulness;
       visibility ]
@@ -407,7 +444,7 @@ let untransl_modality (a : Modality.atom) : Parsetree.modality loc =
   { txt = Modality s; loc = Location.none }
 
 (* For now, mutable implies:
-   1. [global] and [unyielding]. This is for compatibility with existing code
+   1. [global forkable unyielding]. This is for compatibility with existing code
       and will be removed in the future.
    2. [many]. This is to remedy the coarse treatment of modalities in the
       uniqueness analysis.
@@ -420,6 +457,7 @@ let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
   let comonadic : Modality.atom list =
     [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
       Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
+      Atom (Comonadic Forkable, Meet_with Forkable.Const.legacy);
       Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy) ]
   in
   let monadic : Modality.atom list =
@@ -442,7 +480,7 @@ let idx_expected_modalities ~(mut : bool) =
      creation to contain. Because these are coupled, this function checks that
      they are equal.
       1. The default modalities (id for non-mutable fields, global many aliased
-         unyielding for mutable fields) should work.
+         forkable unyielding for mutable fields) should work.
       2. It should also be safe wrt to type signatures given to block index
          primitives (see [idx_imm.mli] and [idx_mut.mli] in [Stdlib_beta]). *)
   let modality_of_list l =
@@ -459,6 +497,7 @@ let idx_expected_modalities ~(mut : bool) =
       modality_of_list
         [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
           Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
+          Atom (Comonadic Forkable, Meet_with Forkable.Const.legacy);
           Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
           Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy) ]
       [@warning "-18"]
@@ -473,18 +512,24 @@ let idx_expected_modalities ~(mut : bool) =
       "Typemode.idx_expected_modalities: mismatch with mutable implied \
        modalities"
 
-(* Since [yielding] is the default mode in presence of [local],
-   the [global] modality must also apply [unyielding] unless specified.
+(* Since [unforkable] is the default mode in presence of [local],
+   the [global] modality must also apply [forkable] unless specified.
 
-   Similarly for [visibility]/[contention] and [statefulness]/[portability]. *)
+   Similarly for [forkable]/[yielding], [visibility]/[contention],
+   and [statefulness]/[portability]. *)
 let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
   match[@warning "-18"] ax, a with
   | Comonadic Areality, Meet_with a ->
-    let b : Yielding.Const.t =
+    let b : Forkable.Const.t =
       match a with
-      | Global -> Unyielding
-      | Local -> Yielding
+      | Global -> Forkable
+      | Local -> Unforkable
       | Regional -> assert false
+    in
+    [Atom (Comonadic Forkable, Meet_with b)]
+  | Comonadic Forkable, Meet_with a ->
+    let b : Yielding.Const.t =
+      match a with Forkable -> Unyielding | Unforkable -> Yielding
     in
     [Atom (Comonadic Yielding, Meet_with b)]
   | Monadic Visibility, Join_with a ->

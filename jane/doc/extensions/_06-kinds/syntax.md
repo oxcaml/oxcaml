@@ -103,15 +103,15 @@ their shallowness, are considered separately.
 
 The abbreviations defined in the language are as follows:
 
-* `everything = global aliased many contended portable unyielding immutable
-                stateless external_`
+* `everything = global aliased many contended portable forkable unyielding
+                immutable stateless external_`
 
     Values whose types have kinds that include `mod everything` do not...
 
     * ... allocate memory: this allows them to mode-cross to `global` and be
       `external_`.
     * ... contain functions: this allows them to mode-cross to `many portable
-      unyielding stateless` (all of which only affect functions).
+      forkable unyielding stateless` (all of which only affect functions).
     * ... support mutation: this allows them to mode-cross to `contended
       immutable`.
     * ... point anywhere: this allows mode-crossing to `aliased` (which would
@@ -137,8 +137,8 @@ The abbreviations defined in the language are as follows:
 
     This is the kind of `int or_null` and similar types.
 
-* `immediate64 = value mod global aliased many contended portable unyielding
-                 immutable stateless external64 non_float`
+* `immediate64 = value mod global aliased many contended portable forkable
+                 unyielding immutable stateless external64 non_float`
 
     This is just like `immediate`, but applies only on 64-bit machines. On a
     32-bit machine, value whose types are `immediate64` may be
@@ -154,7 +154,8 @@ The abbreviations defined in the language are as follows:
     * Something storable in 64 bits without indirection cannot support
       update-in-place, so mode-crossing to `aliased` is safe.
     * Something storable in 64 bits without indirection cannot contain
-      functions, so mode-crossing `many portable unyielding stateless` is safe.
+      functions, so mode-crossing `many portable forkable unyielding stateless`
+      is safe.
     * Something storable in 64 bits without indirection cannot support mutation
       (much like other unboxed types), so mode-crossing `contended immutable` is
       safe.
@@ -167,19 +168,20 @@ The abbreviations defined in the language are as follows:
     call to `caml_modify` (on 64-bit machines). See also the documentation on
     [externality][].
 
-* `immutable_data =
-     value mod many contended portable unyielding immutable stateless non_float`
+* `immutable_data = value mod many contended portable forkable unyielding immutable
+                    stateless non_float`
 
     This is a suitable kind for plain old data that is immutable. By "plain
     old data", we mean that values of types of this kind contain no pointers to
     functions. The type `string` has this kind.
 
-* `sync_data = value mod many contended portable unyielding stateless non_float`
+* `sync_data = value mod many contended portable forkable unyielding stateless
+               non_float`
 
    This is a suitable kind of plain old data that the type system guarantees can be mutated only
    safely in parallel, similar to the `Sync` trait in Rust.
 
-* `mutable_data = value mod many portable unyielding stateless non_float`
+* `mutable_data = value mod many portable forkable unyielding stateless non_float`
 
     This is a suitable kind for plain old data that may be mutable. The
     type `int ref` has this kind.

@@ -1443,10 +1443,17 @@ let tree_of_mode_new (t: Parsetree.mode loc) =
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
   let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
 
-  (* [yielding] has implied defaults depending on [areality]: *)
+  (* [forkable] has implied defaults depending on [areality]: *)
+  let forkable =
+    match modes.areality, modes.forkable with
+    | Local, Unforkable | Global, Forkable -> None
+    | _, _ -> Some modes.forkable
+  in
+
+  (* [yielding] has implied defaults depending on [forkable]: *)
   let yielding =
-    match modes.areality, modes.yielding with
-    | Local, Yielding | Global, Unyielding -> None
+    match modes.forkable, modes.yielding with
+    | Unforkable, Yielding | Forkable, Unyielding -> None
     | _, _ -> Some modes.yielding
   in
 
@@ -1464,7 +1471,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     | _, _ -> Some modes.portability
   in
 
-  let diff = {diff with yielding; contention; portability} in
+  let diff = {diff with forkable; yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
   let l = Typemode.untransl_mode_annots diff in
   match all_or_none tree_of_mode_old l with
