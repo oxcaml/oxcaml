@@ -38,7 +38,7 @@ val transl_toplevel_definition: structure -> lambda
 
 val transl_package:
       Compilation_unit.t option list -> module_coercion
-        -> int * module_representation
+        -> module_representation * module_representation
 
 type runtime_arg =
   | (* A module from which we need to project out the argument block *)

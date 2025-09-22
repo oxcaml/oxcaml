@@ -4393,6 +4393,9 @@ let package_units initial_env objfiles target_cmi modulename =
   (* Compute signature of packaged unit *)
   Ident.reinit();
   let sg = package_signatures units in
+  let repr =
+    Includemod.module_representation_of_signature ~loc:Location.none sg
+  in
   (* Compute the shape of the package *)
   let pack_uid = Uid.of_compilation_unit_id modulename in
   let shape =
@@ -4425,7 +4428,7 @@ let package_units initial_env objfiles target_cmi modulename =
       (Cmt_format.Packed (sg, objfiles)) initial_env  None (Some shape);
     Cms_format.save_cms  (Unit_info.companion_cms target_cmi) modulename
       (Cmt_format.Packed (sg, objfiles)) initial_env (Some shape) decl_deps;
-    cc
+    cc, repr
   end else begin
     (* Determine imports *)
     let unit_names = List.map fst units in
@@ -4456,7 +4459,7 @@ let package_units initial_env objfiles target_cmi modulename =
       Cms_format.save_cms (Unit_info.companion_cms target_cmi)  modulename
         (Cmt_format.Packed (sign, objfiles)) initial_env (Some shape) decl_deps;
     end;
-    Tcoerce_none
+    Tcoerce_none, repr
   end
 
 

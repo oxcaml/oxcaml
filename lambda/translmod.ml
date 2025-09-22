@@ -113,7 +113,7 @@ let rec apply_coercion loc strict restr arg =
           else
             match input_repr with
             | Module_value_only _ -> layout_value_field
-            | Module_mixed shape ->
+            | Module_mixed (shape, _) ->
               layout_of_mixed_block_element shape.(pos)
         in
         let lam =
@@ -1008,6 +1008,7 @@ and transl_include_functor ~generative modl params scopes loc =
   let modl = transl_module ~scopes Tcoerce_none None modl in
   let params = if generative then [params;[]] else [params] in
   let params = List.map (fun coercion ->
+    (* CR jrayman *)
     Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
           List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
@@ -1068,8 +1069,11 @@ let required_globals ~flambda body =
 let add_arg_block_to_module_representation = function
     (* NB: this assumes [arg_block] has layout value *)
   | Module_value_only field_count -> Module_value_only (field_count + 1)
-  | Module_mixed shape ->
-    Module_mixed (Array.append shape [| mixed_block_element_for_module |])
+  | Module_mixed (shape, shape_for_read) ->
+    Module_mixed
+      ( Array.append shape [| mixed_block_element_for_module |],
+        Array.append shape_for_read
+          [| mixed_block_element_with_locality_mode_for_module |] )
 
 let add_arg_block_to_module_block primary_block_lam primary_repr restr =
   let primary_block_id = Ident.create_local "*primary-block*" in
@@ -1090,7 +1094,7 @@ let add_arg_block_to_module_block primary_block_lam primary_repr restr =
        primary_block_id_duid, primary_block_lam,
        Llet(Strict, layout_module, arg_block_id,
             arg_block_id_duid, arg_block_lam,
-            Lprim(block_of_module_representation primary_repr,
+            Lprim(block_of_module_representation new_repr,
                   all_fields,
                   Loc_unknown))),
   new_repr,
@@ -1407,21 +1411,10 @@ let get_component = function
     None -> Lconst const_unit
   | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
 
-let transl_package component_names coercion =
-  (* CR jrayman: should be a better way of getting [repr] *)
-  let repr =
-    match coercion with
-    | Tcoerce_none -> Module_value_only (List.length component_names)
-      (* CR jrayman: wrong *)
-    | Tcoerce_structure { output_repr; _ } ->
-      transl_module_representation output_repr
-    | Tcoerce_functor _
-    | Tcoerce_primitive _
-    | Tcoerce_alias _ -> assert false
-  in
+let transl_package component_names coercion repr =
   repr,
   apply_coercion Loc_unknown Strict coercion
-    (Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
+    (Lprim(block_of_module_representation repr,
            List.map get_component component_names,
            Loc_unknown))
 
@@ -1439,10 +1432,10 @@ let unit_of_runtime_arg arg =
   | Argument_block { ra_unit = cu; _ } | Main_module_block cu -> Some cu
   | Unit -> None
 
-let transl_runtime_arg arg =
+let transl_runtime_arg repr arg =
   match arg with
   | Argument_block { ra_unit; ra_field_idx; } ->
-      Lprim (mod_field ra_field_idx (Module_value_only (-1)),
+      Lprim (mod_field ra_field_idx repr,
              [Lprim (Pgetglobal ra_unit, [], Loc_unknown)],
              Loc_unknown)
   | Main_module_block cu ->
@@ -1460,11 +1453,13 @@ let transl_instance_impl
   let instantiating_functor_lam =
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
-    Lprim (mod_field 0 (Module_value_only (-1)),
+    Lprim (mod_field 0 main_module_block_repr,
            [Lprim (Pgetglobal base_compilation_unit, [], Loc_unknown)],
            Loc_unknown)
   in
-  let runtime_args_lam = List.map transl_runtime_arg runtime_args in
+  let runtime_args_lam =
+    List.map (transl_runtime_arg main_module_block_repr) runtime_args
+  in
   let code =
     Lapply {
       ap_func = instantiating_functor_lam;

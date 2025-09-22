@@ -91,7 +91,7 @@ type flambda2 =
   Cmm.phrase list
 
 let make_package_object ~machine_width unix ~ppf_dump members target coercion
-      ~(flambda2 : flambda2) =
+      repr ~(flambda2 : flambda2) =
   let pack_name =
     Printf.sprintf "pack(%s)"
       (Unit_info.Artifact.modname target |> CU.name_as_string) in
@@ -120,7 +120,7 @@ let make_package_object ~machine_width unix ~ppf_dump members target coercion
     let prefixname = Filename.remove_extension objtemp in
     let required_globals = Compilation_unit.Set.empty in
     let main_module_block_repr, code =
-      Translmod.transl_package components coercion
+      Translmod.transl_package components coercion repr
     in
     let code = Simplif.simplify_lambda code in
     let main_module_block_format : Lambda.main_module_block_format =
@@ -224,12 +224,13 @@ let build_package_cmx members cmxfile ~main_module_block_repr =
 (* Make the .cmx and the .o for the package *)
 
 let package_object_files ~machine_width unix ~ppf_dump files target
-                         targetcmx coercion ~flambda2 =
+                         targetcmx coercion repr ~flambda2 =
   let pack_path = Unit_info.Artifact.modname target in
   let members = map_left_right (read_member_info pack_path) files in
   check_units members;
   let main_module_block_repr =
-    make_package_object ~machine_width unix ~ppf_dump members target coercion ~flambda2
+    make_package_object ~machine_width unix ~ppf_dump members target coercion
+      repr ~flambda2
   in
   build_package_cmx members targetcmx ~main_module_block_repr
 
@@ -256,10 +257,10 @@ let package_files ~machine_width unix ~ppf_dump initial_env files targetcmx
   let comp_unit = Unit_info.Artifact.modname cmx in
   Compilenv.reset unit_info;
   Misc.try_finally (fun () ->
-      let coercion =
+      let coercion, repr =
         Typemod.package_units initial_env files cmi comp_unit in
       package_object_files ~machine_width unix ~ppf_dump files obj targetcmx
-        coercion ~flambda2
+        coercion repr ~flambda2
     )
     ~exceptionally:(fun () ->
         remove_file targetcmx; remove_file (Unit_info.Artifact.filename obj)
