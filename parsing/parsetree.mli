@@ -59,10 +59,6 @@ type constant =
 
 type location_stack = Location.t list
 
-(* TODO (ZJE): change so that the mod in kinds is parsed using this?? is that useless?
-   I think it is the right thing to do (doesn't make semantic sense otherwise)
-   but I fear that it might spiral out of control *)
-(* Q (ZJE): in some uses this gets confused with jkind annotation Mod variant... *)
 type mod_ = | Mod of string [@@unboxed]
 type mods = mod_ loc list
 
@@ -1357,6 +1353,8 @@ and jkind_annotation_desc =
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)
+  (* CR zeisbach: this should be renamed to Jkind_mod or something, to avoid
+     clashing with the other Mod above. Also, this should take in mods and not modes *)
   | Mod of jkind_annotation * modes
   | With of jkind_annotation * core_type * modalities
   | Kind_of of core_type
