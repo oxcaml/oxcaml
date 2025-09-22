@@ -593,7 +593,7 @@ val layout_of_extern_repr : extern_repr -> layout
 
 val extern_repr_involves_unboxed_products : extern_repr -> bool
 
-(* Used for ... CR jrayman *)
+(* CR mixed-modules: finish comment: Used for ... *)
 val layout_of_mixed_block_element : 'a. 'a mixed_block_element -> layout
 
 type structured_constant =

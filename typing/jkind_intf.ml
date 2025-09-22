@@ -285,6 +285,7 @@ module History = struct
     | Tuple_element
     | Separability_check
     | Polymorphic_variant_field
+    | Structure_element
     | V1_safety_check
     | Probe
     | Captured_in_object
