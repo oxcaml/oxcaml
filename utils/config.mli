@@ -148,8 +148,7 @@ val cms_magic_number: string
 val cmj_magic_number: string
 (** Magic number for Js_of_ocaml IR files *)
 
-val cmja_magic_number: string
-(** Magic number for Js_of_ocaml IR archive files *)
+(* Note: .cmja files are JavaScript files, not binary archives with magic numbers *)
 
 val linear_magic_number: string
 (** Magic number for Linear internal representation files *)

@@ -98,15 +98,15 @@ if [[ ! -v srcs["${library}"] ]]; then
     exit 1
 fi
 
-        # Get topological order for creating $library.cmja
-        cmja_contents=$(
+        # Get topological order for creating $library.cmjxa
+        cmjxa_contents=$(
     for cu in "${!deps[@]}"; do
         # std_exit doesn't go in the stdlib archive
         [[ ${cu} != std_exit ]] || continue
 
         # Make sure to still add $cu to archive, even if it has no deps
         for dep in ${deps[$cu]:-$cu}; do
-            echo "${cu}.cmjo ${dep}.cmjo"
+            echo "${cu}.cmjx ${dep}.cmjx"
         done
     done | tsort | uniq | tac | tr '\n' ' ')
 
@@ -141,7 +141,7 @@ done
 
 cat <<EOF
 (rule
- (target ${library}.cmja)
- (deps ${cmja_contents})
- (action (run %{bin:ocamlj} ${OCAMLJ_FLAGS[*]} -linkall -a -o %{target} %{deps})))
+ (targets ${library}.cmjxa ${library}.cmja)
+ (deps ${cmjxa_contents})
+ (action (run %{bin:ocamlj} ${OCAMLJ_FLAGS[*]} -linkall -a -o ${library}.cmjxa %{deps})))
 EOF

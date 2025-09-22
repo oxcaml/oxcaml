@@ -164,6 +164,7 @@ let cmj f = mk_artifact ".cmj" f
 let cmjo f = mk_artifact ".cmjo" f
 let cmja f = mk_artifact ".cmja" f
 let cmjx f = mk_artifact ".cmjx" f
+let cmjxa f = mk_artifact ".cmjxa" f
 let annot f = mk_artifact ".annot" f
 
 let companion_obj f = companion_artifact Config.ext_obj f

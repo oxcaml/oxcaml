@@ -57,7 +57,7 @@ let main argv ppf =
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
     (try
        Compenv.process_deferred_actions
-         (ppf, Jscompile.implementation, Jscompile.interface, ".cmjo", ".cmja")
+         (ppf, Jscompile.implementation, Jscompile.interface, ".cmjx", ".cmjxa")
      with Arg.Bad msg ->
        prerr_endline msg;
        Clflags.print_arguments program;
@@ -86,9 +86,10 @@ let main argv ppf =
     end;
     if !Clflags.make_archive then (
       Compmisc.init_path ();
+      let target = Compenv.extract_output !Clflags.output_name in
       Jslibrarian.create_archive
         (Compenv.get_objfiles ~with_ocamlparam:false)
-        (Compenv.extract_output !Clflags.output_name);
+        target;
       Warnings.check_fatal ())
     else if !Clflags.make_package then Misc.fatal_error "packaging is not supported by ocamlj"
     else if !Clflags.instantiate then Misc.fatal_error "instantiation is not supported by ocamlj"

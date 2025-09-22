@@ -454,8 +454,16 @@ let read_one_param ppf position name v =
         ccobjs := Misc.rev_split_words v @ !ccobjs
     end
 
+  | "jslib" when !jsir ->
+    begin
+      match position with
+      | Before_compile _ -> ()
+      | Before_link | Before_args ->
+        ccobjs := Misc.rev_split_words v @ !ccobjs
+    end
+
   | "ccopt"
-  | "ccopts"
+  | "ccopts" when not !jsir
     ->
     begin
       match position with
@@ -464,6 +472,18 @@ let read_one_param ppf position name v =
       | Before_args ->
         first_ccopts := v :: !first_ccopts
     end
+
+  | "jsopt"
+  | "jsopts" when !jsir
+    ->
+    begin
+      match position with
+      | Before_link | Before_compile _ ->
+        last_ccopts := v :: !last_ccopts
+      | Before_args ->
+        first_ccopts := v :: !first_ccopts
+    end
+
 
   | "ppx" ->
     begin
@@ -476,7 +496,7 @@ let read_one_param ppf position name v =
 
 
   | "cmo" | "cma" ->
-    if not !native_code then
+    if not !native_code && not !jsir then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -487,6 +507,16 @@ let read_one_param ppf position name v =
 
   | "cmx" | "cmxa" ->
     if !native_code then
+    begin
+      match position with
+      | Before_link | Before_compile _ ->
+        last_objfiles := v ::! last_objfiles
+      | Before_args ->
+        first_objfiles := v :: !first_objfiles
+    end
+
+  | "cmjx" | "cmjxa" ->
+    if !jsir then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -716,8 +746,8 @@ let process_action
   | ProcessJavaScriptFile name ->
       (* JavaScript stub files are handled by js_of_ocaml during linking *)
       if !Clflags.jsir then
-        (* For JavaScript backend, add .js files to objfiles for linking *)
-        objfiles := name :: !objfiles
+        (* For JavaScript backend, add .js files to ccobjs for runtime building *)
+        ccobjs := name :: !ccobjs
       else
         (* For non-JavaScript backends, ignore .js files *)
         ()
@@ -731,8 +761,15 @@ let process_action
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
         objfiles := name :: !objfiles
-      else if Filename.check_suffix name Config.ext_obj
-           || Filename.check_suffix name Config.ext_lib then begin
+      else if
+        if !jsir
+        then
+          (Filename.check_suffix name ".cmjo" (* javascript object *)
+           || Filename.check_suffix name ".cmja" (* javascript archive *))
+        else
+          (Filename.check_suffix name Config.ext_obj
+           || Filename.check_suffix name Config.ext_lib)
+      then begin
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
