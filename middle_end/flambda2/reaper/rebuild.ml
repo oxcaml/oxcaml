@@ -893,6 +893,7 @@ let decide_whether_apply_needs_calling_convention_change env apply =
         let new_call_kind =
           match singleton_code_id with
           | Some code_id -> Call_kind.direct_function_call code_id alloc_mode
+          | None ->
             Call_kind.indirect_function_call_known_arity
               ~code_ids:(Known code_ids) alloc_mode
         in
