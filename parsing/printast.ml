@@ -154,17 +154,17 @@ let modality i ppf modality =
   line i ppf "modality %a\n" fmt_string_loc
     (Location.map (fun (Modality x) -> x) modality)
 
-let modalities i ppf (modalities, ms) =
-  List.iter (fun m -> modality i ppf m) modalities;
-  mods i ppf ms
+let modalities i ppf {core_modalities; mod_modalities} =
+  List.iter (fun m -> modality i ppf m) core_modalities;
+  mods i ppf mod_modalities
 
 let mode i ppf mode =
   line i ppf "mode %a\n" fmt_string_loc
     (Location.map (fun (Mode x) -> x) mode)
 
-let modes i ppf (modes, ms) =
-  List.iter (fun m -> mode i ppf m) modes;
-  mods i ppf ms
+let modes i ppf {core_modes; mod_modes} =
+  List.iter (fun m -> mode i ppf m) core_modes;
+  mods i ppf mod_modes
 
 let include_kind i ppf = function
   | Structure -> line i ppf "Structure\n"
