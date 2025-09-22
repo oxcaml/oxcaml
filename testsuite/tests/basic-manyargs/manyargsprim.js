@@ -1,6 +1,6 @@
 //Provides: manyargs
 function manyargs(a, b, c, d, e, f, g, h, i, j, k) {
-  var console = joo_global_object.console;
+  var console = globalThis.console;
   console.log("a = " + a);
   console.log("b = " + b);
   console.log("c = " + c);
