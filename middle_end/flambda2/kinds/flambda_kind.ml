@@ -383,7 +383,11 @@ module Scannable_block_shape = struct
   let of_module_representation = function
     | Lambda.Module_value_only _ -> Value_only
     | Lambda.Module_mixed shape ->
-      Mixed_record (Mixed_block_shape.from_mixed_block_shape shape)
+      Mixed_record
+        (shape
+        |> Mixed_block_lambda_shape.of_mixed_block_elements
+             ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+        |> Mixed_block_shape.from_mixed_block_shape)
 end
 
 module Block_shape = struct
