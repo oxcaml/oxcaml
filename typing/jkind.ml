@@ -482,6 +482,7 @@ module Mod_bounds = struct
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Linearity))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Contention))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Portability))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Forkable))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Yielding))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Visibility))
@@ -1801,11 +1802,14 @@ module Const = struct
             (* [global] implies [forkable unyielding], omit them. *)
             List.filter (fun m -> m <> "forkable" && m <> "unyielding") modes
           | true, true, false ->
-            (* [global] implies [forkable], omit it but indicate [unyielding]. *)
-            List.filter (fun m -> m <> "forkable") modes @ ["unyielding"]
+            (* [global] implies [forkable], omit it and print yielding. *)
+            List.filter (fun m -> m <> "forkable") modes @ ["yielding"]
+          | true, false, true ->
+            (* Print indicating [unforkable]. *)
+            modes @ ["unforkable"]
           | true, false, false ->
-            (* Indicate both [forkable unyielding]. *)
-            modes @ ["forkable"; "unyielding"]
+            (* Print indicating [unforkable yielding]. *)
+            modes @ ["unforkable"; "yielding"]
           | _, _, _ -> modes
         in
         let modes =

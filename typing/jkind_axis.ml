@@ -188,6 +188,7 @@ module Axis = struct
       Pack (Modal (Comonadic Linearity));
       Pack (Modal (Monadic Contention));
       Pack (Modal (Comonadic Portability));
+      Pack (Modal (Comonadic Forkable));
       Pack (Modal (Comonadic Yielding));
       Pack (Modal (Comonadic Statefulness));
       Pack (Modal (Monadic Visibility));

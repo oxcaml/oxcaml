@@ -317,7 +317,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   in
   (* Likewise for [yielding]. *)
   let yielding =
-    match annots.yielding, annots.forkable with
+    match annots.yielding, forkable with
     | (Some _ as y), _ | y, None -> y
     | None, Some Forkable.Const.Forkable -> Some Yielding.Const.Unyielding
     | None, Some Forkable.Const.Unforkable -> Some Yielding.Const.Yielding
@@ -356,7 +356,7 @@ let transl_mode_annots annots : Alloc.Const.Option.t =
 
 let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
   let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
-  (* Untranslate [areality] and [forkable]. *)
+  (* Untranslate [areality], [forkable], and [yielding]. *)
   let areality = print_to_string_opt Mode.Locality.Const.print modes.areality in
   let forkable =
     (* Since [forkable] has non-standard defaults, we special-case
@@ -367,13 +367,14 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
       None
     | _, _ -> print_to_string_opt Mode.Forkable.Const.print modes.forkable
   in
-  (* Untranslate [forkable] and [yielding]. *)
   let yielding =
-    match modes.yielding, modes.forkable with
-    | Some Yielding.Const.Yielding, Some Forkable.Const.Unforkable
-    | Some Yielding.Const.Unyielding, Some Forkable.Const.Forkable ->
+    match modes.yielding, modes.forkable, modes.areality with
+    | Some Yielding.Const.Yielding, Some Forkable.Const.Unforkable, _
+    | Some Yielding.Const.Unyielding, Some Forkable.Const.Forkable, _
+    | Some Yielding.Const.Yielding, None, Some Locality.Const.Local
+    | Some Yielding.Const.Unyielding, None, Some Locality.Const.Global ->
       None
-    | _, _ -> print_to_string_opt Mode.Yielding.Const.print modes.yielding
+    | _, _, _ -> print_to_string_opt Mode.Yielding.Const.print modes.yielding
   in
   (* Untranslate [visibility] and [contention]. *)
   let visibility =
@@ -515,18 +516,19 @@ let idx_expected_modalities ~(mut : bool) =
 (* Since [unforkable] is the default mode in presence of [local],
    the [global] modality must also apply [forkable] unless specified.
 
-   Similarly for [forkable]/[yielding], [visibility]/[contention],
+   Similarly for [forkable]/[yielding], [visibility]/[contention],`
    and [statefulness]/[portability]. *)
 let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
   match[@warning "-18"] ax, a with
   | Comonadic Areality, Meet_with a ->
-    let b : Forkable.Const.t =
+    let f, y =
       match a with
-      | Global -> Forkable
-      | Local -> Unforkable
+      | Global -> Forkable.Const.Forkable, Yielding.Const.Unyielding
+      | Local -> Forkable.Const.Unforkable, Yielding.Const.Yielding
       | Regional -> assert false
     in
-    [Atom (Comonadic Forkable, Meet_with b)]
+    [ Atom (Comonadic Forkable, Meet_with f);
+      Atom (Comonadic Yielding, Meet_with y) ]
   | Comonadic Forkable, Meet_with a ->
     let b : Yielding.Const.t =
       match a with Forkable -> Unyielding | Unforkable -> Yielding

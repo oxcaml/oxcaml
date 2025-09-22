@@ -183,7 +183,7 @@ let value_descriptions ~loc env name
              let mode_f2 = Option.map fst mode_fy2 in
              let mode_y2 = Option.map snd mode_fy2 in
              Option.iter (Mode.Locality.equate_exn loc) mode_l2;
-             Option.iter (Mode.Forkable.equate_exn fork) (mode_f2);
+             Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              try
                Ctype.moregeneral env true ty1 ty2
