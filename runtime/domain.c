@@ -2234,18 +2234,6 @@ static inline void domain_root_remove(value *root) {
   *root = Val_unit;
 }
 
-static inline value domain_root_compare_and_set(value *root, value old, value new)
-{
-  CAMLnoalloc;
-  value current = *root;
-  if (current == old) {
-    caml_modify_generational_global_root(root, new);
-    return Val_true;
-  } else {
-    return Val_false;
-  }
-}
-
 /* Domain-local state */
 
 CAMLprim value caml_domain_dls_set(value t)
@@ -2261,7 +2249,14 @@ CAMLprim value caml_domain_dls_get(value unused)
 
 CAMLprim value caml_domain_dls_compare_and_set(value old, value new)
 {
-  return domain_root_compare_and_set(&Caml_state->dls_state, old, new);
+  CAMLnoalloc;
+  value current = Caml_state->dls_state;
+  if (current == old) {
+    caml_modify_generational_global_root(&Caml_state->dls_state, new);
+    return Val_true;
+  } else {
+    return Val_false;
+  }
 }
 
 /* Thread-local state */
