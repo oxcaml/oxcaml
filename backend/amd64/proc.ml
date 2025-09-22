@@ -622,7 +622,10 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Poptrap _ | Prologue | Epilogue ->
     if fp then [| rbp |] else [||]
   | Stack_check _ ->
-    assert false (* the instruction is added after register allocation *)
+    (* This case is used by [Cfg_available_regs].  r10 is actually saved and
+       restored by the sequence to which [Stack_check] is expanded, but it may
+       be clobbered in the middle. *)
+    [| r10 |]
 
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
