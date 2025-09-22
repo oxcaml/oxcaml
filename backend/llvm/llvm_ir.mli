@@ -129,7 +129,7 @@ module Ident : sig
 
   val to_string_hum : t -> string
 
-  val to_string_raw : t -> string
+  val to_string_encoded : t -> string
 
   module Gen : sig
     type ident = t

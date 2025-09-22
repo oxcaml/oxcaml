@@ -290,11 +290,11 @@ module Ident = struct
     | Local s -> s ^ ":"
     | Global _ -> fail "Type.to_label_string_exn"
 
-  let to_string_hum t = match t with Local s -> "%" ^ s | Global s -> "@" ^ s
+  let to_string_hum t = match t with Local s -> s | Global s -> s
 
-  let to_string_raw = function
-    | Local s | Global s ->
-      Asm_targets.(Asm_symbol.create s |> Asm_symbol.encode)
+  let to_string_encoded = function
+    | Local s -> s
+    | Global s -> Asm_targets.(Asm_symbol.create s |> Asm_symbol.encode)
 
   module Gen = struct
     type ident = t

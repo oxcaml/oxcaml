@@ -1251,10 +1251,10 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
     (* Record label here - we will jump here for the handler *)
     let try_and_exn_entry = V.of_label (Cmm.new_label ()) in
     let fun_name =
-      E.get_fun_ident (get_fun_info t).emitter |> LL.Ident.to_string_raw
+      E.get_fun_ident (get_fun_info t).emitter |> LL.Ident.to_string_hum
     in
     let label_name =
-      LL.Ident.to_string_raw (V.get_ident_exn try_and_exn_entry)
+      LL.Ident.to_string_hum (V.get_ident_exn try_and_exn_entry)
     in
     let recover_rbp_asm_ident =
       LL.Ident.global ("recover_rbp_asm." ^ fun_name ^ "." ^ label_name)
@@ -1736,8 +1736,8 @@ let define_wrap_try t =
 let define_restore_rbp t =
   List.iter
     (fun ({ recover_rbp_asm_ident; recover_rbp_var_ident; _ } : trap_block_info) ->
-      let recover_rbp_asm = LL.Ident.to_string_raw recover_rbp_asm_ident in
-      let recover_rbp_var = LL.Ident.to_string_raw recover_rbp_var_ident in
+      let recover_rbp_asm = LL.Ident.to_string_encoded recover_rbp_asm_ident in
+      let recover_rbp_var = LL.Ident.to_string_encoded recover_rbp_var_ident in
       add_module_asm t
         [ "  .text";
           recover_rbp_asm ^ ":";
@@ -1745,9 +1745,12 @@ let define_restore_rbp t =
           "  addq $8, %rsp";
           "  movq " ^ recover_rbp_var ^ "(%rip), %rbx";
           "  jmpq *%rbx" ];
-      add_data_def t (LL.Data.external_ recover_rbp_asm);
       add_data_def t
-        (LL.Data.constant recover_rbp_var (V.zeroinitializer T.ptr)))
+        (LL.Data.external_ (LL.Ident.to_string_hum recover_rbp_asm_ident));
+      add_data_def t
+        (LL.Data.constant
+           (LL.Ident.to_string_hum recover_rbp_var_ident)
+           (V.zeroinitializer T.ptr)))
     t.all_trap_blocks
 
 (* Declare menitoned but not declared data items as extern *)
