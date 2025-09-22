@@ -58,9 +58,11 @@ type address = Persistent_env.address =
   | Alocal of Ident.t
   | Adot of address * Jkind.Sort.t Jkind.Layout.t array * int
 
-(* CR jrayman: this shouldn't have to be exposed *)
-val field_layout_of_signature_item :
+(* CR jrayman: move somewhere else *)
+val layout_of_lazy_signature_item :
   Subst.Lazy.signature_item -> Jkind_types.Sort.t Jkind_types.Layout.t option
+val layout_of_signature_item :
+  signature_item -> Jkind_types.Sort.t Jkind_types.Layout.t option
 
 type t
 

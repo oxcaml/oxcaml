@@ -593,7 +593,7 @@ val layout_of_extern_repr : extern_repr -> layout
 
 val extern_repr_involves_unboxed_products : extern_repr -> bool
 
-(* CR jrayman: finish comment: Used for ... *)
+(* Used to alias module fields in [Translmod] *)
 val layout_of_const_sort : Jkind.Sort.Const.t -> layout
 val layout_of_mixed_block_element : 'a. 'a mixed_block_element -> layout
 
@@ -944,7 +944,8 @@ type module_representation =
   | Module_value_only of int
   (* All module fields are boxed. The [int] is the number of fields *)
   | Module_mixed of mixed_block_shape
-  (* The module contains both values and unboxed elements *)
+  (* The module contains both values and unboxed elements.
+     N.B.: [Float_boxed] should not occur in the shape *)
 
 (* The structure of the main module block. A module with no parameters will be
    compiled to an [Mb_struct] and a module with at least one parameter will be
@@ -1131,7 +1132,7 @@ val transl_address : scoped_location -> Persistent_env.address -> lambda
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
 val transl_mixed_block_element :
-  Types.mixed_block_element -> unit mixed_block_element
+  Types.mixed_block_element -> value_kind:value_kind -> unit mixed_block_element
 
 val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> locality_mode)
@@ -1140,6 +1141,9 @@ val transl_mixed_product_shape_for_read :
 
 val transl_module_representation :
   Types.module_representation -> module_representation
+
+val module_representation_of_signature :
+  Types.signature -> module_representation
 
 val block_of_module_representation :
   module_representation -> primitive
@@ -1250,7 +1254,7 @@ val reset: unit -> unit
 *)
 val mod_field:
   ?read_semantics: field_read_semantics -> int ->
-  Types.module_representation -> primitive
+  module_representation -> primitive
 (* CR jrayman: check if [mod_setfield] needs module repr *)
 val mod_setfield: int -> primitive
 
