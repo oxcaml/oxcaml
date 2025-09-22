@@ -13,7 +13,7 @@ open Stdlib_upstream_compatible
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 
-let _ = print_endline "Test 1: Open with module ident"
+let _ = print_endline "Test 1: [let open] with module ident"
 
 module M = struct let foo = #42.0 let bar = "hello" end
 
@@ -24,7 +24,7 @@ let _ =
   print_endline (id bar)
 
 
-let _ = print_endline "Test 2: Open with inline struct"
+let _ = print_endline "Test 2: [let open] with inline struct"
 
 let _ =
   let open struct let foo = #42.0 let bar = "hello" end in
@@ -33,7 +33,7 @@ let _ =
   print_endline (id bar)
 
 
-let _ = print_endline "Test 3: Open with functor"
+let _ = print_endline "Test 3: [let open] with functor"
 
 module Functor (X : sig end) = struct let foo = #42.0 let bar = "hello" end
 
@@ -42,3 +42,27 @@ let _ =
   print_float (Float_u.to_float (id foo));
   print_string " ";
   print_endline (id bar)
+
+
+let _ = print_endline "Test 4: Tests 1-3 with [open] instead of [let open]"
+
+module M_4_1 = struct
+  open M
+  let _ = print_float (Float_u.to_float (id foo))
+  let _ = print_string " "
+  let _ = print_endline (id bar)
+end
+
+module M_4_2 = struct
+  open struct let foo = #42.0 let bar = "hello" end
+  let _ = print_float (Float_u.to_float (id foo))
+  let _ = print_string " "
+  let _ = print_endline (id bar)
+end
+
+module M_4_3 = struct
+  open Functor(struct end)
+  let _ = print_float (Float_u.to_float (id foo))
+  let _ = print_string " "
+  let _ = print_endline (id bar)
+end
