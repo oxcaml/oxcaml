@@ -36,8 +36,8 @@ val aggregate : current:t -> new_symbols:t -> t
 (** [aggregate ~current ~new_symbols] returns the union of [current] and
     [new_symbols].
     Raises an exception if there are conflicts except for ["caml_apply*"] and
-    ["caml_curry*"] which are expected to be generated several times in a
-    toplevel session.
+    ["caml_curry*"], ["caml_send*"], and ["caml_tuplify*"] which are expected
+    to be generated several times in a toplevel session.
     When there is a conflict for those symbols, the returned mapping will
     contain the symbol from [new_symbols]. *)
 

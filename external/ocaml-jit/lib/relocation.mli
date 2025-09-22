@@ -56,3 +56,13 @@ val from_x86_relocation : X86_binary_emitter.Relocation.t -> t option
 val from_x86_relocation_err :
   X86_binary_emitter.Relocation.t -> (t, string) result
 (** Same as [from_x86_relocation] but returns an error instead of [None]. *)
+
+val min_value : t -> Int64.t
+(** The minimum computed value for the relocation that can be put in the place. *)
+
+val max_value : t -> Int64.t
+(** The maximum computed value for the relocation that can be put in the place. *)
+
+val value_comparator : t -> (Int64.t -> Int64.t -> int)
+(** A comparison function for the values of the given relocation when expressed
+    as [Int64.t]. *)
