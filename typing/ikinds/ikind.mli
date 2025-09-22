@@ -17,8 +17,6 @@ module RigidName : sig
   val atomic : constr -> int -> t
 
   val param : int -> t
-
-  val classify : t -> [ `Param of int | `Atom of constr * int ]
 end
 
 module Ldd : sig
@@ -65,8 +63,6 @@ module Ldd : sig
   val leq_with_reason : node -> node -> int list option
 
   val round_up : node -> lat
-
-  val map_rigid : (Name.t -> node) -> node -> node
 
   val clear_memos : unit -> unit
 

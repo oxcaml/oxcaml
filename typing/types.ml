@@ -531,13 +531,6 @@ end
 
 (* Type definitions *)
 
-module Ikind_cache = struct
-  type kind = Obj.t
-end
-
-type type_ikind_cache =
-  (Ikind_cache.kind * Ikind_cache.kind list * bool) option
-
 type type_declaration =
   { type_params: type_expr list;
     type_arity: int;
@@ -554,8 +547,8 @@ type type_declaration =
     type_unboxed_default: bool;
     type_uid: Uid.t;
     type_unboxed_version : type_declaration option;
-    mutable type_ikind_cache : type_ikind_cache;
-  }
+ }
+
 and type_decl_kind =
   (label_declaration, label_declaration, constructor_declaration) type_kind
 
@@ -676,9 +669,6 @@ and type_transparence =
     Type_public      (* unrestricted expansion *)
   | Type_new         (* "new" type *)
   | Type_private     (* private type *)
-
-let clear_type_ikind_cache (decl : type_declaration) : unit =
-  decl.type_ikind_cache <- None
 
 let tys_of_constr_args = function
   | Cstr_tuple tl -> List.map (fun ca -> ca.ca_type) tl

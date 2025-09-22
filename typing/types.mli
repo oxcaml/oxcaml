@@ -735,13 +735,6 @@ end
 
 (* Type definitions *)
 
-module Ikind_cache : sig
-  type kind = Obj.t
-end
-
-type type_ikind_cache =
-  (Ikind_cache.kind * Ikind_cache.kind list * bool) option
-
 type type_declaration =
   { type_params: type_expr list;
     type_arity: int;
@@ -781,7 +774,6 @@ type type_declaration =
           itself has [type_unboxed_version = None].
        2. the Uid of the unboxed version is [Uid.unboxed_version <uid of boxed>]
     *)
-    mutable type_ikind_cache : type_ikind_cache;
   }
 
 and type_decl_kind = (label_declaration, label_declaration, constructor_declaration) type_kind
@@ -816,6 +808,7 @@ and tag = Ordinary of {src_index: int;  (* Unique name (per type) *)
                        runtime_tag: int}    (* The runtime tag *)
         | Extension of Path.t
         | Null (* Null pointer *)
+
 (* A mixed product contains a possibly-empty prefix of values followed by a
    non-empty suffix of "flat" elements. Intuitively, a flat element is one that
    need not be scanned by the garbage collector. The front-end allows elements
@@ -932,8 +925,6 @@ and constructor_argument =
 and constructor_arguments =
   | Cstr_tuple of constructor_argument list
   | Cstr_record of label_declaration list
-
-val clear_type_ikind_cache : type_declaration -> unit
 
 val tys_of_constr_args : constructor_arguments -> type_expr list
 

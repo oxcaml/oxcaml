@@ -25,9 +25,6 @@ module type LDD = sig
     val param : int -> t
 
     val atomic : constr -> int -> t
-
-    val classify :
-      t -> [ `Param of int | `Atom of constr * int ]
   end
 
   val bot : node
@@ -61,8 +58,6 @@ module type LDD = sig
   val leq_with_reason : node -> node -> int list option
 
   val round_up : node -> lat
-
-  val map_rigid : (Name.t -> node) -> node -> node
 
   val clear_memos : unit -> unit
 
@@ -116,16 +111,11 @@ module Make
           kind : ckind;
           abstract : bool
         }
-    | Poly of
-        { base : poly;
-          coeffs : poly list;
-          abstract : bool
-        }
+    | Poly of poly * poly list
 
   type env =
     { kind_of : ty -> ckind;
-      lookup : constr -> constr_decl;
-      install_cache_entry : constr -> abstract:bool -> kind * kind list -> unit
+      lookup : constr -> constr_decl
     }
 
   val make_solver : env -> solver

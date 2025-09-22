@@ -618,7 +618,6 @@ let rec type_declaration' copy_scope s decl =
     type_uid = decl.type_uid;
     type_unboxed_version =
       Option.map (type_declaration' copy_scope s) decl.type_unboxed_version;
-    type_ikind_cache = None;
   }
 
 let type_declaration s decl =

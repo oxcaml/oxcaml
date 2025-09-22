@@ -33,6 +33,7 @@ module Make (C : LATTICE) (V : ORDERED) : sig
 
   type var
 
+  (* Constructors *)
   val bot : node
 
   val top : node
@@ -45,12 +46,14 @@ module Make (C : LATTICE) (V : ORDERED) : sig
 
   val var : var -> node
 
+  (* Boolean algebra over nodes *)
   val join : node -> node -> node
 
   val meet : node -> node -> node
 
   val sub_subsets : node -> node -> node
 
+  (* Solving interface *)
   val solve_lfp : var -> node -> unit
 
   val enqueue_lfp : var -> node -> unit
@@ -59,18 +62,20 @@ module Make (C : LATTICE) (V : ORDERED) : sig
 
   val solve_pending : unit -> unit
 
+  (* Linear decomposition/composition helpers *)
   val decompose_linear : universe:var list -> node -> node * node list
 
   val leq : node -> node -> bool
 
+  (* If [a ⊑ b] fails, return witness axis indices where they differ. *)
   val leq_with_reason : node -> node -> int list option
 
   val round_up : node -> C.t
 
-  val map_rigid : (V.t -> node) -> node -> node
-
+  (* Clear all memo tables *)
   val clear_memos : unit -> unit
 
+  (* Pretty printers and checks *)
   val pp : node -> string
 
   val pp_debug : node -> string

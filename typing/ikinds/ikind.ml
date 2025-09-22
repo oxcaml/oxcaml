@@ -35,60 +35,10 @@ module RigidName = struct
   let atomic constr arg_index = Atom { constr; arg_index }
 
   let param i = Param i
-
-  let classify = function
-    | Atom { constr; arg_index } -> `Atom (constr, arg_index)
-    | Param i -> `Param i
 end
 
 module Ldd = struct
-  module type BASE = sig
-    type node
-
-    type var
-
-    val bot : node
-
-    val const : Axis_lattice_bits.t -> node
-
-    val rigid : RigidName.t -> var
-
-    val new_var : unit -> var
-
-    val var : var -> node
-
-    val join : node -> node -> node
-
-    val meet : node -> node -> node
-
-    val sub_subsets : node -> node -> node
-
-    val solve_lfp : var -> node -> unit
-
-    val enqueue_lfp : var -> node -> unit
-
-    val enqueue_gfp : var -> node -> unit
-
-    val solve_pending : unit -> unit
-
-    val decompose_linear : universe:var list -> node -> node * node list
-
-    val leq : node -> node -> bool
-
-    val leq_with_reason : node -> node -> int list option
-
-    val round_up : node -> Axis_lattice_bits.t
-
-    val map_rigid : (RigidName.t -> node) -> node -> node
-
-    val clear_memos : unit -> unit
-
-    val pp : node -> string
-
-    val pp_debug : node -> string
-  end
-
-  module Base : BASE = Ldd.Make (Axis_lattice_bits) (RigidName)
+  module Base = Ldd.Make (Axis_lattice_bits) (RigidName)
 
   type lat = Axis_lattice_bits.t
 
@@ -131,8 +81,6 @@ module Ldd = struct
   let leq_with_reason = Base.leq_with_reason
 
   let round_up = Base.round_up
-
-  let map_rigid = Base.map_rigid
 
   let clear_memos = Base.clear_memos
 
