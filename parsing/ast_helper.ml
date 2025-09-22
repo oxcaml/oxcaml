@@ -281,7 +281,7 @@ module Mty = struct
   let ident ?loc ?attrs a = mk ?loc ?attrs (Pmty_ident a)
   let alias ?loc ?attrs a = mk ?loc ?attrs (Pmty_alias a)
   let signature ?loc ?attrs a = mk ?loc ?attrs (Pmty_signature a)
-  let functor_ ?loc ?attrs ?(ret_mode=[]) a b = mk ?loc ?attrs (Pmty_functor (a, b, ret_mode))
+  let functor_ ?loc ?attrs ?(ret_mode=[],[]) a b = mk ?loc ?attrs (Pmty_functor (a, b, ret_mode))
   let with_ ?loc ?attrs a b = mk ?loc ?attrs (Pmty_with (a, b))
   let typeof_ ?loc ?attrs a = mk ?loc ?attrs (Pmty_typeof a)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pmty_extension a)
@@ -320,7 +320,7 @@ module Sig = struct
   let modtype ?loc a = mk ?loc (Psig_modtype a)
   let modtype_subst ?loc a = mk ?loc (Psig_modtypesubst a)
   let open_ ?loc a = mk ?loc (Psig_open a)
-  let include_ ?loc ?(modalities = []) a = mk ?loc (Psig_include (a, modalities))
+  let include_ ?loc ?(modalities = [],[]) a = mk ?loc (Psig_include (a, modalities))
   let class_ ?loc a = mk ?loc (Psig_class a)
   let class_type ?loc a = mk ?loc (Psig_class_type a)
   let extension ?loc ?(attrs = []) a = mk ?loc (Psig_extension (a, attrs))
@@ -334,7 +334,7 @@ module Sig = struct
 end
 
 module Sg = struct
-  let mk ?(loc = !default_loc) ?(modalities = []) a =
+  let mk ?(loc = !default_loc) ?(modalities = [],[]) a =
     {psg_items = a; psg_modalities = modalities; psg_loc = loc}
 end
 
@@ -455,14 +455,12 @@ end
 
 module Val = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(prim = []) ?(modalities=[])
-        ?(mod_modalities = []) name typ =
+        ?(prim = []) ?(modalities=[],[]) name typ =
     {
      pval_name = name;
      pval_type = typ;
      pval_attributes = add_docs_attrs docs attrs;
      pval_modalities = modalities;
-     pval_mod_modalities = mod_modalities;
      pval_loc = loc;
      pval_prim = prim;
     }
@@ -470,7 +468,7 @@ end
 
 module Md = struct
   let mk ?(loc = !default_loc) ?(attrs = [])
-        ?(docs = empty_docs) ?(text = []) ?(modalities=[]) name typ =
+        ?(docs = empty_docs) ?(text = []) ?(modalities=[],[]) name typ =
     {
      pmd_name = name;
      pmd_type = typ;
@@ -542,13 +540,12 @@ end
 
 module Vb = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(text = []) ?value_constraint ?(modes = []) ?(mod_modalities = []) pat expr =
+        ?(text = []) ?value_constraint ?(modes = [],[]) pat expr =
     {
      pvb_pat = pat;
      pvb_expr = expr;
      pvb_constraint=value_constraint;
      pvb_modes=modes;
-     pvb_mod_modalities = mod_modalities;
      pvb_attributes =
        add_text_attrs text (add_docs_attrs docs attrs);
      pvb_loc = loc;
@@ -603,7 +600,7 @@ module Type = struct
      pcd_attributes = add_info_attrs info attrs;
     }
 
-  let constructor_arg ?(loc = !default_loc) ?(modalities = []) typ =
+  let constructor_arg ?(loc = !default_loc) ?(modalities = [],[]) typ =
     {
       pca_modalities = modalities;
       pca_type = typ;
@@ -611,7 +608,7 @@ module Type = struct
     }
 
   let field ?(loc = !default_loc) ?(attrs = []) ?(info = empty_info)
-        ?(mut = Immutable) ?(modalities = []) name typ =
+        ?(mut = Immutable) ?(modalities = [],[]) name typ =
     {
      pld_name = name;
      pld_mutable = mut;

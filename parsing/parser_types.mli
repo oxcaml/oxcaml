@@ -13,7 +13,6 @@ type let_binding =
     lb_constraint: value_constraint option;
     lb_is_pun: bool;
     lb_modes: modes;
-    lb_mod_modalities: modalities;
     lb_attributes: attributes;
     lb_docs: docs Lazy.t;
     lb_text: text Lazy.t;
