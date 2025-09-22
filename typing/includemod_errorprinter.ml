@@ -114,7 +114,7 @@ module Illegal_permutation = struct
   (* we search the first point which is not invariant at the current level *)
   and not_fixpoint path pos = function
     | [] -> None
-    | (n, _) :: q ->
+    | (n, _, _) :: q ->
         if n = pos then
           not_fixpoint path (pos+1) q
         else
@@ -122,8 +122,8 @@ module Illegal_permutation = struct
   (* we search the first item with a non-identity inner coercion *)
   and first_non_id path pos = function
     | [] -> None
-    | (_, Typedtree.Tcoerce_none) :: q -> first_non_id path (pos + 1) q
-    | (_,c) :: q ->
+    | (_, _, Typedtree.Tcoerce_none) :: q -> first_non_id path (pos + 1) q
+    | (_, _, c) :: q ->
         either
           (transposition_under (Item pos :: path)) c
           (first_non_id path (pos + 1)) q

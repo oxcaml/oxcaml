@@ -150,6 +150,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Generic of Path.t * (int -> (int -> O.t -> Outcometree.out_value,
                                      O.t -> Outcometree.out_value) gen_printer)
 
+    external float_u_box : float# -> float = "%box_float"
+
     (* CR small-ints: small int support is probably incorrect. *)
     let printers = ref ([
       ( Pident(Ident.create_local "print_int"),
@@ -178,10 +180,12 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 (fun x -> Oval_nativeint (O.obj x : nativeint))) );
       ( Pident(Ident.create_local "print_int64"),
         Simple (Predef.type_int64,
-                (fun x -> Oval_int64_u (O.obj x : int64))) );
+                (fun x -> Oval_int64 (O.obj x : int64))) );
       ( Pident(Ident.create_local "print_float_u"),
         Simple (Predef.type_unboxed_float,
-                (fun x -> Oval_float_u (O.obj x : float))) );
+                (if !Clflags.native_code then
+                   fun x -> Oval_float_u (float_u_box ((Obj.magic Obj.magic : float -> float#) (O.obj x)) )
+                 else fun x -> Oval_float_u (O.obj x : float))) );
       ( Pident(Ident.create_local "print_float32_u"),
         Simple (Predef.type_unboxed_float32,
                 (fun x -> Oval_float32_u (O.obj x : Obj.t))) );
@@ -305,19 +309,13 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
       let printer_steps = ref max_steps in
 
-      let is_value ty =
-        (* CR jrayman: change [~why] *)
-        match Ctype.type_sort env ty ~why:Let_binding ~fixed:false with
-        | Error _ -> assert false
-        | Ok sort ->
-          begin match Jkind.Sort.default_for_transl_and_get sort with
-          | Jkind.Sort.Const.(Base Value) -> true
-          | _ -> false (* CR jrayman: expand [_] *)
-          end
+      let is_value _ty =
+        true
+        (* CR jrayman: pass [layout] to [outval_of_value] to figure this out *)
       in
 
       let nested_values = ObjTbl.create 8 in
-      let nest_gen cycle f depth obj ty =
+      let nest_gen err abstr f depth obj ty =
         let repr = obj in
         (* if (match *)
         (*     Jkind.Layout.to_sort layout *)
@@ -329,11 +327,13 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         (* then *)
         (*   abstr *)
         (* else *)
-        if not (is_value ty) || not (is_real_block repr) then
+        if not (is_value ty) then
+          abstr
+        else if not (is_real_block repr) then
           f depth obj ty
         else
           if ObjTbl.mem nested_values repr then
-            cycle
+            err
           else begin
             ObjTbl.add nested_values repr ();
             let ret = f depth obj ty in
@@ -342,7 +342,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           end
       in
 
-      let nest f = nest_gen (Oval_stuff "<cycle>") f in
+      let nest f = nest_gen (Oval_stuff "<cycle>") (Oval_stuff "<abstr>") f in
 
       let rec tree_of_val depth obj ty =
         decr printer_steps;
@@ -375,7 +375,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                           nest tree_of_val (depth - 1) (O.field obj 0) ty_arg
                         in
                         let next_obj = O.field obj 1 in
-                        nest_gen (Oval_stuff "<cycle>" :: tree :: tree_list)
+                        nest_gen
+                          (Oval_stuff "<cycle>" :: tree :: tree_list)
+                          (Oval_stuff "<abstr>" :: tree :: tree_list)
                           (tree_of_conses (tree :: tree_list))
                           depth next_obj ty_arg
                       else tree_list
