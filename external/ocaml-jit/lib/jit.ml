@@ -42,24 +42,35 @@ let round_to_pages section_size =
     let pages = ((section_size - 1) / pagesize) + 1 in
     pages * pagesize
 
-let alloc_memory binary_section =
-  let size = round_to_pages (X86_binary_emitter.size binary_section) in
-  match Externals.memalign size with
-  | Ok address -> address
-  | Error msg -> failwithf "posix_memalign failed: %s" msg
-
-let alloc_all binary_section_map =
-  String.Map.map binary_section_map ~f:(fun binary_section ->
-      let address = alloc_memory binary_section in
-      { address; value = binary_section })
-
-let alloc_text jit_text_section =
-  let size =
+let alloc_all jit_text_section binary_section_map =
+  (* Allocate all sections contiguously (modulo rounding up to page boundaries)
+     to minimize the chance of relocation overflow. *)
+  let text_size =
     round_to_pages (Jit_text_section.in_memory_size jit_text_section)
   in
-  match Externals.memalign size with
-  | Ok address -> { address; value = jit_text_section }
-  | Error msg -> failwithf "posix_memalign failed: %s" msg
+  let total_size =
+    String.Map.fold binary_section_map ~init:text_size
+      ~f:(fun ~key:_ ~data:binary_section total_size ->
+        let size = round_to_pages (X86_binary_emitter.size binary_section) in
+        size + total_size)
+  in
+  match Externals.memalign total_size with
+  | Error msg ->
+    failwithf "posix_memalign for %d bytes failed: %s" total_size msg
+  | Ok address ->
+    let text = { address; value = jit_text_section } in
+    let address = Address.add_int address text_size in
+    let map, _address =
+      String.Map.fold binary_section_map
+        ~init:(String.Map.empty, address)
+        ~f:(fun ~key ~data:binary_section (map, address) ->
+          let data = { address; value = binary_section } in
+          let map = String.Map.add map ~key ~data in
+          let size = round_to_pages (X86_binary_emitter.size binary_section) in
+          let address = Address.add_int address size in
+          map, address)
+    in
+    text, map
 
 let local_symbol_map binary_section_map =
   String.Map.fold binary_section_map ~init:Symbols.empty
@@ -110,7 +121,8 @@ let load_sections addressed_sections =
         set_protection ~mprotect:Externals.mprotect_ro ~name address size)
 
 let entry_points ~phrase_name symbols =
-  let symbol_name name = Printf.sprintf "caml%s__%s" phrase_name name in
+  let separator = (* if Config.runtime5 then "." else *) "__" in
+  let symbol_name name = Printf.sprintf "caml%s%s%s" phrase_name separator name in
   let find_symbol name = Symbols.find symbols (symbol_name name) in
   let frametable = find_symbol "frametable" in
   let gc_roots = find_symbol "gc_roots" in
@@ -154,15 +166,21 @@ let get_arch () =
   | 64 -> X86_ast.X64
   | i -> failwithf "Unexpected word size: %d" i 16
 
-let jit_load_x86 ~outcome_ref asm_program _filename =
-  Debug.print_ast asm_program;
-  let section_map = X86_section.Map.from_program asm_program in
+let jit_load_x86 ~outcome_ref ~delayed:_ section_map _filename =
   let arch = get_arch () in
+  let section_map =
+   List.fold_left
+      ~f:(fun section_map (name, instrs) ->
+        String.Map.add section_map
+          ~key:(X86_proc.Section_name.to_string name)
+          ~data:instrs)
+      section_map
+      ~init:String.Map.empty
+  in
   let binary_section_map = binary_section_map ~arch section_map in
   Debug.print_binary_section_map binary_section_map;
   let other_sections, text = extract_text_section binary_section_map in
-  let addressed_sections = alloc_all other_sections in
-  let addressed_text = alloc_text text in
+  let addressed_text, addressed_sections = alloc_all text other_sections in
   let other_sections_symbols = local_symbol_map addressed_sections in
   let text_section_symbols = Jit_text_section.symbols addressed_text in
   let local_symbols =
@@ -202,27 +220,6 @@ let with_jit_x86 f =
     X86_proc.internal_assembler := ias;
     raise exn
 
-(* Copied from opttoploop.ml *)
-module Backend = struct
-  let symbol_for_global' = Compilenv.symbol_for_global'
-
-  let closure_symbol = Compilenv.closure_symbol
-
-  let really_import_approx = Import_approx.really_import_approx
-
-  let import_symbol = Import_approx.import_symbol
-
-  let size_int = Arch.size_int
-
-  let big_endian = Arch.big_endian
-
-  let max_sensible_number_of_arguments =
-    (* The "-1" is to allow for a potential closure environment parameter. *)
-    Proc.max_arguments_for_tailcalls - 1
-end
-
-let backend = (module Backend : Backend_intf.S)
-
 let jit_load_body ppf (program : Lambda.program) =
   let open Config in
   let open Opttoploop in
@@ -231,21 +228,17 @@ let jit_load_body ppf (program : Lambda.program) =
     else Filename.temp_file ("caml" ^ !phrase_name) ext_dll
   in
   let filename = Filename.chop_extension dll in
-  (if Config.flambda2 then
-    Asmgen.compile_implementation_flambda2 () ~toplevel:need_symbol
-      ~filename ~prefixname:filename
-      ~flambda2:Flambda2.lambda_to_cmm ~ppf_dump:ppf
-      ~size:program.main_module_block_size
-      ~module_ident:program.module_ident
-      ~module_initializer:program.code
-      ~required_globals:program.required_globals
-  else
-    let middle_end =
-      if Config.flambda then Flambda_middle_end.lambda_to_clambda
-      else Closure_middle_end.lambda_to_clambda
-    in
-    Asmgen.compile_implementation ~toplevel:need_symbol ~backend ~filename
-      ~prefixname:filename ~middle_end ~ppf_dump:ppf program);
+  Arch.trap_notes := false;
+  (* TODO: Determine machine_width properly from target configuration *)
+  let machine_width = Target_system.Machine_width.Sixty_four in
+  let pipeline : Asmgen.pipeline =
+    Direct_to_cmm
+      (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
+  in
+    Asmgen.compile_implementation
+      (module Unix : Compiler_owee.Unix_intf.S)
+      ~toplevel:need_symbol ~pipeline ~sourcefile:(Some filename)
+      ~prefixname:filename ~ppf_dump:ppf program;
   match !outcome_global with
   | None -> failwith "No evaluation outcome"
   | Some res ->
