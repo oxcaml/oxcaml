@@ -275,6 +275,7 @@ L158:
   %44 = icmp eq i64 %43, 0
   br i1 %44, label %L159, label %L138
 L159:
+  store ptr blockaddress(@camlSwitch__test_next_1_3_code, %L158), ptr @recover_rbp_var.camlSwitch__test_next_HIDE_STAMP.L158
   %45 = call  ptr @llvm.stacksave()
   %46 = alloca { i64, i64, i64, i64 }
   %47 = ptrtoint ptr %46 to i64
@@ -288,7 +289,7 @@ L159:
   %55 = inttoptr i64 %54 to ptr
   %56 = load i64, ptr %55
   store ptr %46, ptr %55
-  store ptr blockaddress(@camlSwitch__test_next_HIDE_STAMP, %L158), ptr %52
+  store ptr @recover_rbp_asm.camlSwitch__test_next_HIDE_STAMP.L158, ptr %52
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %49) "gc-leaf-function"="true"
   store i64 %56, ptr %46
   %57 = load i64, ptr %11
@@ -344,7 +345,6 @@ L147:
   call  void @llvm.stackrestore(ptr %45)
   br label %L153
 L138:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %86 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %86, ptr %alloc
   store i64 %43, ptr %4
@@ -637,6 +637,7 @@ L361:
   %210 = icmp eq i64 %209, 0
   br i1 %210, label %L362, label %L170
 L362:
+  store ptr blockaddress(@camlSwitch__entry, %L361), ptr @recover_rbp_var.camlSwitch__entry.L361
   %211 = call  ptr @llvm.stacksave()
   %212 = alloca { i64, i64, i64, i64 }
   %213 = ptrtoint ptr %212 to i64
@@ -650,7 +651,7 @@ L362:
   %221 = inttoptr i64 %220 to ptr
   %222 = load i64, ptr %221
   store ptr %212, ptr %221
-  store ptr blockaddress(@camlSwitch__entry, %L361), ptr %218
+  store ptr @recover_rbp_asm.camlSwitch__entry.L361, ptr %218
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %215) "gc-leaf-function"="true"
   store i64 %222, ptr %212
   store i64 3, ptr %15
@@ -707,7 +708,6 @@ L179:
   call  void @llvm.stackrestore(ptr %211)
   br label %L185
 L170:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %252 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %252, ptr %alloc
   store i64 %209, ptr %4
@@ -806,6 +806,7 @@ L363:
   %306 = icmp eq i64 %305, 0
   br i1 %306, label %L364, label %L193
 L364:
+  store ptr blockaddress(@camlSwitch__entry, %L363), ptr @recover_rbp_var.camlSwitch__entry.L363
   %307 = call  ptr @llvm.stacksave()
   %308 = alloca { i64, i64, i64, i64 }
   %309 = ptrtoint ptr %308 to i64
@@ -819,7 +820,7 @@ L364:
   %317 = inttoptr i64 %316 to ptr
   %318 = load i64, ptr %317
   store ptr %308, ptr %317
-  store ptr blockaddress(@camlSwitch__entry, %L363), ptr %314
+  store ptr @recover_rbp_asm.camlSwitch__entry.L363, ptr %314
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %311) "gc-leaf-function"="true"
   store i64 %318, ptr %308
   store i64 7, ptr %38
@@ -876,7 +877,6 @@ L202:
   call  void @llvm.stackrestore(ptr %307)
   br label %L208
 L193:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %348 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %348, ptr %alloc
   store i64 %305, ptr %4
@@ -975,6 +975,7 @@ L365:
   %402 = icmp eq i64 %401, 0
   br i1 %402, label %L366, label %L216
 L366:
+  store ptr blockaddress(@camlSwitch__entry, %L365), ptr @recover_rbp_var.camlSwitch__entry.L365
   %403 = call  ptr @llvm.stacksave()
   %404 = alloca { i64, i64, i64, i64 }
   %405 = ptrtoint ptr %404 to i64
@@ -988,7 +989,7 @@ L366:
   %413 = inttoptr i64 %412 to ptr
   %414 = load i64, ptr %413
   store ptr %404, ptr %413
-  store ptr blockaddress(@camlSwitch__entry, %L365), ptr %410
+  store ptr @recover_rbp_asm.camlSwitch__entry.L365, ptr %410
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %407) "gc-leaf-function"="true"
   store i64 %414, ptr %404
   store i64 11, ptr %61
@@ -1045,7 +1046,6 @@ L225:
   call  void @llvm.stackrestore(ptr %403)
   br label %L231
 L216:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %444 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %444, ptr %alloc
   store i64 %401, ptr %4
@@ -1144,6 +1144,7 @@ L367:
   %498 = icmp eq i64 %497, 0
   br i1 %498, label %L368, label %L239
 L368:
+  store ptr blockaddress(@camlSwitch__entry, %L367), ptr @recover_rbp_var.camlSwitch__entry.L367
   %499 = call  ptr @llvm.stacksave()
   %500 = alloca { i64, i64, i64, i64 }
   %501 = ptrtoint ptr %500 to i64
@@ -1157,7 +1158,7 @@ L368:
   %509 = inttoptr i64 %508 to ptr
   %510 = load i64, ptr %509
   store ptr %500, ptr %509
-  store ptr blockaddress(@camlSwitch__entry, %L367), ptr %506
+  store ptr @recover_rbp_asm.camlSwitch__entry.L367, ptr %506
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %503) "gc-leaf-function"="true"
   store i64 %510, ptr %500
   store i64 15, ptr %84
@@ -1214,7 +1215,6 @@ L248:
   call  void @llvm.stackrestore(ptr %499)
   br label %L254
 L239:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %540 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %540, ptr %alloc
   store i64 %497, ptr %4
@@ -1313,6 +1313,7 @@ L369:
   %594 = icmp eq i64 %593, 0
   br i1 %594, label %L370, label %L262
 L370:
+  store ptr blockaddress(@camlSwitch__entry, %L369), ptr @recover_rbp_var.camlSwitch__entry.L369
   %595 = call  ptr @llvm.stacksave()
   %596 = alloca { i64, i64, i64, i64 }
   %597 = ptrtoint ptr %596 to i64
@@ -1326,7 +1327,7 @@ L370:
   %605 = inttoptr i64 %604 to ptr
   %606 = load i64, ptr %605
   store ptr %596, ptr %605
-  store ptr blockaddress(@camlSwitch__entry, %L369), ptr %602
+  store ptr @recover_rbp_asm.camlSwitch__entry.L369, ptr %602
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %599) "gc-leaf-function"="true"
   store i64 %606, ptr %596
   store i64 19, ptr %107
@@ -1383,7 +1384,6 @@ L271:
   call  void @llvm.stackrestore(ptr %595)
   br label %L277
 L262:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %636 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %636, ptr %alloc
   store i64 %593, ptr %4
@@ -1482,6 +1482,7 @@ L371:
   %690 = icmp eq i64 %689, 0
   br i1 %690, label %L372, label %L285
 L372:
+  store ptr blockaddress(@camlSwitch__entry, %L371), ptr @recover_rbp_var.camlSwitch__entry.L371
   %691 = call  ptr @llvm.stacksave()
   %692 = alloca { i64, i64, i64, i64 }
   %693 = ptrtoint ptr %692 to i64
@@ -1495,7 +1496,7 @@ L372:
   %701 = inttoptr i64 %700 to ptr
   %702 = load i64, ptr %701
   store ptr %692, ptr %701
-  store ptr blockaddress(@camlSwitch__entry, %L371), ptr %698
+  store ptr @recover_rbp_asm.camlSwitch__entry.L371, ptr %698
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %695) "gc-leaf-function"="true"
   store i64 %702, ptr %692
   store i64 5, ptr %130
@@ -1552,7 +1553,6 @@ L294:
   call  void @llvm.stackrestore(ptr %691)
   br label %L300
 L285:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %732 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %732, ptr %alloc
   store i64 %689, ptr %4
@@ -1651,6 +1651,7 @@ L373:
   %786 = icmp eq i64 %785, 0
   br i1 %786, label %L374, label %L308
 L374:
+  store ptr blockaddress(@camlSwitch__entry, %L373), ptr @recover_rbp_var.camlSwitch__entry.L373
   %787 = call  ptr @llvm.stacksave()
   %788 = alloca { i64, i64, i64, i64 }
   %789 = ptrtoint ptr %788 to i64
@@ -1664,7 +1665,7 @@ L374:
   %797 = inttoptr i64 %796 to ptr
   %798 = load i64, ptr %797
   store ptr %788, ptr %797
-  store ptr blockaddress(@camlSwitch__entry, %L373), ptr %794
+  store ptr @recover_rbp_asm.camlSwitch__entry.L373, ptr %794
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %791) "gc-leaf-function"="true"
   store i64 %798, ptr %788
   store i64 1, ptr %153
@@ -1721,7 +1722,6 @@ L317:
   call  void @llvm.stackrestore(ptr %787)
   br label %L323
 L308:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %828 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %828, ptr %alloc
   store i64 %785, ptr %4
@@ -1820,6 +1820,7 @@ L375:
   %882 = icmp eq i64 %881, 0
   br i1 %882, label %L376, label %L331
 L376:
+  store ptr blockaddress(@camlSwitch__entry, %L375), ptr @recover_rbp_var.camlSwitch__entry.L375
   %883 = call  ptr @llvm.stacksave()
   %884 = alloca { i64, i64, i64, i64 }
   %885 = ptrtoint ptr %884 to i64
@@ -1833,7 +1834,7 @@ L376:
   %893 = inttoptr i64 %892 to ptr
   %894 = load i64, ptr %893
   store ptr %884, ptr %893
-  store ptr blockaddress(@camlSwitch__entry, %L375), ptr %890
+  store ptr @recover_rbp_asm.camlSwitch__entry.L375, ptr %890
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %887) "gc-leaf-function"="true"
   store i64 %894, ptr %884
   store i64 201, ptr %176
@@ -1890,7 +1891,6 @@ L340:
   call  void @llvm.stackrestore(ptr %883)
   br label %L346
 L331:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %924 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %924, ptr %alloc
   store i64 %881, ptr %4
@@ -2023,6 +2023,24 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @camlSwitch__const_block17 = global { ptr, i64, i64 } { ptr @camlSwitch__immstring15, i64 5, i64 5 }, section ".data", align 8
 @header.camlSwitch__immstring15 = global i64 3068, section ".data", align 8
 @camlSwitch__immstring15 = global { [ 9 x i8 ], [ 6 x i8 ], i8 } { [ 9 x i8 ] c"\73\77\69\74\63\68\2e\6d\6c", [ 6 x i8 ] zeroinitializer, i8 6 }, section ".data", align 8
+@recover_rbp_asm.camlSwitch__entry.L367 = external global ptr
+@recover_rbp_var.camlSwitch__entry.L367 = global ptr zeroinitializer, section ".data", align 8
+@recover_rbp_asm.camlSwitch__entry.L371 = external global ptr
+@recover_rbp_var.camlSwitch__entry.L371 = global ptr zeroinitializer, section ".data", align 8
+@recover_rbp_asm.camlSwitch__entry.L375 = external global ptr
+@recover_rbp_var.camlSwitch__entry.L375 = global ptr zeroinitializer, section ".data", align 8
+@recover_rbp_asm.camlSwitch__entry.L361 = external global ptr
+@recover_rbp_var.camlSwitch__entry.L361 = global ptr zeroinitializer, section ".data", align 8
+@recover_rbp_asm.camlSwitch__entry.L365 = external global ptr
+@recover_rbp_var.camlSwitch__entry.L365 = global ptr zeroinitializer, section ".data", align 8
+@recover_rbp_asm.camlSwitch__entry.L369 = external global ptr
+@recover_rbp_var.camlSwitch__entry.L369 = global ptr zeroinitializer, section ".data", align 8
+@recover_rbp_asm.camlSwitch__entry.L373 = external global ptr
+@recover_rbp_var.camlSwitch__entry.L373 = global ptr zeroinitializer, section ".data", align 8
+@recover_rbp_asm.camlSwitch__entry.L363 = external global ptr
+@recover_rbp_var.camlSwitch__entry.L363 = global ptr zeroinitializer, section ".data", align 8
+@recover_rbp_asm.camlSwitch__test_next_HIDE_STAMP.L158 = external global ptr
+@recover_rbp_var.camlSwitch__test_next_HIDE_STAMP.L158 = global ptr zeroinitializer, section ".data", align 8
 @camlCamlinternalFormat__make_printf_HIDE_STAMP = external global ptr
 @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1451$2c4$2d$2d59$5d_521 = external global ptr
 @camlStdlib__Int__immstring64 = external global ptr
@@ -2034,6 +2052,61 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 declare void @llvm.stackrestore(ptr)
 declare ptr @llvm.stacksave()
+
+module asm "  .text"
+module asm "recover_rbp_asm.camlSwitch__test_next_HIDE_STAMP.L158:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq recover_rbp_var.camlSwitch__test_next_HIDE_STAMP.L158(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "recover_rbp_asm.camlSwitch__entry.L363:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq recover_rbp_var.camlSwitch__entry.L363(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "recover_rbp_asm.camlSwitch__entry.L373:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq recover_rbp_var.camlSwitch__entry.L373(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "recover_rbp_asm.camlSwitch__entry.L369:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq recover_rbp_var.camlSwitch__entry.L369(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "recover_rbp_asm.camlSwitch__entry.L365:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq recover_rbp_var.camlSwitch__entry.L365(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "recover_rbp_asm.camlSwitch__entry.L361:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq recover_rbp_var.camlSwitch__entry.L361(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "recover_rbp_asm.camlSwitch__entry.L375:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq recover_rbp_var.camlSwitch__entry.L375(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "recover_rbp_asm.camlSwitch__entry.L371:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq recover_rbp_var.camlSwitch__entry.L371(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "recover_rbp_asm.camlSwitch__entry.L367:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq recover_rbp_var.camlSwitch__entry.L367(%rip), %rbx"
+module asm "  jmpq *%rbx"
 
 !0 = !{ i32 1, !"oxcaml_module", !"Switch" }
 !llvm.module.flags = !{ !0 }

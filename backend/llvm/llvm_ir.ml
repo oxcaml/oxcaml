@@ -292,6 +292,10 @@ module Ident = struct
 
   let to_string_hum t = match t with Local s -> "%" ^ s | Global s -> "@" ^ s
 
+  let to_string_raw = function
+    | Local s | Global s ->
+      Asm_targets.(Asm_symbol.create s |> Asm_symbol.encode)
+
   module Gen = struct
     type ident = t
 
