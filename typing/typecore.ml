@@ -7865,7 +7865,7 @@ and type_function
               match pat.ppat_desc with
               | Ppat_constraint (_, Some sty, _) ->
                   let gloc = { default.pexp_loc with loc_ghost = true } in
-                  Ast_helper.Exp.constraint_ default (Some sty) ~loc:gloc []
+                  Ast_helper.Exp.constraint_ default (Some sty) ~loc:gloc ([], [])
               | _ -> default
             in
             (* Defaults are always global. They can be moved out of the
