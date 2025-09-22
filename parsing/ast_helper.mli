@@ -55,6 +55,17 @@ module Const : sig
   val float : ?suffix:char -> string -> constant
 end
 
+(** {1 Modes and Modalities} *)
+module Modes : sig
+  val empty : modes
+  val append : modes -> modes -> modes
+end
+
+module Modalities : sig
+  val empty : modalities
+  val append : modalities -> modalities -> modalities
+end
+
 (** {1 Attributes} *)
 module Attr : sig
   val mk: ?loc:loc -> str -> payload -> attribute
