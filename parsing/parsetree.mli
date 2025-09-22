@@ -59,11 +59,18 @@ type constant =
 
 type location_stack = Location.t list
 
+(* TODO (ZJE): change so that the mod in kinds is parsed using this?? is that useless?
+   I think it is the right thing to do (doesn't make semantic sense otherwise)
+   but I fear that it might spiral out of control *)
+(* Q (ZJE): in some uses this gets confused with jkind annotation Mod variant... *)
+type mod_ = | Mod of string [@@unboxed]
+type mods = mod_ loc list
+
 type modality = | Modality of string [@@unboxed]
-type modalities = modality loc list
+type modalities = modality loc list * mods
 
 type mode = | Mode of string [@@unboxed]
-type modes = mode loc list
+type modes = mode loc list * mods
 
 type include_kind = Structure | Functor
 
@@ -699,7 +706,6 @@ and value_description =
      pval_name: string loc;
      pval_type: core_type;
      pval_modalities : modalities;
-     pval_mod_modalities : modalities;
      pval_prim: string list;
      pval_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      pval_loc: Location.t;
@@ -1321,7 +1327,6 @@ and value_binding =
     pvb_expr: expression;
     pvb_constraint: value_constraint option;
     pvb_modes: modes;
-    pvb_mod_modalities: modalities;
     pvb_attributes: attributes;
     pvb_loc: Location.t;
   }(** [let pat : type_constraint = exp] *)

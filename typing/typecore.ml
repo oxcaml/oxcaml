@@ -1022,7 +1022,7 @@ let mode_annots_from_pat pat =
   let modes =
     match pat.ppat_desc with
     | Ppat_constraint (_, _, modes) -> modes
-    | _ -> []
+    | _ -> [], []
   in
   Typemode.transl_mode_annots modes
 
@@ -2750,7 +2750,7 @@ and type_pat_aux
       solve_Ppat_array ~refine:false loc penv mutability expected_ty
     in
     let modalities =
-      Typemode.transl_modalities ~maturity:Stable mutability []
+      Typemode.transl_modalities ~maturity:Stable mutability ([], [])
     in
     check_project_mutability ~loc ~env:!!penv Array_elements mutability
       alloc_mode.mode;

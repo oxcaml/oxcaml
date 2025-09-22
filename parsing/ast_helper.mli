@@ -72,7 +72,7 @@ module Typ :
     val var: ?loc:loc -> ?attrs:attrs -> string -> jkind_annotation option
       -> core_type
     val arrow: ?loc:loc -> ?attrs:attrs -> arg_label -> core_type -> core_type ->
-      mode with_loc list -> mode with_loc list -> core_type
+      modes -> modes -> core_type
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * core_type) list -> core_type
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
                        -> (string option * core_type) list -> core_type
@@ -133,7 +133,7 @@ module Pat:
       pattern
     val or_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern -> pattern
     val constraint_: ?loc:loc -> ?attrs:attrs -> pattern -> core_type option
-                     -> mode with_loc list -> pattern
+                     -> modes -> pattern
     val type_: ?loc:loc -> ?attrs:attrs -> lid -> pattern
     val lazy_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
     val unpack: ?loc:loc -> ?attrs:attrs -> str_opt -> pattern
@@ -190,7 +190,7 @@ module Exp:
     val coerce: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
                 -> core_type -> expression
     val constraint_: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
-                     -> mode with_loc list -> expression
+                     -> modes -> expression
     val send: ?loc:loc -> ?attrs:attrs -> expression -> str -> expression
     val new_: ?loc:loc -> ?attrs:attrs -> lid -> expression
     val setinstvar: ?loc:loc -> ?attrs:attrs -> str -> expression -> expression
@@ -229,8 +229,7 @@ module Exp:
 module Val:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?prim:string list ->
-      ?modalities:modality with_loc list -> ?mod_modalities:modality with_loc list ->
-      str -> core_type -> value_description
+      ?modalities:modalities -> str -> core_type -> value_description
   end
 
 (** Type declarations *)
@@ -250,11 +249,11 @@ module Type:
       str ->
       constructor_declaration
 
-    val constructor_arg: ?loc:loc -> ?modalities:modality with_loc list -> core_type ->
+    val constructor_arg: ?loc:loc -> ?modalities:modalities -> core_type ->
       constructor_argument
 
     val field: ?loc:loc -> ?attrs:attrs -> ?info:info ->
-      ?mut:mutable_flag -> ?modalities:modality with_loc list -> str -> core_type ->
+      ?mut:mutable_flag -> ?modalities:modalities -> str -> core_type ->
       label_declaration
   end
 
@@ -350,7 +349,7 @@ module Sig:
 
 module Sg:
   sig
-    val mk : ?loc:loc -> ?modalities:modality with_loc list ->
+    val mk : ?loc:loc -> ?modalities:modalities ->
       signature_item list -> signature
   end
 
@@ -425,8 +424,7 @@ module Incl:
 module Vb:
   sig
     val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
-      ?value_constraint:value_constraint -> ?modes:mode with_loc list ->
-      ?mod_modalities:modality with_loc list -> pattern ->
+      ?value_constraint:value_constraint -> ?modes:modes -> pattern ->
       expression -> value_binding
   end
 
