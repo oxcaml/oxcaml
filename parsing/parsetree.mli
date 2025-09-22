@@ -75,6 +75,9 @@ type modalities = {
 
 type mode = | Mode of string [@@unboxed]
 type core_modes = mode loc list
+(* CR zeisbach: according to zqian in [typing/typemod.ml], this should probably have
+   another field storing the location so that it doesn't need to be computed.
+   when this is fixed, go back and fix [loc_of_modes] in that file. *)
 type modes = {
     core_modes : core_modes;
     mod_modes : mods

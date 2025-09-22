@@ -166,11 +166,8 @@ module Transled_modifiers = struct
     | Nonmodal Separability -> { t with separability = value }
 end
 
-let transl_mod_bounds (annots, mods) =
-  (* Q (ZJE): should this be taking mods now? probably yes.
-     if so, no destruct and just do the thing!
-     this will probably come up when the Mod type is changed... *)
-  if mods <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
+let transl_mod_bounds ({ core_modes = annots; mod_modes } : Parsetree.modes) =
+  if mod_modes <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
     match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
@@ -345,8 +342,9 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
-let transl_mode_annots (annots, mods) : Alloc.Const.Option.t =
-  if mods <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
+let transl_mode_annots ({ core_modes = annots; mod_modes } : Parsetree.modes) :
+    Alloc.Const.Option.t =
+  if mod_modes <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
     let (P (ax, a)) =
@@ -359,11 +357,7 @@ let transl_mode_annots (annots, mods) : Alloc.Const.Option.t =
   in
   List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
 
-(* Q (ZJE): it feels like this should not be returning a Parsetree.modes, since the
-   input here will not know the mods part of a modes...
-   if it DOES, then the new return type here is totally wrong and it should be a modes.
-   this made sense for modes, but for the MODALITIES one below, it feels totally wrong! *)
-let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
+let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) : Parsetree.modes =
   let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
   (* Untranslate [areality], [forkable], and [yielding]. *)
   let areality = print_to_string_opt Mode.Locality.Const.print modes.areality in
@@ -414,18 +408,21 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
   let linearity =
     print_to_string_opt Mode.Linearity.Const.print modes.linearity
   in
-  List.filter_map
-    (fun x ->
-      Option.map (fun s -> { txt = Parsetree.Mode s; loc = Location.none }) x)
-    [ areality;
-      uniqueness;
-      linearity;
-      portability;
-      contention;
-      forkable;
-      yielding;
-      statefulness;
-      visibility ]
+  let core_modes =
+    List.filter_map
+      (fun x ->
+        Option.map (fun s -> { txt = Parsetree.Mode s; loc = Location.none }) x)
+      [ areality;
+        uniqueness;
+        linearity;
+        portability;
+        contention;
+        forkable;
+        yielding;
+        statefulness;
+        visibility ]
+  in
+  { core_modes; mod_modes = [] }
 
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
@@ -606,13 +603,15 @@ let sort_dedup_modalities ~warn l =
 (* Q (ZJE): should this be taking in a modality loc list instead?
    if so, should that be its own data type??
    that feels like it's pushing against the cause of hacing modalities track mods too *)
-let transl_modalities ~maturity mut (modalities, mods) =
-  if mods <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
+let transl_modalities ~maturity mut
+    ({ core_modalities; mod_modalities } : Parsetree.modalities) =
+  if mod_modalities <> []
+  then Misc.fatal_error "ZJE: mods are not yet supported";
   let mut_modalities =
     mutable_implied_modalities (Types.is_mutable mut)
       ~for_mutable_variable:false
   in
-  let modalities = List.map (transl_modality ~maturity) modalities in
+  let modalities = List.map (transl_modality ~maturity) core_modalities in
   (* axes listed in the order of implication. *)
   let modalities = sort_dedup_modalities ~warn:true modalities in
   let open Modality in
@@ -633,12 +632,15 @@ let let_mutable_modalities =
 let atomic_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:false
 
-let untransl_modalities mut t =
-  t
-  |> least_modalities_implying mut
-  |> List.map (fun x -> x, Location.none)
-  |> sort_dedup_modalities ~warn:false
-  |> List.map untransl_modality
+let untransl_modalities mut t : Parsetree.modalities =
+  let core_modalities =
+    t
+    |> least_modalities_implying mut
+    |> List.map (fun x -> x, Location.none)
+    |> sort_dedup_modalities ~warn:false
+    |> List.map untransl_modality
+  in
+  { core_modalities; mod_modalities = [] }
 
 let transl_alloc_mode modes =
   (* Q (ZJE): this feels bad to have modes sometimes be just the modes part
