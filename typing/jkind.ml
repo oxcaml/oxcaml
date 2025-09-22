@@ -896,6 +896,8 @@ module Layout_and_axes = struct
      of this function for these axes is undefined; do *not* look at the results for these
      axes.
   *)
+  let normalize_counter = ref 0
+
   let normalize (type layout l r1 r2) ~context ~(mode : r2 normalize_mode)
       ~skip_axes
       ?(map_type_info :
@@ -908,6 +910,18 @@ module Layout_and_axes = struct
          With_bounds.debug_print t.with_bounds Jkind_axis.Axis_set.print
          relevant_axes;
     *)
+    let should_print = !normalize_counter = 157 && false in
+    if should_print
+    then
+      Format.printf "normalizing (%d): %a\n%!" !normalize_counter
+        With_bounds.debug_print t.with_bounds;
+    incr normalize_counter;
+    if should_print
+    then
+      Format.printf "mode: %s\n%!"
+        (match mode with
+        | Ignore_best -> "Ignore_best"
+        | Require_best -> "Require_best");
     match t with
     | { with_bounds = No_with_bounds; _ } as t -> t, Sufficient_fuel
     | { with_bounds = With_bounds tys; _ } as t
@@ -919,6 +933,7 @@ module Layout_and_axes = struct
              (Axis_set.complement skip_axes) ->
       { t with with_bounds = No_with_bounds }, Sufficient_fuel
     | _ ->
+      if should_print then print_endline "using fuel";
       (* Sadly, it seems hard (impossible?) to be sure to expand all types
          here without using a fuel parameter to stop infinite regress. Here
          is a nasty case:
@@ -1082,14 +1097,20 @@ module Layout_and_axes = struct
       end in
       let rec loop (ctl : Loop_control.t) bounds_so_far relevant_axes :
           (type_expr * With_bounds_type_info.t) list ->
-          Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t = function
+          Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t * Loop_control.t =
+        function
         (* early cutoff *)
-        | [] -> bounds_so_far, No_with_bounds, ctl.fuel_status
+        | [] ->
+          if should_print then print_endline "no more with bounds";
+          bounds_so_far, No_with_bounds, ctl.fuel_status, ctl
         | _ when Mod_bounds.equal Mod_bounds.max bounds_so_far ->
+          if should_print then print_endline "all max - can terminate early";
           (* CR layouts v2.8: we can do better by early-terminating on a per-axis
              basis *)
-          bounds_so_far, No_with_bounds, Sufficient_fuel
+          bounds_so_far, No_with_bounds, Sufficient_fuel, ctl
         | (ty, ti) :: bs -> (
+          if should_print
+          then Format.printf "expanding with bound: %a\n%!" !raw_type_expr ty;
           (* Map the type's info before expanding the type *)
           let ti =
             match map_type_info with
@@ -1136,7 +1157,11 @@ module Layout_and_axes = struct
                 ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
             let found_jkind_for_ty new_ctl b_upper_bounds b_with_bounds quality
-                : Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
+                :
+                Mod_bounds.t
+                * (l * r2) with_bounds
+                * Fuel_status.t
+                * Loop_control.t =
               match quality, mode with
               | Best, _ | Not_best, Ignore_best ->
                 (* The relevant axes are the intersection of the relevant axes within our
@@ -1151,7 +1176,7 @@ module Layout_and_axes = struct
                 in
                 (* Descend into the with-bounds of each of our with-bounds types'
                     with-bounds *)
-                let bounds_so_far, nested_with_bounds, fuel_result1 =
+                let bounds_so_far, nested_with_bounds, fuel_result1, new_ctl =
                   loop new_ctl bounds_so_far next_relevant_axes
                     (With_bounds.to_list b_with_bounds)
                 in
@@ -1172,20 +1197,24 @@ module Layout_and_axes = struct
 
                    Ideally, this whole problem goes away once we rethink fuel.
                 *)
-                let bounds, bs', fuel_result2 =
+                let bounds, bs', fuel_result2, final_ctl =
                   loop new_ctl bounds_so_far relevant_axes bs
                 in
                 ( bounds,
                   With_bounds.join nested_with_bounds bs',
-                  Fuel_status.both fuel_result1 fuel_result2 )
+                  Fuel_status.both fuel_result1 fuel_result2,
+                  final_ctl )
               | Not_best, Require_best ->
                 (* CR layouts v2.8: The type annotation on the next line is
                    necessary only because [loop] is
                    local. Bizarre. Investigate. *)
-                let bounds_so_far, (bs' : (l * r2) With_bounds.t), fuel_result =
+                let ( bounds_so_far,
+                      (bs' : (l * r2) With_bounds.t),
+                      fuel_result,
+                      final_ctl ) =
                   loop new_ctl bounds_so_far relevant_axes bs
                 in
-                bounds_so_far, With_bounds.add ty ti bs', fuel_result
+                bounds_so_far, With_bounds.add ty ti bs', fuel_result, final_ctl
             in
             match Loop_control.check ctl ty with
             | Stop ctl_after_stop ->
@@ -1207,7 +1236,7 @@ module Layout_and_axes = struct
                   No_with_bounds Not_best [@nontail])))
       in
       let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
-      let mod_bounds, with_bounds, fuel_status =
+      let mod_bounds, with_bounds, fuel_status, _ =
         loop Loop_control.starting mod_bounds
           (Axis_set.complement skip_axes)
           (With_bounds.to_list t.with_bounds)
