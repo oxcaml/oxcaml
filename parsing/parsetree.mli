@@ -67,10 +67,18 @@ type mod_ = | Mod of string [@@unboxed]
 type mods = mod_ loc list
 
 type modality = | Modality of string [@@unboxed]
-type modalities = modality loc list * mods
+type core_modalities = modality loc list
+type modalities = {
+    core_modalities : core_modalities;
+    mod_modalities : mods
+  }
 
 type mode = | Mode of string [@@unboxed]
-type modes = mode loc list * mods
+type core_modes = mode loc list
+type modes = {
+    core_modes : core_modes;
+    mod_modes : mods
+  }
 
 type include_kind = Structure | Functor
 

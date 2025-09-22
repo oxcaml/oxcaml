@@ -53,7 +53,7 @@ let simple_longident id =
 
 let check_empty_constraint ~loc ty modes =
   match ty, modes with
-  | None, ([], []) -> empty_constraint loc
+  | None, {core_modes = []; mod_modes = []} -> empty_constraint loc
   | _ -> ()
 
 (* Is this pattern a single variable, possibly with a type annotation? *)
