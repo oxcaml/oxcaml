@@ -2067,7 +2067,9 @@ module_type:
 
 %inline module_type_with_optional_modes:
   | module_type { $1, Modes.empty }
-  | module_type_atomic modes_mods_expr { $1, $2 }
+  (* CR zeisbach: if this is modes_mod_expr, then there are shift/reduce conflicts
+     that I don't know how to resolve. *)
+  | module_type_atomic at_mode_expr { $1, { core_modes = $2; mod_modes = [] } }
 
 (* A signature, which appears between SIG and END (among other places),
    is a list of signature elements. *)
@@ -4059,8 +4061,10 @@ jkind_desc:
       in
       Mod ($1, { core_modes; mod_modes = [] })
     }
-  | jkind_annotation WITH core_type optional_modalities_mods_expr {
-      With ($1, $3, $4)
+  (* CR zeisbach: if [optional_atat_modalities_expr] is replaced by
+     [optional_modalities_mods_expr] then there is a shift/reduce conflict *)
+  | jkind_annotation WITH core_type optional_atat_modalities_expr {
+      With ($1, $3, { core_modalities = $4; mod_modalities = [] })
     }
   | ident {
       Abbreviation $1
@@ -4617,7 +4621,12 @@ mod_mods_expr:
 ;
 
 optional_mod_mods_expr:
-  | { [] }
+  (* CR zeisbach: this fixes a shift-reduce conflict to actually resolve an ambiguity:
+      [type t : (kind_of_ t1 -> t2) mod contended] vs
+      [type t : kind_of_ t1 -> (t2 mod contended)]
+   *)
+  | %prec below_HASH
+    { [] }
   | mod_mods_expr
     { $1 }
 ;
@@ -4650,11 +4659,6 @@ modes_mods_expr:
     { $1 }
 ;
 
-// %inline optional_at_mode_expr:
-//   | { [] }
-//   | at_mode_expr {$1}
-// ;
-
 %inline with_optional_mode_expr(ty):
   | m0=optional_mode_expr_legacy ty=ty m1=optional_modes_mods_expr {
     (ty, $loc(ty)), Modes.append m0 m1
@@ -4684,12 +4688,11 @@ modalities_mods_expr:
     { { core_modalities = []; mod_modalities} }
 ;
 
-// optional_atat_modalities_expr:
-//   | %prec below_HASH
-//     { [] }
-//   | atat_modalities_expr
-//     { $1 }
-// ;
+optional_atat_modalities_expr:
+  | { [] }
+  | atat_modalities_expr
+    { $1 }
+;
 
 optional_modalities_mods_expr:
   | %prec below_HASH
