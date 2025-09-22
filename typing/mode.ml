@@ -2846,6 +2846,7 @@ module Comonadic_with (Areality : Areality) = struct
     let { areality = areality1;
           linearity = linearity1;
           portability = portability1;
+          forkable = forkable1;
           yielding = yielding1;
           statefulness = statefulness1
         } =
@@ -2854,6 +2855,7 @@ module Comonadic_with (Areality : Areality) = struct
     let { areality = areality2;
           linearity = linearity2;
           portability = portability2;
+          forkable = forkable2;
           yielding = yielding2;
           statefulness = statefulness2
         } =
@@ -2865,14 +2867,17 @@ module Comonadic_with (Areality : Areality) = struct
       then
         if Portability.Const.le portability1 portability2
         then
-          if Yielding.Const.le yielding1 yielding2
+          if Forkable.Const.le forkable1 forkable2
           then
-            if Statefulness.Const.le statefulness1 statefulness2
-            then assert false
-            else
-              Error
-                (Statefulness, { left = statefulness1; right = statefulness2 })
-          else Error (Yielding, { left = yielding1; right = yielding2 })
+            if Yielding.Const.le yielding1 yielding2
+            then
+              if Statefulness.Const.le statefulness1 statefulness2
+              then assert false
+              else
+                Error
+                  (Statefulness, { left = statefulness1; right = statefulness2 })
+            else Error (Yielding, { left = yielding1; right = yielding2 })
+          else Error (Forkable, { left = forkable1; right = forkable2 })
         else Error (Portability, { left = portability1; right = portability2 })
       else Error (Linearity, { left = linearity1; right = linearity2 })
     else Error (Areality, { left = areality1; right = areality2 })

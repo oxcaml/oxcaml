@@ -1840,7 +1840,9 @@ let instance_prim_mode (desc : Primitive.description) ty =
        List.exists is_poly desc.prim_native_repr_args then
     let mode_l = Locality.newvar () in
     let mode_fy = Forkable.newvar (), Yielding.newvar () in
-    let finalret = prim_mode' (Some (mode_l, mode_fy)) desc.prim_native_repr_res in
+    let finalret =
+      prim_mode' (Some (mode_l, mode_fy)) desc.prim_native_repr_res
+    in
     instance_prim_locals desc.prim_native_repr_args
       mode_l mode_fy (Alloc.disallow_right Alloc.legacy) finalret ty,
     Some mode_l, Some mode_fy
