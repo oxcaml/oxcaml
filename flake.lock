@@ -5,11 +5,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1710146030,
-        "narHash": "sha256-SZ5L6eA7HJ/nmkzGG7/ISclqe6oZdOZTNoesiInkXPQ=",
+        "lastModified": 1731533236,
+        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "b1d9ab70662946ef0850d488da1c9019f3a9752a",
+        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
         "type": "github"
       },
       "original": {
@@ -22,32 +22,33 @@
       "flake": false,
       "locked": {
         "host": "gitlab.inria.fr",
-        "lastModified": 1608146308,
-        "narHash": "sha256-i/Xs6G1L/bZ1zj+LB5ehiaBC10ounc1koURV3vFolhI=",
+        "lastModified": 1704030991,
+        "narHash": "sha256-veB0ORHp6jdRwCyDDAfc7a7ov8sOeHUmiELdOFf/QYk=",
         "owner": "fpottier",
         "repo": "menhir",
-        "rev": "abb46d3d9c536bcbe30025f37474e3b4c8288590",
+        "rev": "d3d815e4f554da68b8c247241c8f8678926eecaa",
         "type": "gitlab"
       },
       "original": {
         "host": "gitlab.inria.fr",
         "owner": "fpottier",
-        "ref": "20201216",
+        "ref": "20231231",
         "repo": "menhir",
         "type": "gitlab"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1718632497,
-        "narHash": "sha256-YtlyfqOdYMuu7gumZtK0Kg7jr4OKfHUhJkZfNUryw68=",
+        "lastModified": 1758277210,
+        "narHash": "sha256-iCGWf/LTy+aY0zFu8q12lK8KuZp7yvdhStehhyX1v8w=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "c58b4a9118498c1055c5908a5bbe666e56abe949",
+        "rev": "8eaee110344796db060382e15d3af0a9fc396e0e",
         "type": "github"
       },
       "original": {
         "owner": "nixos",
+        "ref": "nixos-unstable",
         "repo": "nixpkgs",
         "type": "github"
       }
