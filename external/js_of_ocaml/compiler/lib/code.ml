@@ -345,6 +345,14 @@ module Constant = struct
     | Tuple (ta, a, _), Tuple (tb, b, _) ->
         if ta <> tb || Array.length a <> Array.length b
         then Some false
+        else if ta >= 244
+        then
+          (* Return None for special tags that may have special comparison behavior:
+             - 244: forcing_tag
+             - 245: cont_tag (continuations raise on caml_equal)
+             - 246-250: other special tags (lazy, closure, object, etc.)
+               Tags >= 251 (no_scan_tag) are already non-scannable *)
+          None
         else
           let same = ref (Some true) in
           for i = 0 to Array.length a - 1 do
