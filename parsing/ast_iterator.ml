@@ -834,12 +834,14 @@ let default_iterator =
     attributes = (fun this l -> List.iter (this.attribute this) l);
 
     (* Location inside a mode expression needs to be traversed. *)
-    modes = (fun this m ->
-      List.iter (iter_loc this) m
+    modes = (fun this (modes, mods) ->
+      List.iter (iter_loc this) modes;
+      List.iter (iter_loc this) mods
     );
 
-    modalities = (fun this m ->
-      List.iter (iter_loc this) m
+    modalities = (fun this (modalities, mods) ->
+      List.iter (iter_loc this) modalities;
+      List.iter (iter_loc this) mods
     );
 
     payload =
