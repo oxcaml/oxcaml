@@ -49,11 +49,13 @@ module Mixed_product_kind = struct
     | Record
     | Cstr_tuple
     | Cstr_record
+    | Module
 
   let to_plural_string = function
     | Record -> "records"
     | Cstr_tuple -> "constructors"
     | Cstr_record -> "inline record arguments to constructors"
+    | Module -> "modules"
 end
 
 type mixed_product_violation =
@@ -119,7 +121,7 @@ type error =
       ; err : Jkind.Violation.t
       }
   | Jkind_empty_record
-  | Non_value_in_sig of Jkind.Violation.t * string * type_expr
+  | Non_representable_in_sig of Jkind.Violation.t * string * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error
@@ -1667,6 +1669,19 @@ let assert_mixed_product_support =
                   (Value_prefix_too_long
                      { value_prefix_len; max_value_prefix_len;
                        mixed_product_kind })))
+
+let module_representation_of_mixed_product_shape ~loc shape =
+  let value_count = ref 0 in
+  Array.iter
+    (fun elt -> if equal_mixed_block_element elt Value then incr value_count)
+    shape;
+  let value_count = !value_count in
+  if value_count = Array.length shape
+  then Module_value_only (Array.length shape)
+  else begin
+    assert_mixed_product_support loc Module ~value_prefix_len:value_count;
+    Module_mixed shape
+  end
 
 (* [Element_repr] is used to classify whether something is a "mixed product"
    (a mixed record or mixed variant constructor), meaning that some of the
@@ -3783,6 +3798,15 @@ let check_for_hidden_arrow env loc ty =
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modalities valdecl =
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
+  begin match
+    Ctype.type_sort ~why:Structure_element ~fixed:false env cty.ctyp_type
+  with
+  | Ok _ -> ()
+  | Error err ->
+    raise(Error(cty.ctyp_loc,
+                Non_representable_in_sig
+                  (err,valdecl.pval_name.txt,cty.ctyp_type)))
+  end;
   let ty = cty.ctyp_type in
   let v =
   match valdecl.pval_prim with
@@ -4671,9 +4695,9 @@ let report_error ppf = function
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)) err
   | Jkind_empty_record ->
     fprintf ppf "@[Records must contain at least one runtime value.@]"
-  | Non_value_in_sig (err, val_name, ty) ->
+  | Non_representable_in_sig (err, val_name, ty) ->
     let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
-    fprintf ppf "@[This type signature for %a is not a value type.@ %a@]"
+    fprintf ppf "@[This type signature for %a is not representable.@ %a@]"
       Style.inline_code val_name
       (Jkind.Violation.report_with_offender ~offender) err
   | Invalid_jkind_in_block (typ, sort_const, lloc) ->

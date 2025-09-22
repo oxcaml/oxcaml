@@ -1,13 +1,16 @@
 (* TEST
  include stdlib_upstream_compatible;
- reference = "/dev/null";
  flambda2;
  {
-   native;
-   compiler_reference = "${test_source_directory}/big_module.compilers.reference";
+   setup-ocamlc.opt-build-env;
+   ocamlc_opt_exit_status = "2";
+   ocamlc.opt;
+   check-ocamlc.opt-output;
  }{
-   bytecode;
-   compiler_reference = "/dev/null";
+   setup-ocamlopt.opt-build-env;
+   ocamlopt_opt_exit_status = "2";
+   ocamlopt.opt;
+   check-ocamlopt.opt-output;
  }
 *)
 
