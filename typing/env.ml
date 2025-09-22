@@ -721,11 +721,8 @@ and functor_components = {
 and address_unforced =
   | Projection of
     { parent : address_lazy;
-      field_layouts: Jkind.Sort.t Jkind.Layout.t list;
+      field_layouts: Jkind.Sort.t Jkind.Layout.t array;
       pos : int }
-    (* [field_layouts] is a [list] here because it is constructed with iterative
-       prepending *)
-    (* CR jrayman: is this still true? *)
   | ModAlias of { env : t; path : Path.t; }
 
 and address_lazy = (address_unforced, address) Lazy_backtrack.t
@@ -1616,7 +1613,7 @@ and find_ident_module_address id env =
 
 and force_address = function
   | Projection { parent; field_layouts; pos } ->
-    Adot(get_address parent, Array.of_list field_layouts, pos)
+    Adot(get_address parent, field_layouts, pos)
   | ModAlias { env; path } -> find_module_address path env
 
 and get_address a =
@@ -2147,7 +2144,7 @@ let is_identchar c =
   | _ ->
     false
 
-let field_layout_of_signature_item (item : Subst.Lazy.signature_item) =
+let layout_of_lazy_signature_item (item : Subst.Lazy.signature_item) =
   match item with
   | Sig_value(_, decl, _) ->
     begin match decl.val_kind with
@@ -2157,6 +2154,7 @@ let field_layout_of_signature_item (item : Subst.Lazy.signature_item) =
     | Val_prim _ | Val_mut _ -> None (* error will be thrown later *)
     end
   | Sig_typext _ -> Some (Jkind.Layout.Sort Jkind.Sort.value)
+      (* CR jrayman: add [for_type_extension] *)
   | Sig_module(_, pres, _, _, _) ->
     begin match pres with
     | Mp_present ->
@@ -2169,6 +2167,9 @@ let field_layout_of_signature_item (item : Subst.Lazy.signature_item) =
                    (Layout.Const.of_sort_const Sort.Const.for_object))
           (* CR jrayman: is [for_object] correct? *)
   | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
+
+let layout_of_signature_item item =
+  layout_of_lazy_signature_item (Subst.Lazy.of_signature_item item)
 
 let rec components_of_module_maker
           {cm_env; cm_prefixing_subst;
@@ -2190,8 +2191,9 @@ let rec components_of_module_maker
       let pos = ref 0 in
       let field_layouts =
         List.filter_map
-          (fun (item, _) -> field_layout_of_signature_item item)
+          (fun (item, _) -> layout_of_lazy_signature_item item)
           items_and_paths
+        |> Array.of_list
       in
       let next_address () =
         let addr : address_unforced =

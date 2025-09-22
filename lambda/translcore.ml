@@ -1151,14 +1151,14 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | _ ->
           let oid = Ident.create_local "open" in
           let oid_duid = Lambda.debug_uid_none in
+          let open_repr =
+            module_representation_of_signature od.open_bound_items
+          in
           let body, _ =
-            (* CR jrayman: Currently we only allow values at the top of a
-               module.  When that changes, some adjustments may be needed
-               here. *)
             List.fold_left (fun (body, pos) id ->
               Llet(Alias, Lambda.layout_module_field, id,
                    Lambda.debug_uid_none,
-                   Lprim(mod_field pos (Module_value_only (-1)), [Lvar oid],
+                   Lprim(mod_field pos open_repr, [Lvar oid],
                          of_location ~scopes od.open_loc), body),
               pos + 1
             ) (transl_exp ~scopes sort e, 0)
