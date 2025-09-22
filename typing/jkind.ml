@@ -1802,8 +1802,11 @@ module Const = struct
             (* [global] implies [forkable unyielding], omit them. *)
             List.filter (fun m -> m <> "forkable" && m <> "unyielding") modes
           | true, true, false ->
-            (* [global] implies [forkable], omit it and print yielding. *)
+            (* [global] implies [forkable], omit it and print [yielding]. *)
             List.filter (fun m -> m <> "forkable") modes @ ["yielding"]
+          | false, true, true ->
+            (* [forkable] implies [unyielding], omit it. *)
+            List.filter (fun m -> m <> "unyielding") modes
           | true, false, true ->
             (* Print indicating [unforkable]. *)
             modes @ ["unforkable"]
