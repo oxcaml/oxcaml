@@ -379,6 +379,11 @@ module Scannable_block_shape = struct
     match t with
     | Value_only -> Value
     | Mixed_record t -> (Mixed_block_shape.field_kinds t).(index)
+
+  let of_module_representation = function
+    | Lambda.Module_value_only _ -> Value_only
+    | Lambda.Module_mixed shape ->
+      Mixed_record (Mixed_block_shape.from_mixed_block_shape shape)
 end
 
 module Block_shape = struct
