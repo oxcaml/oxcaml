@@ -46,6 +46,7 @@ let run_jsoo_exn ~args =
   | _ -> raise (Sys_error cmdline)
 
 
+
 (** Js_of_ocaml IR compilation backend for .ml files. *)
 
 let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
@@ -119,7 +120,9 @@ let emit_jsir i
       run_jsoo_exn
         ~args:(["compile"; "--enable=effects,with-js-error"
                ; (Unit_info.Artifact.filename (Unit_info.cmj i.target))
-               ; "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))] @ debug_flag))
+               ; "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))]
+               @ debug_flag
+               @ (List.rev !Clflags.all_ccopts)))
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
       ~as_arg_for =

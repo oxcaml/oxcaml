@@ -286,13 +286,21 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
     Clflags.ccobjs := !Clflags.ccobjs @ !lib_jsobjs;
     Clflags.all_ccopts := !lib_jsopts @ !Clflags.all_ccopts;
 
+    Clflags.ccobjs := ListLabels.map !Clflags.ccobjs ~f:(fun obj_name ->
+        try
+          Load_path.find obj_name
+        with Not_found ->
+          raise(Error(File_not_found obj_name))
+    );
+
     (* Build the runtime *)
     let runtime = output_name ^ ".runtime.js" in
-    let debug_flag = if !Clflags.debug then ["--debug-info"; "--pretty"] else [] in
+    let debug_flag = if !Clflags.debug then ["--debug-info" ] else [] in
 
     (* Extract runtime files from ccobjs *)
-    let runtime_files = List.filter (fun f -> Filename.check_suffix f ".js") !Clflags.ccobjs in
-    let other_objs = List.filter (fun f -> not (Filename.check_suffix f ".js")) !Clflags.ccobjs in
+    let runtime_files, other_objs =
+      ListLabels.partition !Clflags.ccobjs ~f:(fun f -> Filename.check_suffix f ".js")
+    in
 
     (* Always build runtime - it's required for JavaScript execution *)
     Jscompile.run_jsoo_exn
@@ -301,15 +309,15 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
     (* Link everything together *)
     let files_to_link =
       runtime ::
-      js_objfiles @
-      other_objs
+      other_objs @ js_objfiles
     in
     let linkall_flag = if !Clflags.link_everything then ["--linkall"] else [] in
-
     Misc.try_finally
       (fun () ->
         Jscompile.run_jsoo_exn
-          ~args:(["link"; "-o"; output_name ] @ linkall_flag @ debug_flag @ files_to_link))
+          ~args:(["link"; "-o"; output_name ] @ linkall_flag @ debug_flag @ files_to_link
+                 @ (List.rev !Clflags.all_ccopts)
+                ))
       ~always:(fun () ->
         Misc.remove_file runtime)
   )

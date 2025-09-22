@@ -3,7 +3,9 @@
    exit_status = "2";
    { bytecode; }
    { native; }
-   { javascript; }
+   { javascript;
+    reference = "unhandled_unlinked.javascript.reference";
+   }
 *)
 
 open Effect

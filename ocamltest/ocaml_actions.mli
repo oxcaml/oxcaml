@@ -61,4 +61,6 @@ val codegen : Actions.t
 
 val cc : Actions.t
 
+val skip_if_incompatible_libraries : Actions.t
+
 val init : unit -> unit

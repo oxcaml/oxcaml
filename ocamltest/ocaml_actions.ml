@@ -1629,6 +1629,27 @@ let run_ocamldoc =
     (Result.fail_with_reason reason, env)
   end
 
+let skip_if_incompatible_libraries = Actions.make
+  ~name:"skip_if_incompatible_libraries"
+  ~description:"Skip JavaScript tests if incompatible libraries are included"
+  ~does_something:false
+  (fun _log env ->
+    let libraries = Environments.safe_lookup Ocaml_variables.libraries env in
+    (* Parse the libraries string - they are space-separated *)
+    let libs = String.words libraries in
+    (* Check if any library is incompatible with JavaScript *)
+    let is_incompatible lib =
+      (* Allow stdlib_*, testing, and lib; skip for everything else *)
+      not (String.starts_with ~prefix:"stdlib_" lib ||
+           lib = "testing" ||
+           lib = "lib" ||
+           lib = "")
+    in
+    if List.exists is_incompatible libs then
+      (Result.skip_with_reason "Test requires libraries not available in JavaScript", env)
+    else
+      (Result.pass, env))
+
 let init () =
   Environments.register_initializer Environments.Post
     "find_source_modules" find_source_modules;
@@ -1691,5 +1712,6 @@ let init () =
     multidomain;
     stack_checks;
     runtime4;
-    runtime5
+    runtime5;
+    skip_if_incompatible_libraries
   ]

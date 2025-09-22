@@ -180,6 +180,7 @@ let asmgen =
 let javascript =
   let js_actions =
   [
+    skip_if_incompatible_libraries;
     setup_ocamlj_opt_build_env;
     ocamlj_opt;
     check_ocamlj_opt_output;

@@ -1,5 +1,7 @@
 (* TEST
  modules = "blake2b_self_test_stubs.c";
+ { native; }
+ { bytecode; }
 *)
 
 external self_test_main : unit -> unit = "self_test_main"

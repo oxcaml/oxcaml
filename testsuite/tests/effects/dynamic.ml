@@ -3,7 +3,6 @@
    runtime5;
    { bytecode; }
    { native; }
-   { javascript; }
 *)
 
 (* Tests the runtime support for dynamic bindings. Dynamic.t isn't yet implemented in the
