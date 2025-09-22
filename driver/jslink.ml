@@ -1,5 +1,6 @@
 let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
   Profile.(record_call (annotate_file_name output_name)) (fun () ->
+      let debug_flag = if !Clflags.debug then ["--debug-info"; "--pretty"] else [] in
       let stdlib = "stdlib.cmja" in
       let stdexit = "std_exit.cmjo" in
       (* Add stdlib to objfiles unless -nopervasives is set *)
@@ -19,7 +20,7 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
       in
       (* Build the runtime *)
       let runtime = output_name ^ ".runtime.js" in
-      Jscompile.run_jsoo_exn ~args:([ "build-runtime"; "--enable=effects,with-js-error"; "-o"; runtime ] @ runtime_files);
+      Jscompile.run_jsoo_exn ~args:([ "build-runtime"; "--enable=effects,with-js-error"; "-o"; runtime ] @ debug_flag @ runtime_files);
       Misc.try_finally
         (fun () ->
           let find_file name =
@@ -28,7 +29,6 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
               failwith (Printf.sprintf "Cannot find %s in include directories" name)
           in
           let files = runtime :: List.map find_file objfiles in
-          let debug_flag = if !Clflags.debug then ["--debug-info"] else [] in
           let linkall_flag = if !Clflags.link_everything then ["--linkall"] else [] in
           Jscompile.run_jsoo_exn
             ~args:(["link"; "-o"; output_name ] @ linkall_flag @ debug_flag @ files))
