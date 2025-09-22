@@ -655,14 +655,13 @@ let extra_rhs_core_type ct ~pos =
   let docs = rhs_info pos in
   { ct with ptyp_attributes = add_info_attrs docs ct.ptyp_attributes }
 
-let mklb first ~loc (p, e, typ, modes, mod_modalities, is_pun) attrs =
+let mklb first ~loc (p, e, typ, modes, is_pun) attrs =
   {
     lb_pattern = p;
     lb_expression = e;
     lb_constraint=typ;
     lb_is_pun = is_pun;
     lb_modes = modes;
-    lb_mod_modalities = mod_modalities;
     lb_attributes = attrs;
     lb_docs = symbol_docs_lazy loc;
     lb_text = (if first then empty_text_lazy
@@ -689,7 +688,6 @@ let val_of_let_bindings ~loc lbs =
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
            ~modes:lb.lb_modes
-           ~mod_modalities:lb.lb_mod_modalities
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
            ?value_constraint:lb.lb_constraint lb.lb_pattern lb.lb_expression)
@@ -721,8 +719,7 @@ let expr_of_let_bindings ~loc lbs body =
   let bindings =
     List.map
       (fun lb ->
-         Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
-          ~modes:lb.lb_modes ~mod_modalities:lb.lb_mod_modalities
+         Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes ~modes:lb.lb_modes
           ?value_constraint:lb.lb_constraint  lb.lb_pattern lb.lb_expression)
       lbs.lbs_bindings
   in
@@ -3244,18 +3241,16 @@ labeled_simple_expr:
 
 %inline empty_list: { [] }
 
-(* Q: rename? ex: [let_ident_with_modes_mod_modalities] *)
 %inline let_ident_with_modes:
     optional_mode_expr_legacy let_ident
-      { ($2, $1, []) }
-  | LPAREN let_ident at_mode_or_mod_modalities_expr RPAREN
-      { let modes, mod_modalities = $3 in
-        ($2, modes, mod_modalities) }
+      { ($2, ($1, [])) }
+  | LPAREN let_ident at_mode_expr RPAREN
+      { ($2, $3) }
 
 let_binding_body_no_punning:
     let_ident_with_modes strict_binding_modes
-      { let v, modes, mod_modalities = $1 in
-        (v, $2 modes, None, modes, mod_modalities) }
+      { let v, modes = $1 in
+        (v, $2 modes, None, modes) }
   | let_ident_with_modes constraint_ EQUAL seq_expr
       (* CR zqian: modes are duplicated, and one of them needs to be made ghost
          to make internal tools happy. We should try to avoid that. *)
@@ -3605,11 +3600,9 @@ type_constraint:
 
 %inline constraint_:
   | type_constraint_with_modes
-    { let ty, modes = $1 in
-      Some ty, modes, [] }
-  | at_mode_or_mod_modalities_expr
-    { let modes, mod_modalities = $1 in
-      None, modes, mod_modalities }
+    { Some ty, modes }
+  | modes_mods_expr
+    { None, $1 }
 ;
 
 (* the thing between the [type] and the [.] in
@@ -3893,12 +3886,11 @@ value_description:
   COLON
   ty = possibly_poly(core_type)
   modalities = optional_atat_modalities_expr
-  mod_modalities = optional_mod_modalities_expr
   attrs2 = post_item_attributes
     { let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      Val.mk id ty ~attrs ~modalities ~mod_modalities ~loc ~docs,
+      Val.mk id ty ~attrs ~modalities ~loc ~docs,
       ext }
 ;
 
@@ -3912,14 +3904,13 @@ primitive_declaration:
   COLON
   ty = possibly_poly(core_type)
   modalities = optional_atat_modalities_expr
-  mod_modalities = optional_mod_modalities_expr
   EQUAL
   prim = raw_string+
   attrs2 = post_item_attributes
     { let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      Val.mk id ty ~prim ~attrs ~modalities ~mod_modalities ~loc ~docs,
+      Val.mk id ty ~prim ~attrs ~modalities ~loc ~docs,
       ext }
 ;
 
@@ -4054,13 +4045,8 @@ type_parameters:
 ;
 
 jkind_desc:
-    jkind_annotation MOD mkrhs(LIDENT)+ { (* LIDENTs here are for modes *)
-      let modes =
-        List.map
-          (fun {txt; loc} -> {txt = Mode txt; loc})
-          $3
-      in
-      Mod ($1, modes)
+    jkind_annotation mod_mods_expr { (* LIDENTs here are for modes *)
+      Mod ($1, $2)
     }
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       With ($1, $3, $4)
@@ -4620,16 +4606,20 @@ at_mode_expr:
   | AT error { expecting $loc($2) "mode expression" }
 ;
 
-at_mode_or_mod_modalities_expr:
-  | mod_modalities_expr
-    { [], $1 }
-  | AT mode_expr optional_mod_modalities_expr
-    { $2, $3 }
+modes_mods_expr:
+  | at_mode_expr optional_mod_mods_expr { ($1, $2) }
+  | mod_mods_expr { ([], $1) }
 ;
 
 %inline optional_at_mode_expr:
   | { [] }
   | at_mode_expr {$1}
+;
+
+optional_modes_mods_expr:
+  | { [] }
+  | modes_mods_expr
+    { $1 }
 ;
 
 %inline with_optional_mode_expr(ty):
@@ -4639,6 +4629,25 @@ at_mode_or_mod_modalities_expr:
   }
 ;
 
+/* Mods */
+
+%inline mod_:
+  | LIDENT { mkloc (Mod $1) (make_loc $sloc) }
+
+%inline mods:
+  | mod_+ { $1 }
+
+mod_mods_expr:
+  | MOD mods {$2}
+  | MOD error { expecting $loc($2) "mod expression" }
+;
+
+(* TODO (ZJE): this will probably have to change to fix ambiguity *)
+optional_mod_mods_expr:
+  | { [] }
+  | mod_mods_expr
+    { $1 }
+;
 
 /* Modalities */
 
@@ -4653,6 +4662,13 @@ atat_modalities_expr:
   | ATAT error { expecting $loc($2) "modality expression" }
 ;
 
+(* Q (ZJE): is there a reason to prefer one being optional here over the other?
+   or spell out all three cases explicitly, without optional? *)
+modalities_mods_expr:
+  | atat_modalities_expr optional_mod_mods_expr { ($1, $2) }
+  | mod_mods_expr { ([], $1) }
+;
+
 optional_atat_modalities_expr:
   | %prec below_HASH
     { [] }
@@ -4660,14 +4676,9 @@ optional_atat_modalities_expr:
     { $1 }
 ;
 
-mod_modalities_expr:
-  | MOD modalities {$2}
-  | MOD error { expecting $loc($2) "modality expression" }
-;
-
-optional_mod_modalities_expr:
+optional_modalities_mods_expr:
   | { [] }
-  | mod_modalities_expr
+  | modalities_mods_expr
     { $1 }
 ;
 
