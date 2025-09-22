@@ -1,5 +1,7 @@
 (* TEST
- modules = "alloc_async_stubs.c";
+   modules = "alloc_async_stubs.c";
+   bytecode;
+   native;
 *)
 
 external test : int ref -> unit = "stub"
