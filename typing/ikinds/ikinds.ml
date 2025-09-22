@@ -1,5 +1,10 @@
 (* This forces ikinds globally on. *)
-(* Clflags.ikinds := true *)
+let force_use_ikinds = false
+let use_ikind_cache = true
+let __ikind_debug : bool ref = ref false
+let __ikind_debug_cache : bool ref = ref false
+
+let __ikind_cached_entries : Path.t list ref = ref []
 
 module Ldd = Ikind.Ldd
 
@@ -32,10 +37,6 @@ let with_origin_tag (tag : string) (f : unit -> 'a) : 'a =
   __ikind_origin_tag := Some tag;
   Fun.protect ~finally:(fun () -> __ikind_origin_tag := prev) f
 
-(* Debug logging helper with indentation (2 spaces per level).
-   Enable by setting IKIND_DEBUG=1|true|yes in the environment. *)
-let __ikind_debug : bool ref = ref false
-
 let __ikind_log_depth = ref 0
 
 let log ?pp (msg : string) (f : unit -> 'a) : 'a =
@@ -65,6 +66,11 @@ let log ?pp (msg : string) (f : unit -> 'a) : 'a =
       let indent' = String.make (!__ikind_log_depth * 2) ' ' in
       Format.eprintf "%s[ikind] end %s@." indent' msg;
       raise exn
+
+let record_cached_entry (p : Path.t) : unit =
+  if !__ikind_debug_cache
+  then
+    __ikind_cached_entries := p :: !__ikind_cached_entries
 
 let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
  fun (ops : JK.ops) ->
@@ -246,6 +252,84 @@ let relevance_of_rep = function
 
 let always_use_stored_jkind = false
 
+let pack_poly (p : JK.poly) : Types.Ikind_cache.kind = Obj.repr p
+
+let unpack_poly (p : Types.Ikind_cache.kind) : JK.poly = Obj.obj p
+
+let pack_entry ~abstract (base, coeffs) =
+  pack_poly base, List.map pack_poly coeffs, abstract
+
+let unpack_entry (entry : Types.type_ikind_cache) :
+    (JK.poly * JK.poly list * bool) option =
+  match entry with
+  | None -> None
+  | Some (base_raw, coeffs_raw, abstract) ->
+    let base = unpack_poly base_raw in
+    let coeffs = List.map unpack_poly coeffs_raw in
+    Some (base, coeffs, abstract)
+
+let poly_of_kind (k : JK.kind) : JK.poly = Obj.magic k
+
+let get_cached_poly ~path:(_:Path.t) (decl : Types.type_declaration) :
+    (JK.poly * JK.poly list * bool) option =
+  match unpack_entry decl.type_ikind_cache with
+  | None -> None
+  | Some (base, coeffs, abstract) ->
+    let arity = List.length decl.type_params in
+    assert (List.length coeffs = arity);
+    Some (base, coeffs, abstract)
+
+let string_of_jkind (jk : _ Types.jkind) : string =
+  Format.asprintf "<%a>" Jkind.format jk
+
+let debug_drain_cached_entries ~(context : Jkind.jkind_context)
+    ~(who : string) () : unit =
+  if !__ikind_debug_cache then begin
+    let paths = List.rev !__ikind_cached_entries in
+    __ikind_cached_entries := [];
+    if paths = [] then
+      Format.eprintf "%s@." who
+    else begin
+      Format.eprintf "%s@." who;
+      List.iter
+        (fun p ->
+          match context.lookup_type p with
+          | None ->
+            Format.eprintf "  %a: <missing declaration>@." Path.print p
+          | Some decl -> begin
+              match get_cached_poly ~path:p decl with
+              | None ->
+                Format.eprintf "  %a: <no entry>@." Path.print p
+              | Some (base, coeffs, abstract) ->
+                let coeffs_s = String.concat "; " (List.map Ikind.Ldd.pp coeffs) in
+                Format.eprintf "  %a: base=%s coeffs=[%s]%s@."
+                  Path.print p (Ikind.Ldd.pp base) coeffs_s
+                  (if abstract then " (abstract)" else "")
+            end)
+        paths;
+    end
+  end
+
+let install_cache_entry ~(context : Jkind.jkind_context) (constr : Path.t)
+    ~(abstract : bool) ((base, coeffs) : JK.kind * JK.kind list) : unit =
+  if not use_ikind_cache then () else
+  match context.lookup_type constr with
+  | None ->
+    Misc.fatal_errorf "Ikinds: install_cache_entry: unknown constructor %a" Path.print constr
+  | Some decl ->
+    let arity = List.length decl.type_params in
+    assert (List.length coeffs = arity);
+    match decl.type_kind with
+    | Types.Type_record _
+    | Types.Type_record_unboxed_product _
+    | Types.Type_variant _
+    | Types.Type_abstract _ ->
+      let base_poly = poly_of_kind base in
+      let coeffs_poly = List.map poly_of_kind coeffs in
+      decl.type_ikind_cache <- Some (pack_entry ~abstract (base_poly, coeffs_poly));
+      record_cached_entry constr
+    | Types.Type_open -> ()
+
 let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     JK.constr_decl =
   match context.lookup_type p with
@@ -253,6 +337,9 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     failwith
       (Format.asprintf "Ikinds.lookup: unknown constructor %a" Path.print p)
   | Some decl -> (
+    match get_cached_poly ~path:p decl with
+    | Some (base, coeffs, abstract) -> JK.Poly { base; coeffs; abstract }
+    | None ->
     if always_use_stored_jkind
     then
       let abstract =
@@ -436,7 +523,10 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
 (* Package the above into a full solver environment. *)
 let make_solver ~(context : Jkind.jkind_context) : JK.solver =
   JK.make_solver
-    { kind_of = kind_of ~context; lookup = lookup_of_context ~context }
+    { kind_of = kind_of ~context;
+      lookup = lookup_of_context ~context;
+      install_cache_entry = install_cache_entry ~context
+    }
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
@@ -457,75 +547,98 @@ let sub_jkind_l ?allow_any_crossing ?origin
               JK.normalize solver (ckind_of_jkind_l sub)));
        ignore
          (log ~pp:JK.pp "super poly (layout failure)" (fun () ->
-              JK.normalize solver (ckind_of_jkind_l super))));
+              JK.normalize solver (ckind_of_jkind_l super)));
+       let label =
+         Format.asprintf "sub_jkind_l(layout failure) %s %s"
+           (string_of_jkind sub) (string_of_jkind super)
+       in
+       debug_drain_cached_entries ~context ~who:label ());
       Error v
   in
-  if not !Clflags.ikinds
+  if not (force_use_ikinds || !Clflags.ikinds)
   then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context sub super
   else
     let solver = make_solver ~context in
     let allow_any =
       match allow_any_crossing with Some true -> true | _ -> false
     in
-    if allow_any
-    then Ok ()
-    else
-      let ik_leq =
-        JK.leq_with_reason solver (ckind_of_jkind_l sub)
-          (ckind_of_jkind_l super)
-      in
-      match ik_leq with
-      | None -> Ok ()
-      | Some violating_axes ->
-        let violating_axis_names =
-          List.map Axis_lattice_bits.axis_number_to_axis_packed
-            violating_axes
+    let result =
+      if allow_any
+      then Ok ()
+      else
+        let ik_leq =
+          JK.leq_with_reason solver (ckind_of_jkind_l sub)
+            (ckind_of_jkind_l super)
         in
-        (* Also show the normalized ikind polys for both sides. *)
-        ignore
-          (log ~pp:JK.pp "sub poly" (fun () ->
-               JK.normalize solver (ckind_of_jkind_l sub)));
-        ignore
-          (log ~pp:JK.pp "super poly" (fun () ->
-               JK.normalize solver (ckind_of_jkind_l super)));
-        (* Do not try to adjust allowances; Violation.Not_a_subjkind
-           accepts an r-jkind. *)
-        let axis_reasons =
-          List.map
-            (fun axis_name ->
-              Jkind.Sub_failure_reason.Axis_disagreement axis_name)
-            violating_axis_names
-        in
-        Error
-          (Jkind.Violation.of_ ~context
-             (Jkind.Violation.Not_a_subjkind
-                ( sub,
-                  super,
-                  axis_reasons )))
+        match ik_leq with
+        | None -> Ok ()
+        | Some violating_axes ->
+          let violating_axis_names =
+            List.map Axis_lattice_bits.axis_number_to_axis_packed
+              violating_axes
+          in
+          (* Also show the normalized ikind polys for both sides. *)
+          ignore
+            (log ~pp:JK.pp "sub poly" (fun () ->
+                 JK.normalize solver (ckind_of_jkind_l sub)));
+          ignore
+            (log ~pp:JK.pp "super poly" (fun () ->
+                 JK.normalize solver (ckind_of_jkind_l super)));
+          (* Do not try to adjust allowances; Violation.Not_a_subjkind
+             accepts an r-jkind. *)
+          let axis_reasons =
+            List.map
+              (fun axis_name ->
+                Jkind.Sub_failure_reason.Axis_disagreement axis_name)
+              violating_axis_names
+          in
+          Error
+            (Jkind.Violation.of_ ~context
+               (Jkind.Violation.Not_a_subjkind
+                  ( sub,
+                    super,
+                    axis_reasons )))
+    in
+    let label =
+      Format.asprintf "sub_jkind_l %s %s"
+        (string_of_jkind sub) (string_of_jkind super)
+    in
+    debug_drain_cached_entries ~context ~who:label ();
+    result
 
 let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) (sub : Types.jkind_l)
     (super : Types.jkind_r) : bool =
   let _ = type_equal, origin in
-  if not !Clflags.ikinds
+  if not (force_use_ikinds || !Clflags.ikinds)
   then Jkind.sub ~type_equal ~context sub super
   else
     let solver = make_solver ~context in
-    match
-      JK.leq_with_reason solver (ckind_of_jkind_l sub) (ckind_of_jkind_r super)
-    with
-    | None -> true
-    | Some _ -> false
+    let result =
+      match
+        JK.leq_with_reason solver (ckind_of_jkind_l sub) (ckind_of_jkind_r super)
+      with
+      | None -> true
+      | Some _ -> false
+    in
+    let label =
+      Format.asprintf "sub %s %s"
+        (string_of_jkind sub) (string_of_jkind super)
+    in
+    debug_drain_cached_entries ~context ~who:label ();
+    result
 
 (* CR jujacobs: this is really slow when enabled. Fix performance. *)
 let crossing_of_jkind ~(context : Jkind.jkind_context)
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
-  if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
+  if not (force_use_ikinds || !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.get_mode_crossing ~context jkind
   else
     let solver = make_solver ~context in
     let lat = JK.round_up solver (ckind_of_jkind jkind) in
     let mb = Axis_lattice_bits.to_mod_bounds lat in
+    let label = Format.asprintf "crossing_of_jkind %s" (string_of_jkind jkind) in
+    debug_drain_cached_entries ~context ~who:label ();
     Jkind.Mod_bounds.to_mode_crossing mb
 
 (* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
@@ -540,7 +653,7 @@ let sub_or_intersect ?origin
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
   let _ = origin in
-  if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
+  if not (false || !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.sub_or_intersect ~type_equal ~context t1 t2
   else
     (* CR jujacobs: enable this *)
@@ -548,6 +661,11 @@ let sub_or_intersect ?origin
       sub ~type_equal ~context (Jkind.disallow_right t1)
         (Jkind.disallow_left t2)
     in
+    let label =
+      Format.asprintf "sub_or_intersect %s %s"
+        (string_of_jkind t1) (string_of_jkind t2)
+    in
+    debug_drain_cached_entries ~context ~who:label ();
     (* Preserve canonical Jkind classification for now. *)
     Jkind.sub_or_intersect ~type_equal ~context t1 t2
 
@@ -558,14 +676,21 @@ let sub_or_error ?origin
     (t2 : ('l2 * Allowance.allowed) Types.jkind) :
     (unit, Jkind.Violation.t) result =
   let _ = origin in
-  if not !Clflags.ikinds
+  if not (false || !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.sub_or_error ~type_equal ~context t1 t2
-  else if sub ~type_equal ~context (Jkind.disallow_right t1)
-            (Jkind.disallow_left t2)
-  then Ok ()
-  else
-    (* Delegate to Jkind for detailed error reporting. *)
-    Jkind.sub_or_error ~type_equal ~context t1 t2
+  else 
+    let sub_result = sub ~type_equal ~context (Jkind.disallow_right t1)
+            (Jkind.disallow_left t2) in
+    let label =
+      Format.asprintf "sub_or_error %s %s"
+        (string_of_jkind t1) (string_of_jkind t2)
+    in
+    debug_drain_cached_entries ~context ~who:label ();
+    if sub_result
+    then Ok ()
+    else
+      (* Delegate to Jkind for detailed error reporting. *)
+      Jkind.sub_or_error ~type_equal ~context t1 t2
 
 (* Developer probe stub: set IKIND_POLY_PROBE to enable future tests. No-op by
    default. *)

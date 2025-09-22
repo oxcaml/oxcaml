@@ -848,6 +848,10 @@ module Layout_and_axes = struct
          With_bounds.debug_print t.with_bounds Jkind_axis.Axis_set.print
          relevant_axes;
     *)
+    if false && !Clflags.ikinds then
+      (* Just return the original jkind *)
+      Obj.magic t, Sufficient_fuel
+    else
     match t with
     | { with_bounds = No_with_bounds; _ } as t -> t, Sufficient_fuel
     | { with_bounds = With_bounds tys; _ } as t

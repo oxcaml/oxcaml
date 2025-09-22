@@ -1413,6 +1413,7 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_unboxed_default = false;
     type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
     type_unboxed_version = None;
+    type_ikind_cache = None;
   }
 
 let existential_name name_counter ty =
@@ -3720,7 +3721,10 @@ let add_jkind_equation ~reason uenv destination jkind1 =
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
             | Some jkind, Some decl_jkind when
                    not (Jkind.equal jkind decl_jkind) ->
-               let refined_decl = { decl with type_jkind = Jkind.disallow_right jkind } in
+               Types.clear_type_ikind_cache decl;
+               let refined_decl =
+                 { decl with type_jkind = Jkind.disallow_right jkind }
+               in
                set_env uenv (Env.add_local_constraint p refined_decl env)
             | _ -> ()
           with
@@ -7194,6 +7198,7 @@ let rec nondep_type_decl env mid is_covariant decl =
       type_unboxed_default = decl.type_unboxed_default;
       type_uid = decl.type_uid;
       type_unboxed_version;
+      type_ikind_cache = None;
     }
   with Nondep_cannot_erase _ as exn ->
     clear_hash ();

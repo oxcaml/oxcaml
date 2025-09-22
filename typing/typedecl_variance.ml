@@ -270,6 +270,7 @@ let compute_variance_gadt env ~check (required, loc as rloc) decl
     (tl, ret_type_opt) =
   match ret_type_opt with
   | None ->
+      Types.clear_type_ikind_cache decl;
       compute_variance_type env ~check rloc {decl with type_private = Private}
         (for_constr tl)
   | Some ret_type ->
@@ -288,6 +289,7 @@ let compute_variance_gadt env ~check (required, loc as rloc) decl
                     (fv :: fv1, fv2))
               ([], fvl) tyl required
           in
+          Types.clear_type_ikind_cache decl;
           compute_variance_type env ~check rloc
             {decl with type_params = tyl; type_private = Private}
             (for_constr tl)
@@ -298,6 +300,7 @@ let compute_variance_extension env decl ext rloc =
     Some (Extension_constructor (ext.Typedtree.ext_id, ext.Typedtree.ext_type))
   in
   let ext = ext.Typedtree.ext_type in
+  Types.clear_type_ikind_cache decl;
   compute_variance_gadt env ~check rloc
     {decl with type_params = ext.ext_type_params}
     (ext.ext_args, ext.ext_ret_type)
@@ -342,6 +345,7 @@ let compute_variance_decl env ~check decl (required, _ as rloc) =
             let vari =
               List.map
                 (fun ty ->
+                   Types.clear_type_ikind_cache decl;
                    compute_variance_type env ~check rloc
                      {decl with type_private = Private}
                      (add_false [ ty ])

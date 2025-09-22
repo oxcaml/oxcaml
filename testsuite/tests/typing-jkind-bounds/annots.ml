@@ -844,7 +844,18 @@ Line 1, characters 29-36:
                                  ^^^^^^^
 Error: This pattern matches values of type "a"
        but a pattern was expected which matches values of type
-         "('a : '_representable_layout_1)"
+         "('a : '_representable_layout_155)"
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because we must know concretely how to pass a function argument.
+|}, Principal{|
+Line 1, characters 29-36:
+1 | let f = fun (type (a : any)) (x : a) -> x
+                                 ^^^^^^^
+Error: This pattern matches values of type "a"
+       but a pattern was expected which matches values of type
+         "('a : '_representable_layout_151)"
        The layout of a is any
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be representable

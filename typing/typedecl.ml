@@ -317,6 +317,7 @@ in
       type_unboxed_default = false;
       type_uid = Uid.unboxed_version uid;
       type_unboxed_version = None;
+      type_ikind_cache = None;
     }
   in
   let decl =
@@ -331,11 +332,12 @@ in
       type_is_newtype = false;
       type_expansion_scope = Btype.lowest_level;
       type_loc = sdecl.ptype_loc;
-      type_attributes = sdecl.ptype_attributes;
-      type_unboxed_default = false;
-      type_uid = uid;
-      type_unboxed_version;
-    }
+    type_attributes = sdecl.ptype_attributes;
+    type_unboxed_default = false;
+    type_uid = uid;
+    type_unboxed_version;
+    type_ikind_cache = None;
+  }
   in
   add_type ~check:true id decl env
 
@@ -1086,6 +1088,7 @@ let transl_declaration env sdecl (id, uid) =
         type_unboxed_version = None;
         (* Unboxed versions are computed after all declarations have been
            translated, in [derive_unboxed_versions] *)
+        type_ikind_cache = None;
       } in
   (* Check constraints *)
     List.iter
@@ -1261,6 +1264,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_unboxed_default = false;
         type_uid = Uid.unboxed_version decl.type_uid;
         type_unboxed_version = None;
+        type_ikind_cache = None;
       }
 
 let derive_unboxed_versions decls env =
@@ -1524,6 +1528,7 @@ let narrow_to_manifest_jkind env loc decl =
          | Ok () -> ()
          | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v))))
     end;
+    Types.clear_type_ikind_cache decl;
     { decl with type_jkind = manifest_jkind }
 
 (* Check that the type expression (if present) is compatible with the kind.
@@ -1849,6 +1854,7 @@ let rec update_decl_jkind env dpath decl =
         update_decl_jkind env (Path.unboxed_version dpath) d)
       decl.type_unboxed_version
   in
+  Types.clear_type_ikind_cache decl;
   let decl = { decl with type_unboxed_version } in
   let open struct
     (* For tracking what types appear in record blocks. All product layouts
@@ -2061,6 +2067,7 @@ let rec update_decl_jkind env dpath decl =
 
 
   let new_decl =
+    Types.clear_type_ikind_cache decl;
     match decl.type_kind with
     | Type_abstract _ ->
       (* Abstract types should never have quality=best, but let's double check that here
@@ -2145,13 +2152,14 @@ let update_decls_jkind_reason env decls =
   List.map
     (fun (id, decl) ->
        let update_generalized =
-        Ctype.check_and_update_generalized_ty_jkind
+       Ctype.check_and_update_generalized_ty_jkind
           ~name:id ~loc:decl.type_loc env
        in
        List.iter update_generalized decl.type_params;
        Btype.iter_type_expr_kind update_generalized decl.type_kind;
        Option.iter update_generalized decl.type_manifest;
        let reason = Jkind.History.Generalized (Some id, decl.type_loc) in
+       Types.clear_type_ikind_cache decl;
        let new_decl = {decl with type_jkind =
                                    Jkind.History.update_reason decl.type_jkind reason} in
        (id, new_decl)
@@ -2706,6 +2714,7 @@ let name_recursion sdecl id decl =
     if Ctype.deep_occur ty ty' then
       let td = Tconstr(Path.Pident id, decl.type_params, ref Mnil) in
       link_type ty (newty2 ~level:(get_level ty) td);
+      Types.clear_type_ikind_cache decl;
       {decl with type_manifest = Some ty'}
     else decl
   | _ -> decl
@@ -2760,6 +2769,7 @@ let normalize_decl_jkinds env decls =
         decl.type_jkind
     in
     let decl =
+      Types.clear_type_ikind_cache decl;
       { decl with type_jkind = normalized_jkind; type_unboxed_version }
     in
     if normalized_jkind != original_decl.type_jkind then begin
@@ -2808,6 +2818,7 @@ let normalize_decl_jkinds env decls =
             | Type_variant (cs, rep, _) ->
               Type_variant (cs, rep, umc)
           in
+          Types.clear_type_ikind_cache decl;
           { decl with type_jkind; type_kind; }
         else decl
       | Error err ->
@@ -4027,6 +4038,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
           type_unboxed_default = false;
           type_uid = Uid.unboxed_version type_uid;
           type_unboxed_version = None;
+          type_ikind_cache = None;
         }
       | { type_unboxed_version = None ; _ } ->
         None
@@ -4060,6 +4072,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_unboxed_default;
       type_uid;
       type_unboxed_version;
+      type_ikind_cache = None;
     }
   in
   Option.iter (fun p -> set_private_row env sdecl.ptype_loc p new_sig_decl)
@@ -4124,7 +4137,8 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
             type_variance;
             type_separability;
           })
-        new_sig_decl.type_unboxed_version
+        new_sig_decl.type_unboxed_version;
+      type_ikind_cache = None;
     } in
   {
     typ_id = id;
@@ -4164,6 +4178,7 @@ let transl_package_constraint ~loc ty =
     type_unboxed_default = false;
     type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
     type_unboxed_version = None;
+    type_ikind_cache = None;
   }
 
 (* Approximate a type declaration: just make all types abstract *)
@@ -4203,7 +4218,9 @@ let abstract_type_decl ~injective ~jkind ~params =
           type_unboxed_default = false;
           type_uid = Uid.internal_not_actually_unique;
           type_unboxed_version = None;
+          type_ikind_cache = None;
         };
+      type_ikind_cache = None;
     }
   end
 

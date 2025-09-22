@@ -244,6 +244,17 @@ type q = { x : v; }
 |}]
 
 type u
+type t : value mod portable with u
+type v : value mod portable with t
+type q : value mod portable with v = { x : v }
+[%%expect {|
+type u
+type t : value mod portable with u
+type v : value mod portable with t
+type q = { x : v; }
+|}]
+
+type u
 type t = private u
 type v : immutable_data with u = { value : t }
 [%%expect {|
@@ -521,6 +532,13 @@ type this_should_succeed : immutable_data = ((int * int) * (int * int))
 type this_should_succeed = (int * int) * (int * int)
 |}]
 
+type a
+type foo : immutable_data with a = this_should_succeed
+[%%expect{|
+type a
+type foo = this_should_succeed
+|}]
+
 type this_too : immutable_data = (int * int) list
 [%%expect{|
 type this_too = (int * int) list
@@ -556,6 +574,17 @@ and t2__unit = unit t2
 [%%expect{|
 type 'a t2 = A | B of t2__unit
 and t2__unit = unit t2
+|}]
+
+type t3 : immediate = unit t2
+[%%expect{|
+Line 1, characters 0-29:
+1 | type t3 : immediate = unit t2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "unit t2" is immutable_data
+         because of the definition of t2 at lines 1-3, characters 0-17.
+       But the kind of type "unit t2" must be a subkind of immediate
+         because of the definition of t3 at line 1, characters 0-29.
 |}]
 
 (* out of fuel *)

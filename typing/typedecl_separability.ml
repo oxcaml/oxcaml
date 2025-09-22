@@ -688,7 +688,10 @@ let property : (prop, unit) Typedecl_properties.property =
     new_prop in
   let default decl = best_msig decl in
   let compute env decl () = compute_decl env decl in
-  let update_decl decl type_separability = { decl with type_separability } in
+  let update_decl decl type_separability =
+    Types.clear_type_ikind_cache decl;
+    { decl with type_separability }
+  in
   let check _env _id _decl _req = () in (* FIXME run final check? *)
   { eq; merge; default; compute; update_decl; check; }
 

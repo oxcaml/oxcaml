@@ -99,15 +99,18 @@ and strengthen_lazy_sig' ~aliasable sg p =
               Some(Btype.newgenty(Tconstr(path,
                                           decl.type_params, ref Mnil))) in
             if Btype.type_kind_is_abstract decl then
-              { decl with type_private = Public; type_manifest = manif }
+              (Types.clear_type_ikind_cache decl;
+               { decl with type_private = Public; type_manifest = manif })
             else
-              { decl with type_manifest = manif }
+              (Types.clear_type_ikind_cache decl;
+               { decl with type_manifest = manif })
       in
       let path = Pdot(p, Ident.name id) in
       let new_unboxed_version =
         Option.map (strengthen_decl (Path.unboxed_version path))
           decl.type_unboxed_version
       in
+      Types.clear_type_ikind_cache decl;
       let newdecl =
         strengthen_decl path
           {decl with type_unboxed_version = new_unboxed_version}
@@ -320,16 +323,19 @@ let rec sig_make_manifest sg =
         in
         match decl.type_kind with
         | Type_abstract _ ->
-          { decl with type_private = Public; type_manifest = manif }
+          (Types.clear_type_ikind_cache decl;
+           { decl with type_private = Public; type_manifest = manif })
         | (Type_record _ | Type_record_unboxed_product _ | Type_variant _
           | Type_open) ->
-          { decl with type_manifest = manif }
+          (Types.clear_type_ikind_cache decl;
+           { decl with type_manifest = manif })
     in
     let path = Pident id in
     let new_unboxed_version =
       Option.map (decl_make_manifest (Path.unboxed_version path))
         decl.type_unboxed_version
     in
+    Types.clear_type_ikind_cache decl;
     let newdecl =
       decl_make_manifest path
         {decl with type_unboxed_version = new_unboxed_version}
@@ -574,6 +580,7 @@ let enrich_typedecl env p id decl =
                     { d with type_manifest = Some orig_ty_unboxed })
                   decl.type_unboxed_version
               in
+              Types.clear_type_ikind_cache decl;
               {decl with type_manifest = Some orig_ty; type_unboxed_version}
         end
 
