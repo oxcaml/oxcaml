@@ -1042,11 +1042,6 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
   | Legacy -> "record"
   | Unboxed_product -> "unboxed record"
 
-let module_representation_of_mixed_product_shape shape =
-  if Array.for_all (equal_mixed_block_element Value) shape
-  then Module_value_only (Array.length shape)
-  else Module_mixed shape
-
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
   | Base Value -> Value

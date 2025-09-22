@@ -28,6 +28,8 @@ open Debuginfo.Scoped_location
 
 let const_int i = Lambda.const_int i
 
+let module_representation_of_signature _ = assert false
+
 type unsafe_component =
   | Unsafe_module_binding
   | Unsafe_functor
@@ -186,9 +188,6 @@ and apply_coercion_result loc strict funct params args cc_res =
                       ap_probe=None;
                     })))
 
-(* CR jrayman: delete [skip_wrap] *)
-and skip_wrap = Option.is_some (Sys.getenv_opt "SKIP_WRAP")
-
 and wrap_id_pos_list loc id_pos_list get_field get_layout lam =
   let fv = free_variables lam in
   (*Format.eprintf "%a@." Printlambda.lambda lam;
@@ -196,7 +195,7 @@ and wrap_id_pos_list loc id_pos_list get_field get_layout lam =
   Format.eprintf "@.";*)
   let (lam, _fv, s) =
     List.fold_left (fun (lam, fv, s) (id',pos,c) ->
-      if (not skip_wrap) && Ident.Set.mem id' fv then
+      if Ident.Set.mem id' fv then
         let id'' = Ident.create_local (Ident.name id') in
         let id''_duid = Lambda.debug_uid_none in
         let rhs = apply_coercion loc Alias c (get_field pos) in
@@ -673,7 +672,8 @@ and transl_structure ~scopes loc
     [] ->
       let body, repr =
         let repr =
-          module_representation_of_mixed_product_shape
+          Typedecl.module_representation_of_mixed_product_shape
+            ~loc:Location.none
             (List.rev_map (fun (_, mbe) -> mbe) fields |> Array.of_list)
         in
         match cc with
@@ -701,7 +701,8 @@ and transl_structure ~scopes loc
             let get_layout pos =
               if pos < 0 then layout_value_field
               else let _, shape = v.(pos) in
-                shape |> transl_mixed_block_element ~value_kind:generic_value
+                shape |> transl_mixed_block_element
+                           ~value_kind:(lazy generic_value)
                       |> layout_of_mixed_block_element
             in
             let ids = List.fold_right (fun (id, _) s -> Ident.Set.add id s)
@@ -1054,7 +1055,13 @@ let required_globals ~flambda body =
   Translprim.clear_used_primitives ();
   required
 
-let add_arg_block_to_module_block primary_block_lam size restr =
+let add_arg_block_to_module_representation = function
+    (* NB: this assumes [arg_block] has layout value *)
+  | Module_value_only field_count -> Module_value_only (field_count + 1)
+  | Module_mixed shape ->
+    Module_mixed (Array.append shape [| mixed_block_element_for_module |])
+
+let add_arg_block_to_module_block primary_block_lam primary_repr restr =
   let primary_block_id = Ident.create_local "*primary-block*" in
   let primary_block_id_duid = Lambda.debug_uid_none in
   let arg_block_id = Ident.create_local "*arg-block*" in
@@ -1063,20 +1070,20 @@ let add_arg_block_to_module_block primary_block_lam size restr =
     apply_coercion Loc_unknown Strict restr (Lvar primary_block_id)
   in
   let get_field i =
-    Lprim (mod_field i (Module_value_only (-1)),
-      [Lvar primary_block_id], Loc_unknown)
+    Lprim (mod_field i primary_repr, [Lvar primary_block_id], Loc_unknown)
   in
+  let size = module_representation_field_count primary_repr in
   let all_fields = List.init size get_field @ [Lvar arg_block_id] in
   let arg_block_field = size in
-  let new_size = size + 1 in
+  let new_repr = add_arg_block_to_module_representation primary_repr in
   Llet(Strict, layout_module, primary_block_id,
        primary_block_id_duid, primary_block_lam,
        Llet(Strict, layout_module, arg_block_id,
             arg_block_id_duid, arg_block_lam,
-            Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
+            Lprim(block_of_module_representation primary_repr,
                   all_fields,
                   Loc_unknown))),
-  new_size,
+  new_repr,
   Some arg_block_field
 
 let add_runtime_parameters lam params =
@@ -1114,11 +1121,7 @@ let transl_implementation_module ~scopes module_id (str, cc, cc2) =
   match cc2 with
   | None -> lam, repr, None
   | Some cc2 ->
-    let _ = cc2 in
-    let _ = add_arg_block_to_module_block in
-    failwith "CR jrayman"
-    (* add_arg_block_to_module_block lam repr cc2 *)
-    (* CR jrayman: talk with Luke with Chris *)
+    add_arg_block_to_module_block lam repr cc2
 
 let wrap_toplevel_functor_in_struct code =
   Lprim(Pmakeblock(0, Immutable, None, Lambda.alloc_heap),
@@ -1395,15 +1398,17 @@ let get_component = function
   | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
 
 let transl_package component_names coercion =
-  let size =
+  (* CR jrayman: should be a better way of getting [repr] *)
+  let repr =
     match coercion with
-    | Tcoerce_none -> List.length component_names
-    | Tcoerce_structure { pos_cc_list; _ } -> List.length pos_cc_list
+    | Tcoerce_none -> Module_value_only (List.length component_names)
+    | Tcoerce_structure { output_repr; _ } ->
+      transl_module_representation output_repr
     | Tcoerce_functor _
     | Tcoerce_primitive _
     | Tcoerce_alias _ -> assert false
   in
-  size,
+  repr,
   apply_coercion Loc_unknown Strict coercion
     (Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
            List.map get_component component_names,
@@ -1435,7 +1440,7 @@ let transl_runtime_arg arg =
       lambda_unit
 
 let transl_instance_impl
-      compilation_unit ~runtime_args ~main_module_block_size
+      compilation_unit ~runtime_args ~main_module_block_repr
       ~arg_block_idx
     : Lambda.program =
   let base_compilation_unit, _args =
@@ -1468,7 +1473,7 @@ let transl_instance_impl
     |> Compilation_unit.Set.of_list
   in
   let main_module_block_format =
-    Mb_struct { mb_repr = Module_value_only main_module_block_size }
+    Mb_struct { mb_repr = main_module_block_repr }
   in
   {
     compilation_unit;
@@ -1478,13 +1483,13 @@ let transl_instance_impl
     arg_block_idx;
   }
 
-let transl_instance instance_unit ~runtime_args ~main_module_block_size
+let transl_instance instance_unit ~runtime_args ~main_module_block_repr
       ~arg_block_idx =
   assert (Compilation_unit.is_instance instance_unit);
   if (runtime_args = []) then
     Misc.fatal_error "Trying to instantiate but passing no arguments";
   transl_instance_impl instance_unit ~runtime_args
-    ~main_module_block_size ~arg_block_idx
+    ~main_module_block_repr ~arg_block_idx
 
 (* Error report *)
 
