@@ -260,7 +260,7 @@ let package_files ~machine_width unix ~ppf_dump initial_env files targetcmx
       let coercion, repr =
         Typemod.package_units initial_env files cmi comp_unit in
       package_object_files ~machine_width unix ~ppf_dump files obj targetcmx
-        coercion repr ~flambda2
+        coercion (Lambda.transl_module_representation repr) ~flambda2
     )
     ~exceptionally:(fun () ->
         remove_file targetcmx; remove_file (Unit_info.Artifact.filename obj)
