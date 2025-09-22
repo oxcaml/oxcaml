@@ -950,8 +950,6 @@ type module_representation =
   | Module_mixed of mixed_block_shape
   (* The module contains both values and unboxed elements *)
 
-val module_field_count : module_representation -> int
-
 (* The structure of the main module block. A module with no parameters will be
    compiled to an [Mb_struct] and a module with at least one parameter will be
    compiled to an [Mb_instantiating_functor]. *)
