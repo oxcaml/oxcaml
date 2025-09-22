@@ -28,22 +28,36 @@ type lock_item =
   | Class
   | Constructor
 
-(** A description of what type of closure is closing a value *)
-type closure_context =
-  | Function
-  | Functor
-  | Lazy
-
-(** Details of an item being closed by a context *)
-type closure_details =
-  { closure_context : closure_context;
-    value_loc : Location.t;  (** Location of the value being closed over *)
-    value_lid : Longident.t;  (** Identifier for the value being closed over *)
-    value_item : lock_item  (** The item type of the value being closed over *)
+type ident =
+  { category : lock_item;
+    lid : Longident.t
+        (** Sometimes we want the ident to represent [M.x] but the loc can only
+        point to [M]. This field would store [M.x]. *)
   }
 
-(** Hint for a morphism on bounds. See [Mode.Report.print_morph] for what each non-trivial
-    constructor means. *)
+(** Description of pinpoints to accompany the location. The constructors are not
+mutually exclusive - some might be more precise than others *)
+type pinpoint_desc =
+  | Unknown
+  | Ident of ident  (** An identifier *)
+  | Function  (** A function definition *)
+  | Functor  (** A functor definition *)
+  | Lazy  (** A lazy expression *)
+  | Allocation  (** An allocation *)
+  | Expression  (** An arbitrary expression *)
+
+(** A pinpoint is a location in the source code, accompanied by additional description *)
+type pinpoint = Location.t * pinpoint_desc
+
+type closure_details =
+  { closure : pinpoint_desc;
+    (* CR-soon zqian: add location to [closure]. *)
+    closed : pinpoint
+  }
+
+(** Hint for morphisms. When acompanied by a destination [pinpoint], [morph]
+   gives a source [pinpoint] and explains the relation between them. See
+   [Mode.Report.print_morph] for what each non-trivial constructor means. *)
 type 'd morph =
   | Unknown : ('l * 'r) morph  (** The morphism is not explained. *)
   | Unknown_non_rigid : ('l * 'r) morph
@@ -55,6 +69,10 @@ type 'd morph =
       (** The morphism doesn't change the bound and should be skipped in printing. *)
   | Close_over : closure_details -> ('l * disallowed) morph
   | Is_closed_by : closure_details -> (disallowed * 'r) morph
+  (* CR-soon zqian: currently [Close_over] and [Is_closed_by] both store both
+     the source and destination pinpoints. Once we make [pinpoint] mandatory for
+     submode calls, each constructor only needs to store the info of its source
+     pinpoint. *)
   | Captured_by_partial_application : (disallowed * 'r) morph
   | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph

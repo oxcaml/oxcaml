@@ -69,10 +69,24 @@ type 'a simple_error =
     right : 'a
   }
 
+type print_error_result =
+  | Mode  (** A mode constant is printed *)
+  | Mode_with_hint  (** A mode constant with hints is printed *)
+
+type print_error = (Format.formatter -> print_error_result) simple_error
+
 module type Common = sig
   module Const : Lattice
 
   type error
+
+  (** Takes a submode [error] accompanied by a [pinpoint] of the original
+  submode, returns an explaining printer for each side. Each printer prints
+  either a mode constant name, or "[mode] because ...". The function assumes
+  [pinpoint] is already printed, which allows simplifying its own printing. The
+  caller is responsible for printing [pinpoint] and placing the result of this
+  function in a suitable linguistic context. *)
+  val print_error : Mode_hint.pinpoint -> error -> print_error
 
   type equate_error = equate_step * error
 
@@ -104,17 +118,50 @@ module type Common = sig
 
   val newvar : unit -> ('l * 'r) t
 
-  (* CR-soon zqian: The following [submode] is currently abused at callsites
-     where the two modes should be linked via some morph hint, instead of being
-     linked directly. *)
+  (* How to submode
 
-  (** Constrain the first mode lower than the second mode. It also assumes the
-  submode is trivial and links the two modes directly, without inserting an
-  [Unknown] morph hint. *)
-  val submode : (allowed * 'r) t -> ('l * allowed) t -> (unit, error) result
+     Naively, mode constraints need to be justified by some explanation (e.g. a
+     location in the source code). For example, for function application [f e],
+     we check that the mode of [e] is less than the mode of the parameter of
+     [f], and this mode constraint can be justified by pointing to the location
+     of [e] in the application. Such explanation should be made into an
+     adjunction pair in [Mode_hint.morph] and applied to either modes, such that
+     both modes are about the argument (or equivalently, both modes are about
+     the parameter) . After the adjustment, the submode itself becomes
+     self-evident and doesn't require any mode-related hint.
+
+     However, while both modes can self-explain why they are high or low, they
+     don't always know what the "thing" that they both describe is. This
+     information is best known by the caller of submode, and encoded in the
+     [pinpoint] argument passed to submode. *)
+
+  (** Takes the actual and expected mode of something, check that the actual
+    mode is less than the expected mode. In case of error, the error is returned
+    and no mutation is done.
+
+    The two modes should be hinted sufficently that the submode is self-evident.
+    In particular, the two modes should be about the "same thing". See the notes
+    [How to submode] for details. *)
+  val submode :
+    ?pp:Mode_hint.pinpoint ->
+    (allowed * 'r) t ->
+    ('l * allowed) t ->
+    (unit, error) result
+  (* CR-soon zqian: make [pp] mandatory *)
+
+  (** Similar to [submode], but instead of returning an error, raise
+    user-friendly errors directly, with [pinpoint] describing the thing
+    whose actual and expected modes are being checked.
+
+    If you need more than [pinpoint] as the context in the error message,
+    consider [submode]. *)
+  val submode_err :
+    Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
   val equate : lr -> lr -> (unit, equate_error) result
 
+  (** Similiar to [submode], but crashes the compiler if errors. Use this
+    function if the submode is guaranteed to succeed. *)
   val submode_exn : (allowed * 'r) t -> ('l * allowed) t -> unit
 
   val equate_exn : lr -> lr -> unit
@@ -175,17 +222,6 @@ module type Common_product = sig
   include
     Common with type simple_error := simple_error and module Const := Const
 
-  (* CR-soon zqian: Move [?target] into hints, and let [report_error] extract this
-     information. *)
-
-  (** Takes an optional [lock_item] and identifier of the offending value, and report the
-      submode error with hints. *)
-  val report_error :
-    ?target:Mode_hint.lock_item * Longident.t ->
-    Format.formatter ->
-    error ->
-    unit
-
   type 'd hint_const constraint 'd = 'l * 'r
 
   val of_const : ?hint:'d hint_const -> Const.t -> 'd t
@@ -211,9 +247,6 @@ module type S = sig
   module Hint = Mode_hint
 
   type nonrec 'a simple_error = 'a simple_error
-
-  (** Rich mode error specific to axis whose carrier type is ['a]. *)
-  type 'a error
 
   type changes
 
@@ -241,7 +274,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
-         and type error = Const.t error
          and type 'd hint_const := 'd pos_hint_const
   end
 
@@ -252,7 +284,6 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
-         and type error = Const.t error
          and type 'd hint_const := 'd neg_hint_const
   end
 
@@ -459,7 +490,6 @@ module type S = sig
       include
         Common_product
           with type Const.t = monadic
-           and type error = monadic error
            and type 'a Axis.t = (monadic, 'a) Axis.t
            and type 'd hint_morph := 'd neg_hint_morph
            and type 'd hint_const := 'd neg_hint_const
@@ -473,7 +503,6 @@ module type S = sig
       include
         Common_product
           with type Const.t = Areality.Const.t comonadic_with
-           and type error = Areality.Const.t comonadic_with error
            and type 'a Axis.t = (Areality.Const.t comonadic_with, 'a) Axis.t
            and type 'd hint_morph := 'd pos_hint_morph
            and type 'd hint_const := 'd pos_hint_const
@@ -568,8 +597,6 @@ module type S = sig
     type error =
       | Monadic of Monadic.error
       | Comonadic of Comonadic.error
-
-    val report_error : Format.formatter -> error -> unit
 
     type 'a simple_axerror := 'a simple_error
 
