@@ -131,7 +131,9 @@ type flambda_result =
 
 let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     (program : Lambda.program) =
-  let module_repr = failwith "module_repr" in
+  let module_repr =
+    Lambda.main_module_representation program.main_module_block_format
+  in
   let compilation_unit = program.compilation_unit in
   let module_initializer = program.code in
   (* Make sure -linscan is enabled in classic mode. Doing this here to be sure

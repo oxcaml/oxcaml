@@ -956,12 +956,21 @@ type module_representation =
   | Module_value_only of int
   | Module_mixed of mixed_block_shape
 
+let module_field_count = function
+  | Module_value_only size -> size
+  | Module_mixed shape -> Array.length shape
+
 type main_module_block_format =
   | Mb_struct of { mb_repr : module_representation }
   | Mb_instantiating_functor of
       { mb_runtime_params : runtime_param list;
-        mb_returned_size : int;
+        mb_returned_repr : module_representation;
       }
+
+let main_module_representation = function
+  | Mb_struct { mb_repr } -> mb_repr
+  | Mb_instantiating_functor _ -> Module_value_only 1
+
 
 type program =
   { compilation_unit : Compilation_unit.t;
