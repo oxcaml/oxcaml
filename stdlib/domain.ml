@@ -483,12 +483,134 @@ let impl = if runtime5 () then runtime_5_impl else runtime_4_impl
 module M : S = (val impl)
 include M
 
+module TLS0 = struct
+
+  type tls_state = Obj_opt.t array
+
+  external get_tls_state
+    : unit -> tls_state @@ portable = "caml_domain_tls_get"
+  [@@noalloc]
+  external set_tls_state
+    : tls_state -> unit @@ portable = "caml_domain_tls_set"
+  [@@noalloc]
+
+  type 'a key = 'a DLS.key
+
+  let key_counter = Atomic.make 0
+
+  type key_initializer : value mod contended portable =
+      KI : 'a key * ('a -> (unit -> 'a) @ portable once) @@ portable
+      -> key_initializer
+  [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
+
+  type key_initializer_list = key_initializer list
+
+  let parent_keys = Atomic.make ([] : key_initializer_list)
+
+  let rec add_parent_key ki =
+    let l = Atomic.get parent_keys in
+    if not (Atomic.compare_and_set parent_keys l (ki :: l))
+    then add_parent_key ki
+
+  let new_key ?split_from_parent init_orphan =
+    let idx = Atomic.fetch_and_add key_counter 1 in
+    let k = idx, { Modes.Portable.portable = init_orphan } in
+    begin match split_from_parent with
+    | None -> ()
+    | Some split -> add_parent_key (KI (k, split))
+    end;
+    k
+
+  (* If necessary, grow the current domain's local state array such that [idx]
+    * is a valid index in the array. *)
+  let[@inline] maybe_grow idx =
+    let st = get_tls_state () in
+    let size = Array.length st in
+    if idx < size then st
+    else begin
+      let new_st = Obj_opt.grow_array st idx size in
+      set_tls_state new_st;
+      new_st
+    end
+
+  let[@inline] set (type a) (idx, _init) (x : a) =
+    (* Assures [idx] is in range. *)
+    let st = maybe_grow idx in
+    Array.unsafe_set st idx (Obj_opt.some x)
+
+  let[@inline never] init_idx (type a) idx (init : _ -> a) =
+    let v : a = init () in
+    let new_obj = Obj_opt.some v in
+    let st = get_tls_state () in
+    Array.unsafe_set st idx new_obj;
+    v
+
+  let[@inline] get (type a) ((idx, init) : a key) : a =
+    (* Assures [idx] is in range. *)
+    let st = maybe_grow idx in
+    let obj = Array.unsafe_get st idx in
+    if Obj_opt.is_some obj
+    then (Obj_opt.unsafe_get obj : a)
+    else init_idx idx init.portable
+
+  type key_value : value mod portable contended =
+      KV : 'a key * (unit -> 'a) @@ portable -> key_value
+  [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
+
+  module Private = struct
+    type keys = key_value list
+
+    let init () =
+      let st = Obj_opt.fresh () in
+      set_tls_state st
+
+    let get_initial_keys () : key_value list =
+      List.map
+        (* [v] is applied exactly once in [set_initial_keys] *)
+        (fun (KI (k, split)) ->
+          let v = Obj.magic_many (split (get k)) |> Obj.magic_portable in
+          KV (k, v))
+        (Atomic.get parent_keys : key_initializer_list)
+
+    let set_initial_keys (l : key_value list) =
+      List.iter (fun (KV (k, v)) -> set k (v ())) l
+  end
+end
+
 module Safe = struct
   (* Note the exposed signature of [get] and [set] add modes for safety. *)
   module DLS = DLS
-  
-  let spawn = spawn
+  module TLS = TLS0
+
+  let spawn f =
+    let tls_keys = TLS.Private.get_initial_keys () in
+    spawn (fun () ->
+      TLS.Private.init ();
+      TLS.Private.set_initial_keys tls_keys;
+      f ()) [@nontail]
+
   let at_exit = at_exit
+end
+
+module TLS = struct
+  module Private = TLS0.Private
+
+  type 'a key = 'a TLS0.key
+
+  let new_key ?split_from_parent f =
+    let split_from_parent =
+      match split_from_parent with
+      | None -> None
+      | Some split_from_parent ->
+        Some (Obj.magic_portable (fun x ->
+          Obj.magic_portable (fun () -> split_from_parent x)))
+    in
+    TLS0.new_key ?split_from_parent (Obj.magic_portable f)
+  ;;
+
+  let get = TLS0.get
+  let set = TLS0.set
+  let init = TLS0.Private.init
 end
 
 module DLS = struct
@@ -514,5 +636,6 @@ let spawn f = Safe.spawn (Obj.magic_portable f)
 let at_exit f = Safe.at_exit (Obj.magic_portable f)
 
 let () = DLS.init ()
+let () = TLS.init ()
 
 let _ = Stdlib.do_domain_local_at_exit := do_at_exit

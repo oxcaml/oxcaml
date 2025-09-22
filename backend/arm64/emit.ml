@@ -2138,7 +2138,7 @@ let emit_instr i =
   | Lop Dls_get ->
     if Config.runtime5
     then
-      let offset = Domainstate.(idx_of_field Domain_dls_root) * 8 in
+      let offset = Domainstate.(idx_of_field Domain_dls_state) * 8 in
       DSL.ins I.LDR
         [| DSL.emit_reg i.res.(0);
            DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr

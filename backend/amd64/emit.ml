@@ -2318,7 +2318,7 @@ let emit_instr ~first ~fallthrough i =
     I.movzx (res8 i 0) (res i 0)
   | Lop Dls_get ->
     if Config.runtime5
-    then I.mov (domain_field Domainstate.Domain_dls_root) (res i 0)
+    then I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
     else Misc.fatal_error "Dls is not supported in runtime4."
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
