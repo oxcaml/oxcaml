@@ -1592,7 +1592,11 @@ end = struct
   let variant_field s t = child (Projection.Variant_field s) t
 
   let array_index mut i t =
-    let modality = Typemode.transl_modalities ~maturity:Stable mut ([], []) in
+    let modality =
+      (* CR zeisbach: should this really be Ast_helper? maybe it belongs elsewhere *)
+      Typemode.transl_modalities ~maturity:Stable mut
+        Ast_helper.Modalities.empty
+    in
     modal_child modality (Projection.Array_index i) t
 
   let memory_address t = child Projection.Memory_address t
