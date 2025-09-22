@@ -1425,6 +1425,7 @@ let rec transl_mixed_product_element_for_read
   | Void -> fatal_error "Lambda.transl_mixed_product_element_for_read: \
     tried to convert Void to mixed_block_element"
   | Value -> Value generic_value
+    (* CR jrayman: [alloc_heap] is probably not always correct *)
   | Float_boxed -> Float_boxed alloc_heap
   | Float64 -> Float64
   | Float32 -> Float32
@@ -1439,10 +1440,10 @@ let rec transl_mixed_product_element_for_read
   | Product shapes ->
     Product (Array.map transl_mixed_product_element_for_read shapes)
 
-let rec mixed_block_of_sort : Jkind.Sort.Const.t
-                      -> Types.mixed_block_element =
+let rec mixed_block_element_of_const_sort :
+  Jkind.Sort.Const.t -> Types.mixed_block_element =
   function
-  | Base Void -> fatal_error "Lambda.mixed_block_of_sort: \
+  | Base Void -> fatal_error "Lambda.mixed_block_element_of_const_sort: \
     tried to convert Base Void to mixed_block_element"
   | Base Value -> Value
   | Base Bits8 -> Bits8
@@ -1456,7 +1457,7 @@ let rec mixed_block_of_sort : Jkind.Sort.Const.t
   | Base Vec512 -> Vec512
   | Base Word -> Word
   | Product sorts ->
-    Product (Array.map mixed_block_of_sort (Array.of_list sorts))
+    Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
 
 
 let rec transl_address loc = function
@@ -1468,11 +1469,11 @@ let rec transl_address loc = function
   | Env.Adot(addr, field_layouts, pos) ->
       let layout_to_mixed_block layout =
         match
-          Jkind.Layout.default_to_value_and_get layout
-            |> Jkind.Layout.Const.get_sort
+          Jkind.Layout.to_sort layout
         with
         | Some sort ->
-          sort |> mixed_block_of_sort
+          sort |> Jkind.Sort.default_for_transl_and_get
+               |> mixed_block_element_of_const_sort
                |> transl_mixed_product_element_for_read
         | None -> fatal_error "CR jrayman: write error"
       in
