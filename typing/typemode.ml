@@ -160,7 +160,11 @@ module Transled_modifiers = struct
     | Nonmodal Separability -> { t with separability = value }
 end
 
-let transl_mod_bounds annots =
+let transl_mod_bounds (annots, mods) =
+  (* Q (ZJE): should this be taking mods now? probably yes.
+     if so, no destruct and just do the thing!
+     this will probably come up when the Mod type is changed... *)
+  if mods <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
     match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
@@ -313,7 +317,8 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   in
   { annots with yielding; contention; portability }
 
-let transl_mode_annots annots : Alloc.Const.Option.t =
+let transl_mode_annots (annots, mods) : Alloc.Const.Option.t =
+  if mods <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
     let (P (ax, a)) =
@@ -326,6 +331,10 @@ let transl_mode_annots annots : Alloc.Const.Option.t =
   in
   List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
 
+(* Q (ZJE): it feels like this should not be returning a Parsetree.modes, since the
+   input here will not know the mods part of a modes...
+   if it DOES, then the new return type here is totally wrong and it should be a modes.
+   this made sense for modes, but for the MODALITIES one below, it feels totally wrong! *)
 let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
   let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
   (* Untranslate [areality] and [yielding]. *)
@@ -555,7 +564,11 @@ let sort_dedup_modalities ~warn l =
   in
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
-let transl_modalities ~maturity mut modalities =
+(* Q (ZJE): should this be taking in a modality loc list instead?
+   if so, should that be its own data type??
+   that feels like it's pushing against the cause of hacing modalities track mods too *)
+let transl_modalities ~maturity mut (modalities, mods) =
+  if mods <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   let mut_modalities =
     mutable_implied_modalities (Types.is_mutable mut)
       ~for_mutable_variable:false
@@ -589,6 +602,9 @@ let untransl_modalities mut t =
   |> List.map untransl_modality
 
 let transl_alloc_mode modes =
+  (* Q (ZJE): this feels bad to have modes sometimes be just the modes part
+     and also sometimes be the modes+mods part...
+     different names seems useful, if not different types as well... *)
   let opt = transl_mode_annots modes in
   Alloc.Const.Option.value opt ~default:Alloc.Const.legacy
 

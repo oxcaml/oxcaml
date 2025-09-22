@@ -259,8 +259,11 @@ let type_kind sub tk = match tk with
 
 let constructor_argument sub {ca_loc; ca_type; ca_modalities} =
   let loc = sub.location sub ca_loc in
-  let pca_modalities = Typemode.untransl_modalities Immutable ca_modalities in
-  { pca_loc = loc; pca_type = sub.typ sub ca_type; pca_modalities }
+  let modalities = Typemode.untransl_modalities Immutable ca_modalities in
+  (* Q (ZJE): this again feels like a place where the mods should be coming from
+     somewhere. right now, just making the empty list because IDK where they will
+     be stored in the typed tree. this feels like a pretty bad stop-gap... *)
+  { pca_loc = loc; pca_type = sub.typ sub ca_type; pca_modalities = modalities, [] }
 
 let constructor_arguments sub = function
    | Cstr_tuple l -> Pcstr_tuple (List.map (constructor_argument sub) l)
@@ -337,7 +340,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | { pat_extra= (Tpat_constraint ct, _, _attrs) :: rem; _ } ->
         (* CR cgunn: recover mode constraint info here *)
         Ppat_constraint (sub.pat sub { pat with pat_extra=rem },
-                         Some (sub.typ sub ct), [])
+                         Some (sub.typ sub ct), ([], []))
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
@@ -390,7 +393,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
           match tyo, arg with
           | Some (vl, ty), Some arg ->
               (* CR cgunn: recover mode constraint info here *)
-              Some (vl, Pat.mk ~loc (Ppat_constraint (arg, Some ty, [])))
+              Some (vl, Pat.mk ~loc (Ppat_constraint (arg, Some ty, ([], []))))
           | None, Some arg -> Some ([], arg)
           | _, None -> None)
     | Tpat_variant (label, pato, _) ->
@@ -421,13 +424,16 @@ let exp_extra sub (extra, loc, attrs) sexp =
                      Option.map (sub.typ sub) cty1,
                      sub.typ sub cty2)
     | Texp_constraint (cty) ->
-        Pexp_constraint (sexp, Some (sub.typ sub cty), [])
+        Pexp_constraint (sexp, Some (sub.typ sub cty), ([], []))
     | Texp_poly cto -> Pexp_poly (sexp, Option.map (sub.typ sub) cto)
     | Texp_newtype (_, label_loc, jkind, _) ->
         Pexp_newtype (label_loc, jkind, sexp)
     | Texp_stack -> Pexp_stack sexp
     | Texp_mode modes ->
-        Pexp_constraint (sexp, None, Typemode.untransl_mode_annots modes)
+        (* CR zeisbach: it seems plausible that Texp_mode will have mods stuff,
+           so for now this is just procuring an empty mods list. but that should
+           be replaced with the actual mods, once they are tracked!! *)
+        Pexp_constraint (sexp, None, (Typemode.untransl_mode_annots modes, []))
   in
   Exp.mk ~loc ~attrs desc
 
@@ -526,7 +532,7 @@ let expression sub exp =
               (* Unlike function cases, the [exp_extra] is placed on the body
                  itself. *)
               Pfunction_body (sub.expr sub body),
-              { mode_annotations = []; ret_type_constraint = None; ret_mode_annotations = []}
+              { mode_annotations = [], []; ret_type_constraint = None; ret_mode_annotations = [], []}
           | Tfunction_cases
               { fc_cases = cases; fc_loc = loc; fc_exp_extra = exp_extra;
                 fc_attributes = attributes; _ }
@@ -545,7 +551,7 @@ let expression sub exp =
                 | None -> None
               in
               let constraint_ =
-                { ret_type_constraint; mode_annotations=[]; ret_mode_annotations = [] }
+                { ret_type_constraint; mode_annotations = [], []; ret_mode_annotations = [], [] }
               in
               Pfunction_cases (cases, loc, attributes), constraint_
         in
@@ -866,7 +872,7 @@ let class_type_declaration sub = class_infos sub.class_type sub
 let functor_parameter sub : functor_parameter -> Parsetree.functor_parameter =
   function
   | Unit -> Unit
-  | Named (_, name, mtype) -> Named (name, sub.module_type sub mtype, [])
+  | Named (_, name, mtype) -> Named (name, sub.module_type sub mtype, ([], []))
 
 let module_type (sub : mapper) mty =
   let loc = sub.location sub mty.mty_loc in
@@ -881,7 +887,7 @@ let module_type (sub : mapper) mty =
   | Tmty_functor (arg, mtype2) ->
       Mty.mk ~loc ~attrs
         (Pmty_functor
-          (functor_parameter sub arg, sub.module_type sub mtype2, []))
+          (functor_parameter sub arg, sub.module_type sub mtype2, ([], [])))
   | Tmty_with (mtype, list) ->
       Mty.mk ~loc ~attrs
         (Pmty_with (sub.module_type sub mtype,
@@ -929,7 +935,7 @@ let module_expr (sub : mapper) mexpr =
               Pmod_apply_unit (sub.module_expr sub mexp1)
           | Tmod_constraint (mexpr, _, Tmodtype_explicit mtype, _) ->
               Pmod_constraint (sub.module_expr sub mexpr,
-                Some (sub.module_type sub mtype), [])
+                Some (sub.module_type sub mtype), ([], []))
           | Tmod_constraint (_mexpr, _, Tmodtype_implicit, _) ->
               assert false
           | Tmod_unpack (exp, _pack) ->
@@ -1019,7 +1025,7 @@ let core_type sub ct =
     | Ttyp_var (Some s, jkind) -> Ptyp_var (s, jkind)
     | Ttyp_arrow (arg_label, ct1, ct2) ->
         (* CR cgunn: recover mode annotation here *)
-        Ptyp_arrow (label arg_label, sub.typ sub ct1, sub.typ sub ct2, [], [])
+        Ptyp_arrow (label arg_label, sub.typ sub ct1, sub.typ sub ct2, ([], []), ([], []))
     | Ttyp_tuple list ->
         Ptyp_tuple (List.map (fun (lbl, t) -> lbl, sub.typ sub t) list)
     | Ttyp_unboxed_tuple list ->
