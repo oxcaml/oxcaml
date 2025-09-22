@@ -31,22 +31,41 @@ let strict_union t t' =
 let is_gen_fun symbol_name =
   String.starts_with ~prefix:"caml_apply" symbol_name
   || String.starts_with ~prefix:"caml_curry" symbol_name
+  || String.starts_with ~prefix:"caml_send" symbol_name
+  || String.starts_with ~prefix:"caml_tuplify" symbol_name
+
 
 let aggregate ~current ~new_symbols =
+  (* TODO: We should most likely handle local symbols properly.
+     For the moment we just special-case the local symbol used to
+     identify the caml_call_gc glue code; other local symbols should
+     be properly mangled and unique per compilation unit.  When
+     encountering this symbol we always pick the most recent address for it,
+     which will cause older definitions to be ignored. *)
   String.Map.union current new_symbols ~f:(fun symbol_name _old new_ ->
-      if is_gen_fun symbol_name then Some new_
-      else failwithf "Multiple occurences of the symbol %s" symbol_name)
+    if is_gen_fun symbol_name
+       || String.equal symbol_name ".Lcaml_call_gc_"
+       || String.equal symbol_name ".Lcaml_call_gc_avx_"
+       || String.equal symbol_name ".Lcaml_call_gc_avx512_"
+       || String.starts_with ~prefix:".Lcaml_apply" symbol_name
+       || String.starts_with ~prefix:".Lcaml_curry" symbol_name
+       || String.starts_with ~prefix:".Lcaml_send" symbol_name
+       || String.starts_with ~prefix:".Lcaml_tuplify" symbol_name
+    then Some new_
+    else failwithf "Multiple occurrences of the symbol %s" symbol_name)
 
 let from_binary_section { address; value = binary_section } =
-  let symbol_map = X86_binary_emitter.labels binary_section in
-  X86_binary_emitter.StringMap.fold
+  let symbol_tbl = X86_binary_emitter.labels binary_section in
+  Misc.Stdlib.String.Tbl.fold
     (fun name symbol acc ->
       match (symbol.X86_binary_emitter.sy_pos, name) with
       | None, _ -> failwithf "Symbol %s has no offset" name
-      | Some _, ("caml_absf_mask" | "caml_negf_mask") -> acc
+      | Some _, ("caml_absf_mask" | "caml_negf_mask" |
+                 "caml_absf32_mask" | "caml_negf32_mask") -> acc
       | Some offset, _ ->
           String.Map.add ~key:name ~data:(Address.add_int address offset) acc)
-    symbol_map String.Map.empty
+    symbol_tbl
+    String.Map.empty
 
 let find t name =
   match String.Map.find_opt name t with

@@ -49,7 +49,7 @@ module Map = struct
       in
       match l with
       | [] -> add_current ()
-      | Section (s_l, s_opt, s_l') :: tl ->
+      | Directive (Section {names = s_l; flags = s_opt; args = s_l'; _}) :: tl ->
           let acc = add_current () in
           let current_section = name s_l s_opt s_l' in
           let current_instrs = [] in
@@ -59,7 +59,7 @@ module Map = struct
     in
     match l with
     | [] -> String.Map.empty
-    | Section (s_l, s_opt, s_l') :: tl ->
+    | Directive (Section {names = s_l; flags = s_opt; args = s_l'; _}) :: tl ->
         let current_section = name s_l s_opt s_l' in
         let current_instrs = [] in
         aux String.Map.empty current_section current_instrs tl

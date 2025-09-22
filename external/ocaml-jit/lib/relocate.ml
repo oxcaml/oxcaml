@@ -15,7 +15,13 @@
  *)
 
 open Import
-open Relocation
+
+let relocation_doesn't_fit_error ~value ~target_address ~section_name
+      ~min_value ~max_value =
+  errorf
+    "Computed value 0x%Lx for relocation of target address 0x%a in section %s \
+     doesn't fit; permissible range is (0x%Lx, 0x%Lx)"
+    value Address.pp target_address section_name min_value max_value
 
 let out_of_text_error ~got_or_plt ~section_name =
   errorf
@@ -50,8 +56,8 @@ let lookup_plt plt symbol =
 
 let one ~symbols ~got ~plt ~section_name binary_section t =
   let open Result.Op in
-  let+ target_symbol_address =
-    match (t, got, plt) with
+  let* target_symbol_address =
+    match ((t:Relocation.t), got, plt) with
     | { target = Direct name; _ }, _, _ -> lookup_symbol symbols name
     | { target = Got name; kind = Relative; _ }, Some got, _ ->
         lookup_got got name
@@ -66,6 +72,13 @@ let one ~symbols ~got ~plt ~section_name binary_section t =
     | { target = Plt _; _ }, _, None ->
         out_of_text_error ~got_or_plt:"PLT" ~section_name
   in
+  (* TODO: The rest of this function belongs in [Relocation],
+     we should have some thing like this here:
+     [Relocation.patch t target_symbol_address target_symbol_address ~section_name
+     ~binary_section]
+     instead of exposing the details of min and max value and the offset
+     calculations.
+  *)
   let target_address = Address.add_int64 target_symbol_address t.addend in
   let data =
     match t.kind with
@@ -74,22 +87,31 @@ let one ~symbols ~got ~plt ~section_name binary_section t =
         let src_address =
           (* The offset is taken form the beginning of the next instruction, where
              the program counter  is at, that is the address of the relocation + its size .*)
-          let offset = t.offset_from_section_beginning + Size.to_int t.size in
+          let offset = t.offset_from_section_beginning + Relocation.Size.to_int t.size in
           Address.add_int binary_section.address offset
         in
         Int64.sub
           (Address.to_int64 target_address)
           (Address.to_int64 src_address)
   in
-  let size = Size.to_data_size t.size in
-  X86_binary_emitter.add_patch ~offset:t.offset_from_section_beginning ~size
-    ~data binary_section.value
+  let min_value = Relocation.min_value t in
+  let max_value = Relocation.max_value t in
+  let comparator = Relocation.value_comparator t in
+  if comparator data min_value < 0 || comparator data max_value > 0 then
+    relocation_doesn't_fit_error ~value:data ~target_address ~section_name
+      ~min_value ~max_value
+  else (
+    let size = Relocation.Size.to_data_size t.size in
+    X86_binary_emitter.add_patch ~offset:t.offset_from_section_beginning ~size
+      ~data binary_section.value;
+    Ok ()
+  )
 
 let all_gen ~symbols ~got ~plt ~section_name binary_section =
   let open Result.Op in
   let raw_relocations = X86_binary_emitter.relocations binary_section.value in
   let* relocations =
-    Result.List.map_all ~f:from_x86_relocation_err raw_relocations
+    Result.List.map_all ~f:Relocation.from_x86_relocation_err raw_relocations
   in
   Result.List.iter_all relocations
     ~f:(one ~symbols ~got ~plt ~section_name binary_section)

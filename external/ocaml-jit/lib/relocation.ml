@@ -95,3 +95,29 @@ let from_x86_relocation_err relocation =
   let kind = kind_from_reloc_kind kind in
   let+ target = Target.from_label_err label in
   { target; addend; size; kind; offset_from_section_beginning }
+
+let value_comparator t =
+  match t.kind with
+  | Absolute -> Int64.unsigned_compare
+  | Relative -> Int64.compare
+
+let min_value t =
+  match t.kind with
+  | Absolute -> 0L
+  | Relative ->
+    match t.size with
+    | S32 -> Int32.min_int |> Int64.of_int32
+    | S64 -> Int64.min_int
+
+let max_value t =
+  match t.kind with
+  | Absolute -> (
+    match t.size with
+    | S32 -> 0xffff_ffffL
+    | S64 -> 0xffff_ffff_ffff_ffffL
+  )
+  | Relative ->
+    match t.size with
+    | S32 -> Int32.max_int |> Int64.of_int32
+    | S64 -> Int64.max_int
+
