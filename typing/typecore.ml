@@ -1022,7 +1022,7 @@ let mode_annots_from_pat pat =
   let modes =
     match pat.ppat_desc with
     | Ppat_constraint (_, _, modes) -> modes
-    | _ -> [], []
+    | _ -> Ast_helper.Modes.empty
   in
   Typemode.transl_mode_annots modes
 
@@ -2750,7 +2750,7 @@ and type_pat_aux
       solve_Ppat_array ~refine:false loc penv mutability expected_ty
     in
     let modalities =
-      Typemode.transl_modalities ~maturity:Stable mutability ([], [])
+      Typemode.transl_modalities ~maturity:Stable mutability Ast_helper.Modalities.empty
     in
     check_project_mutability ~loc ~env:!!penv Array_elements mutability
       alloc_mode.mode;
@@ -5493,14 +5493,19 @@ let generalize_structure_type_unboxed_access_result
 
 (* value binding elaboration *)
 
-let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=modes; _ } =
+let vb_exp_constraint
+      {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=modes; _ } =
   let open Ast_helper in
+  (* Q (ZJE): is this better than destructing the parameter directly?
+      what about the styling? what I have seems kinda bad... *)
+  let {core_modes; mod_modes} = modes in
   let loc =
-    Location.merge (pat.ppat_loc :: expr.pexp_loc :: List.map (fun m -> m.loc) modes)
+    Location.merge (pat.ppat_loc :: List.map (fun m -> m.loc) core_modes
+      @ List.map (fun m -> m.loc) mod_modes)
   in
   let maybe_add_modes_constraint expr =
     match modes with
-    | [] -> expr
+    | {core_modes = []; mod_modes = []} -> expr
     | _ -> Exp.constraint_ ~loc expr None modes
   in
   match ct with
@@ -5523,12 +5528,16 @@ let vb_pat_constraint
       ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; _ } as vb) =
   let spat =
     let open Ast_helper in
+    (* Q (ZJE): is this better than destructing the parameter directly?
+       what about the styling? what I have seems kinda bad... *)
+    let {core_modes; mod_modes} = modes in
     let loc =
-      Location.merge (pat.ppat_loc :: List.map (fun m -> m.loc) modes)
+      Location.merge (pat.ppat_loc :: List.map (fun m -> m.loc) core_modes
+        @ List.map (fun m -> m.loc) mod_modes)
     in
     let maybe_add_modes_constraint expr =
       match modes with
-      | [] -> expr
+      | {core_modes = []; mod_modes = []} -> expr
       | _ -> Pat.constraint_ ~loc pat None modes
     in
     match vb.pvb_constraint, pat.ppat_desc, exp.pexp_desc with
@@ -7861,7 +7870,7 @@ and type_function
               match pat.ppat_desc with
               | Ppat_constraint (_, Some sty, _) ->
                   let gloc = { default.pexp_loc with loc_ghost = true } in
-                  Ast_helper.Exp.constraint_ default (Some sty) ~loc:gloc ([], [])
+                  Ast_helper.(Exp.constraint_ default (Some sty) ~loc:gloc Modes.empty)
               | _ -> default
             in
             (* Defaults are always global. They can be moved out of the
@@ -8009,15 +8018,17 @@ and type_function
       let ret_mode = Typemode.transl_mode_annots ret_mode_annotations in
       let type_mode =
         match ret_mode_annotations with
-        | _ :: _ ->
+        | {core_modes = _ :: _; mod_modes = []} ->
             (* if return mode annotation is present, we use that to interpret the return
                type annotation (currying mode behavior) *)
             ret_mode
-        | [] ->
+        | {core_modes = []; mod_modes = []} ->
             (* otherwise, we do not constrain the body mode, and we use the mode of the whole
             function to interpret the return type *)
             (* CR zqian: We should infer from [mode], instead of using directly. *)
             mode
+        | {core_modes = _; mod_modes = _ :: _} ->
+            Misc.fatal_error "ZJE: mods are not yet supported"
       in
       match body with
       | Pfunction_body body ->
@@ -10094,7 +10105,8 @@ and type_generic_array
     if Types.is_mutable mutability then Predef.type_array
     else Predef.type_iarray
   in
-  let modalities = Typemode.transl_modalities ~maturity:Stable mutability [] in
+  let modalities =
+    Typemode.transl_modalities ~maturity:Stable mutability Ast_helper.Modalities.empty in
   let argument_mode = mode_modality modalities array_mode in
   let jkind, elt_sort = Jkind.for_array_element_sort () in
   let ty = newgenvar jkind in

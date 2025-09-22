@@ -1421,13 +1421,19 @@ let tree_of_modality_old (t: Parsetree.modality loc) =
   | _ -> None
 
 let tree_of_modalities mut t =
-  let t = Typemode.untransl_modalities mut t in
+  let ({ core_modalities = t; mod_modalities } : Parsetree.modalities) =
+    Typemode.untransl_modalities mut t in
+  (* CR zeisbach: this should definitely not raise but I want to make sure that this
+     will not silently pass through. but these should be printed somehow clearly *)
+  if mod_modalities <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   match all_or_none tree_of_modality_old t with
   | Some l -> l
   | None -> List.map tree_of_modality_new t
 
 let tree_of_modalities_new mut t =
-  let l = Typemode.untransl_modalities mut t in
+  let ({ core_modalities = l; mod_modalities } : Parsetree.modalities) =
+    Typemode.untransl_modalities mut t in
+  if mod_modalities <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   List.map (fun ({txt = Parsetree.Modality s; _}) -> s) l
 
 (** [tree_of_mode m l] finds the outcome node in [l] that corresponds to [m].
@@ -1466,7 +1472,9 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
 
   let diff = {diff with yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
-  let l = Typemode.untransl_mode_annots diff in
+  let ({ core_modes = l; mod_modes } : Parsetree.modes) =
+    Typemode.untransl_mode_annots diff in
+  if mod_modes <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   match all_or_none tree_of_mode_old l with
   | Some l -> l
   | None -> List.map tree_of_mode_new l
