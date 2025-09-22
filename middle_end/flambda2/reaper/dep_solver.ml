@@ -1846,13 +1846,9 @@ let code_id_actually_directly_called_query =
                 (yield [code_id_of_witness; codeid]))))
 
 let code_id_actually_directly_called uses v =
-  if exists_with_parameters any_usage_pred_query
+  if exists_with_parameters unknown_code_id_actually_directly_called_query
        [Code_id_or_name.name v]
        uses.db
-  then Or_unknown.Unknown
-  else if exists_with_parameters unknown_code_id_actually_directly_called_query
-            [Code_id_or_name.name v]
-            uses.db
   then Or_unknown.Unknown
   else
     Or_unknown.Known
