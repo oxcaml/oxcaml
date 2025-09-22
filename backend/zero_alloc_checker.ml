@@ -2571,6 +2571,28 @@ end = struct
 
       type error = unit
 
+      let transform_call_indirect t ~next ~exn callees wkind ~desc dbg =
+        report t next ~msg:"transform_call next" ~desc dbg;
+        report t exn ~msg:"transform_call exn" ~desc dbg;
+        let effect =
+          List.fold_left
+            (fun all_effects { Cmm.sym_name = callee; _ } ->
+              let k = wkind callee in
+              (* Witness.Direct_tailcall { callee } in *)
+              let v = find_callee t callee ~desc dbg k in
+              let w = create_witnesses t k dbg in
+              let effect =
+                match Metadata.assume_value dbg ~can_raise:true w with
+                | Some v' ->
+                  assert (Value.is_resolved v');
+                  if Value.is_resolved v then Value.meet v v' else v'
+                | None -> v
+              in
+              Value.join effect all_effects)
+            Value.bot callees
+        in
+        transform t ~next ~exn ~effect desc dbg
+
       let transform_tailcall_imm t func dbg =
         (* Sound to ignore [next] and [exn] because the call never returns. *)
         let k = Witness.Direct_tailcall { callee = func } in
@@ -2653,7 +2675,11 @@ end = struct
           transform_tailcall_imm t t.current_fun_name dbg
         | Tailcall_func (Direct { sym_name; _ }) ->
           transform_tailcall_imm t sym_name dbg
-        | Tailcall_func (Indirect (Some _callees)) -> failwith "TODO"
+        | Tailcall_func (Indirect (Some _callees)) ->
+          transform_call_indirect t ~next:Value.normal_return
+            ~exn:Value.exn_escape _callees
+            (fun callee -> Witness.Direct_tailcall { callee })
+            ~desc:"indirect tailcall" dbg
         (* XXX what to do here? *)
         | Tailcall_func (Indirect None) ->
           (* Sound to ignore [next] and [exn] because the call never returns. *)
@@ -2689,8 +2715,9 @@ end = struct
           let w = create_witnesses t Indirect_call dbg in
           transform_top t ~next ~exn w "indirect call" dbg
         | Call { op = Indirect (Some _callees); _ } ->
-          (* XXX what to do here? *)
-          failwith "todo"
+          transform_call_indirect t ~next ~exn _callees
+            (fun callee -> Witness.Direct_call { callee })
+            ~desc:"indirect call" dbg
         | Call { op = Direct { sym_name = func; _ }; _ } ->
           let k = Witness.Direct_call { callee = func } in
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
