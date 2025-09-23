@@ -96,7 +96,7 @@ promote:
 
 .PHONY: fmt
 fmt:
-	$(if $(filter 1,$(V)),,@)find . \( -name "*.ml" -or -name "*.mli" \) | \
+	$(if $(filter 1,$(V)),,@)find . -not -path "./external/js_of_ocaml/*" \( -name "*.ml" -or -name "*.mli" \) | \
 	  xargs -P $$(nproc 2>/dev/null || echo 1) -n 20 ocamlformat -i
 ifndef SKIP_80CH
 	$(if $(filter 1,$(V)),,@)bash scripts/80ch.sh
