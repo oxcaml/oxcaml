@@ -41,6 +41,10 @@ let read_info name =
   (Filename.chop_suffix filename ".cmjx" ^ ".cmjo", (info, crc))
 
 let create_archive file_list lib_name =
+  if not (Filename.check_suffix lib_name ".cmjxa") then
+    Location.prerr_warning Location.none
+      (Warnings.Preprocessor
+        (Printf.sprintf "library output should have .cmjxa extension, got: %s" lib_name));
   let archive_name = Filename.remove_extension lib_name ^ ".cmja" in
   let outchan = open_out_bin lib_name in
   Misc.try_finally
