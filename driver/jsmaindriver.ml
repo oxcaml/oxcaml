@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Options = Main_args.Make_jscomp_options (Main_args.Default.Jsmain)
+module Options = Oxcaml_args.Make_jscomp_options (Oxcaml_args.Default.Jsmain)
 
 let default_js_output output_name =
   match output_name with

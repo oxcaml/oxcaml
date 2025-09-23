@@ -2642,15 +2642,12 @@ third-party libraries such as Lwt, but with a different API."
     let _drawflambda = set dump_rawflambda
 
     let _output_complete_obj () =
-      output_c_object := true;
-      output_complete_object := true;
-      (* CR selee: ??? *)
-      custom_runtime := true
+      failwith "-output-complete-obj is not supported by ocamlj"
+
     let _output_obj () =
-      output_c_object := true;
-      (* CR selee: ??? *)
-      custom_runtime := true
-    let _v () = Compenv.print_version_and_library "js-of-ocaml IR compiler"
+      failwith "-output-obj is not supported by ocamlj"
+
+    let _v () = Compenv.print_version_and_library "js-of-ocaml-backend compiler"
 
     let _classic_inlining () = set_oclassic ()
     let _o2 () = Clflags.set_o2 ()

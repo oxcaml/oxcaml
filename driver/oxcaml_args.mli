@@ -18,70 +18,7 @@
     different installable tools and (b) override default implementations
     of arguments. *)
 
-(** Command line arguments required for flambda backend.  *)
-module type Oxcaml_options = sig
-  val ocamlcfg : unit -> unit
-  val no_ocamlcfg : unit -> unit
-  val dump_inlining_paths : unit -> unit
-  val davail : unit -> unit
-  val dranges : unit -> unit
-  val ddebug_invariants : unit -> unit
-  val ddwarf_types : unit -> unit
-  val ddwarf_metrics : unit -> unit
-  val dcfg : unit -> unit
-  val dcfg_invariants : unit -> unit
-  val regalloc : string -> unit
-  val regalloc_linscan_threshold : int -> unit
-  val regalloc_param : string -> unit
-  val regalloc_validate : unit -> unit
-  val no_regalloc_validate : unit -> unit
-  val vectorize : unit -> unit
-  val no_vectorize : unit -> unit
-  val vectorize_max_block_size : int -> unit
-  val dvectorize : unit -> unit
-  val cfg_peephole_optimize : unit -> unit
-  val no_cfg_peephole_optimize : unit -> unit
-  val cfg_stack_checks : unit -> unit
-  val no_cfg_stack_checks : unit -> unit
-  val cfg_stack_checks_threshold : int -> unit
-  val cfg_eliminate_dead_trap_handlers : unit -> unit
-  val no_cfg_eliminate_dead_trap_handlers : unit -> unit
-  val cfg_prologue_validate : unit -> unit
-  val no_cfg_prologue_validate : unit -> unit
-  val cfg_prologue_shrink_wrap : unit -> unit
-  val no_cfg_prologue_shrink_wrap : unit -> unit
-  val cfg_prologue_shrink_wrap_threshold : int -> unit
-  val reorder_blocks_random : int -> unit
-  val basic_block_sections : unit -> unit
-  val module_entry_functions_section : unit -> unit
-  val dasm_comments : unit -> unit
-  val dno_asm_comments : unit -> unit
-  val heap_reduction_threshold : int -> unit
-  val zero_alloc_check : string -> unit
-  val zero_alloc_assert : string -> unit
-  val dzero_alloc : unit -> unit
-  val disable_zero_alloc_checker : unit -> unit
-  val disable_precise_zero_alloc_checker : unit -> unit
-  val zero_alloc_checker_details_cutoff : int -> unit
-  val zero_alloc_checker_details_extra : unit -> unit
-  val no_zero_alloc_checker_details_extra : unit -> unit
-  val zero_alloc_checker_join : int -> unit
-  val function_layout : string -> unit
-  val disable_builtin_check : unit -> unit
-  val disable_poll_insertion : unit -> unit
-  val enable_poll_insertion : unit -> unit
-  val symbol_visibility_protected : unit -> unit
-  val no_symbol_visibility_protected : unit -> unit
-  val long_frames : unit -> unit
-  val no_long_frames : unit -> unit
-  val long_frames_threshold : int -> unit
-  val caml_apply_inline_fast_path : unit -> unit
-  val internal_assembler : unit -> unit
-  val gc_timings : unit -> unit
-  val no_mach_ir : unit -> unit
-  val dllvmir : unit -> unit
-  val keep_llvmir : unit -> unit
-  val llvm_path : string -> unit
+module type Flambda2_options = sig
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val flambda2_join_points : unit -> unit
@@ -145,6 +82,74 @@ module type Oxcaml_options = sig
   val dflow : unit -> unit
   val dsimplify : unit -> unit
   val dreaper : unit -> unit
+end
+
+
+(** Command line arguments required for flambda native backend.  *)
+module type Oxcaml_options = sig
+  val ocamlcfg : unit -> unit
+  val no_ocamlcfg : unit -> unit
+  val dump_inlining_paths : unit -> unit
+  val davail : unit -> unit
+  val dranges : unit -> unit
+  val ddebug_invariants : unit -> unit
+  val ddwarf_types : unit -> unit
+  val ddwarf_metrics : unit -> unit
+  val dcfg : unit -> unit
+  val dcfg_invariants : unit -> unit
+  val regalloc : string -> unit
+  val regalloc_linscan_threshold : int -> unit
+  val regalloc_param : string -> unit
+  val regalloc_validate : unit -> unit
+  val no_regalloc_validate : unit -> unit
+  val vectorize : unit -> unit
+  val no_vectorize : unit -> unit
+  val vectorize_max_block_size : int -> unit
+  val dvectorize : unit -> unit
+  val cfg_peephole_optimize : unit -> unit
+  val no_cfg_peephole_optimize : unit -> unit
+  val cfg_stack_checks : unit -> unit
+  val no_cfg_stack_checks : unit -> unit
+  val cfg_stack_checks_threshold : int -> unit
+  val cfg_eliminate_dead_trap_handlers : unit -> unit
+  val no_cfg_eliminate_dead_trap_handlers : unit -> unit
+  val cfg_prologue_validate : unit -> unit
+  val no_cfg_prologue_validate : unit -> unit
+  val cfg_prologue_shrink_wrap : unit -> unit
+  val no_cfg_prologue_shrink_wrap : unit -> unit
+  val cfg_prologue_shrink_wrap_threshold : int -> unit
+  val reorder_blocks_random : int -> unit
+  val basic_block_sections : unit -> unit
+  val module_entry_functions_section : unit -> unit
+  val dasm_comments : unit -> unit
+  val dno_asm_comments : unit -> unit
+  val heap_reduction_threshold : int -> unit
+  val zero_alloc_check : string -> unit
+  val zero_alloc_assert : string -> unit
+  val dzero_alloc : unit -> unit
+  val disable_zero_alloc_checker : unit -> unit
+  val disable_precise_zero_alloc_checker : unit -> unit
+  val zero_alloc_checker_details_cutoff : int -> unit
+  val zero_alloc_checker_details_extra : unit -> unit
+  val no_zero_alloc_checker_details_extra : unit -> unit
+  val zero_alloc_checker_join : int -> unit
+  val function_layout : string -> unit
+  val disable_builtin_check : unit -> unit
+  val disable_poll_insertion : unit -> unit
+  val enable_poll_insertion : unit -> unit
+  val symbol_visibility_protected : unit -> unit
+  val no_symbol_visibility_protected : unit -> unit
+  val long_frames : unit -> unit
+  val no_long_frames : unit -> unit
+  val long_frames_threshold : int -> unit
+  val caml_apply_inline_fast_path : unit -> unit
+  val internal_assembler : unit -> unit
+  val gc_timings : unit -> unit
+  val no_mach_ir : unit -> unit
+  val dllvmir : unit -> unit
+  val keep_llvmir : unit -> unit
+  val llvm_path : string -> unit
+  include Flambda2_options
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
 end
@@ -179,6 +184,12 @@ module type Opttop_options = sig
   include Debugging_options
 end
 
+(** Command line arguments required for jscomp. *)
+module type Jscomp_options = sig
+  include Main_args.Jscomp_options
+  include Flambda2_options
+end
+
 (** Transform required command-line arguments into actual arguments.
     Each tool can define its own argument implementations and
     call the right functor to actualize them into [Arg.t] list. *)
@@ -186,10 +197,13 @@ module Make_optcomp_options (_ : Optcomp_options) : Main_args.Arg_list
 
 module Make_opttop_options (_ : Opttop_options) : Main_args.Arg_list
 
+module Make_jscomp_options (_ : Jscomp_options) : Main_args.Arg_list
+
 (** Default implementations of required arguments for each tool.  *)
 module Default : sig
   module Optmain : Optcomp_options
   module Opttopmain : Opttop_options
+  module Jsmain : Jscomp_options
 end
 
 (** Extra_params module provides a way to read oxcaml
