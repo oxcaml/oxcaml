@@ -453,13 +453,13 @@ let setup_compiler_build_env (compiler : Ocaml_compilers.compiler) log env =
     let prog_var = Compiler.program_variable in
     let prog_output_var = Compiler.program_output_variable in
     let default_prog_file = get_program_file Compiler.target env in
-    let env = Environments.add prog_var default_prog_file env in
+    let env = Environments.add_if_undefined prog_var default_prog_file env in
     let prog_file = Environments.safe_lookup prog_var env in
     let prog_output_file = prog_file ^ ".output" in
     let env = match prog_output_var with
       | None -> env
       | Some outputvar ->
-        Environments.add outputvar prog_output_file env
+        Environments.add_if_undefined outputvar prog_output_file env
     in
     (r, env)
   end else (r, env)
