@@ -3812,14 +3812,14 @@ let bind_static_consts_and_code acc body =
         defining_expr ~body)
     (acc, body) components
 
-let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
-    ~return_cont ~module_symbol =
+let wrap_final_module_block acc env ~program ~prog_return_cont
+    ~(module_repr : Lambda.module_representation) ~return_cont ~module_symbol =
   let module_block_var = Variable.create "module_block" K.value in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
   let block_shape, field_count, block_access, kind_of_field =
     match module_repr with
-    | Lambda.Module_value_only size ->
+    | Module_value_only size ->
       let block_access _pos : P.Block_access_kind.t =
         Values
           { tag = Known Tag.Scannable.zero;
@@ -3828,7 +3828,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
           }
       in
       K.Scannable_block_shape.Value_only, size, block_access, fun _ -> K.value
-    | Lambda.Module_mixed (shape, _) ->
+    | Module_mixed (shape, _) ->
       let shape =
         K.Mixed_block_lambda_shape.of_mixed_block_elements shape
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
