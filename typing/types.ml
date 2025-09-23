@@ -570,7 +570,7 @@ and mixed_product_shape = mixed_block_element array
 
 and module_representation =
   | Module_value_only of { size : int }
-  | Module_mixed of { shape : mixed_product_shape; value_count : int }
+  | Module_mixed of { shape : mixed_product_shape }
 
 and record_representation =
   | Record_unboxed
@@ -977,8 +977,8 @@ let equal_mixed_product_shape r1 r2 = r1 == r2 ||
 
 let equal_module_representation r1 r2 = match r1, r2 with
   | Module_value_only { size = s1 }, Module_value_only { size = s2 } -> s1 = s2
-  | Module_mixed { shape = p1; value_count = _ },
-    Module_mixed { shape = p2; value_count = _ } ->
+  | Module_mixed { shape = p1; },
+    Module_mixed { shape = p2; } ->
     equal_mixed_product_shape p1 p2
   | (Module_value_only _ | Module_mixed _), _ -> false
 

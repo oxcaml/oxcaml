@@ -1484,7 +1484,7 @@ let mod_setfield pos = function
 
 let transl_module_representation = function
   | Types.Module_value_only { size } -> Module_value_only size
-  | Types.Module_mixed { shape; value_count = _ } ->
+  | Types.Module_mixed { shape } ->
     Module_mixed
       ( transl_mixed_product_shape shape,
         transl_mixed_product_shape_for_read
@@ -1510,6 +1510,7 @@ let rec transl_address loc = function
               |> Jkind.Sort.default_for_transl_and_get
               |> Types.mixed_block_element_of_const_sort)
         |> Mtype.module_representation_of_mixed_product_shape
+             ~check_representable:false ~loc:Location.none
         |> transl_module_representation
       in
       Lprim(mod_field pos module_repr, [transl_address loc addr], loc)

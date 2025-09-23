@@ -105,6 +105,8 @@ COMPILERLIBS_SOURCES=\
   utils/lazy_backtrack.ml \
   utils/zero_alloc_utils.ml \
   utils/compression.ml \
+  utils/diffing.ml \
+  utils/diffing_with_keys.ml \
   parsing/location.ml \
   parsing/language_extension.ml \
   parsing/unit_info.ml \
@@ -146,6 +148,12 @@ COMPILERLIBS_SOURCES=\
   typing/signature_group.ml \
   typing/ctype.ml \
   typing/printtyp.ml \
+  typing/includecore.ml \
+  typing/typedecl_properties.ml \
+  typing/typedecl_separability.ml \
+  typing/typedecl_variance.ml \
+  typing/typetexp.ml \
+  typing/typedecl.ml \
   typing/mtype.ml \
   typing/shape_reduce.ml \
   typing/type_shape.ml \
