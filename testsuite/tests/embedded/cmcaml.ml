@@ -1,6 +1,6 @@
 (* TEST
- native;
- bytecode;
+  { native; }
+  { bytecode; }
  modules = "cmstub.c cmmain.c";
  flags = "-alert -unsafe_multidomain";
 *)

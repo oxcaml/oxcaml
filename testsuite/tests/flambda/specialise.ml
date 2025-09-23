@@ -1,8 +1,8 @@
 (* TEST
  flambda;
  ocamlopt_flags = "-O2 -inline-call-cost 1=20 -unbox-closures";
- native;
- javascript;
+  { native; }
+  { javascript; }
 *)
 
 let hide_until_round_2 init_in_hide f_in_hide =

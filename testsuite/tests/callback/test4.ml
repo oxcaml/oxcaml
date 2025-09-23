@@ -1,6 +1,6 @@
 (* TEST
- native;
- bytecode;
+  { native; }
+  { bytecode; }
  modules = "test4_.c";
  flags = "-alert -unsafe_multidomain";
 *)

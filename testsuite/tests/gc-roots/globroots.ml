@@ -1,6 +1,6 @@
 (* TEST
- native;
- bytecode;
+  { native; }
+  { bytecode; }
  modules = "globrootsprim.c";
  flags = "-alert -unsafe_multidomain";
 *)

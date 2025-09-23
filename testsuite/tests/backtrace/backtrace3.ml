@@ -63,8 +63,8 @@ let _ =
   run [| |]
 
 (* TEST
- native;
- bytecode;
+  { native; }
+  { bytecode; }
  flags = "-g";
  ocamlrunparam += ",b=1";
 *)

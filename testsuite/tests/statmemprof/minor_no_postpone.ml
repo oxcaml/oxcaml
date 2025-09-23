@@ -1,6 +1,6 @@
 (* TEST
- native;
- bytecode;
+  { native; }
+  { bytecode; }
  modules = "minor_no_postpone_stub.c";
 *)
 

@@ -1,7 +1,6 @@
 (* TEST
  modules = "stubs.c stubs.js";
  reference = "${test_source_directory}/void_stubs_runtime_test.reference";
- native;
  flambda2;
  {
    native;
@@ -15,7 +14,6 @@
    bytecode;
  }{
    javascript;
-   flambda2;
  }
 *)
 
