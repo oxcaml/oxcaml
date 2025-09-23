@@ -2,7 +2,7 @@
  include stdlib_stable;
  include stdlib_beta;
  include stdlib_upstream_compatible;
- modules = "idx_repr.ml stubs.c stubs.js";
+ modules = "idx_repr.ml stubs.c";
  flags = "-extension layouts_alpha";
  bytecode;
 *)
