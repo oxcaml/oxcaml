@@ -837,7 +837,7 @@ and type_origin =
 and module_representation =
   | Module_value_only of { size : int }
   (* All module fields are boxed *)
-  | Module_mixed of { shape : mixed_product_shape; value_count : int }
+  | Module_mixed of { shape : mixed_product_shape; }
   (* The module contains both values and unboxed elements. We store
      [value_count] so we get more control over when the "scannable prefix
      too large" error is thrown. *)

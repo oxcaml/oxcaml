@@ -667,14 +667,9 @@ and transl_structure ~scopes loc
       let body, repr =
         let repr =
           Mtype.module_representation_of_mixed_product_shape
+            ~check_representable:true ~loc:(to_location loc)
             (List.rev_map (fun (_, mbe) -> mbe) fields |> Array.of_list)
         in
-        begin match repr with
-        | Module_value_only _ -> ()
-        | Module_mixed { value_count; shape = _ } ->
-          Typedecl.assert_mixed_product_support (to_location loc) Module
-            ~value_prefix_len:value_count
-        end;
         match cc with
           Tcoerce_none ->
             let repr = transl_module_representation repr in
