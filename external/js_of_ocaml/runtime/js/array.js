@@ -203,10 +203,9 @@ function caml_makearray_dynamic_non_scannable_unboxed_product(num_components, _i
 //Requires: caml_array_bound_error
 function caml_makearray_dynamic_scannable_unboxed_product(init, _is_local, non_unarized_length) {
   var num_components = init.length - 1; // skip tag
-  var total_size = num_components * non_unarized_length;
-  if (total_size >>> 0 >= ((0x7fffffff / 4) | 0)) caml_array_bound_error();
+  if (non_unarized_length >>> 0 >= (((0x7fffffff / 4) | 0) / num_components) | 0) caml_array_bound_error();
 
-  var result = new Array(total_size + 1);
+  var result = new Array(non_unarized_length * num_components + 1);
 
   result[0] = 0;
   for (var i = 0; i < non_unarized_length; i++) {
