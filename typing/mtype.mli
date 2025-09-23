@@ -93,7 +93,8 @@ val contains_type: Env.t -> module_type -> bool
 val lower_nongen: int -> module_type -> unit
 
 val module_representation_of_mixed_product_shape :
-  mixed_block_element array -> module_representation
+  check_representable:bool -> loc:Warnings.loc -> mixed_product_shape ->
+  module_representation
 val module_representation_of_signature :
   Types.signature_item list -> module_representation
 val module_representation_of_lazy_signature :
