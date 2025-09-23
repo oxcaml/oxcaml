@@ -32,20 +32,16 @@ let run_jsoo_exn ~args =
   let prog =
     (* Use jsoo from our PATH when we're bootstrapping *)
     match Sys.ocaml_release with
-    | { extra = Some (Plus, "ox") ; _ } ->
-      Filename.concat Config.bindir "js_of_ocaml"
+    | { extra = Some (Plus, "ox"); _ } ->
+        Filename.concat Config.bindir "js_of_ocaml"
     | _ ->
-      (* Try to find js_of_ocaml in the same directory as the current executable *)
-      let exe_dir = Filename.dirname Sys.executable_name in
-      let jsoo_path = Filename.concat exe_dir "js_of_ocaml" in
-      if Sys.file_exists jsoo_path then jsoo_path else "js_of_ocaml"
+        (* Try to find js_of_ocaml in the same directory as the current executable *)
+        let exe_dir = Filename.dirname Sys.executable_name in
+        let jsoo_path = Filename.concat exe_dir "js_of_ocaml" in
+        if Sys.file_exists jsoo_path then jsoo_path else "js_of_ocaml"
   in
   let cmdline = Filename.quote_command prog args in
-  match Ccomp.command cmdline with
-  | 0 -> ()
-  | _ -> raise (Sys_error cmdline)
-
-
+  match Ccomp.command cmdline with 0 -> () | _ -> raise (Sys_error cmdline)
 
 (** Js_of_ocaml IR compilation backend for .ml files. *)
 
@@ -116,20 +112,25 @@ let emit_jsir i
       (* Clean up the intermediate .cmj file *)
       Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmj i.target)))
     (fun () ->
-       let debug_flag = if !Clflags.debug then [ "--debug-info"  ] else [] in
+      let debug_flag = if !Clflags.debug then [ "--debug-info" ] else [] in
       run_jsoo_exn
-        ~args:(["compile"; "--enable=effects,with-js-error"
-               ; (Unit_info.Artifact.filename (Unit_info.cmj i.target))
-               ; "-o"; (Unit_info.Artifact.filename (Unit_info.cmjo i.target))]
-               @ debug_flag
-               @ (List.rev !Clflags.all_ccopts)))
+        ~args:
+          ([
+             "compile";
+             "--enable=effects,with-js-error";
+             Unit_info.Artifact.filename (Unit_info.cmj i.target);
+             "-o";
+             Unit_info.Artifact.filename (Unit_info.cmjo i.target);
+           ]
+          @ debug_flag
+          @ List.rev !Clflags.all_ccopts))
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
-      ~as_arg_for =
+    ~as_arg_for =
   let argument_coercion =
     match argument_interface with
     | Some { ai_coercion_from_primary; ai_signature = _ } ->
-      Some ai_coercion_from_primary
+        Some ai_coercion_from_primary
     | None -> None
   in
   let raw_lambda =
@@ -143,7 +144,6 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     (Unit_info.Artifact.filename (Unit_info.cmjx i.target))
     ~main_module_block_format ~arg_descr;
   jsir
-
 
 type starting_point =
   | Parsing
@@ -178,10 +178,10 @@ let implementation_aux ~start_from ~source_file ~output_prefix
         emit_jsir info jsir
       in
       Compile_common.implementation
-      ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
-      ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
-        Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
-      info ~backend
+        ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
+        ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
+          Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
+        info ~backend
   | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->

@@ -78,11 +78,13 @@ let reg_width_const const : Jsir.constant =
   | Naked_int64 int64 -> int64_to_jsir_const int64
   | Naked_nativeint nativeint -> nativeint_to_jsir_const nativeint
   | Naked_int8 int8 ->
-    (* Int8.t values are already sign-extended when created, so we can use directly *)
+    (* Int8.t values are already sign-extended when created, so we can use
+       directly *)
     let value = Numeric_types.Int8.to_int int8 in
     Int (Targetint.of_int value)
   | Naked_int16 int16 ->
-    (* Int16.t values are already sign-extended when created, so we can use directly *)
+    (* Int16.t values are already sign-extended when created, so we can use
+       directly *)
     let value = Numeric_types.Int16.to_int int16 in
     Int (Targetint.of_int value)
   | Null -> Jsir.Null

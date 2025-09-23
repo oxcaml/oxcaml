@@ -24,10 +24,10 @@ let reaper_is_enabled () =
   match !Oxcaml_flags.Flambda2.enable_reaper with
   | Set set -> set
   | Default ->
-    let default =
-      Oxcaml_flags.Flambda2.default_for_opt_level !Oxcaml_flags.opt_level
-    in
-    default.Oxcaml_flags.Flambda2.enable_reaper
+      let default =
+        Oxcaml_flags.Flambda2.default_for_opt_level !Oxcaml_flags.opt_level
+      in
+      default.Oxcaml_flags.Flambda2.enable_reaper
 
 let main argv ppf =
   Clflags.jsir := true;
@@ -75,27 +75,37 @@ let main argv ppf =
        Clflags.print_arguments program;
        exit 2);
     Compenv.readenv ppf Before_link;
-    if
-      List.length (List.filter (fun x -> !x)
-                     Clflags.[make_package; make_archive; shared; instantiate;
-                      Compenv.stop_early; output_c_object]) > 1
+    (if
+     List.length
+       (List.filter
+          (fun x -> !x)
+          Clflags.
+            [
+              make_package;
+              make_archive;
+              shared;
+              instantiate;
+              Compenv.stop_early;
+              output_c_object;
+            ])
+     > 1
     then
-    begin
-      let module P = Clflags.Compiler_pass in
-      match !Clflags.stop_after with
-      | None ->
-          Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate";
-      | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
-              | P.Simplify_cfg | P.Emit | P.Selection
-              | P.Register_allocation | P.Llvmize) as p) ->
-        assert (P.is_compilation_pass p);
-        Printf.ksprintf Compenv.fatal
-          "Options -i and -stop-after (%s) \
-           are incompatible with -pack, -a, -shared, -output-obj"
-          (String.concat "|"
-             (P.available_pass_names ~filter:(fun _ -> true) ~native:true))
-    end;
+     let module P = Clflags.Compiler_pass in
+     match !Clflags.stop_after with
+     | None ->
+         Compenv.fatal
+           "Please specify at most one of -pack, -a, -shared, -c, -output-obj, \
+            -instantiate"
+     | Some
+         (( P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
+          | P.Simplify_cfg | P.Emit | P.Selection | P.Register_allocation
+          | P.Llvmize ) as p) ->
+         assert (P.is_compilation_pass p);
+         Printf.ksprintf Compenv.fatal
+           "Options -i and -stop-after (%s) are incompatible with -pack, -a, \
+            -shared, -output-obj"
+           (String.concat "|"
+              (P.available_pass_names ~filter:(fun _ -> true) ~native:true)));
     if !Clflags.make_archive then (
       Compmisc.init_path ();
       let target = Compenv.extract_output !Clflags.output_name in
@@ -103,10 +113,13 @@ let main argv ppf =
         (Compenv.get_objfiles ~with_ocamlparam:false)
         target;
       Warnings.check_fatal ())
-    else if !Clflags.make_package then Misc.fatal_error "packaging is not supported by ocamlj"
-    else if !Clflags.instantiate then Misc.fatal_error "instantiation is not supported by ocamlj"
-    else if !Clflags.shared then Misc.fatal_error "shared objects are not supported by ocamlj"
-    else if not !Compenv.stop_early && !Clflags.objfiles <> [] then (
+    else if !Clflags.make_package then
+      Misc.fatal_error "packaging is not supported by ocamlj"
+    else if !Clflags.instantiate then
+      Misc.fatal_error "instantiation is not supported by ocamlj"
+    else if !Clflags.shared then
+      Misc.fatal_error "shared objects are not supported by ocamlj"
+    else if (not !Compenv.stop_early) && !Clflags.objfiles <> [] then (
       let target = default_js_output !Clflags.output_name in
       Compmisc.init_path ();
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->

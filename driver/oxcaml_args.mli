@@ -84,7 +84,6 @@ module type Flambda2_options = sig
   val dreaper : unit -> unit
 end
 
-
 (** Command line arguments required for flambda native backend.  *)
 module type Oxcaml_options = sig
   val ocamlcfg : unit -> unit
@@ -150,7 +149,9 @@ module type Oxcaml_options = sig
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
+
   include Flambda2_options
+
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
 end
@@ -197,7 +198,6 @@ end
 module Make_optcomp_options (_ : Optcomp_options) : Main_args.Arg_list
 
 module Make_opttop_options (_ : Opttop_options) : Main_args.Arg_list
-
 module Make_jscomp_options (_ : Jscomp_options) : Main_args.Arg_list
 
 (** Default implementations of required arguments for each tool.  *)

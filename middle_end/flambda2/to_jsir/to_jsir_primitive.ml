@@ -90,61 +90,112 @@ let use_prim' ~env ~res prim simples =
   let args, res = prim_args ~env ~res simples in
   use_prim ~env ~res prim args
 
-(** Helper functions for sign extension and masking of small integers *)
 (* These work with Simple.t for use in Num_conv *)
+
+(** Helper functions for sign extension and masking of small integers *)
 let mask_and_sign_extend_int8 ~env ~res x =
   (* Mask then sign extend: ((x & 0xFF) << 24) >> 24 *)
   let x, res = prim_arg ~env ~res x in
   let masked = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (masked, Prim (Extern "%int_and", [x; Pc (Int (Targetint.of_int 0xFF))]))) in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( masked,
+           Prim (Extern "%int_and", [x; Pc (Int (Targetint.of_int 0xFF))]) ))
+  in
   let v1 = Jsir.Var.fresh () in
   let v2 = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (v1, Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int 24))]))) in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int 24))]))) in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( v1,
+           Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int 24))])
+         ))
+  in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int 24))])))
+  in
   Some v2, env, res
 
 let mask_and_sign_extend_int16 ~env ~res x =
   (* Mask then sign extend: ((x & 0xFFFF) << 16) >> 16 *)
   let x, res = prim_arg ~env ~res x in
   let masked = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (masked, Prim (Extern "%int_and", [x; Pc (Int (Targetint.of_int 0xFFFF))]))) in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( masked,
+           Prim (Extern "%int_and", [x; Pc (Int (Targetint.of_int 0xFFFF))]) ))
+  in
   let v1 = Jsir.Var.fresh () in
   let v2 = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (v1, Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int 16))]))) in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int 16))]))) in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( v1,
+           Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int 16))])
+         ))
+  in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int 16))])))
+  in
   Some v2, env, res
 
 (* These work directly with JSIR vars for use when we already have a var *)
 let mask_and_sign_extend_int8_var ~env ~res var =
   (* Mask then sign extend: ((x & 0xFF) << 24) >> 24 *)
   let masked = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (masked, Prim (Extern "%int_and", [Pv var; Pc (Int (Targetint.of_int 0xFF))]))) in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( masked,
+           Prim (Extern "%int_and", [Pv var; Pc (Int (Targetint.of_int 0xFF))])
+         ))
+  in
   let v1 = Jsir.Var.fresh () in
   let v2 = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (v1, Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int 24))]))) in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int 24))]))) in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( v1,
+           Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int 24))])
+         ))
+  in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int 24))])))
+  in
   Some v2, env, res
 
 let mask_and_sign_extend_int16_var ~env ~res var =
   (* Mask then sign extend: ((x & 0xFFFF) << 16) >> 16 *)
   let masked = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (masked, Prim (Extern "%int_and", [Pv var; Pc (Int (Targetint.of_int 0xFFFF))]))) in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( masked,
+           Prim (Extern "%int_and", [Pv var; Pc (Int (Targetint.of_int 0xFFFF))])
+         ))
+  in
   let v1 = Jsir.Var.fresh () in
   let v2 = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (v1, Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int 16))]))) in
-  let res = To_jsir_result.add_instr_exn res
-    (Let (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int 16))]))) in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         ( v1,
+           Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int 16))])
+         ))
+  in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let
+         (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int 16))])))
+  in
   Some v2, env, res
 
 let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
@@ -191,15 +242,10 @@ let block_access_kind_exn (kind : Flambda_primitive.Block_access_kind.t) :
         _
       } ->
     Non_float
-  | Mixed
-      { field_kind =
-          Flat_suffix (Naked_int8 | Naked_int16);
-        _
-      } ->
+  | Mixed { field_kind = Flat_suffix (Naked_int8 | Naked_int16); _ } ->
     Non_float
   | Mixed
-      { field_kind =
-          Flat_suffix (Naked_vec128 | Naked_vec256 | Naked_vec512);
+      { field_kind = Flat_suffix (Naked_vec128 | Naked_vec256 | Naked_vec512);
         _
       } ->
     raise Primitive_not_supported
@@ -361,68 +407,89 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
       mask_and_sign_extend_int16 ~env ~res x
     | Naked_int8, (Naked_int32 | Naked_int64 | Naked_nativeint) ->
       (* int8 to larger ints: already sign-extended, convert as int *)
-      let src_name = match dst with
+      let src_name =
+        match dst with
         | Naked_int32 -> "int32"
         | Naked_int64 -> "int64"
         | Naked_nativeint -> "nativeint"
         | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
-        | Naked_float | Naked_float32 -> assert false in
+        | Naked_float | Naked_float32 ->
+          assert false
+      in
       use_prim' (Extern ("caml_" ^ src_name ^ "_of_int"))
     | Naked_int16, (Naked_int32 | Naked_int64 | Naked_nativeint) ->
       (* int16 to larger ints: already sign-extended, convert as int *)
-      let src_name = match dst with
+      let src_name =
+        match dst with
         | Naked_int32 -> "int32"
         | Naked_int64 -> "int64"
         | Naked_nativeint -> "nativeint"
         | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
-        | Naked_float | Naked_float32 -> assert false in
+        | Naked_float | Naked_float32 ->
+          assert false
+      in
       use_prim' (Extern ("caml_" ^ src_name ^ "_of_int"))
-    | (Naked_int32 | Naked_int64 | Naked_nativeint), Naked_int8 ->
+    | (Naked_int32 | Naked_int64 | Naked_nativeint), Naked_int8 -> (
       (* larger ints to int8: convert to int first, then mask and sign-extend *)
-      let src_name = match src with
+      let src_name =
+        match src with
         | Naked_int32 -> "int32"
         | Naked_int64 -> "int64"
         | Naked_nativeint -> "nativeint"
         | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
-        | Naked_float | Naked_float32 -> assert false in
+        | Naked_float | Naked_float32 ->
+          assert false
+      in
       let var, env, res = use_prim' (Extern ("caml_" ^ src_name ^ "_to_int")) in
-      (match var with
+      match var with
       | Some v -> mask_and_sign_extend_int8_var ~env ~res v
       | None -> None, env, res)
-    | (Naked_int32 | Naked_int64 | Naked_nativeint), Naked_int16 ->
-      (* larger ints to int16: convert to int first, then mask and sign-extend *)
-      let src_name = match src with
+    | (Naked_int32 | Naked_int64 | Naked_nativeint), Naked_int16 -> (
+      (* larger ints to int16: convert to int first, then mask and
+         sign-extend *)
+      let src_name =
+        match src with
         | Naked_int32 -> "int32"
         | Naked_int64 -> "int64"
         | Naked_nativeint -> "nativeint"
         | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
-        | Naked_float | Naked_float32 -> assert false in
+        | Naked_float | Naked_float32 ->
+          assert false
+      in
       let var, env, res = use_prim' (Extern ("caml_" ^ src_name ^ "_to_int")) in
-      (match var with
+      match var with
       | Some v -> mask_and_sign_extend_int16_var ~env ~res v
       | None -> None, env, res)
     | (Naked_int8 | Naked_int16), (Naked_float | Naked_float32) ->
       (* Small int to float: already sign-extended, convert as int *)
-      let dst_name = match dst with
+      let dst_name =
+        match dst with
         | Naked_float -> "float"
         | Naked_float32 -> "float32"
         | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
-        | Naked_int32 | Naked_int64 | Naked_nativeint -> assert false in
+        | Naked_int32 | Naked_int64 | Naked_nativeint ->
+          assert false
+      in
       use_prim' (Extern ("caml_" ^ dst_name ^ "_of_int"))
-    | (Naked_float | Naked_float32), (Naked_int8 | Naked_int16) ->
+    | (Naked_float | Naked_float32), (Naked_int8 | Naked_int16) -> (
       (* Float to small int: convert to int first, then mask and sign-extend *)
-      let src_name = match src with
+      let src_name =
+        match src with
         | Naked_float -> "int_of_float"
         | Naked_float32 -> "int_of_float32"
         | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
-        | Naked_int32 | Naked_int64 | Naked_nativeint -> assert false in
+        | Naked_int32 | Naked_int64 | Naked_nativeint ->
+          assert false
+      in
       let var, env, res = use_prim' (Extern ("caml_" ^ src_name)) in
-      (match var, dst with
+      match var, dst with
       | Some v, Naked_int8 -> mask_and_sign_extend_int8_var ~env ~res v
       | Some v, Naked_int16 -> mask_and_sign_extend_int16_var ~env ~res v
-      | Some _, (Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
-                | Naked_nativeint | Naked_float | Naked_float32)
-      | None, _ -> None, env, res))
+      | ( Some _,
+          ( Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+          | Naked_nativeint | Naked_float | Naked_float32 ) )
+      | None, _ ->
+        None, env, res))
   | Boolean_not -> use_prim' Not
   | Reinterpret_64_bit_word reinterpret ->
     let extern_name =
@@ -520,7 +587,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     use_prim' prim
   | Int_arith (kind, op) -> (
     match kind with
-    | Naked_int8 | Naked_int16 ->
+    | Naked_int8 | Naked_int16 -> (
       (* For small ints: do operation then mask and sign-extend result *)
       let op_name =
         match op with
@@ -538,13 +605,14 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       let y, res = prim_arg ~env ~res y in
       let result, env, res = use_prim0 ~env ~res (Extern extern_name) [x; y] in
       (* Mask and sign-extend the result *)
-      (match kind with
+      match kind with
       | Naked_int8 -> mask_and_sign_extend_int8_var ~env ~res result
       | Naked_int16 -> mask_and_sign_extend_int16_var ~env ~res result
       | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
-      | Naked_nativeint -> assert false)
-    | (Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
-      | Naked_nativeint) ->
+      | Naked_nativeint ->
+        assert false)
+    | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+    | Naked_nativeint ->
       let op_name =
         match op with
         | Add -> "add"
@@ -562,42 +630,52 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       use_prim' (Extern extern_name))
   | Int_shift (kind, op) -> (
     match kind with
-    | Naked_int8 | Naked_int16 ->
-      (* For small ints: shift operations on sign-extended values, then mask and re-sign-extend *)
-      let shift_op = match op with
+    | Naked_int8 | Naked_int16 -> (
+      (* For small ints: shift operations on sign-extended values, then mask and
+         re-sign-extend *)
+      let shift_op =
+        match op with
         | Lsl -> "%int_lsl"
-        | Lsr -> "%int_lsr"  (* Logical shift for unsigned *)
-        | Asr -> "%int_asr"  (* Arithmetic shift for signed *)
+        | Lsr -> "%int_lsr" (* Logical shift for unsigned *)
+        | Asr -> "%int_asr" (* Arithmetic shift for signed *)
       in
       let x, res = prim_arg ~env ~res x in
       let y, res = prim_arg ~env ~res y in
       (* For Lsr, mask first to get unsigned behavior *)
-      let x, res = match op with
+      let x, res =
+        match op with
         | Lsr ->
           (* Mask x to bit width before unsigned shift *)
-          let mask = match kind with
+          let mask =
+            match kind with
             | Naked_int8 -> Targetint.of_int 0xFF
             | Naked_int16 -> Targetint.of_int 0xFFFF
             | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
-            | Naked_nativeint -> assert false
+            | Naked_nativeint ->
+              assert false
           in
           let masked = Jsir.Var.fresh () in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (masked, Prim (Extern "%int_and", [x; Pc (Int mask)]))) in
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let (masked, Prim (Extern "%int_and", [x; Pc (Int mask)])))
+          in
           Jsir.Pv masked, res
-        | (Lsl | Asr) -> x, res
+        | Lsl | Asr -> x, res
       in
       let result = Jsir.Var.fresh () in
-      let res = To_jsir_result.add_instr_exn res
-        (Let (result, Prim (Extern shift_op, [x; y]))) in
+      let res =
+        To_jsir_result.add_instr_exn res
+          (Let (result, Prim (Extern shift_op, [x; y])))
+      in
       (* Mask and sign-extend the result *)
-      (match kind with
+      match kind with
       | Naked_int8 -> mask_and_sign_extend_int8_var ~env ~res result
       | Naked_int16 -> mask_and_sign_extend_int16_var ~env ~res result
       | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
-      | Naked_nativeint -> assert false)
-    | (Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
-      | Naked_nativeint) ->
+      | Naked_nativeint ->
+        assert false)
+    | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+    | Naked_nativeint ->
       let op_name =
         match kind, op with
         | (Tagged_immediate | Naked_immediate), Lsl -> "lsl"
@@ -622,8 +700,8 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_nativeint ->
           Eq, Neq, Lt, Ult, Le
         | Naked_int8 | Naked_int16 ->
-          (* Small ints use regular JS comparisons. For unsigned comparisons,
-             we mask the operands first, then use regular signed comparison *)
+          (* Small ints use regular JS comparisons. For unsigned comparisons, we
+             mask the operands first, then use regular signed comparison *)
           Eq, Neq, Lt, Lt, Le
         | Naked_int64 ->
           ( Extern "caml_equal",
@@ -654,24 +732,34 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       let x, res = prim_arg ~env ~res x in
       let y, res = prim_arg ~env ~res y in
       (* For unsigned comparisons on small ints, mask both operands first *)
-      let x, y, res = match kind, comparison with
-        | (Naked_int8 | Naked_int16), (Lt Unsigned | Gt Unsigned | Le Unsigned | Ge Unsigned) ->
-          let mask = match kind with
+      let x, y, res =
+        match kind, comparison with
+        | ( (Naked_int8 | Naked_int16),
+            (Lt Unsigned | Gt Unsigned | Le Unsigned | Ge Unsigned) ) ->
+          let mask =
+            match kind with
             | Naked_int8 -> Targetint.of_int 0xFF
             | Naked_int16 -> Targetint.of_int 0xFFFF
             | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
-            | Naked_nativeint -> assert false
+            | Naked_nativeint ->
+              assert false
           in
           let x_masked = Jsir.Var.fresh () in
           let y_masked = Jsir.Var.fresh () in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (x_masked, Prim (Extern "%int_and", [x; Pc (Int mask)]))) in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (y_masked, Prim (Extern "%int_and", [y; Pc (Int mask)]))) in
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let (x_masked, Prim (Extern "%int_and", [x; Pc (Int mask)])))
+          in
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let (y_masked, Prim (Extern "%int_and", [y; Pc (Int mask)])))
+          in
           Jsir.Pv x_masked, Jsir.Pv y_masked, res
-        | (Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
-          | Naked_nativeint), _
-        | _, (Eq | Neq | Lt Signed | Gt Signed | Le Signed | Ge Signed) -> x, y, res
+        | ( ( Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+            | Naked_nativeint ),
+            _ )
+        | _, (Eq | Neq | Lt Signed | Gt Signed | Le Signed | Ge Signed) ->
+          x, y, res
       in
       match comparison with
       | Eq -> use_prim ~env ~res eq [x; y]
@@ -695,57 +783,92 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         match kind with
         | Naked_int8 | Naked_int16 ->
           (* For small ints, mask both operands then do signed comparison *)
-          let mask = match kind with
+          let mask =
+            match kind with
             | Naked_int8 -> Targetint.of_int 0xFF
             | Naked_int16 -> Targetint.of_int 0xFFFF
             | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
-            | Naked_nativeint -> assert false
+            | Naked_nativeint ->
+              assert false
           in
           let x, res = prim_arg ~env ~res x in
           let y, res = prim_arg ~env ~res y in
           let x_masked = Jsir.Var.fresh () in
           let y_masked = Jsir.Var.fresh () in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (x_masked, Prim (Extern "%int_and", [x; Pc (Int mask)]))) in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (y_masked, Prim (Extern "%int_and", [y; Pc (Int mask)]))) in
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let (x_masked, Prim (Extern "%int_and", [x; Pc (Int mask)])))
+          in
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let (y_masked, Prim (Extern "%int_and", [y; Pc (Int mask)])))
+          in
           (* Now do signed comparison on masked values *)
-          use_prim ~env ~res (Extern "caml_int_compare") [Pv x_masked; Pv y_masked]
+          use_prim ~env ~res (Extern "caml_int_compare")
+            [Pv x_masked; Pv y_masked]
         | Tagged_immediate | Naked_immediate ->
-          (* For regular ints, use unsigned compare by adding min_int to both operands
-             to shift them into the positive range, then do signed comparison *)
+          (* For regular ints, use unsigned compare by adding min_int to both
+             operands to shift them into the positive range, then do signed
+             comparison *)
           let x, res = prim_arg ~env ~res x in
           let y, res = prim_arg ~env ~res y in
           let min_int = Targetint.of_int32 Int32.min_int in
           let x_shifted = Jsir.Var.fresh () in
           let y_shifted = Jsir.Var.fresh () in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (x_shifted, Prim (Extern "%int_sub", [x; Pc (Int min_int)]))) in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (y_shifted, Prim (Extern "%int_sub", [y; Pc (Int min_int)]))) in
-          use_prim ~env ~res (Extern "caml_int_compare") [Pv x_shifted; Pv y_shifted]
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let (x_shifted, Prim (Extern "%int_sub", [x; Pc (Int min_int)])))
+          in
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let (y_shifted, Prim (Extern "%int_sub", [y; Pc (Int min_int)])))
+          in
+          use_prim ~env ~res (Extern "caml_int_compare")
+            [Pv x_shifted; Pv y_shifted]
         | Naked_int32 | Naked_nativeint ->
           (* For int32/nativeint, use the same approach as regular ints *)
           let x, res = prim_arg ~env ~res x in
           let y, res = prim_arg ~env ~res y in
           let x_shifted = Jsir.Var.fresh () in
           let y_shifted = Jsir.Var.fresh () in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (x_shifted, Prim (Extern "caml_int32_sub", [x; Pc (Int32 Int32.min_int)]))) in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (y_shifted, Prim (Extern "caml_int32_sub", [y; Pc (Int32 Int32.min_int)]))) in
-          use_prim ~env ~res (Extern "caml_int32_compare") [Pv x_shifted; Pv y_shifted]
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let
+                 ( x_shifted,
+                   Prim (Extern "caml_int32_sub", [x; Pc (Int32 Int32.min_int)])
+                 ))
+          in
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let
+                 ( y_shifted,
+                   Prim (Extern "caml_int32_sub", [y; Pc (Int32 Int32.min_int)])
+                 ))
+          in
+          use_prim ~env ~res (Extern "caml_int32_compare")
+            [Pv x_shifted; Pv y_shifted]
         | Naked_int64 ->
           (* For int64, use the same min_int trick *)
           let x, res = prim_arg ~env ~res x in
           let y, res = prim_arg ~env ~res y in
           let x_shifted = Jsir.Var.fresh () in
           let y_shifted = Jsir.Var.fresh () in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (x_shifted, Prim (Extern "caml_int64_sub", [x; Pc (Int64 Int64.min_int)]))) in
-          let res = To_jsir_result.add_instr_exn res
-            (Let (y_shifted, Prim (Extern "caml_int64_sub", [y; Pc (Int64 Int64.min_int)]))) in
-          use_prim ~env ~res (Extern "caml_int64_compare") [Pv x_shifted; Pv y_shifted])))
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let
+                 ( x_shifted,
+                   Prim (Extern "caml_int64_sub", [x; Pc (Int64 Int64.min_int)])
+                 ))
+          in
+          let res =
+            To_jsir_result.add_instr_exn res
+              (Let
+                 ( y_shifted,
+                   Prim (Extern "caml_int64_sub", [y; Pc (Int64 Int64.min_int)])
+                 ))
+          in
+          use_prim ~env ~res (Extern "caml_int64_compare")
+            [Pv x_shifted; Pv y_shifted])))
   | Float_arith (bitwidth, op) ->
     let op_name =
       match op with Add -> "add" | Sub -> "sub" | Mul -> "mul" | Div -> "div"

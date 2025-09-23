@@ -22,7 +22,8 @@ module L = Lambda
 module P = Flambda_primitive
 
 let needs_64_bit_target prim dbg ~machine_width =
-  if Target_system.Machine_width.is_32_bit machine_width then
+  if Target_system.Machine_width.is_32_bit machine_width
+  then
     Misc.fatal_errorf
       "Primitive %a is not yet supported on 32-bit targets (this is not \
        necessarily an inherent incompatibility, but the code in Flambda 2 \
@@ -1737,10 +1738,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (* This is implemented as a unary primitive, but from our point of view it's
        actually nullary. *)
     let num_bytes = L.array_element_size_in_bytes array_kind in
-    [ Simple
-        (Simple.const_int
-           (Target_ocaml_int.of_int machine_width
-              num_bytes)) ]
+    [Simple (Simple.const_int (Target_ocaml_int.of_int machine_width num_bytes))]
   | Pmake_idx_field pos, [] ->
     needs_64_bit_target prim dbg ~machine_width;
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in

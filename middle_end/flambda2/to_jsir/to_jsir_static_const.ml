@@ -154,7 +154,8 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:(fun float ->
-        Numeric_types.Float32_by_bit_pattern.to_float float |> Int64.bits_of_float)
+        Numeric_types.Float32_by_bit_pattern.to_float float
+        |> Int64.bits_of_float)
       ~bits_to_constant:(fun bits -> Float32 bits)
       ~bits_to_array:(fun bits -> Float_array bits)
   | Immutable_value_array values ->

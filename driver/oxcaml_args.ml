@@ -1074,12 +1074,14 @@ module type Oxcaml_options = sig
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
+
   include Flambda2_options
+
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
 end
 
-module Make_flambda2_options (F :Flambda2_options) = struct
+module Make_flambda2_options (F : Flambda2_options) = struct
   let list =
     [
       mk_flambda2_debug F.flambda2_debug;
@@ -1172,9 +1174,9 @@ module Make_flambda2_options (F :Flambda2_options) = struct
     ]
 end
 
-
 module Make_oxcaml_options (F : Oxcaml_options) = struct
-  module Flambda2 = Make_flambda2_options(F)
+  module Flambda2 = Make_flambda2_options (F)
+
   let list2 =
     [
       mk_dump_inlining_paths F.dump_inlining_paths;
@@ -1241,14 +1243,13 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dllvmir F.dllvmir;
       mk_keep_llvmir F.keep_llvmir;
       mk_llvm_path F.llvm_path;
-      mk_llvm_flags F.llvm_flags
+      mk_llvm_flags F.llvm_flags;
     ]
     @ Flambda2.list
-    @
-      [
+    @ [
         mk_use_cached_generic_functions F.use_cached_generic_functions;
-      mk_cached_generic_functions_path F.cached_generic_functions_path;
-    ]
+        mk_cached_generic_functions_path F.cached_generic_functions_path;
+      ]
 end
 
 module Flambda2_options_impl = struct
@@ -1256,7 +1257,6 @@ module Flambda2_options_impl = struct
   let clear r () = r := Oxcaml_flags.Set false
   let set' r () = r := true
   let clear' r () = r := false
-
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
   let flambda2_join_points = set Flambda2.join_points
@@ -1437,8 +1437,6 @@ module Flambda2_options_impl = struct
   let dflow = set' Flambda2.Dump.flow
   let dsimplify = set' Flambda2.Dump.simplify
   let dreaper = set' Flambda2.Dump.reaper
-
-
 end
 
 module Oxcaml_options_impl = struct
@@ -1569,6 +1567,7 @@ module Oxcaml_options_impl = struct
   let llvm_flags s = Oxcaml_flags.llvm_flags := s
 
   include Flambda2_options_impl
+
   let use_cached_generic_functions =
     set' Oxcaml_flags.use_cached_generic_functions
 

@@ -967,15 +967,15 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
     | true ->
       (* [close_c_call0] checks [prim_native_name] to see whether we should
          invoke the bytecode name or native name; for JavaScript compilation, we
-         should use the bytecode name unless it involves unboxed products or void
-         arguments, for the following reasons:
+         should use the bytecode name unless it involves unboxed products or
+         void arguments, for the following reasons:
 
-         1. Unboxed products: The expected type for JS stubs with unboxed products
-         are different from bytecode C stubs and bytecode-compiled JSOO stubs.
-         Suppose an external takes an unboxed product, e.g. [#(int * int)]. In
-         bytecode, this is passed as a single argument, containing a pointer to a
-         pair; however, in JSIR, this will be passed as two arguments, in the same
-         way as for native compilation.
+         1. Unboxed products: The expected type for JS stubs with unboxed
+         products are different from bytecode C stubs and bytecode-compiled JSOO
+         stubs. Suppose an external takes an unboxed product, e.g. [#(int *
+         int)]. In bytecode, this is passed as a single argument, containing a
+         pointer to a pair; however, in JSIR, this will be passed as two
+         arguments, in the same way as for native compilation.
 
          In addition, if the return type for an external is a nested unboxed
          product such as [#(#(int * int) * int)], bytecode stubs need to return
