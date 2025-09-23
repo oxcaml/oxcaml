@@ -216,6 +216,16 @@ function caml_atomic_cas_field(ref, field, o, n) {
   return 0;
 }
 
+//Provides: caml_atomic_compare_exchange_field
+//Version: >= 5
+function caml_atomic_compare_exchange_field(ref, field, o, n) {
+  var old = ref[field + 1];
+  if (old === o) {
+    ref[field + 1] = n;
+  }
+  return old;
+}
+
 //Provides: caml_atomic_set_field
 //Version: >= 5
 function caml_atomic_set_field(ref, field, v) {

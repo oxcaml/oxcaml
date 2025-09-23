@@ -192,6 +192,31 @@ function caml_make_vect(len, init) {
   return caml_array_make(len, init);
 }
 
+//Provides: caml_makearray_dynamic_non_scannable_unboxed_product const (const, const, const)
+//Requires: caml_make_vect
+function caml_makearray_dynamic_non_scannable_unboxed_product(num_components, _is_local, non_unarized_length) {
+  var size = num_components * non_unarized_length;
+  return caml_make_vect(size, 0);
+}
+
+//Provides: caml_makearray_dynamic_scannable_unboxed_product const (const, const, const)
+//Requires: caml_array_bound_error
+function caml_makearray_dynamic_scannable_unboxed_product (init, _is_local, non_unarized_length) {
+  var num_components = init.length - 1; // skip tag
+  var total_size = num_components * non_unarized_length;
+  if (total_size >>> 0 >= ((0x7fffffff / 4) | 0)) caml_array_bound_error();
+
+  var result = new Array(total_size + 1);
+
+  result[0] = 0;
+  for (var i = 0; i < non_unarized_length; i++) {
+    for (var j = 0; j < num_components; j++) {
+      result[1 + i * num_components + j] = init[j + 1];
+    }
+  }
+  return result;
+}
+
 //Provides: caml_make_float_vect const (const)
 //Requires: caml_array_bound_error
 function caml_make_float_vect(len) {

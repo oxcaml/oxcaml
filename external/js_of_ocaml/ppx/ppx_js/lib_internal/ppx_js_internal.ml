@@ -267,13 +267,8 @@ let invoker ?(extra_types = []) uplift downlift body arguments =
           | _ -> c, b
         in
         { expr with pexp_desc = Pexp_function (params, c, b) }
-    | _ ->
-        Ppxlib_jane.Ast_builder.Default.add_fun_param
-          ~loc:!Ppxlib.Ast_helper.default_loc
-          label
-          None
-          (Pat.constraint_ pat typ)
-          expr
+    | _ -> 
+      Ppxlib_jane.Ast_builder.Default.add_fun_param ~loc:!Ppxlib.Ast_helper.default_loc label None (Pat.constraint_ pat typ) expr
   in
   let invoker =
     List.fold_right2
@@ -681,7 +676,7 @@ let literal_object self_id (fields : field_desc list) =
     | Val (_, _, _, body) -> body
     | Meth (_, _, _, (body, ty), _) -> (
         match body.pexp_desc, ty with
-        | Pexp_function (params, c, b), None ->
+        | ((Pexp_function (params, c, b), None)) ->
             let params =
               { pparam_desc = Pparam_val (nolabel, None, self_id)
               ; pparam_loc = { body.pexp_loc with loc_ghost = true }
@@ -689,7 +684,7 @@ let literal_object self_id (fields : field_desc list) =
               :: params
             in
             { body with pexp_desc = Pexp_function (params, c, b) }
-        | _, Some ty -> (
+        | ((_, Some ty)) -> (
             let e =
               Ppxlib_jane.Ast_builder.Default.add_fun_param
                 ~loc:{ body.pexp_loc with loc_ghost = true }
@@ -699,16 +694,13 @@ let literal_object self_id (fields : field_desc list) =
                 body
             in
             match e.pexp_desc with
-            | Pexp_function
-                (params, ({ ret_type_constraint = None; _ } as function_constraint), b) ->
+            | Pexp_function (params, ({ ret_type_constraint = None ; _ } as function_constraint), b) ->
                 let ret_type_constraint = Some (Pconstraint ty) in
-                let function_constraint =
-                  { function_constraint with ret_type_constraint }
-                in
-                { e with pexp_desc = Pexp_function (params, function_constraint, b) }
+                let function_constraint = { function_constraint with ret_type_constraint } in
+                { e with pexp_desc = Pexp_function (params, function_constraint , b) }
             | _ -> assert false)
         | _, None ->
-            Ppxlib_jane.Ast_builder.Default.add_fun_param
+          Ppxlib_jane.Ast_builder.Default.add_fun_param
               ~loc:{ body.pexp_loc with loc_ghost = true }
               Nolabel
               None
@@ -929,3 +921,5 @@ let mapper =
     |> Ppxlib_ast.Selected_ast.to_ocaml Expression
   in
   { Ocaml_ast_mapper.default_mapper with expr }
+
+

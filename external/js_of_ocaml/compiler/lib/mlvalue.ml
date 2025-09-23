@@ -48,7 +48,7 @@ module Block = struct
 
        A more principled fix would probably be to refactor [Js.Unsafe], but this is
        a much larger change. *)
-    J.EAccess (e, ANullish, zero)
+      J.EAccess (e, ANullish, zero)
 
   let field e idx =
     let adjusted = J.ENum (J.Num.of_targetint (Targetint.of_int_exn (idx + 1))) in

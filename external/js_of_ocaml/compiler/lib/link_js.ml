@@ -245,16 +245,14 @@ let link
      period when the [Effect] module is in [Stdlib], but no code is actually
      using it. *)
   let warn_effects = ref true in
-  let files =
-    List.map files ~f:(fun file ->
-        Dune_action_trace.add_trace_event_if_enabled
-          ~event_tracing_context
-          ~category:"jsoo.link.read_file"
-          ~name:file
-        @@ fun () ->
+  let files = List.map files ~f:(fun file ->
+    Dune_action_trace.add_trace_event_if_enabled
+      ~event_tracing_context
+      ~category:"jsoo.link.read_file"
+      ~name:file
+      @@ fun () ->
         let lr = Line_reader.open_ file in
-        file, lr, Units.scan_file lr)
-  in
+        file, lr, Units.scan_file lr) in
   let missing, to_link, all =
     List.fold_right
       files
