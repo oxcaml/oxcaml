@@ -34,11 +34,11 @@
    module = "";
    flags = "-a";
    all_modules = "";
-   program = "empty.cmja";
+   program = "empty.cmjxa";
    ocamlj.opt;
    flags = "";
    program = "${test_build_directory}/empty.js";
-   all_modules = "empty.cmja empty.cmj";
+   all_modules = "empty.cmjxa empty.cmjx";
    ocamlj.opt;
    check-ocamlj.opt-output;
  }

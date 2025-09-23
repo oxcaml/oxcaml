@@ -52,4 +52,6 @@ val file_exists : Actions.t
 
 val copy : Actions.t
 
+val libraries_are_javascript_compatible : Actions.t
+
 val init : unit -> unit

@@ -27,12 +27,12 @@ let native_action a =
   if Ocamltest_config.native_compiler then a
   else (Actions.update a no_native_compilers)
 
-let bytecode_action a =
+let bytecode_backend_action a =
   Actions.update a (fun log env ->
     if Ocaml_backends.is_backend_enabled Bytecode then
       Actions.run log env a
     else
-      (Result.skip_with_reason "bytecode backend disabled", env))
+      Result.skip_with_reason "bytecode backend disabled", env)
 
 let native_backend_action a =
   Actions.update a (fun log env ->
@@ -46,7 +46,7 @@ let javascript_backend_action a =
     if Ocaml_backends.is_backend_enabled Javascript then
       Actions.run log env a
     else
-      (Result.skip_with_reason "javascript backend disabled", env))
+      (Result.skip_with_reason "JavaScript backend disabled", env))
 
 let get_backend_value_from_env env bytecode_var native_var =
   Ocaml_backends.make_backend_function
@@ -480,13 +480,13 @@ let mk_toplevel_env_setup name (toplevel : Ocaml_toplevels.toplevel) =
     (setup_toplevel_build_env toplevel)
 
 let setup_ocamlc_byte_build_env =
-  bytecode_action
+  bytecode_backend_action
     (mk_compiler_env_setup
       "setup-ocamlc.byte-build-env"
       Ocaml_compilers.ocamlc_byte)
 
 let setup_ocamlc_opt_build_env =
-  bytecode_action
+  bytecode_backend_action
     (native_action
       (mk_compiler_env_setup
         "setup-ocamlc.opt-build-env"
@@ -553,7 +553,7 @@ let compile (compiler : Ocaml_compilers.compiler) log env =
 (* Compile actions *)
 
 let ocamlc_byte =
-  bytecode_action
+  bytecode_backend_action
     (Actions.make
       ~name:"ocamlc.byte"
       ~description:"Compile the program using ocamlc.byte"
@@ -561,7 +561,7 @@ let ocamlc_byte =
       (compile Ocaml_compilers.ocamlc_byte))
 
 let ocamlc_opt =
-  bytecode_action
+  bytecode_backend_action
     (native_action
       (Actions.make
         ~name:"ocamlc.opt"
@@ -934,12 +934,12 @@ let make_check_toplevel_output name toplevel =
   make_check_tool_output name (module Toplevel : Ocaml_tools.Tool)
 
 let check_ocamlc_byte_output =
-  bytecode_action
+  bytecode_backend_action
     (make_check_compiler_output
       "check-ocamlc.byte-output" Ocaml_compilers.ocamlc_byte)
 
 let check_ocamlc_opt_output =
-  bytecode_action
+  bytecode_backend_action
     (native_action
       (make_check_compiler_output
         "check-ocamlc.opt-output" Ocaml_compilers.ocamlc_opt))
@@ -1334,7 +1334,8 @@ let shared_libraries = Actions.make
     "Shared libraries are supported."
     "Shared libraries are not supported.")
 
-let no_shared_libraries = Actions.make
+let no_shared_libraries =
+  Actions.make
   ~name:"no-shared-libraries"
   ~description:"Passes if shared libraries are NOT supported"
   ~does_something:false
@@ -1342,21 +1343,25 @@ let no_shared_libraries = Actions.make
     "Shared libraries are not supported."
     "Shared libraries are supported.")
 
-let native_compiler = Actions.make
-  ~name:"native-compiler"
-  ~description:"Passes if the native compiler is available"
-  ~does_something:false
-  (Actions_helpers.predicate Ocamltest_config.native_compiler
-    "native compiler available"
-    "native compiler not available")
+let native_compiler =
+  native_backend_action
+    (Actions.make
+       ~name:"native-compiler"
+       ~description:"Passes if the native compiler is available"
+       ~does_something:false
+       (Actions_helpers.predicate Ocamltest_config.native_compiler
+          "native compiler available"
+          "native compiler not available"))
 
-let native_dynlink = Actions.make
-  ~name:"native-dynlink"
-  ~description:"Passes if native dynlink support is available"
-  ~does_something:false
-  (Actions_helpers.predicate (Ocamltest_config.native_dynlink)
-    "native dynlink support available"
-    "native dynlink support not available")
+let native_dynlink =
+  native_backend_action
+  (Actions.make
+     ~name:"native-dynlink"
+     ~description:"Passes if native dynlink support is available"
+     ~does_something:false
+     (Actions_helpers.predicate (Ocamltest_config.native_dynlink)
+        "native dynlink support available"
+        "native dynlink support not available"))
 
 let debugger = Actions.make
   ~name:"debugger"
@@ -1629,27 +1634,6 @@ let run_ocamldoc =
     (Result.fail_with_reason reason, env)
   end
 
-let skip_if_incompatible_libraries = Actions.make
-  ~name:"skip_if_incompatible_libraries"
-  ~description:"Skip JavaScript tests if incompatible libraries are included"
-  ~does_something:false
-  (fun _log env ->
-    let libraries = Environments.safe_lookup Ocaml_variables.libraries env in
-    (* Parse the libraries string - they are space-separated *)
-    let libs = String.words libraries in
-    (* Check if any library is incompatible with JavaScript *)
-    let is_incompatible lib =
-      (* Allow stdlib_*, testing, and lib; skip for everything else *)
-      not (String.starts_with ~prefix:"stdlib_" lib ||
-           lib = "testing" ||
-           lib = "lib" ||
-           lib = "")
-    in
-    if List.exists is_incompatible libs then
-      (Result.skip_with_reason "Test requires libraries not available in JavaScript", env)
-    else
-      (Result.pass, env))
-
 let init () =
   Environments.register_initializer Environments.Post
     "find_source_modules" find_source_modules;
@@ -1713,5 +1697,4 @@ let init () =
     stack_checks;
     runtime4;
     runtime5;
-    skip_if_incompatible_libraries
   ]

@@ -1,6 +1,6 @@
 (* TEST
-   native;
-   bytecode
+   { native; }
+   { bytecode; }
 *)
 
 let[@inline never] float_unboxing s f =

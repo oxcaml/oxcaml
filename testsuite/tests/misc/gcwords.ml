@@ -1,6 +1,6 @@
 (* TEST
-   native;
-   bytecode
+   { native; }
+   { bytecode; }
 *)
 
 type t = Leaf of int | Branch of t * t
