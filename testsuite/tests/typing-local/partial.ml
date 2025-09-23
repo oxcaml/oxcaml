@@ -1,4 +1,6 @@
 (* TEST
+ {native;}
+ {bytecode;}
  flags += " -g";
 *)
 

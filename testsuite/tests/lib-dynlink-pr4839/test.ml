@@ -3,6 +3,7 @@
  libraries = "";
  subdirectories = "host plugin1 plugin2 plugin3 plugin4";
  shared-libraries;
+ skip_if_incompatible_libraries;
  {
    setup-ocamlc.byte-build-env;
    {

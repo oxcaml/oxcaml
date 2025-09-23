@@ -7,9 +7,6 @@
  }{
    flags = "-extension-universe alpha";
    bytecode;
- }{
-   flags = "-extension-universe alpha";
-   javascript;
  }
 *)
 

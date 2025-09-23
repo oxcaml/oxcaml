@@ -1,4 +1,8 @@
-(* TEST *)
+(* TEST
+{native;}
+{bytecode;}
+(* javascript stack-oveflows :C *)
+*)
 
 type t = Float.Array.t
 

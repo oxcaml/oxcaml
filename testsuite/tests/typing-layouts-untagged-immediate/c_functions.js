@@ -20,16 +20,13 @@ function lognot_bytecode(v) {
 
 //Provides: sum_7_UBUBUBUtoU
 function sum_7_UBUBUBUtoU(u1, b2, u3, b4, u5, b6, u7) {
-  return u1 + b2 + u3 + b4 + u5 + b6 + u7;
+  return (u1 + b2 + u3 + b4 + u5 + b6 + u7) | 0;
 }
 
 //Provides: sum_7_bytecode
-function sum_7_bytecode(argv, argn) {
-  var sum = 0;
-  for (var i = 0; i < 7; i++) {
-    sum += argv[i];
-  }
-  return sum;
+//Requires: sum_7_UBUBUBUtoU
+function sum_7_bytecode(u1, b2, u3, b4, u5, b6, u7) {
+  return sum_7_UBUBUBUtoU(u1, b2, u3, b4, u5, b6, u7);
 }
 
 //Provides: is_sign_extended
