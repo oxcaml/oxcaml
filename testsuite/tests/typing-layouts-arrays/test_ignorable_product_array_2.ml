@@ -13,7 +13,7 @@
  }
  {
    (* too big for JS *)
-   javascript;
+   (* javascript; *)
  }
 *)
 
