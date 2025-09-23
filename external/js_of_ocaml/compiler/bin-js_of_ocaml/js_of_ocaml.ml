@@ -85,7 +85,7 @@ let () =
       Format.eprintf "%s: Error: Magic number version mismatch.@." Sys.argv.(0);
       let k =
         match Magic_number.kind h with
-        | (`Cmj | `Cmja) as x -> x
+        | `Cmj as x -> x
         | `Other _ -> assert false
       in
       let comp =

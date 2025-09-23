@@ -53,7 +53,6 @@ let of_string s =
 let kind (s, _) =
   match kind_of_string s with
   | "cmj" -> `Cmj
-  | "cmja" -> `Cmja
   | other -> `Other other
 
 let to_string (k, v) = Printf.sprintf "%s%03d" k v
@@ -66,14 +65,12 @@ let compare (p1, n1) (p2, n2) =
 let equal a b = compare a b = 0
 
 (* Make sure this corresponds with whatever version of oxcaml we're using *)
-let v = 567
+let v = 568
 
 let current_cmj = "Caml1999J", v
 
-let current_cmja = "Caml1999K", v
 
 let current = function
   | `Cmj -> current_cmj
-  | `Cmja -> current_cmja
 
 let from_channel_exn ic = of_string (really_input_string ic size)

@@ -32,12 +32,10 @@ val of_string : string -> t
 
 val to_string : t -> string
 
-val kind : t -> [ `Cmj | `Cmja | `Other of string ]
+val kind : t -> [ `Cmj | `Other of string ]
 
 val current_cmj : t
 
-val current_cmja : t
-
-val current : [ `Cmj | `Cmja ] -> t
+val current : [ `Cmj ] -> t
 
 val from_channel_exn : in_channel -> t

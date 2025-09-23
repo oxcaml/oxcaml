@@ -126,14 +126,11 @@ let load
       let bad_magic_number () = raise Magic_number.(Bad_magic_number (to_string magic)) in
       match Magic_number.kind magic with
       | `Other _ -> bad_magic_number ()
-      | (`Cmj | `Cmja) as kind
-        when Config.Flag.check_magic ()
-             && not (Magic_number.equal magic (Magic_number.current kind)) ->
-          bad_magic_number ()
-      | `Cmj -> `Cmj (from_cmj ic ~name)
-      | `Cmja ->
-          (* .cmja files are now JavaScript archives, not binary format *)
-          failwith ".cmja files are now JavaScript archives and should be treated as .js files")
+      | `Cmj as kind ->
+        if Config.Flag.check_magic ()
+             && not (Magic_number.equal magic (Magic_number.current kind))
+        then bad_magic_number ()
+        else `Cmj (from_cmj ic ~name))
     ~finally:(fun () -> close_in ic)
 
 let predefined_exceptions () =
