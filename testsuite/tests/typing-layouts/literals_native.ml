@@ -8,6 +8,7 @@
  }{
    bytecode;
  }{
+   reference="${test_source_directory}/literals_native.js.reference";
    javascript;
  }
 *)
@@ -56,7 +57,10 @@ let () = test_int64 "negative_one" (- #1L)
 let () = test_nativeint "two_fifty_five_in_hex" (#0xFFn)
 let () = test_int32 "twenty_five_in_octal" (#0o31l)
 let () = test_int64 "forty_two_in_binary" (#0b101010L)
-let () = test_int "max_int + 1" (#4611686018427387904m)
+let () = test_int "max_int + 1" (match Sys.int_size with
+| 32 ->  #2147483648m
+| 63 ->  #4611686018427387904m
+| _ -> assert false)
 
 (*****************************************)
 (* Patterns *)
