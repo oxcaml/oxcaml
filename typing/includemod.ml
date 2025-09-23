@@ -590,17 +590,6 @@ module Sign_diff = struct
     }
 end
 
-(* similar to [Typemod.module_representation_of_signature] *)
-let module_representation_of_lazy_signature sg =
-  sg
-  |> List.filter_map Subst.Lazy.sort_of_signature_item
-  |> List.map (fun sort ->
-      sort
-      |> Jkind.Sort.default_for_transl_and_get
-      |> Types.mixed_block_element_of_const_sort)
-  |> Array.of_list
-  |> module_representation_of_mixed_product_shape
-
 (* Quickly compare module types without expanding them, succeeding only if mty1
   is a subtype of mty2 with no coercion  *)
 let rec shallow_modtypes env subst mty1 mty2 =
@@ -918,8 +907,8 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        let input_repr = module_representation_of_lazy_signature sig1 in
-        let output_repr = module_representation_of_lazy_signature sig2 in
+        let input_repr = Mtype.module_representation_of_lazy_signature sig1 in
+        let output_repr = Mtype.module_representation_of_lazy_signature sig2 in
         let coercion =
           if runtime_len1 = runtime_len2 then (* see PR#5098 *)
             simplify_structure_coercion input_repr output_repr cc id_pos_list

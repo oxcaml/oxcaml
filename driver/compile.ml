@@ -60,8 +60,8 @@ let raw_lambda_to_bytecode i raw_lambda ~as_arg_for =
        |> fun bytecode ->
           let arg_descr =
             make_arg_descr ~param:as_arg_for ~arg_block_idx
-            ~main_repr:(
-              Lambda.main_module_representation main_module_block_format)
+              ~main_repr:(
+                Lambda.main_module_representation main_module_block_format)
           in
           bytecode, required_globals, main_module_block_format, arg_descr
     )
