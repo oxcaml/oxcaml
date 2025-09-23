@@ -1612,6 +1612,7 @@ let temp_abbrev loc id arity uid =
        type_arity = arity;
        type_kind = Type_abstract Definition;
        type_jkind = Jkind.Builtin.value ~why:Object;
+       type_ikind = None;
        type_private = Public;
        type_manifest = Some ty;
        type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1843,6 +1844,7 @@ let class_infos define_class kind
      type_arity = arity;
      type_kind = Type_abstract Definition;
      type_jkind = Jkind.Builtin.value ~why:Object;
+     type_ikind = None;
      type_private = Public;
      type_manifest = Some obj_ty;
      type_variance = Variance.unknown_signature ~injective:false ~arity;

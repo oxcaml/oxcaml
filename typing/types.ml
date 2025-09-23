@@ -18,6 +18,9 @@
 open Allowance
 open Asttypes
 
+(* CR jujacobs: temporary hack to avoid dependency cycle *)
+type type_ikind = Obj.t
+
 type atomic =
   | Nonatomic
   | Atomic
@@ -536,6 +539,7 @@ type type_declaration =
     type_arity: int;
     type_kind: type_decl_kind;
     type_jkind: jkind_l;
+    type_ikind: type_ikind option;
     type_private: private_flag;
     type_manifest: type_expr option;
     type_variance: Variance.t list;

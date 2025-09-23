@@ -306,6 +306,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
+      type_ikind = None;
       type_private = sdecl.ptype_private;
       type_manifest = unboxed_type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -324,6 +325,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
+      type_ikind = None;
       type_private = sdecl.ptype_private;
       type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1073,6 +1075,7 @@ let transl_declaration env sdecl (id, uid) =
         type_arity = arity;
         type_kind = kind;
         type_jkind = jkind;
+        type_ikind = None;
         type_private = sdecl.ptype_private;
         type_manifest = man;
         type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1248,6 +1251,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_arity = decl.type_arity;
         type_kind = kind;
         type_jkind = jkind;
+        type_ikind = None;
         type_private = decl.type_private;
         type_manifest;
         type_variance =
@@ -1440,7 +1444,7 @@ let check_constraints env sdecl (_, decl) =
    corresponds to the manifest (e.g., in the case where [type_jkind] is
    immediate, we should check the manifest is immediate). Also, update the
    resulting jkind to match the manifest. *)
-let narrow_to_manifest_jkind env loc decl =
+let narrow_to_manifest_jkind env loc path decl =
   match decl.type_manifest, decl.type_kind with
   | None, _ -> decl
   | Some _, (Type_record _ | Type_record_unboxed_product _ | Type_variant _ | Type_open)
@@ -1524,7 +1528,17 @@ let narrow_to_manifest_jkind env loc decl =
          | Ok () -> ()
          | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v))))
     end;
-    { decl with type_jkind = manifest_jkind }
+    let type_ikind =
+      if not !Clflags.ikinds
+      then None
+      else
+        let context =
+          Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
+        in
+        Some
+          (Ikinds.normalize_and_pack ~context ~path manifest_jkind)
+    in
+    { decl with type_jkind = manifest_jkind; type_ikind }
 
 (* Check that the type expression (if present) is compatible with the kind.
    If both a variant/record definition and a type equation are given,
@@ -1582,8 +1596,9 @@ let check_coherence env loc dpath decl =
   | None -> ()
 
 let check_abbrev env sdecl (id, decl) =
-  check_coherence env sdecl.ptype_loc (Path.Pident id) decl;
-  (id, narrow_to_manifest_jkind env sdecl.ptype_loc decl)
+  let path = Path.Pident id in
+  check_coherence env sdecl.ptype_loc path decl;
+  (id, narrow_to_manifest_jkind env sdecl.ptype_loc path decl)
 
 (* The [update_x_sorts] functions infer more precise jkinds in the type kind,
    including which fields of a record are void.  This would be hard to do during
@@ -2077,13 +2092,14 @@ let rec update_decl_jkind env dpath decl =
            we mark jkinds as best *)
         |> Jkind.mark_best
       in
-      { decl with type_jkind }
+      { decl with type_jkind; type_ikind = None }
     | Type_record (lbls, rep, umc) ->
       let lbls, rep, type_jkind = update_record_kind decl.type_loc lbls rep in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
-      { decl with type_kind = Type_record (lbls, rep, umc); type_jkind }
+      { decl with type_kind = Type_record (lbls, rep, umc);
+              type_jkind; type_ikind = None }
     (* CR layouts v3.0: handle this case in [update_variant_jkind] when
        [Variant_with_null] introduced.
 
@@ -2108,7 +2124,7 @@ let rec update_decl_jkind env dpath decl =
              mark jkinds as best *)
           let type_jkind = Jkind.mark_best type_jkind in
           { decl with type_kind = Type_record_unboxed_product (lbls, rep, umc);
-                      type_jkind }
+                      type_jkind; type_ikind = None }
         end
     | Type_variant _ when
       Builtin_attributes.has_or_null_reexport decl.type_attributes ->
@@ -2120,7 +2136,8 @@ let rec update_decl_jkind env dpath decl =
       (* See Note [Quality of jkinds during inference] for more information
          about when we mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
-      { decl with type_kind = Type_variant (cstrs, rep, umc); type_jkind }
+      { decl with type_kind = Type_variant (cstrs, rep, umc);
+              type_jkind; type_ikind = None }
   in
 
   (* Check the layout here, both to check it, but more importantly to fill in any sort
@@ -2752,15 +2769,26 @@ let normalize_decl_jkinds env decls =
           allow_any_crossing type_unboxed_version (Path.unboxed_version path))
       decl.type_unboxed_version
     in
+    let normalization_context =
+      Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
+    in
+    let compute_type_ikind jkind =
+      if not !Clflags.ikinds
+      then None
+      else
+        Some
+          (Ikinds.normalize_and_pack ~context:normalization_context ~path jkind)
+    in
     let normalized_jkind =
-      Jkind.normalize
-        ~mode:Require_best
-        ~context:(Ctype.mk_jkind_context env (fun ty ->
-          Some (Ctype.type_jkind env ty)))
+      Jkind.normalize ~mode:Require_best ~context:normalization_context
         decl.type_jkind
     in
     let decl =
-      { decl with type_jkind = normalized_jkind; type_unboxed_version }
+      { decl with
+        type_jkind = normalized_jkind;
+        type_ikind = compute_type_ikind normalized_jkind;
+        type_unboxed_version
+      }
     in
     if normalized_jkind != original_decl.type_jkind then begin
       (* If the jkind has changed, check that it is a subjkind of the original jkind
@@ -2797,6 +2825,7 @@ let normalize_decl_jkinds env decls =
           let type_jkind =
             Jkind.unsafely_set_bounds ~from:original_decl.type_jkind decl.type_jkind
           in
+          let type_ikind = compute_type_ikind type_jkind in
           let umc = Some (Jkind.to_unsafe_mode_crossing type_jkind) in
           let type_kind =
             match decl.type_kind with
@@ -2808,7 +2837,7 @@ let normalize_decl_jkinds env decls =
             | Type_variant (cs, rep, _) ->
               Type_variant (cs, rep, umc)
           in
-          { decl with type_jkind; type_kind; }
+          { decl with type_jkind; type_ikind; type_kind; }
         else decl
       | Error err ->
         raise(Error(decl.type_loc,
@@ -4016,6 +4045,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
           type_arity = arity;
           type_kind;
           type_jkind;
+          type_ikind = None;
           type_private = priv;
           type_manifest = Some man;
           type_variance = [];
@@ -4049,6 +4079,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_arity = arity;
       type_kind;
       type_jkind;
+      type_ikind = None;
       type_private = priv;
       type_manifest = Some man;
       type_variance = [];
@@ -4089,6 +4120,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_arity = new_sig_decl.type_arity;
       type_kind = new_sig_decl.type_kind;
       type_jkind = new_sig_decl.type_jkind;
+      type_ikind = new_sig_decl.type_ikind;
       type_private = new_sig_decl.type_private;
       type_manifest = new_sig_decl.type_manifest;
       type_unboxed_default = new_sig_decl.type_unboxed_default;
@@ -4150,6 +4182,7 @@ let transl_package_constraint ~loc ty =
     type_arity = 0;
     type_kind = Type_abstract Definition;
     type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+    type_ikind = None;
     (* There is no reason to calculate an accurate jkind here.  This typedecl
        will be thrown away once it is used for the package constraint inclusion
        check, and that check will expand the manifest as needed. *)
@@ -4176,6 +4209,7 @@ let abstract_type_decl ~injective ~jkind ~params =
       type_arity = arity;
       type_kind = Type_abstract Definition;
       type_jkind = jkind;
+      type_ikind = None;
       type_private = Public;
       type_manifest = None;
       type_variance = Variance.unknown_signature ~injective ~arity;
@@ -4192,6 +4226,7 @@ let abstract_type_decl ~injective ~jkind ~params =
           type_arity = arity;
           type_kind = Type_abstract Definition;
           type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+          type_ikind = None;
           type_private = Public;
           type_manifest = None;
           type_variance = Variance.unknown_signature ~injective ~arity;

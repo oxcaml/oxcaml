@@ -31,4 +31,4 @@ module type ORDERED = sig
 end
 
 (* Switch here to choose the backend. *)
-module Make (C : LATTICE) (V : ORDERED) = Ldd_memo.Make (C) (V)
+module Make (C : LATTICE) (V : ORDERED) = Ldd_no_memo.Make (C) (V)

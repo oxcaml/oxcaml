@@ -858,6 +858,7 @@ module Merge = struct
               type_kind = Type_abstract Definition;
               type_jkind =
                 Jkind.Builtin.value ~why:(Unknown "merge_constraint");
+              type_ikind = None;
               type_private = Private;
               type_manifest = None;
               type_variance =

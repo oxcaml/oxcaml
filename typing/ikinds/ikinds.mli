@@ -1,5 +1,17 @@
 val with_origin_tag : string -> (unit -> 'a) -> 'a
 
+val normalize : context:Jkind.jkind_context -> Types.jkind_l -> Ikind.Ldd.node
+
+val pack_poly : Ikind.Ldd.node -> Types.type_ikind
+
+val unpack_poly : Types.type_ikind -> Ikind.Ldd.node
+
+val normalize_and_pack :
+  context:Jkind.jkind_context ->
+  path:Path.t ->
+  Types.jkind_l ->
+  Types.type_ikind
+
 val sub_jkind_l :
   ?allow_any_crossing:bool ->
   ?origin:string ->

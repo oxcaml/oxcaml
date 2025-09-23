@@ -438,6 +438,22 @@ let make_solver ~(context : Jkind.jkind_context) : JK.solver =
   JK.make_solver
     { kind_of = kind_of ~context; lookup = lookup_of_context ~context }
 
+let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
+    Ikind.Ldd.node =
+  let solver = make_solver ~context in
+  JK.normalize solver (ckind_of_jkind_l jkind)
+
+let pack_poly (poly : Ikind.Ldd.node) : Types.type_ikind = Obj.repr poly
+
+let unpack_poly (packed : Types.type_ikind) : Ikind.Ldd.node = Obj.obj packed
+
+let normalize_and_pack ~(context : Jkind.jkind_context) ~(path : Path.t)
+    (jkind : Types.jkind_l) : Types.type_ikind =
+  let poly = normalize ~context jkind in
+  let poly_str = JK.pp poly in
+  if false then Format.eprintf "[ikind-store] %a => %s@." Path.print path poly_str else ();
+  pack_poly poly
+
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) (sub : Types.jkind_l)

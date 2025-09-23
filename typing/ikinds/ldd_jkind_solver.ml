@@ -272,7 +272,9 @@ struct
     { ops; constr_kind_poly = constr_kind_poly ~mode:Right }
 
   let normalize (solver : solver) (k : ckind) : poly =
-    k (solver.ops ~mode:Right)
+    let k' = k (solver.ops ~mode:Right) in
+    Ldd.solve_pending ();
+    k'
 
   let constr_kind_poly (solver : solver) (c : constr) : poly * poly list =
     solver.constr_kind_poly c
@@ -295,7 +297,7 @@ struct
   let clear_memos () : unit = Ldd.clear_memos ()
 
   let pp (p : poly) : string =
-    (* Do not solve pending here; pp() forces locally. *)
+    Ldd.solve_pending ();
     Ldd.pp p
 
   let pp_debug (p : poly) : string = Ldd.pp_debug p

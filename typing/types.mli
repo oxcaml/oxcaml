@@ -147,6 +147,9 @@ type row_field
 type field_kind
 type commutable
 
+(* CR jujacobs: temporary hack to avoid dependency cycle *)
+type type_ikind = Obj.t
+
 and type_desc =
   | Tvar of { name : string option; jkind : jkind_lr }
   (** [Tvar (Some "a")] ==> ['a] or ['_a]
@@ -751,6 +754,9 @@ type type_declaration =
        the jkind stored here might be a subjkind of the jkind that would
        be computed from the decl kind. This happens in
        Ctype.add_jkind_equation. *)
+
+    type_ikind: type_ikind option;
+    (* Normalized ikind polynomial (opaque) computed when jkinds are normalized. *)
 
     type_private: private_flag;
     type_manifest: type_expr option;
