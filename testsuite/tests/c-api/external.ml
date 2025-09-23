@@ -1,7 +1,7 @@
 (* TEST
  modules = "external_stubs.c external_stubs.js";
- native;
- javascript;
+  { native; }
+  { javascript; }
  *)
 
 type data = A | B | C | D | E | F

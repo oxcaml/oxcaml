@@ -1,8 +1,8 @@
 (* TEST
  flags = "-g";
  include stdlib_upstream_compatible;
- bytecode;
- javascript;
+  { bytecode; }
+  { javascript; }
 *)
 
 let f1 f i = Stdlib_upstream_compatible.Float_u.to_float (f i)

@@ -1,8 +1,8 @@
 (* TEST
  flags = "-flambda2-advanced-meet";
  flambda2;
- native;
- javascript;
+  { native; }
+  { javascript; }
 *)
 
 type _ opt_or_string =

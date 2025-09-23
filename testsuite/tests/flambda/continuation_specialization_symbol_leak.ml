@@ -1,8 +1,8 @@
 (* TEST
  flambda;
  ocamlopt_flags = "-O3 -flambda2-expert-cont-lifting-budget 200 -flambda2-expert-cont-specialization-budget 20";
- native;
- javascript;
+  { native; }
+  { javascript; }
 *)
 
 (* This test need to *not* be in classic mode to run,
