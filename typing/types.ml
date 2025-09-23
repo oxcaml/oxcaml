@@ -1087,18 +1087,6 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Product [||]
 
-let module_representation_of_mixed_product_shape shape =
-  let value_count = ref 0 in
-  Array.iter
-    (function Value -> incr value_count
-      | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
-      | Product _ | Void -> ())
-    shape;
-  if !value_count = Array.length shape
-  then Module_value_only { size = Array.length shape }
-  else Module_mixed { shape; value_count = !value_count }
-
 let mixed_block_element_for_type_extension = Value
 let mixed_block_element_for_exception = Value
 let mixed_block_element_for_module = Value

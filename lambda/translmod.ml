@@ -666,7 +666,7 @@ and transl_structure ~scopes loc
     [] ->
       let body, repr =
         let repr =
-          Types.module_representation_of_mixed_product_shape
+          Mtype.module_representation_of_mixed_product_shape
             (List.rev_map (fun (_, mbe) -> mbe) fields |> Array.of_list)
         in
         begin match repr with

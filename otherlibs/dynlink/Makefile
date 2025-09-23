@@ -142,6 +142,11 @@ COMPILERLIBS_SOURCES=\
   file_formats/cmi_format.ml \
   typing/persistent_env.ml \
   typing/env.ml \
+  typing/errortrace.ml \
+  typing/signature_group.ml \
+  typing/ctype.ml \
+  typing/printtyp.ml \
+  typing/mtype.ml \
   typing/shape_reduce.ml \
   typing/type_shape.ml \
   typing/typedtree.ml \

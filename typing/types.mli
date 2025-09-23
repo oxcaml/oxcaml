@@ -1188,9 +1188,6 @@ val record_form_to_string : _ record_form -> string
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
-val module_representation_of_mixed_product_shape :
-  mixed_block_element array -> module_representation
-
 val mixed_block_element_for_type_extension : mixed_block_element
 val mixed_block_element_for_exception : mixed_block_element
 val mixed_block_element_for_module : mixed_block_element
