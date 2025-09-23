@@ -1,8 +1,8 @@
 (* TEST
-  { native; }
-  { bytecode; }
  modules = "cmstub.c cmmain.c";
  flags = "-alert -unsafe_multidomain";
+  { native; }
+  { bytecode; }
 *)
 
 (* OCaml part of the code *)

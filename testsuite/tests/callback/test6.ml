@@ -1,8 +1,8 @@
 (* TEST
-  { native; }
-  { bytecode; }
  modules = "test6_.c";
  flags = "-alert -unsafe_multidomain";
+  { native; }
+  { bytecode; }
 *)
 
 (* Tests nested calls from C (main C) to OCaml (main OCaml) to C (caml_to_c) to

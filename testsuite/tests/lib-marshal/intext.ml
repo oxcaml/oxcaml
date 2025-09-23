@@ -1,9 +1,8 @@
 (* TEST
+ modules = "intextaux.c";
   { native; }
   { bytecode; }
- (* JavaScript disabled: js_of_ocaml uses 32-bit integers internally
-    instead of OCaml's 31-bit integers, affecting marshalling *)
- modules = "intextaux.c";
+ (* JavaScript disabled: closures cannot be marshaled *)
 *)
 
 (* Test for output_value / input_value *)

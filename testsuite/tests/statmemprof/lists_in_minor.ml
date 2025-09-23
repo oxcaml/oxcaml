@@ -1,8 +1,8 @@
 (* TEST
-  { native; }
-  { bytecode; }
  flags = "-g";
  reason = "port stat-mem-prof : https://github.com/ocaml/ocaml/pull/8634";
+  { native; }
+  { bytecode; }
 *)
 
 module MP = Gc.Memprof

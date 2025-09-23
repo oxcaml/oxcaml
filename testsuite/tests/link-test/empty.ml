@@ -37,7 +37,7 @@
    program = "empty.cmjxa";
    ocamlj.opt;
    flags = "";
-   program = "${test_build_directory}/empty.js";
+   program = "node ${test_build_directory}/empty.js";
    all_modules = "empty.cmjxa empty.cmjx";
    ocamlj.opt;
    check-ocamlj.opt-output;
