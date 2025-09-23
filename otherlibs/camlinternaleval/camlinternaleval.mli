@@ -18,5 +18,5 @@ type compiler_settings = {
 }
 (** Compiler settings passed to eval *)
 
-val eval : compiler_settings -> CamlinternalQuote.Code.t -> 'b
+val eval : CamlinternalQuote.Code.t -> 'b
 (** Evaluate a quoted OCaml expression at runtime. *)

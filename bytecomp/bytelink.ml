@@ -800,10 +800,7 @@ let link objfiles output_name =
   let early_pervasives =
     if !Clflags.nopervasives then []
     else if CU.Map.mem (CU.of_string "Camlinternaleval") !missing_compunits then
-      [ "stdlib.cma"
-      ; "dynlink/dynlink.cma"
-      ; "unix/unix.cma"
-      ; "camlinternaleval.cma" ]
+      [ "stdlib.cma"; "camlinternaleval.cma" ]
     else[ "stdlib.cma" ] in
   let tolink = List.fold_right scan_file early_pervasives tolink in
   begin

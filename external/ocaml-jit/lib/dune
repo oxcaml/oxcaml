@@ -1,5 +1,5 @@
 (library
- (name ocaml_jit)
+ (name jit)
  (libraries ocamlcommon ocamlopttoplevel)
  (foreign_stubs
   (language c)

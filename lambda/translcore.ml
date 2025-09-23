@@ -1337,42 +1337,22 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       failwith "Cannot unqoute outside of a quotation context."
   | Texp_eval (_, _sort) ->
     let loc = of_location ~scopes e.exp_loc in
-    (* Create compiler settings record *)
-    let settings_record =
-      Lprim
-        ( Pmakeblock (0, Immutable, None, alloc_heap),
-          [ (* debug field *)
-            Lconst (Const_base (Const_int (if !Clflags.debug then 1 else 0)));
-            (* unsafe field *)
-            Lconst (Const_base (Const_int (if !Clflags.unsafe then 1 else 0)));
-            (* noassert field *)
-            Lconst (Const_base (Const_int (if !Clflags.noassert then 1 else 0)));
-            (* native_code field *)
-            Lconst
-              (Const_base (Const_int (if !Clflags.native_code then 1 else 0)))
-          ],
-          loc )
-    in
     (* Generate partial application: Eval.eval_quotation settings *)
-    Lapply
-      { ap_func =
-          Lprim
-            ( Pfield (0, Pointer, Reads_agree),
-              [ Lprim
-                  ( Pgetglobal (Compilation_unit.of_string "Camlinternaleval"),
-                    [],
-                    loc ) ],
-              loc );
-        ap_args = [settings_record];
-        ap_result_layout = layout_function;
-        ap_region_close = Rc_nontail;
-        ap_mode = alloc_heap;
-        ap_loc = loc;
-        ap_tailcall = Default_tailcall;
-        ap_inlined = Default_inlined;
-        ap_specialised = Default_specialise;
-        ap_probe = None;
-      }
+    Lapply {
+      ap_func = Lprim (Pfield (0, Pointer, Reads_agree), [
+        Lprim
+          (Pgetglobal (Compilation_unit.of_string "Camlinternaleval"), [], loc);
+      ], loc);
+      ap_args = [];
+      ap_result_layout = layout_function;
+      ap_region_close = Rc_nontail;
+      ap_mode = alloc_heap;
+      ap_loc = loc;
+      ap_tailcall = Default_tailcall;
+      ap_inlined = Default_inlined;
+      ap_specialised = Default_specialise;
+      ap_probe = None;
+    }
 
 and pure_module m =
   match m.mod_desc with

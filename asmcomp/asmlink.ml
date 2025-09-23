@@ -652,10 +652,7 @@ let link unix ~ppf_dump objfiles output_name =
       else if is_required (Compilation_unit.of_string "Camlinternaleval") then
         (Load_path.add_dir ~hidden:false
           (Misc.expand_directory Config.standard_library "+unix");
-        [ stdlib
-        ; "unix/unix.cmxa"
-        ; "dynlink/dynlink.cmxa"
-        ; "camlinternaleval.cmxa" ])
+        [ stdlib; "camlinternaleval.cmxa" ])
       else [ stdlib ] in
     let ml_objfiles, units_tolink, cached_genfns_imports =
       List.fold_right
