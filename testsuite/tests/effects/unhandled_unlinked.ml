@@ -3,8 +3,9 @@
    exit_status = "2";
    { bytecode; }
    { native; }
-   { javascript;
-    reference = "unhandled_unlinked.javascript.reference";
+   {
+    reference = "${test_source_directory}/unhandled_unlinked.js.reference";
+    javascript;
    }
 *)
 
