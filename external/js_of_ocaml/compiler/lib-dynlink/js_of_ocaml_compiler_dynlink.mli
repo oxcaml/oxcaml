@@ -1,4 +1,4 @@
-(* Js_of_ocaml compiler
+(* Js_of_ocaml library
  * http://www.ocsigen.org/js_of_ocaml/
  * Copyright (C) 2022 Hugo Heuzard
  *
@@ -17,30 +17,6 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-open! Stdlib
+(*/*)
 
-type t =
-  { provides : StringSet.t
-  ; requires : StringSet.t
-  ; primitives : string list
-  ; aliases : (string * string) list
-  ; force_link : bool
-  ; effects_without_cps : bool
-  }
-
-val of_primitives : aliases:(string * string) list -> string list -> t
-
-val of_compilation_units : 
-  exported:Compilation_unit.t -> 
-  imported:Compilation_unit.t list -> 
-  t
-
-val union : t -> t -> t
-
-val empty : t
-
-val prefix : string
-
-val to_string : t -> string
-
-val parse : t -> string -> t option
+val eval_ref : (string -> unit -> Jsoo_runtime.Js.t) ref

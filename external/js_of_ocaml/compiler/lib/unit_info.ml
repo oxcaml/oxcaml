@@ -47,7 +47,9 @@ let of_primitives ~aliases l =
   }
 
 let of_compilation_units ~exported ~imported =
-  let provides = StringSet.singleton (Compilation_unit.name_as_string exported) in
+  let provides =
+    StringSet.singleton (Compilation_unit.name_as_string exported)
+  in
   let requires =
     StringSet.of_list (List.map imported ~f:Compilation_unit.name_as_string)
   in
@@ -55,7 +57,8 @@ let of_compilation_units ~exported ~imported =
   { provides
   ; requires
   ; aliases = []
-  ; primitives = [] (* CR-soon selee: these should be populated properly, too *)
+  ; primitives = []
+  (* CR-soon selee: these should be populated properly, too *)
   ; force_link = false
   ; effects_without_cps = false
   }

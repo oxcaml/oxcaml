@@ -149,7 +149,9 @@ let f ~function_arity p =
 
 (***)
 
-let equal (pc, vs) (pc', vs') = pc = pc' && List.equal ~eq:Var.equal vs vs'
+let equal (pc, vs) (pc', vs') =
+  pc = pc' &&
+  List.equal ~eq:Var.equal vs vs'
 
 let find_outlier_index arr =
   let len = Array.length arr in
