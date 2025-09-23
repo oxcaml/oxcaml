@@ -182,7 +182,7 @@ jobs:
       id: cache
       with:
         path: ${{ github.workspace }}/ocaml-414/_install
-        key: ${{ matrix.os }}-cache-ocaml-414-dune-3191-menhir-20240715-sedlex-34-yojson-222-ppxlib-0330-cmdliner-130-time_now-0160-findlib-198-rev16
+        key: ${{ matrix.os }}-cache-ocaml-414-dune-3191-menhir-20231231-sedlex-34-yojson-222-ppxlib-0330-cmdliner-130-time_now-0160-findlib-198-rev17
 
     - name: Checkout OCaml 4.14
       uses: actions/checkout@master
@@ -224,7 +224,7 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       with:
         repository: 'LexiFi/menhir'
-        ref: '20240715'
+        ref: '20231231'
         path: 'menhir'
 
     - name: Build menhir
