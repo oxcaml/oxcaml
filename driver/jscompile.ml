@@ -116,7 +116,7 @@ let emit_jsir i
       (* Clean up the intermediate .cmj file *)
       Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmj i.target)))
     (fun () ->
-       let debug_flag = if !Clflags.debug then [ "--debug-info"; "--pretty" ] else [] in
+       let debug_flag = if !Clflags.debug then [ "--debug-info"  ] else [] in
       run_jsoo_exn
         ~args:(["compile"; "--enable=effects,with-js-error"
                ; (Unit_info.Artifact.filename (Unit_info.cmj i.target))
