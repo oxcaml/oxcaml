@@ -1,6 +1,6 @@
 (* TEST
-  native;
-  bytecode;
+  { native; }
+  { bytecode; }
 *)
 
 (* Tests that an exception in the alloc_minor callback propagates

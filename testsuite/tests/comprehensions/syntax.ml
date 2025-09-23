@@ -1,7 +1,7 @@
 (* TEST
  include ocamlcommon;
- native;
- bytecode;
+  { native; }
+  { bytecode; }
 *)
 
 let () = Language_extension.enable Comprehensions ();;

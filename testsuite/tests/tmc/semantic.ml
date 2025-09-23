@@ -1,6 +1,6 @@
 (* TEST
- bytecode;
- javascript;
+  { bytecode; }
+  { javascript; }
 *)
 
 (* Test that evaluation order of constructor arguments is preserved.

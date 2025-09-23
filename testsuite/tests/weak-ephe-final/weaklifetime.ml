@@ -1,6 +1,6 @@
 (* TEST
-   native;
-   bytecode;
+  { native; }
+  { bytecode; }
 *)
 
 let () = Random.init 12345

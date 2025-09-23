@@ -1,6 +1,6 @@
 (* TEST
-   native;
-   bytecode;
+  { native; }
+  { bytecode; }
 *)
 
 (* Eratosthene's sieve *)
