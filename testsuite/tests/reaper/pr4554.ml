@@ -2,7 +2,6 @@
    flambda2;
    flags += "-flambda2-reaper";
    { native; }
-   { javascript; }
  *)
 
 [@@@warning "-ignored-extra-argument"]

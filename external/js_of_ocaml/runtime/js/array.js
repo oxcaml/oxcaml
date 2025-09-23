@@ -201,7 +201,7 @@ function caml_makearray_dynamic_non_scannable_unboxed_product(num_components, _i
 
 //Provides: caml_makearray_dynamic_scannable_unboxed_product const (const, const, const)
 //Requires: caml_array_bound_error
-function caml_makearray_dynamic_scannable_unboxed_product (init, _is_local, non_unarized_length) {
+function caml_makearray_dynamic_scannable_unboxed_product(init, _is_local, non_unarized_length) {
   var num_components = init.length - 1; // skip tag
   var total_size = num_components * non_unarized_length;
   if (total_size >>> 0 >= ((0x7fffffff / 4) | 0)) caml_array_bound_error();
@@ -240,6 +240,8 @@ function caml_array_create_float(len) {
   return b;
 }
 //Provides: caml_floatarray_create const (const)
+//Alias: caml_make_unboxed_float64_vect
+//Alias: caml_make_unboxed_float64_vect_bytecode
 //Requires: caml_array_bound_error
 function caml_floatarray_create(len) {
   if (len >>> 0 >= ((0x7fffffff / 8) | 0)) caml_array_bound_error();

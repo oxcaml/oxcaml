@@ -1,5 +1,7 @@
 (* TEST
  expect;
+ {native;}
+ {bytecode;}
 *)
 
 (* Subtyping is "syntactic" *)

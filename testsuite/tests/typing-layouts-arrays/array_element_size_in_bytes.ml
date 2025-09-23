@@ -6,8 +6,6 @@
    bytecode;
  } {
    native;
- } {
-   javascript;
  }
 *)
 

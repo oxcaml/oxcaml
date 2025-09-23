@@ -12,6 +12,7 @@
    native;
  }
  {
+   (* too big for JS *)
    javascript;
  }
 *)

@@ -21,9 +21,8 @@ module I_or_f = K.Standard_int_or_float
 module L = Lambda
 module P = Flambda_primitive
 
-let needs_64_bit_target prim dbg =
-  if not (Target_system.is_64_bit ())
-  then
+let needs_64_bit_target prim dbg ~machine_width =
+  if Target_system.Machine_width.is_32_bit machine_width then
     Misc.fatal_errorf
       "Primitive %a is not yet supported on 32-bit targets (this is not \
        necessarily an inherent incompatibility, but the code in Flambda 2 \
@@ -1734,20 +1733,20 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Parray_element_size_in_bytes array_kind, [_witness] ->
     (* Also see comment in [L.array_element_size_in_bytes] about target word
        size *)
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target prim dbg ~machine_width;
     (* This is implemented as a unary primitive, but from our point of view it's
        actually nullary. *)
     let num_bytes = L.array_element_size_in_bytes array_kind in
     [ Simple
         (Simple.const_int
-           (Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four
+           (Target_ocaml_int.of_int machine_width
               num_bytes)) ]
   | Pmake_idx_field pos, [] ->
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target prim dbg ~machine_width;
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
     [H.simple_i64_expr idx_raw_value]
   | Pmake_idx_mixed_field (shape, pos, path), [] ->
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target prim dbg ~machine_width;
     let module W = Mixed_product_bytes.Wrt_path in
     let { W.offset_bytes; gap_bytes } =
       match W.offset_and_gap (W.count_shape shape pos path) with
@@ -1765,7 +1764,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     in
     [H.simple_i64_expr idx_raw_value]
   | Pmake_idx_array (ak, ik, mbe, path), [[index]] ->
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target prim dbg ~machine_width;
     let module W = Mixed_product_bytes.Wrt_path in
     let index_in_bytes =
       H.Prim
@@ -1794,7 +1793,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           H.simple_i64 (Int64.of_int (BC.on_64_bit_arch offset_after_index)) )
     ]
   | Pidx_deepen (mbe, field_path), [[idx]] -> (
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target prim dbg ~machine_width;
     let module W = Mixed_product_bytes.Wrt_path in
     (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
     let cts = W.count mbe field_path in
@@ -2958,7 +2957,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let kind = standard_int_or_float_of_peek_or_poke layout in
     [Binary (Poke kind, ptr, new_value)]
   | Pget_idx (layout, mut), [[ptr]; [idx]] ->
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target prim dbg ~machine_width;
     let offsets = block_index_access_offsets ~machine_width layout idx in
     let kinds =
       Flambda_arity.unarize
@@ -2972,7 +2971,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     in
     [H.maybe_create_unboxed_product reads]
   | Pset_idx (layout, mode), [[ptr]; [idx]; new_values] ->
-    needs_64_bit_target prim dbg;
+    needs_64_bit_target prim dbg ~machine_width;
     let mode = Alloc_mode.For_assignments.from_lambda mode in
     let offsets = block_index_access_offsets ~machine_width layout idx in
     let kinds =

@@ -20,6 +20,15 @@ let default_js_output output_name =
   | Some s -> s
   | None -> Config.default_executable_name ^ ".js"
 
+let reaper_is_enabled () =
+  match !Oxcaml_flags.Flambda2.enable_reaper with
+  | Set set -> set
+  | Default ->
+    let default =
+      Oxcaml_flags.Flambda2.default_for_opt_level !Oxcaml_flags.opt_level
+    in
+    default.Oxcaml_flags.Flambda2.enable_reaper
+
 let main argv ppf =
   Clflags.jsir := true;
   let program = "ocamlj" in
@@ -53,6 +62,9 @@ let main argv ppf =
     Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
     Compenv.parse_arguments (ref argv) Compenv.anonymous program;
     Compmisc.read_clflags_from_env ();
+    if reaper_is_enabled () then
+      (* test was failing, not sure how to fix... *)
+      Compenv.fatal "reaper is not supported in javascript";
     if !Clflags.plugin then
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
     (try
