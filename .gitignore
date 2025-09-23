@@ -412,5 +412,4 @@ ocaml/primitives.new
 
 dune.runtime_selection
 /otherlibs/dune
-.vscode/settings.json
 AGENTS.md
