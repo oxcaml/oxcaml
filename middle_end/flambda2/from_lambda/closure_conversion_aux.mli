@@ -412,6 +412,12 @@ module Function_decls : sig
 
     val poll_attribute : t -> Lambda.poll_attribute
 
+    val regalloc_attribute : t -> Lambda.regalloc_attribute
+
+    val regalloc_param_attribute : t -> Lambda.regalloc_param_attribute
+
+    val cold : t -> bool
+
     val loop : t -> Lambda.loop_attribute
 
     val is_a_functor : t -> bool

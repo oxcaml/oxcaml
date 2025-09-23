@@ -2156,6 +2156,9 @@ static void domain_terminate (void)
   caml_free_extern_state();
   caml_teardown_major_gc();
 
+  caml_dynamic_delete_thread(domain_state->dynamic_bindings);
+  domain_state->dynamic_bindings = NULL;
+
   caml_teardown_shared_heap(domain_state->shared_heap);
   domain_state->shared_heap = 0;
   caml_free_minor_tables(domain_state->minor_tables);

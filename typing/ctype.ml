@@ -2661,6 +2661,17 @@ let check_type_externality env ty ext =
   | Ok () -> true
   | Error _ -> false
 
+let is_always_gc_ignorable env ty =
+  let ext : Jkind_axis.Externality.t =
+    (* We check that we're compiling to (64-bit) native code before counting
+       External64 types as gc_ignorable, because bytecode is intended to be
+       platform independent. *)
+    if !Clflags.native_code && Sys.word_size = 64
+    then External64
+    else External
+  in
+  check_type_externality env ty ext
+
 let check_type_nullability env ty null =
   let upper_bound =
     Jkind.set_nullability_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) null
@@ -5092,38 +5103,27 @@ let zap_modalities_to_floor_if_modes_enabled_at level =
 
 (** The mode crossing of the memory block of a structure. *)
 let mode_crossing_structure_memaddr =
-  (* CR-someday lmaurer: This is hard to read or maintain. We should have a
-     constructor for [Mode.Crossing.t] that takes a simple [Cross] or
-     [Don't_cross] for each axis. *)
-  Mode.Crossing.of_bounds
-  { monadic = {
-      uniqueness = Unique;
-      contention = Contended;
-      visibility = Immutable
-    };
-    comonadic = {
-      areality = Local;
-      linearity = Many;
-      portability = Portable;
-      yielding = Unyielding;
-      statefulness = Stateless;
-  }}
+  Mode.Crossing.create
+    ~uniqueness:false
+    ~contention:true
+    ~visibility:true
+    ~regionality:false
+    ~linearity:true
+    ~portability:true
+    ~yielding:true
+    ~statefulness:true
 
 (** The mode crossing of a functor. *)
 let mode_crossing_functor =
-  Mode.Crossing.of_bounds
-  { monadic = {
-      uniqueness = Aliased;
-      contention = Contended;
-      visibility = Immutable
-    };
-    comonadic = {
-      areality = Local;
-      linearity = Once;
-      portability = Nonportable;
-      yielding = Yielding;
-      statefulness = Stateful;
-  }}
+  Mode.Crossing.create
+    ~uniqueness:true
+    ~contention:true
+    ~visibility:true
+    ~regionality:false
+    ~linearity:false
+    ~portability:false
+    ~yielding:false
+    ~statefulness:false
 
 (** The mode crossing of any module. *)
 let mode_crossing_module = Mode.Crossing.max

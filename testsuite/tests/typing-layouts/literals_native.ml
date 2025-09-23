@@ -21,6 +21,7 @@ module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
 module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
 
 let test_float s f =
   Format.printf "%s: %f\n" s (Float_u.to_float f); Format.print_flush ()
@@ -32,6 +33,8 @@ let test_nativeint s f =
   Format.printf "%s: %s\n" s (Nativeint_u.to_string f); Format.print_flush ()
 let test_int s f =
   Format.printf "%s: %d\n" s (Int_u.to_int f); Format.print_flush ()
+let test_char s f =
+  Format.printf "%s: %C\n" s (Char_u.to_char f); Format.print_flush ()
 
 (*****************************************)
 (* Expressions *)
@@ -58,9 +61,14 @@ let () = test_nativeint "two_fifty_five_in_hex" (#0xFFn)
 let () = test_int32 "twenty_five_in_octal" (#0o31l)
 let () = test_int64 "forty_two_in_binary" (#0b101010L)
 let () = test_int "max_int + 1" (match Sys.int_size with
+| 31 ->  #1073741824m
 | 32 ->  #2147483648m
 | 63 ->  #4611686018427387904m
 | _ -> assert false)
+let () = test_char "untagged char" #'c'
+let () = test_char "untagged octal char" #'\o000'
+let () = test_char "untagged hex char" #'\xFF'
+let () = test_char "untagged decimal char" #'\222'
 
 (*****************************************)
 (* Patterns *)

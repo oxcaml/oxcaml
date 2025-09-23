@@ -77,6 +77,7 @@ type specific_operation =
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
+  | Illvm_intrinsic of string
 
 and arith_operation =
     Ishiftadd
@@ -210,6 +211,8 @@ let print_specific_operation printreg op ppf arg =
         n printreg arg.(0)
   | Isimd op ->
     Simd.print_operation printreg op ppf arg
+  | Illvm_intrinsic name ->
+      fprintf ppf "llvm_intrinsic %s" name
 
 let specific_operation_name : specific_operation -> string = fun op ->
   match op with
@@ -237,6 +240,7 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Imove32 -> "move32"
   | Isignext _ -> "signext"
   | Isimd _ -> "simd"
+  | Illvm_intrinsic _ -> "llvm_intrinsic"
 
 let equal_addressing_mode left right =
   match left, right with
@@ -275,9 +279,11 @@ let equal_specific_operation left right =
   | Imove32, Imove32 -> true
   | Isignext left, Isignext right -> Int.equal left right
   | Isimd left, Isimd right -> Simd.equal_operation left right
+  | Illvm_intrinsic left, Illvm_intrinsic right -> String.equal left right
   | (Ifar_alloc _  | Ifar_poll  | Ishiftarith _
     | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
-    | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ | Isimd _), _ -> false
+    | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ | Isimd _
+    | Illvm_intrinsic _), _ -> false
 
 let isomorphic_specific_operation op1 op2 =
   equal_specific_operation op1 op2
@@ -367,6 +373,9 @@ let operation_is_pure : specific_operation -> bool = function
   | Imove32 -> true
   | Isignext _ -> true
   | Isimd op -> Simd.operation_is_pure op
+  | Illvm_intrinsic intr ->
+    Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+      intr
 
 (* Specific operations that can raise *)
 
@@ -386,6 +395,9 @@ let operation_allocates = function
   | Isignext _
   | Ibswap _
   | Isimd _ -> false
+  | Illvm_intrinsic intr ->
+    Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+      intr
 
 (* See `amd64/arch.ml`. *)
 let equal_addressing_mode_without_displ (addressing_mode_1: addressing_mode)

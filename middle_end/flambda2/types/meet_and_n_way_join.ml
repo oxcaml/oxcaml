@@ -2362,10 +2362,10 @@ and n_way_join_head_of_kind_naked_immediate env
   | _ :: _, [], _ | _, [], _ :: _ -> (
     (* Slightly better than Unknown *)
     let head =
+      let machine_width = Join_env.machine_width env in
       TG.Head_of_kind_naked_immediate.create_naked_immediates
-        (I.Set.add
-           (I.zero Target_system.Machine_width.Sixty_four)
-           (I.Set.add (I.one Target_system.Machine_width.Sixty_four) immediates))
+        (I.Set.add (I.zero machine_width)
+           (I.Set.add (I.one machine_width) immediates))
     in
     match head with
     | Ok head -> Known head, env

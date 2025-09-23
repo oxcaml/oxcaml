@@ -489,7 +489,10 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~result_arity ~result_types ~result_mode:(Code.result_mode code)
       ~stub:(Code.stub code) ~inline:(Code.inline code)
       ~zero_alloc_attribute:(Code.zero_alloc_attribute code)
-      ~poll_attribute:(Code.poll_attribute code) ~is_a_functor ~is_opaque
+      ~poll_attribute:(Code.poll_attribute code)
+      ~regalloc_attribute:(Code.regalloc_attribute code)
+      ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
+      ~cold:(Code.cold code) ~is_a_functor ~is_opaque
       ~recursive:(Code.recursive code) ~cost_metrics ~inlining_arguments
       ~dbg:(Code.dbg code) ~is_tupled:(Code.is_tupled code) ~is_my_closure_used
       ~inlining_decision ~absolute_history ~relative_history ~loopify

@@ -555,6 +555,9 @@ type codegen_option =
   | Reduce_code_size
   | No_CSE
   | Use_linscan_regalloc
+  | Use_regalloc of Clflags.Register_allocator.t
+  | Use_regalloc_param of string list
+  | Cold
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
@@ -1005,6 +1008,16 @@ let is_val (m : machtype_component) =
   match m with
   | Val -> true
   | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+
+let is_int (m : machtype_component) =
+  match m with
+  | Int -> true
+  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+
+let is_addr (m : machtype_component) =
+  match m with
+  | Addr -> true
+  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
 
 let is_exn_handler (flag : ccatch_flag) =
   match flag with Exn_handler -> true | Normal | Recursive -> false

@@ -234,6 +234,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token PRIM_UNTAG_IMM [@symbol "%untag_imm"]
 
 %token STATIC_CONST_BLOCK [@symbol "Block"]
+%token STATIC_CONST_VALUE_ARRAY [@symbol "Value_array"]
 %token STATIC_CONST_FLOAT_ARRAY [@symbol "Float_array"]
 %token STATIC_CONST_FLOAT_BLOCK [@symbol "Float_block"]
 %token STATIC_CONST_EMPTY_ARRAY [@symbol "Empty_array"]
@@ -999,6 +1000,10 @@ static_data:
     fs = separated_list(SEMICOLON, float_or_variable);
     RBRACKPIPE
     { Immutable_float_array fs }
+  | STATIC_CONST_VALUE_ARRAY; LBRACKPIPE;
+    fs = separated_list(SEMICOLON, field_of_block);
+    RBRACKPIPE
+    { Immutable_value_array fs }
   | STATIC_CONST_EMPTY_ARRAY kind=empty_array_kind { Empty_array kind }
   | KWD_MUTABLE; s = STRING { Mutable_string { initial_value = s } }
   | s = STRING { Immutable_string s }

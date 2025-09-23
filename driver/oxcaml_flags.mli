@@ -18,7 +18,7 @@
 
 val dump_cfg : bool ref
 val cfg_invariants : bool ref
-val regalloc : string ref
+val regalloc : Clflags.Register_allocator.t ref
 val default_regalloc_linscan_threshold : int
 val regalloc_linscan_threshold : int ref
 val regalloc_params : string list ref
@@ -113,6 +113,7 @@ val symbol_visibility_protected : bool ref
 val dump_llvmir : bool ref
 val keep_llvmir : bool ref
 val llvm_path : string option ref
+val llvm_flags : string ref
 
 module Flambda2 : sig
   val debug : bool ref

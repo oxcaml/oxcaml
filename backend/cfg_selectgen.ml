@@ -1527,25 +1527,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     Cfg.add_block_exn cfg tailrec_block;
     DLL.add_end layout tailrec_block.start;
-    let delete_prologue_poll =
-      (* CR mshinwell/xclerc: find a neater way of doing this rather than making
-         a special case for the [optimistic_prologue_poll_instr_id]. *)
-      not
-        (Cfg_polling.requires_prologue_poll ~future_funcnames
-           ~fun_name:f.Cmm.fun_name.sym_name
-           ~optimistic_prologue_poll_instr_id:prologue_poll_instr_id cfg)
-    in
-    let found_prologue_poll = ref false in
     Sub_cfg.iter_basic_blocks body ~f:(fun (block : Cfg.basic_block) ->
-        if delete_prologue_poll && not !found_prologue_poll
-        then
-          DLL.filter_left block.body
-            ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
-              let is_prologue_poll =
-                InstructionId.equal instr.id prologue_poll_instr_id
-              in
-              if is_prologue_poll then found_prologue_poll := true;
-              not is_prologue_poll);
         if not (Cfg.is_never_terminator block.terminator.desc)
         then (
           block.can_raise <- Cfg.can_raise_terminator block.terminator.desc;
@@ -1556,13 +1538,33 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Cfg.add_block_exn cfg block;
           DLL.add_end layout block.start)
         else assert (DLL.is_empty block.body));
-    if delete_prologue_poll && not !found_prologue_poll
-    then Misc.fatal_error "Did not find [Poll] instruction to delete";
     (* note: `Cfgize.Stack_offset_and_exn.update_cfg` may add edges to the
        graph, and should hence be executed before
        `Cfg.register_predecessors_for_all_blocks`. *)
     SU.Stack_offset_and_exn.update_cfg cfg;
     Cfg.register_predecessors_for_all_blocks cfg;
+    (* Delete prologue_poll instruction if not needed *)
+    let delete_prologue_poll =
+      (* CR mshinwell/xclerc: find a neater way of doing this rather than making
+         a special case for the [optimistic_prologue_poll_instr_id]. *)
+      not
+        (Cfg_polling.requires_prologue_poll ~future_funcnames
+           ~fun_name:f.Cmm.fun_name.sym_name
+           ~optimistic_prologue_poll_instr_id:prologue_poll_instr_id cfg)
+    in
+    let found_prologue_poll = ref false in
+    Cfg.iter_blocks cfg ~f:(fun _label (block : Cfg.basic_block) ->
+        if delete_prologue_poll && not !found_prologue_poll
+        then
+          DLL.filter_left block.body
+            ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+              let is_prologue_poll =
+                InstructionId.equal instr.id prologue_poll_instr_id
+              in
+              if is_prologue_poll then found_prologue_poll := true;
+              not is_prologue_poll));
+    if delete_prologue_poll && not !found_prologue_poll
+    then Misc.fatal_error "Did not find [Poll] instruction to delete";
     let fun_contains_calls =
       Sub_cfg.exists_basic_blocks body ~f:Cfg.basic_block_contains_calls
     in

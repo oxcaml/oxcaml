@@ -46,7 +46,12 @@ let mk_dcfg f = ("-dcfg", Arg.Unit f, " (undocumented)")
 let mk_dcfg_invariants f =
   ("-dcfg-invariants", Arg.Unit f, " Extra sanity checks on Cfg")
 
-let mk_regalloc f = ("-regalloc", Arg.String f, " Select the register allocator")
+let mk_regalloc f =
+  ( "-regalloc",
+    Arg.Symbol
+      ( List.map fst Clflags.Register_allocator.assoc_list,
+        fun s -> f (List.assoc s Clflags.Register_allocator.assoc_list) ),
+    " Select the register allocator" )
 
 let mk_regalloc_linscan_threshold f =
   ( "-regalloc-linscan-threshold",
@@ -355,6 +360,11 @@ let mk_keep_llvmir f =
 
 let mk_llvm_path f =
   ("-llvm-path", Arg.String f, " Specify which LLVM compiler to use")
+
+let mk_llvm_flags f =
+  ( "-llvm-flags",
+    Arg.String f,
+    " Extra flags to pass to LLVM (like -march or -mtune)" )
 
 module Flambda2 = Oxcaml_flags.Flambda2
 
@@ -1011,7 +1021,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics : unit -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
-  val regalloc : string -> unit
+  val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
   val regalloc_param : string -> unit
   val regalloc_validate : unit -> unit
@@ -1063,6 +1073,7 @@ module type Oxcaml_options = sig
   val dllvmir : unit -> unit
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
+  val llvm_flags : string -> unit
   include Flambda2_options
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
@@ -1229,7 +1240,9 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_mach_ir F.no_mach_ir;
       mk_dllvmir F.dllvmir;
       mk_keep_llvmir F.keep_llvmir;
-      mk_llvm_path F.llvm_path]
+      mk_llvm_path F.llvm_path;
+      mk_llvm_flags F.llvm_flags
+    ]
     @ Flambda2.list
     @
       [
@@ -1553,6 +1566,7 @@ module Oxcaml_options_impl = struct
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
   let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
+  let llvm_flags s = Oxcaml_flags.llvm_flags := s
 
   include Flambda2_options_impl
   let use_cached_generic_functions =
@@ -1691,7 +1705,21 @@ module Extra_params = struct
         let dummy = ref false in
         set' dummy
     | "cfg-invariants" -> set' Oxcaml_flags.cfg_invariants
-    | "regalloc" -> set_string Oxcaml_flags.regalloc
+    | "regalloc" -> (
+        match Clflags.Register_allocator.of_string v with
+        | Some regalloc ->
+            Oxcaml_flags.regalloc := regalloc;
+            true
+        | None ->
+            let possible_values =
+              String.concat ","
+                (List.map fst Clflags.Register_allocator.assoc_list)
+            in
+            raise
+              (Arg.Bad
+                 (Printf.sprintf
+                    "invalid register allocator %S (possible values: %s)" v
+                    possible_values)))
     | "regalloc-linscan-threshold" ->
         set_int' Oxcaml_flags.regalloc_linscan_threshold
     | "regalloc-param" -> add_string Oxcaml_flags.regalloc_params
@@ -1794,6 +1822,7 @@ module Extra_params = struct
         Oxcaml_flags.llvm_path := Some v;
         true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
+    | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->

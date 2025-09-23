@@ -2909,7 +2909,7 @@ AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
 
 # Ensure compatibility: oxcaml-dwarf-on-compiler requires function-sections to be disabled
 AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
-  [AS_IF([test x"$enable_function_sections" != "xno"],
+  [AS_IF([test x"$function_sections" = "xtrue"],
     [AC_MSG_ERROR([--enable-oxcaml-dwarf-on-compiler requires --disable-function-sections to be passed])])])
 
 # Configure assembly emission flag for compiler

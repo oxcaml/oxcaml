@@ -295,11 +295,11 @@ let zap_axis_to_ceil
 let print_out_mode
 : type a. ?in_structure:_ -> a Mode.Value.Axis.t -> a -> _
 = fun ?(in_structure=true) ax mode ->
-  let (module L) = Mode.Value.Const.lattice_of_axis ax in
+  let print = Mode.Value.Const.print_axis ax in
   if in_structure then
-    Format.dprintf " (* in a structure at %a *)" L.print mode
+    Format.dprintf " (* in a structure at %a *)" print mode
   else
-    Format.dprintf " (* at %a *)" L.print mode
+    Format.dprintf " (* at %a *)" print mode
 
 let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
   match is_modal with

@@ -58,6 +58,7 @@ type specific_operation =
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
+  | Illvm_intrinsic of string
 
 and arith_operation =
     Ishiftadd

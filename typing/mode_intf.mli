@@ -344,8 +344,6 @@ module type S = sig
       include Lattice with type t := t
     end
 
-    module Const_op : Lattice with type t = Const.t
-
     include Common_axis_neg with module Const := Const
 
     val aliased : lr
@@ -362,8 +360,6 @@ module type S = sig
 
       include Lattice with type t := t
     end
-
-    module Const_op : Lattice with type t = Const.t
 
     include Common_axis_neg with module Const := Const
   end
@@ -412,8 +408,6 @@ module type S = sig
 
       include Lattice with type t := t
     end
-
-    module Const_op : Lattice with type t = Const.t
 
     include Common_axis_neg with module Const := Const
 
@@ -470,8 +464,6 @@ module type S = sig
            and type 'd hint_morph := 'd neg_hint_morph
            and type 'd hint_const := 'd neg_hint_const
 
-      module Const_op : Lattice with type t = Const.t
-
       val proj : 'a Axis.t -> ('r * 'l) t -> ('a, 'l * 'r) mode
 
       val min_with : 'a Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
@@ -525,10 +517,6 @@ module type S = sig
               Statefulness.Const.t,
               Visibility.Const.t )
             modes
-
-      (** Gets the normal lattice for comonadic axes and the "op"ped lattice for
-        monadic ones. *)
-      val lattice_of_axis : 'a Axis.t -> (module Lattice with type t = 'a)
 
       module Option : sig
         type some = t
@@ -865,22 +853,119 @@ module type S = sig
     val max : t
   end
 
-  module Crossing : sig
-    (** The mode crossing capability pertaining to a type.
+  (** Some modes on an axis might be indistinguishable for values of some type,
+    in which case the actual mode of values can be strenghthened (or
+    equivalently the expected mode loosened) accordingly to make more programs
+    mode-check. The capabilities/permissions to perform such adjustments are
+    called mode crossing and depicted in this module.
 
-    Some modes might be indistinguishable for values of some type, in which case
-    the actual/expected mode of values can be adjusted accordingly to make more
-    programs mode-check. The adjustment is called mode crossing. *)
-    type t
+    We define an ordering on the crossings: [t0 <= t1] iff [t0] allows more
+    adjustments than [t1]. By this ordering, the currently representable
+    crossings form a lattice:
+    - The bottom crossing allows any adjustments on this axis, which trivializes
+      the axis.
+    - The top crossing allows no adjustments on this axis, which is the safe
+      default.
+    - Joining two crossings gives a crossing that's less permissive than both.
+    - Meeting two crossings gives a crossing that's more permissive than both.
+    *)
+  module Crossing : sig
+    module Monadic : sig
+      module Atom : sig
+        (** The mode crossing capability on a monadic axis whose carrier type is
+      ['a]. Currently it has only one constructor and is thus unboxed. *)
+        type 'a t =
+          | Modality of 'a Modality.Monadic.Atom.t
+              (** The mode crossing caused by a modality atom on an axis whose
+      carrier type is ['a]. For a concrete example, consider:
+
+      type 'x r = { x : 'x @@ portable } [@@unboxed]
+
+      The type ['x r] can cross the portability axis. This is represented as
+      [Modality (Meet_with Portable) : Portability.Const.t t]. *)
+        [@@unboxed]
+      end
+
+      (** The mode crossing capability on the whole monadic fragment. *)
+      type t
+
+      include Lattice with type t := t
+
+      (** Create a mode crossing on the monadic fragment from the collection of mode
+      crossings on each monadic axes. *)
+      val create :
+        uniqueness:Uniqueness.Const.t Atom.t ->
+        contention:Contention.Const.t Atom.t ->
+        visibility:Visibility.Const.t Atom.t ->
+        t
+    end
+
+    module Comonadic : sig
+      module Atom : sig
+        (** The mode crossing capability on a comonadic axis whose carrier type is
+      ['a]. Currently it has only one constructor and is thus unboxed. *)
+        type 'a t =
+          | Modality of 'a Modality.Comonadic.Atom.t
+              (** See comment on the similar constructor in [Monadic.Atom.t] *)
+        [@@unboxed]
+      end
+
+      (** The mode crossing capability on the whole comonadic fragment. *)
+      type t
+
+      include Lattice with type t := t
+
+      (** Create a mode crossing on the comonadic fragment from the collection
+      of mode crossings on each comonadic axes. *)
+      val create :
+        regionality:Regionality.Const.t Atom.t ->
+        linearity:Linearity.Const.t Atom.t ->
+        portability:Portability.Const.t Atom.t ->
+        yielding:Yielding.Const.t Atom.t ->
+        statefulness:Statefulness.Const.t Atom.t ->
+        t
+    end
+
+    (** The mode crossing capability on all axes, split into monadic and
+        comonadic fragments. *)
+    type t = (Monadic.t, Comonadic.t) monadic_comonadic
+
+    module Axis : sig
+      (** ['a t] specifies an axis whose mode crossing capability is represented
+          as ['a] *)
+      type 'a t =
+        | Monadic : 'a Value.Monadic.Axis.t -> 'a Monadic.Atom.t t
+        | Comonadic : 'a Value.Comonadic.Axis.t -> 'a Comonadic.Atom.t t
+
+      type packed = P : 'a t -> packed
+
+      val of_modality : Modality.Axis.packed -> packed
+
+      val to_modality : packed -> Modality.Axis.packed
+    end
+
+    module Per_axis :
+      Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
+
+    (** Convenience for creating a mode crossing capability on all axes, using a
+    boolean for each axis where [true] means full crossing and [false] means no
+    crossing. Alternatively, call [Monadic.create] and [Comonadic.create] and
+    pack the results into a record of type [t]. *)
+    val create :
+      regionality:bool ->
+      linearity:bool ->
+      uniqueness:bool ->
+      portability:bool ->
+      contention:bool ->
+      yielding:bool ->
+      statefulness:bool ->
+      visibility:bool ->
+      t
+
+    (** Project a mode crossing (of all axes) onto the specified axis. *)
+    val proj : 'a Axis.t -> t -> 'a
 
     include Lattice with type t := t
-
-    (* CR zqian: jkind modal bounds should just be our [t], which should allow
-       us to remove [of_bounds]. *)
-
-    (** Convert from jkind modal bounds. *)
-    val of_bounds :
-      (Value.Monadic.Const.t, Value.Comonadic.Const.t) monadic_comonadic -> t
 
     (** [modality m t] gives the mode crossing of type [T] wrapped in modality
     [m] where [T] has mode crossing [t]. *)

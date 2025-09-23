@@ -151,18 +151,20 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
     | [_; _] as kinds ->
       (* CR xclerc: we currently support only pairs as unboxed return values. *)
       (* CR mshinwell: we also currently only support 64 bit integer and float
-         values, since on (at least) x86-64 the calling convention differs for
-         smaller widths. *)
+         values (in addition to things of kind [Value] which count as 64-bit
+         integers for this purpose), since on (at least) x86-64 the calling
+         convention differs for smaller widths. *)
       List.iter
         (fun kind ->
           match Flambda_kind.With_subkind.kind kind with
+          | Value
           | Naked_number
               (Naked_immediate | Naked_int64 | Naked_nativeint | Naked_float) ->
             ()
           | Naked_number
               ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec128
               | Naked_vec256 | Naked_vec512 | Naked_float32 )
-          | Value | Region | Rec_info ->
+          | Region | Rec_info ->
             Misc.fatal_errorf
               "Cannot compile unboxed product return from external C call with \
                a component of kind %a"

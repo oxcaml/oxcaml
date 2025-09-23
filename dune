@@ -55,6 +55,8 @@
 
 (copy_files# backend/internal_assembler/*.ml{,i})
 
+(copy_files# backend/llvm/*.ml{,i})
+
 (copy_files# backend/peephole/*.ml{,i})
 
 (copy_files# backend/regalloc/*.ml{,i})
@@ -100,8 +102,9 @@
    -safe-string
    -strict-formats
    -w
-   -67
+   -67-47
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
+   ; -47 needed because [@inline available] is not recognized by the system compiler
    ))
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
@@ -582,6 +585,8 @@
   vectorize
   vectorize_utils
   vectorize_specific
+  ;; backend/llvm
+  llvm_ir
   llvmize
   ;; backend/regalloc
   regalloc_gi
