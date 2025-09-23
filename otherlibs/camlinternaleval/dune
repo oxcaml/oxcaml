@@ -13,7 +13,7 @@
 (library
  (name camlinternaleval)
  (modes byte native)
- (libraries dynlink_internal unix)
+ (libraries jit)
  (flags
   (:standard
    -strict-sequence

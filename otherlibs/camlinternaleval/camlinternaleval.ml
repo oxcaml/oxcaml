@@ -17,86 +17,64 @@ type compiler_settings = {
   native_code : bool;
 }
 
-let counter = Atomic.make 0
+let counter = ref 0
 
-let eval settings code =
+let eval code =
+  (* TODO: assert Linux x86-64 *)
+  let id = !counter in
+  incr counter;
+
+  (* TODO: reset all the things *)
+  Location.reset ();
+
+  (* TODO: set commandline flags *)
+
   (* Compilation happens here during partial application, not when thunk is called *)
   let exp = CamlinternalQuote.Code.to_exp code in
-  let code_string = Format.asprintf "%a" CamlinternalQuote.Exp.print exp in
-
-  (* Create temporary files using a simple counter for uniqueness *)
-  let id = Atomic.fetch_and_add counter 1 in
-  let temp_dir = Filename.temp_dir "ocaml_eval" "" in
-  let ml_file =
-    Filename.concat temp_dir (Printf.sprintf "eval_code_%d.ml" id)
+  let code_string =
+    Format.asprintf "let eval = (%a)" CamlinternalQuote.Exp.print exp
   in
-  let obj_file =
-    if settings.native_code then
-      Filename.concat temp_dir (Printf.sprintf "eval_code_%d.cmxs" id)
-    else Filename.concat temp_dir (Printf.sprintf "eval_code_%d.cmo" id)
+  let lexbuf = Lexing.from_string code_string in
+  Location.input_lexbuf := Some lexbuf;
+  Location.init lexbuf "//eval//";
+
+  let ast = Parse.implementation lexbuf in
+  (* Definitely won't clash, might be too weird. *)
+  let input_name = Printf.sprintf "Eval#%i" id in
+  let compilation_unit =
+    Compilation_unit.create Compilation_unit.Prefix.empty
+      (Compilation_unit.Name.of_string input_name)
   in
+  let unit_info = Unit_info.make_dummy ~input_name compilation_unit in
+  Compilenv.reset unit_info (* TODO: Work out what this does. *);
 
-  (* Write the quoted code to a temporary .ml file *)
-  let oc = open_out ml_file in
-  Printf.fprintf oc "let eval = (%s)" code_string;
-  close_out oc;
-
-  (* Build compiler command with settings *)
-  let ocaml_dir = Sys.getenv_opt "OCAMLDIR" |> Option.value ~default:"" in
-  let flags = [] in
-  let flags = if settings.debug then "-g" :: flags else flags in
-  let flags = if settings.unsafe then "-unsafe" :: flags else flags in
-  let flags = if settings.noassert then "-noassert" :: flags else flags in
-  let flags = Array.of_list flags in
-  let cmd, args =
-    if settings.native_code then
-      ( ocaml_dir ^ "ocamlopt",
-        Array.append [| "ocamlopt"; "-shared"; "-o"; obj_file; ml_file |] flags
-      )
-    else (ocaml_dir ^ "ocamlc", Array.append [| "ocamlc"; "-c"; ml_file |] flags)
+  let env = Compmisc.initial_env () in
+  let typed_impl =
+    Typemod.type_implementation unit_info compilation_unit env ast
   in
 
-  (* Compile the code *)
-  let stdout, stdin, stderr =
-    Unix.open_process_args_full cmd args (Unix.environment ())
+  let program =
+    Translmod.transl_implementation compilation_unit
+      ( typed_impl.structure,
+        typed_impl.coercion,
+        Option.map
+          (fun (ai : Typedtree.argument_interface) ->
+            ai.ai_coercion_from_primary)
+          typed_impl.argument_interface )
+      ~style:Plain_block (* TODO: Should be Set_global_to_block if bytecode *)
   in
-  let compile_out = In_channel.input_all stdout in
-  let compile_err = In_channel.input_all stderr in
-  let compile_result = Unix.close_process_full (stdout, stdin, stderr) in
-  (match compile_result with
-  | Unix.WEXITED 0 -> ()
-  | _ ->
-      (try Sys.remove ml_file with _ -> ());
-      failwith
-        (Printf.sprintf
-           "Compilation failed for:\n%s\nStdout:\n%s\nStderr:\n%s\n" code_string
-           compile_out compile_err));
+  Warnings.check_fatal () (* TODO: more error handling? *);
+  (* TODO: assert program.arg_block_idx is none? *)
+  let program = { program with code = Simplif.simplify_lambda program.code } in
+  (* ocaml-jit reads this so we need to set it *)
+  Opttoploop.phrase_name := input_name;
+  let ppf = Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) in
+  let res =
+    match Jit.jit_load ppf program with
+    | Result res -> res
+    | Exception exn -> raise exn
+  in
+  Obj.obj (Obj.field res 0)
 
-  (* Load the compiled library *)
-  Dynlink.loadfile obj_file;
-
-  (* Attempt to remove the temporary files *)
-  (try
-     ignore
-       (Array.for_all
-          (fun f ->
-            Sys.remove f;
-            true)
-          (Sys.readdir temp_dir));
-     Sys.rmdir temp_dir
-   with _ -> ());
-
-  (* Get the eval function *)
-  let bytecode_or_asm_symbol =
-    if settings.native_code then "camlEval_code_" ^ string_of_int id
-    else "Eval_code_" ^ string_of_int id
-  in
-  let eval_module_opt =
-    Dynlink.unsafe_get_global_value ~bytecode_or_asm_symbol
-  in
-  let eval_module =
-    match eval_module_opt with
-    | Some module_obj -> module_obj
-    | None -> failwith "Could not find compiled module in dynamic library"
-  in
-  Obj.obj (Obj.field eval_module 0)
+let compile_mutex = Mutex.create ()
+let eval code = Mutex.protect compile_mutex (fun () -> eval code)
