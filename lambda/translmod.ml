@@ -41,7 +41,6 @@ type unsafe_info =
 type error =
   Circular_dependency of (Ident.t * unsafe_info) list
 | Conflicting_inline_attributes
-| Non_value_jkind of type_expr * Jkind.Sort.Const.t
 | Instantiating_packed of Compilation_unit.t
 
 exception Error of Location.t * error
@@ -1524,12 +1523,6 @@ let report_error loc = function
   | Conflicting_inline_attributes ->
       Location.errorf "@[Conflicting %a attributes@]"
         Style.inline_code "inline"
-  | Non_value_jkind (ty, sort) ->
-      Location.errorf
-        "Non-value sort %a detected in [translmod] in type %a:@ \
-         Please report this error to the Jane Street compilers team."
-        Jkind.Sort.Const.format sort
-        Printtyp.type_expr ty
   | Instantiating_packed comp_unit ->
       Location.errorf ~loc
         "Cannot instantiate using the packed module %a@ \
