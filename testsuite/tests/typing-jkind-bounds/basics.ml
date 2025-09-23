@@ -1823,3 +1823,34 @@ module type S2 = S with type 'a t = 'a
 module type S = sig type 'a t : value mod portable with 'a end
 module type S2 = sig type 'a t = 'a end
 |}]
+
+
+(***************************************************)
+(* Test 20: printing of [mod everything separable] *)
+
+module M : sig
+  type 'a t : value_or_null mod everything separable
+end = struct
+  type 'a t : value_or_null mod everything
+end
+(* CR layouts v2.8: Fix printing ([mod everything mod separable] is wrong) *)
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t : value_or_null mod everything
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t : value_or_null mod everything end
+       is not included in
+         sig type 'a t : value_or_null mod everything mod separable end
+       Type declarations do not match:
+         type 'a t : value_or_null mod everything
+       is not included in
+         type 'a t : value_or_null mod everything mod separable
+       The kind of the first is value_or_null mod everything
+         because of the definition of t at line 4, characters 2-42.
+       But the kind of the first must be a subkind of
+           value_or_null mod everything mod separable
+         because of the definition of t at line 2, characters 2-52.
+|}]
