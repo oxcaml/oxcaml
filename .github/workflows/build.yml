@@ -182,7 +182,7 @@ jobs:
       id: cache
       with:
         path: ${{ github.workspace }}/ocaml-414/_install
-        key: ${{ matrix.os }}-cache-ocaml-414-dune-3191-menhir-20231231-packages-rev19
+        key: ${{ matrix.os }}-cache-ocaml-414-dune-3191-menhir-20231231-packages-rev25
 
     - name: Checkout OCaml 4.14
       uses: actions/checkout@master
@@ -252,139 +252,71 @@ jobs:
         PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH make all
         PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH make install
 
-    - name: Build and install ppxlib dependencies
+    - name: Install OCaml packages
       if: steps.cache.outputs.cache-hit != 'true'
       run: |
         cd $GITHUB_WORKSPACE
         export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+        export OCAMLPATH=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml/site-lib:$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
         export OCAMLFIND_DESTDIR=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml/site-lib
         mkdir -p $OCAMLFIND_DESTDIR
 
-        # Install stdlib-shims (needed by ppxlib)
-        git clone --depth 1 --branch 0.3.0 https://github.com/ocaml/stdlib-shims.git
-        cd stdlib-shims
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
+        # Function to install an OCaml package from GitHub
+        install-package() {
+          local repo_url="https://github.com/$1.git"
+          local branch="$2"
+          local package_name="$(basename "$1")"
 
-        # Install ocaml-compiler-libs (needed by ppxlib)
-        git clone --depth 1 --branch v0.12.4 https://github.com/janestreet/ocaml-compiler-libs.git
-        cd ocaml-compiler-libs
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
+          echo "Installing $package_name from $repo_url @ $branch"
+          git clone --depth 1 --branch "$branch" "$repo_url" "$package_name"
+          cd "$package_name"
+          dune build @install
+          OCAMLFIND_DESTDIR=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml/site-lib \
+            dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install \
+                         --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
+          cd ..
+          rm -rf "$package_name"
+        }
 
-        # Install ppx_derivers (needed by ppxlib)
-        git clone --depth 1 --branch 1.2.1 https://github.com/ocaml-ppx/ppx_derivers.git
-        cd ppx_derivers
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
+        # Install packages in dependency order
+        # Basic libraries with no/minimal dependencies
+        install-package ocaml/stdlib-shims 0.3.0
+        install-package janestreet/ocaml-compiler-libs v0.12.4
+        install-package ocaml-ppx/ppx_derivers 1.2.1
+        install-package janestreet/sexplib0 v0.16.0
+        install-package janestreet/jane-street-headers v0.16.0
+        install-package dbuenzli/cmdliner v1.3.0
 
-        # Install sexplib0 (needed by ppxlib)
-        git clone --depth 1 --branch v0.16.0 https://github.com/janestreet/sexplib0.git
-        cd sexplib0
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
+        # ppxlib (depends on stdlib-shims, ocaml-compiler-libs, ppx_derivers, sexplib0)
+        install-package ocaml-ppx/ppxlib 0.33.0
 
-    - name: Build and install ppxlib
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: |
-        cd $GITHUB_WORKSPACE
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
-        export OCAMLFIND_DESTDIR=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml/site-lib
+        # Jane Street base (depends on sexplib0, jane-street-headers)
+        install-package janestreet/base v0.16.3
 
-        git clone --depth 1 --branch 0.33.0 https://github.com/ocaml-ppx/ppxlib.git ppxlib
-        cd ppxlib
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
+        # stdio (depends on base)
+        install-package janestreet/stdio v0.16.0
 
-    - name: Build and install other packages
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: |
-        cd $GITHUB_WORKSPACE
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
-        export OCAMLFIND_DESTDIR=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml/site-lib
+        # Jane Street PPX libraries (depend on ppxlib and base)
+        install-package janestreet/ppx_compare v0.16.0
+        install-package janestreet/ppx_enumerate v0.16.0
+        install-package janestreet/ppx_hash v0.16.0
+        install-package janestreet/ppx_sexp_conv v0.16.0
+        install-package janestreet/ppx_globalize v0.16.0
+        install-package janestreet/ppx_cold v0.16.0
 
-        # Install cmdliner
-        git clone --depth 1 --branch v1.3.0 https://github.com/dbuenzli/cmdliner.git cmdliner
-        cd cmdliner
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
+        # ppx_base (depends on other ppx libraries)
+        install-package janestreet/ppx_base v0.16.0
 
-        # Install sedlex dependencies (gen)
-        git clone --depth 1 --branch 1.1 https://github.com/c-cube/gen.git gen
-        cd gen
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
+        # time_now (depends on base and ppx libraries)
+        install-package janestreet/time_now v0.16.0
 
-        # Install sedlex
-        git clone --depth 1 --branch v3.2 https://github.com/ocaml-community/sedlex.git sedlex
-        cd sedlex
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
+        # Sedlex chain (seq -> gen -> sedlex)
+        install-package c-cube/seq 0.1
+        install-package c-cube/gen 1.1
+        install-package ocaml-community/sedlex v3.2
 
-        # Install yojson
-        git clone --depth 1 --branch 2.2.2 https://github.com/ocaml-community/yojson.git yojson
-        cd yojson
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-
-    - name: Build and install Jane Street packages
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: |
-        cd $GITHUB_WORKSPACE
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
-        export OCAMLFIND_DESTDIR=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml/site-lib
-
-        # Install Jane Street packages needed for time_now
-        # Install jane-street-headers
-        git clone --depth 1 --branch v0.16.0 https://github.com/janestreet/jane-street-headers.git
-        cd jane-street-headers
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
-
-        # Install base
-        git clone --depth 1 --branch v0.16.3 https://github.com/janestreet/base.git
-        cd base
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
-
-        # Install ppx_sexp_conv and other ppx needed by time_now
-        git clone --depth 1 --branch v0.16.0 https://github.com/janestreet/ppx_compare.git
-        cd ppx_compare
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
-
-        git clone --depth 1 --branch v0.16.0 https://github.com/janestreet/ppx_sexp_conv.git
-        cd ppx_sexp_conv
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
-
-        git clone --depth 1 --branch v0.16.0 https://github.com/janestreet/ppx_enumerate.git
-        cd ppx_enumerate
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
-
-        git clone --depth 1 --branch v0.16.0 https://github.com/janestreet/ppx_hash.git
-        cd ppx_hash
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
-        cd ..
-
-        # Install time_now
-        git clone --depth 1 --branch v0.16.0 https://github.com/janestreet/time_now.git time_now
-        cd time_now
-        dune build @install
-        dune install --prefix=$GITHUB_WORKSPACE/ocaml-414/_install --libdir=$GITHUB_WORKSPACE/ocaml-414/_install/lib/ocaml
+        # yojson (mostly independent)
+        install-package ocaml-community/yojson 2.2.2
 
     - name: Install GNU parallel
       if: matrix.os == 'macos-latest'
