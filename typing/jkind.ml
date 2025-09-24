@@ -982,11 +982,14 @@ module Layout_and_axes = struct
                       seen_constrs
                 }
             | Some (fuel, seen_args, { relevant_axes_when_seen }) ->
-              if List.for_all2
-                   (fun ty1 ty2 ->
-                     TransientTypeOps.equal (Transient_expr.repr ty1)
-                       (Transient_expr.repr ty2))
-                   seen_args args
+              let args_equal =
+                List.for_all2
+                  (fun ty1 ty2 ->
+                    TransientTypeOps.equal (Transient_expr.repr ty1)
+                      (Transient_expr.repr ty2))
+                  seen_args args
+              in
+              if args_equal
                  && (not (context.is_abstract p))
                  && Axis_set.is_subset relevant_axes relevant_axes_when_seen
               then Skip
@@ -999,8 +1002,11 @@ module Layout_and_axes = struct
                         ( fuel - 1,
                           args,
                           { relevant_axes_when_seen =
-                              Axis_set.union relevant_axes
-                                relevant_axes_when_seen
+                              (if args_equal
+                              then
+                                Axis_set.union relevant_axes
+                                  relevant_axes_when_seen
+                              else relevant_axes)
                           } )
                         seen_constrs
                   }

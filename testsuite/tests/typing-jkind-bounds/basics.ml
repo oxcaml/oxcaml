@@ -1823,3 +1823,69 @@ module type S2 = S with type 'a t = 'a
 module type S = sig type 'a t : value mod portable with 'a end
 module type S2 = sig type 'a t = 'a end
 |}]
+
+(***********************************************)
+(* Test 20: modalities are properly handled by fuel *)
+
+type t : value mod contended
+type a = t
+type b = Foo of a
+type c : value mod portable contended = { a : a @@ portable; b : b }
+[%%expect {|
+type t : value mod contended
+type a = t
+type b = Foo of a
+Line 4, characters 0-68:
+4 | type c : value mod portable contended = { a : a @@ portable; b : b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with a
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod contended portable
+         because of the annotation on the declaration of the type c.
+|}]
+
+type 'a t : value mod contended
+type 'a a = 'a t
+type 'a b = Foo of 'a a
+type 'a c : value mod portable contended = { a : 'a a @@ portable; b : 'a b }
+[%%expect {|
+type 'a t : value mod contended
+type 'a a = 'a t
+type 'a b = Foo of 'a a
+Line 4, characters 0-77:
+4 | type 'a c : value mod portable contended = { a : 'a a @@ portable; b : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with 'a a
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod contended portable
+         because of the annotation on the declaration of the type c.
+|}]
+
+type 'a t : value mod contended portable with 'a
+type 'a a = 'a t
+type 'a b = Foo of 'a a
+type ('a : value mod contended portable, 'b : value mod contended) c
+  : value mod contended portable =
+  { b : 'b a @@ portable
+  ; a : 'a a
+  ; c : 'b b
+  }
+[%%expect {|
+type 'a t : value mod contended portable with 'a
+type 'a a = 'a t
+type 'a b = Foo of 'a a
+Lines 4-9, characters 0-3:
+4 | type ('a : value mod contended portable, 'b : value mod contended) c
+5 |   : value mod contended portable =
+6 |   { b : 'b a @@ portable
+7 |   ; a : 'a a
+8 |   ; c : 'b b
+9 |   }
+Error: The kind of type "c" is immutable_data with 'a a with 'b a
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod contended portable
+         because of the annotation on the declaration of the type c.
+|}]
