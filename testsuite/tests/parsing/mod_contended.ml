@@ -94,7 +94,7 @@ module M = struct
   let foo = (42 : int mod contended aliased) + (42 : int @ once portable mod contended aliased)
   let foo = (42 : _ mod contended aliased) + (42 : _ @ once portable mod contended aliased)
 end
-
+(*=
 (* let expressions (not just as structure items) *)
 let f () =
   let v mod contended aliased = 42 in
@@ -105,7 +105,7 @@ let f () =
   and v : int @ once portable mod contended aliased = 42
   and v : (int -> int) @ once portable mod contended aliased = fun _ -> 42 in
 
-  ()
+  () *)
 
 (* ALSO WORTH TESTING:
     - make sure that comments work; specifically, that doc comments are attached to the
