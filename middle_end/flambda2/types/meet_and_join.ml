@@ -677,8 +677,18 @@ and meet_head_of_kind_value env
     match is_null1, is_null2 with
     | Not_null, Not_null -> Bottom Both_inputs
     | Maybe_null, Maybe_null -> Ok (Both_inputs, env)
-    | Not_null, Maybe_null -> Bottom Left_input
-    | Maybe_null, Not_null -> Bottom Right_input
+    | Maybe_null, Is_null _ ->
+      (* We rely on the inverse relations for reductions. *)
+      Ok (Right_input, env)
+    | Is_null _, Maybe_null ->
+      (* We rely on the inverse relations for reductions. *)
+      Ok (Left_input, env)
+    | Not_null, (Maybe_null | Is_null _) -> Bottom Left_input
+    | (Maybe_null | Is_null _), Not_null -> Bottom Right_input
+    | Is_null is_null1, Is_null is_null2 ->
+      map_result
+        ~f:(fun _ : TG.is_null -> Is_null is_null1)
+        (meet_relation env (Some is_null1) (Some is_null2))
   in
   let bottom_a () = Or_unknown_or_bottom.Bottom in
   let bottom_b () : TG.is_null = Not_null in
@@ -698,23 +708,34 @@ and meet_head_of_kind_value_non_null env
         { blocks = blocks1;
           immediates = imms1;
           extensions = extensions1;
-          is_unique = is_unique1
+          is_unique = is_unique1;
+          is_int = is_int1;
+          get_tag = get_tag1
         },
       Variant
         { blocks = blocks2;
           immediates = imms2;
           extensions = extensions2;
-          is_unique = is_unique2
+          is_unique = is_unique2;
+          is_int = is_int2;
+          get_tag = get_tag2
         } ) ->
     (* Uniqueness tracks whether duplication/lifting is allowed. It must always
        be propagated, both for meet and join. *)
     let is_unique = is_unique1 || is_unique2 in
-    map_result
-      ~f:(fun (blocks, immediates, extensions) ->
+    combine_results2 env
+      ~rebuild:(fun is_int (get_tag, blocks, immediates, extensions) ->
         TG.Head_of_kind_value_non_null.create_variant ~is_unique ~blocks
-          ~immediates ~extensions)
-      (meet_variant env ~blocks1 ~imms1 ~blocks2 ~imms2 ~extensions1
-         ~extensions2)
+          ~immediates ~extensions ~is_int ~get_tag)
+      ~meet_a:meet_relation
+      ~meet_b:
+        (fun env (get_tag1, blocks1, imms1, extensions1)
+             (get_tag2, blocks2, imms2, extensions2) ->
+        meet_variant env ~get_tag1 ~blocks1 ~imms1 ~get_tag2 ~blocks2 ~imms2
+          ~extensions1 ~extensions2)
+      ~left_a:is_int1 ~right_a:is_int2
+      ~left_b:(get_tag1, blocks1, imms1, extensions1)
+      ~right_b:(get_tag2, blocks2, imms2, extensions2)
   | ( Mutable_block { alloc_mode = alloc_mode1 },
       Mutable_block { alloc_mode = alloc_mode2 } ) ->
     map_result
@@ -914,22 +935,62 @@ and meet_array_contents env (array_contents1 : TG.array_contents Or_unknown.t)
       | Immutable { fields } -> Array.exists TG.is_obviously_bottom fields)
     env array_contents1 array_contents2
 
-and meet_variant env ~(blocks1 : TG.Row_like_for_blocks.t Or_unknown.t)
-    ~(imms1 : TG.t Or_unknown.t)
+and meet_relation env var1 var2 =
+  match var1, var2 with
+  | None, None -> Ok (Both_inputs, env)
+  | Some _, None -> Ok (Left_input, env)
+  | None, Some _ -> Ok (Right_input, env)
+  | Some var1, Some var2 ->
+    let simple1 =
+      TE.get_canonical_simple_ignoring_name_mode (ME.typing_env env)
+        (Simple.var var1)
+    in
+    let simple2 =
+      TE.get_canonical_simple_ignoring_name_mode (ME.typing_env env)
+        (Simple.var var2)
+    in
+    if Simple.equal simple1 simple2
+    then Ok (Both_inputs, env)
+    else
+      Simple.pattern_match simple1
+        ~const:(fun _ ->
+          Simple.pattern_match simple2
+            ~const:(fun _ : _ meet_result ->
+              (* Distinct constants: this is a bottom result *)
+              Bottom (New_result ()))
+            ~name:(fun _ ~coercion:_ : _ meet_result -> Ok (Right_input, env)))
+        ~name:(fun _ ~coercion:_ ->
+          Simple.pattern_match simple2
+            ~const:(fun _ : _ meet_result -> Ok (Left_input, env))
+            ~name:(fun _ ~coercion:_ ->
+              (* CR bclement: We want to add an equality here, but it can
+                 currently cause loops due to the reductions that could be
+                 stored on the relation variables. *)
+              Ok (Both_inputs, env)))
+
+and meet_variant env ~(get_tag1 : Variable.t option)
+    ~(blocks1 : TG.Row_like_for_blocks.t Or_unknown.t)
+    ~(imms1 : TG.t Or_unknown.t) ~(get_tag2 : Variable.t option)
     ~(blocks2 : TG.Row_like_for_blocks.t Or_unknown.t)
     ~(imms2 : TG.t Or_unknown.t) ~(extensions1 : TG.variant_extensions)
     ~(extensions2 : TG.variant_extensions) :
-    (TG.Row_like_for_blocks.t Or_unknown.t
+    (Variable.t option
+    * TG.Row_like_for_blocks.t Or_unknown.t
     * TG.t Or_unknown.t
     * TG.variant_extensions)
     meet_result =
   let meet_a = meet_unknown meet ~contents_is_bottom:TG.is_obviously_bottom in
-  let meet_b =
-    meet_unknown meet_row_like_for_blocks
-      ~contents_is_bottom:TG.Row_like_for_blocks.is_bottom
+  let meet_b env (get_tag1, blocks1) (get_tag2, blocks2) =
+    combine_results2 env
+      ~rebuild:(fun get_tag blocks -> get_tag, blocks)
+      ~meet_a:meet_relation
+      ~meet_b:
+        (meet_unknown meet_row_like_for_blocks
+           ~contents_is_bottom:TG.Row_like_for_blocks.is_bottom)
+      ~left_a:get_tag1 ~right_a:get_tag2 ~left_b:blocks1 ~right_b:blocks2
   in
   let bottom_a () = Or_unknown.Known TG.bottom_naked_immediate in
-  let bottom_b () = Or_unknown.Known TG.Row_like_for_blocks.bottom in
+  let bottom_b () = None, Or_unknown.Known TG.Row_like_for_blocks.bottom in
   let extensions1 =
     match extensions1 with
     | No_extensions -> No_extensions
@@ -943,17 +1004,17 @@ and meet_variant env ~(blocks1 : TG.Row_like_for_blocks.t Or_unknown.t)
       Ext { when_a = when_immediate; when_b = when_block }
   in
   map_result
-    ~f:(fun (imms, blocks, extensions) ->
+    ~f:(fun (imms, (get_tag, blocks), extensions) ->
       let extensions : TG.variant_extensions =
         match extensions with
         | No_extensions -> No_extensions
         | Ext { when_a = when_immediate; when_b = when_block } ->
           Ext { when_immediate; when_block }
       in
-      blocks, imms, extensions)
+      get_tag, blocks, imms, extensions)
     (meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type
-       ~join_env_extension env imms1 blocks1 extensions1 imms2 blocks2
-       extensions2)
+       ~join_env_extension env imms1 (get_tag1, blocks1) extensions1 imms2
+       (get_tag2, blocks2) extensions2)
 
 and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
     (t2 : TG.head_of_kind_naked_immediate) :
@@ -1785,12 +1846,22 @@ and join_head_of_kind_value env (head1 : TG.head_of_kind_value)
   in
   let is_null : TG.is_null =
     match head1.is_null, head2.is_null with
-    | Maybe_null, _ | _, Maybe_null -> Maybe_null
+    | Is_null var1, Is_null var2 when Variable.equal var1 var2 ->
+      (* CR bclement: Look for a shared alias. *)
+      Is_null var1
+    | (Maybe_null | Is_null _), _ | _, (Maybe_null | Is_null _) -> Maybe_null
     | Not_null, Not_null -> Not_null
   in
   match[@warning "-4"] non_null, is_null with
   | Unknown, Maybe_null -> Unknown
   | _, _ -> Known { non_null; is_null }
+
+and join_relation _env var1 var2 =
+  match var1, var2 with
+  | Some var1, Some var2 when Variable.equal var1 var2 ->
+    (* CR bclement: Look for shared aliases. *)
+    Some var1
+  | (Some _ | None), (Some _ | None) -> None
 
 and join_head_of_kind_value_non_null env
     (head1 : TG.head_of_kind_value_non_null)
@@ -1801,14 +1872,20 @@ and join_head_of_kind_value_non_null env
         { blocks = blocks1;
           immediates = imms1;
           extensions = extensions1;
-          is_unique = is_unique1
+          is_unique = is_unique1;
+          is_int = is_int1;
+          get_tag = get_tag1
         },
       Variant
         { blocks = blocks2;
           immediates = imms2;
           extensions = extensions2;
-          is_unique = is_unique2
+          is_unique = is_unique2;
+          is_int = is_int2;
+          get_tag = get_tag2
         } ) ->
+    let is_int = join_relation env is_int1 is_int2 in
+    let get_tag = join_relation env get_tag1 get_tag2 in
     let>+ blocks, immediates, extensions =
       join_variant env ~blocks1 ~imms1 ~extensions1 ~blocks2 ~imms2 ~extensions2
     in
@@ -1816,7 +1893,7 @@ and join_head_of_kind_value_non_null env
        be propagated, both for meet and join. *)
     let is_unique = is_unique1 || is_unique2 in
     TG.Head_of_kind_value_non_null.create_variant ~is_unique ~blocks ~immediates
-      ~extensions
+      ~extensions ~is_int ~get_tag
   | ( Mutable_block { alloc_mode = alloc_mode1 },
       Mutable_block { alloc_mode = alloc_mode2 } ) ->
     let alloc_mode = join_alloc_mode alloc_mode1 alloc_mode2 in
