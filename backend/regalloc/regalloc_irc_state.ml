@@ -609,12 +609,14 @@ let[@inline] check_set_and_field_consistency_instr state
     (work_list, set, field_value) =
   Instruction.Set.iter
     (fun (instr : Instruction.t) ->
-      let irc_work_list = get_instr_work_list state ~instruction_id:instr.id in
-      if not (InstrWorkList.equal irc_work_list field_value)
+      let instr_work_list =
+        get_instr_work_list state ~instruction_id:instr.id
+      in
+      if not (InstrWorkList.equal instr_work_list field_value)
       then
         fatal "instruction %a is in %s but its field equals %S"
           InstructionId.format instr.id work_list
-          (InstrWorkList.to_string irc_work_list))
+          (InstrWorkList.to_string instr_work_list))
     set
 
 let[@inline] check_inter_has_no_duplicates state (reg : Reg.t) : unit =
