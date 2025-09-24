@@ -438,8 +438,8 @@ module F :
 |}]
 
 (***************************************************************************)
-(* Test 4: Unboxed products can go blocks that are nominally typed, but not
-   structurally typed. *)
+(* Test 4: Unboxed products can go in blocks that are nominally typed, and the
+   only structurally typed blocks that support them are modules. *)
 
 type poly_var_type = [ `Foo of #(int * bool) ]
 [%%expect{|
