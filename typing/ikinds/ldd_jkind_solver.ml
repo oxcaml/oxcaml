@@ -8,7 +8,9 @@ module type LDD = sig
   type constr
 
   module Name : sig
-    type t
+    type t =
+      | Atom of { constr : constr; arg_index : int }
+      | Param of int
 
     val param : int -> t
 
@@ -46,6 +48,8 @@ module type LDD = sig
   val leq_with_reason : node -> node -> int list option
 
   val round_up : node -> lat
+
+  val map_rigid : (Name.t -> node) -> node -> node
 
   val clear_memos : unit -> unit
 
@@ -163,7 +167,30 @@ struct
       | Some base_and_coeffs -> base_and_coeffs
       | None -> (
         match env.lookup c with
-        | Poly (base, coeffs) -> base, coeffs
+        | Poly (base, coeffs) ->
+          let instantiate (name : Ldd.Name.t) : kind =
+            match name with
+            | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
+            | Ldd.Name.Atom { constr = constr'; arg_index } ->
+              if Constr.compare constr' c = 0
+              then Ldd.var (Ldd.rigid name)
+              else
+                let base', coeffs' = constr_kind ~mode constr' in
+                if arg_index = 0
+                then base'
+                else
+                  match List.nth_opt coeffs' (arg_index - 1) with
+                  | Some coeff -> coeff
+                  | None ->
+                    Misc.fatal_errorf
+                      "jkind_solver: cached polynomial for %s has no coefficient %d"
+                      (Constr.to_string constr') arg_index
+          in
+          let rehydrate node = Ldd.map_rigid instantiate node in
+          let base' = rehydrate base in
+          let coeffs' = List.map rehydrate coeffs in
+          ConstrTbl.replace constr_to_coeffs c (base', coeffs');
+          base', coeffs'
         | Ty { args; kind; abstract } ->
           let base = Ldd.new_var () in
           (* Allocate coefficient vars based on declared arity, not on ks
