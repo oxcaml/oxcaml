@@ -319,7 +319,6 @@ static void restore_runtime_state(caml_thread_t th)
   Active_thread = th;
   Caml_state->current_stack = th->current_stack;
   caml_use_local_arenas(th->current_stack->local_arenas, th->current_stack->local_sp);
-  Caml_state->tls_state = th->tls_state;
   Caml_state->c_stack = th->c_stack;
   Caml_state->gc_regs = th->gc_regs;
   Caml_state->gc_regs_buckets = th->gc_regs_buckets;
