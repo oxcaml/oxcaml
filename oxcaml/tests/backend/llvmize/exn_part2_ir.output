@@ -83,6 +83,7 @@ L101:
   store i64 %64, ptr %ds
   store i64 %65, ptr %alloc
   %66 = extractvalue { { i64, i64 }, { i64 } } %63, 1, 0
+  call void asm sideeffect "movq $0, %rax", "r"(i64 %66) "gc-leaf-function"="true"
   br label %L142
 L142:
   %67 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
@@ -381,6 +382,7 @@ L146:
   store i64 %49, ptr %ds
   store i64 %50, ptr %alloc
   %51 = extractvalue { { i64, i64 }, { i64 } } %48, 1, 0
+  call void asm sideeffect "movq $0, %rax", "r"(i64 %51) "gc-leaf-function"="true"
   br label %L176
 L176:
   %52 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
@@ -597,6 +599,7 @@ L180:
   store i64 %59, ptr %ds
   store i64 %60, ptr %alloc
   %61 = extractvalue { { i64, i64 }, { i64 } } %58, 1, 0
+  call void asm sideeffect "movq $0, %rax", "r"(i64 %61) "gc-leaf-function"="true"
   br label %L218
 L218:
   %62 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
@@ -1082,6 +1085,7 @@ L241:
   store i64 %103, ptr %ds
   store i64 %104, ptr %alloc
   %105 = extractvalue { { i64, i64 }, { i64 } } %102, 1, 0
+  call void asm sideeffect "movq $0, %rax", "r"(i64 %105) "gc-leaf-function"="true"
   br label %L332
 L332:
   %106 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
@@ -1159,6 +1163,7 @@ L257:
   store i64 %151, ptr %ds
   store i64 %152, ptr %alloc
   %153 = extractvalue { { i64, i64 }, { i64 } } %150, 1, 0
+  call void asm sideeffect "movq $0, %rax", "r"(i64 %153) "gc-leaf-function"="true"
   br label %L334
 L334:
   %154 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
@@ -1236,6 +1241,7 @@ L273:
   store i64 %199, ptr %ds
   store i64 %200, ptr %alloc
   %201 = extractvalue { { i64, i64 }, { i64 } } %198, 1, 0
+  call void asm sideeffect "movq $0, %rax", "r"(i64 %201) "gc-leaf-function"="true"
   br label %L336
 L336:
   %202 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
@@ -1574,6 +1580,7 @@ L347:
   store i64 %42, ptr %ds
   store i64 %43, ptr %alloc
   %44 = extractvalue { { i64, i64 }, { i64 } } %41, 1, 0
+  call void asm sideeffect "movq $0, %rax", "r"(i64 %44) "gc-leaf-function"="true"
   br label %L394
 L394:
   %45 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
@@ -1814,6 +1821,7 @@ L400:
   store i64 %44, ptr %ds
   store i64 %45, ptr %alloc
   %46 = extractvalue { { i64, i64 }, { i64 } } %43, 1, 0
+  call void asm sideeffect "movq $0, %rax", "r"(i64 %46) "gc-leaf-function"="true"
   br label %L426
 L426:
   %47 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
