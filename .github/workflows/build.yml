@@ -178,18 +178,13 @@ jobs:
     - name: Set up Opam
       uses: ocaml/setup-ocaml@v3
       with:
-        ocaml-compiler: ocaml-base-compiler.4.14.2+patched
+        ocaml-compiler: oxcaml-ci-deps.1.0.0
         opam-repositories: |
           local: file://${{ github.workspace }}/local-opam
           default: https://github.com/ocaml/opam-repository.git
         opam-disable-sandboxing: true
         opam-pin: false
-        cache-prefix: ${{ matrix.os }}-v1
-
-    - name: Install Opam dependencies
-      run: |
-        opam install menhir.20231231 ocamlformat.0.24.1
-        opam install --deps-only --with-test ./external/js_of_ocaml/js_of_ocaml-compiler.opam
+        cache-prefix: ${{ matrix.os }}-v2
 
     - name: Set up Opam environment
       run: |
