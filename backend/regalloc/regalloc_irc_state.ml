@@ -160,11 +160,6 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
     RegWorkListSet.iter rwl ~f:(fun reg ->
         Reg.Tbl.replace state.reg_work_list reg RegWorkList.Unknown_list)
   in
-  let unknown_instruction_work_list (iwl : InstructionWorkList.t) : unit =
-    InstructionWorkList.iter iwl ~f:(fun instr ->
-        InstructionId.Tbl.replace state.instr_work_list instr.id
-          InstrWorkList.Unknown_list)
-  in
   List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
       Reg.Tbl.replace state.reg_color reg None;
       Reg.Tbl.replace state.reg_alias reg None;
@@ -201,15 +196,10 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   RegWorkListSet.clear state.spilled_nodes;
   RegWorkListSet.clear state.coalesced_nodes;
   assert (Misc.Stdlib.List.is_empty state.select_stack);
-  unknown_instruction_work_list state.coalesced_moves;
   InstructionWorkList.clear state.coalesced_moves;
-  unknown_instruction_work_list state.constrained_moves;
   InstructionWorkList.clear state.constrained_moves;
-  unknown_instruction_work_list state.frozen_moves;
   InstructionWorkList.clear state.frozen_moves;
-  unknown_instruction_work_list state.work_list_moves;
   InstructionWorkList.clear state.work_list_moves;
-  unknown_instruction_work_list state.active_moves;
   InstructionWorkList.clear state.active_moves;
   RegisterStamp.PairSet.clear state.adj_set;
   Reg.Tbl.clear state.move_list;
