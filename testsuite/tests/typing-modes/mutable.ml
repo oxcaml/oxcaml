@@ -90,7 +90,9 @@ let foo (local_ r) = ref r.s
 Line 1, characters 25-28:
 1 | let foo (local_ r) = ref r.s
                              ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let foo (local_ r) =

@@ -178,7 +178,9 @@ let disallowed_by_regionality (local_ unique_ r) x =
 Line 3, characters 16-17:
 3 |   let ref = ref r in
                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 let gc_soundness_no_bug (unique_ r) x =

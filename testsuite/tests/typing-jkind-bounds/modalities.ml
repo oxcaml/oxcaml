@@ -37,7 +37,9 @@ let foo (t : int ref t @ contended) = use_uncontended t.contended
 Line 1, characters 54-65:
 1 | let foo (t : int ref t @ contended) = use_uncontended t.contended
                                                           ^^^^^^^^^^^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (t : int ref t @ contended) = cross_contended t
@@ -55,7 +57,9 @@ let foo (t : _ t @ nonportable) = use_portable t
 Line 1, characters 47-48:
 1 | let foo (t : _ t @ nonportable) = use_portable t
                                                    ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
 
 type 'a t : immutable_data with 'a @@ many = { x : 'a @@ many }
@@ -129,5 +133,7 @@ let foo (t : (string -> string) t @ nonportable) = use_portable t
 Line 1, characters 64-65:
 1 | let foo (t : (string -> string) t @ nonportable) = use_portable t
                                                                     ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the argument for a parameter
+       which is expected to be "portable".
 |}]
