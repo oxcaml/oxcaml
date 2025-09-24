@@ -1001,14 +1001,12 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
       in
       let has_void_args =
         List.exists
-          (fun (_mode, repr) ->
-            match repr with
-            | Lambda.Same_as_ocaml_repr (Jkind.Sort.Const.Base Void) -> true
-            | _ -> false)
+          (fun (_mode, repr) -> Lambda.extern_repr_involves_void repr)
           prim_native_repr_args
       in
+      let has_void_return = Lambda.extern_repr_involves_void (snd prim_native_repr_res) in
       let prim_native_name =
-        match has_unboxed_products || has_void_args with
+        match has_unboxed_products || has_void_args || has_void_return with
         | false -> ""
         | true -> prim_native_name
       in
