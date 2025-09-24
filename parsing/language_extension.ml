@@ -128,6 +128,7 @@ module Exist_pair = struct
     | Pair (SIMD, m) -> to_string SIMD ^ "_" ^ maturity_to_string m
     | Pair (Layout_poly, m) ->
       to_string Layout_poly ^ "_" ^ maturity_to_string m
+    | Pair (Layout_poly, m) -> to_string Layout_poly ^ "_" ^ maturity_to_string m
     | Pair
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
            | Immutable_arrays | Module_strengthening | Labeled_tuples
