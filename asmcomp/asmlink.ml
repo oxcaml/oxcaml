@@ -650,9 +650,23 @@ let link unix ~ppf_dump objfiles output_name =
     let early_pervasives =
       if !Clflags.nopervasives then []
       else if is_required (Compilation_unit.of_string "Camlinternaleval") then
-        (Load_path.add_dir ~hidden:false
+        (Load_path.add_dir
+          ~hidden:false
           (Misc.expand_directory Config.standard_library "+unix");
-        [ stdlib; "camlinternaleval.cmxa" ])
+        Load_path.add_dir
+        ~hidden:false
+        (Misc.expand_directory Config.standard_library "+compiler-libs");
+        Load_path.add_dir
+        ~hidden:false
+        (Misc.expand_directory Config.standard_library "+ocaml-jit");
+        [ stdlib
+        ; "unix/unix.cmxa"
+        ; "dynlink/dynlink.cmxa"
+        ; "compiler-libs/ocamlcommon.cmxa"
+        ; "compiler-libs/ocamloptcomp.cmxa"
+        ; "compiler-libs/ocamlopttoplevel.cmxa"
+        ; "ocaml-jit/jit.cmxa"
+        ; "eval.cmxa" ])
       else [ stdlib ] in
     let ml_objfiles, units_tolink, cached_genfns_imports =
       List.fold_right
