@@ -121,7 +121,7 @@ type error =
       ; err : Jkind.Violation.t
       }
   | Jkind_empty_record
-  | Non_representable_in_sig of Jkind.Violation.t * string * type_expr
+  | Non_representable_in_sig of Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error
@@ -3793,7 +3793,7 @@ let transl_value_decl env loc ~modalities valdecl =
     | Error err ->
       raise(Error(cty.ctyp_loc,
                   Non_representable_in_sig
-                    (err,valdecl.pval_name.txt,cty.ctyp_type)))
+                    (err,cty.ctyp_type)))
   in
   let ty = cty.ctyp_type in
   let v =
@@ -4682,10 +4682,10 @@ let report_error ppf = function
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)) err
   | Jkind_empty_record ->
     fprintf ppf "@[Records must contain at least one runtime value.@]"
-  | Non_representable_in_sig (err, val_name, ty) ->
+  | Non_representable_in_sig (err, ty) ->
     let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
-    fprintf ppf "@[This type signature for %a is not representable.@ %a@]"
-      Style.inline_code val_name
+    fprintf ppf "@[The type of a module-level value must have a@ \
+                   representable layout.@ %a@]"
       (Jkind.Violation.report_with_offender ~offender) err
   | Invalid_jkind_in_block (typ, sort_const, lloc) ->
     let struct_desc =

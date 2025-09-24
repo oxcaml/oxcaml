@@ -57,8 +57,6 @@ val unboxed_product : t# = #{i = 1; j = 2}
 - : t# = #{i = 1; j = 2}
 |}]
 
-(* However, we can have a top-level unboxed record if its kind is value *)
-
 type m_record = { i1 : int }
 module M = struct
   let x = #{ i1 = 1 }

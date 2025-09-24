@@ -1,8 +1,0 @@
-File "unrepresentable_sig_item.ml", line 19, characters 10-11:
-19 |   val x : t
-               ^
-Error: This type signature for "x" is not representable.
-       The layout of type t is any
-         because of the definition of t at file "unrepresentable_sig_item.ml", line 18, characters 2-14.
-       But the layout of type t must be representable
-         because it's the type of something stored in a module structure.
