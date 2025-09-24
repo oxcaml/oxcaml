@@ -361,9 +361,11 @@ jobs:
 
     - name: Collect and push metrics
       if: matrix.name == 'flambda2_o3' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+      env:
+        GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
       run: |
         # Checkout metrics repository
-        git clone https://x-access-token:${{ secrets.METRICS_REPO_TOKEN }}@github.com/oxcaml/oxcaml-metrics.git metrics-repo
+        gh repo clone oxcaml/oxcaml-metrics metrics-repo
 
         # Create data directory if it doesn't exist
         mkdir -p metrics-repo/data
