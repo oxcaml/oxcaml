@@ -77,7 +77,9 @@ struct caml_locking_scheme {
   /* If non-NULL, these functions are called when threads start and stop.
      For threads created by OCaml, that's at creation and termination.
      For threads created by C, that's at caml_c_thread_register/unregister.
-     The lock is not held when these functions are called. */
+     The lock is not held when these functions are called.
+     These functions are not called on the backup thread, even though
+     it uses lock/unlock. */
   void (*thread_start)(void*, enum caml_thread_type);
   void (*thread_stop)(void*, enum caml_thread_type);
 

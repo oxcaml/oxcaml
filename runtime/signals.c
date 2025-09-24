@@ -187,8 +187,8 @@ static void caml_enter_blocking_section_default(void)
 
 static void caml_leave_blocking_section_default(void)
 {
-  caml_bt_enter_ocaml();
   caml_acquire_domain_lock();
+  caml_bt_enter_ocaml();
 }
 
 CAMLexport void (*caml_enter_blocking_section_hook)(void) =
