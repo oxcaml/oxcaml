@@ -2074,7 +2074,7 @@ module_type:
 (* A signature, which appears between SIG and END (among other places),
    is a list of signature elements. *)
 signature:
-  optional_atat_modalities_expr extra_sig(flatten(signature_element*))
+  optional_modalities_mods_expr extra_sig(flatten(signature_element*))
     { { psg_modalities = $1;
         psg_items = $2;
         psg_loc = make_loc $sloc; } }
@@ -2136,7 +2136,7 @@ signature_item:
         { let (ext, l) = $1 in (Psig_class_type l, ext) }
     )
     { $1 }
-  | include_statement(module_type) modalities = optional_atat_modalities_expr
+  | include_statement(module_type) modalities = optional_modalities_mods_expr
       { let incl, ext = $1 in
         let item = mksig ~loc:$sloc (Psig_include (incl, modalities)) in
         wrap_sig_ext ~loc:$sloc item ext
@@ -2148,7 +2148,7 @@ signature_item:
   ext = ext attrs1 = attributes
   name_ = module_name_modalities
   body = module_declaration_body(
-    module_type optional_atat_modalities_expr { ($1, $2) }
+    module_type optional_modalities_mods_expr { ($1, $2) }
   )
   attrs2 = post_item_attributes
   {
@@ -2186,7 +2186,7 @@ module_declaration_body(module_type_with_optional_modal_expr):
   name_ = module_name_modalities
   EQUAL
   body = module_expr_alias
-  modalities = optional_atat_modalities_expr
+  modalities = optional_modalities_mods_expr
   attrs2 = post_item_attributes
   {
     let attrs = attrs1 @ attrs2 in
@@ -2232,7 +2232,7 @@ module_subst:
   name = mkrhs(module_name)
   COLON
   mty = module_type
-  modalities = optional_atat_modalities_expr
+  modalities = optional_modalities_mods_expr
   attrs2 = post_item_attributes
   {
     let attrs = attrs1 @ attrs2 in
@@ -2247,7 +2247,7 @@ module_subst:
   name = mkrhs(module_name)
   COLON
   mty = module_type
-  modalities = optional_atat_modalities_expr
+  modalities = optional_modalities_mods_expr
   attrs2 = post_item_attributes
   {
     let attrs = attrs1 @ attrs2 in
@@ -2725,7 +2725,7 @@ pattern_var:
 
 optional_poly_type_and_modes:
       { None, Modes.empty }
-  | at_mode_expr_temp
+  | modes_mods_expr
       { None, $1 }
   | COLON cty_mm = poly_type_with_optional_modes
       { let cty, mm = cty_mm in
@@ -2814,7 +2814,7 @@ optional_atomic_constraint_:
     ; ret_mode_annotations = Modes.empty
     }
    }
-  | at_mode_expr_temp {
+  | modes_mods_expr {
     { ret_type_constraint = None
     ; mode_annotations = Modes.empty
     ; ret_mode_annotations = $1
@@ -3244,7 +3244,7 @@ labeled_simple_expr:
     val_ident { mkpatvar ~loc:$sloc $1 }
 ;
 %inline pvc_modes:
-  | at_mode_expr_temp {None, $1}
+  | modes_mods_expr {None, $1}
   | COLON core_type_with_optional_modes {
       let typ, mm = $2 in
       Some(Pvc_constraint { locally_abstract_univars=[]; typ }), mm
@@ -3254,7 +3254,7 @@ labeled_simple_expr:
 %inline let_ident_with_modes:
     optional_mode_expr_legacy let_ident
       { ($2, $1) }
-  | LPAREN let_ident at_mode_expr_temp RPAREN
+  | LPAREN let_ident modes_mods_expr RPAREN
       { ($2, $3) }
 
 let_binding_body_no_punning:
@@ -3282,7 +3282,7 @@ let_binding_body_no_punning:
         let modes = Modes.append modes0 modes1 in
         (v, $5, Some (Pvc_constraint { locally_abstract_univars = []; typ }), modes)
       }
-  | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = core_type modes1 = optional_at_mode_expr_temp EQUAL e = seq_expr
+  | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = core_type modes1 = optional_modes_mods_expr EQUAL e = seq_expr
       (* The code upstream looks like:
          {[
            let constraint' =
@@ -3608,7 +3608,7 @@ type_constraint:
   | type_constraint_with_modes
     { let ty, modes = $1 in
       Some ty, modes }
-  | at_mode_expr_temp
+  | modes_mods_expr
     { None, $1 }
 ;
 
@@ -4247,7 +4247,7 @@ generalized_constructor_arguments:
 ;
 
 %inline constructor_argument:
-  gbl=global_flag cty=atomic_type m1=optional_atat_modalities_expr {
+  gbl=global_flag cty=atomic_type m1=optional_modalities_mods_expr {
     let modalities = Modalities.append gbl m1 in
     Type.constructor_arg cty ~modalities ~loc:(make_loc $sloc)
   }
@@ -4265,14 +4265,14 @@ label_declarations:
   | label_declaration_semi label_declarations   { $1 :: $2 }
 ;
 label_declaration:
-    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_atat_modalities_expr attrs=attributes
+    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_modalities_mods_expr attrs=attributes
       { let info = symbol_info $endpos in
         let mut, m0 = $1 in
         let modalities = Modalities.append m0 m1 in
         Type.field $2 $4 ~mut ~modalities ~attrs ~loc:(make_loc $sloc) ~info}
 ;
 label_declaration_semi:
-    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_atat_modalities_expr attrs0=attributes
+    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_modalities_mods_expr attrs0=attributes
       SEMI attrs1=attributes
       { let info =
           match rhs_info $endpos(attrs0) with
@@ -4421,7 +4421,7 @@ possibly_poly(X):
 ;
 
 %inline poly_type_with_modes:
-  | poly_tuple_type at_mode_expr_temp { $1, $2 }
+  | poly_tuple_type modes_mods_expr { $1, $2 }
 ;
 
 %inline poly_type_with_optional_modes:
@@ -4431,7 +4431,7 @@ possibly_poly(X):
 
 %inline strictly_poly_type_with_optional_modes:
   | strictly_poly_type { $1, Modes.empty }
-  | strictly_poly_tuple_type at_mode_expr_temp { $1, $2 }
+  | strictly_poly_tuple_type modes_mods_expr { $1, $2 }
 ;
 
 %inline poly_type_no_attr:
@@ -4454,7 +4454,7 @@ core_type:
 
 %inline core_type_with_optional_modes:
     core_type { $1, Modes.empty }
-  | tuple_type at_mode_expr_temp { $1, $2 }
+  | tuple_type modes_mods_expr { $1, $2 }
 
 (* A core type without attributes is currently defined as an alias type, but
    this could change in the future if new forms of types are introduced. From
@@ -4641,10 +4641,10 @@ optional_mod_mods_expr:
   | mode+ { $1 }
 ;
 
-// at_mode_expr:
-//   | AT mode_expr {$2}
-//   | AT error { expecting $loc($2) "mode expression" }
-// ;
+at_mode_expr:
+  | AT mode_expr {$2}
+  | AT error { expecting $loc($2) "mode expression" }
+;
 
 at_mode_expr_temp:
   | AT mode_expr { { core_modes = $2; mod_modes = [] } }
@@ -4657,19 +4657,19 @@ at_mode_expr_temp:
     { $1 }
 ;
 
-// modes_mods_expr:
-//   | core_modes = at_mode_expr
-//     mod_modes = optional_mod_mods_expr
-//     { { core_modes; mod_modes } }
-//   | mod_modes = mod_mods_expr
-//     { { core_modes = []; mod_modes } }
-// ;
+modes_mods_expr:
+  | core_modes = at_mode_expr
+    mod_modes = optional_mod_mods_expr
+    { { core_modes; mod_modes } }
+  | mod_modes = mod_mods_expr
+    { { core_modes = []; mod_modes } }
+;
 
-// %inline optional_modes_mods_expr:
-//   | { Modes.empty }
-//   | modes_mods_expr
-//     { $1 }
-// ;
+%inline optional_modes_mods_expr:
+  | { Modes.empty }
+  | modes_mods_expr
+    { $1 }
+;
 
 %inline with_optional_mode_expr(ty):
   | m0=optional_mode_expr_legacy ty=ty m1=optional_at_mode_expr_temp {
@@ -4701,14 +4701,14 @@ modalities_mods_expr:
 ;
 
 optional_atat_modalities_expr:
-  | %prec below_HASH
+  | // %prec below_HASH
     { Modalities.empty }
   | atat_modalities_expr
     { { core_modalities = $1; mod_modalities = [] } }
 ;
 
 optional_modalities_mods_expr:
-  | // %prec below_HASH
+  | %prec below_HASH
     { Modalities.empty }
   | modalities_mods_expr
     { $1 }
