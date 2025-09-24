@@ -170,9 +170,10 @@ jobs:
       run: true
       # run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install afl-fuzz
 
-    - name: Install autoconf (for macOS workers)
+    - name: Install autoconf and bash (for macOS workers)
       if: matrix.os == 'macos-latest'
-      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf
+      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf bash
+      # bash >=4 is needed for tools/gen_ocamlj_rules.sh
 
     - name: Set up Opam
       uses: ocaml/setup-ocaml@v3
@@ -187,7 +188,8 @@ jobs:
 
     - name: Install Opam dependencies
       run: |
-        opam install --deps-only ./oxcaml.opam ./external/js_of_ocaml/js_of_ocaml-compiler.opam
+        opam install menhir.20231231 ocamlformat.0.24.1
+        opam install --deps-only --with-test ./external/js_of_ocaml/js_of_ocaml-compiler.opam
 
     - name: Set up Opam environment
       run: |
