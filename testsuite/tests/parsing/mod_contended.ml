@@ -78,6 +78,9 @@ module M = struct
   let (x, y) : (int * int) mod contended aliased = 4, 2
   let (x, y) : (int * int) @ once portable mod contended aliased = 4, 2
 
+  let foo : type a. a @ once portable mod contended aliased = fun x -> x
+  let foo : type a. (a -> a) @ once portable mod contended aliased = fun x -> x
+
   (* source_jane_street has more examples with (kind-constrained) polymorphism
      and also locally abstract type stuff too, which is omitted here currently *)
 
