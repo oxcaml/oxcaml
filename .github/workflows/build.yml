@@ -155,9 +155,10 @@ jobs:
     - name: Checkout the OxCaml repo
       uses: actions/checkout@master
 
-    - name: Install AFL (for Linux workers)
-      if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get install afl++
+    # jvanburen: I don't think we actually test this and it takes forever to set up
+    # - name: Install AFL (for Linux workers)
+    #   if: matrix.os == 'ubuntu-latest'
+    #   run: sudo apt-get install afl++
 
     - name: Install clang
       if: matrix.os == 'ubuntu-latest' && matrix.cc == 'clang'
