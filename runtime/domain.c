@@ -1063,6 +1063,9 @@ static void free_domain_ml_values(struct domain_ml_values* ml_values)
    parameters returned to the parent by the child.
 */
 struct domain_startup_params {
+  caml_plat_mutex lock;
+  caml_plat_cond cond;
+
   dom_internal *parent; /* in */
   enum domain_status status; /* in+out:
                                 parent and child synchronize on this value. */
@@ -1266,15 +1269,15 @@ static void* domain_thread_func(void* v)
   p->newdom = domain_self;
 
   /* handshake with the parent domain */
-  caml_plat_lock_blocking(&p->parent->interrupt_lock);
+  caml_plat_lock_blocking(&p->lock);
   if (domain_self) {
     p->status = Dom_started;
     p->unique_id = domain_self->unique_id;
   } else {
     p->status = Dom_failed;
   }
-  caml_plat_broadcast(&p->parent->interrupt_cond);
-  caml_plat_unlock(&p->parent->interrupt_lock);
+  caml_plat_broadcast(&p->cond);
+  caml_plat_unlock(&p->lock);
   /* Cannot access p below here. */
 
   if (domain_self) {
@@ -1330,10 +1333,16 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
 
   caml_domain_spawn_hook();
 
+  /* When domain 0 first spawns a domain, the backup thread is not active, we
+     ensure it is started here. */
+  install_backup_thread(domain_self);
+
 #ifndef NATIVE_CODE
   if (caml_debugger_in_use)
     caml_fatal_error("ocamldebug does not support spawning multiple domains");
 #endif
+  caml_plat_mutex_init(&p.lock);
+  caml_plat_cond_init(&p.cond);
   p.parent = domain_self;
   p.status = Dom_starting;
 
@@ -1349,19 +1358,13 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
     caml_failwith("failed to create domain thread");
   }
 
-  /* While waiting for the child thread to start up, we need to service any
-     stop-the-world requests as they come in. */
-  caml_plat_lock_blocking(&domain_self->interrupt_lock);
+  caml_enter_blocking_section();
+  caml_plat_lock_blocking(&p.lock);
   while (p.status == Dom_starting) {
-    if (caml_incoming_interrupts_queued()) {
-      caml_plat_unlock(&domain_self->interrupt_lock);
-      handle_incoming(domain_self);
-      caml_plat_lock_blocking(&domain_self->interrupt_lock);
-    } else {
-      caml_plat_wait(&domain_self->interrupt_cond, &domain_self->interrupt_lock);
-    }
+    caml_plat_wait(&p.cond, &p.lock);
   }
-  caml_plat_unlock(&domain_self->interrupt_lock);
+  caml_plat_unlock(&p.lock);
+  caml_leave_blocking_section();
 
   if (p.status == Dom_started) {
     /* successfully created a domain.
@@ -1374,9 +1377,8 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
     free_domain_ml_values(p.ml_values);
     caml_failwith("failed to allocate domain");
   }
-  /* When domain 0 first spawns a domain, the backup thread is not active, we
-     ensure it is started here. */
-  install_backup_thread(domain_self);
+  caml_plat_mutex_free(&p.lock);
+  caml_plat_cond_free(&p.cond);
 
   CAMLreturn (Val_long(p.unique_id));
 }
