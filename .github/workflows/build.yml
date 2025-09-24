@@ -188,6 +188,7 @@ jobs:
         opam install --deps-only ./oxcaml.opam ./external/js_of_ocaml/js_of_ocaml-compiler.opam
 
     - name: Set up Opam environment
+      run: |
         opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
 
     - name: Install GNU parallel
