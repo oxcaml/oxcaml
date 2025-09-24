@@ -1535,8 +1535,7 @@ let narrow_to_manifest_jkind env loc path decl =
         let context =
           Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
         in
-        Some
-          (Ikinds.normalize_and_pack ~context ~path manifest_jkind)
+        Some (Ikinds.type_declaration_ikind ~context ~path)
     in
     { decl with type_jkind = manifest_jkind; type_ikind }
 
@@ -2772,12 +2771,12 @@ let normalize_decl_jkinds env decls =
     let normalization_context =
       Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
     in
-    let compute_type_ikind jkind =
+    let compute_type_ikind () =
       if not !Clflags.ikinds
       then None
       else
         Some
-          (Ikinds.normalize_and_pack ~context:normalization_context ~path jkind)
+          (Ikinds.type_declaration_ikind ~context:normalization_context ~path)
     in
     let normalized_jkind =
       Jkind.normalize ~mode:Require_best ~context:normalization_context
@@ -2786,7 +2785,7 @@ let normalize_decl_jkinds env decls =
     let decl =
       { decl with
         type_jkind = normalized_jkind;
-        type_ikind = compute_type_ikind normalized_jkind;
+        type_ikind = compute_type_ikind ();
         type_unboxed_version
       }
     in
@@ -2825,7 +2824,7 @@ let normalize_decl_jkinds env decls =
           let type_jkind =
             Jkind.unsafely_set_bounds ~from:original_decl.type_jkind decl.type_jkind
           in
-          let type_ikind = compute_type_ikind type_jkind in
+          let type_ikind = compute_type_ikind () in
           let umc = Some (Jkind.to_unsafe_mode_crossing type_jkind) in
           let type_kind =
             match decl.type_kind with

@@ -2,15 +2,26 @@ val with_origin_tag : string -> (unit -> 'a) -> 'a
 
 val normalize : context:Jkind.jkind_context -> Types.jkind_l -> Ikind.Ldd.node
 
-val pack_poly : Ikind.Ldd.node -> Types.type_ikind
+val pack_poly : Ikind.Ldd.node -> Types.constructor_ikind
 
-val unpack_poly : Types.type_ikind -> Ikind.Ldd.node
+val unpack_poly : Types.constructor_ikind -> Ikind.Ldd.node
 
 val normalize_and_pack :
   context:Jkind.jkind_context ->
   path:Path.t ->
   Types.jkind_l ->
-  Types.type_ikind
+  Types.constructor_ikind
+
+val type_declaration_ikind :
+  context:Jkind.jkind_context ->
+  path:Path.t ->
+  Types.constructor_ikind
+
+val apply_constructor_ikind :
+  context:Jkind.jkind_context ->
+  Types.constructor_ikind ->
+  Ikind.Ldd.node list ->
+  Ikind.Ldd.node
 
 val sub_jkind_l :
   ?allow_any_crossing:bool ->

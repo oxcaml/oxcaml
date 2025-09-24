@@ -148,7 +148,7 @@ type field_kind
 type commutable
 
 (* CR jujacobs: temporary hack to avoid dependency cycle *)
-type type_ikind = Obj.t
+type constructor_ikind = Obj.t
 
 and type_desc =
   | Tvar of { name : string option; jkind : jkind_lr }
@@ -755,8 +755,9 @@ type type_declaration =
        be computed from the decl kind. This happens in
        Ctype.add_jkind_equation. *)
 
-    type_ikind: type_ikind option;
-    (* Normalized ikind polynomial (opaque) computed when jkinds are normalized. *)
+    type_ikind: constructor_ikind option;
+    (* Cached constructor ikind polynomial (opaque) populated when jkinds are
+       normalized under [-ikinds]. *)
 
     type_private: private_flag;
     type_manifest: type_expr option;

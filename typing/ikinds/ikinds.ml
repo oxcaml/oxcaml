@@ -443,16 +443,69 @@ let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
   let solver = make_solver ~context in
   JK.normalize solver (ckind_of_jkind_l jkind)
 
-let pack_poly (poly : Ikind.Ldd.node) : Types.type_ikind = Obj.repr poly
+type constructor_ikind_payload =
+  { base : JK.poly;
+    coeffs : JK.poly array
+  }
 
-let unpack_poly (packed : Types.type_ikind) : Ikind.Ldd.node = Obj.obj packed
+let pack_poly (poly : Ikind.Ldd.node) : Types.constructor_ikind = Obj.magic poly
+
+let unpack_poly (packed : Types.constructor_ikind) : Ikind.Ldd.node = Obj.magic packed
+
+let pack_constructor_ikind (payload : constructor_ikind_payload) :
+    Types.constructor_ikind =
+  Obj.magic payload
+
+let unpack_constructor_ikind (packed : Types.constructor_ikind) :
+    constructor_ikind_payload =
+  Obj.magic packed
 
 let normalize_and_pack ~(context : Jkind.jkind_context) ~(path : Path.t)
-    (jkind : Types.jkind_l) : Types.type_ikind =
+    (jkind : Types.jkind_l) : Types.constructor_ikind =
   let poly = normalize ~context jkind in
   let poly_str = JK.pp poly in
   if false then Format.eprintf "[ikind-store] %a => %s@." Path.print path poly_str else ();
   pack_poly poly
+
+let type_declaration_ikind ~(context : Jkind.jkind_context)
+    ~(path : Path.t) : Types.constructor_ikind =
+  let solver = make_solver ~context in
+  let base, coeffs = JK.constr_kind_poly solver path in
+  let coeffs_array = Array.of_list coeffs in
+  if false || !__ikind_debug
+  then (
+    let base_str = JK.pp base in
+    let coeffs_str =
+      coeffs_array
+      |> Array.to_list
+      |> List.mapi (fun i coeff -> Format.asprintf "%d:%s" i (JK.pp coeff))
+      |> String.concat ", "
+    in
+    Format.eprintf "[ikind-install] %a base=%s coeffs=[%s]@."
+      Path.print path base_str coeffs_str);
+  pack_constructor_ikind { base; coeffs = coeffs_array }
+
+let rehydrate_constructor_ikind ~(context : Jkind.jkind_context)
+    (payload : constructor_ikind_payload) : constructor_ikind_payload =
+  ignore context;
+  payload
+
+let apply_constructor_ikind ~(context : Jkind.jkind_context)
+    (packed : Types.constructor_ikind) (args : Ikind.Ldd.node list) :
+    Ikind.Ldd.node =
+  let payload = rehydrate_constructor_ikind ~context (unpack_constructor_ikind packed) in
+  let arity = Array.length payload.coeffs in
+  if List.length args <> arity
+  then
+    Misc.fatal_errorf
+      "ikinds: constructor arity mismatch (expected %d, got %d)"
+      arity (List.length args);
+  let contributions =
+    List.mapi
+      (fun i arg -> Ikind.Ldd.meet arg payload.coeffs.(i))
+      args
+  in
+  List.fold_left Ikind.Ldd.join payload.base contributions
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
