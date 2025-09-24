@@ -378,7 +378,12 @@ jobs:
 
         # Generate timestamp and short commit hash
         TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        COMMIT_HASH="${{ github.sha }}"
+        # Use the actual commit being tested (not the merge commit for PRs)
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
+        else
+          COMMIT_HASH="${{ github.sha }}"
+        fi
         SHORT_HASH="${COMMIT_HASH:0:8}"
         DATE=$(date -u +"%Y-%m-%d")
 
