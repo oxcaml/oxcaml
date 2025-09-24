@@ -210,9 +210,6 @@ let[@inline] reg_work_list state reg =
   | None -> fatal "%a is not in the work_list map" Printreg.reg reg
   | Some x -> x
 
-let[@inline] reg_work_list_opt state reg =
-  Reg.Tbl.find_opt state.reg_work_list reg
-
 let[@inline] color state reg =
   match Reg.Tbl.find_opt state.reg_color reg with
   | None -> fatal "%a is not in the color map" Printreg.reg reg
