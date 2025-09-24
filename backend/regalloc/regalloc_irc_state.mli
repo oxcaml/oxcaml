@@ -17,9 +17,9 @@ val reset :
   new_block_temporaries:Reg.t list ->
   unit
 
-val work_list : t -> Reg.t -> WorkList.t
+val reg_work_list : t -> Reg.t -> RegWorkList.t
 
-val work_list_opt : t -> Reg.t -> WorkList.t option
+val reg_work_list_opt : t -> Reg.t -> RegWorkList.t option
 
 val color : t -> Reg.t -> Color.t option
 

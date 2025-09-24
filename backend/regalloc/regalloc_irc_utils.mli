@@ -18,7 +18,7 @@ val log_body_and_terminator :
 
 val log_cfg_with_infos : Cfg_with_infos.t -> unit
 
-module WorkList : sig
+module RegWorkList : sig
   (* CR xclerc for xclerc: double check all constructors are actually used. *)
   type t =
     | Unknown_list

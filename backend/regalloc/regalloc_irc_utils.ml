@@ -34,7 +34,7 @@ let log_cfg_with_infos : Cfg_with_infos.t -> unit =
   make_log_cfg_with_infos (Lazy.force log_function) ~instr_prefix ~term_prefix
     cfg_with_infos
 
-module WorkList = struct
+module RegWorkList = struct
   type t =
     | Unknown_list
     | Precolored
