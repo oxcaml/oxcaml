@@ -246,10 +246,10 @@ Yielding is a future axis that tracks whether a function is permitted to perform
 effects that will be handled in its parent stack. See [the OCaml Manual entry
 for effect handlers](https://ocaml.org/manual/5.3/effects.html).
 
-Yielding has different defaults depending on the forkable (and hence locality) axes:
-*forkable* values are defaulted to *unyielding*, while *unforkable* values are
-defaulted to *yielding*. More documentation on mode implications is available
-[here](../../kinds/syntax).
+Yielding has different defaults depending on the locality axis: *global* values are
+defaulted to *yielding*, while *local* values are defaulted to *unyielding*.
+More documentation on mode implications is available [here](../../kinds/syntax).
+
 
 Yielding is irrelevant for types that do not contain functions, and values of such types
 *mode cross* on the yielding axis; they may be used as unyielding even

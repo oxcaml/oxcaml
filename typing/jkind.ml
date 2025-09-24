@@ -1793,27 +1793,21 @@ module Const = struct
       | Some modes ->
         (* Handle all the mode implications *)
         let modes =
-          match
-            ( List.mem "global" modes,
-              List.mem "forkable" modes,
-              List.mem "unyielding" modes )
-          with
-          | true, true, true ->
-            (* [global] implies [forkable unyielding], omit them. *)
-            List.filter (fun m -> m <> "forkable" && m <> "unyielding") modes
-          | true, true, false ->
-            (* [global] implies [forkable], omit it and print [yielding]. *)
-            List.filter (fun m -> m <> "forkable") modes @ ["yielding"]
-          | false, true, true ->
-            (* [forkable] implies [unyielding], omit it. *)
+          match List.mem "global" modes, List.mem "unyielding" modes with
+          | true, true ->
+            (* [global] implies [unyielding], omit it. *)
             List.filter (fun m -> m <> "unyielding") modes
-          | true, false, true ->
-            (* Print indicating [unforkable]. *)
-            modes @ ["unforkable"]
-          | true, false, false ->
-            (* Print indicating [unforkable yielding]. *)
-            modes @ ["unforkable"; "yielding"]
-          | _, _, _ -> modes
+          | true, false ->
+            (* Otherwise, print [mod global yielding] to indicate [yielding]. *)
+            modes @ ["yielding"]
+          | _, _ -> modes
+        in
+        let modes =
+          (* Likewise for [global] and [forkable]. *)
+          match List.mem "global" modes, List.mem "forkable" modes with
+          | true, true -> List.filter (fun m -> m <> "forkable") modes
+          | true, false -> modes @ ["unforkable"]
+          | _, _ -> modes
         in
         let modes =
           (* Likewise for [stateless] and [portable]. *)

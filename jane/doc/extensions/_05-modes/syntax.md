@@ -289,9 +289,9 @@ and modalities, according to this table:
 | this          | implies this |
 |---------------|--------------|
 | `global`      | `forkable`   |
-| `forkable`    | `unyielding` |
 | `local`       | `unforkable` |
-| `unforkable`  | `yielding`   |
+| `global`      | `unyielding` |
+| `local`       | `yielding`   |
 | `stateless`   | `portable`   |
 | `immutable`   | `contended`  |
 | `read`        | `shared`     |

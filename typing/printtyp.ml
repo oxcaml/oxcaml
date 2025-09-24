@@ -1440,7 +1440,7 @@ let tree_of_mode_old (t : Parsetree.mode loc) =
 let tree_of_mode_new (t: Parsetree.mode loc) =
   let Mode s = t.txt in Omd_new s
 
-let tree_of_modes (modes : Mode.Alloc.Const.t) =
+let[@warning "-21-26"] tree_of_modes (modes : Mode.Alloc.Const.t) =
   let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
 
   (* [forkable] has implied defaults depending on [areality]: *)
@@ -1450,10 +1450,10 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     | _, _ -> Some modes.forkable
   in
 
-  (* [yielding] has implied defaults depending on [forkable]: *)
+  (* [yielding] has implied defaults depending on [areality]: *)
   let yielding =
-    match modes.forkable, modes.yielding with
-    | Unforkable, Yielding | Forkable, Unyielding -> None
+    match modes.areality, modes.yielding with
+    | Local, Yielding | Global, Unyielding -> None
     | _, _ -> Some modes.yielding
   in
 

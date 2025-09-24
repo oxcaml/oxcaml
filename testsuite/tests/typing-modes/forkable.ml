@@ -81,8 +81,6 @@ type 'a t3 = Mk3 of 'a @@ global forkable unyielding
 type 'a t4 = Mk4 of 'a @@ global forkable yielding
 type 'a t5 = Mk5 of 'a @@ global unforkable unyielding
 type 'a t6 = Mk6 of 'a @@ global unforkable yielding
-
-(* CR mslater: fix *)
 type 'a t7 = Mk7 of 'a @@ forkable unyielding
 type 'a t8 = Mk8 of 'a @@ forkable yielding
 type 'a t9 = Mk9 of 'a @@ unforkable unyielding
@@ -94,7 +92,7 @@ let with_global_unforkable : ((string -> unit) @ unforkable -> 'a) -> 'a =
 [%%expect{|
 type 'a t0 = Mk0 of global_ 'a
 type 'a t1 = Mk1 of global_ 'a
-type 'a t2 = Mk2 of 'a @@ global unforkable yielding
+type 'a t2 = Mk2 of 'a @@ global unforkable
 type 'a t3 = Mk3 of global_ 'a
 type 'a t4 = Mk4 of 'a @@ global yielding
 type 'a t5 = Mk5 of 'a @@ global unforkable
@@ -172,10 +170,7 @@ let _ = with_global_unforkable (fun k -> requires_unyielding k)
 external requires_unyielding : 'a @ local unyielding -> unit = "%ignore"
 - : unit = ()
 - : unit = ()
-Line 7, characters 61-62:
-7 | let _ = with_global_unforkable (fun k -> requires_unyielding k)
-                                                                 ^
-Error: This value is "yielding" but is expected to be "unyielding".
+- : unit = ()
 |}]
 
 external returns_unyielding : 'a -> 'a @ local unyielding = "%identity"

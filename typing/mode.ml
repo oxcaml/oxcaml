@@ -882,9 +882,10 @@ module Lattices = struct
       { areality; linearity; portability; forkable; yielding; statefulness }
 
     let print ppf m =
-      Format.fprintf ppf "%a,%a,%a,%a,%a" Areality.print m.areality
+      Format.fprintf ppf "%a,%a,%a,%a,%a,%a" Areality.print m.areality
         Linearity.print m.linearity Portability.print m.portability
-        Yielding.print m.yielding Statefulness.print m.statefulness
+        Forkable.print m.forkable Yielding.print m.yielding Statefulness.print
+        m.statefulness
   end
   [@@inline]
 
@@ -2718,10 +2719,10 @@ module Yielding = struct
 
   let legacy = of_const Const.legacy
 
-  (* [unyielding] is the default for [forkable]s and [yielding] for [unforkable],
-     so we vary [zap_to_legacy] accordingly. *)
-  let zap_to_legacy ~forkable =
-    match forkable with true -> zap_to_floor | false -> zap_to_ceil
+  (* [unyielding] is the default for [global]s and [yielding] for [local]
+     or [regional] values, so we vary [zap_to_legacy] accordingly. *)
+  let zap_to_legacy ~global =
+    match global with true -> zap_to_floor | false -> zap_to_ceil
 end
 
 let regional_to_local m = S.apply Locality.Obj.obj C.Regional_to_local m
@@ -2831,10 +2832,7 @@ module Comonadic_with (Areality : Areality) = struct
     in
     let global = Areality.Const.(equal areality legacy) in
     let forkable = proj Forkable m |> Forkable.zap_to_legacy ~global in
-    let yielding =
-      proj Yielding m
-      |> Yielding.zap_to_legacy ~forkable:Forkable.Const.(equal forkable legacy)
-    in
+    let yielding = proj Yielding m |> Yielding.zap_to_legacy ~global in
     { areality; linearity; portability; forkable; yielding; statefulness }
 
   let legacy = of_const Const.legacy
