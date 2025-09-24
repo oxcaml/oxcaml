@@ -7,6 +7,7 @@ homepage: "https://ocaml.org"
 bug-reports: "https://github.com/ocaml/ocaml/issues"
 dev-repo: "git+https://github.com/ocaml/ocaml#4.14"
 depends: [
+  "ocaml" {= "4.14.2" & post}
   "base-unix" {post}
   "base-bigarray" {post}
   "base-threads" {post}
