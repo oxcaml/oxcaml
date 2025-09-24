@@ -136,9 +136,7 @@ let[@inline] set_instr_work_list state ~instruction_id ~work_list =
 
 let[@inline] get_instr_work_list state ~instruction_id =
   try InstructionId.Tbl.find state.instr_work_list instruction_id
-  with Not_found ->
-    fatal "Regalloc_irc_state.get_instr_work_list: instruction_id %a not found"
-      InstructionId.print instruction_id
+  with Not_found -> Cfg.Unknown_list
 
 let[@inline] add_initial_one state reg =
   Reg.Tbl.replace state.reg_work_list reg WorkList.Initial;
@@ -215,11 +213,7 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   InstructionWorkList.clear state.active_moves;
   RegisterStamp.PairSet.clear state.adj_set;
   Reg.Tbl.clear state.move_list;
-  InstructionId.Tbl.iter
-    (fun instruction_id _ ->
-      InstructionId.Tbl.replace state.instr_work_list instruction_id
-        Cfg.Unknown_list)
-    state.instr_work_list
+  InstructionId.Tbl.clear state.instr_work_list
 
 let[@inline] work_list state reg =
   match Reg.Tbl.find_opt state.reg_work_list reg with
