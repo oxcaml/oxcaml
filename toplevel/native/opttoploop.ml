@@ -304,13 +304,33 @@ let load_lambda ppf ~compilation_unit ~required_globals lam repr =
   | None -> default_load ppf program
   | Some {Jit.load; _} -> load ppf program
 
+(* *)
+let outval_of_sig_value env id val_kind val_type =
+  let sort =
+    match val_kind with
+    | Val_reg sort -> sort
+    | Val_ivar _ -> Jkind_types.Sort.(of_const Const.for_instance_var)
+    | Val_self _ | Val_anc _ -> Jkind_types.Sort.(of_const Const.for_object)
+    | Val_prim _ ->
+      Misc.fatal_error "Unexpected primitive"
+    | Val_mut _ ->
+      Misc.fatal_error "Mutable variable found at the structure level"
+  in
+  let call_outval () = outval_of_value env (toplevel_value id) val_type in
+  match Jkind.Sort.default_for_transl_and_get sort with
+  | Base Value -> call_outval ()
+  | _ when not !Clflags.native_code -> call_outval()
+  | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+         | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
+  | Product _ -> Oval_stuff "<abstr>"
+
 (* Print the outcome of an evaluation *)
 
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-       | Sig_value(id, {val_kind = Val_reg _; val_type; _}, _) ->
-          Some (outval_of_value env (toplevel_value id) val_type)
+       | Sig_value(id, {val_kind = Val_reg sort; val_type; _}, _) ->
+         Some (outval_of_sig_value env id (Val_reg sort) val_type)
       | _ -> None
     )
 
@@ -468,7 +488,7 @@ let execute_phrase print_outcome ppf phr =
                       match sg' with
                       | [ Sig_value (id, vd, _) ] ->
                           let outv =
-                            outval_of_value newenv (toplevel_value id)
+                            outval_of_sig_value newenv id vd.val_kind
                               vd.val_type
                           in
                           let ty = Printtyp.tree_of_type_scheme vd.val_type in

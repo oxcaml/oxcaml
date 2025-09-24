@@ -205,7 +205,7 @@ let build_package_cmx members cmxfile ~main_module_block_repr =
             filter (Asmlink.extract_crc_interfaces ());
       ui_imports_cmx =
           filter(Asmlink.extract_crc_implementations());
-      ui_format = format;
+      ui_format = Some format;
       ui_generic_fns =
         { curry_fun =
             union(List.map (fun info -> info.ui_generic_fns.curry_fun) units);
