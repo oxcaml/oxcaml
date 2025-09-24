@@ -51,6 +51,7 @@ Error: The kind of type "t" is immutable_data with 'a @@ portable
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
          contention: mod contended with 'a ≰ mod contended
+         forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
          statefulness: mod stateless with 'a ≰ mod stateless
          visibility: mod immutable with 'a ≰ mod immutable
@@ -104,6 +105,7 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
          statefulness: mod stateless with 'a ≰ mod stateless
          visibility: mod immutable with 'a ≰ mod immutable
@@ -222,6 +224,7 @@ Error: This type "(int -> int) u" should be an instance of type
        The first mode-crosses less than the second along:
          linearity: mod many with int -> int ≰ mod many
          contention: mod contended with int -> int ≰ mod contended
+         forkable: mod forkable with int -> int ≰ mod forkable
          yielding: mod unyielding with int -> int ≰ mod unyielding
          statefulness: mod stateless with int -> int ≰ mod stateless
          visibility: mod immutable with int -> int ≰ mod immutable
@@ -356,6 +359,7 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
+         forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
 |}]
 

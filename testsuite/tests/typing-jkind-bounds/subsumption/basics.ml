@@ -194,13 +194,14 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
+         forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
 |}]
 
 module M : sig
   type 'a t : immutable_data with 'a ref
 end = struct
-  type 'a t : mutable_data with 'a @@ many unyielding
+  type 'a t : mutable_data with 'a @@ many unyielding forkable
 end
 [%%expect {|
 module M : sig type 'a t : mutable_data with 'a @@ unyielding many end
