@@ -2865,7 +2865,7 @@ fun_expr:
     { mkexp ~loc:$sloc Pexp_hole }
   | mode=mode_legacy exp=seq_expr
      { mkexp_constraint ~loc:$sloc ~exp ~cty:None
-        ~modes:(Modes.singleton_core mode) }
+        ~modes:(Modes.of_core_modes [mode]) }
   | EXCLAVE seq_expr
      { mkexp_exclave ~loc:$sloc ~kwd_loc:($loc($1)) $2 }
 ;
@@ -3011,7 +3011,7 @@ comprehension_clause_binding:
      over to the RHS of the binding, so we need everything to be visible. *)
   | attributes mode_legacy pattern IN expr
       { let expr =
-          mkexp_constraint ~loc:$sloc ~exp:$5 ~cty:None ~modes:(Modes.singleton_core $2)
+          mkexp_constraint ~loc:$sloc ~exp:$5 ~cty:None ~modes:(Modes.of_core_modes [$2])
         in
         { pcomp_cb_pattern    = $3
         ; pcomp_cb_iterator   = Pcomp_in expr
@@ -4062,7 +4062,7 @@ jkind_desc:
           (fun {txt; loc} -> {txt = Mode txt; loc})
           $3
       in
-      Mod ($1, { core_modes; mod_modes = [] })
+      Mod ($1, Modes.of_core_modes core_modes)
     }
   (* CR zeisbach: if [optional_core_modalities_expr] is replaced by
      [optional_modality_annot_expr] then there is a shift/reduce conflict *)
@@ -4602,7 +4602,7 @@ strict_function_or_labeled_tuple_type:
 ;
 
 %inline mode_expr_legacy:
-   | mode_legacy+ { { core_modes = $1; mod_modes = [] } }
+   | mode_legacy+ { Modes.of_core_modes $1 }
 ;
 
 %inline optional_mode_expr_legacy:
@@ -4658,7 +4658,7 @@ mode_annot_expr:
 ;
 
 %inline core_modes_expr:
-  | at_mode_expr { { core_modes = $1; mod_modes = [] } }
+  | at_mode_expr { Modes.of_core_modes $1 }
 ;
 
 %inline optional_core_modes_expr:
@@ -4706,7 +4706,7 @@ optional_modality_annot_expr:
 optional_core_modalities_expr:
   | { Modalities.empty }
   | atat_modalities_expr
-    { { core_modalities = $1; mod_modalities = [] } }
+    { Modalities.of_core_modalities $1 }
 ;
 
 %inline stack(expr):
@@ -5250,11 +5250,12 @@ mutable_or_global_flag:
   | MUTABLE
     { Mutable, Modalities.empty }
   | GLOBAL
-    { Immutable, Modalities.singleton_core (mkloc (Modality "global") (make_loc $sloc)) }
+    { Immutable,
+      Modalities.of_core_modalities [(mkloc (Modality "global") (make_loc $sloc))] }
 ;
 %inline global_flag:
            { Modalities.empty }
-  | GLOBAL { Modalities.singleton_core (mkloc (Modality "global") (make_loc $sloc)) }
+  | GLOBAL { Modalities.of_core_modalities [(mkloc (Modality "global") (make_loc $sloc))]}
 ;
 virtual_flag:
     /* empty */                                 { Concrete }
