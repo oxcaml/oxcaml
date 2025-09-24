@@ -164,6 +164,9 @@ module Exist_pair = struct
     | "instances" -> Some (Pair (Instances, ()))
     | "separability" -> Some (Pair (Separability, ()))
     | "let_mutable" -> Some (Pair (Let_mutable, ()))
+    | "layout_poly" -> Some (Pair (Layout_poly, Stable))
+    | "layout_poly_alpha" -> Some (Pair (Layout_poly, Alpha))
+    | "layout_poly_beta" -> Some (Pair (Layout_poly, Beta))
     | _ -> None
 end
 
@@ -186,7 +189,8 @@ let all_extensions =
     Pack Small_numbers;
     Pack Instances;
     Pack Separability;
-    Pack Let_mutable ]
+    Pack Let_mutable;
+    Pack Layout_poly ]
 
 (**********************************)
 (* string conversions *)
