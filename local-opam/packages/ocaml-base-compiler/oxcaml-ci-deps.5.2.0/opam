@@ -11,7 +11,6 @@ depends: [
   "base-unix" {post}
   "base-bigarray" {post}
   "base-threads" {post}
-  "ocaml-options-vanilla" {post}
   # CI dependencies
   "menhir" {= "20231231" & post}
   "ocamlformat" {= "0.24.1" & post}
