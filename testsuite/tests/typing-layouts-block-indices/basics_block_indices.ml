@@ -689,7 +689,8 @@ Line 1, characters 40-46:
                                             ^^^^^^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
-       The kind of float is value mod many unyielding stateless immutable
+       The kind of float is
+           value mod many forkable unyielding stateless immutable
          because it is the primitive type float.
        But the kind of float must be a subkind of value_or_null mod non_float
          because it's the element type (the second type parameter) for a
@@ -727,7 +728,8 @@ Line 1, characters 41-48:
                                              ^^^^^^^
 Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(float iarray, 'b) idx_imm"
-       The kind of float is value mod many unyielding stateless immutable
+       The kind of float is
+           value mod many forkable unyielding stateless immutable
          because it is the primitive type float.
        But the kind of float must be a subkind of value_or_null mod non_float
          because it's the element type (the second type parameter) for a
@@ -744,7 +746,8 @@ Line 3, characters 23-24:
                            ^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
-       The kind of float is value mod many unyielding stateless immutable
+       The kind of float is
+           value mod many forkable unyielding stateless immutable
          because it is the primitive type float.
        But the kind of float must be a subkind of value_or_null mod non_float
          because of the definition of y at line 2, characters 10-17.
