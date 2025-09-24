@@ -218,16 +218,16 @@ val magic_D : void_variant =
 (***********************************)
 (* Test 3: top-level void bindings *)
 
-let x : t_void = assert false;;
+let x : t_void = t_void ();;
 [%%expect {|
-Exception: Assert_failure ("", 1, 17).
+val x : t_void = <abstr>
 |}];;
 
 module M3_1 = struct
-  let x : t_void = assert false;;
+  let x : t_void = t_void ();;
 end;;
 [%%expect {|
-Exception: Assert_failure ("", 2, 19).
+module M3_1 : sig val x : t_void end
 |}];;
 
 module M3_2 = struct
