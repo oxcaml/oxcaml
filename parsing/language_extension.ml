@@ -75,6 +75,7 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
   | Instances -> (module Unit)
   | Separability -> (module Unit)
   | Let_mutable -> (module Unit)
+  | Layout_poly -> (module Maturity)
 
 (* We'll do this in a more principled way later. *)
 (* CR layouts: Note that layouts is only "mostly" erasable, because of annoying
@@ -85,7 +86,7 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
    But we've decided to punt on this issue in the short term.
 *)
 let is_erasable : type a. a t -> bool = function
-  | Mode | Unique | Overwriting | Layouts -> true
+  | Mode | Unique | Overwriting | Layouts | Layout_poly -> true
   | Comprehensions | Include_functor | Polymorphic_parameters | Immutable_arrays
   | Module_strengthening | SIMD | Labeled_tuples | Small_numbers | Instances
   | Separability | Let_mutable ->
@@ -114,6 +115,7 @@ module Exist_pair = struct
     | Pair (Instances, ()) -> Stable
     | Pair (Separability, ()) -> Stable
     | Pair (Let_mutable, ()) -> Stable
+    | Pair (Layout_poly, m) -> m
 
   let is_erasable : t -> bool = function Pair (ext, _) -> is_erasable ext
 
@@ -124,6 +126,7 @@ module Exist_pair = struct
     | Pair (Small_numbers, m) ->
       to_string Small_numbers ^ "_" ^ maturity_to_string m
     | Pair (SIMD, m) -> to_string SIMD ^ "_" ^ maturity_to_string m
+    | Pair (Layout_poly, m) -> to_string Layout_poly ^ "_" ^ maturity_to_string m
     | Pair
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
            | Immutable_arrays | Module_strengthening | Labeled_tuples
@@ -224,10 +227,11 @@ let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
   | Instances, Instances -> Some Refl
   | Separability, Separability -> Some Refl
   | Let_mutable, Let_mutable -> Some Refl
+  | Layout_poly, Layout_poly -> Some Refl
   | ( ( Comprehensions | Mode | Unique | Overwriting | Include_functor
       | Polymorphic_parameters | Immutable_arrays | Module_strengthening
       | Layouts | SIMD | Labeled_tuples | Small_numbers | Instances
-      | Separability | Let_mutable ),
+      | Separability | Let_mutable | Layout_poly ),
       _ ) ->
     None
 
