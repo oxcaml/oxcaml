@@ -190,7 +190,6 @@ stdenv.mkDerivation rec {
       ocamlPackages.menhir
       ocamlPackages.ocaml
       ocamlPackages.dune_3
-      ocamlPackages.time_now
       ocamlPackages.cmdliner
       ocamlPackages.ppxlib
       ocamlPackages.findlib
@@ -205,7 +204,6 @@ stdenv.mkDerivation rec {
     ++ lib.optional oxcamlLldb pkgs.python312;
 
   buildInputs = [
-    ocamlPackages.time_now
     ocamlPackages.cmdliner
     ocamlPackages.ppxlib
     pkgs.llvm # llvm-objcopy is used for debuginfo

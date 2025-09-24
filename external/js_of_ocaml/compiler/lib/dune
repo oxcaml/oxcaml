@@ -5,8 +5,11 @@
  (libraries
   menhirLib
   sedlex
-  time_now
   yojson)
+  (foreign_stubs
+    (language c)
+    (names dune_action_trace_stubs)
+    (flags -std=c11 -fPIC))
  (flags
   (:standard -w -7-37 -safe-string))
  (preprocess
