@@ -147,10 +147,11 @@ val mem_all_introduced_temporaries : t -> Reg.t -> bool
 
 val diff_all_introduced_temporaries : t -> Reg.Set.t -> Reg.Set.t
 
-val set_irc_work_list :
-  t -> instruction_id:InstructionId.t -> irc_work_list:Cfg.irc_work_list -> unit
+val set_instr_work_list :
+  t -> instruction_id:InstructionId.t -> work_list:Cfg.irc_work_list -> unit
 
-val get_irc_work_list : t -> instruction_id:InstructionId.t -> Cfg.irc_work_list
+val get_instr_work_list :
+  t -> instruction_id:InstructionId.t -> Cfg.irc_work_list
 
 val update_register_locations : t -> unit
 
