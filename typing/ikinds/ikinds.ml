@@ -246,6 +246,29 @@ let relevance_of_rep = function
 
 let always_use_stored_jkind = false
 
+type constructor_ikind_payload =
+  { base : JK.poly;
+    coeffs : JK.poly array
+  }
+
+let pack_constructor_ikind (payload : constructor_ikind_payload) :
+    Types.constructor_ikind =
+  Obj.magic payload
+
+let unpack_constructor_ikind (packed : Types.constructor_ikind) :
+    constructor_ikind_payload =
+  Obj.magic packed
+
+let rehydrate_constructor_ikind ~(context : Jkind.jkind_context)
+    (payload : constructor_ikind_payload) : constructor_ikind_payload =
+  ignore context;
+  payload
+
+let constructor_ikind_polynomial ~(context : Jkind.jkind_context)
+    (packed : Types.constructor_ikind) : JK.poly * JK.poly list =
+  let payload = rehydrate_constructor_ikind ~context (unpack_constructor_ikind packed) in
+  payload.base, Array.to_list payload.coeffs
+
 let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     JK.constr_decl =
   match context.lookup_type p with
@@ -253,16 +276,23 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     failwith
       (Format.asprintf "Ikinds.lookup: unknown constructor %a" Path.print p)
   | Some decl -> (
-    if always_use_stored_jkind
-    then
-      let abstract =
-        match decl.type_manifest, decl.type_kind with
-        | None, Types.Type_abstract _ -> true
-        | _ -> false
+    match decl.type_ikind with
+    | Some constructor when !Clflags.ikinds ->
+      let base, coeffs =
+        constructor_ikind_polynomial ~context constructor
       in
-      let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
-      JK.Ty { args = decl.type_params; kind; abstract }
-    else
+      JK.Poly (base, coeffs)
+    | _ ->
+      if always_use_stored_jkind
+      then
+        let abstract =
+          match decl.type_manifest, decl.type_kind with
+          | None, Types.Type_abstract _ -> true
+          | _ -> false
+        in
+        let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
+        JK.Ty { args = decl.type_params; kind; abstract }
+      else
       match decl.type_manifest with
       | None -> (
         (* No manifest: may still be concrete (record/variant/...). Build
@@ -443,22 +473,9 @@ let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
   let solver = make_solver ~context in
   JK.normalize solver (ckind_of_jkind_l jkind)
 
-type constructor_ikind_payload =
-  { base : JK.poly;
-    coeffs : JK.poly array
-  }
-
 let pack_poly (poly : Ikind.Ldd.node) : Types.constructor_ikind = Obj.magic poly
 
 let unpack_poly (packed : Types.constructor_ikind) : Ikind.Ldd.node = Obj.magic packed
-
-let pack_constructor_ikind (payload : constructor_ikind_payload) :
-    Types.constructor_ikind =
-  Obj.magic payload
-
-let unpack_constructor_ikind (packed : Types.constructor_ikind) :
-    constructor_ikind_payload =
-  Obj.magic packed
 
 let normalize_and_pack ~(context : Jkind.jkind_context) ~(path : Path.t)
     (jkind : Types.jkind_l) : Types.constructor_ikind =
@@ -472,7 +489,7 @@ let type_declaration_ikind ~(context : Jkind.jkind_context)
   let solver = make_solver ~context in
   let base, coeffs = JK.constr_kind_poly solver path in
   let coeffs_array = Array.of_list coeffs in
-  if false || !__ikind_debug
+  if true || !__ikind_debug
   then (
     let base_str = JK.pp base in
     let coeffs_str =
@@ -484,11 +501,6 @@ let type_declaration_ikind ~(context : Jkind.jkind_context)
     Format.eprintf "[ikind-install] %a base=%s coeffs=[%s]@."
       Path.print path base_str coeffs_str);
   pack_constructor_ikind { base; coeffs = coeffs_array }
-
-let rehydrate_constructor_ikind ~(context : Jkind.jkind_context)
-    (payload : constructor_ikind_payload) : constructor_ikind_payload =
-  ignore context;
-  payload
 
 let apply_constructor_ikind ~(context : Jkind.jkind_context)
     (packed : Types.constructor_ikind) (args : Ikind.Ldd.node list) :
