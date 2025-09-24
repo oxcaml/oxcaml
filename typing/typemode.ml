@@ -422,7 +422,7 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) : Parsetree.modes =
         statefulness;
         visibility ]
   in
-  { core_modes; mod_modes = [] }
+  Ast_helper.Modes.of_core_modes core_modes
 
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
@@ -640,7 +640,7 @@ let untransl_modalities mut t : Parsetree.modalities =
     |> sort_dedup_modalities ~warn:false
     |> List.map untransl_modality
   in
-  { core_modalities; mod_modalities = [] }
+  Ast_helper.Modalities.of_core_modalities core_modalities
 
 let transl_alloc_mode modes =
   (* Q (ZJE): this feels bad to have modes sometimes be just the modes part
