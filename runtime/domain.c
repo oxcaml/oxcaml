@@ -2144,8 +2144,8 @@ static void domain_terminate (void)
   caml_memprof_delete_domain(domain_state);
 
   /* We can not touch domain_self after here because it may be reused */
-  domain_root_remove(&domain_state->dls_root);
-  domain_root_remove(&domain_state->tls_root);
+  domain_root_remove(&domain_state->dls_state);
+  domain_root_remove(&domain_state->tls_state);
   domain_root_remove(&domain_state->backtrace_last_exn);
   caml_stat_free(domain_state->final_info);
   caml_stat_free(domain_state->ephe_info);
