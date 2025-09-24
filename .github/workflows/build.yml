@@ -360,7 +360,7 @@ jobs:
         done
 
     - name: Collect and push metrics
-      if: matrix.name == 'flambda2_o3' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+      if: matrix.name == 'flambda2_o3'
       env:
         GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
       run: |
