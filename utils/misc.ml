@@ -1962,6 +1962,29 @@ let remove_double_underscores s =
   loop 0;
   Buffer.contents buf
 
+module Sexp = struct
+
+  type field =
+    | Bool : string * bool -> field
+    | Int : string * int -> field
+    | P : string * (Format.formatter -> 'a -> unit) * 'a -> field
+
+  let i s i = Int (s, i)
+  let b s b = Bool (s, b)
+  let p s pp p = P (s, pp, p)
+
+  let print_field ppf = function
+    | Bool (name, b) -> Format.fprintf ppf "@[<hov 1>(%s@ %b)@]" name b
+    | Int (name, i) -> Format.fprintf ppf "@[<hov 1>(%s@ %d)@]" name i
+    | P (name, pp, x) -> Format.fprintf ppf "@[<hov 1>(%s@ %a)@]" name pp x
+
+  let print ppf l =
+    let pp_sep = Format.pp_print_space in
+    Format.fprintf ppf "@[<hov 1>(%a)@]"
+      (Format.pp_print_list ~pp_sep print_field) l
+
+end
+
 module Json = struct
 
   (* [escape_unicode] is based on [Bytes.unsafe_escape], which is used
