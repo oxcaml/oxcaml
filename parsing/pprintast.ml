@@ -374,16 +374,15 @@ let optional_mod_mods f m =
 let mode f { txt = Mode s; _ } =
   pp_print_string f s
 
-let modes f m =
+let core_modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") mode f m
 
 let optional_at_core_modes f m =
   match m with
   | [] -> ()
-  | m -> pp f " %@ %a" modes m
+  | m -> pp f " %@ %a" core_modes m
 
-(* CR zeisbach: this isn't so good of a name... *)
-let optional_modes_mods f m =
+let optional_mode_annot f m =
   match m with
   | { core_modes = []; mod_modes = [] } -> ()
   | { core_modes; mod_modes } ->
@@ -394,15 +393,15 @@ let modality f m =
   let {txt = Modality txt; _} = m in
   pp_print_string f txt
 
-let modalities f m =
+let core_modalities f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") modality f m
 
 let optional_atat_core_modalities f m =
   match m with
   | [] -> ()
-  | m -> pp f "%@%@@ %a" modalities m
+  | m -> pp f "%@%@@ %a" core_modalities m
 
-let optional_modalities_mods ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m =
+let optional_modality_annot ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m =
   match m with
   | { core_modalities = []; mod_modalities = [] } -> ()
   | { core_modalities; mod_modalities } ->
@@ -411,12 +410,12 @@ let optional_modalities_mods ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f 
     optional_mod_mods f mod_modalities;
     post f ()
 
-let optional_space_modalities_mods f m =
+let optional_space_modality_annot f m =
   let pre f () = Format.fprintf f "@ " in
-  optional_modalities_mods ~pre f m
+  optional_modality_annot ~pre f m
 
-let optional_modalities_mods_newline f m =
-  optional_modalities_mods ~post:pp_print_newline f m
+let optional_modality_annot_newline f m =
+  optional_modality_annot ~post:pp_print_newline f m
 
 (** For a list of modes, we either print everything in old syntax (if they
   are purely old modes), or everything in new syntax. *)
@@ -451,7 +450,7 @@ let modalities_type pty ctxt f pca =
   else
     pp f "%a%a"
       (pty ctxt) pca.pca_type
-      optional_space_modalities_mods m
+      optional_space_modality_annot m
 
 let include_kind f = function
   | Functor -> pp f "@ functor"
@@ -471,7 +470,7 @@ and core_type_with_optional_legacy_modes pty ctxt f (c, m) =
     if print_modes_in_old_syntax m then
       pp f "%a%a" optional_legacy_modes m (core_type1 ctxt) c
     else
-      pp f "%a%a" (core_type1 ctxt) c optional_modes_mods m
+      pp f "%a%a" (core_type1 ctxt) c optional_mode_annot m
 
 and type_with_label ctxt f (label, c, mode) =
   match label with
@@ -504,7 +503,7 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
       pp f "%a with %a%a"
         (jkind_annotation ~nested:true ctxt) t
         (core_type ctxt) ty
-        optional_space_modalities_mods modalities;
+        optional_space_modality_annot modalities;
     ) f (t, ty, modalities)
   | Kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
   | Product ts ->
@@ -692,7 +691,7 @@ and return_type ctxt f (x, m) =
 and core_type_with_optional_modes  ctxt f (ty, modes) =
   match modes with
   | { core_modes = []; mod_modes = []} -> core_type ctxt f ty
-  | _ -> pp f "%a%a" (core_type2 ctxt) ty optional_modes_mods modes
+  | _ -> pp f "%a%a" (core_type2 ctxt) ty optional_mode_annot modes
 
 (********************pattern********************)
 (* be cautious when use [pattern], [pattern1] is preferred *)
@@ -868,7 +867,7 @@ and pattern2 ctxt f p =
     | None, false ->
         pp f "@[<2>%a%a@]"
         (simple_pattern ctxt) p
-        optional_modes_mods m
+        optional_mode_annot m
     end
   | _ -> pattern1 ctxt f p
 
@@ -1216,7 +1215,7 @@ and simple_expr ctxt f x =
       | None, true ->
         pp f "(%a %a)" optional_legacy_modes m (expression ctxt) e
       | None, false ->
-        pp f "(%a : _%a)" (expression ctxt) e optional_modes_mods m
+        pp f "(%a : _%a)" (expression ctxt) e optional_mode_annot m
       | Some ct, _ ->
         pp f "(%a : %a)"
           (expression ctxt) e
@@ -1273,7 +1272,7 @@ and value_description ctxt f x =
   (* note: value_description has an attribute field,
            but they're already printed by the callers this method *)
   pp f "@[<hov2>%a%a%a@]" (core_type ctxt) x.pval_type
-    optional_space_modalities_mods x.pval_modalities
+    optional_space_modality_annot x.pval_modalities
     (fun f x ->
        if x.pval_prim <> []
        then pp f "@ =@ %a" (list constant_string) x.pval_prim
@@ -1487,7 +1486,7 @@ and include_ : 'a. ctxt -> formatter ->
 
 and sig_include ctxt f incl moda =
   include_ ctxt f ~contents:module_type incl;
-  optional_space_modalities_mods f moda
+  optional_space_modality_annot f moda
 
 and kind_abbrev ctxt f name jkind =
   pp f "@[<hov2>kind_abbrev_@ %a@ =@ %a@]"
@@ -1497,12 +1496,12 @@ and kind_abbrev ctxt f name jkind =
 and module_type_with_optional_modes ctxt f (mty, mm) =
   match mm with
   | { core_modes = []; mod_modes = [] } -> module_type ctxt f mty
-  | _ -> pp f "%a%a" (module_type1 ctxt) mty optional_modes_mods mm
+  | _ -> pp f "%a%a" (module_type1 ctxt) mty optional_mode_annot mm
 
 and module_type1_with_optional_modes ctxt f (mty, mm) =
   match mm with
   | { core_modes = []; mod_modes = [] } -> module_type1 ctxt f mty
-  | _ -> pp f "%a%a" (module_type1 ctxt) mty optional_modes_mods mm
+  | _ -> pp f "%a%a" (module_type1 ctxt) mty optional_mode_annot mm
 
 and module_type ctxt f x =
   if x.pmty_attributes <> [] then begin
@@ -1563,7 +1562,7 @@ and module_type1 ctxt f x =
         pp f "(module %a)" longident_loc li;
     | Pmty_signature {psg_items; psg_modalities} ->
         pp f "@[<hv0>@[<hv2>sig%a@ %a@]@ end@]" (* "@[<hov>sig@ %a@ end@]" *)
-          optional_space_modalities_mods psg_modalities
+          optional_space_modality_annot psg_modalities
           (list (signature_item ctxt)) psg_items (* FIXME wrong indentation*)
     | Pmty_typeof me ->
         pp f "@[<hov2>module@ type@ of@ %a@]" (module_expr ctxt) me
@@ -1571,7 +1570,7 @@ and module_type1 ctxt f x =
     | _ -> paren true (module_type ctxt) f x
 
 and signature ctxt f {psg_items; psg_modalities} =
-  optional_modalities_mods_newline f psg_modalities;
+  optional_modality_annot_newline f psg_modalities;
   signature_items ctxt f psg_items
 
 and signature_items ctxt f items =
@@ -1618,13 +1617,13 @@ and signature_item ctxt f x : unit =
       pp f "@[<hov>module@ %s@ =@ %a%a@]%a"
         (Option.value pmd.pmd_name.txt ~default:"_")
         longident_loc alias
-        optional_space_modalities_mods pmd.pmd_modalities
+        optional_space_modality_annot pmd.pmd_modalities
         (item_attributes ctxt) pmd.pmd_attributes
   | Psig_module pmd ->
       pp f "@[<hov>module@ %s@ :@ %a%a@]%a"
         (Option.value pmd.pmd_name.txt ~default:"_")
         (module_type ctxt) pmd.pmd_type
-        optional_space_modalities_mods pmd.pmd_modalities
+        optional_space_modality_annot pmd.pmd_modalities
         (item_attributes ctxt) pmd.pmd_attributes
   | Psig_modsubst pms ->
       pp f "@[<hov>module@ %s@ :=@ %a@]%a" pms.pms_name.txt
@@ -1664,13 +1663,13 @@ and signature_item ctxt f x : unit =
               pp f "@ @[<hov2>and@ %s:@ %a%a@]%a"
                 (Option.value pmd.pmd_name.txt ~default:"_")
                 (module_type1 ctxt) pmd.pmd_type
-                optional_space_modalities_mods pmd.pmd_modalities
+                optional_space_modality_annot pmd.pmd_modalities
                 (item_attributes ctxt) pmd.pmd_attributes
             else
               pp f "@[<hov2>module@ rec@ %s:@ %a%a@]%a"
                 (Option.value pmd.pmd_name.txt ~default:"_")
                 (module_type1 ctxt) pmd.pmd_type
-                optional_space_modalities_mods pmd.pmd_modalities
+                optional_space_modality_annot pmd.pmd_modalities
                 (item_attributes ctxt) pmd.pmd_attributes;
             string_x_module_type_list f ~first:false tl
       in
@@ -1695,7 +1694,7 @@ and module_expr ctxt f x =
         | None ->
             pp f "@[<hov2>(%a%a)@]"
               (module_expr ctxt) me
-              optional_modes_mods mm
+              optional_mode_annot mm
         | Some mt ->
             pp f "@[<hov2>(%a@ :@ %a)@]"
               (module_expr ctxt) me
@@ -1767,7 +1766,7 @@ and poly_type_with_optional_modes ctxt f (vars, typ, modes) =
   match modes with
   | { core_modes = []; mod_modes = [] } -> poly_type ctxt core_type f (vars, typ)
   | _ -> pp f "%a%a" (poly_type ctxt core_type1) (vars, typ)
-      optional_modes_mods modes
+      optional_mode_annot modes
 
 (* transform [f = fun g h -> ..] to [f g h = ... ] could be improved *)
 and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = modes; _} =
@@ -1847,13 +1846,13 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
           | _ ->
             pp f "(%a%a)@ %a"
               (simple_pattern ctxt) p
-              optional_modes_mods modes
+              optional_mode_annot modes
               (pp_print_params_then_equals ctxt) x
           end
         | _ ->
           pp f "%a%a@;=@;%a"
             (pattern ctxt) p
-            optional_modes_mods modes
+            optional_mode_annot modes
             (expression ctxt) x
         end
       end
@@ -2003,7 +2002,7 @@ and structure_item ctxt f x =
         | ({pmb_expr={pmod_desc=Pmod_constraint (expr, None, mm)}} as pmb) ->
           pp f "@[<hov2>@ and@ %s%a@ =@ %a@]%a"
             (Option.value pmb.pmb_name.txt ~default:"_")
-            optional_modes_mods mm
+            optional_mode_annot mm
             (module_expr ctxt) expr
             (item_attributes ctxt) pmb.pmb_attributes
         | pmb ->
@@ -2023,7 +2022,7 @@ and structure_item ctxt f x =
       | ({pmb_expr={pmod_desc=Pmod_constraint (expr, None, mm)}} as pmb) :: l2 ->
         pp f "@[<hv>@[<hov2>module@ rec@ %s%a@ =@ %a@]%a@ %a@]"
           (Option.value pmb.pmb_name.txt ~default:"_")
-          optional_modes_mods mm
+          optional_mode_annot mm
           (module_expr ctxt) expr
           (item_attributes ctxt) pmb.pmb_attributes
           (fun f l2 -> List.iter (aux f) l2) l2
@@ -2105,7 +2104,7 @@ and record_declaration ctxt f ~unboxed lbls =
       optional_legacy_modalities legacy
       ident_of_name pld.pld_name.txt
       (core_type ctxt) pld.pld_type
-      optional_space_modalities_mods m
+      optional_space_modality_annot m
       (attributes ctxt) pld.pld_attributes
   in
   let hash = if unboxed then "#" else "" in
@@ -2376,7 +2375,7 @@ and function_constraint ctxt f x =
       (option ~first:":@;" (core_type ctxt)) ty1
       (core_type ctxt) ty2
   | { ret_type_constraint = None; ret_mode_annotations; _} ->
-    pp f "%a" optional_modes_mods ret_mode_annotations
+    pp f "%a" optional_mode_annot ret_mode_annotations
 
 and function_params_then_body ctxt f params constraint_ body ~delimiter =
   let pp_params f =
