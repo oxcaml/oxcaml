@@ -17,6 +17,12 @@ type compiler_settings = {
   native_code : bool;
 }
 
+let () =
+  Clflags.no_cwd := true;
+  Clflags.native_code := true;
+  Clflags.dont_write_files := true;
+  Clflags.shared := true
+
 let counter = ref 0
 
 let eval code =
@@ -40,7 +46,7 @@ let eval code =
 
   let ast = Parse.implementation lexbuf in
   (* Definitely won't clash, might be too weird. *)
-  let input_name = Printf.sprintf "Eval#%i" id in
+  let input_name = Printf.sprintf "Eval__%i" id in
   let compilation_unit =
     Compilation_unit.create Compilation_unit.Prefix.empty
       (Compilation_unit.Name.of_string input_name)
@@ -69,12 +75,21 @@ let eval code =
   (* ocaml-jit reads this so we need to set it *)
   Opttoploop.phrase_name := input_name;
   let ppf = Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) in
-  let res =
-    match Jit.jit_load ppf program with
-    | Result res -> res
-    | Exception exn -> raise exn
+
+  (match Jit.jit_load ppf program with
+  | Result _ -> ()
+  | Exception exn -> raise exn);
+
+  (* Compilenv.save_unit_info
+    (Unit_info.Artifact.filename (Unit_info.cmx unit_info))
+    ~main_module_block_format:program.main_module_block_format ~arg_descr:None; *)
+
+  let linkage_name =
+    Symbol.for_compilation_unit compilation_unit
+    |> Symbol.linkage_name |> Linkage_name.to_string
   in
-  Obj.obj (Obj.field res 0)
+  let obj = Jit.jit_lookup_symbol linkage_name |> Option.get in
+  Obj.obj (Obj.field obj 0)
 
 let compile_mutex = Mutex.create ()
 let eval code = Mutex.protect compile_mutex (fun () -> eval code)

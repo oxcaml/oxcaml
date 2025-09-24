@@ -20,6 +20,8 @@ val jit_load
   -> Opttoploop.evaluation_outcome
 (** Loads and runs the provided program *)
 
+val jit_lookup_symbol : string -> Obj.t option
+
 val init_top : unit -> unit
 (** Register the JIT so that the native toplevel uses it instead of
     the regular toolchain *)

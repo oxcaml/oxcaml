@@ -13,7 +13,7 @@
 (library
  (name camlinternaleval)
  (modes byte native)
- (libraries jit)
+ (libraries jit ocamlcommon)
  (flags
   (:standard
    -strict-sequence
