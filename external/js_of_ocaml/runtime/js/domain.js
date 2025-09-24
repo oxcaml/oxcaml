@@ -7,6 +7,7 @@ var caml_domain_dls = [0];
 //Version: >= 5
 function caml_domain_dls_set(a) {
   caml_domain_dls = a;
+  return 0;
 }
 
 //Provides: caml_domain_dls_compare_and_set
@@ -32,6 +33,7 @@ var caml_domain_tls = [0];
 //Requires: caml_domain_tls
 function caml_domain_tls_set(a) {
   caml_domain_tls = a;
+  return 0;
 }
 
 //Provides: caml_domain_tls_get
