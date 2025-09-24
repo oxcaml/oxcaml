@@ -71,9 +71,9 @@ val combine_ts : t -> t -> t = <fun>
 
 (* Top-level products *)
 
-let disallowed = #{ f = #3.14; i = 0 }
+let unboxed_product = #{ f = #3.14; i = 0 }
 [%%expect{|
-val disallowed : t = #{f = <abstr>; i = 0}
+val unboxed_product : t = #{f = <abstr>; i = 0}
 |}]
 
 ;;
@@ -81,8 +81,6 @@ val disallowed : t = #{f = <abstr>; i = 0}
 [%%expect{|
 - : t = #{f = <abstr>; i = 0}
 |}]
-
-(* However, we can have a top-level unboxed record if its kind is value *)
 
 type m_record = #{ i1 : int }
 module M = struct

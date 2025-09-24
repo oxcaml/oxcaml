@@ -1,5 +1,4 @@
 (* TEST
- include stdlib_upstream_compatible;
  flambda2;
  {
    setup-ocamlc.opt-build-env;
@@ -14,7 +13,7 @@
  }
 *)
 
-(* Won't compile on native because the scannable prefix is too big *)
+(* Won't compile because the scannable prefix is too big *)
 let f_0 = #42.0
 let a_0 = "a"
 let a_1 = "a"
