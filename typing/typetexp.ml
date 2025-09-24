@@ -618,7 +618,20 @@ let transl_type_param env path jkind_default styp =
   Builtin_attributes.warning_scope styp.ptyp_attributes
     (fun () -> transl_type_param env path jkind_default styp)
 
-let get_type_param_jkind path styp =
+module Default_jkind_bound = struct
+  type t =
+    | Legacy
+    | Any
+
+  let fresh_jkind ~path bound =
+    match bound with
+    | Legacy -> Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path)
+    | Any ->
+      (* We can use Dummy_jkind here because the  *)
+      Jkind.Builtin.any ~why:Dummy_jkind
+end
+
+let get_type_param_jkind path styp ~default_bound =
   let of_annotation jkind name =
     let jkind =
       Jkind.of_annotation ~context:(Type_parameter (path, name)) jkind
@@ -630,7 +643,7 @@ let get_type_param_jkind path styp =
       of_annotation jkind None
   | Ptyp_var (name, Some jkind) ->
       of_annotation jkind (Some name)
-  | _ -> Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path)
+  | _ -> Default_jkind_bound.fresh_jkind ~path default_bound
 
 let get_type_param_name styp =
   (* We don't need to check for jkinds here, just to get the name. *)

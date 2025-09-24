@@ -243,6 +243,7 @@ module History = struct
     | Old_style_unboxed_type
     | Array_element
     | Idx_element
+    | Unannotated_type_parameter_on_reexport of Path.t
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
