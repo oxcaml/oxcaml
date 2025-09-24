@@ -3251,6 +3251,8 @@ labeled_simple_expr:
     }
 ;
 
+%inline empty_list_modes: { Modes.empty }
+
 %inline let_ident_with_modes:
     optional_mode_expr_legacy let_ident
       { ($2, $1) }
@@ -3282,7 +3284,8 @@ let_binding_body_no_punning:
         let modes = Modes.append modes0 modes1 in
         (v, $5, Some (Pvc_constraint { locally_abstract_univars = []; typ }), modes)
       }
-  | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = core_type modes1 = optional_modes_mods_expr EQUAL e = seq_expr
+  | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = core_type  modes1 = empty_list_modes EQUAL e = seq_expr
+  | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = tuple_type modes1 = modes_mods_expr  EQUAL e = seq_expr
       (* The code upstream looks like:
          {[
            let constraint' =
@@ -4665,11 +4668,11 @@ modes_mods_expr:
     { { core_modes = []; mod_modes } }
 ;
 
-%inline optional_modes_mods_expr:
-  | { Modes.empty }
-  | modes_mods_expr
-    { $1 }
-;
+// %inline optional_modes_mods_expr:
+//   | { Modes.empty }
+//   | modes_mods_expr
+//     { $1 }
+// ;
 
 %inline with_optional_mode_expr(ty):
   | m0=optional_mode_expr_legacy ty=ty m1=optional_at_mode_expr_temp {
