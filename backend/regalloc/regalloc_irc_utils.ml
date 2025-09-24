@@ -77,6 +77,37 @@ module WorkList = struct
     | Select_stack -> "select_stack"
 end
 
+module InstrWorkList = struct
+  type t =
+    | Unknown_list
+    | Coalesced
+    | Constrained
+    | Frozen
+    | Work_list
+    | Active
+
+  let rank = function
+    | Unknown_list -> 0
+    | Coalesced -> 1
+    | Constrained -> 2
+    | Frozen -> 3
+    | Work_list -> 4
+    | Active -> 5
+
+  let equal
+      ((Unknown_list | Coalesced | Constrained | Frozen | Work_list | Active) as
+      left) right =
+    rank left = rank right
+
+  let to_string = function
+    | Unknown_list -> "unknown_list"
+    | Coalesced -> "coalesced"
+    | Constrained -> "constrained"
+    | Frozen -> "frozen"
+    | Work_list -> "work_list"
+    | Active -> "active"
+end
+
 module Color = struct
   type t = int
 end

@@ -85,14 +85,6 @@ module S = struct
       uo : Label.t  (** if at least one of x or y is NaN *)
     }
 
-  type irc_work_list =
-    | Unknown_list
-    | Coalesced
-    | Constrained
-    | Frozen
-    | Work_list
-    | Active
-
   type 'a instruction =
     { desc : 'a;
       id : InstructionId.t;

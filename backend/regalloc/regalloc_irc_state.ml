@@ -54,7 +54,7 @@ type t =
     reg_alias : Reg.t option Reg.Tbl.t;
     reg_interf : Reg.t list Reg.Tbl.t;
     reg_degree : int Reg.Tbl.t;
-    instr_work_list : Cfg.irc_work_list InstructionId.Tbl.t
+    instr_work_list : InstrWorkList.t InstructionId.Tbl.t
   }
 
 let[@inline] make ~initial ~stack_slots () =
@@ -136,7 +136,7 @@ let[@inline] set_instr_work_list state ~instruction_id ~work_list =
 
 let[@inline] get_instr_work_list state ~instruction_id =
   try InstructionId.Tbl.find state.instr_work_list instruction_id
-  with Not_found -> Cfg.Unknown_list
+  with Not_found -> InstrWorkList.Unknown_list
 
 let[@inline] add_initial_one state reg =
   Reg.Tbl.replace state.reg_work_list reg WorkList.Initial;
@@ -163,7 +163,7 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   let unknown_instruction_work_list (iwl : InstructionWorkList.t) : unit =
     InstructionWorkList.iter iwl ~f:(fun instr ->
         InstructionId.Tbl.replace state.instr_work_list instr.id
-          Cfg.Unknown_list)
+          InstrWorkList.Unknown_list)
   in
   List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
       Reg.Tbl.replace state.reg_color reg None;
@@ -381,9 +381,9 @@ let[@inline] choose_and_remove_work_list_moves state =
     res
 
 let[@inline] mem_active_moves state (instr : Instruction.t) =
-  Cfg.equal_irc_work_list
+  InstrWorkList.equal
     (get_instr_work_list state ~instruction_id:instr.id)
-    Cfg.Active
+    InstrWorkList.Active
 
 let[@inline] add_active_moves state (instr : Instruction.t) =
   set_instr_work_list state ~instruction_id:instr.id ~work_list:Active;
@@ -610,11 +610,11 @@ let[@inline] check_set_and_field_consistency_instr state
   Instruction.Set.iter
     (fun (instr : Instruction.t) ->
       let irc_work_list = get_instr_work_list state ~instruction_id:instr.id in
-      if not (Cfg.equal_irc_work_list irc_work_list field_value)
+      if not (InstrWorkList.equal irc_work_list field_value)
       then
         fatal "instruction %a is in %s but its field equals %S"
           InstructionId.format instr.id work_list
-          (Cfg.string_of_irc_work_list irc_work_list))
+          (InstrWorkList.to_string irc_work_list))
     set
 
 let[@inline] check_inter_has_no_duplicates state (reg : Reg.t) : unit =
@@ -687,19 +687,19 @@ let[@inline] invariant state =
       ~f:(check_set_and_field_consistency_instr state)
       [ ( "coalesced_moves",
           instruction_set_of_instruction_work_list state.coalesced_moves,
-          Cfg.Coalesced );
+          InstrWorkList.Coalesced );
         ( "constrained_moves",
           instruction_set_of_instruction_work_list state.constrained_moves,
-          Cfg.Constrained );
+          InstrWorkList.Constrained );
         ( "frozen_moves",
           instruction_set_of_instruction_work_list state.frozen_moves,
-          Cfg.Frozen );
+          InstrWorkList.Frozen );
         ( "work_list_moves",
           instruction_set_of_instruction_work_list state.work_list_moves,
-          Cfg.Work_list );
+          InstrWorkList.Work_list );
         ( "active_moves",
           instruction_set_of_instruction_work_list state.active_moves,
-          Cfg.Active ) ];
+          InstrWorkList.Active ) ];
     (* degree is consistent with adjacency lists/sets *)
     let work_lists =
       Reg.Set.union

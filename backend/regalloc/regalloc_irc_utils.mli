@@ -37,6 +37,20 @@ module WorkList : sig
   val to_string : t -> string
 end
 
+module InstrWorkList : sig
+  type t =
+    | Unknown_list
+    | Coalesced
+    | Constrained
+    | Frozen
+    | Work_list
+    | Active
+
+  val equal : t -> t -> bool
+
+  val to_string : t -> string
+end
+
 module Color : sig
   type t = int
 end

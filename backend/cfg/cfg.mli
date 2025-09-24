@@ -222,8 +222,6 @@ val set_stack_offset : 'a instruction -> int -> unit
 
 val set_live : 'a instruction -> Reg.Set.t -> unit
 
-val string_of_irc_work_list : irc_work_list -> string
-
 val dump_basic : Format.formatter -> basic -> unit
 
 val dump_terminator : ?sep:string -> Format.formatter -> terminator -> unit
@@ -255,7 +253,5 @@ val make_empty_block : ?label:Label.t -> terminator instruction -> basic_block
 
 (** "Contains calls" in the traditional sense as used in upstream [Selectgen]. *)
 val basic_block_contains_calls : basic_block -> bool
-
-val equal_irc_work_list : irc_work_list -> irc_work_list -> bool
 
 val invalid_stack_offset : int
