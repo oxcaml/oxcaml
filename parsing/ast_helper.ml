@@ -48,7 +48,7 @@ module Modes = struct
   let empty = { core_modes = []; mod_modes = [] }
   let append { core_modes = cm; mod_modes = mm } { core_modes = cm'; mod_modes = mm' } =
     { core_modes = cm @ cm'; mod_modes = mm @ mm' }
-  let singleton_core m = { core_modes = [m]; mod_modes = [] }
+  let of_core_modes core_modes = { core_modes; mod_modes = [] }
 end
 
 module Modalities = struct
@@ -56,7 +56,7 @@ module Modalities = struct
   let append { core_modalities = cm; mod_modalities = mm }
         { core_modalities = cm'; mod_modalities = mm' } =
     { core_modalities = cm @ cm'; mod_modalities = mm @ mm' }
-  let singleton_core m = { core_modalities = [m]; mod_modalities = [] }
+  let of_core_modalities core_modalities = { core_modalities; mod_modalities = [] }
 end
 
 module Attr = struct
