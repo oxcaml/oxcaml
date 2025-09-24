@@ -25,6 +25,21 @@ function caml_domain_dls_get(unit) {
   return caml_domain_dls;
 }
 
+//Provides: caml_domain_tls
+var caml_domain_tls = [0];
+
+//Provides: caml_domain_tls_set
+//Requires: caml_domain_tls
+function caml_domain_tls_set(a) {
+  caml_domain_tls = a;
+}
+
+//Provides: caml_domain_tls_get
+//Requires: caml_domain_tls
+function caml_domain_tls_get(unit) {
+  return caml_domain_tls;
+}
+
 //Provides: caml_atomic_load
 //Version: >= 5
 function caml_atomic_load(ref) {
