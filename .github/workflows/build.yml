@@ -376,9 +376,7 @@ jobs:
         # Create data directory if it doesn't exist
         mkdir -p metrics-repo/data
 
-        # Generate timestamp and short commit hash
-        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        # Use the actual commit being tested (not the merge commit for PRs)
+        # Determine the actual commit being tested (not the merge commit for PRs)
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
         else
@@ -390,29 +388,13 @@ jobs:
         # CSV filename
         CSV_FILE="metrics-repo/data/metrics-${DATE}-${SHORT_HASH}.csv"
 
-        # Extensions to track
-        EXTENSIONS="exe opt a cmxa cma cmi cmx cmo cms cmsi cmt cmti o"
+        # Use the metrics collection script
+        ${{ github.workspace }}/oxcaml/scripts/collect-size-metrics.sh \
+          "${{ github.workspace }}/_install" \
+          "$CSV_FILE" \
+          "$COMMIT_HASH"
 
-        # Write CSV header
-        echo "timestamp,commit_hash,extension,total_size_bytes" > "$CSV_FILE"
-
-        # Collect metrics for each extension
-        for ext in $EXTENSIONS; do
-          total_size=0
-          if find ${{ github.workspace }}/_install -name "*.${ext}" -type f > /tmp/files_${ext} 2>/dev/null; then
-            # Calculate total size of all files with this extension
-            while IFS= read -r file; do
-              if [ -f "$file" ]; then
-                size=$(stat -c%s "$file" 2>/dev/null || echo 0)
-                total_size=$((total_size + size))
-              fi
-            done < /tmp/files_${ext}
-          fi
-          # Write to CSV
-          echo "${TIMESTAMP},${COMMIT_HASH},${ext},${total_size}" >> "$CSV_FILE"
-        done
-
-        echo "Generated metrics file: $CSV_FILE"
+        echo "Contents of generated metrics file:"
         cat "$CSV_FILE"
 
         # Commit and push metrics
