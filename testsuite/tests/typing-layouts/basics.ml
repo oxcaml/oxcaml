@@ -1805,7 +1805,7 @@ external foo33 : t_any = "foo33";;
 Line 1, characters 17-22:
 1 | external foo33 : t_any = "foo33";;
                      ^^^^^
-Error: This type signature for "foo33" is not representable.
+Error: The type of a module-level value must have a representable layout.
        The layout of type t_any is any
          because of the definition of t_any at line 5, characters 0-18.
        But the layout of type t_any must be representable

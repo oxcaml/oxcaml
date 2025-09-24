@@ -1,5 +1,0 @@
-File "generative_functor_type_mismatch.ml", line 34, characters 22-35:
-34 | let _ = Id_2.validate (Id_1.gen ())
-                           ^^^^^^^^^^^^^
-Error: This expression has type "Id_1.t" but an expression was expected of type
-         "Id_2.t"

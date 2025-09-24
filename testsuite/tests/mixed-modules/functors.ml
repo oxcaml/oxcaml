@@ -31,9 +31,9 @@ end
 
 module Two = Incr (One)
 
-let _ = print_float (Float_u.to_float (id One.as_float_u))
+let _ = print_float (Float_u.to_float (id Two.as_float_u))
 let _ = print_endline ""
-let _ = print_endline (id One.as_string)
+let _ = print_endline (id Two.as_string)
 
 
 let _ = print_endline "Test 2: coercion in, no coercion out"

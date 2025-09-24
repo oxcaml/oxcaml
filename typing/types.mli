@@ -1069,7 +1069,8 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
-  (* Returns [None] for items that have no runtime representation *)
+  (* Returns [None] for items that have no runtime representation (see
+     [Includemod.is_runtime_component]. *)
   val sort_of_signature_item : signature_item -> Jkind_types.Sort.t option
 end
 

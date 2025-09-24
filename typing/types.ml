@@ -788,7 +788,9 @@ module Make_wrapped(Wrap : Wrap) = struct
         Some Jkind_types.Sort.(of_const Const.for_instance_var)
       | Val_self _ | Val_anc _ ->
         Some Jkind_types.Sort.(of_const Const.for_object)
-      | Val_prim _ | Val_mut _ -> None (* error will be thrown later in Env *)
+      | Val_prim _ -> None (* Primitives are not stored in modules *)
+      | Val_mut _ ->
+        Misc.fatal_error "Mutable variable found at the structure level"
       end
     | Sig_typext _ ->
       Some Jkind_types.Sort.(of_const Const.for_type_extension)

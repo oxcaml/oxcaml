@@ -1,6 +1,6 @@
 Test 1: no coercion in or out
-1.
-1
+2.
+1+1
 Test 2: coercion in, no coercion out
 11.
 10+1
