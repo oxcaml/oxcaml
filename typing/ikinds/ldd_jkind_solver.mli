@@ -20,7 +20,9 @@ module type LDD = sig
   type constr
 
   module Name : sig
-    type t
+    type t =
+      | Atom of { constr : constr; arg_index : int }
+      | Param of int
 
     val param : int -> t
 
@@ -58,6 +60,8 @@ module type LDD = sig
   val leq_with_reason : node -> node -> int list option
 
   val round_up : node -> lat
+
+  val map_rigid : (Name.t -> node) -> node -> node
 
   val clear_memos : unit -> unit
 
