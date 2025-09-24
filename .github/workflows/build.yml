@@ -359,6 +359,57 @@ jobs:
             -validate -param SPLIT_AROUND_LOOPS:on -regalloc $allocator || exit 1; \
         done
 
+    - name: Collect and push metrics
+      if: matrix.name == 'flambda2_o3' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        # Checkout metrics repository
+        git clone https://x-access-token:${{ secrets.METRICS_REPO_TOKEN }}@github.com/oxcaml/oxcaml-metrics.git metrics-repo
+
+        # Create data directory if it doesn't exist
+        mkdir -p metrics-repo/data
+
+        # Generate timestamp and short commit hash
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        COMMIT_HASH="${{ github.sha }}"
+        SHORT_HASH="${COMMIT_HASH:0:8}"
+        DATE=$(date -u +"%Y-%m-%d")
+
+        # CSV filename
+        CSV_FILE="metrics-repo/data/metrics-${DATE}-${SHORT_HASH}.csv"
+
+        # Extensions to track
+        EXTENSIONS="exe opt a cmxa cma cmi cmx cmo cms cmsi cmt cmti o"
+
+        # Write CSV header
+        echo "timestamp,commit_hash,extension,total_size_bytes" > "$CSV_FILE"
+
+        # Collect metrics for each extension
+        for ext in $EXTENSIONS; do
+          total_size=0
+          if find ${{ github.workspace }}/_install -name "*.${ext}" -type f > /tmp/files_${ext} 2>/dev/null; then
+            # Calculate total size of all files with this extension
+            while IFS= read -r file; do
+              if [ -f "$file" ]; then
+                size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+                total_size=$((total_size + size))
+              fi
+            done < /tmp/files_${ext}
+          fi
+          # Write to CSV
+          echo "${TIMESTAMP},${COMMIT_HASH},${ext},${total_size}" >> "$CSV_FILE"
+        done
+
+        echo "Generated metrics file: $CSV_FILE"
+        cat "$CSV_FILE"
+
+        # Commit and push metrics
+        cd metrics-repo
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add data/
+        git commit -m "Add metrics for commit ${{ github.sha }}"
+        git push
+
     - uses: actions/upload-artifact@v4
       if: ${{ failure() }}
       with:
@@ -388,6 +439,7 @@ jobs:
 #       with:
 #         name: _runtest-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
 #         path: ${{ github.workspace }}/oxcaml/_runtest
+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
