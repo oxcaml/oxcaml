@@ -408,6 +408,7 @@ jobs:
         cd metrics-repo
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
+        git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/oxcaml/oxcaml-metrics.git
         git add data/
         git commit -m "Add metrics for commit ${{ github.sha }}"
         git push
