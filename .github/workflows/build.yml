@@ -291,6 +291,12 @@ jobs:
         ulimit -c unlimited
         make $target \
           || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+
+        # Install the compiler for flambda2_o3 configuration to populate _install directory
+        # This is needed for the metrics collection step to analyze installed artifacts
+        if [ "${{ matrix.name }}" = "flambda2_o3" ]; then
+          make install
+        fi
       env:
         BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
         OCAMLPARAM: ${{ matrix.ocamlparam }}
