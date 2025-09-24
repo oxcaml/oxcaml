@@ -846,9 +846,9 @@ let bswap t (i : Cfg.basic Cfg.instruction) (bitwidth : Arch.bswap_bitwidth) =
     | Sixtyfour -> T.i64
   in
   let do_trunc arg =
-    if T.equal typ T.i64
+    if T.equal typ (V.get_type arg)
     then arg
-    else emit_ins t (I.convert Trunc ~arg ~to_:T.i64)
+    else emit_ins t (I.convert Trunc ~arg ~to_:typ)
   in
   let do_zext arg =
     if T.equal typ T.i64
@@ -899,6 +899,8 @@ let intrinsic t (i : Cfg.basic Cfg.instruction) intrinsic_name =
     let conved_res = do_conv res (T.of_reg i.res.(0)) in
     store_into_reg t i.res.(0) conved_res
   in
+  (* Intrinsics must not allocate on the OCaml heap. See
+     [Arch.operation_allocates]. *)
   match intrinsic_name with
   | "caml_sse2_float64_min" ->
     do_intrinsic_call "x86.sse2.min.sd" [T.doublex2; T.doublex2] T.doublex2

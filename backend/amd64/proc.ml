@@ -597,7 +597,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Specific (Isimd_mem (op,_))) ->
     destroyed_by_simd_mem_op op
   | Op (Specific (Illvm_intrinsic intr)) ->
-      Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+      Misc.fatal_errorf "destroyed_at_basic: Unexpected llvm_intrinsic %s: \
+                         not using LLVM backend"
         intr
   | Op (Move | Spill | Reload
        | Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
@@ -622,7 +623,10 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Poptrap _ | Prologue | Epilogue ->
     if fp then [| rbp |] else [||]
   | Stack_check _ ->
-    assert false (* the instruction is added after register allocation *)
+    (* This case is used by [Cfg_available_regs].  r10 is actually saved and
+       restored by the sequence to which [Stack_check] is expanded, but it may
+       be clobbered in the middle. *)
+    [| r10 |]
 
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
