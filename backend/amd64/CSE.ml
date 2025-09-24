@@ -46,7 +46,8 @@ let class_of_operation (op : Operation.t)
     | Icldemote _
     | Iprefetch _ -> Class Op_other
     | Illvm_intrinsic intr ->
-      Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+      Misc.fatal_errorf "CSE.class_of_operation: Unexpected llvm_intrinsic %s: \
+                         not using LLVM backend"
         intr
     end
   | Move | Spill | Reload
