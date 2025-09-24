@@ -43,14 +43,49 @@ let rec select_addr exp =
     let a, n = select_addr arg in
     if Misc.no_overflow_sub n m then a, n - m else default
   | Cmm.Cop (Clsl, [arg; Cconst_int (((1 | 2 | 3) as shift), _)], _) -> (
-    let default = Ascale (arg, 1 lsl shift), 0 in
-    match select_addr arg with
-    | Alinear e, n ->
-      if Misc.no_overflow_lsl n shift
-      then Ascale (e, 1 lsl shift), n lsl shift
-      else default
-    | (Asymbol _ | Aadd (_, _) | Ascale (_, _) | Ascaledadd (_, _, _)), _ ->
-      default)
+    (* Special case: When shifting an addition with a constant,
+       distribute the shift to help vectorization patterns *)
+    match arg with
+    | Cmm.Cop ((Caddi | Caddv | Cadda), [base; Cconst_int (offset, _)], _)
+      when Misc.no_overflow_lsl offset shift ->
+      (* Transform (base + offset) << shift into (base << shift) + (offset << shift) *)
+      Ascale (base, 1 lsl shift), offset lsl shift
+    | Cmm.Cop ((Caddi | Caddv | Cadda), [Cconst_int (offset, _); base], _)
+      when Misc.no_overflow_lsl offset shift ->
+      (* Transform (base + offset) << shift into (base << shift) + (offset << shift) *)
+      Ascale (base, 1 lsl shift), offset lsl shift
+    | _ ->
+      let default = Ascale (arg, 1 lsl shift), 0 in
+      match select_addr arg with
+      | Alinear e, n ->
+        if Misc.no_overflow_lsl n shift
+        then Ascale (e, 1 lsl shift), n lsl shift
+        else default
+      | (Asymbol _ | Aadd (_, _) | Ascale (_, _) | Ascaledadd (_, _, _)), _ ->
+        default)
+  (* Handle bit windowing operations that are simple left shifts *)
+  | Cmm.Cop (Cbitwindow { src = 0; dst; len; sign_extend = 0; low_bits }, [arg], _)
+    when dst >= 1 && dst <= 3 && len = 64 - dst && Nativeint.equal low_bits Nativeint.zero -> (
+    (* This is a simple left shift by dst *)
+    let shift = dst in
+    match arg with
+    | Cmm.Cop ((Caddi | Caddv | Cadda), [base; Cconst_int (offset, _)], _)
+      when Misc.no_overflow_lsl offset shift ->
+      (* Transform (base + offset) << shift into (base << shift) + (offset << shift) *)
+      Ascale (base, 1 lsl shift), offset lsl shift
+    | Cmm.Cop ((Caddi | Caddv | Cadda), [Cconst_int (offset, _); base], _)
+      when Misc.no_overflow_lsl offset shift ->
+      (* Transform (base + offset) << shift into (base << shift) + (offset << shift) *)
+      Ascale (base, 1 lsl shift), offset lsl shift
+    | _ ->
+      let default = Ascale (arg, 1 lsl shift), 0 in
+      match select_addr arg with
+      | Alinear e, n ->
+        if Misc.no_overflow_lsl n shift
+        then Ascale (e, 1 lsl shift), n lsl shift
+        else default
+      | (Asymbol _ | Aadd (_, _) | Ascale (_, _) | Ascaledadd (_, _, _)), _ ->
+        default)
   | Cmm.Cop (Cmuli, [arg; Cconst_int (((2 | 4 | 8) as mult), _)], _)
   | Cmm.Cop (Cmuli, [Cconst_int (((2 | 4 | 8) as mult), _); arg], _) -> (
     let default = Ascale (arg, mult), 0 in
