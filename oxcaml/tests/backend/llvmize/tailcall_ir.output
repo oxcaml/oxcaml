@@ -238,7 +238,7 @@ L143:
   %73 = load i64, ptr %6
   %74 = load i64, ptr %ds
   %75 = load i64, ptr %alloc
-  %76 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__collatz_even_HIDE_STAMP(i64 %74, i64 %75, i64 %72, i64 %73) "gc-leaf-function"="true" "statepoint-id"="0"
+  %76 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__collatz_even_HIDE_STAMP(i64 %74, i64 %75, i64 %72, i64 %73) "statepoint-id"="0"
   ret { { i64, i64 }, { i64 } } %76
 }
 
@@ -397,7 +397,7 @@ L174:
   %96 = load i64, ptr %6
   %97 = load i64, ptr %ds
   %98 = load i64, ptr %alloc
-  %99 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__collatz_odd_HIDE_STAMP(i64 %97, i64 %98, i64 %95, i64 %96) "gc-leaf-function"="true" "statepoint-id"="0"
+  %99 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__collatz_odd_HIDE_STAMP(i64 %97, i64 %98, i64 %95, i64 %96) "statepoint-id"="0"
   ret { { i64, i64 }, { i64 } } %99
 }
 
@@ -463,7 +463,7 @@ L182:
   %39 = load ptr addrspace(1), ptr %9
   %40 = load i64, ptr %ds
   %41 = load i64, ptr %alloc
-  %42 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @caml_apply3(i64 %40, i64 %41, i64 %36, i64 %37, ptr addrspace(1) %38, ptr addrspace(1) %39) "gc-leaf-function"="true" "statepoint-id"="0"
+  %42 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @caml_apply3(i64 %40, i64 %41, i64 %36, i64 %37, ptr addrspace(1) %38, ptr addrspace(1) %39) "statepoint-id"="0"
   ret { { i64, i64 }, { i64 } } %42
 }
 
@@ -576,7 +576,7 @@ L194:
   %70 = load ptr addrspace(1), ptr %9
   %71 = load i64, ptr %ds
   %72 = load i64, ptr %alloc
-  %73 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @caml_apply3(i64 %71, i64 %72, i64 %67, i64 %68, ptr addrspace(1) %69, ptr addrspace(1) %70) "gc-leaf-function"="true" "statepoint-id"="0"
+  %73 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @caml_apply3(i64 %71, i64 %72, i64 %67, i64 %68, ptr addrspace(1) %69, ptr addrspace(1) %70) "statepoint-id"="0"
   ret { { i64, i64 }, { i64 } } %73
 }
 

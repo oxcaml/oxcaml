@@ -918,8 +918,10 @@ module Instruction = struct
     Select { cond; ifso; ifnot }
 
   let call ~func ~args ~res_type ~attrs ~cc ~musttail =
-    (* Statepoint insertion breaks musttail checks, so we disable it if so. *)
-    let attrs = if musttail then Fn_attr.Gc_leaf_function :: attrs else attrs in
+    (* Statepoint insertion breaks musttail checks. We can't mark them as GC
+       leaves here, as LLVM might inline them to a position where they aren't
+       tail calls anymore and we'd need a statepoint there. So, we make LLVM
+       skip `musttail` calls instead. *)
     Call { func; args; res_type; attrs; cc; musttail }
 
   let inline_asm ~args ~res_type ~asm ~constraints ~sideeffect =
