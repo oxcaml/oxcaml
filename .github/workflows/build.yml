@@ -425,7 +425,7 @@ jobs:
         git config --global credential.https://github.com.helper "!gh auth git-credential"
 
         git add data/
-        git commit -m "Add metrics for commit ${{ github.sha }}"
+        git commit -m "Add metrics for commit ${COMMIT_HASH}"
         git push
 
     - uses: actions/upload-artifact@v4
