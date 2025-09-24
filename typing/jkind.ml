@@ -884,14 +884,28 @@ module Layout_and_axes = struct
          recursive descent" bit is why we recur separately down one type before
          iterating down the list.)
       *)
-      (* CR reisenberg: document seen_args *)
       let module Loop_control = struct
-        type seen = { relevant_axes_when_seen : Axis_set.t } [@@unboxed]
+        (** Represents the cache for a specific type constructor *)
+        type seen_constr =
+          { fuel : int;
+            seen_args : type_expr list;
+                (** The arguments the type constructor was most recently seen
+                    with. *)
+            relevant_axes_when_seen : Axis_set.t
+                (** The axes that were relevant when the type constructor was
+                    most recently seen. *)
+          }
+
+        type seen_row_var =
+          { relevant_axes_when_seen : Axis_set.t
+                (** The axes that were relevant when the row var was seen. *)
+          }
+        [@@unboxed]
 
         type t =
           { tuple_fuel : int;
-            seen_constrs : (int * type_expr list * seen) Path.Map.t;
-            seen_row_vars : seen Numbers.Int.Map.t;
+            seen_constrs : seen_constr Path.Map.t;
+            seen_row_vars : seen_row_var Numbers.Int.Map.t;
             fuel_status : Fuel_status.t
           }
 
@@ -976,12 +990,13 @@ module Layout_and_axes = struct
                 { t with
                   seen_constrs =
                     Path.Map.add p
-                      ( initial_fuel_per_ty,
-                        args,
-                        { relevant_axes_when_seen = relevant_axes } )
+                      { fuel = initial_fuel_per_ty;
+                        seen_args = args;
+                        relevant_axes_when_seen = relevant_axes
+                      }
                       seen_constrs
                 }
-            | Some (fuel, seen_args, { relevant_axes_when_seen }) ->
+            | Some { fuel; seen_args; relevant_axes_when_seen } ->
               let args_equal =
                 List.for_all2
                   (fun ty1 ty2 ->
@@ -999,15 +1014,20 @@ module Layout_and_axes = struct
                   { t with
                     seen_constrs =
                       Path.Map.add p
-                        ( fuel - 1,
-                          args,
-                          { relevant_axes_when_seen =
-                              (if args_equal
-                              then
-                                Axis_set.union relevant_axes
-                                  relevant_axes_when_seen
-                              else relevant_axes)
-                          } )
+                        { fuel = fuel - 1;
+                          seen_args = args;
+                          relevant_axes_when_seen =
+                            (* Even if we can't skip the type, if the args match
+                               the most recently seen args, we can merge the
+                               relevant axes with the ones seen previously since
+                               we have now seen the types under all of these
+                               axes. *)
+                            (if args_equal
+                            then
+                              Axis_set.union relevant_axes
+                                relevant_axes_when_seen
+                            else relevant_axes)
+                        }
                         seen_constrs
                   }
               else Stop { t with fuel_status = Ran_out_of_fuel })
