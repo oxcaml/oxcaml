@@ -108,7 +108,10 @@ fi
         for dep in ${deps[$cu]:-$cu}; do
             echo "${cu}.cmjx ${dep}.cmjx"
         done
-    done | tsort | uniq | tac | tr '\n' ' ')
+
+        # This horrifying sed command just reverses the input, like `tac` except available
+        # on both macos and linux
+    done | tsort | uniq | sed '1!G;h;$!d' | tr '\n' ' ')
 
 # Generate dune rules
 echo ";; Generated dune rules for ocamlj $library compilation"
