@@ -318,6 +318,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
+  type anyvar = Var : 'a var -> anyvar [@@unboxed]
+
   let get_key (Amorphvar (v, m, _)) = v.id, Any_morph m
 
   module VarSet = Set.Make (Int)
@@ -800,11 +802,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           then set_vlower ~log u (VarMap.add key x u.vlower);
           Ok ())
 
-  let cnt_id = ref 0
+  let vars = ref (0, [])
 
   let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower obj =
-    let id = !cnt_id in
-    cnt_id := id + 1;
+    let id, l = !vars in
     let upper, upper_hint =
       match upper, upper_hint with
       | None, None -> C.max obj, Comp_hint.Max
@@ -820,7 +821,21 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       | Some lower, Some lower_hint -> lower, lower_hint
     in
     let vlower = Option.value vlower ~default:VarMap.empty in
-    { upper; upper_hint; lower; lower_hint; vlower; id }
+    let var = { upper; upper_hint; lower; lower_hint; vlower; id } in
+    vars := id + 1, Var var :: l;
+    var
+
+  let unhint_morphvar (Amorphvar (v, f, _)) =
+    Amorphvar (v, f, Comp_hint.Morph_hint.Base (H.Morph.unknown, f))
+
+  let unhint_var v =
+    v.upper_hint <- Comp_hint.Unknown v.upper;
+    v.lower_hint <- Comp_hint.Unknown v.lower;
+    v.vlower <- VarMap.map unhint_morphvar v.vlower
+
+  let unhint_vars () =
+    let _, l = !vars in
+    List.iter (fun (Var v) -> unhint_var v) l
 
   type ('a, 'd) hint_raw = ('a, 'd) Comp_hint.t
 

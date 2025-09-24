@@ -4247,6 +4247,7 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env source_intf dclsig arg_type
           in
           Typecore.force_delayed_checks ();
+          Mode.unhint_vars ();
           Typecore.optimise_allocations ();
           (* It is important to run these checks after the inclusion test above,
              so that value declarations which are not used internally but
@@ -4286,6 +4287,7 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env sourcefile simple_sg arg_type
           in
           Typecore.force_delayed_checks ();
+          Mode.unhint_vars ();
           Typecore.optimise_allocations ();
           (* See comment above. Here the target signature contains all
              the values being exported. We can still capture unused

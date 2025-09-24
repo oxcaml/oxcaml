@@ -233,6 +233,10 @@ module type Solver_mono = sig
   (** Create a new mode variable of the full range. *)
   val newvar : 'a obj -> ('a, 'l * 'r) mode
 
+  (** Remove hints from all vars that have been created. This doesn't affect
+  hints that were applied on top of vars. *)
+  val unhint_vars : unit -> unit
+
   (** Raw hint returned by failed [submode a b]. To consume it, see [populate_hint]. *)
   type ('a, 'd) hint_raw constraint 'd = 'l * 'r
 

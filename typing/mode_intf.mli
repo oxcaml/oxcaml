@@ -208,6 +208,9 @@ type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
 module type S = sig
   val print_longident : (Format.formatter -> Longident.t -> unit) ref
 
+  (** Remove hints from all variables that have been created. *)
+  val unhint_vars : unit -> unit
+
   module Hint = Mode_hint
 
   type nonrec 'a simple_error = 'a simple_error
