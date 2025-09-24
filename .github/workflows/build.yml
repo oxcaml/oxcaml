@@ -182,6 +182,7 @@ jobs:
           local: file://${{ github.workspace }}/local-opam
           default: https://github.com/ocaml/opam-repository.git
         opam-disable-sandboxing: true
+        opam-pin: false
         cache-prefix: ${{ matrix.os }}-v1
 
     - name: Install Opam dependencies
