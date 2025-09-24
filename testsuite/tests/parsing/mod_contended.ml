@@ -27,13 +27,13 @@ module type S = sig
   (* type declarations are not currently intended to be supported, but could be one day.
      these examples are included as an indication of what could come eventually *)
 
-  (* type t =
+  type t =
     | T1 of int mod contended aliased
     | T2 of int @@ once portable mod contended aliased
     | T3 of (int -> int) mod contended aliased
     | T4 of (int -> int) @@ once portable mod contended aliased
     | T5 of int @@ once portable mod contended aliased * int mod contended aliased
-    | T6 of { x : int mod contended } -> int
+    (*= | T6 of { x : int mod contended } -> int *)
   (* these examples are non-exhaustive; see the OxCaml docs -> modes -> syntax ->
      "constructor field" examples *)
 
@@ -42,7 +42,7 @@ module type S = sig
   ; f2 : 'a @@ once portable mod contended aliased
   ; f3 : 'a -> 'a mod contended aliased
   ; f4 : 'a -> 'a @@ once portable mod contended aliased
-  } *)
+  }
 
   (* the other places where modalities appear all have to deal with modules, which is
      not currently intended to be supported *)
@@ -94,7 +94,7 @@ module M = struct
   let foo = (42 : int mod contended aliased) + (42 : int @ once portable mod contended aliased)
   let foo = (42 : _ mod contended aliased) + (42 : _ @ once portable mod contended aliased)
 end
-(*=
+
 (* let expressions (not just as structure items) *)
 let f () =
   let v mod contended aliased = 42 in
@@ -105,7 +105,7 @@ let f () =
   and v : int @ once portable mod contended aliased = 42
   and v : (int -> int) @ once portable mod contended aliased = fun _ -> 42 in
 
-  () *)
+  ()
 
 (* ALSO WORTH TESTING:
     - make sure that comments work; specifically, that doc comments are attached to the
