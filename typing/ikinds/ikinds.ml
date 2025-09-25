@@ -1,17 +1,7 @@
 (* This forces ikinds globally on. *)
 (* Clflags.ikinds := true *)
 
-(* Debug logging helper with indentation (2 spaces per level).
-   Enable by setting IKIND_DEBUG=1|true|yes in the environment. *)
-let () =
-  let is_enabled value =
-    match String.lowercase_ascii (String.trim value) with
-    | "" | "0" | "false" | "no" | "off" -> false
-    | _ -> true
-  in
-  match Sys.getenv_opt "IKIND_DEBUG" with
-  | Some value when is_enabled value -> Types.ikind_debug := true
-  | _ -> ()
+(* Types.ikind_debug := !Clflags.ikinds *)
 
 module Ldd = Ikind.Ldd
 
@@ -47,6 +37,7 @@ let with_origin_tag (tag : string) (f : unit -> 'a) : 'a =
 let __ikind_log_depth = ref 0
 
 let log ?pp (msg : string) (f : unit -> 'a) : 'a =
+  Types.ikind_debug := !Clflags.ikinds;
   if not !Types.ikind_debug
   then f ()
   else
@@ -501,9 +492,10 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           in
           JK.Poly (base, coeffs))
     | Types.No_constructor_ikind reason ->
-      if (not !Clflags.ikinds) || (not !Types.ikind_debug)
+      if !Clflags.ikinds && !Types.ikind_debug
       then ()
-      else Format.eprintf "[ikind-miss] %a => %s@." Path.print p reason;
+      else if !Clflags.ikinds
+      then Format.eprintf "[ikind-miss] %a => %s@." Path.print p reason;
       fallback ()
     | Types.Constructor_ikind _ -> fallback ()
 
@@ -768,11 +760,3 @@ let sub_or_error ?origin
       else
         (* Delegate to Jkind for detailed error reporting. *)
         Jkind.sub_or_error ~type_equal ~context t1 t2)
-
-(* Developer probe stub: set IKIND_POLY_PROBE to enable future tests. No-op by
-   default. *)
-let () =
-  match Sys.getenv_opt "IKIND_POLY_PROBE" with
-  | Some v when v = "1" || String.lowercase_ascii v = "true" ->
-    Format.eprintf "[ikind] IKIND_POLY_PROBE enabled (no-op stub)\n%!"
-  | _ -> ()
