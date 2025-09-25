@@ -1672,7 +1672,7 @@ module_name_modes:
 
 module_name_modalities:
   | mkrhs(module_name) { $1, Modalities.empty }
-  | LPAREN mkrhs(module_name) modality_annot_expr RPAREN { $2, $3 }
+  | LPAREN mkrhs(module_name) core_modalities_expr RPAREN { $2, $3 }
 
 (* -------------------------------------------------------------------------- *)
 
@@ -2072,7 +2072,7 @@ module_type:
 (* A signature, which appears between SIG and END (among other places),
    is a list of signature elements. *)
 signature:
-  optional_modality_annot_expr extra_sig(flatten(signature_element*))
+  optional_core_modalities_expr extra_sig(flatten(signature_element*))
     { { psg_modalities = $1;
         psg_items = $2;
         psg_loc = make_loc $sloc; } }
@@ -2134,7 +2134,7 @@ signature_item:
         { let (ext, l) = $1 in (Psig_class_type l, ext) }
     )
     { $1 }
-  | include_statement(module_type) modalities = optional_modality_annot_expr
+  | include_statement(module_type) modalities = optional_core_modalities_expr
       { let incl, ext = $1 in
         let item = mksig ~loc:$sloc (Psig_include (incl, modalities)) in
         wrap_sig_ext ~loc:$sloc item ext
@@ -2146,7 +2146,7 @@ signature_item:
   ext = ext attrs1 = attributes
   name_ = module_name_modalities
   body = module_declaration_body(
-    module_type optional_modality_annot_expr { ($1, $2) }
+    module_type optional_core_modalities_expr { ($1, $2) }
   )
   attrs2 = post_item_attributes
   {
@@ -2184,7 +2184,7 @@ module_declaration_body(module_type_with_optional_modal_expr):
   name_ = module_name_modalities
   EQUAL
   body = module_expr_alias
-  modalities = optional_modality_annot_expr
+  modalities = optional_core_modalities_expr
   attrs2 = post_item_attributes
   {
     let attrs = attrs1 @ attrs2 in
@@ -2230,7 +2230,7 @@ module_subst:
   name = mkrhs(module_name)
   COLON
   mty = module_type
-  modalities = optional_modality_annot_expr
+  modalities = optional_core_modalities_expr
   attrs2 = post_item_attributes
   {
     let attrs = attrs1 @ attrs2 in
@@ -2245,7 +2245,7 @@ module_subst:
   name = mkrhs(module_name)
   COLON
   mty = module_type
-  modalities = optional_modality_annot_expr
+  modalities = optional_core_modalities_expr
   attrs2 = post_item_attributes
   {
     let attrs = attrs1 @ attrs2 in
@@ -4693,6 +4693,10 @@ optional_modality_annot_expr:
     { Modalities.empty }
   | modality_annot_expr
     { $1 }
+;
+
+%inline core_modalities_expr:
+  | atat_modalities_expr { Modalities.of_core_modalities $1 }
 ;
 
 optional_core_modalities_expr:
