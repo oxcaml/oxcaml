@@ -910,9 +910,12 @@ module Layout_and_axes = struct
           }
 
         type result =
-          | Stop of t (* give up, returning [max] *)
-          | Skip (* skip reducing this type, but otherwise continue *)
-          | Continue of t (* continue, with a new [t] *)
+          | Stop of t  (** give up, returning [max] *)
+          | Skip  (** skip reducing this type, but otherwise continue *)
+          | Continue of
+              { ctl : t;
+                skippable_axes : Axis_set.t
+              }  (** continue, with a new [t] *)
 
         let initial_fuel_per_ty = 2
 
@@ -981,20 +984,27 @@ module Layout_and_axes = struct
           | Tpoly (ty, _) -> check ~relevant_axes t ty
           | Ttuple _ ->
             if tuple_fuel > 0
-            then Continue { t with tuple_fuel = tuple_fuel - 1 }
+            then
+              Continue
+                { ctl = { t with tuple_fuel = tuple_fuel - 1 };
+                  skippable_axes = Axis_set.empty
+                }
             else Stop { t with fuel_status = Ran_out_of_fuel }
           | Tconstr (p, args, _) -> (
             match Path.Map.find_opt p seen_constrs with
             | None ->
               Continue
-                { t with
-                  seen_constrs =
-                    Path.Map.add p
-                      { fuel = initial_fuel_per_ty;
-                        seen_args = args;
-                        relevant_axes_when_seen = relevant_axes
-                      }
-                      seen_constrs
+                { ctl =
+                    { t with
+                      seen_constrs =
+                        Path.Map.add p
+                          { fuel = initial_fuel_per_ty;
+                            seen_args = args;
+                            relevant_axes_when_seen = relevant_axes
+                          }
+                          seen_constrs
+                    };
+                  skippable_axes = Axis_set.empty
                 }
             | Some { fuel; seen_args; relevant_axes_when_seen } ->
               let args_equal =
@@ -1004,31 +1014,37 @@ module Layout_and_axes = struct
                       (Transient_expr.repr ty2))
                   seen_args args
               in
-              if args_equal
-                 && (not (context.is_abstract p))
-                 && Axis_set.is_subset relevant_axes relevant_axes_when_seen
+              let skippable_axes =
+                if args_equal && not (context.is_abstract p)
+                then relevant_axes_when_seen
+                else Axis_set.empty
+              in
+              if Axis_set.is_subset relevant_axes skippable_axes
               then Skip
               else if fuel > 0
               then
                 Continue
-                  { t with
-                    seen_constrs =
-                      Path.Map.add p
-                        { fuel = fuel - 1;
-                          seen_args = args;
-                          relevant_axes_when_seen =
-                            (* Even if we can't skip the type, if the args match
-                               the most recently seen args, we can merge the
-                               relevant axes with the ones seen previously since
-                               we have now seen the types under all of these
-                               axes. *)
-                            (if args_equal
-                            then
-                              Axis_set.union relevant_axes
-                                relevant_axes_when_seen
-                            else relevant_axes)
-                        }
-                        seen_constrs
+                  { ctl =
+                      { t with
+                        seen_constrs =
+                          Path.Map.add p
+                            { fuel = fuel - 1;
+                              seen_args = args;
+                              relevant_axes_when_seen =
+                                (* Even if we can't skip the type, if the args match
+                                   the most recently seen args, we can merge the
+                                   relevant axes with the ones seen previously since
+                                   we have now seen the types under all of these
+                                   axes. *)
+                                (if args_equal
+                                then
+                                  Axis_set.union relevant_axes
+                                    relevant_axes_when_seen
+                                else relevant_axes)
+                            }
+                            seen_constrs
+                      };
+                    skippable_axes
                   }
               else Stop { t with fuel_status = Ran_out_of_fuel })
           | Tvariant _ ->
@@ -1044,13 +1060,17 @@ module Layout_and_axes = struct
             then Skip
             else
               Continue
-                { t with
-                  seen_row_vars =
-                    Numbers.Int.Map.add row_var_id
-                      { relevant_axes_when_seen =
-                          Axis_set.union relevant_axes_when_seen relevant_axes
-                      }
-                      seen_row_vars
+                { ctl =
+                    { t with
+                      seen_row_vars =
+                        Numbers.Int.Map.add row_var_id
+                          { relevant_axes_when_seen =
+                              Axis_set.union relevant_axes_when_seen
+                                relevant_axes
+                          }
+                          seen_row_vars
+                    };
+                  skippable_axes = relevant_axes
                 }
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
           | Tunivar _ | Tpackage _ | Tof_kind _ ->
@@ -1058,7 +1078,7 @@ module Layout_and_axes = struct
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
                should double-check before we're done that they haven't. *)
-            Continue t
+            Continue { ctl = t; skippable_axes = Axis_set.empty }
           | Tlink _ | Tsubst _ ->
             Misc.fatal_error "Tlink or Tsubst in normalize"
       end in
@@ -1131,7 +1151,11 @@ module Layout_and_axes = struct
                 ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
             let found_jkind_for_ty new_ctl b_upper_bounds b_with_bounds quality
-                : Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
+                skippable_axes :
+                Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
+              let relevant_axes_for_ty =
+                Axis_set.diff relevant_axes_for_ty skippable_axes
+              in
               match quality, mode with
               | Best, _ | Not_best, Ignore_best ->
                 (* The relevant axes are the intersection of the relevant axes within our
@@ -1180,20 +1204,20 @@ module Layout_and_axes = struct
             | Stop ctl_after_stop ->
               (* out of fuel, so assume [ty] has the worst possible bounds. *)
               found_jkind_for_ty ctl_after_stop Mod_bounds.max No_with_bounds
-                Not_best [@nontail]
+                Not_best Axis_set.empty [@nontail]
             | Skip -> loop ctl bounds_so_far relevant_axes bs (* skip [b] *)
-            | Continue ctl_after_unpacking_b -> (
+            | Continue { ctl = ctl_after_unpacking_b; skippable_axes } -> (
               match context.jkind_of_type ty with
               | Some b_jkind ->
                 found_jkind_for_ty ctl_after_unpacking_b
                   b_jkind.jkind.mod_bounds b_jkind.jkind.with_bounds
-                  b_jkind.quality [@nontail]
+                  b_jkind.quality skippable_axes [@nontail]
               | None ->
                 (* kind of b is not principally known, so we treat it as having
                    the max bound (only along the axes we care about for this
                    type!) *)
                 found_jkind_for_ty ctl_after_unpacking_b Mod_bounds.max
-                  No_with_bounds Not_best [@nontail])))
+                  No_with_bounds Not_best skippable_axes [@nontail])))
       in
       let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
       let mod_bounds, with_bounds, fuel_status =
