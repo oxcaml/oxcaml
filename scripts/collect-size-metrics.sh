@@ -40,7 +40,9 @@ for ext in $EXTENSIONS; do
         fi
     fi
     # Clean up temporary file
-    rm -f "$temp_file"
+    if [ -n "$temp_file" ]; then
+        rm -f "$temp_file"
+    fi
     # Write to CSV
     echo "${TIMESTAMP},${COMMIT_HASH},${ext},${total_size}" >> "$CSV_FILE"
 done
