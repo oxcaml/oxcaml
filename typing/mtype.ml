@@ -99,9 +99,12 @@ and strengthen_lazy_sig' ~aliasable sg p =
               Some(Btype.newgenty(Tconstr(path,
                                           decl.type_params, ref Mnil))) in
             if Btype.type_kind_is_abstract decl then
-              { decl with type_private = Public; type_manifest = manif }
+              { decl with type_private = Public;
+                         type_manifest = manif;
+                         type_ikind = None }
             else
-              { decl with type_manifest = manif }
+              { decl with type_manifest = manif;
+                         type_ikind = None }
       in
       let path = Pdot(p, Ident.name id) in
       let new_unboxed_version =
@@ -567,14 +570,17 @@ let enrich_typedecl env p id decl =
                 Option.map
                   (fun d ->
                     let orig_ty_unboxed =
-                      Btype.newgenty(
-                        Tconstr
-                          (Path.unboxed_version p, decl.type_params, ref Mnil))
+                      Btype.newgenty
+                        (Tconstr
+                           (Path.unboxed_version p, decl.type_params, ref Mnil))
                     in
-                    { d with type_manifest = Some orig_ty_unboxed })
+                    { d with type_manifest = Some orig_ty_unboxed;
+                             type_ikind = None })
                   decl.type_unboxed_version
               in
-              {decl with type_manifest = Some orig_ty; type_unboxed_version}
+              { decl with type_manifest = Some orig_ty;
+                         type_unboxed_version;
+                         type_ikind = None }
         end
 
 let rec enrich_modtype env p mty =
