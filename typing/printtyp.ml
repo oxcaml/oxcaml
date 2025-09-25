@@ -1440,7 +1440,7 @@ let tree_of_mode_old (t : Parsetree.mode loc) =
 let tree_of_mode_new (t: Parsetree.mode loc) =
   let Mode s = t.txt in Omd_new s
 
-let[@warning "-21-26"] tree_of_modes (modes : Mode.Alloc.Const.t) =
+let tree_of_modes (modes : Mode.Alloc.Const.t) =
   let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
 
   (* [forkable] has implied defaults depending on [areality]: *)
