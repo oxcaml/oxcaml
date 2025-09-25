@@ -46,7 +46,7 @@ let
       ocaml = (super.ocaml.override { inherit stdenv; }).overrideAttrs {
         # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
         # compiler that we use to bootstrap ourselves on ARM64
-        patches = [ ./arm64-issue-debug-upstream.patch ];
+        patches = [ ./local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.4.14.2+patched/files/oxcaml-setup.patch ];
       };
 
       dune_3 = super.dune_3.overrideAttrs rec {
