@@ -6,6 +6,10 @@ backend/vectorizer/test_float32_unboxed.ml
 simd/*_u.ml
 simd/let_mutable.ml
 simd/unbox_types.ml
+simd/consts.ml
+simd/consts256.ml
+simd/consts_u.ml
+simd/consts256_u.ml
 simd/arrays.ml
 simd/arrays256.ml
 simd/amd64/load_store.ml
