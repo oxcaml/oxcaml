@@ -88,9 +88,10 @@ type fun_info =
         (* Emitter responsible for producing LLVM IR of a function *)
     reg2alloca : LL.Value.t Reg.Tbl.t;
         (* Map [Reg.t]'s from OCaml to alloca'd identifiers in LLVM IR *)
-    trap_blocks : trap_block_info Label.Tbl.t
+    trap_blocks : trap_block_info Label.Tbl.t;
         (* Identifiers created during a [Pushtrap] instruction needed for
            [Poptrap] and trap handler entry *)
+    has_try : bool
   }
 
 type t =
@@ -117,25 +118,26 @@ type t =
     mutable c_call_wrappers : c_call_wrapper String.Map.t;
         (* Wrappers for noalloc C calls. This is currently needed since
            manipulating the stack inline is broken. *)
-    mutable stack_offset : int;
-        (* Accumulate [Stackoffset]s to be able to calculate the # of trap
-           blocks at a given instruction via [i.stack_offset] *)
     mutable all_trap_blocks : trap_block_info list;
     mutable module_asm : string list
   }
 
 (* current_fun_info interface *)
 
-let create_fun_info emitter =
-  { emitter; reg2alloca = Reg.Tbl.create 0; trap_blocks = Label.Tbl.create 0 }
+let create_fun_info ~has_try emitter =
+  { emitter;
+    reg2alloca = Reg.Tbl.create 0;
+    trap_blocks = Label.Tbl.create 0;
+    has_try
+  }
 
 let get_fun_info t =
   match t.current_fun_info with
   | Some fun_info -> fun_info
   | None -> fail_msg ~name:"get_fun_info" "not_available"
 
-let reset_fun_info t emitter =
-  t.current_fun_info <- Some (create_fun_info emitter)
+let reset_fun_info ?(has_try = false) t emitter =
+  t.current_fun_info <- Some (create_fun_info ~has_try emitter)
 
 let get_alloca_for_reg t reg =
   let fun_info = get_fun_info t in
@@ -172,7 +174,6 @@ let create ~llvmir_filename ~ppf_dump =
     referenced_symbols = String.Set.empty;
     called_intrinsics = String.Map.empty;
     c_call_wrappers = String.Map.empty;
-    stack_offset = 0;
     all_trap_blocks = [];
     module_asm = []
   }
@@ -422,7 +423,11 @@ let call_simple ?(attrs = []) ~cc t name args res_types =
    * The least significant bit is set if this call is to [caml_call_gc]. We can
    do this since [stack_offset] must be even. *)
 let statepoint_id_attr ?alloc_info t (i : 'a Cfg.instruction) =
-  let stack_offset = i.stack_offset - t.stack_offset in
+  let stack_offset =
+    if (get_fun_info t).has_try
+    then i.stack_offset
+    else 0 (* LLVM will know the stack size statically *)
+  in
   let statepoint_id =
     match alloc_info with
     | Some alloc_info ->
@@ -430,10 +435,9 @@ let statepoint_id_attr ?alloc_info t (i : 'a Cfg.instruction) =
         List.fold_left
           (fun acc Cmm.{ alloc_words; _ } -> acc + alloc_words)
           0 alloc_info
-        - 2
       in
       fail_if_not ~msg:"invalid alloc size or stack offset" "statepoint_id_attr"
-        (0 <= alloc_size && alloc_size < 256 && 0 <= stack_offset
+        (0 <= alloc_size && alloc_size < 65_536 && 0 <= stack_offset
        && stack_offset < 65_536
         && stack_offset land 1 = 0);
       (alloc_size lsl 16) lor stack_offset lor 1
@@ -1174,7 +1178,6 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Intop op -> int_op t i op ~imm:None
   | Intop_imm (op, n) -> int_op t i op ~imm:(Some n)
   | Floatop (width, op) -> float_op t i width op
-  | Stackoffset n -> t.stack_offset <- t.stack_offset + n
   | Begin_region ->
     let local_sp_ptr = load_domainstate_addr t Domain_local_sp in
     let local_sp = emit_ins t (I.load ~ptr:local_sp_ptr ~typ:T.i64) in
@@ -1225,6 +1228,7 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
   | Pause -> call_llvm_intrinsic_no_res t "x86.sse2.pause" []
   | Poll -> () (* CR yusumez: insert poll call *)
+  | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
   | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
   | Probe_is_enabled _ | Name_for_debugger _ | Dls_get ->
     not_implemented_basic i
@@ -1380,10 +1384,10 @@ let reg_listed_in_signature (reg : Reg.t) =
   | Stack _ -> false
   | Unknown -> fail "reg_listed_in_signature"
 
-let fun_attrs ~fun_has_try codegen_options =
+let fun_attrs ~has_try codegen_options =
   let open LL.Fn_attr in
   let exn_attrs =
-    if fun_has_try
+    if has_try
     then [Noinline] (* We need this for the statepoint-id trick to work *)
     else []
   in
@@ -1416,7 +1420,7 @@ let prepare_fun_info t (cfg : Cfg.t) =
       } =
     cfg
   in
-  let fun_has_try =
+  let has_try =
     Cfg.fold_blocks cfg
       ~f:(fun _ block acc -> acc || block.is_trap_handler)
       ~init:false
@@ -1426,12 +1430,12 @@ let prepare_fun_info t (cfg : Cfg.t) =
   in
   let arg_types = List.map T.of_reg arg_regs |> make_arg_types in
   let res_type = filter_ds_and_make_ret_type fun_ret_type in
-  let attrs = fun_attrs ~fun_has_try fun_codegen_options in
+  let attrs = fun_attrs ~has_try fun_codegen_options in
   let emitter =
     E.create ~name:fun_name ~args:arg_types ~res:(Some res_type) ~cc:Oxcaml
       ~attrs ~dbg:fun_dbg ~private_:false
   in
-  reset_fun_info t emitter;
+  reset_fun_info ~has_try t emitter;
   arg_regs
 
 (* Emits [alloca]'s in the entry block for all [Reg.t]s in [cfg] and runtime

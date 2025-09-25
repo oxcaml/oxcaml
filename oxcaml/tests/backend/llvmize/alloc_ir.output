@@ -484,7 +484,7 @@ L147:
 L153:
   %55 = load i64, ptr %ds
   %56 = load i64, ptr %alloc
-  %57 = call oxcaml_alloccc { { i64, i64 }, {  } } @caml_call_gc(i64 %55, i64 %56) "statepoint-id"="65537" cold
+  %57 = call oxcaml_alloccc { { i64, i64 }, {  } } @caml_call_gc(i64 %55, i64 %56) "statepoint-id"="196609" cold
   %58 = extractvalue { { i64, i64 }, {  } } %57, 0, 0
   %59 = extractvalue { { i64, i64 }, {  } } %57, 0, 1
   store i64 %58, ptr %ds
@@ -668,7 +668,7 @@ L176:
 L179:
   %18 = load i64, ptr %ds
   %19 = load i64, ptr %alloc
-  %20 = call oxcaml_alloccc { { i64, i64 }, {  } } @caml_call_gc(i64 %18, i64 %19) "statepoint-id"="1" cold
+  %20 = call oxcaml_alloccc { { i64, i64 }, {  } } @caml_call_gc(i64 %18, i64 %19) "statepoint-id"="131073" cold
   %21 = extractvalue { { i64, i64 }, {  } } %20, 0, 0
   %22 = extractvalue { { i64, i64 }, {  } } %20, 0, 1
   store i64 %21, ptr %ds
