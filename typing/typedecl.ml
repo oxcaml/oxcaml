@@ -2722,7 +2722,9 @@ let name_recursion sdecl id decl =
     if Ctype.deep_occur ty ty' then
       let td = Tconstr(Path.Pident id, decl.type_params, ref Mnil) in
       link_type ty (newty2 ~level:(get_level ty) td);
-      { decl with type_manifest = Some ty'; type_ikind = None }
+      { decl with type_manifest = Some ty';
+               (* CR jujacobs: check if we can keep the ikind up to date here *)
+               type_ikind = None }
     else decl
   | _ -> decl
 

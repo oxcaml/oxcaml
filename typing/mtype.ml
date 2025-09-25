@@ -101,9 +101,13 @@ and strengthen_lazy_sig' ~aliasable sg p =
             if Btype.type_kind_is_abstract decl then
               { decl with type_private = Public;
                          type_manifest = manif;
+                         (* CR jujacobs: check if we can keep the ikind up to date here
+                            Strengthening adds a manifest referencing the strengthened path. *)
                          type_ikind = None }
             else
               { decl with type_manifest = manif;
+                         (* CR jujacobs: check if we can keep the ikind up to date here
+                            Strengthening adds a manifest referencing the strengthened path. *)
                          type_ikind = None }
       in
       let path = Pdot(p, Ident.name id) in
@@ -575,11 +579,15 @@ let enrich_typedecl env p id decl =
                            (Path.unboxed_version p, decl.type_params, ref Mnil))
                     in
                     { d with type_manifest = Some orig_ty_unboxed;
+                             (* CR jujacobs: check if we can keep the ikind up to date here
+                                Enriching copies the signature's unboxed manifest. *)
                              type_ikind = None })
                   decl.type_unboxed_version
               in
               { decl with type_manifest = Some orig_ty;
                          type_unboxed_version;
+                         (* CR jujacobs: check if we can keep the ikind up to date here
+                            Enriching copies the signature manifest. *)
                          type_ikind = None }
         end
 
