@@ -41,7 +41,7 @@ less precise kind is expected.
 This page describes the kind system at a high level, and contains complete
 details for the non-modal bounds. It does not exhaustively describe the possible
 layouts (which are documented on the [unboxed types
-page](../../unboxed-types/intro)) or the modal axes (which are documented on the
+page](../../unboxed-types/01-intro)) or the modal axes (which are documented on the
 [modes page](../../modes/intro)), but does explain how those components appear in
 kinds, including how the modal bounds are affected by the with-bounds.
 
@@ -83,7 +83,7 @@ floating point numbers that are passed in SIMD registers), `bits64`
 and `bits32` (for types represented by unboxed/untagged integers) and product
 layouts like `float64 & bits32` (an unboxed pair that is passed in two
 registers). More detail on layouts and the unboxed types language feature can be
-found [here](../../unboxed-types/intro).
+found [here](../../unboxed-types/01-intro).
 
 Modal bounds all correspond to modal axes, which are described in more detail in
 the [modes documentation](../../modes/intro). The logic for which types can

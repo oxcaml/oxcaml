@@ -8,7 +8,7 @@ title: Block indices
 
 This document describes the language feature and implementation for explicit
 _indices_ into a block. Before reading this document, you may wish to read up
-through the [layouts](./01-intro.md#layouts) section of the main document.
+through the [layouts](../01-intro#layouts) section of the main document.
 
 As a quick example:
 ```ocaml
@@ -161,7 +161,7 @@ type c = { mutable b : b; s : string }
 The record `c` presents an interesting problem for block indices: the fields of
 its contained unboxed records `a` and `b` are not actually contiguous at runtime
 when using the native code compiler. This problem is caused by the
-[mixed block representation](01-intro.md#the-mixed-block-representation),
+[mixed block representation](../01-intro#the-mixed-block-representation),
 which mandates that we reorder fields so that values come before unboxed types.
 
 While the layout of `c` has the shape
