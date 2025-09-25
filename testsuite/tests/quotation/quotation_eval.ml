@@ -1,5 +1,7 @@
 (* TEST
-  set OCAMLDIR = "${ocamlsrcdir}/";
+ {
+  native;
+ }
 *)
 
 let test_simple_eval =
