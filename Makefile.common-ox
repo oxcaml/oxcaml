@@ -83,12 +83,17 @@ boot_targets = \
   ocamltest/ocamltest.native \
 
 boot-compiler: _build/_bootinstall
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 boot-runtest: boot-compiler
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_boot) $(coverage_dune_flags) --force
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 runtime-stdlib: boot-compiler
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
 	rm -rf _build/runtime_stdlib_install
 # Dune 3.11+ clears `_build/install` before building, move the runtime stdlib
@@ -99,6 +104,7 @@ runtime-stdlib: boot-compiler
 # Dune will look here if the system compiler is OCaml 5 instead.
 	@mkdir -p _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink/
 	@touch _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink/dynlink.cmxa
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 # This target is a polling version of "make runtime-stdlib"
 .PHONY: runtime-stdlib-hacking
@@ -106,6 +112,7 @@ runtime-stdlib-hacking: boot-compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build -w $(ws_runstd) --only-packages=ocaml_runtime_stdlib,js_of_ocaml-compiler @install
 
 compiler: runtime-stdlib
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::compiler"
 	RUNTIME_DIR=$(RUNTIME_DIR) SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           $(dune) build $(ws_main) \
@@ -117,19 +124,26 @@ compiler: runtime-stdlib
           testsuite/lib/lib.cm{,j}{,x}a \
           testsuite/lib/testing.cm{,j}{,x}a \
           $(ocamldir)/tools/dumpobj.bc
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 # CR dkalinichenko: [runtest] is built using the main profile,
 # which uses the boot compiler. Use the final compiler for [runtest],
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
 runtest: compiler
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::runtest"
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_main)
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 runtest-llvmize: compiler
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-llvmize $(ws_main)
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 runtest-dwarf: compiler
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-dwarf $(ws_main)
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
@@ -215,6 +229,7 @@ cpl=$(if $(filter linux,$(SYSTEM)),cp -l,cp -L)
 # slow and/or unable to make hardlinks)
 .PHONY: _install install install_for_opam
 _install: compiler
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
 	$(cpl) _build/_bootinstall/bin/{js_of_ocaml,jsoo_minify} _install/bin/
@@ -242,16 +257,21 @@ _install: compiler
 	find _build/main/ \( -name "flambda2*.cmi" \
           -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
           -exec cp -f {} _install/lib/ocaml/compiler-libs \;
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 # Copy _install to the final install directory (no-op if they are the same)
 install: _install
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	mkdir -p '$(prefix)'
 	rsync --chmod=u+rw,go+r -rl _install/ '$(prefix)'
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 # Same as above, but relies on a successfull earlier _install
 install_for_opam:
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	mkdir -p '$(prefix)'
 	rsync --chmod=u+rw,go+r -rl _install/ '$(prefix)'
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 main_prefix = _build/install/main
 main_build = _build/main
@@ -261,6 +281,7 @@ boot_build = _build/default
 # run on an installed tree (led by David Allsopp) is completed.
 .PHONY: runtest-upstream test install_for_test
 install_for_test: _install
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	rm -rf _runtest
 	mkdir _runtest
 	ln -s ../_install _runtest/_install
@@ -376,7 +397,9 @@ install_for_test: _install
 	# ocamltest itself
 	mkdir _runtest/ocamltest
 	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/ocamltest
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 test: install_for_test
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	if [ "$(middle_end)" = "flambda2" ]; then \
 	  for dir in `cd testsuite; ls -1 -d tests/*`; do \
 	    if ! grep -q "^  $$dir " oxcaml/testsuite/flambda2-test-list; then \
@@ -406,6 +429,7 @@ test: install_for_test
                  make --no-print-directory all; \
                fi \
              fi)
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 promote-failed:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
@@ -482,6 +506,7 @@ debug-printers: runtime-stdlib # required for $(ws_main) to work
 # tools/compare.sh
 .PHONY: boot-_install
 boot-_install: runtime-stdlib
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
 	$(cpl) _build/runtime_stdlib_install/bin/* _install/bin/
@@ -505,3 +530,4 @@ boot-_install: runtime-stdlib
 	find _build/default/ \( -name "flambda2*.cmi" \
           -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
           -print0 | xargs -0 -I '{}' cp -f '{}' _install/lib/ocaml/compiler-libs
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
