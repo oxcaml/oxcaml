@@ -1238,12 +1238,12 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
        without the LLVM backend. Pushtrap sets this up, while they get torn down
        at trap handler entry.
 
-       Currently, this implementation does not work for some cases since the two
-       points during execution at which control flow can arrive after the dummy
-       call don't agree in whether RBP needs restoring or not. So, we get cases
-       where LLVM reloads stuff from the stack using RBP before it gets restored
-       in the handler (since we need to do the check + jump to the handler
-       first). *)
+       To recover RBP in the case of an exception, we can't put that bit of code
+       in the trap handler entry since things happen beforehand. So, we make
+       exceptions jump to some extra bit of asm written in the module-level that
+       recovers RBP. For it to know where to jump back, we have an extra global
+       variable where we write the code address for right after the [wrap_try]
+       call. *)
     call_simple
       ~attrs:[Returns_twice; Gc_leaf_function]
       ~cc:Oxcaml t "wrap_try" [] [T.i64]
@@ -1257,10 +1257,10 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
       LL.Ident.to_string_hum (V.get_ident_exn try_and_exn_entry)
     in
     let recover_rbp_asm_ident =
-      LL.Ident.global ("recover_rbp_asm." ^ fun_name ^ "." ^ label_name)
+      LL.Ident.global (fun_name ^ ".recover_rbp_asm." ^ label_name)
     in
     let recover_rbp_var_ident =
-      LL.Ident.global ("recover_rbp_var." ^ fun_name ^ "." ^ label_name)
+      LL.Ident.global (fun_name ^ ".recover_rbp_var." ^ label_name)
     in
     emit_ins_no_res t (I.br try_and_exn_entry);
     emit_label t try_and_exn_entry;
