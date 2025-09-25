@@ -207,10 +207,12 @@ let compute_static_size lam =
     | Parraysetu _
     | Parraysets _
     | Pbigarrayset _
+    | Pbytes_set_8 _
     | Pbytes_set_16 _
     | Pbytes_set_32 _
     | Pbytes_set_f32 _
     | Pbytes_set_64 _
+    | Pbigstring_set_8 _
     | Pbigstring_set_16 _
     | Pbigstring_set_32 _
     | Pbigstring_set_f32 _
@@ -305,14 +307,17 @@ let compute_static_size lam =
     | Pisout
     | Pbigarrayref _
     | Pbigarraydim _
+    | Pstring_load_8 _
     | Pstring_load_16 _
     | Pstring_load_32 _
     | Pstring_load_f32 _
     | Pstring_load_64 _
+    | Pbytes_load_8 _
     | Pbytes_load_16 _
     | Pbytes_load_32 _
     | Pbytes_load_f32 _
     | Pbytes_load_64 _
+    | Pbigstring_load_8 _
     | Pbigstring_load_16 _
     | Pbigstring_load_32 _
     | Pbigstring_load_f32 _
@@ -350,6 +355,8 @@ let compute_static_size lam =
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
     | Punboxed_float32_array_set_vec _
+    | Puntagged_int8_array_set_vec _
+    | Puntagged_int16_array_set_vec _
     | Punboxed_int32_array_set_vec _
     | Punboxed_int64_array_set_vec _
     | Punboxed_nativeint_array_set_vec _
@@ -377,6 +384,8 @@ let compute_static_size lam =
     | Pint_array_load_vec _
     | Punboxed_float_array_load_vec _
     | Punboxed_float32_array_load_vec _
+    | Puntagged_int8_array_load_vec _
+    | Puntagged_int16_array_load_vec _
     | Punboxed_int32_array_load_vec _
     | Punboxed_int64_array_load_vec _
     | Punboxed_nativeint_array_load_vec _
