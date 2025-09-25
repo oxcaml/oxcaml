@@ -184,7 +184,7 @@ jobs:
           default: https://github.com/ocaml/opam-repository.git
         opam-disable-sandboxing: true
         opam-pin: false
-        cache-prefix: ${{ matrix.os }}-v3
+        cache-prefix: ${{ matrix.os }}-v4
 
     - name: Set up Opam environment
       run: |

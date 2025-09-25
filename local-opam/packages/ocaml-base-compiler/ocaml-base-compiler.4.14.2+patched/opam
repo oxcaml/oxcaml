@@ -1,27 +1,17 @@
 opam-version: "2.0"
-synopsis: "OxCaml 5.2.0 CI bootstrap compiler with dependencies (OCaml 4.14.2 base)"
+synopsis: "OCaml 4.14.2 patched for OxCaml Bootstrapping"
 maintainer: "oxcaml-team"
 license: "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
 authors: "Xavier Leroy and many contributors"
-homepage: "https://github.com/ocaml-flambda/flambda-backend"
-bug-reports: "https://github.com/ocaml-flambda/flambda-backend/issues"
-dev-repo: "git+https://github.com/ocaml-flambda/flambda-backend"
+homepage: "https://ocaml.org"
+bug-reports: "https://github.com/ocaml/ocaml/issues"
+dev-repo: "git+https://github.com/ocaml/ocaml#4.14"
 depends: [
   "ocaml" {= "4.14.2" & post}
   "base-unix" {post}
   "base-bigarray" {post}
   "base-threads" {post}
-  # CI dependencies
-  "menhir" {= "20231231" & post}
-  "ocamlformat" {= "0.24.1" & post}
-  "re" {>= "1.10.0" & post}
-  # js_of_ocaml-compiler dependencies
-  "ppxlib" {>= "0.15" & post}
-  "cmdliner" {>= "1.1.0" & post}
-  "sedlex" {>= "3.3" & post}
-  "menhirLib" {post}
-  "menhirSdk" {post}
-  "yojson" {>= "2.1" & post}
+  "ocaml-options-vanilla" {post}
 ]
 conflict-class: "ocaml-core-compiler"
 flags: compiler
