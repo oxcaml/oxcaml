@@ -1,5 +1,7 @@
 Hello from C! 9 10
-too_many arg list: 2 3 4 5 6 7 69992756281232 2624455 69992752087040 69992756281232 0 0
+too_many arg list: 1 2 3 4 5 6 7 8 9 10 11 12
+too_many arg list: 1 2 3 4 5 6 7 8 9 10 11 12
 int_and_float arg list: 1 2.000000 3 4.000000
 print_and_add res: 19
-too_many res: 69992756281232
+too_many res: 10
+too_many (with try) res: 10

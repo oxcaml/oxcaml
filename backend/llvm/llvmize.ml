@@ -88,10 +88,9 @@ type fun_info =
         (* Emitter responsible for producing LLVM IR of a function *)
     reg2alloca : LL.Value.t Reg.Tbl.t;
         (* Map [Reg.t]'s from OCaml to alloca'd identifiers in LLVM IR *)
-    trap_blocks : trap_block_info Label.Tbl.t;
+    trap_blocks : trap_block_info Label.Tbl.t
         (* Identifiers created during a [Pushtrap] instruction needed for
            [Poptrap] and trap handler entry *)
-    has_try : bool
   }
 
 type t =
@@ -124,20 +123,16 @@ type t =
 
 (* current_fun_info interface *)
 
-let create_fun_info ~has_try emitter =
-  { emitter;
-    reg2alloca = Reg.Tbl.create 0;
-    trap_blocks = Label.Tbl.create 0;
-    has_try
-  }
+let create_fun_info emitter =
+  { emitter; reg2alloca = Reg.Tbl.create 0; trap_blocks = Label.Tbl.create 0 }
 
 let get_fun_info t =
   match t.current_fun_info with
   | Some fun_info -> fun_info
   | None -> fail_msg ~name:"get_fun_info" "not_available"
 
-let reset_fun_info ?(has_try = false) t emitter =
-  t.current_fun_info <- Some (create_fun_info ~has_try emitter)
+let reset_fun_info t emitter =
+  t.current_fun_info <- Some (create_fun_info emitter)
 
 let get_alloca_for_reg t reg =
   let fun_info = get_fun_info t in
@@ -422,12 +417,8 @@ let call_simple ?(attrs = []) ~cc t name args res_types =
 
    * The least significant bit is set if this call is to [caml_call_gc]. We can
    do this since [stack_offset] must be even. *)
-let statepoint_id_attr ?alloc_info t (i : 'a Cfg.instruction) =
-  let stack_offset =
-    if (get_fun_info t).has_try
-    then i.stack_offset
-    else 0 (* LLVM will know the stack size statically *)
-  in
+let statepoint_id_attr ?alloc_info _t (i : 'a Cfg.instruction) =
+  let stack_offset = i.stack_offset in
   let statepoint_id =
     match alloc_info with
     | Some alloc_info ->
@@ -590,30 +581,90 @@ let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
       ~attrs:(gc_attr ~can_call_gc:true t i)
       ~cc t caml_c_call_symbol args res_types
   in
-  let call_func args res_types =
+  let call_func arg_regs res_types =
     if stack_ofs > 0
-    then
-      (* [caml_c_call_stack_args_llvm_backend] is a wrapper around
-         [caml_c_call_stack_args] which computes the address range of the
-         arguments on the stack given the offset. *)
-      let args = [func_ptr; V.of_int stack_ofs] @ args in
+    then (
+      (* We handle stack arguments manually as opposed to making LLVM's C
+         calling conventions handle it. The reason is twofold:
+
+         * We want to be able to get pointers delimiting the arguments to pass
+         to [caml_c_call_stack_args] so that it properly transfer them. Doing
+         this via reading the stack pointer is not reliable.
+
+         * We want LLVM to know the frame size statically for frametable
+         emission. We make sure that any additional tampering with the stack is
+         done by us, not by LLVM, since we can keep track of it ourselves and
+         give that information to the frametable printer. *)
+      let opaque_stack_ofs =
+        emit_ins t
+          (I.inline_asm ~asm:"" ~constraints:"=r,0"
+             ~args:[V.of_int stack_ofs]
+             ~res_type:(Some T.i64) ~sideeffect:true)
+      in
+      (* Save stack + make space for stack args *)
+      let stacksave_ptr = call_llvm_intrinsic t "stacksave" [] T.ptr in
+      let stack_args_alloca =
+        emit_ins t (I.alloca ~count:opaque_stack_ofs T.i8)
+      in
+      (* Determine which ones to pass directly and which ones via stack *)
+      let stack_arg_regs, direct_arg_regs =
+        List.partition
+          (fun (reg : Reg.t) ->
+            match reg.loc with
+            | Stack (Outgoing _) -> true
+            | Stack (Local _ | Incoming _ | Domainstate _) | Unknown | Reg _ ->
+              false)
+          arg_regs
+      in
+      (* Fill up the slots *)
+      List.iter
+        (fun (reg : Reg.t) ->
+          match reg.loc with
+          | Stack (Outgoing n) ->
+            let temp = load_reg_to_temp t reg in
+            let slot =
+              emit_ins t
+                (I.getelementptr ~base_type:T.i8 ~base_ptr:stack_args_alloca
+                   ~indices:[V.of_int n])
+            in
+            emit_ins_no_res t (I.store ~ptr:slot ~to_store:temp)
+          | Stack (Local _ | Incoming _ | Domainstate _) | Unknown | Reg _ ->
+            assert false)
+        stack_arg_regs;
+      (* Prepare direct args + special values for [caml_c_call_stack_args] *)
+      let stack_args_begin =
+        emit_ins t (I.convert Ptrtoint ~arg:stack_args_alloca ~to_:T.i64)
+      in
+      let stack_args_end =
+        emit_ins t
+          (I.binary Add ~arg1:stack_args_begin ~arg2:(V.of_int stack_ofs))
+      in
+      let args =
+        [func_ptr; stack_args_begin; stack_args_end]
+        @ List.map (load_reg_to_temp t) direct_arg_regs
+      in
       let caml_c_call_stack_args =
-        "caml_c_call_stack_args_llvm_backend"
+        "caml_c_call_stack_args"
         ^
         match (stack_align : Cmm.stack_align) with
         | Align_16 -> ""
         | Align_32 -> "_avx"
         | Align_64 -> "_avx512"
       in
-      make_ocaml_c_call ~cc:Oxcaml_c_call_stack_args caml_c_call_stack_args args
-        res_types
+      let res_vals =
+        make_ocaml_c_call ~cc:Oxcaml_c_call_stack_args caml_c_call_stack_args
+          args res_types
+      in
+      call_llvm_intrinsic_no_res t "stackrestore" [stacksave_ptr];
+      res_vals)
     else if alloc
     then
-      let args = [func_ptr] @ args in
+      let args = [func_ptr] @ List.map (load_reg_to_temp t) arg_regs in
       make_ocaml_c_call ~cc:Oxcaml_c_call "caml_c_call" args res_types
     else
       (* Wrap C calls to avoid reloading from the stack after overwriting the
          stack pointer *)
+      let args = List.map (load_reg_to_temp t) arg_regs in
       let wrapper_symbol =
         add_c_call_wrapper t func_symbol ~args:(List.map V.get_type args)
           ~res:res_types
@@ -624,10 +675,9 @@ let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
         ~cc:Oxcaml t wrapper_symbol args res_types
   in
   let arg_regs = reg_list_for_call i.arg in
-  let args = List.map (load_reg_to_temp t) arg_regs in
   let res_regs = reg_list_for_call i.res in
   let res_types = List.map T.of_reg res_regs in
-  let res_values = call_func args res_types in
+  let res_values = call_func arg_regs res_types in
   List.iter2 (store_into_reg t) res_regs res_values
 
 let raise_ t (i : Cfg.terminator Cfg.instruction)
@@ -1435,7 +1485,7 @@ let prepare_fun_info t (cfg : Cfg.t) =
     E.create ~name:fun_name ~args:arg_types ~res:(Some res_type) ~cc:Oxcaml
       ~attrs ~dbg:fun_dbg ~private_:false
   in
-  reset_fun_info ~has_try t emitter;
+  reset_fun_info t emitter;
   arg_regs
 
 (* Emits [alloca]'s in the entry block for all [Reg.t]s in [cfg] and runtime
