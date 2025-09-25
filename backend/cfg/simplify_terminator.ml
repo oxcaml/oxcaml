@@ -178,7 +178,27 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
   match block.terminator.desc with
   | Always successor_label -> (
     match is_last_instruction_const_int block.body with
-    | None -> false
+    | None ->
+      (* If we jump to a block that is empty, we can copy the terminator from
+         the successor to the current block. There might be size considerations,
+         so we currently do so only for "tests" and return. *)
+      let successor_block = Cfg.get_block_exn cfg successor_label in
+      if Dll.is_empty successor_block.body
+      then
+        match successor_block.terminator.desc with
+        | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Return ->
+          (* CR xclerc for xclerc: should we also copy `dbg`? *)
+          block.terminator
+            <- { block.terminator with
+                 desc = successor_block.terminator.desc;
+                 arg = Array.copy successor_block.terminator.arg;
+                 res = Array.copy successor_block.terminator.res
+               };
+          true
+        | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
+        | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
+          false
+      else false
     | Some (const, reg) ->
       (* If we have an Iconst_int instruction at the end of the block followed
          by a jump to an empty block whose terminator is a condition over the
