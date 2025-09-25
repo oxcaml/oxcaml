@@ -1244,10 +1244,14 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
        recovers RBP. For it to know where to jump back, we have an extra global
        variable where we write the code address for right after the [wrap_try]
        call. *)
-    call_simple
-      ~attrs:[Returns_twice; Gc_leaf_function]
-      ~cc:Oxcaml t "wrap_try" [] [T.i64]
-    |> ignore (* Note that we don't need the returned identifier here. *);
+    let wrap_try_res =
+      call_simple
+        ~attrs:[Returns_twice; Gc_leaf_function]
+        ~cc:Oxcaml t "wrap_try" [] [T.i64]
+    in
+    emit_ins_no_res t
+      (I.inline_asm ~asm:"movq $0, %rax" ~constraints:"r" ~args:wrap_try_res
+         ~res_type:T.Or_void.void ~sideeffect:true);
     (* Record label here - we will jump here for the handler *)
     let try_and_exn_entry = V.of_label (Cmm.new_label ()) in
     let fun_name =
