@@ -89,17 +89,17 @@ val foo : r @ shared -> r @ shared = <fun>
 (* Force top level to be uncontended and nonportable *)
 let r @ contended = best_bytes ()
 [%%expect{|
-Line 1, characters 4-33:
+Line 1, characters 4-17:
 1 | let r @ contended = best_bytes ()
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^^^^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let r @ shared = best_bytes ()
 [%%expect{|
-Line 1, characters 4-30:
+Line 1, characters 4-14:
 1 | let r @ shared = best_bytes ()
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^
 Error: This value is "shared" but is expected to be "uncontended".
 |}]
 
@@ -338,9 +338,9 @@ Error: This function when partially applied returns a value which is "nonportabl
 let foo : ('a @ contended portable -> (string -> string) @ portable) @ nonportable contended = fun a b -> best_bytes ()
 (* CR layouts v2.8: arrows should cross contention. Internal ticket 5121. *)
 [%%expect{|
-Line 1, characters 4-119:
+Line 1, characters 4-92:
 1 | let foo : ('a @ contended portable -> (string -> string) @ portable) @ nonportable contended = fun a b -> best_bytes ()
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 

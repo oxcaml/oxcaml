@@ -160,7 +160,8 @@ module Transled_modifiers = struct
     | Nonmodal Separability -> { t with separability = value }
 end
 
-let transl_mod_bounds annots =
+let transl_mod_bounds ({ core_modes = annots; mod_modes } : Parsetree.modes) =
+  if mod_modes <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
     match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
@@ -313,7 +314,9 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   in
   { annots with yielding; contention; portability }
 
-let transl_mode_annots annots : Alloc.Const.Option.t =
+let transl_mode_annots ({ core_modes = annots; mod_modes } : Parsetree.modes) :
+    Alloc.Const.Option.t =
+  if mod_modes <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
     let (P (ax, a)) =
@@ -326,7 +329,7 @@ let transl_mode_annots annots : Alloc.Const.Option.t =
   in
   List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
 
-let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
+let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) : Parsetree.modes =
   let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
   (* Untranslate [areality] and [yielding]. *)
   let areality = print_to_string_opt Mode.Locality.Const.print modes.areality in
@@ -370,17 +373,20 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
   let linearity =
     print_to_string_opt Mode.Linearity.Const.print modes.linearity
   in
-  List.filter_map
-    (fun x ->
-      Option.map (fun s -> { txt = Parsetree.Mode s; loc = Location.none }) x)
-    [ areality;
-      uniqueness;
-      linearity;
-      portability;
-      contention;
-      yielding;
-      statefulness;
-      visibility ]
+  let core_modes =
+    List.filter_map
+      (fun x ->
+        Option.map (fun s -> { txt = Parsetree.Mode s; loc = Location.none }) x)
+      [ areality;
+        uniqueness;
+        linearity;
+        portability;
+        contention;
+        yielding;
+        statefulness;
+        visibility ]
+  in
+  Ast_helper.Modes.of_core_modes core_modes
 
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
@@ -555,12 +561,15 @@ let sort_dedup_modalities ~warn l =
   in
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
-let transl_modalities ~maturity mut modalities =
+let transl_modalities ~maturity mut
+    ({ core_modalities; mod_modalities } : Parsetree.modalities) =
+  if mod_modalities <> []
+  then Misc.fatal_error "ZJE: mods are not yet supported";
   let mut_modalities =
     mutable_implied_modalities (Types.is_mutable mut)
       ~for_mutable_variable:false
   in
-  let modalities = List.map (transl_modality ~maturity) modalities in
+  let modalities = List.map (transl_modality ~maturity) core_modalities in
   (* axes listed in the order of implication. *)
   let modalities = sort_dedup_modalities ~warn:true modalities in
   let open Modality in
@@ -581,12 +590,15 @@ let let_mutable_modalities =
 let atomic_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:false
 
-let untransl_modalities mut t =
-  t
-  |> least_modalities_implying mut
-  |> List.map (fun x -> x, Location.none)
-  |> sort_dedup_modalities ~warn:false
-  |> List.map untransl_modality
+let untransl_modalities mut t : Parsetree.modalities =
+  let core_modalities =
+    t
+    |> least_modalities_implying mut
+    |> List.map (fun x -> x, Location.none)
+    |> sort_dedup_modalities ~warn:false
+    |> List.map untransl_modality
+  in
+  Ast_helper.Modalities.of_core_modalities core_modalities
 
 let transl_alloc_mode modes =
   let opt = transl_mode_annots modes in

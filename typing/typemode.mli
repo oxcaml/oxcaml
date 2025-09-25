@@ -1,11 +1,18 @@
+(* CR zeisbach: depending on use, maybe this is better to take in core_modes.
+   that's a big diff so for now I am keeping the signatures as they are here *)
 (** Interpret mode syntax as mode annotation, where axes can be left unspecified *)
 val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t
 
+(* CR zeisbach: like above, perhaps the return type here should be core_modes.
+   this depends on use, which is something that will likely come up soon *)
 val untransl_mode_annots : Mode.Alloc.Const.Option.t -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
 val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t
+
+(* CR zeisbach: like with the mode translation functoins above, maybe these should
+   take and return core_modalities. this also depends on use *)
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
