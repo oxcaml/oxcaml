@@ -5496,8 +5496,6 @@ let generalize_structure_type_unboxed_access_result
 let vb_exp_constraint
       {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=modes; _ } =
   let open Ast_helper in
-  (* Q (ZJE): is this better than destructing the parameter directly?
-      what about the styling? what I have seems kinda bad... *)
   let {core_modes; mod_modes} = modes in
   let loc =
     Location.merge (pat.ppat_loc :: List.map (fun m -> m.loc) core_modes
@@ -5528,8 +5526,6 @@ let vb_pat_constraint
       ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; _ } as vb) =
   let spat =
     let open Ast_helper in
-    (* Q (ZJE): is this better than destructing the parameter directly?
-       what about the styling? what I have seems kinda bad... *)
     let {core_modes; mod_modes} = modes in
     let loc =
       Location.merge (pat.ppat_loc :: List.map (fun m -> m.loc) core_modes
