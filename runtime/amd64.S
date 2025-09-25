@@ -924,21 +924,15 @@ ENDFUNCTION(G(caml_c_call))
     ENDFUNCTION(G(caml_c_call_stack_args ## suffix));                   \
                                                                         \
     FUNCTION(G(caml_c_call_stack_args_llvm_backend ## suffix));         \
-    CFI_STARTPROC                       ;                               \
-        CFI_SIGNAL_FRAME;                                               \
-        ENTER_FUNCTION;                                                 \
     /* Arguments:                                                       \
         C arguments         : %rdi, %rsi, %rdx, %rcx, %r8, and %r9      \
         C function          : %rax                                      \
         C stack args        : offset=%r12                               \
        Wrap caml_c_stack_args and prepare stack args for it */          \
     /* Where rsp was right before the call */                           \
-        leaq	8+FRAME_POINTER_SIZE(%rsp), %r13;                       \
+        leaq	8(%rsp), %r13;                                          \
         leaq	(%r13, %r12), %r12;                                     \
-        call	G(caml_c_call_stack_args ## suffix);                    \
-        LEAVE_FUNCTION;                                                 \
-        ret;                                                            \
-    CFI_ENDPROC                 ;                                       \
+        jmp 	G(caml_c_call_stack_args ## suffix);                    \
     ENDFUNCTION(G(caml_c_call_stack_args_llvm_backend ## suffix))       \
 
 Make_c_call_stack_args()
