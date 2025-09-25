@@ -2067,8 +2067,6 @@ module_type:
 
 %inline module_type_with_optional_modes:
   | module_type { $1, Modes.empty }
-  (* CR zeisbach: if this is modes_mod_expr, then there are shift/reduce conflicts
-     that I don't know how to resolve. *)
   | module_type_atomic core_modes_expr { $1, $2 }
 
 (* A signature, which appears between SIG and END (among other places),
@@ -2778,7 +2776,7 @@ pattern_with_modes_or_poly:
         let cty, modes = cty_modes in
         mkpat_with_modes ~loc:$sloc ~pat ~cty:(Some cty) ~modes
       }
-  | pat = pattern modes = core_modes_expr
+  | pat = pattern modes = mode_annot_expr
       {
         mkpat_with_modes ~loc:$sloc ~pat ~cty:None ~modes
       }
@@ -4624,13 +4622,7 @@ mod_mods_expr:
 ;
 
 optional_mod_mods_expr:
-  (* CR zeisbach: this fixes a shift-reduce conflict to actually resolve an ambiguity:
-      [type t : (kind_of_ t1 -> t2) mod contended] vs
-      [type t : kind_of_ t1 -> (t2 mod contended)]
-    actually somehow this has gone away by replacing some instances of
-    mode_annot with core_modes and same for modalities. still worth looking at *)
-  | // %prec below_HASH
-    { [] }
+  | { [] }
   | mod_mods_expr
     { $1 }
 ;
@@ -4661,14 +4653,14 @@ mode_annot_expr:
   | at_mode_expr { Modes.of_core_modes $1 }
 ;
 
-%inline optional_core_modes_expr:
+%inline optional_mode_annot_expr:
   | { Modes.empty }
   | core_modes_expr
     { $1 }
 ;
 
 %inline with_optional_mode_expr(ty):
-  | m0=optional_mode_expr_legacy ty=ty m1=optional_core_modes_expr {
+  | m0=optional_mode_expr_legacy ty=ty m1=optional_mode_annot_expr {
     (ty, $loc(ty)), Modes.append m0 m1
   }
 ;
