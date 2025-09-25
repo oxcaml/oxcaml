@@ -5,17 +5,14 @@
  check-ocamlc.byte-output;
 *)
 
-(*****************)
-(* as a modality *)
-
 module type S = sig
   (* value descriptions *)
   val v : int mod contended aliased
   val v : int @@ once portable mod contended aliased
+  (* currently, these parse in the same way, which is not desired *)
   val v : int -> int mod contended aliased
   val v : (int -> int) mod contended aliased
   val v : int -> int @@ once portable mod contended aliased
-  val v : (int -> int) @@ once portable mod contended aliased
 
   (* primitive declarations *)
   external ex : int mod contended aliased = "foo1"
@@ -41,25 +38,30 @@ module type S = sig
   ; f2 : 'a @@ once portable mod contended aliased
   ; f3 : 'a -> 'a mod contended aliased
   ; f4 : ('a -> 'a) mod contended aliased
-  (* ; f5 : 'a mod contended aliased -> 'a *)
-  (* ; f6 : 'a @ once portable mod contended aliased -> 'a *)
-  ; f7 : 'a -> 'a @@ once portable mod contended aliased
-  (* ; f8 : ('a -> 'a mod contended aliased) @@ once portable *)
+  ; f5 : 'a -> 'a @@ once portable mod contended aliased
   }
+
+  (* currently, mod modes are properly parsing on arrow types:
+     the following examples will not parse, but they should eventually
+
+  val v : int -> int mod contended aliased @@ once portable
+
+  type 'a r = {
+    f1 : 'a mod contended aliased -> 'a
+  ; f2 : 'a @ once portable mod contended aliased -> 'a
+  ; f3 : 'a -> 'a mod contended aliased @@ once portable
+  }
+  *)
 
   (* the other places where modalities appear all have to deal with modules, which is
      not currently intended to be supported and does not parse currently *)
 end
 
-(*************)
-(* as a mode *)
-
-(* Q (ZJE): does it matter these examples are in a structure (aka [structure_item]s) *)
 module M = struct
   (* value bindings *)
-  (* no support for using legacy syntax for modes with the new mod modalities syntax *)
+  (* CR zeisbach: we intend no support for using legacy syntax for modes with the new mod
+     modalities syntax, but maybe some of it will accidentally work. Test this out *)
 
-  (* TODO (ZJE): maybe add more of these tests? Definitely rearrange some, at least *)
   let (v mod contended aliased) = 42
   let (v @ once portable mod contended aliased) = 42
 
@@ -73,17 +75,13 @@ module M = struct
   let v : int @ once portable mod contended aliased = 42
   let v : (int -> int) @ once portable mod contended aliased = fun _ -> 42
 
-  (* these modalities are attached to the [let] itself, not to the pattern.
-     such modalities on arbitrary patterns will not be supported, at least initially *)
+  (* these modalities are attached to the [let] itself, not to the pattern. *)
   let (x, y) mod contended aliased = 4, 2
   let (x, y) : (int * int) mod contended aliased = 4, 2
   let (x, y) : (int * int) @ once portable mod contended aliased = 4, 2
 
   let foo : type a. a @ once portable mod contended aliased = fun x -> x
   let foo : type a. (a -> a) @ once portable mod contended aliased = fun x -> x
-
-  (* source_jane_street has more examples with (kind-constrained) polymorphism
-     and also locally abstract type stuff too, which is omitted here currently *)
 
   (* the following syntax is plausible, but currently serves no purpose, since functions
      cross all monadic axes currently anyways. this may just be a coincedence, so these
@@ -95,6 +93,14 @@ module M = struct
   (* expressions *)
   let foo = (42 : int mod contended aliased) + (42 : int @ once portable mod contended)
   let foo = (42 : _ mod contended aliased) + (42 : _ @ once portable mod contended)
+
+  (* like above, there are examples with mod modes on arrow types which do not work.
+     here are a few examples:
+
+  let v : int -> int mod contended aliased = fun _ -> 42
+  let v : int -> int @ once portable mod contended aliased = fun _ -> 42
+  let v : int mod contended aliased -> int = fun _ -> 42
+  *)
 end
 
 (* let expressions (not just as structure items) *)
@@ -109,10 +115,24 @@ let f () =
 
   ()
 
-(* ALSO WORTH TESTING:
+(* TODO (ZJE): ALSO WORTH TESTING:
     - make sure that comments work; specifically, that doc comments are attached to the
       right thing after parsing
     - make sure that attributes work too
-   Of course, more tests will reveal themselves during implementation *)
+    - might want to add to the source_jane_street.ml test file, which also has more *)
 
-(* TODO more tests: examples with with_kinds, examples with kind_of_ *)
+(* in addition to the mod modes on arrow types, there are some more odd consequences
+   of this choice of syntax, which are noted here for examination:
+
+  mod modalities interaction with with-bounds: parses as mod jkind_annotation
+
+  type 'a t : immutable_data with 'a mod contended
+  type 'a t : immutable_data with 'a -> 'a mod contended
+
+  kind_of_ similarly has weird precedence-related cases.
+
+  type 'a t : kind_of_ 'a mod global
+  (* these two cases parse identically *)
+  type 'a t : kind_of_ 'a -> 'a mod global
+  type 'a t : kind_of_ ('a -> 'a) mod global
+*)
