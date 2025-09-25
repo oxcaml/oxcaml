@@ -18,10 +18,6 @@ depends: [
   "menhirLib"
   "menhirSdk"
   "yojson" {>= "2.1"}
-  # Test dependencies
-  "num"
-  "ppx_expect" {>= "v0.16.1"}
-  "qcheck"
 ]
 build: []
 install: []
