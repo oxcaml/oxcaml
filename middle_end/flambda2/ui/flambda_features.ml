@@ -30,6 +30,8 @@ type 'a mode =
 type any_mode = Mode : _ mode -> any_mode
 
 let classic_mode () =
+  (* jvanburen: classic mode breaks ocamlj in ways I don't understand *)
+  not !Clflags.jsir &&
   !Oxcaml_flags.Flambda2.classic_mode
   |> with_default ~f:(fun d -> d.classic_mode)
 
