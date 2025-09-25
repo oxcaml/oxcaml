@@ -4651,14 +4651,14 @@ mode_annot_expr:
   | at_mode_expr { Modes.of_core_modes $1 }
 ;
 
-%inline optional_mode_annot_expr:
+%inline optional_core_modes_expr:
   | { Modes.empty }
   | core_modes_expr
     { $1 }
 ;
 
 %inline with_optional_mode_expr(ty):
-  | m0=optional_mode_expr_legacy ty=ty m1=optional_mode_annot_expr {
+  | m0=optional_mode_expr_legacy ty=ty m1=optional_core_modes_expr {
     (ty, $loc(ty)), Modes.append m0 m1
   }
 ;
