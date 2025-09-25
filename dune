@@ -263,10 +263,15 @@
   mixed_block_shape
   mixed_product_bytes
   printlambda
+  printslambda0
+  printslambda
   runtimedef
   runtimetags
   tmc
   simplif
+  slambda0
+  slambda
+  slambdaeval
   switch
   value_rec_compiler
   translmode

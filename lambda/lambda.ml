@@ -964,12 +964,14 @@ let main_module_block_size format =
   | Mb_struct { mb_size } -> mb_size
   | Mb_instantiating_functor _ -> 1
 
-type program =
+type 'lam program0 =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
     arg_block_idx : int option;
     required_globals : Compilation_unit.Set.t;
-    code : lambda }
+    code : 'lam }
+
+type program = lambda program0
 
 type arg_descr =
   { arg_param: Global_module.Parameter_name.t;

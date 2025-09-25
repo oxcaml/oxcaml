@@ -122,6 +122,11 @@ let close_phrase lam =
     Llet(Strict, Lambda.layout_module_field, id, Lambda.debug_uid_none, glob, l)
   ) (free_variables lam) lam
 
+let close_slambda_phrase slam =
+  let open Slambda in
+  match slam with
+  | SLquote lam -> SLquote (close_phrase lam)
+
 let toplevel_value id =
   let glob, pos = toplevel_value id in
   (Obj.magic (global_symbol glob)).(pos)
@@ -284,8 +289,11 @@ let default_load ppf (program : Lambda.program) =
      files) *)
   res
 
-let load_lambda ppf ~compilation_unit ~required_globals lam size =
+let load_slambda ppf ~compilation_unit ~required_globals program size =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
+  if !Clflags.dump_slambda then fprintf ppf "%a@." Printslambda.program program;
+  let program = Slambdaeval.eval program in
+  let lam = program.code in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let slam = Simplif.simplify_lambda lam in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
@@ -431,9 +439,9 @@ let execute_phrase print_outcome ppf phr =
             str, sg', true
         | _ -> str, sg', false
       in
-      let compilation_unit, res, required_globals, size =
+      let compilation_unit, program, required_globals, size =
         let { Lambda.compilation_unit; main_module_block_format;
-              required_globals; code = res } =
+              required_globals; code = res } as program =
           Translmod.transl_implementation compilation_unit
             (str, coercion, None)
         in
@@ -444,14 +452,15 @@ let execute_phrase print_outcome ppf phr =
           | Mb_instantiating_functor _ ->
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
-        compilation_unit, close_phrase res, required_globals, size
+        let program = { program with code = close_slambda_phrase res } in
+        compilation_unit, program, required_globals, size
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_lambda ppf ~required_globals ~compilation_unit res size
+          load_slambda ppf ~required_globals ~compilation_unit program size
         in
         let out_phr =
           match res with

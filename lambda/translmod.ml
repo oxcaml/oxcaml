@@ -1051,7 +1051,7 @@ let transl_implementation compilation_unit impl =
     main_module_block_format;
     arg_block_idx;
     required_globals = required_globals ~flambda:true body;
-    code = body }
+    code = Slambda0.SLquote body }
 
 
 (* Compile a toplevel phrase *)
@@ -1298,7 +1298,7 @@ let transl_runtime_arg arg =
 let transl_instance_impl
       compilation_unit ~runtime_args ~main_module_block_size
       ~arg_block_idx
-    : Lambda.program =
+    : Slambda.program =
   let base_compilation_unit, _args =
     Compilation_unit.split_instance_exn compilation_unit
   in
@@ -1324,6 +1324,7 @@ let transl_instance_impl
       ap_probe = None;
     }
   in
+  let code = Slambda.SLquote code in
   let required_globals =
     base_compilation_unit :: List.filter_map unit_of_runtime_arg runtime_args
     |> Compilation_unit.Set.of_list
