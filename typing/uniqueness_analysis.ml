@@ -1593,7 +1593,6 @@ end = struct
 
   let array_index mut i t =
     let modality =
-      (* CR zeisbach: should this really be Ast_helper? maybe it belongs elsewhere *)
       Typemode.transl_modalities ~maturity:Stable mut
         Ast_helper.Modalities.empty
     in

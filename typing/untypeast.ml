@@ -260,9 +260,6 @@ let type_kind sub tk = match tk with
 let constructor_argument sub {ca_loc; ca_type; ca_modalities} =
   let loc = sub.location sub ca_loc in
   let modalities = Typemode.untransl_modalities Immutable ca_modalities in
-  (* Q (ZJE): this again feels like a place where the mods should be coming from
-     somewhere. right now, just making the empty list because IDK where they will
-     be stored in the typed tree. this feels like a pretty bad stop-gap... *)
   { pca_loc = loc; pca_type = sub.typ sub ca_type; pca_modalities = modalities }
 
 let constructor_arguments sub = function
