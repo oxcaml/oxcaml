@@ -31,17 +31,16 @@ echo "timestamp,commit_hash,extension,total_size_bytes" > "$CSV_FILE"
 # Collect metrics for each extension
 for ext in $EXTENSIONS; do
     total_size=0
-    if find "$INSTALL_DIR" -name "*.${ext}" -type f > "/tmp/files_${ext}" 2>/dev/null; then
-        # Calculate total size of all files with this extension
-        while IFS= read -r file; do
-            if [ -f "$file" ]; then
-                size=$(stat -c%s "$file" 2>/dev/null || echo 0)
-                total_size=$((total_size + size))
-            fi
-        done < "/tmp/files_${ext}"
-        # Clean up temporary file
-        rm -f "/tmp/files_${ext}"
+    temp_file=$(mktemp)
+    if find "$INSTALL_DIR" -name "*.${ext}" -type f > "$temp_file" 2>/dev/null; then
+        # Calculate total size of all files with this extension using du
+        if [ -s "$temp_file" ]; then
+            # Use du to get size in bytes, summing all files
+            total_size=$(du -bc $(cat "$temp_file") 2>/dev/null | tail -n1 | cut -f1 || echo 0)
+        fi
     fi
+    # Clean up temporary file
+    rm -f "$temp_file"
     # Write to CSV
     echo "${TIMESTAMP},${COMMIT_HASH},${ext},${total_size}" >> "$CSV_FILE"
 done
