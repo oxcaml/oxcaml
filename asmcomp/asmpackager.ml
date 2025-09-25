@@ -91,7 +91,7 @@ type flambda2 =
   Cmm.phrase list
 
 let make_package_object ~machine_width unix ~ppf_dump members target coercion
-      ~(flambda2 : flambda2) =
+      repr ~(flambda2 : flambda2) =
   let pack_name =
     Printf.sprintf "pack(%s)"
       (Unit_info.Artifact.modname target |> CU.name_as_string) in
@@ -119,12 +119,12 @@ let make_package_object ~machine_width unix ~ppf_dump members target coercion
     let compilation_unit = Unit_info.Artifact.modname target in
     let prefixname = Filename.remove_extension objtemp in
     let required_globals = Compilation_unit.Set.empty in
-    let main_module_block_size, code =
-      Translmod.transl_package components coercion
+    let main_module_block_repr, code =
+      Translmod.transl_package components coercion repr
     in
     let code = Simplif.simplify_lambda code in
     let main_module_block_format : Lambda.main_module_block_format =
-      Mb_struct { mb_size = main_module_block_size }
+      Mb_struct { mb_repr = main_module_block_repr }
     in
     let arg_block_idx =
       (* Packs not supported as argument modules *)
@@ -157,12 +157,12 @@ let make_package_object ~machine_width unix ~ppf_dump members target coercion
     in
     remove_file objtemp;
     if not (exitcode = 0) then raise(Error Linking_error);
-    main_module_block_size
+    main_module_block_repr
   )
 
 (* Make the .cmx file for the package *)
 
-let build_package_cmx members cmxfile ~main_module_block_size =
+let build_package_cmx members cmxfile ~main_module_block_repr =
   let unit_names =
     List.map (fun m -> m.pm_name) members in
   let filter lst =
@@ -191,7 +191,7 @@ let build_package_cmx members cmxfile ~main_module_block_size =
   let modname = Compilation_unit.name ui.ui_unit in
   let format : Lambda.main_module_block_format =
     (* Open modules not supported with packs, so always just a record *)
-    Mb_struct { mb_size = main_module_block_size }
+    Mb_struct { mb_repr = main_module_block_repr }
   in
   let pkg_infos =
     { ui_unit = ui.ui_unit;
@@ -205,7 +205,7 @@ let build_package_cmx members cmxfile ~main_module_block_size =
             filter (Asmlink.extract_crc_interfaces ());
       ui_imports_cmx =
           filter(Asmlink.extract_crc_implementations());
-      ui_format = format;
+      ui_format = Some format;
       ui_generic_fns =
         { curry_fun =
             union(List.map (fun info -> info.ui_generic_fns.curry_fun) units);
@@ -224,15 +224,15 @@ let build_package_cmx members cmxfile ~main_module_block_size =
 (* Make the .cmx and the .o for the package *)
 
 let package_object_files ~machine_width unix ~ppf_dump files target
-                         targetcmx coercion ~flambda2 =
+                         targetcmx coercion repr ~flambda2 =
   let pack_path = Unit_info.Artifact.modname target in
   let members = map_left_right (read_member_info pack_path) files in
   check_units members;
-  let main_module_block_size =
+  let main_module_block_repr =
     make_package_object ~machine_width unix ~ppf_dump members target coercion
-      ~flambda2
+      repr ~flambda2
   in
-  build_package_cmx members targetcmx ~main_module_block_size
+  build_package_cmx members targetcmx ~main_module_block_repr
 
 (* The entry point *)
 
@@ -257,10 +257,10 @@ let package_files ~machine_width unix ~ppf_dump initial_env files targetcmx
   let comp_unit = Unit_info.Artifact.modname cmx in
   Compilenv.reset unit_info;
   Misc.try_finally (fun () ->
-      let coercion =
+      let coercion, repr =
         Typemod.package_units initial_env files cmi comp_unit in
       package_object_files ~machine_width unix ~ppf_dump files obj targetcmx
-        coercion ~flambda2
+        coercion (Lambda.transl_module_representation repr) ~flambda2
     )
     ~exceptionally:(fun () ->
         remove_file targetcmx; remove_file (Unit_info.Artifact.filename obj)

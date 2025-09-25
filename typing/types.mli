@@ -635,7 +635,7 @@ module Vars  : Map.S with type key = string
 (* Value descriptions *)
 
 type value_kind =
-    Val_reg                             (* Regular value *)
+    Val_reg of Jkind_types.Sort.t       (* Regular value *)
   | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -830,6 +830,17 @@ and type_origin =
     Definition
   | Rec_check_regularity       (* See Typedecl.transl_type_decl *)
   | Existential of string
+
+(* The structure of a module block. This is distinct from
+   [Types.record_representation] since, e.g., modules don't support the
+   flat float block optimization. *)
+and module_representation =
+  | Module_value_only of { size : int }
+  (* All module fields are boxed *)
+  | Module_mixed of { shape : mixed_product_shape }
+  (* The module contains both values and unboxed elements. We store
+     [value_count] so we get more control over when the "scannable prefix
+     too large" error is thrown. *)
 
 and record_representation =
   | Record_unboxed
@@ -1057,6 +1068,10 @@ module type Wrapped = sig
     mtd_loc: Location.t;
     mtd_uid: Uid.t;
   }
+
+  (* Returns [None] for items that have no runtime representation (see
+     [Includemod.is_runtime_component]. *)
+  val sort_of_signature_item : signature_item -> Jkind_types.Sort.t option
 end
 
 module Make_wrapped(Wrap : Wrap) : Wrapped with type 'a wrapped = 'a Wrap.t
@@ -1121,6 +1136,9 @@ val may_equal_constr :
 
 (* Equality *)
 
+val equal_module_representation :
+  module_representation -> module_representation -> bool
+
 val equal_record_representation :
   record_representation -> record_representation -> bool
 
@@ -1168,11 +1186,23 @@ type record_form_packed =
 
 val record_form_to_string : _ record_form -> string
 
+val mixed_block_element_of_const_sort :
+  Jkind_types.Sort.Const.t -> mixed_block_element
+
+val mixed_block_element_for_type_extension : mixed_block_element
+val mixed_block_element_for_exception : mixed_block_element
+val mixed_block_element_for_module : mixed_block_element
+val mixed_block_element_for_class : mixed_block_element
+
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that
     correspond to a run-time value: values, extensions, modules, classes.
     Note: manifest primitives do not correspond to a run-time value! *)
 val bound_value_identifiers: signature -> Ident.t list
+
+(** Like [bound_value_identifiers], but also return sorts *)
+val bound_value_identifiers_and_sorts :
+  signature -> (Ident.t * Jkind_types.Sort.t) list
 
 val signature_item_id : signature_item -> Ident.t
 

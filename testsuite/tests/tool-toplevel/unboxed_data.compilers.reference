@@ -1,0 +1,10 @@
+val a_1 : float# = <abstr>
+val b_1 : float32# = <abstr>
+val c_1 : int64# = <abstr>
+val d_1 : int32# = <abstr>
+val e_1 : nativeint# = <abstr>
+type t_2 = #{ x : int; y : int64#; }
+val a_3 : #(int * int) array = <abstr array>
+val b_3 : int ref# array = [|#{contents = 1}; #{contents = 2}|]
+val c_3 : t_2 array = <abstr array>
+

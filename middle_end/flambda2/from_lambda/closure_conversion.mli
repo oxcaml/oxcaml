@@ -104,7 +104,7 @@ val close_program :
   big_endian:bool ->
   cmx_loader:Flambda_cmx.loader ->
   compilation_unit:Compilation_unit.t ->
-  module_block_size_in_words:int ->
+  module_repr:Lambda.module_representation ->
   program:(Acc.t -> Env.t -> Expr_with_acc.t) ->
   prog_return_cont:Continuation.t ->
   exn_continuation:Continuation.t ->

@@ -63,7 +63,8 @@ module EvalPath =
     let rec eval_address = function
     | Env.Aunit cu -> eval_id (cu |> Compilation_unit.to_global_ident_for_bytecode)
     | Env.Alocal id -> eval_id id
-    | Env.Adot(root, pos) ->
+    | Env.Adot(root, _field_sorts, pos) ->
+        (* We can ignore [_field_sorts] the debugger runs only bytecode *)
         let v = eval_address root in
         if not (Debugcom.Remote_value.is_block v)
         then raise Error
