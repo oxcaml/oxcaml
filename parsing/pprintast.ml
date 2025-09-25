@@ -368,7 +368,6 @@ let mods f m =
 let optional_mod_mods f m =
   match m with
   | [] -> ()
-  (* CR zeisbach: maybe this should not have a space at the start *)
   | m -> pp f " mod %a" mods m
 
 let mode f { txt = Mode s; _ } =
