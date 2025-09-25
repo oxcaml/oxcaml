@@ -1137,6 +1137,23 @@ type alerts = string Stdlib.String.Map.t
 
 val remove_double_underscores : string -> string
 
+(** {1 {Sexp printing utulities} *)
+module Sexp : sig
+
+  type field =
+    | Bool : string * bool -> field
+    | Int : string * int -> field
+    | P : string * (Format.formatter -> 'a -> unit) * 'a -> field (**)
+
+  val i : string -> int -> field
+  val b : string -> bool -> field
+  val p : string -> (Format.formatter -> 'a -> unit) -> 'a -> field
+
+  val print : Format.formatter -> field list -> unit
+  (** Print a list of named elements as an s-expression. *)
+
+end
+
 (** {1 JSON utilities} *)
 module Json : sig
   (** Simple (and not very robust) JSON generation utilities.
