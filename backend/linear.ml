@@ -135,4 +135,4 @@ let instr_cons d a r n ~available_before ~available_across =
     available_across
   }
 
-let traps_to_bytes traps = Proc.trap_size_in_bytes * traps
+let traps_to_bytes traps = Proc.trap_size_in_bytes () * traps
