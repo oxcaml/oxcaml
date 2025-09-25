@@ -713,13 +713,13 @@ let remove_trap_instructions t removed_trap_handlers =
       else (
         update_block lbl_handler ~stack_offset;
         update_basic_next (DLL.Cursor.next cursor)
-          ~stack_offset:(stack_offset + Proc.trap_size_in_bytes))
+          ~stack_offset:(stack_offset + Proc.trap_size_in_bytes ()))
     | Poptrap { lbl_handler } ->
       if Label.Set.mem lbl_handler removed_trap_handlers
       then update_basic_next (DLL.Cursor.delete_and_next cursor) ~stack_offset
       else
         update_basic_next (DLL.Cursor.next cursor)
-          ~stack_offset:(stack_offset - Proc.trap_size_in_bytes)
+          ~stack_offset:(stack_offset - Proc.trap_size_in_bytes ())
     | Op (Stackoffset n) ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset:(stack_offset + n)
     | Op

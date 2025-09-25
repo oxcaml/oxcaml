@@ -508,4 +508,10 @@ let expression_supported : Cmm.expression -> bool = function
   | Cexit _ -> true
   | Cconst_vec256 _ | Cconst_vec512 _ -> false
 
-let trap_size_in_bytes = 16
+
+let trap_size_in_bytes () =
+  if !Clflags.llvm_backend
+  then
+    Misc.fatal_error
+      "Proc.trap_size_in_bytes: LLVM backend not supported for ARM"
+  else 16
