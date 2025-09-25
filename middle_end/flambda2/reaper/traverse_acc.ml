@@ -258,7 +258,7 @@ let create_known_arity_call_witness t code_id ~params ~returns ~exn =
     ~from:(Code_id_or_name.code_id code_id);
   witness
 
-let make_known_arity_apply_widget t ~denv ~params ~returns ~exn =
+let make_known_arity_apply_widget t ~(denv : Env.t) ~params ~returns ~exn =
   let witness =
     Code_id_or_name.var
       (Variable.create "known_arity_apply" Flambda_kind.rec_info)
@@ -266,7 +266,9 @@ let make_known_arity_apply_widget t ~denv ~params ~returns ~exn =
   List.iteri
     (fun i v ->
       Graph.add_coaccessor_dep t.deps ~base:witness (Param i)
-        ~to_:(Code_id_or_name.var v))
+        ~to_:
+          (Code_id_or_name.name
+             (simple_to_name t ~all_constants:denv.all_constants v)))
     params;
   List.iteri
     (fun i v ->
@@ -366,7 +368,8 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
     add_deps (List.combine params witnesses);
     witnesses
 
-let make_unknown_arity_apply_widget t ~denv ~arity ~params ~returns ~exn =
+let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
+    ~exn =
   let called =
     Code_id_or_name.var (Variable.create "called" Flambda_kind.rec_info)
   in
@@ -378,7 +381,9 @@ let make_unknown_arity_apply_widget t ~denv ~arity ~params ~returns ~exn =
       List.iteri
         (fun i v ->
           Graph.add_coaccessor_dep t.deps ~base:witness (Param i)
-            ~to_:(Code_id_or_name.var v))
+            ~to_:
+              (Code_id_or_name.name
+                 (simple_to_name t ~all_constants:denv.all_constants v)))
         first;
       Graph.add_accessor_dep t.deps ~base:witness (Apply Exn)
         ~to_:(Code_id_or_name.var exn);

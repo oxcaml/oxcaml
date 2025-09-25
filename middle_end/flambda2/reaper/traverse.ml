@@ -575,70 +575,8 @@ and traverse_apply denv acc apply : rev_expr =
   { expr; holed_expr = denv.parent }
 
 and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
-  let calls_are_not_pure = Variable.create "not_pure" Flambda_kind.value in
-  Acc.used ~denv (Simple.var calls_are_not_pure) acc;
-  let add_call_widget (function_call : Call_kind.Function_call.t) =
-    let args, closure_entry_point =
-      match function_call with
-      | Indirect_unknown_arity ->
-        ( Flambda_arity.group_by_parameter (Apply.args_arity apply)
-            (Apply.args apply),
-          Global_flow_graph.Unknown_arity_code_pointer )
-      | Indirect_known_arity | Direct _ ->
-        [Apply.args apply], Global_flow_graph.Known_arity_code_pointer
-    in
-    (* List.iter (fun arg -> Acc.used ~denv arg acc) (Apply.args apply); *)
-    let callee =
-      match Apply.callee apply with
-      | None -> assert false
-      | Some callee ->
-        Code_id_or_name.name (Acc.simple_to_name acc ~denv callee)
-    in
-    let rec add_deps callee args calls_are_not_pure =
-      match args with
-      | [] -> Misc.fatal_error "add_deps: no args"
-      | first :: rest -> (
-        List.iteri
-          (fun i arg ->
-            Graph.add_coaccessor_dep (Acc.graph acc)
-              ~to_:(Code_id_or_name.name (Acc.simple_to_name acc ~denv arg))
-              (Param (closure_entry_point, i))
-              ~base:callee)
-          first;
-        Graph.add_accessor_dep (Acc.graph acc)
-          ~to_:(Code_id_or_name.var calls_are_not_pure)
-          (Code_of_closure closure_entry_point) ~base:callee;
-        Graph.add_accessor_dep (Acc.graph acc)
-          ~to_:(Code_id_or_name.var exn_arg)
-          (Apply (closure_entry_point, Exn))
-          ~base:callee;
-        match rest with
-        | [] -> (
-          match return_args with
-          | None -> ()
-          | Some return_args ->
-            List.iteri
-              (fun i return_arg ->
-                Graph.add_accessor_dep (Acc.graph acc)
-                  ~to_:(Code_id_or_name.var return_arg)
-                  (Apply (closure_entry_point, Normal i))
-                  ~base:callee)
-              return_args)
-        | _ :: _ ->
-          let v = Variable.create "partial_apply" Flambda_kind.value in
-          Graph.add_accessor_dep (Acc.graph acc) ~to_:(Code_id_or_name.var v)
-            (Apply (closure_entry_point, Normal 0))
-            ~base:callee;
-          let calls_are_not_pure =
-            Variable.create "not_pure" Flambda_kind.value
-          in
-          Acc.used ~denv (Simple.var calls_are_not_pure) acc;
-          add_deps (Code_id_or_name.var v) rest calls_are_not_pure)
-    in
-    add_deps callee args calls_are_not_pure
-  in
   match Apply.call_kind apply with
-  | Function { function_call = Direct code_id as function_call; _ } ->
+  | Function { function_call = Direct code_id; _ } ->
     (* CR ncourant: think about cross-module propagation *)
     (* if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
        then ( let apply_dep = { Traverse_acc.function_containing_apply_expr =
@@ -648,7 +586,18 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
        calls_are_not_pure } in Acc.add_apply apply_dep acc; if Option.is_some
        (Apply.callee apply) then add_call_widget function_call) else default_acc
        acc *)
-    if Option.is_some (Apply.callee apply) then add_call_widget function_call;
+    let call_widget =
+      Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
+        ~returns:return_args ~exn:exn_arg
+    in
+    (if Option.is_some (Apply.callee apply)
+    then
+      let closure =
+        Acc.simple_to_name acc ~denv (Option.get (Apply.callee apply))
+      in
+      Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
+        (Code_of_closure Known_arity_code_pointer)
+        ~base:(Code_id_or_name.name closure));
     if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
        && (Option.is_none (Apply.callee apply)
           || denv.should_preserve_direct_calls)
@@ -656,22 +605,36 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       let apply_dep =
         { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
           apply_code_id = code_id;
-          apply_args = Apply.args apply;
           apply_closure = Apply.callee apply;
-          params_of_apply_return_cont = return_args;
-          param_of_apply_exn_cont = exn_arg;
-          not_pure_call_witness = calls_are_not_pure
+          apply_call_witness = call_widget
         }
       in
       Acc.add_apply apply_dep acc
     else if Option.is_none (Apply.callee apply)
     then default_acc acc
-  | Function
-      { function_call =
-          (Indirect_unknown_arity | Indirect_known_arity) as function_call;
-        _
-      } ->
-    add_call_widget function_call
+  | Function { function_call = Indirect_known_arity; _ } ->
+    let call_widget =
+      Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
+        ~returns:return_args ~exn:exn_arg
+    in
+    let closure =
+      Acc.simple_to_name acc ~denv (Option.get (Apply.callee apply))
+    in
+    Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
+      (Code_of_closure Known_arity_code_pointer)
+      ~base:(Code_id_or_name.name closure)
+  | Function { function_call = Indirect_unknown_arity; _ } ->
+    let call_widget =
+      Acc.make_unknown_arity_apply_widget acc ~denv
+        ~arity:(Apply.args_arity apply) ~params:(Apply.args apply)
+        ~returns:return_args ~exn:exn_arg
+    in
+    let closure =
+      Acc.simple_to_name acc ~denv (Option.get (Apply.callee apply))
+    in
+    Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
+      (Code_of_closure Unknown_arity_code_pointer)
+      ~base:(Code_id_or_name.name closure)
   | Method _ | C_call _ | Effect _ -> default_acc acc
 
 and traverse_apply_cont denv acc apply_cont : rev_expr =
