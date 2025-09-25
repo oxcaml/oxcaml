@@ -216,9 +216,11 @@ let check_stack_offset t label (block : Cfg.basic_block) =
               Cfg.dump_basic basic.desc cur_stack_offset
               (Label.to_string lbl_handler)
               handler_block.stack_offset;
-          cur_stack_offset + Proc.trap_size_in_bytes
+          cur_stack_offset + Proc.trap_size_in_bytes ()
         | Poptrap { lbl_handler = _ } ->
-          let new_stack_offset = cur_stack_offset - Proc.trap_size_in_bytes in
+          let new_stack_offset =
+            cur_stack_offset - Proc.trap_size_in_bytes ()
+          in
           if Int.compare new_stack_offset 0 < 0
           then
             report t

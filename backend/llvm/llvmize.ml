@@ -409,7 +409,7 @@ let call_simple ?(attrs = []) ~cc t name args res_types =
    instructions *)
 let statepoint_id_attr_for_stack_adjustment ?(offset = 0) t
     (i : 'a Cfg.instruction) =
-  LL.Fn_attr.Statepoint_id (((i.stack_offset - t.stack_offset) * 2) + offset)
+  LL.Fn_attr.Statepoint_id (i.stack_offset - t.stack_offset + offset)
 
 let gc_attr ~can_call_gc t i =
   if can_call_gc
