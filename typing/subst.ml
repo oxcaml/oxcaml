@@ -607,7 +607,8 @@ let rec type_declaration' copy_scope s decl =
         in
         Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
       end;
-    type_ikind = None; (* CR jujacobs: fix this to preserve ikinds during substitution
+    type_ikind = Types.ikind_reset
+      "subst type_declaration"; (* CR jujacobs: fix this to preserve ikinds during substitution
                           Substitution rewrites manifests/jkinds. *)
     type_private = decl.type_private;
     type_variance = decl.type_variance;

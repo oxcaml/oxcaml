@@ -306,7 +306,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
-      type_ikind = None;
+      type_ikind = Types.ikind_reset "transl_declaration initial unboxed";
       (* CR jujacobs: check if we can keep the ikind up to date here
          Initial temporary unboxed version declared with dummy manifest. *)
       type_private = sdecl.ptype_private;
@@ -327,7 +327,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
-      type_ikind = None;
+      type_ikind = Types.ikind_reset "transl_declaration initial";
       (* CR jujacobs: check if we can keep the ikind up to date here
          Initial declaration seeded with placeholder manifest. *)
       type_private = sdecl.ptype_private;
@@ -1079,7 +1079,7 @@ let transl_declaration env sdecl (id, uid) =
         type_arity = arity;
         type_kind = kind;
         type_jkind = jkind;
-        type_ikind = None;
+        type_ikind = Types.ikind_reset "update_decl_jkind initial";
         (* CR jujacobs: check if we can keep the ikind up to date here
            Fresh declaration seeded before later jkind adjustments. *)
         type_private = sdecl.ptype_private;
@@ -1257,7 +1257,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_arity = decl.type_arity;
         type_kind = kind;
         type_jkind = jkind;
-        type_ikind = None;
+        type_ikind = Types.ikind_reset "derive_unboxed_versions";
         (* CR jujacobs: check if we can keep the ikind up to date here
            Derived unboxed version inherits manifest from boxed type. *)
         type_private = decl.type_private;
@@ -1538,12 +1538,13 @@ let narrow_to_manifest_jkind env loc path decl =
     end;
     let type_ikind =
       if not !Clflags.ikinds
-      then None
+      then Types.ikind_reset "ikinds disabled"
       else
         let context =
           Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
         in
-        Some (Ikinds.type_declaration_ikind ~context ~path)
+        Types.Constructor_ikind
+          (Ikinds.type_declaration_ikind ~context ~path)
     in
     { decl with type_jkind = manifest_jkind; type_ikind }
 
@@ -2099,20 +2100,22 @@ let rec update_decl_jkind env dpath decl =
            we mark jkinds as best *)
         |> Jkind.mark_best
       in
+      let reason = "update_decl_jkind open" in
       { decl with type_jkind;
                (* CR jujacobs: check if we can keep the ikind up to date here
                   Refining jkind for open type during normalization. *)
-               type_ikind = None }
+               type_ikind = Types.ikind_reset reason }
     | Type_record (lbls, rep, umc) ->
       let lbls, rep, type_jkind = update_record_kind decl.type_loc lbls rep in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
+      let reason = "update_decl_jkind record" in
       { decl with type_kind = Type_record (lbls, rep, umc);
               type_jkind;
               (* CR jujacobs: check if we can keep the ikind up to date here
                  Updating record layout/jkind after normalization. *)
-              type_ikind = None }
+              type_ikind = Types.ikind_reset reason }
     (* CR layouts v3.0: handle this case in [update_variant_jkind] when
        [Variant_with_null] introduced.
 
@@ -2136,11 +2139,12 @@ let rec update_decl_jkind env dpath decl =
           (* See Note [Quality of jkinds during inference] for more information about when we
              mark jkinds as best *)
           let type_jkind = Jkind.mark_best type_jkind in
+          let reason = "update_decl_jkind unboxed record" in
           { decl with type_kind = Type_record_unboxed_product (lbls, rep, umc);
                       type_jkind;
                       (* CR jujacobs: check if we can keep the ikind up to date here
                          Updating unboxed record layout/jkind. *)
-                      type_ikind = None }
+                      type_ikind = Types.ikind_reset reason }
         end
     | Type_variant _ when
       Builtin_attributes.has_or_null_reexport decl.type_attributes ->
@@ -2152,11 +2156,12 @@ let rec update_decl_jkind env dpath decl =
       (* See Note [Quality of jkinds during inference] for more information
          about when we mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
+      let reason = "update_decl_jkind variant" in
       { decl with type_kind = Type_variant (cstrs, rep, umc);
               type_jkind;
               (* CR jujacobs: check if we can keep the ikind up to date here
                  Updating variant layout/jkind. *)
-              type_ikind = None }
+              type_ikind = Types.ikind_reset reason }
   in
 
   (* Check the layout here, both to check it, but more importantly to fill in any sort
@@ -2745,7 +2750,10 @@ let name_recursion sdecl id decl =
       { decl with type_manifest = Some ty';
                (* CR jujacobs: check if we can keep the ikind up to date here
                   Private row alias rewired to recursive path. *)
-               type_ikind = None }
+               type_ikind =
+                 Types.ikind_reset
+                   (Format.asprintf "name_recursion path=%a"
+                      Path.print (Path.Pident id)) }
     else decl
   | _ -> decl
 
@@ -2796,9 +2804,9 @@ let normalize_decl_jkinds env decls =
     in
     let compute_type_ikind () =
       if not !Clflags.ikinds
-      then None
+      then Types.ikind_reset "normalize_decl_jkind (ikinds disabled)"
       else
-        Some
+        Types.Constructor_ikind
           (Ikinds.type_declaration_ikind ~context:normalization_context ~path)
     in
     let normalized_jkind =
@@ -3990,6 +3998,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   (* In the first part of this function, we typecheck the syntactic
      declaration [sdecl] in the outer environment [outer_env]. *)
   let env = outer_env in
+  let decl_path = Path.Pident id in
   let loc = sdecl.ptype_loc in
   let tparams = make_params env (Pident id) sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
@@ -4067,7 +4076,12 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
           type_arity = arity;
           type_kind;
           type_jkind;
-          type_ikind = None;
+          type_ikind =
+            (let reason =
+               Format.asprintf "transl_with_constraint unboxed path=%a"
+                 Path.print (Path.unboxed_version path)
+             in
+             Types.ikind_reset reason);
           (* CR jujacobs: check if we can keep the ikind up to date here
              Unboxed counterpart mirrors manifest from signature. *)
           type_private = priv;
@@ -4103,7 +4117,11 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_arity = arity;
       type_kind;
       type_jkind;
-      type_ikind = None;
+      type_ikind =
+        (let reason =
+           Format.asprintf "transl_with_constraint path=%a" Path.print decl_path
+         in
+         Types.ikind_reset reason);
       (* CR jujacobs: check if we can keep the ikind up to date here
          Translating [with type] installs signature manifest. *)
       type_private = priv;
@@ -4208,7 +4226,7 @@ let transl_package_constraint ~loc ty =
     type_arity = 0;
     type_kind = Type_abstract Definition;
     type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
-    type_ikind = None;
+    type_ikind = Types.ikind_reset "transl_package_constraint";
     (* There is no reason to calculate an accurate jkind here.  This typedecl
        will be thrown away once it is used for the package constraint inclusion
        check, and that check will expand the manifest as needed.
@@ -4236,7 +4254,7 @@ let abstract_type_decl ~injective ~jkind ~params =
       type_arity = arity;
       type_kind = Type_abstract Definition;
       type_jkind = jkind;
-      type_ikind = None;
+      type_ikind = Types.ikind_reset "abstract_type_decl";
       (* CR jujacobs: check if we can keep the ikind up to date here
          Abstract approximation with no manifest. *)
       type_private = Public;
@@ -4255,7 +4273,7 @@ let abstract_type_decl ~injective ~jkind ~params =
           type_arity = arity;
           type_kind = Type_abstract Definition;
           type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
-          type_ikind = None;
+          type_ikind = Types.ikind_reset "abstract_type_decl unboxed";
           (* CR jujacobs: check if we can keep the ikind up to date here
              Unboxed approximation for abstract type. *)
           type_private = Public;

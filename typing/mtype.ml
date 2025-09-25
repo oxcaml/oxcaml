@@ -98,17 +98,24 @@ and strengthen_lazy_sig' ~aliasable sg p =
             let manif =
               Some(Btype.newgenty(Tconstr(path,
                                           decl.type_params, ref Mnil))) in
-            if Btype.type_kind_is_abstract decl then
+            if Btype.type_kind_is_abstract decl then begin
+              let reason =
+                Format.asprintf "strengthen abstract path=%a" Path.print path
+              in
               { decl with type_private = Public;
                          type_manifest = manif;
                          (* CR jujacobs: check if we can keep the ikind up to date here
                             Strengthening adds a manifest referencing the strengthened path. *)
-                         type_ikind = None }
-            else
+                         type_ikind = Types.ikind_reset reason }
+            end else begin
+              let reason =
+                Format.asprintf "strengthen manifest path=%a" Path.print path
+              in
               { decl with type_manifest = manif;
                          (* CR jujacobs: check if we can keep the ikind up to date here
                             Strengthening adds a manifest referencing the strengthened path. *)
-                         type_ikind = None }
+                         type_ikind = Types.ikind_reset reason }
+            end
       in
       let path = Pdot(p, Ident.name id) in
       let new_unboxed_version =
@@ -578,17 +585,24 @@ let enrich_typedecl env p id decl =
                         (Tconstr
                            (Path.unboxed_version p, decl.type_params, ref Mnil))
                     in
+                    let reason =
+                      Format.asprintf "enrich unboxed path=%a"
+                        Path.print (Path.unboxed_version p)
+                    in
                     { d with type_manifest = Some orig_ty_unboxed;
                              (* CR jujacobs: check if we can keep the ikind up to date here
                                 Enriching copies the signature's unboxed manifest. *)
-                             type_ikind = None })
+                             type_ikind = Types.ikind_reset reason })
                   decl.type_unboxed_version
+              in
+              let reason =
+                Format.asprintf "enrich manifest path=%a" Path.print p
               in
               { decl with type_manifest = Some orig_ty;
                          type_unboxed_version;
                          (* CR jujacobs: check if we can keep the ikind up to date here
                             Enriching copies the signature manifest. *)
-                         type_ikind = None }
+                         type_ikind = Types.ikind_reset reason }
         end
 
 let rec enrich_modtype env p mty =

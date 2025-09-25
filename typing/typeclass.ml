@@ -1612,7 +1612,7 @@ let temp_abbrev loc id arity uid =
        type_arity = arity;
        type_kind = Type_abstract Definition;
        type_jkind = Jkind.Builtin.value ~why:Object;
-       type_ikind = None;
+       type_ikind = Types.ikind_reset "typeclass temp_abbrev";
        type_private = Public;
        type_manifest = Some ty;
        type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1840,22 +1840,22 @@ let class_infos define_class kind
   let obj_abbr =
     let arity = List.length obj_params in
     {
-     type_params = obj_params;
-     type_arity = arity;
-     type_kind = Type_abstract Definition;
-     type_jkind = Jkind.Builtin.value ~why:Object;
-     type_ikind = None;
-     type_private = Public;
-     type_manifest = Some obj_ty;
-     type_variance = Variance.unknown_signature ~injective:false ~arity;
-     type_separability = Types.Separability.default_signature ~arity;
-     type_is_newtype = false;
-     type_expansion_scope = Btype.lowest_level;
-     type_loc = cl.pci_loc;
-     type_attributes = []; (* or keep attrs from cl? *)
-     type_unboxed_default = false;
-     type_uid = dummy_class.cty_uid;
-     type_unboxed_version = None;
+      type_params = obj_params;
+      type_arity = arity;
+      type_kind = Type_abstract Definition;
+      type_jkind = Jkind.Builtin.value ~why:Object;
+      type_ikind = Types.ikind_reset "typeclass temp_abbrev";
+      type_private = Public;
+      type_manifest = Some obj_ty;
+      type_variance = Variance.unknown_signature ~injective:false ~arity;
+      type_separability = Types.Separability.default_signature ~arity;
+      type_is_newtype = false;
+      type_expansion_scope = Btype.lowest_level;
+      type_loc = cl.pci_loc;
+      type_attributes = []; (* or keep attrs from cl? *)
+      type_unboxed_default = false;
+      type_uid = dummy_class.cty_uid;
+      type_unboxed_version = None;
     }
   in
   let (cl_params, cl_ty) =

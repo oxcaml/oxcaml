@@ -3,7 +3,15 @@
 
 (* Debug logging helper with indentation (2 spaces per level).
    Enable by setting IKIND_DEBUG=1|true|yes in the environment. *)
-let __ikind_debug : bool ref = ref false
+let () =
+  let is_enabled value =
+    match String.lowercase_ascii (String.trim value) with
+    | "" | "0" | "false" | "no" | "off" -> false
+    | _ -> true
+  in
+  match Sys.getenv_opt "IKIND_DEBUG" with
+  | Some value when is_enabled value -> Types.ikind_debug := true
+  | _ -> ()
 
 module Ldd = Ikind.Ldd
 
@@ -39,7 +47,7 @@ let with_origin_tag (tag : string) (f : unit -> 'a) : 'a =
 let __ikind_log_depth = ref 0
 
 let log ?pp (msg : string) (f : unit -> 'a) : 'a =
-  if not !__ikind_debug
+  if not !Types.ikind_debug
   then f ()
   else
     let indent = String.make (!__ikind_log_depth * 2) ' ' in
@@ -67,9 +75,11 @@ let log ?pp (msg : string) (f : unit -> 'a) : 'a =
       raise exn
 
 let log_call ?pp (build_msg : unit -> string) (f : unit -> 'a) : 'a =
-  if (not !Clflags.ikinds) || (not !__ikind_debug)
+  if (not !Clflags.ikinds) || (not !Types.ikind_debug)
   then f ()
   else log ?pp (build_msg ()) f
+
+let ikind_reset : string -> Types.type_ikind = Types.ikind_reset
 
 let string_of_jkind (j : _ Types.jkind) : string = Format.asprintf "%a" Jkind.format j
 
@@ -130,7 +140,7 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
   incr kind_of_depth;
   if !kind_of_depth > 5000 then failwith "kind_of_depth too deep" else ();
   incr kind_of_counter;
-  (* if !kind_of_counter > 10000000 then __ikind_debug := true else (); *)
+  (* if !kind_of_counter > 10000000 then Types.ikind_debug := true else (); *)
   let res =
     match Types.get_desc ty with
     | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
@@ -292,22 +302,12 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
   | None ->
     failwith
       (Format.asprintf "Ikinds.lookup: unknown constructor %a" Path.print p)
-  | Some decl -> (
+  | Some decl ->
     (* Here we can switch to using the cached ikind or not. *)
-    match decl.type_ikind with
-    (* match None with *)
-    | Some constructor when !Clflags.ikinds ->
-      log_call ~pp:string_of_constr_decl
-        (fun () ->
-          Format.asprintf "lookup cached path=%a" Path.print p)
-        (fun () ->
-          let base, coeffs =
-            constructor_ikind_polynomial ~context constructor
-          in
-          JK.Poly (base, coeffs))
-    | _ ->
+    let fallback () =
       match decl.type_manifest with
-      | None -> (
+      | None ->
+        begin
         (* No manifest: may still be concrete (record/variant/...). Build
            ckind. *)
         match decl.type_kind with
@@ -475,7 +475,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                 log ~pp:ops.pp_kind "Type_open kind" (fun () ->
                     ops.const Axis_lattice_bits.value)
               in
-              JK.Ty { args = decl.type_params; kind; abstract = false }))
+              JK.Ty { args = decl.type_params; kind; abstract = false })
+        end
       | Some body_ty ->
         log
           (Format.asprintf "lookup manifest body path=%a" Path.print p)
@@ -487,7 +488,24 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
               log ~pp:ops.pp_kind "manifest kind" (fun () ->
                   ops.kind_of body_ty)
             in
-            JK.Ty { args; kind; abstract = false }))
+            JK.Ty { args; kind; abstract = false })
+    in
+    match decl.type_ikind with
+    | Types.Constructor_ikind constructor when !Clflags.ikinds ->
+      log_call ~pp:string_of_constr_decl
+        (fun () ->
+          Format.asprintf "lookup cached path=%a" Path.print p)
+        (fun () ->
+          let base, coeffs =
+            constructor_ikind_polynomial ~context constructor
+          in
+          JK.Poly (base, coeffs))
+    | Types.No_constructor_ikind reason ->
+      if (not !Clflags.ikinds) || (not !Types.ikind_debug)
+      then ()
+      else Format.eprintf "[ikind-miss] %a => %s@." Path.print p reason;
+      fallback ()
+    | Types.Constructor_ikind _ -> fallback ()
 
 (* Package the above into a full solver environment. *)
 let make_solver ~(context : Jkind.jkind_context) : JK.solver =
@@ -526,7 +544,7 @@ let type_declaration_ikind ~(context : Jkind.jkind_context)
   let solver = make_solver ~context in
   let base, coeffs = JK.constr_kind_poly solver path in
   let coeffs_array = Array.of_list coeffs in
-  if true || !__ikind_debug
+  if true || !Types.ikind_debug
   then (
     let base_str = JK.pp base in
     let coeffs_str =
@@ -535,7 +553,7 @@ let type_declaration_ikind ~(context : Jkind.jkind_context)
       |> List.mapi (fun i coeff -> Format.asprintf "%d:%s" i (JK.pp coeff))
       |> String.concat ", "
     in
-    if !__ikind_debug
+    if !Types.ikind_debug
     then Format.eprintf "[ikind-install] %a base=%s coeffs=[%s]@."
       Path.print path base_str coeffs_str
     else ());
@@ -605,7 +623,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
         else
           let sub_ckind = ckind_of_jkind_l sub in
           let super_ckind = ckind_of_jkind_l super in
-          let should_log = !Clflags.ikinds && !__ikind_debug in
+          let should_log = !Clflags.ikinds && !Types.ikind_debug in
           if should_log then begin
             ignore
               (log ~pp:JK.pp "leq lhs"
@@ -680,7 +698,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
     (fun () ->
       Format.asprintf "crossing_of_jkind jkind=%s" (string_of_jkind jkind))
     (fun () ->
-      if not (false && !Clflags.ikinds) (* CR jujacobs: fix this *)
+      if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
       then Jkind.get_mode_crossing ~context jkind
       else
         let solver = make_solver ~context in
@@ -713,7 +731,7 @@ let sub_or_intersect ?origin
   in
   log_call ~pp:string_of_sub_or_intersect msg
     (fun () ->
-      if not (false && !Clflags.ikinds) (* CR jujacobs: fix this *)
+      if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
       then Jkind.sub_or_intersect ~type_equal ~context t1 t2
       else
         (* CR jujacobs: enable this *)
@@ -742,7 +760,7 @@ let sub_or_error ?origin
     | Error _ -> "Error"
   in
   log_call ~pp:pp_result msg (fun () ->
-      if not (false && !Clflags.ikinds)
+      if not (true && !Clflags.ikinds)
       then Jkind.sub_or_error ~type_equal ~context t1 t2
       else if sub ~type_equal ~context (Jkind.disallow_right t1)
                 (Jkind.disallow_left t2)
