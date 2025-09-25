@@ -46,6 +46,8 @@ module type S = sig
 
   val v : int -> int mod contended aliased @@ once portable
 
+  type t = int mod contended aliased -> int
+
   type 'a r = {
     f1 : 'a mod contended aliased -> 'a
   ; f2 : 'a @ once portable mod contended aliased -> 'a
