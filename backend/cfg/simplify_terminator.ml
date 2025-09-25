@@ -177,8 +177,12 @@ let block_const_int (block : C.basic_block) : bool =
 let block (cfg : C.t) (block : C.basic_block) : bool =
   match block.terminator.desc with
   | Always successor_label -> (
-    match is_last_instruction_const_int block.body with
-    | None ->
+    match
+      ( Label.equal block.start cfg.entry_label,
+        is_last_instruction_const_int block.body )
+    with
+    | true, None -> false
+    | false, None ->
       (* If we jump to a block that is empty, we can copy the terminator from
          the successor to the current block. There might be size considerations,
          so we currently do so only for "tests" and return. *)
@@ -199,7 +203,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
         | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
           false
       else false
-    | Some (const, reg) ->
+    | _, Some (const, reg) ->
       (* If we have an Iconst_int instruction at the end of the block followed
          by a jump to an empty block whose terminator is a condition over the
          Iconst_value, then we can evaluate the condition at compile-time and
