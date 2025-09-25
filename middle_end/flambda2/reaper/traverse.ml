@@ -38,7 +38,7 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
     List.mapi
       (fun i kind ->
         Variable.create
-          (Format.asprintf "function_return_%i_%a" i Code_id.print code_id)
+          (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
           (Flambda_kind.With_subkind.kind kind))
       (Flambda_arity.unarized_components (Code.result_arity code))
   in
@@ -68,17 +68,13 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
     | Assume _ -> false
     | Check _ -> true
   in
-  let call_witnesses =
-    List.init
-      (if Code.is_tupled code then 1 else Flambda_arity.num_params arity)
-      (fun i ->
-        Code_id_or_name.var
-          (* These witnesses are not going to end up as actual program
-             variables; giving them kind Value is a bit misleading but should
-             not cause any issue. *)
-          (Variable.create
-             (Printf.sprintf "witness_%d_for_%s" i (Code_id.name code_id))
-             Flambda_kind.value))
+  let is_tupled = Code.is_tupled code in
+  let known_arity_call_witness =
+    Acc.create_known_arity_call_witness acc code_id ~params ~returns:return ~exn
+  in
+  let unknown_arity_call_witnesses =
+    Acc.create_unknown_arity_call_witnesses acc code_id ~is_tupled ~arity
+      ~params ~returns:return ~exn
   in
   let code_dep =
     { Traverse_acc.arity;
@@ -86,35 +82,21 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
       my_closure;
       exn;
       params;
-      is_tupled = Code.is_tupled code;
-      call_witnesses
+      is_tupled;
+      known_arity_call_witness;
+      unknown_arity_call_witnesses
     }
   in
-  List.iteri
-    (fun i witness ->
-      Graph.add_constructor_dep (Acc.graph acc) ~base:witness
-        (Code_id_of_call_witness i)
-        ~from:(Code_id_or_name.code_id code_id))
-    call_witnesses;
-  Graph.add_alias (Acc.graph acc)
-    ~to_:(Code_id_or_name.code_id code_id)
-    ~from:(Code_id_or_name.name denv.le_monde_exterieur);
-  (* Graph.add_use_dep (Acc.graph acc) ~to_:indirect_call_witness
-     ~from:(Code_id_or_name.code_id code_id); *)
-  (* let le_monde_exterieur = denv.le_monde_exterieur in List.iter (fun param ->
-     let param = Code_id_or_name.var param in Graph.add_propagate_dep (Acc.graph
-     acc) ~if_used:indirect_call_witness ~from:le_monde_exterieur ~to_:param)
-     params; *)
+  Graph.add_any_source (Acc.graph acc) (Code_id_or_name.code_id code_id);
   if has_unsafe_result_type || never_delete
   then (
     List.iter
       (fun var -> Acc.used ~denv (Simple.var var) acc)
       ((my_closure :: params) @ (exn :: return));
-    let le_monde_exterieur = Code_id_or_name.name denv.le_monde_exterieur in
     List.iter
       (fun param ->
         let param = Code_id_or_name.var param in
-        Graph.add_alias (Acc.graph acc) ~to_:param ~from:le_monde_exterieur)
+        Graph.add_any_source (Acc.graph acc) param)
       (my_closure :: params));
   if never_delete then Acc.used_code_id code_id acc;
   Acc.add_code code_id code_dep acc
@@ -542,10 +524,9 @@ and traverse_cont_handler :
 and traverse_apply denv acc apply : rev_expr =
   let return_args =
     match Apply.continuation apply with
-    | Never_returns -> None
+    | Never_returns -> []
     | Return cont -> (
-      match Continuation.Map.find cont denv.conts with
-      | Normal params -> Some params)
+      match Continuation.Map.find cont denv.conts with Normal params -> params)
   in
   let exn_arg =
     let exn = Apply.exn_continuation apply in
@@ -567,11 +548,9 @@ and traverse_apply denv acc apply : rev_expr =
     (match Apply.callee apply with
     | None -> ()
     | Some callee -> Acc.used ~denv callee acc);
+    Acc.any_source ~denv exn_arg acc;
     Acc.alias_dep ~denv exn_arg (Simple.name denv.le_monde_exterieur) acc;
-    List.iter
-      (fun param ->
-        Acc.alias_dep ~denv param (Simple.name denv.le_monde_exterieur) acc)
-      (match return_args with None -> [] | Some l -> l);
+    List.iter (fun param -> Acc.any_source ~denv param acc) return_args;
     match Apply.call_kind apply with
     | Function _ -> ()
     | Method { obj; kind = _; alloc_mode = _ } -> Acc.used ~denv obj acc

@@ -41,18 +41,16 @@ type code_dep =
     return : Variable.t list; (* Dummy variable representing return value *)
     exn : Variable.t; (* Dummy variable representing exn return value *)
     is_tupled : bool;
-    call_witnesses :
+    known_arity_call_witness : Code_id_or_name.t;
+    unknown_arity_call_witnesses :
       Code_id_or_name.t list (* One element for each (complex) parameter *)
   }
 
 type apply_dep =
   { function_containing_apply_expr : Code_id.t option;
     apply_code_id : Code_id.t;
-    apply_args : Simple.t list;
     apply_closure : Simple.t option;
-    params_of_apply_return_cont : Variable.t list option;
-    param_of_apply_exn_cont : Variable.t;
-    not_pure_call_witness : Variable.t
+    apply_call_witness : Code_id_or_name.t
   }
 
 type closure_dep =
@@ -150,6 +148,23 @@ let used ~(denv : Env.t) dep t =
       ~to_:(Code_id_or_name.code_id code_id)
       ~from:(Code_id_or_name.name name)
 
+let any_source ~(denv : Env.t) v t =
+  match denv.current_code_id with
+  | None -> Graph.add_any_source t.deps (Code_id_or_name.var v)
+  | Some code_id ->
+    Graph.add_propagate_dep t.deps
+      ~if_used:(Code_id_or_name.code_id code_id)
+      ~from:(Code_id_or_name.name denv.le_monde_exterieur)
+      ~to_:(Code_id_or_name.var v)
+
+let cond_alias t ~(denv : Env.t) ~from ~to_ =
+  match denv.current_code_id with
+  | None -> Graph.add_alias t.deps ~from ~to_
+  | Some code_id ->
+    Graph.add_propagate_dep t.deps
+      ~if_used:(Code_id_or_name.code_id code_id)
+      ~from ~to_
+
 let used_code_id code_id t =
   Graph.add_use t.deps (Code_id_or_name.code_id code_id)
 
@@ -182,7 +197,228 @@ let add_set_of_closures_dep let_bound_name_of_the_closure closure_code_id
        }
        :: t.set_of_closures_dep
 
-let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
+(* Encoding of sets of closures and apply
+ *
+ * Let us consider, for now, a set of closures that is only directly called.
+ * Assume that it has a value slot x, two function slots f and g, with
+ * associated code_ids p (param a, return s) and q (param b, return t).
+ * We will name the respective witnesses n and m, and ignore exception returns
+ * to make the diagram simpler.
+ 
+ * We will create a widget looking like this:
+ *  ┌──╔═══╗─────[g]────>╔═══╗──┐
+ * [f] ║ f ║             ║ g ║ [g]
+ *  └─>╚═══╝<────[f]─────╚═══╝<─┘
+ *      │ │     ╔═══╗     │ │
+ *      │ └[x]─>║ x ║<─[x]┘ │
+ *    [wit]     ╚═══╝     [wit]
+ *      │                   │
+ *      v                   v
+ *    ╔═══╗               ╔═══╗
+ *    ║ n ║               ║ m ║
+ *    ╚═══╝               ╚═══╝
+ *     ││║          ╔═══╗  ││║          ╔═══╗
+ *     ││╚[param0]═>║ a ║  ││╚[param0]═>║ b ║
+ *     ││           ╚═══╝  ││           ╚═══╝
+ *     ││           ╔═══╗  ││           ╔═══╗
+ *     │└[return0]─>║ s ║  │└[return0]─>║ t ║
+ *     │            ╚═══╝  │            ╚═══╝
+ *     │            ╔═══╗  │            ╔═══╗
+ *     └─[code_id]─>║ p ║  └─[code_id]─>║ q ║
+ *                  ╚═══╝               ╚═══╝
+ *
+ * For indirect calls, we have a series of call witnesses for each
+ * complex parameter, each with coconstructors for each part of the
+ * complex parameter, the code_id, and returning a value with the next call
+ * witness.
+ *)
+
+let create_known_arity_call_witness t code_id ~params ~returns ~exn =
+  let witness =
+    Variable.create
+      (Format.asprintf "known_arity_witness_%s" (Code_id.name code_id))
+      Flambda_kind.rec_info
+    (* dummy kind to make sure the rest of the code breaks if this is ever
+       used *)
+  in
+  let witness = Code_id_or_name.var witness in
+  List.iteri
+    (fun i v ->
+      Graph.add_coconstructor_dep t.deps ~base:witness (Param i)
+        ~from:(Code_id_or_name.var v))
+    params;
+  List.iteri
+    (fun i v ->
+      Graph.add_constructor_dep t.deps ~base:witness (Apply (Normal i))
+        ~from:(Code_id_or_name.var v))
+    returns;
+  Graph.add_constructor_dep t.deps ~base:witness (Apply Exn)
+    ~from:(Code_id_or_name.var exn);
+  Graph.add_constructor_dep t.deps ~base:witness Code_id_of_call_witness
+    ~from:(Code_id_or_name.code_id code_id);
+  witness
+
+let make_known_arity_apply_widget t ~denv ~params ~returns ~exn =
+  let witness =
+    Code_id_or_name.var
+      (Variable.create "known_arity_apply" Flambda_kind.rec_info)
+  in
+  List.iteri
+    (fun i v ->
+      Graph.add_coaccessor_dep t.deps ~base:witness (Param i)
+        ~to_:(Code_id_or_name.var v))
+    params;
+  List.iteri
+    (fun i v ->
+      Graph.add_accessor_dep t.deps ~base:witness (Apply (Normal i))
+        ~to_:(Code_id_or_name.var v))
+    returns;
+  Graph.add_accessor_dep t.deps ~base:witness (Apply Exn)
+    ~to_:(Code_id_or_name.var exn);
+  let called =
+    Code_id_or_name.var (Variable.create "called" Flambda_kind.rec_info)
+  in
+  Graph.add_accessor_dep t.deps ~base:witness Code_id_of_call_witness
+    ~to_:called;
+  Graph.add_use t.deps called;
+  let apply =
+    Code_id_or_name.var (Variable.create "apply" Flambda_kind.rec_info)
+  in
+  cond_alias t ~denv ~from:apply ~to_:witness;
+  apply
+
+let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
+    ~returns ~exn =
+  if is_tupled
+  then (
+    let witness =
+      Variable.create
+        (Format.asprintf "unknown_arity_witness_tupled_%s"
+           (Code_id.name code_id))
+        Flambda_kind.rec_info
+    in
+    let witness = Code_id_or_name.var witness in
+    List.iteri
+      (fun i v ->
+        Graph.add_constructor_dep t.deps ~base:witness (Apply (Normal i))
+          ~from:(Code_id_or_name.var v))
+      returns;
+    Graph.add_constructor_dep t.deps ~base:witness (Apply Exn)
+      ~from:(Code_id_or_name.var exn);
+    Graph.add_constructor_dep t.deps ~base:witness Code_id_of_call_witness
+      ~from:(Code_id_or_name.code_id code_id);
+    let untuple_var =
+      Code_id_or_name.var (Variable.create "untuple_var" Flambda_kind.value)
+    in
+    Graph.add_coconstructor_dep t.deps ~base:witness (Param 0) ~from:untuple_var;
+    (* CR ncourant: this should be changed if we ever allow non-value tuples *)
+    List.iteri
+      (fun i v ->
+        Graph.add_accessor_dep t.deps ~to_:(Code_id_or_name.var v)
+          (Block (i, Flambda_kind.value))
+          ~base:untuple_var)
+      params;
+    [witness])
+  else
+    let rec add_deps params_and_witnesses =
+      match params_and_witnesses with
+      | [] -> Misc.fatal_error "add_deps: no params"
+      | (first, witness) :: rest -> (
+        List.iteri
+          (fun i arg ->
+            Graph.add_coconstructor_dep t.deps ~from:(Code_id_or_name.var arg)
+              (Param i) ~base:witness)
+          first;
+        Graph.add_constructor_dep t.deps ~base:witness Code_id_of_call_witness
+          ~from:(Code_id_or_name.code_id code_id);
+        match rest with
+        | [] ->
+          Graph.add_constructor_dep t.deps ~base:witness (Apply Exn)
+            ~from:(Code_id_or_name.var exn);
+          List.iteri
+            (fun i return_arg ->
+              Graph.add_constructor_dep t.deps
+                ~from:(Code_id_or_name.var return_arg)
+                (Apply (Normal i)) ~base:witness)
+            returns
+        | (_, next_witness) :: _ ->
+          let v =
+            Code_id_or_name.var
+              (Variable.create "partial_apply" Flambda_kind.value)
+          in
+          Graph.add_constructor_dep t.deps ~from:v (Apply (Normal 0))
+            ~base:witness;
+          Graph.add_constructor_dep t.deps ~from:next_witness
+            (Code_of_closure Unknown_arity_code_pointer) ~base:v;
+          add_deps rest)
+    in
+    let params = Flambda_arity.group_by_parameter arity params in
+    let witnesses =
+      List.mapi
+        (fun i _ ->
+          Code_id_or_name.var
+            (Variable.create
+               (Format.asprintf "unknown_arity_witness_%d_%s" i
+                  (Code_id.name code_id))
+               Flambda_kind.rec_info))
+        params
+    in
+    add_deps (List.combine params witnesses);
+    witnesses
+
+let make_unknown_arity_apply_widget t ~denv ~arity ~params ~returns ~exn =
+  let called =
+    Code_id_or_name.var (Variable.create "called" Flambda_kind.rec_info)
+  in
+  Graph.add_use t.deps called;
+  let rec add_deps params_and_witnesses =
+    match params_and_witnesses with
+    | [] -> Misc.fatal_error "add_deps: no params"
+    | (first, witness) :: rest -> (
+      List.iteri
+        (fun i v ->
+          Graph.add_coaccessor_dep t.deps ~base:witness (Param i)
+            ~to_:(Code_id_or_name.var v))
+        first;
+      Graph.add_accessor_dep t.deps ~base:witness (Apply Exn)
+        ~to_:(Code_id_or_name.var exn);
+      Graph.add_accessor_dep t.deps ~base:witness Code_id_of_call_witness
+        ~to_:called;
+      match rest with
+      | [] ->
+        List.iteri
+          (fun i v ->
+            Graph.add_accessor_dep t.deps ~base:witness (Apply (Normal i))
+              ~to_:(Code_id_or_name.var v))
+          returns
+      | (_, next_witness) :: _ ->
+        let v =
+          Code_id_or_name.var
+            (Variable.create "partial_apply" Flambda_kind.value)
+        in
+        Graph.add_accessor_dep t.deps ~base:witness (Apply (Normal 0)) ~to_:v;
+        Graph.add_accessor_dep t.deps ~base:v
+          (Code_of_closure Unknown_arity_code_pointer) ~to_:next_witness;
+        add_deps rest)
+  in
+  let params = Flambda_arity.group_by_parameter arity params in
+  let witnesses =
+    List.mapi
+      (fun i _ ->
+        Code_id_or_name.var
+          (Variable.create
+             (Format.asprintf "unknown_arity_apply_%d" i)
+             Flambda_kind.rec_info))
+      params
+  in
+  add_deps (List.combine params witnesses);
+  let apply =
+    Code_id_or_name.var (Variable.create "apply" Flambda_kind.rec_info)
+  in
+  cond_alias t ~denv ~from:apply ~to_:(List.hd witnesses);
+  apply
+
+let record_set_of_closure_deps t =
   List.iter
     (fun { let_bound_name_of_the_closure = name;
            closure_code_id = code_id;
@@ -197,209 +433,67 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
           not
             (Compilation_unit.is_current (Code_id.get_compilation_unit code_id)));
         (* The code comes from another compilation unit; so we don't know what
-           happens once it is applied. As such, it must escape the whole block.
-           Besides, return values can be anything. *)
-        Graph.add_constructor_dep t.deps
-          ~base:(Code_id_or_name.name name)
-          (Code_of_closure Unknown_arity_code_pointer)
-          ~from:(Code_id_or_name.name name);
-        Graph.add_constructor_dep t.deps
-          ~base:(Code_id_or_name.name name)
-          (Code_of_closure Known_arity_code_pointer)
-          ~from:(Code_id_or_name.name name);
-        let code_metadata = get_code_metadata code_id in
-        let num_returns =
-          Flambda_arity.cardinal_unarized
-            (Code_metadata.result_arity code_metadata)
+           happens once it is applied. As such, it must escape the whole
+           block. *)
+        let witness =
+          Code_id_or_name.var
+            (Variable.create
+               (Format.asprintf "external_code_id_witness_%s"
+                  (Code_id.name code_id))
+               Flambda_kind.value)
         in
-        for i = 0 to num_returns - 1 do
-          Graph.add_constructor_dep t.deps
-            ~base:(Code_id_or_name.name name)
-            (Apply (Known_arity_code_pointer, Normal i))
-            ~from:(Code_id_or_name.name le_monde_exterieur);
-          Graph.add_constructor_dep t.deps
-            ~base:(Code_id_or_name.name name)
-            (Apply (Unknown_arity_code_pointer, Normal i))
-            ~from:(Code_id_or_name.name le_monde_exterieur)
-        done;
-        Graph.add_constructor_dep t.deps
-          ~base:(Code_id_or_name.name name)
-          (Apply (Known_arity_code_pointer, Exn))
-          ~from:(Code_id_or_name.name le_monde_exterieur);
-        Graph.add_constructor_dep t.deps
-          ~base:(Code_id_or_name.name name)
-          (Apply (Unknown_arity_code_pointer, Exn))
-          ~from:(Code_id_or_name.name le_monde_exterieur);
-        let params_unarized =
-          Flambda_arity.unarize_per_parameter
-            (Code_metadata.params_arity code_metadata)
-        in
-        let is_tupled = Code_metadata.is_tupled code_metadata in
-        let num_indirect_params =
-          if is_tupled then 1 else List.length (List.hd params_unarized)
-        in
-        let num_direct_params =
-          List.length
-            (Flambda_arity.unarize (Code_metadata.params_arity code_metadata))
-        in
-        let always_used = Variable.create "always_used" Flambda_kind.value in
-        Graph.add_use t.deps (Code_id_or_name.var always_used);
-        for i = 0 to num_direct_params - 1 do
-          Graph.add_coconstructor_dep t.deps
-            ~base:(Code_id_or_name.name name)
-            (Param (Known_arity_code_pointer, i))
-            ~from:(Code_id_or_name.var always_used)
-        done;
-        for i = 0 to num_indirect_params - 1 do
-          Graph.add_coconstructor_dep t.deps
-            ~base:(Code_id_or_name.name name)
-            (Param (Unknown_arity_code_pointer, i))
-            ~from:(Code_id_or_name.var always_used)
-        done
-      | code_dep ->
-        Graph.add_alias t.deps
-          ~to_:(Code_id_or_name.var code_dep.my_closure)
-          ~from:(Code_id_or_name.name name);
-        let call_witnesses = code_dep.call_witnesses in
-        Graph.add_constructor_dep t.deps ~from:(List.hd call_witnesses)
+        Graph.add_any_source t.deps witness;
+        Graph.add_constructor_dep t.deps ~from:witness
           (Code_of_closure Known_arity_code_pointer)
           ~base:(Code_id_or_name.name name);
-        List.iteri
-          (fun i v ->
-            Graph.add_constructor_dep t.deps
-              ~base:(Code_id_or_name.name name)
-              (Apply (Known_arity_code_pointer, Normal i))
-              ~from:(Code_id_or_name.var v))
-          code_dep.return;
-        List.iteri
-          (fun i v ->
-            Graph.add_coconstructor_dep t.deps
-              ~base:(Code_id_or_name.name name)
-              (Param (Known_arity_code_pointer, i))
-              ~from:(Code_id_or_name.var v))
-          code_dep.params;
+        Graph.add_constructor_dep t.deps ~from:witness
+          (Code_of_closure Unknown_arity_code_pointer)
+          ~base:(Code_id_or_name.name name);
+        Graph.add_constructor_dep t.deps ~base:witness Code_id_of_call_witness
+          ~from:(Code_id_or_name.name name)
+      | code_dep ->
+        Graph.add_propagate_dep t.deps
+          ~to_:(Code_id_or_name.var code_dep.my_closure)
+          ~from:(Code_id_or_name.name name)
+          ~if_used:(Code_id_or_name.code_id code_id);
+        Graph.add_constructor_dep t.deps ~from:code_dep.known_arity_call_witness
+          (Code_of_closure Known_arity_code_pointer)
+          ~base:(Code_id_or_name.name name);
         Graph.add_constructor_dep t.deps
-          ~base:(Code_id_or_name.name name)
-          (Apply (Known_arity_code_pointer, Exn))
-          ~from:(Code_id_or_name.var code_dep.exn);
-        if code_dep.is_tupled
-        then (
-          assert (List.compare_length_with call_witnesses 1 = 0);
-          let call_witness = List.hd call_witnesses in
-          Graph.add_constructor_dep t.deps
-            ~base:(Code_id_or_name.name name)
-            (Apply (Unknown_arity_code_pointer, Exn))
-            ~from:(Code_id_or_name.var code_dep.exn);
-          List.iteri
-            (fun i return_arg ->
-              Graph.add_constructor_dep t.deps
-                ~from:(Code_id_or_name.var return_arg)
-                (Apply (Unknown_arity_code_pointer, Normal i))
-                ~base:(Code_id_or_name.name name))
-            code_dep.return;
-          Graph.add_constructor_dep t.deps ~from:call_witness
-            (Code_of_closure Unknown_arity_code_pointer)
-            ~base:(Code_id_or_name.name name);
-          let untuple_var = Variable.create "untuple_var" Flambda_kind.value in
-          Graph.add_coconstructor_dep t.deps
-            ~from:(Code_id_or_name.var untuple_var)
-            (Param (Unknown_arity_code_pointer, 0))
-            ~base:(Code_id_or_name.name name);
-          List.iteri
-            (fun i v ->
-              Graph.add_accessor_dep t.deps ~to_:(Code_id_or_name.var v)
-                (Block (i, Flambda_kind.value))
-                ~base:(Code_id_or_name.var untuple_var))
-            code_dep.params)
-        else
-          let rec add_deps func params_and_witnesses =
-            match params_and_witnesses with
-            | [] -> Misc.fatal_error "add_deps: no params"
-            | (first, witness) :: rest -> (
-              List.iteri
-                (fun i arg ->
-                  Graph.add_coconstructor_dep t.deps
-                    ~from:(Code_id_or_name.var arg)
-                    (Param (Unknown_arity_code_pointer, i))
-                    ~base:func)
-                first;
-              Graph.add_constructor_dep t.deps ~from:witness
-                (Code_of_closure Unknown_arity_code_pointer) ~base:func;
-              match rest with
-              | [] ->
-                Graph.add_constructor_dep t.deps ~base:func
-                  (Apply (Unknown_arity_code_pointer, Exn))
-                  ~from:(Code_id_or_name.var code_dep.exn);
-                List.iteri
-                  (fun i return_arg ->
-                    Graph.add_constructor_dep t.deps
-                      ~from:(Code_id_or_name.var return_arg)
-                      (Apply (Unknown_arity_code_pointer, Normal i))
-                      ~base:func)
-                  code_dep.return
-              | _ :: _ ->
-                let v = Variable.create "partial_apply" Flambda_kind.value in
-                Graph.add_constructor_dep t.deps ~from:(Code_id_or_name.var v)
-                  (Apply (Unknown_arity_code_pointer, Normal 0))
-                  ~base:func;
-                add_deps (Code_id_or_name.var v) rest)
-          in
-          let params =
-            Flambda_arity.group_by_parameter code_dep.arity code_dep.params
-          in
-          assert (List.compare_lengths call_witnesses params = 0);
-          add_deps
-            (Code_id_or_name.name name)
-            (List.combine params call_witnesses))
+          ~from:(List.hd code_dep.unknown_arity_call_witnesses)
+          (Code_of_closure Unknown_arity_code_pointer)
+          ~base:(Code_id_or_name.name name))
     t.set_of_closures_dep
 
 let graph t = t.deps
 
-let deps t ~get_code_metadata ~le_monde_exterieur ~all_constants =
+let deps t ~get_code_metadata:_ ~le_monde_exterieur:_ ~all_constants =
   List.iter
     (fun { function_containing_apply_expr;
            apply_code_id;
-           apply_args;
            apply_closure;
-           params_of_apply_return_cont;
-           param_of_apply_exn_cont;
-           not_pure_call_witness
+           apply_call_witness
          } ->
       let code_dep = find_code t apply_code_id in
-      Graph.add_alias t.deps
-        ~from:(List.hd code_dep.call_witnesses)
-        ~to_:(Code_id_or_name.var not_pure_call_witness);
-      let add_cond_dep param name =
-        let param = Name.var param in
+      Graph.add_alias t.deps ~from:code_dep.known_arity_call_witness
+        ~to_:apply_call_witness;
+      match apply_closure with
+      | None -> ()
+      | Some closure -> (
         match function_containing_apply_expr with
         | None ->
           Graph.add_alias t.deps
-            ~to_:(Code_id_or_name.name param)
-            ~from:(Code_id_or_name.name name)
+            ~to_:(Code_id_or_name.var code_dep.my_closure)
+            ~from:
+              (Code_id_or_name.name (simple_to_name t ~all_constants closure))
         | Some code_id ->
           Graph.add_propagate_dep t.deps
-            ~if_used:(Code_id_or_name.code_id code_id)
-            ~from:(Code_id_or_name.name name)
-            ~to_:(Code_id_or_name.name param)
-      in
-      List.iter2
-        (fun param arg ->
-          add_cond_dep param (simple_to_name t ~all_constants arg))
-        code_dep.params apply_args;
-      (match apply_closure with
-      | None -> add_cond_dep code_dep.my_closure le_monde_exterieur
-      | Some apply_closure ->
-        add_cond_dep code_dep.my_closure
-          (simple_to_name t ~all_constants apply_closure));
-      (match params_of_apply_return_cont with
-      | None -> ()
-      | Some apply_return ->
-        List.iter2
-          (fun arg param -> add_cond_dep param (Name.var arg))
-          code_dep.return apply_return);
-      add_cond_dep param_of_apply_exn_cont (Name.var code_dep.exn))
+            ~to_:(Code_id_or_name.var code_dep.my_closure)
+            ~from:
+              (Code_id_or_name.name (simple_to_name t ~all_constants closure))
+            ~if_used:(Code_id_or_name.code_id code_id)))
     t.apply_deps;
-  record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t;
+  record_set_of_closure_deps t;
   t.deps
 
 let simple_to_name t ~denv s =
