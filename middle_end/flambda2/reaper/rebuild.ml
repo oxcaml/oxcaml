@@ -440,7 +440,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
           (fun field (uf : _ DS.unboxed_fields) value_slots ->
             match (field : Field.t) with
             | Is_int | Get_tag | Block _ -> assert false
-            | Code_of_closure _ | Apply _ | Code_id_of_call_witness _ ->
+            | Code_of_closure _ | Apply _ | Code_id_of_call_witness ->
               assert false
             | Function_slot _ -> assert false
             | Value_slot value_slot -> (
@@ -710,26 +710,19 @@ let make_apply_wrapper env
                   print_param_decision apply_decision print_param_decision
                   func_decision Apply.print apply
               in
-              let direct_or_indirect =
-                match Apply.call_kind apply with
-                | Function { function_call = Direct _; _ } -> error ()
-                | Function { function_call = Indirect_known_arity _; _ } ->
-                  GFG.Known_arity_code_pointer
-                | Function { function_call = Indirect_unknown_arity; _ }
-                | C_call _ | Method _ | Effect _ ->
-                  GFG.Unknown_arity_code_pointer
-              in
-              let field =
-                GFG.Field.Apply (direct_or_indirect, GFG.Field.Normal i)
-              in
-              let has_any_source =
-                DS.not_local_field_has_source env.uses
-                  (Simple.pattern_match
-                     (Option.get (Apply.callee apply))
-                     ~name:(fun name ~coercion:_ -> Code_id_or_name.name name)
-                     ~const:(fun _ -> assert false))
-                  field
-              in
+              (* let direct_or_indirect = match Apply.call_kind apply with |
+                 Function { function_call = Direct _; _ } -> error () | Function
+                 { function_call = Indirect_known_arity _; _ } ->
+                 GFG.Known_arity_code_pointer | Function { function_call =
+                 Indirect_unknown_arity; _ } | C_call _ | Method _ | Effect _ ->
+                 GFG.Unknown_arity_code_pointer in let field = GFG.Field.Apply
+                 (direct_or_indirect, GFG.Field.Normal i) in let has_any_source
+                 = DS.not_local_field_has_source env.uses (Simple.pattern_match
+                 (Option.get (Apply.callee apply)) ~name:(fun name ~coercion:_
+                 -> Code_id_or_name.name name) ~const:(fun _ -> assert false))
+                 field in *)
+              (* CR ncourant: restore this check *)
+              let has_any_source = false in
               if has_any_source then error () else Invalid
             | Delete, _ -> Ok (i + 1, rev_args)
             | Keep (_, _), Keep (v, _) -> Ok (i + 1, Simple.var v :: rev_args)
@@ -983,7 +976,7 @@ let rebuild_apply env apply =
   | Not_changing_calling_convention ->
     (* Format.eprintf "NOT CHANGING CALLING CONVENTION %a@." Apply.print
        apply; *)
-    let callee_with_known_arity =
+    let _callee_with_known_arity =
       match (call_kind : Call_kind.t) with
       | Function { function_call = Direct _ | Indirect_known_arity _; _ } -> (
         match Apply.callee apply with
@@ -998,17 +991,14 @@ let rebuild_apply env apply =
     in
     let args =
       List.mapi
-        (fun i arg ->
-          match callee_with_known_arity with
-          | Some callee ->
-            if DS.cofield_has_use env.uses callee
-                 (Param (Known_arity_code_pointer, i))
-            then arg
-            else
-              Simple.pattern_match arg
-                ~const:(fun _ -> arg)
-                ~name:(fun name ~coercion:_ -> name_poison env name)
-          | None -> rewrite_simple env arg)
+        (fun _i arg ->
+          (* match callee_with_known_arity with | Some callee -> if
+             DS.cofield_has_use env.uses callee (Param
+             (Known_arity_code_pointer, i)) then arg else Simple.pattern_match
+             arg ~const:(fun _ -> arg) ~name:(fun name ~coercion:_ ->
+             name_poison env name) | None -> *)
+          (* CR ncourant: fix this *)
+          rewrite_simple env arg)
         (Apply.args apply)
     in
     let args_arity = Apply.args_arity apply in
@@ -1193,7 +1183,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
                 (Simple.untagged_const_int
                    (Tag.to_targetint_31_63 env.machine_width tag))
             | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
-            | Code_id_of_call_witness _ ->
+            | Code_id_of_call_witness ->
               assert false
           in
           match arg with
@@ -1288,7 +1278,7 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                 in
                 RE.create_let bp (Named.create_simple arg) ~body:hole
             | Block _ | Is_int | Get_tag | Function_slot _ | Code_of_closure _
-            | Apply _ | Code_id_of_call_witness _ ->
+            | Apply _ | Code_id_of_call_witness ->
               assert false)
           to_bind hole)
     hole bvs
@@ -1372,7 +1362,7 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
                 mp
             | Unboxed _ -> Misc.fatal_errorf "trying to unbox simple")
           | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
-          | Code_id_of_call_witness _ ->
+          | Code_id_of_call_witness ->
             assert false)
         fields Int.Map.empty
     in
