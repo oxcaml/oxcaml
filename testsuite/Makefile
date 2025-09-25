@@ -295,9 +295,11 @@ one:
 .PHONY: exec-one
 exec-one:
 	@$(ocamltest) -find-test-dirs $(DIR) | while $(IFS_LINE) read -r dir; do \
-	  echo "Running tests from '$$dir' ..."; \
+		[ -z "${GITHUB_ACTIONS:-}" ] || echo -n "::group::"; \
+		echo "Running tests from '$$dir' ..."; \
 	  $(MAKE) exec-ocamltest DIR="$$dir" \
 	    OCAMLTESTENV="OCAMLTESTDIR=$(OCAMLTESTDIR)"; \
+		[ -z "${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"; \
 	done
 
 .PHONY: exec-ocamltest
