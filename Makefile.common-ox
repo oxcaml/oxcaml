@@ -525,16 +525,3 @@ boot-_install: runtime-stdlib
           -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
           -print0 | xargs -0 -I '{}' cp -f '{}' _install/lib/ocaml/compiler-libs
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
-
-.PHONY: regalloc
-# even though the compiler target depends on this, it was failing in CI, so
-# here we use dune exec to make sure this always works
-regalloc:
-	for allocator in irc ls gi; do \
-    RUNTIME_DIR=$(RUNTIME_DIR) SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
-          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)"  $(dune) exec $(ws_main) --context=main tools/regalloc/regalloc.exe -- _build -validate -summary -regalloc $$allocator || exit 1; \
-  done
-	for allocator in irc ls gi; do \
-    RUNTIME_DIR=$(RUNTIME_DIR) SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
-          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)"  $(dune) exec $(ws_main) --context=main tools/regalloc/regalloc.exe --  _build -validate -param SPLIT_AROUND_LOOPS:on -regalloc $$allocator || exit 1; \
-  done
