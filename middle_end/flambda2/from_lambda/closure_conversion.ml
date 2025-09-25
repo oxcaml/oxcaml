@@ -1004,7 +1004,9 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
           (fun (_mode, repr) -> Lambda.extern_repr_involves_void repr)
           prim_native_repr_args
       in
-      let has_void_return = Lambda.extern_repr_involves_void (snd prim_native_repr_res) in
+      let has_void_return =
+        Lambda.extern_repr_involves_void (snd prim_native_repr_res)
+      in
       let prim_native_name =
         match has_unboxed_products || has_void_args || has_void_return with
         | false -> ""
@@ -1764,7 +1766,7 @@ let close_exact_or_unknown_apply acc env
               Code_metadata.print meta;
           let can_erase_callee =
             Flambda_features.classic_mode ()
-            && not (Code_metadata.is_my_closure_used meta)
+            && (not (Code_metadata.is_my_closure_used meta))
             && not !Clflags.jsir
           in
           acc, Call_kind.direct_function_call code_id mode, can_erase_callee
