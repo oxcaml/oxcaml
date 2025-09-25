@@ -307,6 +307,8 @@ in
       type_kind = Type_abstract abstract_source;
       type_jkind;
       type_ikind = None;
+      (* CR jujacobs: check if we can keep the ikind up to date here
+         Initial temporary unboxed version declared with dummy manifest. *)
       type_private = sdecl.ptype_private;
       type_manifest = unboxed_type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -326,6 +328,8 @@ in
       type_kind = Type_abstract abstract_source;
       type_jkind;
       type_ikind = None;
+      (* CR jujacobs: check if we can keep the ikind up to date here
+         Initial declaration seeded with placeholder manifest. *)
       type_private = sdecl.ptype_private;
       type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1076,6 +1080,8 @@ let transl_declaration env sdecl (id, uid) =
         type_kind = kind;
         type_jkind = jkind;
         type_ikind = None;
+        (* CR jujacobs: check if we can keep the ikind up to date here
+           Fresh declaration seeded before later jkind adjustments. *)
         type_private = sdecl.ptype_private;
         type_manifest = man;
         type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1252,6 +1258,8 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_kind = kind;
         type_jkind = jkind;
         type_ikind = None;
+        (* CR jujacobs: check if we can keep the ikind up to date here
+           Derived unboxed version inherits manifest from boxed type. *)
         type_private = decl.type_private;
         type_manifest;
         type_variance =
@@ -2091,14 +2099,20 @@ let rec update_decl_jkind env dpath decl =
            we mark jkinds as best *)
         |> Jkind.mark_best
       in
-      { decl with type_jkind; type_ikind = None }
+      { decl with type_jkind;
+               (* CR jujacobs: check if we can keep the ikind up to date here
+                  Refining jkind for open type during normalization. *)
+               type_ikind = None }
     | Type_record (lbls, rep, umc) ->
       let lbls, rep, type_jkind = update_record_kind decl.type_loc lbls rep in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
       { decl with type_kind = Type_record (lbls, rep, umc);
-              type_jkind; type_ikind = None }
+              type_jkind;
+              (* CR jujacobs: check if we can keep the ikind up to date here
+                 Updating record layout/jkind after normalization. *)
+              type_ikind = None }
     (* CR layouts v3.0: handle this case in [update_variant_jkind] when
        [Variant_with_null] introduced.
 
@@ -2123,7 +2137,10 @@ let rec update_decl_jkind env dpath decl =
              mark jkinds as best *)
           let type_jkind = Jkind.mark_best type_jkind in
           { decl with type_kind = Type_record_unboxed_product (lbls, rep, umc);
-                      type_jkind; type_ikind = None }
+                      type_jkind;
+                      (* CR jujacobs: check if we can keep the ikind up to date here
+                         Updating unboxed record layout/jkind. *)
+                      type_ikind = None }
         end
     | Type_variant _ when
       Builtin_attributes.has_or_null_reexport decl.type_attributes ->
@@ -2136,7 +2153,10 @@ let rec update_decl_jkind env dpath decl =
          about when we mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
       { decl with type_kind = Type_variant (cstrs, rep, umc);
-              type_jkind; type_ikind = None }
+              type_jkind;
+              (* CR jujacobs: check if we can keep the ikind up to date here
+                 Updating variant layout/jkind. *)
+              type_ikind = None }
   in
 
   (* Check the layout here, both to check it, but more importantly to fill in any sort
@@ -2723,7 +2743,8 @@ let name_recursion sdecl id decl =
       let td = Tconstr(Path.Pident id, decl.type_params, ref Mnil) in
       link_type ty (newty2 ~level:(get_level ty) td);
       { decl with type_manifest = Some ty';
-               (* CR jujacobs: check if we can keep the ikind up to date here *)
+               (* CR jujacobs: check if we can keep the ikind up to date here
+                  Private row alias rewired to recursive path. *)
                type_ikind = None }
     else decl
   | _ -> decl
@@ -4047,6 +4068,8 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
           type_kind;
           type_jkind;
           type_ikind = None;
+          (* CR jujacobs: check if we can keep the ikind up to date here
+             Unboxed counterpart mirrors manifest from signature. *)
           type_private = priv;
           type_manifest = Some man;
           type_variance = [];
@@ -4081,6 +4104,8 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_kind;
       type_jkind;
       type_ikind = None;
+      (* CR jujacobs: check if we can keep the ikind up to date here
+         Translating [with type] installs signature manifest. *)
       type_private = priv;
       type_manifest = Some man;
       type_variance = [];
@@ -4186,7 +4211,8 @@ let transl_package_constraint ~loc ty =
     type_ikind = None;
     (* There is no reason to calculate an accurate jkind here.  This typedecl
        will be thrown away once it is used for the package constraint inclusion
-       check, and that check will expand the manifest as needed. *)
+       check, and that check will expand the manifest as needed.
+       CR jujacobs: check if we can keep the ikind up to date here. *)
     type_private = Public;
     type_manifest = Some ty;
     type_variance = [];
@@ -4211,6 +4237,8 @@ let abstract_type_decl ~injective ~jkind ~params =
       type_kind = Type_abstract Definition;
       type_jkind = jkind;
       type_ikind = None;
+      (* CR jujacobs: check if we can keep the ikind up to date here
+         Abstract approximation with no manifest. *)
       type_private = Public;
       type_manifest = None;
       type_variance = Variance.unknown_signature ~injective ~arity;
@@ -4228,6 +4256,8 @@ let abstract_type_decl ~injective ~jkind ~params =
           type_kind = Type_abstract Definition;
           type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
           type_ikind = None;
+          (* CR jujacobs: check if we can keep the ikind up to date here
+             Unboxed approximation for abstract type. *)
           type_private = Public;
           type_manifest = None;
           type_variance = Variance.unknown_signature ~injective ~arity;

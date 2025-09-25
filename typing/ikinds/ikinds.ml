@@ -680,7 +680,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
     (fun () ->
       Format.asprintf "crossing_of_jkind jkind=%s" (string_of_jkind jkind))
     (fun () ->
-      if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
+      if not (false && !Clflags.ikinds) (* CR jujacobs: fix this *)
       then Jkind.get_mode_crossing ~context jkind
       else
         let solver = make_solver ~context in
@@ -713,7 +713,7 @@ let sub_or_intersect ?origin
   in
   log_call ~pp:string_of_sub_or_intersect msg
     (fun () ->
-      if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
+      if not (false && !Clflags.ikinds) (* CR jujacobs: fix this *)
       then Jkind.sub_or_intersect ~type_equal ~context t1 t2
       else
         (* CR jujacobs: enable this *)
@@ -742,7 +742,7 @@ let sub_or_error ?origin
     | Error _ -> "Error"
   in
   log_call ~pp:pp_result msg (fun () ->
-      if not !Clflags.ikinds
+      if not (false && !Clflags.ikinds)
       then Jkind.sub_or_error ~type_equal ~context t1 t2
       else if sub ~type_equal ~context (Jkind.disallow_right t1)
                 (Jkind.disallow_left t2)

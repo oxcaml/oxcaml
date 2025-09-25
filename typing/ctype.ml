@@ -1403,6 +1403,8 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_kind = Type_abstract origin;
     type_jkind = Jkind.disallow_right jkind;
     type_ikind = None;
+    (* CR jujacobs: check if we can keep the ikind up to date here
+       Creating fresh local type for constraint solving. *)
     type_private = Public;
     type_manifest = manifest;
     type_variance = [];
@@ -7185,6 +7187,8 @@ let rec nondep_type_decl env mid is_covariant decl =
       type_kind = tk;
       type_jkind = jkind;
       type_ikind = None;
+      (* CR jujacobs: check if we can keep the ikind up to date here
+         Producing non-dependent copy of declaration. *)
       type_manifest = tm;
       type_private = priv;
       type_variance = decl.type_variance;

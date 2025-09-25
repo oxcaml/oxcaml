@@ -859,6 +859,8 @@ module Merge = struct
               type_jkind =
                 Jkind.Builtin.value ~why:(Unknown "merge_constraint");
               type_ikind = None;
+              (* CR jujacobs: check if we can keep the ikind up to date here
+                 Temporary decl for with-constraint checking. *)
               type_private = Private;
               type_manifest = None;
               type_variance =
@@ -1100,7 +1102,8 @@ module Merge = struct
           check_type_decl sig_env sg_for_env loc id None tdecl sig_decl;
           let tdecl =
             { tdecl with type_manifest = None;
-                         (* CR jujacobs: check if we can keep the ikind up to date here *)
+                         (* CR jujacobs: check if we can keep the ikind up to date here
+                            Removing the temporary manifest after constraint translation. *)
                          type_ikind = None }
           in
           let path = Pident id in

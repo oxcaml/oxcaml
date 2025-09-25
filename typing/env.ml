@@ -1514,6 +1514,8 @@ and find_type_unboxed_version path env seen =
       type_kind = decl.type_kind;
       type_jkind = jkind;
       type_ikind = None;
+      (* CR jujacobs: check if we can keep the ikind up to date here
+         Building aliased unboxed version in the environment. *)
       type_private = decl.type_private;
       type_manifest = Some man;
       type_variance = decl.type_variance;
