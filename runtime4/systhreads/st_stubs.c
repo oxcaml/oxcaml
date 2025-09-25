@@ -122,6 +122,7 @@ struct caml_thread_struct {
   int backtrace_pos; /* Saved Caml_state->_backtrace_pos */
   backtrace_slot * backtrace_buffer; /* Saved Caml_state->_backtrace_buffer */
   value backtrace_last_exn;  /* Saved Caml_state->_backtrace_last_exn (root) */
+  value tls_state; /* Saved Caml_state->_tls_state (root) */
   struct caml_memprof_th_ctx *memprof_ctx;
 };
 
@@ -227,6 +228,7 @@ static void caml_thread_scan_roots(scanning_action action)
   do {
     (*action)(th->descr, &th->descr);
     (*action)(th->backtrace_last_exn, &th->backtrace_last_exn);
+    (*action)(th->tls_state, &th->tls_state);
     /* Don't rescan the stack of the current thread, it was done already */
     if (th != curr_thread) {
 #ifdef NATIVE_CODE
@@ -279,6 +281,7 @@ CAMLexport void caml_thread_save_runtime_state(void)
   curr_thread->backtrace_pos = Caml_state->_backtrace_pos;
   curr_thread->backtrace_buffer = Caml_state->_backtrace_buffer;
   curr_thread->backtrace_last_exn = Caml_state->_backtrace_last_exn;
+  curr_thread->tls_state = Caml_state->_tls_state;
   caml_memprof_leave_thread();
 }
 
@@ -309,6 +312,8 @@ CAMLexport void caml_thread_restore_runtime_state(void)
   Caml_state->_backtrace_pos = curr_thread->backtrace_pos;
   Caml_state->_backtrace_buffer = curr_thread->backtrace_buffer;
   Caml_state->_backtrace_last_exn = curr_thread->backtrace_last_exn;
+  caml_modify_generational_global_root
+    (&Caml_state->_tls_state, curr_thread->tls_state);
   caml_memprof_enter_thread(curr_thread->memprof_ctx);
 }
 
@@ -460,6 +465,7 @@ static caml_thread_t caml_thread_new_info(void)
   th->backtrace_pos = 0;
   th->backtrace_buffer = NULL;
   th->backtrace_last_exn = Val_unit;
+  th->tls_state = Val_unit;
   th->memprof_ctx = caml_memprof_new_th_ctx();
   return th;
 }
@@ -556,6 +562,7 @@ CAMLprim value caml_thread_initialize(value unit)   /* ML */
   curr_thread->prev = curr_thread;
   all_threads = curr_thread;
   curr_thread->backtrace_last_exn = Val_unit;
+  curr_thread->tls_state = Val_unit;
 #ifdef NATIVE_CODE
   curr_thread->exit_buf = &caml_termination_jmpbuf;
 #endif

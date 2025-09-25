@@ -409,8 +409,8 @@ jobs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
         # Configure git to use gh for authentication
-        git config --global credential.helper ""
-        git config --global credential.https://github.com.helper "!gh auth git-credential"
+        git config --local credential.helper ""
+        git config --local credential.https://github.com.helper "!gh auth git-credential"
 
         git add data/
         git commit -m "Add metrics for commit ${COMMIT_HASH}"
