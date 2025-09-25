@@ -666,7 +666,7 @@ let link unix ~ppf_dump objfiles output_name =
         ; "compiler-libs/ocamloptcomp.cmxa"
         ; "compiler-libs/ocamlopttoplevel.cmxa"
         ; "ocaml-jit/jit.cmxa"
-        ; "eval.cmxa" ])
+        ; "camlinternaleval.cmxa" ])
       else [ stdlib ] in
     let ml_objfiles, units_tolink, cached_genfns_imports =
       List.fold_right

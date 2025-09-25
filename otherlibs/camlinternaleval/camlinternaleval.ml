@@ -67,7 +67,6 @@ let eval code =
           (fun (ai : Typedtree.argument_interface) ->
             ai.ai_coercion_from_primary)
           typed_impl.argument_interface )
-      ~style:Plain_block (* TODO: Should be Set_global_to_block if bytecode *)
   in
   Warnings.check_fatal () (* TODO: more error handling? *);
   (* TODO: assert program.arg_block_idx is none? *)

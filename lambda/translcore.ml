@@ -1337,22 +1337,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       failwith "Cannot unqoute outside of a quotation context."
   | Texp_eval (_, _sort) ->
     let loc = of_location ~scopes e.exp_loc in
-    (* Generate partial application: Eval.eval_quotation settings *)
-    Lapply {
-      ap_func = Lprim (Pfield (0, Pointer, Reads_agree), [
-        Lprim
-          (Pgetglobal (Compilation_unit.of_string "Camlinternaleval"), [], loc);
-      ], loc);
-      ap_args = [];
-      ap_result_layout = layout_function;
-      ap_region_close = Rc_nontail;
-      ap_mode = alloc_heap;
-      ap_loc = loc;
-      ap_tailcall = Default_tailcall;
-      ap_inlined = Default_inlined;
-      ap_specialised = Default_specialise;
-      ap_probe = None;
-    }
+    Lprim (Pfield (0, Pointer, Reads_agree), [
+      Lprim
+        (Pgetglobal (Compilation_unit.of_string "Camlinternaleval"), [], loc);
+    ], loc)
 
 and pure_module m =
   match m.mod_desc with
