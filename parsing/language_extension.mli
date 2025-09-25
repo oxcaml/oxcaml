@@ -33,6 +33,7 @@ type 'a t = 'a Language_extension_kernel.t =
   | Instances : unit t
   | Separability : unit t
   | Let_mutable : unit t
+  | Layout_poly : maturity t
 
 (** Require that an extension is enabled for at least the provided level, or
     else throw an exception at the provided location saying otherwise. *)

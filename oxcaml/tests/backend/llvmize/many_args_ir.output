@@ -23,16 +23,16 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlMany_args__call_with_HIDE_STAMP(
   %18 = alloca i64
   %19 = alloca i64
   %20 = load i64, ptr %ds
-  %21 = add i64 %20, 576
+  %21 = add i64 %20, 584
   %22 = inttoptr i64 %21 to ptr
   %23 = load i64, ptr %ds
-  %24 = add i64 %23, 584
+  %24 = add i64 %23, 592
   %25 = inttoptr i64 %24 to ptr
   %26 = load i64, ptr %ds
-  %27 = add i64 %26, 592
+  %27 = add i64 %26, 600
   %28 = inttoptr i64 %27 to ptr
   %29 = load i64, ptr %ds
-  %30 = add i64 %29, 600
+  %30 = add i64 %29, 608
   %31 = inttoptr i64 %30 to ptr
   %32 = alloca i64
   %33 = alloca i64
@@ -170,6 +170,7 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @camlMany_args__call_with_1 = global { ptr, i64 } { ptr @camlMany_args__call_with_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @camlMany_args_defn = external global ptr
 @caml_apply13 = external global ptr
+
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Many_args" }

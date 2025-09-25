@@ -60,7 +60,8 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
       "Unexpected simd instruction with memory operands before vectorization"
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32 -> None
   | Illvm_intrinsic intr ->
-    Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+    Misc.fatal_errorf
+      "Vectorize_specific: Unexpected llvm_intrinsic %s: not using LLVM backend"
       intr
 
 let is_seed_store :
@@ -73,5 +74,7 @@ let is_seed_store :
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32 ->
     None
   | Illvm_intrinsic intr ->
-    Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+    Misc.fatal_errorf
+      "Vectorize_specific.is_seed_store: Unexpected llvm_intrinsic %s: not \
+       using LLVM backend"
       intr

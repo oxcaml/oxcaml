@@ -1075,8 +1075,8 @@ let num_call_gc_points instr =
     | Lop (Const_vec256 _ | Const_vec512 _) ->
       Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Specific (Illvm_intrinsic intr)) ->
-      Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
-        intr
+      Misc.fatal_errorf
+        "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
   in
   loop instr 0
 
@@ -1335,8 +1335,8 @@ module BR = Branch_relaxation.Make (struct
     | Lstackcheck _ -> 5
     | Lop (Specific (Isimd simd)) -> DSL.simd_instr_size simd
     | Lop (Specific (Illvm_intrinsic intr)) ->
-      Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
-        intr
+      Misc.fatal_errorf
+        "Emit.size:Unexpected llvm_intrinsic %s: not using LLVM backend" intr
 
   let relax_poll () = Lop (Specific Ifar_poll)
 
@@ -2138,7 +2138,7 @@ let emit_instr i =
   | Lop Dls_get ->
     if Config.runtime5
     then
-      let offset = Domainstate.(idx_of_field Domain_dls_root) * 8 in
+      let offset = Domainstate.(idx_of_field Domain_dls_state) * 8 in
       DSL.ins I.LDR
         [| DSL.emit_reg i.res.(0);
            DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
@@ -2348,8 +2348,8 @@ let emit_instr i =
              sc_max_frame_size_in_bytes = max_frame_size_bytes
            }
   | Lop (Specific (Illvm_intrinsic intr)) ->
-    Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
-      intr
+    Misc.fatal_errorf
+      "Emit:Unexpected llvm_intrinsic %s: not using LLVM backend" intr
 
 let emit_instr i =
   try emit_instr i

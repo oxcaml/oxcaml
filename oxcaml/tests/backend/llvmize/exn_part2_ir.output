@@ -89,6 +89,7 @@ L142:
   %68 = icmp eq i64 %67, 0
   br i1 %68, label %L143, label %L106
 L143:
+  store ptr blockaddress(@camlExn_part2__catch_exn1_from_llvm_0_9_code, %L142), ptr @camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP.recover_rbp_var.L142
   %69 = call  ptr @llvm.stacksave()
   %70 = alloca { i64, i64, i64, i64 }
   %71 = ptrtoint ptr %70 to i64
@@ -102,7 +103,7 @@ L143:
   %79 = inttoptr i64 %78 to ptr
   %80 = load i64, ptr %79
   store ptr %70, ptr %79
-  store ptr blockaddress(@camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP, %L142), ptr %76
+  store ptr @camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP.recover_rbp_asm.L142, ptr %76
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %73) "gc-leaf-function"="true"
   store i64 %80, ptr %70
   store i64 5, ptr %15
@@ -167,7 +168,6 @@ L117:
   %117 = insertvalue { { i64, i64 }, { i64 } } %116, i64 %112, 1, 0
   ret { { i64, i64 }, { i64 } } %117
 L106:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %118 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %118, ptr %alloc
   store i64 %67, ptr %4
@@ -387,6 +387,7 @@ L176:
   %53 = icmp eq i64 %52, 0
   br i1 %53, label %L177, label %L152
 L177:
+  store ptr blockaddress(@camlExn_part2__raise_exn1_catch_exn2_from_llvm_1_10_code, %L176), ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP.recover_rbp_var.L176
   %54 = call  ptr @llvm.stacksave()
   %55 = alloca { i64, i64, i64, i64 }
   %56 = ptrtoint ptr %55 to i64
@@ -400,7 +401,7 @@ L177:
   %64 = inttoptr i64 %63 to ptr
   %65 = load i64, ptr %64
   store ptr %55, ptr %64
-  store ptr blockaddress(@camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP, %L176), ptr %61
+  store ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP.recover_rbp_asm.L176, ptr %61
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %58) "gc-leaf-function"="true"
   store i64 %65, ptr %55
   %66 = ptrtoint ptr @camlExn_part1 to i64
@@ -458,7 +459,6 @@ L162:
   %99 = insertvalue { { i64, i64 }, { i64 } } %98, i64 %94, 1, 0
   ret { { i64, i64 }, { i64 } } %99
 L152:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %100 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %100, ptr %alloc
   store i64 %52, ptr %4
@@ -603,6 +603,7 @@ L218:
   %63 = icmp eq i64 %62, 0
   br i1 %63, label %L219, label %L185
 L219:
+  store ptr blockaddress(@camlExn_part2__catch_exn1_nested_from_llvm_2_11_code, %L218), ptr @camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP.recover_rbp_var.L218
   %64 = call  ptr @llvm.stacksave()
   %65 = alloca { i64, i64, i64, i64 }
   %66 = ptrtoint ptr %65 to i64
@@ -616,7 +617,7 @@ L219:
   %74 = inttoptr i64 %73 to ptr
   %75 = load i64, ptr %74
   store ptr %65, ptr %74
-  store ptr blockaddress(@camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP, %L218), ptr %71
+  store ptr @camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP.recover_rbp_asm.L218, ptr %71
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %68) "gc-leaf-function"="true"
   store i64 %75, ptr %65
   store i64 9, ptr %15
@@ -661,7 +662,6 @@ L194:
   %99 = insertvalue { { i64, i64 }, { i64 } } %98, i64 %94, 1, 0
   ret { { i64, i64 }, { i64 } } %99
 L185:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %100 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %100, ptr %alloc
   store i64 %62, ptr %4
@@ -1088,6 +1088,7 @@ L332:
   %107 = icmp eq i64 %106, 0
   br i1 %107, label %L333, label %L244
 L333:
+  store ptr blockaddress(@camlExn_part2__complicated_6_15_code, %L332), ptr @camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L332
   %108 = call  ptr @llvm.stacksave()
   %109 = alloca { i64, i64, i64, i64 }
   %110 = ptrtoint ptr %109 to i64
@@ -1101,7 +1102,7 @@ L333:
   %118 = inttoptr i64 %117 to ptr
   %119 = load i64, ptr %118
   store ptr %109, ptr %118
-  store ptr blockaddress(@camlExn_part2__complicated_HIDE_STAMP, %L332), ptr %115
+  store ptr @camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L332, ptr %115
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %112) "gc-leaf-function"="true"
   store i64 %119, ptr %109
   %120 = ptrtoint ptr @camlExn_part1 to i64
@@ -1164,6 +1165,7 @@ L334:
   %155 = icmp eq i64 %154, 0
   br i1 %155, label %L335, label %L260
 L335:
+  store ptr blockaddress(@camlExn_part2__complicated_6_15_code, %L334), ptr @camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L334
   %156 = call  ptr @llvm.stacksave()
   %157 = alloca { i64, i64, i64, i64 }
   %158 = ptrtoint ptr %157 to i64
@@ -1177,7 +1179,7 @@ L335:
   %166 = inttoptr i64 %165 to ptr
   %167 = load i64, ptr %166
   store ptr %157, ptr %166
-  store ptr blockaddress(@camlExn_part2__complicated_HIDE_STAMP, %L334), ptr %163
+  store ptr @camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L334, ptr %163
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %160) "gc-leaf-function"="true"
   store i64 %167, ptr %157
   %168 = ptrtoint ptr @camlExn_part1 to i64
@@ -1240,6 +1242,7 @@ L336:
   %203 = icmp eq i64 %202, 0
   br i1 %203, label %L337, label %L276
 L337:
+  store ptr blockaddress(@camlExn_part2__complicated_6_15_code, %L336), ptr @camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L336
   %204 = call  ptr @llvm.stacksave()
   %205 = alloca { i64, i64, i64, i64 }
   %206 = ptrtoint ptr %205 to i64
@@ -1253,7 +1256,7 @@ L337:
   %214 = inttoptr i64 %213 to ptr
   %215 = load i64, ptr %214
   store ptr %205, ptr %214
-  store ptr blockaddress(@camlExn_part2__complicated_HIDE_STAMP, %L336), ptr %211
+  store ptr @camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L336, ptr %211
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %208) "gc-leaf-function"="true"
   store i64 %215, ptr %205
   store i64 1, ptr %43
@@ -1295,7 +1298,6 @@ L284:
   call  void @llvm.stackrestore(ptr %204)
   br label %L301
 L276:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %237 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %237, ptr %alloc
   store i64 %202, ptr %5
@@ -1373,7 +1375,6 @@ L301:
   call  void @llvm.stackrestore(ptr %156)
   br label %L320
 L260:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %281 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %281, ptr %alloc
   store i64 %154, ptr %5
@@ -1462,7 +1463,6 @@ L320:
   %334 = insertvalue { { i64, i64 }, { i64 } } %333, i64 %329, 1, 0
   ret { { i64, i64 }, { i64 } } %334
 L244:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %335 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %335, ptr %alloc
   store i64 %106, ptr %5
@@ -1580,6 +1580,7 @@ L394:
   %46 = icmp eq i64 %45, 0
   br i1 %46, label %L395, label %L353
 L395:
+  store ptr blockaddress(@camlExn_part2__raise_in_loop_7_16_code, %L394), ptr @camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_var.L394
   %47 = call  ptr @llvm.stacksave()
   %48 = alloca { i64, i64, i64, i64 }
   %49 = ptrtoint ptr %48 to i64
@@ -1593,7 +1594,7 @@ L395:
   %57 = inttoptr i64 %56 to ptr
   %58 = load i64, ptr %57
   store ptr %48, ptr %57
-  store ptr blockaddress(@camlExn_part2__raise_in_loop_HIDE_STAMP, %L394), ptr %54
+  store ptr @camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_asm.L394, ptr %54
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %51) "gc-leaf-function"="true"
   store i64 %58, ptr %48
   %59 = ptrtoint ptr @camlExn_part1 to i64
@@ -1642,7 +1643,6 @@ L363:
   call  void @llvm.stackrestore(ptr %47)
   br label %L384
 L353:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %86 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %86, ptr %alloc
   store i64 %45, ptr %4
@@ -1820,6 +1820,7 @@ L426:
   %48 = icmp eq i64 %47, 0
   br i1 %48, label %L427, label %L403
 L427:
+  store ptr blockaddress(@camlExn_part2__catch_wildcard_8_17_code, %L426), ptr @camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_var.L426
   %49 = call  ptr @llvm.stacksave()
   %50 = alloca { i64, i64, i64, i64 }
   %51 = ptrtoint ptr %50 to i64
@@ -1833,7 +1834,7 @@ L427:
   %59 = inttoptr i64 %58 to ptr
   %60 = load i64, ptr %59
   store ptr %50, ptr %59
-  store ptr blockaddress(@camlExn_part2__catch_wildcard_HIDE_STAMP, %L426), ptr %56
+  store ptr @camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_asm.L426, ptr %56
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %53) "gc-leaf-function"="true"
   store i64 %60, ptr %50
   store i64 1, ptr %14
@@ -1865,7 +1866,6 @@ L411:
   %78 = insertvalue { { i64, i64 }, { i64 } } %77, i64 %73, 1, 0
   ret { { i64, i64 }, { i64 } } %78
 L403:
-  call void asm sideeffect "pop %rbp; addq $$8, %rsp", ""() "gc-leaf-function"="true"
   %79 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
   store i64 %79, ptr %alloc
   store i64 %47, ptr %4
@@ -2151,6 +2151,22 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @camlExn_part2__const_block192 = global { ptr, i64, i64 } { ptr @camlExn_part2__immstring190, i64 101, i64 95 }, section ".data", align 8
 @header.camlExn_part2__immstring190 = global i64 3068, section ".data", align 8
 @camlExn_part2__immstring190 = global { [ 12 x i8 ], [ 3 x i8 ], i8 } { [ 12 x i8 ] c"\65\78\6e\5f\70\61\72\74\32\2e\6d\6c", [ 3 x i8 ] zeroinitializer, i8 3 }, section ".data", align 8
+@camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_asm.L426 = external global ptr
+@camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_var.L426 = global ptr zeroinitializer, section ".data", align 8
+@camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_asm.L394 = external global ptr
+@camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_var.L394 = global ptr zeroinitializer, section ".data", align 8
+@camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L332 = external global ptr
+@camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L332 = global ptr zeroinitializer, section ".data", align 8
+@camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L334 = external global ptr
+@camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L334 = global ptr zeroinitializer, section ".data", align 8
+@camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L336 = external global ptr
+@camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L336 = global ptr zeroinitializer, section ".data", align 8
+@camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP.recover_rbp_asm.L218 = external global ptr
+@camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP.recover_rbp_var.L218 = global ptr zeroinitializer, section ".data", align 8
+@camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP.recover_rbp_asm.L176 = external global ptr
+@camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP.recover_rbp_var.L176 = global ptr zeroinitializer, section ".data", align 8
+@camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP.recover_rbp_asm.L142 = external global ptr
+@camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP.recover_rbp_var.L142 = global ptr zeroinitializer, section ".data", align 8
 @camlExn_part1 = external global ptr
 @camlStdlib__print_endline_138 = external global ptr
 @caml_c_call = external global ptr
@@ -2168,6 +2184,55 @@ declare i64 @llvm.read_register.i64(metadata)
 declare void @llvm.stackrestore(ptr)
 declare ptr @llvm.stacksave()
 declare void @llvm.write_register.i64(metadata, i64)
+
+module asm "  .text"
+module asm "camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP.recover_rbp_asm.L142:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP.recover_rbp_var.L142(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP.recover_rbp_asm.L176:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP.recover_rbp_var.L176(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP.recover_rbp_asm.L218:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP.recover_rbp_var.L218(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L336:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L336(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L334:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L334(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L332:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L332(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_asm.L394:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_var.L394(%rip), %rbx"
+module asm "  jmpq *%rbx"
+module asm "  .text"
+module asm "camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_asm.L426:"
+module asm "  pop %rbp"
+module asm "  addq $8, %rsp"
+module asm "  movq camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_var.L426(%rip), %rbx"
+module asm "  jmpq *%rbx"
 
 !0 = !{ i32 1, !"oxcaml_module", !"Exn_part2" }
 !llvm.module.flags = !{ !0 }
