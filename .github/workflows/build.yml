@@ -60,6 +60,12 @@ jobs:
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
+          - name: metrics_collection
+            config: --enable-middle-end=flambda2
+            os: ubuntu-latest
+            build_ocamlparam: ''
+            ocamlparam: '_,O3=1'
+
           - name: flambda2_frame_pointers_oclassic_polling
             config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
             os: ubuntu-latest
@@ -292,9 +298,9 @@ jobs:
         make $target \
           || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
 
-        # Install the compiler for flambda2_o3 configuration to populate _install directory
+        # Install the compiler for metrics_collection configuration to populate _install directory
         # This is needed for the metrics collection step to analyze installed artifacts
-        if [ "${{ matrix.name }}" = "flambda2_o3" ]; then
+        if [ "${{ matrix.name }}" = "metrics_collection" ]; then
           make install
         fi
       env:
@@ -366,7 +372,7 @@ jobs:
         done
 
     - name: Collect and push metrics
-      if: matrix.name == 'flambda2_o3' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+      if: matrix.name == 'metrics_collection' && github.ref == 'refs/heads/main' && github.event_name == 'push'
       env:
         GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
       run: |
