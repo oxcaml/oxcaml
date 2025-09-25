@@ -263,13 +263,12 @@ install_for_test: _install
 	rsync --link-dest=../../$(ocamldir)/testsuite/ -a $(ocamldir)/testsuite/ _runtest/testsuite/
 	 # replace backend-specific testsuite/tools with their new versions
 	rm -f _runtest/testsuite/tools/*
-	cp -a oxcaml/testsuite/tools/* _runtest/testsuite/tools/
-	cp $(main_build)/oxcaml/testsuite/tools/expect.exe _runtest/testsuite/tools/expect
+	cp $(main_build)/testsuite/tools/expect.exe _runtest/testsuite/tools/expect
 	chmod 755 _runtest/testsuite/tools/expect
-	cp $(main_build)/oxcaml/testsuite/tools/codegen_main.exe \
+	cp $(main_build)/testsuite/tools/codegen_main.exe \
           _runtest/testsuite/tools/codegen
 	chmod 755 _runtest/testsuite/tools/codegen
-	cp $(main_build)/oxcaml/testsuite/tools/asmgen_*.o \
+	cp $(main_build)/testsuite/tools/asmgen_*.o \
           _runtest/testsuite/tools/
 	cp $(main_build)/testsuite/lib/lib.{a,cmxa,cma} \
           _runtest/testsuite/lib/
