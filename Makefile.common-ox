@@ -80,7 +80,7 @@ boot_targets = \
   $(boot_ocamlobjinfo) \
   $(boot_js_of_ocaml) \
   $(boot_jsoo_minify) \
-  ocamltest/ocamltest.native \
+  ocamltest/ocamltest.native
 
 boot-compiler: _build/_bootinstall
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
@@ -136,14 +136,10 @@ runtest: compiler
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 runtest-llvmize: compiler
-	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-llvmize $(ws_main)
-	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 runtest-dwarf: compiler
-	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-dwarf $(ws_main)
-	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
@@ -399,7 +395,6 @@ install_for_test: _install
 	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/ocamltest
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 test: install_for_test
-	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	if [ "$(middle_end)" = "flambda2" ]; then \
 	  for dir in `cd testsuite; ls -1 -d tests/*`; do \
 	    if ! grep -q "^  $$dir " oxcaml/testsuite/flambda2-test-list; then \
@@ -429,7 +424,6 @@ test: install_for_test
                  make --no-print-directory all; \
                fi \
              fi)
-	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 promote-failed:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
@@ -531,3 +525,16 @@ boot-_install: runtime-stdlib
           -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
           -print0 | xargs -0 -I '{}' cp -f '{}' _install/lib/ocaml/compiler-libs
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
+
+.PHONY: regalloc
+# even though the compiler target depends on this, it was failing in CI, so
+# here we use dune exec to make sure this always works
+regalloc:
+	for allocator in irc ls gi; do \
+    RUNTIME_DIR=$(RUNTIME_DIR) SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
+          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)"  $(dune) exec $(ws_main) --context=main tools/regalloc/regalloc.exe -- _build -validate -summary -regalloc $$allocator || exit 1; \
+  done
+	for allocator in irc ls gi; do \
+    RUNTIME_DIR=$(RUNTIME_DIR) SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
+          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)"  $(dune) exec $(ws_main) --context=main tools/regalloc/regalloc.exe --  _build -validate -param SPLIT_AROUND_LOOPS:on -regalloc $$allocator || exit 1; \
+  done
