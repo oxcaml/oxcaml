@@ -301,8 +301,15 @@ function caml_sys_isatty(_chan) {
 }
 
 //Provides: caml_sys_const_runtime5 const
+//Version: < 5
 function caml_sys_const_runtime5(_unit) {
     return 0;
+}
+
+//Provides: caml_sys_const_runtime5 const
+//Version: >= 5
+function caml_sys_const_runtime5(_unit) {
+    return 1;
 }
 
 //Provides: caml_runtime_variant
