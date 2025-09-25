@@ -833,7 +833,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     v.lower_hint <- Comp_hint.Unknown v.lower;
     v.vlower <- VarMap.map unhint_morphvar v.vlower
 
-  let unhint_vars () =
+  let erase_hints () =
     let _, l = !vars in
     List.iter (fun (Var v) -> unhint_var v) l
 

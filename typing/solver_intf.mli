@@ -234,8 +234,16 @@ module type Solver_mono = sig
   val newvar : 'a obj -> ('a, 'l * 'r) mode
 
   (** Remove hints from all vars that have been created. This doesn't affect
-  hints that were applied on top of vars. *)
-  val unhint_vars : unit -> unit
+  hints that were applied on top of vars. For example:
+
+  let m = newvar () in
+  submode m (apply ~hint:hint0 g n);
+  let m' = apply ~hint:hint1 f m in
+  erase_hints ()
+
+  The last line erases the hints on [m] (caused by [n]), but [m'] has an immutable hint
+  on top of [m], which is not affected. *)
+  val erase_hints : unit -> unit
 
   (** Raw hint returned by failed [submode a b]. To consume it, see [populate_hint]. *)
   type ('a, 'd) hint_raw constraint 'd = 'l * 'r

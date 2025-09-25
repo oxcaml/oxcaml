@@ -208,8 +208,12 @@ type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
 module type S = sig
   val print_longident : (Format.formatter -> Longident.t -> unit) ref
 
-  (** Remove hints from all variables that have been created. *)
-  val unhint_vars : unit -> unit
+  (* CR-someday zqian: find a better stroy to erase bounds (and hints) that incorporates
+  into [disallow_*]. *)
+
+  (** Remove hints from all variables that have been created. See the comments
+  on [erase_hint] in [Solver_intf] for details. *)
+  val erase_hints : unit -> unit
 
   module Hint = Mode_hint
 
