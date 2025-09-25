@@ -98,14 +98,25 @@ module Name = struct
   let mk t = t
 
   let base_name s =
-    match String.index_opt s '_' with
-    | None ->
+    let whole_possibly_parens s =
       if List.for_all
            (fun p -> not (String.starts_with ~prefix:p s))
            let_prefixes
       then s
       else "(" ^ s ^ ")"
-    | Some i -> String.sub s 0 i
+    in
+    match String.rindex_opt s '_' with
+    | None -> whole_possibly_parens s
+    | Some i -> begin
+        if i = 0 then whole_possibly_parens s
+        else if s.[i - 1] = '_'
+        then
+          let n = String.length s in
+          match Int32.of_string_opt (String.sub s (i + 1) (n - i - 1)) with
+          | None -> s
+          | Some _ -> String.sub s 0 (i - 1)
+        else s
+      end
 
   let print fmt s = Format.fprintf fmt "%s" s
 end
@@ -1317,7 +1328,6 @@ module Ast = struct
   let infix_symbols =
     ['='; '<'; '>'; '@'; '^'; '|'; '&'; '+'; '-'; '*'; '/'; '$'; '%'; '#']
 
-  (* type fixity = Infix| Prefix  *)
   let special_infix_strings =
     ["asr"; "land"; "lor"; "lsl"; "lsr"; "lxor"; "mod"; "or"; ":="; "!="; "::"]
 
@@ -1374,7 +1384,7 @@ module Ast = struct
 
   and print_const fmt = function
     | Int n -> pp fmt "%d" n
-    | Char c -> pp fmt "%c" c
+    | Char c -> pp fmt "\'%c\'" c
     | String (s, id_opt) -> (
       match id_opt with
       | None -> pp fmt "\"%s\"" s
@@ -1465,7 +1475,7 @@ module Ast = struct
     | _ -> pp fmt "(@[%a@])" (print_exp env) exp
 
   and print_case env fmt { lhs; guard; rhs } =
-    pp fmt " | %a" (print_pat env) lhs;
+    pp fmt "@ |@ %a" (print_pat env) lhs;
     (match guard with
     | None -> ()
     | Some guard -> pp fmt "@ with@ %a" (print_exp_with_parens env) guard);
@@ -1722,7 +1732,7 @@ module Ast = struct
         (print_exp_with_parens env)
         cond (print_exp_with_parens env) then_;
       match else_ with
-      | Some else_ -> pp fmt "@ @[<2>else@ %a@]" (print_exp env) else_
+      | Some else_ -> pp fmt "@ @[<2>else@ %a@]@]" (print_exp env) else_
       | None -> pp fmt "@]")
     | Sequence (exp1, exp2) ->
       pp fmt "%a;@ @,%a" (print_exp env) exp1 (print_exp env) exp2
