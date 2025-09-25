@@ -77,7 +77,9 @@ type c_call_wrapper =
 type trap_block_info =
   { trap_block : LL.Value.t;
     stacksave_ptr : LL.Value.t;
-    exn_bucket : LL.Value.t
+    exn_bucket : LL.Value.t;
+    recover_rbp_asm_ident : LL.Ident.t;
+    recover_rbp_var_ident : LL.Ident.t
   }
 
 (* CR yusumez: Refactor into its own sub-module *)
@@ -115,9 +117,11 @@ type t =
     mutable c_call_wrappers : c_call_wrapper String.Map.t;
         (* Wrappers for noalloc C calls. This is currently needed since
            manipulating the stack inline is broken. *)
-    mutable stack_offset : int
+    mutable stack_offset : int;
         (* Accumulate [Stackoffset]s to be able to calculate the # of trap
            blocks at a given instruction via [i.stack_offset] *)
+    mutable all_trap_blocks : trap_block_info list;
+    mutable module_asm : string list
   }
 
 (* current_fun_info interface *)
@@ -168,7 +172,9 @@ let create ~llvmir_filename ~ppf_dump =
     referenced_symbols = String.Set.empty;
     called_intrinsics = String.Map.empty;
     c_call_wrappers = String.Map.empty;
-    stack_offset = 0
+    stack_offset = 0;
+    all_trap_blocks = [];
+    module_asm = []
   }
 
 let add_called_intrinsic t name ~args ~res =
@@ -209,8 +215,13 @@ let add_function_def t fundef = t.function_defs <- fundef :: t.function_defs
 
 let add_data_def t data_def = t.data_defs <- data_def :: t.data_defs
 
+let add_module_asm t asm_lines = t.module_asm <- asm_lines @ t.module_asm
+
 let complete_func_def t =
   add_function_def t (E.get_fun (get_fun_info t).emitter);
+  t.all_trap_blocks
+    <- (Label.Tbl.to_list (get_fun_info t).trap_blocks |> List.map snd)
+       @ t.all_trap_blocks;
   t.current_fun_info <- None
 
 let gc_name = "oxcaml" (* The name of the [GCStrategy] we use in LLVM *)
@@ -398,7 +409,7 @@ let call_simple ?(attrs = []) ~cc t name args res_types =
    instructions *)
 let statepoint_id_attr_for_stack_adjustment ?(offset = 0) t
     (i : 'a Cfg.instruction) =
-  LL.Fn_attr.Statepoint_id (((i.stack_offset - t.stack_offset) * 2) + offset)
+  LL.Fn_attr.Statepoint_id (i.stack_offset - t.stack_offset + offset)
 
 let gc_attr ~can_call_gc t i =
   if can_call_gc
@@ -1197,7 +1208,7 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
   | Poptrap { lbl_handler } -> (
     match Label.Tbl.find_opt (get_fun_info t).trap_blocks lbl_handler with
     | None -> fail_msg "unbalanced trap pop"
-    | Some { trap_block; stacksave_ptr; exn_bucket = _ } ->
+    | Some { trap_block; stacksave_ptr; _ } ->
       (* Restore previous exn handler sp (top word on trap block) *)
       let exn_sp_ptr = load_domainstate_addr t Domain_exn_handler in
       let prev_exn_sp = emit_ins t (I.load ~ptr:trap_block ~typ:T.i64) in
@@ -1229,18 +1240,34 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
        without the LLVM backend. Pushtrap sets this up, while they get torn down
        at trap handler entry.
 
-       Currently, this implementation does not work for some cases since the two
-       points during execution at which control flow can arrive after the dummy
-       call don't agree in whether RBP needs restoring or not. So, we get cases
-       where LLVM reloads stuff from the stack using RBP before it gets restored
-       in the handler (since we need to do the check + jump to the handler
-       first). *)
-    call_simple
-      ~attrs:[Returns_twice; Gc_leaf_function]
-      ~cc:Oxcaml t "wrap_try" [] [T.i64]
-    |> ignore (* Note that we don't need the returned identifier here. *);
+       To recover RBP in the case of an exception, we can't put that bit of code
+       in the trap handler entry since things happen beforehand. So, we make
+       exceptions jump to some extra bit of asm written in the module-level that
+       recovers RBP. For it to know where to jump back, we have an extra global
+       variable where we write the code address for right after the [wrap_try]
+       call. *)
+    let wrap_try_res =
+      call_simple
+        ~attrs:[Returns_twice; Gc_leaf_function]
+        ~cc:Oxcaml t "wrap_try" [] [T.i64]
+    in
+    emit_ins_no_res t
+      (I.inline_asm ~asm:"movq $0, %rax" ~constraints:"r" ~args:wrap_try_res
+         ~res_type:T.Or_void.void ~sideeffect:true);
     (* Record label here - we will jump here for the handler *)
     let try_and_exn_entry = V.of_label (Cmm.new_label ()) in
+    let fun_name =
+      E.get_fun_ident (get_fun_info t).emitter |> LL.Ident.to_string_hum
+    in
+    let label_name =
+      LL.Ident.to_string_hum (V.get_ident_exn try_and_exn_entry)
+    in
+    let recover_rbp_asm_ident =
+      LL.Ident.global (fun_name ^ ".recover_rbp_asm." ^ label_name)
+    in
+    let recover_rbp_var_ident =
+      LL.Ident.global (fun_name ^ ".recover_rbp_var." ^ label_name)
+    in
     emit_ins_no_res t (I.br try_and_exn_entry);
     emit_label t try_and_exn_entry;
     (* Extract the result of the call, or the exception bucket. *)
@@ -1259,6 +1286,14 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
       (I.br_cond ~cond:exn_bucket_is_zero ~ifso:try_label ~ifnot:exn_label);
     (* Enter try block from this point onwards. *)
     emit_label t try_label;
+    (* Take the address of common entry and put it somewhere accessible *)
+    emit_ins_no_res t
+      (I.store
+         ~ptr:(V.of_ident ~typ:T.ptr recover_rbp_var_ident)
+         ~to_store:
+           (V.blockaddress
+              ~func:(E.get_fun_ident (get_fun_info t).emitter)
+              ~block:(V.get_ident_exn try_and_exn_entry)));
     (* Save state of stack *)
     let stacksave_ptr = call_llvm_intrinsic t "stacksave" [] T.ptr in
     (* Allocate trap block on stack. It will get allocated at the top of the
@@ -1275,10 +1310,7 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
     (* Fill up the slots *)
     emit_ins_no_res t
       (I.store ~ptr:handler_slot
-         ~to_store:
-           (V.blockaddress
-              ~func:(E.get_fun_ident (get_fun_info t).emitter)
-              ~block:(V.get_ident_exn try_and_exn_entry)));
+         ~to_store:(V.of_ident ~typ:T.ptr recover_rbp_asm_ident));
     emit_ins_no_res t
       (I.inline_asm ~asm:"mov %rbp, ($0)" ~constraints:"r" ~args:[rbp_slot]
          ~res_type:T.Or_void.void ~sideeffect:true);
@@ -1288,7 +1320,12 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
     | Some _ -> fail_msg "multiple pushtraps for the same handler"
     | None ->
       Label.Tbl.add (get_fun_info t).trap_blocks lbl_handler
-        { trap_block; stacksave_ptr; exn_bucket })
+        { trap_block;
+          stacksave_ptr;
+          exn_bucket;
+          recover_rbp_asm_ident;
+          recover_rbp_var_ident
+        })
 
 (* Cfg translation entry *)
 
@@ -1453,9 +1490,8 @@ let trap_handler_entry t (block : Cfg.basic_block) label =
     match Label.Tbl.find_opt (get_fun_info t).trap_blocks label with
     | Some { exn_bucket; _ } ->
       (* Restore RBP (+ remove padding) *)
-      emit_ins_no_res t
-        (I.inline_asm ~asm:"pop %rbp; addq $$8, %rsp" ~constraints:"" ~args:[]
-           ~res_type:T.Or_void.void ~sideeffect:true);
+      (* emit_ins_no_res t (I.inline_asm ~asm:"pop %rbp; addq $$8, %rsp"
+         ~constraints:"" ~args:[] ~res_type:T.Or_void.void ~sideeffect:true); *)
       (* Restore allocation pointer *)
       let new_alloc_ptr =
         emit_ins t
@@ -1703,6 +1739,26 @@ let define_wrap_try t =
   emit_ins_no_res t (I.ret res);
   complete_func_def t
 
+let define_restore_rbp t =
+  List.iter
+    (fun ({ recover_rbp_asm_ident; recover_rbp_var_ident; _ } : trap_block_info) ->
+      let recover_rbp_asm = LL.Ident.to_string_encoded recover_rbp_asm_ident in
+      let recover_rbp_var = LL.Ident.to_string_encoded recover_rbp_var_ident in
+      add_module_asm t
+        [ "  .text";
+          recover_rbp_asm ^ ":";
+          "  pop %rbp";
+          "  addq $8, %rsp";
+          "  movq " ^ recover_rbp_var ^ "(%rip), %rbx";
+          "  jmpq *%rbx" ];
+      add_data_def t
+        (LL.Data.external_ (LL.Ident.to_string_hum recover_rbp_asm_ident));
+      add_data_def t
+        (LL.Data.constant
+           (LL.Ident.to_string_hum recover_rbp_var_ident)
+           (V.zeroinitializer T.ptr)))
+    t.all_trap_blocks
+
 (* Declare menitoned but not declared data items as extern *)
 let declare_data t =
   String.Set.diff t.referenced_symbols t.defined_symbols
@@ -1710,7 +1766,8 @@ let declare_data t =
 
 let define_auxiliary_functions t =
   define_c_call_wrappers t;
-  define_wrap_try t
+  define_wrap_try t;
+  define_restore_rbp t
 
 (* Interface with the rest of the compiler *)
 
@@ -1825,6 +1882,10 @@ let write_llvmir_to_file t =
   String.Map.iter
     (fun _ fundecl -> LL.Fundecl.pp_t t.ppf fundecl)
     t.called_intrinsics;
+  F.pp_line t.ppf "";
+  List.iter
+    (fun asm_line -> F.pp_line t.ppf {|module asm "%s"|} asm_line)
+    t.module_asm;
   write_module_metadata t
 
 let end_assembly () =

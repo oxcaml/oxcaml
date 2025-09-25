@@ -480,7 +480,7 @@ module Stack_offset_and_exn = struct
   let fun_name = ref ""
 
   let compute_stack_offset ~stack_offset ~traps =
-    stack_offset + (Proc.trap_size_in_bytes * List.length traps)
+    stack_offset + (Proc.trap_size_in_bytes () * List.length traps)
 
   let check_and_set_stack_offset :
       'a Cfg.instruction -> stack_offset:int -> traps:handler_stack -> unit =

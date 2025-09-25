@@ -138,7 +138,10 @@ type exttype =
   | XVec512
 
 let machtype_of_exttype = function
-  | XInt -> typ_int
+  | XInt ->
+    (* [XInt] only gets created from values, and LLVM needs to keep track of
+       them properly. *)
+    if !Clflags.llvm_backend then typ_val else typ_int
   | XInt8 -> typ_int
   | XInt16 -> typ_int
   | XInt32 -> typ_int
