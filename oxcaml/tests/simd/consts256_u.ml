@@ -1,4 +1,5 @@
 open Stdlib
+open Stdlib_stable
 open Utils256_u
 
 [@@@ocaml.warning "-unused-module"]
@@ -207,30 +208,30 @@ end
 module Int16x16 = struct
   type t = int16x16
 
-  external low_to : (t[@unboxed]) -> (int[@untagged])
+  external low_to : (t[@unboxed]) -> int16#
     = "" "caml_int16x16_low_to_int"
     [@@noalloc] [@@builtin]
 
-  external const1 : (int[@untagged]) -> (t[@unboxed]) = "" "caml_int16x16_const1"
+  external const1 : int16# -> (t[@unboxed]) = "" "caml_int16x16_const1"
     [@@noalloc] [@@builtin]
 
   external const16 :
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
     (t[@unboxed]) = "" "caml_int16x16_const16"
     [@@noalloc] [@@builtin]
 
@@ -240,13 +241,13 @@ module Int16x16 = struct
     let i64 = i16 i in
     let i64 = Int64.(logor (shift_left i64 16) i64) in
     let i64 = Int64.(logor (shift_left i64 32) i64) in
-    let v = const1 i in
+    let v = const1 (Int16_u.of_int i) in
     let w0 = int16x16_first_int64 v in
     let w1 = int16x16_second_int64 v in
     let w2 = int16x16_third_int64 v in
     let w3 = int16x16_fourth_int64 v in
     eq4 w0 w1 w2 w3 i64 i64 i64 i64;
-    let _i = low_to v in
+    let _i = low_to v |> Int16_u.to_int |> (land) 0xffff in
     eqi _i 0 i 0
 
   let () =
@@ -280,13 +281,16 @@ module Int16x16 = struct
           (logor (shift_left (i16 p) 48) (shift_left (i16 o) 32))
           (logor (shift_left (i16 n) 16) (i16 m)))
     in
-    let v = const16 a b c d e f g h i j k l m n o p in
+    let v = const16 (Int16_u.of_int a) (Int16_u.of_int b) (Int16_u.of_int c) (Int16_u.of_int d)
+                    (Int16_u.of_int e) (Int16_u.of_int f) (Int16_u.of_int g) (Int16_u.of_int h)
+                    (Int16_u.of_int i) (Int16_u.of_int j) (Int16_u.of_int k) (Int16_u.of_int l)
+                    (Int16_u.of_int m) (Int16_u.of_int n) (Int16_u.of_int o) (Int16_u.of_int p) in
     let _w0 = int16x16_first_int64 v in
     let _w1 = int16x16_second_int64 v in
     let _w2 = int16x16_third_int64 v in
     let _w3 = int16x16_fourth_int64 v in
     eq4 _w0 _w1 _w2 _w3 w0 w1 w2 w3;
-    let _a = low_to v in
+    let _a = low_to v |> Int16_u.to_int |> (land) 0xffff in
     eqi _a 0 a 0
 
   let () =
@@ -300,46 +304,46 @@ end
 module Int8x32 = struct
   type t = int8x32
 
-  external low_to : (t[@unboxed]) -> (int[@untagged])
+  external low_to : (t[@unboxed]) -> int8#
     = "" "caml_int8x32_low_to_int"
     [@@noalloc] [@@builtin]
 
-  external const1 : (int[@untagged]) -> (t[@unboxed]) = "" "caml_int8x32_const1"
+  external const1 : int8# -> (t[@unboxed]) = "" "caml_int8x32_const1"
     [@@noalloc] [@@builtin]
 
   external const32 :
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
     (t[@unboxed]) = "" "caml_int8x32_const32"
     [@@noalloc] [@@builtin]
 
@@ -350,13 +354,13 @@ module Int8x32 = struct
     let i64 = Int64.(logor (shift_left i64 8) i64) in
     let i64 = Int64.(logor (shift_left i64 16) i64) in
     let i64 = Int64.(logor (shift_left i64 32) i64) in
-    let v = const1 i in
+    let v = const1 (Int8_u.of_int i) in
     let w0 = int8x32_first_int64 v in
     let w1 = int8x32_second_int64 v in
     let w2 = int8x32_third_int64 v in
     let w3 = int8x32_fourth_int64 v in
     eq4 w0 w1 w2 w3 i64 i64 i64 i64;
-    let _i = low_to v in
+    let _i = low_to v |> Int8_u.to_int |> (land) 0xff in
     eqi _i 0 i 0
 
   let () =
@@ -418,13 +422,22 @@ module Int8x32 = struct
           (logor (shift_left (i8 dd) 8) (i8 cc)))
     in
     let w3 = Int64.(logor (shift_left h32 32) l32) in
-    let v = const32 a b c d e f g h i j k l m n o p q r s t u v w x y z aa bb cc dd ee ff in
+    let v =
+      const32 (Int8_u.of_int a) (Int8_u.of_int b) (Int8_u.of_int c) (Int8_u.of_int d)
+              (Int8_u.of_int e) (Int8_u.of_int f) (Int8_u.of_int g) (Int8_u.of_int h)
+              (Int8_u.of_int i) (Int8_u.of_int j) (Int8_u.of_int k) (Int8_u.of_int l)
+              (Int8_u.of_int m) (Int8_u.of_int n) (Int8_u.of_int o) (Int8_u.of_int p)
+              (Int8_u.of_int q) (Int8_u.of_int r) (Int8_u.of_int s) (Int8_u.of_int t)
+              (Int8_u.of_int u) (Int8_u.of_int v) (Int8_u.of_int w) (Int8_u.of_int x)
+              (Int8_u.of_int y) (Int8_u.of_int z) (Int8_u.of_int aa) (Int8_u.of_int bb)
+              (Int8_u.of_int cc) (Int8_u.of_int dd) (Int8_u.of_int ee) (Int8_u.of_int ff)
+    in
     let _w0 = int8x32_first_int64 v in
     let _w1 = int8x32_second_int64 v in
     let _w2 = int8x32_third_int64 v in
     let _w3 = int8x32_fourth_int64 v in
     eq4 _w0 _w1 _w2 _w3 w0 w1 w2 w3;
-    let _a = low_to v in
+    let _a = low_to v |> Int8_u.to_int |> (land) 0xff in
     eqi _a 0 a 0
 
   let () =
