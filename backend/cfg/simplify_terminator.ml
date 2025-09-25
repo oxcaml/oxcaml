@@ -185,7 +185,9 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
     | false, None ->
       (* If we jump to a block that is empty, we can copy the terminator from
          the successor to the current block. There might be size considerations,
-         so we currently do so only for "tests" and return. *)
+         so we currently do so only for "tests" and return. The optimization is
+         disabled because of a CFG invariant expecting "the tailrec block to be
+         the entry block or the only successor of the entry block". *)
       let successor_block = Cfg.get_block_exn cfg successor_label in
       if Dll.is_empty successor_block.body
       then
