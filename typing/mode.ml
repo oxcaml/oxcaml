@@ -2767,7 +2767,12 @@ module Comonadic_with (Areality : Areality) = struct
     let compare = Axis.compare
 
     let all =
-      [P Areality; P Linearity; P Portability; P Yielding; P Statefulness]
+      [ P Areality;
+        P Linearity;
+        P Portability;
+        P Forkable;
+        P Yielding;
+        P Statefulness ]
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
