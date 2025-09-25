@@ -248,6 +248,35 @@ let type_open_ ?(used_slot=ref false) ?(toplevel=false) ovf env loc lid =
 let initial_env ~loc ~initially_opened_module
     ~open_implicit_modules =
   let env = Lazy.force Env.initial in
+  (* Under -ikinds, precompute and install constructor ikinds for predefs.
+     Do this here (not in Env) to avoid module dependency cycles. *)
+  let env =
+    if not !Clflags.ikinds then env else begin
+      let context =
+        Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
+      in
+      Env.fold_types
+        (fun _name path decl acc_env ->
+           match path with
+           | Path.Pident id ->
+             let compute path =
+               Types.Constructor_ikind
+                 (Ikinds.type_declaration_ikind ~context ~path)
+             in
+             let type_ikind = compute path in
+             let type_unboxed_version =
+               Option.map
+                 (fun ud ->
+                    let uik = compute (Path.unboxed_version path) in
+                    { ud with type_ikind = uik })
+                 decl.type_unboxed_version
+             in
+             let decl' = { decl with type_ikind; type_unboxed_version } in
+             Env.add_type ~check:false id decl' acc_env
+           | _ -> acc_env)
+        None env env
+    end
+  in
   let open_module env m =
     let open Asttypes in
     let lexbuf = Lexing.from_string m in
