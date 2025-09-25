@@ -1070,7 +1070,7 @@ module Layout_and_axes = struct
                           }
                           seen_row_vars
                     };
-                  skippable_axes = relevant_axes
+                  skippable_axes = relevant_axes_when_seen
                 }
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
           | Tunivar _ | Tpackage _ | Tof_kind _ ->
