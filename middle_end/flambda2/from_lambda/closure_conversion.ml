@@ -1765,6 +1765,7 @@ let close_exact_or_unknown_apply acc env
           let can_erase_callee =
             Flambda_features.classic_mode ()
             && not (Code_metadata.is_my_closure_used meta)
+            && not !Clflags.jsir
           in
           acc, Call_kind.direct_function_call code_id mode, can_erase_callee
       | None -> acc, Call_kind.indirect_function_call_unknown_arity mode, false
