@@ -4062,8 +4062,6 @@ jkind_desc:
       in
       Mod ($1, Modes.of_core_modes core_modes)
     }
-  (* CR zeisbach: if [optional_core_modalities_expr] is replaced by
-     [optional_modality_annot_expr] then there is a shift/reduce conflict *)
   | jkind_annotation WITH core_type optional_core_modalities_expr {
       With ($1, $3, $4)
     }
@@ -4678,8 +4676,6 @@ atat_modalities_expr:
   | ATAT error { expecting $loc($2) "modality expression" }
 ;
 
-(* Q (ZJE): is there a reason to prefer one being optional here over the other?
-   or spell out all three cases explicitly, without optional? *)
 modality_annot_expr:
   | core_modalities = atat_modalities_expr
     mod_modalities = optional_mod_mods_expr

@@ -561,9 +561,6 @@ let sort_dedup_modalities ~warn l =
   in
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
-(* Q (ZJE): should this be taking in a modality loc list instead?
-   if so, should that be its own data type??
-   that feels like it's pushing against the cause of hacing modalities track mods too *)
 let transl_modalities ~maturity mut
     ({ core_modalities; mod_modalities } : Parsetree.modalities) =
   if mod_modalities <> []
@@ -604,9 +601,6 @@ let untransl_modalities mut t : Parsetree.modalities =
   Ast_helper.Modalities.of_core_modalities core_modalities
 
 let transl_alloc_mode modes =
-  (* Q (ZJE): this feels bad to have modes sometimes be just the modes part
-     and also sometimes be the modes+mods part...
-     different names seems useful, if not different types as well... *)
   let opt = transl_mode_annots modes in
   Alloc.Const.Option.value opt ~default:Alloc.Const.legacy
 
