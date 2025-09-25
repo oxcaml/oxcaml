@@ -1420,7 +1420,8 @@ let datalog_rules =
        field_of_constructor_is_used to_ relation;
        filter_field real_field relation;
        (* ^ XXX check *)
-       cannot_change_representation to_ ]
+       cannot_change_representation to_;
+       cannot_unbox0 to_ ]
      ==> cannot_unbox0 allocation_id);
     (* As previously: if any closure of a set of closures cannot be unboxed,
        then every closure in the set cannot be unboxed. *)

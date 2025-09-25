@@ -40,17 +40,15 @@ type code_dep =
     return : Variable.t list; (* Dummy variable representing return value *)
     exn : Variable.t; (* Dummy variable representing exn return value *)
     is_tupled : bool;
-    call_witnesses : Code_id_or_name.t list
+    known_arity_call_witness : Code_id_or_name.t;
+    unknown_arity_call_witnesses : Code_id_or_name.t list
   }
 
 type apply_dep =
   { function_containing_apply_expr : Code_id.t option;
     apply_code_id : Code_id.t;
-    apply_args : Simple.t list;
     apply_closure : Simple.t option;
-    params_of_apply_return_cont : Variable.t list option;
-    param_of_apply_exn_cont : Variable.t;
-    not_pure_call_witness : Variable.t
+    apply_call_witness : Code_id_or_name.t
   }
 
 type t
@@ -73,6 +71,8 @@ val root : Variable.t -> t -> unit
 
 val used : denv:Env.t -> Simple.t -> t -> unit
 
+val any_source : denv:Env.t -> Variable.t -> t -> unit
+
 val used_code_id : Code_id.t -> t -> unit
 
 val called : denv:Env.t -> Code_id.t -> t -> unit
@@ -86,6 +86,41 @@ val continuation_info : t -> Continuation.t -> continuation_info -> unit
 val get_continuation_info : t -> continuation_info Continuation.Map.t
 
 val add_apply : apply_dep -> t -> unit
+
+val create_known_arity_call_witness :
+  t ->
+  Code_id.t ->
+  params:Variable.t list ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t
+
+val make_known_arity_apply_widget :
+  t ->
+  denv:Env.t ->
+  params:Variable.t list ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t
+
+val create_unknown_arity_call_witnesses :
+  t ->
+  Code_id.t ->
+  is_tupled:bool ->
+  arity:[`Complex] Flambda_arity.t ->
+  params:Variable.t list ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t list
+
+val make_unknown_arity_apply_widget :
+  t ->
+  denv:Env.t ->
+  arity:[`Complex] Flambda_arity.t ->
+  params:Variable.t list ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t
 
 val add_set_of_closures_dep :
   Name.t -> Code_id.t -> only_full_applications:bool -> t -> unit
