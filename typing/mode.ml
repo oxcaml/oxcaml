@@ -213,40 +213,54 @@ end
 (* Even though our lattices are all bi-heyting algebras, that knowledge is
    internal to this module. Externally they are seen as normal lattices. *)
 module Lattices = struct
-  module Total = struct
-    (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a]. *)
+  module type Total = sig
+    (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
 
-    module CoHeyting (L : Lattice) : CoHeyting with type t := L.t = struct
-      (** A total lattice has a co-heyting structure. *)
+      If it's also finite, then the ordering can be represented by a monotone
+      bijection to [int]. *)
 
-      include L
+    type t
 
-      (* Prove the [subtract] below is the left adjoint of [join].
-         - If [subtract a c <= b], by the definition of [subtract] below,
-           that could mean one of two things:
-           - Took the branch [a <= c], and [min <= b]. In this case, we have [a <= c <= join c b].
-           - Took the other branch, and [a <= b]. In this case, we have [a <= b <= join c b].
+    val ord : t -> int
 
-         - In the other direction: Given [a <= join c b], compare [c] and [b]:
-           - if [c <= b], then [a <= join c b = b], and:
-             - either [a <= c], then [subtract a c = min <= b]
-             - or the other branch, then [subtract a c = a <= b]
-           - if [b <= c], then [a <= join c b = c], then [subtract a c = min <= b]
-      *)
-      let subtract a c = if le a c then min else a
-    end
-    [@@inline]
+    val min : t
 
-    module Heyting (L : Lattice) : Heyting with type t := L.t = struct
-      (** A total lattice has a heyting structure. *)
-
-      include L
-
-      (* The proof for [imply] is dual and omitted. *)
-      let imply c b = if le c b then max else b
-    end
-    [@@inline]
+    val max : t
   end
+
+  module Total (L : Total) = struct
+    let min = L.min
+
+    let max = L.max
+
+    let le a b = L.ord a <= L.ord b
+
+    let equal a b = L.ord a = L.ord b
+
+    let join a b = if L.ord a > L.ord b then a else b
+
+    let meet a b = if L.ord a < L.ord b then a else b
+
+    (* A total lattice has a co-heyting structure.
+       Prove the [subtract] below is the left adjoint of [join].
+        - If [subtract a c <= b], by the definition of [subtract] below,
+          that could mean one of two things:
+          - Took the branch [a <= c], and [min <= b]. In this case, we have [a <= c <= join c b].
+          - Took the other branch, and [a <= b]. In this case, we have [a <= b <= join c b].
+
+        - In the other direction: Given [a <= join c b], compare [c] and [b]:
+          - if [c <= b], then [a <= join c b = b], and:
+            - either [a <= c], then [subtract a c = min <= b]
+            - or the other branch, then [subtract a c = a <= b]
+          - if [b <= c], then [a <= join c b = c], then [subtract a c = min <= b]
+    *)
+    let subtract a c = if le a c then L.min else a
+
+    (* A total lattice has a heyting structure. The proof for [imply] is dual
+       and omitted. *)
+    let imply c b = if le c b then L.max else b
+  end
+  [@@inline]
 
   (* Make the type of [Locality] and [Regionality] below distinguishable,
      so that we can be sure [Comonadic_with] is applied correctly. *)
@@ -261,37 +275,21 @@ module Lattices = struct
       | Global
       | Local
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Global
 
       let max = Local
 
-      let legacy = Global
-
-      let[@inline] le a b =
-        match a, b with Global, _ | _, Local -> true | Local, Global -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Global, Global | Local, Local -> true
-        | Global, Local | Local, Global -> false
-
-      let join a b =
-        match a, b with
-        | Local, _ | _, Local -> Local
-        | Global, Global -> Global
-
-      let meet a b =
-        match a, b with
-        | Global, _ | _, Global -> Global
-        | Local, Local -> Local
-
-      let print ppf = function
-        | Global -> Format.fprintf ppf "global"
-        | Local -> Format.fprintf ppf "local"
+      let ord = Obj.magic
     end)
+
+    let legacy = Global
+
+    let print ppf = function
+      | Global -> Format.fprintf ppf "global"
+      | Local -> Format.fprintf ppf "local"
 
     let _is_areality = ()
   end
@@ -302,48 +300,22 @@ module Lattices = struct
       | Regional
       | Local
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Global
 
       let max = Local
 
-      let legacy = Global
-
-      let[@inline] equal a b =
-        match a, b with
-        | Global, Global -> true
-        | Regional, Regional -> true
-        | Local, Local -> true
-        | Global, (Regional | Local)
-        | Regional, (Global | Local)
-        | Local, (Global | Regional) ->
-          false
-
-      let join a b =
-        match a, b with
-        | Local, _ | _, Local -> Local
-        | Regional, _ | _, Regional -> Regional
-        | Global, Global -> Global
-
-      let meet a b =
-        match a, b with
-        | Global, _ | _, Global -> Global
-        | Regional, _ | _, Regional -> Regional
-        | Local, Local -> Local
-
-      let[@inline] le a b =
-        match a, b with
-        | Global, _ | _, Local -> true
-        | _, Global | Local, _ -> false
-        | Regional, Regional -> true
-
-      let print ppf = function
-        | Global -> Format.fprintf ppf "global"
-        | Regional -> Format.fprintf ppf "regional"
-        | Local -> Format.fprintf ppf "local"
+      let ord = Obj.magic
     end)
+
+    let legacy = Global
+
+    let print ppf = function
+      | Global -> Format.fprintf ppf "global"
+      | Regional -> Format.fprintf ppf "regional"
+      | Local -> Format.fprintf ppf "local"
 
     let _is_areality = ()
   end
@@ -353,40 +325,21 @@ module Lattices = struct
       | Unique
       | Aliased
 
-    include Total.CoHeyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Unique
 
       let max = Aliased
 
-      let legacy = Aliased
-
-      let[@inline] le a b =
-        match a, b with
-        | Unique, _ | _, Aliased -> true
-        | Aliased, Unique -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Unique, Unique -> true
-        | Aliased, Aliased -> true
-        | Unique, Aliased | Aliased, Unique -> false
-
-      let join a b =
-        match a, b with
-        | Aliased, _ | _, Aliased -> Aliased
-        | Unique, Unique -> Unique
-
-      let meet a b =
-        match a, b with
-        | Unique, _ | _, Unique -> Unique
-        | Aliased, Aliased -> Aliased
-
-      let print ppf = function
-        | Aliased -> Format.fprintf ppf "aliased"
-        | Unique -> Format.fprintf ppf "unique"
+      let ord = Obj.magic
     end)
+
+    let legacy = Aliased
+
+    let print ppf = function
+      | Aliased -> Format.fprintf ppf "aliased"
+      | Unique -> Format.fprintf ppf "unique"
   end
 
   module Linearity = struct
@@ -394,34 +347,21 @@ module Lattices = struct
       | Many
       | Once
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Many
 
       let max = Once
 
-      let legacy = Many
-
-      let[@inline] le a b =
-        match a, b with Many, _ | _, Once -> true | Once, Many -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Many, Many -> true
-        | Once, Once -> true
-        | Many, Once | Once, Many -> false
-
-      let join a b =
-        match a, b with Once, _ | _, Once -> Once | Many, Many -> Many
-
-      let meet a b =
-        match a, b with Many, _ | _, Many -> Many | Once, Once -> Once
-
-      let print ppf = function
-        | Once -> Format.fprintf ppf "once"
-        | Many -> Format.fprintf ppf "many"
+      let ord = Obj.magic
     end)
+
+    let legacy = Many
+
+    let print ppf = function
+      | Once -> Format.fprintf ppf "once"
+      | Many -> Format.fprintf ppf "many"
   end
 
   module Portability = struct
@@ -429,172 +369,89 @@ module Lattices = struct
       | Portable
       | Nonportable
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Portable
 
       let max = Nonportable
 
-      let legacy = Nonportable
-
-      let[@inline] le a b =
-        match a, b with
-        | Portable, _ | _, Nonportable -> true
-        | Nonportable, Portable -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Portable, Portable -> true
-        | Nonportable, Nonportable -> true
-        | Portable, Nonportable | Nonportable, Portable -> false
-
-      let join a b =
-        match a, b with
-        | Nonportable, _ | _, Nonportable -> Nonportable
-        | Portable, Portable -> Portable
-
-      let meet a b =
-        match a, b with
-        | Portable, _ | _, Portable -> Portable
-        | Nonportable, Nonportable -> Nonportable
-
-      let print ppf = function
-        | Portable -> Format.fprintf ppf "portable"
-        | Nonportable -> Format.fprintf ppf "nonportable"
+      let ord = Obj.magic
     end)
+
+    let legacy = Nonportable
+
+    let print ppf = function
+      | Portable -> Format.fprintf ppf "portable"
+      | Nonportable -> Format.fprintf ppf "nonportable"
   end
 
   module Contention = struct
     type t =
-      | Contended
-      | Shared
       | Uncontended
+      | Shared
+      | Contended
 
-    include Total.CoHeyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Uncontended
 
       let max = Contended
 
-      let legacy = Uncontended
-
-      let[@inline] le a b =
-        match a, b with
-        | Uncontended, _ | _, Contended -> true
-        | _, Uncontended | Contended, _ -> false
-        | Shared, Shared -> true
-
-      let[@inline] equal a b =
-        match a, b with
-        | Contended, Contended -> true
-        | Shared, Shared -> true
-        | Uncontended, Uncontended -> true
-        | Contended, (Shared | Uncontended)
-        | Shared, (Contended | Uncontended)
-        | Uncontended, (Contended | Shared) ->
-          false
-
-      let join a b =
-        match a, b with
-        | Contended, _ | _, Contended -> Contended
-        | Shared, _ | _, Shared -> Shared
-        | Uncontended, Uncontended -> Uncontended
-
-      let meet a b =
-        match a, b with
-        | Uncontended, _ | _, Uncontended -> Uncontended
-        | Shared, _ | _, Shared -> Shared
-        | Contended, Contended -> Contended
-
-      let print ppf = function
-        | Contended -> Format.fprintf ppf "contended"
-        | Shared -> Format.fprintf ppf "shared"
-        | Uncontended -> Format.fprintf ppf "uncontended"
+      let ord = Obj.magic
     end)
+
+    let legacy = Uncontended
+
+    let print ppf = function
+      | Contended -> Format.fprintf ppf "contended"
+      | Shared -> Format.fprintf ppf "shared"
+      | Uncontended -> Format.fprintf ppf "uncontended"
   end
 
   module Forkable = struct
     type t =
-      | Unforkable
       | Forkable
+      | Unforkable
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Forkable
 
       let max = Unforkable
 
-      let legacy = Forkable
-
-      let[@inline] le a b =
-        match a, b with
-        | Forkable, _ | _, Unforkable -> true
-        | Unforkable, Forkable -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Unforkable, Unforkable -> true
-        | Forkable, Forkable -> true
-        | Unforkable, Forkable | Forkable, Unforkable -> false
-
-      let join a b =
-        match a, b with
-        | Unforkable, _ | _, Unforkable -> Unforkable
-        | Forkable, Forkable -> Forkable
-
-      let meet a b =
-        match a, b with
-        | Forkable, _ | _, Forkable -> Forkable
-        | Unforkable, Unforkable -> Unforkable
-
-      let print ppf = function
-        | Unforkable -> Format.fprintf ppf "unforkable"
-        | Forkable -> Format.fprintf ppf "forkable"
+      let ord = Obj.magic
     end)
+
+    let legacy = Forkable
+
+    let print ppf = function
+      | Unforkable -> Format.fprintf ppf "unforkable"
+      | Forkable -> Format.fprintf ppf "forkable"
   end
 
   module Yielding = struct
     type t =
-      | Yielding
       | Unyielding
+      | Yielding
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Unyielding
 
       let max = Yielding
 
-      let legacy = Unyielding
-
-      let[@inline] le a b =
-        match a, b with
-        | Unyielding, _ | _, Yielding -> true
-        | Yielding, Unyielding -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Yielding, Yielding -> true
-        | Unyielding, Unyielding -> true
-        | Yielding, Unyielding | Unyielding, Yielding -> false
-
-      let join a b =
-        match a, b with
-        | Yielding, _ | _, Yielding -> Yielding
-        | Unyielding, Unyielding -> Unyielding
-
-      let meet a b =
-        match a, b with
-        | Unyielding, _ | _, Unyielding -> Unyielding
-        | Yielding, Yielding -> Yielding
-
-      let print ppf = function
-        | Yielding -> Format.fprintf ppf "yielding"
-        | Unyielding -> Format.fprintf ppf "unyielding"
+      let ord = Obj.magic
     end)
+
+    let legacy = Unyielding
+
+    let print ppf = function
+      | Yielding -> Format.fprintf ppf "yielding"
+      | Unyielding -> Format.fprintf ppf "unyielding"
   end
 
   module Statefulness = struct
@@ -603,98 +460,46 @@ module Lattices = struct
       | Observing
       | Stateful
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Stateless
 
       let max = Stateful
 
-      let legacy = Stateful
-
-      let[@inline] le a b =
-        match a, b with
-        | Stateless, _ | _, Stateful -> true
-        | _, Stateless | Stateful, _ -> false
-        | Observing, Observing -> true
-
-      let[@inline] equal a b =
-        match a, b with
-        | Stateless, Stateless -> true
-        | Observing, Observing -> true
-        | Stateful, Stateful -> true
-        | Stateless, (Observing | Stateful)
-        | Observing, (Stateless | Stateful)
-        | Stateful, (Stateless | Observing) ->
-          false
-
-      let join a b =
-        match a, b with
-        | Stateful, _ | _, Stateful -> Stateful
-        | Observing, _ | _, Observing -> Observing
-        | Stateless, Stateless -> Stateless
-
-      let meet a b =
-        match a, b with
-        | Stateless, _ | _, Stateless -> Stateless
-        | Observing, _ | _, Observing -> Observing
-        | Stateful, Stateful -> Stateful
-
-      let print ppf = function
-        | Stateless -> Format.fprintf ppf "stateless"
-        | Observing -> Format.fprintf ppf "observing"
-        | Stateful -> Format.fprintf ppf "stateful"
+      let ord = Obj.magic
     end)
+
+    let legacy = Stateful
+
+    let print ppf = function
+      | Stateless -> Format.fprintf ppf "stateless"
+      | Observing -> Format.fprintf ppf "observing"
+      | Stateful -> Format.fprintf ppf "stateful"
   end
 
   module Visibility = struct
     type t =
-      | Immutable
-      | Read
       | Read_write
+      | Read
+      | Immutable
 
-    include Total.CoHeyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Read_write
 
       let max = Immutable
 
-      let legacy = Read_write
-
-      let[@inline] le a b =
-        match a, b with
-        | Read_write, _ | _, Immutable -> true
-        | _, Read_write | Immutable, _ -> false
-        | Read, Read -> true
-
-      let[@inline] equal a b =
-        match a, b with
-        | Immutable, Immutable -> true
-        | Read, Read -> true
-        | Read_write, Read_write -> true
-        | Immutable, (Read | Read_write)
-        | Read, (Immutable | Read_write)
-        | Read_write, (Immutable | Read) ->
-          false
-
-      let join a b =
-        match a, b with
-        | Immutable, _ | _, Immutable -> Immutable
-        | Read, _ | _, Read -> Read
-        | Read_write, Read_write -> Read_write
-
-      let meet a b =
-        match a, b with
-        | Read_write, _ | _, Read_write -> Read_write
-        | Read, _ | _, Read -> Read
-        | Immutable, Immutable -> Immutable
-
-      let print ppf = function
-        | Immutable -> Format.fprintf ppf "immutable"
-        | Read -> Format.fprintf ppf "read"
-        | Read_write -> Format.fprintf ppf "read_write"
+      let ord = Obj.magic
     end)
+
+    let legacy = Read_write
+
+    let print ppf = function
+      | Immutable -> Format.fprintf ppf "immutable"
+      | Read -> Format.fprintf ppf "read"
+      | Read_write -> Format.fprintf ppf "read_write"
   end
 
   type monadic =
