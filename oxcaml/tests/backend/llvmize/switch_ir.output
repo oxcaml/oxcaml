@@ -411,7 +411,7 @@ L155:
   %121 = load ptr addrspace(1), ptr %8
   %122 = load i64, ptr %ds
   %123 = load i64, ptr %alloc
-  %124 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @caml_apply2(i64 %122, i64 %123, i64 %119, ptr addrspace(1) %120, ptr addrspace(1) %121) "gc-leaf-function"="true" "statepoint-id"="0"
+  %124 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @caml_apply2(i64 %122, i64 %123, i64 %119, ptr addrspace(1) %120, ptr addrspace(1) %121) "statepoint-id"="0"
   ret { { i64, i64 }, { i64 } } %124
 }
 
