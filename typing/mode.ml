@@ -2263,13 +2263,21 @@ module Error = struct
     let loc, desc = pp in
     let print ppf () =
       let print_desc = Report.print_pinpoint_desc desc in
-      (match print_desc with
-      | None -> fprintf ppf "This is "
-      | Some print_desc -> fprintf ppf "The %t is " print_desc);
+      (let print_desc =
+         match print_desc with
+         | None -> dprintf "This"
+         | Some print_desc -> dprintf "The %t" print_desc
+       in
+       fprintf ppf "%t is " print_desc);
       let ({ left; right } : print_error) = print_packed pp packed in
       (match left ppf with
       | Mode_with_hint ->
-        fprintf ppf ".@\nHowever, the highlighted is expected to be "
+        let print_desc =
+          match print_desc with
+          | None -> dprintf "the highlighted"
+          | Some print_desc -> dprintf "the highlighted %t" print_desc
+        in
+        fprintf ppf ".@\nHowever, %t is expected to be " print_desc
       | Mode -> fprintf ppf "@ but is expected to be ");
       ignore (right ppf);
       pp_print_string ppf "."
