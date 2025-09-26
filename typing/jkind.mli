@@ -301,6 +301,9 @@ module Const : sig
     (** Values of types of this jkind are either immediate or null pointers *)
     val immediate_or_null : t
 
+    (** Values of types of this jkind are either immediate64 or null pointers *)
+    val immediate64_or_null : t
+
     (** The jkind of unboxed 64-bit floats with no mode crossing. *)
     val float64 : t
 
