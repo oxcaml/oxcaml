@@ -292,9 +292,9 @@ module Sort = struct
     v.contents <- t_op;
     Option.iter
       (t_iter ~f:(fun u ->
-         let new_level = max v.level u.level in
-         v.level <- new_level;
-         u.level <- new_level))
+           let new_level = max v.level u.level in
+           v.level <- new_level;
+           u.level <- new_level))
       t_op
 
   module Static = struct
@@ -451,7 +451,7 @@ module Sort = struct
 
   let new_var () =
     incr last_var_uid;
-    Var { contents = None; uid = !last_var_uid; level = (get_current_level ()) }
+    Var { contents = None; uid = !last_var_uid; level = get_current_level () }
 
   let rec get : t -> t = function
     | Base _ as t -> t
