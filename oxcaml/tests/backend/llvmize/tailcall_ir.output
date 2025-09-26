@@ -954,7 +954,7 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @header.camlTailcall__const_block85 = global i64 2828, section ".data", align 8
 @camlTailcall__const_block85 = global { i64, i64 } { i64 21, i64 1 }, section ".data", align 8
 @header.camlTailcall__float108 = global i64 2045, section ".data", align 8
-@camlTailcall__float108 = global { double } { double 41.29999999999999715783 }, section ".data", align 8
+@camlTailcall__float108 = global { double } { double 0x4044a66666666666 }, section ".data", align 8
 @camlCamlinternalFormat__make_printf_HIDE_STAMP = external global ptr
 @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 = external global ptr
 @camlTailcall2 = external global ptr

@@ -505,9 +505,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @header.camlData_decl__f_2 = global i64 4345, section ".data", align 8
 @camlData_decl__f_2 = global { ptr, i64 } { ptr @camlData_decl__f_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlData_decl__float4 = global i64 2045, section ".data", align 8
-@camlData_decl__float4 = global { double } { double 3.14159265358979311600 }, section ".data", align 8
+@camlData_decl__float4 = global { double } { double 0x400921fb54442d18 }, section ".data", align 8
 @header.camlData_decl__float327 = global i64 3071, section ".data", align 8
-@camlData_decl__float327 = global { ptr, float } { ptr @caml_float32_ops, float 2.71828174591064453125 }, section ".data", align 8
+@camlData_decl__float327 = global { ptr, float } { ptr @caml_float32_ops, float 0x4005bf0a80000000 }, section ".data", align 8
 @header.camlData_decl__immstring35 = global i64 5116, section ".data", align 8
 @camlData_decl__immstring35 = global { [ 30 x i8 ], [ 1 x i8 ], i8 } { [ 30 x i8 ] c"\6f\6e\65\20\6f\66\20\74\68\65\20\73\74\72\69\6e\67\73\0a\6f\66\20\61\6c\6c\20\74\69\6d\65", [ 1 x i8 ] zeroinitializer, i8 1 }, section ".data", align 8
 @header.camlData_decl__immstring38 = global i64 2044, section ".data", align 8

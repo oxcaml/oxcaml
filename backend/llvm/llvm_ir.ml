@@ -345,18 +345,25 @@ module Value = struct
 
   let of_nativeint ?(typ = Type.i64) i = typ, Immediate (Nativeint.to_string i)
 
-  let of_float32_bits bits =
-    (* Note that "%#x" formats 0 as "0", not "0x0"... *)
-    Type.float, Immediate (Format.sprintf "0x%lx" bits)
-
   let of_float64_bits bits =
+    (* Note that "%#x" formats 0 as "0", not "0x0"... *)
     Type.double, Immediate (Format.sprintf "0x%Lx" bits)
 
-  (* CR yusumez: 64-bit floats with at least 17 digits are guaranteed to round
-     trip exactly through string conversions by the IEEE 754 standard (9 digits
-     for 32-bit floats). However, it would still be nice to prefer the functions
-     above whenever possible. *)
-  let of_float ~typ f = typ, Immediate (Format.sprintf "%.20f" f)
+  (* Strangely enough, all floating point numbers use the 64-bit representation
+     if written in hexadecimal. So we first convert that to a 64-bit float and
+     back to its bits. *)
+  let of_float32_bits bits =
+    let bits = Int64.bits_of_float (Int32.float_of_bits bits) in
+    Type.float, Immediate (Format.sprintf "0x%Lx" bits)
+
+  let of_float ~(typ : Type.t) f =
+    match typ with
+    | Float -> of_float32_bits (Int32.bits_of_float f)
+    | Double -> of_float64_bits (Int64.bits_of_float f)
+    | Int _ | Ptr _ | Struct _ | Array _ | Vector _ | Label | Token | Metadata
+      ->
+      fail_msg ~name:"Value.of_float"
+        "expected type to be a float or double, got %a" Type.pp_t typ
 
   let of_label label = of_ident ~typ:Type.label (Ident.of_label label)
 

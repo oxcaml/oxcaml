@@ -539,9 +539,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @header.camlExtcalls__call_too_many_4 = global i64 3063, section ".data", align 8
 @camlExtcalls__call_too_many_4 = global { ptr, i64 } { ptr @camlExtcalls__call_too_many_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExtcalls__float38 = global i64 2045, section ".data", align 8
-@camlExtcalls__float38 = global { double } { double 4.00000000000000000000 }, section ".data", align 8
+@camlExtcalls__float38 = global { double } { double 0x4010000000000000 }, section ".data", align 8
 @header.camlExtcalls__float36 = global i64 2045, section ".data", align 8
-@camlExtcalls__float36 = global { double } { double 2.00000000000000000000 }, section ".data", align 8
+@camlExtcalls__float36 = global { double } { double 0x4000000000000000 }, section ".data", align 8
 @temp.Extcalls.0 = global { ptr, ptr, ptr } { ptr @int_and_float, ptr @too_many, ptr @print_and_add }, section ".data", align 8
 @camlExtcalls__call_too_many_with_try_HIDE_STAMP.recover_rbp_asm.L122 = external global ptr
 @camlExtcalls__call_too_many_with_try_HIDE_STAMP.recover_rbp_var.L122 = global ptr zeroinitializer, section ".data", align 8
