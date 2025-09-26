@@ -138,7 +138,7 @@ let drop_last_to_y_axis (s : line Stack.t) =
    `float#`.
 4. Indices to some records containing both values and non-values, and occupying
    over 2^16 bytes, cannot be created. See [Representation of block
-   indices](#Representation-of-block-indices) for details.
+   indices](#representation-of-block-indices) for details.
 5. Indices to structures with non-default modalities are not supported.
    Specifically, the composition of modalities of the accesses of an `idx_imm`
    must have the identity modality, while the composition of modalities of the
