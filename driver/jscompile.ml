@@ -90,26 +90,29 @@ let emit_jsir i
   let jsir = Unit_info.jsir i.target in
   let compilation_unit : Jsoo_imports.Jsir.compilation_unit =
     let info : Jsoo_imports.Unit_info.t =
-      { provides =
+      {
+        provides =
           Jsoo_imports.StringSet.singleton
-            (Compilation_unit.full_path_as_string i.module_name)
-      ; requires =
+            (Compilation_unit.full_path_as_string i.module_name);
+        requires =
           Compilation_unit.Set.elements imported_compilation_units
           |> List.map Compilation_unit.full_path_as_string
-          |> Jsoo_imports.StringSet.of_list
-      ; primitives = []
-      ; aliases = []
-      ; force_link = false
-      ; effects_without_cps = false
+          |> Jsoo_imports.StringSet.of_list;
+        primitives = [];
+        aliases = [];
+        force_link = false;
+        effects_without_cps = false;
       }
     in
-    { info
-    ; contents =
+    {
+      info;
+      contents =
         (* CR-soon jvanburen: add debug info for source maps *)
-        { code = program
-        ; cmis = Jsoo_imports.StringSet.empty
-        ; debug = Jsoo_imports.Jsir.Debug.default_summary
-        }
+        {
+          code = program;
+          cmis = Jsoo_imports.StringSet.empty;
+          debug = Jsoo_imports.Jsir.Debug.default_summary;
+        };
     }
   in
   let filename = Unit_info.Artifact.filename jsir in

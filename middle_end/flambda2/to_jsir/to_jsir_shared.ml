@@ -44,9 +44,9 @@ let target_ocaml_int_to_jsir_const targetint : Jsir.constant =
     if received <> expected
     then
       Misc.fatal_errorf
-        "BUG: JSIR expected %d-bit integers from flambda, but got a %d-bit int from flambda"
-        expected
-        received
+        "BUG: JSIR expected %d-bit integers from flambda, but got a %d-bit int \
+         from flambda"
+        expected received
   in
   let targetint =
     match Target_ocaml_int.repr targetint with

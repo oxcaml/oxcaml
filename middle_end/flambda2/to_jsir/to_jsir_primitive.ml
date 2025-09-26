@@ -101,7 +101,8 @@ let mask_and_sign_extend_int8 ~env ~res x =
     To_jsir_result.add_instr_exn res
       (Let
          ( masked,
-           Prim (Extern "%int_and", [x; Pc (Int (Targetint.of_int_exn 0xFF))]) ))
+           Prim (Extern "%int_and", [x; Pc (Int (Targetint.of_int_exn 0xFF))])
+         ))
   in
   let v1 = Jsir.Var.fresh () in
   let v2 = Jsir.Var.fresh () in
@@ -109,13 +110,16 @@ let mask_and_sign_extend_int8 ~env ~res x =
     To_jsir_result.add_instr_exn res
       (Let
          ( v1,
-           Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int_exn 24))])
+           Prim
+             (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int_exn 24))])
          ))
   in
   let res =
     To_jsir_result.add_instr_exn res
       (Let
-         (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int_exn 24))])))
+         ( v2,
+           Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int_exn 24))])
+         ))
   in
   Some v2, env, res
 
@@ -127,7 +131,8 @@ let mask_and_sign_extend_int16 ~env ~res x =
     To_jsir_result.add_instr_exn res
       (Let
          ( masked,
-           Prim (Extern "%int_and", [x; Pc (Int (Targetint.of_int_exn 0xFFFF))]) ))
+           Prim (Extern "%int_and", [x; Pc (Int (Targetint.of_int_exn 0xFFFF))])
+         ))
   in
   let v1 = Jsir.Var.fresh () in
   let v2 = Jsir.Var.fresh () in
@@ -135,13 +140,16 @@ let mask_and_sign_extend_int16 ~env ~res x =
     To_jsir_result.add_instr_exn res
       (Let
          ( v1,
-           Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int_exn 16))])
+           Prim
+             (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int_exn 16))])
          ))
   in
   let res =
     To_jsir_result.add_instr_exn res
       (Let
-         (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int_exn 16))])))
+         ( v2,
+           Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int_exn 16))])
+         ))
   in
   Some v2, env, res
 
@@ -153,7 +161,8 @@ let mask_and_sign_extend_int8_var ~env ~res var =
     To_jsir_result.add_instr_exn res
       (Let
          ( masked,
-           Prim (Extern "%int_and", [Pv var; Pc (Int (Targetint.of_int_exn 0xFF))])
+           Prim
+             (Extern "%int_and", [Pv var; Pc (Int (Targetint.of_int_exn 0xFF))])
          ))
   in
   let v1 = Jsir.Var.fresh () in
@@ -162,13 +171,16 @@ let mask_and_sign_extend_int8_var ~env ~res var =
     To_jsir_result.add_instr_exn res
       (Let
          ( v1,
-           Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int_exn 24))])
+           Prim
+             (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int_exn 24))])
          ))
   in
   let res =
     To_jsir_result.add_instr_exn res
       (Let
-         (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int_exn 24))])))
+         ( v2,
+           Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int_exn 24))])
+         ))
   in
   Some v2, env, res
 
@@ -179,8 +191,9 @@ let mask_and_sign_extend_int16_var ~env ~res var =
     To_jsir_result.add_instr_exn res
       (Let
          ( masked,
-           Prim (Extern "%int_and", [Pv var; Pc (Int (Targetint.of_int_exn 0xFFFF))])
-         ))
+           Prim
+             ( Extern "%int_and",
+               [Pv var; Pc (Int (Targetint.of_int_exn 0xFFFF))] ) ))
   in
   let v1 = Jsir.Var.fresh () in
   let v2 = Jsir.Var.fresh () in
@@ -188,13 +201,16 @@ let mask_and_sign_extend_int16_var ~env ~res var =
     To_jsir_result.add_instr_exn res
       (Let
          ( v1,
-           Prim (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int_exn 16))])
+           Prim
+             (Extern "%int_lsl", [Pv masked; Pc (Int (Targetint.of_int_exn 16))])
          ))
   in
   let res =
     To_jsir_result.add_instr_exn res
       (Let
-         (v2, Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int_exn 16))])))
+         ( v2,
+           Prim (Extern "%int_asr", [Pv v1; Pc (Int (Targetint.of_int_exn 16))])
+         ))
   in
   Some v2, env, res
 
