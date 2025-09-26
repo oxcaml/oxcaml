@@ -55,20 +55,15 @@ let rec all_ids_up_to_root0 t ~resolver id all_ids_so_far =
 let all_ids_up_to_root t ~resolver id =
   all_ids_up_to_root0 t ~resolver id Code_id.Set.empty
 
-let all_ids_up_to_root_set t ~resolver ids =
-  Code_id.Set.fold
-    (fun code_id all_ids -> all_ids_up_to_root0 t ~resolver code_id all_ids)
-    ids Code_id.Set.empty
-
 let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
   if Code_id.Set.equal ids1 ids2
   then Ok ids1
   else
-    let ids1_to_root = all_ids_up_to_root_set t ~resolver ids1 in
-    let ids2_to_root = all_ids_up_to_root_set t ~resolver ids2 in
-    let ids1_newer_than_ids2 = Code_id.Set.inter ids1 ids2_to_root in
-    let ids2_newer_than_ids1 = Code_id.Set.inter ids2 ids1_to_root in
-    let ids = Code_id.Set.union ids1_newer_than_ids2 ids2_newer_than_ids1 in
+    let should_keep_id other_ids id =
+      let ids_to_root = all_ids_up_to_root t ~resolver id in
+      not (Code_id.Set.is_empty (Code_id.Set.inter ids_to_root other_ids))
+    in
+    let ids = Code_id.Set.union (Code_id.Set.filter (should_keep_id ids1) ids2) (Code_id.Set.filter (should_keep_id ids2) ids1) in
     if Code_id.Set.is_empty ids then Bottom else Ok ids
 
 let _num_ids_up_to_root t ~resolver id =
