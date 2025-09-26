@@ -294,17 +294,9 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
   (* We may need to be careful here to look up the right thing: what happens on GADT-installed equations? *)
   match context.lookup_type p with
   | None ->
-    (* Fallback: treat as identity polynomial in an "unknown" context.
-       Provide a generous number of coefficients to avoid index errors when
-       rehydrating cached polynomials that reference this constructor's args. *)
-    let default_max_coeffs = 128 in
-    let base = Ldd.var (Ldd.rigid (Ldd.Name.atomic p 0)) in
-    let coeffs =
-      List.init default_max_coeffs (fun i ->
-        let a = Ldd.Name.atomic p (i + 1) in
-        let r = Ldd.rigid a in
-        Ldd.var r) in
-    JK.Poly (base, coeffs)
+    (* Fallback: treat unknown constructors as abstract, ignoring arguments. *)
+    let kind : JK.ckind = fun (ops : JK.ops) -> ops.const Axis_lattice_bits.value in
+    JK.Ty { args = []; kind; abstract = true }
   | Some decl ->
     (* Here we can switch to using the cached ikind or not. *)
     let fallback () =

@@ -168,6 +168,10 @@ struct
       | None -> (
         match env.lookup c with
         | Poly (base, coeffs) ->
+          (* Install placeholders to break cycles across cached polynomials. *)
+          let base_var = Ldd.new_var () in
+          let coeff_vars = List.init (List.length coeffs) (fun _ -> Ldd.new_var ()) in
+          ConstrTbl.add constr_to_coeffs c (Ldd.var base_var, List.map Ldd.var coeff_vars);
           let instantiate (name : Ldd.Name.t) : kind =
             match name with
             | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
@@ -176,21 +180,18 @@ struct
               then Ldd.var (Ldd.rigid name)
               else
                 let base', coeffs' = constr_kind constr' in
-                if arg_index = 0
-                then base'
-                else
+                if arg_index = 0 then base'
+                else (
                   match List.nth_opt coeffs' (arg_index - 1) with
                   | Some coeff -> coeff
-                  | None ->
-                    Misc.fatal_errorf
-                      "jkind_solver: cached polynomial for %s has no coefficient %d"
-                      (Constr.to_string constr') arg_index
+                  | None -> Ldd.var (Ldd.rigid name))
           in
           let rehydrate node = Ldd.map_rigid instantiate node in
-          let base' = rehydrate base in
-          let coeffs' = List.map rehydrate coeffs in
-          ConstrTbl.replace constr_to_coeffs c (base', coeffs');
-          base', coeffs'
+          let base_rhs = rehydrate base in
+          let coeffs_rhs = List.map rehydrate coeffs in
+          Ldd.solve_lfp base_var base_rhs;
+          List.iter2 (fun v rhs -> Ldd.solve_lfp v rhs) coeff_vars coeffs_rhs;
+          (Ldd.var base_var, List.map Ldd.var coeff_vars)
         | Ty { args; kind; abstract } ->
           let base = Ldd.new_var () in
           (* Allocate coefficient vars based on declared arity, not on ks
