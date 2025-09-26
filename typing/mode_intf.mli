@@ -209,7 +209,7 @@ module type S = sig
   val print_longident : (Format.formatter -> Longident.t -> unit) ref
 
   (* CR-someday zqian: find a better stroy to erase bounds (and hints) that incorporates
-  into [disallow_*]. *)
+     into [disallow_*]. *)
 
   (** Remove hints from all variables that have been created. See the comments
   on [erase_hint] in [Solver_intf] for details. *)
