@@ -1137,6 +1137,9 @@ let datalog_rules =
     (let$ [allocation_id] = ["allocation_id"] in
      [any_source_pred allocation_id]
      ==> cannot_change_representation0 allocation_id);
+    (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
+     [constructor_rel call_witness (fld Code_id_of_call_witness) code_id]
+     ==> cannot_change_representation0 call_witness);
     (* Note this rule is here to still allow changing the calling convention of
        symbols /!\ when adding back the local value slots, there should be a few
        more rules here *)
@@ -1777,7 +1780,6 @@ let code_id_actually_directly_called_query =
                        (Field.encode (Code_of_closure Known_arity_code_pointer)))
                     call_witness;
                   sources_rel call_witness indirect;
-                  any_usage_pred call_witness;
                   constructor_rel indirect
                     (Term.constant (Field.encode Code_id_of_call_witness))
                     codeid ]
