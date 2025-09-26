@@ -49,78 +49,74 @@ L101:
   %38 = load ptr addrspace(1), ptr %37
   store ptr addrspace(1) %38, ptr %16
   %39 = load i64, ptr %14
-  store i64 %39, ptr %17
-  %40 = load i64, ptr %17
-  %41 = add i64 %40, 60
-  store i64 %41, ptr %17
+  %40 = add i64 %39, 60
+  store i64 %40, ptr %17
   store i64 7, ptr %18
+  %41 = load i64, ptr %14
+  store i64 %41, ptr %4
   %42 = load i64, ptr %14
-  store i64 %42, ptr %4
-  %43 = load i64, ptr %14
-  store i64 %43, ptr %5
-  %44 = load i64, ptr %18
-  store i64 %44, ptr %6
+  store i64 %42, ptr %5
+  %43 = load i64, ptr %18
+  store i64 %43, ptr %6
+  %44 = load i64, ptr %14
+  store i64 %44, ptr %7
   %45 = load i64, ptr %14
-  store i64 %45, ptr %7
+  store i64 %45, ptr %8
   %46 = load i64, ptr %14
-  store i64 %46, ptr %8
+  store i64 %46, ptr %9
   %47 = load i64, ptr %14
-  store i64 %47, ptr %9
+  store i64 %47, ptr %10
   %48 = load i64, ptr %14
-  store i64 %48, ptr %10
+  store i64 %48, ptr %11
   %49 = load i64, ptr %14
-  store i64 %49, ptr %11
+  store i64 %49, ptr %12
   %50 = load i64, ptr %14
-  store i64 %50, ptr %12
+  store i64 %50, ptr %13
   %51 = load i64, ptr %14
-  store i64 %51, ptr %13
+  store i64 %51, ptr %22
   %52 = load i64, ptr %14
-  store i64 %52, ptr %22
-  %53 = load i64, ptr %14
-  store i64 %53, ptr %25
-  %54 = load i64, ptr %17
-  store i64 %54, ptr %28
-  %55 = load ptr addrspace(1), ptr %16
-  store ptr addrspace(1) %55, ptr %31
-  %56 = load i64, ptr %4
-  %57 = load i64, ptr %5
-  %58 = load i64, ptr %6
-  %59 = load i64, ptr %7
-  %60 = load i64, ptr %8
-  %61 = load i64, ptr %9
-  %62 = load i64, ptr %10
-  %63 = load i64, ptr %11
-  %64 = load i64, ptr %12
-  %65 = load i64, ptr %13
-  %66 = load i64, ptr %ds
-  %67 = load i64, ptr %alloc
-  %68 = call oxcamlcc { { i64, i64 }, { i64 } } @caml_apply13(i64 %66, i64 %67, i64 %56, i64 %57, i64 %58, i64 %59, i64 %60, i64 %61, i64 %62, i64 %63, i64 %64, i64 %65) "statepoint-id"="0"
-  %69 = extractvalue { { i64, i64 }, { i64 } } %68, 0, 0
-  %70 = extractvalue { { i64, i64 }, { i64 } } %68, 0, 1
-  store i64 %69, ptr %ds
-  store i64 %70, ptr %alloc
-  %71 = extractvalue { { i64, i64 }, { i64 } } %68, 1, 0
-  store i64 %71, ptr %4
+  store i64 %52, ptr %25
+  %53 = load i64, ptr %17
+  store i64 %53, ptr %28
+  %54 = load ptr addrspace(1), ptr %16
+  store ptr addrspace(1) %54, ptr %31
+  %55 = load i64, ptr %4
+  %56 = load i64, ptr %5
+  %57 = load i64, ptr %6
+  %58 = load i64, ptr %7
+  %59 = load i64, ptr %8
+  %60 = load i64, ptr %9
+  %61 = load i64, ptr %10
+  %62 = load i64, ptr %11
+  %63 = load i64, ptr %12
+  %64 = load i64, ptr %13
+  %65 = load i64, ptr %ds
+  %66 = load i64, ptr %alloc
+  %67 = call oxcamlcc { { i64, i64 }, { i64 } } @caml_apply13(i64 %65, i64 %66, i64 %55, i64 %56, i64 %57, i64 %58, i64 %59, i64 %60, i64 %61, i64 %62, i64 %63, i64 %64) "statepoint-id"="0"
+  %68 = extractvalue { { i64, i64 }, { i64 } } %67, 0, 0
+  %69 = extractvalue { { i64, i64 }, { i64 } } %67, 0, 1
+  store i64 %68, ptr %ds
+  store i64 %69, ptr %alloc
+  %70 = extractvalue { { i64, i64 }, { i64 } } %67, 1, 0
+  store i64 %70, ptr %4
   br label %L103
 L103:
-  %72 = load i64, ptr %4
-  store i64 %72, ptr %19
-  %73 = load i64, ptr %19
-  store i64 %73, ptr %32
-  %74 = load i64, ptr %32
+  %71 = load i64, ptr %4
+  store i64 %71, ptr %19
+  %72 = load i64, ptr %19
+  store i64 %72, ptr %32
+  %73 = load i64, ptr %32
+  %74 = add i64 %73, 2
   store i64 %74, ptr %33
   %75 = load i64, ptr %33
-  %76 = add i64 %75, 2
-  store i64 %76, ptr %33
-  %77 = load i64, ptr %33
-  store i64 %77, ptr %4
-  %78 = load i64, ptr %4
-  %79 = load i64, ptr %ds
-  %80 = load i64, ptr %alloc
-  %81 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %79, 0, 0
-  %82 = insertvalue { { i64, i64 }, { i64 } } %81, i64 %80, 0, 1
-  %83 = insertvalue { { i64, i64 }, { i64 } } %82, i64 %78, 1, 0
-  ret { { i64, i64 }, { i64 } } %83
+  store i64 %75, ptr %4
+  %76 = load i64, ptr %4
+  %77 = load i64, ptr %ds
+  %78 = load i64, ptr %alloc
+  %79 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %77, 0, 0
+  %80 = insertvalue { { i64, i64 }, { i64 } } %79, i64 %78, 0, 1
+  %81 = insertvalue { { i64, i64 }, { i64 } } %80, i64 %76, 1, 0
+  ret { { i64, i64 }, { i64 } } %81
 }
 
 define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlMany_args__entry(i64 %0, i64 %1) gc "oxcaml" {
