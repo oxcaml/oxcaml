@@ -48,7 +48,7 @@ let rec all_ids_up_to_root0 t ~resolver id all_ids_so_far =
           (* Inlining the base case, so that we do not recursively loop in case
              of a code_id that is not bound in the map *)
           match Code_id.Map.find id t with
-          | exception Not_found -> Code_id.Set.singleton id
+          | exception Not_found -> all_ids_so_far
           | older -> all_ids_up_to_root0 t ~resolver older all_ids_so_far))
     | older -> all_ids_up_to_root0 t ~resolver older all_ids_so_far
 
