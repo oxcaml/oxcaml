@@ -36,9 +36,9 @@ let f () =
 Line 2, characters 18-26:
 2 |   let g = stack_ ((42, 42) : _ @ global ) in
                       ^^^^^^^^
-Error: This value is "local"
+Error: The allocation is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted allocation is expected to be "global".
 |}]
 
 let f () =
@@ -60,9 +60,9 @@ let f () =
 Line 2, characters 18-30:
 2 |   let g = stack_ (fun x y -> x : 'a -> 'a -> 'a) in
                       ^^^^^^^^^^^^
-Error: This value is "local"
+Error: The allocation is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+       However, the highlighted allocation is expected to be "global".
 |}]
 
 let f () =
