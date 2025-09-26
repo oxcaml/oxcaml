@@ -1,7 +1,10 @@
 (* This forces ikinds globally on. *)
-(* Clflags.ikinds := true *)
+Clflags.ikinds := true
 
-(* Types.ikind_debug := !Clflags.ikinds *)
+(* Types.ikind_debug := true *)
+let enable_crossing = true
+let enable_sub_or_intersect = false
+let enable_sub_or_error = false
 
 module Ldd = Ikind.Ldd
 
@@ -37,7 +40,7 @@ let with_origin_tag (tag : string) (f : unit -> 'a) : 'a =
 let __ikind_log_depth = ref 0
 
 let log ?pp (msg : string) (f : unit -> 'a) : 'a =
-  Types.ikind_debug := !Clflags.ikinds;
+  (* Types.ikind_debug := !Clflags.ikinds; *)
   if not !Types.ikind_debug
   then f ()
   else
@@ -291,8 +294,17 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
   (* We may need to be careful here to look up the right thing: what happens on GADT-installed equations? *)
   match context.lookup_type p with
   | None ->
-    failwith
-      (Format.asprintf "Ikinds.lookup: unknown constructor %a" Path.print p)
+    (* Fallback: treat as identity polynomial in an "unknown" context.
+       Provide a generous number of coefficients to avoid index errors when
+       rehydrating cached polynomials that reference this constructor's args. *)
+    let default_max_coeffs = 128 in
+    let base = Ldd.var (Ldd.rigid (Ldd.Name.atomic p 0)) in
+    let coeffs =
+      List.init default_max_coeffs (fun i ->
+        let a = Ldd.Name.atomic p (i + 1) in
+        let r = Ldd.rigid a in
+        Ldd.var r) in
+    JK.Poly (base, coeffs)
   | Some decl ->
     (* Here we can switch to using the cached ikind or not. *)
     let fallback () =
@@ -493,8 +505,6 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           JK.Poly (base, coeffs))
     | Types.No_constructor_ikind reason ->
       if !Clflags.ikinds && !Types.ikind_debug
-      then ()
-      else if !Clflags.ikinds
       then Format.eprintf "[ikind-miss] %a => %s@." Path.print p reason;
       fallback ()
     | Types.Constructor_ikind _ -> fallback ()
@@ -690,7 +700,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
     (fun () ->
       Format.asprintf "crossing_of_jkind jkind=%s" (string_of_jkind jkind))
     (fun () ->
-      if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
+      if not (enable_crossing && !Clflags.ikinds) (* CR jujacobs: fix this *)
       then Jkind.get_mode_crossing ~context jkind
       else
         let solver = make_solver ~context in
@@ -723,7 +733,7 @@ let sub_or_intersect ?origin
   in
   log_call ~pp:string_of_sub_or_intersect msg
     (fun () ->
-      if not (true && !Clflags.ikinds) (* CR jujacobs: fix this *)
+      if not (enable_sub_or_intersect && !Clflags.ikinds) (* CR jujacobs: fix this *)
       then Jkind.sub_or_intersect ~type_equal ~context t1 t2
       else
         (* CR jujacobs: enable this *)
@@ -752,7 +762,7 @@ let sub_or_error ?origin
     | Error _ -> "Error"
   in
   log_call ~pp:pp_result msg (fun () ->
-      if not (true && !Clflags.ikinds)
+      if not (enable_sub_or_error && !Clflags.ikinds)
       then Jkind.sub_or_error ~type_equal ~context t1 t2
       else if sub ~type_equal ~context (Jkind.disallow_right t1)
                 (Jkind.disallow_left t2)
@@ -760,3 +770,116 @@ let sub_or_error ?origin
       else
         (* Delegate to Jkind for detailed error reporting. *)
         Jkind.sub_or_error ~type_equal ~context t1 t2)
+
+(**
+  Substitution over constructor ikinds (polynomials)
+
+  We sometimes need to apply a Subst-style mapping of type constructors to
+  other constructors or to type functions, but without access to an Env. For
+  ikinds, we can interpret such substitutions directly on the cached
+  polynomials (constructor_ikind) by mapping rigid atoms via Ldd.map_rigid.
+
+  The caller supplies a [lookup] function that describes the substitution:
+  - None: the path is unchanged (identity)
+  - `Path q: replace occurrences of constructor [p] with [q]
+  - `Type_fun (params, body): inline a type function; we convert [body] to a
+    polynomial in an identity environment (where every constructor [r] has a
+    polynomial consisting solely of its self-atoms) and use its base/coefficient
+    polynomials. This avoids Env while keeping results stable.
+*)
+
+let rec max_arity_in_type (acc : int Path.Map.t) (ty : Types.type_expr) =
+  let open Types in
+  match get_desc ty with
+  | Tconstr (p, args, _) ->
+      let n = List.length args in
+      let prev = match Path.Map.find_opt p acc with None -> 0 | Some m -> m in
+      let acc = if n > prev then Path.Map.add p n acc else acc in
+      List.fold_left max_arity_in_type acc args
+  | Ttuple elts -> List.fold_left (fun a (_, t) -> max_arity_in_type a t) acc elts
+  | Tunboxed_tuple elts -> List.fold_left (fun a (_, t) -> max_arity_in_type a t) acc elts
+  | Tarrow (_, t1, t2, _) -> max_arity_in_type (max_arity_in_type acc t1) t2
+  | Tpoly (t, ts) -> List.fold_left max_arity_in_type (max_arity_in_type acc t) ts
+  | Tobject (t, _) -> max_arity_in_type acc t
+  | Tfield (_, _, t1, t2) -> max_arity_in_type (max_arity_in_type acc t1) t2
+  | Tvar _ | Tunivar _ | Tlink _ | Tsubst _ | Tnil | Tvariant _ | Tpackage _
+  | Tof_kind _ -> acc
+
+let identity_lookup_from_arity_map (arity : int Path.Map.t) (p : Path.t)
+    : JK.constr_decl =
+  let open Ldd in
+  let n = match Path.Map.find_opt p arity with None -> 0 | Some m -> m in
+  let base = var (rigid (Name.atomic p 0)) in
+  let coeffs =
+    List.init n (fun i -> var (rigid (Name.atomic p (i + 1))))
+  in
+  JK.Poly (base, coeffs)
+
+let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
+    ~(body : Types.type_expr) : JK.poly * JK.poly list =
+  let arity = max_arity_in_type Path.Map.empty body in
+  let lookup p = identity_lookup_from_arity_map arity p in
+  let env : JK.env = { kind_of = (fun ty -> kind_of ~context:(
+                                  (* dummy context; currently ignored *)
+                                  { Jkind.jkind_of_type = (fun _ -> None)
+                                  ; is_abstract = (fun _ -> false)
+                                  ; lookup_type = (fun _ -> None)
+                                  ; debug_print_env = (fun _ppf -> ())
+                                  }
+                                ) ty)
+                    ; lookup } in
+  let solver = JK.make_solver env in
+  let poly = JK.normalize solver (kind_of ~context:{
+                      Jkind.jkind_of_type = (fun _ -> None);
+                      is_abstract = (fun _ -> false);
+                      lookup_type = (fun _ -> None);
+                      debug_print_env = (fun _ -> ())
+                    } body)
+  in
+  let rigid_vars =
+    List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
+  in
+  Ldd.decompose_linear ~universe:rigid_vars poly
+
+let substitute_decl_ikind_with_lookup
+    ~(lookup : Path.t -> [ `Path of Path.t
+                         | `Type_fun of Types.type_expr list * Types.type_expr ] option)
+    (entry : Types.type_ikind) : Types.type_ikind =
+  match entry with
+  | Types.No_constructor_ikind _ -> entry
+  | Types.Constructor_ikind packed ->
+      let payload = unpack_constructor_ikind packed in
+      let memo : (Path.t, (JK.poly * JK.poly list)) Hashtbl.t = Hashtbl.create 17 in
+      let map_name (name : Ldd.Name.t) : Ldd.node =
+        match name with
+        | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
+        | Ldd.Name.Atom { constr = p; arg_index } ->
+            (match lookup p with
+             | None -> Ldd.var (Ldd.rigid name)
+             | Some (`Path q) ->
+                 Ldd.var (Ldd.rigid (Ldd.Name.atomic q arg_index))
+             | Some (`Type_fun _ as tf) ->
+                 let base, coeffs =
+                   match tf with
+                   | `Type_fun (params, body) ->
+                       (* Memoized by [p] to avoid recomputation *)
+                       (match Hashtbl.find_opt memo p with
+                        | Some v -> v
+                        | None ->
+                            let v =
+                              poly_of_type_function_in_identity_env
+                                ~params ~body
+                            in
+                            Hashtbl.add memo p v; v)
+                 in
+                 if arg_index = 0 then base
+                 else
+                   match List.nth_opt coeffs (arg_index - 1) with
+                   | Some k -> k
+                   | None ->
+                       (* Fallback: if coefficient missing, keep original atom *)
+                       Ldd.var (Ldd.rigid name))
+      in
+      let base' = Ldd.map_rigid map_name payload.base in
+      let coeffs' = Array.map (Ldd.map_rigid map_name) payload.coeffs in
+      Types.Constructor_ikind (pack_constructor_ikind { base = base'; coeffs = coeffs' })

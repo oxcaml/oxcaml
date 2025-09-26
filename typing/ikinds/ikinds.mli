@@ -56,3 +56,15 @@ val sub_or_error :
   (Allowance.allowed * 'r1) Types.jkind ->
   ('l2 * Allowance.allowed) Types.jkind ->
   (unit, Jkind.Violation.t) result
+
+(** Apply a path/type-function substitution to a constructor ikind.
+    - [lookup p] should describe the substitution for constructor [p]:
+      [None] for identity, [`Path q] to rename to [q], or
+      [`Type_fun (params, body)] to inline a type function, which is evaluated
+      in an identity environment (no Env required).
+*)
+val substitute_decl_ikind_with_lookup :
+  lookup:(Path.t -> [ `Path of Path.t
+                    | `Type_fun of Types.type_expr list * Types.type_expr ] option) ->
+  Types.type_ikind ->
+  Types.type_ikind

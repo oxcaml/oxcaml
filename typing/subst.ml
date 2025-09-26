@@ -607,9 +607,20 @@ let rec type_declaration' copy_scope s decl =
         in
         Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
       end;
-    type_ikind = Types.ikind_reset
-      "subst type_declaration"; (* CR jujacobs: fix this to preserve ikinds during substitution
-                          Substitution rewrites manifests/jkinds. *)
+    type_ikind = (
+      (* Preserve and transform ikinds under substitution by mapping rigid
+         atoms according to the substitution. For path->path we rename the
+         atom; for path->type-function we inline the type-function's
+         polynomial in an identity environment. If no information is
+         available, leave the ikind unchanged. *)
+      let lookup (p : Path.t) =
+        match Path.Map.find p s.types with
+        | Path p' -> Some (`Path p')
+        | Type_function { params; body } -> Some (`Type_fun (params, body))
+        | exception Not_found -> None
+      in
+      Ikinds.substitute_decl_ikind_with_lookup ~lookup decl.type_ikind
+    );
     type_private = decl.type_private;
     type_variance = decl.type_variance;
     type_separability = decl.type_separability;

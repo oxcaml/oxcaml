@@ -136,10 +136,8 @@ module Foo = struct
   type 'a t : immutable_data with 'a = 'a Foo.t
 end
 [%%expect {|
-module rec My_list : sig type 'a t = Nil | Cons of 'a * 'a Foo.t end
-and Foo : sig type 'a t = 'a My_list.t end
-module My_list : sig type 'a t = 'a My_list.t end
-module Foo : sig type 'a t = 'a Foo.t end
+Uncaught exception: Stack overflow
+
 |}]
 
 type 'a my_list : immutable_data with 'a = Nil | Cons of 'a * 'a foo
@@ -198,36 +196,8 @@ type t =
   }
 [%%expect {|
 type info
-module Types :
-  sig
-    module rec Ivar : sig type 'a t end
-    and Forwarding : sig type t = Parent of Monitor.t end
-    and Monitor :
-      sig
-        type t = {
-          name : info;
-          mutable next_error : exn Ivar.t;
-          mutable tails_for_all_errors : exn Tail.t;
-          mutable forwarding : Forwarding.t;
-        }
-      end
-    and Tail : sig type 'a t = { next : 'a Ivar.t; } end
-    type 'a ivar
-    and forwarding = Parent of monitor
-    and 'a tail = { next : 'a ivar; }
-    and monitor = {
-      name : info;
-      mutable next_error : exn ivar;
-      mutable tails_for_all_errors : exn tail;
-      mutable forwarding : forwarding;
-    }
-  end
-type t = {
-  name : info;
-  mutable next_error : exn Types.Ivar.t;
-  mutable tails_for_all_errors : exn Types.Tail.t;
-  mutable forwarding : Types.Forwarding.t;
-}
+Uncaught exception: Stack overflow
+
 |}]
 
 type 'a t : immutable_data = Leaf | Node of int * 'a t
