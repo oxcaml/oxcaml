@@ -602,7 +602,7 @@ let make_constructor
         | _ -> true
       in
       let targs, tret_type, args, ret_type, _univars =
-        Ctype.with_local_level_if closed begin fun () ->
+        Levels.with_local_level_if closed begin fun () ->
           TyVarEnv.reset ();
           let univar_list =
             TyVarEnv.make_poly_univars_jkinds
@@ -835,7 +835,7 @@ let shape_extension_constructor ext =
 
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
-  Ctype.with_local_level begin fun () ->
+  Levels.with_local_level begin fun () ->
   TyVarEnv.reset();
   let path = Path.Pident id in
   let tparams = make_params env path sdecl.ptype_params in
@@ -860,7 +860,7 @@ let transl_declaration env sdecl (id, uid) =
   verify_unboxed_attr unboxed_attr sdecl;
   let transl_type sty =
     let cty =
-      Ctype.with_local_level begin fun () ->
+      Levels.with_local_level begin fun () ->
         Typetexp.transl_simple_type env ~new_var_jkind:Any
           ~closed:true Mode.Alloc.Const.legacy sty
       end
@@ -2894,7 +2894,7 @@ let transl_type_decl env rec_flag sdecl_list =
   in
 
   (* Create identifiers. *)
-  let scope = Ctype.create_scope () in
+  let scope = Levels.create_scope () in
   let ids_list =
     List.map (fun sdecl ->
       Ident.create_scoped ~scope sdecl.ptype_name.txt,
@@ -2905,7 +2905,7 @@ let transl_type_decl env rec_flag sdecl_list =
      expand to a generic type variable. After that, we check the coherence of
      the translated declarations in the resulting new environment. *)
   let tdecls, decls, new_env, delayed_jkind_checks =
-    Ctype.with_local_level_iter ~post:generalize_decl begin fun () ->
+    Levels.with_local_level_iter ~post:generalize_decl begin fun () ->
       (* Enter types. *)
       let temp_env =
         List.fold_left2 (enter_type rec_flag) env sdecl_list ids_list in
@@ -3317,8 +3317,8 @@ let transl_type_extension extend env loc styext =
   let ttype_params, _type_params, constructors =
     (* Note: it would be incorrect to call [create_scope] *after*
        [TyVarEnv.reset] or after [with_local_level] (see #10010). *)
-    let scope = Ctype.create_scope () in
-    Ctype.with_local_level begin fun () ->
+    let scope = Levels.create_scope () in
+    Levels.with_local_level begin fun () ->
       TyVarEnv.reset();
       let ttype_params = make_params env type_path styext.ptyext_params in
       let type_params = List.map (fun (cty, _) -> cty.ctyp_type) ttype_params in
@@ -3389,8 +3389,8 @@ let transl_type_extension extend env loc styext =
 
 let transl_exception env sext =
   let ext, shape =
-    let scope = Ctype.create_scope () in
-    Ctype.with_local_level
+    let scope = Levels.create_scope () in
+    Levels.with_local_level
       (fun () ->
         TyVarEnv.reset();
         transl_extension_constructor ~scope env
@@ -3966,7 +3966,7 @@ let transl_value_decl env ~modalities loc valdecl =
 let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     sdecl =
   Env.mark_type_used sig_decl.type_uid;
-  Ctype.with_local_level begin fun () ->
+  Levels.with_local_level begin fun () ->
   TyVarEnv.reset();
   (* In the first part of this function, we typecheck the syntactic
      declaration [sdecl] in the outer environment [outer_env]. *)
@@ -4202,7 +4202,7 @@ let transl_package_constraint ~loc ty =
 
 let abstract_type_decl ~injective ~jkind ~params =
   let arity = List.length params in
-  Ctype.with_local_level ~post:generalize_decl begin fun () ->
+  Levels.with_local_level ~post:generalize_decl begin fun () ->
     let params = List.map Ctype.newvar params in
     { type_params = params;
       type_arity = arity;
@@ -4240,7 +4240,7 @@ let abstract_type_decl ~injective ~jkind ~params =
   end
 
 let approx_type_decl sdecl_list =
-  let scope = Ctype.create_scope () in
+  let scope = Levels.create_scope () in
   List.map
     (fun sdecl ->
        let id = Ident.create_scoped ~scope sdecl.ptype_name.txt in

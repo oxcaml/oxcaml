@@ -121,6 +121,7 @@
   mode
   jkind_intf
   jkind_axis
+  levels
   jkind_types
   scalar
   primitive
@@ -283,6 +284,8 @@
 
 (copy_files ../../typing/jkind_types.ml)
 
+(copy_files ../../typing/levels.ml)
+
 (copy_files ../../typing/oprint.ml)
 
 (copy_files ../../typing/primitive.ml)
@@ -442,6 +445,8 @@
 (copy_files ../../typing/jkind_types.mli)
 
 (copy_files ../../typing/jkind_axis.mli)
+
+(copy_files ../../typing/levels.mli)
 
 (copy_files ../../typing/oprint.mli)
 
@@ -623,6 +628,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Mode.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind_intf.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind_axis.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Levels.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Zero_alloc.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
@@ -722,6 +728,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Mode.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind_axis.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Levels.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Zero_alloc.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx

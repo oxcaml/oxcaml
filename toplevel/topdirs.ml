@@ -239,7 +239,7 @@ let match_simple_printer_type desc ~is_old_style =
     else Topprinters.printer_type_new
   in
   match
-    Ctype.with_local_level ~post:Ctype.generalize begin fun () ->
+    Levels.with_local_level ~post:Ctype.generalize begin fun () ->
       let ty_arg = Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument) in
       Ctype.unify !toplevel_env
         (make_printer_type ty_arg)
@@ -257,7 +257,7 @@ let match_simple_printer_type desc ~is_old_style =
 let match_generic_printer_type desc ty_path params =
   let make_printer_type = Topprinters.printer_type_new in
   match
-    Ctype.with_local_level ~post:(List.iter Ctype.generalize) begin fun () ->
+    Levels.with_local_level ~post:(List.iter Ctype.generalize) begin fun () ->
       let args = List.map (fun _ -> Ctype.newvar
                                       (Jkind.Builtin.value ~why:Debug_printer_argument))
                           params in

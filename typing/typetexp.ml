@@ -24,6 +24,7 @@ open Typedtree
 open Types
 open Mode
 open Ctype
+open Levels
 
 exception Already_bound
 

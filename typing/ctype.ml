@@ -20,8 +20,8 @@ open Asttypes
 open Types
 open Btype
 open Errortrace
+open Levels
 open Mode
-open Local_store
 module Int = Misc.Stdlib.Int
 
 (*
@@ -145,79 +145,6 @@ exception Cannot_unify_universal_variables
 
 exception Incompatible
 
-(**** Type level management ****)
-
-let current_level = s_ref 0
-let nongen_level = s_ref 0
-let global_level = s_ref 0
-let saved_level = s_ref []
-
-let get_current_level () = !current_level
-let init_def level = current_level := level; nongen_level := level
-let begin_def () =
-  saved_level := (!current_level, !nongen_level) :: !saved_level;
-  incr current_level; nongen_level := !current_level
-let begin_class_def () =
-  saved_level := (!current_level, !nongen_level) :: !saved_level;
-  incr current_level
-let raise_nongen_level () =
-  saved_level := (!current_level, !nongen_level) :: !saved_level;
-  nongen_level := !current_level
-let end_def () =
-  let (cl, nl) = List.hd !saved_level in
-  saved_level := List.tl !saved_level;
-  current_level := cl; nongen_level := nl
-let create_scope () =
-  init_def (!current_level + 1);
-  !current_level
-
-let wrap_end_def f = Misc.try_finally f ~always:end_def
-
-let with_local_level ?post f =
-  begin_def ();
-  let result = wrap_end_def f in
-  Option.iter (fun g -> g result) post;
-  result
-let with_local_level_if cond f ~post =
-  if cond then with_local_level f ~post else f ()
-let with_local_level_iter f ~post =
-  begin_def ();
-  let result, l = wrap_end_def f in
-  List.iter post l;
-  result
-let with_local_level_iter_if cond f ~post =
-  if cond then with_local_level_iter f ~post else fst (f ())
-let with_local_level_if_principal f ~post =
-  with_local_level_if !Clflags.principal f ~post
-let with_local_level_iter_if_principal f ~post =
-  with_local_level_iter_if !Clflags.principal f ~post
-let with_level ~level f =
-  begin_def (); init_def level;
-  let result = wrap_end_def f in
-  result
-let with_level_if cond ~level f =
-  if cond then with_level ~level f else f ()
-
-let with_local_level_for_class ?post f =
-  begin_class_def ();
-  let result = wrap_end_def f in
-  Option.iter (fun g -> g result) post;
-  result
-
-let with_raised_nongen_level f =
-  raise_nongen_level ();
-  wrap_end_def f
-
-
-let reset_global_level () =
-  global_level := !current_level
-let increase_global_level () =
-  let gl = !global_level in
-  global_level := !current_level;
-  gl
-let restore_global_level gl =
-  global_level := gl
-
 (**** Control tracing of GADT instances *)
 
 let trace_gadt_instances = ref false
@@ -248,19 +175,19 @@ let proper_abbrevs tl abbrev =
 
 (* Re-export generic type creators *)
 
-let newty desc              = newty2 ~level:!current_level desc
-let new_scoped_ty scope desc = newty3 ~level:!current_level ~scope desc
+let newty desc              = newty2 ~level:(get_current_level ()) desc
+let new_scoped_ty scope desc = newty3 ~level:(get_current_level ()) ~scope desc
 
 let newvar ?name jkind =
-  newty2 ~level:!current_level (Tvar { name; jkind })
+  newty2 ~level:(get_current_level ()) (Tvar { name; jkind })
 let new_rep_var ?name ~why () =
   let jkind, sort = Jkind.of_new_sort_var ~why in
   newvar ?name jkind, sort
 let newvar2 ?name level jkind = newty2 ~level (Tvar { name; jkind })
 let new_global_var ?name jkind =
-  newty2 ~level:!global_level (Tvar { name; jkind })
+  newty2 ~level:(get_global_level ()) (Tvar { name; jkind })
 let newstub ~scope jkind =
-  newty3 ~level:!current_level ~scope (Tvar { name = None; jkind })
+  newty3 ~level:(get_current_level ()) ~scope (Tvar { name = None; jkind })
 
 let newobj fields      = newty (Tobject (fields, ref None))
 
@@ -837,7 +764,7 @@ let rec lower_all ty =
 *)
 let rec generalize stage_offset ty =
   let level = get_level ty in
-  if (level > !current_level) && (level <> generic_level) then begin
+  if (level > get_current_level ()) && (level <> generic_level) then begin
     set_level ty generic_level;
     (* recur into abbrev for the speed *)
     begin match get_desc ty with
@@ -865,9 +792,9 @@ let generalize ty =
 let rec generalize_structure ty =
   let level = get_level ty in
   if level <> generic_level then begin
-    if is_Tvar ty && level > !current_level then
-      set_level ty !current_level
-    else if level > !current_level then begin
+    if is_Tvar ty && level > get_current_level () then
+      set_level ty (get_current_level ())
+    else if level > get_current_level () then begin
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
           abbrev := Mnil
@@ -882,11 +809,11 @@ let generalize_structure ty =
   simple_abbrevs := Mnil;
   generalize_structure ty
 
-(* Generalize the spine of a function, if the level >= !current_level *)
+(* Generalize the spine of a function, if the level >= get_current_level () *)
 
 let rec generalize_spine ty =
   let level = get_level ty in
-  if level < !current_level || level = generic_level then () else
+  if level < get_current_level () || level = generic_level then () else
   match get_desc ty with
     Tarrow (_, ty1, ty2, _) ->
       set_level ty generic_level;
@@ -1115,7 +1042,7 @@ let lower_variables_only env level ty =
 
 let lower_contravariant env ty =
   simple_abbrevs := Mnil;
-  lower_contravariant env !nongen_level (Hashtbl.create 7) false ty
+  lower_contravariant env (get_nongen_level ()) (Hashtbl.create 7) false ty
 
 let rec generalize_class_type' gen =
   function
@@ -1151,7 +1078,7 @@ let limited_generalize ty0 ty =
     | Some parents -> parents := pty @ !parents
     | None ->
         let level = get_level ty in
-        if level > !current_level then begin
+        if level > get_current_level () then begin
           TypeHash.add graph ty (ref pty);
           (* XXX: why generic_level needs to be a root *)
           if (level = generic_level) || eq_type ty ty0 then
@@ -1169,7 +1096,7 @@ let limited_generalize ty0 ty =
         Tvariant row ->
           let more = row_more row in
           let lv = get_level more in
-          if (TypeHash.mem graph more || lv > !current_level)
+          if (TypeHash.mem graph more || lv > get_current_level ())
               && lv <> generic_level then set_level more generic_level
       | _ -> ()
     end
@@ -1179,7 +1106,7 @@ let limited_generalize ty0 ty =
   List.iter (generalize_parents ~is_root:true) !roots;
   TypeHash.iter
     (fun ty _ ->
-       if get_level ty <> generic_level then set_level ty !current_level)
+       if get_level ty <> generic_level then set_level ty (get_current_level ()))
     graph
 
 let limited_generalize_class_type rv cty =
@@ -1285,7 +1212,7 @@ let rec copy ?partial ?keep_names copy_scope ty =
         None -> assert false
       | Some (free_univars, keep) ->
           if not (is_Tpoly ty) && TypeSet.is_empty (free_univars ty) then
-            if keep then level else !current_level
+            if keep then level else get_current_level ()
           else generic_level
     in
     if forget <> generic_level then
@@ -1396,10 +1323,10 @@ let instance ?partial sch =
     copy ?partial copy_scope sch)
 
 let generic_instance sch =
-  let old = !current_level in
-  current_level := generic_level;
+  let old = get_current_level () in
+  update_current_level generic_level;
   let ty = instance sch in
-  current_level := old;
+  update_current_level old;
   ty
 
 let instance_list schl =
@@ -1559,10 +1486,10 @@ let instance_declaration decl =
   )
 
 let generic_instance_declaration decl =
-  let old = !current_level in
-  current_level := generic_level;
+  let old = get_current_level () in
+  update_current_level generic_level;
   let decl = instance_declaration decl in
-  current_level := old;
+  update_current_level old;
   decl
 
 let instance_class params cty =
@@ -1886,8 +1813,8 @@ let unify_var' = (* Forward declaration *)
 
 let subst env level priv abbrev oty params args body =
   if List.length params <> List.length args then raise Cannot_subst;
-  let old_level = !current_level in
-  current_level := level;
+  let old_level = get_current_level () in
+  update_current_level level;
   let body0 = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in          (* Stub *)
   let undo_abbrev =
     match oty with
@@ -1907,10 +1834,10 @@ let subst env level priv abbrev oty params args body =
   try
     !unify_var' uenv body0 body';
     List.iter2 (!unify_var' uenv) params' args;
-    current_level := old_level;
+    update_current_level old_level;
     body'
   with Unify _ ->
-    current_level := old_level;
+    update_current_level old_level;
     undo_abbrev ();
     raise Cannot_subst
 
@@ -1922,13 +1849,13 @@ let jkind_subst env level params args jkind =
      them. Though we should measure, this should be a nice little speedup.
      Internal ticket 5105. *)
   if List.length params <> List.length args then raise Cannot_subst;
-  let old_level = !current_level in
-  current_level := level;
+  let old_level = get_current_level () in
+  update_current_level level;
   let (params', jkind') = instance_parameterized_kind params jkind in
   let uenv = Expression {env; in_subst = true} in
   try
     List.iter2 (!unify_var' uenv) params' args;
-    current_level := old_level;
+    update_current_level old_level;
     (* CR layouts v2.8: It's plausibly worth immediately calling [Jkind.normalize
        ~mode:Require_best] on this jkind, so that if we do multiple things with it down
        the road we don't have to normalize each time. But doing so in a way that avoids
@@ -1936,7 +1863,7 @@ let jkind_subst env level params args jkind =
        Internal ticket 5106. *)
     jkind'
   with Unify _ ->
-    current_level := old_level;
+    update_current_level old_level;
     raise Cannot_subst
 
 (* CR layouts: Can we actually just always ignore jkinds in apply/subst?
@@ -1968,7 +1895,7 @@ let jkind_subst env level params args jkind =
 *)
 let apply ?(use_current_level = false) env params body args =
   simple_abbrevs := Mnil;
-  let level = if use_current_level then !current_level else generic_level in
+  let level = if use_current_level then get_current_level () else generic_level in
   try
     subst env level Public (ref Mnil) None params args body
   with
@@ -3814,10 +3741,10 @@ let rec concat_longident lid1 =
 let nondep_instance env level id ty =
   let ty = !nondep_type' env [id] ty in
   if level = generic_level then duplicate_type ty else
-  let old = !current_level in
-  current_level := level;
+  let old = get_current_level () in
+  update_current_level level;
   let ty = instance ty in
-  current_level := old;
+  update_current_level old;
   ty
 
 (* Find the type paths nl1 in the module type mty2, and add them to the
@@ -5574,8 +5501,8 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    is unimportant.  So, no need to propagate abbreviations.
 *)
 let moregeneral env inst_nongen pat_sch subj_sch =
-  let old_level = !current_level in
-  current_level := generic_level - 1;
+  let old_level = get_current_level () in
+  update_current_level (generic_level - 1);
   (*
      Generic variables are first duplicated with [instance].  So,
      their levels are lowered to [generic_level - 1].  The subject is
@@ -5584,7 +5511,7 @@ let moregeneral env inst_nongen pat_sch subj_sch =
   *)
   let subj_inst = instance subj_sch in
   let subj = duplicate_type subj_inst in
-  current_level := generic_level;
+  update_current_level generic_level;
   (* Duplicate generic variables *)
   let patt = instance pat_sch in
   Misc.try_finally
@@ -5603,10 +5530,10 @@ let moregeneral env inst_nongen pat_sch subj_sch =
             [moregen] does some unification that we need to preserve for more
             legible error messages, we have to manually perform the
             regeneralization rather than backtracking. *)
-         current_level := generic_level - 2;
+         update_current_level (generic_level - 2);
          generalize subj_inst;
          raise (Moregen (expand_to_moregen_error env trace)))
-    ~always:(fun () -> current_level := old_level)
+    ~always:(fun () -> update_current_level old_level)
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match moregeneral env inst_nongen pat_sch subj_sch with
@@ -6184,8 +6111,8 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
   let errors = match_class_sig_shape ~strict:false sign1 sign2 in
   match errors with
   | [] ->
-      let old_level = !current_level in
-      current_level := generic_level - 1;
+      let old_level = get_current_level () in
+      update_current_level (generic_level - 1);
       (*
          Generic variables are first duplicated with [instance].  So,
          their levels are lowered to [generic_level - 1].  The subject is
@@ -6194,7 +6121,7 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
       *)
       let (_, subj_inst) = instance_class [] subj_sch in
       let subj = duplicate_class_type subj_inst in
-      current_level := generic_level;
+      update_current_level generic_level;
       (* Duplicate generic variables *)
       let (_, patt) = instance_class [] pat_sch in
       let type_pairs = fresh_moregen_pairs () in
@@ -6220,11 +6147,11 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
              unification that we need to preserve for more legible error
              messages, we have to manually perform the regeneralization rather
              than backtracking. *)
-          current_level := generic_level - 2;
+          update_current_level (generic_level - 2);
           generalize_class_type subj_inst;
           res
       in
-      current_level := old_level;
+      update_current_level old_level;
       res
   | errors ->
       CM_Class_type_mismatch (env, pat_sch, subj_sch) :: errors
@@ -6434,7 +6361,7 @@ let rec build_subtype env (visited : transient_expr list)
           let cl_abbr, body = find_cltype_for_path env p in
           let ty =
             try
-              subst env !current_level Public abbrev None
+              subst env (get_current_level ()) Public abbrev None
                 cl_abbr.type_params tl body
             with Cannot_subst -> assert false in
           let ty1, tl1 =
@@ -7401,28 +7328,6 @@ let same_constr env t1 t2 =
 
 let () =
   Env.same_constr := same_constr
-
-(* For use with ocamldebug *)
-type global_state =
-  { current_level : int ref;
-    nongen_level : int ref;
-    global_level : int ref;
-  }
-
-let global_state : global_state =
-  { current_level;
-    nongen_level;
-    global_level;
-  }
-
-let print_global_state fmt global_state =
-  let print_field fmt s r = Format.fprintf fmt "%s = %d;@;" s !r in
-  let print_fields fmt { current_level; nongen_level; global_level; } =
-    print_field fmt "current_level" current_level;
-    print_field fmt "nongen_level" nongen_level;
-    print_field fmt "global_level" global_level;
-  in
-  Format.fprintf fmt "@[<1>{@;%a}@]" print_fields global_state
 
               (*******************************)
               (* checking declaration jkinds *)

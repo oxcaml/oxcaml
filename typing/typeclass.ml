@@ -685,7 +685,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
       with_attrs
         (fun () ->
            let cty =
-             Ctype.with_local_level_if_principal
+             Levels.with_local_level_if_principal
                (fun () -> Typetexp.transl_simple_type ~new_var_jkind:Any val_env
                             ~closed:false Alloc.Const.legacy styp)
                ~post:(fun cty -> Ctype.generalize_structure cty.ctyp_type)
@@ -734,7 +734,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
                            No_overriding ("instance variable", label.txt)))
            end;
            let definition =
-             Ctype.with_local_level_if_principal
+             Levels.with_local_level_if_principal
                ~post:Typecore.generalize_structure_exp
                (fun () -> Typecore.type_exp val_env sdefinition)
            in
@@ -969,7 +969,7 @@ and class_field_second_pass cl_num sign met_env field =
                 (Tarrow(arrow_desc, self_param_type, ty, commu_ok)))
            in
            let texp =
-             Ctype.with_raised_nongen_level
+             Levels.with_raised_nongen_level
                (fun () -> Typecore.type_expect met_env sdefinition meth_type) in
            let kind = Tcfk_concrete (override, texp) in
            let desc = Tcf_method(label, priv, kind) in
@@ -988,7 +988,7 @@ and class_field_second_pass cl_num sign met_env field =
                (Tarrow (arrow_desc, self_param_type, unit_type, commu_ok)))
            in
            let texp =
-             Ctype.with_raised_nongen_level
+             Levels.with_raised_nongen_level
                (fun () -> Typecore.type_expect met_env sexpr meth_type) in
            let desc = Tcf_initializer texp in
            met_env, mkcf desc loc attributes)
@@ -1235,7 +1235,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       if Typecore.has_poly_constraint spat then
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
       let (pat, pv, val_env', met_env) =
-        Ctype.with_local_level_if_principal
+        Levels.with_local_level_if_principal
           (fun () ->
             Typecore.type_class_arg_pattern cl_num val_env met_env l spat)
           ~post: begin fun (pat, _, _, _) ->
@@ -1275,7 +1275,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       let val_env' = Env.add_escape_lock Class val_env' in
       let val_env' = Env.add_share_lock Class val_env' in
       let cl =
-        Ctype.with_raised_nongen_level
+        Levels.with_raised_nongen_level
           (fun () -> class_expr cl_num val_env' met_env virt self_scope scl') in
       if not_nolabel_function cl.cl_type then begin
         match l with
@@ -1297,7 +1297,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
   | Pcl_apply (scl', sargs) ->
       assert (sargs <> []);
       let cl =
-        Ctype.with_local_level_if_principal
+        Levels.with_local_level_if_principal
           (fun () -> class_expr cl_num val_env met_env virt self_scope scl')
           ~post:(fun cl -> Ctype.generalize_class_type_structure cl.cl_type)
       in
@@ -1453,7 +1453,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                |> Subst.Lazy.force_value_description
              in
              let ty =
-               Ctype.with_local_level ~post:Ctype.generalize
+               Levels.with_local_level ~post:Ctype.generalize
                  (fun () -> Ctype.instance vd.val_type)
              in
              let expr =
@@ -1496,7 +1496,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
          }
   | Pcl_constraint (scl', scty) ->
       let cl, clty =
-        Ctype.with_local_level_for_class begin fun () ->
+        Levels.with_local_level_for_class begin fun () ->
           let cl =
             Typetexp.TyVarEnv.with_local_scope begin fun () ->
               let cl = class_expr cl_num val_env met_env virt self_scope scl' in
@@ -1637,7 +1637,7 @@ let initial_env define_class approx
 
   (* Temporary type for the class constructor *)
   let constr_type =
-    Ctype.with_local_level_if_principal (fun () -> approx cl.pci_expr)
+    Levels.with_local_level_if_principal (fun () -> approx cl.pci_expr)
       ~post:Ctype.generalize_structure
   in
   let dummy_cty = Cty_signature (Ctype.new_class_signature ()) in
@@ -1690,7 +1690,7 @@ let class_infos define_class kind
     (res, env) =
 
   let ci_params, params, coercion_locs, expr, typ, sign =
-    Ctype.with_local_level_for_class begin fun () ->
+    Levels.with_local_level_for_class begin fun () ->
       TyVarEnv.reset ();
       (* Introduce class parameters *)
       let ci_params =
@@ -2010,7 +2010,7 @@ let check_coercions env { id; id_loc; clty; ty_id; cltydef; obj_id; obj_abbr;
 (*******************************)
 
 let type_classes define_class approx kind env cls =
-  let scope = Ctype.create_scope () in
+  let scope = Levels.create_scope () in
   let cls =
     List.map
       (function cl ->
@@ -2023,7 +2023,7 @@ let type_classes define_class approx kind env cls =
       cls
   in
   let res, env =
-    Ctype.with_local_level_for_class begin fun () ->
+    Levels.with_local_level_for_class begin fun () ->
       let (res, env) =
         List.fold_left (initial_env define_class approx) ([], env) cls
       in
@@ -2048,7 +2048,7 @@ let type_classes define_class approx kind env cls =
 let class_num = ref 0
 let class_declaration env virt sexpr =
   incr class_num;
-  let self_scope = Ctype.get_current_level () in
+  let self_scope = Levels.get_current_level () in
   let expr =
     class_expr (Int.to_string !class_num) env env virt self_scope sexpr
   in
@@ -2056,7 +2056,7 @@ let class_declaration env virt sexpr =
   (expr, expr.cl_type)
 
 let class_description env virt sexpr =
-  let self_scope = Ctype.get_current_level () in
+  let self_scope = Levels.get_current_level () in
   let expr = class_type env virt self_scope sexpr in
   complete_class_type expr.cltyp_loc env virt Class_type expr.cltyp_type;
   (expr, expr.cltyp_type)
