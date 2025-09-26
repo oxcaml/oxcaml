@@ -832,9 +832,9 @@ let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
   has_mismatch params args
 
 let simplify_direct_function_call ~simplify_expr dacc apply
-    ~callee's_code_id_from_type ~callee's_code_ids_from_call_kind
-    ~callee's_function_slot ~coming_from_indirect ~result_arity ~result_types
-    ~recursive ~must_be_detupled ~closure_alloc_mode_from_type ~apply_alloc_mode
+    ~callee's_code_id_from_type ~callee's_code_id_from_call_kind
+    ~callee's_function_slot ~result_arity ~result_types ~recursive
+    ~must_be_detupled ~closure_alloc_mode_from_type ~apply_alloc_mode
     function_decl ~down_to_up =
   (match Apply.probe apply, Apply.inlined apply with
   | None, _ | Some _, Never_inlined -> ()
@@ -843,28 +843,21 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
        always be marked as [Never_inline]:@ %a"
       Apply.print apply);
-  let callee's_code_ids : _ Or_bottom.t =
-    match (callee's_code_ids_from_call_kind : _ Or_unknown.t) with
-    | Unknown -> Ok (Code_id.Set.singleton callee's_code_id_from_type)
-    | Known callee's_code_ids_from_call_kind ->
+    let coming_from_indirect = Option.is_none callee's_code_id_from_call_kind in
+    let callee's_code_id : _ Or_bottom.t =
+    match callee's_code_id_from_call_kind with
+    | None -> Ok callee's_code_id_from_type
+    | Some callee's_code_id_from_call_kind ->
       let typing_env = DA.typing_env dacc in
-      Code_age_relation.meet_set
+      Code_age_relation.meet
         (TE.code_age_relation typing_env)
         ~resolver:(TE.code_age_relation_resolver typing_env)
-        callee's_code_ids_from_call_kind
-        (Code_id.Set.singleton callee's_code_id_from_type)
+        callee's_code_id_from_call_kind callee's_code_id_from_type
   in
-  match callee's_code_ids with
+  match callee's_code_id with
   | Bottom ->
     replace_apply_by_invalid dacc ~down_to_up (Closure_type_was_invalid apply)
-  | Ok callee's_code_ids ->
-    let callee's_code_id =
-      (* XXX: go to indirect_known_arity if there are multiple code ids even
-         with the types. *)
-      match Code_id.Set.get_singleton callee's_code_ids with
-      | Some callee's_code_id -> callee's_code_id
-      | None -> callee's_code_id_from_type
-    in
+  | Ok callee's_code_id ->
     let call_kind =
       Call_kind.direct_function_call callee's_code_id apply_alloc_mode
     in
@@ -1122,16 +1115,10 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
           closure_alloc_mode_from_type,
           _closures_entry,
           func_decl_type ) ->
-      let callee's_code_ids_from_call_kind : _ Or_unknown.t =
+      let callee's_code_id_from_call_kind =
         match call with
-        | Direct code_id -> Known (Code_id.Set.singleton code_id)
-        | Indirect_known_arity code_ids -> code_ids
-        | Indirect_unknown_arity -> Unknown
-      in
-      let coming_from_indirect =
-        match call with
-        | Direct _ -> true
-        | Indirect_known_arity _ | Indirect_unknown_arity -> false
+        | Direct code_id -> Some code_id
+        | Indirect_known_arity _ | Indirect_unknown_arity -> None
       in
       let callee's_code_id_from_type = T.Function_type.code_id func_decl_type in
       let callee's_code_or_metadata =
@@ -1144,8 +1131,8 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
         call_must_be_detupled (Code_metadata.is_tupled callee's_code_metadata)
       in
       simplify_direct_function_call ~simplify_expr dacc apply
-        ~callee's_code_id_from_type ~callee's_code_ids_from_call_kind
-        ~callee's_function_slot ~coming_from_indirect
+        ~callee's_code_id_from_type ~callee's_code_id_from_call_kind
+        ~callee's_function_slot
         ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
         ~result_types:(Code_metadata.result_types callee's_code_metadata)
         ~recursive:(Code_metadata.recursive callee's_code_metadata)
