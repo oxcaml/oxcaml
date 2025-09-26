@@ -299,10 +299,10 @@
                   None
             ]
         ]
-  structure_item (mod_contended.ml[62,2210+0]..[106,4122+3])
+  structure_item (mod_contended.ml[62,2210+0]..[109,4217+3])
     Pstr_module
     "M" (mod_contended.ml[62,2210+7]..[62,2210+8])
-      module_expr (mod_contended.ml[62,2210+11]..[106,4122+3])
+      module_expr (mod_contended.ml[62,2210+11]..[109,4217+3])
         Pmod_structure
         [
           structure_item (mod_contended.ml[67,2428+2]..[67,2428+36])
@@ -458,465 +458,514 @@
                 mod "contended" (mod_contended.ml[78,2805+43]..[78,2805+52])
                 mod "aliased" (mod_contended.ml[78,2805+53]..[78,2805+60])
             ]
-          structure_item (mod_contended.ml[81,2960+2]..[81,2960+41])
+          structure_item (mod_contended.ml[80,2881+2]..[80,2881+38])
             Pstr_value Nonrec
             [
               <def>
-                pattern (mod_contended.ml[81,2960+6]..[81,2960+12])
+                pattern (mod_contended.ml[80,2881+6]..[80,2881+7])
+                  Ppat_var "f" (mod_contended.ml[80,2881+6]..[80,2881+7])
+                expression (mod_contended.ml[80,2881+8]..[80,2881+38]) ghost
+                  Pexp_function
+                  [
+                    Pparam_val (mod_contended.ml[80,2881+8]..[80,2881+33])
+                      Nolabel
+                      None
+                      pattern (mod_contended.ml[80,2881+9]..[80,2881+32])
+                        Ppat_constraint
+                        pattern (mod_contended.ml[80,2881+9]..[80,2881+10])
+                          Ppat_var "x" (mod_contended.ml[80,2881+9]..[80,2881+10])
+                        mod "contended" (mod_contended.ml[80,2881+15]..[80,2881+24])
+                        mod "aliased" (mod_contended.ml[80,2881+25]..[80,2881+32])
+                  ]
+                  None
+                  Pfunction_body
+                    expression (mod_contended.ml[80,2881+36]..[80,2881+38])
+                      Pexp_constant PConst_int (42,None)
+            ]
+          structure_item (mod_contended.ml[81,2920+2]..[81,2920+54])
+            Pstr_value Nonrec
+            [
+              <def>
+                pattern (mod_contended.ml[81,2920+6]..[81,2920+7])
+                  Ppat_var "f" (mod_contended.ml[81,2920+6]..[81,2920+7])
+                expression (mod_contended.ml[81,2920+8]..[81,2920+54]) ghost
+                  Pexp_function
+                  [
+                    Pparam_val (mod_contended.ml[81,2920+8]..[81,2920+49])
+                      Nolabel
+                      None
+                      pattern (mod_contended.ml[81,2920+9]..[81,2920+48])
+                        Ppat_constraint
+                        pattern (mod_contended.ml[81,2920+9]..[81,2920+10])
+                          Ppat_var "x" (mod_contended.ml[81,2920+9]..[81,2920+10])
+                        mode "once" (mod_contended.ml[81,2920+13]..[81,2920+17])
+                        mode "portable" (mod_contended.ml[81,2920+18]..[81,2920+26])
+                        mod "contended" (mod_contended.ml[81,2920+31]..[81,2920+40])
+                        mod "aliased" (mod_contended.ml[81,2920+41]..[81,2920+48])
+                  ]
+                  None
+                  Pfunction_body
+                    expression (mod_contended.ml[81,2920+52]..[81,2920+54])
+                      Pexp_constant PConst_int (42,None)
+            ]
+          structure_item (mod_contended.ml[84,3055+2]..[84,3055+41])
+            Pstr_value Nonrec
+            [
+              <def>
+                pattern (mod_contended.ml[84,3055+6]..[84,3055+12])
                   Ppat_tuple
  Closed
                   [
                     None
-                    pattern (mod_contended.ml[81,2960+7]..[81,2960+8])
-                      Ppat_var "x" (mod_contended.ml[81,2960+7]..[81,2960+8])
+                    pattern (mod_contended.ml[84,3055+7]..[84,3055+8])
+                      Ppat_var "x" (mod_contended.ml[84,3055+7]..[84,3055+8])
                     None
-                    pattern (mod_contended.ml[81,2960+10]..[81,2960+11])
-                      Ppat_var "y" (mod_contended.ml[81,2960+10]..[81,2960+11])
+                    pattern (mod_contended.ml[84,3055+10]..[84,3055+11])
+                      Ppat_var "y" (mod_contended.ml[84,3055+10]..[84,3055+11])
                   ]
-                expression (mod_contended.ml[81,2960+37]..[81,2960+41])
+                expression (mod_contended.ml[84,3055+37]..[84,3055+41])
                   Pexp_tuple
                   [
                     None
-                    expression (mod_contended.ml[81,2960+37]..[81,2960+38])
+                    expression (mod_contended.ml[84,3055+37]..[84,3055+38])
                       Pexp_constant PConst_int (4,None)
                     None
-                    expression (mod_contended.ml[81,2960+40]..[81,2960+41])
+                    expression (mod_contended.ml[84,3055+40]..[84,3055+41])
                       Pexp_constant PConst_int (2,None)
                   ]
-                mod "contended" (mod_contended.ml[81,2960+17]..[81,2960+26])
-                mod "aliased" (mod_contended.ml[81,2960+27]..[81,2960+34])
+                mod "contended" (mod_contended.ml[84,3055+17]..[84,3055+26])
+                mod "aliased" (mod_contended.ml[84,3055+27]..[84,3055+34])
             ]
-          structure_item (mod_contended.ml[82,3002+2]..[82,3002+55])
+          structure_item (mod_contended.ml[85,3097+2]..[85,3097+55])
             Pstr_value Nonrec
             [
               <def>
-                pattern (mod_contended.ml[82,3002+6]..[82,3002+12])
+                pattern (mod_contended.ml[85,3097+6]..[85,3097+12])
                   Ppat_tuple
  Closed
                   [
                     None
-                    pattern (mod_contended.ml[82,3002+7]..[82,3002+8])
-                      Ppat_var "x" (mod_contended.ml[82,3002+7]..[82,3002+8])
+                    pattern (mod_contended.ml[85,3097+7]..[85,3097+8])
+                      Ppat_var "x" (mod_contended.ml[85,3097+7]..[85,3097+8])
                     None
-                    pattern (mod_contended.ml[82,3002+10]..[82,3002+11])
-                      Ppat_var "y" (mod_contended.ml[82,3002+10]..[82,3002+11])
+                    pattern (mod_contended.ml[85,3097+10]..[85,3097+11])
+                      Ppat_var "y" (mod_contended.ml[85,3097+10]..[85,3097+11])
                   ]
-                core_type (mod_contended.ml[82,3002+16]..[82,3002+25])
+                core_type (mod_contended.ml[85,3097+16]..[85,3097+25])
                   Ptyp_tuple
                   [
                     None
-                    core_type (mod_contended.ml[82,3002+16]..[82,3002+19])
-                      Ptyp_constr "int" (mod_contended.ml[82,3002+16]..[82,3002+19])
+                    core_type (mod_contended.ml[85,3097+16]..[85,3097+19])
+                      Ptyp_constr "int" (mod_contended.ml[85,3097+16]..[85,3097+19])
                       []
                     None
-                    core_type (mod_contended.ml[82,3002+22]..[82,3002+25])
-                      Ptyp_constr "int" (mod_contended.ml[82,3002+22]..[82,3002+25])
+                    core_type (mod_contended.ml[85,3097+22]..[85,3097+25])
+                      Ptyp_constr "int" (mod_contended.ml[85,3097+22]..[85,3097+25])
                       []
                   ]
-                expression (mod_contended.ml[82,3002+51]..[82,3002+55])
+                expression (mod_contended.ml[85,3097+51]..[85,3097+55])
                   Pexp_tuple
                   [
                     None
-                    expression (mod_contended.ml[82,3002+51]..[82,3002+52])
+                    expression (mod_contended.ml[85,3097+51]..[85,3097+52])
                       Pexp_constant PConst_int (4,None)
                     None
-                    expression (mod_contended.ml[82,3002+54]..[82,3002+55])
+                    expression (mod_contended.ml[85,3097+54]..[85,3097+55])
                       Pexp_constant PConst_int (2,None)
                   ]
-                mod "contended" (mod_contended.ml[82,3002+31]..[82,3002+40])
-                mod "aliased" (mod_contended.ml[82,3002+41]..[82,3002+48])
+                mod "contended" (mod_contended.ml[85,3097+31]..[85,3097+40])
+                mod "aliased" (mod_contended.ml[85,3097+41]..[85,3097+48])
             ]
-          structure_item (mod_contended.ml[83,3058+2]..[83,3058+71])
+          structure_item (mod_contended.ml[86,3153+2]..[86,3153+71])
             Pstr_value Nonrec
             [
               <def>
-                pattern (mod_contended.ml[83,3058+6]..[83,3058+12])
+                pattern (mod_contended.ml[86,3153+6]..[86,3153+12])
                   Ppat_tuple
  Closed
                   [
                     None
-                    pattern (mod_contended.ml[83,3058+7]..[83,3058+8])
-                      Ppat_var "x" (mod_contended.ml[83,3058+7]..[83,3058+8])
+                    pattern (mod_contended.ml[86,3153+7]..[86,3153+8])
+                      Ppat_var "x" (mod_contended.ml[86,3153+7]..[86,3153+8])
                     None
-                    pattern (mod_contended.ml[83,3058+10]..[83,3058+11])
-                      Ppat_var "y" (mod_contended.ml[83,3058+10]..[83,3058+11])
+                    pattern (mod_contended.ml[86,3153+10]..[86,3153+11])
+                      Ppat_var "y" (mod_contended.ml[86,3153+10]..[86,3153+11])
                   ]
-                core_type (mod_contended.ml[83,3058+16]..[83,3058+25])
+                core_type (mod_contended.ml[86,3153+16]..[86,3153+25])
                   Ptyp_tuple
                   [
                     None
-                    core_type (mod_contended.ml[83,3058+16]..[83,3058+19])
-                      Ptyp_constr "int" (mod_contended.ml[83,3058+16]..[83,3058+19])
+                    core_type (mod_contended.ml[86,3153+16]..[86,3153+19])
+                      Ptyp_constr "int" (mod_contended.ml[86,3153+16]..[86,3153+19])
                       []
                     None
-                    core_type (mod_contended.ml[83,3058+22]..[83,3058+25])
-                      Ptyp_constr "int" (mod_contended.ml[83,3058+22]..[83,3058+25])
+                    core_type (mod_contended.ml[86,3153+22]..[86,3153+25])
+                      Ptyp_constr "int" (mod_contended.ml[86,3153+22]..[86,3153+25])
                       []
                   ]
-                expression (mod_contended.ml[83,3058+67]..[83,3058+71])
+                expression (mod_contended.ml[86,3153+67]..[86,3153+71])
                   Pexp_tuple
                   [
                     None
-                    expression (mod_contended.ml[83,3058+67]..[83,3058+68])
+                    expression (mod_contended.ml[86,3153+67]..[86,3153+68])
                       Pexp_constant PConst_int (4,None)
                     None
-                    expression (mod_contended.ml[83,3058+70]..[83,3058+71])
+                    expression (mod_contended.ml[86,3153+70]..[86,3153+71])
                       Pexp_constant PConst_int (2,None)
                   ]
-                mode "once" (mod_contended.ml[83,3058+29]..[83,3058+33])
-                mode "portable" (mod_contended.ml[83,3058+34]..[83,3058+42])
-                mod "contended" (mod_contended.ml[83,3058+47]..[83,3058+56])
-                mod "aliased" (mod_contended.ml[83,3058+57]..[83,3058+64])
+                mode "once" (mod_contended.ml[86,3153+29]..[86,3153+33])
+                mode "portable" (mod_contended.ml[86,3153+34]..[86,3153+42])
+                mod "contended" (mod_contended.ml[86,3153+47]..[86,3153+56])
+                mod "aliased" (mod_contended.ml[86,3153+57]..[86,3153+64])
             ]
-          structure_item (mod_contended.ml[85,3131+2]..[85,3131+72])
+          structure_item (mod_contended.ml[88,3226+2]..[88,3226+72])
             Pstr_value Nonrec
             [
               <def>
-                pattern (mod_contended.ml[85,3131+6]..[85,3131+59]) ghost
+                pattern (mod_contended.ml[88,3226+6]..[88,3226+59]) ghost
                   Ppat_constraint
-                  pattern (mod_contended.ml[85,3131+6]..[85,3131+9])
-                    Ppat_var "foo" (mod_contended.ml[85,3131+6]..[85,3131+9])
-                  core_type (mod_contended.ml[85,3131+20]..[85,3131+21]) ghost
+                  pattern (mod_contended.ml[88,3226+6]..[88,3226+9])
+                    Ppat_var "foo" (mod_contended.ml[88,3226+6]..[88,3226+9])
+                  core_type (mod_contended.ml[88,3226+20]..[88,3226+21]) ghost
                     Ptyp_poly
                     [
                       var: a
                     ]
-                    core_type (mod_contended.ml[85,3131+20]..[85,3131+21])
+                    core_type (mod_contended.ml[88,3226+20]..[88,3226+21])
                       Ptyp_var a
-                expression (mod_contended.ml[85,3131+6]..[85,3131+72])
+                expression (mod_contended.ml[88,3226+6]..[88,3226+72])
                   Pexp_newtype "a"
-                  expression (mod_contended.ml[85,3131+6]..[85,3131+72])
+                  expression (mod_contended.ml[88,3226+6]..[88,3226+72])
                     Pexp_constraint
-                    expression (mod_contended.ml[85,3131+62]..[85,3131+72])
+                    expression (mod_contended.ml[88,3226+62]..[88,3226+72])
                       Pexp_function
                       [
-                        Pparam_val (mod_contended.ml[85,3131+66]..[85,3131+67])
+                        Pparam_val (mod_contended.ml[88,3226+66]..[88,3226+67])
                           Nolabel
                           None
-                          pattern (mod_contended.ml[85,3131+66]..[85,3131+67])
-                            Ppat_var "x" (mod_contended.ml[85,3131+66]..[85,3131+67])
+                          pattern (mod_contended.ml[88,3226+66]..[88,3226+67])
+                            Ppat_var "x" (mod_contended.ml[88,3226+66]..[88,3226+67])
                       ]
                       None
                       Pfunction_body
-                        expression (mod_contended.ml[85,3131+71]..[85,3131+72])
-                          Pexp_ident "x" (mod_contended.ml[85,3131+71]..[85,3131+72])
-                    core_type (mod_contended.ml[85,3131+20]..[85,3131+21])
-                      Ptyp_constr "a" (mod_contended.ml[85,3131+20]..[85,3131+21])
+                        expression (mod_contended.ml[88,3226+71]..[88,3226+72])
+                          Pexp_ident "x" (mod_contended.ml[88,3226+71]..[88,3226+72])
+                    core_type (mod_contended.ml[88,3226+20]..[88,3226+21])
+                      Ptyp_constr "a" (mod_contended.ml[88,3226+20]..[88,3226+21])
                       []
-                mode "once" (mod_contended.ml[85,3131+24]..[85,3131+28])
-                mode "portable" (mod_contended.ml[85,3131+29]..[85,3131+37])
-                mod "contended" (mod_contended.ml[85,3131+42]..[85,3131+51])
-                mod "aliased" (mod_contended.ml[85,3131+52]..[85,3131+59])
+                mode "once" (mod_contended.ml[88,3226+24]..[88,3226+28])
+                mode "portable" (mod_contended.ml[88,3226+29]..[88,3226+37])
+                mod "contended" (mod_contended.ml[88,3226+42]..[88,3226+51])
+                mod "aliased" (mod_contended.ml[88,3226+52]..[88,3226+59])
             ]
-          structure_item (mod_contended.ml[86,3204+2]..[86,3204+79])
+          structure_item (mod_contended.ml[89,3299+2]..[89,3299+79])
             Pstr_value Nonrec
             [
               <def>
-                pattern (mod_contended.ml[86,3204+6]..[86,3204+66]) ghost
+                pattern (mod_contended.ml[89,3299+6]..[89,3299+66]) ghost
                   Ppat_constraint
-                  pattern (mod_contended.ml[86,3204+6]..[86,3204+9])
-                    Ppat_var "foo" (mod_contended.ml[86,3204+6]..[86,3204+9])
-                  core_type (mod_contended.ml[86,3204+20]..[86,3204+28]) ghost
+                  pattern (mod_contended.ml[89,3299+6]..[89,3299+9])
+                    Ppat_var "foo" (mod_contended.ml[89,3299+6]..[89,3299+9])
+                  core_type (mod_contended.ml[89,3299+20]..[89,3299+28]) ghost
                     Ptyp_poly
                     [
                       var: a
                     ]
-                    core_type (mod_contended.ml[86,3204+21]..[86,3204+27])
+                    core_type (mod_contended.ml[89,3299+21]..[89,3299+27])
                       Ptyp_arrow
                       Nolabel
-                      core_type (mod_contended.ml[86,3204+21]..[86,3204+22])
+                      core_type (mod_contended.ml[89,3299+21]..[89,3299+22])
                         Ptyp_var a
-                      core_type (mod_contended.ml[86,3204+26]..[86,3204+27])
+                      core_type (mod_contended.ml[89,3299+26]..[89,3299+27])
                         Ptyp_var a
-                expression (mod_contended.ml[86,3204+6]..[86,3204+79])
+                expression (mod_contended.ml[89,3299+6]..[89,3299+79])
                   Pexp_newtype "a"
-                  expression (mod_contended.ml[86,3204+6]..[86,3204+79])
+                  expression (mod_contended.ml[89,3299+6]..[89,3299+79])
                     Pexp_constraint
-                    expression (mod_contended.ml[86,3204+69]..[86,3204+79])
+                    expression (mod_contended.ml[89,3299+69]..[89,3299+79])
                       Pexp_function
                       [
-                        Pparam_val (mod_contended.ml[86,3204+73]..[86,3204+74])
+                        Pparam_val (mod_contended.ml[89,3299+73]..[89,3299+74])
                           Nolabel
                           None
-                          pattern (mod_contended.ml[86,3204+73]..[86,3204+74])
-                            Ppat_var "x" (mod_contended.ml[86,3204+73]..[86,3204+74])
+                          pattern (mod_contended.ml[89,3299+73]..[89,3299+74])
+                            Ppat_var "x" (mod_contended.ml[89,3299+73]..[89,3299+74])
                       ]
                       None
                       Pfunction_body
-                        expression (mod_contended.ml[86,3204+78]..[86,3204+79])
-                          Pexp_ident "x" (mod_contended.ml[86,3204+78]..[86,3204+79])
-                    core_type (mod_contended.ml[86,3204+21]..[86,3204+27])
+                        expression (mod_contended.ml[89,3299+78]..[89,3299+79])
+                          Pexp_ident "x" (mod_contended.ml[89,3299+78]..[89,3299+79])
+                    core_type (mod_contended.ml[89,3299+21]..[89,3299+27])
                       Ptyp_arrow
                       Nolabel
-                      core_type (mod_contended.ml[86,3204+21]..[86,3204+22])
-                        Ptyp_constr "a" (mod_contended.ml[86,3204+21]..[86,3204+22])
+                      core_type (mod_contended.ml[89,3299+21]..[89,3299+22])
+                        Ptyp_constr "a" (mod_contended.ml[89,3299+21]..[89,3299+22])
                         []
-                      core_type (mod_contended.ml[86,3204+26]..[86,3204+27])
-                        Ptyp_constr "a" (mod_contended.ml[86,3204+26]..[86,3204+27])
+                      core_type (mod_contended.ml[89,3299+26]..[89,3299+27])
+                        Ptyp_constr "a" (mod_contended.ml[89,3299+26]..[89,3299+27])
                         []
-                mode "once" (mod_contended.ml[86,3204+31]..[86,3204+35])
-                mode "portable" (mod_contended.ml[86,3204+36]..[86,3204+44])
-                mod "contended" (mod_contended.ml[86,3204+49]..[86,3204+58])
-                mod "aliased" (mod_contended.ml[86,3204+59]..[86,3204+66])
+                mode "once" (mod_contended.ml[89,3299+31]..[89,3299+35])
+                mode "portable" (mod_contended.ml[89,3299+36]..[89,3299+44])
+                mod "contended" (mod_contended.ml[89,3299+49]..[89,3299+58])
+                mod "aliased" (mod_contended.ml[89,3299+59]..[89,3299+66])
             ]
-          structure_item (mod_contended.ml[92,3522+2]..[92,3522+40])
+          structure_item (mod_contended.ml[95,3617+2]..[95,3617+40])
             Pstr_value Nonrec
             [
               <def>
-                pattern (mod_contended.ml[92,3522+7]..[92,3522+8])
-                  Ppat_var "f" (mod_contended.ml[92,3522+7]..[92,3522+8])
-                expression (mod_contended.ml[92,3522+32]..[92,3522+40]) ghost
+                pattern (mod_contended.ml[95,3617+7]..[95,3617+8])
+                  Ppat_var "f" (mod_contended.ml[95,3617+7]..[95,3617+8])
+                expression (mod_contended.ml[95,3617+32]..[95,3617+40]) ghost
                   Pexp_function
                   [
-                    Pparam_val (mod_contended.ml[92,3522+32]..[92,3522+33])
+                    Pparam_val (mod_contended.ml[95,3617+32]..[95,3617+33])
                       Nolabel
                       None
-                      pattern (mod_contended.ml[92,3522+32]..[92,3522+33])
-                        Ppat_var "a" (mod_contended.ml[92,3522+32]..[92,3522+33])
-                    Pparam_val (mod_contended.ml[92,3522+34]..[92,3522+35])
+                      pattern (mod_contended.ml[95,3617+32]..[95,3617+33])
+                        Ppat_var "a" (mod_contended.ml[95,3617+32]..[95,3617+33])
+                    Pparam_val (mod_contended.ml[95,3617+34]..[95,3617+35])
                       Nolabel
                       None
-                      pattern (mod_contended.ml[92,3522+34]..[92,3522+35])
-                        Ppat_var "b" (mod_contended.ml[92,3522+34]..[92,3522+35])
+                      pattern (mod_contended.ml[95,3617+34]..[95,3617+35])
+                        Ppat_var "b" (mod_contended.ml[95,3617+34]..[95,3617+35])
                   ]
                   None
                   Pfunction_body
-                    expression (mod_contended.ml[92,3522+38]..[92,3522+40])
+                    expression (mod_contended.ml[95,3617+38]..[95,3617+40])
                       Pexp_constant PConst_int (42,None)
-                mod "contended" (mod_contended.ml[92,3522+13]..[92,3522+22])
-                mod "aliased" (mod_contended.ml[92,3522+23]..[92,3522+30])
+                mod "contended" (mod_contended.ml[95,3617+13]..[95,3617+22])
+                mod "aliased" (mod_contended.ml[95,3617+23]..[95,3617+30])
             ]
-          structure_item (mod_contended.ml[93,3563+2]..[93,3563+56])
+          structure_item (mod_contended.ml[96,3658+2]..[96,3658+56])
             Pstr_value Nonrec
             [
               <def>
-                pattern (mod_contended.ml[93,3563+7]..[93,3563+8])
-                  Ppat_var "f" (mod_contended.ml[93,3563+7]..[93,3563+8])
-                expression (mod_contended.ml[93,3563+48]..[93,3563+56]) ghost
+                pattern (mod_contended.ml[96,3658+7]..[96,3658+8])
+                  Ppat_var "f" (mod_contended.ml[96,3658+7]..[96,3658+8])
+                expression (mod_contended.ml[96,3658+48]..[96,3658+56]) ghost
                   Pexp_function
                   [
-                    Pparam_val (mod_contended.ml[93,3563+48]..[93,3563+49])
+                    Pparam_val (mod_contended.ml[96,3658+48]..[96,3658+49])
                       Nolabel
                       None
-                      pattern (mod_contended.ml[93,3563+48]..[93,3563+49])
-                        Ppat_var "a" (mod_contended.ml[93,3563+48]..[93,3563+49])
-                    Pparam_val (mod_contended.ml[93,3563+50]..[93,3563+51])
+                      pattern (mod_contended.ml[96,3658+48]..[96,3658+49])
+                        Ppat_var "a" (mod_contended.ml[96,3658+48]..[96,3658+49])
+                    Pparam_val (mod_contended.ml[96,3658+50]..[96,3658+51])
                       Nolabel
                       None
-                      pattern (mod_contended.ml[93,3563+50]..[93,3563+51])
-                        Ppat_var "b" (mod_contended.ml[93,3563+50]..[93,3563+51])
+                      pattern (mod_contended.ml[96,3658+50]..[96,3658+51])
+                        Ppat_var "b" (mod_contended.ml[96,3658+50]..[96,3658+51])
                   ]
                   None
                   Pfunction_body
-                    expression (mod_contended.ml[93,3563+54]..[93,3563+56])
+                    expression (mod_contended.ml[96,3658+54]..[96,3658+56])
                       Pexp_constant PConst_int (42,None)
-                mode "once" (mod_contended.ml[93,3563+11]..[93,3563+15])
-                mode "portable" (mod_contended.ml[93,3563+16]..[93,3563+24])
-                mod "contended" (mod_contended.ml[93,3563+29]..[93,3563+38])
-                mod "aliased" (mod_contended.ml[93,3563+39]..[93,3563+46])
+                mode "once" (mod_contended.ml[96,3658+11]..[96,3658+15])
+                mode "portable" (mod_contended.ml[96,3658+16]..[96,3658+24])
+                mod "contended" (mod_contended.ml[96,3658+29]..[96,3658+38])
+                mod "aliased" (mod_contended.ml[96,3658+39]..[96,3658+46])
             ]
-          structure_item (mod_contended.ml[96,3641+2]..[96,3641+87])
+          structure_item (mod_contended.ml[99,3736+2]..[99,3736+87])
             Pstr_value Nonrec
             [
               <def>
-                pattern (mod_contended.ml[96,3641+6]..[96,3641+9])
-                  Ppat_var "foo" (mod_contended.ml[96,3641+6]..[96,3641+9])
-                expression (mod_contended.ml[96,3641+12]..[96,3641+87])
+                pattern (mod_contended.ml[99,3736+6]..[99,3736+9])
+                  Ppat_var "foo" (mod_contended.ml[99,3736+6]..[99,3736+9])
+                expression (mod_contended.ml[99,3736+12]..[99,3736+87])
                   Pexp_apply
-                  expression (mod_contended.ml[96,3641+45]..[96,3641+46])
-                    Pexp_ident "+" (mod_contended.ml[96,3641+45]..[96,3641+46])
+                  expression (mod_contended.ml[99,3736+45]..[99,3736+46])
+                    Pexp_ident "+" (mod_contended.ml[99,3736+45]..[99,3736+46])
                   [
                     <arg>
                     Nolabel
-                      expression (mod_contended.ml[96,3641+12]..[96,3641+44]) ghost
+                      expression (mod_contended.ml[99,3736+12]..[99,3736+44]) ghost
                         Pexp_constraint
-                        expression (mod_contended.ml[96,3641+13]..[96,3641+15])
+                        expression (mod_contended.ml[99,3736+13]..[99,3736+15])
                           Pexp_constant PConst_int (42,None)
-                        core_type (mod_contended.ml[96,3641+18]..[96,3641+21])
-                          Ptyp_constr "int" (mod_contended.ml[96,3641+18]..[96,3641+21])
+                        core_type (mod_contended.ml[99,3736+18]..[99,3736+21])
+                          Ptyp_constr "int" (mod_contended.ml[99,3736+18]..[99,3736+21])
                           []
-                        mod "contended" (mod_contended.ml[96,3641+26]..[96,3641+35])
-                        mod "aliased" (mod_contended.ml[96,3641+36]..[96,3641+43])
+                        mod "contended" (mod_contended.ml[99,3736+26]..[99,3736+35])
+                        mod "aliased" (mod_contended.ml[99,3736+36]..[99,3736+43])
                     <arg>
                     Nolabel
-                      expression (mod_contended.ml[96,3641+47]..[96,3641+87]) ghost
+                      expression (mod_contended.ml[99,3736+47]..[99,3736+87]) ghost
                         Pexp_constraint
-                        expression (mod_contended.ml[96,3641+48]..[96,3641+50])
+                        expression (mod_contended.ml[99,3736+48]..[99,3736+50])
                           Pexp_constant PConst_int (42,None)
-                        core_type (mod_contended.ml[96,3641+53]..[96,3641+56])
-                          Ptyp_constr "int" (mod_contended.ml[96,3641+53]..[96,3641+56])
+                        core_type (mod_contended.ml[99,3736+53]..[99,3736+56])
+                          Ptyp_constr "int" (mod_contended.ml[99,3736+53]..[99,3736+56])
                           []
-                        mode "once" (mod_contended.ml[96,3641+59]..[96,3641+63])
-                        mode "portable" (mod_contended.ml[96,3641+64]..[96,3641+72])
-                        mod "contended" (mod_contended.ml[96,3641+77]..[96,3641+86])
+                        mode "once" (mod_contended.ml[99,3736+59]..[99,3736+63])
+                        mode "portable" (mod_contended.ml[99,3736+64]..[99,3736+72])
+                        mod "contended" (mod_contended.ml[99,3736+77]..[99,3736+86])
                   ]
             ]
-          structure_item (mod_contended.ml[97,3729+2]..[97,3729+83])
+          structure_item (mod_contended.ml[100,3824+2]..[100,3824+83])
             Pstr_value Nonrec
             [
               <def>
-                pattern (mod_contended.ml[97,3729+6]..[97,3729+9])
-                  Ppat_var "foo" (mod_contended.ml[97,3729+6]..[97,3729+9])
-                expression (mod_contended.ml[97,3729+12]..[97,3729+83])
+                pattern (mod_contended.ml[100,3824+6]..[100,3824+9])
+                  Ppat_var "foo" (mod_contended.ml[100,3824+6]..[100,3824+9])
+                expression (mod_contended.ml[100,3824+12]..[100,3824+83])
                   Pexp_apply
-                  expression (mod_contended.ml[97,3729+43]..[97,3729+44])
-                    Pexp_ident "+" (mod_contended.ml[97,3729+43]..[97,3729+44])
+                  expression (mod_contended.ml[100,3824+43]..[100,3824+44])
+                    Pexp_ident "+" (mod_contended.ml[100,3824+43]..[100,3824+44])
                   [
                     <arg>
                     Nolabel
-                      expression (mod_contended.ml[97,3729+12]..[97,3729+42]) ghost
+                      expression (mod_contended.ml[100,3824+12]..[100,3824+42]) ghost
                         Pexp_constraint
-                        expression (mod_contended.ml[97,3729+13]..[97,3729+15])
+                        expression (mod_contended.ml[100,3824+13]..[100,3824+15])
                           Pexp_constant PConst_int (42,None)
-                        core_type (mod_contended.ml[97,3729+18]..[97,3729+19])
+                        core_type (mod_contended.ml[100,3824+18]..[100,3824+19])
                           Ptyp_any
-                        mod "contended" (mod_contended.ml[97,3729+24]..[97,3729+33])
-                        mod "aliased" (mod_contended.ml[97,3729+34]..[97,3729+41])
+                        mod "contended" (mod_contended.ml[100,3824+24]..[100,3824+33])
+                        mod "aliased" (mod_contended.ml[100,3824+34]..[100,3824+41])
                     <arg>
                     Nolabel
-                      expression (mod_contended.ml[97,3729+45]..[97,3729+83]) ghost
+                      expression (mod_contended.ml[100,3824+45]..[100,3824+83]) ghost
                         Pexp_constraint
-                        expression (mod_contended.ml[97,3729+46]..[97,3729+48])
+                        expression (mod_contended.ml[100,3824+46]..[100,3824+48])
                           Pexp_constant PConst_int (42,None)
-                        core_type (mod_contended.ml[97,3729+51]..[97,3729+52])
+                        core_type (mod_contended.ml[100,3824+51]..[100,3824+52])
                           Ptyp_any
-                        mode "once" (mod_contended.ml[97,3729+55]..[97,3729+59])
-                        mode "portable" (mod_contended.ml[97,3729+60]..[97,3729+68])
-                        mod "contended" (mod_contended.ml[97,3729+73]..[97,3729+82])
+                        mode "once" (mod_contended.ml[100,3824+55]..[100,3824+59])
+                        mode "portable" (mod_contended.ml[100,3824+60]..[100,3824+68])
+                        mod "contended" (mod_contended.ml[100,3824+73]..[100,3824+82])
                   ]
             ]
         ]
-  structure_item (mod_contended.ml[109,4179+0]..[118,4522+4])
+  structure_item (mod_contended.ml[112,4274+0]..[121,4617+4])
     Pstr_value Nonrec
     [
       <def>
-        pattern (mod_contended.ml[109,4179+4]..[109,4179+5])
-          Ppat_var "f" (mod_contended.ml[109,4179+4]..[109,4179+5])
-        expression (mod_contended.ml[109,4179+6]..[118,4522+4]) ghost
+        pattern (mod_contended.ml[112,4274+4]..[112,4274+5])
+          Ppat_var "f" (mod_contended.ml[112,4274+4]..[112,4274+5])
+        expression (mod_contended.ml[112,4274+6]..[121,4617+4]) ghost
           Pexp_function
           [
-            Pparam_val (mod_contended.ml[109,4179+6]..[109,4179+8])
+            Pparam_val (mod_contended.ml[112,4274+6]..[112,4274+8])
               Nolabel
               None
-              pattern (mod_contended.ml[109,4179+6]..[109,4179+8])
-                Ppat_construct "()" (mod_contended.ml[109,4179+6]..[109,4179+8])
+              pattern (mod_contended.ml[112,4274+6]..[112,4274+8])
+                Ppat_construct "()" (mod_contended.ml[112,4274+6]..[112,4274+8])
                 None
           ]
           None
           Pfunction_body
-            expression (mod_contended.ml[110,4190+2]..[118,4522+4])
+            expression (mod_contended.ml[113,4285+2]..[121,4617+4])
               Pexp_let Immutable Nonrec
               [
                 <def>
-                  pattern (mod_contended.ml[110,4190+6]..[110,4190+7])
-                    Ppat_var "v" (mod_contended.ml[110,4190+6]..[110,4190+7])
-                  expression (mod_contended.ml[110,4190+32]..[110,4190+34])
+                  pattern (mod_contended.ml[113,4285+6]..[113,4285+7])
+                    Ppat_var "v" (mod_contended.ml[113,4285+6]..[113,4285+7])
+                  expression (mod_contended.ml[113,4285+32]..[113,4285+34])
                     Pexp_constant PConst_int (42,None)
-                  mod "contended" (mod_contended.ml[110,4190+12]..[110,4190+21])
-                  mod "aliased" (mod_contended.ml[110,4190+22]..[110,4190+29])
+                  mod "contended" (mod_contended.ml[113,4285+12]..[113,4285+21])
+                  mod "aliased" (mod_contended.ml[113,4285+22]..[113,4285+29])
               ]
-              expression (mod_contended.ml[111,4228+2]..[118,4522+4])
+              expression (mod_contended.ml[114,4323+2]..[121,4617+4])
                 Pexp_let Immutable Nonrec
                 [
                   <def>
-                    pattern (mod_contended.ml[111,4228+6]..[111,4228+7])
-                      Ppat_var "v" (mod_contended.ml[111,4228+6]..[111,4228+7])
-                    core_type (mod_contended.ml[111,4228+10]..[111,4228+13])
-                      Ptyp_constr "int" (mod_contended.ml[111,4228+10]..[111,4228+13])
+                    pattern (mod_contended.ml[114,4323+6]..[114,4323+7])
+                      Ppat_var "v" (mod_contended.ml[114,4323+6]..[114,4323+7])
+                    core_type (mod_contended.ml[114,4323+10]..[114,4323+13])
+                      Ptyp_constr "int" (mod_contended.ml[114,4323+10]..[114,4323+13])
                       []
-                    expression (mod_contended.ml[111,4228+38]..[111,4228+40])
+                    expression (mod_contended.ml[114,4323+38]..[114,4323+40])
                       Pexp_constant PConst_int (42,None)
-                    mod "contended" (mod_contended.ml[111,4228+18]..[111,4228+27])
-                    mod "aliased" (mod_contended.ml[111,4228+28]..[111,4228+35])
+                    mod "contended" (mod_contended.ml[114,4323+18]..[114,4323+27])
+                    mod "aliased" (mod_contended.ml[114,4323+28]..[114,4323+35])
                 ]
-                expression (mod_contended.ml[112,4272+2]..[118,4522+4])
+                expression (mod_contended.ml[115,4367+2]..[121,4617+4])
                   Pexp_let Immutable Nonrec
                   [
                     <def>
-                      pattern (mod_contended.ml[112,4272+6]..[112,4272+7])
-                        Ppat_var "v" (mod_contended.ml[112,4272+6]..[112,4272+7])
-                      core_type (mod_contended.ml[112,4272+11]..[112,4272+21])
+                      pattern (mod_contended.ml[115,4367+6]..[115,4367+7])
+                        Ppat_var "v" (mod_contended.ml[115,4367+6]..[115,4367+7])
+                      core_type (mod_contended.ml[115,4367+11]..[115,4367+21])
                         Ptyp_arrow
                         Nolabel
-                        core_type (mod_contended.ml[112,4272+11]..[112,4272+14])
-                          Ptyp_constr "int" (mod_contended.ml[112,4272+11]..[112,4272+14])
+                        core_type (mod_contended.ml[115,4367+11]..[115,4367+14])
+                          Ptyp_constr "int" (mod_contended.ml[115,4367+11]..[115,4367+14])
                           []
-                        core_type (mod_contended.ml[112,4272+18]..[112,4272+21])
-                          Ptyp_constr "int" (mod_contended.ml[112,4272+18]..[112,4272+21])
+                        core_type (mod_contended.ml[115,4367+18]..[115,4367+21])
+                          Ptyp_constr "int" (mod_contended.ml[115,4367+18]..[115,4367+21])
                           []
-                      expression (mod_contended.ml[112,4272+47]..[112,4272+58])
+                      expression (mod_contended.ml[115,4367+47]..[115,4367+58])
                         Pexp_function
                         [
-                          Pparam_val (mod_contended.ml[112,4272+51]..[112,4272+52])
+                          Pparam_val (mod_contended.ml[115,4367+51]..[115,4367+52])
                             Nolabel
                             None
-                            pattern (mod_contended.ml[112,4272+51]..[112,4272+52])
+                            pattern (mod_contended.ml[115,4367+51]..[115,4367+52])
                               Ppat_any
                         ]
                         None
                         Pfunction_body
-                          expression (mod_contended.ml[112,4272+56]..[112,4272+58])
+                          expression (mod_contended.ml[115,4367+56]..[115,4367+58])
                             Pexp_constant PConst_int (42,None)
-                      mod "contended" (mod_contended.ml[112,4272+27]..[112,4272+36])
-                      mod "aliased" (mod_contended.ml[112,4272+37]..[112,4272+44])
+                      mod "contended" (mod_contended.ml[115,4367+27]..[115,4367+36])
+                      mod "aliased" (mod_contended.ml[115,4367+37]..[115,4367+44])
                   ]
-                  expression (mod_contended.ml[114,4335+2]..[118,4522+4])
+                  expression (mod_contended.ml[117,4430+2]..[121,4617+4])
                     Pexp_let Immutable Nonrec
                     [
                       <def>
-                        pattern (mod_contended.ml[114,4335+6]..[114,4335+7])
-                          Ppat_var "v" (mod_contended.ml[114,4335+6]..[114,4335+7])
-                        expression (mod_contended.ml[114,4335+48]..[114,4335+50])
+                        pattern (mod_contended.ml[117,4430+6]..[117,4430+7])
+                          Ppat_var "v" (mod_contended.ml[117,4430+6]..[117,4430+7])
+                        expression (mod_contended.ml[117,4430+48]..[117,4430+50])
                           Pexp_constant PConst_int (42,None)
-                        mode "once" (mod_contended.ml[114,4335+10]..[114,4335+14])
-                        mode "portable" (mod_contended.ml[114,4335+15]..[114,4335+23])
-                        mod "contended" (mod_contended.ml[114,4335+28]..[114,4335+37])
-                        mod "aliased" (mod_contended.ml[114,4335+38]..[114,4335+45])
+                        mode "once" (mod_contended.ml[117,4430+10]..[117,4430+14])
+                        mode "portable" (mod_contended.ml[117,4430+15]..[117,4430+23])
+                        mod "contended" (mod_contended.ml[117,4430+28]..[117,4430+37])
+                        mod "aliased" (mod_contended.ml[117,4430+38]..[117,4430+45])
                       <def>
-                        pattern (mod_contended.ml[115,4386+6]..[115,4386+7])
-                          Ppat_var "v" (mod_contended.ml[115,4386+6]..[115,4386+7])
-                        core_type (mod_contended.ml[115,4386+10]..[115,4386+13])
-                          Ptyp_constr "int" (mod_contended.ml[115,4386+10]..[115,4386+13])
+                        pattern (mod_contended.ml[118,4481+6]..[118,4481+7])
+                          Ppat_var "v" (mod_contended.ml[118,4481+6]..[118,4481+7])
+                        core_type (mod_contended.ml[118,4481+10]..[118,4481+13])
+                          Ptyp_constr "int" (mod_contended.ml[118,4481+10]..[118,4481+13])
                           []
-                        expression (mod_contended.ml[115,4386+54]..[115,4386+56])
+                        expression (mod_contended.ml[118,4481+54]..[118,4481+56])
                           Pexp_constant PConst_int (42,None)
-                        mode "once" (mod_contended.ml[115,4386+16]..[115,4386+20])
-                        mode "portable" (mod_contended.ml[115,4386+21]..[115,4386+29])
-                        mod "contended" (mod_contended.ml[115,4386+34]..[115,4386+43])
-                        mod "aliased" (mod_contended.ml[115,4386+44]..[115,4386+51])
+                        mode "once" (mod_contended.ml[118,4481+16]..[118,4481+20])
+                        mode "portable" (mod_contended.ml[118,4481+21]..[118,4481+29])
+                        mod "contended" (mod_contended.ml[118,4481+34]..[118,4481+43])
+                        mod "aliased" (mod_contended.ml[118,4481+44]..[118,4481+51])
                       <def>
-                        pattern (mod_contended.ml[116,4443+6]..[116,4443+7])
-                          Ppat_var "v" (mod_contended.ml[116,4443+6]..[116,4443+7])
-                        core_type (mod_contended.ml[116,4443+11]..[116,4443+21])
+                        pattern (mod_contended.ml[119,4538+6]..[119,4538+7])
+                          Ppat_var "v" (mod_contended.ml[119,4538+6]..[119,4538+7])
+                        core_type (mod_contended.ml[119,4538+11]..[119,4538+21])
                           Ptyp_arrow
                           Nolabel
-                          core_type (mod_contended.ml[116,4443+11]..[116,4443+14])
-                            Ptyp_constr "int" (mod_contended.ml[116,4443+11]..[116,4443+14])
+                          core_type (mod_contended.ml[119,4538+11]..[119,4538+14])
+                            Ptyp_constr "int" (mod_contended.ml[119,4538+11]..[119,4538+14])
                             []
-                          core_type (mod_contended.ml[116,4443+18]..[116,4443+21])
-                            Ptyp_constr "int" (mod_contended.ml[116,4443+18]..[116,4443+21])
+                          core_type (mod_contended.ml[119,4538+18]..[119,4538+21])
+                            Ptyp_constr "int" (mod_contended.ml[119,4538+18]..[119,4538+21])
                             []
-                        expression (mod_contended.ml[116,4443+63]..[116,4443+74])
+                        expression (mod_contended.ml[119,4538+63]..[119,4538+74])
                           Pexp_function
                           [
-                            Pparam_val (mod_contended.ml[116,4443+67]..[116,4443+68])
+                            Pparam_val (mod_contended.ml[119,4538+67]..[119,4538+68])
                               Nolabel
                               None
-                              pattern (mod_contended.ml[116,4443+67]..[116,4443+68])
+                              pattern (mod_contended.ml[119,4538+67]..[119,4538+68])
                                 Ppat_any
                           ]
                           None
                           Pfunction_body
-                            expression (mod_contended.ml[116,4443+72]..[116,4443+74])
+                            expression (mod_contended.ml[119,4538+72]..[119,4538+74])
                               Pexp_constant PConst_int (42,None)
-                        mode "once" (mod_contended.ml[116,4443+25]..[116,4443+29])
-                        mode "portable" (mod_contended.ml[116,4443+30]..[116,4443+38])
-                        mod "contended" (mod_contended.ml[116,4443+43]..[116,4443+52])
-                        mod "aliased" (mod_contended.ml[116,4443+53]..[116,4443+60])
+                        mode "once" (mod_contended.ml[119,4538+25]..[119,4538+29])
+                        mode "portable" (mod_contended.ml[119,4538+30]..[119,4538+38])
+                        mod "contended" (mod_contended.ml[119,4538+43]..[119,4538+52])
+                        mod "aliased" (mod_contended.ml[119,4538+53]..[119,4538+60])
                     ]
-                    expression (mod_contended.ml[118,4522+2]..[118,4522+4])
-                      Pexp_construct "()" (mod_contended.ml[118,4522+2]..[118,4522+4])
+                    expression (mod_contended.ml[121,4617+2]..[121,4617+4])
+                      Pexp_construct "()" (mod_contended.ml[121,4617+2]..[121,4617+4])
                       None
     ]
 ]
-

@@ -77,6 +77,9 @@ module M = struct
   let v : int @ once portable mod contended aliased = 42
   let v : (int -> int) @ once portable mod contended aliased = fun _ -> 42
 
+  let f (x mod contended aliased) = 42
+  let f (x @ once portable mod contended aliased) = 42
+
   (* these modalities are attached to the [let] itself, not to the pattern. *)
   let (x, y) mod contended aliased = 4, 2
   let (x, y) : (int * int) mod contended aliased = 4, 2
