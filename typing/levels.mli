@@ -1,3 +1,17 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                  Andrej Ivaskovic, Jane Street, London                 *)
+(*                                                                        *)
+(*   Copyright 2025 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* All the following wrapper functions revert to the original level,
    even in case of exception. *)
 val with_local_level : ?post:('a -> unit) -> (unit -> 'a) -> 'a
@@ -57,6 +71,7 @@ val get_global_level : unit -> int
 val get_nongen_level : unit -> int
 
 val update_current_level : int -> unit
+(* This function is only meant to be used inside Ctype *)
 
 (* For use with ocamldebug *)
 type global_state
