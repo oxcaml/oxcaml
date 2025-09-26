@@ -835,8 +835,7 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
   in
   let do_unary_intrinsic op_name = do_unary_intrinsic_extra_args op_name [] in
   let do_gep ~negate_arg =
-    let base_ptr = load_reg_to_temp t i.arg.(0) in
-    fail_if_not "int_op.do_gep" (T.is_ptr (V.get_type base_ptr));
+    let base_ptr = load_reg_to_temp t ~typ:T.val_ptr i.arg.(0) in
     let offset =
       match imm with
       | None ->
