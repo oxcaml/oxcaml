@@ -1106,7 +1106,8 @@ let limited_generalize ty0 ty =
   List.iter (generalize_parents ~is_root:true) !roots;
   TypeHash.iter
     (fun ty _ ->
-       if get_level ty <> generic_level then set_level ty (get_current_level ()))
+       if get_level ty <> generic_level then
+         set_level ty (get_current_level ()))
     graph
 
 let limited_generalize_class_type rv cty =
@@ -1895,7 +1896,9 @@ let jkind_subst env level params args jkind =
 *)
 let apply ?(use_current_level = false) env params body args =
   simple_abbrevs := Mnil;
-  let level = if use_current_level then get_current_level () else generic_level in
+  let level = if use_current_level
+    then get_current_level ()
+    else generic_level in
   try
     subst env level Public (ref Mnil) None params args body
   with
