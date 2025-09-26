@@ -247,7 +247,7 @@ effects that will be handled in its parent stack. See [the OCaml Manual entry
 for effect handlers](https://ocaml.org/manual/5.3/effects.html).
 
 Yielding has different defaults depending on the locality axis: *global* values are
-defaulted to *yielding*, while *local* values are defaulted to *unyielding*.
+defaulted to *unyielding*, while *local* values are defaulted to *yielding*.
 More documentation on mode implications is available [here](../../kinds/syntax).
 
 
