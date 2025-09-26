@@ -69,7 +69,9 @@ let create_archive file_list lib_name =
       let pos_toc = pos_out outchan in
       output_value outchan toc;
       seek_out outchan ofs_pos_toc;
-      output_binary_int outchan pos_toc)
+      output_binary_int outchan pos_toc);
+  Jscompile.run_jsoo_exn
+    ~args:[ "compile"; "-o"; lib_name ^ ".js"; lib_name  ]
 
 open Format
 module Style = Misc.Style

@@ -1,0 +1,4 @@
+(tests
+ (names suffix extension)
+ (libraries)
+ (modes js wasm))

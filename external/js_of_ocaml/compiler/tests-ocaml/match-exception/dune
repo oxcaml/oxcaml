@@ -1,0 +1,11 @@
+(tests
+ (names
+  allocation
+  exception_propagation
+  identifier_sharing
+  match_failure
+  nested_handlers
+  raise_from_success_continuation
+  streams
+  tail_calls)
+ (modes js wasm))

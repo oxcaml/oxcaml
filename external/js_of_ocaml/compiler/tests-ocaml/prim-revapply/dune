@@ -1,0 +1,4 @@
+(tests
+ (names apply revapply)
+ (libraries)
+ (modes js wasm))
