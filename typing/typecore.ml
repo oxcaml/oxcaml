@@ -26,6 +26,7 @@ open Mode
 open Typedtree
 open Btype
 open Ctype
+open Levels
 
 type comprehension_type =
   | List_comprehension
