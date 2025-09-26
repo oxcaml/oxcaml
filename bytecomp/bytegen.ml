@@ -301,6 +301,7 @@ let comp_primitive stack_info p sz args =
   | Asrint -> Kasrint
   | Offsetint n -> Koffsetint n
   | Offsetref n -> Koffsetref n
+  | Getstringchar -> Kgetstringchar
   | Getbyteschar -> Kgetbyteschar
   | Setbyteschar -> Ksetbyteschar
   | Vectlength -> Kvectlength
