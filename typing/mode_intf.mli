@@ -392,9 +392,9 @@ module type S = sig
   module Contention : sig
     module Const : sig
       type t =
-        | Contended
-        | Shared
         | Uncontended
+        | Shared
+        | Contended
 
       include Lattice with type t := t
     end
@@ -405,8 +405,8 @@ module type S = sig
   module Forkable : sig
     module Const : sig
       type t =
-        | Unforkable
         | Forkable
+        | Unforkable
 
       include Lattice with type t := t
     end
@@ -421,8 +421,8 @@ module type S = sig
   module Yielding : sig
     module Const : sig
       type t =
-        | Yielding
         | Unyielding
+        | Yielding
 
       include Lattice with type t := t
     end
@@ -456,9 +456,9 @@ module type S = sig
   module Visibility : sig
     module Const : sig
       type t =
-        | Immutable
-        | Read
         | Read_write
+        | Read
+        | Immutable
 
       include Lattice with type t := t
     end
