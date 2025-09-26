@@ -294,7 +294,14 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
   (* We may need to be careful here to look up the right thing: what happens on GADT-installed equations? *)
   match context.lookup_type p with
   | None ->
-    (* Fallback: treat unknown constructors as abstract, ignoring arguments. *)
+    (* CR jujacobs: unknown-constructor fallback
+       ----------------------------------------
+       When we don't find a declaration in [context.lookup_type], we treat the
+       constructor as abstract with a conservative [value] base, ignoring
+       arguments. This avoids deep recursion and speculation about arities.
+       Longer-term, we should ensure contexts always supply enough lookup
+       information, or thread Env through places that need it, and delete this
+       fallback. *)
     let kind : JK.ckind = fun (ops : JK.ops) -> ops.const Axis_lattice_bits.value in
     JK.Ty { args = []; kind; abstract = true }
   | Some decl ->
@@ -809,6 +816,16 @@ let identity_lookup_from_arity_map (arity : int Path.Map.t) (p : Path.t)
 
 let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
     ~(body : Types.type_expr) : JK.poly * JK.poly list =
+  (* CR jujacobs: identity-environment evaluation of type functions
+     --------------------------------------------------------------
+     We approximate type-function substitution for ikinds without Env by
+     evaluating the body in an "identity environment" where every constructor
+     [p] is mapped to a polynomial consisting solely of its own rigid atoms
+     (one base and as many coefficients as observed arity in [body]). This
+     intentionally does not recurse into other environments or unfold further
+     information; it is a local, stable interpretation suitable for
+     substitution. If/when Env is available here, we should replace this with a
+     proper evaluation against real declarations and cached constructor ikinds. *)
   let arity = max_arity_in_type Path.Map.empty body in
   let lookup p = identity_lookup_from_arity_map arity p in
   let env : JK.env = { kind_of = (fun ty -> kind_of ~context:(

@@ -168,7 +168,19 @@ struct
       | None -> (
         match env.lookup c with
         | Poly (base, coeffs) ->
-          (* Install placeholders to break cycles across cached polynomials. *)
+          (* CR jujacobs: cycle-breaker for cached polynomials
+             --------------------------------------------------
+             We install placeholder LDD variables for the base and each
+             coefficient before rehydrating the polynomial via map_rigid.
+             This prevents recursive rehydration from looping when cached
+             polynomials reference each other cyclically (common in recursive
+             type groups). Once placeholders are published to the cache, we
+             rehydrate the right-hand sides and solve LFPs to define them.
+
+             A more principled approach would construct these polynomials in a
+             strictly topologically-safe order or use an explicit fixpoint
+             builder for constructor coefficients; this hack should be replaced
+             by such a mechanism when the solver grows a dedicated interface. *)
           let base_var = Ldd.new_var () in
           let coeff_vars = List.init (List.length coeffs) (fun _ -> Ldd.new_var ()) in
           ConstrTbl.add constr_to_coeffs c (Ldd.var base_var, List.map Ldd.var coeff_vars);

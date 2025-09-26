@@ -608,11 +608,14 @@ let rec type_declaration' copy_scope s decl =
         Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
       end;
     type_ikind = (
-      (* Preserve and transform ikinds under substitution by mapping rigid
-         atoms according to the substitution. For path->path we rename the
-         atom; for path->type-function we inline the type-function's
-         polynomial in an identity environment. If no information is
-         available, leave the ikind unchanged. *)
+      (* CR jujacobs: ikind substitution without Env
+         -------------------------------------------
+         We preserve constructor ikinds through substitution by mapping their
+         rigid atoms according to [s.types]. For path->path we rename atoms; for
+         path->type-function we inline a polynomial computed in an identity
+         environment (see Ikinds.poly_of_type_function_in_identity_env). This
+         avoids needing Env at substitution time. Longer-term, we may want to
+         thread Env and/or move this logic to a dedicated normalization pass. *)
       let lookup (p : Path.t) =
         match Path.Map.find p s.types with
         | Path p' -> Some (`Path p')
