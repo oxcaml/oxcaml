@@ -615,7 +615,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pstringrefs -> binary (Ccall "caml_string_get")
     | Pbytesrefs -> binary (Ccall "caml_bytes_get")
     | Pbytessets -> ternary (Ccall "caml_bytes_set")
-    | Pstringrefu | Pbytesrefu -> binary Getbyteschar
+    | Pstringrefu -> binary Getstringchar
+    | Pbytesrefu -> binary Getbyteschar
     | Pbytessetu -> ternary Setbyteschar
     | Pstring_load_16 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_string_get16")

@@ -54,6 +54,7 @@ let primitive ppf = function
   | Lsrint -> pp_print_string ppf "lsrint"
   | Asrint -> pp_print_string ppf "asrint"
   | Intcomp cmp -> comparison ppf cmp
+  | Getstringchar -> pp_print_string ppf "getstringchar"
   | Getbyteschar -> pp_print_string ppf "getbyteschar"
   | Getvectitem -> pp_print_string ppf "getvectitem"
   | Setfield i -> fprintf ppf "setfield %d" i
