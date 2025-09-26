@@ -1,5 +1,7 @@
 (* Js_of_ocaml compiler
  * http://www.ocsigen.org/js_of_ocaml/
+ * Copyright (C) 2010 Jérôme Vouillon
+ * Laboratoire PPS - CNRS Université Paris Diderot
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -14,28 +16,6 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- *)
+*)
 
-type t = private string * int
-
-exception Bad_magic_number of string
-
-exception Bad_magic_version of t
-
-val size : int
-
-val compare : t -> t -> int
-
-val equal : t -> t -> bool
-
-val of_string : string -> t
-
-val to_string : t -> string
-
-val kind : t -> [ `Cmj | `Other of string ]
-
-val current_cmj : t
-
-val current : [ `Cmj ] -> t
-
-val from_channel_exn : in_channel -> t
+val predefined_exceptions : unit -> Code.program * Unit_info.t

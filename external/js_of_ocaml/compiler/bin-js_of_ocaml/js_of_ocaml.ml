@@ -72,37 +72,11 @@ let () =
       let backtrace = Printexc.get_backtrace () in
       Format.eprintf
         "%s: You found a bug. Please report it at \
-         https://github.com/ocsigen/js_of_ocaml/issues :@."
+         https://github.com/oxcaml/oxcaml/issues :@."
         Sys.argv.(0);
       Format.eprintf "Error: %s@." (Printexc.to_string exc);
       prerr_string backtrace;
       exit Cmdliner.Cmd.Exit.internal_error
-  | Magic_number.Bad_magic_number s ->
-      Format.eprintf "%s: Error: Not an recognized file format@." Sys.argv.(0);
-      Format.eprintf "%s: Error: Invalid magic number %S@." Sys.argv.(0) s;
-      exit 1
-  | Magic_number.Bad_magic_version h ->
-      Format.eprintf "%s: Error: Magic number version mismatch.@." Sys.argv.(0);
-      let k =
-        match Magic_number.kind h with
-        | `Cmj as x -> x
-        | `Other _ -> assert false
-      in
-      let comp =
-        if Magic_number.compare h (Magic_number.current k) < 0
-        then "an older"
-        else "a newer"
-      in
-      Format.eprintf
-        "%s: Error: Your JSIR file and the js_of_ocaml compiler have to be compiled for \
-         the same version of ocaml.@."
-        Sys.argv.(0);
-      Format.eprintf
-        "%s: Error: Its seems that your ocaml bytecode has been compiled with %s version \
-         of ocaml.@."
-        Sys.argv.(0)
-        comp;
-      exit 1
   | Failure s ->
       let backtrace = Printexc.get_backtrace () in
       Format.eprintf "%s: Error: %s@." Sys.argv.(0) s;

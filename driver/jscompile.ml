@@ -78,7 +78,7 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
              flambda_result.flambda
            |> print_if i.ppf_dump Clflags.dump_jsir
                 (fun ppf (jsir : Flambda2_to_jsir.To_jsir_result.program) ->
-                  Jsoo_imports.Code.Print.program ppf
+                  Jsoo_imports.Jsir.Print.program ppf
                     (fun _ _ -> "")
                     jsir.program)
          in
@@ -87,30 +87,37 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
 let emit_jsir i
     ({ program; imported_compilation_units } :
       Flambda2_to_jsir.To_jsir_result.program) =
-  let cmj = Unit_info.cmj i.target in
-  let oc = open_out_bin (Unit_info.Artifact.filename cmj) in
-  Misc.try_finally
-    ~always:(fun () -> close_out oc)
-    ~exceptionally:(fun () ->
-      Misc.remove_file (Unit_info.Artifact.filename cmj))
-    (fun () ->
-      output_string oc Config.cmj_magic_number;
-      (* We include the highest used variable in the translation, so that Js_of_ocaml
-         can read this number and update its own state accordingly. *)
-      let cmj_body : Jsoo_imports.Code.cmj_body =
-        {
-          program;
-          last_var = Jsoo_imports.Code.Var.idx (Jsoo_imports.Code.Var.last ());
-          imported_compilation_units =
-            Compilation_unit.Set.elements imported_compilation_units;
-          exported_compilation_unit = i.module_name;
+  let jsir = Unit_info.jsir i.target in
+  let compilation_unit : Jsoo_imports.Jsir.compilation_unit =
+    let info : Jsoo_imports.Unit_info.t =
+      { provides =
+          Jsoo_imports.StringSet.singleton
+            (Compilation_unit.full_path_as_string i.module_name)
+      ; requires =
+          Compilation_unit.Set.elements imported_compilation_units
+          |> List.map Compilation_unit.full_path_as_string
+          |> Jsoo_imports.StringSet.of_list
+      ; primitives = []
+      ; aliases = []
+      ; force_link = false
+      ; effects_without_cps = false
+      }
+    in
+    { info
+    ; contents =
+        (* CR-soon jvanburen: add debug info for source maps *)
+        { code = program
+        ; cmis = Jsoo_imports.StringSet.empty
+        ; debug = Jsoo_imports.Jsir.Debug.default_summary
         }
-      in
-      output_value oc cmj_body);
+    }
+  in
+  let filename = Unit_info.Artifact.filename jsir in
+  Jsoo_imports.Jsir.save compilation_unit ~filename;
   Misc.try_finally
     ~always:(fun () ->
-      (* Clean up the intermediate .cmj file *)
-      Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmj i.target)))
+      (* Clean up the intermediate .jsir file *)
+      Misc.remove_file filename)
     (fun () ->
       let debug_flag = if !Clflags.debug then [ "--debug-info" ] else [] in
       run_jsoo_exn
@@ -118,7 +125,7 @@ let emit_jsir i
           ([
              "compile";
              "--enable=effects,with-js-error";
-             Unit_info.Artifact.filename (Unit_info.cmj i.target);
+             Unit_info.Artifact.filename (Unit_info.jsir i.target);
              "-o";
              Unit_info.Artifact.filename (Unit_info.cmjo i.target);
            ]
@@ -170,6 +177,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
   | Parsing ->
       let backend info typed =
         Compilenv.reset info.target;
+        Jsoo_imports.Targetint.set_num_bits 32;
         let as_arg_for =
           !Clflags.as_argument_for
           |> Option.map Global_module.Parameter_name.of_string

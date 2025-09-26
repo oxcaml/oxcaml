@@ -42,6 +42,8 @@ end
 module Var : sig
   type t [@@ocaml.immediate]
 
+  type state
+
   val print : Format.formatter -> t -> unit
 
   val equal : t -> t -> bool
@@ -66,9 +68,9 @@ module Var : sig
 
   val propagate_name : t -> t -> unit
 
-  val reset : unit -> unit
+  val reset : ?state:state -> unit -> unit
 
-  val set_last : min:int -> unit
+  val current_state : unit -> state
 
   module Set : Set.S with type elt = t
 
@@ -201,12 +203,6 @@ end = struct
 
   let last_var = ref 0
 
-  let reset () =
-    last_var := 0;
-    Name.reset ()
-
-  let set_last ~min = last_var := max !last_var min
-
   let print f x =
     Format.fprintf
       f
@@ -265,6 +261,28 @@ end = struct
         f i (Array.unsafe_get t i)
       done
   end
+
+  (** A table of names *)
+  type state = string option Tbl.t
+
+  let current_state () : state =
+    let state = Tbl.make () None in
+    Int.Hashtbl.iter (fun i name -> Tbl.set state i (Some name)) Name.names;
+    state
+
+  let reset ?state () =
+    match state with
+    | None ->
+      last_var := 0;
+      Name.reset ()
+    | Some (state : state) ->
+      last_var := Tbl.length state - 1;
+      Name.reset ();
+      Tbl.iter (fun var name ->
+        match name with
+        | None -> ()
+        | Some name -> Name.set_raw var name)
+        state
 
   module Hashtbl = Hashtbl.Make (T)
 

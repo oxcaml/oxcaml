@@ -50,8 +50,30 @@
  (action
   (bash "echo 'let version = \"'$(head -n1 %{deps})'\"' > %{target}")))
 
+(copy_files ../../../../lambda/runtimedef.ml)
+
+;; Next, copy the magic numbers from oxcaml:
+
 (rule
- (target runtimedef.ml)
- (deps ../../../../lambda/runtimedef.ml)
+ (target config.ml)
+ (deps config.jsoo.ml )
  (action
-  (copy %{deps} %{target})))
+  (with-stdout-to %{target} (progn
+  (cat %{deps})
+  (with-stdin-from ../../../../utils/config.common.ml (run grep -E "^(let|and) *[a-z0-9_]*_magic_number *=" )
+  )))))
+
+(rule
+ (target misc.ml)
+ (deps %{workspace_root}/utils/misc.ml)
+ (action
+  (with-stdout-to %{target}
+(with-stdin-from %{deps} (run sed -n "/^module Magic_number/,/^end/p")))))
+
+
+(rule
+ (target misc.mli)
+ (deps %{workspace_root}/utils/misc.mli)
+ (action
+  (with-stdout-to %{target}
+  (with-stdin-from %{deps} (run sed -n "/^module Magic_number/,/^end/p")))))

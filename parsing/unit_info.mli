@@ -170,7 +170,7 @@ val cmt: t -> Artifact.t
 val cmti: t -> Artifact.t
 val cms: t -> Artifact.t
 val cmsi: t -> Artifact.t
-val cmj: t -> Artifact.t
+val jsir: t -> Artifact.t
 val cmjo: t -> Artifact.t
 val cmja : t -> Artifact.t
 val cmjx : t -> Artifact.t

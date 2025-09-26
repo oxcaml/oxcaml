@@ -26,7 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open! Jsoo_imports.Import
+open! Jsoo_imports
 
 (** Result structure used during Flambda to Js_of_ocaml IR translation. *)
 

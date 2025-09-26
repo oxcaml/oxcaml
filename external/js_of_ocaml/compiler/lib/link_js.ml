@@ -258,12 +258,12 @@ let link
       files
       ~init:(StringSet.empty, StringSet.empty, StringSet.empty)
       ~f:(fun (_file, _lr, (build_info, units)) acc ->
-        let cmo_or_cmj_file =
+        let is_cmjo =
           match build_info with
           | Some bi -> (
               match Build_info.kind bi with
-              | `Cmo | `Cmj | `Cmja -> true
-              | `Cma | `Exe | `Runtime | `Unknown -> false)
+              | `Cmjo -> true
+              | `Cmja | `Runtime | `Unknown -> false)
           | None -> false
         in
         List.fold_right
@@ -274,7 +274,7 @@ let link
             if
               (not (Config.Flag.auto_link ()))
               || mklib
-              || cmo_or_cmj_file
+              || is_cmjo
               || linkall
               || info.force_link
               || not (StringSet.is_empty (StringSet.inter requires info.provides))
@@ -322,7 +322,7 @@ let link
         | Some bi -> (
             match Build_info.kind bi with
             | `Runtime -> Some bi
-            | `Cmj | `Cmja | `Cma | `Exe | `Cmo | `Unknown -> None)
+            | `Cmjo | `Cmja | `Unknown -> None)
         | None -> None
       in
       let sm_for_file = ref None in
@@ -348,7 +348,7 @@ let link
                 skip ic;
                 if not !build_info_emitted
                 then (
-                  let bi = Build_info.with_kind bi (if mklib then `Cma else `Unknown) in
+                  let bi = Build_info.with_kind bi (if mklib then `Cmja else `Unknown) in
                   Line_writer.write oc Global_constant.header;
                   Line_writer.write_lines oc (Build_info.to_string bi);
                   build_info_emitted := true)

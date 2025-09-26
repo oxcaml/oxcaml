@@ -26,7 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open! Jsoo_imports.Import
+open! Jsoo_imports
 
 let static_const_not_supported const =
   Misc.fatal_errorf "The static_const %a is not yet supported."

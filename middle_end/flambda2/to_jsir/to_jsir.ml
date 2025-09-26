@@ -27,7 +27,7 @@
  ******************************************************************************)
 
 open! Flambda.Import
-open! Jsoo_imports.Import
+open! Jsoo_imports
 
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)

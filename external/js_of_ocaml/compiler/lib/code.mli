@@ -40,6 +40,8 @@ end
 module Var : sig
   type t [@@ocaml.immediate]
 
+  type state
+
   val print : Format.formatter -> t -> unit
 
   val equal : t -> t -> bool
@@ -64,10 +66,9 @@ module Var : sig
 
   val propagate_name : t -> t -> unit
 
-  val reset : unit -> unit
+  val reset : ?state:state -> unit -> unit
 
-  val set_last : min:int -> unit
-  (** increase the last variable to at least [min] *)
+  val current_state : unit -> state
 
   module Set : Set.S with type elt = t
 

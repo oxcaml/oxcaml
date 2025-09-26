@@ -26,7 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open! Jsoo_imports.Import
+open! Jsoo_imports
 
 let bind_expr_to_var' ~env ~res fvar expr =
   let jvar = Jsir.Var.fresh () in
@@ -39,14 +39,26 @@ let bind_expr_to_var ~env ~res fvar expr =
   env, res
 
 let target_ocaml_int_to_jsir_const targetint : Jsir.constant =
-  let repr =
-    Target_ocaml_int.to_targetint Thirty_two_no_gc_tag_bit targetint
-    |> Targetint_32_64.repr
+  let check_size ~received =
+    let expected = Targetint.num_bits () in
+    if received <> expected
+    then
+      Misc.fatal_errorf
+        "BUG: JSIR expected %d-bit integers from flambda, but got a %d-bit int from flambda"
+        expected
+        received
   in
   let targetint =
-    match repr with
-    | Int32 int32 -> Targetint.of_int32 int32
-    | Int64 int64 -> Targetint.of_int64 int64
+    match Target_ocaml_int.repr targetint with
+    | Int31 i ->
+      check_size ~received:31;
+      Targetint.of_int32_exn i
+    | Int32 i ->
+      check_size ~received:32;
+      Targetint.of_int32_exn i
+    | Int63 (_ : int64) ->
+      check_size ~received:63;
+      assert false
   in
   Int targetint
 
@@ -81,12 +93,12 @@ let reg_width_const const : Jsir.constant =
     (* Int8.t values are already sign-extended when created, so we can use
        directly *)
     let value = Numeric_types.Int8.to_int int8 in
-    Int (Targetint.of_int value)
+    Int (Targetint.of_int_exn value)
   | Naked_int16 int16 ->
     (* Int16.t values are already sign-extended when created, so we can use
        directly *)
     let value = Numeric_types.Int16.to_int int16 in
-    Int (Targetint.of_int value)
+    Int (Targetint.of_int_exn value)
   | Null -> Jsir.Null
   | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ ->
     (* SIMD not supported *)

@@ -1,12 +1,11 @@
 (include_subdirs no)
 
+(copy_files# %{workspace_root}/external/js_of_ocaml/compiler/lib/{jsir,code,reserved,parse_info,targetint,debug,timer,unit_info}.{ml,mli})
+
 (library
  (name jsoo_imports)
  (wrapped true)
  (instrumentation (backend bisect_ppx))
- (flags
-  (:standard))
- (ocamlopt_flags
-  (:standard -O3))
+ (flags (:standard -no-principal -w -4-44-45))
  (libraries
   ocamlcommon))

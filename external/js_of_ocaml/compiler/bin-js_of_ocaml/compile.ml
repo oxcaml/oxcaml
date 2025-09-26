@@ -199,8 +199,8 @@ let run
   if times () then Format.eprintf "  parsing js: %a@." Timer.print t1;
   if times () then Format.eprintf "Start parsing...@.";
   let need_debug = Option.is_some source_map || Config.Flag.debuginfo () in
-  let check_debug (one : Parse_bytecode.one) =
-    if Option.is_some source_map && Parse_bytecode.Debug.is_empty one.debug
+  let check_debug (one : Jsir.one) =
+    if Option.is_some source_map && Jsir.Debug.is_empty one.debug
     then
       warn
         "Warning: '--source-map' is enabled but the program was compiled with no \
@@ -209,7 +209,7 @@ let run
   in
   let pseudo_fs_instr prim debug cmis =
     let paths =
-      include_dirs @ StringSet.elements (Parse_bytecode.Debug.paths debug ~units:cmis)
+      include_dirs @ StringSet.elements (Jsir.Debug.paths debug ~units:cmis)
     in
     Pseudo_fs.f ~prim ~cmis ~files:fs_files ~paths
   in
@@ -225,7 +225,7 @@ let run
           ])
   in
   let output
-      (one : Parse_bytecode.one)
+      (one : Jsir.one)
       ~check_sourcemap
       ~standalone
       ~(source_map : Source_map.Encoding_spec.t option)
@@ -288,7 +288,7 @@ let run
     sm
   in
   let output_partial
-      ({ name = _; info = uinfo; contents } : Parse_bytecode.compilation_unit)
+      ({ info = uinfo; contents } : Jsir.compilation_unit)
       ~standalone
       ~source_map
       ((_, fmt) as output_file) =
@@ -313,9 +313,9 @@ let run
     Pretty_print.string fmt "\n";
     Pretty_print.string fmt (Unit_info.to_string uinfo);
     let code =
-      { Parse_bytecode.code = Code.empty
+      { Jsir.code = Code.empty
       ; cmis = StringSet.empty
-      ; debug = Parse_bytecode.Debug.default_summary ()
+      ; debug = Jsir.Debug.default_summary
       }
     in
     output
@@ -340,10 +340,10 @@ let run
       in
       let primitives = StringSet.elements primitives in
       assert (List.length primitives > 0);
-      let code, uinfo = Parse_bytecode.predefined_exceptions () in
+      let code, uinfo = Predefined_exceptions.predefined_exceptions () in
       let uinfo = Unit_info.union uinfo (Unit_info.of_primitives ~aliases primitives) in
-      let code : Parse_bytecode.one =
-        { code; cmis = StringSet.empty; debug = Parse_bytecode.Debug.default_summary () }
+      let code : Jsir.one =
+        { code; cmis = StringSet.empty; debug = Jsir.Debug.default_summary }
       in
       output_gen
         ~standalone:true
@@ -363,80 +363,28 @@ let run
             output_file
           |> sourcemap_of_info ~base:source_map_base)
   | `Filename filename -> (
-      match
-        Parse_bytecode.load
+      let jsir =
+        Jsir.load
           ~filename
           ~include_dirs
           ~include_cmis
           ~debug:need_debug
-      with
-      | `Cmj cmj ->
-          output_gen
-            ~standalone:false
-            ~custom_header
-            ~build_info:(Build_info.create `Cmj)
-            ~source_map
-            (fst output_file)
-            (fun ~standalone ~source_map output ->
-              if include_runtime
-              then
-                let sm1 = output_partial_runtime ~standalone ~source_map output in
-                let sm2 = output_partial cmj ~standalone ~source_map output in
-                sourcemap_of_infos ~base:source_map_base [ sm1; sm2 ]
-              else
-                output_partial cmj ~standalone ~source_map output
-                |> sourcemap_of_info ~base:source_map_base)
-      | `Cmja units ->
-          if keep_unit_names
-          then (
-            let output_dir =
-              match output_file with
-              | `Stdout, false -> Filename.current_dir_name
-              | `Name x, false -> Filename.dirname x
-              | `Name x, true when String.ends_with x ~suffix:"/" -> x
-              | `Stdout, true | `Name _, true ->
-                  failwith "use [-o dirname/] or remove [--keep-unit-names]"
-            in
-            if include_runtime
-            then
-              output_gen
-                ~standalone:false
-                ~custom_header
-                ~build_info:(Build_info.create `Runtime)
-                ~source_map
-                (`Name (Filename.concat output_dir "runtime.js"))
-                (fun ~standalone ~source_map output ->
-                  output_partial_runtime ~standalone ~source_map output
-                  |> sourcemap_of_info ~base:source_map_base);
-            List.iter units ~f:(fun (cmj : Parse_bytecode.compilation_unit) ->
-                output_gen
-                  ~standalone:false
-                  ~custom_header
-                  ~build_info:(Build_info.create `Cmja)
-                  ~source_map
-                  (`Name (Filename.concat output_dir (cmj.name ^ ".js")))
-                  (fun ~standalone ~source_map output ->
-                    output_partial ~standalone ~source_map cmj output
-                    |> sourcemap_of_info ~base:source_map_base)))
-          else
-            output_gen
-              ~standalone:false
-              ~custom_header
-              ~build_info:(Build_info.create `Cmja)
-              ~source_map
-              (fst output_file)
-              (fun ~standalone ~source_map output ->
-                let source_map_runtime =
-                  if not include_runtime
-                  then []
-                  else [ output_partial_runtime ~standalone ~source_map output ]
-                in
-                let source_map_units =
-                  List.map units ~f:(fun cmj ->
-                      output_partial cmj ~standalone ~source_map output)
-                in
-                let source_maps = source_map_runtime @ source_map_units in
-                sourcemap_of_infos ~base:source_map_base source_maps)));
+      in
+      output_gen
+        ~standalone:false
+        ~custom_header
+        ~build_info:(Build_info.create `Cmjo)
+        ~source_map
+        (fst output_file)
+        (fun ~standalone ~source_map output ->
+           if include_runtime
+           then
+             let sm1 = output_partial_runtime ~standalone ~source_map output in
+             let sm2 = output_partial jsir ~standalone ~source_map output in
+             sourcemap_of_infos ~base:source_map_base [ sm1; sm2 ]
+           else
+             output_partial jsir ~standalone ~source_map output
+             |> sourcemap_of_info ~base:source_map_base)));
   Debug.stop_profiling ()
 
 let info name =

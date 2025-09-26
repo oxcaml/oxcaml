@@ -46,23 +46,6 @@ let of_primitives ~aliases l =
   ; effects_without_cps = false
   }
 
-let of_compilation_units ~exported ~imported =
-  let provides =
-    StringSet.singleton (Compilation_unit.name_as_string exported)
-  in
-  let requires =
-    StringSet.of_list (List.map imported ~f:Compilation_unit.name_as_string)
-  in
-  let requires = StringSet.diff requires provides in
-  { provides
-  ; requires
-  ; aliases = []
-  ; primitives = []
-  (* CR-soon selee: these should be populated properly, too *)
-  ; force_link = false
-  ; effects_without_cps = false
-  }
-
 let union t1 t2 =
   let provides = StringSet.union t1.provides t2.provides in
   let requires = StringSet.union t1.requires t2.requires in
