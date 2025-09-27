@@ -413,3 +413,4 @@ ocaml/primitives.new
 
 dune.runtime_selection
 /otherlibs/dune
+*.code-workspace
