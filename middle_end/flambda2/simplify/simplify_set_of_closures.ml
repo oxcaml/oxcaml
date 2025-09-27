@@ -540,8 +540,9 @@ let simplify_function context ~outer_dacc function_slot code_id
           if should_resimplify && Flambda_features.dump_flambda () && debug ()
           then
             Format.eprintf
-              "@\n%tAfter a single simplify_set_of_closures:%t@\n%a@\n@."
-              Flambda_colours.each_file Flambda_colours.pop Code.print new_code;
+              "@\n%tAfter a single simplify_set_of_closures:%t@\n%a:@\n%a@\n@."
+              Flambda_colours.each_file Flambda_colours.pop Code_id.print
+              code_id Code.print new_code;
           if should_resimplify && count < max_function_simplify_run
           then run ~outer_dacc ~code:new_code (count + 1)
           else
@@ -780,6 +781,10 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
       (DA.denv dacc)
       (Function_slot.Lmap.bindings closure_symbols)
   in
+  let denv =
+    DE.map_specialization_cost denv
+      ~f:(Specialization_cost.add_lifted_set_of_closures set_of_closures)
+  in
   Simplify_named_result.create_have_lifted_set_of_closures
     (DA.with_denv dacc denv) bindings
     ~original_defining_expr:(Named.create_set_of_closures set_of_closures)
@@ -979,6 +984,12 @@ let simplify_lifted_set_of_closures0 dacc context ~closure_symbols
     Rebuilt_static_const.create_set_of_closures
       (DA.are_rebuilding_terms dacc)
       set_of_closures
+  in
+  let dacc =
+    DA.map_denv dacc
+      ~f:
+        (DE.map_specialization_cost
+           ~f:(Specialization_cost.add_lifted_set_of_closures set_of_closures))
   in
   set_of_closures_pattern, set_of_closures_static_const, dacc
 

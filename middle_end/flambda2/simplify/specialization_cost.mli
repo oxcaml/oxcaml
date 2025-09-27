@@ -76,3 +76,5 @@ val add_prim :
 
 (** Add a set of closure containing [~num] closures to the cost of specialization. *)
 val add_set_of_closures : Set_of_closures.t -> t -> t
+
+val add_lifted_set_of_closures : Set_of_closures.t -> t -> t

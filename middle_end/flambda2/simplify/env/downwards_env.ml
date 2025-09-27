@@ -680,7 +680,8 @@ let enter_continuation_handler lifted_params t =
   { t with
     lifted;
     defined_variables_by_scope = lifted_params :: t.defined_variables_by_scope;
-    cost_of_lifting_continuations_out_of_current_one = 0
+    cost_of_lifting_continuations_out_of_current_one = 0;
+    specialization_cost = Specialization_cost.can_specialize
   }
 
 let variables_defined_in_current_continuation t =
@@ -705,7 +706,8 @@ let must_inline t = Replay_history.must_inline t.replay_history
 let replay_history t = t.replay_history
 
 let map_specialization_cost ~f t =
-  { t with specialization_cost = f t.specialization_cost }
+  let specialization_cost = f t.specialization_cost in
+  { t with specialization_cost }
 
 let specialization_cost t = t.specialization_cost
 
@@ -724,9 +726,9 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     inlined_debuginfo = denv.inlined_debuginfo;
     disable_inlining = denv.disable_inlining;
     inlining_state = denv.inlining_state;
-    all_code = denv.all_code;
     inlining_history_tracker = denv.inlining_history_tracker;
     (* denv_for_join *)
+    all_code = denv_for_join.all_code;
     typing_env = denv_for_join.typing_env;
     at_unit_toplevel = denv_for_join.at_unit_toplevel;
     variables_defined_at_toplevel = denv_for_join.variables_defined_at_toplevel;

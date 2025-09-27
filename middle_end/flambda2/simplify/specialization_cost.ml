@@ -65,3 +65,6 @@ let add_prim ~machine_width prim t =
 
 let add_set_of_closures _soc _t =
   Cannot_specialize { reason = Contains_set_of_closures }
+
+let add_lifted_set_of_closures _soc _t =
+  Cannot_specialize { reason = Contains_set_of_closures }
