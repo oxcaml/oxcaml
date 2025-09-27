@@ -40,15 +40,19 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
   | Some _, None -> Misc.fatal_error "No argument field"
   | None, Some _ -> Misc.fatal_error "Unexpected argument field"
 
-let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
-  raw_lambda
-  |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
-        (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
-  |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
-  |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
+let compile_from_slambda i slambda ~unix ~pipeline ~as_arg_for =
+  slambda
   |> Profile.(record generate)
-   (fun (program : Lambda.program) ->
+   (fun (program : Slambda.program) ->
       Builtin_attributes.warn_unused ();
+      program
+      |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
+      |> Slambdaeval.eval
+      |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
+           (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
+      |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
+      |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
+      |> fun program ->
       let code = Simplif.simplify_lambda program.Lambda.code in
       { program with Lambda.code }
       |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.program
@@ -77,7 +81,7 @@ let compile_from_typed i typed ~unix ~pipeline ~as_arg_for =
   typed
   |> Profile.(record transl)
     (Translmod.transl_implementation i.module_name)
-  |> compile_from_raw_lambda i ~unix ~pipeline ~as_arg_for
+  |> compile_from_slambda i ~unix ~pipeline ~as_arg_for
 
 type flambda2 =
   ppf_dump:Format.formatter ->
@@ -166,7 +170,7 @@ let implementation_aux ~machine_width unix ~(flambda2 : flambda2) ~start_from
         ~main_module_block_size ~arg_block_idx
     in
     if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-    compile_from_raw_lambda info impl ~unix ~pipeline ~as_arg_for
+    compile_from_slambda info impl ~unix ~pipeline ~as_arg_for
 
 let implementation ~machine_width unix ~flambda2 ~start_from ~source_file
       ~output_prefix ~keep_symbol_tables =

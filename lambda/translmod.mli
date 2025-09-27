@@ -32,7 +32,7 @@ open Lambda
    mshinwell: PR4527 has now removed transl_store* *)
 val transl_implementation:
       Compilation_unit.t -> structure * module_coercion * module_coercion option
-        -> Lambda.program
+        -> Slambda.program
 
 val transl_toplevel_definition: structure -> lambda
 
@@ -54,7 +54,7 @@ type runtime_arg =
 val transl_instance:
       Compilation_unit.t -> runtime_args:runtime_arg list
         -> main_module_block_size:int -> arg_block_idx:int option
-        -> Lambda.program
+        -> Slambda.program
 
 val toplevel_name: Ident.t -> string
 
