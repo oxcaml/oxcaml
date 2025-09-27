@@ -184,7 +184,7 @@ Each numeric type has its own library for working with it: `float_u`,
 ## Unboxed options
 
 We now have `type 'a or_null : value_or_null`, the type of unboxed options.
-It has constructors `Null` and `This v`. See the [`or_null` document](../or-null)
+It has constructors `Null` and `This v`. See the [`or_null` document](../02-or-null)
 for more details.
 
 # Unboxed products
