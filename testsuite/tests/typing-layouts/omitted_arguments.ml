@@ -12,6 +12,8 @@
    native;
  } {
    bytecode;
+ } {
+   javascript;
  }
 *)
 

@@ -521,7 +521,7 @@ let dump_obj_by_kind filename ic obj_kind =
        let header = (input_value ic : dynheader) in
        close_in ic;
        print_cmxs_infos header;
-    | Ast_impl | Ast_intf ->
+    | Ast_impl | Ast_intf | Jsir ->
        exit_errf "The object file type %S \
                   is currently unsupported by this tool."
          (human_name_of_kind obj_kind)

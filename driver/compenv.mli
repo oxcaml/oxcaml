@@ -61,6 +61,7 @@ type deferred_action =
   | ProcessImplementation of string
   | ProcessInterface of string
   | ProcessCFile of string
+  | ProcessJavaScriptFile of string
   | ProcessOtherFile of string
   | ProcessObjects of string list
   | ProcessDLLs of string list

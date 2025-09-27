@@ -4,6 +4,8 @@
    native;
  }{
    bytecode;
+ }{
+   javascript;
  }
 *)
 

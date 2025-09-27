@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+   { native; }
+   { bytecode; }
+*)
 
 type t = Leaf of int | Branch of t * t
 

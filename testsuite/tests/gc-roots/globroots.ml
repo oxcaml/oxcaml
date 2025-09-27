@@ -1,6 +1,8 @@
 (* TEST
  modules = "globrootsprim.c";
  flags = "-alert -unsafe_multidomain";
+  { native; }
+  { bytecode; }
 *)
 
 module type GLOBREF = sig

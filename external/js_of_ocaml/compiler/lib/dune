@@ -1,0 +1,79 @@
+(library
+ (name js_of_ocaml_compiler)
+ (public_name js_of_ocaml-compiler)
+ (synopsis "Js_of_ocaml compiler library")
+ (libraries
+  menhirLib
+  sedlex
+  yojson)
+  (foreign_stubs
+    (language c)
+    (names dune_action_trace_stubs)
+    (flags -std=c11 -fPIC))
+ (flags
+  (:standard -w -7-37 -safe-string))
+ (preprocess
+  (pps ppx_optcomp_light sedlex.ppx)))
+
+(ocamllex annot_lexer)
+
+(menhir
+ (modules js_parser)
+ (flags
+  --table
+  --external-tokens
+  Js_token
+  --unused-token
+  TAnnot
+  --unused-token
+  TComment
+  --unused-token
+  TCommentLineDirective
+  --unused-token
+  T_ERROR
+  --unused-token
+  T_AT))
+
+(menhir
+ (modules annot_parser))
+
+(rule
+ (targets compiler_version.ml)
+ (deps
+  (:input-file ../../version.ml.in))
+ (action
+  (copy %{input-file} %{targets})))
+
+(rule
+ (target oxcaml_version.ml)
+ (deps ../../../../VERSION)
+ (action
+  (bash "echo 'let version = \"'$(head -n1 %{deps})'\"' > %{target}")))
+
+(copy_files ../../../../lambda/runtimedef.ml)
+
+;; Next, copy the magic numbers from oxcaml:
+
+(rule
+ (target config.ml)
+ (deps config.jsoo.ml )
+ (action
+  (with-stdout-to %{target} (progn
+  (cat %{deps})
+  (with-stdin-from ../../../../utils/config.common.ml (run grep -E "^(let|and) *[a-z0-9_]*_magic_number *=" )
+  )))))
+
+(rule
+ (target misc.ml)
+ (deps %{workspace_root}/utils/misc.ml)
+ (action
+  (with-stdout-to %{target}
+(with-stdin-from %{deps} (run sed -n "/^module Magic_number/,/^end/p")))))
+
+
+(rule
+ (target misc.mli)
+ (deps %{workspace_root}/utils/misc.mli)
+ (action
+  (with-stdout-to %{target}
+  (with-stdin-from %{deps} (run sed -n "/^module Magic_number/,/^end/p")))))

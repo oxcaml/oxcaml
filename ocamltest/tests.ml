@@ -42,7 +42,17 @@ let get_registered_tests () =
 
 let default_tests () =
   let f _test_name test acc =
-    if test.test_run_by_default then test::acc else acc in
+    if test.test_run_by_default then
+      (* Filter backend tests based on enabled backends *)
+      match test.test_name with
+      | "bytecode" ->
+          if Ocaml_backends.is_backend_enabled Bytecode then test::acc else acc
+      | "native" ->
+          if Ocaml_backends.is_backend_enabled Native then test::acc else acc
+      | "javascript" ->
+          if Ocaml_backends.is_backend_enabled Javascript then test::acc else acc
+      | _ -> test::acc
+    else acc in
   Hashtbl.fold f tests []
 
 let lookup name =

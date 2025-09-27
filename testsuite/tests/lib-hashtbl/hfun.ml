@@ -1,4 +1,10 @@
-(* TEST *)
+(* TEST
+  { native; }
+  { bytecode; }
+ (* JavaScript disabled: js_of_ocaml uses 32-bit integers internally
+    instead of OCaml's 31-bit integers, causing different hash values
+    for floats and native integers *)
+*)
 
 (* Testing the hash function Hashtbl.hash *)
 (* What is tested:

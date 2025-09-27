@@ -195,3 +195,10 @@ module Pair : sig
 end
 
 val cross_product : Set.t -> Set.t -> Pair.Set.t
+
+type repr =
+  | Int31 of int32
+  | Int32 of int32
+  | Int63 of int64
+
+val repr : t -> repr

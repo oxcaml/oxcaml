@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+{native;}
+{bytecode;}
+*)
 
 module OCaml_5 = struct
 open Gc

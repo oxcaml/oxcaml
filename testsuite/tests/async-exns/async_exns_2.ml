@@ -1,7 +1,7 @@
 (* TEST
    runtime5;
-   bytecode;
-   native;
+  { bytecode; }
+  { native; }
 *)
 
 open Effect

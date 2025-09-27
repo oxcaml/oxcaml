@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+  { native; }
+  { bytecode; }
+*)
 
 let n = 500
 let loop = 2

@@ -967,15 +967,15 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
     | true ->
       (* [close_c_call0] checks [prim_native_name] to see whether we should
          invoke the bytecode name or native name; for JavaScript compilation, we
-         should use the bytecode name unless it involves unboxed products, for
-         the following reason:
+         should use the bytecode name unless it involves unboxed products or
+         void arguments, for the following reasons:
 
-         The expected type for JS stubs with unboxed products are different from
-         bytecode C stubs and bytecode-compiled JSOO stubs. Suppose an external
-         takes an unboxed product, e.g. [#(int * int)]. In bytecode, this is
-         passed as a single argument, containing a pointer to a pair; however,
-         in JSIR, this will be passed as two arguments, in the same way as for
-         native compilation.
+         1. Unboxed products: The expected type for JS stubs with unboxed
+         products are different from bytecode C stubs and bytecode-compiled JSOO
+         stubs. Suppose an external takes an unboxed product, e.g. [#(int *
+         int)]. In bytecode, this is passed as a single argument, containing a
+         pointer to a pair; however, in JSIR, this will be passed as two
+         arguments, in the same way as for native compilation.
 
          In addition, if the return type for an external is a nested unboxed
          product such as [#(#(int * int) * int)], bytecode stubs need to return
@@ -983,6 +983,10 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
          non-nested) tuple containing the unarised arguments. Unlike the
          parameter passing case above, this is different from native code
          compilation, where multiple return values are supported to some extent.
+
+         2. Void arguments: In bytecode, void values are passed as unit/dummy
+         values, while in JSIR/native they are omitted entirely from the call.
+         This means JS stubs expecting void arguments need the native signature.
 
          Also note that [@untagged] and [@unboxed] on externals are irrelevant
          for what JS stubs should look like, since there is no tagging in JSIR
@@ -995,8 +999,18 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
         || Lambda.extern_repr_involves_unboxed_products
              (snd prim_native_repr_res)
       in
+      let has_void_args =
+        List.exists
+          (fun (_mode, repr) -> Lambda.extern_repr_involves_void repr)
+          prim_native_repr_args
+      in
+      let has_void_return =
+        Lambda.extern_repr_involves_void (snd prim_native_repr_res)
+      in
       let prim_native_name =
-        match has_unboxed_products with false -> "" | true -> prim_native_name
+        match has_unboxed_products || has_void_args || has_void_return with
+        | false -> ""
+        | true -> prim_native_name
       in
       Primitive.make ~name:prim_name ~alloc:prim_alloc ~c_builtin:prim_c_builtin
         ~effects:prim_effects ~coeffects:prim_coeffects
@@ -1752,7 +1766,8 @@ let close_exact_or_unknown_apply acc env
               Code_metadata.print meta;
           let can_erase_callee =
             Flambda_features.classic_mode ()
-            && not (Code_metadata.is_my_closure_used meta)
+            && (not (Code_metadata.is_my_closure_used meta))
+            && not !Clflags.jsir
           in
           acc, Call_kind.direct_function_call code_id mode, can_erase_callee
       | None -> acc, Call_kind.indirect_function_call_unknown_arity mode, false

@@ -34,6 +34,8 @@ val ocamlopt : string
 
 val ocamlopt_dot_opt : string
 
+val ocamlj_dot_opt : string
+
 val ocamlnat : string
 
 val cmpbyt : string

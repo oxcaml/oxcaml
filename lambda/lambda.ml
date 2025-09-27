@@ -2287,6 +2287,14 @@ let extern_repr_involves_unboxed_products extern_repr =
   | Unboxed_or_untagged_integer _ ->
     false
 
+let extern_repr_involves_void extern_repr =
+  match extern_repr with
+  | Same_as_ocaml_repr (Jkind.Sort.Const.Base Void) -> true
+  | Same_as_ocaml_repr (Base _ | Product _)
+  | Unboxed_vector _ | Unboxed_float _
+  | Unboxed_or_untagged_integer _ ->
+    false
+
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
 

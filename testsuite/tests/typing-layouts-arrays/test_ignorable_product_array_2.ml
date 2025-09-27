@@ -11,6 +11,10 @@
  {
    native;
  }
+ {
+   (* too big for JS *)
+   (* javascript; *)
+ }
 *)
 
 open Gen_product_array_helpers

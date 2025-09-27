@@ -71,6 +71,8 @@ let ocamldebug = @build_ocamldebug@
 
 let native_compiler = @native_compiler@
 
+let javascript_compiler = @javascript_compiler@
+
 let native_dynlink = @natdynlink@
 
 let shared_library_cflags = {@QS@|@sharedlib_cflags@|@QS@}

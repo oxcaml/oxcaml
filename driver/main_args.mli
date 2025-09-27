@@ -310,6 +310,9 @@ module type Jscomp_options = sig
   val _classic_inlining : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+
+  val _jslib : string -> unit
+  val _jsopt : string -> unit
 end
 
 module type Ocamldoc_options = sig

@@ -18,7 +18,73 @@
     different installable tools and (b) override default implementations
     of arguments. *)
 
-(** Command line arguments required for flambda backend.  *)
+module type Flambda2_options = sig
+  val flambda2_debug : unit -> unit
+  val no_flambda2_debug : unit -> unit
+  val flambda2_join_points : unit -> unit
+  val no_flambda2_join_points : unit -> unit
+  val flambda2_result_types_functors_only : unit -> unit
+  val flambda2_result_types_all_functions : unit -> unit
+  val no_flambda2_result_types : unit -> unit
+  val flambda2_basic_meet : unit -> unit
+  val flambda2_advanced_meet : unit -> unit
+  val flambda2_join_algorithm : string -> unit
+  val flambda2_unbox_along_intra_function_control_flow : unit -> unit
+  val no_flambda2_unbox_along_intra_function_control_flow : unit -> unit
+  val flambda2_backend_cse_at_toplevel : unit -> unit
+  val no_flambda2_backend_cse_at_toplevel : unit -> unit
+  val flambda2_cse_depth : int -> unit
+  val flambda2_join_depth : int -> unit
+  val flambda2_reaper : unit -> unit
+  val no_flambda2_reaper : unit -> unit
+  val flambda2_expert_fallback_inlining_heuristic : unit -> unit
+  val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
+  val flambda2_expert_inline_effects_in_cmm : unit -> unit
+  val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
+  val flambda2_expert_phantom_lets : unit -> unit
+  val no_flambda2_expert_phantom_lets : unit -> unit
+  val flambda2_expert_max_block_size_for_projections : int -> unit
+  val flambda2_expert_max_unboxing_depth : int -> unit
+  val flambda2_expert_can_inline_recursive_functions : unit -> unit
+  val no_flambda2_expert_can_inline_recursive_functions : unit -> unit
+  val flambda2_expert_max_function_simplify_run : int -> unit
+  val flambda2_expert_shorten_symbol_names : unit -> unit
+  val no_flambda2_expert_shorten_symbol_names : unit -> unit
+  val flambda2_expert_cont_lifting_budget : int -> unit
+  val flambda2_expert_cont_spec_budget : int -> unit
+  val flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
+  val no_flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
+  val flambda2_debug_keep_invalid_handlers : unit -> unit
+  val no_flambda2_debug_keep_invalid_handlers : unit -> unit
+  val flambda2_inline_max_depth : string -> unit
+  val flambda2_inline_max_rec_depth : string -> unit
+  val flambda2_inline_call_cost : string -> unit
+  val flambda2_inline_alloc_cost : string -> unit
+  val flambda2_inline_prim_cost : string -> unit
+  val flambda2_inline_branch_cost : string -> unit
+  val flambda2_inline_indirect_call_cost : string -> unit
+  val flambda2_inline_poly_compare_cost : string -> unit
+  val flambda2_inline_small_function_size : string -> unit
+  val flambda2_inline_large_function_size : string -> unit
+  val flambda2_inline_threshold : string -> unit
+  val flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
+  val no_flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
+  val flambda2_inlining_report_bin : unit -> unit
+  val flambda2_unicode : unit -> unit
+  val flambda2_kind_checks : unit -> unit
+  val drawfexpr : unit -> unit
+  val drawfexpr_to : string -> unit
+  val dfexpr : unit -> unit
+  val dfexpr_to : string -> unit
+  val dflexpect_to : string -> unit
+  val dslot_offsets : unit -> unit
+  val dfreshen : unit -> unit
+  val dflow : unit -> unit
+  val dsimplify : unit -> unit
+  val dreaper : unit -> unit
+end
+
+(** Command line arguments required for flambda native backend.  *)
 module type Oxcaml_options = sig
   val ocamlcfg : unit -> unit
   val no_ocamlcfg : unit -> unit
@@ -83,69 +149,9 @@ module type Oxcaml_options = sig
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
-  val flambda2_debug : unit -> unit
-  val no_flambda2_debug : unit -> unit
-  val flambda2_join_points : unit -> unit
-  val no_flambda2_join_points : unit -> unit
-  val flambda2_result_types_functors_only : unit -> unit
-  val flambda2_result_types_all_functions : unit -> unit
-  val no_flambda2_result_types : unit -> unit
-  val flambda2_basic_meet : unit -> unit
-  val flambda2_advanced_meet : unit -> unit
-  val flambda2_join_algorithm : string -> unit
-  val flambda2_unbox_along_intra_function_control_flow : unit -> unit
-  val no_flambda2_unbox_along_intra_function_control_flow : unit -> unit
-  val flambda2_backend_cse_at_toplevel : unit -> unit
-  val no_flambda2_backend_cse_at_toplevel : unit -> unit
-  val flambda2_cse_depth : int -> unit
-  val flambda2_join_depth : int -> unit
-  val flambda2_reaper : unit -> unit
-  val no_flambda2_reaper : unit -> unit
-  val flambda2_expert_fallback_inlining_heuristic : unit -> unit
-  val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
-  val flambda2_expert_inline_effects_in_cmm : unit -> unit
-  val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
-  val flambda2_expert_phantom_lets : unit -> unit
-  val no_flambda2_expert_phantom_lets : unit -> unit
-  val flambda2_expert_max_block_size_for_projections : int -> unit
-  val flambda2_expert_max_unboxing_depth : int -> unit
-  val flambda2_expert_can_inline_recursive_functions : unit -> unit
-  val no_flambda2_expert_can_inline_recursive_functions : unit -> unit
-  val flambda2_expert_max_function_simplify_run : int -> unit
-  val flambda2_expert_shorten_symbol_names : unit -> unit
-  val no_flambda2_expert_shorten_symbol_names : unit -> unit
-  val flambda2_expert_cont_lifting_budget : int -> unit
-  val flambda2_expert_cont_spec_budget : int -> unit
-  val flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
-  val no_flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
-  val flambda2_debug_keep_invalid_handlers : unit -> unit
-  val no_flambda2_debug_keep_invalid_handlers : unit -> unit
-  val flambda2_inline_max_depth : string -> unit
-  val flambda2_inline_max_rec_depth : string -> unit
-  val flambda2_inline_call_cost : string -> unit
-  val flambda2_inline_alloc_cost : string -> unit
-  val flambda2_inline_prim_cost : string -> unit
-  val flambda2_inline_branch_cost : string -> unit
-  val flambda2_inline_indirect_call_cost : string -> unit
-  val flambda2_inline_poly_compare_cost : string -> unit
-  val flambda2_inline_small_function_size : string -> unit
-  val flambda2_inline_large_function_size : string -> unit
-  val flambda2_inline_threshold : string -> unit
-  val flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
-  val no_flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
-  val flambda2_inlining_report_bin : unit -> unit
-  val flambda2_unicode : unit -> unit
-  val flambda2_kind_checks : unit -> unit
-  val drawfexpr : unit -> unit
-  val drawfexpr_to : string -> unit
-  val dfexpr : unit -> unit
-  val dfexpr_to : string -> unit
-  val dflexpect_to : string -> unit
-  val dslot_offsets : unit -> unit
-  val dfreshen : unit -> unit
-  val dflow : unit -> unit
-  val dsimplify : unit -> unit
-  val dreaper : unit -> unit
+
+  include Flambda2_options
+
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
 end
@@ -180,17 +186,25 @@ module type Opttop_options = sig
   include Debugging_options
 end
 
+(** Command line arguments required for jscomp. *)
+module type Jscomp_options = sig
+  include Main_args.Jscomp_options
+  include Flambda2_options
+end
+
 (** Transform required command-line arguments into actual arguments.
     Each tool can define its own argument implementations and
     call the right functor to actualize them into [Arg.t] list. *)
 module Make_optcomp_options (_ : Optcomp_options) : Main_args.Arg_list
 
 module Make_opttop_options (_ : Opttop_options) : Main_args.Arg_list
+module Make_jscomp_options (_ : Jscomp_options) : Main_args.Arg_list
 
 (** Default implementations of required arguments for each tool.  *)
 module Default : sig
   module Optmain : Optcomp_options
   module Opttopmain : Opttop_options
+  module Jsmain : Jscomp_options
 end
 
 (** Extra_params module provides a way to read oxcaml

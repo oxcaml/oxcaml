@@ -12,6 +12,9 @@
  {
    native;
  }
+ {
+   javascript;
+ }
 *)
 
 

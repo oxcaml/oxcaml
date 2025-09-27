@@ -1,5 +1,7 @@
 (* TEST
    modules = "mkroot_stubs.c";
+   {native;}
+   {bytecode;}
  *)
 
 type 'a box

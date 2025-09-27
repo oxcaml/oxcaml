@@ -26,7 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open! Jsoo_imports.Import
+open! Jsoo_imports
 
 (** Blocks with the continuation potentially not yet defined.
 
@@ -77,9 +77,16 @@ let add_instr_exn t instr =
   { t with current_blocks = top_current_block :: rest_current_blocks }
 
 let maybe_add_debuginfo_exn t dbg ~pos =
-  match Parse_info.t_of_debuginfo dbg ~pos with
-  | None -> t
-  | Some parse_info -> add_instr_exn t (Event parse_info)
+  if Debuginfo.is_none dbg
+  then t
+  else
+    let loc = Debuginfo.to_location dbg in
+    let parse_info =
+      match pos with
+      | `Start -> Parse_info.t_of_pos loc.loc_start
+      | `End -> Parse_info.t_of_pos loc.loc_end
+    in
+    add_instr_exn t (Event parse_info)
 
 let with_debuginfo_exn t dbg ~f =
   let t = maybe_add_debuginfo_exn t dbg ~pos:`Start in
