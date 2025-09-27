@@ -420,6 +420,9 @@ let indexing_primitives =
       (Ptagged_int_index, "");
       (Punboxed_or_untagged_integer_index Unboxed_nativeint,
        "_indexed_by_nativeint#");
+      (Punboxed_or_untagged_integer_index Untagged_int, "_indexed_by_int#");
+      (Punboxed_or_untagged_integer_index Untagged_int8, "_indexed_by_int8#");
+      (Punboxed_or_untagged_integer_index Untagged_int16, "_indexed_by_int16#");
       (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
       (Punboxed_or_untagged_integer_index Unboxed_int64, "_indexed_by_int64#");
     ]
@@ -478,6 +481,24 @@ let array_vec_primitives =
                                          mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_int32_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("untagged_int16_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Puntagged_int16_array_load_vec { size; unsafe; index_kind;
+                                          mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Puntagged_int16_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("untagged_int8_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Puntagged_int8_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Puntagged_int8_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("untagged_int_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Puntagged_int_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Puntagged_int_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_nativeint_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
          Punboxed_nativeint_array_load_vec { size; unsafe; index_kind;
@@ -496,6 +517,9 @@ let array_vec_primitives =
       (Ptagged_int_index, "");
       (Punboxed_or_untagged_integer_index Unboxed_nativeint,
        "_indexed_by_nativeint#");
+      (Punboxed_or_untagged_integer_index Untagged_int, "_indexed_by_int#");
+      (Punboxed_or_untagged_integer_index Untagged_int8, "_indexed_by_int8#");
+      (Punboxed_or_untagged_integer_index Untagged_int16, "_indexed_by_int16#");
       (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
       (Punboxed_or_untagged_integer_index Unboxed_int64, "_indexed_by_int64#");
     ]
