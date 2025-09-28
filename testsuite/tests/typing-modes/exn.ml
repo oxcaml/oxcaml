@@ -183,7 +183,9 @@ let (foo @ portable) () =
 Line 3, characters 21-22:
 3 |     | Contended r -> r := 4
                          ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let (foo @ portable) () =

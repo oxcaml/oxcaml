@@ -181,7 +181,9 @@ let foo (x @ immutable) a = x := a
 Line 1, characters 28-29:
 1 | let foo (x @ immutable) a = x := a
                                 ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (x @ immutable shared) a = x := a
@@ -189,7 +191,9 @@ let foo (x @ immutable shared) a = x := a
 Line 1, characters 35-36:
 1 | let foo (x @ immutable shared) a = x := a
                                        ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (x @ immutable uncontended) a = x := a
@@ -197,7 +201,9 @@ let foo (x @ immutable uncontended) a = x := a
 Line 1, characters 40-41:
 1 | let foo (x @ immutable uncontended) a = x := a
                                             ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" but is expected to be "read_write"
+       because it is the argument for a parameter
+       which is expected to be "read_write".
 |}]
 
 let foo (x @ read) a = x := a
@@ -205,7 +211,9 @@ let foo (x @ read) a = x := a
 Line 1, characters 23-24:
 1 | let foo (x @ read) a = x := a
                            ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (x @ read contended) a = x := a
@@ -213,7 +221,9 @@ let foo (x @ read contended) a = x := a
 Line 1, characters 33-34:
 1 | let foo (x @ read contended) a = x := a
                                      ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (x @ read uncontended) a = x := a
@@ -221,7 +231,9 @@ let foo (x @ read uncontended) a = x := a
 Line 1, characters 35-36:
 1 | let foo (x @ read uncontended) a = x := a
                                        ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" but is expected to be "read_write"
+       because it is the argument for a parameter
+       which is expected to be "read_write".
 |}]
 
 let foo (x @ read_write) a = x := a
@@ -234,7 +246,9 @@ let foo (x @ read_write contended) a = x := a
 Line 1, characters 39-40:
 1 | let foo (x @ read_write contended) a = x := a
                                            ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (x @ read_write shared) a = x := a
@@ -242,7 +256,9 @@ let foo (x @ read_write shared) a = x := a
 Line 1, characters 36-37:
 1 | let foo (x @ read_write shared) a = x := a
                                         ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (x @ immutable) = !x
@@ -250,7 +266,9 @@ let foo (x @ immutable) = !x
 Line 1, characters 27-28:
 1 | let foo (x @ immutable) = !x
                                ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 (* CR dkalinichenko: update Stdlib to reflect required visibility and contention. *)
@@ -260,7 +278,9 @@ let foo (x @ immutable shared) = !x
 Line 1, characters 34-35:
 1 | let foo (x @ immutable shared) = !x
                                       ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (x @ immutable uncontended) = !x
@@ -268,7 +288,9 @@ let foo (x @ immutable uncontended) = !x
 Line 1, characters 39-40:
 1 | let foo (x @ immutable uncontended) = !x
                                            ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" but is expected to be "read_write"
+       because it is the argument for a parameter
+       which is expected to be "read_write".
 |}]
 
 let foo (x @ read) = !x
@@ -276,7 +298,9 @@ let foo (x @ read) = !x
 Line 1, characters 22-23:
 1 | let foo (x @ read) = !x
                           ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (x @ read contended) = !x
@@ -284,7 +308,9 @@ let foo (x @ read contended) = !x
 Line 1, characters 32-33:
 1 | let foo (x @ read contended) = !x
                                     ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (x @ read uncontended) = !x
@@ -292,7 +318,9 @@ let foo (x @ read uncontended) = !x
 Line 1, characters 34-35:
 1 | let foo (x @ read uncontended) = !x
                                       ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" but is expected to be "read_write"
+       because it is the argument for a parameter
+       which is expected to be "read_write".
 |}]
 
 let foo (x @ read_write) = !x
@@ -305,7 +333,9 @@ let foo (x @ read_write contended) = !x
 Line 1, characters 38-39:
 1 | let foo (x @ read_write contended) = !x
                                           ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let foo (x @ read_write shared) = !x
@@ -313,7 +343,9 @@ let foo (x @ read_write shared) = !x
 Line 1, characters 35-36:
 1 | let foo (x @ read_write shared) = !x
                                        ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 (* API that uses the [sync_data] kind. *)
@@ -350,7 +382,9 @@ let foo (a @ read) = Atomic.set a 42
 Line 1, characters 32-33:
 1 | let foo (a @ read) = Atomic.set a 42
                                     ^
-Error: This value is "read" but is expected to be "read_write".
+Error: This value is "read" but is expected to be "read_write"
+       because it is the argument for a parameter
+       which is expected to be "read_write".
 |}]
 
 let foo (a @ read_write) = Atomic.set a 0
@@ -363,7 +397,9 @@ let foo (a @ immutable) = Atomic.set a 9
 Line 1, characters 37-38:
 1 | let foo (a @ immutable) = Atomic.set a 9
                                          ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" but is expected to be "read_write"
+       because it is the argument for a parameter
+       which is expected to be "read_write".
 |}]
 
 let foo (a @ read) = Atomic.get a
@@ -381,7 +417,9 @@ let foo (a @ immutable) = Atomic.get a
 Line 1, characters 37-38:
 1 | let foo (a @ immutable) = Atomic.get a
                                          ^
-Error: This value is "immutable" but is expected to be "read" or "read_write".
+Error: This value is "immutable" but is expected to be "read" or "read_write"
+       because it is the argument for a parameter
+       which is expected to be "read" or "read_write".
 |}]
 
 (* Closing over use of read_write gives stateful *)
@@ -421,7 +459,9 @@ let foo @ stateless =
 Line 2, characters 25-26:
 2 |     fun () -> Atomic.set a 0
                              ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "immutable" but is expected to be "read_write"
+       because it is the argument for a parameter
+       which is expected to be "read_write".
 |}]
 
 (* Closing over a stateful value also gives stateful. *)
@@ -578,7 +618,9 @@ let override : 'a @ contended -> ('a @ immutable uncontended -> 'b) -> 'b = fun 
 Line 1, characters 89-90:
 1 | let override : 'a @ contended -> ('a @ immutable uncontended -> 'b) -> 'b = fun x f -> f x
                                                                                              ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let override : 'a @ contended -> ('a @ immutable shared -> 'b) -> 'b = fun x f -> f x
@@ -586,7 +628,9 @@ let override : 'a @ contended -> ('a @ immutable shared -> 'b) -> 'b = fun x f -
 Line 1, characters 84-85:
 1 | let override : 'a @ contended -> ('a @ immutable shared -> 'b) -> 'b = fun x f -> f x
                                                                                         ^
-Error: This value is "contended" but is expected to be "shared" or "uncontended".
+Error: This value is "contended" but is expected to be "shared" or "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "shared" or "uncontended".
 |}]
 
 (* [read] => [shared]. *)
@@ -601,7 +645,9 @@ let default : 'a @ contended -> ('a @ read -> 'b) -> 'b = fun x f -> f x
 Line 1, characters 71-72:
 1 | let default : 'a @ contended -> ('a @ read -> 'b) -> 'b = fun x f -> f x
                                                                            ^
-Error: This value is "contended" but is expected to be "shared" or "uncontended".
+Error: This value is "contended" but is expected to be "shared" or "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "shared" or "uncontended".
 |}]
 
 let override : 'a @ contended -> ('a @ read uncontended -> 'b) -> 'b = fun x f -> f x
@@ -609,7 +655,9 @@ let override : 'a @ contended -> ('a @ read uncontended -> 'b) -> 'b = fun x f -
 Line 1, characters 84-85:
 1 | let override : 'a @ contended -> ('a @ read uncontended -> 'b) -> 'b = fun x f -> f x
                                                                                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let override : 'a @ contended -> ('a @ read contended -> 'b) -> 'b = fun x f -> f x
@@ -625,7 +673,9 @@ let fails : 'a @ contended -> ('a @ read_write uncontended -> 'b) -> 'b = fun x 
 Line 1, characters 87-88:
 1 | let fails : 'a @ contended -> ('a @ read_write uncontended -> 'b) -> 'b = fun x f -> f x
                                                                                            ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let fails : 'a @ contended -> ('a @ read_write shared -> 'b) -> 'b = fun x f -> f x
@@ -633,7 +683,9 @@ let fails : 'a @ contended -> ('a @ read_write shared -> 'b) -> 'b = fun x f -> 
 Line 1, characters 82-83:
 1 | let fails : 'a @ contended -> ('a @ read_write shared -> 'b) -> 'b = fun x f -> f x
                                                                                       ^
-Error: This value is "contended" but is expected to be "shared" or "uncontended".
+Error: This value is "contended" but is expected to be "shared" or "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "shared" or "uncontended".
 |}]
 
 let fails : 'a @ contended -> ('a @ read_write -> 'b) -> 'b = fun x f -> f x
@@ -641,7 +693,9 @@ let fails : 'a @ contended -> ('a @ read_write -> 'b) -> 'b = fun x f -> f x
 Line 1, characters 75-76:
 1 | let fails : 'a @ contended -> ('a @ read_write -> 'b) -> 'b = fun x f -> f x
                                                                                ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let fails : 'a @ shared -> ('a @ read_write -> 'b) -> 'b = fun x f -> f x
@@ -649,7 +703,9 @@ let fails : 'a @ shared -> ('a @ read_write -> 'b) -> 'b = fun x f -> f x
 Line 1, characters 72-73:
 1 | let fails : 'a @ shared -> ('a @ read_write -> 'b) -> 'b = fun x f -> f x
                                                                             ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 let succeeds : 'a @ contended -> ('a @ read_write contended -> 'b) -> 'b = fun x f -> f x

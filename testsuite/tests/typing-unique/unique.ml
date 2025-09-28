@@ -116,7 +116,9 @@ let f () =
 Line 3, characters 13-14:
 3 |   let g () = k @ [(fun x -> x)] in
                  ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the argument for a parameter
+       which is expected to be "many".
 |}]
 
 (* variables inside loops will be made both aliased and many *)
@@ -170,7 +172,9 @@ let f =
 Line 5, characters 14-15:
 5 |     let _ = g a in ()
                   ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
   Hint: This identifier cannot be used uniquely,
   because it was defined outside of the for-loop.
 |}]
@@ -292,7 +296,9 @@ let higher_order4 (f : unique_ 'a -> 'b) (x : 'a) = f (aliased_id x)
 Line 1, characters 54-68:
 1 | let higher_order4 (f : unique_ 'a -> 'b) (x : 'a) = f (aliased_id x)
                                                           ^^^^^^^^^^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique"
+       because it is the argument for a parameter
+       which is expected to be "unique".
 |}]
 
 let higher_order5 (unique_ x) = let f (unique_ x) = unique_ x in higher_order f x

@@ -54,7 +54,9 @@ let f : local_ _ -> _ =
 Line 2, characters 14-15:
 2 |   fun x -> f' x
                   ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 (* 2. constructor argument crosses mode at construction *)
@@ -216,7 +218,9 @@ val g : string -> string = <fun>
 Line 6, characters 6-22:
 6 |     g (local_ "world")
           ^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 (* the result of function application crosses mode *)

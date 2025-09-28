@@ -148,7 +148,9 @@ let foo (t : int option @ local) = use_global t [@nontail]
 Line 1, characters 46-47:
 1 | let foo (t : int option @ local) = use_global t [@nontail]
                                                   ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 (* ref *)
@@ -246,7 +248,9 @@ let foo (t : int ref @ contended) = use_uncontended t
 Line 1, characters 52-53:
 1 | let foo (t : int ref @ contended) = use_uncontended t
                                                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 (* list *)
@@ -369,7 +373,9 @@ let foo (t : int list @ local) = use_global t [@nontail]
 Line 1, characters 44-45:
 1 | let foo (t : int list @ local) = use_global t [@nontail]
                                                 ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]
 
 (* array *)
@@ -459,7 +465,9 @@ let foo (t : int array @ contended) = use_uncontended t
 Line 1, characters 54-55:
 1 | let foo (t : int array @ contended) = use_uncontended t
                                                           ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 (* iarray *)
@@ -580,5 +588,7 @@ let foo (t : int iarray @ local) = use_global t [@nontail]
 Line 1, characters 46-47:
 1 | let foo (t : int iarray @ local) = use_global t [@nontail]
                                                   ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the argument for a parameter
+       which is expected to be "global".
 |}]

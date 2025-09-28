@@ -599,7 +599,12 @@ tail-call. Returns [expected_mode] and [Value.lr] which are backed by the same
 mode variable. We encode extra position information in the former. We need the
 latter to the both left and right mode because of how it will be used. *)
 let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
-  let vmode , _ = Value.newvar_below (alloc_as_value marg) in
+  let marg = Mode.Alloc.disallow_left marg in
+  let vmode , _ =
+    Value.newvar_below (alloc_as_value
+      ~hint_monadic:(Parameter_to_argument Monadic)
+      ~hint_comonadic:(Parameter_to_argument Comonadic) marg)
+  in
   if partial_app then mode_default vmode, vmode
   else match funct.exp_desc, index, position_and_mode.apply_position with
   | Texp_ident (_, _, {val_kind =

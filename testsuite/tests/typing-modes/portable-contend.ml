@@ -179,14 +179,18 @@ let foo (r @ contended) = Array.set r 42 (best_bytes ())
 Line 1, characters 36-37:
 1 | let foo (r @ contended) = Array.set r 42 (best_bytes ())
                                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 let foo (r @ contended) = Array.get r 42
 [%%expect{|
 Line 1, characters 36-37:
 1 | let foo (r @ contended) = Array.get r 42
                                         ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 let foo (r @ contended) =
     match r with
@@ -205,7 +209,9 @@ let foo (r @ shared) = Array.set r 42 (best_bytes ())
 Line 1, characters 33-34:
 1 | let foo (r @ shared) = Array.set r 42 (best_bytes ())
                                      ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 (* The signature of Array.get could be generalized to expect shared rather than
@@ -217,7 +223,9 @@ let foo (r @ shared) = Array.get r 42
 Line 1, characters 33-34:
 1 | let foo (r @ shared) = Array.get r 42
                                      ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 (* Reading from a shared array is fine *)
@@ -384,7 +392,9 @@ let foo (r @ contended) = Iarray.get r 42
 Line 1, characters 37-38:
 1 | let foo (r @ contended) = Iarray.get r 42
                                          ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended"
+       because it is the argument for a parameter
+       which is expected to be "uncontended".
 |}]
 
 (* CR zqian: add portable/uncontended modality and test. *)

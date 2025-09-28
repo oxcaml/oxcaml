@@ -36,6 +36,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Captured_by_partial_application -> Adj_captured_by_partial_application
       | Crossing -> Crossing
       | Unknown_non_rigid -> Unknown_non_rigid
+      | Argument_to_parameter Monadic -> Parameter_to_argument Monadic
+      | Parameter_to_argument Comonadic -> Argument_to_parameter Comonadic
 
     let right_adjoint : type r. (allowed * r) t -> (disallowed * allowed) t =
       function
@@ -45,6 +47,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Adj_captured_by_partial_application -> Captured_by_partial_application
       | Crossing -> Crossing
       | Unknown_non_rigid -> Unknown_non_rigid
+      | Argument_to_parameter Comonadic -> Parameter_to_argument Comonadic
+      | Parameter_to_argument Monadic -> Argument_to_parameter Monadic
 
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
@@ -59,6 +63,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Argument_to_parameter Comonadic -> Argument_to_parameter Comonadic
+         | Parameter_to_argument Monadic -> Parameter_to_argument Monadic
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
         fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -69,6 +75,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Captured_by_partial_application -> Captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Argument_to_parameter Monadic -> Argument_to_parameter Monadic
+         | Parameter_to_argument Comonadic -> Parameter_to_argument Comonadic
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
         fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -82,6 +90,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Argument_to_parameter Monadic -> Argument_to_parameter Monadic
+         | Parameter_to_argument Comonadic -> Parameter_to_argument Comonadic
+         | Parameter_to_argument Monadic -> Parameter_to_argument Monadic
+         | Argument_to_parameter Comonadic -> Argument_to_parameter Comonadic
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
         fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -95,6 +107,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Argument_to_parameter Comonadic -> Argument_to_parameter Comonadic
+         | Parameter_to_argument Monadic -> Parameter_to_argument Monadic
+         | Parameter_to_argument Comonadic -> Parameter_to_argument Comonadic
+         | Argument_to_parameter Monadic -> Argument_to_parameter Monadic
     end)
   end
 
@@ -2090,6 +2106,9 @@ module Report = struct
     | Lazy -> fprintf ppf "lazy expression"
 
   let print_morph : type l r. (l * r) morph -> (formatter -> unit) option =
+    (* CR-soon zqian: Some of the morph hints don't read well. The printing of
+       morph hints need a refactor. However, before that, We will add more hints to
+       get a broader sense of how to refactor. *)
     function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
     | Unknown | Unknown_non_rigid -> None
@@ -2110,6 +2129,11 @@ module Report = struct
     | Adj_captured_by_partial_application ->
       Some (dprintf "has a partial application capturing a value")
     | Crossing -> Some (dprintf "crosses with something")
+    | Parameter_to_argument _ ->
+      Some (dprintf "is the argument for a parameter")
+    | Argument_to_parameter _ ->
+      (* never prints due to the order of type checking *)
+      Some (dprintf "is the parameter for an argument")
 
   let print_mode :
       type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
@@ -2160,7 +2184,8 @@ module Report = struct
   let is_rigid : type l r. (l * r) morph -> bool = function
     | Unknown -> true
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
-    | Adj_captured_by_partial_application ->
+    | Adj_captured_by_partial_application | Parameter_to_argument _
+    | Argument_to_parameter _ ->
       true
     | Skip | Crossing | Unknown_non_rigid -> false
 
@@ -3674,7 +3699,9 @@ let alloc_as_value_unhint m =
   let comonadic = comonadic_locality_as_regionality comonadic in
   { comonadic; monadic }
 
-let alloc_as_value m = m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint
+let alloc_as_value ?hint_monadic ?hint_comonadic m =
+  m |> Alloc.unhint |> alloc_as_value_unhint
+  |> Value.hint ?monadic:hint_monadic ?comonadic:hint_comonadic
 
 let alloc_to_value_l2r_unhint m =
   let { comonadic; monadic } = m in
