@@ -121,6 +121,58 @@ let co_sub (a:t) (b:t) : t =
   let r = a land (lnot b) in
   r lor ((r lsr 1) land lnot_lsr_1_lows)
 
+(* Individual axis constants: each axis at a specific non-bot level *)
+
+(* Areality axis: 0=Global, 1=Regional, 2=Local *)
+let global    : t = set_axis bot ~axis:0 ~level:0
+let regional  : t = set_axis bot ~axis:0 ~level:1
+let local_    : t = set_axis bot ~axis:0 ~level:2
+
+(* Linearity axis: 0=Many, 1=Once *)
+let many : t = set_axis bot ~axis:1 ~level:0
+let once : t = set_axis bot ~axis:1 ~level:1
+
+(* Uniqueness axis (monadic): 0=Aliased, 1=Unique *)
+let aliased : t = set_axis bot ~axis:2 ~level:0
+let unique  : t = set_axis bot ~axis:2 ~level:1
+
+(* Portability axis: 0=Portable, 1=Nonportable *)
+let portable    : t = set_axis bot ~axis:3 ~level:0
+let nonportable : t = set_axis bot ~axis:3 ~level:1
+
+(* Contention axis (monadic): 0=Contended, 1=Shared, 2=Uncontended *)
+let contended   : t = set_axis bot ~axis:4 ~level:0
+let shared      : t = set_axis bot ~axis:4 ~level:1
+let uncontended : t = set_axis bot ~axis:4 ~level:2
+
+(* Yielding axis: 0=Unyielding, 1=Yielding *)
+let unyielding : t = set_axis bot ~axis:5 ~level:0
+let yielding   : t = set_axis bot ~axis:5 ~level:1
+
+(* Statefulness axis: 0=Stateless, 1=Observing, 2=Stateful *)
+let stateless : t = set_axis bot ~axis:6 ~level:0
+let observing : t = set_axis bot ~axis:6 ~level:1
+let stateful  : t = set_axis bot ~axis:6 ~level:2
+
+(* Visibility axis (monadic): 0=Immutable, 1=Read, 2=Read_write *)
+let immutable  : t = set_axis bot ~axis:7 ~level:0
+let read       : t = set_axis bot ~axis:7 ~level:1
+let read_write : t = set_axis bot ~axis:7 ~level:2
+
+(* Externality axis: 0=External, 1=External64, 2=Internal *)
+let external_   : t = set_axis bot ~axis:8 ~level:0
+let external64  : t = set_axis bot ~axis:8 ~level:1
+let internal    : t = set_axis bot ~axis:8 ~level:2
+
+(* Nullability axis: 0=Non_null, 1=Maybe_null *)
+let non_null   : t = set_axis bot ~axis:9 ~level:0
+let maybe_null : t = set_axis bot ~axis:9 ~level:1
+
+(* Separability axis: 0=Non_float, 1=Separable, 2=Maybe_separable *)
+let non_float       : t = set_axis bot ~axis:10 ~level:0
+let separable       : t = set_axis bot ~axis:10 ~level:1
+let maybe_separable : t = set_axis bot ~axis:10 ~level:2
+
 (* Build a mask from a set of relevant axes. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
   let levels = Array.make num_axes 0 in

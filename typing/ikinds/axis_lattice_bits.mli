@@ -15,6 +15,58 @@ val non_bot_axes : t -> int list
 (* Build a mask from a set of relevant axes. *)
 val of_axis_set : Jkind_axis.Axis_set.t -> t
 
+(* Individual axis constants: each axis at a specific non-bot level *)
+
+(* Areality axis *)
+val global : t
+val regional : t
+val local_ : t
+
+(* Linearity axis *)
+val many : t
+val once : t
+
+(* Uniqueness axis (monadic) *)
+val aliased : t
+val unique : t
+
+(* Portability axis *)
+val portable : t
+val nonportable : t
+
+(* Contention axis (monadic) *)
+val contended : t
+val shared : t
+val uncontended : t
+
+(* Yielding axis *)
+val unyielding : t
+val yielding : t
+
+(* Statefulness axis *)
+val stateless : t
+val observing : t
+val stateful : t
+
+(* Visibility axis (monadic) *)
+val immutable : t
+val read : t
+val read_write : t
+
+(* Externality axis *)
+val external_ : t
+val external64 : t
+val internal : t
+
+(* Nullability axis *)
+val non_null : t
+val maybe_null : t
+
+(* Separability axis *)
+val non_float : t
+val separable : t
+val maybe_separable : t
+
 (* Mask that excludes the shallow axes (nullability and separability). *)
 val mask_shallow : t
 

@@ -104,10 +104,7 @@ let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
         |> List.map (fun (ty, info) ->
                let axes = Jkind.With_bounds.type_info_relevant_axes info in
                let mask = Axis_lattice_bits.of_axis_set axes in
-               let mask2 =
-                Axis_lattice_bits.mask_of_modality
-                  ~relevant_for_shallow:`Irrelevant Mode.Modality.Const.id
-              in
+               let mask2 = Axis_lattice_bits.mask_shallow in
                log ~pp:ops.pp_kind "with-bound" (fun () ->
                    let kty = ops.kind_of ty in
                    ops.modality mask2 (ops.modality mask kty)))
