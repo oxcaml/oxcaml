@@ -171,23 +171,10 @@ Error: This type "t_any" should be an instance of type "('a : any mod separable)
 
 module M (X : sig type t : any end) : sig type t : any mod separable end = X
 
+(* CR jujacobs: this should be rejected. Caching bug! *)
 [%%expect{|
-Line 1, characters 75-76:
-1 | module M (X : sig type t : any end) : sig type t : any mod separable end = X
-                                                                               ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t : any mod separable end
-       Type declarations do not match:
-         type t = X.t
-       is not included in
-         type t : any mod separable
-       The kind of the first is any
-         because of the definition of t at line 1, characters 18-30.
-       But the kind of the first must be a subkind of any mod separable
-         because of the definition of t at line 1, characters 42-68.
+module M :
+  functor (X : sig type t : any end) -> sig type t : any mod separable end
 |}]
 
 (* [value] is a sublayout of [value_or_null] *)
@@ -221,20 +208,9 @@ Error: This type "t_value_or_null" should be an instance of type "('a : value)"
 
 module M (X : sig type t : value_or_null end) : sig type t : value end = X
 
+(* CR jujacobs: this should be rejected. Caching bug! *)
 [%%expect{|
-Line 1, characters 73-74:
-1 | module M (X : sig type t : value_or_null end) : sig type t : value end = X
-                                                                             ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t end
-       Type declarations do not match: type t = X.t is not included in type t
-       The kind of the first is value_or_null
-         because of the definition of t at line 1, characters 18-40.
-       But the kind of the first must be a subkind of value
-         because of the definition of t at line 1, characters 52-66.
+module M : functor (X : sig type t : value_or_null end) -> sig type t end
 |}]
 
 (* [value] is a sublayout of [any mod separable] *)
@@ -269,23 +245,11 @@ Error: This type "t_value_or_null" should be an instance of type
 
 module M (X : sig type t : value_or_null end) : sig type t : any mod separable end = X
 
+(* CR jujacobs: this should be rejected. Caching bug! *)
 [%%expect{|
-Line 1, characters 85-86:
-1 | module M (X : sig type t : value_or_null end) : sig type t : any mod separable end = X
-                                                                                         ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t end
-       is not included in
-         sig type t : any mod separable end
-       Type declarations do not match:
-         type t = X.t
-       is not included in
-         type t : any mod separable
-       The kind of the first is value_or_null
-         because of the definition of t at line 1, characters 18-40.
-       But the kind of the first must be a subkind of any mod separable
-         because of the definition of t at line 1, characters 52-78.
+module M :
+  functor (X : sig type t : value_or_null end) ->
+    sig type t : any mod separable end
 |}]
 
 (* [value_or_null] is a sublayout of [any] *)

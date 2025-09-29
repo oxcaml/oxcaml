@@ -28,6 +28,23 @@
 let axis_sizes = [| 3; 2; 2; 2; 3; 2; 3; 3; 3; 2; 3 |]
 let num_axes = 11
 
+(* Axes in the correct order matching axis_index (NOT Jkind_axis.Axis.all).
+   This is the order used by Axis_set.create and axis_index.
+   DO NOT use Jkind_axis.Axis.all directly as it has a different order. *)
+let all_axes_correct_order : Jkind_axis.Axis.packed list =
+  let open Mode.Crossing.Axis in
+  [ Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Areality));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Linearity));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Uniqueness));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Portability));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Contention));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality);
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability);
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability) ]
+
 (* widths[i] = 2 for size-3 axes, 1 for size-2 *)
 let widths =
   Array.map
@@ -177,27 +194,11 @@ let separability_maybe_separable : t = set_axis bot ~axis:10 ~level:2
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
   let levels = Array.make num_axes 0 in
   let open Jkind_axis in
-  let set_idx_by_name (name : string) =
-    let top i = axis_sizes.(i) - 1 in
-    let idx =
-      match name with
-      | "areality" -> Some 0
-      | "linearity" -> Some 1
-      | "uniqueness" -> Some 2
-      | "portability" -> Some 3
-      | "contention" -> Some 4
-      | "yielding" -> Some 5
-      | "statefulness" -> Some 6
-      | "visibility" -> Some 7
-      | "externality" -> Some 8
-      | "nullability" -> Some 9
-      | "separability" -> Some 10
-      | _ -> None
-    in
-    match idx with None -> () | Some i -> levels.(i) <- top i
-  in
-  Axis_set.to_seq set
-  |> Seq.iter (fun (Axis.Pack ax) -> set_idx_by_name (Axis.name ax));
+  (* Iterate in the correct axis_index order, not Axis.all order *)
+  List.iteri (fun i (Axis.Pack ax) ->
+    if Axis_set.mem set ax then
+      levels.(i) <- axis_sizes.(i) - 1
+  ) all_axes_correct_order;
   encode ~levels
 
 (* IK-only: compute relevant axes of a constant modality, mirroring

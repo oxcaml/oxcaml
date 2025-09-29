@@ -1728,15 +1728,8 @@ module M : sig
 end = struct
   type t : value mod non_float
 end
-(* CR jujacobs: this should be accepted, but it's not with -ikinds. Bug! *)
 [%%expect{|
-Line 2, characters 2-36:
-2 |   type t : immediate with extensible
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod non_float
-         because of the annotation on the declaration of the type t.
-       But the kind of type "t" must be a subkind of value mod non_float
-         because of the annotation on the declaration of the type t.
+module M : sig type t : value mod non_float end
 |}]
 
 (*********************************)
@@ -1790,15 +1783,8 @@ module M : sig
 end = struct
   type t : value mod non_float
 end
-(* CR jujacobs: this should be accepted, but it's not with -ikinds. Bug! *)
 [%%expect{|
-Line 2, characters 2-36:
-2 |   type t : immediate with extensible
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod non_float
-         because of the annotation on the declaration of the type t.
-       But the kind of type "t" must be a subkind of value mod non_float
-         because of the annotation on the declaration of the type t.
+module M : sig type t : value mod non_float end
 |}]
 
 (**************************)
