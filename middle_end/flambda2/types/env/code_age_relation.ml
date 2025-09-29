@@ -63,7 +63,11 @@ let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
       let ids_to_root = all_ids_up_to_root t ~resolver id in
       not (Code_id.Set.is_empty (Code_id.Set.inter ids_to_root other_ids))
     in
-    let ids = Code_id.Set.union (Code_id.Set.filter (should_keep_id ids1) ids2) (Code_id.Set.filter (should_keep_id ids2) ids1) in
+    let ids =
+      Code_id.Set.union
+        (Code_id.Set.filter (should_keep_id ids1) ids2)
+        (Code_id.Set.filter (should_keep_id ids2) ids1)
+    in
     if Code_id.Set.is_empty ids then Bottom else Ok ids
 
 let _num_ids_up_to_root t ~resolver id =
