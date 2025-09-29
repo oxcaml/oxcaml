@@ -926,6 +926,11 @@ module type S = sig
         contention:Contention.Const.t Atom.t ->
         visibility:Visibility.Const.t Atom.t ->
         t
+
+      (** Create the default crossing for type checking mods, which is currently
+          the min, but will gradually transition into the max *)
+      val mod_default : t
+      (* CR zeisbach: get rid of this over time, but using it as a way to find easily *)
     end
 
     module Comonadic : sig

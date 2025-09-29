@@ -490,18 +490,20 @@ let meet_regional ?hint:h mode =
     areality = Regional
   }); mode]
 
-let mode_default { mode; crossing } =
+let mode_default mossing =
   { position = RNontail;
-    (* CR zeisbach: this is quite a bad naming situation... *)
-    mode = { mode = Value.disallow_left mode; crossing };
+    mode = mossing;
     strictly_local = false;
     tuple_modes = None }
 
-(* CR zeisbach: this will one day be Crossing.Monadic.max, but before that it
-   will be Crossing.Monadic.min with contended instead of uncontended *)
+let mode_default_restrict mode crossing =
+  { position = RNontail;
+    mode = { mode = mode |> Value.disallow_left; crossing };
+    strictly_local = false;
+    tuple_modes = None }
+
 let mode_legacy =
-  mode_default { mode = Value.legacy |> Value.disallow_left
-               ; crossing = (ref Crossing.Monadic.min) }
+  mode_default_restrict Value.legacy (ref Crossing.Monadic.mod_default)
 
 (* CR zeisbach: there are few signatures that could make sense here, but the Some
    branch is never currently taken anyways, so I just did what is simple for now *)
@@ -521,41 +523,48 @@ let as_mossing {mode = {mode; crossing}; tuple_modes; _} =
   | Some l -> { mode = Value.meet (mode :: l); crossing }
   | None -> { mode; crossing }
 
-let mossing_morph f {mode; crossing} =
+let mossing_morph_mode f {mode; crossing} =
   { mode = f mode |> Mode.Value.disallow_left ; crossing }
 
 let mode_morph f expected_mode =
   (* CR zeisbach: this isn't really a mode rather a mossing.
      Maybe it would be actually better to rename occurrences of mode but probably not *)
   let mode = as_mossing expected_mode in
-  let mode = mossing_morph f mode in
+  let mode = mossing_morph_mode f mode in
   let tuple_modes = None in
   {expected_mode with mode; tuple_modes}
 
 let mode_modality modality expected_mode =
-  as_mode_and_mods expected_mode
-  |> mode_and_mod_morph (Mode.Modality.Const.apply modality)
+  as_mossing expected_mode
+  (* CR zeisbach: maybe this should be using Crossing.Monadic.modality?
+     currently, modalities just don't impact the crossing stuff, which is wrong *)
+  |> mossing_morph_mode (Mode.Modality.Const.apply modality)
   |> mode_default
 
 (* used when entering a function;
 mode is the mode of the function region *)
 let mode_return mode =
-  (* CR zeisbach: for now this doesn't interact with the mods stuff at all *)
-  { (mode_default (meet_regional ~hint:Function_return mode)) with
+  (* CR zeisbach: for now this doesn't interact with the mods stuff at all,
+     and just makes a new crossing variable for each function *)
+  let mossing = { mode = meet_regional ~hint:Function_return mode;
+                  crossing = (ref Crossing.Monadic.mod_default) } in
+  { (mode_default mossing) with
     position = RTail (Regionality.disallow_left
       (Value.proj_comonadic Areality mode), FTail);
   }
 
 (* used when entering a region.*)
 let mode_region mode =
-  { (mode_default (meet_regional mode)) with
+  let mossing = { mode = meet_regional mode;
+                crossing = (ref Crossing.Monadic.mod_default) } in
+  { (mode_default mossing) with
     position =
       RTail (Regionality.disallow_left
         (Value.proj_comonadic Areality mode), FNontail);
   }
 
 let mode_max =
-  mode_default Value.max
+  mode_default_restrict Value.max (ref Crossing.Monadic.mod_default)
 
 let mode_with_position mode position =
   { (mode_default mode ) with position }
@@ -566,14 +575,14 @@ let mode_max_with_position position =
 (** Take the expected mode of [exclave_ exp], return the expected mode of [exp].
     [expected_mode] must be higher than [regional]. *)
 let mode_exclave expected_mode =
-  let mode =
-     as_single_mode expected_mode
+  let mossing =
+     as_mossing expected_mode
      (* if we expect an exclave to be [regional], then inside the exclave the
         body should be [local] *)
-     |> value_to_alloc_r2l
-     |> alloc_as_value
+     (* CR zeisbach: is there a better way to be doing this?? *)
+     |> mossing_morph_mode (fun m -> m |> value_to_alloc_r2l |> alloc_as_value)
   in
-  { (mode_default mode)
+  { (mode_default mossing)
     with strictly_local = true
   }
 
@@ -581,6 +590,9 @@ let mode_strictly_local expected_mode =
   { expected_mode
     with strictly_local = true
   }
+
+(* CR zeisbach: perhaps [mode_coerce] and [mode_lazy] should interact with the
+   mod crossing stuff? seems plausible but I'd have to look at use sites. *)
 
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
@@ -625,24 +637,28 @@ mode variable. We encode extra position information in the former. We need the
 latter to the both left and right mode because of how it will be used. *)
 let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   let vmode , _ = Value.newvar_below (alloc_as_value marg) in
-  if partial_app then mode_default vmode, vmode
+  (* CR zeisbach: maybe mode_default_restrict should call a helper which does
+     this mossing construction with the disallow, which could be used here too *)
+  let mossing = { mode = vmode |> Value.disallow_left;
+                  crossing = (ref Crossing.Monadic.mod_default) } in
+  if partial_app then mode_default mossing, vmode
   else match funct.exp_desc, index, position_and_mode.apply_position with
   | Texp_ident (_, _, {val_kind =
       Val_prim {Primitive.prim_name = ("%sequor"|"%sequand")}},
                 Id_prim _, _), 1, Tail ->
      (* RHS of (&&) and (||) is at the tail of function region if the
         application is. The argument mode is not constrained otherwise. *)
-     mode_with_position vmode (RTail (Option.get position_and_mode.region_mode, FTail)),
+     mode_with_position mossing (RTail (Option.get position_and_mode.region_mode, FTail)),
      vmode
   | Texp_ident (_, _, _, Id_prim _, _), _, _ ->
      (* Other primitives cannot be tail-called *)
-     mode_default vmode, vmode
+     mode_default mossing, vmode
   | _, _, (Nontail | Default) ->
-     mode_default vmode, vmode
+     mode_default mossing, vmode
   | _, _, Tail -> begin
     Value.submode_exn vmode Value.(of_const ~hint_comonadic:Tailcall_argument
       { Const.max with areality = Regional});
-    mode_default vmode, vmode
+    mode_default mossing, vmode
   end
 
 (* expected_mode.locality_context explains why expected_mode.mode is low;
