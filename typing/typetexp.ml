@@ -502,7 +502,8 @@ end = struct
     | Any -> Jkind.Builtin.any ~why:(if is_named then Unification_var else Wildcard)
     | Sort ->
         let level = get_current_level () in
-        Jkind.of_new_legacy_sort ~why:(if is_named then Unification_var else Wildcard) ~level
+        Jkind.of_new_legacy_sort
+          ~why:(if is_named then Unification_var else Wildcard) ~level
 
   let new_any_var loc env jkind = function
     | { unbound_variable_policy = Closed; _ } ->

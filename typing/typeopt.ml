@@ -112,7 +112,8 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
 let type_sort ~why env loc ty =
-  match Ctype.type_sort ~why ~fixed:false ~level:(Ctype.get_current_level ()) env ty with
+  match Ctype.type_sort ~why ~fixed:false ~level:(Ctype.get_current_level ())
+          env ty with
   | Ok sort -> sort
   | Error err -> raise (Error (loc, Not_a_sort (ty, err)))
 

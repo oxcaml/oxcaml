@@ -305,13 +305,19 @@ module Layout = struct
            to end up less than a sort (so, no [any]), but it seems easier to keep
            this case lined up with the inverse case, which definitely cannot use
            [to_product_sort]. *)
-        match Sort.decompose_into_product ~level:Btype.generic_level s2 (List.length ts1) with
+        match
+          Sort.decompose_into_product ~level:Btype.generic_level s2
+            (List.length ts1)
+        with
         | None -> Not_le
         | Some ss2 ->
           Misc.Le_result.combine_list
             (List.map2 (fun t1 s2 -> sub t1 (Sort s2)) ts1 ss2))
       | Sort s1, Product ts2 -> (
-        match Sort.decompose_into_product ~level:Btype.generic_level s1 (List.length ts2) with
+        match
+          Sort.decompose_into_product ~level:Btype.generic_level s1
+            (List.length ts2)
+        with
         | None -> Not_le
         | Some ss1 ->
           Misc.Le_result.combine_list
@@ -335,7 +341,10 @@ module Layout = struct
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
     | Product ts, Sort sort | Sort sort, Product ts -> (
-      match Sort.decompose_into_product ~level:Btype.generic_level sort (List.length ts) with
+      match
+        Sort.decompose_into_product ~level:Btype.generic_level sort
+          (List.length ts)
+      with
       | None -> None
       | Some sorts -> products ts (List.map (fun x -> Sort x) sorts))
 
@@ -2445,7 +2454,8 @@ module Builtin = struct
   let product_of_sorts ~why arity =
     let layout =
       Layout.product
-        (List.init arity (fun _ -> fst (Layout.of_new_sort_var ~level:(Btype.generic_level))))
+        (List.init arity (fun _ ->
+             fst (Layout.of_new_sort_var ~level:Btype.generic_level)))
     in
     let desc : _ jkind_desc =
       { layout; mod_bounds = Mod_bounds.max; with_bounds = No_with_bounds }
@@ -2478,7 +2488,9 @@ let has_with_bounds (type r) (t : (_ * r) jkind) =
 (* construction *)
 
 let of_new_sort_var ~why ~level =
-  let jkind, sort = Jkind_desc.of_new_sort_var ~level Maybe_null Maybe_separable in
+  let jkind, sort =
+    Jkind_desc.of_new_sort_var ~level Maybe_null Maybe_separable
+  in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
@@ -2823,7 +2835,9 @@ let for_array_argument =
     ~annotation:None ~why:(Any_creation Array_type_argument)
 
 let for_array_element_sort ~level =
-  let jkind_desc, sort = Jkind_desc.of_new_sort_var ~level Maybe_null Separable in
+  let jkind_desc, sort =
+    Jkind_desc.of_new_sort_var ~level Maybe_null Separable
+  in
   let jkind = { for_array_argument.jkind with layout = jkind_desc.layout } in
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
     sort )
