@@ -164,7 +164,7 @@ let raise_nongen_level () =
   saved_level := (!current_level, !nongen_level) :: !saved_level;
   nongen_level := !current_level
 let end_def () =
-  let cl, nl = List.hd !saved_level in
+  let (cl, nl) = List.hd !saved_level in
   saved_level := List.tl !saved_level;
   current_level := cl; nongen_level := nl
 let create_scope () =
@@ -192,11 +192,11 @@ let with_local_level_if_principal f ~post =
 let with_local_level_iter_if_principal f ~post =
   with_local_level_iter_if !Clflags.principal f ~post
 let with_level ~level f =
-  begin_def ();
-  init_def level;
+  begin_def (); init_def level;
   let result = wrap_end_def f in
   result
-let with_level_if cond ~level f = if cond then with_level ~level f else f ()
+let with_level_if cond ~level f =
+  if cond then with_level ~level f else f ()
 
 let with_local_level_for_class ?post f =
   begin_class_def ();
@@ -209,32 +209,15 @@ let with_raised_nongen_level f =
   wrap_end_def f
 
 
-let reset_global_level () = global_level := !current_level
+let reset_global_level () =
+  global_level := !current_level
 let increase_global_level () =
   let gl = !global_level in
   global_level := !current_level;
   gl
-let restore_global_level gl = global_level := gl
+let restore_global_level gl =
+  global_level := gl
 
-let update_current_level l = current_level := l
-
-(* For use with ocamldebug *)
-type global_state =
-  { current_level : int ref;
-    nongen_level : int ref;
-    global_level : int ref
-  }
-
-let global_state : global_state = { current_level; nongen_level; global_level }
-
-let print_global_state fmt global_state =
-  let print_field fmt s r = Format.fprintf fmt "%s = %d;@;" s !r in
-  let print_fields fmt { current_level; nongen_level; global_level } =
-    print_field fmt "current_level" current_level;
-    print_field fmt "nongen_level" nongen_level;
-    print_field fmt "global_level" global_level
-  in
-  Format.fprintf fmt "@[<1>{@;%a}@]" print_fields global_state
 (**** Control tracing of GADT instances *)
 
 let trace_gadt_instances = ref false
@@ -266,7 +249,7 @@ let proper_abbrevs tl abbrev =
 (* Re-export generic type creators *)
 
 let newty desc              = newty2 ~level:!current_level desc
-let new_scoped_ty scope desc = newty3 ~level:(get_current_level ()) ~scope desc
+let new_scoped_ty scope desc = newty3 ~level:!current_level ~scope desc
 
 let newvar ?name jkind =
   newty2 ~level:!current_level (Tvar { name; jkind })
@@ -1415,9 +1398,9 @@ let instance ?partial sch =
 
 let generic_instance sch =
   let old = !current_level in
-  update_current_level generic_level;
+  current_level := generic_level;
   let ty = instance sch in
-  update_current_level old;
+  current_level := old;
   ty
 
 let instance_list schl =
@@ -1578,9 +1561,9 @@ let instance_declaration decl =
 
 let generic_instance_declaration decl =
   let old = !current_level in
-  update_current_level generic_level;
+  current_level := generic_level;
   let decl = instance_declaration decl in
-  update_current_level old;
+  current_level := old;
   decl
 
 let instance_class params cty =
@@ -1904,8 +1887,8 @@ let unify_var' = (* Forward declaration *)
 
 let subst env level priv abbrev oty params args body =
   if List.length params <> List.length args then raise Cannot_subst;
-  let old_level = get_current_level () in
-  update_current_level level;
+  let old_level = !current_level in
+  current_level := level;
   let body0 = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in          (* Stub *)
   let undo_abbrev =
     match oty with
@@ -1925,10 +1908,10 @@ let subst env level priv abbrev oty params args body =
   try
     !unify_var' uenv body0 body';
     List.iter2 (!unify_var' uenv) params' args;
-    update_current_level old_level;
+    current_level := old_level;
     body'
   with Unify _ ->
-    update_current_level old_level;
+    current_level := old_level;
     undo_abbrev ();
     raise Cannot_subst
 
@@ -1940,13 +1923,13 @@ let jkind_subst env level params args jkind =
      them. Though we should measure, this should be a nice little speedup.
      Internal ticket 5105. *)
   if List.length params <> List.length args then raise Cannot_subst;
-  let old_level = get_current_level () in
-  update_current_level level;
+  let old_level = !current_level in
+  current_level := level;
   let (params', jkind') = instance_parameterized_kind params jkind in
   let uenv = Expression {env; in_subst = true} in
   try
     List.iter2 (!unify_var' uenv) params' args;
-    update_current_level old_level;
+    current_level := old_level;
     (* CR layouts v2.8: It's plausibly worth immediately calling [Jkind.normalize
        ~mode:Require_best] on this jkind, so that if we do multiple things with it down
        the road we don't have to normalize each time. But doing so in a way that avoids
@@ -1954,7 +1937,7 @@ let jkind_subst env level params args jkind =
        Internal ticket 5106. *)
     jkind'
   with Unify _ ->
-    update_current_level old_level;
+    current_level := old_level;
     raise Cannot_subst
 
 (* CR layouts: Can we actually just always ignore jkinds in apply/subst?
@@ -1987,7 +1970,7 @@ let jkind_subst env level params args jkind =
 let apply ?(use_current_level = false) env params body args =
   simple_abbrevs := Mnil;
   let level = if use_current_level
-    then get_current_level ()
+    then !current_level
     else generic_level in
   try
     subst env level Public (ref Mnil) None params args body
@@ -3834,10 +3817,10 @@ let rec concat_longident lid1 =
 let nondep_instance env level id ty =
   let ty = !nondep_type' env [id] ty in
   if level = generic_level then duplicate_type ty else
-  let old = get_current_level () in
-  update_current_level level;
+  let old = !current_level in
+  current_level := level;
   let ty = instance ty in
-  update_current_level old;
+  current_level := old;
   ty
 
 (* Find the type paths nl1 in the module type mty2, and add them to the
@@ -5594,8 +5577,8 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    is unimportant.  So, no need to propagate abbreviations.
 *)
 let moregeneral env inst_nongen pat_sch subj_sch =
-  let old_level = get_current_level () in
-  update_current_level (generic_level - 1);
+  let old_level = !current_level in
+  current_level := generic_level - 1;
   (*
      Generic variables are first duplicated with [instance].  So,
      their levels are lowered to [generic_level - 1].  The subject is
@@ -5604,7 +5587,7 @@ let moregeneral env inst_nongen pat_sch subj_sch =
   *)
   let subj_inst = instance subj_sch in
   let subj = duplicate_type subj_inst in
-  update_current_level generic_level;
+  current_level := generic_level;
   (* Duplicate generic variables *)
   let patt = instance pat_sch in
   Misc.try_finally
@@ -5623,10 +5606,10 @@ let moregeneral env inst_nongen pat_sch subj_sch =
             [moregen] does some unification that we need to preserve for more
             legible error messages, we have to manually perform the
             regeneralization rather than backtracking. *)
-         update_current_level (generic_level - 2);
+         current_level := generic_level - 2;
          generalize subj_inst;
          raise (Moregen (expand_to_moregen_error env trace)))
-    ~always:(fun () -> update_current_level old_level)
+    ~always:(fun () -> current_level := old_level)
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match moregeneral env inst_nongen pat_sch subj_sch with
@@ -6204,8 +6187,8 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
   let errors = match_class_sig_shape ~strict:false sign1 sign2 in
   match errors with
   | [] ->
-      let old_level = get_current_level () in
-      update_current_level (generic_level - 1);
+      let old_level = !current_level in
+      current_level := generic_level - 1;
       (*
          Generic variables are first duplicated with [instance].  So,
          their levels are lowered to [generic_level - 1].  The subject is
@@ -6214,7 +6197,7 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
       *)
       let (_, subj_inst) = instance_class [] subj_sch in
       let subj = duplicate_class_type subj_inst in
-      update_current_level generic_level;
+      current_level := generic_level;
       (* Duplicate generic variables *)
       let (_, patt) = instance_class [] pat_sch in
       let type_pairs = fresh_moregen_pairs () in
@@ -6240,11 +6223,11 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
              unification that we need to preserve for more legible error
              messages, we have to manually perform the regeneralization rather
              than backtracking. *)
-          update_current_level (generic_level - 2);
+          current_level := generic_level - 2;
           generalize_class_type subj_inst;
           res
       in
-      update_current_level old_level;
+      current_level := old_level;
       res
   | errors ->
       CM_Class_type_mismatch (env, pat_sch, subj_sch) :: errors
@@ -6454,7 +6437,7 @@ let rec build_subtype env (visited : transient_expr list)
           let cl_abbr, body = find_cltype_for_path env p in
           let ty =
             try
-              subst env (get_current_level ()) Public abbrev None
+              subst env !current_level Public abbrev None
                 cl_abbr.type_params tl body
             with Cannot_subst -> assert false in
           let ty1, tl1 =
@@ -7421,6 +7404,24 @@ let same_constr env t1 t2 =
 
 let () =
   Env.same_constr := same_constr
+
+(* For use with ocamldebug *)
+type global_state =
+  { current_level : int ref;
+    nongen_level : int ref;
+    global_level : int ref
+  }
+
+let global_state : global_state = { current_level; nongen_level; global_level }
+
+let print_global_state fmt global_state =
+  let print_field fmt s r = Format.fprintf fmt "%s = %d;@;" s !r in
+  let print_fields fmt { current_level; nongen_level; global_level } =
+    print_field fmt "current_level" current_level;
+    print_field fmt "nongen_level" nongen_level;
+    print_field fmt "global_level" global_level
+  in
+  Format.fprintf fmt "@[<1>{@;%a}@]" print_fields global_state
 
               (*******************************)
               (* checking declaration jkinds *)
