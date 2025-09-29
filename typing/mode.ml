@@ -2709,6 +2709,8 @@ module Comonadic_with (Areality : Areality) = struct
 
     let compare = Axis.compare
 
+    let proj = Axis.proj
+
     let all =
       [ P Areality;
         P Linearity;
@@ -2724,6 +2726,8 @@ module Comonadic_with (Areality : Areality) = struct
   module Const = struct
     include C.Comonadic_with (Areality.Const)
     include Lattice_Product (C.Comonadic_with (Areality.Const))
+
+    let proj = Axis.proj
 
     module Per_axis = struct
       let print ax ppf a =
@@ -2799,44 +2803,15 @@ module Comonadic_with (Areality : Areality) = struct
     | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error
 
   let axis_of_error (actual : Obj.const) (expected : Obj.const) : simple_error =
-    let { areality = areality1;
-          linearity = linearity1;
-          portability = portability1;
-          forkable = forkable1;
-          yielding = yielding1;
-          statefulness = statefulness1
-        } =
-      actual
-    in
-    let { areality = areality2;
-          linearity = linearity2;
-          portability = portability2;
-          forkable = forkable2;
-          yielding = yielding2;
-          statefulness = statefulness2
-        } =
-      expected
-    in
-    if Areality.Const.le areality1 areality2
-    then
-      if Linearity.Const.le linearity1 linearity2
-      then
-        if Portability.Const.le portability1 portability2
-        then
-          if Forkable.Const.le forkable1 forkable2
-          then
-            if Yielding.Const.le yielding1 yielding2
-            then
-              if Statefulness.Const.le statefulness1 statefulness2
-              then assert false
-              else
-                Error
-                  (Statefulness, { left = statefulness1; right = statefulness2 })
-            else Error (Yielding, { left = yielding1; right = yielding2 })
-          else Error (Forkable, { left = forkable1; right = forkable2 })
-        else Error (Portability, { left = portability1; right = portability2 })
-      else Error (Linearity, { left = linearity1; right = linearity2 })
-    else Error (Areality, { left = areality1; right = areality2 })
+    List.find_map
+      (fun (Axis.P ax) ->
+        let left = Const.proj ax actual in
+        let right = Const.proj ax expected in
+        if Const.Per_axis.le ax left right
+        then None
+        else Some (Error (ax, { left; right })))
+      Axis.all
+    |> Option.get
 
   (* overriding to report the offending axis *)
   let to_simple_error ({ left; right; _ } : error) = axis_of_error left right
@@ -2873,6 +2848,8 @@ module Monadic = struct
 
     let print = Axis.print
 
+    let proj = Axis.proj
+
     let all =
       [P Uniqueness; P Contention; P Visibility]
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
@@ -2883,6 +2860,8 @@ module Monadic = struct
   module Const = struct
     include C.Monadic
     include Lattice_Product (C.Monadic)
+
+    let proj = Axis.proj
 
     module Per_axis = struct
       let print ax ppf a =
@@ -2955,27 +2934,15 @@ module Monadic = struct
     | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error
 
   let axis_of_error (actual : Obj.const) (expected : Obj.const) : simple_error =
-    let { uniqueness = uniqueness1;
-          contention = contention1;
-          visibility = visibility1
-        } =
-      actual
-    in
-    let { uniqueness = uniqueness2;
-          contention = contention2;
-          visibility = visibility2
-        } =
-      expected
-    in
-    if Uniqueness.Const.le uniqueness1 uniqueness2
-    then
-      if Contention.Const.le contention1 contention2
-      then
-        if Visibility.Const.le visibility1 visibility2
-        then assert false
-        else Error (Visibility, { left = visibility1; right = visibility2 })
-      else Error (Contention, { left = contention1; right = contention2 })
-    else Error (Uniqueness, { left = uniqueness1; right = uniqueness2 })
+    List.find_map
+      (fun (Axis.P ax) ->
+        let left = Const.proj ax actual in
+        let right = Const.proj ax expected in
+        if Const.Per_axis.le ax left right
+        then None
+        else Some (Error (ax, { left; right })))
+      Axis.all
+    |> Option.get
 
   let to_simple_error ({ left; right; _ } : error) =
     (* monadic fragment is flipped *)
