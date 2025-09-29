@@ -955,6 +955,8 @@ module Lattices_mono = struct
 
   module Axis = struct
     type ('t, 'r) t =
+      (* Constructors must be listed in implication order: if A implies B, then A is bofore B.
+         This is to make [compare] work. *)
       | Areality : ('a comonadic_with, 'a) t
       | Forkable : ('areality comonadic_with, Forkable.t) t
       | Yielding : ('areality comonadic_with, Yielding.t) t
@@ -965,18 +967,7 @@ module Lattices_mono = struct
       | Visibility : (Monadic_op.t, Visibility_op.t) t
       | Contention : (Monadic_op.t, Contention_op.t) t
 
-    let to_int : type a b. (a, b) t -> int = function
-      | Areality -> 0
-      | Forkable -> 1
-      | Yielding -> 2
-      | Linearity -> 3
-      | Statefulness -> 4
-      | Portability -> 5
-      | Uniqueness -> 6
-      | Visibility -> 7
-      | Contention -> 8
-
-    let compare a b = to_int a - to_int b
+    let compare a b = (Obj.magic a : int) - (Obj.magic b : int)
 
     let print : type p r. _ -> (p, r) t -> unit =
      fun ppf -> function
