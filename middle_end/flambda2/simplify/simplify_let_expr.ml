@@ -114,10 +114,10 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
       Name_occurrences.greatest_name_mode_var free_names_of_body
         (VB.var bound_var)
     | Set_of_closures _ ->
-        Name_mode.Or_absent.join_in_terms greatest_name_mode
-          (Bound_pattern.fold_all_bound_vars bound_vars
-             ~init:Name_mode.Or_absent.absent ~f:(fun greatest_name_mode bound_var ->
-                 Name_occurrences.greatest_name_mode_var free_names_of_body
+        Bound_pattern.fold_all_bound_vars bound_vars
+          ~init:Name_mode.Or_absent.absent ~f:(fun greatest_name_mode bound_var ->
+              Name_mode.Or_absent.join_in_terms greatest_name_mode
+                (Name_occurrences.greatest_name_mode_var free_names_of_body
                    (VB.var bound_var)))
     | Static _ -> assert false
     (* see below *)

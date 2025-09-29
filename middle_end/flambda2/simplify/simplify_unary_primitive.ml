@@ -782,7 +782,7 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
           Expr_builder.Keep_binding
             { let_bound =
                 Bound_pattern.singleton
-                  (Bound_var.create contents_var contents_car_duid NM.normal);
+                  (Bound_var.create contents_var contents_var_duid NM.normal);
               simplified_defining_expr = Simplified_named.create ~machine_width contents_expr;
               original_defining_expr = None
             }

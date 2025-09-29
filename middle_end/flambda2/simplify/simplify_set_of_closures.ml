@@ -835,7 +835,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
             (fun (func : Function_declarations.code_id_in_function_declaration) ->
               match func with
               | Deleted _ -> func
-              | Code_id code_id ->
+              | Code_id { code_id; _ } ->
                 let code_metadata =
                   DE.find_code_exn (DA.denv dacc) code_id
                   |> Code_or_metadata.code_metadata
