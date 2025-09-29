@@ -815,6 +815,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
         ~closure_bound_names ~closure_bound_names_inside ~value_slots
         ~value_slot_types
     else
+      (* If the closure is to be phantomized, mark all code as deleted *)
       let dacc =
         DA.map_denv dacc ~f:(fun denv ->
             Bound_pattern.fold_all_bound_vars bound_vars ~init:denv
