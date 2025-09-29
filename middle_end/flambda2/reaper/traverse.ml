@@ -694,7 +694,6 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     | Assume _ -> false
     | Check _ -> true
   in
-  let is_opaque = is_opaque || check_zero_alloc in
   let code_dep = Acc.find_code acc code_id in
   Graph.add_code_id_my_closure (Acc.graph acc) code_id my_closure;
   let maybe_opaque var = if is_opaque then Variable.rename var else var in
