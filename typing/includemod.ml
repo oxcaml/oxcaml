@@ -1448,7 +1448,7 @@ module Functor_app_diff = struct
     | Keep ((Named arg,  _mty, _mode) , Named (Some param, _param), _) ->
         let res =
           Option.map (fun res ->
-              let scope = Levels.create_scope () in
+              let scope = Ctype.create_scope () in
               let subst = Subst.add_module param arg Subst.identity in
               Subst.modtype (Rescope scope) subst res
             )

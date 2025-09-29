@@ -12,8 +12,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Levels
-
 module Sort = struct
   type base =
     | Void
@@ -449,9 +447,9 @@ module Sort = struct
 
   let last_var_uid = ref 0
 
-  let new_var () =
+  let new_var ~level =
     incr last_var_uid;
-    Var { contents = None; uid = !last_var_uid; level = get_current_level () }
+    Var { contents = None; uid = !last_var_uid; level }
 
   let rec get : t -> t = function
     | Base _ as t -> t
@@ -606,8 +604,8 @@ module Sort = struct
       false
     | Product _ -> false
 
-  let decompose_into_product t n =
-    let ts = List.init n (fun _ -> new_var ()) in
+  let decompose_into_product ~level t n =
+    let ts = List.init n (fun _ -> new_var ~level) in
     if equate t (Product ts) then Some ts else None
 
   (*** pretty printing ***)
