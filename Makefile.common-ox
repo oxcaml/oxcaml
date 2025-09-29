@@ -79,7 +79,6 @@ boot_targets = \
   $(boot_ocamldep) \
   $(boot_ocamlobjinfo) \
   $(boot_js_of_ocaml) \
-  $(boot_jsoo_minify) \
   ocamltest/ocamltest.native
 
 boot-compiler: _build/_bootinstall
@@ -121,8 +120,8 @@ compiler: runtime-stdlib
           oxcaml/testsuite/tools/expect.exe \
           oxcaml/testsuite/tools/codegen_main.exe \
           oxcaml/testsuite/tools/asmgen_$(ARCH).o \
-          testsuite/lib/lib.cm{,j}{,x}a \
-          testsuite/lib/testing.cm{,j}{,x}a \
+          testsuite/lib/lib.cm{,x}a \
+          testsuite/lib/testing.cm{,x}a \
           $(ocamldir)/tools/dumpobj.bc
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
@@ -204,8 +203,7 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	ln -sf ../../default/$(boot_ocamlopt) _build/_bootinstall/bin/ocamlopt.opt
 	ln -sf ../../default/$(boot_ocamlc) _build/_bootinstall/bin/ocamlc.opt
 	ln -sf ../../default/$(boot_ocamlj) _build/_bootinstall/bin/ocamlj.opt
-	ln -sf ../../default/$(boot_js_of_ocaml) _build/_bootinstall/bin/js_of_ocaml
-	ln -sf ../../default/$(boot_jsoo_minify) _build/_bootinstall/bin/jsoo_minify
+	ln -sf ../../default/$(boot_js_of_ocaml) _build/_bootinstall/bin/js_of_oxcaml
 	ln -sf ../../default/$(boot_ocamlmklib) _build/_bootinstall/bin/ocamlmklib.opt
 	ln -sf ../../default/$(boot_ocamldep) _build/_bootinstall/bin/ocamldep.opt
 	ln -sf ../../default/$(boot_ocamlobjinfo) _build/_bootinstall/bin/ocamlobjinfo.opt
@@ -228,7 +226,7 @@ _install: compiler
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
-	$(cpl) _build/_bootinstall/bin/{js_of_ocaml,jsoo_minify} _install/bin/
+	$(cpl) _build/_bootinstall/bin/js_of_oxcaml _install/bin/
 	$(cpl) _build/runtime_stdlib_install/bin/* _install/bin/
 	$(cpl) _build/install/main/bin/* _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
@@ -293,13 +291,13 @@ install_for_test: _install
 	chmod 755 _runtest/testsuite/tools/codegen
 	cp $(main_build)/oxcaml/testsuite/tools/asmgen_*.o \
           _runtest/testsuite/tools/
-	cp $(main_build)/testsuite/lib/lib.{a,cmxa,cma,cmja,cmjx} \
+	cp $(main_build)/testsuite/lib/lib.{a,cmxa,cma} \
           _runtest/testsuite/lib/
 	cp $(main_build)/testsuite/lib/.lib.objs/byte/lib.cm* \
           _runtest/testsuite/lib/
 	cp $(main_build)/testsuite/lib/.lib.objs/native/lib.cm* \
           _runtest/testsuite/lib/
-	cp $(main_build)/testsuite/lib/testing.{a,cmxa,cma,cmja,cmjxa,cmjx} \
+	cp $(main_build)/testsuite/lib/testing.{a,cmxa,cma} \
           _runtest/testsuite/lib/
 	cp $(main_build)/testsuite/lib/.testing.objs/byte/testing.cm* \
           _runtest/testsuite/lib/
@@ -508,7 +506,7 @@ boot-_install: runtime-stdlib
 	# is possibly on a different device
 	ln -sf $(realpath _build/_bootinstall/bin/ocamllex.opt) _install/bin/ocamllex.opt
 	$(cpl) _build/_bootinstall/bin/ocaml{j,c,opt,mklib,dep,objinfo}.opt _install/bin/
-	$(cpl) _build/_bootinstall/bin/{js_of_ocaml,jsoo_minify} _install/bin/
+	$(cpl) _build/_bootinstall/bin/js_of_oxcaml _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
 	$(cpl) -R _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/* \
     _install/lib/ocaml/

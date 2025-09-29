@@ -33,12 +33,12 @@ let run_jsoo_exn ~args =
     (* Use jsoo from our PATH when we're bootstrapping *)
     match Sys.ocaml_release with
     | { extra = Some (Plus, "ox"); _ } ->
-        Filename.concat Config.bindir "js_of_ocaml"
+        Filename.concat Config.bindir "js_of_oxcaml"
     | _ ->
-        (* Try to find js_of_ocaml in the same directory as the current executable *)
+        (* Try to find js_of_oxcaml in the same directory as the current executable *)
         let exe_dir = Filename.dirname Sys.executable_name in
-        let jsoo_path = Filename.concat exe_dir "js_of_ocaml" in
-        if Sys.file_exists jsoo_path then jsoo_path else "js_of_ocaml"
+        let jsoo_path = Filename.concat exe_dir "js_of_oxcaml" in
+        if Sys.file_exists jsoo_path then jsoo_path else "js_of_oxcaml"
   in
   let cmdline = Filename.quote_command prog args in
   match Ccomp.command cmdline with 0 -> () | _ -> raise (Sys_error cmdline)
