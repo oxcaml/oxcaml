@@ -397,12 +397,18 @@ type position_in_region =
      (for tail call escape detection) *)
   | RTail of Regionality.r * position_in_function
 
+type mossing = {
+  mode : Value.r;
+  (** The upper bound, hence r (right) *)
+
+  crossing : Crossing.Monadic.t ref;
+}
+
 (* CR mode-hint: unify the mode error hinting. *)
 type expected_mode =
   { position : position_in_region;
 
-    mode : Value.r;
-    (** The upper bound, hence r (right) *)
+    mode : mossing;
 
     strictly_local : bool;
     (** Indicates that the expression was directly annotated with [local], which
@@ -484,38 +490,57 @@ let meet_regional ?hint:h mode =
     areality = Regional
   }); mode]
 
-let mode_default mode =
+let mode_default { mode; crossing } =
   { position = RNontail;
-    mode = Value.disallow_left mode;
+    (* CR zeisbach: this is quite a bad naming situation... *)
+    mode = { mode = Value.disallow_left mode; crossing };
     strictly_local = false;
     tuple_modes = None }
 
-let mode_legacy = mode_default Value.legacy
+(* CR zeisbach: this will one day be Crossing.Monadic.max, but before that it
+   will be Crossing.Monadic.min with contended instead of uncontended *)
+let mode_legacy =
+  mode_default { mode = Value.legacy |> Value.disallow_left
+               ; crossing = (ref Crossing.Monadic.min) }
 
-let mode_default_opt mode_opt =
-  match mode_opt with
+(* CR zeisbach: there are few signatures that could make sense here, but the Some
+   branch is never currently taken anyways, so I just did what is simple for now *)
+let mode_default_opt mossing_opt =
+  match mossing_opt with
   | None -> mode_legacy
-  | Some mode -> mode_default mode
+  | Some mossing -> mode_default mossing
 
-let as_single_mode {mode; tuple_modes; _} =
+let as_single_mode {mode = {mode; _}; tuple_modes; _} =
   match tuple_modes with
   | Some l -> Value.meet (mode :: l)
   | None -> mode
 
+(* CR zeisbach: change this once tuple_modes gets changed too to have crossings *)
+let as_mossing {mode = {mode; crossing}; tuple_modes; _} =
+  match tuple_modes with
+  | Some l -> { mode = Value.meet (mode :: l); crossing }
+  | None -> { mode; crossing }
+
+let mossing_morph f {mode; crossing} =
+  { mode = f mode |> Mode.Value.disallow_left ; crossing }
+
 let mode_morph f expected_mode =
-  let mode = as_single_mode expected_mode in
-  let mode = f mode |> Mode.Value.disallow_left in
+  (* CR zeisbach: this isn't really a mode rather a mossing.
+     Maybe it would be actually better to rename occurrences of mode but probably not *)
+  let mode = as_mossing expected_mode in
+  let mode = mossing_morph f mode in
   let tuple_modes = None in
   {expected_mode with mode; tuple_modes}
 
 let mode_modality modality expected_mode =
-  as_single_mode expected_mode
-  |> Modality.Const.apply modality
+  as_mode_and_mods expected_mode
+  |> mode_and_mod_morph (Mode.Modality.Const.apply modality)
   |> mode_default
 
 (* used when entering a function;
 mode is the mode of the function region *)
 let mode_return mode =
+  (* CR zeisbach: for now this doesn't interact with the mods stuff at all *)
   { (mode_default (meet_regional ~hint:Function_return mode)) with
     position = RTail (Regionality.disallow_left
       (Value.proj_comonadic Areality mode), FTail);
@@ -533,7 +558,7 @@ let mode_max =
   mode_default Value.max
 
 let mode_with_position mode position =
-  { (mode_default mode) with position }
+  { (mode_default mode ) with position }
 
 let mode_max_with_position position =
   { mode_max with position }
@@ -11755,6 +11780,8 @@ let check_partial ?lev a b c cases =
 
 (* drop unnecessary arguments from the external API
    and check for uniqueness *)
+(* CR zeisbach: these could be extended to take ?mods too, but that doesn't seem
+   necessary, considering the mode optional parameter is never actually supplied *)
 let type_expect env ?mode e ty =
   let expected_mode = mode_default_opt mode in
   let exp = type_expect env expected_mode e ty in
