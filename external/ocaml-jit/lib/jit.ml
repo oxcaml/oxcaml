@@ -16,7 +16,17 @@
 
 open Import
 
-let outcome_global : Opttoploop.evaluation_outcome option ref = ref None
+type evaluation_outcome =
+  | Result of Obj.t
+  | Exception of exn
+
+let outcome_global : evaluation_outcome option ref = ref None
+
+external ndl_loadsym : string -> Obj.t
+  = "caml_sys_exit" "caml_natdynlink_loadsym"
+external ndl_existssym : string -> bool
+  = "caml_sys_exit" "caml_natdynlink_existssym"
+  [@@noalloc]
 
 (** Assemble each section using X86_binary_emitter. Empty sections are filtered *)
 let binary_section_map ~arch section_map =
@@ -148,7 +158,6 @@ let entry_points ~phrase_name symbols =
         entry_name
 
 let jit_run entry_points =
-  let open Opttoploop in
   match
     try Result (Obj.magic (Externals.run_toplevel entry_points))
     with exn -> Exception exn
@@ -166,7 +175,7 @@ let get_arch () =
   | 64 -> X86_ast.X64
   | i -> failwithf "Unexpected word size: %d" i 16
 
-let jit_load_x86 ~outcome_ref ~delayed:_ section_map _filename =
+let jit_load_x86 ~phrase_name ~outcome_ref ~delayed:_ section_map _filename =
   let arch = get_arch () in
   let section_map =
    List.fold_left
@@ -192,14 +201,11 @@ let jit_load_x86 ~outcome_ref ~delayed:_ section_map _filename =
   Globals.symbols := symbols;
   let relocated_text = relocate_text ~symbols addressed_text in
   relocate_other ~symbols addressed_sections;
-  Debug.save_binary_sections ~phrase_name:!Opttoploop.phrase_name
-    addressed_sections;
-  Debug.save_text_section ~phrase_name:!Opttoploop.phrase_name relocated_text;
+  Debug.save_binary_sections ~phrase_name addressed_sections;
+  Debug.save_text_section ~phrase_name relocated_text;
   load_text relocated_text;
   load_sections addressed_sections;
-  let entry_points =
-    entry_points ~phrase_name:!Opttoploop.phrase_name symbols
-  in
+  let entry_points = entry_points ~phrase_name symbols in
   let result = jit_run entry_points in
   outcome_ref := Some result
 
@@ -208,10 +214,10 @@ let set_debug () =
   | Some ("true" | "1") -> Globals.debug := true
   | None | Some _ -> Globals.debug := false
 
-let with_jit_x86 f =
+let with_jit_x86 ~phrase_name f =
   let ias = !X86_proc.internal_assembler in
   X86_proc.register_internal_assembler
-    (jit_load_x86 ~outcome_ref:outcome_global);
+    (jit_load_x86 ~phrase_name ~outcome_ref:outcome_global);
   try
     let res = f () in
     X86_proc.internal_assembler := ias;
@@ -220,12 +226,16 @@ let with_jit_x86 f =
     X86_proc.internal_assembler := ias;
     raise exn
 
-let jit_load_body ppf (program : Lambda.program) =
+let need_symbol sym =
+  match Symbols.find !Globals.symbols sym with
+  | Some _ -> false
+  | None -> not (ndl_existssym sym)
+
+let jit_load_body ~phrase_name ppf (program : Lambda.program) =
   let open Config in
-  let open Opttoploop in
   let dll =
-    if !Clflags.keep_asm_file then !phrase_name ^ ext_dll
-    else Filename.temp_file ("caml" ^ !phrase_name) ext_dll
+    if !Clflags.keep_asm_file then phrase_name ^ ext_dll
+    else Filename.temp_file ("caml" ^ phrase_name) ext_dll
   in
   let filename = Filename.chop_extension dll in
   Arch.trap_notes := false;
@@ -245,14 +255,12 @@ let jit_load_body ppf (program : Lambda.program) =
       outcome_global := None;
       res
 
-let jit_load ppf program = with_jit_x86 (fun () -> jit_load_body ppf program)
+let jit_load ~phrase_name ppf program =
+  with_jit_x86 ~phrase_name (fun () -> jit_load_body ~phrase_name ppf program)
 
 let jit_lookup_symbol symbol =
   match Symbols.find !Globals.symbols symbol with
-  | None -> Opttoploop.default_lookup symbol
+  | None -> (match ndl_loadsym symbol with
+    | exception _ -> None
+    | obj -> Some obj)
   | Some x -> Some (Address.to_obj x)
-
-let init_top () =
-  set_debug ();
-  Opttoploop.register_jit
-    { Opttoploop.Jit.load = jit_load; lookup_symbol = jit_lookup_symbol }

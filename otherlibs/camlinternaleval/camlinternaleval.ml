@@ -52,8 +52,10 @@ let eval code =
       (Compilation_unit.Name.of_string input_name)
   in
   let unit_info = Unit_info.make_dummy ~input_name compilation_unit in
-  Compilenv.reset unit_info (* TODO: Work out what this does. *);
 
+  let () = Compmisc.init_path () in
+  let () = Compmisc.init_parameters () in
+  Compilenv.reset unit_info (* TODO: Work out what this does. *);
   let env = Compmisc.initial_env () in
   let typed_impl =
     Typemod.type_implementation unit_info compilation_unit env ast
@@ -71,18 +73,14 @@ let eval code =
   Warnings.check_fatal () (* TODO: more error handling? *);
   (* TODO: assert program.arg_block_idx is none? *)
   let program = { program with code = Simplif.simplify_lambda program.code } in
-  (* ocaml-jit reads this so we need to set it *)
-  Opttoploop.phrase_name := input_name;
   let ppf = Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) in
-
-  (match Jit.jit_load ppf program with
+  (match Jit.jit_load ~phrase_name:input_name ppf program with
   | Result _ -> ()
   | Exception exn -> raise exn);
 
   (* Compilenv.save_unit_info
-    (Unit_info.Artifact.filename (Unit_info.cmx unit_info))
-    ~main_module_block_format:program.main_module_block_format ~arg_descr:None; *)
-
+     (Unit_info.Artifact.filename (Unit_info.cmx unit_info))
+     ~main_module_block_format:program.main_module_block_format ~arg_descr:None; *)
   let linkage_name =
     Symbol.for_compilation_unit compilation_unit
     |> Symbol.linkage_name |> Linkage_name.to_string
@@ -91,4 +89,10 @@ let eval code =
   Obj.obj (Obj.field obj 0)
 
 let compile_mutex = Mutex.create ()
-let eval code = Mutex.protect compile_mutex (fun () -> eval code)
+
+let eval code =
+  Mutex.protect compile_mutex (fun () ->
+      try eval code
+      with exn ->
+        Location.report_exception Format.std_formatter exn;
+        raise exn)
