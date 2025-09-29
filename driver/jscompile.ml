@@ -84,10 +84,53 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
          in
          (jsir, program.main_module_block_format, arg_descr))
 
+let collect_source_files (program : Jsoo_imports.Jsir.program) =
+  let open Jsoo_imports in
+  let paths = ref StringSet.empty in
+  let collect_from_instr (instr : Jsir.instr) =
+    match instr with
+    | Event pi ->
+      (match pi.Parse_info.src with
+      | Some src when src <> "" -> paths := StringSet.add src !paths
+      | _ -> ())
+    | _ -> ()
+  in
+  let collect_from_block (block : Jsir.block) =
+    List.iter collect_from_instr block.body
+  in
+  Jsir.Addr.Map.iter (fun _ block -> collect_from_block block) program.blocks;
+  StringSet.elements !paths
+
+let build_debug_summary unit_info module_name program =
+  let source_file_path = Unit_info.original_source_file unit_info in
+  let open Jsoo_imports in
+  let source_files = collect_source_files program in
+  (* If we're compiling with -g, always create a debug summary even if we
+     didn't find any Event instructions yet. This prevents warnings from
+     js_of_ocaml when linking. *)
+  if not !Clflags.debug
+  then Jsir.Debug.default_summary
+  else
+    let paths =
+      if source_files = []
+      then
+        (* No events found, but we can still include the source file path *)
+        [ source_file_path ]
+      else source_files
+    in
+    { Jsir.Debug.is_empty = false;
+      units =
+        [ { Jsir.Debug.module_name =
+              Compilation_unit.full_path_as_string module_name;
+            paths
+          } ]
+    }
+
 let emit_jsir i
     ({ program; imported_compilation_units } :
       Flambda2_to_jsir.To_jsir_result.program) =
   let jsir = Unit_info.jsir i.target in
+  let debug_summary = build_debug_summary i.target i.module_name program in
   let compilation_unit : Jsoo_imports.Jsir.compilation_unit =
     let info : Jsoo_imports.Unit_info.t =
       {
@@ -107,11 +150,10 @@ let emit_jsir i
     {
       info;
       contents =
-        (* CR-soon jvanburen: add debug info for source maps *)
         {
           code = program;
           cmis = Jsoo_imports.StringSet.empty;
-          debug = Jsoo_imports.Jsir.Debug.default_summary;
+          debug = debug_summary;
         };
     }
   in
@@ -122,7 +164,9 @@ let emit_jsir i
       (* Clean up the intermediate .jsir file *)
       Misc.remove_file filename)
     (fun () ->
-      let debug_flag = if !Clflags.debug then [ "--debug-info" ] else [] in
+      let debug_flag =
+        if !Clflags.debug then [ "--debug-info"; "--source-map" ] else []
+      in
       run_jsoo_exn
         ~args:
           ([

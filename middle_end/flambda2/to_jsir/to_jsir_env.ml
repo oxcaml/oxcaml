@@ -52,10 +52,14 @@ type t =
     function_slots : Jsir.Var.t Function_slot.Map.t;
     value_slots : Jsir.Var.t Value_slot.Map.t;
     traps : Continuation.t list;
-    my_closure : Variable.t option
+    my_closure : Variable.t option;
+    offsets : Exported_offsets.t;
+    all_code : Exported_code.t;
+    reachable_names : Name_occurrences.t
   }
 
-let create ~module_symbol ~return_continuation ~exn_continuation =
+let create ~module_symbol ~return_continuation ~exn_continuation
+    ~offsets ~all_code ~reachable_names =
   { module_symbol;
     return_continuation;
     exn_continuation;
@@ -67,7 +71,10 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     function_slots = Function_slot.Map.empty;
     value_slots = Value_slot.Map.empty;
     traps = [];
-    my_closure = None
+    my_closure = None;
+    offsets;
+    all_code;
+    reachable_names
   }
 
 let module_symbol t = t.module_symbol
@@ -224,6 +231,12 @@ let get_value_slot_exn t vslot = Value_slot.Map.find vslot t.value_slots
 let add_var_alias_of_var_exn t ~var ~alias_of =
   let jvar = get_var_exn t alias_of in
   { t with vars = Variable.Map.add var jvar t.vars }
+
+let offsets t = t.offsets
+
+let all_code t = t.all_code
+
+let reachable_names t = t.reachable_names
 
 let add_symbol_alias_of_var_exn t ~res ~symbol ~alias_of =
   let jvar = get_var_exn t alias_of in

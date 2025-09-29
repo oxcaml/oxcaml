@@ -41,6 +41,9 @@ val create :
   module_symbol:Symbol.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
+  offsets:Exported_offsets.t ->
+  all_code:Exported_code.t ->
+  reachable_names:Name_occurrences.t ->
   t
 
 val return_continuation : t -> Continuation.t
@@ -141,6 +144,15 @@ val add_function_slot : t -> Function_slot.t -> Jsir.Var.t -> t
 
 (** Map a Flambda2 value slot to the corresponding JSIR closure variable. *)
 val add_value_slot : t -> Value_slot.t -> Jsir.Var.t -> t
+
+(** Get the exported offsets. *)
+val offsets : t -> Exported_offsets.t
+
+(** Get the exported code. *)
+val all_code : t -> Exported_code.t
+
+(** Get the reachable names. *)
+val reachable_names : t -> Name_occurrences.t
 
 (** Return the block address for the given continuation. Raises if given an
     unbound continuation. *)

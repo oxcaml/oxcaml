@@ -295,7 +295,9 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
 
     (* Build the runtime *)
     let runtime = output_name ^ ".runtime.js" in
-    let debug_flag = if !Clflags.debug then ["--debug-info" ] else [] in
+    let debug_flag =
+      if !Clflags.debug then ["--debug-info"; "--source-map"] else []
+    in
 
     (* Extract runtime files from ccobjs *)
     let runtime_files, other_objs =
