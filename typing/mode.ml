@@ -2763,6 +2763,16 @@ module Comonadic_with (Areality : Areality) = struct
 
   let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
+  module Per_axis = struct
+    let zap_to_floor ax m =
+      let obj = proj_obj ax in
+      with_log (Solver.zap_to_floor obj m)
+
+    let zap_to_ceil ax m =
+      let obj = proj_obj ax in
+      with_log (Solver.zap_to_ceil obj m)
+  end
+
   let min_with ax m =
     Solver.apply Obj.obj (Min_with ax) (Solver.disallow_right m)
 
@@ -2913,6 +2923,16 @@ module Monadic = struct
   end
 
   let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
+
+  module Per_axis = struct
+    let zap_to_floor ax m =
+      let obj = proj_obj ax in
+      with_log (Solver.zap_to_ceil obj m)
+
+    let zap_to_ceil ax m =
+      let obj = proj_obj ax in
+      with_log (Solver.zap_to_floor obj m)
+  end
 
   (* The monadic fragment is inverted. *)
 

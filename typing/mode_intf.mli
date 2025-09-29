@@ -521,6 +521,12 @@ module type S = sig
 
       val proj : 'a Axis.t -> ('r * 'l) t -> ('a, 'l * 'r) mode
 
+      module Per_axis : sig
+        val zap_to_floor : 'a Axis.t -> ('a, 'l * allowed) mode -> 'a
+
+        val zap_to_ceil : 'a Axis.t -> ('a, allowed * 'r) mode -> 'a
+      end
+
       val min_with : 'a Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
     end
 
@@ -533,6 +539,12 @@ module type S = sig
            and type 'd hint_const := 'd pos_hint_const
 
       val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) mode
+
+      module Per_axis : sig
+        val zap_to_floor : 'a Axis.t -> ('a, allowed * 'r) mode -> 'a
+
+        val zap_to_ceil : 'a Axis.t -> ('a, 'l * allowed) mode -> 'a
+      end
 
       val max_with : 'a Axis.t -> ('a, 'l * 'r) mode -> (disallowed * 'r) t
     end
