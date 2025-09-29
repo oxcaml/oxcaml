@@ -457,27 +457,27 @@ val is_best : ('l * disallowed) Types.jkind -> bool
 (** Create a fresh sort variable, packed into a jkind, returning both
     the resulting kind and the sort. *)
 val of_new_sort_var :
-  why:History.concrete_creation_reason -> 'd Types.jkind * sort
+  why:History.concrete_creation_reason -> level:int -> 'd Types.jkind * sort
 
 (** Create a fresh sort variable, packed into a jkind. *)
-val of_new_sort : why:History.concrete_creation_reason -> 'd Types.jkind
+val of_new_sort : why:History.concrete_creation_reason -> level:int -> 'd Types.jkind
 
 (** Same as [of_new_sort_var], but the jkind is lowered to [Non_null]
     to mirror "legacy" OCaml values.
     Defaulting the sort variable produces exactly [value].  *)
 val of_new_legacy_sort_var :
-  why:History.concrete_legacy_creation_reason -> 'd Types.jkind * sort
+  why:History.concrete_legacy_creation_reason -> level:int -> 'd Types.jkind * sort
 
 (** Same as [of_new_sort], but the jkind is lowered to [Non_null]
     to mirror "legacy" OCaml values.
     Defaulting the sort variable produces exactly [value].  *)
 val of_new_legacy_sort :
-  why:History.concrete_legacy_creation_reason -> 'd Types.jkind
+  why:History.concrete_legacy_creation_reason -> level:int -> 'd Types.jkind
 
 (** Same as [of_new_sort_var], but the jkind is lowered to [Non_float].
     Defaulting the sort variable produces exactly the sort [value].  *)
 val of_new_non_float_sort_var :
-  why:History.concrete_creation_reason -> 'd Types.jkind * sort
+  why:History.concrete_creation_reason -> level:int -> 'd Types.jkind * sort
 
 (** Construct a jkind from a constant jkind, at quality [Not_best] *)
 val of_const :
@@ -592,7 +592,7 @@ val for_abbreviation :
 val for_array_argument : Types.jkind_lr
 
 (** The jkind for array elements, creating a new sort variable. *)
-val for_array_element_sort : unit -> Types.jkind_lr * sort
+val for_array_element_sort : level:int -> Types.jkind_lr * sort
 (******************************)
 (* elimination and defaulting *)
 

@@ -20,8 +20,8 @@ open Asttypes
 open Types
 open Btype
 open Errortrace
-open Levels
 open Mode
+open Local_store
 module Int = Misc.Stdlib.Int
 
 (*
@@ -145,6 +145,96 @@ exception Cannot_unify_universal_variables
 
 exception Incompatible
 
+(**** Type level management ****)
+
+let current_level = s_ref 0
+let nongen_level = s_ref 0
+let global_level = s_ref 0
+let saved_level = s_ref []
+
+let get_current_level () = !current_level
+let init_def level = current_level := level; nongen_level := level
+let begin_def () =
+  saved_level := (!current_level, !nongen_level) :: !saved_level;
+  incr current_level; nongen_level := !current_level
+let begin_class_def () =
+  saved_level := (!current_level, !nongen_level) :: !saved_level;
+  incr current_level
+let raise_nongen_level () =
+  saved_level := (!current_level, !nongen_level) :: !saved_level;
+  nongen_level := !current_level
+let end_def () =
+  let cl, nl = List.hd !saved_level in
+  saved_level := List.tl !saved_level;
+  current_level := cl; nongen_level := nl
+let create_scope () =
+  init_def (!current_level + 1);
+  !current_level
+
+let wrap_end_def f = Misc.try_finally f ~always:end_def
+
+let with_local_level ?post f =
+  begin_def ();
+  let result = wrap_end_def f in
+  Option.iter (fun g -> g result) post;
+  result
+let with_local_level_if cond f ~post =
+  if cond then with_local_level f ~post else f ()
+let with_local_level_iter f ~post =
+  begin_def ();
+  let result, l = wrap_end_def f in
+  List.iter post l;
+  result
+let with_local_level_iter_if cond f ~post =
+  if cond then with_local_level_iter f ~post else fst (f ())
+let with_local_level_if_principal f ~post =
+  with_local_level_if !Clflags.principal f ~post
+let with_local_level_iter_if_principal f ~post =
+  with_local_level_iter_if !Clflags.principal f ~post
+let with_level ~level f =
+  begin_def ();
+  init_def level;
+  let result = wrap_end_def f in
+  result
+let with_level_if cond ~level f = if cond then with_level ~level f else f ()
+
+let with_local_level_for_class ?post f =
+  begin_class_def ();
+  let result = wrap_end_def f in
+  Option.iter (fun g -> g result) post;
+  result
+
+let with_raised_nongen_level f =
+  raise_nongen_level ();
+  wrap_end_def f
+
+
+let reset_global_level () = global_level := !current_level
+let increase_global_level () =
+  let gl = !global_level in
+  global_level := !current_level;
+  gl
+let restore_global_level gl = global_level := gl
+
+let update_current_level l = current_level := l
+
+(* For use with ocamldebug *)
+type global_state =
+  { current_level : int ref;
+    nongen_level : int ref;
+    global_level : int ref
+  }
+
+let global_state : global_state = { current_level; nongen_level; global_level }
+
+let print_global_state fmt global_state =
+  let print_field fmt s r = Format.fprintf fmt "%s = %d;@;" s !r in
+  let print_fields fmt { current_level; nongen_level; global_level } =
+    print_field fmt "current_level" current_level;
+    print_field fmt "nongen_level" nongen_level;
+    print_field fmt "global_level" global_level
+  in
+  Format.fprintf fmt "@[<1>{@;%a}@]" print_fields global_state
 (**** Control tracing of GADT instances *)
 
 let trace_gadt_instances = ref false
@@ -175,19 +265,19 @@ let proper_abbrevs tl abbrev =
 
 (* Re-export generic type creators *)
 
-let newty desc              = newty2 ~level:(get_current_level ()) desc
+let newty desc              = newty2 ~level:!current_level desc
 let new_scoped_ty scope desc = newty3 ~level:(get_current_level ()) ~scope desc
 
 let newvar ?name jkind =
-  newty2 ~level:(get_current_level ()) (Tvar { name; jkind })
+  newty2 ~level:!current_level (Tvar { name; jkind })
 let new_rep_var ?name ~why () =
-  let jkind, sort = Jkind.of_new_sort_var ~why in
+  let jkind, sort = Jkind.of_new_sort_var ~why ~level:!current_level in
   newvar ?name jkind, sort
 let newvar2 ?name level jkind = newty2 ~level (Tvar { name; jkind })
 let new_global_var ?name jkind =
-  newty2 ~level:(get_global_level ()) (Tvar { name; jkind })
+  newty2 ~level:!global_level (Tvar { name; jkind })
 let newstub ~scope jkind =
-  newty3 ~level:(get_current_level ()) ~scope (Tvar { name = None; jkind })
+  newty3 ~level:!current_level ~scope (Tvar { name = None; jkind })
 
 let newobj fields      = newty (Tobject (fields, ref None))
 
@@ -764,7 +854,7 @@ let rec lower_all ty =
 *)
 let rec generalize stage_offset ty =
   let level = get_level ty in
-  if (level > get_current_level ()) && (level <> generic_level) then begin
+  if (level > !current_level) && (level <> generic_level) then begin
     set_level ty generic_level;
     (* recur into abbrev for the speed *)
     begin match get_desc ty with
@@ -792,9 +882,9 @@ let generalize ty =
 let rec generalize_structure ty =
   let level = get_level ty in
   if level <> generic_level then begin
-    if is_Tvar ty && level > get_current_level () then
-      set_level ty (get_current_level ())
-    else if level > get_current_level () then begin
+    if is_Tvar ty && level > !current_level then
+      set_level ty !current_level
+    else if level > !current_level then begin
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
           abbrev := Mnil
@@ -809,11 +899,11 @@ let generalize_structure ty =
   simple_abbrevs := Mnil;
   generalize_structure ty
 
-(* Generalize the spine of a function, if the level >= get_current_level () *)
+(* Generalize the spine of a function, if the level >= !current_level *)
 
 let rec generalize_spine ty =
   let level = get_level ty in
-  if level < get_current_level () || level = generic_level then () else
+  if level < !current_level || level = generic_level then () else
   match get_desc ty with
     Tarrow (_, ty1, ty2, _) ->
       set_level ty generic_level;
@@ -1042,7 +1132,7 @@ let lower_variables_only env level ty =
 
 let lower_contravariant env ty =
   simple_abbrevs := Mnil;
-  lower_contravariant env (get_nongen_level ()) (Hashtbl.create 7) false ty
+  lower_contravariant env !nongen_level (Hashtbl.create 7) false ty
 
 let rec generalize_class_type' gen =
   function
@@ -1078,7 +1168,7 @@ let limited_generalize ty0 ty =
     | Some parents -> parents := pty @ !parents
     | None ->
         let level = get_level ty in
-        if level > get_current_level () then begin
+        if level > !current_level then begin
           TypeHash.add graph ty (ref pty);
           (* XXX: why generic_level needs to be a root *)
           if (level = generic_level) || eq_type ty ty0 then
@@ -1096,7 +1186,7 @@ let limited_generalize ty0 ty =
         Tvariant row ->
           let more = row_more row in
           let lv = get_level more in
-          if (TypeHash.mem graph more || lv > get_current_level ())
+          if (TypeHash.mem graph more || lv > !current_level)
               && lv <> generic_level then set_level more generic_level
       | _ -> ()
     end
@@ -1107,7 +1197,7 @@ let limited_generalize ty0 ty =
   TypeHash.iter
     (fun ty _ ->
        if get_level ty <> generic_level then
-         set_level ty (get_current_level ()))
+         set_level ty !current_level)
     graph
 
 let limited_generalize_class_type rv cty =
@@ -1213,7 +1303,7 @@ let rec copy ?partial ?keep_names copy_scope ty =
         None -> assert false
       | Some (free_univars, keep) ->
           if not (is_Tpoly ty) && TypeSet.is_empty (free_univars ty) then
-            if keep then level else get_current_level ()
+            if keep then level else !current_level
           else generic_level
     in
     if forget <> generic_level then
@@ -1324,7 +1414,7 @@ let instance ?partial sch =
     copy ?partial copy_scope sch)
 
 let generic_instance sch =
-  let old = get_current_level () in
+  let old = !current_level in
   update_current_level generic_level;
   let ty = instance sch in
   update_current_level old;
@@ -1487,7 +1577,7 @@ let instance_declaration decl =
   )
 
 let generic_instance_declaration decl =
-  let old = get_current_level () in
+  let old = !current_level in
   update_current_level generic_level;
   let decl = instance_declaration decl in
   update_current_level old;
@@ -1749,7 +1839,7 @@ let instance_prim_layout (desc : Primitive.description) ty =
     let sort = match !new_sort with
     | Some sort -> sort
     | None ->
-      let sort = Jkind.Sort.new_var () in
+      let sort = Jkind.Sort.new_var ~level:!current_level in
       new_sort := Some sort;
       sort
     in
@@ -2634,8 +2724,8 @@ let constrain_type_jkind ~fixed env ty jkind =
   loop ~fuel:100 ~expanded:false ty ~is_open:false
     (estimate_type_jkind env ty) (Jkind.disallow_left jkind)
 
-let type_sort ~why ~fixed env ty =
-  let jkind, sort = Jkind.of_new_sort_var ~why in
+let type_sort ~why ~fixed ~level env ty =
+  let jkind, sort = Jkind.of_new_sort_var ~level ~why in
   match constrain_type_jkind ~fixed env ty jkind with
   | Ok _ -> Ok sort
   | Error _ as e -> e

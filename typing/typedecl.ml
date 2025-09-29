@@ -171,7 +171,9 @@ let make_params env path params =
        have jkind any).  But it might be possible to infer [any] in some
        cases. *)
     let jkind =
-      Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path)
+      Jkind.of_new_legacy_sort
+        ~why:(Unannotated_type_parameter path)
+        ~level:(Ctype.get_current_level ())
     in
     try
       (transl_type_param env path jkind sty, v)
@@ -467,7 +469,7 @@ let set_private_row env loc p decl =
    constructed.  We've been conservative here in the first version. This is the
    same issue as with arrows. *)
 let check_representable ~why env loc kloc typ =
-  match Ctype.type_sort ~why ~fixed:false env typ with
+  match Ctype.type_sort ~why ~fixed:false ~level:(Ctype.get_current_level ()) env typ with
   | Ok _ -> ()
   | Error err -> raise (Error (loc,Jkind_sort {kloc; typ; err}))
 
@@ -602,7 +604,7 @@ let make_constructor
         | _ -> true
       in
       let targs, tret_type, args, ret_type, _univars =
-        Levels.with_local_level_if closed begin fun () ->
+        Ctype.with_local_level_if closed begin fun () ->
           TyVarEnv.reset ();
           let univar_list =
             TyVarEnv.make_poly_univars_jkinds
@@ -835,7 +837,7 @@ let shape_extension_constructor ext =
 
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
-  Levels.with_local_level begin fun () ->
+  Ctype.with_local_level begin fun () ->
   TyVarEnv.reset();
   let path = Path.Pident id in
   let tparams = make_params env path sdecl.ptype_params in
@@ -860,7 +862,7 @@ let transl_declaration env sdecl (id, uid) =
   verify_unboxed_attr unboxed_attr sdecl;
   let transl_type sty =
     let cty =
-      Levels.with_local_level begin fun () ->
+      Ctype.with_local_level begin fun () ->
         Typetexp.transl_simple_type env ~new_var_jkind:Any
           ~closed:true Mode.Alloc.Const.legacy sty
       end
@@ -973,7 +975,8 @@ let transl_declaration env sdecl (id, uid) =
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         let rep, jkind =
           if unbox then
-            Variant_unboxed, Jkind.of_new_sort ~why:Old_style_unboxed_type
+            Variant_unboxed,
+            Jkind.of_new_sort ~why:Old_style_unboxed_type ~level:(Ctype.get_current_level ())
           else
             (* We mark all arg sorts "void" here.  They are updated later,
                after the circular type checks make it safe to check sorts.
@@ -992,7 +995,7 @@ let transl_declaration env sdecl (id, uid) =
                    Constructor_uniform_value, sorts)
                 (Array.of_list cstrs)
             ),
-          Jkind.for_non_float ~why:Boxed_variant
+            Jkind.for_non_float ~why:Boxed_variant
         in
           Ttype_variant tcstrs, Type_variant (cstrs, rep, None), jkind
       | Ptype_record lbls ->
@@ -1003,7 +1006,7 @@ let transl_declaration env sdecl (id, uid) =
           let rep, jkind =
             if unbox then
               Record_unboxed,
-              Jkind.of_new_sort ~why:Old_style_unboxed_type
+              Jkind.of_new_sort ~why:Old_style_unboxed_type ~level:(Ctype.get_current_level ())
             else
             (* Note this is inaccurate, using `Record_boxed` in cases where the
                correct representation is [Record_float], [Record_ufloat], or
@@ -2894,7 +2897,7 @@ let transl_type_decl env rec_flag sdecl_list =
   in
 
   (* Create identifiers. *)
-  let scope = Levels.create_scope () in
+  let scope = Ctype.create_scope () in
   let ids_list =
     List.map (fun sdecl ->
       Ident.create_scoped ~scope sdecl.ptype_name.txt,
@@ -2905,7 +2908,7 @@ let transl_type_decl env rec_flag sdecl_list =
      expand to a generic type variable. After that, we check the coherence of
      the translated declarations in the resulting new environment. *)
   let tdecls, decls, new_env, delayed_jkind_checks =
-    Levels.with_local_level_iter ~post:generalize_decl begin fun () ->
+    Ctype.with_local_level_iter ~post:generalize_decl begin fun () ->
       (* Enter types. *)
       let temp_env =
         List.fold_left2 (enter_type rec_flag) env sdecl_list ids_list in
@@ -3317,8 +3320,8 @@ let transl_type_extension extend env loc styext =
   let ttype_params, _type_params, constructors =
     (* Note: it would be incorrect to call [create_scope] *after*
        [TyVarEnv.reset] or after [with_local_level] (see #10010). *)
-    let scope = Levels.create_scope () in
-    Levels.with_local_level begin fun () ->
+    let scope = Ctype.create_scope () in
+    Ctype.with_local_level begin fun () ->
       TyVarEnv.reset();
       let ttype_params = make_params env type_path styext.ptyext_params in
       let type_params = List.map (fun (cty, _) -> cty.ctyp_type) ttype_params in
@@ -3389,8 +3392,8 @@ let transl_type_extension extend env loc styext =
 
 let transl_exception env sext =
   let ext, shape =
-    let scope = Levels.create_scope () in
-    Levels.with_local_level
+    let scope = Ctype.create_scope () in
+    Ctype.with_local_level
       (fun () ->
         TyVarEnv.reset();
         transl_extension_constructor ~scope env
@@ -3553,7 +3556,7 @@ let error_if_has_deep_native_repr_attributes core_type =
     [external f : ('a : any). 'a -> 'a = "%identity"]
    In such cases, we raise an expection. *)
 let type_sort_external ~is_layout_poly ~why env loc typ =
-  match Ctype.type_sort ~why ~fixed:true env typ with
+  match Ctype.type_sort ~why ~fixed:true ~level:(Ctype.get_current_level ()) env typ with
   | Ok s -> Jkind.Sort.default_to_value_and_get s
   | Error err ->
     let kloc =
@@ -3966,7 +3969,7 @@ let transl_value_decl env ~modalities loc valdecl =
 let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     sdecl =
   Env.mark_type_used sig_decl.type_uid;
-  Levels.with_local_level begin fun () ->
+  Ctype.with_local_level begin fun () ->
   TyVarEnv.reset();
   (* In the first part of this function, we typecheck the syntactic
      declaration [sdecl] in the outer environment [outer_env]. *)
@@ -4202,7 +4205,7 @@ let transl_package_constraint ~loc ty =
 
 let abstract_type_decl ~injective ~jkind ~params =
   let arity = List.length params in
-  Levels.with_local_level ~post:generalize_decl begin fun () ->
+  Ctype.with_local_level ~post:generalize_decl begin fun () ->
     let params = List.map Ctype.newvar params in
     { type_params = params;
       type_arity = arity;
@@ -4240,7 +4243,7 @@ let abstract_type_decl ~injective ~jkind ~params =
   end
 
 let approx_type_decl sdecl_list =
-  let scope = Levels.create_scope () in
+  let scope = Ctype.create_scope () in
   List.map
     (fun sdecl ->
        let id = Ident.create_scoped ~scope sdecl.ptype_name.txt in

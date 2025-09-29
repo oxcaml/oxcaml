@@ -1429,7 +1429,7 @@ let glb_array_set_type loc t1 t2 =
 
 let peek_or_poke_layout_from_type ~prim_name error_loc env ty
       : Lambda.peek_or_poke option =
-  match Ctype.type_sort ~why:Peek_or_poke ~fixed:true env ty with
+  match Ctype.type_sort ~why:Peek_or_poke ~fixed:true ~level:(Ctype.get_current_level ()) env ty with
   | Error _ -> None
   | Ok sort ->
     let sort = Jkind.Sort.default_to_value_and_get sort in

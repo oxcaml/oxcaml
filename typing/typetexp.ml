@@ -24,7 +24,6 @@ open Typedtree
 open Types
 open Mode
 open Ctype
-open Levels
 
 exception Already_bound
 
@@ -501,7 +500,9 @@ end = struct
        preserve backwards compatibility. But we also need [Any] callsites
        to accept nullable jkinds to allow cases like [type ('a : value_or_null) t = 'a]. *)
     | Any -> Jkind.Builtin.any ~why:(if is_named then Unification_var else Wildcard)
-    | Sort -> Jkind.of_new_legacy_sort ~why:(if is_named then Unification_var else Wildcard)
+    | Sort ->
+        let level = get_current_level () in
+        Jkind.of_new_legacy_sort ~why:(if is_named then Unification_var else Wildcard) ~level
 
   let new_any_var loc env jkind = function
     | { unbound_variable_policy = Closed; _ } ->
@@ -645,7 +646,9 @@ let get_type_param_jkind path styp =
       of_annotation jkind None
   | Ptyp_var (name, Some jkind) ->
       of_annotation jkind (Some name)
-  | _ -> Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path)
+  | _ ->
+      let level = get_current_level () in
+      Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path) ~level
 
 let get_type_param_name styp =
   (* We don't need to check for jkinds here, just to get the name. *)

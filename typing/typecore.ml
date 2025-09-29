@@ -26,7 +26,6 @@ open Mode
 open Typedtree
 open Btype
 open Ctype
-open Levels
 
 type comprehension_type =
   | List_comprehension
@@ -1690,7 +1689,7 @@ let solve_Ppat_unboxed_tuple ~refine ~alloc_mode loc env args expected_ty =
     List.map2
       (fun (label, p) mode ->
          let jkind, sort =
-           Jkind.of_new_sort_var ~why:Jkind.History.Unboxed_tuple_element
+           Jkind.of_new_sort_var ~why:Jkind.History.Unboxed_tuple_element ~level:(Ctype.get_current_level ())
          in
         ( label,
           p,
@@ -1866,7 +1865,7 @@ let solve_Ppat_array ~refine loc env mutability expected_ty =
     if Types.is_mutable mutability then Predef.type_array
     else Predef.type_iarray
   in
-  let jkind, arg_sort = Jkind.for_array_element_sort () in
+  let jkind, arg_sort = Jkind.for_array_element_sort ~level:(Ctype.get_current_level ()) in
   let ty_elt = newgenvar jkind in
   let expected_ty = generic_instance expected_ty in
   unify_pat_types_refine ~refine
@@ -2869,7 +2868,7 @@ and type_pat_aux
             Wrong_expected_record_boxing(Pattern, P record_form, expected_ty) in
           raise (Error (loc, !!penv, error))
         | Maybe_a_record_type ->
-          None, newvar (Jkind.of_new_sort ~why:Record_projection)
+          None, newvar (Jkind.of_new_sort ~level:(Ctype.get_current_level ()) ~why:Record_projection)
         | Not_a_record_type ->
           let wks = record_form_to_wrong_kind_sort record_form in
           let error = Wrong_expected_kind(wks, Pattern, expected_ty) in
@@ -2943,6 +2942,7 @@ and type_pat_aux
             let sort =
               match
                 Ctype.type_sort ~why:Jkind.History.Mutable_var_assignment
+                  ~level:(get_current_level ())
                   ~fixed:false !!penv ty
               with
               | Ok sort -> sort
@@ -4116,7 +4116,7 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
               let ty_arg_mono, sort_arg = new_rep_var ~why:Function_argument () in
               let ty_arg = newmono ty_arg_mono in
               let ty_res =
-                newvar (Jkind.of_new_sort ~why:Function_result)
+                newvar (Jkind.of_new_sort ~why:Function_result ~level:(Ctype.get_current_level ()))
               in
               if ret_tvar &&
                  not (is_prim ~name:"%identity" funct) &&
@@ -4148,7 +4148,8 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
         | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
           when labels_match ~param:l ~arg:lbl ->
             let sort_arg =
-              match type_sort ~why:Function_argument ~fixed:false env ty_arg with
+              match type_sort ~why:Function_argument ~fixed:false
+                      ~level:(get_current_level ()) env ty_arg with
               | Ok sort -> sort
               | Error err -> raise(Error(funct.exp_loc, env,
                                          Function_type_not_rep (ty_arg,err)))
@@ -4219,7 +4220,8 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
           end
         in
         let sort_arg =
-          match type_sort ~why:Function_argument ~fixed:false env ty_arg with
+          match type_sort ~why:Function_argument ~fixed:false
+                  ~level:(get_current_level ()) env ty_arg with
           | Ok sort -> sort
           | Error err -> raise(Error(sarg1.pexp_loc, env,
                                      Function_type_not_rep(ty_arg, err)))
@@ -4317,7 +4319,8 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
          | Omitted { mode_fun; ty_arg; mode_arg; level; sort_arg } ->
              let arrow_desc = (lbl, mode_arg, mode_ret) in
              let sort_ret =
-               match type_sort ~why:Function_result ~fixed:false env ty_ret with
+               match type_sort ~why:Function_result ~fixed:false
+                       ~level:(get_current_level ()) env ty_ret with
                | Ok sort -> sort
                | Error err ->
                  raise (Error (loc, env, Function_type_not_rep (ty_ret, err)))
@@ -5434,7 +5437,7 @@ let split_function_ty
   let arg_value_mode = alloc_to_value_l2r arg_mode in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
   let type_sort ~why ty =
-    match Ctype.type_sort ~why ~fixed:false env ty with
+    match Ctype.type_sort ~why ~fixed:false ~level:(get_current_level ()) env ty with
     | Ok sort -> sort
     | Error err -> raise (Error (loc_fun, env, Function_type_not_rep (ty, err)))
   in
@@ -5716,7 +5719,7 @@ and type_expect_
         in
         match expected_opath, opt_exp_opath with
         | None, None ->
-          newvar (Jkind.of_new_sort ~why:Record_projection), None
+          newvar (Jkind.of_new_sort ~why:Record_projection ~level:(Ctype.get_current_level ())), None
         | Some _, None -> ty_expected, expected_opath
         | Some(_, _, true), Some _ -> ty_expected, expected_opath
         | (None | Some (_, _, false)), Some (_, p', _) ->
@@ -5876,7 +5879,7 @@ and type_expect_
             let sort =
               match
                 Ctype.type_sort ~why:Record_functional_update ~fixed:false
-                  env exp.exp_type
+                  ~level:(get_current_level ()) env exp.exp_type
               with
               | Ok sort -> sort
               | Error err ->
@@ -6456,7 +6459,7 @@ and type_expect_
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
         if expected_type = None
-        then newvar (Jkind.of_new_sort ~why:Record_assignment)
+        then newvar (Jkind.of_new_sort ~why:Record_assignment ~level:(Ctype.get_current_level ()))
         else record.exp_type
       in
       let (label_loc, label, newval) =
@@ -7111,7 +7114,7 @@ and type_expect_
           let spat_params, ty_params, param_sort =
             let initial_jkind, initial_sort = match sands with
               | [] ->
-                Jkind.of_new_sort_var ~why:Function_argument
+                Jkind.of_new_sort_var ~why:Function_argument ~level:(Ctype.get_current_level ())
               (* CR layouts v5: eliminate value requirement for tuple elements *)
               | _ -> Jkind.Builtin.value_or_null ~why:Tuple_element, Jkind.Sort.value
             in
@@ -7536,7 +7539,7 @@ and type_block_access env expected_base_ty principal
     { ba; base_ty = ty_res; el_ty = ty_arg; flat_float; modality }
   | Baccess_array (mut, index_kind, index) ->
     let elt_jkind, elt_sort =
-      Jkind.of_new_non_float_sort_var ~why:Idx_element in
+      Jkind.of_new_non_float_sort_var ~why:Idx_element ~level:(Ctype.get_current_level ()) in
     let elt_ty = newvar elt_jkind in
     let base_ty =
       match mut with
@@ -7562,7 +7565,7 @@ and type_block_access env expected_base_ty principal
     { ba; base_ty; el_ty = elt_ty; flat_float = false; modality }
   | Baccess_block (mut, idx) ->
     let base_ty = newvar (Jkind.Builtin.value ~why:Idx_base) in
-    let el_ty = newvar (Jkind.of_new_sort ~why:Idx_element) in
+    let el_ty = newvar (Jkind.of_new_sort ~why:Idx_element ~level:(Ctype.get_current_level ())) in
     let idx_type_expected =
       match mut with
       | Immutable -> Predef.type_idx_imm base_ty el_ty
@@ -7957,7 +7960,7 @@ and type_function
                 Misc.fatal_error "[default] allowed only with optional argument"
             in
             let default_arg_jkind, default_arg_sort =
-              Jkind.of_new_sort_var ~why:Optional_arg_default
+              Jkind.of_new_sort_var ~why:Optional_arg_default ~level:(Ctype.get_current_level ())
             in
             let ty_default_arg = newvar default_arg_jkind in
             begin
@@ -8210,7 +8213,7 @@ and type_label_access
     _ * _ * _ * 'rep gen_label_description * _
   = fun record_form env srecord usage lid ->
   let mode = Value.newvar () in
-  let record_jkind, record_sort = Jkind.of_new_sort_var ~why:Record_projection in
+  let record_jkind, record_sort = Jkind.of_new_sort_var ~why:Record_projection ~level:(Ctype.get_current_level ()) in
   let record =
     with_local_level_if_principal ~post:generalize_structure_exp
       (fun () ->
@@ -8736,7 +8739,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       Regionality.submode_exn
         (Value.proj_comonadic Areality eta_mode) Regionality.regional;
       let type_sort ~why ty =
-        match type_sort ~why ~fixed:false env ty with
+        match type_sort ~why ~fixed:false ~level:(get_current_level ()) env ty with
         | Ok sort -> sort
         | Error err ->
           raise(Error(sarg.pexp_loc, env, Function_type_not_rep (ty, err)))
@@ -8918,7 +8921,7 @@ and type_application env app_loc expected_mode position_and_mode
       in
       let ret_mode = Alloc.disallow_right ret_mode in
       let type_sort ~why ty =
-        match Ctype.type_sort ~why ~fixed:false env ty with
+        match Ctype.type_sort ~why ~fixed:false ~level:(get_current_level ()) env ty with
         | Ok sort -> sort
         | Error err -> raise (Error (app_loc, env, Function_type_not_rep (ty, err)))
       in
@@ -9071,7 +9074,7 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   (* elements must be representable *)
   let labels_types_and_sorts =
     List.map (fun (label, _) ->
-      let jkind, sort = Jkind.of_new_sort_var ~why:Unboxed_tuple_element in
+      let jkind, sort = Jkind.of_new_sort_var ~why:Unboxed_tuple_element ~level:(Ctype.get_current_level ()) in
       label, newgenvar jkind, sort)
     sexpl
   in
@@ -10213,7 +10216,7 @@ and type_generic_array
   in
   let modalities = Typemode.transl_modalities ~maturity:Stable mutability [] in
   let argument_mode = mode_modality modalities array_mode in
-  let jkind, elt_sort = Jkind.for_array_element_sort () in
+  let jkind, elt_sort = Jkind.for_array_element_sort ~level:(Ctype.get_current_level ()) in
   let ty = newgenvar jkind in
   let to_unify = type_ ty in
   with_explanation explanation (fun () ->
@@ -10291,7 +10294,7 @@ and type_n_ary_function
                 | Unification_error trace -> trace
                 | Not_a_function ->
                     let tarrow =
-                      let new_ty_var why = newvar (Jkind.of_new_sort ~why) in
+                      let new_ty_var why = newvar (Jkind.of_new_sort ~why ~level:(Ctype.get_current_level ())) in
                       let new_mode_var () = Mode.Alloc.newvar () in
                       (newty
                          (Tarrow
@@ -10785,7 +10788,7 @@ let type_expression env jkind sexp =
   maybe_check_uniqueness_exp exp; exp
 
 let type_representable_expression ~why env sexp =
-  let jkind, sort = Jkind.of_new_sort_var ~why in
+  let jkind, sort = Jkind.of_new_sort_var ~why ~level:(Ctype.get_current_level ()) in
   let exp = type_expression env jkind sexp in
   exp, sort
 
