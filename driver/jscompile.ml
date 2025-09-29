@@ -89,10 +89,10 @@ let collect_source_files (program : Jsoo_imports.Jsir.program) =
   let paths = ref StringSet.empty in
   let collect_from_instr (instr : Jsir.instr) =
     match instr with
-    | Event pi ->
-      (match pi.Parse_info.src with
-      | Some src when src <> "" -> paths := StringSet.add src !paths
-      | _ -> ())
+    | Event pi -> (
+        match pi.Parse_info.src with
+        | Some src when src <> "" -> paths := StringSet.add src !paths
+        | _ -> ())
     | _ -> ()
   in
   let collect_from_block (block : Jsir.block) =
@@ -108,22 +108,24 @@ let build_debug_summary unit_info module_name program =
   (* If we're compiling with -g, always create a debug summary even if we
      didn't find any Event instructions yet. This prevents warnings from
      js_of_ocaml when linking. *)
-  if not !Clflags.debug
-  then Jsir.Debug.default_summary
+  if not !Clflags.debug then Jsir.Debug.default_summary
   else
     let paths =
-      if source_files = []
-      then
+      if source_files = [] then
         (* No events found, but we can still include the source file path *)
         [ source_file_path ]
       else source_files
     in
-    { Jsir.Debug.is_empty = false;
+    {
+      Jsir.Debug.is_empty = false;
       units =
-        [ { Jsir.Debug.module_name =
+        [
+          {
+            Jsir.Debug.module_name =
               Compilation_unit.full_path_as_string module_name;
-            paths
-          } ]
+            paths;
+          };
+        ];
     }
 
 let emit_jsir i
@@ -164,9 +166,7 @@ let emit_jsir i
       (* Clean up the intermediate .jsir file *)
       Misc.remove_file filename)
     (fun () ->
-      let debug_flag =
-        if !Clflags.debug then [ "--debug-info" ] else []
-      in
+      let debug_flag = if !Clflags.debug then [ "--debug-info" ] else [] in
       run_jsoo_exn
         ~args:
           ([

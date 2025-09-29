@@ -58,8 +58,8 @@ type t =
     reachable_names : Name_occurrences.t
   }
 
-let create ~module_symbol ~return_continuation ~exn_continuation
-    ~offsets ~all_code ~reachable_names =
+let create ~module_symbol ~return_continuation ~exn_continuation ~offsets
+    ~all_code ~reachable_names =
   { module_symbol;
     return_continuation;
     exn_continuation;
