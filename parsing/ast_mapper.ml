@@ -966,9 +966,14 @@ let default_mapper =
         | Pjk_mod (t, mode_list) ->
           Pjk_mod (this.jkind_annotation this t, this.modes this mode_list)
         | Pjk_with (t, ty, modalities) ->
-          Pjk_with (this.jkind_annotation this t, this.typ this ty, this.modalities this modalities)
+          Pjk_with (
+            this.jkind_annotation this t,
+            this.typ this ty,
+            this.modalities this modalities
+          )
         | Pjk_kind_of ty -> Pjk_kind_of (this.typ this ty)
-        | Pjk_product ts -> Pjk_product (List.map (this.jkind_annotation this) ts)
+        | Pjk_product ts ->
+          Pjk_product (List.map (this.jkind_annotation this) ts)
       in
       { pjkind_loc; pjkind_desc });
 

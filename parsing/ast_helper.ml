@@ -145,7 +145,8 @@ module Typ = struct
         | Pjk_default as x -> x
         | Pjk_abbreviation _ as x -> x
         | Pjk_mod (jkind, modes) -> Pjk_mod (loop_jkind jkind, modes)
-        | Pjk_with (jkind, typ, modalities) -> Pjk_with (loop_jkind jkind, loop typ, modalities)
+        | Pjk_with (jkind, typ, modalities) ->
+          Pjk_with (loop_jkind jkind, loop typ, modalities)
         | Pjk_kind_of typ -> Pjk_kind_of (loop typ)
         | Pjk_product jkinds -> Pjk_product (List.map loop_jkind jkinds)
       in
