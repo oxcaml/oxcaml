@@ -114,11 +114,11 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
       Name_occurrences.greatest_name_mode_var free_names_of_body
         (VB.var bound_var)
     | Set_of_closures _ ->
-      Bound_pattern.fold_all_bound_vars bound_vars
-        ~init:Name_mode.Or_absent.absent ~f:(fun greatest_name_mode bound_var ->
-          Name_occurrences.greatest_name_mode_var free_names_of_body
-            (VB.var bound_var)
-          |> Name_mode.Or_absent.join_in_terms greatest_name_mode)
+        Name_mode.Or_absent.join_in_terms greatest_name_mode
+          (Bound_pattern.fold_all_bound_vars bound_vars
+             ~init:Name_mode.Or_absent.absent ~f:(fun greatest_name_mode bound_var ->
+                 Name_occurrences.greatest_name_mode_var free_names_of_body
+                   (VB.var bound_var)))
     | Static _ -> assert false
     (* see below *)
   in
@@ -142,13 +142,9 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
             | None -> true
             | Some c -> c > 0
           in
-          let { Simplified_named.named = defining_expr;
-                free_names = _;
-                cost_metrics = _
-              } =
-            simplified_defining_expr
+          let defining_expr =
+            Simplified_named.to_named simplified_defining_expr.Simplified_named.named
           in
-          let defining_expr = Simplified_named.to_named defining_expr in
           if mismatched_modes
           then
             Misc.fatal_errorf
@@ -176,9 +172,12 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               in
               not is_used, is_used
           in
-          if is_end_region_for_used_region
-             || (not is_end_region_for_unused_region)
-                && not (Named.at_most_generative_effects defining_expr)
+          let must_be_kept_for_its_effects =
+            is_end_region_for_used_region
+            || (not is_end_region_for_unused_region)
+               && not (Named.at_most_generative_effects defining_expr)
+          in
+          if must_be_kept_for_its_effects
           then (
             if not (Name_mode.is_normal declared_name_mode)
             then

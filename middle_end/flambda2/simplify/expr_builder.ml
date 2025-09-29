@@ -172,7 +172,7 @@ let create_coerced_singleton_let uacc var defining_expr
 let make_new_let_bindings uacc ~bindings_outermost_first ~body =
   (* The name occurrences component of [uacc] is expected to be in the state
      described in the comment at the top of [Simplify_let.rebuild_let]. *)
-  let delete_binding uacc ~original_defining_expr =
+  let notify_removed uacc ~original_defining_expr =
     match (original_defining_expr : Named.t option) with
     | Some (Prim (prim, _dbg)) ->
       UA.notify_removed ~operation:(Removed_operations.prim prim) uacc
@@ -184,7 +184,7 @@ let make_new_let_bindings uacc ~bindings_outermost_first ~body =
     ~f:(fun (expr, uacc) binding ->
       match (binding : binding_to_place) with
       | Delete_binding { original_defining_expr } ->
-        expr, delete_binding uacc ~original_defining_expr
+        expr, notify_removed uacc ~original_defining_expr
       | Keep_binding
           { let_bound; simplified_defining_expr; original_defining_expr = _ } ->
         let { Simplified_named.named = defining_expr;
