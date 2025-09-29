@@ -18,54 +18,54 @@ val of_axis_set : Jkind_axis.Axis_set.t -> t
 (* Individual axis constants: each axis at a specific non-bot level *)
 
 (* Areality axis *)
-val global : t
-val regional : t
-val local_ : t
+val areality_global : t
+val areality_regional : t
+val areality_local : t
 
 (* Linearity axis *)
-val many : t
-val once : t
+val linearity_many : t
+val linearity_once : t
 
 (* Uniqueness axis (monadic) *)
-val aliased : t
-val unique : t
+val uniqueness_aliased : t
+val uniqueness_unique : t
 
 (* Portability axis *)
-val portable : t
-val nonportable : t
+val portability_portable : t
+val portability_nonportable : t
 
 (* Contention axis (monadic) *)
-val contended : t
-val shared : t
-val uncontended : t
+val contention_contended : t
+val contention_shared : t
+val contention_uncontended : t
 
 (* Yielding axis *)
-val unyielding : t
-val yielding : t
+val yielding_unyielding : t
+val yielding_yielding : t
 
 (* Statefulness axis *)
-val stateless : t
-val observing : t
-val stateful : t
+val statefulness_stateless : t
+val statefulness_observing : t
+val statefulness_stateful : t
 
 (* Visibility axis (monadic) *)
-val immutable : t
-val read : t
-val read_write : t
+val visibility_immutable : t
+val visibility_read : t
+val visibility_read_write : t
 
 (* Externality axis *)
-val external_ : t
-val external64 : t
-val internal : t
+val externality_external : t
+val externality_external64 : t
+val externality_internal : t
 
 (* Nullability axis *)
-val non_null : t
-val maybe_null : t
+val nullability_non_null : t
+val nullability_maybe_null : t
 
 (* Separability axis *)
-val non_float : t
-val separable : t
-val maybe_separable : t
+val separability_non_float : t
+val separability_separable : t
+val separability_maybe_separable : t
 
 (* Mask that excludes the shallow axes (nullability and separability). *)
 val mask_shallow : t

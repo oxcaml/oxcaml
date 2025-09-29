@@ -124,54 +124,54 @@ let co_sub (a:t) (b:t) : t =
 (* Individual axis constants: each axis at a specific non-bot level *)
 
 (* Areality axis: 0=Global, 1=Regional, 2=Local *)
-let global    : t = set_axis bot ~axis:0 ~level:0
-let regional  : t = set_axis bot ~axis:0 ~level:1
-let local_    : t = set_axis bot ~axis:0 ~level:2
+let areality_global    : t = set_axis bot ~axis:0 ~level:0
+let areality_regional  : t = set_axis bot ~axis:0 ~level:1
+let areality_local     : t = set_axis bot ~axis:0 ~level:2
 
 (* Linearity axis: 0=Many, 1=Once *)
-let many : t = set_axis bot ~axis:1 ~level:0
-let once : t = set_axis bot ~axis:1 ~level:1
+let linearity_many : t = set_axis bot ~axis:1 ~level:0
+let linearity_once : t = set_axis bot ~axis:1 ~level:1
 
 (* Uniqueness axis (monadic): 0=Aliased, 1=Unique *)
-let aliased : t = set_axis bot ~axis:2 ~level:0
-let unique  : t = set_axis bot ~axis:2 ~level:1
+let uniqueness_aliased : t = set_axis bot ~axis:2 ~level:0
+let uniqueness_unique  : t = set_axis bot ~axis:2 ~level:1
 
 (* Portability axis: 0=Portable, 1=Nonportable *)
-let portable    : t = set_axis bot ~axis:3 ~level:0
-let nonportable : t = set_axis bot ~axis:3 ~level:1
+let portability_portable    : t = set_axis bot ~axis:3 ~level:0
+let portability_nonportable : t = set_axis bot ~axis:3 ~level:1
 
 (* Contention axis (monadic): 0=Contended, 1=Shared, 2=Uncontended *)
-let contended   : t = set_axis bot ~axis:4 ~level:0
-let shared      : t = set_axis bot ~axis:4 ~level:1
-let uncontended : t = set_axis bot ~axis:4 ~level:2
+let contention_contended   : t = set_axis bot ~axis:4 ~level:0
+let contention_shared      : t = set_axis bot ~axis:4 ~level:1
+let contention_uncontended : t = set_axis bot ~axis:4 ~level:2
 
 (* Yielding axis: 0=Unyielding, 1=Yielding *)
-let unyielding : t = set_axis bot ~axis:5 ~level:0
-let yielding   : t = set_axis bot ~axis:5 ~level:1
+let yielding_unyielding : t = set_axis bot ~axis:5 ~level:0
+let yielding_yielding   : t = set_axis bot ~axis:5 ~level:1
 
 (* Statefulness axis: 0=Stateless, 1=Observing, 2=Stateful *)
-let stateless : t = set_axis bot ~axis:6 ~level:0
-let observing : t = set_axis bot ~axis:6 ~level:1
-let stateful  : t = set_axis bot ~axis:6 ~level:2
+let statefulness_stateless : t = set_axis bot ~axis:6 ~level:0
+let statefulness_observing : t = set_axis bot ~axis:6 ~level:1
+let statefulness_stateful  : t = set_axis bot ~axis:6 ~level:2
 
 (* Visibility axis (monadic): 0=Immutable, 1=Read, 2=Read_write *)
-let immutable  : t = set_axis bot ~axis:7 ~level:0
-let read       : t = set_axis bot ~axis:7 ~level:1
-let read_write : t = set_axis bot ~axis:7 ~level:2
+let visibility_immutable  : t = set_axis bot ~axis:7 ~level:0
+let visibility_read       : t = set_axis bot ~axis:7 ~level:1
+let visibility_read_write : t = set_axis bot ~axis:7 ~level:2
 
 (* Externality axis: 0=External, 1=External64, 2=Internal *)
-let external_   : t = set_axis bot ~axis:8 ~level:0
-let external64  : t = set_axis bot ~axis:8 ~level:1
-let internal    : t = set_axis bot ~axis:8 ~level:2
+let externality_external   : t = set_axis bot ~axis:8 ~level:0
+let externality_external64 : t = set_axis bot ~axis:8 ~level:1
+let externality_internal   : t = set_axis bot ~axis:8 ~level:2
 
 (* Nullability axis: 0=Non_null, 1=Maybe_null *)
-let non_null   : t = set_axis bot ~axis:9 ~level:0
-let maybe_null : t = set_axis bot ~axis:9 ~level:1
+let nullability_non_null   : t = set_axis bot ~axis:9 ~level:0
+let nullability_maybe_null : t = set_axis bot ~axis:9 ~level:1
 
 (* Separability axis: 0=Non_float, 1=Separable, 2=Maybe_separable *)
-let non_float       : t = set_axis bot ~axis:10 ~level:0
-let separable       : t = set_axis bot ~axis:10 ~level:1
-let maybe_separable : t = set_axis bot ~axis:10 ~level:2
+let separability_non_float       : t = set_axis bot ~axis:10 ~level:0
+let separability_separable       : t = set_axis bot ~axis:10 ~level:1
+let separability_maybe_separable : t = set_axis bot ~axis:10 ~level:2
 
 (* Build a mask from a set of relevant axes. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
