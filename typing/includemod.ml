@@ -418,7 +418,7 @@ let rec print_coercion ppf c =
   let pr fmt = Format.fprintf ppf fmt in
   match c with
     Tcoerce_none -> pr "id"
-  | Tcoerce_structure { pos_cc_list; id_pos_list } ->
+  | Tcoerce_structure { pos_cc_list; id_pos_list; _ } ->
       pr "@[<2>struct@ %a@ %a@]"
         (print_list print_coercion2) pos_cc_list
         (print_list print_coercion3) id_pos_list
@@ -907,8 +907,14 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        let input_repr = Mtype.module_representation_of_lazy_signature sig1 in
-        let output_repr = Mtype.module_representation_of_lazy_signature sig2 in
+        let input_repr =
+          Mtype.module_representation_of_lazy_signature
+            ~check_representable:`No sig1
+        in
+        let output_repr =
+          Mtype.module_representation_of_lazy_signature
+            ~check_representable:(`Yes loc) sig2
+        in
         let coercion =
           if runtime_len1 = runtime_len2 then (* see PR#5098 *)
             simplify_structure_coercion input_repr output_repr cc id_pos_list

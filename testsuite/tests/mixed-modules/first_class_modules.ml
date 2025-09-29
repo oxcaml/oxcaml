@@ -12,7 +12,7 @@
 open Stdlib_upstream_compatible
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
-let _ = print_endline "Test 1: basic first-class mixed module"
+let _ = print_endline "Test: basic first-class mixed module"
 
 module type S1 = sig
   val unboxed_float : float#
@@ -42,7 +42,7 @@ let () =
   print_endline ""
 
 
-let _ = print_endline "Test 2: passing modules to functions"
+let _ = print_endline "Test: passing modules to functions"
 
 let use_module m =
   let module M = (val m : S1) in
@@ -56,25 +56,26 @@ let _ = print_endline ""
 let _ = print_endline (id concat)
 
 
-let _ = print_endline "Test 3: returning modules from functions"
+let _ = print_endline "Test: returning modules from functions"
 
 let make_module n s =
   (module struct
     let boxed_int = n
     let boxed_string = s
-    let unboxed_float = Float_u.of_float (float_of_int n)
-    let unboxed_int64 = Int64_u.of_int64 (Int64.of_int (n * 2))
+    let unboxed_float = Float_u.of_float (float_of_int (n + 1))
+    let unboxed_int64 = Int64_u.of_int64 (Int64.of_int (2 * n))
   end : S1)
 
 let m3 = make_module 10 "ten"
 module M3 = (val m3 : S1)
-let _ = print_int (id M3.boxed_int)
-let _ = print_endline ""
-let _ = print_string (id M3.boxed_string)
-let _ = print_endline ""
+let () =
+  Printf.printf "%d %s %.1f %d\n"
+    (id M3.boxed_int) (id M3.boxed_string)
+    (Float_u.to_float (id M3.unboxed_float))
+    (Int64_u.to_int (id M3.unboxed_int64))
 
 
-let _ = print_endline "Test 4: list of first-class modules"
+let _ = print_endline "Test: list of first-class modules"
 
 let modules = [
   (module struct
@@ -107,7 +108,7 @@ let _ = print_int (sum_ints (id modules))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 5: conditional module selection"
+let _ = print_endline "Test: conditional module selection"
 
 let select_module b =
   if b then
@@ -137,7 +138,7 @@ let _ = print_endline ""
 let _ = print_string (id Selected2.boxed_string)
 let _ = print_endline ""
 
-let _ = print_endline "Test 6: unboxed tuples and records in a first-class module"
+let _ = print_endline "Test: unboxed tuples and records in a first-class module"
 
 module type S6 = sig
   val regular_tuple : int * string
@@ -180,7 +181,7 @@ let _ =
   print_endline ""
 
 
-let _ = print_endline "Test 7: functor producing first-class mixed modules"
+let _ = print_endline "Test: functor producing first-class mixed modules"
 
 module type Input = sig
   val n : int
@@ -209,7 +210,7 @@ let _ = print_float (Float_u.to_float (id M7.unboxed_float))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 8: first-class functors"
+let _ = print_endline "Test: first-class functors"
 
 module type S8 = sig
   val foo : float#
@@ -305,7 +306,7 @@ let _ = print_int (id M8_F_Result.boxed_int)
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 9: subtype by forgetting abstract types"
+let _ = print_endline "Test: subtype by forgetting abstract types"
 
 module type S9_base = sig
   type t : any
@@ -338,7 +339,7 @@ let _ = print_float (Float_u.to_float (id M9.y))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 10: subtype by forgetting type alias"
+let _ = print_endline "Test: subtype by forgetting type alias"
 
 module type S10_with_eq = sig
   type t
@@ -368,7 +369,7 @@ let _ = print_float (Float_u.to_float (id M10.y))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 11: subtype with unboxed type in forgotten types"
+let _ = print_endline "Test: subtype with unboxed type in forgotten types"
 
 module type S11_many_unboxed = sig
   type t = float#

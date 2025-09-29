@@ -1,19 +1,19 @@
-Test 1: abstract type : value
+Test: abstract type : value
 foo
 10
 20
 bar
-Test 2: abstract type : value with type t := string
+Test: abstract type : value with type t := string
 foo
 10
 20
 bar
-Test 3: abstract type : float64
+Test: abstract type : float64
 30.
 40
 50
 baz
-Test 4: abstract type : float64 with type t := float#
+Test: abstract type : float64 with type t := float#
 30.
 40
 50

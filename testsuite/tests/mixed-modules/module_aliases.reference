@@ -1,4 +1,4 @@
-Test 1: Based on pr11186.ml
+Test: Based on pr11186.ml
 4. Hello
-Test 2: Coercion with aliases, modules, and vals
+Test: Coercion with aliases, modules, and vals
 2. 3. 4. 5.

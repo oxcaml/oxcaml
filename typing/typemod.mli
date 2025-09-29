@@ -70,7 +70,7 @@ val save_signature:
 
 val package_units:
   Env.t -> string list -> Unit_info.Artifact.t -> Compilation_unit.t
-  -> Typedtree.module_coercion * Types.module_representation
+  -> Typedtree.module_coercion
 
 (* Should be in Envaux, but it breaks the build of the debugger *)
 val initial_env:

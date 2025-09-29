@@ -13,7 +13,7 @@ open Stdlib_upstream_compatible
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 
-let _ = print_endline "Test 1: include with module ident"
+let _ = print_endline "Test: include with module ident"
 
 module M = struct
   let foo = #42.0
@@ -37,7 +37,7 @@ module M1 = struct
 end
 
 
-let _ = print_endline "Test 2: include with inline struct"
+let _ = print_endline "Test: include with inline struct"
 
 module M2 = struct
   include struct
@@ -59,7 +59,7 @@ module M2 = struct
 end
 
 
-let _ = print_endline "Test 3: include with functor"
+let _ = print_endline "Test: include with functor"
 
 module Functor (X : sig end) = struct
   let foo = #42.0
@@ -83,7 +83,7 @@ module M3 = struct
 end
 
 
-let _ = print_endline "Test 4: multiple includes"
+let _ = print_endline "Test: multiple includes"
 
 module A = struct
   let a = #1.0
@@ -114,7 +114,7 @@ module M4 = struct
 end
 
 
-let _ = print_endline "Test 5: include shadowing include"
+let _ = print_endline "Test: include shadowing include"
 
 module Base = struct
   let x = #10.0
@@ -141,7 +141,7 @@ module M5 = struct
 end
 
 
-let _ = print_endline "Test 6: include shadowing a val"
+let _ = print_endline "Test: include shadowing a val"
 
 module M6 = struct
   let a = #5.0
@@ -162,7 +162,7 @@ module M6 = struct
 end
 
 
-let _ = print_endline "Test 7: val shadowing an include"
+let _ = print_endline "Test: val shadowing an include"
 
 module M7 = struct
   include struct

@@ -13,7 +13,7 @@ open Stdlib_upstream_compatible
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 
-let _ = print_endline "Test 1: abstract type : value"
+let _ = print_endline "Test: abstract type : value"
 
 module type S_value = sig
   type t
@@ -42,7 +42,7 @@ let _ = print_endline ""
 let _ = print_endline (id M_value_abstr.boxed_string)
 
 
-let _ = print_endline "Test 2: abstract type : value with type t := string"
+let _ = print_endline "Test: abstract type : value with type t := string"
 
 module M_value : S_value with type t := string = struct
   type t = string
@@ -61,7 +61,7 @@ let _ = print_endline ""
 let _ = print_endline (id M_value.boxed_string)
 
 
-let _ = print_endline "Test 3: abstract type : float64"
+let _ = print_endline "Test: abstract type : float64"
 
 module type S_float = sig
   type t : float64
@@ -90,7 +90,7 @@ let _ = print_endline ""
 let _ = print_endline (id M_unboxed_abstr.boxed_string)
 
 
-let _ = print_endline "Test 4: abstract type : float64 with type t := float#"
+let _ = print_endline "Test: abstract type : float64 with type t := float#"
 
 module M_unboxed : S_float with type t := float# = struct
   type t = float#

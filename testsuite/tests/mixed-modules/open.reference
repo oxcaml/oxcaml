@@ -1,18 +1,18 @@
-Test 1: [let open] with module ident
+Test: [let open] with module ident
 42. hello
-Test 2: [let open] with inline struct
+Test: [let open] with inline struct
 42. hello
-Test 3: [let open] with functor
+Test: [let open] with functor
 42. hello
-Test 4: Tests 1-3 with [open] instead of [let open]
+Test: Tests 1-3 with [open] instead of [let open]
 42. hello
 42. hello
 42. hello
-Test 5: open shadowing open
+Test: open shadowing open
 20. overridden 100
-Test 6: open shadowing a val
+Test: open shadowing a val
 5. from open 7.
-Test 7: val shadowing an open
+Test: val shadowing an open
 9. from open after open
-Test 8: open Ident can be used to circumvent the scannable tag size restriction
+Test: opens can't violate the scannable tag size restriction
 42. 43. [a_181] [a_250]

@@ -1512,7 +1512,7 @@ let rec transl_address loc = function
               |> Jkind.Sort.default_for_transl_and_get
               |> Types.mixed_block_element_of_const_sort)
         |> Mtype.module_representation_of_mixed_product_shape
-             ~check_representable:false ~loc:Location.none
+             ~check_representable:`No
         |> transl_module_representation
       in
       Lprim(mod_field pos module_repr, [transl_address loc addr], loc)

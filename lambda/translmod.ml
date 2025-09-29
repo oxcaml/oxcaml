@@ -664,28 +664,24 @@ and transl_structure ~scopes loc
   function
     [] ->
       let body, repr =
-        let repr =
-          Mtype.module_representation_of_mixed_product_shape
-            ~check_representable:true ~loc:(to_location loc)
-            (List.rev_map (fun (_, mbe) -> mbe) fields |> Array.of_list)
-        in
         match cc with
           Tcoerce_none ->
+            let repr =
+              Mtype.module_representation_of_mixed_product_shape
+                ~check_representable:(`Yes (to_location loc))
+                (List.rev_map (fun (_, mbe) -> mbe) fields |> Array.of_list)
+            in
             let repr = transl_module_representation repr in
             Lprim(block_of_module_representation repr,
                   List.map (fun (id, _) -> Lvar id) (List.rev fields), loc),
               repr
         | Tcoerce_structure
-          { input_repr; output_repr; pos_cc_list; id_pos_list; } ->
+          { input_repr = _; output_repr; pos_cc_list; id_pos_list; } ->
                 (* Do not ignore id_pos_list ! *)
             (*Format.eprintf "%a@.@[" Includemod.print_coercion cc;
             List.iter (fun l -> Format.eprintf "%a@ " Ident.print l)
               fields;
             Format.eprintf "@]@.";*)
-            begin if not (equal_module_representation input_repr repr) then
-              fatal_error
-                "Translmod.transl_structure: module representation mismatch"
-            end;
             let v = Array.of_list (List.rev fields) in
             let get_field pos =
               if pos < 0 then lambda_unit
@@ -1382,19 +1378,18 @@ let get_component = function
     None -> Lconst const_unit
   | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
 
-let transl_package component_names coercion repr =
-  let repr =
+let transl_package component_names coercion =
+  let size =
     match coercion with
-    | Tcoerce_none -> repr
-    | Tcoerce_structure { output_repr; _ } ->
-      transl_module_representation output_repr
+    | Tcoerce_none -> List.length component_names
+    | Tcoerce_structure { pos_cc_list; _ } -> List.length pos_cc_list
     | Tcoerce_functor _
     | Tcoerce_primitive _
     | Tcoerce_alias _ -> assert false
   in
-  repr,
+  size,
   apply_coercion Loc_unknown Strict coercion
-    (Lprim(block_of_module_representation repr,
+    (Lprim(block_of_module_representation (Module_value_only size),
            List.map get_component component_names,
            Loc_unknown))
 
