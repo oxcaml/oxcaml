@@ -1,5 +1,5 @@
 (* This forces ikinds globally on. *)
-Clflags.ikinds := true
+(*= Clflags.ikinds := true *)
 
 (* Types.ikind_debug := true *)
 let enable_crossing = true
@@ -167,10 +167,7 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
           let contribs =
             List.map
               (fun (_lbl, t) ->
-                let mask =
-                  Axis_lattice_bits.mask_of_modality
-                    ~relevant_for_shallow:`Irrelevant Mode.Modality.Const.id
-                in
+                let mask = Axis_lattice_bits.mask_shallow in
                 log ~pp:ops.pp_kind "tuple elt" (fun () ->
                     ops.modality mask (ops.kind_of t)))
               elts
@@ -183,15 +180,13 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
           (* Unboxed tuples: per-element contributions; shallow axes relevant
              only for arity = 1. *)
           let contribs =
-            let relevant_for_shallow =
-              match List.length elts with 1 -> `Relevant | _ -> `Irrelevant
+            let mask =
+              match List.length elts with
+              | 1 -> Axis_lattice_bits.top  (* arity 1: include all axes *)
+              | _ -> Axis_lattice_bits.mask_shallow  (* arity > 1: exclude shallow axes *)
             in
             List.map
               (fun (_lbl, t) ->
-                let mask =
-                  Axis_lattice_bits.mask_of_modality ~relevant_for_shallow
-                    Mode.Modality.Const.id
-                in
                 log ~pp:ops.pp_kind "unboxed tuple elt" (fun () ->
                     ops.modality mask (ops.kind_of t)))
               elts
@@ -226,10 +221,7 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
                   (* Closed, boxed polymorphic variant: immutable_data base plus
                      per-constructor args. *)
                   let base = ops.const Axis_lattice_bits.immutable_data in
-                  let mask =
-                    Axis_lattice_bits.mask_of_modality
-                      ~relevant_for_shallow:`Irrelevant Mode.Modality.Const.id
-                  in
+                  let mask = Axis_lattice_bits.mask_shallow in
                   Btype.fold_row
                     (fun acc ty ->
                       let k =

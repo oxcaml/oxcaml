@@ -15,6 +15,9 @@ val non_bot_axes : t -> int list
 (* Build a mask from a set of relevant axes. *)
 val of_axis_set : Jkind_axis.Axis_set.t -> t
 
+(* Mask that excludes the shallow axes (nullability and separability). *)
+val mask_shallow : t
+
 (* Relevant axes of a constant modality and the corresponding mask. *)
 val mask_of_modality
   :  relevant_for_shallow:[ `Relevant | `Irrelevant ]

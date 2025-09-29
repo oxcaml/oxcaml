@@ -1,3 +1,30 @@
+(* Axis lattice bits: efficient bitfield encoding of jkind axes.
+
+   This module packs 11 axes into a 17-bit integer, where each axis can have
+   2 or 3 possible values (levels). The axes are indexed 0-10 and their values
+   are ordered from most restrictive (0) to least restrictive (max).
+
+   Axis layout (index, name, values from level 0 to max):
+   0. Areality (Regionality): Global -> Regional -> Local
+   1. Linearity: Many -> Once
+   2. Uniqueness (monadic): Aliased -> Unique
+   3. Portability: Portable -> Nonportable
+   4. Contention (monadic): Contended -> Shared -> Uncontended
+   5. Yielding: Unyielding -> Yielding
+   6. Statefulness: Stateless -> Observing -> Stateful
+   7. Visibility (monadic): Immutable -> Read -> Read_write
+   8. Externality: External -> External64 -> Internal
+   9. Nullability: Non_null -> Maybe_null
+   10. Separability: Non_float -> Separable -> Maybe_separable
+
+   Axes 0-7 are modal axes (affect mode-crossing).
+   Axes 8-10 are non-modal axes (externality and shallow axes).
+   Axes 9-10 are "shallow" axes (nullability and separability) that are
+   sometimes excluded from masking operations.
+
+   Each 3-valued axis uses 2 bits, each 2-valued axis uses 1 bit.
+   Total: 2*7 + 1*4 = 17 bits, fitting in an OCaml immediate integer. *)
+
 let axis_sizes = [| 3; 2; 2; 2; 3; 2; 3; 3; 3; 2; 3 |]
 let num_axes = 11
 
@@ -147,6 +174,10 @@ let relevant_axes_of_modality
         match relevant_for_shallow with
         | `Relevant -> true
         | `Irrelevant -> false))
+
+(* Mask that excludes the shallow axes (nullability and separability). *)
+let mask_shallow : t =
+  co_sub top (join axis_mask.(9) axis_mask.(10))
 
 (* Directly produce an axis-lattice mask from a constant modality. *)
 let mask_of_modality ~(relevant_for_shallow : [`Relevant | `Irrelevant])
