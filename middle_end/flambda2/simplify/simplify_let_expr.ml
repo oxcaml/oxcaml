@@ -95,11 +95,12 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               with
               | None -> binding
               | Some dbg ->
-              let machine_width = UE.machine_width (UA.uenv uacc) in
+                let machine_width = UE.machine_width (UA.uenv uacc) in
                 Keep_binding
                   { kept_binding with
                     simplified_defining_expr =
-                      Simplified_named.create ~machine_width (Named.create_prim prim dbg)
+                      Simplified_named.create ~machine_width
+                        (Named.create_prim prim dbg)
                   }))
           | Simple _ | Set_of_closures _ | Rec_info _ -> binding))
       bindings
@@ -114,11 +115,11 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
       Name_occurrences.greatest_name_mode_var free_names_of_body
         (VB.var bound_var)
     | Set_of_closures _ ->
-        Bound_pattern.fold_all_bound_vars bound_vars
-          ~init:Name_mode.Or_absent.absent ~f:(fun greatest_name_mode bound_var ->
-              Name_mode.Or_absent.join_in_terms greatest_name_mode
-                (Name_occurrences.greatest_name_mode_var free_names_of_body
-                   (VB.var bound_var)))
+      Bound_pattern.fold_all_bound_vars bound_vars
+        ~init:Name_mode.Or_absent.absent ~f:(fun greatest_name_mode bound_var ->
+          Name_mode.Or_absent.join_in_terms greatest_name_mode
+            (Name_occurrences.greatest_name_mode_var free_names_of_body
+               (VB.var bound_var)))
     | Static _ -> assert false
     (* see below *)
   in
@@ -143,7 +144,8 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
             | Some c -> c > 0
           in
           let defining_expr =
-            Simplified_named.to_named simplified_defining_expr.Simplified_named.named
+            Simplified_named.to_named
+              simplified_defining_expr.Simplified_named.named
           in
           if mismatched_modes
           then
@@ -278,7 +280,8 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
             | Invalid k ->
               let prim : P.t = Nullary (Invalid k) in
               let simplified_defining_expr =
-                Simplified_named.create ~machine_width (Named.create_prim prim dbg)
+                Simplified_named.create ~machine_width
+                  (Named.create_prim prim dbg)
               in
               [ Expr_builder.Keep_binding
                   { binding with simplified_defining_expr } ]
@@ -287,7 +290,8 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               let var' = Bound_var.var bv in
               assert (Variable.equal var var');
               let simplified_defining_expr =
-                Simplified_named.create ~machine_width (Named.create_simple bound_to)
+                Simplified_named.create ~machine_width
+                  (Named.create_simple bound_to)
               in
               [ Expr_builder.Keep_binding
                   { binding with simplified_defining_expr } ]

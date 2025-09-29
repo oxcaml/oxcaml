@@ -231,8 +231,12 @@ let prepare_code ~env ~res ~code_id code =
       let closure = Jsir.Var.fresh () in
       let env = To_jsir_env.add_code_id env code_id ~addr ~params ~closure in
       let free_names = Code0.free_names code in
-      let function_slots = Name_occurrences.all_function_slots_at_normal_mode free_names in
-      let value_slots = Name_occurrences.all_value_slots_at_normal_mode free_names in
+      let function_slots =
+        Name_occurrences.all_function_slots_at_normal_mode free_names
+      in
+      let value_slots =
+        Name_occurrences.all_value_slots_at_normal_mode free_names
+      in
       (* We create new variables that represent each function and value slots,
          if they don't exist already, and use them everywhere that the
          corresponding slot is used. We will make sure later (when translating

@@ -614,7 +614,9 @@ let add_phantom_params_bindings uacc handler new_phantom_params =
         let let_bound = Bound_pattern.singleton var in
         let prim = Flambda_primitive.(Nullary (Optimised_out kind)) in
         let named = Named.create_prim prim Debuginfo.none in
-        let simplified_defining_expr = Simplified_named.create ~machine_width named in
+        let simplified_defining_expr =
+          Simplified_named.create ~machine_width named
+        in
         Expr_builder.Keep_binding
           { let_bound;
             simplified_defining_expr;
