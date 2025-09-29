@@ -42,6 +42,8 @@ end
 module Var : sig
   type t [@@ocaml.immediate]
 
+  type state
+
   val print : Format.formatter -> t -> unit
 
   val equal : t -> t -> bool
@@ -66,9 +68,9 @@ module Var : sig
 
   val propagate_name : t -> t -> unit
 
-  val reset : unit -> unit
+  val reset : ?state:state -> unit -> unit
 
-  val set_last : int -> unit
+  val current_state : unit -> state
 
   module Set : Set.S with type elt = t
 
@@ -201,13 +203,6 @@ end = struct
 
   let last_var = ref 0
 
-  let reset () =
-    last_var := 0;
-    Name.reset ()
-
-  let set_last n =
-    last_var := n
-
   let print f x =
     Format.fprintf
       f
@@ -266,6 +261,28 @@ end = struct
         f i (Array.unsafe_get t i)
       done
   end
+
+  (** A table of names *)
+  type state = string option Tbl.t
+
+  let current_state () : state =
+    let state = Tbl.make () None in
+    Int.Hashtbl.iter (fun i name -> Tbl.set state i (Some name)) Name.names;
+    state
+
+  let reset ?state () =
+    match state with
+    | None ->
+      last_var := 0;
+      Name.reset ()
+    | Some (state : state) ->
+      last_var := Tbl.length state - 1;
+      Name.reset ();
+      Tbl.iter (fun var name ->
+        match name with
+        | None -> ()
+        | Some name -> Name.set_raw var name)
+        state
 
   module Hashtbl = Hashtbl.Make (T)
 
@@ -346,6 +363,14 @@ module Constant = struct
     | Tuple (ta, a, _), Tuple (tb, b, _) ->
         if ta <> tb || Array.length a <> Array.length b
         then Some false
+        else if ta >= 244
+        then
+          (* Return None for special tags that may have special comparison behavior:
+             - 244: forcing_tag
+             - 245: cont_tag (continuations raise on caml_equal)
+             - 246-250: other special tags (lazy, closure, object, etc.)
+               Tags >= 251 (no_scan_tag) are already non-scannable *)
+          None
         else
           let same = ref (Some true) in
           for i = 0 to Array.length a - 1 do
@@ -396,11 +421,23 @@ module Constant = struct
         | Float32 _
         | Tuple _ ) ) -> Some false
     | ( String _
-      , (Int64 _ | Int _ | Int32 _ | NativeInt _ | Float _ | Float32 _ | Tuple _ | Float_array _) ) ->
-        Some false
+      , ( Int64 _
+        | Int _
+        | Int32 _
+        | NativeInt _
+        | Float _
+        | Float32 _
+        | Tuple _
+        | Float_array _ ) ) -> Some false
     | ( NativeString _
-      , (Int64 _ | Int _ | Int32 _ | NativeInt _ | Float _ | Float32 _ | Tuple _ | Float_array _) ) ->
-        Some false
+      , ( Int64 _
+        | Int _
+        | Int32 _
+        | NativeInt _
+        | Float _
+        | Float32 _
+        | Tuple _
+        | Float_array _ ) ) -> Some false
     | ( Int64 _
       , ( String _
         | NativeString _
@@ -411,14 +448,16 @@ module Constant = struct
         | Float32 _
         | Tuple _
         | Float_array _ ) ) -> Some false
-    | Float _, (Float32 _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _)) ->
-        Some false
-    | Float32 _, (Float _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _)) ->
-        Some false
+    | ( Float _
+      , (Float32 _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _))
+      ) -> Some false
+    | ( Float32 _
+      , (Float _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _))
+      ) -> Some false
     | ( (Int _ | Int32 _ | NativeInt _)
       , (String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _)) ) ->
         Some false
-    | (Null, _) | (_, Null) -> Some false
+    | Null, _ | _, Null -> Some false
     (* Note: the following cases should not occur when compiling to Javascript *)
     | Int _, (Int32 _ | NativeInt _)
     | Int32 _, (Int _ | NativeInt _)
@@ -487,19 +526,6 @@ type program =
   { start : Addr.t
   ; blocks : block Addr.Map.t
   ; free_pc : Addr.t
-  }
-
-type cmj_body =
-  { program : program
-  ; last_var : Addr.t
-    (** Highest used variable in the translation, since it is kept track by a
-        mutable state (in [Var]), and the [ocamlj] compiler and [js_of_ocaml]
-        need to have these in sync *)
-  ; imported_compilation_units : Compilation_unit.t list
-    (** Compilation units fetched from JSOO's global data table. Needed to fill in
-      [Unit_info.t] in JSOO *)
-  ; exported_compilation_unit : Compilation_unit.t
-    (** Current compilation unit. Needed to fill in [Unit_info.t] in JSOO *)
   }
 
 let noloc = No

@@ -65,6 +65,13 @@ let mk_ccopt f =
   "-ccopt", Arg.String f,
   "<opt>  Pass option <opt> to the C compiler and linker"
 
+let mk_jslib f =
+  "-jslib", Arg.String f, "<opt>  Pass option <opt> to js_of_ocaml link"
+
+let mk_jsopt f =
+  "-jsopt", Arg.String f,
+  "<opt>  Pass option <opt> to js_of_ocaml compile and link"
+
 let mk_clambda_checks f =
   "-clambda-checks", Arg.Unit f, " Instrument clambda code with closure and \
     field access checks (for debugging the compiler)"
@@ -1312,6 +1319,9 @@ module type Jscomp_options = sig
   val _classic_inlining : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+
+  val _jslib : string -> unit
+  val _jsopt : string -> unit
 end
 
 module type Opttop_options = sig
@@ -2040,6 +2050,8 @@ struct
     mk_dflambda_let F._dflambda_let;
     mk_dflambda_verbose F._dflambda_verbose;
     mk_djsir F._djsir;
+    mk_jslib F._jslib;
+    mk_jsopt F._jsopt;
   ]
 end;;
 
@@ -2630,18 +2642,20 @@ third-party libraries such as Lwt, but with a different API."
     let _drawflambda = set dump_rawflambda
 
     let _output_complete_obj () =
-      output_c_object := true;
-      output_complete_object := true;
-      (* CR selee: ??? *)
-      custom_runtime := true
+      failwith "-output-complete-obj is not supported by ocamlj"
+
     let _output_obj () =
-      output_c_object := true;
-      (* CR selee: ??? *)
-      custom_runtime := true
-    let _v () = Compenv.print_version_and_library "js-of-ocaml IR compiler"
+      failwith "-output-obj is not supported by ocamlj"
+
+    let _v () = Compenv.print_version_and_library "js-of-ocaml-backend compiler"
 
     let _classic_inlining () = set_oclassic ()
     let _o2 () = Clflags.set_o2 ()
     let _o3 () = Clflags.set_o3 ()
+
+    let _jslib s =
+      Compenv.defer (ProcessObjects (Misc.rev_split_words s))
+    let _jsopt s =
+      Compenv.first_ccopts := (s :: (!Compenv.first_ccopts))
   end
 end

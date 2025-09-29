@@ -40,6 +40,8 @@ end
 module Var : sig
   type t [@@ocaml.immediate]
 
+  type state
+
   val print : Format.formatter -> t -> unit
 
   val equal : t -> t -> bool
@@ -64,9 +66,9 @@ module Var : sig
 
   val propagate_name : t -> t -> unit
 
-  val reset : unit -> unit
+  val reset : ?state:state -> unit -> unit
 
-  val set_last : int -> unit
+  val current_state : unit -> state
 
   module Set : Set.S with type elt = t
 
@@ -227,13 +229,6 @@ type program =
   { start : Addr.t
   ; blocks : block Addr.Map.t
   ; free_pc : Addr.t
-  }
-
-type cmj_body =
-  { program : program
-  ; last_var : Addr.t
-  ; imported_compilation_units : Compilation_unit.t list
-  ; exported_compilation_unit : Compilation_unit.t
   }
 
 module Print : sig

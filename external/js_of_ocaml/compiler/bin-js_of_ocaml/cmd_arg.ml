@@ -59,16 +59,14 @@ type t =
   ; no_runtime : bool
   ; include_runtime : bool
   ; output_file : [ `Name of string | `Stdout ] * bool
-  ; input : [ `Bytecode_file of string | `Cmj of string | `Cmja of string | `Bytecode_stdin | `None ]
+  ; input : [ `Filename of string | `None ]
   ; params : (string * string) list
   ; static_env : (string * string) list
   ; wrap_with_fun : [ `Iife | `Named of string | `Anonymous ]
   ; target_env : Target_env.t
   ; (* toplevel *)
     dynlink : bool
-  ; linkall : bool
   ; toplevel : bool
-  ; export_file : string option
   ; no_cmis : bool
   ; (* filesystem *)
     include_dirs : string list
@@ -115,10 +113,7 @@ let options =
     Arg.(value & opt (some string) None & info [ "o" ] ~docv:"FILE" ~doc)
   in
   let input_file =
-    let doc =
-      "Compile the bytecode program [$(docv)], IR file (.cmj), or IR archive (.cmja). "
-      ^ "Use '-' to read from the standard input instead."
-    in
+    let doc = "Compile the JSOO IR file (.cmj) [$(docv)]." in
     Arg.(required & pos ~rev:true 0 (some string) None & info [] ~docv:"PROGRAM" ~doc)
   in
   let keep_unit_names =
@@ -205,13 +200,6 @@ let options =
     in
     Arg.(value & flag & info [ "toplevel" ] ~docs:toplevel_section ~doc)
   in
-  let export_file =
-    let doc =
-      "File containing the list of unit to export in a toplevel, with Dynlink or with \
-       --linkall. If absent, all units will be exported."
-    in
-    Arg.(value & opt (some string) None & info [ "export" ] ~docs:toplevel_section ~doc)
-  in
   let dynlink =
     let doc =
       "Enable dynlink of bytecode files.  Use this if you want to be able to use the \
@@ -219,13 +207,6 @@ let options =
        'js_of_ocaml-compiler.dynlink'."
     in
     Arg.(value & flag & info [ "dynlink" ] ~doc)
-  in
-  let linkall =
-    let doc =
-      "Link all primitives and compilation units. Exported compilation units can be \
-       configured with '--export'."
-    in
-    Arg.(value & flag & info [ "linkall" ] ~doc)
   in
   let no_cmis =
     let doc = "Do not include cmis when compiling toplevel." in
@@ -286,9 +267,7 @@ let options =
       set_param
       set_env
       dynlink
-      linkall
       toplevel
-      export_file
       wrap_with_fun
       include_dirs
       fs_files
@@ -314,22 +293,12 @@ let options =
     let chop_extension s = try Filename.chop_extension s with Invalid_argument _ -> s in
     let runtime_files = js_files in
     let fs_external = fs_external || (toplevel && no_cmis) in
-    let input =
-      match input_file with
-      | "-" -> `Bytecode_stdin
-      | x when Filename.check_suffix x ".cmj" -> `Cmj x
-      | x when Filename.check_suffix x ".cmja" -> `Cmja x
-      | x -> `Bytecode_file x
-    in
+    let input = `Filename input_file in
     let output_file =
       match output_file with
       | Some "-" -> `Stdout, true
       | Some s -> `Name s, true
-      | None -> (
-          match input with
-          | `Bytecode_file s | `Cmj s | `Cmja s ->
-            `Name (chop_extension s ^ ".js"), false
-          | `Bytecode_stdin -> `Stdout, false)
+      | None -> `Name (chop_extension input_file ^ ".js"), false
     in
     let source_map =
       if (not no_sourcemap) && (sourcemap || sourcemap_inline_in_js)
@@ -366,10 +335,8 @@ let options =
       ; static_env
       ; wrap_with_fun
       ; dynlink
-      ; linkall
       ; target_env
       ; toplevel
-      ; export_file
       ; include_dirs
       ; runtime_files
       ; no_runtime
@@ -392,9 +359,7 @@ let options =
       $ set_param
       $ set_env
       $ dynlink
-      $ linkall
       $ toplevel
-      $ export_file
       $ wrap_with_function
       $ include_dirs
       $ fs_files
@@ -619,10 +584,8 @@ let options_runtime_only =
       ; static_env
       ; wrap_with_fun
       ; dynlink = false
-      ; linkall = false
       ; target_env
       ; toplevel
-      ; export_file = None
       ; include_dirs
       ; runtime_files
       ; no_runtime

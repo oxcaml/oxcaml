@@ -21,6 +21,13 @@ type t =
   | Int32 of int32
   | Int63 of int64
 
+type repr = t =
+  | Int31 of int32
+  | Int32 of int32
+  | Int63 of int64
+
+let repr t = t
+
 (* Wrapper module for Int32 to work with One_bit_fewer *)
 module Int32_base = struct
   type t = int32

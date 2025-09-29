@@ -27,10 +27,32 @@ let native_action a =
   if Ocamltest_config.native_compiler then a
   else (Actions.update a no_native_compilers)
 
+let bytecode_backend_action a =
+  Actions.update a (fun log env ->
+    if Ocaml_backends.is_backend_enabled Bytecode then
+      Actions.run log env a
+    else
+      Result.skip_with_reason "bytecode backend disabled", env)
+
+let native_backend_action a =
+  Actions.update a (fun log env ->
+    if Ocaml_backends.is_backend_enabled Native then
+      Actions.run log env a
+    else
+      (Result.skip_with_reason "native backend disabled", env))
+
+let javascript_backend_action a =
+  Actions.update a (fun log env ->
+    if Ocaml_backends.is_backend_enabled Javascript then
+      Actions.run log env a
+    else
+      (Result.skip_with_reason "JavaScript backend disabled", env))
+
 let get_backend_value_from_env env bytecode_var native_var =
   Ocaml_backends.make_backend_function
     (Environments.safe_lookup bytecode_var env)
     (Environments.safe_lookup native_var env)
+    (Environments.safe_lookup native_var env) (* JavaScript uses same vars as native for now *)
 
 let modules env =
   Actions_helpers.words_of_variable env Ocaml_variables.modules
@@ -164,7 +186,7 @@ let prepare_module output_variable log env input =
   let input_type = snd input in
   let open Ocaml_filetypes in
   match input_type with
-    | Implementation | Interface | C | Obj -> [input]
+    | Implementation | Interface | C | Javascript | Obj -> [input]
     | Binary_interface -> [input]
     | Backend_specific _ -> [input]
     | Lexer ->
@@ -186,6 +208,18 @@ let get_program_file backend env =
   Filename.make_path [test_build_directory; program_filename]
 
 let is_c_file (_filename, filetype) = filetype=Ocaml_filetypes.C
+
+(* Filter modules based on backend - C files for native/bytecode, JS files for JavaScript *)
+let filter_modules_for_backend backend modules =
+  List.filter (fun (_filename, filetype) ->
+    match backend with
+    | Ocaml_backends.Javascript ->
+        (* JS backend: skip C files, keep everything else *)
+        filetype <> Ocaml_filetypes.C
+    | Ocaml_backends.Native | Ocaml_backends.Bytecode ->
+        (* Native/bytecode: skip JS files, keep everything else *)
+        filetype <> Ocaml_filetypes.Javascript
+  ) modules
 
 let cmas_need_dynamic_loading directories libraries =
   let loads_c_code library =
@@ -219,6 +253,8 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
   let prepare = prepare_module output_variable log env in
   let modules =
     List.concatmap prepare (List.map Ocaml_filetypes.filetype all_modules) in
+  (* Filter modules based on backend - only include appropriate stub files *)
+  let modules = filter_modules_for_backend Compiler.target modules in
   let has_c_file = List.exists is_c_file modules in
   let c_headers_flags =
     if has_c_file then Ocaml_flags.c_includes else "" in
@@ -444,27 +480,31 @@ let mk_toplevel_env_setup name (toplevel : Ocaml_toplevels.toplevel) =
     (setup_toplevel_build_env toplevel)
 
 let setup_ocamlc_byte_build_env =
-  mk_compiler_env_setup
-    "setup-ocamlc.byte-build-env"
-    Ocaml_compilers.ocamlc_byte
+  bytecode_backend_action
+    (mk_compiler_env_setup
+      "setup-ocamlc.byte-build-env"
+      Ocaml_compilers.ocamlc_byte)
 
 let setup_ocamlc_opt_build_env =
-  native_action
-    (mk_compiler_env_setup
-      "setup-ocamlc.opt-build-env"
-      Ocaml_compilers.ocamlc_opt)
+  bytecode_backend_action
+    (native_action
+      (mk_compiler_env_setup
+        "setup-ocamlc.opt-build-env"
+        Ocaml_compilers.ocamlc_opt))
 
 let setup_ocamlopt_byte_build_env =
-  native_action
-    (mk_compiler_env_setup
-      "setup-ocamlopt.byte-build-env"
-      Ocaml_compilers.ocamlopt_byte)
+  native_backend_action
+    (native_action
+      (mk_compiler_env_setup
+        "setup-ocamlopt.byte-build-env"
+        Ocaml_compilers.ocamlopt_byte))
 
 let setup_ocamlopt_opt_build_env =
-  native_action
-    (mk_compiler_env_setup
-      "setup-ocamlopt.opt-build-env"
-      Ocaml_compilers.ocamlopt_opt)
+  native_backend_action
+    (native_action
+      (mk_compiler_env_setup
+        "setup-ocamlopt.opt-build-env"
+        Ocaml_compilers.ocamlopt_opt))
 
 let setup_ocaml_build_env =
   mk_toplevel_env_setup
@@ -513,35 +553,39 @@ let compile (compiler : Ocaml_compilers.compiler) log env =
 (* Compile actions *)
 
 let ocamlc_byte =
-  Actions.make
-    ~name:"ocamlc.byte"
-    ~description:"Compile the program using ocamlc.byte"
-    ~does_something:true
-    (compile Ocaml_compilers.ocamlc_byte)
+  bytecode_backend_action
+    (Actions.make
+      ~name:"ocamlc.byte"
+      ~description:"Compile the program using ocamlc.byte"
+      ~does_something:true
+      (compile Ocaml_compilers.ocamlc_byte))
 
 let ocamlc_opt =
-  native_action
-    (Actions.make
-      ~name:"ocamlc.opt"
-      ~description:"Compile the program using ocamlc.opt"
-      ~does_something:true
-      (compile Ocaml_compilers.ocamlc_opt))
+  bytecode_backend_action
+    (native_action
+      (Actions.make
+        ~name:"ocamlc.opt"
+        ~description:"Compile the program using ocamlc.opt"
+        ~does_something:true
+        (compile Ocaml_compilers.ocamlc_opt)))
 
 let ocamlopt_byte =
-  native_action
-    (Actions.make
-      ~name:"ocamlopt.byte"
-      ~description:"Compile the program using ocamlopt.byte"
-      ~does_something:true
-      (compile Ocaml_compilers.ocamlopt_byte))
+  native_backend_action
+    (native_action
+      (Actions.make
+        ~name:"ocamlopt.byte"
+        ~description:"Compile the program using ocamlopt.byte"
+        ~does_something:true
+        (compile Ocaml_compilers.ocamlopt_byte)))
 
 let ocamlopt_opt =
-  native_action
-    (Actions.make
-      ~name:"ocamlopt.opt"
-      ~description:"Compile the program using ocamlopt.opt"
-      ~does_something:true
-      (compile Ocaml_compilers.ocamlopt_opt))
+  native_backend_action
+    (native_action
+      (Actions.make
+        ~name:"ocamlopt.opt"
+        ~description:"Compile the program using ocamlopt.opt"
+        ~does_something:true
+        (compile Ocaml_compilers.ocamlopt_opt)))
 
 let env_with_lib_unix env =
   let libunixdir = Ocaml_directories.libunix in
@@ -889,23 +933,57 @@ let make_check_toplevel_output name toplevel =
   let (module Toplevel : Ocaml_toplevels.Toplevel) = toplevel in
   make_check_tool_output name (module Toplevel : Ocaml_tools.Tool)
 
-let check_ocamlc_byte_output = make_check_compiler_output
-  "check-ocamlc.byte-output" Ocaml_compilers.ocamlc_byte
+let check_ocamlc_byte_output =
+  bytecode_backend_action
+    (make_check_compiler_output
+      "check-ocamlc.byte-output" Ocaml_compilers.ocamlc_byte)
 
 let check_ocamlc_opt_output =
-  native_action
-    (make_check_compiler_output
-      "check-ocamlc.opt-output" Ocaml_compilers.ocamlc_opt)
+  bytecode_backend_action
+    (native_action
+      (make_check_compiler_output
+        "check-ocamlc.opt-output" Ocaml_compilers.ocamlc_opt))
 
 let check_ocamlopt_byte_output =
-  native_action
-    (make_check_compiler_output
-      "check-ocamlopt.byte-output" Ocaml_compilers.ocamlopt_byte)
+  native_backend_action
+    (native_action
+      (make_check_compiler_output
+        "check-ocamlopt.byte-output" Ocaml_compilers.ocamlopt_byte))
 
 let check_ocamlopt_opt_output =
-  native_action
-    (make_check_compiler_output
-      "check-ocamlopt.opt-output" Ocaml_compilers.ocamlopt_opt)
+  native_backend_action
+    (native_action
+      (make_check_compiler_output
+        "check-ocamlopt.opt-output" Ocaml_compilers.ocamlopt_opt))
+
+let no_javascript_compiler _log env =
+  (Result.skip_with_reason "JavaScript compiler disabled", env)
+
+let javascript_action a =
+  if Ocamltest_config.javascript_compiler then a
+  else (Actions.update a no_javascript_compiler)
+
+let setup_ocamlj_opt_build_env =
+  javascript_backend_action
+    (javascript_action
+      (mk_compiler_env_setup
+        "setup-ocamlj.opt-build-env"
+        Ocaml_compilers.ocamlj_opt))
+
+let ocamlj_opt =
+  javascript_backend_action
+    (javascript_action
+      (Actions.make
+        ~name:"ocamlj.opt"
+        ~description:"Compile the program using ocamlj.opt"
+        ~does_something:true
+        (compile Ocaml_compilers.ocamlj_opt)))
+
+let check_ocamlj_opt_output =
+  javascript_backend_action
+    (javascript_action
+      (make_check_compiler_output
+        "check-ocamlj.opt-output" Ocaml_compilers.ocamlj_opt))
 
 let really_compare_programs backend comparison_tool log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
@@ -1256,7 +1334,8 @@ let shared_libraries = Actions.make
     "Shared libraries are supported."
     "Shared libraries are not supported.")
 
-let no_shared_libraries = Actions.make
+let no_shared_libraries =
+  Actions.make
   ~name:"no-shared-libraries"
   ~description:"Passes if shared libraries are NOT supported"
   ~does_something:false
@@ -1264,21 +1343,25 @@ let no_shared_libraries = Actions.make
     "Shared libraries are not supported."
     "Shared libraries are supported.")
 
-let native_compiler = Actions.make
-  ~name:"native-compiler"
-  ~description:"Passes if the native compiler is available"
-  ~does_something:false
-  (Actions_helpers.predicate Ocamltest_config.native_compiler
-    "native compiler available"
-    "native compiler not available")
+let native_compiler =
+  native_backend_action
+    (Actions.make
+       ~name:"native-compiler"
+       ~description:"Passes if the native compiler is available"
+       ~does_something:false
+       (Actions_helpers.predicate Ocamltest_config.native_compiler
+          "native compiler available"
+          "native compiler not available"))
 
-let native_dynlink = Actions.make
-  ~name:"native-dynlink"
-  ~description:"Passes if native dynlink support is available"
-  ~does_something:false
-  (Actions_helpers.predicate (Ocamltest_config.native_dynlink)
-    "native dynlink support available"
-    "native dynlink support not available")
+let native_dynlink =
+  native_backend_action
+  (Actions.make
+     ~name:"native-dynlink"
+     ~description:"Passes if native dynlink support is available"
+     ~does_something:false
+     (Actions_helpers.predicate (Ocamltest_config.native_dynlink)
+        "native dynlink support available"
+        "native dynlink support not available"))
 
 let debugger = Actions.make
   ~name:"debugger"
@@ -1570,6 +1653,9 @@ let init () =
     setup_ocamlopt_opt_build_env;
     ocamlopt_opt;
     check_ocamlopt_opt_output;
+    setup_ocamlj_opt_build_env;
+    ocamlj_opt;
+    check_ocamlj_opt_output;
     run_expect;
     compare_bytecode_programs;
     compare_binary_files;
@@ -1610,5 +1696,5 @@ let init () =
     multidomain;
     stack_checks;
     runtime4;
-    runtime5
+    runtime5;
   ]

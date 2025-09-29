@@ -41,8 +41,7 @@ and ast_intf_magic_number = {magic|@AST_INTF_MAGIC_NUMBER@|magic}
 and cmxs_magic_number = {magic|@CMXS_MAGIC_NUMBER@|magic}
 and cmt_magic_number = {magic|@CMT_MAGIC_NUMBER@|magic}
 and cms_magic_number = {magic|@CMS_MAGIC_NUMBER@|magic}
-and cmj_magic_number = {magic|@CMJ_MAGIC_NUMBER@|magic}
-and cmja_magic_number = {magic|@CMJA_MAGIC_NUMBER@|magic}
+and jsir_magic_number = {magic|@JSIR_MAGIC_NUMBER@|magic}
 and linear_magic_number = {magic|@LINEAR_MAGIC_NUMBER@|magic}
 and cfg_magic_number = {magic|@CFG_MAGIC_NUMBER@|magic}
 
@@ -140,8 +139,7 @@ let configuration_variables () =
   p "cmxs_magic_number" cmxs_magic_number;
   p "cmt_magic_number" cmt_magic_number;
   p "cms_magic_number" cms_magic_number;
-  p "cmj_magic_number" cmj_magic_number;
-  p "cmja_magic_number" cmja_magic_number;
+  p "jsir_magic_number" jsir_magic_number;
   p "linear_magic_number" linear_magic_number;
 
   (* "flambda_backend" is still printed for compatibility *)

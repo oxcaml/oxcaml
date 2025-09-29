@@ -1540,6 +1540,7 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             assert (not (cps_transform ()));
             (* CR-soon mshinwell: This is a temporary hack for the period when the
                [Effect] module is in [Stdlib], but no code is actually using it. *)
+            ignore ctx.effect_warning;
             (*
             if not !(ctx.effect_warning)
             then (

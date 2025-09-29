@@ -83,7 +83,8 @@ let is_pure nm =
   | _ -> (
       match kind nm with
       | `Mutator -> false
-      | `Mutable | `Pure -> true)
+      | `Mutable -> false
+      | `Pure -> true)
 
 let exists p = String.Hashtbl.mem kinds p
 

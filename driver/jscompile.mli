@@ -44,3 +44,5 @@ val to_jsir :
 (** [to_jsir info typed] takes a typechecked implementation
     and returns its Js_of_ocaml IR representation.
 *)
+
+val run_jsoo_exn : args:string list -> unit

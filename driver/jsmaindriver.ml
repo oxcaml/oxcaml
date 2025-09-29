@@ -13,7 +13,21 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Options = Main_args.Make_jscomp_options (Main_args.Default.Jsmain)
+module Options = Oxcaml_args.Make_jscomp_options (Oxcaml_args.Default.Jsmain)
+
+let default_js_output output_name =
+  match output_name with
+  | Some s -> s
+  | None -> Config.default_executable_name ^ ".js"
+
+let reaper_is_enabled () =
+  match !Oxcaml_flags.Flambda2.enable_reaper with
+  | Set set -> set
+  | Default ->
+      let default =
+        Oxcaml_flags.Flambda2.default_for_opt_level !Oxcaml_flags.opt_level
+      in
+      default.Oxcaml_flags.Flambda2.enable_reaper
 
 let main argv ppf =
   Clflags.jsir := true;
@@ -48,24 +62,73 @@ let main argv ppf =
     Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
     Compenv.parse_arguments (ref argv) Compenv.anonymous program;
     Compmisc.read_clflags_from_env ();
+    if reaper_is_enabled () then
+      (* test was failing, not sure how to fix... *)
+      Compenv.fatal "reaper is not supported in javascript";
     if !Clflags.plugin then
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
-    try
-      Compenv.process_deferred_actions
-        (ppf, Jscompile.implementation, Jscompile.interface, ".cmj", ".cmja")
-    with Arg.Bad msg ->
-      prerr_endline msg;
-      Clflags.print_arguments program;
-      exit 2
+    (try
+       Compenv.process_deferred_actions
+         (ppf, Jscompile.implementation, Jscompile.interface, ".cmjx", ".cmjxa")
+     with Arg.Bad msg ->
+       prerr_endline msg;
+       Clflags.print_arguments program;
+       exit 2);
+    Compenv.readenv ppf Before_link;
+    (if
+     List.length
+       (List.filter
+          (fun x -> !x)
+          Clflags.
+            [
+              make_package;
+              make_archive;
+              shared;
+              instantiate;
+              Compenv.stop_early;
+              output_c_object;
+            ])
+     > 1
+    then
+     let module P = Clflags.Compiler_pass in
+     match !Clflags.stop_after with
+     | None ->
+         Compenv.fatal
+           "Please specify at most one of -pack, -a, -shared, -c, -output-obj, \
+            -instantiate"
+     | Some
+         (( P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
+          | P.Simplify_cfg | P.Emit | P.Selection | P.Register_allocation
+          | P.Llvmize ) as p) ->
+         assert (P.is_compilation_pass p);
+         Printf.ksprintf Compenv.fatal
+           "Options -i and -stop-after (%s) are incompatible with -pack, -a, \
+            -shared, -output-obj"
+           (String.concat "|"
+              (P.available_pass_names ~filter:(fun _ -> true) ~native:true)));
+    if !Clflags.make_archive then (
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !Clflags.output_name in
+      Jslibrarian.create_archive
+        (Compenv.get_objfiles ~with_ocamlparam:false)
+        target;
+      Warnings.check_fatal ())
+    else if !Clflags.make_package then
+      Misc.fatal_error "packaging is not supported by ocamlj"
+    else if !Clflags.instantiate then
+      Misc.fatal_error "instantiation is not supported by ocamlj"
+    else if !Clflags.shared then
+      Misc.fatal_error "shared objects are not supported by ocamlj"
+    else if (not !Compenv.stop_early) && !Clflags.objfiles <> [] then (
+      let target = default_js_output !Clflags.output_name in
+      Compmisc.init_path ();
+      Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
+          let objs = Compenv.get_objfiles ~with_ocamlparam:true in
+          Jslink.link ~ppf_dump objs target);
+      Warnings.check_fatal ())
   with
   | exception Compenv.Exit_with_status n -> n
   | () ->
-      if !Clflags.make_archive then (
-        Compmisc.init_path ();
-        Jslibrarian.create_archive
-          (Compenv.get_objfiles ~with_ocamlparam:false)
-          (Compenv.extract_output !Clflags.output_name);
-        Warnings.check_fatal ());
       (* Prevents outputting when using make install to dump CSVs for whole compiler.
          Example use case: scripts/profile-compiler-build.sh *)
       if not !Clflags.dump_into_csv then

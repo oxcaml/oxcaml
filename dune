@@ -12,6 +12,8 @@
 ;*                                                                        *
 ;**************************************************************************
 
+(vendored_dirs external)
+
 ; set warning as error in release profile
 
 (env
@@ -40,6 +42,8 @@
 (copy_files# driver/*.ml{,i})
 
 (copy_files# asmcomp/*.ml{,i})
+
+(copy_files# jscomp/*.ml{,i})
 
 (copy_files# backend/*.ml{,i})
 
@@ -355,6 +359,7 @@
   (:include %{project_root}/ocamlopt_flags.sexp))
  (libraries ocamlcommon flambda2)
  (modules
+   jslink
    jsmaindriver
    jscompile
    jslibrarian))
@@ -962,3 +967,118 @@
   otherlibs/dynlink/dynlink.cmxa
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cma
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa))
+
+
+; generate the dune rules for compiling stdlib with ocamlj:
+
+(subdir stdlib-js
+  (dynamic_include ../stdlib-js.inc))
+
+(rule
+ (target stdlib-js.inc)
+ (deps
+  (:gen_ocamlj_rules %{workspace_root}/tools/gen_ocamlj_rules.sh)
+  (source_tree stdlib))
+ (enabled_if (= %{context_name} "runtime_stdlib"))
+ (action (with-stdout-to %{target} (run bash %{gen_ocamlj_rules} stdlib))))
+
+(rule
+ (target stdlib-js.inc)
+ (enabled_if (<> %{context_name} "runtime_stdlib"))
+ (action (write-file %{target} "")))
+
+(install
+  (files (glob_files (stdlib-js/*.cmj* with_prefix .)))
+  (section lib)
+  (package ocaml_runtime_stdlib))
+
+; generate the dune rules for compiling otherlibs with ocamlj:
+(subdir otherlibs
+  ;; stdlib_upstream_compatible:
+  (subdir stdlib_upstream_compatible-js
+    (dynamic_include ../stdlib_upstream_compatible-js.inc))
+
+  (rule
+    (target stdlib_upstream_compatible-js.inc)
+    (deps
+      (:gen_ocamlj_rules %{workspace_root}/tools/gen_ocamlj_rules.sh)
+      (source_tree stdlib_upstream_compatible))
+    (enabled_if (= %{context_name} "main"))
+    (action (with-stdout-to %{target} (run bash %{gen_ocamlj_rules} stdlib_upstream_compatible))))
+
+  (rule
+    (target stdlib_upstream_compatible-js.inc)
+    (enabled_if (<> %{context_name} "main"))
+    (action (write-file %{target} "")))
+
+  (install
+    (files (glob_files (stdlib_upstream_compatible-js/*.cmj* with_prefix stdlib_upstream_compatible)))
+    (section lib)
+    (package ocaml))
+
+  ;; stdlib_stable:
+  (subdir stdlib_stable-js
+    (dynamic_include ../stdlib_stable-js.inc))
+
+  (rule
+    (target stdlib_stable-js.inc)
+    (deps
+      (:gen_ocamlj_rules %{workspace_root}/tools/gen_ocamlj_rules.sh)
+      (source_tree stdlib_stable))
+    (enabled_if (= %{context_name} "main"))
+    (action (with-stdout-to %{target} (run bash %{gen_ocamlj_rules} stdlib_stable))))
+
+  (rule
+    (target stdlib_stable-js.inc)
+    (enabled_if (<> %{context_name} "main"))
+    (action (write-file %{target} "")))
+
+  (install
+    (files (glob_files (stdlib_stable-js/*.cmj* with_prefix stdlib_stable)))
+    (section lib)
+    (package ocaml))
+
+  ;; stdlib_beta:
+  (subdir stdlib_beta-js
+    (dynamic_include ../stdlib_beta-js.inc))
+
+  (rule
+    (target stdlib_beta-js.inc)
+    (deps
+      (:gen_ocamlj_rules %{workspace_root}/tools/gen_ocamlj_rules.sh)
+      (source_tree stdlib_beta))
+    (enabled_if (= %{context_name} "main"))
+    (action (with-stdout-to %{target} (run bash %{gen_ocamlj_rules} stdlib_beta))))
+
+  (rule
+    (target stdlib_beta-js.inc)
+    (enabled_if (<> %{context_name} "main"))
+    (action (write-file %{target} "")))
+
+  (install
+    (files (glob_files (stdlib_beta-js/*.cmj* with_prefix stdlib_beta)))
+    (section lib)
+    (package ocaml))
+
+  ;; stdlib_alpha:
+  (subdir stdlib_alpha-js
+    (dynamic_include ../stdlib_alpha-js.inc))
+
+  (rule
+    (target stdlib_alpha-js.inc)
+    (deps
+      (:gen_ocamlj_rules %{workspace_root}/tools/gen_ocamlj_rules.sh)
+      (source_tree stdlib_alpha))
+    (enabled_if (= %{context_name} "main"))
+    (action (with-stdout-to %{target} (run bash %{gen_ocamlj_rules} stdlib_alpha))))
+
+  (rule
+    (target stdlib_alpha-js.inc)
+    (enabled_if (<> %{context_name} "main"))
+    (action (write-file %{target} "")))
+
+  (install
+    (files (glob_files (stdlib_alpha-js/*.cmj* with_prefix stdlib_alpha)))
+    (section lib)
+    (package ocaml))
+)
