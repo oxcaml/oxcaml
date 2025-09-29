@@ -282,9 +282,6 @@ install_for_test: _install
           _runtest/testsuite/lib/
 	cp $(main_build)/testsuite/lib/.testing.objs/native/testing.cm* \
           _runtest/testsuite/lib/
-	 # replace backend-specific testsuite/tests/unboxed-primitive-args with their new versions
-	rm _runtest/testsuite/tests/unboxed-primitive-args/*
-	cp -a oxcaml/testsuite/tests/unboxed-primitive-args/* _runtest/testsuite/tests/unboxed-primitive-args/
 	 # add extension library tests that are not supported by the upstream compiler
 	rm _runtest/testsuite/tests/lib-extensions/*
 	cp -a oxcaml/testsuite/tests/lib-extensions/* _runtest/testsuite/tests/lib-extensions
