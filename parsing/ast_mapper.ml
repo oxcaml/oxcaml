@@ -972,11 +972,13 @@ let default_mapper =
       in
       { pjkind_loc; pjkind_desc });
 
-    modes = (fun this m ->
-      List.map (map_loc this) m);
+    modes = (fun this { core_modes; mod_modes } ->
+      { core_modes = List.map (map_loc this) core_modes
+      ; mod_modes = List.map (map_loc this) mod_modes});
 
-    modalities = (fun this m ->
-      List.map (map_loc this) m);
+    modalities = (fun this { core_modalities; mod_modalities } ->
+      { core_modalities = List.map (map_loc this) core_modalities
+      ; mod_modalities = List.map (map_loc this) mod_modalities});
 
     directive_argument =
       (fun this a ->
@@ -1252,7 +1254,7 @@ let apply_lazy ~source ~target mapper =
       with exn ->
         { psg_items = [{psig_desc = Psig_extension (extension_of_exn exn, []);
           psig_loc = Location.none}];
-          psg_modalities = []; psg_loc = Location.none }
+          psg_modalities = Modalities.empty; psg_loc = Location.none }
     in
     let fields = PpxContext.update_cookies fields in
     let psg_items = Sig.attribute (PpxContext.mk fields) :: psg_items in

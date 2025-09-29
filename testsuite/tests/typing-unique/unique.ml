@@ -194,9 +194,9 @@ val x : string = "foo"
 (* Top-level must be many *)
 let once_ foo = "foo"
 [%%expect{|
-Line 1, characters 4-21:
+Line 1, characters 4-13:
 1 | let once_ foo = "foo"
-        ^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^
 Error: This value is "once" but is expected to be "many".
 |}]
 

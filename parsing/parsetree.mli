@@ -59,11 +59,25 @@ type constant =
 
 type location_stack = Location.t list
 
+type mod_ = | Mod of string [@@unboxed]
+type mods = mod_ loc list
+
 type modality = | Modality of string [@@unboxed]
-type modalities = modality loc list
+type core_modalities = modality loc list
+type modalities = {
+    core_modalities : core_modalities;
+    mod_modalities : mods
+  }
 
 type mode = | Mode of string [@@unboxed]
-type modes = mode loc list
+type core_modes = mode loc list
+(* CR zeisbach: according to zqian in [typing/typemod.ml], this should probably have
+   another field storing the location so that it doesn't need to be computed.
+   when this is fixed, go back and fix [loc_of_modes] in that file. *)
+type modes = {
+    core_modes : core_modes;
+    mod_modes : mods
+  }
 
 type include_kind = Structure | Functor
 
@@ -333,7 +347,7 @@ and pattern_desc =
   | Ppat_or of pattern * pattern  (** Pattern [P1 | P2] *)
   | Ppat_constraint of pattern * core_type option * modes
       (** [Ppat_constraint(tyopt, modes)] represents:
-          - [(P : ty @@ modes)] when [tyopt] is [Some ty]
+          - [(P : ty @ modes)] when [tyopt] is [Some ty]
           - [(P @ modes)] when [tyopt] is [None]
          *)
   | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
@@ -471,7 +485,7 @@ and expression_desc =
             - [for i = E1 downto E2 do E3 done]
                  when [direction] is {{!Asttypes.direction_flag.Downto}[Downto]}
          *)
-  | Pexp_constraint of expression * core_type option * modes  (** [(E : T @@ modes)] *)
+  | Pexp_constraint of expression * core_type option * modes  (** [(E : T @ modes)] *)
   | Pexp_coerce of expression * core_type option * core_type
       (** [Pexp_coerce(E, from, T)] represents
             - [(E :> T)]      when [from] is [None],
@@ -1075,7 +1089,7 @@ and module_type_desc =
   | Pmty_ident of Longident.t loc  (** [Pmty_ident(S)] represents [S] *)
   | Pmty_signature of signature  (** [sig ... end] *)
   | Pmty_functor of functor_parameter * module_type * modes
-      (** [functor(X : MT1 @@ modes) -> MT2 @ modes] *)
+      (** [functor(X : MT1 @ modes) -> MT2 @ modes] *)
   | Pmty_with of module_type * with_constraint list  (** [MT with ...] *)
   | Pmty_typeof of module_expr  (** [module type of ME] *)
   | Pmty_extension of extension  (** [[%id]] *)
@@ -1087,8 +1101,8 @@ and functor_parameter =
   | Unit  (** [()] *)
   | Named of string option loc * module_type * modes
       (** [Named(name, MT)] represents:
-            - [(X : MT @@ modes)] when [name] is [Some X],
-            - [(_ : MT @@ modes)] when [name] is [None] *)
+            - [(X : MT @ modes)] when [name] is [Some X],
+            - [(_ : MT @ modes)] when [name] is [None] *)
 
 and signature =
   {
@@ -1339,6 +1353,8 @@ and jkind_annotation_desc =
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)
+  (* CR zeisbach: this should be renamed to Jkind_mod or something, to avoid
+     clashing with the other Mod above. Also, this should take in mods and not modes *)
   | Mod of jkind_annotation * modes
   | With of jkind_annotation * core_type * modalities
   | Kind_of of core_type

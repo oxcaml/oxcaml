@@ -2,32 +2,34 @@
  include ocamlcommon;
 *)
 
-let locs_to_string (locs : 'a Location.loc list) (f : 'a -> string) : string =
+let locs_to_string ?(sep = " ") locs f : string =
   List.map
     (fun (m : _ Location.loc) ->
        Format.asprintf "%s [%a]" (f m.txt) Location.print_loc m.loc
     )
     locs
-  |> String.concat " "
+  |> String.concat sep
 
 let mapper: Ast_mapper.mapper =
   let open Ast_mapper in
   { default_mapper with
     modes = (fun sub m ->
       (match m with
-      | [] -> ();
-      | _ ->
-        Format.printf "modes: %s\n"
-          (locs_to_string m (fun (Mode s) -> s))
+      | { core_modes = []; mod_modes = [] } -> ();
+      | { core_modes; mod_modes } ->
+        Format.printf "modes: %s%s\n"
+          (locs_to_string core_modes (fun (Mode s) -> s))
+          (locs_to_string ~sep:"" mod_modes (fun (Mod s) -> Format.sprintf " mod %s" s));
       );
       default_mapper.modes sub m
     );
     modalities = (fun sub m ->
       (match m with
-        | [] -> ();
-        | _ ->
-          Format.printf "modalities: %s\n"
-            (locs_to_string m (fun (Modality s) -> s))
+        | { core_modalities = []; mod_modalities = [] } -> ();
+        | { core_modalities; mod_modalities } ->
+          Format.printf "modalities: %s%s\n"
+            (locs_to_string core_modalities (fun (Modality s) -> s))
+            (locs_to_string ~sep:"" mod_modalities (fun (Mod s) -> Format.sprintf " mod %s" s));
       );
       default_mapper.modalities sub m
     );
@@ -43,4 +45,5 @@ let () =
   test mapper "let unique_ f (local_ x) = x";
   test mapper "let local_ f x: int -> int = x";
   test mapper "module M : sig val x : string -> string @ foo @@ bar hello end = struct end";
+  (* CR zeisbach: add test cases for mods *)
   ()
