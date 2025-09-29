@@ -4051,22 +4051,22 @@ jkind_desc:
           (fun {txt; loc} -> {txt = Mode txt; loc})
           $3
       in
-      Mod ($1, modes)
+      Pjk_mod ($1, modes)
     }
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
-      With ($1, $3, $4)
+      Pjk_with ($1, $3, $4)
     }
   | ident {
-      Abbreviation $1
+      Pjk_abbreviation $1
     }
   | KIND_OF ty=core_type {
-      Kind_of ty
+      Pjk_kind_of ty
     }
   | UNDERSCORE {
-      Default
+      Pjk_default
     }
   | reverse_product_jkind %prec below_AMPERSAND {
-      Product (List.rev $1)
+      Pjk_product (List.rev $1)
     }
   | LPAREN jkind_desc RPAREN {
       $2

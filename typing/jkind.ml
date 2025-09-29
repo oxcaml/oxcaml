@@ -1992,7 +1992,7 @@ module Const = struct
       (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
    fun context jkind ->
     match jkind.pjkind_desc with
-    | Abbreviation name ->
+    | Pjk_abbreviation name ->
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
       (match name with
       | "any" -> Builtin.any.jkind
@@ -2019,19 +2019,19 @@ module Const = struct
       | "mutable_data" -> Builtin.mutable_data.jkind
       | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
       |> allow_left |> allow_right
-    | Mod (base, modifiers) ->
+    | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
       let mod_bounds =
         Mod_bounds.meet base.mod_bounds (Typemode.transl_mod_bounds modifiers)
       in
       { layout = base.layout; mod_bounds; with_bounds = No_with_bounds }
-    | Product ts ->
+    | Pjk_product ts ->
       let jkinds =
         List.map (of_user_written_annotation_unchecked_level context) ts
       in
       jkind_of_product_annotations jkinds
-    | With (base, type_, modalities) -> (
+    | Pjk_with (base, type_, modalities) -> (
       let base = of_user_written_annotation_unchecked_level context base in
       match context with
       | Right_jkind _ -> raise ~loc:type_.ptyp_loc With_on_right
@@ -2046,7 +2046,8 @@ module Const = struct
             With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
               ~type_expr:type_ base.with_bounds
         })
-    | Default | Kind_of _ -> raise ~loc:jkind.pjkind_loc Unimplemented_syntax
+    | Pjk_default | Pjk_kind_of _ ->
+      raise ~loc:jkind.pjkind_loc Unimplemented_syntax
 
   (* The [annotation_context] parameter can be used to allow annotations / kinds
      in different contexts to be enabled with different extension settings.
@@ -2239,7 +2240,9 @@ end
 
 (* every context where this is used actually wants an [option] *)
 let mk_annot name =
-  Some Parsetree.{ pjkind_loc = Location.none; pjkind_desc = Abbreviation name }
+  Some
+    Parsetree.
+      { pjkind_loc = Location.none; pjkind_desc = Pjk_abbreviation name }
 
 let mark_best (type l r) (t : (l * r) Types.jkind) =
   { (disallow_right t) with quality = Best }
