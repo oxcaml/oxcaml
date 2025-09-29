@@ -576,7 +576,7 @@ and traverse_apply denv acc apply : rev_expr =
 
 and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
   match Apply.call_kind apply with
-  | Function { function_call = Direct code_id; _ } ->
+  | Function { function_call = Direct code_id; _ } -> (
     (* CR ncourant: think about cross-module propagation *)
     (* if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
        then ( let apply_dep = { Traverse_acc.function_containing_apply_expr =
@@ -590,28 +590,30 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
         ~returns:return_args ~exn:exn_arg
     in
-    (if Option.is_some (Apply.callee apply)
-    then
-      let closure =
-        Acc.simple_to_name acc ~denv (Option.get (Apply.callee apply))
-      in
-      Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
-        (Code_of_closure Known_arity_code_pointer)
-        ~base:(Code_id_or_name.name closure));
-    if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
-       && (Option.is_none (Apply.callee apply)
-          || denv.should_preserve_direct_calls)
-    then
-      let apply_dep =
-        { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
-          apply_code_id = code_id;
-          apply_closure = Apply.callee apply;
-          apply_call_witness = call_widget
-        }
-      in
-      Acc.add_apply apply_dep acc
-    else if Option.is_none (Apply.callee apply)
-    then default_acc acc
+    let[@local] add_apply acc =
+      if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
+      then
+        let apply_dep =
+          { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
+            apply_code_id = code_id;
+            apply_closure = Apply.callee apply;
+            apply_call_witness = call_widget
+          }
+        in
+        Acc.add_apply apply_dep acc
+      else default_acc acc
+    in
+    match Apply.callee apply with
+    | None -> add_apply acc
+    | Some callee -> (
+      (let closure = Acc.simple_to_name acc ~denv callee in
+       Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
+         (Code_of_closure Known_arity_code_pointer)
+         ~base:(Code_id_or_name.name closure));
+      match denv.should_preserve_direct_calls with
+      | Yes -> add_apply acc
+      | No -> ()
+      | Auto -> failwith "todo"))
   | Function { function_call = Indirect_known_arity; _ } ->
     let call_widget =
       Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
@@ -683,6 +685,16 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
      it is highly unclear what should be done for zero_alloc code, so we simply
      mark the code as escaping. *)
   let is_opaque = Code_metadata.is_opaque code_metadata in
+  let check_zero_alloc =
+    match Code.zero_alloc_attribute code with
+    | Default_zero_alloc ->
+      (* The effect of [Clflags.zero_alloc_assert] has been compiled into
+         [Check] earlier. *)
+      false
+    | Assume _ -> false
+    | Check _ -> true
+  in
+  let is_opaque = is_opaque || check_zero_alloc in
   let code_dep = Acc.find_code acc code_id in
   Graph.add_code_id_my_closure (Acc.graph acc) code_id my_closure;
   let maybe_opaque var = if is_opaque then Variable.rename var else var in
@@ -706,19 +718,17 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     };
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
-  let check_zero_alloc =
-    match Code.zero_alloc_attribute code with
-    | Default_zero_alloc ->
-      (* The effect of [Clflags.zero_alloc_assert] has been compiled into
-         [Check] earlier. *)
-      false
-    | Assume _ -> false
-    | Check _ -> true
+  let should_preserve_direct_calls =
+    match Flambda_features.reaper_preserve_direct_calls () with
+    | Never -> No
+    | Always -> Yes
+    | Zero_alloc -> if check_zero_alloc then Yes else No
+    | Auto -> Auto
   in
   let denv =
     { parent = Hole;
       conts;
-      should_preserve_direct_calls = check_zero_alloc;
+      should_preserve_direct_calls;
       current_code_id = Some code_id;
       le_monde_exterieur;
       all_constants
@@ -832,10 +842,16 @@ let run ~get_code_metadata (unit : Flambda_unit.t) =
       };
     Acc.fixed_arity_continuation acc return_continuation;
     Acc.fixed_arity_continuation acc exn_continuation;
+    let should_preserve_direct_calls =
+      match Flambda_features.reaper_preserve_direct_calls () with
+      | Never | Zero_alloc -> No
+      | Always -> Yes
+      | Auto -> Auto
+    in
     traverse
       { parent = Hole;
         conts;
-        should_preserve_direct_calls = false;
+        should_preserve_direct_calls;
         current_code_id = None;
         le_monde_exterieur = Name.symbol le_monde_exterieur;
         all_constants = Name.symbol all_constants

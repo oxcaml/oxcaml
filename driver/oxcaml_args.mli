@@ -101,6 +101,7 @@ module type Oxcaml_options = sig
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
+  val reaper_preserve_direct_calls : string -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit

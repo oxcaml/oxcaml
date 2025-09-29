@@ -502,6 +502,20 @@ let mk_no_flambda2_reaper f =
     Printf.sprintf " Disable reaper pass%s (Flambda2 only)"
       (format_not_default Flambda2.Default.enable_reaper) )
 
+let mk_reaper_preserve_direct_calls f =
+  ( "-reaper-preserve-direct-calls",
+    Arg.Symbol ([ "never"; "always"; "zero-alloc"; "auto" ], f),
+    Printf.sprintf
+      " Choose the direct call preservation strategy of the reaper (Flambda2 \
+       only)\n\
+      \      Valid values are: \n\
+      \       \"never\": do not try to preserve direct calls to old functions;\n\
+      \       \"always\": always preserve existing direct calls;\n\
+      \       \"zero-alloc\": preserve direct calls only in zero-alloc checked \
+       functions;\n\
+      \       \"auto\": preserve direct calls for which a set of possibly \
+       called functions cannot be determined." )
+
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
     Arg.Unit f,
@@ -1026,6 +1040,7 @@ module type Oxcaml_options = sig
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
+  val reaper_preserve_direct_calls : string -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -1166,6 +1181,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_join_depth F.flambda2_join_depth;
       mk_flambda2_reaper F.flambda2_reaper;
       mk_no_flambda2_reaper F.no_flambda2_reaper;
+      mk_reaper_preserve_direct_calls F.reaper_preserve_direct_calls;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -1375,7 +1391,8 @@ module Oxcaml_options_impl = struct
       Oxcaml_flags.Set Oxcaml_flags.All_functions
 
   let no_flambda2_result_types () =
-    Flambda2.function_result_types := Oxcaml_flags.Set Oxcaml_flags.Never
+    Flambda2.function_result_types :=
+      Oxcaml_flags.Set (Oxcaml_flags.Never : Oxcaml_flags.function_result_types)
 
   let flambda2_basic_meet () = ()
   let flambda2_advanced_meet () = ()
@@ -1404,6 +1421,23 @@ module Oxcaml_options_impl = struct
   let flambda2_join_depth n = Flambda2.join_depth := Oxcaml_flags.Set n
   let flambda2_reaper = set Flambda2.enable_reaper
   let no_flambda2_reaper = clear Flambda2.enable_reaper
+
+  let reaper_preserve_direct_calls s =
+    match s with
+    | "never" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set
+            (Oxcaml_flags.Never : Oxcaml_flags.reaper_preserve_direct_calls)
+    | "always" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set Oxcaml_flags.Always
+    | "zero-alloc" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set Oxcaml_flags.Zero_alloc
+    | "auto" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set Oxcaml_flags.Auto
+    | _ -> () (* This should not occur as we use Arg.Symbol *)
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -1800,7 +1834,9 @@ module Extra_params = struct
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->
         (match String.lowercase_ascii v with
-        | "never" -> Flambda2.function_result_types := Oxcaml_flags.(Set Never)
+        | "never" ->
+            Flambda2.function_result_types :=
+              Oxcaml_flags.(Set (Never : function_result_types))
         | "functors-only" ->
             Flambda2.function_result_types := Oxcaml_flags.(Set Functors_only)
         | "all-functions" ->
@@ -1919,6 +1955,23 @@ module Extra_params = struct
         Oxcaml_flags.cached_generic_functions_path := v;
         true
     | "reaper" -> set Flambda2.enable_reaper
+    | "reaper-preserve-direct-calls" ->
+        (match String.lowercase_ascii v with
+        | "never" ->
+            Flambda2.reaper_preserve_direct_calls :=
+              Oxcaml_flags.(Set (Never : reaper_preserve_direct_calls))
+        | "always" ->
+            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Always)
+        | "zero-alloc" ->
+            Flambda2.reaper_preserve_direct_calls :=
+              Oxcaml_flags.(Set Zero_alloc)
+        | "auto" ->
+            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Auto)
+        | _ ->
+            Misc.fatal_error
+              "Syntax: reaper-preserve-direct-calls: \
+               always|never|zero-alloc|auto");
+        true
     | _ -> false
 end
 
