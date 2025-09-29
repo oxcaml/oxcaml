@@ -430,10 +430,11 @@ let ( let$ ) (name, kind, prim, dbg) k uacc ~dacc_before_switch =
     let machine_width = UE.machine_width (UA.uenv uacc) in
     let binding =
       EB.Keep_binding
-      { let_bound = BPt.singleton (BV.create var duid NM.normal);
-        simplified_defining_expr = Simplified_named.create ~machine_width named;
-        original_defining_expr = None
-      }
+        { let_bound = BPt.singleton (BV.create var duid NM.normal);
+          simplified_defining_expr =
+            Simplified_named.create ~machine_width named;
+          original_defining_expr = None
+        }
     in
     EB.make_new_let_bindings uacc ~bindings_outermost_first:[binding] ~body
 
