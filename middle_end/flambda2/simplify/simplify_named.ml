@@ -68,13 +68,13 @@ let create_lifted_constant (dacc, lifted_constants)
 
 let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
     ~simplify_function_body : Simplify_named_result.t Or_invalid.t =
+  let machine_width = DE.machine_width (DA.denv dacc) in
   match named with
   | Simple simple ->
     let bound_var = Bound_pattern.must_be_singleton bound_pattern in
     let min_name_mode = Bound_var.name_mode bound_var in
     let ty, new_simple = S.simplify_simple dacc simple ~min_name_mode in
     let dacc = DA.add_variable dacc bound_var ty in
-    let machine_width = DE.machine_width (DA.denv dacc) in
     let defining_expr =
       if simple == new_simple
       then Simplified_named.create ~machine_width named
@@ -109,7 +109,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
            [ Expr_builder.Keep_binding
                { let_bound = bound_pattern;
                  simplified_defining_expr =
-                   Simplified_named.create defining_expr;
+                   Simplified_named.create ~machine_width defining_expr;
                  original_defining_expr = Some named
                } ])
     else
