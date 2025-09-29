@@ -1501,6 +1501,16 @@ module Const = struct
         name = "immediate64"
       }
 
+    let immediate64_or_null =
+      { jkind =
+          { immediate_or_null.jkind with
+            mod_bounds =
+              Mod_bounds.set_externality Externality.External64
+                immediate_or_null.jkind.mod_bounds
+          };
+        name = "immediate64_or_null"
+      }
+
     (* CR or_null: nullability here should be [Maybe_null], but is set
        to [Non_null] for now due to inference limitations. *)
     let float64 =
@@ -1717,6 +1727,7 @@ module Const = struct
         immediate;
         immediate_or_null;
         immediate64;
+        immediate64_or_null;
         float64;
         kind_of_unboxed_float;
         float32;
@@ -1989,6 +2000,7 @@ module Const = struct
       | "value" -> Builtin.value.jkind
       | "void" -> Builtin.void.jkind
       | "immediate64" -> Builtin.immediate64.jkind
+      | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
       | "immediate" -> Builtin.immediate.jkind
       | "immediate_or_null" -> Builtin.immediate_or_null.jkind
       | "float64" -> Builtin.float64.jkind
