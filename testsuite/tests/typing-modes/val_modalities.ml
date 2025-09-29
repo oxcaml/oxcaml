@@ -155,18 +155,18 @@ Error: Signature mismatch:
            val y : int ref @@ stateless
            val z : 'a -> 'a
            val x : 'a -> 'a
-         end (* at nonportable *)
+         end (* at stateful *)
        is not included in
          sig
            val y : int ref @@ stateless
            val z : 'a -> 'a
            val x : 'a -> 'a @@ stateless
-         end (* at nonportable *)
+         end (* at stateful *)
        Values do not match:
-         val x : 'a -> 'a (* in a structure at nonportable *)
+         val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
-         val x : 'a -> 'a @@ stateless (* in a structure at nonportable *)
-       The first is "nonportable" but the second is "portable".
+         val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
+       The first is "stateful" but the second is "stateless".
 |}, Principal{|
 Lines 8-12, characters 33-5:
  8 | .................................struct
@@ -176,18 +176,18 @@ Lines 8-12, characters 33-5:
 12 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end (* at nonportable *)
+         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end (* at stateful *)
        is not included in
          sig
            val y : int ref
            val z : 'a -> 'a
            val x : 'a -> 'a @@ stateless
-         end (* at nonportable *)
+         end (* at stateful *)
        Values do not match:
-         val x : 'a -> 'a (* in a structure at nonportable *)
+         val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
-         val x : 'a -> 'a @@ stateless (* in a structure at nonportable *)
-       The first is "nonportable" but the second is "portable".
+         val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
+       The first is "stateful" but the second is "stateless".
 |}]
 
 module Module_type_of_monadic = struct
