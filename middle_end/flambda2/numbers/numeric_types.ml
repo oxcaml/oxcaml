@@ -56,12 +56,32 @@ struct
 
     let max_int64 = Int64.lognot min_int64
 
+    let unsigned_min_int64 = 0L
+
+    let unsigned_max_int64 =
+      Int64.shift_right_logical Int64.minus_one (64 - num_bits)
+
+    let () =
+      if num_bits = 8
+      then (
+        assert (Int64.equal min_int64 (-128L));
+        assert (Int64.equal max_int64 127L);
+        assert (Int64.equal unsigned_max_int64 255L))
+
     let of_int64_exn i =
       if Int64.compare i min_int64 < 0 || Int64.compare i max_int64 > 0
       then Misc.fatal_errorf "Int%d: %Ld is out of range" num_bits i
       else Int64.to_int i
 
+    let unsigned_of_int64_exn i =
+      if Int64.compare i unsigned_min_int64 < 0
+         || Int64.compare i unsigned_max_int64 > 0
+      then Misc.fatal_errorf "Int%d: %Ld is out of range" num_bits i
+      else Int64.to_int i
+
     let of_int_exn i = of_int64_exn (Int64.of_int i)
+
+    let unsigned_of_int_exn i = unsigned_of_int64_exn (Int64.of_int i)
 
     let of_int i =
       let extra_bits = Sys.int_size - num_bits in

@@ -1,0 +1,20 @@
+File "regalloc_attributes.ml", line 9, characters 20-28:
+9 | let[@regalloc irc][@regalloc ls] duplicate x = x
+                        ^^^^^^^^
+Warning 54 [duplicated-attribute]: the "regalloc" attribute is used more than once on this expression
+
+File "regalloc_attributes.ml", line 11, characters 5-13:
+11 | let[@regalloc unknown] payload x = x
+          ^^^^^^^^
+Warning 47 [attribute-payload]: illegal payload for attribute 'regalloc'.
+It must be either 'cfg', 'irc', 'ls', 'gi' or empty
+
+File "regalloc_attributes.ml", line 17, characters 0-38:
+17 | let[@cold][@inline never] unused x = x
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 215 [implied-attribute]: attribute [@inline] is unused because it is implied by [@cold]
+
+File "regalloc_attributes.ml", line 14, characters 7-15:
+14 |   let[@regalloc irc] y = x + x in
+            ^^^^^^^^
+Warning 53 [misplaced-attribute]: the "regalloc" attribute cannot appear in this context

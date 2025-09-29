@@ -56,7 +56,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
- (deps const_val.cmx const_val_main.cmx)
+ (deps const_val.output.exe)
  (targets const_val.output.corrected)
  (action
   (with-outputs-to
@@ -91,15 +91,16 @@
    (= %{context_name} "main")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
- (targets int_ops_data.cmx int_ops.cmx int_ops_ir.output.corrected int_ops_main.cmx int_ops.output.exe)
- (deps int_ops_data.ml int_ops.ml int_ops_main.ml)
+ (targets int_ops_stub.o int_ops_data.cmx int_ops.cmx int_ops_ir.output.corrected int_ops_main.cmx int_ops.output.exe)
+ (deps int_ops_stub.c int_ops_data.ml int_ops.ml int_ops_main.ml)
  (action
   (progn
+   (run clang int_ops_stub.c -c -g -O3 -I %{project_root}/runtime)
    (run %{bin:ocamlopt.opt} int_ops_data.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} int_ops.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to int_ops_ir.output.corrected (pipe-outputs (run cat int_ops.ll) (run ./filter.sh)))
    (run %{bin:ocamlopt.opt} int_ops_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
-   (run %{bin:ocamlopt.opt} int_ops_data.cmx int_ops.cmx int_ops_main.cmx -opaque -o int_ops.output.exe))))
+   (run %{bin:ocamlopt.opt} int_ops_stub.o int_ops_data.cmx int_ops.cmx int_ops_main.cmx -opaque -o int_ops.output.exe))))
 
 (rule
  (enabled_if
@@ -108,7 +109,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
- (deps int_ops_data.cmx int_ops.cmx int_ops_main.cmx)
+ (deps int_ops.output.exe)
  (targets int_ops.output.corrected)
  (action
   (with-outputs-to
@@ -160,7 +161,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
- (deps gcd_data.cmx gcd.cmx gcd_main.cmx)
+ (deps gcd.output.exe)
  (targets gcd.output.corrected)
  (action
   (with-outputs-to
@@ -212,7 +213,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
- (deps array_rev_data.cmx array_rev.cmx array_rev_main.cmx)
+ (deps array_rev.output.exe)
  (targets array_rev.output.corrected)
  (action
   (with-outputs-to
@@ -263,7 +264,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
- (deps float_ops.cmx float_ops_main.cmx)
+ (deps float_ops.output.exe)
  (targets float_ops.output.corrected)
  (action
   (with-outputs-to
@@ -315,7 +316,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
- (deps many_args_defn.cmx many_args.cmx many_args_main.cmx)
+ (deps many_args.output.exe)
  (targets many_args.output.corrected)
  (action
   (with-outputs-to
@@ -366,7 +367,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
- (deps multi_ret.cmx multi_ret_main.cmx)
+ (deps multi_ret.output.exe)
  (targets multi_ret.output.corrected)
  (action
   (with-outputs-to
@@ -417,7 +418,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
- (deps indirect_call.cmx indirect_call_main.cmx)
+ (deps indirect_call.output.exe)
  (targets indirect_call.output.corrected)
  (action
   (with-outputs-to
@@ -469,7 +470,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
- (deps extcalls_defn.o extcalls.cmx extcalls_main.cmx)
+ (deps extcalls.output.exe)
  (targets extcalls.output.corrected)
  (action
   (with-outputs-to
@@ -519,7 +520,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
- (deps data_decl.cmx)
+ (deps data_decl.output.exe)
  (targets data_decl.output.corrected)
  (action
   (with-outputs-to
@@ -547,4 +548,258 @@
  (deps data_decl_ir.output data_decl_ir.output.corrected)
  (action
   (diff data_decl_ir.output data_decl_ir.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets exn_part1.cmx exn_part2.cmx exn_part2_ir.output.corrected exn_part3.cmx exn.output.exe)
+ (deps exn_part1.ml exn_part2.ml exn_part3.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} exn_part1.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} exn_part2.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (with-outputs-to exn_part2_ir.output.corrected (pipe-outputs (run cat exn_part2.ll) (run ./filter.sh)))
+   (run %{bin:ocamlopt.opt} exn_part3.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} exn_part1.cmx exn_part2.cmx exn_part3.cmx -opaque -o exn.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps exn.output.exe)
+ (targets exn.output.corrected)
+ (action
+  (with-outputs-to
+   exn.output.corrected
+   (run ./exn.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps exn.output exn.output.corrected)
+ (action
+  (diff exn.output exn.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps exn_part2_ir.output exn_part2_ir.output.corrected)
+ (action
+  (diff exn_part2_ir.output exn_part2_ir.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets alloc.cmx alloc_ir.output.corrected alloc.output.exe)
+ (deps alloc.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} alloc.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (with-outputs-to alloc_ir.output.corrected (pipe-outputs (run cat alloc.ll) (run ./filter.sh)))
+   (run %{bin:ocamlopt.opt} alloc.cmx -opaque -o alloc.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps alloc.output.exe)
+ (targets alloc.output.corrected)
+ (action
+  (with-outputs-to
+   alloc.output.corrected
+   (run ./alloc.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps alloc.output alloc.output.corrected)
+ (action
+  (diff alloc.output alloc.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps alloc_ir.output alloc_ir.output.corrected)
+ (action
+  (diff alloc_ir.output alloc_ir.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets tailcall2.cmx tailcall.cmx tailcall_ir.output.corrected tailcall.output.exe)
+ (deps tailcall2.ml tailcall.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} tailcall2.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} tailcall.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (with-outputs-to tailcall_ir.output.corrected (pipe-outputs (run cat tailcall.ll) (run ./filter.sh)))
+   (run %{bin:ocamlopt.opt} tailcall2.cmx tailcall.cmx -opaque -o tailcall.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps tailcall.output.exe)
+ (targets tailcall.output.corrected)
+ (action
+  (with-outputs-to
+   tailcall.output.corrected
+   (run ./tailcall.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps tailcall.output tailcall.output.corrected)
+ (action
+  (diff tailcall.output tailcall.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps tailcall_ir.output tailcall_ir.output.corrected)
+ (action
+  (diff tailcall_ir.output tailcall_ir.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets switch.cmx switch_ir.output.corrected switch.output.exe)
+ (deps switch.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} switch.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (with-outputs-to switch_ir.output.corrected (pipe-outputs (run cat switch.ll) (run ./filter.sh)))
+   (run %{bin:ocamlopt.opt} switch.cmx -opaque -o switch.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps switch.output.exe)
+ (targets switch.output.corrected)
+ (action
+  (with-outputs-to
+   switch.output.corrected
+   (run ./switch.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps switch.output switch.output.corrected)
+ (action
+  (diff switch.output switch.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps switch_ir.output switch_ir.output.corrected)
+ (action
+  (diff switch_ir.output switch_ir.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets csel_stub.o csel.cmx csel_ir.output.corrected csel.output.exe)
+ (deps csel_stub.c csel.ml)
+ (action
+  (progn
+   (run clang csel_stub.c -c -g -O3 -I %{project_root}/runtime)
+   (run %{bin:ocamlopt.opt} csel.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (with-outputs-to csel_ir.output.corrected (pipe-outputs (run cat csel.ll) (run ./filter.sh)))
+   (run %{bin:ocamlopt.opt} csel_stub.o csel.cmx -opaque -o csel.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps csel.output.exe)
+ (targets csel.output.corrected)
+ (action
+  (with-outputs-to
+   csel.output.corrected
+   (run ./csel.output.exe))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps csel.output csel.output.corrected)
+ (action
+  (diff csel.output csel.output.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps csel_ir.output csel_ir.output.corrected)
+ (action
+  (diff csel_ir.output csel_ir.output.corrected)))
 

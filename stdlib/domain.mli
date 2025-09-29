@@ -99,12 +99,13 @@ let temp_file_key = Domain.DLS.new_key (fun _ ->
     case the current domain exits. *)
 
 (** Domain-local Storage *)
-module DLS : sig 
+module DLS : sig
 
     type 'a key : value mod portable contended
     (** Type of a DLS key *)
 
-    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key @@ nonportable
+    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
+      @@ nonportable
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.new_key]."]
     (** [new_key f] returns a new key bound to initialiser [f] for accessing
 ,        domain-local variables.
@@ -161,6 +162,36 @@ module DLS : sig
         to [k], which cannot be restored later. *)
 end
 
+(** Thread-local storage. Like {!DLS}, but stores a distinct value for each
+    thread. Domains can contain multiple threads, so [TLS] should be preferred
+    in nearly all cases. *)
+module TLS : sig
+
+    type 'a key : value mod portable contended
+    (** Type of a TLS key *)
+
+    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
+        @@ nonportable
+    [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.new_key]."]
+    (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
+
+    val get : 'a key -> 'a @@ nonportable
+    [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.get]."]
+    (** Like {!DLS.get}, but reads the value for the current thread. *)
+
+    val set : 'a key -> 'a -> unit @@ nonportable
+    [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.set]."]
+    (** Like {!DLS.set}, but sets the value for the current thread. *)
+
+    (** For use by the threading library. *)
+    module Private : sig @@ portable
+        type keys
+        val init : unit -> unit
+        val get_initial_keys : unit -> keys
+        val set_initial_keys : keys -> unit
+    end
+end
+
 (** Submodule containing non-backwards-compatible functions which enforce thread safety
     via modes. *)
 module Safe : sig @@ portable
@@ -176,7 +207,7 @@ module Safe : sig @@ portable
       : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
       -> (unit -> 'a) @ portable
       -> 'a key
-    (** Like {!DLS.new_key}, but safe to use in the presence of multiple 
+    (** Like {!DLS.new_key}, but safe to use in the presence of multiple
         domains. *)
 
     val get : ('a : value mod portable). 'a key -> 'a @ contended
@@ -184,6 +215,27 @@ module Safe : sig @@ portable
 
     val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
     (** Like {!DLS.set}, but safe to use in the presence of multiple domains. *)
+  end
+
+  (** Like {!TLS}, but uses modes to enforce properties necessary for data-race
+      freedom. *)
+  module TLS : sig
+
+    type 'a key = 'a TLS.key
+    (** Type of a TLS key *)
+
+    val new_key
+      : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
+      -> (unit -> 'a) @ portable
+      -> 'a key
+    (** Like {!TLS.new_key}, but safe to use in the presence of multiple
+        domains. *)
+
+    val get : ('a : value mod portable). 'a key -> 'a @ contended
+    (** Like {!TLS.get}, but safe to use in the presence of multiple domains. *)
+
+    val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
+    (** Like {!TLS.set}, but safe to use in the presence of multiple domains. *)
   end
 
   val spawn : (unit -> 'a) @ portable once -> 'a t

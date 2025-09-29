@@ -2,9 +2,11 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*                              Jane Street                               *)
+(*                       Pierre Chambart, OCamlPro                        *)
+(*           Mark Shinwell and Leo White, Jane Street Europe              *)
 (*                                                                        *)
-(*   Copyright 2025 Jane Street Group LLC                                 *)
+(*   Copyright 2013--2020 OCamlPro SAS                                    *)
+(*   Copyright 2014--2020 Jane Street Group LLC                           *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -12,19 +14,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Generate LLVM IR *)
-val cfg : Cfg_with_layout.t -> unit
+type t = Lambda.regalloc_attribute
 
-val data : Cmm.data_item list -> unit
+val print : Format.formatter -> t -> unit
 
-val begin_assembly : sourcefile:string option -> unit
+val equal : t -> t -> bool
 
-val end_assembly : unit -> unit
+val is_default : t -> bool
 
-val close_out : unit -> unit
+val from_lambda : Lambda.regalloc_attribute -> t
 
-val open_out : asm_filename:string -> unit
-
-val assemble_file : asm_filename:string -> obj_filename:string -> int
-
-val init : output_prefix:string -> ppf_dump:Format.formatter -> unit
+val to_lambda : t -> Lambda.regalloc_attribute

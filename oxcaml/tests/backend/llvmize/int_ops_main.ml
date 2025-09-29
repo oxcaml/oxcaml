@@ -25,4 +25,7 @@ let () =
   int_test "(-15) lxor 4" (Int_ops.lxor_imm ());
   int_test "(-15) lsl 4" (Int_ops.lsl_imm ());
   int_test "(-15) lsr 4" (Int_ops.lsr_imm ());
-  int_test "(-15) asr 4" (Int_ops.asr_imm ())
+  int_test "(-15) asr 4" (Int_ops.asr_imm ());
+  int_test "popcnt 0b100111010000" (Int_ops.popcnt ());
+  int_test "ctz 0b100111010000" (Int_ops.ctz ());
+  int_test "clz 0b100111010000" (Int_ops.clz ())

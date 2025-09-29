@@ -50,6 +50,15 @@ let is_poll_attribute =
 let is_loop_attribute =
   [ "loop", Return ]
 
+let is_regalloc_attribute =
+  [ "regalloc", Return ]
+
+let is_regalloc_param_attribute =
+  [ "regalloc_param", Return ]
+
+let is_cold_attribute =
+  [ "cold", Return ]
+
 let is_opaque_attribute =
   [ "opaque", Return ]
 
@@ -177,6 +186,31 @@ let parse_loop_attribute attr =
         ]
         payload
 
+let parse_regalloc_attribute attr : regalloc_attribute =
+  match attr with
+  | None -> Default_regalloc
+  | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
+      parse_id_payload txt loc
+        ~default:Default_regalloc
+        ~empty:Default_regalloc
+        (List.map
+          (fun (name, regalloc) -> name, Regalloc regalloc)
+          Clflags.Register_allocator.assoc_list)
+        payload
+
+let parse_regalloc_param_attribute attr =
+  match attr with
+  | None -> None
+  | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
+      match payload with
+      | PStr [{pstr_desc=Pstr_eval(
+          {pexp_desc=Pexp_constant(Pconst_string(s, _, _)); _}, _); _}] ->
+          Some s
+      | _ ->
+          Location.prerr_warning loc
+            (Warnings.Attribute_payload (txt, "It must be a string literal"));
+          None
+
 let parse_opaque_attribute attr =
   match attr with
   | None -> false
@@ -210,6 +244,23 @@ let get_poll_attribute l =
 let get_loop_attribute l =
   let attr = find_attribute is_loop_attribute l in
   parse_loop_attribute attr
+
+let get_regalloc_attribute l =
+  let attr = find_attribute is_regalloc_attribute l in
+  parse_regalloc_attribute attr
+
+let get_regalloc_param_attributes l =
+  let attrs = select_attributes is_regalloc_param_attribute l in
+  match
+    List.filter_map
+      (fun attr -> parse_regalloc_param_attribute (Some attr))
+      attrs
+  with
+  | [] -> Default_regalloc_params
+  | (_ :: _) as params -> Regalloc_params params
+
+let get_cold_attribute l =
+  find_attribute is_cold_attribute l <> None
 
 let check_local_inline loc attr =
   match attr.local, attr.inline with
@@ -331,6 +382,89 @@ let add_loop_attribute expr loc attributes =
       let attr = { attr with loop } in
       lfunction_with_attr ~attr funct
     end
+  | _ -> expr
+
+let add_regalloc_attribute expr loc attributes =
+  match expr with
+  | Lfunction({ attr = { stub = false } as attr } as funct) ->
+    begin match get_regalloc_attribute attributes with
+    | Default_regalloc -> expr
+    | (Regalloc _) as regalloc ->
+      begin match attr.regalloc with
+      | Default_regalloc -> ()
+      | Regalloc _ ->
+          Location.prerr_warning loc
+            (Warnings.Duplicated_attribute "regalloc")
+      end;
+      let attr = { attr with regalloc } in
+      lfunction_with_attr ~attr funct
+    end
+  | _ -> expr
+
+let add_regalloc_param_attribute expr _loc attributes =
+  match expr with
+  | Lfunction({ attr } as funct) ->
+    let params = get_regalloc_param_attributes attributes in
+    begin match params with
+    | Default_regalloc_params -> expr
+    | Regalloc_params params ->
+      let existing =
+        match attr.regalloc_param with
+        | Default_regalloc_params -> []
+        | Regalloc_params existing -> existing
+      in
+      let attr = {
+        attr with regalloc_param = Regalloc_params (existing @ params)
+      } in
+      lfunction_with_attr ~attr funct
+    end
+  | _ -> expr
+
+let add_cold_attribute expr loc attributes =
+  match expr with
+  | Lfunction({ attr = { stub = false } as attr } as funct) ->
+    if get_cold_attribute attributes then begin
+      if attr.cold then Location.prerr_warning loc
+            (Warnings.Duplicated_attribute "cold");
+      (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never]
+         [@local never]` so we do the equivalent here. *)
+      begin match attr.inline with 
+      | Always_inline
+      | Never_inline
+      | Available_inline
+      | Unroll _ ->
+        Location.prerr_warning
+          loc
+          (Warnings.Implied_attribute
+            { implying = "cold"; implied = "inline" });
+      | Default_inline -> ()
+      end;
+      begin match attr.specialise with
+      | Always_specialise
+      | Never_specialise ->
+        Location.prerr_warning
+          loc
+          (Warnings.Implied_attribute
+            { implying = "cold"; implied = "specialise" });
+      | Default_specialise -> ()
+      end;
+      begin match attr.local with
+      | Always_local
+      | Never_local ->
+        Location.prerr_warning
+          loc
+          (Warnings.Implied_attribute { implying = "cold"; implied = "local" });
+      | Default_local -> ()
+      end;
+      let attr =
+        { attr with cold = true;
+          inline = Never_inline;
+          specialise = Never_specialise;
+          local = Never_local; }
+      in
+      lfunction_with_attr ~attr funct
+    end else
+      expr
   | _ -> expr
 
 let add_tmc_attribute expr loc attributes =
@@ -455,6 +589,15 @@ let add_function_attributes lam loc attr =
     add_loop_attribute lam loc attr
   in
   let lam =
+    add_regalloc_attribute lam loc attr
+  in
+  let lam =
+    add_regalloc_param_attribute lam loc attr
+  in
+  let lam =
+    add_cold_attribute lam loc attr
+  in
+  let lam =
     add_tmc_attribute lam loc attr
   in
   let lam =
@@ -466,6 +609,22 @@ let add_function_attributes lam loc attr =
   in
   let lam =
     add_opaque_attribute lam loc attr
+  in
+  (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never]
+    [@local never]` so if all three attributes are set to never, we set
+    `cold` to `true`. *)
+  let lam =
+    match lam with
+    | Lfunction({
+      attr = {
+        inline = Never_inline;
+        specialise = Never_specialise;
+        local = Never_local
+      } as attr
+    } as funct) ->
+      let attr = { attr with cold = true; } in
+      lfunction_with_attr ~attr funct
+    | _ -> lam
   in
   lam
 

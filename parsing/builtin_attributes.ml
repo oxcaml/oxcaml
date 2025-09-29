@@ -117,6 +117,9 @@ let builtin_attrs =
   ; "or_null_reexport"
   ; "no_recursive_modalities"
   ; "jane.non_erasable.instances"
+  ; "cold"
+  ; "regalloc"
+  ; "regalloc_param"
   ]
 
 let builtin_attrs =

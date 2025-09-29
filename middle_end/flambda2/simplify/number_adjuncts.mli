@@ -147,6 +147,21 @@ module For_tagged_immediates : Int_number_kind
 module For_naked_immediates : Int_number_kind
 
 module For_float32s : Boxable_number_kind
+(* Float32s in JSOO are actually normal 64-bit floats, and each operation is
+   performed in 64-bit precision and then rounded to the nearest 32-bit float.
+   Since this is not identical to true 32-bit operations, there is a mismatch
+   between the semantics of [For_float32s] and the semantics of the JSIR target.
+   However, this should be okay: IEEE 754 only fully specifies the result of
+   certain operations such as sqrt and rint [1], which seem to be exact in our
+   setting [2, Table 1]. Other operations are only "recommended", and indeed
+   many libraries produce different errors [3].
+
+   [1]
+   https://sourceware.org/glibc/manual/2.42/html_node/Errors-in-Math-Functions.html
+
+   [2] https://dl.acm.org/doi/pdf/10.1145/221332.221334
+
+   [3] https://inria.hal.science/hal-03141101 *)
 
 module For_floats : Boxable_number_kind
 

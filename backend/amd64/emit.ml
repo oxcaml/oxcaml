@@ -2246,6 +2246,9 @@ let emit_instr ~first ~fallthrough i =
       ~dependencies:[| res i 0 |]
       ~instr:i ~address Onetwentyeight_unaligned Store_modify;
     emit_simd_instr_with_memory_arg op i address
+  | Lop (Specific (Illvm_intrinsic intr)) ->
+    Misc.fatal_errorf
+      "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
   | Lop (Specific (Icldemote addr)) ->
@@ -2315,7 +2318,7 @@ let emit_instr ~first ~fallthrough i =
     I.movzx (res8 i 0) (res i 0)
   | Lop Dls_get ->
     if Config.runtime5
-    then I.mov (domain_field Domainstate.Domain_dls_root) (res i 0)
+    then I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
     else Misc.fatal_error "Dls is not supported in runtime4."
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()

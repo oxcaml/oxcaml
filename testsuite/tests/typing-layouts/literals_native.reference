@@ -19,6 +19,10 @@ two_fifty_five_in_hex: 255
 twenty_five_in_octal: 25
 forty_two_in_binary: 42
 max_int + 1: -4611686018427387904
+untagged char: 'c'
+untagged octal char: '\000'
+untagged hex char: '\255'
+untagged decimal char: '\222'
 result: 7.000000
 larger match result: 3.000000
 result: 7

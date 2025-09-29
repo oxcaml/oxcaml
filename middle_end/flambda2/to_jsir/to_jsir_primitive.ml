@@ -251,7 +251,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | (Tagged_immediate | Naked_immediate), Naked_nativeint ->
       caml_of "nativeint" "int"
     | Naked_float32, (Tagged_immediate | Naked_immediate) ->
-      caml_to "float32" "int"
+      caml_of "int" "float32"
     | Naked_float32, Naked_float -> caml_of "float" "float32"
     | Naked_float32, Naked_int32 -> caml_of "int32" "float32"
     | Naked_float32, Naked_int64 -> caml_to_bytecode "float32" "int64"
