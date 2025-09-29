@@ -393,23 +393,6 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
   | _ ->
       (kind, layout)
 
-let value_kind_of_value_jkind env jkind =
-  let layout = Jkind.get_layout_defaulting_to_value jkind in
-  (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
-     the principality check, as we're just trying to compute optimizations. *)
-  let context = Ctype.mk_jkind_context_always_principal env in
-  let externality_upper_bound =
-    Jkind.get_externality_upper_bound ~context jkind
-  in
-  match layout with
-  | Base Value ->
-    value_kind_of_value_with_externality externality_upper_bound
-  | Any
-  | Product _
-  | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 |
-          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
-    Misc.fatal_error "expected a layout of value"
-
 (* [value_kind] has a pre-condition that it is only called on values.  With the
    current set of sort restrictions, there are two reasons this invariant may
    be violated:
@@ -475,24 +458,12 @@ let non_nullable raw_kind = { raw_kind; nullable = Non_nullable }
 
 let nullable raw_kind = { raw_kind; nullable = Nullable }
 
-(* CR layouts v3: This file has two approaches for checking
-   nullability. [representation_properties_type] does this by calling
-   [Ctype.check_type_nullability] (which is just [constrain_type_jkind] on [any
-   mod non_null]), while [add_nullability_from_jkind] just pulls it out of a
-   kind (and sometimes we compute a jkind with [estimate_type_jkind] for that
-   purpose).
-
-   The former is a bit more expensive (though quite cheap in the places where we
-   are doing it now, as the type has already been scraped) but will give a fully
-   accurate nullability. The later is conservative but cheaper when we already
-   have a jkind. We should pick one, or rationalize why there are two.
-*)
-let add_nullability_from_jkind env jkind raw_kind =
-  let context = Ctype.mk_jkind_context_always_principal env in
-  let nullable =
-    match Jkind.get_nullability ~context jkind with
-    | Non_null -> Non_nullable
-    | Maybe_null -> Nullable
+let estimate_value_kind_from_jkind env ty =
+  let immediate_or_pointer, nullable = maybe_pointer_type env ty in
+  let raw_kind =
+    match immediate_or_pointer with
+    | Immediate -> Pintval
+    | Pointer -> Pgenval
   in
   { raw_kind; nullable }
 
@@ -631,8 +602,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       if cannot_proceed () then
         num_nodes_visited,
-        add_nullability_from_jkind env decl.type_jkind
-          (value_kind_of_value_jkind env decl.type_jkind)
+        estimate_value_kind_from_jkind env ty
       else
         let visited = Numbers.Int.Set.add (get_id ty) visited in
         (* Default of [Pgenval] is currently safe for the missing cmi fallback
@@ -664,8 +634,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
         | Type_abstract _ ->
           num_nodes_visited,
-          add_nullability_from_jkind env decl.type_jkind
-            (value_kind_of_value_jkind env decl.type_jkind)
+          estimate_value_kind_from_jkind env ty
         | Type_open -> num_nodes_visited, non_nullable Pgenval
     end
   | Ttuple labeled_fields ->
@@ -697,7 +666,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     else non_nullable Pintval
   | _ ->
     num_nodes_visited,
-    add_nullability_from_jkind env (Ctype.estimate_type_jkind env ty) Pgenval
+    estimate_value_kind_from_jkind env ty
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
@@ -991,14 +960,20 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
     end
 
 let value_kind env loc ty =
+  (* CR dkalinichenko: [value_kind] sometimes changes the levels
+     in the original type. Investigate why and fix. *)
+  let snap = Btype.snapshot () in
   try
     let (_num_nodes_visited, value_kind) =
       value_kind env ~loc ~visited:Numbers.Int.Set.empty ~depth:0
         ~num_nodes_visited:0 ty
     in
+    Btype.backtrack snap;
     value_kind
   with
-  | Missing_cmi_fallback -> raise (Error (loc, Non_value_layout (ty, None)))
+  | Missing_cmi_fallback ->
+    Btype.backtrack snap;
+    raise (Error (loc, Non_value_layout (ty, None)))
 
 let transl_mixed_block_element env loc ty mbe =
   try
