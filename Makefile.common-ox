@@ -109,9 +109,9 @@ compiler: runtime-stdlib
           $(dune) build $(ws_main) \
           --only-package=ocaml @install \
           tools/regalloc/regalloc.exe \
-          oxcaml/testsuite/tools/expect.exe \
-          oxcaml/testsuite/tools/codegen_main.exe \
-          oxcaml/testsuite/tools/asmgen_$(ARCH).o \
+          testsuite/tools/expect.exe \
+          testsuite/tools/codegen_main.exe \
+          testsuite/tools/asmgen_$(ARCH).o \
           testsuite/lib/lib.cm{,x}a \
           testsuite/lib/testing.cm{,x}a \
           $(ocamldir)/tools/dumpobj.bc
