@@ -4522,51 +4522,21 @@ module Crossing = struct
 
   let create ~regionality ~linearity ~uniqueness ~portability ~contention
       ~forkable ~yielding ~statefulness ~visibility =
-    let regionality =
-      if regionality
-      then Per_axis.min (Comonadic Areality)
-      else Per_axis.max (Comonadic Areality)
+    let comonadic b ax =
+      if b then Per_axis.min (Comonadic ax) else Per_axis.max (Comonadic ax)
     in
-    let linearity =
-      if linearity
-      then Per_axis.min (Comonadic Linearity)
-      else Per_axis.max (Comonadic Linearity)
+    let monadic b ax =
+      if b then Per_axis.min (Monadic ax) else Per_axis.max (Monadic ax)
     in
-    let uniqueness =
-      if uniqueness
-      then Per_axis.min (Monadic Uniqueness)
-      else Per_axis.max (Monadic Uniqueness)
-    in
-    let portability =
-      if portability
-      then Per_axis.min (Comonadic Portability)
-      else Per_axis.max (Comonadic Portability)
-    in
-    let contention =
-      if contention
-      then Per_axis.min (Monadic Contention)
-      else Per_axis.max (Monadic Contention)
-    in
-    let forkable =
-      if forkable
-      then Per_axis.min (Comonadic Forkable)
-      else Per_axis.max (Comonadic Forkable)
-    in
-    let yielding =
-      if yielding
-      then Per_axis.min (Comonadic Yielding)
-      else Per_axis.max (Comonadic Yielding)
-    in
-    let statefulness =
-      if statefulness
-      then Per_axis.min (Comonadic Statefulness)
-      else Per_axis.max (Comonadic Statefulness)
-    in
-    let visibility =
-      if visibility
-      then Per_axis.min (Monadic Visibility)
-      else Per_axis.max (Monadic Visibility)
-    in
+    let regionality = comonadic regionality Areality in
+    let linearity = comonadic linearity Linearity in
+    let uniqueness = monadic uniqueness Uniqueness in
+    let portability = comonadic portability Portability in
+    let contention = monadic contention Contention in
+    let forkable = comonadic forkable Forkable in
+    let yielding = comonadic yielding Yielding in
+    let statefulness = comonadic statefulness Statefulness in
+    let visibility = monadic visibility Visibility in
     let monadic = Monadic.create ~uniqueness ~contention ~visibility in
     let comonadic =
       Comonadic.create ~regionality ~linearity ~portability ~yielding ~forkable
