@@ -988,7 +988,8 @@
  (action (write-file %{target} "")))
 
 (install
-  (files (glob_files (stdlib-js/*.cmj* with_prefix .)))
+  (files (glob_files (stdlib-js/*.cmj* with_prefix .))
+         (glob_files (stdlib-js/*.map with_prefix .)))
   (section lib)
   (package ocaml_runtime_stdlib))
 
@@ -1012,7 +1013,8 @@
     (action (write-file %{target} "")))
 
   (install
-    (files (glob_files (stdlib_upstream_compatible-js/*.cmj* with_prefix stdlib_upstream_compatible)))
+    (files (glob_files (stdlib_upstream_compatible-js/*.cmj* with_prefix stdlib_upstream_compatible))
+           (glob_files (stdlib_upstream_compatible-js/*.map with_prefix stdlib_upstream_compatible)))
     (section lib)
     (package ocaml))
 
@@ -1034,7 +1036,8 @@
     (action (write-file %{target} "")))
 
   (install
-    (files (glob_files (stdlib_stable-js/*.cmj* with_prefix stdlib_stable)))
+    (files (glob_files (stdlib_stable-js/*.cmj* with_prefix stdlib_stable))
+           (glob_files (stdlib_stable-js/*.map with_prefix stdlib_stable)))
     (section lib)
     (package ocaml))
 
@@ -1056,7 +1059,8 @@
     (action (write-file %{target} "")))
 
   (install
-    (files (glob_files (stdlib_beta-js/*.cmj* with_prefix stdlib_beta)))
+    (files (glob_files (stdlib_beta-js/*.cmj* with_prefix stdlib_beta))
+           (glob_files (stdlib_beta-js/*.map with_prefix stdlib_beta)))
     (section lib)
     (package ocaml))
 
@@ -1078,7 +1082,8 @@
     (action (write-file %{target} "")))
 
   (install
-    (files (glob_files (stdlib_alpha-js/*.cmj* with_prefix stdlib_alpha)))
+    (files (glob_files (stdlib_alpha-js/*.cmj* with_prefix stdlib_alpha))
+           (glob_files (stdlib_alpha-js/*.map with_prefix stdlib_alpha)))
     (section lib)
     (package ocaml))
 )

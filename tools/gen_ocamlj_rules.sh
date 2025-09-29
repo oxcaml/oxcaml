@@ -121,7 +121,7 @@ echo ""
 # Individual compilation rules
 for cu in "${!srcs[@]}"; do
     echo "(rule"
-    echo " (targets ${cu}.cmjo ${cu}.cmjx)"
+    echo " (targets ${cu}.cmjo ${cu}.cmjx ${cu}.map)"
     echo " (deps "
     echo "  (source_tree ${src})"
     echo "  ${cmis_dir}/${cu}.cmi"

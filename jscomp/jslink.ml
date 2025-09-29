@@ -314,10 +314,13 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
       other_objs @ js_objfiles
     in
     let linkall_flag = if !Clflags.link_everything then ["--linkall"] else [] in
+    let resolve_sourcemap_flag =
+      if !Clflags.debug then ["--resolve-sourcemap-url"; "true"] else []
+    in
     Misc.try_finally
       (fun () ->
         Jscompile.run_jsoo_exn
-          ~args:(["link"; "-o"; output_name ] @ linkall_flag @ debug_flag @ files_to_link
+          ~args:(["link"; "-o"; output_name ] @ linkall_flag @ debug_flag @ resolve_sourcemap_flag @ files_to_link
                  @ (List.rev !Clflags.all_ccopts)
                 ))
       ~always:(fun () ->
