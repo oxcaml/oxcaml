@@ -14,14 +14,19 @@
  *
  *)
 
+type evaluation_outcome =
+  | Result of Obj.t
+  | Exception of exn
+
 val jit_load
-  :  Format.formatter
+  :  phrase_name:string
+  -> Format.formatter
   -> Lambda.program
-  -> Opttoploop.evaluation_outcome
+  -> evaluation_outcome
 (** Loads and runs the provided program *)
 
 val jit_lookup_symbol : string -> Obj.t option
 
-val init_top : unit -> unit
-(** Register the JIT so that the native toplevel uses it instead of
-    the regular toolchain *)
+val set_debug : unit -> unit
+(** Enables debugging if the OCAML_JIT_DEBUG env var is set. *)
+

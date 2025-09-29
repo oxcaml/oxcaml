@@ -1,6 +1,6 @@
 (library
  (name jit)
- (libraries ocamlcommon ocamlopttoplevel)
+ (libraries ocamlcommon ocamloptcomp flambda2 unix)
  (foreign_stubs
   (language c)
   (names jit_stubs)))
