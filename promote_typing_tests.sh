@@ -1,6 +1,6 @@
 #!/bin/bash
-# Script to build the compiler and promote layout/mode/jkind test outputs
-# This is useful when making changes that affect type inference for modes and layouts
+# Script to build the compiler and promote all typing test outputs
+# This is useful when making changes that affect type inference
 
 set -e
 
@@ -8,11 +8,24 @@ echo "Building compiler..."
 make boot-compiler
 
 echo ""
-echo "Promoting test outputs for layout/mode/jkind tests..."
+echo "Promoting test outputs for all typing tests..."
 
-# List of test directories that are affected by layout/mode/jkind changes
+# All typing-related test directories
 TEST_DIRS=(
+  "typing-core-bugs"
+  "typing-deprecated"
+  "typing-extension-constructor"
+  "typing-extensions"
+  "typing-external"
+  "typing-fstclassmod"
+  "typing-gadts"
+  "typing-immediate"
+  "typing-implicit-source-positions"
+  "typing-implicit_unpack"
   "typing-jkind-bounds"
+  "typing-kind"
+  "typing-labeled-tuples"
+  "typing-labels"
   "typing-layouts"
   "typing-layouts-arrays"
   "typing-layouts-bits16"
@@ -33,8 +46,43 @@ TEST_DIRS=(
   "typing-layouts-vec128"
   "typing-layouts-void"
   "typing-layouts-word"
+  "typing-local"
+  "typing-misc"
+  "typing-misc-bugs"
+  "typing-missing-cmi"
+  "typing-missing-cmi-2"
+  "typing-missing-cmi-3"
+  "typing-missing-cmi-indirections"
   "typing-modal-kinds"
   "typing-modes"
+  "typing-modules"
+  "typing-modules-bugs"
+  "typing-multifile"
+  "typing-objects"
+  "typing-objects-bugs"
+  "typing-ocamlc-i"
+  "typing-poly"
+  "typing-poly-bugs"
+  "typing-polyvariants-bugs"
+  "typing-polyvariants-bugs-2"
+  "typing-private"
+  "typing-private-bugs"
+  "typing-recmod"
+  "typing-recordarg"
+  "typing-rectypes-bugs"
+  "typing-safe-linking"
+  "typing-shadowing-of-pervasives-submodules"
+  "typing-short-paths"
+  "typing-signatures"
+  "typing-sigsubst"
+  "typing-simd"
+  "typing-small-numbers"
+  "typing-typeparam"
+  "typing-unboxed"
+  "typing-unboxed-types"
+  "typing-unique"
+  "typing-warnings"
+  "typing-zero-alloc"
 )
 
 for dir in "${TEST_DIRS[@]}"; do
