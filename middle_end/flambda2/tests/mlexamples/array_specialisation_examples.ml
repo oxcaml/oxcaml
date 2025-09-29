@@ -10,7 +10,7 @@ let g (x : int option) =
   let[@local] get a = Array.get a 0 in
   get [| x |]
 
-(* Example of a specialised primitive (on Immediates arrays) being called on a
+(* Example of a specialised primitive (on Externals arrays) being called on a
    generic array. The specialised primitive should be kept. *)
 let h (x : int) =
   let[@local] make v = [| v |] in

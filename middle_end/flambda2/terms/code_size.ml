@@ -172,7 +172,7 @@ let block_load (kind : Flambda_primitive.Block_access_kind.t) =
 
 let array_load (kind : Flambda_primitive.Array_load_kind.t) =
   match kind with
-  | Immediates -> 1 (* cadda + load *)
+  | Externals -> 1 (* cadda + load *)
   | Naked_floats | Values -> 1
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
   | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
@@ -195,7 +195,7 @@ let array_set (kind : Flambda_primitive.Array_set_kind.t) =
   match kind with
   | Values (Assignment Heap) -> does_not_need_caml_c_call_extcall_size
   | Values (Assignment Local | Initialization) -> 1
-  | Immediates | Naked_floats -> 1
+  | Externals | Naked_floats -> 1
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
   | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
     2 (* as above *)
@@ -398,7 +398,7 @@ let unary_prim_size ~machine_width prim =
   | Array_length array_kind -> (
     match array_kind with
     | Array_kind
-        ( Immediates | Values | Naked_floats | Naked_int64s | Naked_nativeints
+        ( Externals | Values | Naked_floats | Naked_int64s | Naked_nativeints
         | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ) ->
       array_length_size
     | Array_kind (Naked_int32s | Naked_float32s) ->

@@ -483,7 +483,7 @@ string_accessor_width:
 
 array_kind:
   | { (Values : array_kind) }
-  | KWD_IMM { (Immediates : array_kind) }
+  | KWD_IMM { (Externals : array_kind) }
   | KWD_FLOAT { (Naked_floats : array_kind) }
 
 array_kind_for_length:
@@ -603,7 +603,7 @@ binop_app:
     {
     let array_load_kind : array_load_kind =
       match ak with
-      | Immediates -> Immediates
+      | Externals -> Externals
       | Values -> Values
       | Naked_floats -> Naked_floats
       | Naked_float32s -> Naked_float32s
@@ -640,7 +640,7 @@ ternop_app:
     {
       let array_set_kind : array_set_kind =
         match ak with
-        | Immediates -> Immediates
+        | Externals -> Externals
         | Values -> Values ia
         | Naked_floats -> Naked_floats
         | Naked_float32s -> Naked_float32s

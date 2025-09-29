@@ -305,7 +305,7 @@ let array_kind ~space ppf (ak : array_kind) =
   let str =
     match ak with
     | Values -> None
-    | Immediates -> Some "imm"
+    | Externals -> Some "ext"
     | Naked_floats -> Some "float"
     | Naked_float32s -> Some "float32"
     | Naked_int32s -> Some "int32"
@@ -658,7 +658,7 @@ let ternop ppf t a1 a2 a3 =
     let ia =
       match set_kind with
       | Values ia -> ia
-      | Immediates | Naked_floats | Naked_float32s | Naked_int32s | Naked_int64s
+      | Externals | Naked_floats | Naked_float32s | Naked_int32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         Initialization (* Will be ignored anyway *)
     in

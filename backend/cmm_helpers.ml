@@ -1636,7 +1636,7 @@ let field_address_computed ptr ofs dbg =
 let addr_array_ref arr ofs dbg =
   Cop (mk_load_mut Word_val, [array_indexing log2_size_addr arr ofs dbg], dbg)
 
-let int_array_ref arr ofs dbg =
+let ext_array_ref arr ofs dbg =
   Cop (mk_load_mut Word_int, [array_indexing log2_size_addr arr ofs dbg], dbg)
 
 let unboxed_mutable_float_array_ref arr ofs dbg =
@@ -1724,7 +1724,7 @@ let addr_array_set (mode : Lambda.modify_mode) arr ofs newval dbg =
 
 (* int and float arrays can be written to uniformly regardless of their mode *)
 
-let int_array_set arr ofs newval dbg =
+let ext_array_set arr ofs newval dbg =
   Cop
     ( Cstore (Word_int, Assignment),
       [array_indexing log2_size_addr arr ofs dbg; newval],
@@ -1865,7 +1865,7 @@ let unboxed_float32_array_ref =
 
 let unboxed_int64_or_nativeint_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
-      bind "index" array_index (fun index -> int_array_ref arr index dbg))
+      bind "index" array_index (fun index -> ext_array_ref arr index dbg))
 
 let unboxed_packed_array_set arr ~index ~new_value dbg ~memory_chunk =
   bind "arr" arr (fun arr ->
@@ -1887,7 +1887,7 @@ let unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
-              int_array_set arr index new_value dbg)))
+              ext_array_set arr index new_value dbg)))
 
 let get_field_unboxed ~dbg memory_chunk mutability block ~index_in_words =
   if Arch.big_endian && memory_chunk_width_in_bytes memory_chunk <> size_addr
@@ -4003,7 +4003,7 @@ let setfield_computed ptr init arg1 arg2 arg3 dbg =
     return_unit dbg (addr_array_set_local arg1 arg2 arg3 dbg)
   | Caml_initialize ->
     return_unit dbg (addr_array_initialize arg1 arg2 arg3 dbg)
-  | Simple _ -> return_unit dbg (int_array_set arg1 arg2 arg3 dbg)
+  | Simple _ -> return_unit dbg (ext_array_set arg1 arg2 arg3 dbg)
 
 (* Symbols *)
 

@@ -271,7 +271,7 @@ type primitive =
   | Pfloat_array_load_vec of { size : boxed_vector; unsafe : bool;
                                index_kind : array_index_kind;
                                mode : locality_mode; boxed : bool }
-  | Pint_array_load_vec of { size : boxed_vector; unsafe : bool;
+  | Pext_array_load_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind;
                              mode : locality_mode; boxed : bool }
   | Punboxed_float_array_load_vec of { size : boxed_vector; unsafe : bool;
@@ -293,7 +293,7 @@ type primitive =
                              index_kind : array_index_kind; boxed : bool }
   | Pfloat_array_set_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind; boxed : bool }
-  | Pint_array_set_vec of { size : boxed_vector; unsafe : bool;
+  | Pext_array_set_vec of { size : boxed_vector; unsafe : bool;
                             index_kind : array_index_kind; boxed : bool }
   | Punboxed_float_array_set_vec of { size : boxed_vector; unsafe : bool;
                                       index_kind : array_index_kind;
@@ -423,7 +423,7 @@ and constructor_shape =
   | Constructor_mixed of mixed_block_shape
 
 and array_kind =
-    Pgenarray | Paddrarray | Pintarray | Pfloatarray
+    Pgenarray | Paddrarray | Pextarray | Pfloatarray
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
@@ -433,7 +433,7 @@ and array_kind =
 and array_ref_kind =
   | Pgenarray_ref of locality_mode
   | Paddrarray_ref
-  | Pintarray_ref
+  | Pextarray_ref
   | Pfloatarray_ref of locality_mode
   | Punboxedfloatarray_ref of unboxed_float
   | Punboxedoruntaggedintarray_ref of unboxed_or_untagged_integer
@@ -444,7 +444,7 @@ and array_ref_kind =
 and array_set_kind =
   | Pgenarray_set of modify_mode
   | Paddrarray_set of modify_mode
-  | Pintarray_set
+  | Pextarray_set
   | Pfloatarray_set
   | Punboxedfloatarray_set of unboxed_float
   | Punboxedoruntaggedintarray_set of unboxed_or_untagged_integer
@@ -454,13 +454,13 @@ and array_set_kind =
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
 
 and ignorable_product_element_kind =
-  | Pint_ignorable
+  | Pext_ignorable
   | Punboxedfloat_ignorable of unboxed_float
   | Punboxedoruntaggedint_ignorable of unboxed_or_untagged_integer
   | Pproduct_ignorable of ignorable_product_element_kind list
 
 and scannable_product_element_kind =
-  | Pint_scannable
+  | Pext_scannable
   | Paddr_scannable
   | Pproduct_scannable of scannable_product_element_kind list
 
@@ -641,14 +641,14 @@ let rec compatible_layout x y =
 
 let rec equal_ignorable_product_element_kind k1 k2 =
   match k1, k2 with
-  | Pint_ignorable, Pint_ignorable -> true
+  | Pext_ignorable, Pext_ignorable -> true
   | Punboxedfloat_ignorable f1, Punboxedfloat_ignorable f2 ->
     Primitive.equal_unboxed_float f1 f2
   | Punboxedoruntaggedint_ignorable i1, Punboxedoruntaggedint_ignorable i2 ->
     Primitive.equal_unboxed_or_untagged_integer i1 i2
   | Pproduct_ignorable p1, Pproduct_ignorable p2 ->
     List.equal equal_ignorable_product_element_kind p1 p2
-  | ( Pint_ignorable | Punboxedfloat_ignorable _
+  | ( Pext_ignorable | Punboxedfloat_ignorable _
     | Punboxedoruntaggedint_ignorable _ | Pproduct_ignorable _), _ -> false
 
 let must_be_value layout =
@@ -1961,12 +1961,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Parraylength _ -> None
   | Parrayblit _
   | Parraysetu _ | Parraysets _
-  | Parrayrefu ((Paddrarray_ref | Pintarray_ref
+  | Parrayrefu ((Paddrarray_ref | Pextarray_ref
       | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
       | Punboxedvectorarray_ref _
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _)
-  | Parrayrefs ((Paddrarray_ref | Pintarray_ref
+  | Parrayrefs ((Paddrarray_ref | Pextarray_ref
       | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
       | Punboxedvectorarray_ref _
       | Pgcscannableproductarray_ref _
@@ -1989,7 +1989,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbytes_load_vec { mode = m; boxed = true; _ }
   | Pfloatarray_load_vec { mode = m; boxed = true; _ }
   | Pfloat_array_load_vec { mode = m; boxed = true; _ }
-  | Pint_array_load_vec { mode = m; boxed = true; _ }
+  | Pext_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_float_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_float32_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_int32_array_load_vec { mode = m; boxed = true; _ }
@@ -2006,7 +2006,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbytes_load_vec { boxed = false; _ }
   | Pfloatarray_load_vec { boxed = false; _ }
   | Pfloat_array_load_vec { boxed = false; _ }
-  | Pint_array_load_vec { boxed = false; _ }
+  | Pext_array_load_vec { boxed = false; _ }
   | Punboxed_float_array_load_vec { boxed = false; _ }
   | Punboxed_float32_array_load_vec { boxed = false; _ }
   | Punboxed_int32_array_load_vec { boxed = false; _ }
@@ -2025,7 +2025,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbigstring_load_vec { boxed = false; _ } -> None
   | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
   | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pext_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _ -> None
@@ -2107,7 +2107,7 @@ let primitive_can_raise prim =
   | Pbigstring_set_vec { unsafe = false; _ }
   | Pfloatarray_load_vec { unsafe = false; _ }
   | Pfloat_array_load_vec { unsafe = false; _ }
-  | Pint_array_load_vec { unsafe = false; _ }
+  | Pext_array_load_vec { unsafe = false; _ }
   | Punboxed_float_array_load_vec { unsafe = false; _ }
   | Punboxed_float32_array_load_vec { unsafe = false; _ }
   | Punboxed_int32_array_load_vec { unsafe = false; _ }
@@ -2115,7 +2115,7 @@ let primitive_can_raise prim =
   | Punboxed_nativeint_array_load_vec { unsafe = false; _ }
   | Pfloatarray_set_vec { unsafe = false; _ }
   | Pfloat_array_set_vec { unsafe = false; _ }
-  | Pint_array_set_vec { unsafe = false; _ }
+  | Pext_array_set_vec { unsafe = false; _ }
   | Punboxed_float_array_set_vec { unsafe = false; _ }
   | Punboxed_float32_array_set_vec { unsafe = false; _ }
   | Punboxed_int32_array_set_vec { unsafe = false; _ }
@@ -2188,7 +2188,7 @@ let primitive_can_raise prim =
   | Pbigstring_set_vec { unsafe = true; _ }
   | Pfloatarray_load_vec { unsafe = true; _ }
   | Pfloat_array_load_vec { unsafe = true; _ }
-  | Pint_array_load_vec { unsafe = true; _ }
+  | Pext_array_load_vec { unsafe = true; _ }
   | Punboxed_float_array_load_vec { unsafe = true; _ }
   | Punboxed_float32_array_load_vec { unsafe = true; _ }
   | Punboxed_int32_array_load_vec { unsafe = true; _ }
@@ -2196,7 +2196,7 @@ let primitive_can_raise prim =
   | Punboxed_nativeint_array_load_vec { unsafe = true; _ }
   | Pfloatarray_set_vec { unsafe = true; _ }
   | Pfloat_array_set_vec { unsafe = true; _ }
-  | Pint_array_set_vec { unsafe = true; _ }
+  | Pext_array_set_vec { unsafe = true; _ }
   | Punboxed_float_array_set_vec { unsafe = true; _ }
   | Punboxed_float32_array_set_vec { unsafe = true; _ }
   | Punboxed_int32_array_set_vec { unsafe = true; _ }
@@ -2295,7 +2295,7 @@ let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
 
 and layout_of_scannable_kind = function
-  | Pint_scannable -> layout_int
+  | Pext_scannable -> layout_int
   | Paddr_scannable -> layout_value_field
   | Pproduct_scannable kinds -> layout_of_scannable_kinds kinds
 
@@ -2303,13 +2303,13 @@ let rec layout_of_ignorable_kinds kinds =
   Punboxed_product (List.map layout_of_ignorable_kind kinds)
 
 and layout_of_ignorable_kind = function
-  | Pint_ignorable -> layout_int
+  | Pext_ignorable -> layout_int
   | Punboxedfloat_ignorable f -> layout_unboxed_float f
   | Punboxedoruntaggedint_ignorable i -> layout_unboxed_int i
   | Pproduct_ignorable kinds -> layout_of_ignorable_kinds kinds
 
 let array_ref_kind_result_layout = function
-  | Pintarray_ref -> layout_int
+  | Pextarray_ref -> layout_int
   | Pfloatarray_ref _ -> layout_boxed_float Boxed_float64
   | Punboxedfloatarray_ref bf -> layout_unboxed_float bf
   | Pgenarray_ref _ | Paddrarray_ref -> layout_value_field
@@ -2454,7 +2454,7 @@ let primitive_result_layout (p : primitive) =
   | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _
   | Pbytes_set_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pext_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _
@@ -2521,7 +2521,7 @@ let primitive_result_layout (p : primitive) =
   | Pfloat_array_load_vec { size; boxed = false; _ }
   | Punboxed_float_array_load_vec { size; boxed = false; _ }
   | Punboxed_float32_array_load_vec { size; boxed = false; _ }
-  | Pint_array_load_vec { size; boxed = false; _ }
+  | Pext_array_load_vec { size; boxed = false; _ }
   | Punboxed_int64_array_load_vec { size; boxed = false; _ }
   | Punboxed_nativeint_array_load_vec { size; boxed = false; _ }
   | Punboxed_int32_array_load_vec { size; boxed = false; _ } ->
@@ -2533,7 +2533,7 @@ let primitive_result_layout (p : primitive) =
   | Pfloat_array_load_vec { size; boxed = true; _ }
   | Punboxed_float_array_load_vec { size; boxed = true; _ }
   | Punboxed_float32_array_load_vec { size; boxed = true; _ }
-  | Pint_array_load_vec { size; boxed = true; _ }
+  | Pext_array_load_vec { size; boxed = true; _ }
   | Punboxed_int64_array_load_vec { size; boxed = true; _ }
   | Punboxed_nativeint_array_load_vec { size; boxed = true; _ }
   | Punboxed_int32_array_load_vec { size; boxed = true; _ } ->
@@ -2653,7 +2653,7 @@ let compute_expr_layout free_vars_kind lam =
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode
   | Paddrarray -> Paddrarray_ref
-  | Pintarray -> Pintarray_ref
+  | Pextarray -> Pextarray_ref
   | Pfloatarray -> Pfloatarray_ref mode
   | Punboxedoruntaggedintarray int_kind ->
     Punboxedoruntaggedintarray_ref int_kind
@@ -2665,7 +2665,7 @@ let array_ref_kind mode = function
 let array_set_kind mode = function
   | Pgenarray -> Pgenarray_set mode
   | Paddrarray -> Paddrarray_set mode
-  | Pintarray -> Pintarray_set
+  | Pextarray -> Pextarray_set
   | Pfloatarray -> Pfloatarray_set
   | Punboxedoruntaggedintarray int_kind ->
     Punboxedoruntaggedintarray_set int_kind
@@ -2677,7 +2677,7 @@ let array_set_kind mode = function
 let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
       : array_ref_kind =
   match kind with
-  | Pintarray_set -> Pintarray_ref
+  | Pextarray_set -> Pextarray_ref
   | Punboxedfloatarray_set uf -> Punboxedfloatarray_ref uf
   | Punboxedoruntaggedintarray_set ui -> Punboxedoruntaggedintarray_ref ui
   | Punboxedvectorarray_set uv -> Punboxedvectorarray_ref uv
@@ -2789,7 +2789,7 @@ let try_to_find_debuginfo lam =
 let rec count_initializers_scannable
       (scannable : scannable_product_element_kind) =
   match scannable with
-  | Pint_scannable | Paddr_scannable -> 1
+  | Pext_scannable | Paddr_scannable -> 1
   | Pproduct_scannable scannables ->
     List.fold_left
       (fun acc scannable -> acc + count_initializers_scannable scannable)
@@ -2798,7 +2798,7 @@ let rec count_initializers_scannable
 let rec count_initializers_ignorable
     (ignorable : ignorable_product_element_kind) =
   match ignorable with
-  | Pint_ignorable | Punboxedfloat_ignorable _ |
+  | Pext_ignorable | Punboxedfloat_ignorable _ |
     Punboxedoruntaggedint_ignorable _ -> 1
   | Pproduct_ignorable ignorables ->
     List.fold_left
@@ -2807,7 +2807,7 @@ let rec count_initializers_ignorable
 
 let count_initializers_array_kind (lambda_array_kind : array_kind) =
   match lambda_array_kind with
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
+  | Pgenarray | Paddrarray | Pextarray | Pfloatarray | Punboxedfloatarray _
   | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ -> 1
   | Pgcscannableproductarray scannables ->
     List.fold_left
@@ -2822,7 +2822,7 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
    Flambda 2 -> WASM backend *)
 let array_element_size_in_bytes (array_kind : array_kind) =
   match array_kind with
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray -> 8
+  | Pgenarray | Paddrarray | Pextarray | Pfloatarray -> 8
   | Punboxedfloatarray Unboxed_float32 ->
     (* float32# arrays are packed *)
     4
@@ -2843,7 +2843,7 @@ let array_element_size_in_bytes (array_kind : array_kind) =
 let rec ignorable_product_element_kind_involves_int
     (kind : ignorable_product_element_kind) =
   match kind with
-  | Pint_ignorable -> true
+  | Pext_ignorable -> true
   | Punboxedfloat_ignorable _ | Punboxedoruntaggedint_ignorable _ -> false
   | Pproduct_ignorable kinds ->
     List.exists ignorable_product_element_kind_involves_int kinds

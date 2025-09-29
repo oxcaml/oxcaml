@@ -1041,7 +1041,7 @@ module With_subkind = struct
           in
           Variant { consts; non_consts })
       | Parrayval Pfloatarray -> Float_array
-      | Parrayval Pintarray -> Immediate_array
+      | Parrayval Pextarray -> Immediate_array
       | Parrayval Paddrarray -> Value_array
       | Parrayval Pgenarray -> Generic_array
       | Parrayval (Punboxedfloatarray Unboxed_float64) -> Float_array

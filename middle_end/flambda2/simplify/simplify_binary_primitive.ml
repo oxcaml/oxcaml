@@ -999,7 +999,7 @@ let simplify_array_load (array_kind : P.Array_kind.t)
     ~arg1:array ~arg1_ty:array_ty ~arg2:index ~arg2_ty:index_ty ~result_var =
   let result_kind =
     match array_load_kind with
-    | Immediates -> (* CR mshinwell: use the subkind *) K.value
+    | Externals -> (* CR mshinwell: use the subkind *) K.value
     | Values -> K.value
     | Naked_floats -> K.naked_float
     | Naked_float32s -> K.naked_float32

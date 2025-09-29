@@ -254,7 +254,7 @@ let compute_static_size lam =
     | Pmakearray (kind, _, _) ->
         let size = List.length args in
         begin match kind with
-        | Pgenarray | Paddrarray | Pintarray ->
+        | Pgenarray | Paddrarray | Pextarray ->
             Block (Regular_block size)
         | Pfloatarray ->
             Block (Float_record size)
@@ -346,7 +346,7 @@ let compute_static_size lam =
     | Pbigstring_set_vec _
     | Pfloatarray_set_vec _
     | Pfloat_array_set_vec _
-    | Pint_array_set_vec _
+    | Pext_array_set_vec _
     | Punboxed_float_array_set_vec _
     | Punboxed_float32_array_set_vec _
     | Punboxed_int32_array_set_vec _
@@ -373,7 +373,7 @@ let compute_static_size lam =
     | Pbigstring_load_vec _
     | Pfloatarray_load_vec _
     | Pfloat_array_load_vec _
-    | Pint_array_load_vec _
+    | Pext_array_load_vec _
     | Punboxed_float_array_load_vec _
     | Punboxed_float32_array_load_vec _
     | Punboxed_int32_array_load_vec _

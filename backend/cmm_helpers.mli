@@ -261,7 +261,7 @@ val numfloat_shift : int
     result; [float_array_set] takes an unboxed float *)
 val addr_array_ref : expression -> expression -> Debuginfo.t -> expression
 
-val int_array_ref : expression -> expression -> Debuginfo.t -> expression
+val ext_array_ref : expression -> expression -> Debuginfo.t -> expression
 
 val unboxed_float_array_ref :
   Asttypes.mutable_flag ->
@@ -290,7 +290,7 @@ val addr_array_set :
   Debuginfo.t ->
   expression
 
-val int_array_set :
+val ext_array_set :
   expression -> expression -> expression -> Debuginfo.t -> expression
 
 val float_array_set :

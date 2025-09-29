@@ -118,7 +118,7 @@ end
 
 module Array_kind = struct
   type t =
-    | Immediates
+    | Externals
     | Values
     | Naked_floats
     | Naked_float32s
@@ -132,7 +132,7 @@ module Array_kind = struct
 
   let rec print ppf t =
     match t with
-    | Immediates -> Format.pp_print_string ppf "Immediates"
+    | Externals -> Format.pp_print_string ppf "Externals"
     | Naked_floats -> Format.pp_print_string ppf "Naked_floats"
     | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
     | Values -> Format.pp_print_string ppf "Values"
@@ -151,7 +151,7 @@ module Array_kind = struct
 
   let rec element_kinds t =
     match t with
-    | Immediates -> [K.With_subkind.tagged_immediate]
+    | Externals -> [K.With_subkind.tagged_immediate]
     | Values -> [K.With_subkind.any_value]
     | Naked_floats -> [K.With_subkind.naked_float]
     | Naked_float32s -> [K.With_subkind.naked_float32]
@@ -180,7 +180,7 @@ module Array_kind = struct
 
   let rec width_in_scalars t =
     match t with
-    | Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
+    | Externals | Values | Naked_floats | Naked_float32s | Naked_int32s
     | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
     | Naked_vec512s ->
       1
@@ -192,7 +192,7 @@ end
 
 module Array_load_kind = struct
   type t =
-    | Immediates
+    | Externals
     | Values
     | Naked_floats
     | Naked_float32s
@@ -205,7 +205,7 @@ module Array_load_kind = struct
 
   let print ppf t =
     match t with
-    | Immediates -> Format.pp_print_string ppf "Immediates"
+    | Externals -> Format.pp_print_string ppf "Externals"
     | Values -> Format.pp_print_string ppf "Values"
     | Naked_floats -> Format.fprintf ppf "Naked_floats"
     | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
@@ -220,7 +220,7 @@ module Array_load_kind = struct
 
   let kind_of_loaded_value t =
     match t with
-    | Immediates -> Flambda_kind.With_subkind.tagged_immediate
+    | Externals -> Flambda_kind.With_subkind.tagged_immediate
     | Values -> Flambda_kind.With_subkind.any_value
     | Naked_floats -> Flambda_kind.With_subkind.naked_float
     | Naked_float32s -> Flambda_kind.With_subkind.naked_float32
@@ -234,7 +234,7 @@ end
 
 module Array_set_kind = struct
   type t =
-    | Immediates
+    | Externals
     | Values of Init_or_assign.t
     | Naked_floats
     | Naked_float32s
@@ -247,7 +247,7 @@ module Array_set_kind = struct
 
   let print ppf t =
     match t with
-    | Immediates -> Format.pp_print_string ppf "Immediates"
+    | Externals -> Format.pp_print_string ppf "Externals"
     | Values init_or_assign ->
       Format.fprintf ppf "@[<hov 1>(Values %a)@]" Init_or_assign.print
         init_or_assign
@@ -264,7 +264,7 @@ module Array_set_kind = struct
 
   let kind_of_new_value t =
     match t with
-    | Immediates -> Flambda_kind.With_subkind.tagged_immediate
+    | Externals -> Flambda_kind.With_subkind.tagged_immediate
     | Values _ -> Flambda_kind.With_subkind.any_value
     | Naked_floats -> Flambda_kind.With_subkind.naked_float
     | Naked_float32s -> Flambda_kind.With_subkind.naked_float32
@@ -346,7 +346,7 @@ end
 
 module Duplicate_array_kind = struct
   type t =
-    | Immediates
+    | Externals
     | Values
     | Naked_floats of { length : Target_ocaml_int.t option }
     | Naked_float32s of { length : Target_ocaml_int.t option }
@@ -359,7 +359,7 @@ module Duplicate_array_kind = struct
 
   let [@ocamlformat "disable"] print ppf t =
     match t with
-    | Immediates -> Format.pp_print_string ppf "Immediates"
+    | Externals -> Format.pp_print_string ppf "Externals"
     | Values -> Format.pp_print_string ppf "Values"
     | Naked_floats { length; } ->
       Format.fprintf ppf
@@ -412,7 +412,7 @@ module Duplicate_array_kind = struct
 
   let compare t1 t2 =
     match t1, t2 with
-    | Immediates, Immediates | Values, Values -> 0
+    | Externals, Externals | Values, Values -> 0
     | Naked_floats { length = length1 }, Naked_floats { length = length2 } ->
       Option.compare Target_ocaml_int.compare length1 length2
     | Naked_float32s { length = length1 }, Naked_float32s { length = length2 }
@@ -431,8 +431,8 @@ module Duplicate_array_kind = struct
       Option.compare Target_ocaml_int.compare length1 length2
     | Naked_vec512s { length = length1 }, Naked_vec512s { length = length2 } ->
       Option.compare Target_ocaml_int.compare length1 length2
-    | Immediates, _ -> -1
-    | _, Immediates -> 1
+    | Externals, _ -> -1
+    | _, Externals -> 1
     | Values, _ -> -1
     | _, Values -> 1
     | Naked_floats _, _ -> -1
@@ -634,7 +634,7 @@ let reading_from_an_array (array_kind : Array_kind.t)
     (mutable_or_immutable : Mutability.t) =
   let effects : Effects.t =
     match array_kind with
-    | Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
+    | Externals | Values | Naked_floats | Naked_float32s | Naked_int32s
     | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
     | Naked_vec512s | Unboxed_product _ ->
       No_effects

@@ -51,7 +51,7 @@ end
 
 module Array_kind : sig
   type t =
-    | Immediates  (** An array consisting only of immediate values. *)
+    | Externals  (** An array consisting only of gc-ignorable values. *)
     | Values
         (** An array consisting of elements of kind [value]. With the float
             array optimisation enabled, such elements must never be [float]s. *)
@@ -99,7 +99,7 @@ end
 
 module Array_load_kind : sig
   type t =
-    | Immediates  (** An array consisting only of immediate values. *)
+    | Externals  (** An array consisting only of gc-ignorable values. *)
     | Values
         (** An array consisting of elements of kind [value]. With the float
             array optimisation enabled, such elements must never be [float]s. *)
@@ -121,7 +121,7 @@ end
 
 module Array_set_kind : sig
   type t =
-    | Immediates  (** An array consisting only of immediate values. *)
+    | Externals  (** An array consisting only of immediate values. *)
     | Values of Init_or_assign.t
         (** An array consisting of elements of kind [value]. With the float
         array optimisation enabled, such elements must never be [float]s. *)
@@ -161,7 +161,7 @@ end
 
 module Duplicate_array_kind : sig
   type t =
-    | Immediates
+    | Externals
     | Values
     | Naked_floats of { length : Target_ocaml_int.t option }
     | Naked_float32s of { length : Target_ocaml_int.t option }

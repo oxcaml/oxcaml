@@ -424,7 +424,7 @@ let specialise_array_kind dacc (array_kind : P.Array_kind.t) ~array_ty :
   | Naked_vec128s -> for_naked_number Naked_vec128
   | Naked_vec256s -> for_naked_number Naked_vec256
   | Naked_vec512s -> for_naked_number Naked_vec512
-  | Immediates -> (
+  | Externals -> (
     (* The only thing worth checking is for float arrays, as that would allow us
        to remove the branch *)
     match T.meet_is_flat_float_array typing_env array_ty with
@@ -434,8 +434,8 @@ let specialise_array_kind dacc (array_kind : P.Array_kind.t) ~array_ty :
     (* Try to specialise to immediates *)
     match T.prove_is_immediates_array typing_env array_ty with
     | Proved () ->
-      (* Specialise the array operation to [Immediates]. *)
-      Ok P.Array_kind.Immediates
+      (* Specialise the array operation to [Externals]. *)
+      Ok P.Array_kind.Externals
     | Unknown -> (
       (* Check for float arrays *)
       match T.meet_is_flat_float_array typing_env array_ty with

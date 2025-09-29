@@ -216,7 +216,7 @@ let rec scannable_product_array_kind elt_ty_for_error loc sorts =
 
 and sort_to_scannable_product_element_kind elt_ty_for_error loc
       (s : Jkind.Sort.Const.t) =
-  (* Unfortunate: this never returns `Pint_scannable`.  Doing so would require
+  (* Unfortunate: this never returns `Pext_scannable`.  Doing so would require
      this to traverse the type, rather than just the kind, or to add product
      kinds. *)
   match s with
@@ -234,7 +234,7 @@ let rec ignorable_product_array_kind loc sorts =
 
 and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   match s with
-  | Base Value -> Pint_ignorable
+  | Base Value -> Pext_ignorable
   | Base Float64 -> Punboxedfloat_ignorable Unboxed_float64
   | Base Float32 -> Punboxedfloat_ignorable Unboxed_float32
   | Base Bits8 -> Punboxedoruntaggedint_ignorable Untagged_int8
@@ -275,7 +275,7 @@ let array_kind_of_elt ~elt_sort env loc ty =
     else Paddrarray
   | Float -> if Config.flat_float_array then Pfloatarray else Paddrarray
   | Addr | Lazy -> Paddrarray
-  | Int -> Pintarray
+  | Int -> Pextarray
   | Unboxed_float f -> Punboxedfloatarray f
   | Unboxed_int Untagged_int -> Punboxedoruntaggedintarray Untagged_int
   | Unboxed_int Unboxed_int64 -> Punboxedoruntaggedintarray Unboxed_int64
@@ -299,7 +299,7 @@ let array_type_kind ~elt_sort ~elt_ty env loc ty =
       begin match kind with
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
         raise (Error (loc, Product_iarrays_unsupported))
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
+      | Pgenarray | Paddrarray | Pextarray | Pfloatarray | Punboxedfloatarray _
       | Punboxedoruntaggedintarray _ | Punboxedvectorarray _  ->
         kind
       end

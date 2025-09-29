@@ -49,7 +49,7 @@ let unboxed_product_iarray_check loc kind mut =
     (Immutable | Immutable_unique) ->
     raise (Error (loc, Product_iarrays_unsupported))
   | _, Mutable
-  | (Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
+  | (Pgenarray | Paddrarray | Pextarray | Pfloatarray | Punboxedfloatarray _
     | Punboxedoruntaggedintarray _ | Punboxedvectorarray _), _  ->
     ()
 
@@ -63,7 +63,7 @@ let unboxed_product_uninitialized_array_check loc array_kind =
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
   | Punboxedvectorarray _ ->
     ()
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray
+  | Pgenarray | Paddrarray | Pextarray | Pfloatarray
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     raise (Error (loc, Invalid_array_kind_for_uninitialized_makearray_dynamic))
 
@@ -463,9 +463,9 @@ let array_vec_primitives =
          Punboxed_float32_array_set_vec { size; unsafe; index_kind; boxed }));
       ("int_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
-         Pint_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+         Pext_array_load_vec { size; unsafe; index_kind; mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
-         Pint_array_set_vec { size; unsafe; index_kind; boxed }));
+         Pext_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_int64_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
          Punboxed_int64_array_load_vec { size; unsafe; index_kind;
@@ -1155,13 +1155,13 @@ let rec glb_scannable_kinds kinds1 kinds2 =
 
 and glb_scannable_kind kind1 kind2 =
   match kind1, kind2 with
-  | Pint_scannable, (Paddr_scannable | Pint_scannable)
-  | Paddr_scannable, Pint_scannable -> Some Pint_scannable
+  | Pext_scannable, (Paddr_scannable | Pext_scannable)
+  | Paddr_scannable, Pext_scannable -> Some Pext_scannable
   | Paddr_scannable, Paddr_scannable -> Some Paddr_scannable
   | Pproduct_scannable kinds1, Pproduct_scannable kinds2 ->
     Option.map (fun x -> Pproduct_scannable x)
       (glb_scannable_kinds kinds1 kinds2)
-  | (Pint_scannable | Paddr_scannable | Pproduct_scannable _), _ -> None
+  | (Pext_scannable | Paddr_scannable | Pproduct_scannable _), _ -> None
 
 (* The following function computes the greatest lower bound of array kinds:
 
@@ -1242,15 +1242,15 @@ let glb_array_type loc t1 t2 =
     Misc.fatal_error "unexpected Pgcscannableproductarray kind in glb"
 
   (* No GLB; only used in the [Obj.magic] case *)
-  | Pfloatarray, (Paddrarray | Pintarray)
-  | (Paddrarray | Pintarray), Pfloatarray -> t1
+  | Pfloatarray, (Paddrarray | Pextarray)
+  | (Paddrarray | Pextarray), Pfloatarray -> t1
 
   (* Compute the correct GLB *)
-  | Pgenarray, ((Pgenarray | Paddrarray | Pintarray | Pfloatarray) as x)
-  | ((Paddrarray | Pintarray | Pfloatarray) as x), Pgenarray -> x
+  | Pgenarray, ((Pgenarray | Paddrarray | Pextarray | Pfloatarray) as x)
+  | ((Paddrarray | Pextarray | Pfloatarray) as x), Pgenarray -> x
   | Paddrarray, Paddrarray -> Paddrarray
-  | Paddrarray, Pintarray | Pintarray, Paddrarray -> Pintarray
-  | Pintarray, Pintarray -> Pintarray
+  | Paddrarray, Pextarray | Pextarray, Paddrarray -> Pextarray
+  | Pextarray, Pextarray -> Pextarray
   | Pfloatarray, Pfloatarray -> Pfloatarray
 
 let glb_array_ref_type loc t1 t2 =
@@ -1316,25 +1316,25 @@ let glb_array_ref_type loc t1 t2 =
     Misc.fatal_error "unexpected Pgcscannableproductarray kind in glb"
 
   (* No GLB; only used in the [Obj.magic] case *)
-  | Pfloatarray_ref _, (Paddrarray | Pintarray)
-  | (Paddrarray_ref | Pintarray_ref), Pfloatarray -> t1
+  | Pfloatarray_ref _, (Paddrarray | Pextarray)
+  | (Paddrarray_ref | Pextarray_ref), Pfloatarray -> t1
 
   (* Compute the correct GLB *)
 
   (* Pgenarray >= _ *)
   | (Pgenarray_ref _ as x), Pgenarray -> x
-  | Pgenarray_ref _, Pintarray -> Pintarray_ref
+  | Pgenarray_ref _, Pextarray -> Pextarray_ref
   | Pgenarray_ref _, Paddrarray -> Paddrarray_ref
   | Pgenarray_ref mode, Pfloatarray -> Pfloatarray_ref mode
-  | (Paddrarray_ref | Pintarray_ref | Pfloatarray_ref _ as x), Pgenarray -> x
+  | (Paddrarray_ref | Pextarray_ref | Pfloatarray_ref _ as x), Pgenarray -> x
 
-  (* Paddrarray > Pintarray *)
+  (* Paddrarray > Pextarray *)
   | Paddrarray_ref, Paddrarray -> Paddrarray_ref
-  | Paddrarray_ref, Pintarray -> Pintarray_ref
-  | Pintarray_ref, Paddrarray -> Pintarray_ref
+  | Paddrarray_ref, Pextarray -> Pextarray_ref
+  | Pextarray_ref, Paddrarray -> Pextarray_ref
 
-  (* Pintarray is a minimum *)
-  | Pintarray_ref, Pintarray -> Pintarray_ref
+  (* Pextarray is a minimum *)
+  | Pextarray_ref, Pextarray -> Pextarray_ref
 
   (* Pfloatarray is a minimum *)
   | (Pfloatarray_ref _ as x), Pfloatarray -> x
@@ -1403,25 +1403,25 @@ let glb_array_set_type loc t1 t2 =
     Misc.fatal_error "unexpected Pgcscannableproductarray_set kind in glb"
 
   (* No GLB; only used in the [Obj.magic] case *)
-  | Pfloatarray_set, (Paddrarray | Pintarray)
-  | (Paddrarray_set _ | Pintarray_set), Pfloatarray -> t1
+  | Pfloatarray_set, (Paddrarray | Pextarray)
+  | (Paddrarray_set _ | Pextarray_set), Pfloatarray -> t1
 
   (* Compute the correct GLB *)
 
   (* Pgenarray >= _ *)
   | (Pgenarray_set _ as x), Pgenarray -> x
-  | Pgenarray_set _, Pintarray -> Pintarray_set
+  | Pgenarray_set _, Pextarray -> Pextarray_set
   | Pgenarray_set mode, Paddrarray -> Paddrarray_set mode
   | Pgenarray_set _, Pfloatarray -> Pfloatarray_set
-  | (Paddrarray_set _ | Pintarray_set | Pfloatarray_set as x), Pgenarray -> x
+  | (Paddrarray_set _ | Pextarray_set | Pfloatarray_set as x), Pgenarray -> x
 
-  (* Paddrarray > Pintarray *)
+  (* Paddrarray > Pextarray *)
   | (Paddrarray_set _ as x), Paddrarray -> x
-  | Paddrarray_set _, Pintarray -> Pintarray_set
-  | Pintarray_set, Paddrarray -> Pintarray_set
+  | Paddrarray_set _, Pextarray -> Pextarray_set
+  | Pextarray_set, Paddrarray -> Pextarray_set
 
-  (* Pintarray is a minimum *)
-  | Pintarray_set, Pintarray -> Pintarray_set
+  (* Pextarray is a minimum *)
+  | Pextarray_set, Pextarray -> Pextarray_set
 
   (* Pfloatarray is a minimum *)
   | Pfloatarray_set, Pfloatarray -> Pfloatarray_set
@@ -2284,11 +2284,11 @@ let lambda_primitive_needs_event_after = function
   | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
   | Pbigstring_load_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+  | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pext_array_load_vec _
   | Punboxed_float_array_load_vec _| Punboxed_float32_array_load_vec _
   | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
   | Punboxed_nativeint_array_load_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pext_array_set_vec _
   | Punboxed_float_array_set_vec _| Punboxed_float32_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _
@@ -2318,11 +2318,11 @@ let lambda_primitive_needs_event_after = function
   | Psequor | Psequand | Pnot
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu
   | Pbytessetu
-  | Pmakearray ((Pintarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
+  | Pmakearray ((Pextarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
       | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
       | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Pmakearray_dynamic
-      ((Pintarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
+      ((Pextarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
        | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
        | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Parrayblit _
