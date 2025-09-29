@@ -24,11 +24,16 @@ type continuation_info =
 module Env = struct
   type cont_kind = Normal of Variable.t list
 
+  type should_preserve_direct_calls =
+    | Yes
+    | No
+    | Auto
+
   type t =
     { parent : Rev_expr.rev_expr_holed;
       conts : cont_kind Continuation.Map.t;
       current_code_id : Code_id.t option;
-      should_preserve_direct_calls : bool;
+      should_preserve_direct_calls : should_preserve_direct_calls;
       le_monde_exterieur : Name.t;
       all_constants : Name.t
     }
