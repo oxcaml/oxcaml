@@ -107,6 +107,13 @@ let create_archive file_list lib_name =
             })
           descr_list
       in
+      (* Check that all_ccopts is empty - JavaScript compilation should use
+         -jsopt for js_of_ocaml flags, not -ccopt. Semantic flags are handled
+         by buildInfo in .cmjo files. *)
+      if !Clflags.all_ccopts <> [] then
+        Misc.fatal_error
+          "ocamlj -a: -ccopt flags are not supported for JavaScript archives. \
+           Use -jsopt instead.";
       let infos =
         {
           lib_units = units;
@@ -114,7 +121,7 @@ let create_archive file_list lib_name =
           lib_imports_cmx = cmxs;
           lib_generic_fns = Generic_fns.Tbl.entries genfns;
           lib_ccobjs = !Clflags.ccobjs;
-          lib_ccopts = !Clflags.all_ccopts;
+          lib_ccopts = [];
         }
       in
       output_value outchan infos;

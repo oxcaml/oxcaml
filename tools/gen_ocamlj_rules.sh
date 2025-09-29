@@ -32,6 +32,7 @@ OCAMLJ_FLAGS+=(-g)
 OCAMLJ_FLAGS+=(-absname)
 OCAMLJ_FLAGS+=(-bin-annot)
 OCAMLJ_FLAGS+=(-strict-formats)
+OCAMLJ_FLAGS+=(-jsopt --source-map-inline)
 
 if [[ $library == stdlib ]]; then
     OCAMLJ_FLAGS+=(-nopervasives -nostdlib)
@@ -121,7 +122,7 @@ echo ""
 # Individual compilation rules
 for cu in "${!srcs[@]}"; do
     echo "(rule"
-    echo " (targets ${cu}.cmjo ${cu}.cmjx ${cu}.map)"
+    echo " (targets ${cu}.cmjo ${cu}.cmjx)"
     echo " (deps "
     echo "  (source_tree ${src})"
     echo "  ${cmis_dir}/${cu}.cmi"

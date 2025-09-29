@@ -165,7 +165,7 @@ let emit_jsir i
       Misc.remove_file filename)
     (fun () ->
       let debug_flag =
-        if !Clflags.debug then [ "--debug-info"; "--source-map" ] else []
+        if !Clflags.debug then [ "--debug-info" ] else []
       in
       run_jsoo_exn
         ~args:
@@ -177,7 +177,7 @@ let emit_jsir i
              Unit_info.Artifact.filename (Unit_info.cmjo i.target);
            ]
           @ debug_flag
-          @ List.rev !Clflags.all_ccopts))
+          @ List.rev !Clflags.all_jsopts))
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     ~as_arg_for =
