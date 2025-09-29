@@ -1969,9 +1969,7 @@ let jkind_subst env level params args jkind =
 *)
 let apply ?(use_current_level = false) env params body args =
   simple_abbrevs := Mnil;
-  let level = if use_current_level
-    then !current_level
-    else generic_level in
+  let level = if use_current_level then !current_level else generic_level in
   try
     subst env level Public (ref Mnil) None params args body
   with
@@ -7409,17 +7407,21 @@ let () =
 type global_state =
   { current_level : int ref;
     nongen_level : int ref;
-    global_level : int ref
+    global_level : int ref;
   }
 
-let global_state : global_state = { current_level; nongen_level; global_level }
+let global_state : global_state =
+  { current_level;
+    nongen_level;
+    global_level
+  }
 
 let print_global_state fmt global_state =
   let print_field fmt s r = Format.fprintf fmt "%s = %d;@;" s !r in
-  let print_fields fmt { current_level; nongen_level; global_level } =
+  let print_fields fmt { current_level; nongen_level; global_level; } =
     print_field fmt "current_level" current_level;
     print_field fmt "nongen_level" nongen_level;
-    print_field fmt "global_level" global_level
+    print_field fmt "global_level" global_level;
   in
   Format.fprintf fmt "@[<1>{@;%a}@]" print_fields global_state
 
