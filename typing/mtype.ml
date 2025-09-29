@@ -855,7 +855,7 @@ let lower_nongen nglev mty =
   it.it_module_type unmark_iterators mty
 
 let module_representation_of_mixed_product_shape
-      ~check_representable ~loc shape =
+      ~check_representable shape =
   let value_count = ref 0 in
   Array.iter
     (function Value -> incr value_count
@@ -866,13 +866,17 @@ let module_representation_of_mixed_product_shape
   if !value_count = Array.length shape
   then Module_value_only { size = Array.length shape }
   else begin
-    if check_representable then
+    begin match check_representable with
+    | `Yes loc ->
       Typedecl.assert_mixed_product_support loc Module
         ~value_prefix_len:(!value_count);
+    | `No -> ()
+    end;
     Module_mixed { shape }
   end
 
-let module_representation_of_signature sg sort_of_signature_item =
+let module_representation_of_signature
+    ~check_representable sg sort_of_signature_item =
   sg
   |> List.filter_map sort_of_signature_item
   |> List.map (fun sort ->
@@ -881,10 +885,12 @@ let module_representation_of_signature sg sort_of_signature_item =
       |> Types.mixed_block_element_of_const_sort)
   |> Array.of_list
   |> module_representation_of_mixed_product_shape
-       ~check_representable:false ~loc:Location.none
+       ~check_representable
 
-let module_representation_of_lazy_signature sg =
-  module_representation_of_signature sg Subst.Lazy.sort_of_signature_item
+let module_representation_of_lazy_signature ~check_representable sg =
+  module_representation_of_signature ~check_representable sg
+    Subst.Lazy.sort_of_signature_item
 
-let module_representation_of_signature sg =
-  module_representation_of_signature sg Types.sort_of_signature_item
+let module_representation_of_signature ~check_representable sg =
+  module_representation_of_signature ~check_representable sg
+    Types.sort_of_signature_item

@@ -13,7 +13,7 @@ open Stdlib_upstream_compatible
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 
-let _ = print_endline "Test 1: Based on pr11186.ml"
+let _ = print_endline "Test: Based on pr11186.ml"
 
 module M_1 =
   (((struct
@@ -37,7 +37,7 @@ let _ = print_string " "
 let _ = print_endline (id M_1.C.s)
 
 
-let _ = print_endline "Test 2: Coercion with aliases, modules, and vals"
+let _ = print_endline "Test: Coercion with aliases, modules, and vals"
 
 module type S_2 = sig
   val foo_2 : string

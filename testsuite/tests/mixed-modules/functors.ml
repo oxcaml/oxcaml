@@ -12,7 +12,7 @@
 open Stdlib_upstream_compatible
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
-let _ = print_endline "Test 1: no coercion in or out"
+let _ = print_endline "Test: no coercion in or out"
 
 module type Number = sig
   val as_float_u : float#
@@ -36,7 +36,7 @@ let _ = print_endline ""
 let _ = print_endline (id Two.as_string)
 
 
-let _ = print_endline "Test 2: coercion in, no coercion out"
+let _ = print_endline "Test: coercion in, no coercion out"
 
 module Ten = struct
   let as_int = 10
@@ -52,7 +52,7 @@ let _ = print_endline ""
 let _ = print_endline (id Eleven.as_string)
 
 
-let _ = print_endline "Test 3: coercion out, no coercion in"
+let _ = print_endline "Test: coercion out, no coercion in"
 
 module Double (M : Number) : Number = struct
   let undoubled_float = M.as_float_u
@@ -67,7 +67,7 @@ let _ = print_endline ""
 let _ = print_endline (id Four.as_string)
 
 
-let _ = print_endline "Test 4: coercion in and out"
+let _ = print_endline "Test: coercion in and out"
 
 module Three = struct
   let as_int = 3
@@ -83,7 +83,7 @@ let _ = print_endline ""
 let _ = print_endline (id Six.as_string)
 
 
-let _ = print_endline "Test 5: generative functor"
+let _ = print_endline "Test: generative functor"
 
 module type Counting_sig = sig
   val boxed_one : float

@@ -13,7 +13,7 @@ open Stdlib_upstream_compatible
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 
-let _ = print_endline "Test 1: mixed to mixed"
+let _ = print_endline "Test: mixed to mixed"
 
 module Module_1 = struct
   let foo = "hello"
@@ -34,7 +34,7 @@ let _ = print_int (id Coerced_module_1.qux)
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 2: mixed to value only"
+let _ = print_endline "Test: mixed to value only"
 
 module Coerced_module_2 : sig
   val qux : int
@@ -46,7 +46,7 @@ let _ = print_endline ""
 let _ = print_endline (id Coerced_module_2.foo)
 
 
-let _ = print_endline "Test 3: nested modules"
+let _ = print_endline "Test: nested modules"
 
 module Module_3 = struct
   module Numbers = struct
@@ -96,7 +96,7 @@ let _ =
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 4: composed coercions"
+let _ = print_endline "Test: composed coercions"
 
 module type S = sig
   module K : sig

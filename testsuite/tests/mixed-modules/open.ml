@@ -13,7 +13,7 @@ open Stdlib_upstream_compatible
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 
-let _ = print_endline "Test 1: [let open] with module ident"
+let _ = print_endline "Test: [let open] with module ident"
 
 module M = struct let foo = #42.0 let bar = "hello" end
 
@@ -24,7 +24,7 @@ let _ =
   print_endline (id bar)
 
 
-let _ = print_endline "Test 2: [let open] with inline struct"
+let _ = print_endline "Test: [let open] with inline struct"
 
 let _ =
   let open struct let foo = #42.0 let bar = "hello" end in
@@ -33,7 +33,7 @@ let _ =
   print_endline (id bar)
 
 
-let _ = print_endline "Test 3: [let open] with functor"
+let _ = print_endline "Test: [let open] with functor"
 
 module Functor (X : sig end) = struct let foo = #42.0 let bar = "hello" end
 
@@ -44,7 +44,7 @@ let _ =
   print_endline (id bar)
 
 
-let _ = print_endline "Test 4: Tests 1-3 with [open] instead of [let open]"
+let _ = print_endline "Test: Tests 1-3 with [open] instead of [let open]"
 
 module M_4_1 = struct
   open M
@@ -68,7 +68,7 @@ module M_4_3 = struct
 end
 
 
-let _ = print_endline "Test 5: open shadowing open"
+let _ = print_endline "Test: open shadowing open"
 
 module Base = struct
   let x = #10.0
@@ -95,7 +95,7 @@ module M_5 = struct
 end
 
 
-let _ = print_endline "Test 6: open shadowing a val"
+let _ = print_endline "Test: open shadowing a val"
 
 module M_6 = struct
   let a = #5.0
@@ -116,7 +116,7 @@ module M_6 = struct
 end
 
 
-let _ = print_endline "Test 7: val shadowing an open"
+let _ = print_endline "Test: val shadowing an open"
 
 module M_7 = struct
   open struct
@@ -137,9 +137,7 @@ module M_7 = struct
 end
 
 let _ =
-  print_endline
-    "Test 8: open Ident can be used to circumvent the scannable tag \
-             size restriction"
+  print_endline "Test: opens can't violate the scannable tag size restriction"
 
 module M_8 = struct
   let f_0 = #42.0
@@ -385,7 +383,7 @@ module M_8 = struct
   let a_239 = "a"
   let a_240 = "a"
   let a_241 = "a"
-  module Inner = struct
+  open struct
     let f_1 = #43.0
     let a_242 = "a"
     let a_243 = "a"
@@ -412,7 +410,6 @@ module M_8 = struct
     let a_264 = "a"
     let a_265 = "a"
   end
-  open Inner
 
   let _ = print_float (Float_u.to_float (id f_0))
   let _ = print_string " "

@@ -1,10 +1,10 @@
-Test 1: mixed to mixed
+Test: mixed to mixed
 5
 10
-Test 2: mixed to value only
+Test: mixed to value only
 10
 hello
-Test 3: nested modules
+Test: nested modules
 1. 0. 0. 0.
-Test 4: composed coercions
+Test: composed coercions
 1. 2. s

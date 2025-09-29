@@ -194,7 +194,10 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
         with Includemod.Error msg ->
           raise (Error(loc, env, Not_included_functor msg))
       in
-      let param_repr = Mtype.module_representation_of_signature sg_param in
+      let param_repr =
+        Mtype.module_representation_of_signature
+          ~check_representable:`No sg_param
+      in
       (* We must scrape the result type in an environment expanded with the
          parameter type (to avoid `Not_found` exceptions when it is referenced).
          Because we don't have an actual parameter, we create definitions for
@@ -2009,7 +2012,9 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     let incl =
       { incl_mod = tmty;
         incl_type = sg;
-        incl_repr = Mtype.module_representation_of_signature sg;
+        incl_repr =
+          Mtype.module_representation_of_signature
+            ~check_representable:`No sg;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -3330,7 +3335,8 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
-      open_bound_repr = Mtype.module_representation_of_signature sg;
+      open_bound_repr =
+        Mtype.module_representation_of_signature ~check_representable:`No sg;
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3375,7 +3381,9 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
     let incl =
       { incl_mod = modl;
         incl_type = sg;
-        incl_repr = Mtype.module_representation_of_signature sg;
+        incl_repr =
+          Mtype.module_representation_of_signature
+            ~check_representable:`No sg;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -4395,7 +4403,6 @@ let package_units initial_env objfiles target_cmi modulename =
   (* Compute signature of packaged unit *)
   Ident.reinit();
   let sg = package_signatures units in
-  let repr = Mtype.module_representation_of_signature sg in
   (* Compute the shape of the package *)
   let pack_uid = Uid.of_compilation_unit_id modulename in
   let shape =
@@ -4428,7 +4435,7 @@ let package_units initial_env objfiles target_cmi modulename =
       (Cmt_format.Packed (sg, objfiles)) initial_env  None (Some shape);
     Cms_format.save_cms  (Unit_info.companion_cms target_cmi) modulename
       (Cmt_format.Packed (sg, objfiles)) initial_env (Some shape) decl_deps;
-    cc, repr
+    cc
   end else begin
     (* Determine imports *)
     let unit_names = List.map fst units in
@@ -4459,7 +4466,7 @@ let package_units initial_env objfiles target_cmi modulename =
       Cms_format.save_cms (Unit_info.companion_cms target_cmi)  modulename
         (Cmt_format.Packed (sign, objfiles)) initial_env (Some shape) decl_deps;
     end;
-    Tcoerce_none, repr
+    Tcoerce_none
   end
 
 

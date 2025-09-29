@@ -1,8 +1,14 @@
-Test 1: basic mixed module
+Test: basic mixed module
 5
 10
 25
-Test 2: shadowing within a module
+Test: shadowing within a module
 10. 20.
-Test 3: pattern aliases
+Test: pattern aliases
 a 1. a 1.
+Test: complicated unboxed products
+hello 42 world
+10.0 bar 3.1
+20 30.0 2.7 ! ? baz
+qux
+40

@@ -13,7 +13,7 @@ open Stdlib_upstream_compatible
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 
-let _ = print_endline "Test 1: Basic include functor with unboxed types"
+let _ = print_endline "Test: Basic include functor with unboxed types"
 
 module Make_stats (M : sig val x : float# val name : string end) = struct
   let doubled = Float_u.mul M.x #2.0
@@ -36,7 +36,7 @@ let _ = print_endline ""
 let _ = print_endline (id Stats.description)
 
 
-let _ = print_endline "Test 2: Include functor with shadowing of mixed values"
+let _ = print_endline "Test: Include functor with shadowing of mixed values"
 
 module Override (M : sig val value : float# val label : string end) = struct
   let original_value = M.value
@@ -58,7 +58,7 @@ let _ = print_float (Float_u.to_float (id Combined.original_value))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 3: Multiple include functors with mixed types"
+let _ = print_endline "Test: Multiple include functors with mixed types"
 
 module F_3_1 (M : sig val x : int end) = struct
   let x_float = Float_u.of_float (float_of_int M.x)
@@ -86,7 +86,7 @@ let _ = print_int (Int64_u.to_int (id Multi.y_int64))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 4: Include functor that adds unboxed fields to input"
+let _ = print_endline "Test: Include functor that adds unboxed fields to input"
 
 module Add_unboxed (M : sig val n : int val s : string end) = struct
   let n_float_u = Float_u.of_float (float_of_int M.n)
@@ -108,7 +108,7 @@ let _ = print_int (Int64_u.to_int (id Enhanced.n_int64_u))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 5: Nested include functor applications"
+let _ = print_endline "Test: Nested include functor applications"
 
 module Add_one (M : sig val x : float# val final_string : string end) = struct
   let inner_result = Float_u.add M.x #1.0
@@ -133,7 +133,7 @@ let _ = print_endline (id Nested.final_string)
 let _ = print_endline (id Nested.inner_string)
 
 
-let _ = print_endline "Test 6: Include with type"
+let _ = print_endline "Test: Include with type"
 
 module type S = sig
   type t : float64
@@ -156,7 +156,7 @@ let _ = print_float (Float_u.to_float ((id W.extract) (id W.example)))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 7: Value-only input to mixed output"
+let _ = print_endline "Test: Value-only input to mixed output"
 
 module Mixed_from_boxed (M : sig val a : int val b : string end) = struct
   include M
@@ -181,7 +181,7 @@ let _ = print_int (Int64_u.to_int (id Mixed_7.unboxed_int64))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 8: Mixed input with value-only functor"
+let _ = print_endline "Test: Mixed input with value-only functor"
 
 module type Value_only_input = sig
   val x : int

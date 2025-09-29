@@ -14,7 +14,7 @@ external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 external int_u_of_int : int -> int# = "%int#_of_int"
 external int_of_int_u : int# -> int = "%int_of_int#"
 
-let _ = print_endline "Test 1: basic mixed module"
+let _ = print_endline "Test: basic mixed module"
 
 module My_module = struct
   let foo = "a"
@@ -32,7 +32,7 @@ let _ = print_int (int_of_int_u (id My_module.zil))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test 2: shadowing within a module"
+let _ = print_endline "Test: shadowing within a module"
 
 module Shadow = struct
   let foo = "a"
@@ -49,7 +49,7 @@ module Shadow = struct
 end
 
 
-let _ = print_endline "Test 3: pattern aliases"
+let _ = print_endline "Test: pattern aliases"
 
 module Pat_alias = struct let #(a, b) as c = #("a", #1.0) end
 
@@ -73,3 +73,27 @@ module Pat_alias_sig_check : sig
   val b : float#
   val c : #(string * float#)
 end = Pat_alias
+
+let _ = print_endline "Test: complicated unboxed products"
+
+module Complicated_unboxed_products = struct
+  let foo = #("hello", #42l, "world")
+  let bar = #(#10.0, "bar", #3.1)
+  let baz = #(#20l, #(30.0, #2.7, "!", "?"), "baz")
+  let qux = "qux"
+  let zil = #40L
+end
+
+let () =
+  let #(a, b, c) = id Complicated_unboxed_products.foo in
+  let #(d, e, f) = id Complicated_unboxed_products.bar in
+  let #(g, #(h, i, j, k), l) = id Complicated_unboxed_products.baz in
+  let m = id Complicated_unboxed_products.qux in
+  let n = id Complicated_unboxed_products.zil in
+
+  Format.printf "%s %d %s\n%.1f %s %.1f\n%d %.1f %.1f %s %s %s\n%s\n%d\n"
+    a (Int32_u.to_int b) c
+    (Float_u.to_float d) e (Float_u.to_float f)
+    (Int32_u.to_int g) h (Float_u.to_float i) j k l
+    m
+    (Int64_u.to_int n)

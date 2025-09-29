@@ -1,40 +1,39 @@
-Test 1: basic first-class mixed module
+Test: basic first-class mixed module
 42
 hello
 3.14
 100
-Test 2: passing modules to functions
+Test: passing modules to functions
 142
 hello 3.14
-Test 3: returning modules from functions
-10
-ten
-Test 4: list of first-class modules
+Test: returning modules from functions
+10 ten 11.0 20
+Test: list of first-class modules
 6
-Test 5: conditional module selection
+Test: conditional module selection
 222.222
 false branch
 111.111
 true branch
-Test 6: unboxed tuples and records in a first-class module
+Test: unboxed tuples and records in a first-class module
 42
 answer
 3.14
 271828
 2.718
 314159
-Test 7: functor producing first-class mixed modules
+Test: functor producing first-class mixed modules
 5
 3.
-Test 8: first-class functors
+Test: first-class functors
 5.0 (doubled) (+1.5) = 11.5
 20 (*2) (+3) = 43
 1 [+100] [*2] [+3] = 205
-Test 9: subtype by forgetting abstract types
+Test: subtype by forgetting abstract types
 42
 3.14
-Test 10: subtype by forgetting type alias
+Test: subtype by forgetting type alias
 1
 2.718
-Test 11: subtype with unboxed type in forgotten types
+Test: subtype with unboxed type in forgotten types
 99.9
