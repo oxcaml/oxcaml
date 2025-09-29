@@ -44,6 +44,7 @@ META
 .#*
 *#
 *.orig
+*.bak
 *.rej
 *.pyc
 .gdbinit
