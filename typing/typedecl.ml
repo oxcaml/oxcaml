@@ -3836,6 +3836,9 @@ let transl_value_decl env loc ~modalities valdecl =
     raise(Error(cty.ctyp_loc,
                 Non_value_in_sig(err,valdecl.pval_name.txt,cty.ctyp_type)))
   end;
+  (* it's okay to reach into [valdecl] here instead of [~modalities], since
+    modules do not have default crossings (meaning annotations are all we need) *)
+  let crossing = Typemode.transl_modalities_crossing valdecl.pval_modalities in
   let ty = cty.ctyp_type in
   let v =
   match valdecl.pval_prim with
@@ -3886,7 +3889,7 @@ let transl_value_decl env loc ~modalities valdecl =
       in
       { val_type = ty; val_kind = Val_reg; Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities = modalities;
-        val_zero_alloc = zero_alloc;
+        val_crossing = crossing; val_zero_alloc = zero_alloc;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
       }
   | [] ->
@@ -3926,7 +3929,7 @@ let transl_value_decl env loc ~modalities valdecl =
       check_unboxable env loc ty;
       { val_type = ty; val_kind = Val_prim prim; Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities = modalities;
-        val_zero_alloc = Zero_alloc.default;
+        val_crossing = crossing; val_zero_alloc = Zero_alloc.default;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
       }
   in

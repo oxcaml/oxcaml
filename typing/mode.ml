@@ -4711,3 +4711,31 @@ module Crossing = struct
     in
     Format.(pp_print_list ~pp_sep:pp_print_space pp_print_string ppf l)
 end
+
+module Crossing_bound = struct
+  type t =
+    { upper : Crossing.t option;
+      (* CR modes: maybe store added location information for better errors? *)
+      mutable lower : Crossing.t
+    }
+
+  let default = { upper = None; lower = Crossing.max }
+
+  (* CR modes: over time, expand this to have more set to true by default
+     (moving closer to [Crossing.Monadic.min]) *)
+  let newvar () =
+    let lower =
+      Crossing.create ~uniqueness:false ~contention:true ~visibility:false
+        ~regionality:false ~linearity:false ~portability:false ~forkable:false
+        ~yielding:false ~statefulness:false
+    in
+    { upper = None; lower }
+
+  let newvar_below upper = { (newvar ()) with upper = Some upper }
+
+  (* CR modes: this should raise an error if this would bring [lower] above the
+     stated upper bound. But annot information needs to be tracked first *)
+  let set_max t = t.lower <- Crossing.max
+
+  let join_lower t lower = t.lower <- Crossing.join t.lower lower
+end

@@ -65,6 +65,7 @@ type pattern_variable =
     pv_id: Ident.t;
     pv_uid: Uid.t;
     pv_mode: Mode.Value.l;
+    pv_crossing: Mode.Crossing_bound.t;
     pv_kind: value_kind;
     pv_type: type_expr;
     pv_loc: Location.t;

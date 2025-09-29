@@ -724,7 +724,8 @@ module type Wrapped = sig
 
   type value_description =
     { val_type: type_expr wrapped;                (* Type of the value *)
-      val_modalities : Mode.Modality.t;     (* Modalities on the value *)
+      val_modalities: Mode.Modality.t;      (* Modalities on the value *)
+      val_crossing: Mode.Crossing_bound.t;    (* Crossing of the value *)
       val_kind: value_kind;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
@@ -803,11 +804,12 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       | Unit -> To.Unit
       | Named (id,mty) -> To.Named (id, module_type m mty)
 
-  let value_description m {val_type; val_modalities; val_kind; val_zero_alloc;
-                           val_attributes; val_loc; val_uid} =
+  let value_description m {val_type; val_modalities; val_crossing; val_kind;
+                           val_zero_alloc; val_attributes; val_loc; val_uid} =
     To.{
       val_type = m.map_type_expr m val_type;
       val_modalities;
+      val_crossing;
       val_kind;
       val_zero_alloc;
       val_attributes;

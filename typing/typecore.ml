@@ -406,12 +406,17 @@ type expected_mode =
     mode : Value.r;
     (** The upper bound, hence r (right) *)
 
+    crossing : Crossing_bound.t;
+    (** Stores both the expected (upper bound) crossing behavior, and the
+    accumulated actual (lower bound) crossing behavior *)
+
     strictly_local : bool;
     (** Indicates that the expression was directly annotated with [local], which
     should force any allocations to be on the stack. No invariant between this
     field and [mode]: this field being [true] while [mode] being [global] is
     sensible, but not very useful as it will fail all expressions. *)
 
+    (* CR modes: this should store [Crossing_bound.t]s at some point too *)
     tuple_modes : Value.r list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
         field. If this is [Some [x0; x1; ..]]:
@@ -486,18 +491,20 @@ let meet_regional ?hint:h mode =
     areality = Regional
   }); mode]
 
-let mode_default mode =
+let mode_default mode crossing =
   { position = RNontail;
     mode = Value.disallow_left mode;
+    crossing;
     strictly_local = false;
     tuple_modes = None }
 
-let mode_legacy = mode_default Value.legacy
+let mode_legacy = mode_default Value.legacy Crossing_bound.default
 
+(* CR modes: maybe this should take a [Value.r * Crossing_bound.t] instead *)
 let mode_default_opt mode_opt =
   match mode_opt with
   | None -> mode_legacy
-  | Some mode -> mode_default mode
+  | Some mode -> mode_default mode Crossing_bound.default
 
 let as_single_mode {mode; tuple_modes; _} =
   match tuple_modes with
@@ -511,31 +518,33 @@ let mode_morph f expected_mode =
   {expected_mode with mode; tuple_modes}
 
 let mode_modality modality expected_mode =
-  as_single_mode expected_mode
-  |> Modality.Const.apply modality
-  |> mode_default
+  let mode = as_single_mode expected_mode in
+  (* CR modes: the crossing is threaded through to prevent unsoundness, but not
+     maxed out because that is too restrictive. eventually, this should
+     properly update the crossing based on the applied modality. For now,
+     care is taken at call sites to ensure soundness. *)
+  mode_default (Modality.Const.apply modality mode) expected_mode.crossing
 
 (* used when entering a function;
 mode is the mode of the function region *)
 let mode_return mode =
-  { (mode_default (meet_regional ~hint:Function_return mode)) with
+  { (mode_default (meet_regional ~hint:Function_return mode) Crossing_bound.default) with
     position = RTail (Regionality.disallow_left
       (Value.proj_comonadic Areality mode), FTail);
   }
 
 (* used when entering a region.*)
 let mode_region mode =
-  { (mode_default (meet_regional mode)) with
+  { (mode_default (meet_regional mode) Crossing_bound.default) with
     position =
       RTail (Regionality.disallow_left
         (Value.proj_comonadic Areality mode), FNontail);
   }
 
-let mode_max =
-  mode_default Value.max
+let mode_max = mode_default Value.max Crossing_bound.default
 
-let mode_with_position mode position =
-  { (mode_default mode) with position }
+let mode_with_position mode crossing position =
+  { (mode_default mode crossing) with position }
 
 let mode_max_with_position position =
   { mode_max with position }
@@ -550,7 +559,7 @@ let mode_exclave expected_mode =
      |> value_to_alloc_r2l
      |> alloc_as_value
   in
-  { (mode_default mode)
+  { (mode_default mode expected_mode.crossing)
     with strictly_local = true
   }
 
@@ -590,9 +599,9 @@ let mode_partial_application expected_mode =
 let mode_trywith expected_mode =
   { expected_mode with position = RNontail }
 
-let mode_tuple mode tuple_modes =
+let mode_tuple mode crossing tuple_modes =
   let tuple_modes = Some (Value.List.disallow_left tuple_modes) in
-  { (mode_default mode) with
+  { (mode_default mode crossing) with
     tuple_modes }
 
 (** Takes [marg:Alloc.lr] extracted from the arrow type and returns the real
@@ -602,24 +611,25 @@ mode variable. We encode extra position information in the former. We need the
 latter to the both left and right mode because of how it will be used. *)
 let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   let vmode , _ = Value.newvar_below (alloc_as_value marg) in
-  if partial_app then mode_default vmode, vmode
+  if partial_app then mode_default vmode Crossing_bound.default, vmode
   else match funct.exp_desc, index, position_and_mode.apply_position with
   | Texp_ident (_, _, {val_kind =
       Val_prim {Primitive.prim_name = ("%sequor"|"%sequand")}},
                 Id_prim _, _), 1, Tail ->
      (* RHS of (&&) and (||) is at the tail of function region if the
         application is. The argument mode is not constrained otherwise. *)
-     mode_with_position vmode (RTail (Option.get position_and_mode.region_mode, FTail)),
+     mode_with_position vmode Crossing_bound.default
+      (RTail (Option.get position_and_mode.region_mode, FTail)),
      vmode
   | Texp_ident (_, _, _, Id_prim _, _), _, _ ->
      (* Other primitives cannot be tail-called *)
-     mode_default vmode, vmode
+     mode_default vmode Crossing_bound.default, vmode
   | _, _, (Nontail | Default) ->
-     mode_default vmode, vmode
+     mode_default vmode Crossing_bound.default, vmode
   | _, _, Tail -> begin
     Value.submode_exn vmode Value.(of_const ~hint_comonadic:Tailcall_argument
       { Const.max with areality = Regional});
-    mode_default vmode, vmode
+    mode_default vmode Crossing_bound.default, vmode
   end
 
 (* expected_mode.locality_context explains why expected_mode.mode is low;
@@ -642,31 +652,43 @@ let actual_submode ~loc ~env ?reason (actual_mode : Env.actual_mode)
 let escape ~loc ~env ~reason m =
   submode ~loc ~env ~reason m mode_legacy
 
+let set_max_crossing expected_mode =
+  Crossing_bound.set_max expected_mode.crossing
+
+(* CR modes: track down calls to this function to find places where crossing
+   information should be tracked in more fine-grained ways *)
+let set_max_crossing_temp expected_mode =
+  Crossing_bound.set_max expected_mode.crossing
+
 type expected_pat_mode =
   { mode : Value.l;
     (** The mode of the current pattern. *)
 
+    crossing : Crossing_bound.t;
+    (** The crossing associated with the current pattern. *)
+
+    (* CR modes: crossing bounds should be tracked with tuple_modes *)
     tuple_modes : Value.l list option;
     (** If the current pattern is [Ppat_tuple], the sub-patterns will have these
         modes. It is sound to ignore this field and get weaker modes. *)
-    }
+  }
 
-let simple_pat_mode mode =
-  { mode = Value.disallow_right mode; tuple_modes = None }
+let simple_pat_mode mode crossing =
+  { mode = Value.disallow_right mode; crossing; tuple_modes = None }
 
-let tuple_pat_mode mode tuple_modes =
+let tuple_pat_mode mode crossing tuple_modes =
   let mode = Value.disallow_right mode in
   let tuple_modes = Some (Value.List.disallow_right tuple_modes) in
-  { mode; tuple_modes }
+  { mode; crossing; tuple_modes }
 
-let global_pat_mode {mode; _}=
+let global_pat_mode {mode; crossing; _} =
   let mode =
     mode
     |> Value.meet_with Areality Regionality.Const.Global
     |> Value.meet_with Forkable Forkable.Const.Forkable
     |> Value.meet_with Yielding Yielding.Const.Unyielding
   in
-  simple_pat_mode mode
+  simple_pat_mode mode crossing
 
 let allocations : Alloc.r list ref = Local_store.s_ref []
 
@@ -689,7 +711,7 @@ let register_allocation (expected_mode : expected_mode) =
   let alloc_mode, mode =
     register_allocation_value_mode (as_single_mode expected_mode)
   in
-  alloc_mode, mode_default mode
+  alloc_mode, mode_default mode expected_mode.crossing
 
 let optimise_allocations () =
   (* CR zqian: Ideally we want to optimise all axes relavant to allocation. For
@@ -995,9 +1017,12 @@ let has_poly_constraint spat =
     end
   | _ -> false
 
-let actual_mode_cross_left env ty (actual_mode : Env.actual_mode)
+let cross_left_crossing crossing mode =
+  mode |> Value.disallow_right |> Crossing.apply_left crossing
+
+let actual_mode_cross_left crossing (actual_mode : Env.actual_mode)
   : Env.actual_mode =
-  let mode = cross_left env ty actual_mode.mode in
+  let mode = cross_left_crossing crossing actual_mode.mode in
   {actual_mode with mode}
 
 (** Mode cross a mode whose monadic fragment is a right mode, and whose comonadic
@@ -1018,6 +1043,11 @@ let expect_mode_cross_jkind env jkind (expected_mode : expected_mode) =
 let expect_mode_cross env ty (expected_mode : expected_mode) =
   let crossing = crossing_of_ty env ty in
   mode_morph (Crossing.apply_right crossing) expected_mode
+
+(* CR modes: the API for interacting with [Crossing_bound.t]s should be
+   improved, and this should be refactored accordingly *)
+let expect_mode_join_crossing (expected_mode : expected_mode) (crossing : Crossing_bound.t) =
+  Crossing_bound.join_lower expected_mode.crossing crossing.lower
 
 (** The expected mode for objects *)
 let mode_object = expect_mode_cross_jkind Env.empty Jkind.for_object mode_legacy
@@ -1062,7 +1092,7 @@ let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
 *)
 let mutvar_mode ~loc ~env m0 exp_mode =
   let m = Value.newvar () in
-  let mode = mode_default m in
+  let mode = mode_default m Crossing_bound.default in
   let modalities = Typemode.let_mutable_modalities in
   submode ~loc ~env exp_mode (mode_modality modalities mode);
   check_construct_mutability ~loc ~env
@@ -1077,7 +1107,7 @@ let mode_project_mutable mut_name =
       contention = Contention.Const.Shared }
     |> Value.of_const ~hint_monadic:(Mutable_read mut_name)
   in
-  mode_default mode
+  mode_default mode Crossing_bound.default
 
 (** The [expected_mode] of the record when mutating a mutable field. *)
 let mode_mutate_mutable mut_name =
@@ -1087,7 +1117,7 @@ let mode_mutate_mutable mut_name =
       contention = Uncontended }
     |> Value.of_const ~hint_monadic:(Mutable_write mut_name)
   in
-  mode_default mode
+  mode_default mode Crossing_bound.default
 
 (** The [expected_mode] of the lazy expression when forcing it. *)
 let mode_force_lazy =
@@ -1096,7 +1126,7 @@ let mode_force_lazy =
       contention = Uncontended }
     |> Value.of_const ~hint_monadic:Lazy_forced
   in
-  mode_default mode
+  mode_default mode Crossing_bound.default
 
 let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
@@ -1204,7 +1234,8 @@ type pattern_variable =
     pv_id: Ident.t;
     pv_uid: Uid.t;
     pv_mode: Value.l;
-    pv_kind : value_kind;
+    pv_crossing: Crossing_bound.t;
+    pv_kind: value_kind;
     pv_type: type_expr;
     pv_loc: Location.t;
     pv_as_var: bool;
@@ -1310,12 +1341,13 @@ let iter_pattern_variables_type_mut ~f_immut ~f_mut pvs =
 
 let add_pattern_variables ?check ?check_as env pv =
   List.fold_right
-    (fun {pv_id; pv_mode; pv_kind; pv_type; pv_loc; pv_as_var;
+    (fun {pv_id; pv_mode; pv_crossing; pv_kind; pv_type; pv_loc; pv_as_var;
           pv_attributes; pv_uid} env ->
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
          {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.id;
+          val_crossing = pv_crossing;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
          } env
@@ -1363,7 +1395,7 @@ let add_module_variables env module_variables =
   ) env module_variables_as_list
 
 let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
-    ~kind ty attrs sort =
+    crossing ~kind ty attrs sort =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
       tps.tps_pattern_variables
   then raise(Error(loc, Env.empty, Multiply_bound_variable name.txt));
@@ -1396,6 +1428,7 @@ let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
   tps.tps_pattern_variables <-
     {pv_id = id;
      pv_mode = mode;
+     pv_crossing = crossing;
      pv_kind = kind;
      pv_type = ty;
      pv_loc = loc;
@@ -1663,7 +1696,9 @@ let solve_Ppat_tuple ~refine ~alloc_mode loc env args expected_ty =
         ( label,
           p,
           newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element),
-          simple_pat_mode mode ))
+          (* CR modes: when [tuple_modes] is enhanced to store crossing,
+             this should be made finer-grained *)
+          simple_pat_mode mode alloc_mode.crossing ))
       args arg_modes
   in
   let ty = newgenty (Ttuple (List.map (fun (lbl, _, t, _) -> lbl, t) ann)) in
@@ -1690,7 +1725,9 @@ let solve_Ppat_unboxed_tuple ~refine ~alloc_mode loc env args expected_ty =
         ( label,
           p,
           newgenvar jkind,
-          simple_pat_mode mode,
+          (* CR modes: when [tuple_modes] is enhanced to store crossing,
+             this should be made finer-grained *)
+          simple_pat_mode mode alloc_mode.crossing,
           sort
         ))
       args arg_modes
@@ -1992,6 +2029,7 @@ let type_for_loop_like_index ~error ~loc ~env ~param ~any ~var =
   | Ppat_var name ->
       var ~name
           ~pv_mode:Value.(min |> disallow_right)
+          ~pv_crossing:Crossing_bound.default
           ~pv_type:(instance Predef.type_int)
           ~pv_loc:loc
           ~pv_as_var:false
@@ -2010,6 +2048,7 @@ let type_for_loop_index ~loc ~env ~param =
     ~any:(fun wildcard_name -> wildcard_name, env)
     ~var:(fun ~name:{txt; loc = _}
               ~pv_mode
+              ~pv_crossing
               ~pv_type
               ~pv_loc
               ~pv_as_var
@@ -2019,7 +2058,7 @@ let type_for_loop_index ~loc ~env ~param =
             let pv_id = Ident.create_local txt in
             let pv_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
             let pv =
-              { pv_id; pv_uid; pv_mode;
+              { pv_id; pv_uid; pv_mode; pv_crossing;
                 pv_kind=Val_reg; pv_type; pv_loc; pv_as_var;
                 pv_attributes;
                 pv_sort = Jkind.Sort.(of_const Const.for_loop_index)
@@ -2037,7 +2076,7 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
        because it can't have been referenced later so we don't need to track it
        for duplicates or anything else. *)
     ~any:Fun.id
-    ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
+    ~var:(fun ~name ~pv_mode ~pv_crossing ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
           enter_variable
             ~is_as_variable:pv_as_var
             ~kind:Val_reg
@@ -2045,6 +2084,7 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
             pv_loc
             name
             pv_mode
+            pv_crossing
             pv_type
             pv_attributes
             Jkind.Sort.(of_const Const.for_loop_index))
@@ -2758,8 +2798,11 @@ and type_pat_aux
     in
     check_project_mutability ~loc ~env:!!penv Array_elements mutability
       alloc_mode.mode;
+    (* CR modes: this crossing information should be threaded along properly
+       instead of bailing out (after defensively maxing it out) *)
+    Crossing_bound.set_max alloc_mode.crossing;
     let alloc_mode = Modality.Const.apply modalities alloc_mode.mode in
-    let alloc_mode = simple_pat_mode alloc_mode in
+    let alloc_mode = simple_pat_mode alloc_mode Crossing_bound.default in
     let pl =
       List.map (fun p -> type_pat ~alloc_mode tps Value p ty_elt arg_sort) spl
     in
@@ -2876,8 +2919,10 @@ and type_pat_aux
             record_ty record_form in
         check_project_mutability ~loc ~env:!!penv (Record_field label.lbl_name)
           label.lbl_mut alloc_mode.mode;
+        (* CR modes: like above, this shouldn't just bail out *)
+        Crossing_bound.set_max alloc_mode.crossing;
         let mode = Modality.Const.apply label.lbl_modalities alloc_mode.mode in
-        let alloc_mode = simple_pat_mode mode in
+        let alloc_mode = simple_pat_mode mode Crossing_bound.default in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg
           (Jkind.Sort.of_const label.lbl_sort))
       in
@@ -2921,6 +2966,7 @@ and type_pat_aux
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_var name ->
       let ty = instance expected_ty in
+      let crossing = alloc_mode.crossing in
       let alloc_mode =
         cross_left !!penv expected_ty alloc_mode.mode
       in
@@ -2948,7 +2994,7 @@ and type_pat_aux
             mode, kind
       in
       let id, uid =
-        enter_variable tps loc name mode ~kind ty sp.ppat_attributes sort
+        enter_variable tps loc name mode crossing ~kind ty sp.ppat_attributes sort
       in
       rvp {
         pat_desc = Tpat_var (id, name, uid, sort, alloc_mode);
@@ -2976,8 +3022,8 @@ and type_pat_aux
              the comment on [may_contain_modules]. *)
           let sort = Jkind.Sort.(of_const Const.for_module) in
           let id, uid =
-            enter_variable tps loc v alloc_mode.mode t ~is_module:true
-            ~kind:Val_reg sp.ppat_attributes sort
+            enter_variable tps loc v alloc_mode.mode alloc_mode.crossing t
+            ~is_module:true ~kind:Val_reg sp.ppat_attributes sort
           in
           rvp {
             pat_desc = Tpat_var (id, v, uid, sort, alloc_mode.mode);
@@ -2994,7 +3040,7 @@ and type_pat_aux
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
         enter_variable ~is_as_variable:true ~kind:Val_reg tps name.loc name mode
-          ty_var sp.ppat_attributes sort
+          alloc_mode.crossing ty_var sp.ppat_attributes sort
       in
       rvp { pat_desc = Tpat_alias(q, id, name, uid, sort, mode, ty_var);
             pat_loc = loc; pat_extra=[];
@@ -3132,13 +3178,16 @@ and type_pat_aux
       let args =
         List.map2
           (fun p (arg : Types.constructor_argument) ->
+             Crossing_bound.set_max alloc_mode.crossing;
              let alloc_mode =
               Modality.Const.apply arg.ca_modalities alloc_mode.mode
              in
              let alloc_mode =
               Mode.Value.join [ alloc_mode; constructor_mode ]
              in
-             let alloc_mode = simple_pat_mode alloc_mode in
+             let alloc_mode =
+              simple_pat_mode alloc_mode Crossing_bound.default
+             in
              type_pat ~alloc_mode tps Value p arg.ca_type
                (Jkind.Sort.of_const arg.ca_sort))
           sargs args
@@ -3292,7 +3341,7 @@ and type_pat_aux
       { p with pat_extra = (Tpat_open (path,lid,new_env),
                                 loc, sp.ppat_attributes) :: p.pat_extra }
   | Ppat_exception p ->
-      let alloc_mode = simple_pat_mode Value.legacy in
+      let alloc_mode = simple_pat_mode Value.legacy Crossing_bound.default in
       let p_exn =
         type_pat tps Value ~alloc_mode p Predef.type_exn
           Jkind.Sort.(of_const Const.for_exception)
@@ -3357,7 +3406,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
     with_local_level_if_principal begin fun () ->
       let tps = create_type_pat_state Modules_rejected in
       let nv = newvar (Jkind.Builtin.value ~why:Class_term_argument) in
-      let alloc_mode = simple_pat_mode Value.legacy in
+      let alloc_mode = simple_pat_mode Value.legacy Crossing_bound.default in
       let equations_scope = get_current_level () in
       let new_penv = Pattern_env.make val_env
           ~equations_scope ~allow_recursive_equations:false in
@@ -3395,6 +3444,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.id
+            ; val_crossing = Crossing_bound.default
             ; val_loc = pv_loc
             ; val_uid = pv_uid
             }
@@ -3407,6 +3457,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.id
+            ; val_crossing = Crossing_bound.default
             ; val_loc = pv_loc
             ; val_uid = pv_uid
             }
@@ -3422,7 +3473,7 @@ let type_self_pattern env spat =
   let spat = Pat.mk(Ppat_alias (spat, mknoloc "selfpat-*")) in
   let tps = create_type_pat_state Modules_rejected in
   let nv = newvar (Jkind.Builtin.value ~why:Object) in
-  let alloc_mode = simple_pat_mode Value.legacy in
+  let alloc_mode = simple_pat_mode Value.legacy Crossing_bound.default in
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
       ~equations_scope ~allow_recursive_equations:false in
@@ -3633,7 +3684,7 @@ let rec check_counter_example_pat
     check_counter_example_pat ~info ~penv type_pat_state in
   let loc = tp.pat_loc in
   let refine = true in
-  let alloc_mode = simple_pat_mode Value.min in
+  let alloc_mode = simple_pat_mode Value.min Crossing_bound.default in
   let solve_expected (x : pattern) : pattern =
     unify_pat_types_refine ~refine x.pat_loc penv x.pat_type
       (instance expected_ty);
@@ -5258,9 +5309,9 @@ let unique_use ~loc ~env mode_l mode_r  =
        instead, we force all uses to be aliased and many. This is equivalent to
        running a UA which forces everything *)
     submode ~loc ~env Value.(of_const {Const.min with uniqueness = Aliased})
-      (mode_default mode_r);
+      (mode_default mode_r Crossing_bound.default);
     submode ~loc ~env mode_l (mode_default Value.(of_const
-      {Const.max with linearity = Many}));
+      {Const.max with linearity = Many}) Crossing_bound.default);
     (Uniqueness.disallow_left Uniqueness.aliased,
      Linearity.disallow_right Linearity.many)
   end
@@ -5409,7 +5460,7 @@ let split_function_ty
     if not is_final_val_param then
       (* no need to check mode crossing in this case because ty_res always a
       function *)
-      mode_default ret_value_mode
+      mode_default ret_value_mode Crossing_bound.default
     else
       let ret_value_mode = mode_return ret_value_mode in
       let ret_value_mode = expect_mode_cross env ty_ret ret_value_mode in
@@ -5427,7 +5478,9 @@ let split_function_ty
     end
   in
   let arg_value_mode = alloc_to_value_l2r arg_mode in
-  let expected_pat_mode = simple_pat_mode arg_value_mode in
+  let expected_pat_mode =
+    simple_pat_mode arg_value_mode Crossing_bound.default
+  in
   let type_sort ~why ty =
     match Ctype.type_sort ~why ~fixed:false env ty with
     | Ok sort -> sort
@@ -5570,21 +5623,29 @@ let vb_pat_constraint
 
 let pat_modes ~force_toplevel rec_mode_var (attrs, spat) =
   let pat_mode, exp_mode =
-    if force_toplevel
-    then simple_pat_mode Value.legacy, mode_legacy
+    if force_toplevel then
+      let crossing = Crossing_bound.newvar () in
+      simple_pat_mode Value.legacy crossing, { mode_legacy with crossing }
     else match rec_mode_var with
     | None -> begin
         match pat_tuple_arity spat with
         | Not_local_tuple | Maybe_local_tuple ->
             let mode = Value.newvar () in
-            simple_pat_mode mode, mode_default mode
+            let crossing = Crossing_bound.newvar () in
+            simple_pat_mode mode crossing,
+            mode_default mode crossing
         | Local_tuple arity ->
             let modes = List.init arity (fun _ -> Value.newvar ()) in
             let mode = Value.newvar () in
-            tuple_pat_mode mode modes, mode_tuple mode modes
+            let crossing = Crossing_bound.newvar () in
+            tuple_pat_mode mode crossing modes,
+            mode_tuple mode crossing modes
       end
     | Some mode ->
-        simple_pat_mode mode, mode_default mode
+        (* CR modes: try this as [Some (mode, crossing)] and pass the crossing
+           in to both. watch out for [let rec]-related pitfalls *)
+        simple_pat_mode mode Crossing_bound.default,
+        mode_default mode Crossing_bound.default
   in
   attrs, pat_mode, exp_mode, spat
 
@@ -5675,7 +5736,8 @@ and type_expect_
             let exp, mode =
               with_local_level_if_principal begin fun () ->
                 let mode = Value.newvar () in
-                let exp = type_exp ~recarg env (mode_default mode) sexp in
+                let exp = type_exp ~recarg env
+                  (mode_default mode Crossing_bound.default) sexp in
                 exp, mode
               end ~post:(fun (exp, _) -> generalize_structure_exp exp)
             in
@@ -5924,9 +5986,11 @@ and type_expect_
       let path, (actual_mode : Env.actual_mode), desc, kind =
         type_ident env ~recarg lid
       in
+      expect_mode_join_crossing expected_mode desc.val_crossing;
       let exp_desc =
         match desc.val_kind with
         | Val_ivar (_, cl_num) ->
+            set_max_crossing expected_mode;
             let (self_path, _) =
               Env.find_value_by_name
                 (Longident.Lident ("self-" ^ cl_num)) env
@@ -5936,6 +6000,7 @@ and type_expect_
                              Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
         | Val_mut (_m0, _) -> begin
+            set_max_crossing_temp expected_mode;
             match path with
             | Path.Pident id ->
               let modalities = Typemode.let_mutable_modalities in
@@ -5947,6 +6012,7 @@ and type_expect_
                 bad mutable variable identifier"
           end
         | Val_self (_, _, _, cl_num) ->
+            set_max_crossing expected_mode;
             let (path, _) =
               Env.find_value_by_name (Longident.Lident ("self-" ^ cl_num)) env
             in
@@ -6018,6 +6084,8 @@ and type_expect_
         | Nonrecursive -> None
       in
       check_let_mutable mutable_flag env ?restriction spat_sexp_list;
+      if mutable_flag = (Mutable : mutable_flag)
+        then set_max_crossing_temp expected_mode;
       let existential_context : existential_restriction =
         if rec_flag = Recursive then In_rec
         else if List.compare_length_with spat_sexp_list 1 > 0 then In_group
@@ -6101,11 +6169,13 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_function (params, body_constraint, body) ->
+      set_max_crossing_temp expected_mode;
       type_n_ary_function ~loc ~env ~expected_mode ~ty_expected ~explanation
         ~attributes:sexp.pexp_attributes (params, body_constraint, body)
   | Pexp_apply
       ({ pexp_desc = Pexp_extension({txt = "extension.escape"}, PStr []) },
        [Nolabel, sbody]) ->
+      set_max_crossing_temp expected_mode;
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let exp =
         type_expect ~recarg env mode_legacy sbody
@@ -6115,6 +6185,7 @@ and type_expect_
   | Pexp_apply
       ({ pexp_desc = Pexp_extension({ txt }, PStr []) },
        [Nolabel, sbody]) when is_exclave_extension_node txt ->
+      set_max_crossing_temp expected_mode;
       if (txt = "extension.exclave") && not (Language_extension.is_enabled Mode) then
           raise (Typetexp.Error (loc, Env.empty, Unsupported_extension Mode));
       begin
@@ -6149,6 +6220,7 @@ and type_expect_
   | Pexp_apply(sfunct, sargs) ->
       (* See Note [Type-checking applications] *)
       assert (sargs <> []);
+      set_max_crossing_temp expected_mode;
       let pm = position_and_mode env expected_mode sexp in
       let funct_mode =
         match pm.apply_position with
@@ -6161,7 +6233,8 @@ and type_expect_
           mode
         | Nontail | Default -> Value.newvar ()
       in
-      let funct_expected_mode = mode_default funct_mode in
+      let funct_expected_mode =
+        mode_default funct_mode Crossing_bound.default in
       (* does the function return a tvar which is too generic? *)
       let rec ret_tvar seen ty_fun =
         let ty = expand_head env ty_fun in
@@ -6244,11 +6317,13 @@ and type_expect_
         match cases_tuple_arity caselist with
         | Not_local_tuple | Maybe_local_tuple ->
           let mode = Value.newvar () in
-          simple_pat_mode mode, mode_default mode
+          let crossing = Crossing_bound.newvar () in
+          simple_pat_mode mode crossing, mode_default mode crossing
         | Local_tuple arity ->
           let modes = List.init arity (fun _ -> Value.newvar ()) in
           let mode = Value.newvar () in
-          tuple_pat_mode mode modes, mode_tuple mode modes
+          let crossing = Crossing_bound.newvar () in
+          tuple_pat_mode mode crossing modes, mode_tuple mode crossing modes
       in
       let arg, sort =
         with_local_level begin fun () ->
@@ -6279,7 +6354,7 @@ and type_expect_
         type_expect env (mode_trywith expected_mode)
           sbody ty_expected_explained
       in
-      let arg_mode = simple_pat_mode Value.legacy in
+      let arg_mode = simple_pat_mode Value.legacy Crossing_bound.default in
       let cases, _ =
         type_cases Value env arg_mode expected_mode
           Predef.type_exn Jkind.Sort.(of_const Const.for_exception)
@@ -6356,11 +6431,13 @@ and type_expect_
           exp_env = env }
       end
   | Pexp_record(lid_sexp_list, opt_sexp) ->
+      set_max_crossing_temp expected_mode;
       type_expect_record ~overwrite Legacy lid_sexp_list opt_sexp
   | Pexp_record_unboxed_product(lid_sexp_list, opt_sexp) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
   | Pexp_field(srecord, lid) ->
+      set_max_crossing_temp expected_mode;
       let (record, record_sort, rmode, label, _) =
         type_label_access Legacy env srecord Env.Projection lid
       in
@@ -6416,6 +6493,7 @@ and type_expect_
         exp_env = env }
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
+      set_max_crossing_temp expected_mode;
       let (record, record_sort, rmode, label, _) =
         type_label_access Unboxed_product env srecord Env.Projection lid
       in
@@ -6456,7 +6534,8 @@ and type_expect_
           ignore atomic;  (* CR aspsmith: TODO *)
           submode ~loc:record.exp_loc ~env rmode (mode_mutate_mutable
             (Record_field label.lbl_name));
-          let mode = mutable_mode m0 |> mode_default in
+          let mode =
+            mode_default (mutable_mode m0) Crossing_bound.default in
           let mode = mode_modality label.lbl_modalities mode in
           type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
             (lid, label, snewval) Legacy
@@ -6476,11 +6555,13 @@ and type_expect_
   | Pexp_array(mut, sargl) ->
       let mutability =
         match mut with
-        | Mutable -> Mutable {
-          mode = Value.Comonadic.legacy;
-          (* CR aspsmith: Revisit once we support atomic arrays *)
-          atomic = Nonatomic;
-        }
+        | Mutable ->
+            set_max_crossing expected_mode;
+            Mutable {
+              mode = Value.Comonadic.legacy;
+              (* CR aspsmith: Revisit once we support atomic arrays *)
+              atomic = Nonatomic;
+            }
         | Immutable ->
             Language_extension.assert_enabled ~loc Immutable_arrays ();
             Immutable
@@ -6498,6 +6579,7 @@ and type_expect_
     Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
     (* Compute the expected base type, to use for disambiguation of the record
        and unboxed record fields *)
+    set_max_crossing_temp expected_mode;
     let expected_base_ty ty_expected =
       match get_desc (expand_head env ty_expected) with
       | Tconstr(p, [arg1; _], _)
@@ -6695,6 +6777,8 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_constraint (sarg, None, modes) ->
+      (* CR modes: the stored crossings in [modes] should be extracted and
+         used as a [Crossing_bound.t] upper bound *)
       let modes = Typemode.transl_mode_annots modes in
       let expected_mode = type_expect_mode ~loc ~env ~modes expected_mode in
       let exp = type_expect env expected_mode sarg (mk_expected ty_expected ?explanation) in
@@ -6745,6 +6829,7 @@ and type_expect_
         exp_extra = (exp_extra, loc, sexp.pexp_attributes) :: arg.exp_extra;
       }
   | Pexp_send (e, {txt=met}) ->
+      set_max_crossing expected_mode;
       submode ~loc ~env Mode.Value.legacy expected_mode;
       let pm = position_and_mode env expected_mode sexp in
       let (obj,meth,typ) =
@@ -6777,6 +6862,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_new cl ->
+      set_max_crossing expected_mode;
       submode ~loc ~env Value.legacy expected_mode;
       let (cl_path, cl_decl, cl_mode) =
         Env.lookup_class ~loc:cl.loc cl.txt env
@@ -6810,7 +6896,7 @@ and type_expect_
             raise(Error(loc, env, Instance_variable_not_mutable lab.txt))
         | Mutable_variable (id, mode, ty, sort) ->
             let newval =
-              type_expect env (mode_default mode)
+              type_expect env (mode_default mode Crossing_bound.default)
                 snewval (mk_expected (instance ty))
             in
             let lid = {txt = id; loc} in
@@ -6823,6 +6909,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_override lst ->
+      set_max_crossing expected_mode;
       submode ~loc ~env Value.legacy expected_mode;
       let _ =
        List.fold_right
@@ -6959,6 +7046,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_lazy e ->
+      set_max_crossing_temp expected_mode;
       let expected_mode, closure_mode = mode_lazy expected_mode in
       let ty = newgenvar (Jkind.Builtin.value ~why:Lazy_expression) in
       let to_unify = Predef.type_lazy_t ty in
@@ -6974,6 +7062,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_object s ->
+      set_max_crossing expected_mode;
       Env.check_no_open_quotations loc env Object_qt;
       submode ~loc ~env Value.legacy expected_mode;
       let desc, meths = !type_object env loc s in
@@ -6985,6 +7074,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_poly(sbody, sty) ->
+      set_max_crossing expected_mode;
       let ty, cty =
         with_local_level_if_principal
           ~post:(fun (ty,_) -> generalize_structure ty)
@@ -7034,9 +7124,11 @@ and type_expect_
       re { exp with exp_extra =
              (Texp_poly cty, loc, sexp.pexp_attributes) :: exp.exp_extra }
   | Pexp_newtype(name, jkind, sbody) ->
+    set_max_crossing_temp expected_mode;
     type_newtype_expr ~loc ~env ~expected_mode ~rue ~attributes:sexp.pexp_attributes
       name jkind sbody
   | Pexp_pack m ->
+      set_max_crossing expected_mode;
       let (p, fl) =
         match get_desc (Ctype.expand_head env (instance ty_expected)) with
           Tpackage (p, fl) ->
@@ -7079,6 +7171,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_letop{ let_ = slet; ands = sands; body = sbody } ->
+      set_max_crossing expected_mode;
       submode ~loc ~env Value.legacy expected_mode;
       let rec loop spat_acc ty_acc ty_acc_sort sands =
         match sands with
@@ -7140,7 +7233,8 @@ and type_expect_
       let scase = Ast_helper.Exp.case spat_params sbody in
       let cases, partial =
         type_cases Value body_env
-          (simple_pat_mode Value.legacy) (mode_return Value.legacy)
+          (simple_pat_mode Value.legacy Crossing_bound.default)
+          (mode_return Value.legacy)
           ty_params param_sort (mk_expected ty_func_result)
           ~check_if_total:true loc [scase]
       in
@@ -7174,6 +7268,7 @@ and type_expect_
   | Pexp_extension ({ txt = ("ocaml.extension_constructor"
                              |"extension_constructor"); _ },
                     payload) ->
+      set_max_crossing_temp expected_mode;
       begin match payload with
       | PStr [ { pstr_desc =
                    Pstr_eval ({ pexp_desc = Pexp_construct (lid, None); _ }, _)
@@ -7198,6 +7293,7 @@ and type_expect_
           raise (Error (loc, env, Invalid_extension_constructor_payload))
       end
   | Pexp_extension ({ txt = ("probe" | "ocaml.probe"); _ }, payload) ->
+    set_max_crossing_temp expected_mode;
     begin match Builtin_attributes.get_tracing_probe_payload payload with
     | Error () -> raise (Error (loc, env, Probe_format))
     | Ok { name; name_loc; enabled_at_init; arg; } ->
@@ -7214,6 +7310,7 @@ and type_expect_
     end
   | Pexp_extension ({ txt = ("probe_is_enabled"
                             |"ocaml.probe_is_enabled"); _ }, payload) ->
+      set_max_crossing_temp expected_mode;
       begin match payload with
       | PStr ([{ pstr_desc =
                    Pstr_eval
@@ -7235,10 +7332,12 @@ and type_expect_
       | _ -> raise (Error (loc, env, Probe_is_enabled_format))
     end
   | Pexp_extension ({ txt = "src_pos"; _ }, _) ->
+      set_max_crossing_temp expected_mode;
       rue (src_pos loc sexp.pexp_attributes env)
   | Pexp_extension ({ txt = ("ocaml.atomic.loc"
                              |"atomic.loc"); _ },
                     payload) ->
+      set_max_crossing_temp expected_mode;
       begin match payload with
       | PStr [ { pstr_desc =
                   Pstr_eval (
@@ -7362,6 +7461,7 @@ and type_expect_
       {exp with exp_extra}
   | Pexp_comprehension comp ->
       Language_extension.assert_enabled ~loc Comprehensions ();
+      set_max_crossing_temp expected_mode;
       type_comprehension_expr
         ~loc
         ~env
@@ -7369,6 +7469,7 @@ and type_expect_
         ~attributes:sexp.pexp_attributes
         comp
   | Pexp_overwrite (exp1, exp2) ->
+      set_max_crossing expected_mode;
       if not (Language_extension.is_enabled Overwriting) then
         raise (Typetexp.Error (loc, env, Unsupported_extension Overwriting));
       if not (can_be_overwritten exp2.pexp_desc) then
@@ -7386,7 +7487,8 @@ and type_expect_
         (* CR uniqueness: this could be the jkind of exp2 *)
         mk_expected (newvar (Jkind.for_non_float ~why:Boxed_record))
       in
-      let exp1 = type_expect ~recarg env (mode_default cell_mode) exp1 cell_type in
+      let mode = mode_default cell_mode Crossing_bound.default in
+      let exp1 = type_expect ~recarg env mode exp1 cell_type in
       let new_fields_mode =
         (* The newly-written fields have to be global to avoid heap-to-stack pointers.
            We enforce that here, by asking the allocation to be global.
@@ -7456,6 +7558,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_hole ->
+      set_max_crossing expected_mode;
       begin match overwrite with
       | Assigning(typ, fields_mode) ->
         assert (Language_extension.is_enabled Overwriting);
@@ -7734,7 +7837,9 @@ and type_constraint_expect
 and type_ident env ?(recarg=Rejected) lid =
   (* CR zqian: [lookup_value] should close over the memaddr of all prefix
   modules.  *)
-  let path, desc, (mode, locks) = Env.lookup_value ~loc:lid.loc lid.txt env in
+  let path, ({val_type; val_crossing; val_kind; _} as desc), (mode, locks) =
+    Env.lookup_value ~loc:lid.loc lid.txt env
+  in
   (* We cross modes when typing [Ppat_ident], before adding new variables into
   the environment. Therefore, one might think all values in the environment are
   already mode-crossed. That is not true for several reasons:
@@ -7744,7 +7849,10 @@ and type_ident env ?(recarg=Rejected) lid =
 
   Therefore, we need to cross modes upon look-up. Ideally that should be done in
   [Env], but that is difficult due to cyclic dependency between jkind and env. *)
-  let mode = cross_left env desc.val_type mode in
+  let crossing =
+    Crossing.meet (crossing_of_ty env val_type) val_crossing.lower
+  in
+  let mode = cross_left_crossing crossing mode in
   (* There can be locks between the definition and a use of a value. For
   example, if a function closes over a value, there will be Closure_lock between
   the value's definition and the value's use in the function. Walking the locks
@@ -7772,7 +7880,7 @@ and type_ident env ?(recarg=Rejected) lid =
   *)
   (* CR modes: codify the above per-axis argument. *)
   let actual_mode =
-    Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
+    Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some val_type)
       (mode, locks)
   in
   (* We need to cross again, because the monadic fragment might have been
@@ -7780,13 +7888,13 @@ and type_ident env ?(recarg=Rejected) lid =
   and the second only deals with monadic. *)
   (* CR layouts: allow to cross comonadic fragment and monadic fragment
      separately. *)
-  let actual_mode = actual_mode_cross_left env desc.val_type actual_mode in
+  let actual_mode = actual_mode_cross_left crossing actual_mode in
   let is_recarg =
-    match get_desc desc.val_type with
+    match get_desc val_type with
     | Tconstr(p, _, _) -> Path.is_constructor_typath p
     | _ -> false
   in
-  begin match is_recarg, recarg, get_desc desc.val_type with
+  begin match is_recarg, recarg, get_desc val_type with
   | _, Allowed, _
   | true, Required, _
   | false, Rejected, _ -> ()
@@ -7796,9 +7904,9 @@ and type_ident env ?(recarg=Rejected) lid =
   | false, Required, _  -> () (* will fail later *)
   end;
   let val_type, kind =
-    match desc.val_kind with
+    match val_kind with
     | Val_prim prim ->
-       let ty, mode, _, sort = instance_prim prim desc.val_type in
+       let ty, mode, _, sort = instance_prim prim val_type in
        let ty = instance ty in
        begin match prim.prim_native_repr_res, mode with
        (* if the locality of returned value of the primitive is poly
@@ -7809,7 +7917,7 @@ and type_ident env ?(recarg=Rejected) lid =
        end;
        ty, Id_prim (Option.map Locality.disallow_right mode, sort)
     | _ ->
-       instance desc.val_type, Id_value in
+       instance val_type, Id_value in
   path, actual_mode, { desc with val_type }, kind
 
 and type_binding_op_ident env s =
@@ -8110,7 +8218,7 @@ and type_function
       let type_mode =
         match ret_mode_annotations with
         | Modes {crossings = _ :: _; _} ->
-            Misc.fatal_error "crossings on arrows not yet implemented"
+            Misc.fatal_error "crossing on arrows not yet implemented"
         | No_modes ->
             (* if the return mode annotation is absent we do not constrain the
                body mode, and we use the mode of the whole function to interpret
@@ -8208,8 +8316,9 @@ and type_label_access
   let record =
     with_local_level_if_principal ~post:generalize_structure_exp
       (fun () ->
-         type_expect ~recarg:Allowed env (mode_default mode) srecord
-           (mk_expected (newvar record_jkind)))
+         type_expect ~recarg:Allowed env
+           (mode_default mode Crossing_bound.default)
+           srecord (mk_expected (newvar record_jkind)))
   in
   let ty_exp = record.exp_type in
   let expected_type =
@@ -8703,6 +8812,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.id;
+            val_crossing = Crossing_bound.default;
             val_loc = Location.none;
             val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
           }
@@ -8990,7 +9100,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
      we allow non-values in boxed tuples. *)
   let arity = List.length sexpl in
   assert (arity >= 2);
-  let alloc_mode, argument_mode = register_allocation_value_mode expected_mode.mode in
+  let alloc_mode, argument_mode =
+    register_allocation_value_mode expected_mode.mode in
   (* CR layouts v5: non-values in tuples *)
   let unify_as_tuple ty_expected =
     let labeled_subtypes =
@@ -9036,7 +9147,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
         Option.iter (fun _ ->
              Language_extension.assert_enabled ~loc Labeled_tuples ())
           label;
-        let argument_mode = mode_default argument_mode in
+        let argument_mode = mode_default argument_mode expected_mode.crossing in
         let argument_mode = expect_mode_cross env ty argument_mode in
           (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
       sexpl types_and_modes overwrites
@@ -9092,7 +9203,9 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
         Option.iter (fun _ ->
              Language_extension.assert_enabled ~loc Labeled_tuples ())
           label;
-        let argument_mode = mode_default argument_mode in
+        let argument_mode =
+          mode_default argument_mode expected_mode.crossing
+        in
         let argument_mode = expect_mode_cross env ty argument_mode in
           (label, type_expect env argument_mode body (mk_expected ty), sort))
       sexpl types_sorts_and_modes
@@ -9208,9 +9321,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
         Submode_failed (e, Constructor lid.txt, None)))
   in
   let expected_mode =
-    { expected_mode with mode =
-      Mode.Value.meet [ expected_mode.mode; constructor_mode ] }
-  in
+    mode_morph (fun m -> Mode.Value.meet [ m; constructor_mode ]) expected_mode in
   let (argument_mode, alloc_mode) =
     match constr.cstr_repr with
     | Variant_unboxed | Variant_with_null -> expected_mode, None
@@ -10621,7 +10732,7 @@ and type_comprehension_iterator
           tps
           Value
           ~no_existentials:In_self_pattern
-          ~alloc_mode:(simple_pat_mode Value.legacy)
+          ~alloc_mode:(simple_pat_mode Value.legacy Crossing_bound.default)
           ~mutable_flag:Immutable
           penv
           pattern

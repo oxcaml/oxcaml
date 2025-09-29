@@ -1088,4 +1088,21 @@ module type S = sig
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
     val print : Format.formatter -> t -> unit
   end
+
+  module Crossing_bound : sig
+    type t =
+      { upper : Crossing.t option;
+        mutable lower : Crossing.t
+      }
+
+    val default : t
+
+    val newvar : unit -> t
+
+    val newvar_below : Crossing.t -> t
+
+    val set_max : t -> unit
+
+    val join_lower : t -> Crossing.t -> unit
+  end
 end

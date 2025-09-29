@@ -1016,6 +1016,7 @@ module type Wrapped = sig
   type value_description =
     { val_type: type_expr wrapped;                (* Type of the value *)
       val_modalities: Mode.Modality.t;      (* Modalities on the value *)
+      val_crossing: Mode.Crossing_bound.t;    (* Crossing of the value *)
       val_kind: value_kind;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
