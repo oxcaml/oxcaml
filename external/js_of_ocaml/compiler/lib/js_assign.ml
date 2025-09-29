@@ -253,7 +253,7 @@ module Preserve : Strategy = struct
   (* Try to preserve variable names.
      - Assign the origin name if present: "{original_name}"
      - If present but not available, derive a similar name: "{original_name}${n}" (eg. result$3).
-     - If not present, make up a name: "$${n}"
+     - If not present, make up a name: "${n}"
 
      Color variables one scope/block at a time - outer scope first.
   *)

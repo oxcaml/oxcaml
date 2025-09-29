@@ -59,7 +59,7 @@ type t =
   ; no_runtime : bool
   ; include_runtime : bool
   ; output_file : [ `Name of string | `Stdout ] * bool
-  ; input : [ `Filename of string | `None ]
+  ; input : [ `Bytecode_file of string | `Cmj of string | `Cmja of string | `Bytecode_stdin | `None ]
   ; params : (string * string) list
   ; static_env : (string * string) list
   ; wrap_with_fun : [ `Iife | `Named of string | `Anonymous ]
@@ -115,7 +115,10 @@ let options =
     Arg.(value & opt (some string) None & info [ "o" ] ~docv:"FILE" ~doc)
   in
   let input_file =
-    let doc = "Compile the JSOO file (.cmj) or archive (.cmja) [$(docv)]." in
+    let doc =
+      "Compile the bytecode program [$(docv)], IR file (.cmj), or IR archive (.cmja). "
+      ^ "Use '-' to read from the standard input instead."
+    in
     Arg.(required & pos ~rev:true 0 (some string) None & info [] ~docv:"PROGRAM" ~doc)
   in
   let keep_unit_names =
@@ -311,12 +314,22 @@ let options =
     let chop_extension s = try Filename.chop_extension s with Invalid_argument _ -> s in
     let runtime_files = js_files in
     let fs_external = fs_external || (toplevel && no_cmis) in
-    let input = `Filename input_file in
+    let input =
+      match input_file with
+      | "-" -> `Bytecode_stdin
+      | x when Filename.check_suffix x ".cmj" -> `Cmj x
+      | x when Filename.check_suffix x ".cmja" -> `Cmja x
+      | x -> `Bytecode_file x
+    in
     let output_file =
       match output_file with
       | Some "-" -> `Stdout, true
       | Some s -> `Name s, true
-      | None -> `Name (chop_extension input_file ^ ".js"), false
+      | None -> (
+          match input with
+          | `Bytecode_file s | `Cmj s | `Cmja s ->
+            `Name (chop_extension s ^ ".js"), false
+          | `Bytecode_stdin -> `Stdout, false)
     in
     let source_map =
       if (not no_sourcemap) && (sourcemap || sourcemap_inline_in_js)

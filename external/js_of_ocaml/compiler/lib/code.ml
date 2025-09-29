@@ -68,7 +68,7 @@ module Var : sig
 
   val reset : unit -> unit
 
-  val set_last : min:int -> unit
+  val set_last : int -> unit
 
   module Set : Set.S with type elt = t
 
@@ -205,7 +205,8 @@ end = struct
     last_var := 0;
     Name.reset ()
 
-  let set_last ~min = last_var := max !last_var min
+  let set_last n =
+    last_var := n
 
   let print f x =
     Format.fprintf
@@ -395,23 +396,11 @@ module Constant = struct
         | Float32 _
         | Tuple _ ) ) -> Some false
     | ( String _
-      , ( Int64 _
-        | Int _
-        | Int32 _
-        | NativeInt _
-        | Float _
-        | Float32 _
-        | Tuple _
-        | Float_array _ ) ) -> Some false
+      , (Int64 _ | Int _ | Int32 _ | NativeInt _ | Float _ | Float32 _ | Tuple _ | Float_array _) ) ->
+        Some false
     | ( NativeString _
-      , ( Int64 _
-        | Int _
-        | Int32 _
-        | NativeInt _
-        | Float _
-        | Float32 _
-        | Tuple _
-        | Float_array _ ) ) -> Some false
+      , (Int64 _ | Int _ | Int32 _ | NativeInt _ | Float _ | Float32 _ | Tuple _ | Float_array _) ) ->
+        Some false
     | ( Int64 _
       , ( String _
         | NativeString _
@@ -422,16 +411,14 @@ module Constant = struct
         | Float32 _
         | Tuple _
         | Float_array _ ) ) -> Some false
-    | ( Float _
-      , (Float32 _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _))
-      ) -> Some false
-    | ( Float32 _
-      , (Float _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _))
-      ) -> Some false
+    | Float _, (Float32 _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _)) ->
+        Some false
+    | Float32 _, (Float _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _)) ->
+        Some false
     | ( (Int _ | Int32 _ | NativeInt _)
       , (String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _)) ) ->
         Some false
-    | Null, _ | _, Null -> Some false
+    | (Null, _) | (_, Null) -> Some false
     (* Note: the following cases should not occur when compiling to Javascript *)
     | Int _, (Int32 _ | NativeInt _)
     | Int32 _, (Int _ | NativeInt _)
@@ -500,6 +487,19 @@ type program =
   { start : Addr.t
   ; blocks : block Addr.Map.t
   ; free_pc : Addr.t
+  }
+
+type cmj_body =
+  { program : program
+  ; last_var : Addr.t
+    (** Highest used variable in the translation, since it is kept track by a
+        mutable state (in [Var]), and the [ocamlj] compiler and [js_of_ocaml]
+        need to have these in sync *)
+  ; imported_compilation_units : Compilation_unit.t list
+    (** Compilation units fetched from JSOO's global data table. Needed to fill in
+      [Unit_info.t] in JSOO *)
+  ; exported_compilation_unit : Compilation_unit.t
+    (** Current compilation unit. Needed to fill in [Unit_info.t] in JSOO *)
   }
 
 let noloc = No

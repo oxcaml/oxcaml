@@ -66,8 +66,7 @@ module Var : sig
 
   val reset : unit -> unit
 
-  val set_last : min:int -> unit
-  (** increase the last variable to at least [min] *)
+  val set_last : int -> unit
 
   module Set : Set.S with type elt = t
 
@@ -228,6 +227,13 @@ type program =
   { start : Addr.t
   ; blocks : block Addr.Map.t
   ; free_pc : Addr.t
+  }
+
+type cmj_body =
+  { program : program
+  ; last_var : Addr.t
+  ; imported_compilation_units : Compilation_unit.t list
+  ; exported_compilation_unit : Compilation_unit.t
   }
 
 module Print : sig

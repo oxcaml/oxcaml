@@ -245,16 +245,14 @@ let link
      period when the [Effect] module is in [Stdlib], but no code is actually
      using it. *)
   let warn_effects = ref true in
-  let files =
-    List.map files ~f:(fun file ->
-        Dune_action_trace.add_trace_event_if_enabled
-          ~event_tracing_context
-          ~category:"jsoo.link.read_file"
-          ~name:file
-        @@ fun () ->
+  let files = List.map files ~f:(fun file ->
+    Dune_action_trace.add_trace_event_if_enabled
+      ~event_tracing_context
+      ~category:"jsoo.link.read_file"
+      ~name:file
+      @@ fun () ->
         let lr = Line_reader.open_ file in
-        file, lr, Units.scan_file lr)
-  in
+        file, lr, Units.scan_file lr) in
   let missing, to_link, all =
     List.fold_right
       files
@@ -297,26 +295,26 @@ let link
   let sm = ref [] in
   let build_info = ref None in
   let t = Timer.make () in
-  (* let sym = ref Ocaml_compiler.Symtable.GlobalMap.empty in *)
+  let sym = ref Ocaml_compiler.Symtable.GlobalMap.empty in
   let sym_js = ref [] in
   List.iter files ~f:(fun (_, _, (_, units)) ->
       List.iter units ~f:(fun (u : Unit_info.t) ->
           StringSet.iter
             (fun s ->
-              (* ignore
-               *   (Ocaml_compiler.Symtable.GlobalMap.enter
-               *      sym
-               *      (Ocaml_compiler.Symtable.Global.Glob_compunit s)
-               *     : int); *)
+              ignore
+                (Ocaml_compiler.Symtable.GlobalMap.enter
+                   sym
+                   (Ocaml_compiler.Symtable.Global.Glob_compunit s)
+                  : int);
               sym_js := s :: !sym_js)
             u.Unit_info.provides));
 
   let build_info_emitted = ref false in
   List.iter files ~f:(fun (file, ic, (build_info_for_file, units)) ->
-      Dune_action_trace.add_trace_event_if_enabled
-        ~event_tracing_context
-        ~category:"jsoo.link.driver"
-        ~name:file
+    Dune_action_trace.add_trace_event_if_enabled
+      ~event_tracing_context
+      ~category:"jsoo.link.driver"
+      ~name:file
       @@ fun () ->
       Line_reader.reset ic;
       let is_runtime =
@@ -324,7 +322,7 @@ let link
         | Some bi -> (
             match Build_info.kind bi with
             | `Runtime -> Some bi
-            | `Cmj | `Cmja | `Cma | `Exe | `Cmo | `Unknown -> None)
+            | `Cma | `Exe | `Cmo | `Cmj | `Cmja | `Unknown -> None)
         | None -> None
       in
       let sm_for_file = ref None in
@@ -429,23 +427,23 @@ let link
             read ()
       in
       read ();
-      (* (match is_runtime with
-       * | None -> ()
-       * | Some bi ->
-       *     Build_info.configure bi;
-       *     let primitives =
-       *       List.fold_left units ~init:StringSet.empty ~f:(fun acc (u : Unit_info.t) ->
-       *           List.iter u.aliases ~f:(fun (a, b) -> Primitive.alias a b);
-       *           StringSet.union acc (StringSet.of_list u.primitives))
-       *     in
-       *     let code = Parse_bytecode.link_info ~symbols:!sym ~primitives ~crcs:[] in
-       *     let b = Buffer.create 100 in
-       *     let fmt = Pretty_print.to_buffer b in
-       *     Driver.configure fmt;
-       *     Driver.f' ~standalone:false ~link:`No ~wrap_with_fun:`Iife fmt code;
-       *     let content = Buffer.contents b in
-       *     Line_writer.write_lines oc content;
-       *     Line_writer.write oc ""); *)
+      (match is_runtime with
+      | None -> ()
+      | Some bi ->
+          Build_info.configure bi;
+          let primitives =
+            List.fold_left units ~init:StringSet.empty ~f:(fun acc (u : Unit_info.t) ->
+                List.iter u.aliases ~f:(fun (a, b) -> Primitive.alias a b);
+                StringSet.union acc (StringSet.of_list u.primitives))
+          in
+          let code = Parse_bytecode.link_info ~symbols:!sym ~primitives ~crcs:[] in
+          let b = Buffer.create 100 in
+          let fmt = Pretty_print.to_buffer b in
+          Driver.configure fmt;
+          Driver.f' ~standalone:false ~link:`No ~wrap_with_fun:`Iife fmt code;
+          let content = Buffer.contents b in
+          Line_writer.write_lines oc content;
+          Line_writer.write oc "");
       (match !sm_for_file with
       | None -> ()
       | Some x -> sm := (x, List.rev !reloc, line_offset) :: !sm);
