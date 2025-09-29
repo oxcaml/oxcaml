@@ -883,10 +883,13 @@ let decide_whether_apply_needs_calling_convention_change env apply =
       match code_id with
       | Unknown -> None, call_kind, false
       | Known code_ids ->
-        (* XXX bclement *)
-        let (Some code_id) = Code_id.Set.get_singleton code_ids in
-        let new_call_kind = Call_kind.direct_function_call code_id alloc_mode in
-        Some code_id, new_call_kind, was_indirect_unknown_arity
+        let singleton_code_id = Code_id.Set.get_singleton code_ids in
+        let new_call_kind =
+          match singleton_code_id with
+          | Some code_id -> Call_kind.direct_function_call code_id alloc_mode
+          | None -> Call_kind.indirect_function_call_known_arity alloc_mode
+        in
+        singleton_code_id, new_call_kind, was_indirect_unknown_arity
     in
     match call_kind with
     | Function { function_call = Direct code_id; alloc_mode } -> (
