@@ -516,3 +516,31 @@ Error: The kind of type "t2" is immutable_data with 'a with t1 with t1 t2
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
+
+(***********)
+
+type 'a t : immutable_data with 'a @@ contended portable =
+  | T : 'a t
+
+and 'a u : immutable_data with 'a @@ contended portable =
+  | U : 'a t -> 'a u
+[@@unboxed]
+(* CR layouts v2.8: This should either be accepted, or the error message should
+   be fixed *)
+[%%expect{|
+Lines 4-6, characters 0-11:
+4 | and 'a u : immutable_data with 'a @@ contended portable =
+5 |   | U : 'a t -> 'a u
+6 | [@@unboxed]
+Error: The kind of type "u" is immutable_data with 'a @@ portable contended
+         because of the annotation on the declaration of the type t.
+       But the kind of type "u" must be a subkind of
+           immutable_data with 'a @@ portable contended
+         because of the annotation on the declaration of the type u.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many with 'a
+         yielding: mod unyielding with 'a ≰ mod unyielding with 'a
+         statefulness: mod stateless with 'a ≰ mod stateless with 'a
+         visibility: mod immutable with 'a ≰ mod immutable with 'a
+|}]
