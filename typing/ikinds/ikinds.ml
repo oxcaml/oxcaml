@@ -548,6 +548,12 @@ let type_declaration_ikind ~(context : Jkind.jkind_context)
     else ());
   pack_constructor_ikind { base; coeffs = coeffs_array }
 
+let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
+    ~(path : Path.t) : Types.type_ikind =
+  if not !Clflags.ikinds
+  then Types.ikind_reset "ikinds disabled"
+  else Types.Constructor_ikind (type_declaration_ikind ~context ~path)
+
 let apply_constructor_ikind ~(context : Jkind.jkind_context)
     (packed : Types.constructor_ikind) (args : Ikind.Ldd.node list) :
     Ikind.Ldd.node =

@@ -259,15 +259,16 @@ let initial_env ~loc ~initially_opened_module
         (fun _name path decl acc_env ->
            match path with
            | Path.Pident id ->
-             let compute path =
-               Types.Constructor_ikind
-                 (Ikinds.type_declaration_ikind ~context ~path)
+             let type_ikind =
+               Ikinds.type_declaration_ikind_gated ~context ~path
              in
-             let type_ikind = compute path in
              let type_unboxed_version =
                Option.map
                  (fun ud ->
-                    let uik = compute (Path.unboxed_version path) in
+                    let uik =
+                      Ikinds.type_declaration_ikind_gated
+                        ~context ~path:(Path.unboxed_version path)
+                    in
                     { ud with type_ikind = uik })
                  decl.type_unboxed_version
              in

@@ -1536,16 +1536,10 @@ let narrow_to_manifest_jkind env loc path decl =
          | Ok () -> ()
          | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v))))
     end;
-    let type_ikind =
-      if not !Clflags.ikinds
-      then Types.ikind_reset "ikinds disabled"
-      else
-        let context =
-          Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
-        in
-        Types.Constructor_ikind
-          (Ikinds.type_declaration_ikind ~context ~path)
+    let context =
+      Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
     in
+    let type_ikind = Ikinds.type_declaration_ikind_gated ~context ~path in
     { decl with type_jkind = manifest_jkind; type_ikind }
 
 (* Check that the type expression (if present) is compatible with the kind.
@@ -2802,13 +2796,6 @@ let normalize_decl_jkinds env decls =
     let normalization_context =
       Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
     in
-    let compute_type_ikind () =
-      if not !Clflags.ikinds
-      then Types.ikind_reset "normalize_decl_jkind (ikinds disabled)"
-      else
-        Types.Constructor_ikind
-          (Ikinds.type_declaration_ikind ~context:normalization_context ~path)
-    in
     let normalized_jkind =
       Jkind.normalize ~mode:Require_best ~context:normalization_context
         decl.type_jkind
@@ -2816,7 +2803,9 @@ let normalize_decl_jkinds env decls =
     let decl =
       { decl with
         type_jkind = normalized_jkind;
-        type_ikind = compute_type_ikind ();
+        type_ikind =
+          Ikinds.type_declaration_ikind_gated
+            ~context:normalization_context ~path;
         type_unboxed_version
       }
     in
@@ -2855,7 +2844,10 @@ let normalize_decl_jkinds env decls =
           let type_jkind =
             Jkind.unsafely_set_bounds ~from:original_decl.type_jkind decl.type_jkind
           in
-          let type_ikind = compute_type_ikind () in
+          let type_ikind =
+            Ikinds.type_declaration_ikind_gated
+              ~context:normalization_context ~path
+          in
           let umc = Some (Jkind.to_unsafe_mode_crossing type_jkind) in
           let type_kind =
             match decl.type_kind with

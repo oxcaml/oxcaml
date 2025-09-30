@@ -19,6 +19,11 @@ val type_declaration_ikind :
   path:Path.t ->
   Types.constructor_ikind
 
+val type_declaration_ikind_gated :
+  context:Jkind.jkind_context ->
+  path:Path.t ->
+  Types.type_ikind
+
 val apply_constructor_ikind :
   context:Jkind.jkind_context ->
   Types.constructor_ikind ->
