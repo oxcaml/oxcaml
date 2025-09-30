@@ -3349,15 +3349,18 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
 let closure_mode ~loc ~item ~lid
   ({mode = {Mode.monadic; comonadic}; _} as vmode) closure_context comonadic0 =
   let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
-  let hint : _ Mode.Hint.morph =
-    Is_closed_by {closure = closure_context; closed = pp}
+  let hint_comonadic : _ Mode.Hint.morph =
+    Is_closed_by {closure = closure_context; closed = pp; polarity = Comonadic}
   in
   Mode.Value.Comonadic.submode_err pp
-    comonadic (Mode.Value.Comonadic.apply_hint hint comonadic0);
+    comonadic (Mode.Value.Comonadic.apply_hint hint_comonadic comonadic0);
+  let hint_monadic : _ Mode.Hint.morph =
+    Is_closed_by {closure = closure_context; closed = pp; polarity = Monadic}
+  in
   let monadic =
     Mode.Value.Monadic.join
       [ monadic;
-        Mode.Value.comonadic_to_monadic ~hint comonadic0 ]
+        Mode.Value.comonadic_to_monadic ~hint:hint_monadic comonadic0 ]
   in
   {vmode with mode = {monadic; comonadic}}
 

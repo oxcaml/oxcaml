@@ -2141,13 +2141,15 @@ module Report = struct
     | Expression -> Some (dprintf "expression")
     | Allocation -> Some (dprintf "allocation")
 
-  let print_pinpoint : pinpoint -> (formatter -> unit) option =
-   fun (loc, desc) ->
+  let print_pinpoint : ?parens:bool -> pinpoint -> (formatter -> unit) option =
+   fun ?(parens = true) (loc, desc) ->
     print_pinpoint_desc desc
     |> Option.map (fun print_desc ppf ->
-           if not (Location.is_none loc)
+           if Location.is_none loc
+           then fprintf ppf "a %t" print_desc
+           else if parens
            then fprintf ppf "the %t (at %a)" print_desc Location.print_loc loc
-           else fprintf ppf "a %t" print_desc)
+           else fprintf ppf "the %t at %a" print_desc Location.print_loc loc)
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and gives the source pinpoint. *)
@@ -2157,9 +2159,13 @@ module Report = struct
    fun pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
     | Unknown | Unknown_non_rigid -> None
-    | Close_over { closed = pp; _ } ->
+    | Close_over { closed = pp; polarity = Comonadic; _ } ->
       print_pinpoint pp
       |> Option.map (fun print_pp -> dprintf "closes over %t" print_pp, pp)
+    | Close_over { closed = pp; polarity = Monadic; _ } ->
+      print_pinpoint ~parens:false pp
+      |> Option.map (fun print_pp ->
+             dprintf "contains a usage (of %t)" print_pp, pp)
     | Is_closed_by { closure; _ } ->
       let pp = Location.none, closure in
       print_pinpoint pp

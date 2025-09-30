@@ -677,7 +677,8 @@ Line 3, characters 10-11:
 3 |   (module M : S)
               ^
 Error: Signature mismatch:
-       Got "local" but expected "global"
+       Got "local"
+       but expected "global"
        because it is a module and thus needs to be allocated on the heap.
 |}]
 

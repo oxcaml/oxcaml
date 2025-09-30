@@ -357,7 +357,7 @@ let report_mode_sub_error got expected ppf e =
   in
   Format.fprintf ppf "%s " (String.capitalize_ascii got);
   begin match left ppf with
-  | Mode -> Format.fprintf ppf " but %s " expected
+  | Mode -> Format.fprintf ppf "@ but %s " expected
   | Mode_with_hint -> Format.fprintf ppf ".@\nHowever, %s " expected
   end;
   ignore (right ppf);

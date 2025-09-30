@@ -779,7 +779,7 @@ let core env id x =
         (Printtyp.tree_of_value_description id diff.expected)
         mode2
         (Includecore.report_value_mismatch
-           "the first" "the second" env) diff.symptom
+           "the left-hand side" "the right-hand side" env) diff.symptom
         show_locs (diff.got.val_loc, diff.expected.val_loc)
         Printtyp.Conflicts.print_explanations
   | Err.Modalities e ->

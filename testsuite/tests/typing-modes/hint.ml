@@ -21,7 +21,7 @@ Line 10, characters 16-19:
 Error: The value "bar" is "nonportable"
        because it closes over the value "foo" (at Line 7, characters 17-20)
        which is "nonportable"
-       because it closes over the value "x" (at Line 4, characters 8-9)
+       because it contains a usage (of the value "x" at Line 4, characters 8-9)
        which is expected to be "uncontended".
        However, the highlighted value "bar" is expected to be "portable"
        because it is used inside a function which is expected to be "portable".
@@ -42,7 +42,7 @@ Line 6, characters 38-41:
 Error: The value "bar" is "nonportable"
        because it closes over the value "foo" (at Line 5, characters 26-29)
        which is "nonportable"
-       because it closes over the value "x" (at Line 4, characters 17-18)
+       because it contains a usage (of the value "x" at Line 4, characters 17-18)
        which is expected to be "uncontended".
        However, the highlighted value "bar" is expected to be "portable"
        because it is used inside a function which is expected to be "portable".
@@ -80,12 +80,12 @@ Error: Signature mismatch:
          val baz : unit -> unit (* in a structure at nonportable *)
        is not included in
          val baz : unit -> unit @@ portable (* in a structure at nonportable *)
-       The first is "nonportable"
+       The left-hand side is "nonportable"
        because it closes over the value "bar" (at Line 8, characters 25-28)
        which is "nonportable"
        because it closes over the value "foo" (at Line 7, characters 26-29)
        which is "nonportable"
-       because it closes over the value "x" (at Line 6, characters 17-18)
+       because it contains a usage (of the value "x" at Line 6, characters 17-18)
        which is expected to be "uncontended".
-       However, the second is "portable".
+       However, the right-hand side is "portable".
 |}]
