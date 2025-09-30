@@ -1,3 +1,5 @@
+#syntax quotations on
+
 module Expr : sig
   val bool : bool -> <[bool]> expr
   val int : int -> <[int]> expr
