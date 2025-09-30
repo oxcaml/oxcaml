@@ -82,7 +82,7 @@
   (name allprims)
   (modes native)
   (modules allprims)
-  (libraries ocamlcommon ocamlbytecomp))
+  (libraries ocamlcommon))
 
 (executable
   (name ocamlmklib)

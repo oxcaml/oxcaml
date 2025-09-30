@@ -115,7 +115,8 @@ compiler: runtime-stdlib
           testsuite/lib/lib.cm{,x}a \
           testsuite/lib/testing.cm{,x}a \
           $(ocamldir)/tools/dumpobj.bc \
-          $(ocamldir)/tools/allprims.exe
+          $(ocamldir)/tools/allprims.exe \
+          $(ocamldir)/lambda/primitives
 
 # CR dkalinichenko: [runtest] is built using the main profile,
 # which uses the boot compiler. Use the final compiler for [runtest],

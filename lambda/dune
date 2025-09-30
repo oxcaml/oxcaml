@@ -13,6 +13,13 @@
 ;**************************************************************************
 
 (rule
+ (targets primitives)
+ (mode    promote)
+ (deps    ../tools/allprims.exe)
+ (action  (with-stdout-to %{targets}
+            (run %{deps}))))
+
+(rule
  (targets runtimedef.ml)
  (mode    fallback)
  (deps    (:fail (file ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/fail.h))

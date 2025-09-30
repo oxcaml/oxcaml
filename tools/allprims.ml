@@ -12,6 +12,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open! Lambda
-
-let () = print_endline "Hello world!"
+let () =
+  List.iter print_endline Translprim.indexing_primitive_names;
+  List.iter print_endline Translprim.array_vec_primitive_names;
+  List.iter
+    (fun op ->
+      let s = Scalar.Operation.With_percent_prefix.to_string op in
+      print_endline s)
+    Scalar.Operation.all
+;;

@@ -1117,6 +1117,11 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
   in
   prim
 
+let indexing_primitive_names =
+  String.Map.fold (fun name _ l -> name :: l) indexing_primitives []
+let array_vec_primitive_names =
+  String.Map.fold (fun name _ l -> name :: l) array_vec_primitives []
+
 let lookup_primitive_and_mark_used loc ~poly_mode ~poly_sort pos p env path =
   match lookup_primitive loc ~poly_mode ~poly_sort pos p with
   | External _ as e -> add_used_primitive loc env path; e

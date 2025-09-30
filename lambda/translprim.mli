@@ -78,3 +78,8 @@ exception Error of Location.t * error
 open Format
 
 val report_error : formatter -> error -> unit
+
+(* CR jrayman *)
+
+val indexing_primitive_names : string list
+val array_vec_primitive_names : string list
