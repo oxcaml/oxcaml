@@ -802,25 +802,60 @@ type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
     where the input variables flow with live accessor.
     
     Function slots are considered as aliases for this analysis. *)
-let get_all_usages : Datalog.database -> unit Code_id_or_name.Map.t -> usages =
+let get_all_usages :
+    for_unboxing:bool ->
+    Datalog.database ->
+    unit Code_id_or_name.Map.t ->
+    usages =
   (* CR-someday ncourant: once the datalog API supports something cleaner, use
      it. *)
   let out_tbl, out = rel1_r "out" Cols.[n] in
   let in_tbl, in_ = rel1_r "in_" Cols.[n] in
   let open! Syntax in
   let open! Global_flow_graph in
-  let rs =
-    [ (let$ [x; y] = ["x"; "y"] in
-       [in_ x; usages_rel x y] ==> out y);
-      (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+  let base, for_closures, function_slots =
+    ( (let$ [x; y] = ["x"; "y"] in
+       [in_ x; usages_rel x y] ==> out y),
+      (let$ [ x;
+              indirect_call_witness;
+              indirect;
+              code_id_of_witness;
+              code_id;
+              my_closure_of_code_id;
+              y ] =
+         [ "x";
+           "indirect_call_witness";
+           "indirect";
+           "code_id_of_witness";
+           "code_id";
+           "my_closure_of_code_id";
+           "y" ]
+       in
        [ out x;
-         field_usages_rel x field y;
-         filter_field is_function_slot field;
-         usages_rel y z ]
-       ==> out z) ]
+         rev_accessor_rel x
+           (Term.constant (Field.encode Code_of_closure))
+           indirect_call_witness;
+         sources_rel indirect_call_witness indirect;
+         constructor_rel indirect code_id_of_witness code_id;
+         (* CR ncourant: this only works because this can only correspond to a
+            full application, otherwise we wouldn't have unboxed! *)
+         code_id_my_closure_rel code_id my_closure_of_code_id;
+         usages_rel my_closure_of_code_id y ]
+       ==> out y),
+      let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+      [ out x;
+        field_usages_rel x field y;
+        filter_field is_function_slot field;
+        usages_rel y z ]
+      ==> out z )
   in
-  fun db s ->
+  fun ~for_unboxing db s ->
     let db = Datalog.set_table in_tbl s db in
+    let rs =
+      if for_unboxing
+      then [base; for_closures; function_slots]
+      else [base; function_slots]
+    in
     let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
     Usages (Datalog.get_table out_tbl db)
 
@@ -1008,11 +1043,9 @@ let to_change_representation = rel1 "to_change_representation" Cols.[n]
 let datalog_rules =
   let open! Syntax in
   let open! Global_flow_graph in
-  let field_cannot_be_destructured (i : Field.t) =
-    match[@ocaml.warning "-4"] i with
-    | Code_of_closure | Apply _ | Code_id_of_call_witness _ -> true
-    | _ -> false
-  in
+  (* let field_cannot_be_destructured (i : Field.t) = match[@ocaml.warning "-4"]
+     i with | Code_of_closure | Apply _ | Code_id_of_call_witness _ -> true | _
+     -> false in *)
   let real_field (i : Field.t) =
     match[@ocaml.warning "-4"] i with
     | Code_of_closure | Apply _ | Code_id_of_call_witness _ -> false
@@ -1293,9 +1326,16 @@ let datalog_rules =
      [cannot_change_representation1 x] ==> cannot_unbox0 x);
     (let$ [x] = ["x"] in
      [any_usage_pred x] ==> cannot_unbox0 x);
-    (let$ [x; field] = ["x"; "field"] in
-     [ field_of_constructor_is_used x field;
-       filter_field field_cannot_be_destructured field ]
+    (* (let$ [x; field] = ["x"; "field"] in [ field_of_constructor_is_used x
+       field; filter_field field_cannot_be_destructured field ] ==>
+       cannot_unbox0 x); *)
+    (let$ [x; coderel; call_witness; code_id_of_witness; codeid] =
+       ["x"; "coderel"; "call_witness"; "code_id_of_witness"; "codeid"]
+     in
+     [ constructor_rel x coderel call_witness;
+       filter_field is_code_field coderel;
+       constructor_rel call_witness code_id_of_witness codeid;
+       cannot_change_calling_convention codeid ]
      ==> cannot_unbox0 x);
     (let$ [ alias;
             allocation_id;
@@ -1469,7 +1509,9 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
     erase kind
   | Variant { consts; non_consts } ->
     (* CR ncourant: we should make sure poison is in the consts! *)
-    let usages = get_all_usages db flow_to in
+    (* We don't need to follow indirect code pointers for usage, since functions
+       never appear in value_kinds *)
+    let usages = get_all_usages ~for_unboxing:false db flow_to in
     let fields = get_fields db usages in
     let non_consts =
       Tag.Scannable.Map.map
@@ -1537,7 +1579,7 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db usages name_prefix =
             Some
               (Unboxed
                  (mk_unboxed_fields ~has_to_be_unboxed ~mk db
-                    (get_all_usages db flow_to)
+                    (get_all_usages ~for_unboxing:true db flow_to)
                     new_name))
           else if Code_id_or_name.Map.exists
                     (fun k () -> has_to_be_unboxed k)
@@ -1619,7 +1661,8 @@ let fixpoint (graph : Global_flow_graph.graph) =
             mk_unboxed_fields ~has_to_be_unboxed
               ~mk:(fun kind name -> Variable.create name kind)
               db
-              (get_all_usages db (Code_id_or_name.Map.singleton to_patch ()))
+              (get_all_usages ~for_unboxing:true db
+                 (Code_id_or_name.Map.singleton to_patch ()))
               new_name
           in
           unboxed := Code_id_or_name.Map.add to_patch fields !unboxed)
@@ -1665,7 +1708,8 @@ let fixpoint (graph : Global_flow_graph.graph) =
                   }) )
           in
           let uses =
-            get_all_usages db (Code_id_or_name.Map.singleton code_id_or_name ())
+            get_all_usages ~for_unboxing:false db
+              (Code_id_or_name.Map.singleton code_id_or_name ())
           in
           let repr = mk_unboxed_fields ~has_to_be_unboxed ~mk db uses "" in
           add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
@@ -1676,7 +1720,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
               ~name ~is_always_immediate:false kind
           in
           let uses =
-            get_all_usages db
+            get_all_usages ~for_unboxing:false db
               (List.fold_left
                  (fun acc (_, x) -> Code_id_or_name.Map.add x () acc)
                  Code_id_or_name.Map.empty l)
