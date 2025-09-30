@@ -294,6 +294,11 @@ module Transfer = struct
                 with
                 | exception Not_found -> None
                 | arg_reg ->
+                  (* CR mshinwell/xclerc: it seems maybe possible for two
+                     distinct variables to end up coalesced into the same hard
+                     register / stack slot. In this case, maybe the choice of
+                     register in [find_reg_with_same_location_exn] could make a
+                     difference to what the user sees in the debugger? *)
                   if Option.is_some (RD.debug_info arg_reg)
                   then
                     Some
