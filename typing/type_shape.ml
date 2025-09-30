@@ -352,7 +352,7 @@ end
 
 module Type_decl_shape = struct
   let rec mixed_block_shape_to_layout = function
-    | Types.Value -> Layout.Base Value
+    | Types.Value -> Layout.Base (Scannable { pointerness = Any_pointerness })
     | Types.Float_boxed ->
       Layout.Base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime,
@@ -425,7 +425,7 @@ module Type_decl_shape = struct
           List.map
             (fun { Shape.field_name = _; field_value = _, ly } ->
               if not
-                   (Layout.equal ly (Layout.Base Value)
+                   (Layout.equal ly Layout.value
                    || Layout.equal ly (Layout.Base Void))
               then
                 if !Clflags.dwarf_pedantic
@@ -434,7 +434,7 @@ module Type_decl_shape = struct
                     "Type_shape: variant constructor with mismatched layout, \
                      has %a but expected value or void."
                     Layout.format ly
-                else Layout.Base Value
+                else Layout.value
               else ly)
             args
         in
@@ -1078,7 +1078,7 @@ let rec estimate_layout_from_type_shape (t : Shape.t) : Layout.t option =
     (* CR sspies: [arg_layout] could become unreliable in the future. Consider
        recursively descending in that case. *)
   | Tuple _ | Arrow | Variant _ | Poly_variant _ | Record _ ->
-    Some (Layout.Base Value)
+    Some Layout.value
   | Alias t -> estimate_layout_from_type_shape t
   | Mu t ->
     estimate_layout_from_type_shape t

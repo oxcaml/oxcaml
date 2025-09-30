@@ -32,6 +32,8 @@ module Maybe_naked = struct
 
     val to_string : any_locality_mode t -> string
 
+    val value_sort : _ t -> Jkind_types.Sort.Const.t
+
     val naked_sort : any_locality_mode t -> Jkind_types.Sort.Const.t
 
     val equal : ('a -> 'b -> bool) -> 'a t -> 'b t -> bool
@@ -57,7 +59,7 @@ module Maybe_naked = struct
     let all = List.concat_map (fun m -> [Value m; Naked m]) M.all
 
     let sort = function
-      | Value (_ : any_locality_mode M.t) -> Jkind_types.Sort.Const.value
+      | Value t -> M.value_sort t
       | Naked t -> M.naked_sort t
 
     let equal eq x y =
@@ -85,6 +87,13 @@ module Integral = struct
         | Int8 -> "int8"
         | Int16 -> "int16"
         | Int -> "int"
+
+      let value_sort = function
+        | Int8
+        | Int16
+        | Int ->
+          (* non_pointer non_null maybe_tagged *)
+          Jkind_types.Sort.Const.Base (Scannable { pointerness = Non_pointer })
 
       let naked_sort = function
         | Int8 -> Jkind_types.Sort.Const.bits8
@@ -126,6 +135,11 @@ module Integral = struct
         | Nativeint Any_locality_mode -> "nativeint"
         | Int64 Any_locality_mode -> "int64"
 
+      let value_sort = function
+        | Int32 _ | Nativeint _ | Int64 _ ->
+          (* non_float non_null non_tagged *)
+          Jkind_types.Sort.Const.Base (Scannable { pointerness = Any_pointerness })
+
       let naked_sort = function
         | Int32 Any_locality_mode -> Jkind_types.Sort.Const.bits32
         | Int64 Any_locality_mode -> Jkind_types.Sort.Const.bits64
@@ -163,6 +177,10 @@ module Integral = struct
       | Taggable t -> Taggable.Width.to_string t
       | Boxable b -> Boxable.Width.to_string b
 
+    let value_sort = function
+      | Taggable t -> Taggable.Width.value_sort t
+      | Boxable b -> Boxable.Width.value_sort b
+
     let naked_sort = function
       | Taggable t -> Taggable.Width.naked_sort t
       | Boxable b -> Boxable.Width.naked_sort b
@@ -195,6 +213,14 @@ module Floating = struct
       | Float32 Any_locality_mode -> "float32"
       | Float64 Any_locality_mode -> "float"
 
+    let value_sort = function
+      | Float32 _ ->
+        (* non_float non_null non_tagged *)
+        Jkind_types.Sort.Const.Base (Scannable { pointerness = Any_pointerness })
+      | Float64 _ ->
+        (* separable non_null non_tagged *)
+        Jkind_types.Sort.Const.Base (Scannable { pointerness = Any_pointerness })
+
     let naked_sort = function
       | Float32 Any_locality_mode -> Jkind_types.Sort.Const.float32
       | Float64 Any_locality_mode -> Jkind_types.Sort.Const.float64
@@ -224,6 +250,10 @@ module Width = struct
     match t with
     | Floating g -> Floating (Floating.Width.map g ~f)
     | Integral i -> Integral (Integral.Width.map i ~f)
+
+  let value_sort = function
+    | Floating f -> Floating.Width.value_sort f
+    | Integral i -> Integral.Width.value_sort i
 
   let naked_sort = function
     | Floating f -> Floating.Width.naked_sort f

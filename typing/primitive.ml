@@ -80,7 +80,7 @@ exception Error of Location.t * error
 type value_check = Bad_attribute | Bad_layout | Ok_value
 
 let check_ocaml_value = function
-  | _, Same_as_ocaml_repr (Base Value) -> Ok_value
+  | _, Same_as_ocaml_repr (Base (Scannable _)) -> Ok_value
   | _, Same_as_ocaml_repr _
   | _, Repr_poly -> Bad_layout
   | _, Unboxed_float _
@@ -255,7 +255,7 @@ let print p osig_val_decl =
     List.for_all f p.prim_native_repr_args && f p.prim_native_repr_res
   in
   let needs_unboxed_attribute = function
-    | _, Same_as_ocaml_repr (Base Value)
+    | _, Same_as_ocaml_repr (Base (Scannable _))
     | _, Repr_poly
     | _, Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
                                     | Untagged_int16) -> false
@@ -318,7 +318,7 @@ let print p osig_val_decl =
      | Prim_poly -> [oattr_local_opt])
     @
     (match repr with
-     | Same_as_ocaml_repr (Base Value)
+     | Same_as_ocaml_repr (Base (Scannable _))
      | Repr_poly -> []
      | Unboxed_float _
      | Unboxed_vector _
@@ -466,7 +466,7 @@ module Repr_check = struct
   let any = fun _ -> true
 
   let value_or_unboxed_or_untagged = function
-    | Same_as_ocaml_repr (Base Value)
+    | Same_as_ocaml_repr (Base (Scannable _))
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _ -> true
     | Same_as_ocaml_repr _ | Repr_poly -> false
 

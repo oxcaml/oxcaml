@@ -41,13 +41,17 @@
 
    All definitions here are commented in jkind.ml or jkind.mli. *)
 
+module Scannable_axes : sig
+  include Jkind_intf.Scannable_axes
+end
+
 module Sort : sig
   (* We need to expose these details for use in [Jkind] *)
 
   (* Comments in [Jkind_intf.ml] *)
   type base =
     | Void
-    | Value
+    | Scannable of Scannable_axes.t
     | Untagged_immediate
     | Float64
     | Float32
@@ -72,7 +76,9 @@ module Sort : sig
   and var
 
   include
-    Jkind_intf.Sort with type t := t and type var := var and type base := base
+    Jkind_intf.Sort with
+      module Scannable_axes := Scannable_axes
+      and type t := t and type var := var and type base := base
 
   val set_change_log : (change -> unit) -> unit
 
@@ -101,11 +107,11 @@ module Layout : sig
   type 'sort t =
     | Sort of 'sort
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
   module Const : sig
     type t =
-      | Any
+      | Any of Scannable_axes.t
       | Base of Sort.base
       | Product of t list
   end

@@ -41,10 +41,13 @@ open Allowance
    solver, but it is defined here because we do not yet track externalities
    on expressions, just in jkinds. *)
 
+module Scannable_axes : Jkind_intf.Scannable_axes
+
 module Sort : sig
   include
     Jkind_intf.Sort
-      with type t = Jkind_types.Sort.t
+    with module Scannable_axes = Jkind_types.Scannable_axes
+       and type t = Jkind_types.Sort.t
        and type base = Jkind_types.Sort.base
        and type Const.t = Jkind_types.Sort.Const.t
 
@@ -89,7 +92,7 @@ module Layout : sig
   type 'sort t = 'sort Jkind_types.Layout.t =
     | Sort of 'sort
     | Product of 'sort t list
-    | Any
+    | Any of Jkind_types.Scannable_axes.t
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t

@@ -218,7 +218,7 @@ let sort_of_native_repr ~poly_sort repr =
   | Same_as_ocaml_repr s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
       Unboxed_vector _) ->
-    Jkind.Sort.Const.Base Value
+    Jkind.Sort.Const.value
 
 let to_lambda_prim prim ~poly_sort =
   let native_repr_args =

@@ -238,7 +238,7 @@ let base_layout_to_byte_size (sort : base_layout) =
   | Vec128 -> 16
   | Vec256 -> 32
   | Vec512 -> 64
-  | Value -> Arch.size_addr
+  | Scannable _ -> Arch.size_addr
 
 (* CR sspies: This handling is incorrect for [Void] layout. Once we support
    putting [Void] data into records, we have to adjust the code below to filter
@@ -420,7 +420,8 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   match ly with
   | Base base -> (
     match base with
-    | Value -> Value
+      (* CR rtjoa: update mixed_block_element *)
+    | Scannable _ -> Value
     | Float64 -> Float64
     (* This is a case, where we potentially have mapped [Float_boxed] to
        [Float64], but that is fine, because they are reordered like other mixed
@@ -452,7 +453,7 @@ let rec project_layout (layout : Layout.t) path =
         Layout.format layout
         (Format.pp_print_list Format.pp_print_int)
         path
-    else Sort.Value
+    else Layout.value
 
 let rec field_name_with_path base path =
   match path with

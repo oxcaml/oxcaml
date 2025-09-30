@@ -91,25 +91,28 @@ module Layout = struct
   type nonrec 'sort t = 'sort t =
     | Sort of 'sort
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
   module Const = struct
     type t = Const.t =
-      | Any
+      | Any of Scannable_axes.t
       | Base of Sort.base
       | Product of t list
 
-    let max = Any
+    let max = Any Scannable_axes.max
 
     let rec equal c1 c2 =
       match c1, c2 with
       | Base b1, Base b2 -> Sort.equal_base b1 b2
-      | Any, Any -> true
+      | Any s1, Any s2 -> Scannable_axes.equal s1 s2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
-      | (Base _ | Any | Product _), _ -> false
+      | (Base _ | Any _ | Product _), _ -> false
 
     module Static = struct
-      let value = Base Sort.Value
+      let scannable_any_pointerness = Base (Sort.Scannable { pointerness = Any_pointerness })
+      let scannable_non_pointer = Base ( Sort.Scannable { pointerness = Non_pointer } )
+
+      let value = Sort.value
 
       let void = Base Sort.Void
 
@@ -136,7 +139,8 @@ module Layout = struct
       let vec512 = Base Sort.Vec512
 
       let of_base : Sort.base -> t = function
-        | Value -> value
+        | Scannable { pointerness = Any_pointerness } -> scannable_any_pointerness
+        | Scannable { pointerness = Non_pointer } -> scannable_non_pointer
         | Void -> void
         | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
@@ -154,7 +158,7 @@ module Layout = struct
     include Static
 
     let rec get_sort : t -> Sort.Const.t option = function
-      | Any -> None
+      | Any _ -> None
       | Base b -> Some (Base b)
       | Product ts ->
         Option.map
@@ -184,7 +188,7 @@ module Layout = struct
     let to_string t =
       let rec to_string nested (t : t) =
         match t with
-        | Any -> "any"
+        | Any s -> "any " ^ Scannable_axes.to_string s
         | Base b -> Sort.to_string_base b
         | Product ts ->
           String.concat ""
@@ -205,7 +209,7 @@ module Layout = struct
     open Format
 
     let rec t format_sort ppf = function
-      | Any -> fprintf ppf "Any"
+      | Any _ -> fprintf ppf "Any"
       | Sort s -> fprintf ppf "Sort %a" format_sort s
       | Product ts ->
         fprintf ppf "Product [ %a ]"
@@ -217,7 +221,7 @@ module Layout = struct
 
   let rec of_const (const : Const.t) : _ t =
     match const with
-    | Any -> Any
+    | Any s -> Any s
     | Base b -> Sort (Sort.of_base b)
     | Product cs -> Product (List.map of_const cs)
 
@@ -227,7 +231,7 @@ module Layout = struct
     | lays -> Product lays
 
   let rec to_sort = function
-    | Any -> None
+    | Any _ -> None
     | Sort s -> Some s
     | Product ts -> to_product_sort ts
 
@@ -245,12 +249,12 @@ module Layout = struct
       | Product sorts -> Product (List.map flatten_sort sorts)
     in
     function
-    | Any -> Any
+    | Any s -> Any s
     | Sort s -> flatten_sort (Sort.get s)
     | Product ts -> Product (List.map get ts)
 
   let rec get_const of_sort : _ t -> Const.t option = function
-    | Any -> Some Any
+    | Any s -> Some (Any s)
     | Sort s -> of_sort s
     | Product layouts ->
       Option.map
@@ -286,15 +290,18 @@ module Layout = struct
           (Sort.equate_tracking_mutation sort sort'))
     | Product ts1, Product ts2 ->
       List.equal (equate_or_equal ~allow_mutation) ts1 ts2
-    | Any, Any -> true
-    | (Any | Sort _ | Product _), _ -> false
+    | Any s1, Any s2 -> Scannable_axes.equal s1 s2
+    | (Any _ | Sort _ | Product _), _ -> false
+
 
   let sub t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
-      | Any, Any -> Equal
-      | _, Any -> Less
-      | Any, _ -> Not_le
+      | Any s1, Any s2 -> Scannable_axes.sub s1 s2
+      | Product _, Any _ -> Less
+      | Sort s, Any sa ->
+        Sort.equate s (Sort.var_of_scannable_axes sa)
+      | Any _, _ -> Not_le
       | Sort s1, Sort s2 -> if Sort.equate s1 s2 then Equal else Not_le
       | Product ts1, Product ts2 ->
         if List.compare_lengths ts1 ts2 = 0

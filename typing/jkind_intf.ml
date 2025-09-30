@@ -13,8 +13,27 @@
 (**************************************************************************)
 
 (* This module contains definitions that we do not otherwise need to repeat
-   between the various Jkind modules. See comment in jkind_types.mli. *)
+  between the various Jkind modules. See comment in jkind_types.mli. *)
+
+module type Scannable_axes = sig
+  type pointerness = Non_pointer | (* Non_float | Separable | *) Any_pointerness
+  (* type taggedness = Non_tagged | Maybe_tagged *)
+  (* type nullability = Non_null | Maybe_null *)
+
+  type t = { pointerness : pointerness }
+
+  val max : t
+
+  val equal : t -> t -> bool
+
+  val to_string : t -> string
+
+  val sub : t -> t -> Misc.Le_result.t
+end
+
 module type Sort = sig
+  module Scannable_axes : Scannable_axes
+
   (** A sort classifies how a type is represented at runtime. Every concrete
       jkind has a sort, and knowing the sort is sufficient for knowing the
       calling convention of values of a given type. *)
@@ -23,7 +42,7 @@ module type Sort = sig
   (** These are the constant sorts -- fully determined and without variables *)
   type base =
     | Void  (** No run time representation at all *)
-    | Value  (** Standard ocaml value representation *)
+    | Scannable of Scannable_axes.t (** Standard ocaml value representation *)
     | Untagged_immediate
         (** Untagged 31- or 63-bit immediates, but without the tag bit, so they must
         never be visible to the GC *)
@@ -83,12 +102,12 @@ module type Sort = sig
     end
 
     (* CR layouts: These are sorts for the types of ocaml expressions that are
-       currently required to be values, but for which we expect to relax that
-       restriction in versions 2 and beyond.  Naming them makes it easy to find
-       where in the translation to lambda they are assume to be value. *)
+      currently required to be values, but for which we expect to relax that
+      restriction in versions 2 and beyond.  Naming them makes it easy to find
+      where in the translation to lambda they are assume to be value. *)
     (* CR layouts: add similarly named jkinds and use those names everywhere (not
-       just the translation to lambda) rather than writing specific jkinds and
-       sorts in the code. *)
+      just the translation to lambda) rather than writing specific jkinds and
+      sorts in the code. *)
     val for_class_arg : t
 
     val for_instance_var : t

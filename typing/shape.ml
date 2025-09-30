@@ -412,23 +412,23 @@ module Predef = struct
       | Unboxed_simd s -> simd_vec_split_to_layout s
 
     let to_layout : t -> Layout.t = function
-      | Array -> Base Value
-      | Bytes -> Base Value
-      | Char -> Base Value
-      | Extension_constructor -> Base Value
-      | Float -> Base Value
-      | Float32 -> Base Value
-      | Floatarray -> Base Value
-      | Int -> Base Value
-      | Int8 -> Base Value
-      | Int16 -> Base Value
-      | Int32 -> Base Value
-      | Int64 -> Base Value
-      | Lazy_t -> Base Value
-      | Nativeint -> Base Value
-      | String -> Base Value
-      | Simd _ -> Base Value
-      | Exception -> Base Value
+      | Array -> Base (Scannable { pointerness = Any_pointerness })
+      | Bytes -> Base (Scannable { pointerness = Any_pointerness })
+      | Char -> Base (Scannable { pointerness = Non_pointer })
+      | Extension_constructor -> Base (Scannable { pointerness = Any_pointerness })
+      | Float -> Base (Scannable { pointerness = Any_pointerness })
+      | Float32 -> Base (Scannable { pointerness = Any_pointerness })
+      | Floatarray -> Base (Scannable { pointerness = Any_pointerness })
+      | Int -> Base (Scannable { pointerness = Non_pointer })
+      | Int8 -> Base (Scannable { pointerness = Non_pointer })
+      | Int16 -> Base (Scannable { pointerness = Non_pointer })
+      | Int32 -> Base (Scannable { pointerness = Any_pointerness })
+      | Int64 -> Base (Scannable { pointerness = Any_pointerness })
+      | Lazy_t -> Base (Scannable { pointerness = Any_pointerness })
+      | Nativeint -> Base (Scannable { pointerness = Any_pointerness })
+      | String -> Base (Scannable { pointerness = Any_pointerness })
+      | Simd _ -> Base (Scannable { pointerness = Any_pointerness })
+      | Exception -> Base (Scannable { pointerness = Any_pointerness })
       | Unboxed u -> Base (unboxed_type_to_base_layout u)
 
     let equal_simd_vec_split s1 s2 =

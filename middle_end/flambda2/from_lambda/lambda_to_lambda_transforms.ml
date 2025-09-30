@@ -254,7 +254,7 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
       ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
       ~native_name:name
       ~native_repr_args:
-        ([Primitive.Prim_global, L.Same_as_ocaml_repr (Base Value)]
+        ([Primitive.Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.value]
         @
         match init with
         | None -> []
@@ -264,7 +264,7 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
         ( (match mode with
           | Alloc_heap -> Prim_global
           | Alloc_local -> Prim_local),
-          L.Same_as_ocaml_repr (Base Value) )
+          L.Same_as_ocaml_repr Jkind.Sort.Const.value )
       ~is_layout_poly:false
   in
   L.Lprim

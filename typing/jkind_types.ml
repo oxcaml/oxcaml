@@ -12,10 +12,65 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Scannable_axes = struct
+  type pointerness = Non_pointer | (* Non_float | Separable | *) Any_pointerness
+  type t = { pointerness : pointerness }
+
+  let to_string_pointerness = function
+    | Non_pointer -> "non_pointer"
+    | Any_pointerness -> "any_pointerness"
+
+  let equal_pointerness p1 p2 =
+    match p1, p2 with
+    | Non_pointer, Non_pointer
+    | Any_pointerness, Any_pointerness ->
+      true
+    | (Non_pointer | Any_pointerness), _ -> false
+
+  let equal
+        { pointerness = pointerness1 }
+        { pointerness = pointerness2 }
+    =
+    equal_pointerness pointerness1 pointerness2
+
+  let to_string
+        { pointerness }
+    =
+    to_string_pointerness pointerness
+
+  let meet_pointerness p1 p2 =
+    match p1, p2 with
+    | Any_pointerness, Any_pointerness -> Any_pointerness
+    | Non_pointer, Non_pointer
+    | (Non_pointer, Any_pointerness)
+    | (Any_pointerness, Non_pointer) -> Non_pointer
+
+  let meet
+        { pointerness = pointerness1 }
+        { pointerness = pointerness2 }
+    =
+    { pointerness = meet_pointerness pointerness1 pointerness2 }
+
+  let sub_pointerness p1 p2 : Misc.Le_result.t =
+    match p1, p2 with
+    | Any_pointerness, Any_pointerness
+    | Non_pointer, Non_pointer -> Equal
+    | Non_pointer, Any_pointerness -> Less
+    | Any_pointerness, Non_pointer -> Not_le
+
+  let sub
+        { pointerness = pointerness1 }
+        { pointerness = pointerness2 }
+    =
+    sub_pointerness pointerness1 pointerness2
+
+  let max = { pointerness = Any_pointerness }
+end
+
 module Sort = struct
   type base =
     | Void
-    | Value
+    | Scannable of Scannable_axes.t
     | Untagged_immediate
     | Float64
     | Float32
@@ -29,19 +84,24 @@ module Sort = struct
     | Vec512
 
   type t =
+    (* scannable axes is an upper bound, if the var gets filled in with
+       scannable *)
     | Var of var
     | Base of base
     | Product of t list
 
   and var =
-    { mutable contents : t option;
+    { mutable contents : var_contents;
       uid : int (* For debugging / printing only *)
     }
+
+  and var_contents =
+    | Filled of t
+    | Empty of Scannable_axes.t
 
   let equal_base b1 b2 =
     match b1, b2 with
     | Void, Void
-    | Value, Value
     | Untagged_immediate, Untagged_immediate
     | Float64, Float64
     | Float32, Float32
@@ -54,13 +114,15 @@ module Sort = struct
     | Vec256, Vec256
     | Vec512, Vec512 ->
       true
-    | ( ( Void | Value | Untagged_immediate | Float64 | Float32 | Word | Bits8
+    | Scannable s1, Scannable s2 ->
+      Scannable_axes.equal s1 s2
+    | ( ( Void | Scannable _ | Untagged_immediate | Float64 | Float32 | Word | Bits8
         | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
         _ ) ->
       false
 
   let to_string_base = function
-    | Value -> "value"
+    | Scannable s -> "scannable " ^ Scannable_axes.to_string s
     | Void -> "void"
     | Untagged_immediate -> "untagged_immediate"
     | Float64 -> "float64"
@@ -97,12 +159,13 @@ module Sort = struct
     let rec all_void = function
       | Base Void -> true
       | Base
-          ( Value | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
+          ( Scannable _ | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
           | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 ) ->
         false
       | Product ts -> List.for_all all_void ts
 
-    let value = Base Value
+    (* CR rtjoa: audit uses *)
+    let value = Base (Scannable { pointerness = Any_pointerness })
 
     let untagged_immediate = Base Untagged_immediate
 
@@ -135,7 +198,8 @@ module Sort = struct
             Format.fprintf ppf "%s"
               (match b with
               | Void -> "Void"
-              | Value -> "Value"
+              (* CR rtjoa: better debug printer *)
+              | Scannable _ -> "Scannable"
               | Untagged_immediate -> "Untagged_immediate"
               | Float64 -> "Float64"
               | Float32 -> "Float32"
@@ -238,7 +302,8 @@ module Sort = struct
       fprintf ppf "%s"
         (match b with
         | Void -> "Void"
-        | Value -> "Value"
+        (* CR rtjoa: better debug printer *)
+        | Scannable _ -> "Scannable"
         | Untagged_immediate -> "Untagged_immediate"
         | Float64 -> "Float64"
         | Float32 -> "Float32"
@@ -259,16 +324,16 @@ module Sort = struct
           (pp_print_list ~pp_sep:(fun ppf () -> pp_print_text ppf "; ") t)
           ts
 
-    and opt_t ppf = function
-      | Some s -> fprintf ppf "Some %a" t s
-      | None -> fprintf ppf "None"
+    and var_contents ppf = function
+      | Filled s -> fprintf ppf "Filled %a" t s
+      | Empty sa -> fprintf ppf "Empty %s" (Scannable_axes.to_string sa)
 
     and var ppf v =
-      fprintf ppf "{@[@ contents = %a;@ uid = %d@ @]}" opt_t v.contents v.uid
+      fprintf ppf "{@[@ contents = %a;@ uid = %d@ @]}" var_contents v.contents v.uid
   end
 
   (* To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
-  type change = var * t option
+  type change = var * var_contents
 
   let change_log : (change -> unit) ref = ref (fun _ -> ())
 
@@ -278,7 +343,7 @@ module Sort = struct
 
   let undo_change (v, t_op) = v.contents <- t_op
 
-  let set : var -> t option -> unit =
+  let set : var -> var_contents -> unit =
    fun v t_op ->
     log_change (v, v.contents);
     v.contents <- t_op
@@ -291,7 +356,14 @@ module Sort = struct
     module T = struct
       let void = Base Void
 
-      let value = Base Value
+      let scannable_any_pointerness =
+        Base (Scannable { pointerness = Any_pointerness })
+
+      let scannable_non_pointer =
+        Base (Scannable { pointerness = Non_pointer })
+
+      let value =
+        Base (Scannable { pointerness = Any_pointerness })
 
       let untagged_immediate = Base Untagged_immediate
 
@@ -317,7 +389,10 @@ module Sort = struct
 
       let of_base = function
         | Void -> void
-        | Value -> value
+        | Scannable { pointerness = Any_pointerness } ->
+          scannable_any_pointerness
+        | Scannable { pointerness = Non_pointer } ->
+          scannable_non_pointer
         | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
@@ -336,6 +411,10 @@ module Sort = struct
     end
 
     module T_option = struct
+      let scannable_any_pointerness = Some T.scannable_any_pointerness
+
+      let scannable_non_pointer = Some T.scannable_non_pointer
+
       let value = Some T.value
 
       let void = Some T.void
@@ -364,7 +443,9 @@ module Sort = struct
 
       let of_base = function
         | Void -> void
-        | Value -> value
+        | Scannable { pointerness = Any_pointerness } ->
+          scannable_any_pointerness
+        | Scannable { pointerness = Non_pointer } -> scannable_non_pointer
         | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
@@ -388,7 +469,11 @@ module Sort = struct
     module Const = struct
       open Const
 
-      let value = Base Value
+      let scannable_any_pointerness = Base (Scannable { pointerness = Any_pointerness })
+
+      let scannable_non_pointer = Base (Scannable { pointerness = Non_pointer })
+
+      let value = Base (Scannable { pointerness = Any_pointerness })
 
       let void = Base Void
 
@@ -415,7 +500,8 @@ module Sort = struct
       let vec512 = Base Vec512
 
       let of_base : base -> Const.t = function
-        | Value -> value
+        | Scannable { pointerness = Any_pointerness } -> scannable_any_pointerness
+        | Scannable { pointerness = Non_pointer } -> scannable_non_pointer
         | Void -> void
         | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
@@ -435,9 +521,17 @@ module Sort = struct
 
   let last_var_uid = ref 0
 
-  let new_var () =
+  let new_var s =
     incr last_var_uid;
-    Var { contents = None; uid = !last_var_uid }
+    Var { contents = Empty s; uid = !last_var_uid }
+
+  (* let apply_sa (t : t) (sa : Scannable_axes.t) =
+   *   match t with
+   *   | Var (r, sa') -> Var (r, Scannable_axes.meet sa sa')
+   *   | Product _ -> t
+   *   | Base sa' ->
+   *     (* assert (Scannable_axes.less sa' sa) *)
+   *     Base sa' *)
 
   let rec get : t -> t = function
     | Base _ as t -> t
@@ -446,17 +540,17 @@ module Sort = struct
       if List.for_all2 ( == ) ts ts' then t else Product ts'
     | Var r as t -> (
       match r.contents with
-      | None -> t
-      | Some s ->
+      | Empty _ -> t
+      | Filled s ->
         let result = get s in
-        if result != s then set r (Some result);
+        if result != s then set r result;
         (* path compression *)
         result)
 
   let rec default_to_value_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
     | Product ts -> Product (List.map default_to_value_and_get ts)
-    | Var r -> (
+    | Var (r, sa) -> (
       match r.contents with
       | None ->
         set r Static.T_option.value;
@@ -587,10 +681,15 @@ module Sort = struct
     match default_to_value_and_get t with
     | Base Void -> true
     | Base
-        ( Value | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
+        ( Scannable _ | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
         | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
       false
     | Product _ -> false
+
+  let var_of_scannable_axes s =
+    let v = new_var () in
+    set v (Some (Var (new_var (), s)));
+    v
 
   let decompose_into_product t n =
     let ts = List.init n (fun _ -> new_var ()) in
@@ -616,11 +715,11 @@ module Layout = struct
   type 'sort t =
     | Sort of 'sort
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
   module Const = struct
     type t =
-      | Any
+      | Any of Scannable_axes.t
       | Base of Sort.base
       | Product of t list
   end
