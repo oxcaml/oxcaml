@@ -1,3 +1,5 @@
+#syntax quotations on
+
 open CamlinternalQuote
 
 module Expr = struct
