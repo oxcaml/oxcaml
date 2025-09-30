@@ -89,6 +89,8 @@ module Set : sig
 
   val find_reg_exn : t -> Reg.t -> reg_with_debug_info
 
+  val find_reg_with_same_location_exn : t -> Reg.t -> reg_with_debug_info
+
   val filter_reg : t -> Reg.t -> t
 
   val forget_debug_info : t -> Reg.Set.t
