@@ -1,9 +1,9 @@
 (* This forces ikinds globally on. *)
-Clflags.ikinds := true
+(*= Clflags.ikinds := true *)
 
 (* Types.ikind_debug := true *)
-let enable_crossing = false
-let enable_sub_jkind_l = false
+let enable_crossing = true
+let enable_sub_jkind_l = true
 let enable_sub_or_intersect = false
 let enable_sub_or_error = false
 
@@ -68,9 +68,9 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
  fun (ops : JK.ops) ->
   ignore context;
   incr kind_of_depth;
-  if !kind_of_depth > 5000 then failwith "kind_of_depth too deep" else ();
+  if !kind_of_depth > 50 then failwith "kind_of_depth too deep" else ();
   incr kind_of_counter;
-  (* if !kind_of_counter > 10000000 then Types.ikind_debug := true else (); *)
+  if !kind_of_counter > 10000000 then failwith "kind_of_counter too big" else ();
   let res =
     match Types.get_desc ty with
     | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
@@ -359,7 +359,10 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
         constructor_ikind_polynomial ~context constructor
       in
       JK.Poly (base, coeffs)
-    | Types.No_constructor_ikind _reason ->
+    | Types.No_constructor_ikind reason ->
+      (* Print the reason *)
+      ignore reason;
+      (*= Format.eprintf "[ikind-miss] %s@." reason; *)
       fallback ()
     | Types.Constructor_ikind _ -> fallback ()
 
@@ -394,7 +397,14 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.type_ikind =
   if not !Clflags.ikinds
   then Types.ikind_reset "ikinds disabled"
-  else Types.Constructor_ikind (type_declaration_ikind ~context ~path)
+  else
+    let ikind = type_declaration_ikind ~context ~path in
+    let payload = unpack_constructor_ikind ikind in
+    Format.eprintf "[ikind] %a: base=%s, coeffs=[%s]@."
+      Path.print path
+      (Ikind.Ldd.pp payload.base)
+      (String.concat "; " (Array.to_list (Array.map Ikind.Ldd.pp payload.coeffs)));
+    Types.Constructor_ikind ikind
 
 let apply_constructor_ikind ~(context : Jkind.jkind_context)
     (packed : Types.constructor_ikind) (args : Ikind.Ldd.node list) :
