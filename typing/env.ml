@@ -3365,7 +3365,7 @@ let closure_mode ~loc ~item ~lid
   let monadic =
     Mode.Value.Monadic.join
       [ monadic;
-        Mode.Value.comonadic_to_monadic ~hint:hint_monadic comonadic0 ]
+        Mode.Value.comonadic_to_monadic_min ~hint:hint_monadic comonadic0 ]
   in
   {vmode with mode = {monadic; comonadic}}
 

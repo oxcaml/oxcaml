@@ -486,6 +486,7 @@ module Mod_bounds = struct
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Yielding))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Visibility))
+    @@ Sub_result.combine (modal_less_or_equal (Monadic Staticity))
     @@ Sub_result.combine
          (axis_less_or_equal ~le:Externality.le
             ~axis:(Pack (Nonmodal Externality)) (externality t1)
@@ -533,6 +534,7 @@ module Mod_bounds = struct
     |> add_crossing_if (Comonadic Yielding)
     |> add_crossing_if (Comonadic Statefulness)
     |> add_crossing_if (Monadic Visibility)
+    |> add_crossing_if (Monadic Staticity)
     |> add_if
          (Externality.le Externality.max (externality t))
          (Nonmodal Externality)
@@ -547,7 +549,7 @@ module Mod_bounds = struct
     let crossing =
       Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
         ~portability:false ~contention:true ~forkable:false ~yielding:false
-        ~statefulness:false ~visibility:true
+        ~statefulness:false ~visibility:true ~staticity:false
     in
     create crossing ~externality:Externality.max
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
@@ -1133,6 +1135,7 @@ module Layout_and_axes = struct
                     (value_for_axis ~axis:(Modal (Monadic Contention)))
                   ~visibility:
                     (value_for_axis ~axis:(Modal (Monadic Visibility)))
+                  ~staticity:(value_for_axis ~axis:(Modal (Monadic Staticity)))
               in
               let comonadic =
                 Mod_bounds.Crossing.Comonadic.create
@@ -1443,7 +1446,7 @@ module Const = struct
                  Crossing.create ~regionality:false ~linearity:true
                    ~portability:true ~forkable:true ~yielding:true
                    ~uniqueness:false ~contention:true ~statefulness:true
-                   ~visibility:true
+                   ~visibility:true ~staticity:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1461,7 +1464,7 @@ module Const = struct
                  Crossing.create ~regionality:false ~linearity:false
                    ~portability:true ~forkable:false ~yielding:false
                    ~uniqueness:false ~contention:true ~statefulness:false
-                   ~visibility:false
+                   ~visibility:false ~staticity:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1479,7 +1482,7 @@ module Const = struct
                  Crossing.create ~regionality:false ~linearity:true
                    ~portability:true ~forkable:true ~yielding:true
                    ~uniqueness:false ~contention:true ~statefulness:true
-                   ~visibility:false
+                   ~visibility:false ~staticity:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1497,7 +1500,7 @@ module Const = struct
                  Crossing.create ~regionality:false ~linearity:true
                    ~portability:true ~forkable:true ~yielding:true
                    ~contention:false ~uniqueness:false ~statefulness:true
-                   ~visibility:false
+                   ~visibility:false ~staticity:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -2767,7 +2770,7 @@ let for_float ident =
   let crossing =
     Crossing.create ~regionality:false ~linearity:true ~portability:true
       ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
-      ~statefulness:true ~visibility:true
+      ~statefulness:true ~visibility:true ~staticity:false
   in
   let mod_bounds =
     Mod_bounds.create crossing ~externality:Externality.max
