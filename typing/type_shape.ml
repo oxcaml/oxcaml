@@ -296,9 +296,7 @@ module Type_shape = struct
                 | Tvariant _ | Tunivar _
                 | Tpoly (_, _)
                 | Tpackage (_, _)
-                | Tquote _
-                | Tsplice _
-                | Tof_kind _ ->
+                | Tquote _ | Tsplice _ | Tof_kind _ ->
                   assert false
               in
               Misc.fatal_errorf
