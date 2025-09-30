@@ -314,12 +314,12 @@ install_for_test: _install
 	 done; \
 	 ln -s . lex; ln -s . yacc; \
 	 ln -s _install/lib/ocaml/compiler-libs compilerlibs; \
-	 mkdir -p otherlibs/{unix,dynlink/native,str,bigarray,runtime_events,eval}; \
+	 mkdir -p otherlibs/{unix,dynlink/native,str,bigarray,runtime_events,camlinternaleval}; \
 	 ln -s ../stdlib/threads otherlibs/systhreads$(RUNTIME_SUFFIX); \
          $(cpl) stdlib/unix/{lib,}unix* otherlibs/unix; \
          $(cpl) stdlib/dynlink/dynlink* otherlibs/dynlink; \
          $(cpl) stdlib/str/{lib,}str* otherlibs/str; \
-		 $(cpl) stdlib/eval/eval* otherlibs/eval; \
+		 $(cpl) stdlib/camlinternaleval/camlinternaleval* otherlibs/camlinternaleval; \
 	 for universe in upstream_compatible stable beta alpha ; do \
 		mkdir -p otherlibs/{stdlib_,}$${universe}; \
 		$(cpl) stdlib/stdlib_$${universe}/* otherlibs/stdlib_$${universe}; \
