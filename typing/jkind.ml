@@ -1151,7 +1151,26 @@ module Layout_and_axes = struct
           (Axis_set.complement skip_axes)
           (With_bounds.to_list t.with_bounds)
       in
-      { t with mod_bounds; with_bounds }, fuel_status
+      let with_bounds_list = With_bounds.to_list with_bounds in
+      if List.length with_bounds_list > 10
+      then
+        let rec get_relevant_axes_in_bounds relevant_so_far bounds =
+          match bounds with
+          | [] -> relevant_so_far
+          | (_, ({ relevant_axes } : With_bounds_type_info.t)) :: tl ->
+            let relevant_so_far =
+              Axis_set.union relevant_so_far relevant_axes
+            in
+            if Axis_set.equal relevant_so_far Axis_set.all
+            then Axis_set.all
+            else get_relevant_axes_in_bounds relevant_so_far tl
+        in
+        let axes_to_max_out =
+          get_relevant_axes_in_bounds Axis_set.empty with_bounds_list
+        in
+        let mod_bounds = Mod_bounds.set_max_in_set mod_bounds axes_to_max_out in
+        { t with mod_bounds; with_bounds = No_with_bounds }, Ran_out_of_fuel
+      else { t with mod_bounds; with_bounds }, fuel_status
 end
 
 (*********************************)
