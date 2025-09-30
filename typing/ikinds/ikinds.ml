@@ -2,7 +2,8 @@
 Clflags.ikinds := true
 
 (* Types.ikind_debug := true *)
-let enable_crossing = true
+let enable_crossing = false
+let enable_sub_jkind_l = false
 let enable_sub_or_intersect = false
 let enable_sub_or_error = false
 
@@ -425,7 +426,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
     | Ok () -> Ok ()
     | Error v -> Error v
   in
-  if not !Clflags.ikinds
+  if not (enable_sub_jkind_l && !Clflags.ikinds)
   then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context sub super
   else
     let solver = make_solver ~context in
