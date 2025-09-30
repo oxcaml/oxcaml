@@ -2863,6 +2863,25 @@ let without_open_quotations env = env.stage = 0
 let has_open_quotations env = env.stage <> 0
 let stage env = env.stage
 
+let quotation_locks_offset locks =
+  List.fold_right
+    (fun lock rel_stage ->
+       match rel_stage with
+       | None -> None
+       | Some n ->
+         match lock with
+         | Quotation_lock -> Some (n + 1)
+         | Splice_lock -> Some (n - 1)
+         | Local_env_lock -> None
+         | Escape_lock _
+         | Exclave_lock
+         | Region_lock
+         | Unboxed_lock
+         | Share_lock _
+         | Closure_lock _  -> Some n)
+    locks
+    (Some 0)
+
 (* Insertion of all components of a signature *)
 
 let proj_shape map mod_shape item =
@@ -3304,6 +3323,43 @@ let lookup_global_name_module_no_locks
           may_lookup_error errors loc env (Error_from_persistent_env err)
     end
 
+let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
+  let path, locks, data =
+    match find_name_module ~mark:use s env.modules with
+    | path, locks, data -> begin
+        match quotation_locks_offset locks with
+        | None | Some 0 -> path, locks, data
+        | Some n ->
+          may_lookup_error errors loc env
+            (Incompatible_stage (Lident s, loc, env.stage,
+                                 Location.none, env.stage - n))
+    end
+    | exception Not_found ->
+        may_lookup_error errors loc env (Unbound_module (Lident s))
+  in
+  match data with
+  | Mod_local (mda, alias_locks) -> begin
+      use_module ~use ~loc path mda;
+      let _, mode = normalize_mda_mode mda in
+      let locks = alias_locks @ locks in
+      match load with
+      (* CR-soon zqian: duplication of information. Should move modes out of
+         [value_data] and [module_data] *)
+      | Load -> path, (mode, locks), (mda : a)
+      | Don't_load -> path, (mode, locks), (() : a)
+    end
+  | Mod_unbound reason ->
+      report_module_unbound ~errors ~loc env reason
+  | Mod_persistent -> begin
+      (* This is only used when processing [Longident.t]s, which never have
+         instance arguments *)
+      let name = Global_module.Name.create_no_args s in
+      let path, a =
+        lookup_global_name_module_no_locks load ~errors ~use ~loc name env
+      in
+      path, (Mode.Value.(disallow_right mode_unit), locks), a
+    end
+
 let escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context =
   begin match
   Mode.Regionality.submode
@@ -3451,25 +3507,6 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           mode
     ) mode locks
 
-let quotation_locks_offset locks =
-  List.fold_right
-    (fun lock rel_stage ->
-       match rel_stage with
-       | None -> None
-       | Some n ->
-         match lock with
-         | Quotation_lock -> Some (n + 1)
-         | Splice_lock -> Some (n - 1)
-         | Local_env_lock -> None
-         | Escape_lock _
-         | Exclave_lock
-         | Region_lock
-         | Unboxed_lock
-         | Share_lock _
-         | Closure_lock _  -> Some n)
-    locks
-    (Some 0)
-
 let lookup_ident_value ~errors ~use ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
   | Ok (path, locks, Val_bound vda) -> begin
@@ -3510,43 +3547,6 @@ let lookup_ident_type ~errors ~use ~loc s env =
     end
   | exception Not_found | Error _ ->
       may_lookup_error errors loc env (Unbound_type (Lident s))
-
-let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
-  let path, locks, data =
-    match find_name_module ~mark:use s env.modules with
-    | path, locks, data -> begin
-        match quotation_locks_offset locks with
-        | None | Some 0 -> path, locks, data
-        | Some n ->
-          may_lookup_error errors loc env
-            (Incompatible_stage (Lident s, loc, env.stage,
-                                 Location.none, env.stage - n))
-    end
-    | exception Not_found ->
-        may_lookup_error errors loc env (Unbound_module (Lident s))
-  in
-  match data with
-  | Mod_local (mda, alias_locks) -> begin
-      use_module ~use ~loc path mda;
-      let _, mode = normalize_mda_mode mda in
-      let locks = alias_locks @ locks in
-      match load with
-      (* CR-soon zqian: duplication of information. Should move modes out of
-         [value_data] and [module_data] *)
-      | Load -> path, (mode, locks), (mda : a)
-      | Don't_load -> path, (mode, locks), (() : a)
-    end
-  | Mod_unbound reason ->
-      report_module_unbound ~errors ~loc env reason
-  | Mod_persistent -> begin
-      (* This is only used when processing [Longident.t]s, which never have
-         instance arguments *)
-      let name = Global_module.Name.create_no_args s in
-      let path, a =
-        lookup_global_name_module_no_locks load ~errors ~use ~loc name env
-      in
-      path, (Mode.Value.(disallow_right mode_unit), locks), a
-    end
 
 let lookup_ident_modtype ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.modtypes with
