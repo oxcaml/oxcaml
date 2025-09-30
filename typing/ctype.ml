@@ -7459,8 +7459,7 @@ let constrain_decl_jkind env decl jkind =
      the need for reimplementation. Hopefully no one hits this for
      a while. *)
   | None ->
-    Ikinds.with_origin_tag "ctype:constrain_decl_jkind" (fun () ->
-        check_decl_jkind env decl jkind)
+    check_decl_jkind env decl jkind
   | Some jkind ->
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in

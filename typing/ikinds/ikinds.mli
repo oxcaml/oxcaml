@@ -1,5 +1,3 @@
-val with_origin_tag : string -> (unit -> 'a) -> 'a
-
 val ikind_reset : string -> Types.type_ikind
 
 val normalize : context:Jkind.jkind_context -> Types.jkind_l -> Ikind.Ldd.node
