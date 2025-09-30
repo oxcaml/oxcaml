@@ -100,9 +100,6 @@ val ocamldebug : bool
 val native_compiler : bool
 (** Whether the native compiler has been enabled at configure time *)
 
-val javascript_compiler : bool
-(** Whether the JavaScript compiler has been enabled at configure time *)
-
 val native_dynlink : bool
 (** Whether support for native dynlink is available or not *)
 

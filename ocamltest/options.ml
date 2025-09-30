@@ -65,15 +65,12 @@ let translate = ref false
 let style = ref Translate.Plain
 let compact = ref false
 
-let backends = ref ""
 
 let add_to_list r x =
   r := !r @ [x]
 
 let commandline_options =
 [
-  ("-backends", Arg.Set_string backends,
-   "<backends> Comma-separated list of backends to run (bytecode,native,javascript)");
   ("-e", Arg.Set log_to_stderr, " Log to stderr instead of a file.");
   ("-promote", Arg.Set promote,
    " Overwrite reference files with the test output (experimental, unstable)");
@@ -121,4 +118,3 @@ let show_timings = !show_timings
 let translate = !translate
 let style = !style
 let compact = !compact
-let backends = !backends

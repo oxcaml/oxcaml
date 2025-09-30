@@ -21,7 +21,6 @@ type t =
   | Implementation
   | Interface
   | C
-  | Javascript
   | C_minus_minus
   | Lexer
   | Grammar

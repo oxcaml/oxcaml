@@ -21,7 +21,6 @@ type t =
   | Implementation
   | Interface
   | C
-  | Javascript
   | C_minus_minus
   | Lexer
   | Grammar
@@ -40,7 +39,6 @@ let string_of_filetype = function
   | Implementation -> "implementation"
   | Interface -> "interface"
   | C -> "C source file"
-  | Javascript -> "JavaScript source file"
   | C_minus_minus -> "C minus minus source"
   | Lexer -> "lexer"
   | Grammar -> "grammar"
@@ -56,7 +54,6 @@ let extension_of_filetype = function
   | Implementation -> "ml"
   | Interface -> "mli"
   | C -> "c"
-  | Javascript -> "js"
   | C_minus_minus -> "cmm"
   | Lexer -> "mll"
   | Grammar -> "mly"
@@ -70,9 +67,6 @@ let extension_of_filetype = function
       | (Ocaml_backends.Bytecode, Object) -> "cmo"
       | (Ocaml_backends.Bytecode, Library) -> "cma"
       | (Ocaml_backends.Bytecode, Program) -> "byte"
-      | (Ocaml_backends.Javascript, Object) -> "cmjx"
-      | (Ocaml_backends.Javascript, Library) -> "cmjxa"
-      | (Ocaml_backends.Javascript, Program) -> "js"
     end
   | Text -> "txt"
   | Other s -> s
@@ -81,7 +75,6 @@ let filetype_of_extension = function
   | "ml" -> Implementation
   | "mli" -> Interface
   | "c" -> C
-  | "js" -> Javascript
   | "cmm" -> C_minus_minus
   | "mll" -> Lexer
   | "mly" -> Grammar
@@ -94,8 +87,6 @@ let filetype_of_extension = function
   | "cmo" -> Backend_specific (Ocaml_backends.Bytecode, Object)
   | "cma" -> Backend_specific (Ocaml_backends.Bytecode, Library)
   | "byte" -> Backend_specific (Ocaml_backends.Bytecode, Program)
-  | "cmjx" -> Backend_specific (Ocaml_backends.Javascript, Object)
-  | "cmjxa" -> Backend_specific (Ocaml_backends.Javascript, Library)
   | "txt" -> Text
   | e -> Other e
 

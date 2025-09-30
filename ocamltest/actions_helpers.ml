@@ -227,12 +227,7 @@ let run
     let arguments = match args_variable with
       | None -> ""
       | Some variable -> Environments.safe_lookup variable env in
-    (* If the program is a JavaScript file, run it with Node.js *)
-    let commandline =
-      if Filename.check_suffix program ".js" then
-        ["node"; program; arguments]
-      else
-        [program; arguments] in
+    let commandline = [program; arguments] in
     let what = log_message ^ " " ^ program ^ " " ^
     begin if arguments="" then "without any argument"
     else "with arguments " ^ arguments
