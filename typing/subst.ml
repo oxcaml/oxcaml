@@ -33,10 +33,14 @@ type type_replacement =
 
 type additional_action =
   | Prepare_for_saving of
-      { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind }
-    (* The [Prepare_for_saving] function should be applied to all jkinds when
+      { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
+        prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr
+      }
+    (* The [prepare_jkind] function should be applied to all jkinds when
        saving; this commons them up, truncates their histories, and runs
-       a check that all unconstrained variables have been defaulted to value. *)
+       a check that all unconstrained variables have been defaulted to value.
+       The [prepare_mode] function should be applied to all modes when saving;
+       this ensures the saved file doesn't contain mode variables. *)
   | Duplicate_variables
   | No_action
 
@@ -185,7 +189,10 @@ let with_additional_action =
             end
           | None -> raise(Error (loc, Unconstrained_jkind_variable))
         in
-        Prepare_for_saving { prepare_jkind }
+        (* CR-someday zqian: preserve the hints *)
+        (* modes should have been zapped already; doesn't hurt to zap again *)
+        let prepare_mode mode = Mode.Alloc.(zap_to_legacy mode |> of_const) in
+        Prepare_for_saving { prepare_jkind; prepare_mode }
   in
   { s with additional_action; last_compose = None }
 
@@ -398,7 +405,7 @@ let rec typexp copy_scope s ty =
         let ty' =
           match s.additional_action with
           | Duplicate_variables -> newpersty desc
-          | Prepare_for_saving { prepare_jkind } ->
+          | Prepare_for_saving { prepare_jkind; _ } ->
               newpersty (norm desc ~prepare_jkind)
           | No_action -> newty2 ~level:(get_level ty) desc
         in
@@ -502,6 +509,17 @@ let rec typexp copy_scope s ty =
           end
       | Tfield(_label, kind, _t1, t2) when field_kind_repr kind = Fabsent ->
           Tlink (typexp copy_scope s t2)
+      | Tarrow ((label, marg, mret), arg, ret, comm) ->
+          let marg, mret =
+            match s.additional_action with
+            | Prepare_for_saving { prepare_mode; _ } ->
+              prepare_mode marg, prepare_mode mret
+            | _ -> marg, mret
+          in
+          let arg = typexp copy_scope s arg in
+          let ret = typexp copy_scope s ret in
+          let comm = copy_commu comm in
+          Tarrow ((label, marg, mret), arg, ret, comm)
       | _ -> copy_type_desc (typexp copy_scope s) desc
     in
     Transient_expr.set_stub_desc ty' desc;
@@ -602,7 +620,7 @@ let rec type_declaration' copy_scope s decl =
       begin
         let jkind =
           match s.additional_action with
-          | Prepare_for_saving { prepare_jkind } ->
+          | Prepare_for_saving { prepare_jkind; _ } ->
             prepare_jkind decl.type_loc decl.type_jkind
           | Duplicate_variables | No_action -> decl.type_jkind
         in
