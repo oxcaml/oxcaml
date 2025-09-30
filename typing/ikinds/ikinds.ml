@@ -1,5 +1,5 @@
 (* This forces ikinds globally on. *)
-(*= Clflags.ikinds := true *)
+(* Clflags.ikinds := true *)
 
 (* Types.ikind_debug := true *)
 let enable_crossing = true
@@ -481,7 +481,20 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
             in
             JK.Ty { args; kind; abstract = false })
     in
-    match decl.type_ikind with
+    (* For abstract types, the cached ikind depends on the type_jkind annotation,
+       so we must not reuse it in a different jkind context (e.g. during module
+       inclusion checking). For concrete types (records/variants), the cached
+       ikind is structural and safe to reuse. *)
+    let ikind_safe_to_reuse =
+      match decl.type_kind with
+      | Types.Type_abstract _ -> false
+      | _ -> true
+    in
+    let ikind_to_use =
+      if ikind_safe_to_reuse then decl.type_ikind
+      else Types.No_constructor_ikind "abstract type: jkind context-dependent"
+    in
+    match ikind_to_use with
     | Types.Constructor_ikind constructor when !Clflags.ikinds ->
       log_call ~pp:string_of_constr_decl
         (fun () ->
