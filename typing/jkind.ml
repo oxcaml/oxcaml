@@ -1154,7 +1154,9 @@ module Layout_and_axes = struct
       { t with mod_bounds; with_bounds }, fuel_status
 
   let normalize ~context ~mode ~skip_axes ?map_type_info t =
-    ignore (normalize ~context ~mode ~skip_axes ?map_type_info t);
+    for _ = 0 to 20 do
+      ignore (normalize ~context ~mode ~skip_axes ?map_type_info t)
+    done;
     normalize ~context ~mode ~skip_axes ?map_type_info t
 end
 
