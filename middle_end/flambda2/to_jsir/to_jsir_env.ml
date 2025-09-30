@@ -116,8 +116,8 @@ let register_symbol' ~res symbol var =
       (Let
          ( Jsir.Var.fresh (),
            Prim
-             (Extern "caml_register_symbol", [Pc (NativeString symbol_name); Pv var])
-         ))
+             ( Extern "caml_register_symbol",
+               [Pc (NativeString symbol_name); Pv var] ) ))
 
 let add_symbol_without_registering t symbol jvar =
   { t with symbols = Symbol.Map.add symbol jvar t.symbols }
