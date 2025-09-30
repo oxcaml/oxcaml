@@ -177,7 +177,7 @@ module Set = struct
   let find_reg_with_same_location_exn t (reg : Reg.t) =
     match elements (filter (fun t -> Reg.same_loc t.reg reg) t) with
     | [] -> raise Not_found
-    | reg::_ -> reg
+    | reg :: _ -> reg
 end
 
 let print ~print_reg ppf t =
