@@ -1,0 +1,41 @@
+;**************************************************************************
+;*                                                                        *
+;*                                 OCaml                                  *
+;*                                                                        *
+;*                      Implementation of [%eval]                         *
+;*                                                                        *
+;*   All rights reserved.  This file is distributed under the terms of    *
+;*   the GNU Lesser General Public License version 2.1, with the          *
+;*   special exception on linking described in the file LICENSE.          *
+;*                                                                        *
+;**************************************************************************
+
+(library
+ (name camlinternaleval)
+ (modes byte native)
+ (libraries dynlink_internal unix)
+ (flags
+  (:standard
+   -strict-sequence
+   -absname
+   -bin-annot
+   -safe-string
+   -strict-formats))
+ (ocamlopt_flags
+  (:include %{project_root}/ocamlopt_flags.sexp))
+ (library_flags
+  (:standard -linkall)))
+
+(install
+ (files
+  (.camlinternaleval.objs/native/camlinternaleval.cmx as camlinternaleval.cmx)
+  camlinternaleval.cmxa
+  camlinternaleval.a
+  camlinternaleval.cmxs
+  camlinternaleval.cma
+  ; (camlinternaleval.mli as camlinternaleval/eval.mli)
+  (.camlinternaleval.objs/byte/camlinternaleval.cmi as camlinternaleval.cmi)
+  (.camlinternaleval.objs/byte/camlinternaleval.cmt as camlinternaleval.cmt)
+  (.camlinternaleval.objs/byte/camlinternaleval.cmti as camlinternaleval.cmti))
+ (section lib)
+ (package ocaml))
