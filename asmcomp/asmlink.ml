@@ -661,10 +661,8 @@ let link unix ~ppf_dump objfiles output_name =
         (Misc.expand_directory Config.standard_library "+ocaml-jit");
         [ stdlib
         ; "unix/unix.cmxa"
-        ; "dynlink/dynlink.cmxa"
         ; "compiler-libs/ocamlcommon.cmxa"
         ; "compiler-libs/ocamloptcomp.cmxa"
-        ; "compiler-libs/ocamlopttoplevel.cmxa"
         ; "ocaml-jit/jit.cmxa"
         ; "camlinternaleval.cmxa" ])
       else [ stdlib ] in
