@@ -1348,17 +1348,17 @@ and module_binding =
 (** Values of type [module_binding] represents [module X = ME] *)
 
 and jkind_annotation_desc =
-  | Default
-  | Abbreviation of string
+  | Pjk_default
+  | Pjk_abbreviation of string
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)
   (* CR zeisbach: this should be renamed to Jkind_mod or something, to avoid
      clashing with the other Mod above. Also, this should take in mods and not modes *)
-  | Mod of jkind_annotation * modes
-  | With of jkind_annotation * core_type * modalities
-  | Kind_of of core_type
-  | Product of jkind_annotation list
+  | Pjk_mod of jkind_annotation * modes
+  | Pjk_with of jkind_annotation * core_type * modalities
+  | Pjk_kind_of of core_type
+  | Pjk_product of jkind_annotation list
 
 and jkind_annotation =
   { pjkind_loc : Location.t

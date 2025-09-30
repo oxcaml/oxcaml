@@ -484,10 +484,10 @@ and type_with_label ctxt f (label, c, mode) =
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
-  | Default -> pp f "_"
-  | Abbreviation s -> pp f "%s" s
+  | Pjk_default -> pp f "_"
+  | Pjk_abbreviation s -> pp f "%s" s
   (* CR zeisbach: change this when this gets changed to mods, like other places *)
-  | Mod (t, {core_modes; _}) ->
+  | Pjk_mod (t, {core_modes; _}) ->
     begin match core_modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
     | _ :: _ ->
@@ -497,15 +497,15 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
           (pp_print_list ~pp_sep:pp_print_space mode) modes
       ) f (t, core_modes)
     end
-  | With (t, ty, modalities) ->
+  | Pjk_with (t, ty, modalities) ->
     Misc.pp_parens_if nested (fun f (t, ty, modalities) ->
       pp f "%a with %a%a"
         (jkind_annotation ~nested:true ctxt) t
         (core_type ctxt) ty
         optional_space_modality_annot modalities;
     ) f (t, ty, modalities)
-  | Kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
-  | Product ts ->
+  | Pjk_kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
+  | Pjk_product ts ->
     Misc.pp_parens_if nested (fun f ts ->
       pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
     ) f ts
