@@ -13,7 +13,7 @@ type t_float64_mod_e : float64 mod everything
 type t_value
 type t_value_mod_e : value_or_null mod everything mod non_null separable
 type t_float64 : float64
-type t_float64_mod_e : float64 mod everything
+type t_float64_mod_e : float64 mod everything mod dynamic
 |}]
 
 (*** locality ***)
@@ -296,7 +296,7 @@ type t : value & float64 mod everything
 [%%expect{|
 type t
   : value_or_null mod everything mod non_null separable
-    & float64 mod global aliased many stateless immutable external_
+    & float64 mod global aliased many stateless immutable dynamic external_
 |}]
 
 type t : value & (immediate & bits64) & float32 mod everything
@@ -304,6 +304,6 @@ type t : value & (immediate & bits64) & float32 mod everything
 type t
   : value_or_null mod everything mod non_null separable
     & (value_or_null mod everything mod non_null separable
-      & bits64 mod global aliased many stateless immutable external_)
-    & float32 mod global aliased many stateless immutable external_
+      & bits64 mod global aliased many stateless immutable dynamic external_)
+    & float32 mod global aliased many stateless immutable dynamic external_
 |}]
