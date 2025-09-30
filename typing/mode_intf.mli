@@ -613,10 +613,10 @@ module type S = sig
       val diff : t -> t -> Option.t
 
       (** Similar to [Alloc.close_over] but for constants *)
-      val close_over : t -> t
+      val close_over : t -> Comonadic.Const.t
 
       (** Similar to [Alloc.partial_apply] but for constants *)
-      val partial_apply : t -> t
+      val partial_apply : t -> Comonadic.Const.t
 
       (** Prints a constant on any axis. *)
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit

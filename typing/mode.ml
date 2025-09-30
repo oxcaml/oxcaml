@@ -3490,20 +3490,15 @@ module Value_with (Areality : Areality) = struct
     (** See [Alloc.close_over] for explanation. *)
     let close_over m =
       let { monadic; comonadic } = split m in
-      let comonadic =
-        Comonadic.join comonadic
-          (C.monadic_to_comonadic_min
-             (C.comonadic_with_obj Areality.Obj.obj)
-             monadic)
-      in
-      let monadic = Monadic.min in
-      merge { comonadic; monadic }
+      Comonadic.join comonadic
+        (C.monadic_to_comonadic_min
+           (C.comonadic_with_obj Areality.Obj.obj)
+           monadic)
 
     (** See [Alloc.partial_apply] for explanation. *)
     let partial_apply m =
       let { comonadic; _ } = split m in
-      let monadic = Monadic.min in
-      merge { comonadic; monadic }
+      comonadic
 
     let print_axis : type a. a Axis.t -> _ -> a -> unit =
      fun ax ppf a ->
@@ -3717,15 +3712,17 @@ module Value_with (Areality : Areality) = struct
     let comonadic1 = monadic_to_comonadic_min monadic in
     (* It's also constrained by the comonadic of the closed argument. *)
     let comonadic = Comonadic.join [comonadic; comonadic1] in
-    (* The returned function crosses all monadic axes that we know of
-       (uniqueness/contention). *)
+    (* The closure will access [A] at the specified monadic modes, and thus the
+       monadic mode of the closure itself is not constrained by it. *)
     let monadic = Monadic.disallow_right Monadic.min in
     { comonadic; monadic }
 
   (** Similar to above, but we are given the mode of [A -> B -> C], and need to
       give the lower bound mode of [B -> C]. *)
   let partial_apply { comonadic; _ } =
-    (* The returned function crosses all monadic axes that we know of. *)
+    (* The closure will invoke the original function at the specified monadic
+       modes, and thus the monadic mode of the closure itself is not constrained by
+       it. *)
     let monadic = Monadic.disallow_right Monadic.min in
     let comonadic = Comonadic.disallow_right comonadic in
     { comonadic; monadic }
