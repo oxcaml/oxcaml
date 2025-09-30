@@ -66,6 +66,10 @@
 (lldb) b Test_datatypes_dwarf.f_poly_bits32
 (lldb) c
 (lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_tuple_field
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) b Test_datatypes_dwarf.f_exception_specific
 (lldb) c
 (lldb) c
@@ -86,5 +90,13 @@
 (lldb) b Test_datatypes_dwarf.f_exception_with_record
 (lldb) c
 (lldb) b Test_datatypes_dwarf.f_exception_with_unboxed
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tree
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_forest
+(lldb) c
+(lldb) c
 (lldb) c
 (lldb) quit

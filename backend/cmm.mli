@@ -500,7 +500,15 @@ type ccatch_flag =
 
 (** Every basic block should have a corresponding [Debuginfo.t] for its
     beginning. *)
-type expression =
+type static_handler =
+  { label : Lambda.static_label;
+    params : (Backend_var.With_provenance.t * machtype) list;
+    body : expression;
+    dbg : Debuginfo.t;
+    is_cold : bool
+  }
+
+and expression =
   | Cconst_int of int * Debuginfo.t
   | Cconst_natint of nativeint * Debuginfo.t
   | Cconst_float32 of float * Debuginfo.t
@@ -525,21 +533,16 @@ type expression =
       * Debuginfo.t
   | Cswitch of
       expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
-  | Ccatch of
-      ccatch_flag
-      * (Lambda.static_label
-        * (Backend_var.With_provenance.t * machtype) list
-        * expression
-        * Debuginfo.t
-        * bool (* is_cold *))
-        list
-      * expression
+  | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
 
 type codegen_option =
   | Reduce_code_size
   | No_CSE
   | Use_linscan_regalloc
+  | Use_regalloc of Clflags.Register_allocator.t
+  | Use_regalloc_param of string list
+  | Cold
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
@@ -656,5 +659,9 @@ val equal_integer_comparison : integer_comparison -> integer_comparison -> bool
 val caml_flambda2_invalid : string
 
 val is_val : machtype_component -> bool
+
+val is_int : machtype_component -> bool
+
+val is_addr : machtype_component -> bool
 
 val is_exn_handler : ccatch_flag -> bool

@@ -112,11 +112,13 @@ let set_original_source_file_name x original_source_file =
 module Artifact = struct
   type t =
    {
-     source_file: filename option;
+     original_source_file: filename option;
+     raw_source_file: filename option;
      filename: filename;
      modname: Compilation_unit.t;
    }
-  let source_file x = x.source_file
+  let original_source_file x = x.original_source_file
+  let raw_source_file x = x.raw_source_file
   let filename x = x.filename
   let modname x = x.modname
   let prefix x = Filename.remove_extension (filename x)
@@ -124,7 +126,7 @@ module Artifact = struct
   let from_filename ~for_pack_prefix filename =
     let modname = compilation_unit_from_source ~for_pack_prefix filename in
 
-    { modname; filename; source_file = None }
+    { modname; filename; original_source_file = None; raw_source_file = None }
 
 end
 
@@ -132,15 +134,19 @@ let of_artifact ~dummy_source_file kind (a : Artifact.t) =
   let modname = Artifact.modname a in
   let prefix = Artifact.prefix a in
   let original_source_file =
-    Option.value a.source_file ~default:dummy_source_file
+    Option.value a.original_source_file ~default:dummy_source_file
   in
-  { modname; prefix; original_source_file; raw_source_file = a.filename; kind }
+  let raw_source_file =
+    Option.value a.raw_source_file ~default:dummy_source_file
+  in
+  { modname; prefix; original_source_file; raw_source_file; kind }
 
 let mk_artifact ext u =
   {
     Artifact.filename = u.prefix ^ ext;
     modname = u.modname;
-    source_file = Some u.original_source_file;
+    original_source_file = Some u.original_source_file;
+    raw_source_file = Some u.raw_source_file;
   }
 
 let companion_artifact ext x =
@@ -154,6 +160,9 @@ let cmt f = mk_artifact ".cmt" f
 let cmti f = mk_artifact ".cmti" f
 let cms f = mk_artifact ".cms" f
 let cmsi f = mk_artifact ".cmsi" f
+let cmj f = mk_artifact ".cmj" f
+let cmja f = mk_artifact ".cmja" f
+let cmjx f = mk_artifact ".cmjx" f
 let annot f = mk_artifact ".annot" f
 
 let companion_obj f = companion_artifact Config.ext_obj f
@@ -177,5 +186,6 @@ let find_normalized_cmi f =
   {
     Artifact.filename;
     modname = modname f;
-    source_file = Some f.original_source_file
+    original_source_file = Some f.original_source_file;
+    raw_source_file = Some f.raw_source_file;
   }

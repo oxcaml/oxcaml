@@ -304,6 +304,10 @@ let () =
   print_endline s;
   let s = Idx_mut.unsafe_get a (.l(#3l)) in
   print_endline s;
+  let s = Idx_mut.unsafe_get a (.S(#3S)) in
+  print_endline s;
+  let s = Idx_mut.unsafe_get a (.s(#3s)) in
+  print_endline s;
   let s = Idx_mut.unsafe_get a (.n(#3n)) in
   print_endline s;
   print_newline ()
@@ -327,6 +331,14 @@ let () =
   let #{ i; j } = Idx_mut.unsafe_get a (.l(#3l)) in
   let i2 = Idx_mut.unsafe_get a (.l(#3l).#i) in
   let j2 = Idx_mut.unsafe_get a (.l(#3l).#j) in
+  Printf.printf "%d %d %d %d\n" i i2 j j2;
+  let #{ i; j } = Idx_mut.unsafe_get a (.S(#3S)) in
+  let i2 = Idx_mut.unsafe_get a (.S(#3S).#i) in
+  let j2 = Idx_mut.unsafe_get a (.S(#3S).#j) in
+  Printf.printf "%d %d %d %d\n" i i2 j j2;
+  let #{ i; j } = Idx_mut.unsafe_get a (.s(#3s)) in
+  let i2 = Idx_mut.unsafe_get a (.s(#3s).#i) in
+  let j2 = Idx_mut.unsafe_get a (.s(#3s).#j) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
   let #{ i; j } = Idx_mut.unsafe_get a (.n(#3n)) in
   let i2 = Idx_mut.unsafe_get a (.n(#3n).#i) in
@@ -361,6 +373,18 @@ let () =
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
+  let #{ i; j } = Idx_mut.unsafe_get a (.S(#3S)) in
+  let i2 = Idx_mut.unsafe_get a (.S(#3S).#i) in
+  let j2 = Idx_mut.unsafe_get a (.S(#3S).#j) in
+  Printf.printf "%f %f %f %f\n"
+    (Float_u.to_float i) (Float_u.to_float i2)
+    (Float_u.to_float j) (Float_u.to_float j2);
+  let #{ i; j } = Idx_mut.unsafe_get a (.s(#3s)) in
+  let i2 = Idx_mut.unsafe_get a (.s(#3s).#i) in
+  let j2 = Idx_mut.unsafe_get a (.s(#3s).#j) in
+  Printf.printf "%f %f %f %f\n"
+    (Float_u.to_float i) (Float_u.to_float i2)
+    (Float_u.to_float j) (Float_u.to_float j2);
   let #{ i; j } = Idx_mut.unsafe_get a (.n(#3n)) in
   let i2 = Idx_mut.unsafe_get a (.n(#3n).#i) in
   let j2 = Idx_mut.unsafe_get a (.n(#3n).#j) in
@@ -391,6 +415,18 @@ let () =
   let #{ i; j } = Idx_mut.unsafe_get a (.l(#3l)) in
   let i2 = Idx_mut.unsafe_get a (.l(#3l).#i) in
   let j2 = Idx_mut.unsafe_get a (.l(#3l).#j) in
+  Printf.printf "%f %f %f %f\n"
+    (Float_u.to_float i) (Float_u.to_float i2)
+    (Float_u.to_float j) (Float_u.to_float j2);
+  let #{ i; j } = Idx_mut.unsafe_get a (.S(#3S)) in
+  let i2 = Idx_mut.unsafe_get a (.S(#3S).#i) in
+  let j2 = Idx_mut.unsafe_get a (.S(#3S).#j) in
+  Printf.printf "%f %f %f %f\n"
+    (Float_u.to_float i) (Float_u.to_float i2)
+    (Float_u.to_float j) (Float_u.to_float j2);
+  let #{ i; j } = Idx_mut.unsafe_get a (.s(#3s)) in
+  let i2 = Idx_mut.unsafe_get a (.s(#3s).#i) in
+  let j2 = Idx_mut.unsafe_get a (.s(#3s).#j) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);

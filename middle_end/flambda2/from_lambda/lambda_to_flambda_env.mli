@@ -30,12 +30,15 @@ end
 
 val create :
   current_unit:Compilation_unit.t ->
+  machine_width:Target_system.Machine_width.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   my_region:Region_stack_element.t option ->
   t
 
 val current_unit : t -> Compilation_unit.t
+
+val machine_width : t -> Target_system.Machine_width.t
 
 val ident_stamp_upon_starting : t -> int
 
@@ -86,13 +89,17 @@ val add_continuation :
   add_continuation_result
 
 val add_static_exn_continuation :
-  t -> int -> pop_region:bool -> Continuation.t -> add_continuation_result
+  t ->
+  Static_label.t ->
+  pop_region:bool ->
+  Continuation.t ->
+  add_continuation_result
 
-val get_static_exn_continuation : t -> int -> Continuation.t
+val get_static_exn_continuation : t -> Static_label.t -> Continuation.t
 
-val mark_as_recursive_static_catch : t -> int -> t
+val mark_as_recursive_static_catch : t -> Static_label.t -> t
 
-val is_static_exn_recursive : t -> int -> bool
+val is_static_exn_recursive : t -> Static_label.t -> bool
 
 val get_try_stack : t -> Continuation.t list
 

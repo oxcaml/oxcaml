@@ -198,9 +198,7 @@ and row_like_for_closures =
   }
 
 and closures_entry =
-  { (* CR pchambart: Forbid the Bottom case in function types (propagate to the
-       whole environment *)
-    function_types : function_type Or_unknown_or_bottom.t Function_slot.Map.t;
+  { function_types : function_type Or_unknown.t Function_slot.Map.t;
     closure_types : function_slot_indexed_product;
     value_slot_types : value_slot_indexed_product
   }
@@ -548,10 +546,10 @@ and free_names_int_indexed_product ~follow_value_slots fields =
     Name_occurrences.empty fields
 
 and free_names_function_type ~follow_value_slots
-    (function_type : _ Or_unknown_or_bottom.t) =
+    (function_type : _ Or_unknown.t) =
   match function_type with
-  | Bottom | Unknown -> Name_occurrences.empty
-  | Ok { code_id; rec_info } ->
+  | Unknown -> Name_occurrences.empty
+  | Known { code_id; rec_info } ->
     Name_occurrences.add_code_id
       (free_names0 ~follow_value_slots rec_info)
       code_id Name_mode.normal
@@ -903,7 +901,7 @@ and apply_renaming_closures_entry
   { function_types =
       Function_slot.Map.map_sharing
         (fun function_type ->
-          Or_unknown_or_bottom.map function_type ~f:(fun function_type ->
+          Or_unknown.map function_type ~f:(fun function_type ->
               apply_renaming_function_type function_type renaming))
         function_types;
     closure_types =
@@ -1283,7 +1281,7 @@ and print_closures_entry ppf { function_types; closure_types; value_slot_types }
   Format.fprintf ppf
     "@[<hov 1>(@[<hov 1>(function_types@ %a)@]@ @[<hov 1>(closure_types@ \
      %a)@]@ @[<hov 1>(value_slot_types@ %a)@])@]"
-    (Function_slot.Map.print (Or_unknown_or_bottom.print print_function_type))
+    (Function_slot.Map.print (Or_unknown.print print_function_type))
     function_types print_function_slot_indexed_product closure_types
     print_value_slot_indexed_product value_slot_types
 
@@ -1496,10 +1494,10 @@ and ids_for_export_closures_entry
     { function_types; closure_types; value_slot_types } =
   let function_types_ids =
     Function_slot.Map.fold
-      (fun _function_slot (function_type : _ Or_unknown_or_bottom.t) ids ->
+      (fun _function_slot (function_type : _ Or_unknown.t) ids ->
         match function_type with
-        | Unknown | Bottom -> ids
-        | Ok function_type ->
+        | Unknown -> ids
+        | Known function_type ->
           Ids_for_export.union ids (ids_for_export_function_type function_type))
       function_types Ids_for_export.empty
   in
@@ -1906,22 +1904,21 @@ and apply_coercion_to_value_slot_types_in_set product _coercion : _ Or_bottom.t
      depth of [inner]. *)
   Ok product
 
-and apply_coercion_function_type
-    (function_type : function_type Or_unknown_or_bottom.t)
-    (coercion : Coercion.t) : _ Or_bottom.t =
+and apply_coercion_function_type (function_type : function_type Or_unknown.t)
+    (coercion : Coercion.t) : _ Or_unknown.t Or_bottom.t =
   match coercion with
   | Id -> Ok function_type
   | Change_depth { from; to_ } -> (
     match function_type with
-    | Unknown | Bottom -> Ok function_type
-    | Ok { code_id; rec_info } ->
+    | Unknown -> Ok function_type
+    | Known { code_id; rec_info } ->
       (* CR lmaurer: We should really be checking that [from] matches the
          current [rec_info], but that requires either passing in a typing
          environment or making absolutely sure that rec_infos get
          canonicalized. *)
       ignore (from, rec_info);
       let rec_info = Rec_info (TD.create to_) in
-      Ok (Or_unknown_or_bottom.Ok { code_id; rec_info }))
+      Ok (Known { code_id; rec_info }))
 
 and apply_coercion_env_extension { equations } coercion : _ Or_bottom.t =
   let<+ equations =
@@ -2384,7 +2381,7 @@ and remove_unused_value_slots_and_shortcut_aliases_closures_entry
   { function_types =
       Function_slot.Map.map_sharing
         (fun function_type ->
-          Or_unknown_or_bottom.map function_type ~f:(fun function_type ->
+          Or_unknown.map function_type ~f:(fun function_type ->
               remove_unused_value_slots_and_shortcut_aliases_function_type
                 function_type ~used_value_slots ~canonicalise))
         function_types;
@@ -2991,7 +2988,7 @@ and project_closures_entry ~to_project ~expand
   let function_types' =
     Function_slot.Map.map_sharing
       (fun function_type ->
-        Or_unknown_or_bottom.map_sharing function_type ~f:(fun function_type ->
+        Or_unknown.map_sharing function_type ~f:(fun function_type ->
             project_function_type ~to_project ~expand function_type))
       function_types
   in
@@ -3146,7 +3143,8 @@ module Closures_entry = struct
   let find_function_type t ~exact function_slot : _ Or_unknown_or_bottom.t =
     match Function_slot.Map.find function_slot t.function_types with
     | exception Not_found -> if exact then Bottom else Unknown
-    | func_decl -> func_decl
+    | Unknown -> Unknown
+    | Known func_decl -> Ok func_decl
 
   let value_slot_types { value_slot_types; _ } =
     value_slot_types.value_slot_components_by_index
@@ -3174,9 +3172,7 @@ module Product = struct
 
     let top = { function_slot_components_by_index = Function_slot.Map.empty }
 
-    let width t =
-      Target_ocaml_int.of_int
-        (Function_slot.Map.cardinal t.function_slot_components_by_index)
+    let width t = Function_slot.Map.cardinal t.function_slot_components_by_index
   end
 
   module Value_slot_indexed = struct
@@ -3187,9 +3183,7 @@ module Product = struct
 
     let top = { value_slot_components_by_index = Value_slot.Map.empty }
 
-    let width t =
-      Target_ocaml_int.of_int
-        (Value_slot.Map.cardinal t.value_slot_components_by_index)
+    let width t = Value_slot.Map.cardinal t.value_slot_components_by_index
   end
 
   module Int_indexed = struct
@@ -3201,7 +3195,7 @@ module Product = struct
 
     let create_top () = [||]
 
-    let width t = Target_ocaml_int.of_int (Array.length t)
+    let width t = Array.length t
 
     let components t = Array.to_list t
   end
@@ -3304,7 +3298,7 @@ module Row_like_for_blocks = struct
               Flambda_kind.print field_kind Flambda_kind.print shape_kind)
         field_tys
 
-  let create ~(shape : K.Block_shape.t) ~field_tys
+  let create ~machine_width ~(shape : K.Block_shape.t) ~field_tys
       (open_or_closed : open_or_closed) alloc_mode =
     check_field_tys ~shape ~field_tys;
     let tag : _ Or_unknown.t =
@@ -3336,7 +3330,7 @@ module Row_like_for_blocks = struct
           Known tag)
     in
     let product = Array.of_list field_tys in
-    let size = Target_ocaml_int.of_int (List.length field_tys) in
+    let size = Target_ocaml_int.of_int machine_width (List.length field_tys) in
     match open_or_closed with
     | Open _ -> (
       match tag with
@@ -3348,26 +3342,30 @@ module Row_like_for_blocks = struct
       | Unknown -> assert false)
   (* see above *)
 
-  let create_blocks_with_these_tags tags alloc_mode =
+  let create_blocks_with_these_tags ~machine_width tags alloc_mode =
     let maps_to = Product.Int_indexed.create_top () in
     let case shape =
       Or_unknown.map
         ~f:(fun shape ->
           { maps_to;
-            index = { domain = At_least Target_ocaml_int.zero; shape };
+            index =
+              { domain = At_least (Target_ocaml_int.zero machine_width); shape };
             env_extension = { equations = Name.Map.empty }
           })
         shape
     in
     { known_tags = Tag.Map.map case tags; other_tags = Bottom; alloc_mode }
 
-  let create_exactly_multiple ~shape_and_field_tys_by_tag alloc_mode =
+  let create_exactly_multiple ~machine_width ~shape_and_field_tys_by_tag
+      alloc_mode =
     let known_tags =
       Tag.Map.map
         (fun (shape, field_tys) ->
           check_field_tys ~shape ~field_tys;
           let maps_to = Array.of_list field_tys in
-          let size = Target_ocaml_int.of_int (List.length field_tys) in
+          let size =
+            Target_ocaml_int.of_int machine_width (List.length field_tys)
+          in
           Or_unknown.Known
             { maps_to;
               index = { domain = Known size; shape };
@@ -3381,7 +3379,7 @@ module Row_like_for_blocks = struct
     (* CR-someday mshinwell: add invariant check? *)
     { known_tags; other_tags; alloc_mode }
 
-  let all_tags_and_sizes t :
+  let all_tags_and_sizes ~machine_width t :
       (Target_ocaml_int.t * K.Block_shape.t) Tag.Map.t Or_unknown.t =
     match t.other_tags with
     | Ok _ -> Unknown
@@ -3393,8 +3391,9 @@ module Row_like_for_blocks = struct
             match (case : _ Or_unknown.t) with
             | Unknown ->
               any_unknown := true;
-              (* result doesn't matter as it is unused *)
-              Target_ocaml_int.zero, K.Block_shape.Scannable Value_only
+              (* result doesn't matter as it's unused - see below *)
+              ( Target_ocaml_int.zero machine_width,
+                K.Block_shape.Scannable Value_only )
             | Known { index = { domain; shape }; _ } -> (
               match domain with
               | Known size -> size, shape
@@ -3754,7 +3753,7 @@ let box_float (t : t) alloc_mode : t =
   | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
     Misc.fatal_errorf "Type of wrong kind for [box_float]: %a" print t
 
-let tag_int8 (t : t) : t =
+let tag_int8 (t : t) ~machine_width : t =
   match t with
   | Naked_int8 head -> (
     match TD.descr head with
@@ -3771,7 +3770,9 @@ let tag_int8 (t : t) : t =
       let ints =
         Int8.Set.fold
           (fun x acc ->
-            Target_ocaml_int.Set.add (Target_ocaml_int.of_int8 x) acc)
+            Target_ocaml_int.Set.add
+              (Target_ocaml_int.of_int8 machine_width x)
+              acc)
           ints Target_ocaml_int.Set.empty
       in
       non_null_value
@@ -3786,7 +3787,7 @@ let tag_int8 (t : t) : t =
   | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
     Misc.fatal_errorf "Type of wrong kind for [tag_int8]: %a" print t
 
-let tag_int16 (t : t) : t =
+let tag_int16 (t : t) ~machine_width : t =
   match t with
   | Naked_int16 head -> (
     match TD.descr head with
@@ -3803,7 +3804,9 @@ let tag_int16 (t : t) : t =
       let ints =
         Int16.Set.fold
           (fun x acc ->
-            Target_ocaml_int.Set.add (Target_ocaml_int.of_int16 x) acc)
+            Target_ocaml_int.Set.add
+              (Target_ocaml_int.of_int16 machine_width x)
+              acc)
           ints Target_ocaml_int.Set.empty
       in
       non_null_value
@@ -3933,16 +3936,16 @@ let boxed_vec256_alias_to ~naked_vec256 =
 let boxed_vec512_alias_to ~naked_vec512 =
   box_vec512 (Naked_vec512 (TD.create_equals (Simple.var naked_vec512)))
 
-let this_immutable_string str =
-  let size = Target_ocaml_int.of_int (String.length str) in
+let this_immutable_string str ~machine_width =
+  let size = Target_ocaml_int.of_int machine_width (String.length str) in
   let string_info =
     String_info.Set.singleton
       (String_info.create ~contents:(Contents str) ~size)
   in
   non_null_value (String string_info)
 
-let mutable_string ~size =
-  let size = Target_ocaml_int.of_int size in
+let mutable_string ~size ~machine_width =
+  let size = Target_ocaml_int.of_int machine_width size in
   let string_info =
     String_info.Set.singleton
       (String_info.create ~contents:Unknown_or_mutable ~size)
@@ -3957,12 +3960,13 @@ let mutable_array ~element_kind ~length alloc_mode =
   non_null_value
     (Array { element_kind; length; contents = Known Mutable; alloc_mode })
 
-let immutable_array ~element_kind ~fields alloc_mode =
+let immutable_array ~element_kind ~fields alloc_mode ~machine_width =
   non_null_value
     (Array
        { element_kind;
          length =
-           this_tagged_immediate (Target_ocaml_int.of_int (List.length fields));
+           this_tagged_immediate
+             (Target_ocaml_int.of_int machine_width (List.length fields));
          contents = Known (Immutable { fields = Array.of_list fields });
          alloc_mode
        })
@@ -4219,7 +4223,7 @@ module Head_of_kind_naked_vec256 =
 module Head_of_kind_naked_vec512 =
   Make_head_of_kind_naked_number (Vector_types.Vec512.Bit_pattern)
 
-let rec must_be_singleton t : RWC.t option =
+let rec must_be_singleton t ~machine_width : RWC.t option =
   match t with
   | Value ty -> (
     match TD.descr ty with
@@ -4254,7 +4258,7 @@ let rec must_be_singleton t : RWC.t option =
           match immediates with
           | Unknown -> None
           | Known immediates -> (
-            match must_be_singleton immediates with
+            match must_be_singleton immediates ~machine_width with
             | None -> None
             | Some const -> (
               match RWC.descr const with
@@ -4297,7 +4301,8 @@ let rec must_be_singleton t : RWC.t option =
     | Ok (Equals simple) -> Simple.must_be_const simple
     | Ok (No_alias is) -> (
       match Int8.Set.get_singleton is with
-      | Some i -> Some (RWC.naked_immediate (Target_ocaml_int.of_int8 i))
+      | Some i ->
+        Some (RWC.naked_immediate (Target_ocaml_int.of_int8 machine_width i))
       | None -> None))
   | Naked_int16 ty -> (
     match TD.descr ty with
@@ -4305,7 +4310,8 @@ let rec must_be_singleton t : RWC.t option =
     | Ok (Equals simple) -> Simple.must_be_const simple
     | Ok (No_alias is) -> (
       match Int16.Set.get_singleton is with
-      | Some i -> Some (RWC.naked_immediate (Target_ocaml_int.of_int16 i))
+      | Some i ->
+        Some (RWC.naked_immediate (Target_ocaml_int.of_int16 machine_width i))
       | None -> None))
   | Naked_int32 ty -> (
     match TD.descr ty with

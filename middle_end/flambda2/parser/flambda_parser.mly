@@ -234,6 +234,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token PRIM_UNTAG_IMM [@symbol "%untag_imm"]
 
 %token STATIC_CONST_BLOCK [@symbol "Block"]
+%token STATIC_CONST_VALUE_ARRAY [@symbol "Value_array"]
 %token STATIC_CONST_FLOAT_ARRAY [@symbol "Float_array"]
 %token STATIC_CONST_FLOAT_BLOCK [@symbol "Float_block"]
 %token STATIC_CONST_EMPTY_ARRAY [@symbol "Empty_array"]
@@ -433,7 +434,10 @@ unop:
     mut = mutability;
     kind = block_access_kind;
     LPAREN; field = tag; RPAREN;
-    { Block_load { kind; mut; field = Target_ocaml_int.of_int field } }
+    { (* CR mshinwell: Should get machine_width from fexpr context when
+         available *)
+      let mw = Target_system.Machine_width.Sixty_four in
+      Block_load { kind; mut; field = Target_ocaml_int.of_int mw field } }
 
 infix_binop:
   | o = binary_int_arith_op { Int_arith o }
@@ -583,10 +587,12 @@ binop_app:
     block = simple; DOT;
     LPAREN; field = tag; RPAREN;
     init = init_or_assign;
-    v = simple
-    { Binary
-        (Block_set
-           { kind; init; field = Target_ocaml_int.of_int field }, block, v) }
+    v = simple;
+    { (* CR mshinwell: pass machine width through properly *)
+      let mw = Target_system.Machine_width.Sixty_four in
+      let field = Target_ocaml_int.of_int mw field in
+      Binary (Block_set { kind; init; field }, block, v) }
+           (* TODO: Should get machine_width from fexpr context *)
   | op = prefix_binop; LPAREN; arg1 = simple; COMMA; arg2 = simple; RPAREN
     { Binary (op, arg1, arg2) }
   | arg1 = simple; op = infix_binop; arg2 = simple
@@ -994,6 +1000,10 @@ static_data:
     fs = separated_list(SEMICOLON, float_or_variable);
     RBRACKPIPE
     { Immutable_float_array fs }
+  | STATIC_CONST_VALUE_ARRAY; LBRACKPIPE;
+    fs = separated_list(SEMICOLON, field_of_block);
+    RBRACKPIPE
+    { Immutable_value_array fs }
   | STATIC_CONST_EMPTY_ARRAY kind=empty_array_kind { Empty_array kind }
   | KWD_MUTABLE; s = STRING { Mutable_string { initial_value = s } }
   | s = STRING { Immutable_string s }

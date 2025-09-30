@@ -59,9 +59,11 @@ val these_tagged_immediates0 : Target_ocaml_int.Set.t -> Type_grammar.t
 
 val these_tagged_immediates : Target_ocaml_int.Set.t -> Type_grammar.t
 
-val any_tagged_bool : Type_grammar.t
+val any_tagged_bool :
+  machine_width:Target_system.Machine_width.t -> Type_grammar.t
 
-val any_naked_bool : Type_grammar.t
+val any_naked_bool :
+  machine_width:Target_system.Machine_width.t -> Type_grammar.t
 
 val this_boxed_float32 :
   Numeric_types.Float32_by_bit_pattern.t ->
@@ -122,9 +124,13 @@ val any_block : Type_grammar.t
 
 (* Note this is only for blocks (variants, tuples, etc), not arrays! *)
 val blocks_with_these_tags :
-  Tag.Set.t -> Alloc_mode.For_types.t -> Type_grammar.t Or_unknown.t
+  machine_width:Target_system.Machine_width.t ->
+  Tag.Set.t ->
+  Alloc_mode.For_types.t ->
+  Type_grammar.t Or_unknown.t
 
 val immutable_block :
+  machine_width:Target_system.Machine_width.t ->
   is_unique:bool ->
   Tag.t ->
   shape:Flambda_kind.Block_shape.t ->
@@ -133,6 +139,7 @@ val immutable_block :
   Type_grammar.t
 
 val immutable_block_with_size_at_least :
+  machine_width:Target_system.Machine_width.t ->
   tag:Tag.t Or_unknown.t ->
   n:Target_ocaml_int.t ->
   shape:Flambda_kind.Block_shape.t ->
@@ -140,6 +147,7 @@ val immutable_block_with_size_at_least :
   Type_grammar.t
 
 val variant :
+  machine_width:Target_system.Machine_width.t ->
   const_ctors:Type_grammar.t ->
   non_const_ctors:
     (Flambda_kind.Block_shape.t * Type_grammar.t list) Tag.Scannable.Map.t ->
@@ -149,7 +157,7 @@ val variant :
 val exactly_this_closure :
   Function_slot.t ->
   all_function_slots_in_set:
-    Type_grammar.function_type Or_unknown_or_bottom.t Function_slot.Map.t ->
+    Type_grammar.function_type Or_unknown.t Function_slot.Map.t ->
   all_closure_types_in_set:Type_grammar.t Function_slot.Map.t ->
   all_value_slots_in_set:Type_grammar.t Value_slot.Map.t ->
   Alloc_mode.For_types.t ->
@@ -190,9 +198,12 @@ val arity_of_list : Type_grammar.t list -> [`Unarized] Flambda_arity.t
 
 val unknown_with_subkind :
   ?alloc_mode:Alloc_mode.For_types.t ->
+  machine_width:Target_system.Machine_width.t ->
   Flambda_kind.With_subkind.t ->
   Type_grammar.t
 
 (** For each of the kinds in an arity, create an "unknown" type. *)
 val unknown_types_from_arity :
-  [`Unarized] Flambda_arity.t -> Type_grammar.t list
+  machine_width:Target_system.Machine_width.t ->
+  [`Unarized] Flambda_arity.t ->
+  Type_grammar.t list

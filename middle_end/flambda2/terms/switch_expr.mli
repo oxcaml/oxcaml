@@ -33,6 +33,7 @@ val create :
 
 (** Create a [Switch] corresponding to a traditional if-then-else. *)
 val if_then_else :
+  machine_width:Target_system.Machine_width.t ->
   condition_dbg:Debuginfo.t ->
   scrutinee:Simple.t ->
   if_true:Apply_cont_expr.t ->

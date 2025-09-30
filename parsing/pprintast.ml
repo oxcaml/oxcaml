@@ -246,6 +246,8 @@ let longident_loc f x = pp f "%a" longident x.txt
 let constant f = function
   | Pconst_char i ->
       pp f "%C"  i
+  | Pconst_untagged_char i ->
+      pp f "#%C"  i
   | Pconst_string (i, _, None) ->
       pp f "%S" i
   | Pconst_string (i, _, Some delim) ->
@@ -450,9 +452,9 @@ and type_with_label ctxt f (label, c, mode) =
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
-  | Default -> pp f "_"
-  | Abbreviation s -> pp f "%s" s
-  | Mod (t, modes) ->
+  | Pjk_default -> pp f "_"
+  | Pjk_abbreviation s -> pp f "%s" s
+  | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
     | _ :: _ ->
@@ -462,15 +464,15 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
           (pp_print_list ~pp_sep:pp_print_space mode) modes
       ) f (t, modes)
     end
-  | With (t, ty, modalities) ->
+  | Pjk_with (t, ty, modalities) ->
     Misc.pp_parens_if nested (fun f (t, ty, modalities) ->
       pp f "%a with %a%a"
         (jkind_annotation ~nested:true ctxt) t
         (core_type ctxt) ty
         optional_space_atat_modalities modalities;
     ) f (t, ty, modalities)
-  | Kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
-  | Product ts ->
+  | Pjk_kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
+  | Pjk_product ts ->
     Misc.pp_parens_if nested (fun f ts ->
       pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
     ) f ts
@@ -2248,6 +2250,8 @@ and block_access ctxt f = function
       | Index_int -> ""
       | Index_unboxed_int64 -> "L"
       | Index_unboxed_int32 -> "l"
+      | Index_unboxed_int16 -> "S"
+      | Index_unboxed_int8 -> "s"
       | Index_unboxed_nativeint -> "n"
     in
     pp f "%s%s(%a)" dotop suffix (expression ctxt) index

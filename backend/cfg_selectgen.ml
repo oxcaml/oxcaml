@@ -23,7 +23,6 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-4-9-40-41-42"]
 
 module DLL = Oxcaml_utils.Doubly_linked_list
-module Int = Numbers.Int
 module Or_never_returns = Select_utils.Or_never_returns
 module SU = Select_utils
 module V = Backend_var
@@ -1041,7 +1040,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       body =
     let handlers =
       List.map
-        (fun (nfail, ids, e2, dbg, is_cold) ->
+        (fun Cmm.{ label = nfail; params = ids; body = e2; dbg; is_cold } ->
           let rs =
             List.map
               (fun (id, typ) ->
@@ -1059,8 +1058,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (fun (env, map) (nfail, ids, rs, e2, dbg, is_cold) ->
           let label = Cmm.new_label () in
           let env, r = SU.env_add_static_exception nfail rs env label in
-          env, Int.Map.add nfail (r, (ids, rs, e2, dbg, is_cold, label)) map)
-        (env, Int.Map.empty) handlers
+          ( env,
+            Static_label.Map.add nfail
+              (r, (ids, rs, e2, dbg, is_cold, label))
+              map ))
+        (env, Static_label.Map.empty)
+        handlers
     in
     let r_body, sub_body = emit_new_sub_cfg env body ~bound_name in
     let translate_one_handler _nfail
@@ -1105,16 +1108,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
-        Int.Map.partition
+        Static_label.Map.partition
           (fun _n (r, _) ->
             match !r with SU.Unreachable -> true | SU.Reachable _ -> false)
           not_built
       in
-      if Int.Map.is_empty to_build
+      if Static_label.Map.is_empty to_build
       then already_built
       else
         let already_built =
-          Int.Map.fold
+          Static_label.Map.fold
             (fun nfail handler already_built ->
               translate_one_handler nfail handler :: already_built)
             to_build already_built
@@ -1130,7 +1133,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (* We cannot drop exception handlers as some trap instructions may refer
            to them even if they're unreachable. Instead, [translate_one_handler]
            will generate a dummy handler for the unreachable cases. *)
-        Int.Map.fold
+        Static_label.Map.fold
           (fun nfail handler all_handlers ->
             translate_one_handler nfail handler :: all_handlers)
           handlers_map []
@@ -1162,9 +1165,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let handler =
           try SU.env_find_static_exception nfail env
           with Not_found ->
-            Misc.fatal_error
-              ("Selection.emit_expr: unbound label "
-             ^ Stdlib.Int.to_string nfail)
+            Misc.fatal_errorf "Selection.emit_expr: unbound label %a"
+              Static_label.format nfail
         in
         (* Intermediate registers to handle cases where some registers from src
            are present in dest *)
@@ -1319,7 +1321,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   and emit_tail_catch env sub_cfg (flag : Cmm.ccatch_flag) handlers e1 =
     let handlers =
       List.map
-        (fun (nfail, ids, e2, dbg, is_cold) ->
+        (fun Cmm.{ label = nfail; params = ids; body = e2; dbg; is_cold } ->
           let rs =
             List.map
               (fun (id, typ) ->
@@ -1335,8 +1337,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (fun (env, map) (nfail, ids, rs, e2, dbg, is_cold) ->
           let label = Cmm.new_label () in
           let env, r = SU.env_add_static_exception nfail rs env label in
-          env, Int.Map.add nfail (r, (ids, rs, e2, dbg, is_cold, label)) map)
-        (env, Int.Map.empty) handlers
+          ( env,
+            Static_label.Map.add nfail
+              (r, (ids, rs, e2, dbg, is_cold, label))
+              map ))
+        (env, Static_label.Map.empty)
+        handlers
     in
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let s_body = emit_tail_new_sub_cfg env e1 in
@@ -1383,16 +1389,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
-        Int.Map.partition
+        Static_label.Map.partition
           (fun _n (r, _) ->
             match !r with SU.Unreachable -> true | SU.Reachable _ -> false)
           not_built
       in
-      if Int.Map.is_empty to_build
+      if Static_label.Map.is_empty to_build
       then already_built
       else
         let already_built =
-          Int.Map.fold
+          Static_label.Map.fold
             (fun nfail handler already_built ->
               translate_one_handler nfail handler :: already_built)
             to_build already_built
@@ -1408,7 +1414,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (* We cannot drop exception handlers as some trap instructions may refer
            to them even if they're unreachable. Instead, [translate_one_handler]
            will generate a dummy handler for the unreachable cases. *)
-        Int.Map.fold
+        Static_label.Map.fold
           (fun nfail handler all_handlers ->
             translate_one_handler nfail handler :: all_handlers)
           handlers_map []
@@ -1430,6 +1436,34 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     (match at_start with None -> () | Some f -> f sub_cfg);
     emit_tail env sub_cfg exp;
     sub_cfg
+
+  let insert_param_name_for_debugger block fun_args loc_arg num_regs_per_arg =
+    let loc_arg_index = ref 0 in
+    List.iteri
+      (fun param_index (var, _ty) ->
+        let provenance = VP.provenance var in
+        let var = VP.var var in
+        let num_regs_for_arg = num_regs_per_arg.(param_index) in
+        let hard_regs_for_arg =
+          Array.init num_regs_for_arg (fun index ->
+              loc_arg.(!loc_arg_index + index))
+        in
+        loc_arg_index := !loc_arg_index + num_regs_for_arg;
+        if Option.is_some provenance
+        then
+          let naming_op =
+            Operation.Name_for_debugger
+              { ident = var;
+                provenance;
+                which_parameter = Some param_index;
+                is_assignment = false;
+                regs = hard_regs_for_arg
+              }
+          in
+          DLL.add_end block.Cfg.body
+            (Sub_cfg.make_instr (Cfg.Op naming_op) hard_regs_for_arg [||]
+               Debuginfo.none))
+      fun_args
 
   (* Sequentialization of a function definition *)
 
@@ -1458,31 +1492,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         f.Cmm.fun_args rargs env
     in
     let body = Sub_cfg.make_empty () in
-    let loc_arg_index = ref 0 in
-    List.iteri
-      (fun param_index (var, _ty) ->
-        let provenance = VP.provenance var in
-        let var = VP.var var in
-        let num_regs_for_arg = num_regs_per_arg.(param_index) in
-        let hard_regs_for_arg =
-          Array.init num_regs_for_arg (fun index ->
-              loc_arg.(!loc_arg_index + index))
-        in
-        loc_arg_index := !loc_arg_index + num_regs_for_arg;
-        if Option.is_some provenance
-        then
-          let naming_op =
-            Operation.Name_for_debugger
-              { ident = var;
-                provenance;
-                which_parameter = Some param_index;
-                is_assignment = false;
-                regs = hard_regs_for_arg
-              }
-          in
-          insert_debug env body (Op naming_op) Debuginfo.none hard_regs_for_arg
-            [||])
-      f.Cmm.fun_args;
     SU.insert_moves env body loc_arg rarg;
     let prologue_poll_instr_id =
       insert_op_debug_returning_id env body Operation.Poll Debuginfo.none [||]
@@ -1506,6 +1515,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Cfg.make_empty_block ~label:(Cfg.entry_label cfg)
         (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none)
     in
+    insert_param_name_for_debugger entry_block f.Cmm.fun_args loc_arg
+      num_regs_per_arg;
     Cfg.add_block_exn cfg entry_block;
     DLL.add_end layout entry_block.start;
     let tailrec_block =
@@ -1516,25 +1527,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     Cfg.add_block_exn cfg tailrec_block;
     DLL.add_end layout tailrec_block.start;
-    let delete_prologue_poll =
-      (* CR mshinwell/xclerc: find a neater way of doing this rather than making
-         a special case for the [optimistic_prologue_poll_instr_id]. *)
-      not
-        (Cfg_polling.requires_prologue_poll ~future_funcnames
-           ~fun_name:f.Cmm.fun_name.sym_name
-           ~optimistic_prologue_poll_instr_id:prologue_poll_instr_id cfg)
-    in
-    let found_prologue_poll = ref false in
     Sub_cfg.iter_basic_blocks body ~f:(fun (block : Cfg.basic_block) ->
-        if delete_prologue_poll && not !found_prologue_poll
-        then
-          DLL.filter_left block.body
-            ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
-              let is_prologue_poll =
-                InstructionId.equal instr.id prologue_poll_instr_id
-              in
-              if is_prologue_poll then found_prologue_poll := true;
-              not is_prologue_poll);
         if not (Cfg.is_never_terminator block.terminator.desc)
         then (
           block.can_raise <- Cfg.can_raise_terminator block.terminator.desc;
@@ -1545,13 +1538,33 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Cfg.add_block_exn cfg block;
           DLL.add_end layout block.start)
         else assert (DLL.is_empty block.body));
-    if delete_prologue_poll && not !found_prologue_poll
-    then Misc.fatal_error "Did not find [Poll] instruction to delete";
     (* note: `Cfgize.Stack_offset_and_exn.update_cfg` may add edges to the
        graph, and should hence be executed before
        `Cfg.register_predecessors_for_all_blocks`. *)
     SU.Stack_offset_and_exn.update_cfg cfg;
     Cfg.register_predecessors_for_all_blocks cfg;
+    (* Delete prologue_poll instruction if not needed *)
+    let delete_prologue_poll =
+      (* CR mshinwell/xclerc: find a neater way of doing this rather than making
+         a special case for the [optimistic_prologue_poll_instr_id]. *)
+      not
+        (Cfg_polling.requires_prologue_poll ~future_funcnames
+           ~fun_name:f.Cmm.fun_name.sym_name
+           ~optimistic_prologue_poll_instr_id:prologue_poll_instr_id cfg)
+    in
+    let found_prologue_poll = ref false in
+    Cfg.iter_blocks cfg ~f:(fun _label (block : Cfg.basic_block) ->
+        if delete_prologue_poll && not !found_prologue_poll
+        then
+          DLL.filter_left block.body
+            ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+              let is_prologue_poll =
+                InstructionId.equal instr.id prologue_poll_instr_id
+              in
+              if is_prologue_poll then found_prologue_poll := true;
+              not is_prologue_poll));
+    if delete_prologue_poll && not !found_prologue_poll
+    then Misc.fatal_error "Did not find [Poll] instruction to delete";
     let fun_contains_calls =
       Sub_cfg.exists_basic_blocks body ~f:Cfg.basic_block_contains_calls
     in

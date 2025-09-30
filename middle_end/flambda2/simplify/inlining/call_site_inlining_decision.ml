@@ -97,14 +97,16 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
             ~specialization_map:(DA.specialization_map dacc)
             ~return_continuation:function_return_cont
             ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
+            ~machine_width:(DE.machine_width (DA.denv dacc))
         in
         let uenv =
           (* Note that we don't need to do anything special if the exception
              continuation takes extra arguments, since we are only simplifying
              the body of the function in question, not substituting it into an
              existing context. *)
+          let machine_width = DE.machine_width (DA.denv dacc) in
           UE.add_function_return_or_exn_continuation
-            (UE.create (DA.are_rebuilding_terms dacc))
+            (UE.create (DA.are_rebuilding_terms dacc) ~machine_width)
             (Exn_continuation.exn_handler exn_continuation)
             (Flambda_arity.create_singletons
                [Flambda_kind.With_subkind.any_value])
@@ -190,7 +192,7 @@ let get_rec_info dacc ~function_type =
   | Need_meet -> Rec_info_expr.unknown
   | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline
 
-let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
+let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =
   let must_inline = DE.must_inline (DA.denv dacc) in
   let fail_if_must_inline () =
@@ -303,3 +305,9 @@ let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
               fail_if_must_inline ();
               Unrolling_depth_exceeded)
           | `Always -> Attribute_always))
+
+let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
+    Call_site_inlining_decision_type.t =
+  if !Clflags.jsir
+  then Jsir_inlining_disabled
+  else make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity

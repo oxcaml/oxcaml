@@ -59,12 +59,18 @@ let randomized_default =
 
 let randomized = Atomic.make randomized_default
 
-let randomize () = Atomic.Contended.set randomized true
-let is_randomized () = Atomic.Contended.get randomized
+let randomize () = Atomic.set randomized true
+let is_randomized () = Atomic.get randomized
 
-module DLS = Domain.Safe.DLS
-
-let prng_key = DLS.new_key Random.State.make_self_init
+module Rng : sig
+  val bits : unit -> int
+end = struct
+  (* This is safe since [bits] is a C call that cannot be preempted, 
+     we do not yield, and we do not borrow the state. *)
+  let key = Domain.Safe.DLS.new_key Random.State.make_self_init
+  let[@inline] bits () = 
+    Random.State.bits (Obj.magic_uncontended (Domain.Safe.DLS.get key))
+end
 
 (* Functions which appear before the functorial interface must either be
    independent of the hash function or take it as a parameter (see #2202 and
@@ -81,7 +87,7 @@ let create ?(random = is_randomized ()) initial_size =
   let s = power_2_above 16 initial_size in
   let seed =
     if random
-    then DLS.access (fun access -> Random.State.bits (DLS.get access prng_key))
+    then Rng.bits ()
     else 0
   in
   { initial_size = s; size = 0; seed = seed; data = Array.make s Empty }
@@ -781,7 +787,7 @@ let rebuild ?(random = is_randomized ()) h =
   let s = power_2_above 16 (Array.length h.data) in
   let seed =
     if random
-    then DLS.access (fun access -> Random.State.bits (DLS.get access prng_key))
+    then Rng.bits ()
     else if Obj.size (Obj.repr h) >= 4 then h.seed
     else 0 in
   let h' = {

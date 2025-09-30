@@ -57,9 +57,11 @@ and simple_or_prim =
   | Simple of Simple.t
   | Prim of expr_primitive
 
-let simple_untagged_int x : simple_or_prim =
+let simple_untagged_int ~machine_width x : simple_or_prim =
   Simple
-    (Simple.const (Reg_width_const.naked_immediate (Target_ocaml_int.of_int x)))
+    (Simple.const
+       (Reg_width_const.naked_immediate
+          (Target_ocaml_int.of_int machine_width x)))
 
 let simple_i64 x : simple_or_prim =
   Simple (Simple.const (Reg_width_const.naked_int64 x))
@@ -323,12 +325,15 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
                   Apply_cont_with_acc.goto acc condition_passed_cont
                 in
                 let acc, failure = Apply_cont_with_acc.goto acc failure_cont in
+                let machine_width = Acc.machine_width acc in
                 Expr_with_acc.create_switch acc
                   (Switch.create ~condition_dbg:dbg ~scrutinee:prim_result
                      ~arms:
                        (Target_ocaml_int.Map.of_list
-                          [ Target_ocaml_int.bool_true, condition_passed;
-                            Target_ocaml_int.bool_false, failure ])))
+                          [ ( Target_ocaml_int.bool_true machine_width,
+                              condition_passed );
+                            Target_ocaml_int.bool_false machine_width, failure
+                          ])))
           in
           Let_cont_with_acc.build_non_recursive acc condition_passed_cont
             ~handler_params:Bound_parameters.empty
@@ -377,12 +382,13 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
       let acc, ifso_cont = Apply_cont_with_acc.goto acc ifso_cont in
       let acc, ifnot_cont = Apply_cont_with_acc.goto acc ifnot_cont in
       let acc, switch =
+        let machine_width = Acc.machine_width acc in
         Expr_with_acc.create_switch acc
           (Switch.create ~condition_dbg:dbg ~scrutinee:(Simple.var cond_result)
              ~arms:
                (Target_ocaml_int.Map.of_list
-                  [ Target_ocaml_int.bool_true, ifso_cont;
-                    Target_ocaml_int.bool_false, ifnot_cont ]))
+                  [ Target_ocaml_int.bool_true machine_width, ifso_cont;
+                    Target_ocaml_int.bool_false machine_width, ifnot_cont ]))
       in
       Let_with_acc.create acc
         (Bound_pattern.singleton cond_result_pat)
@@ -448,7 +454,8 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
               |> Bound_pattern.singleton
             in
             Let_with_acc.create acc pat named ~body))
-      (cont acc [Named.create_simple Simple.const_unit])
+      (let machine_width = Acc.machine_width acc in
+       cont acc [Named.create_simple (Simple.const_unit machine_width)])
       (List.rev expr_primitives)
   | Unboxed_product (expr_primitive :: expr_primitives) ->
     bind_recs acc exn_cont ~register_const0 expr_primitive dbg

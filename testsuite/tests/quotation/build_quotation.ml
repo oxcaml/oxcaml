@@ -353,7 +353,8 @@ Here is an example of a case that is not matched:
   let rec f =
   (fun x -> if ((x mod 2) = 0) then (x + (g (x / 2))) else g (x - 1))
   and g = (fun x__1 -> if (x__1 = 0) then 0 else x__1 + (f (x__1 - 1))) in
-  f 20 ]>
+  f 20
+]>
 |}];;
 
 <[

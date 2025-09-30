@@ -2,7 +2,9 @@
  modules = "replace_caml_modify.c";
  {
    not-macos;
-   flags = "-cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify \
+   (* Remove layout_beta here when block indices are out of beta *)
+   flags = "-extension layouts_beta \
+            -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify_local";
    native;
  }
@@ -103,21 +105,21 @@ let () =
     foo.(0) <- x
   in
   let expect_caml_modifies = 1 in
-  (* CR layouts v2.8: should have no caml_modify call *)
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
   test ~expect_caml_modifies (fun () -> f 10);
   test ~expect_caml_modifies (fun () -> f "hello");
-  (* CR layouts v2.8: should have no caml_modify call *)
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385.*)
   test ~expect_caml_modifies (fun () -> f true);
   test ~expect_caml_modifies (fun () -> f { boxed = 10 });
   test ~expect_caml_modifies (fun () -> f { boxed = "hello" });
-  (* CR layouts v2.8: should have no caml_modify call *)
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
   test ~expect_caml_modifies (fun () -> f { unboxed = 10 });
   test ~expect_caml_modifies (fun () -> f { unboxed = "hello" });
-  (* CR layouts v2.8: should have no caml_modify call *)
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
   test ~expect_caml_modifies (fun () -> f External_variant.make);
   test ~expect_caml_modifies (fun () -> f (Boxed 10));
   test ~expect_caml_modifies (fun () -> f (Boxed "hello"));
-  (* CR layouts v2.8: should have no caml_modify call *)
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
   test ~expect_caml_modifies (fun () -> f (Unboxed 10));
   test ~expect_caml_modifies (fun () -> f (Unboxed "hello"))
 
@@ -326,3 +328,77 @@ let () =
     outer.y <- U inner4_2;
     ignore (Sys.opaque_identity outer)
   )
+
+(* Setting an immediate or non-value block index should give only the needed
+   number of caml_modifies *)
+
+(* First layout poly versions *)
+external unsafe_set : ('a : value) ('b : any).
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+[@@layout_poly]
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int }
+  end in
+  let t = { x = "x"; y = 0 } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set t idx 1; ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int64# }
+  end in
+  let t = { x = "x"; y = #0L } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set t idx #1L; ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : #(int64# * string * bool)}
+  end in
+  let t = { x = "x"; y = #(#0L, "a", true) } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:1
+    (fun () -> unsafe_set t idx #(#1L, "b", false);
+               ignore (Sys.opaque_identity t))
+
+(* Second, specialized versions *)
+external unsafe_set_imm : ('a : value) ('b : immediate).
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int }
+  end in
+  let t = { x = "x"; y = 0 } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm t idx 1; ignore (Sys.opaque_identity t))
+
+external unsafe_set_i64 : ('a : value) ('b : bits64).
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int64# }
+  end in
+  let t = { x = "x"; y = #0L } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_i64 t idx #1L; ignore (Sys.opaque_identity t))
+
+external unsafe_set_prod : ('a : value) ('b : bits64 & value & immediate).
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : #(int64# * string * bool)}
+  end in
+  let t = { x = "x"; y = #(#0L, "a", true) } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:1
+    (fun () -> unsafe_set_prod t idx #(#1L, "b", false);
+               ignore (Sys.opaque_identity t))

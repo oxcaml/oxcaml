@@ -21,7 +21,10 @@ type t
 (** Create an upwards environment.
 
     The [are_rebuilding_terms] provided is only used for printing. *)
-val create : Are_rebuilding_terms.t -> t
+val create :
+  Are_rebuilding_terms.t -> machine_width:Target_system.Machine_width.t -> t
+
+val machine_width : t -> Target_system.Machine_width.t
 
 val print : Format.formatter -> t -> unit
 

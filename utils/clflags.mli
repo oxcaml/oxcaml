@@ -56,6 +56,20 @@ type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
 type shape_format = Old_merlin | Debugging_shapes
+type gdwarf_fidelity =
+  | Fidelity_low | Fidelity_medium | Fidelity_high
+  | Fidelity_very_high | Fidelity_ultra_high | Fidelity_unlimited
+
+module Dwarf_config_defaults : sig
+  val shape_reduce_depth : int option
+  val shape_eval_depth : int option
+  val max_cms_files_per_unit : int option
+  val max_cms_files_per_variable : int option
+  val max_type_to_shape_depth : int option
+  val max_shape_reduce_steps_per_variable : int option
+  val max_evaluation_steps_per_variable : int option
+  val shape_reduce_fuel : int option
+end
 
 val objfiles : string list ref
 val ccobjs : string list ref
@@ -75,6 +89,18 @@ val debug : bool ref
 val debug_full : bool ref
 val dwarf_c_toolchain_flag : string ref
 val dwarf_fission : dwarf_fission ref
+val dwarf_pedantic : bool ref
+val gdwarf_config_shape_reduce_depth : int option ref
+val gdwarf_config_shape_eval_depth : int option ref
+val gdwarf_config_max_cms_files_per_unit : int option ref
+val gdwarf_config_max_cms_files_per_variable : int option ref
+val gdwarf_config_max_type_to_shape_depth : int option ref
+val gdwarf_config_max_shape_reduce_steps_per_variable : int option ref
+val gdwarf_config_max_evaluation_steps_per_variable : int option ref
+val gdwarf_config_shape_reduce_fuel : int option ref
+val gdwarf_fidelity : gdwarf_fidelity option ref
+val gdwarf_fidelity_of_string : string -> gdwarf_fidelity option
+val set_gdwarf_fidelity : gdwarf_fidelity -> unit
 val unsafe : bool ref
 val use_linscan : bool ref
 val link_everything : bool ref
@@ -155,6 +181,7 @@ val dump_linear : bool ref
 val debug_ocaml : bool ref
 val keep_startup_file : bool ref
 val native_code : bool ref
+val jsir : bool ref
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref
@@ -210,6 +237,7 @@ val default_inline_max_depth : int
 val inline_max_depth : Int_arg_helper.parsed ref
 val remove_unused_arguments : bool ref
 val dump_flambda_verbose : bool ref
+val dump_jsir : bool ref
 val classic_inlining : bool ref
 val afl_instrument : bool ref
 val afl_inst_ratio : int ref
@@ -292,6 +320,19 @@ val set_save_ir_after : Compiler_pass.t -> bool -> unit
 val set_save_ir_before : Compiler_pass.t -> bool -> unit
 val should_save_ir_after : Compiler_pass.t -> bool
 val should_save_ir_before : Compiler_pass.t -> bool
+
+module Register_allocator : sig
+  type t =
+    | Cfg
+    | Irc
+    | Ls
+    | Gi
+  val equal : t -> t -> bool
+  val to_string : t -> string
+  val of_string : string -> t option
+  val assoc_list : (string * t) list
+  val format : Format.formatter -> t -> unit
+end
 
 val is_flambda2 : unit -> bool
 

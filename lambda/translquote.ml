@@ -1985,7 +1985,15 @@ let quote_constant loc (const : Typedtree.constant) =
   | Const_unboxed_float32 x -> Constant.unboxed_float32 loc x
   | Const_unboxed_int32 x -> Constant.unboxed_int32 loc x
   | Const_unboxed_int64 x -> Constant.unboxed_int64 loc x
-  | Const_unboxed_nativeint x -> Constant.unboxed_nativeint loc x)
+  | Const_unboxed_nativeint x -> Constant.unboxed_nativeint loc x
+  (* TODO: add support for these in CamlinternalQuote *)
+  | Const_untagged_char x -> Constant.char loc x
+  | Const_int8 x
+  | Const_int16 x
+  | Const_untagged_int x
+  | Const_untagged_int8 x
+  | Const_untagged_int16 x -> Constant.int loc x
+  )
   |> Constant.wrap
 
 let quote_loc (loc : Location.t) =

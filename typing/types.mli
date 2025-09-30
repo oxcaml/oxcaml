@@ -85,14 +85,7 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** The mod-bounds of a jkind *)
 module Jkind_mod_bounds : sig
-  module Areality = Mode.Regionality.Const
-  module Linearity = Mode.Linearity.Const
-  module Uniqueness = Mode.Uniqueness.Const_op
-  module Portability = Mode.Portability.Const
-  module Contention = Mode.Contention.Const_op
-  module Yielding = Mode.Yielding.Const
-  module Statefulness = Mode.Statefulness.Const
-  module Visibility = Mode.Visibility.Const_op
+  module Crossing = Mode.Crossing
   module Externality = Jkind_axis.Externality
   module Nullability = Jkind_axis.Nullability
   module Separability = Jkind_axis.Separability
@@ -100,39 +93,18 @@ module Jkind_mod_bounds : sig
   type t
 
   val create :
-    areality:Areality.t ->
-    linearity:Linearity.t ->
-    uniqueness:Uniqueness.t ->
-    portability:Portability.t ->
-    contention:Contention.t ->
-    yielding:Yielding.t ->
-    statefulness:Statefulness.t ->
-    visibility:Visibility.t ->
+    Crossing.t->
     externality:Externality.t ->
     nullability:Nullability.t ->
     separability:Separability.t ->
     t
 
-  val areality : t -> Areality.t
-  val linearity : t -> Linearity.t
-  val uniqueness : t -> Uniqueness.t
-  val portability : t -> Portability.t
-  val contention : t -> Contention.t
-  val yielding : t -> Yielding.t
-  val statefulness : t -> Statefulness.t
-  val visibility : t -> Visibility.t
+  val crossing : t -> Crossing.t
   val externality : t -> Externality.t
   val nullability : t -> Nullability.t
   val separability : t -> Separability.t
 
-  val set_areality : Areality.t -> t -> t
-  val set_linearity : Linearity.t -> t -> t
-  val set_uniqueness : Uniqueness.t -> t -> t
-  val set_portability : Portability.t -> t -> t
-  val set_contention : Contention.t -> t -> t
-  val set_yielding : Yielding.t -> t -> t
-  val set_statefulness : Statefulness.t -> t -> t
-  val set_visibility : Visibility.t -> t -> t
+  val set_crossing : Crossing.t -> t -> t
   val set_externality : Externality.t -> t -> t
   val set_nullability : Nullability.t -> t -> t
   val set_separability : Separability.t -> t -> t
@@ -921,7 +893,7 @@ and label_declaration =
   {
     ld_id: Ident.t;
     ld_mutable: mutability;
-    ld_modalities: Mode.Modality.Value.Const.t;
+    ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t;
     ld_loc: Location.t;
@@ -941,7 +913,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
-    ca_modalities: Mode.Modality.Value.Const.t;
+    ca_modalities: Mode.Modality.Const.t;
     ca_type: type_expr;
     ca_sort: Jkind_types.Sort.Const.t;
     ca_loc: Location.t;
@@ -954,7 +926,8 @@ and constructor_arguments =
 val tys_of_constr_args : constructor_arguments -> type_expr list
 
 (* Returns the inner type and its modalities, if unboxed. *)
-val find_unboxed_type : type_declaration -> (type_expr * Mode.Modality.Value.Const.t) option
+val find_unboxed_type : type_declaration ->
+  (type_expr * Mode.Modality.Const.t) option
 
 type extension_constructor =
   {
@@ -1042,7 +1015,7 @@ module type Wrapped = sig
 
   type value_description =
     { val_type: type_expr wrapped;                (* Type of the value *)
-      val_modalities: Mode.Modality.Value.t;      (* Modalities on the value *)
+      val_modalities: Mode.Modality.t;      (* Modalities on the value *)
       val_kind: value_kind;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
@@ -1077,7 +1050,7 @@ module type Wrapped = sig
   and module_declaration =
   {
     md_type: module_type;
-    md_modalities : Mode.Modality.Value.t;
+    md_modalities : Mode.Modality.t;
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
@@ -1168,7 +1141,7 @@ type 'a gen_label_description =
     lbl_res: type_expr;                 (* Type of the result *)
     lbl_arg: type_expr;                 (* Type of the argument *)
     lbl_mut: mutability;                (* Is this a mutable field? *)
-    lbl_modalities: Mode.Modality.Value.Const.t;
+    lbl_modalities: Mode.Modality.Const.t;
                                         (* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
     lbl_pos: int;                       (* Position in type *)

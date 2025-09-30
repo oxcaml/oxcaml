@@ -274,7 +274,7 @@ module type S = sig
   (** Compute ranges for the code in the given linearized function declaration,
       returning the ranges as a value of type [t] and the rewritten code that
       must go forward for emission. *)
-  val create : Linear.fundecl -> t * Linear.fundecl
+  val create : ppf_dump:Format.formatter -> Linear.fundecl -> t * Linear.fundecl
 
   (** Iterate through ranges. Each range is associated with an index. *)
   val iter : t -> f:(Index.t -> Range.t -> unit) -> unit

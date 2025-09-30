@@ -255,8 +255,11 @@ let default_load ppf (program : Lambda.program) =
     else Filename.temp_file ("caml" ^ !phrase_name) ext_dll
   in
   let filename = Filename.chop_extension dll in
+  (* TODO: Determine machine_width properly from target configuration *)
+  let machine_width = Target_system.Machine_width.Sixty_four in
   let pipeline : Asmgen.pipeline =
-    Direct_to_cmm (Flambda2.lambda_to_cmm ~keep_symbol_tables:true)
+    Direct_to_cmm
+      (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
   in
   Asmgen.compile_implementation
     (module Unix : Compiler_owee.Unix_intf.S)
@@ -347,7 +350,7 @@ let name_expression ~loc ~attrs sort exp =
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
-      val_modalities = Mode.Modality.Value.id;
+      val_modalities = Mode.Modality.id;
       val_uid = Uid.internal_not_actually_unique; }
   in
   let sg = [Sig_value(id, vd, Exported)] in

@@ -128,7 +128,14 @@ let all_phys_regs =
 
 let phys_reg ty n =
   match (ty : machtype_component) with
-  | Int | Addr | Val -> hard_int_reg.(n)
+  | Int | Addr | Val ->
+    (* CR yusumez: We need physical registers to have the appropriate machtype
+       for the LLVM backend. However, this breaks an invariant the IRC register
+       allocator relies on. It is safe to guard it with this flag since the LLVM
+       backend doesn't get that far. *)
+    if !Clflags.llvm_backend
+    then { hard_int_reg.(n) with typ = ty }
+    else hard_int_reg.(n)
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
@@ -589,6 +596,10 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_by_simd_op op
   | Op (Specific (Isimd_mem (op,_))) ->
     destroyed_by_simd_mem_op op
+  | Op (Specific (Illvm_intrinsic intr)) ->
+      Misc.fatal_errorf "destroyed_at_basic: Unexpected llvm_intrinsic %s: \
+                         not using LLVM backend"
+        intr
   | Op (Move | Spill | Reload
        | Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
@@ -612,7 +623,10 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Poptrap _ | Prologue | Epilogue ->
     if fp then [| rbp |] else [||]
   | Stack_check _ ->
-    assert false (* the instruction is added after register allocation *)
+    (* This case is used by [Cfg_available_regs].  r10 is actually saved and
+       restored by the sequence to which [Stack_check] is expanded, but it may
+       be clobbered in the middle. *)
+    [| r10 |]
 
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
@@ -766,4 +780,5 @@ let expression_supported = function
   | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()
   | Cconst_vec512 _ -> Arch.Extension.enabled_vec512 ()
 
-let trap_size_in_bytes = 16
+let trap_size_in_bytes () =
+  if !Clflags.llvm_backend then 32 else 16

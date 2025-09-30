@@ -972,24 +972,32 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
       (match side with Left -> meet env ty shape | Right -> meet env shape ty)
   in
   let is_int_immediate ~is_int_ty ~immediates ~is_int_side =
-    if I.Set.is_empty immediates
-    then bottom_other_side is_int_side
-    else
+    match I.Set.choose_opt immediates with
+    | None -> bottom_other_side is_int_side
+    | Some arbitrary_int -> (
       let rebuild = TG.Head_of_kind_naked_immediate.create_is_int in
-      match I.Set.mem I.zero immediates, I.Set.mem I.one immediates with
+      let machine_width = I.machine_width arbitrary_int in
+      match
+        ( I.Set.mem (I.zero machine_width) immediates,
+          I.Set.mem (I.one machine_width) immediates )
+      with
       | false, false -> Bottom (New_result ())
       | true, true -> keep_side is_int_side
       | true, false ->
         meet_with_shape ~rebuild is_int_ty MTC.any_block is_int_side
       | false, true ->
-        meet_with_shape ~rebuild is_int_ty MTC.any_tagged_immediate is_int_side
+        meet_with_shape ~rebuild is_int_ty MTC.any_tagged_immediate is_int_side)
   in
   let is_null_immediate ~is_null_ty ~immediates ~is_null_side =
     if I.Set.is_empty immediates
     then bottom_other_side is_null_side
     else
       let rebuild = TG.Head_of_kind_naked_immediate.create_is_null in
-      match I.Set.mem I.zero immediates, I.Set.mem I.one immediates with
+      let machine_width = TE.machine_width (ME.typing_env env) in
+      match
+        ( I.Set.mem (I.zero machine_width) immediates,
+          I.Set.mem (I.one machine_width) immediates )
+      with
       | false, false -> Bottom (New_result ())
       | true, true -> keep_side is_null_side
       | true, false ->
@@ -997,13 +1005,14 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
       | false, true -> meet_with_shape ~rebuild is_null_ty TG.null is_null_side
   in
   let get_tag_immediate ~get_tag_ty ~immediates ~get_tag_side =
-    if I.Set.is_empty immediates
-    then bottom_other_side get_tag_side
-    else
+    match I.Set.choose_opt immediates with
+    | None -> bottom_other_side get_tag_side
+    | Some arbitrary_int -> (
       let tags =
         I.Set.fold
           (fun tag tags ->
-            match Tag.create_from_targetint tag with
+            let machine_width = I.machine_width arbitrary_int in
+            match Tag.create_from_targetint machine_width tag with
             | Some tag -> Tag.Set.add tag tags
             | None -> tags (* No blocks exist with this tag *))
           immediates Tag.Set.empty
@@ -1011,14 +1020,16 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
       if Tag.Set.is_empty tags
       then Bottom (New_result ())
       else
+        let machine_width = TE.machine_width (ME.typing_env env) in
         match
-          MTC.blocks_with_these_tags tags (Alloc_mode.For_types.unknown ())
+          MTC.blocks_with_these_tags ~machine_width tags
+            (Alloc_mode.For_types.unknown ())
         with
         | Known shape ->
           meet_with_shape
             ~rebuild:TG.Head_of_kind_naked_immediate.create_get_tag get_tag_ty
             shape get_tag_side
-        | Unknown -> keep_side get_tag_side
+        | Unknown -> keep_side get_tag_side)
   in
   match t1, t2 with
   | Naked_immediates is1, Naked_immediates is2 ->
@@ -1568,21 +1579,21 @@ and meet_array_of_types env fields1 fields2 ~length =
   meet_mapping ~meet_data:meet ~fold2 ~env ~left:fields1 ~right:fields2 ~rebuild
 
 and meet_function_type (env : ME.t)
-    (func_type1 : TG.Function_type.t Or_unknown_or_bottom.t)
-    (func_type2 : TG.Function_type.t Or_unknown_or_bottom.t) :
-    TG.Function_type.t Or_unknown_or_bottom.t meet_result =
+    (func_type1 : TG.Function_type.t Or_unknown.t)
+    (func_type2 : TG.Function_type.t Or_unknown.t) :
+    TG.Function_type.t Or_unknown.t meet_result =
   match func_type1, func_type2 with
-  | Bottom, Bottom | Unknown, Unknown -> Ok (Both_inputs, env)
-  | Bottom, _ | _, Unknown -> Ok (Left_input, env)
-  | _, Bottom | Unknown, _ -> Ok (Right_input, env)
-  | ( Ok { code_id = code_id1; rec_info = rec_info1 },
-      Ok { code_id = code_id2; rec_info = rec_info2 } ) ->
+  | Unknown, Unknown -> Ok (Both_inputs, env)
+  | _, Unknown -> Ok (Left_input, env)
+  | Unknown, _ -> Ok (Right_input, env)
+  | ( Known { code_id = code_id1; rec_info = rec_info1 },
+      Known { code_id = code_id2; rec_info = rec_info2 } ) ->
     let rebuild code_id rec_info =
       (* It's possible that [code_id] corresponds to deleted code. In that case,
          any attempt to inline will fail, as the code will not be found in the
          simplifier's environment -- see
          [Simplify_apply_expr.simplify_direct_function_call]. *)
-      Or_unknown_or_bottom.Ok (TG.Function_type.create code_id ~rec_info)
+      Or_unknown.Known (TG.Function_type.create code_id ~rec_info)
     in
     combine_results2 env ~rebuild ~meet_a:meet_code_id ~left_a:code_id1
       ~right_a:code_id2 ~meet_b:meet ~left_b:rec_info1 ~right_b:rec_info2
@@ -1967,38 +1978,42 @@ and join_head_of_kind_naked_immediate env
      those) but this looks unlikely to be useful and could end up begin quite
      expensive. *)
   | Is_int ty, Naked_immediates is_int | Naked_immediates is_int, Is_int ty -> (
-    if I.Set.is_empty is_int
-    then Known (TG.Head_of_kind_naked_immediate.create_is_int ty)
-    else
+    match I.Set.choose_opt is_int with
+    | None -> Known (TG.Head_of_kind_naked_immediate.create_is_int ty)
+    | Some arbitrary_int -> (
+      let machine_width = I.machine_width arbitrary_int in
       (* Slightly better than Unknown *)
       let head =
         TG.Head_of_kind_naked_immediate.create_naked_immediates
-          (I.Set.add I.zero (I.Set.add I.one is_int))
+          (I.Set.add (I.zero machine_width)
+             (I.Set.add (I.one machine_width) is_int))
       in
       match head with
       | Ok head -> Known head
       | Bottom ->
         Misc.fatal_error
-          "Did not expect [Bottom] from [create_naked_immediates]")
+          "Did not expect [Bottom] from [create_naked_immediates]"))
   | Get_tag ty, Naked_immediates tags | Naked_immediates tags, Get_tag ty ->
     if I.Set.is_empty tags
     then Known (TG.Head_of_kind_naked_immediate.create_get_tag ty)
     else Unknown
   | Is_null ty, Naked_immediates is_null | Naked_immediates is_null, Is_null ty
     -> (
-    if I.Set.is_empty is_null
-    then Known (TG.Head_of_kind_naked_immediate.create_is_null ty)
-    else
+    match I.Set.choose_opt is_null with
+    | None -> Known (TG.Head_of_kind_naked_immediate.create_is_null ty)
+    | Some arbitrary_int -> (
+      let machine_width = I.machine_width arbitrary_int in
       (* Slightly better than Unknown *)
       let head =
         TG.Head_of_kind_naked_immediate.create_naked_immediates
-          (I.Set.add I.zero (I.Set.add I.one is_null))
+          (I.Set.add (I.zero machine_width)
+             (I.Set.add (I.one machine_width) is_null))
       in
       match head with
       | Ok head -> Known head
       | Bottom ->
         Misc.fatal_error
-          "Did not expect [Bottom] from [create_naked_immediates]")
+          "Did not expect [Bottom] from [create_naked_immediates]"))
   | (Is_int _ | Get_tag _ | Is_null _), (Is_int _ | Get_tag _ | Is_null _) ->
     Unknown
 
@@ -2333,14 +2348,13 @@ and join_int_indexed_product env shape (fields1 : TG.Product.Int_indexed.t)
   TG.Product.Int_indexed.create_from_array fields
 
 and join_function_type (env : Join_env.t)
-    (func_type1 : TG.Function_type.t Or_unknown_or_bottom.t)
-    (func_type2 : TG.Function_type.t Or_unknown_or_bottom.t) :
-    TG.Function_type.t Or_unknown_or_bottom.t =
+    (func_type1 : TG.Function_type.t Or_unknown.t)
+    (func_type2 : TG.Function_type.t Or_unknown.t) :
+    TG.Function_type.t Or_unknown.t =
   match func_type1, func_type2 with
-  | Bottom, func_type | func_type, Bottom -> func_type
   | Unknown, _ | _, Unknown -> Unknown
-  | ( Ok { code_id = code_id1; rec_info = rec_info1 },
-      Ok { code_id = code_id2; rec_info = rec_info2 } ) -> (
+  | ( Known { code_id = code_id1; rec_info = rec_info1 },
+      Known { code_id = code_id2; rec_info = rec_info2 } ) -> (
     let target_typing_env = Join_env.target_join_env env in
     (* As a note, sometimes it might be preferable not to do the code age
        relation join, and take the hit of an indirect call in exchange for
@@ -2359,7 +2373,7 @@ and join_function_type (env : Join_env.t)
     | Unknown -> Unknown
     | Known code_id -> (
       match join env rec_info1 rec_info2 with
-      | Known rec_info -> Ok (TG.Function_type.create code_id ~rec_info)
+      | Known rec_info -> Known (TG.Function_type.create code_id ~rec_info)
       | Unknown -> Unknown))
 
 and join_env_extension env (ext1 : TEE.t) (ext2 : TEE.t) : TEE.t =

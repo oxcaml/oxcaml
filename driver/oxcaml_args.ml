@@ -46,7 +46,12 @@ let mk_dcfg f = ("-dcfg", Arg.Unit f, " (undocumented)")
 let mk_dcfg_invariants f =
   ("-dcfg-invariants", Arg.Unit f, " Extra sanity checks on Cfg")
 
-let mk_regalloc f = ("-regalloc", Arg.String f, " Select the register allocator")
+let mk_regalloc f =
+  ( "-regalloc",
+    Arg.Symbol
+      ( List.map fst Clflags.Register_allocator.assoc_list,
+        fun s -> f (List.assoc s Clflags.Register_allocator.assoc_list) ),
+    " Select the register allocator" )
 
 let mk_regalloc_linscan_threshold f =
   ( "-regalloc-linscan-threshold",
@@ -331,6 +336,12 @@ let mk_ddebug_invariants f =
 let mk_ddwarf_types f =
   ("-ddwarf-types", Arg.Unit f, " Enable debug output for DWARF type generation")
 
+let mk_ddwarf_metrics f =
+  ( "-ddwarf-metrics",
+    Arg.Unit f,
+    " Write DWARF metrics to auxiliary JSON file .debug-stats.json, which can \
+     then be aggregated with the analyze_debug_stats.py Python script." )
+
 let mk_internal_assembler f =
   ( "-internal-assembler",
     Arg.Unit f,
@@ -349,6 +360,11 @@ let mk_keep_llvmir f =
 
 let mk_llvm_path f =
   ("-llvm-path", Arg.String f, " Specify which LLVM compiler to use")
+
+let mk_llvm_flags f =
+  ( "-llvm-flags",
+    Arg.String f,
+    " Extra flags to pass to LLVM (like -march or -mtune)" )
 
 module Flambda2 = Oxcaml_flags.Flambda2
 
@@ -832,7 +848,8 @@ let mk_restrict_to_upstream_dwarf f =
 let mk_no_restrict_to_upstream_dwarf f =
   ( "-gno-upstream-dwarf",
     Arg.Unit f,
-    " Emit potentially more DWARF information than the upstream compiler" )
+    " Emit potentially more DWARF information than the upstream compiler. \
+     Implies -shape-format debugging-shapes." )
 
 let mk_dwarf_inlined_frames f =
   ("-gdwarf-inlined-frames", Arg.Unit f, " Emit DWARF inlined frame information")
@@ -890,6 +907,12 @@ let mk_gdwarf_fission f =
     \     Only takes effect with -gno-upstream-dwarf or --enable-oxcaml-dwarf"
   )
 
+let mk_gdwarf_pedantic f =
+  ( "-gdwarf-pedantic",
+    Arg.Unit f,
+    " Enable pedantic DWARF error checking (fatal errors instead of silent \
+     fallbacks)" )
+
 let mk_use_cached_generic_functions f =
   ( "-use-cached-generic-functions",
     Arg.Unit f,
@@ -929,9 +952,10 @@ module type Oxcaml_options = sig
   val dranges : unit -> unit
   val ddebug_invariants : unit -> unit
   val ddwarf_types : unit -> unit
+  val ddwarf_metrics : unit -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
-  val regalloc : string -> unit
+  val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
   val regalloc_param : string -> unit
   val regalloc_validate : unit -> unit
@@ -983,6 +1007,7 @@ module type Oxcaml_options = sig
   val dllvmir : unit -> unit
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
+  val llvm_flags : string -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val flambda2_join_points : unit -> unit
@@ -1058,6 +1083,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dranges F.dranges;
       mk_ddebug_invariants F.ddebug_invariants;
       mk_ddwarf_types F.ddwarf_types;
+      mk_ddwarf_metrics F.ddwarf_metrics;
       mk_ocamlcfg F.ocamlcfg;
       mk_no_ocamlcfg F.no_ocamlcfg;
       mk_dcfg F.dcfg;
@@ -1116,6 +1142,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dllvmir F.dllvmir;
       mk_keep_llvmir F.keep_llvmir;
       mk_llvm_path F.llvm_path;
+      mk_llvm_flags F.llvm_flags;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
       mk_flambda2_join_points F.flambda2_join_points;
@@ -1268,6 +1295,7 @@ module Oxcaml_options_impl = struct
   let dranges = set' Oxcaml_flags.dranges
   let ddebug_invariants = set' Dwarf_flags.ddebug_invariants
   let ddwarf_types = set' Dwarf_flags.ddwarf_types
+  let ddwarf_metrics = set' Dwarf_flags.ddwarf_metrics
   let heap_reduction_threshold x = Oxcaml_flags.heap_reduction_threshold := x
 
   let zero_alloc_check s =
@@ -1332,6 +1360,7 @@ module Oxcaml_options_impl = struct
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
   let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
+  let llvm_flags s = Oxcaml_flags.llvm_flags := s
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
   let flambda2_join_points = set Flambda2.join_points
@@ -1532,6 +1561,7 @@ module type Debugging_options = sig
   val gdwarf_max_function_complexity : int -> unit
   val gdwarf_compression : string -> unit
   val gdwarf_fission : string -> unit
+  val gdwarf_pedantic : unit -> unit
 end
 
 module Make_debugging_options (F : Debugging_options) = struct
@@ -1548,15 +1578,22 @@ module Make_debugging_options (F : Debugging_options) = struct
       mk_gdwarf_max_function_complexity F.gdwarf_max_function_complexity;
       mk_gdwarf_compression F.gdwarf_compression;
       mk_gdwarf_fission F.gdwarf_fission;
+      mk_gdwarf_pedantic F.gdwarf_pedantic;
     ]
 end
 
 module Debugging_options_impl = struct
   let restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := true
+    Debugging.restrict_to_upstream_dwarf := true;
+    Clflags.shape_format := Clflags.Old_merlin
 
   let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false
+    Debugging.restrict_to_upstream_dwarf := false;
+    Clflags.shape_format := Clflags.Debugging_shapes
+  (* CR sspies: We should only enable OxCaml DWARF on the compiler once we are
+     ready to switch, since it leads to a new format of shapes in the .cms and
+     .cmt files. Merlin should continue to work, but we should be careful and
+     probably should switch over to debugging shapes in general first. *)
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
@@ -1584,6 +1621,8 @@ module Debugging_options_impl = struct
              (Printf.sprintf
                 "Invalid value for -gdwarf-fission: %s\n\
                  Valid values are: none, objcopy, dsymutil" value))
+
+  let gdwarf_pedantic () = Clflags.dwarf_pedantic := true
 end
 
 module Extra_params = struct
@@ -1639,7 +1678,21 @@ module Extra_params = struct
         let dummy = ref false in
         set' dummy
     | "cfg-invariants" -> set' Oxcaml_flags.cfg_invariants
-    | "regalloc" -> set_string Oxcaml_flags.regalloc
+    | "regalloc" -> (
+        match Clflags.Register_allocator.of_string v with
+        | Some regalloc ->
+            Oxcaml_flags.regalloc := regalloc;
+            true
+        | None ->
+            let possible_values =
+              String.concat ","
+                (List.map fst Clflags.Register_allocator.assoc_list)
+            in
+            raise
+              (Arg.Bad
+                 (Printf.sprintf
+                    "invalid register allocator %S (possible values: %s)" v
+                    possible_values)))
     | "regalloc-linscan-threshold" ->
         set_int' Oxcaml_flags.regalloc_linscan_threshold
     | "regalloc-param" -> add_string Oxcaml_flags.regalloc_params
@@ -1659,6 +1712,7 @@ module Extra_params = struct
     | "dranges" -> set' Oxcaml_flags.dranges
     | "ddebug-invariants" -> set' Dwarf_flags.ddebug_invariants
     | "ddwarf-types" -> set' Dwarf_flags.ddwarf_types
+    | "ddwarf-metrics" -> set' Dwarf_flags.ddwarf_metrics
     | "reorder-blocks-random" ->
         set_int_option' Oxcaml_flags.reorder_blocks_random
     | "basic-block-sections" -> set' Oxcaml_flags.basic_block_sections
@@ -1728,12 +1782,20 @@ module Extra_params = struct
     | "gupstream-dwarf" -> set' Debugging.restrict_to_upstream_dwarf
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
+    | "gdwarf-pedantic" -> set' Clflags.dwarf_pedantic
     | "gdwarf-max-function-complexity" ->
         set_int' Debugging.dwarf_max_function_complexity
+    | "gdwarf-fidelity" -> (
+        match Clflags.gdwarf_fidelity_of_string v with
+        | Some fidelity ->
+            Clflags.set_gdwarf_fidelity fidelity;
+            true
+        | None -> Misc.fatal_error ("Invalid gdwarf-fidelity value: " ^ v))
     | "llvm-path" ->
         Oxcaml_flags.llvm_path := Some v;
         true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
+    | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->

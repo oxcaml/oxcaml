@@ -47,6 +47,8 @@ type out_value =
   | Oval_float of float
   | Oval_float32 of Obj.t (* We cannot use the [float32] type in the compiler. *)
   | Oval_int of int
+  | Oval_int8 of int (* We cannot use the [int8] type in the compiler. *)
+  | Oval_int16 of int (* We cannot use the [int16] type in the compiler. *)
   | Oval_int32 of int32
   | Oval_int64 of int64
   | Oval_nativeint of nativeint

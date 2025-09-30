@@ -148,12 +148,13 @@ module Typ = struct
     and loop_jkind jkind =
       let pjkind_desc =
         match jkind.pjkind_desc with
-        | Default as x -> x
-        | Abbreviation _ as x -> x
-        | Mod (jkind, modes) -> Mod (loop_jkind jkind, modes)
-        | With (jkind, typ, modalities) -> With (loop_jkind jkind, loop typ, modalities)
-        | Kind_of typ -> Kind_of (loop typ)
-        | Product jkinds -> Product (List.map loop_jkind jkinds)
+        | Pjk_default as x -> x
+        | Pjk_abbreviation _ as x -> x
+        | Pjk_mod (jkind, modes) -> Pjk_mod (loop_jkind jkind, modes)
+        | Pjk_with (jkind, typ, modalities) ->
+          Pjk_with (loop_jkind jkind, loop typ, modalities)
+        | Pjk_kind_of typ -> Pjk_kind_of (loop typ)
+        | Pjk_product jkinds -> Pjk_product (List.map loop_jkind jkinds)
       in
       { jkind with pjkind_desc }
     and loop_row_field field =

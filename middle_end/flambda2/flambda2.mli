@@ -19,6 +19,7 @@
 val lambda_to_cmm :
   ppf_dump:Format.formatter ->
   prefixname:string ->
+  machine_width:Target_system.Machine_width.t ->
   keep_symbol_tables:bool ->
   Lambda.program ->
   Cmm.phrase list
@@ -35,6 +36,7 @@ type flambda_result =
 val lambda_to_flambda :
   ppf_dump:Format.formatter ->
   prefixname:string ->
+  machine_width:Target_system.Machine_width.t ->
   Lambda.program ->
   flambda_result
 

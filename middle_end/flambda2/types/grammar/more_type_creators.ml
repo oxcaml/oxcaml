@@ -107,9 +107,11 @@ let these_tagged_immediates0 imms =
 
 let these_tagged_immediates imms = these_tagged_immediates0 imms
 
-let any_tagged_bool = these_tagged_immediates Target_ocaml_int.all_bools
+let any_tagged_bool ~machine_width =
+  these_tagged_immediates (Target_ocaml_int.all_bools machine_width)
 
-let any_naked_bool = TG.these_naked_immediates Target_ocaml_int.all_bools
+let any_naked_bool ~machine_width =
+  TG.these_naked_immediates (Target_ocaml_int.all_bools machine_width)
 
 let this_boxed_float32 f alloc_mode =
   TG.box_float32 (TG.this_naked_float32 f) alloc_mode
@@ -202,21 +204,22 @@ let any_block =
     ~immediates:(Known TG.bottom_naked_immediate) ~blocks:Unknown
     ~extensions:No_extensions
 
-let blocks_with_these_tags tags alloc_mode : _ Or_unknown.t =
+let blocks_with_these_tags ~machine_width tags alloc_mode : _ Or_unknown.t =
   if not (Tag.Set.for_all Tag.is_structured_block tags)
   then Unknown
   else
     let tags = Tag.Map.of_set (fun _ -> Or_unknown.Unknown) tags in
     let blocks =
-      TG.Row_like_for_blocks.create_blocks_with_these_tags tags alloc_mode
+      TG.Row_like_for_blocks.create_blocks_with_these_tags ~machine_width tags
+        alloc_mode
     in
     Known
       (TG.create_variant ~is_unique:false
          ~immediates:(Known TG.bottom_naked_immediate) ~blocks:(Known blocks)
          ~extensions:No_extensions)
 
-let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
-  match Target_ocaml_int.of_int_option (List.length fields) with
+let immutable_block ~machine_width ~is_unique tag ~shape alloc_mode ~fields =
+  match Target_ocaml_int.of_int_option machine_width (List.length fields) with
   | None ->
     (* CR-someday mshinwell: This should be a special kind of error. *)
     Misc.fatal_error "Block too long for target"
@@ -224,12 +227,13 @@ let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
     TG.create_variant ~is_unique ~immediates:(Known TG.bottom_naked_immediate)
       ~blocks:
         (Known
-           (TG.Row_like_for_blocks.create ~shape ~field_tys:fields (Closed tag)
-              alloc_mode))
+           (TG.Row_like_for_blocks.create ~machine_width ~shape
+              ~field_tys:fields (Closed tag) alloc_mode))
       ~extensions:No_extensions
 
-let immutable_block_non_null ~is_unique tag ~shape alloc_mode ~fields =
-  match Target_ocaml_int.of_int_option (List.length fields) with
+let immutable_block_non_null ~machine_width ~is_unique tag ~shape alloc_mode
+    ~fields =
+  match Target_ocaml_int.of_int_option machine_width (List.length fields) with
   | None ->
     (* CR-someday mshinwell: This should be a special kind of error. *)
     Misc.fatal_error "Block too long for target"
@@ -238,11 +242,12 @@ let immutable_block_non_null ~is_unique tag ~shape alloc_mode ~fields =
       ~immediates:(Known TG.bottom_naked_immediate)
       ~blocks:
         (Known
-           (TG.Row_like_for_blocks.create ~shape ~field_tys:fields (Closed tag)
-              alloc_mode))
+           (TG.Row_like_for_blocks.create ~machine_width ~shape
+              ~field_tys:fields (Closed tag) alloc_mode))
       ~extensions:No_extensions
 
-let immutable_block_with_size_at_least ~tag ~n ~shape ~field_n_minus_one =
+let immutable_block_with_size_at_least ~machine_width ~tag ~n ~shape
+    ~field_n_minus_one =
   let n = Target_ocaml_int.to_int n in
   let field_tys =
     List.init n (fun index ->
@@ -255,11 +260,12 @@ let immutable_block_with_size_at_least ~tag ~n ~shape ~field_n_minus_one =
     ~immediates:(Known TG.bottom_naked_immediate)
     ~blocks:
       (Known
-         (TG.Row_like_for_blocks.create ~shape ~field_tys (Open tag)
+         (TG.Row_like_for_blocks.create ~machine_width ~shape ~field_tys
+            (Open tag)
             (Alloc_mode.For_types.unknown ())))
     ~extensions:No_extensions
 
-let variant ~const_ctors ~non_const_ctors alloc_mode =
+let variant ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
   let blocks =
     let shape_and_field_tys_by_tag =
       Tag.Scannable.Map.fold
@@ -267,13 +273,13 @@ let variant ~const_ctors ~non_const_ctors alloc_mode =
           Tag.Map.add (Tag.Scannable.to_tag tag) ty non_const_ctors)
         non_const_ctors Tag.Map.empty
     in
-    TG.Row_like_for_blocks.create_exactly_multiple ~shape_and_field_tys_by_tag
-      alloc_mode
+    TG.Row_like_for_blocks.create_exactly_multiple ~machine_width
+      ~shape_and_field_tys_by_tag alloc_mode
   in
   TG.create_variant ~is_unique:false ~immediates:(Known const_ctors)
     ~blocks:(Known blocks) ~extensions:No_extensions
 
-let variant_non_null ~const_ctors ~non_const_ctors alloc_mode =
+let variant_non_null ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
   let blocks =
     let shape_and_field_tys_by_tag =
       Tag.Scannable.Map.fold
@@ -281,8 +287,8 @@ let variant_non_null ~const_ctors ~non_const_ctors alloc_mode =
           Tag.Map.add (Tag.Scannable.to_tag tag) ty non_const_ctors)
         non_const_ctors Tag.Map.empty
     in
-    TG.Row_like_for_blocks.create_exactly_multiple ~shape_and_field_tys_by_tag
-      alloc_mode
+    TG.Row_like_for_blocks.create_exactly_multiple ~machine_width
+      ~shape_and_field_tys_by_tag alloc_mode
   in
   TG.Head_of_kind_value_non_null.create_variant ~is_unique:false
     ~immediates:(Known const_ctors) ~blocks:(Known blocks)
@@ -316,7 +322,7 @@ let static_closure_with_this_code ~this_function_slot ~closure_symbol ~code_id =
         ~rec_info:(TG.this_rec_info Rec_info_expr.initial)
     in
     Function_slot.Map.singleton this_function_slot
-      (Or_unknown_or_bottom.Ok function_type)
+      (Or_unknown.Known function_type)
   in
   let closure_types =
     let closure_type =
@@ -351,7 +357,7 @@ let closure_with_at_least_these_function_slots ~this_function_slot
   in
   let function_types =
     Function_slot.Map.map
-      (fun _ -> Or_unknown_or_bottom.Unknown)
+      (fun _ -> Or_unknown.Unknown)
       function_slots_and_bindings
   in
   let closure_types =
@@ -442,7 +448,7 @@ let mutable_array_non_null ~element_kind ~length alloc_mode =
     ~length Unknown alloc_mode
 
 let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
-    (kind : Flambda_kind.With_subkind.t) =
+    ~machine_width (kind : Flambda_kind.With_subkind.t) =
   (* CR mshinwell: use [alloc_mode] more *)
   match Flambda_kind.With_subkind.kind kind with
   | Naked_number Naked_immediate -> TG.any_naked_immediate
@@ -477,14 +483,18 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
           Tag.Scannable.Map.map
             (fun (shape, fields) ->
               ( shape,
-                List.map (fun subkind -> unknown_with_subkind subkind) fields ))
+                List.map
+                  (fun subkind -> unknown_with_subkind ~machine_width subkind)
+                  fields ))
             non_consts
         in
-        Ok (variant_non_null ~const_ctors ~non_const_ctors alloc_mode)
+        Ok
+          (variant_non_null ~machine_width ~const_ctors ~non_const_ctors
+             alloc_mode)
       | Float_block { num_fields } ->
         Ok
-          (immutable_block_non_null ~is_unique:false Tag.double_array_tag
-             ~shape:Flambda_kind.Block_shape.Float_record
+          (immutable_block_non_null ~machine_width ~is_unique:false
+             Tag.double_array_tag ~shape:Flambda_kind.Block_shape.Float_record
              ~fields:(List.init num_fields (fun _ -> TG.any_naked_float))
              alloc_mode)
       | Float_array ->
@@ -553,7 +563,7 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
     in
     TG.create_from_head_value { non_null; is_null }
 
-let unknown_types_from_arity arity =
+let unknown_types_from_arity ~machine_width arity =
   List.map
-    (unknown_with_subkind ?alloc_mode:None)
+    (unknown_with_subkind ?alloc_mode:None ~machine_width)
     (Flambda_arity.unarized_components arity)

@@ -68,6 +68,8 @@ let fmt_constant f x =
   match x with
   | Const_int (i) -> fprintf f "Const_int %d" i
   | Const_char (c) -> fprintf f "Const_char %02x" (Char.code c)
+  | Const_untagged_char (c) ->
+      fprintf f "Const_untagged_char %02x" (Char.code c)
   | Const_string (s, strloc, None) ->
       fprintf f "Const_string(%S,%a,None)" s fmt_location strloc
   | Const_string (s, strloc, Some delim) ->
@@ -76,9 +78,14 @@ let fmt_constant f x =
   | Const_float32 (s) -> fprintf f "Const_float32 %s" s;
   | Const_unboxed_float (s) -> fprintf f "Const_unboxed_float %s" s
   | Const_unboxed_float32 (s) -> fprintf f "Const_unboxed_float32 %s" s
+  | Const_int8 (i) -> fprintf f "Const_int8 %d" i
+  | Const_int16 (i) -> fprintf f "Const_int16 %d" i
   | Const_int32 (i) -> fprintf f "Const_int32 %ld" i
   | Const_int64 (i) -> fprintf f "Const_int64 %Ld" i
   | Const_nativeint (i) -> fprintf f "Const_nativeint %nd" i
+  | Const_untagged_int (i) -> fprintf f "Const_untagged_int %d" i
+  | Const_untagged_int8 (i) -> fprintf f "Const_untagged_int8 %d" i
+  | Const_untagged_int16 (i) -> fprintf f "Const_untagged_int16 %d" i
   | Const_unboxed_int32 (i) -> fprintf f "Const_unboxed_int32 %ld" i
   | Const_unboxed_int64 (i) -> fprintf f "Const_unboxed_int64 %Ld" i
   | Const_unboxed_nativeint (i) -> fprintf f "Const_unboxed_nativeint %nd" i
@@ -135,6 +142,8 @@ let fmt_index_kind f = function
   | Index_int -> fprintf f "Index_int"
   | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
   | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
+  | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
+  | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
   | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
 
 let line i f s (*...*) =
@@ -477,7 +486,7 @@ and expression_extra i ppf x attrs =
 and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
   = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.print ()) m
 
-and alloc_mode i ppf (m : alloc_mode) = alloc_mode_raw i ppf m.mode
+and alloc_mode i ppf (m : alloc_mode) = alloc_mode_raw i ppf m
 
 and alloc_mode_option i ppf m = Option.iter (alloc_mode i ppf) m
 

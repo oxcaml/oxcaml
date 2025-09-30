@@ -227,6 +227,8 @@ let print_out_value ppf tree =
     | tree -> print_simple_tree ppf tree
   and print_constr_param ppf = function
     | Oval_int i -> parenthesize_if_neg ppf "%i" i (i < 0)
+    | Oval_int8 i -> parenthesize_if_neg ppf "%is" i (i < 0)
+    | Oval_int16 i -> parenthesize_if_neg ppf "%iS" i (i < 0)
     | Oval_int32 i -> parenthesize_if_neg ppf "%lil" i (i < 0l)
     | Oval_int64 i -> parenthesize_if_neg ppf "%LiL" i (i < 0L)
     | Oval_nativeint i -> parenthesize_if_neg ppf "%nin" i (i < 0n)
@@ -244,6 +246,8 @@ let print_out_value ppf tree =
   and print_simple_tree ppf =
     function
       Oval_int i -> fprintf ppf "%i" i
+    | Oval_int8 i -> fprintf ppf "%is" i
+    | Oval_int16 i -> fprintf ppf "%iS" i
     | Oval_int32 i -> fprintf ppf "%lil" i
     | Oval_int64 i -> fprintf ppf "%LiL" i
     | Oval_nativeint i -> fprintf ppf "%nin" i

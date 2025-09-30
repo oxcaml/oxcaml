@@ -232,8 +232,9 @@ val prim_mode :
         -> (Mode.allowed * 'r) Mode.Locality.t
 val instance_prim:
         Primitive.description -> type_expr ->
-        type_expr * Mode.Locality.lr option
-        * Mode.Yielding.lr option * Jkind.Sort.t option
+        type_expr *
+        Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
+        Jkind.Sort.t option
 
 (** Given (a @ m1 -> b -> c) @ m0, where [m0] and [m1] are modes expressed by
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
@@ -584,7 +585,7 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
 type unwrapped_type_expr =
   { ty : type_expr
   ; is_open : bool  (* are there any unbound variables in this type? *)
-  ; modality : Mode.Modality.Value.Const.t }
+  ; modality : Mode.Modality.Const.t }
 
 val get_unboxed_type_representation :
   Env.t ->
@@ -666,6 +667,10 @@ val constrain_type_jkind :
 val check_type_externality :
   Env.t -> type_expr -> Jkind_axis.Externality.t -> bool
 
+(* Check whether a type is gc ignorable based on its externality and the target
+   platform. *)
+val is_always_gc_ignorable : Env.t -> type_expr -> bool
+
 (* Check whether a type's nullability is less than some target.
    Uses get_nullability which is potentially cheaper than calling type_jkind
    if all with-bounds are irrelevant. *)
@@ -740,7 +745,7 @@ val crossing_of_jkind : Env.t -> 'd Types.jkind -> Mode.Crossing.t
     trivial crossing. *)
 val crossing_of_ty :
   Env.t ->
-  ?modalities:Mode.Modality.Value.Const.t ->
+  ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Crossing.t
 
@@ -748,7 +753,7 @@ val crossing_of_ty :
     types don't cross. *)
 val cross_right :
   Env.t ->
-  ?modalities:Mode.Modality.Value.Const.t ->
+  ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Value.r ->
   Mode.Value.r
@@ -757,7 +762,7 @@ val cross_right :
     types don't cross. *)
 val cross_left :
   Env.t ->
-  ?modalities:Mode.Modality.Value.Const.t ->
+  ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Value.l ->
   Mode.Value.l
@@ -765,7 +770,7 @@ val cross_left :
 (** Similar to [cross_right] but for [Mode.Alloc]  *)
 val cross_right_alloc :
   Env.t ->
-  ?modalities:Mode.Modality.Value.Const.t ->
+  ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Alloc.r ->
   Mode.Alloc.r
@@ -773,7 +778,7 @@ val cross_right_alloc :
 (** Similar to [cross_left] but for [Mode.Alloc]  *)
 val cross_left_alloc :
   Env.t ->
-  ?modalities:Mode.Modality.Value.Const.t ->
+  ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Alloc.l ->
   Mode.Alloc.l
@@ -782,8 +787,8 @@ val cross_left_alloc :
     immature than the given one. Zap to id otherwise. *)
 val zap_modalities_to_floor_if_modes_enabled_at :
   Language_extension.maturity ->
-  Mode.Modality.Value.t ->
-  Mode.Modality.Value.Const.t
+  Mode.Modality.t ->
+  Mode.Modality.Const.t
 
 (** The mode crossing of the memory block of a structure. *)
 val mode_crossing_structure_memaddr : Mode.Crossing.t
@@ -797,8 +802,8 @@ val mode_crossing_module : Mode.Crossing.t
 (** Zap a modality to floor if maturity allows, zap to id otherwise. *)
 val zap_modalities_to_floor_if_at_least :
   Language_extension.maturity ->
-  Mode.Modality.Value.t ->
-  Mode.Modality.Value.Const.t
+  Mode.Modality.t ->
+  Mode.Modality.Const.t
 
 val check_constructor_crossing_creation :
   Env.t -> Longident.t loc

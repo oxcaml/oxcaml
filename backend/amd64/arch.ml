@@ -260,6 +260,12 @@ type specific_operation =
         locality: prefetch_temporal_locality_hint;
         addr: addressing_mode;
       }
+  | Illvm_intrinsic of string
+
+(* CR yusumez: [Illvm_intrinsic] exists to pass extcalls with builtin = true to
+   the LLVM backend. Ideally, we'd want this variant to contain the LLVM
+   intrinsic signature (name, arg types, res type) to be determined in
+   [Cfg_selection]. *)
 
 and float_operation =
   | Ifloatadd
@@ -405,6 +411,8 @@ let print_specific_operation printreg op ppf arg =
       fprintf ppf "prefetch is_write=%b prefetch_temporal_locality_hint=%s %a"
         is_write (string_of_prefetch_temporal_locality_hint locality)
         printreg arg.(0)
+  | Illvm_intrinsic name ->
+      fprintf ppf "llvm_intrinsic %s" name
 
 let specific_operation_name : specific_operation -> string = fun op ->
   match op with
@@ -426,6 +434,7 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Isimd_mem (_simd,_addr) -> "simd_mem"
   | Icldemote _ -> "cldemote"
   | Iprefetch _ -> "prefetch"
+  | Illvm_intrinsic _ -> "llvm_intrinsic"
 
 (* Are we using the Windows 64-bit ABI? *)
 let win64 =
@@ -446,6 +455,10 @@ let operation_is_pure = function
   | Ipackf32 -> true
   | Isimd op -> Simd.is_pure_operation op
   | Isimd_mem (op, _addr) -> Simd.Mem.is_pure_operation op
+  | Illvm_intrinsic intr ->
+      Misc.fatal_errorf "operation_is_pure: Unexpected llvm_intrinsic %s: \
+                         not using LLVM backend"
+      intr
 
 (* Keep in sync with [Vectorize_specific] *)
 let operation_allocates = function
@@ -456,6 +469,10 @@ let operation_allocates = function
   | Ilfence | Isfence | Imfence
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
   | Icldemote _ | Iprefetch _ -> false
+  | Illvm_intrinsic _intr ->
+      (* Used by the zero_alloc checker that runs before the Llvmize. *)
+      false
+
 
 open X86_ast
 
@@ -546,9 +563,11 @@ let equal_specific_operation left right =
     Simd.equal_operation l r
   | Isimd_mem (l,al), Isimd_mem (r,ar) ->
     Simd.Mem.equal_operation l r && equal_addressing_mode al ar
+  | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
      Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
-      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
+     Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
+     Illvm_intrinsic _), _ ->
     false
 
 (* addressing mode functions *)
@@ -656,7 +675,9 @@ let isomorphic_specific_operation op1 op2 =
     Simd.equal_operation l r
   | Isimd_mem (l,al), Isimd_mem (r,ar) ->
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
+  | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
-    | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
+     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
+     Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
+     Illvm_intrinsic _), _ ->
     false

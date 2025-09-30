@@ -38,7 +38,11 @@ type fundecl = private
   }
 
 val dwarf_for_fundecl :
-  t -> Linear.fundecl -> fun_end_label:Cmm.label -> fundecl
+  t ->
+  Linear.fundecl ->
+  fun_end_label:Cmm.label ->
+  ppf_dump:Format.formatter ->
+  fundecl
 
 (** Write the DWARF information to the assembly file. This should only be called
     once all (in)constants and function declarations have been passed to the

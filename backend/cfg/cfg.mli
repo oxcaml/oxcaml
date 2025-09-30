@@ -69,6 +69,12 @@ type basic_block =
 type codegen_option =
   | Reduce_code_size
   | No_CSE
+  | Use_linscan_regalloc
+    (* CR-soon xclerc for xclerc: remove the `Use_linscan_regalloc`, and use
+       `Use_regalloc_param` instead. *)
+  | Use_regalloc of Clflags.Register_allocator.t
+  | Use_regalloc_param of string list
+  | Cold
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
@@ -232,13 +238,12 @@ val make_instruction :
   stack_offset:int ->
   id:InstructionId.t ->
   ?irc_work_list:irc_work_list ->
-  ?ls_order:int ->
   ?available_before:Reg_availability_set.t option ->
   ?available_across:Reg_availability_set.t option ->
   unit ->
   'a instruction
 
-(** Make sure that the default parameter values of [irc_work_list] and [ls_order] are
+(** Make sure that the default parameter value of [irc_work_list] is
     reasonable before using. *)
 val make_instruction_from_copy :
   'a instruction ->
@@ -247,7 +252,6 @@ val make_instruction_from_copy :
   ?arg:Reg.t array ->
   ?res:Reg.t array ->
   ?irc_work_list:irc_work_list ->
-  ?ls_order:int ->
   unit ->
   'b instruction
 

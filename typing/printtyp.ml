@@ -110,7 +110,7 @@ module Style = Misc.Style
 (* Print a long identifier *)
 let longident = Pprintast.longident
 
-let () = Env.print_longident := longident
+let () = Env.print_longident := longident; Mode.print_longident := longident
 
 (* Print an identifier avoiding name collisions *)
 
@@ -1363,7 +1363,7 @@ let out_jkind_of_const_jkind jkind =
   Ojkind_const (Jkind.Const.to_out_jkind_const jkind)
 
 (* CR layouts v2.8: This is just like [Jkind.format], and likely needs to
-   be overhauled with [with]-types. *)
+   be overhauled with [with]-types. Internal ticket 5096. *)
 let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
   match desc.layout with
   | Sort (Var n) ->
@@ -1383,7 +1383,7 @@ let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
    Note [When to print jkind annotations] *)
 (* CR layouts v2.8: This should use the annotation in the jkind, if there
    is one. But first that annotation needs to be in Typedtree, not in
-   Parsetree. *)
+   Parsetree. Internal ticket 4435. *)
 let out_jkind_option_of_jkind ~ignore_null jkind =
   let desc = Jkind.get jkind in
   let elide =
@@ -1447,6 +1447,13 @@ let tree_of_mode_new (t: Parsetree.mode loc) =
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
   let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
 
+  (* [forkable] has implied defaults depending on [areality]: *)
+  let forkable =
+    match modes.areality, modes.forkable with
+    | Local, Unforkable | Global, Forkable -> None
+    | _, _ -> Some modes.forkable
+  in
+
   (* [yielding] has implied defaults depending on [areality]: *)
   let yielding =
     match modes.areality, modes.yielding with
@@ -1468,7 +1475,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     | _, _ -> Some modes.portability
   in
 
-  let diff = {diff with yielding; contention; portability} in
+  let diff = {diff with forkable; yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
   let l = Typemode.untransl_mode_annots diff in
   match all_or_none tree_of_mode_old l with
@@ -1773,10 +1780,10 @@ let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
 
 (* Only used for printing a single modality in error message *)
-let modality ?(id = fun _ppf -> ()) ppf modality =
-  if Mode.Modality.Atom.is_id modality then id ppf
+let modality ?(id = fun _ppf -> ()) ax ppf modality =
+  if Mode.Modality.Per_axis.is_id ax modality then id ppf
   else
-    modality
+    Atom (ax, modality)
     |> Typemode.untransl_modality
     |> tree_of_modality_new
     |> !Oprint.out_modality ppf

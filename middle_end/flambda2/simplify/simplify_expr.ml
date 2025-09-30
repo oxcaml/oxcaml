@@ -62,10 +62,13 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
             ~code_ids_to_never_delete:(DA.code_ids_to_never_delete dacc)
             ~specialization_map:(DA.specialization_map dacc)
             ~return_continuation ~exn_continuation
+            ~machine_width:(DE.machine_width (DA.denv dacc))
         in
         let uenv =
           UE.add_function_return_or_exn_continuation
-            (UE.create (DA.are_rebuilding_terms dacc))
+            (UE.create
+               (DA.are_rebuilding_terms dacc)
+               ~machine_width:(DE.machine_width (DA.denv dacc)))
             return_continuation return_arity
         in
         let uenv =

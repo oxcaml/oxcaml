@@ -129,7 +129,9 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
              [Flambda_debug_uid.t]. *)
           (* CR sspies: Consider introducing a phantom let for it in the future
              to improve the debug information. *)
-          Simplify_common.project_tuple ~dbg ~size:tuple_size ~field tuple_arg ))
+          Simplify_common.project_tuple
+            ~machine_width:(DE.machine_width (DA.denv dacc))
+            ~dbg ~size:tuple_size ~field tuple_arg ))
   in
   (* Construct the arities for the tuple and any over application arguments *)
   let args_arity =
@@ -277,7 +279,9 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
             DA.record_continuation_use dacc apply_return_continuation
               (Non_inlinable { escaping = true })
               ~env_at_use:(DA.denv dacc)
-              ~arg_types:(T.unknown_types_from_arity result_arity)
+              ~arg_types:
+                (T.unknown_types_from_arity result_arity
+                   ~machine_width:(DE.machine_width (DA.denv dacc)))
           in
           dacc, Some use_id, result_continuation
         | Return apply_return_continuation, Ok result_types ->
@@ -326,7 +330,8 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
                     let result_var, result_uid = BP.var_and_uid result in
                     DE.add_variable denv
                       (VB.create result_var result_uid NM.in_types)
-                      (T.unknown_with_subkind kind))
+                      (T.unknown_with_subkind kind
+                         ~machine_width:(DE.machine_width denv)))
                   denv result_arity results
               in
               let denv = DE.extend_typing_environment denv env_extension in
@@ -356,7 +361,8 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
           ~env_at_use:(DA.denv dacc)
           ~arg_types:
             (T.unknown_types_from_arity
-               (Exn_continuation.arity (Apply.exn_continuation apply)))
+               (Exn_continuation.arity (Apply.exn_continuation apply))
+               ~machine_width:(DE.machine_width (DA.denv dacc)))
       in
       let apply = Apply.with_continuation apply result_continuation in
       let dacc =
@@ -624,8 +630,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                         { project_from = wrapper_function_slot; value_slot },
                       Simple.var my_closure )
                 in
+                let machine_width = DE.machine_width (DA.denv dacc) in
                 let cost_metrics_of_defining_expr =
-                  Cost_metrics.from_size (Code_size.prim prim)
+                  Cost_metrics.from_size (Code_size.prim ~machine_width prim)
                 in
                 let free_names =
                   NO.add_value_slot_in_projection free_names value_slot
@@ -681,9 +688,10 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~param_modes:remaining_params_alloc_modes
               ~first_complex_local_param ~result_arity ~result_types:Unknown
               ~result_mode ~stub:true ~inline:Default_inline
-              ~poll_attribute:Default
+              ~poll_attribute:Default ~regalloc_attribute:Default_regalloc
+              ~regalloc_param_attribute:Default_regalloc_params
               ~zero_alloc_attribute:Zero_alloc_attribute.Default_zero_alloc
-              ~is_a_functor:false ~is_opaque:false ~recursive
+              ~cold:false ~is_a_functor:false ~is_opaque:false ~recursive
               ~cost_metrics:cost_metrics_of_body
               ~inlining_arguments:(DE.inlining_arguments (DA.denv dacc))
               ~dbg ~is_tupled:false
@@ -995,7 +1003,9 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
         DA.record_continuation_use dacc continuation
           (Non_inlinable { escaping = true })
           ~env_at_use
-          ~arg_types:(T.unknown_types_from_arity (Apply.return_arity apply))
+          ~arg_types:
+            (T.unknown_types_from_arity (Apply.return_arity apply)
+               ~machine_width:(DE.machine_width denv))
       in
       dacc, Some use_id
   in
@@ -1006,7 +1016,8 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
       ~env_at_use:(DA.denv dacc)
       ~arg_types:
         (T.unknown_types_from_arity
-           (Exn_continuation.arity (Apply.exn_continuation apply)))
+           (Exn_continuation.arity (Apply.exn_continuation apply))
+           ~machine_width:(DE.machine_width (DA.denv dacc)))
   in
   let call_kind =
     match call with
@@ -1210,7 +1221,9 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
     DA.record_continuation_use dacc apply_cont
       (Non_inlinable { escaping = true })
       ~env_at_use:denv
-      ~arg_types:(T.unknown_types_from_arity (Apply.return_arity apply))
+      ~arg_types:
+        (T.unknown_types_from_arity (Apply.return_arity apply)
+           ~machine_width:(DE.machine_width denv))
   in
   let dacc, exn_cont_use_id =
     DA.record_continuation_use dacc
@@ -1219,7 +1232,8 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
       ~env_at_use:(DA.denv dacc)
       ~arg_types:
         (T.unknown_types_from_arity
-           (Exn_continuation.arity (Apply.exn_continuation apply)))
+           (Exn_continuation.arity (Apply.exn_continuation apply))
+           ~machine_width:(DE.machine_width (DA.denv dacc)))
   in
   let dacc =
     record_free_names_of_apply_as_used dacc ~use_id:(Some use_id)
@@ -1257,7 +1271,10 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
       match Apply.continuation apply with
       | Return apply_continuation ->
         let apply_continuation_arg_types =
-          let from_arity = T.unknown_types_from_arity return_arity in
+          let from_arity =
+            T.unknown_types_from_arity return_arity
+              ~machine_width:(DE.machine_width (DA.denv dacc))
+          in
           match return_types with
           | Unknown -> from_arity
           | Known return_types ->
@@ -1279,7 +1296,8 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
         ~env_at_use:(DA.denv dacc)
         ~arg_types:
           (T.unknown_types_from_arity
-             (Exn_continuation.arity (Apply.exn_continuation apply)))
+             (Exn_continuation.arity (Apply.exn_continuation apply))
+             ~machine_width:(DE.machine_width (DA.denv dacc)))
     in
     let dacc =
       record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
@@ -1322,7 +1340,9 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
         DA.record_continuation_use dacc continuation
           (Non_inlinable { escaping = true })
           ~env_at_use:denv
-          ~arg_types:(T.unknown_types_from_arity (Apply.return_arity apply))
+          ~arg_types:
+            (T.unknown_types_from_arity (Apply.return_arity apply)
+               ~machine_width:(DE.machine_width denv))
       in
       dacc, Some use_id
   in
@@ -1333,7 +1353,8 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
       ~env_at_use:(DA.denv dacc)
       ~arg_types:
         (T.unknown_types_from_arity
-           (Exn_continuation.arity (Apply.exn_continuation apply)))
+           (Exn_continuation.arity (Apply.exn_continuation apply))
+           ~machine_width:(DE.machine_width (DA.denv dacc)))
   in
   let dacc =
     record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply

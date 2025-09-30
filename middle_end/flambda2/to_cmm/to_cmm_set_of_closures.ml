@@ -438,6 +438,22 @@ let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
   | Check { strict; loc; custom_error_msg } ->
     [Check_zero_alloc { strict; loc; custom_error_msg }]
 
+(* Translation of regalloc attributes on functions. *)
+let transl_regalloc_attrib : Regalloc_attribute.t -> Cmm.codegen_option list =
+  function
+  | Default_regalloc -> []
+  | Regalloc regalloc -> [Use_regalloc regalloc]
+
+(* Translation of regalloc_param attributes on functions. *)
+let transl_regalloc_param_attrib :
+    Regalloc_param_attribute.t -> Cmm.codegen_option list = function
+  | Default_regalloc_params -> []
+  | Regalloc_params params -> [Use_regalloc_param params]
+
+(* Translation of cold attributes on functions. *)
+let transl_cold_attrib (cold : bool) : Cmm.codegen_option list =
+  if cold then [Cmm.Cold] else []
+
 (* Translation of the bodies of functions. *)
 
 let params_and_body0 env res code_id ~result_arity ~fun_dbg
@@ -527,8 +543,18 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     then Afl_instrument.instrument_function fun_body fun_dbg
     else fun_body
   in
+  let regalloc_attribute =
+    Env.get_code_metadata env code_id |> Code_metadata.regalloc_attribute
+  in
+  let regalloc_param_attribute =
+    Env.get_code_metadata env code_id |> Code_metadata.regalloc_param_attribute
+  in
+  let cold = Env.get_code_metadata env code_id |> Code_metadata.cold in
   let fun_flags =
     transl_check_attrib zero_alloc_attribute
+    @ transl_regalloc_attrib regalloc_attribute
+    @ transl_regalloc_param_attrib regalloc_param_attribute
+    @ transl_cold_attrib cold
     @
     if Flambda_features.optimize_for_speed () then [] else [Cmm.Reduce_code_size]
   in

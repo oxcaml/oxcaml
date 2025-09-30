@@ -799,9 +799,6 @@ val trywith :
 
 (** {2 Static jumps} *)
 
-(** Opaque type for static handlers. *)
-type static_handler
-
 (** [handler id vars body is_cold] creates a static handler for exit number [id],
     binding variables [vars] in [body]. *)
 val handler :
@@ -810,7 +807,7 @@ val handler :
   (Backend_var.With_provenance.t * Cmm.machtype) list ->
   Cmm.expression ->
   bool ->
-  static_handler
+  Cmm.static_handler
 
 (** [cexit id args] creates the cmm expression for static to a static handler
     with exit number [id], with arguments [args]. *)
@@ -827,7 +824,7 @@ val trap_return : Cmm.expression -> Cmm.trap_action list -> Cmm.expression
 (** Enclose a body with some static handlers. *)
 val create_ccatch :
   rec_flag:bool ->
-  handlers:static_handler list ->
+  handlers:Cmm.static_handler list ->
   body:Cmm.expression ->
   Cmm.expression
 

@@ -61,7 +61,10 @@ let simplify_atomic_compare_and_set_field
            desired ))
       dbg
   in
-  let dacc = DA.add_variable dacc result_var T.any_tagged_bool in
+  let dacc =
+    DA.add_variable dacc result_var
+      (T.any_tagged_bool ~machine_width:(DE.machine_width (DA.denv dacc)))
+  in
   SPR.create new_term ~try_reify:false dacc
 
 let simplify_atomic_compare_exchange_field

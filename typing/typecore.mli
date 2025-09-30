@@ -193,15 +193,6 @@ val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allow
 
 val self_coercion : (Path.t * Location.t list ref) list ref
 
-type contention_context =
-  | Read_mutable
-  | Write_mutable
-  | Force_lazy
-
-type visibility_context =
-  | Read_mutable
-  | Write_mutable
-
 type unsupported_stack_allocation =
   | Lazy
   | Module
@@ -303,6 +294,9 @@ type error =
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
+  | Int8_literal of string
+  | Int16_literal of string
+  | Untagged_char_literal of char
   | Illegal_letrec_pat
   | Illegal_letrec_expr
   | Illegal_mutable_pat
@@ -321,12 +315,8 @@ type error =
   | Block_access_record_unboxed
   | Block_access_private_record
   | Block_index_modality_mismatch of
-      { mut : bool; err : Mode.Modality.Value.equate_error }
-  | Submode_failed of
-      Mode.Value.error * submode_reason *
-      Env.locality_context option *
-      contention_context option *
-      visibility_context option *
+      { mut : bool; err : Mode.Modality.equate_error }
+  | Submode_failed of Mode.Value.error * submode_reason *
       Env.shared_context option
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -346,7 +336,6 @@ type error =
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
-  | Cannot_stack_allocate of Env.locality_context option
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
   | Impossible_function_jkind of

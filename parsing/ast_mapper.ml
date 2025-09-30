@@ -102,6 +102,7 @@ module C = struct
     | Pconst_integer _
     | Pconst_unboxed_integer _
     | Pconst_char _
+    | Pconst_untagged_char _
     | Pconst_float _
     | Pconst_unboxed_float _
       -> c
@@ -966,14 +967,19 @@ let default_mapper =
       let pjkind_loc = this.location this pjkind_loc in
       let pjkind_desc =
         match pjkind_desc with
-        | Default -> Default
-        | Abbreviation (s : string) -> Abbreviation s
-        | Mod (t, mode_list) ->
-          Mod (this.jkind_annotation this t, this.modes this mode_list)
-        | With (t, ty, modalities) ->
-          With (this.jkind_annotation this t, this.typ this ty, this.modalities this modalities)
-        | Kind_of ty -> Kind_of (this.typ this ty)
-        | Product ts -> Product (List.map (this.jkind_annotation this) ts)
+        | Pjk_default -> Pjk_default
+        | Pjk_abbreviation (s : string) -> Pjk_abbreviation s
+        | Pjk_mod (t, mode_list) ->
+          Pjk_mod (this.jkind_annotation this t, this.modes this mode_list)
+        | Pjk_with (t, ty, modalities) ->
+          Pjk_with (
+            this.jkind_annotation this t,
+            this.typ this ty,
+            this.modalities this modalities
+          )
+        | Pjk_kind_of ty -> Pjk_kind_of (this.typ this ty)
+        | Pjk_product ts ->
+          Pjk_product (List.map (this.jkind_annotation this) ts)
       in
       { pjkind_loc; pjkind_desc });
 

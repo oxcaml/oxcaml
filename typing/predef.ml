@@ -310,9 +310,7 @@ let option_argument_jkind = Jkind.Builtin.value_or_null ~why:(
 
 let list_jkind param =
   Jkind.Builtin.immutable_data ~why:Boxed_variant |>
-  Jkind.add_with_bounds
-    ~modality:Mode.Modality.Value.Const.id
-    ~type_expr:param |>
+  Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param |>
   Jkind.mark_best
 
 let list_sort = Jkind.Sort.Const.value
@@ -466,7 +464,7 @@ let mk_add_extension add_extension id args =
               {
                 ca_type;
                 ca_sort;
-                ca_modalities=Mode.Modality.Value.Const.id;
+                ca_modalities=Mode.Modality.Const.id;
                 ca_loc=Location.none
               })
             args);
@@ -499,7 +497,7 @@ let variant constrs =
 let unrestricted tvar ca_sort =
   {ca_type=tvar;
    ca_sort;
-   ca_modalities=Mode.Modality.Value.Const.id;
+   ca_modalities=Mode.Modality.Const.id;
    ca_loc=Location.none}
 
 (* CR layouts: Changes will be needed here as we add support for the built-ins
@@ -518,7 +516,7 @@ let build_initial_env add_type add_extension empty_env =
        ~jkind:(fun param ->
          Jkind.Builtin.mutable_data ~why:(Primitive ident_array) |>
          Jkind.add_with_bounds
-           ~modality:Mode.Modality.Value.Const.id
+           ~modality:Mode.Modality.Const.id
            ~type_expr:param)
   |> add_type1 ident_iarray
        ~variance:Variance.covariant
@@ -527,7 +525,7 @@ let build_initial_env add_type add_extension empty_env =
        ~jkind:(fun param ->
          Jkind.Builtin.immutable_data ~why:(Primitive ident_iarray) |>
          Jkind.add_with_bounds
-           ~modality:Mode.Modality.Value.Const.id
+           ~modality:Mode.Modality.Const.id
            ~type_expr:param)
   |> add_type ident_bool
        ~kind:(variant [ cstr ident_false []; cstr ident_true []])
@@ -553,7 +551,7 @@ let build_initial_env add_type add_extension empty_env =
           It can at least cross locality, because it's always heap-allocated.
           It might also cross portability, linearity, uniqueness subject to its
           parameter. But I'm also fine not doing that for now (and wait until
-          users complains).  *)
+          users complains). Internal ticket 5103. *)
        ~jkind:(fun _ -> Jkind.for_non_float ~why:(Primitive ident_lazy_t))
   |> add_type1 ident_list
        ~variance:Variance.covariant
@@ -577,7 +575,7 @@ let build_initial_env add_type add_extension empty_env =
        ~jkind:(fun param ->
          Jkind.Builtin.immutable_data ~why:Boxed_variant |>
          Jkind.add_with_bounds
-           ~modality:Mode.Modality.Value.Const.id
+           ~modality:Mode.Modality.Const.id
            ~type_expr:param)
   |> add_type2 ident_idx_imm
        ~param1_jkind:(
@@ -622,7 +620,7 @@ let build_initial_env add_type add_extension empty_env =
              {
                ld_id=id;
                ld_mutable=Immutable;
-               ld_modalities=Mode.Modality.Value.Const.id;
+               ld_modalities=Mode.Modality.Const.id;
                ld_type=field_type;
                ld_sort=Jkind.Sort.Const.value;
                ld_loc=Location.none;
@@ -643,23 +641,24 @@ let build_initial_env add_type add_extension empty_env =
          )
        )
        (* CR layouts v2.8: Possibly remove this -- and simplify [mk_add_type] --
-          when we have a better jkind subsumption check. *)
+          when we have a better jkind subsumption check. Internal ticket 5104 *)
        ~jkind:Jkind.(
          of_builtin Const.Builtin.immutable_data
            ~why:(Primitive ident_lexing_position) |>
-         add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr:type_string)
+         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
+         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
+         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
+         add_with_bounds ~modality:Mode.Modality.Const.id
+          ~type_expr:type_string)
   |> add_type1 ident_atomic_loc
        ~variance:Variance.full
        ~separability:Separability.Ind
        ~param_jkind:(
          Jkind.Builtin.value_or_null ~why:(Primitive ident_atomic_loc))
        ~jkind:(fun param ->
-         Jkind.Builtin.mutable_data ~why:(Primitive ident_atomic_loc) |>
+         Jkind.Builtin.sync_data ~why:(Primitive ident_atomic_loc) |>
          Jkind.add_with_bounds
-           ~modality:Mode.Modality.Value.Const.id
+           ~modality:Mode.Modality.Const.id
            ~type_expr:param)
   |> add_type ident_string ~jkind:Jkind.Const.Builtin.immutable_data
   |> add_type1 ident_code
@@ -668,7 +667,7 @@ let build_initial_env add_type add_extension empty_env =
        ~jkind:(fun param ->
          Jkind.Builtin.immutable_data ~why:Tquote |>
            Jkind.add_with_bounds
-             ~modality:Mode.Modality.Value.Const.id
+             ~modality:Mode.Modality.Const.id
              ~type_expr:param)
   |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit
@@ -768,9 +767,7 @@ let or_null_kind tvar =
 let or_null_jkind param =
   Jkind.Const.Builtin.value_or_null_mod_everything
   |> Jkind.of_builtin ~why:(Primitive ident_or_null)
-  |> Jkind.add_with_bounds
-    ~modality:Mode.Modality.Value.Const.id
-    ~type_expr:param
+  |> Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param
   |> Jkind.mark_best
 
 let add_or_null add_type env =

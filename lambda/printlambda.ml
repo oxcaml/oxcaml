@@ -1062,7 +1062,18 @@ let function_attribute ppf t =
   begin match t.poll with
   | Default_poll -> ()
   | Error_poll -> fprintf ppf "error_poll@ "
-  end
+  end;
+  begin match t.regalloc with
+  | Default_regalloc -> ()
+  | Regalloc regalloc ->
+    fprintf ppf "%a@ " Clflags.Register_allocator.format regalloc
+  end;
+  begin match t.regalloc_param with
+  | Default_regalloc_params -> ()
+  | Regalloc_params params ->
+      List.iter (fun param -> fprintf ppf "regalloc_param(%S)@ " param) params
+  end;
+  if t.cold then fprintf ppf "cold@ "
 
 let apply_tailcall_attribute ppf = function
   | Default_tailcall -> ()
@@ -1103,6 +1114,7 @@ let debug_uid ppf duid =
 let rec struct_const ppf = function
   | Const_base(Const_int n) -> fprintf ppf "%i" n
   | Const_base(Const_char c) -> fprintf ppf "%C" c
+  | Const_base(Const_untagged_char c) -> fprintf ppf "#%C" c
   | Const_base(Const_string (s, _, _)) -> fprintf ppf "%S" s
   | Const_immstring s -> fprintf ppf "#%S" s
   | Const_base(Const_float f) -> fprintf ppf "%s" f
@@ -1111,9 +1123,17 @@ let rec struct_const ppf = function
       fprintf ppf "%s" (Misc.format_as_unboxed_literal f)
   | Const_base(Const_unboxed_float32 f) ->
       fprintf ppf "%ss" (Misc.format_as_unboxed_literal f)
+  | Const_base(Const_int8 n) -> fprintf ppf "%is" n
+  | Const_base(Const_int16 n) -> fprintf ppf "%iS" n
   | Const_base(Const_int32 n) -> fprintf ppf "%lil" n
   | Const_base(Const_int64 n) -> fprintf ppf "%LiL" n
   | Const_base(Const_nativeint n) -> fprintf ppf "%nin" n
+  | Const_base(Const_untagged_int i) ->
+      fprintf ppf "%sm" (Misc.format_as_unboxed_literal (Int.to_string i))
+  | Const_base(Const_untagged_int8 i) ->
+      fprintf ppf "%ss" (Misc.format_as_unboxed_literal (Int.to_string i))
+  | Const_base(Const_untagged_int16 i) ->
+      fprintf ppf "%sS" (Misc.format_as_unboxed_literal (Int.to_string i))
   | Const_base(Const_unboxed_int32 i) ->
       fprintf ppf "%sl" (Misc.format_as_unboxed_literal (Int32.to_string i))
   | Const_base(Const_unboxed_int64 i) ->
@@ -1249,15 +1269,15 @@ let rec lam ppf = function
   | Lstaticraise (i, ls)  ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
-      fprintf ppf "@[<2>(exit@ %d%a)@]" i lams ls;
+      fprintf ppf "@[<2>(exit@ %a%a)@]" Static_label.format i lams ls;
   | Lstaticcatch(lbody, (i, vars), lhandler, r, _kind) ->
       let excl =
         match r with
         | Popped_region -> " exclave"
         | Same_region -> ""
       in
-      fprintf ppf "@[<2>(catch@ %a@;<1 -1>with (%d%a)%s@ %a)@]"
-        lam lbody i
+      fprintf ppf "@[<2>(catch@ %a@;<1 -1>with (%a%a)%s@ %a)@]"
+        lam lbody Static_label.format i
         (fun ppf vars ->
            List.iter
              (fun (x, duid, k) ->

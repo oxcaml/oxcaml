@@ -20,7 +20,7 @@ type 'a my_list = Nil | Cons of 'a * 'a foo
 and 'a foo = 'a my_list
 |}]
 
-(* CR layouts v2.8: this should be accepted *)
+(* CR layouts v2.8: this should be accepted. Internal ticket 4770 *)
 type 'a my_list : immutable_data with 'a =
   | Nil
   | Cons of 'a * 'a my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list
@@ -65,8 +65,8 @@ type ('a : immutable_data) immutable_list =
   | Cons of 'a * 'a immutable_list
 |}]
 
-(* CR layouts v2.8: this should be accepted *)
-(* CR layouts v2.8: this error message is bad *)
+(* CR layouts v2.8: this should be accepted. Internal ticket 4770. *)
+(* CR layouts v2.8: this error message is bad. Internal ticket 4770. *)
 type 'a degenerate : immutable_data with 'a = Leaf of 'a | Branch of ('a * 'a) degenerate
 [%%expect {|
 Line 1, characters 0-89:
@@ -352,7 +352,7 @@ type ('a, 'b) zipped_list = Nil | Cons of 'a * 'b * ('a, 'b) zipped_list
 module rec My_list : sig
   type 'a t : immutable_data with 'a = Nil | Cons of 'a * 'a My_list.t
 end = My_list
-(* CR layouts v2.8: fix this *)
+(* CR layouts v2.8: fix this. Internal ticket 5127 *)
 [%%expect {|
 >> Fatal error: I do not yet know how to deal with [with]-types (such as
                 'a)
@@ -502,7 +502,7 @@ type 'a mutable_list = Nil | Cons of int ref * 'a mutable_list
 
 type t1
 type 'a t2 : immutable_data with 'a with t1 = Leaf of 'a | Node of 'a * t1 t2
-(* CR layouts v2.8: this should be accepted *)
+(* CR layouts v2.8: this should be accepted. Internal ticket 4770 *)
 [%%expect {|
 type t1
 Line 2, characters 0-77:

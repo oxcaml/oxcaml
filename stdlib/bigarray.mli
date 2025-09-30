@@ -346,15 +346,17 @@ module Genarray :
 
       @since 4.12 *)
 
-  external num_dims: (('a, 'b, 'c) t[@local_opt]) @ contended -> int
+  external num_dims
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "caml_ba_num_dims"
   (** Return the number of dimensions of the given Bigarray. *)
 
-  val dims : ('a, 'b, 'c) t @ contended local -> int array
+  val dims : ('a, 'b, 'c) t @ immutable local -> int array
   (** [Genarray.dims a] returns all dimensions of the Bigarray [a],
      as an array of integers of length [Genarray.num_dims a]. *)
 
-  external nth_dim: (('a, 'b, 'c) t[@local_opt]) @ contended -> int -> int
+  external nth_dim
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> int -> int @@ stateless
     = "caml_ba_dim"
   (** [Genarray.nth_dim a n] returns the [n]-th dimension of the
      Bigarray [a].  The first dimension corresponds to [n = 0];
@@ -363,11 +365,13 @@ module Genarray :
      @raise Invalid_argument if [n] is less than 0 or greater or equal than
      [Genarray.num_dims a]. *)
 
-  external kind: (('a, 'b, 'c) t[@local_opt]) @ contended -> ('a, 'b) kind
+  external kind
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   (** Return the kind of the given Bigarray. *)
 
-  external layout: (('a, 'b, 'c) t[@local_opt]) @ contended -> 'c layout
+  external layout
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
@@ -383,7 +387,7 @@ module Genarray :
       @since 4.04
   *)
 
-  val size_in_bytes : ('a, 'b, 'c) t @ contended local -> int
+  val size_in_bytes : ('a, 'b, 'c) t @ immutable local -> int
   (** [size_in_bytes a] is the number of elements in [a] multiplied
     by [a]'s {!kind_size_in_bytes}.
 
@@ -552,11 +556,13 @@ module Array0 : sig
 
      @since 4.12 *)
 
-  external kind: (('a, 'b, 'c) t[@local_opt]) @ contended -> ('a, 'b) kind
+  external kind
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   (** Return the kind of the given Bigarray. *)
 
-  external layout: (('a, 'b, 'c) t[@local_opt]) @ contended -> 'c layout
+  external layout
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
@@ -569,7 +575,7 @@ module Array0 : sig
       @since 4.06
   *)
 
-  val size_in_bytes : ('a, 'b, 'c) t @ contended local -> int
+  val size_in_bytes : ('a, 'b, 'c) t @ immutable local -> int
   (** [size_in_bytes a] is [a]'s {!kind_size_in_bytes}. *)
 
   val get: ('a, 'b, 'c) t @ local shared -> 'a
@@ -633,16 +639,18 @@ module Array1 : sig
 
      @since 4.12 *)
 
-  external dim: (('a, 'b, 'c) t[@local_opt]) @ contended -> int
+  external dim: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_1"
   (** Return the size (dimension) of the given one-dimensional
      Bigarray. *)
 
-  external kind: (('a, 'b, 'c) t[@local_opt]) @ contended -> ('a, 'b) kind
+  external kind
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   (** Return the kind of the given Bigarray. *)
 
-  external layout: (('a, 'b, 'c) t[@local_opt]) @ contended -> 'c layout
+  external layout
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
@@ -656,7 +664,7 @@ module Array1 : sig
   *)
 
 
-  val size_in_bytes : ('a, 'b, 'c) t @ contended -> int
+  val size_in_bytes : ('a, 'b, 'c) t @ immutable -> int
   (** [size_in_bytes a] is the number of elements in [a]
     multiplied by [a]'s {!kind_size_in_bytes}.
 
@@ -759,19 +767,21 @@ module Array2 :
 
      @since 4.12 *)
 
-  external dim1: (('a, 'b, 'c) t[@local_opt]) @ contended -> int
+  external dim1: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_1"
   (** Return the first dimension of the given two-dimensional Bigarray. *)
 
-  external dim2: (('a, 'b, 'c) t[@local_opt]) @ contended -> int
+  external dim2: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_2"
   (** Return the second dimension of the given two-dimensional Bigarray. *)
 
-  external kind: (('a, 'b, 'c) t[@local_opt]) @ contended -> ('a, 'b) kind
+  external kind
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   (** Return the kind of the given Bigarray. *)
 
-  external layout: (('a, 'b, 'c) t[@local_opt]) @ contended -> 'c layout
+  external layout
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
@@ -787,7 +797,7 @@ module Array2 :
   *)
 
 
-  val size_in_bytes : ('a, 'b, 'c) t @ contended -> int
+  val size_in_bytes : ('a, 'b, 'c) t @ immutable -> int
   (** [size_in_bytes a] is the number of elements in [a]
     multiplied by [a]'s {!kind_size_in_bytes}.
 
@@ -906,23 +916,25 @@ module Array3 :
 
      @since 4.12 *)
 
-  external dim1: (('a, 'b, 'c) t[@local_opt]) @ contended -> int
+  external dim1: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_1"
   (** Return the first dimension of the given three-dimensional Bigarray. *)
 
-  external dim2: (('a, 'b, 'c) t[@local_opt]) @ contended -> int
+  external dim2: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_2"
   (** Return the second dimension of the given three-dimensional Bigarray. *)
 
-  external dim3: (('a, 'b, 'c) t[@local_opt]) @ contended -> int
+  external dim3: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_3"
   (** Return the third dimension of the given three-dimensional Bigarray. *)
 
-  external kind: (('a, 'b, 'c) t[@local_opt]) @ contended -> ('a, 'b) kind
+  external kind
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   (** Return the kind of the given Bigarray. *)
 
-  external layout: (('a, 'b, 'c) t[@local_opt]) @ contended -> 'c layout
+  external layout
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
@@ -938,7 +950,7 @@ module Array3 :
       @since 4.06
   *)
 
-  val size_in_bytes : ('a, 'b, 'c) t @ contended -> int
+  val size_in_bytes : ('a, 'b, 'c) t @ immutable -> int
   (** [size_in_bytes a] is the number of elements in [a]
     multiplied by [a]'s {!kind_size_in_bytes}.
 

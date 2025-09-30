@@ -18,6 +18,8 @@
 
 [@@@ocaml.flambda_o3]
 
+module TLS = Domain.Safe.TLS
+
 type t : value mod contended portable
 
 external thread_initialize : unit -> unit = "caml_thread_initialize"
@@ -30,7 +32,6 @@ external yield : unit -> unit @@ portable = "caml_thread_yield"
 external self : unit -> t @@ portable = "caml_thread_self" [@@noalloc]
 external id : t -> int @@ portable = "caml_thread_id" [@@noalloc]
 external join : t -> unit @@ portable = "caml_thread_join"
-external exit_stub : unit -> unit @@ portable = "caml_thread_exit"
 
 (* For new, make sure the function passed to thread_new never
    raises an exception. *)
@@ -41,13 +42,17 @@ let default_uncaught_exception_handler = thread_uncaught_exception
 
 let uncaught_exception_handler = Atomic.make { Modes.Portable.portable = default_uncaught_exception_handler }
 
-let set_uncaught_exception_handler (fn @ portable) = Atomic.Contended.set uncaught_exception_handler { Modes.Portable.portable = fn }
+let set_uncaught_exception_handler (fn @ portable) =
+  Atomic.set uncaught_exception_handler { Modes.Portable.portable = fn }
 
 exception Exit
 
 let create (fn @ once) arg =
+  let tls_keys = Domain.TLS.Private.get_initial_keys () in
   thread_new
     (fun () ->
+      Domain.TLS.Private.init ();
+      Domain.TLS.Private.set_initial_keys tls_keys;
       try
         fn arg;
         ignore (Sys.opaque_identity (check_memprof_cb ()))
@@ -58,7 +63,7 @@ let create (fn @ once) arg =
         let raw_backtrace = Printexc.get_raw_backtrace () in
         flush stdout; flush stderr;
         try
-          (Atomic.Contended.get uncaught_exception_handler).portable exn
+          (Atomic.get uncaught_exception_handler).portable exn
         with
         | Exit -> ()
         | exn' ->
@@ -77,6 +82,8 @@ module Portable = struct
 end
 
 let create (fn @ many) arg = create fn arg
+
+external exit_stub : unit -> unit @@ portable = "caml_thread_exit"
 
 let exit () =
   ignore (Sys.opaque_identity (check_memprof_cb ()));

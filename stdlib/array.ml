@@ -23,7 +23,7 @@ type 'a t = 'a array
 
 (* Array operations *)
 
-external length : ('a array[@local_opt]) @ contended -> int @@ portable
+external length : ('a array[@local_opt]) @ immutable -> int @@ stateless
   = "%array_length"
 external get : ('a array[@local_opt]) -> int -> 'a @@ portable
   = "%array_safe_get"
@@ -46,7 +46,7 @@ external create_float: int -> float array @@ portable = "caml_make_float_vect"
 
 module Floatarray = struct
   external create : int -> floatarray @@ portable = "caml_floatarray_create"
-  external length : (floatarray[@local_opt]) @ contended -> int @@ portable
+  external length : (floatarray[@local_opt]) @ immutable -> int @@ stateless
     = "%floatarray_length"
   external get
     : (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])

@@ -3,6 +3,12 @@
 #include <caml/callback.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <stdlib.h>
+
+void* vec_aligned_alloc(intnat align, intnat size) 
+{
+  return aligned_alloc(align, size);
+}
 
 value vec128_run_callback(value f)
 {

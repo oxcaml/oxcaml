@@ -1,6 +1,7 @@
 (* TEST
  flambda2;
  include stdlib_upstream_compatible;
+ include stdlib_stable;
  {
    native;
  }{
@@ -45,6 +46,34 @@ module By_int32_u = struct
       "%array_unsafe_get_indexed_by_int32#"
     external unsafe_set : 'a array -> int32# -> 'a -> unit =
       "%array_unsafe_set_indexed_by_int32#"
+  end
+end
+
+module By_int16_u = struct
+  module I = Stdlib_stable.Int16_u
+  module A = struct
+    external get : 'a array -> int16# -> 'a =
+      "%array_safe_get_indexed_by_int16#"
+    external set : 'a array -> int16# -> 'a -> unit =
+      "%array_safe_set_indexed_by_int16#"
+    external unsafe_get : 'a array -> int16# -> 'a =
+      "%array_unsafe_get_indexed_by_int16#"
+    external unsafe_set : 'a array -> int16# -> 'a -> unit =
+      "%array_unsafe_set_indexed_by_int16#"
+  end
+end
+
+module By_int8_u = struct
+  module I = Stdlib_stable.Int8_u
+  module A = struct
+    external get : 'a array -> int8# -> 'a =
+      "%array_safe_get_indexed_by_int8#"
+    external set : 'a array -> int8# -> 'a -> unit =
+      "%array_safe_set_indexed_by_int8#"
+    external unsafe_get : 'a array -> int8# -> 'a =
+      "%array_unsafe_get_indexed_by_int8#"
+    external unsafe_set : 'a array -> int8# -> 'a -> unit =
+      "%array_unsafe_set_indexed_by_int8#"
   end
 end
 
@@ -131,6 +160,36 @@ let test_int32_u () =
   check_inval (fun () -> A.set [| 1; 2; 3|] (-#2147483647l) 0);
   check_inval (fun () -> A.get [| 1; 2; 3|] (-#1l));
   check_inval (fun () -> A.set [| 1; 2; 3|] (-#1l) 1);
+  ()
+
+let test_int16_u () =
+  let open By_int16_u in
+
+  test_get (fun arr i -> A.get arr (I.of_int i));
+  test_get (fun arr i -> A.unsafe_get arr (I.of_int i));
+
+  test_set (fun arr i -> A.set arr (I.of_int i));
+  test_set (fun arr i -> A.unsafe_set arr (I.of_int i));
+
+  check_inval (fun () -> A.get [| 1; 2; 3|] (I.of_int (-32767)));
+  check_inval (fun () -> A.set [| 1; 2; 3|] (I.of_int (-32767)) 0);
+  check_inval (fun () -> A.get [| 1; 2; 3|] (I.of_int (-1)));
+  check_inval (fun () -> A.set [| 1; 2; 3|] (I.of_int (-1)) 1);
+  ()
+
+let test_int8_u () =
+  let open By_int8_u in
+
+  test_get (fun arr i -> A.get arr (I.of_int i));
+  test_get (fun arr i -> A.unsafe_get arr (I.of_int i));
+
+  test_set (fun arr i -> A.set arr (I.of_int i));
+  test_set (fun arr i -> A.unsafe_set arr (I.of_int i));
+
+  check_inval (fun () -> A.get [| 1; 2; 3|] (I.of_int (-127)));
+  check_inval (fun () -> A.set [| 1; 2; 3|] (I.of_int (-127)) 0);
+  check_inval (fun () -> A.get [| 1; 2; 3|] (I.of_int (-1)));
+  check_inval (fun () -> A.set [| 1; 2; 3|] (I.of_int (-1)) 1);
   ()
 
 let test_nativeint_u () =

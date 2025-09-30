@@ -261,6 +261,15 @@ module type Optcomp_options = sig
   val _save_ir_before : string -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
+  val _gdwarf_config_shape_reduce_depth : string -> unit
+  val _gdwarf_config_shape_eval_depth : string -> unit
+  val _gdwarf_config_max_cms_files_per_unit : string -> unit
+  val _gdwarf_config_max_cms_files_per_variable : string -> unit
+  val _gdwarf_config_max_type_to_shape_depth : string -> unit
+  val _gdwarf_config_max_shape_reduce_steps_per_variable : string -> unit
+  val _gdwarf_config_max_evaluation_steps_per_variable : string -> unit
+  val _gdwarf_config_shape_reduce_fuel : string -> unit
+  val _gdwarf_fidelity : string -> unit
 end
 
 module type Opttop_options = sig
@@ -268,6 +277,39 @@ module type Opttop_options = sig
   include Optcommon_options
   val _verbose : unit -> unit
   val _S : unit -> unit
+end
+
+module type Jscomp_options = sig
+  include Core_options
+  include Compiler_options
+
+  val _inline : string -> unit
+  val _inline_toplevel : string -> unit
+  val _inlining_report : unit -> unit
+  val _dump_pass : string -> unit
+  val _inline_max_depth : string -> unit
+  val _rounds : int -> unit
+  val _inline_max_unroll : string -> unit
+  val _inline_call_cost : string -> unit
+  val _inline_alloc_cost : string -> unit
+  val _inline_prim_cost : string -> unit
+  val _inline_branch_cost : string -> unit
+  val _inline_indirect_cost : string -> unit
+  val _inline_lifting_benefit : string -> unit
+  val _inline_branch_factor : string -> unit
+
+  val _dflambda : unit -> unit
+  val _dflambda_heavy_invariants : unit -> unit
+  val _dflambda_invariants : unit -> unit
+  val _dflambda_let : int -> unit
+  val _dflambda_no_invariants : unit -> unit
+  val _dflambda_verbose : unit -> unit
+  val _djsir : unit -> unit
+  val _drawflambda : unit -> unit
+
+  val _classic_inlining : unit -> unit
+  val _o2 : unit -> unit
+  val _o3 : unit -> unit
 end
 
 module type Ocamldoc_options = sig
@@ -290,6 +332,7 @@ module Make_bytecomp_options : Bytecomp_options -> Arg_list
 module Make_bytetop_options : Bytetop_options -> Arg_list
 module Make_optcomp_options : Optcomp_options -> Arg_list
 module Make_opttop_options : Opttop_options -> Arg_list
+module Make_jscomp_options : Jscomp_options -> Arg_list
 module Make_ocamldoc_options : Ocamldoc_options -> Arg_list
 
 (** [options_with_command_line_syntax options r] returns [options2] that behaves
@@ -307,5 +350,6 @@ module Default: sig
   module Opttopmain: Opttop_options
   module Main: Bytecomp_options
   module Optmain: Optcomp_options
+  module Jsmain : Jscomp_options
   module Odoc_args: Ocamldoc_options
 end

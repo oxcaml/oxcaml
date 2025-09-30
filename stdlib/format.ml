@@ -1031,32 +1031,37 @@ and err_formatter = formatter_of_out_channel Stdlib.stderr
 and str_formatter = formatter_of_buffer stdbuf
 
 (* Initialise domain local state *)
-module DLS = Domain.Safe.DLS
+
+(* CR-soon mslater: switch to TLS to remove thread unsafety *)
+module DLS = struct 
+  let new_key = Domain.Safe.DLS.new_key
+  let get = Obj.magic_portable Domain.DLS.get
+  let set = Obj.magic_portable Domain.DLS.set
+end
 
 let stdbuf_key = DLS.new_key pp_make_buffer
-let _ = Domain.DLS.set stdbuf_key stdbuf
+let _ = DLS.set stdbuf_key stdbuf
 
-let str_formatter_key = DLS.new_key' (fun access ->
-  formatter_of_buffer (DLS.get access stdbuf_key))
-let _ = Domain.DLS.set str_formatter_key str_formatter
+let str_formatter_key = DLS.new_key (fun () ->
+  formatter_of_buffer (DLS.get stdbuf_key))
+let _ = DLS.set str_formatter_key str_formatter
 
 let buffered_out_string key (str : string) (ofs : int) (len : int) : unit =
-  DLS.access (fun access ->
-    Buffer.add_substring (DLS.get access key) str ofs len)
+  Buffer.add_substring (DLS.get key) str ofs len
 
 let buffered_out_flush oc key () : unit =
-  DLS.access (fun access ->
-    let buf = DLS.get access key in
-    let len = Buffer.length buf in
-    let str = Buffer.contents buf in
-    output_substring oc str 0 len ;
-    Stdlib.flush oc;
-    Buffer.clear buf)
+  let buf = DLS.get key in
+  let len = Buffer.length buf in
+  let str = Buffer.contents buf in
+  output_substring oc str 0 len ;
+  Stdlib.flush oc;
+  Buffer.clear buf
 
 let std_buf_key = DLS.new_key (fun () -> Buffer.create pp_buffer_size)
+
 let err_buf_key = DLS.new_key (fun () -> Buffer.create pp_buffer_size)
 
-let std_formatter_key = DLS.new_key' (fun access ->
+let std_formatter_key = DLS.new_key (fun () ->
   let ppf =
     pp_make_formatter (buffered_out_string std_buf_key)
       (buffered_out_flush Stdlib.stdout std_buf_key) ignore ignore ignore
@@ -1064,11 +1069,11 @@ let std_formatter_key = DLS.new_key' (fun access ->
   ppf.pp_out_newline <- display_newline ppf;
   ppf.pp_out_spaces <- display_blanks ppf;
   ppf.pp_out_indent <- display_indent ppf;
-  Domain.Safe.at_exit' access (pp_print_flush ppf);
+  Domain.Safe.at_exit (Obj.magic_portable (pp_print_flush ppf));
   ppf)
-let _ = Domain.DLS.set std_formatter_key std_formatter
+let _ = DLS.set std_formatter_key std_formatter
 
-let err_formatter_key = DLS.new_key' (fun access ->
+let err_formatter_key = DLS.new_key (fun () ->
   let ppf =
     pp_make_formatter (buffered_out_string err_buf_key)
       (buffered_out_flush Stdlib.stderr err_buf_key) ignore ignore ignore
@@ -1076,18 +1081,14 @@ let err_formatter_key = DLS.new_key' (fun access ->
   ppf.pp_out_newline <- display_newline ppf;
   ppf.pp_out_spaces <- display_blanks ppf;
   ppf.pp_out_indent <- display_indent ppf;
-  Domain.Safe.at_exit' access (pp_print_flush ppf);
+  Domain.Safe.at_exit (Obj.magic_portable (pp_print_flush ppf));
   ppf)
-let _ = Domain.DLS.set err_formatter_key err_formatter
+let _ = DLS.set err_formatter_key err_formatter
 
-let get_std_formatter' access = DLS.get access std_formatter_key
-let get_err_formatter' access = DLS.get access err_formatter_key
-let get_str_formatter' access = DLS.get access str_formatter_key
-let get_stdbuf' access = DLS.get access stdbuf_key
-let get_std_formatter () = get_std_formatter' DLS.Access.for_initial_domain
-let get_err_formatter () = get_err_formatter' DLS.Access.for_initial_domain
-let get_str_formatter () = get_str_formatter' DLS.Access.for_initial_domain
-let get_stdbuf () = get_stdbuf' DLS.Access.for_initial_domain
+let get_std_formatter () = DLS.get std_formatter_key
+let get_err_formatter () = DLS.get err_formatter_key
+let get_str_formatter () = DLS.get str_formatter_key
+let get_stdbuf () = DLS.get stdbuf_key
 
 (* [flush_buffer_formatter buf ppf] flushes formatter [ppf],
    then returns the contents of buffer [buf] that is reset.
@@ -1101,10 +1102,9 @@ let flush_buffer_formatter buf ppf =
 
 (* Flush [str_formatter] and get the contents of [stdbuf]. *)
 let flush_str_formatter () =
-  DLS.access (fun access ->
-    let stdbuf = DLS.get access stdbuf_key in
-    let str_formatter = DLS.get access str_formatter_key in
-    flush_buffer_formatter stdbuf str_formatter)
+  let stdbuf = DLS.get stdbuf_key in
+  let str_formatter = DLS.get str_formatter_key in
+  flush_buffer_formatter stdbuf str_formatter
 
 let make_synchronized_formatter_safe output flush =
   DLS.new_key (fun () ->
@@ -1117,8 +1117,10 @@ let make_synchronized_formatter_safe output flush =
     in
     make_formatter output' flush')
 
-let make_synchronized_formatter_unsafe output flush =
-  make_synchronized_formatter_safe (Obj.magic_portable output) (Obj.magic_portable flush)
+let make_synchronized_formatter_unsafe output flush = 
+  make_synchronized_formatter_safe 
+    (Obj.magic_portable output)
+    (Obj.magic_portable flush)
 
 let synchronized_formatter_of_out_channel oc =
   make_synchronized_formatter_safe
@@ -1192,75 +1194,65 @@ let formatter_of_symbolic_output_buffer sob =
 
 *)
 
-let[@inline] apply1 f v = f (Domain.DLS.get std_formatter_key) v
-let[@inline] apply2 f v w = f (Domain.DLS.get std_formatter_key) v w
-let[@inline] apply1' (type a : value mod portable contended) f (v : a) =
-  DLS.access (fun access -> f (DLS.get access std_formatter_key) v)
-let[@inline] apply2'
-      (type (a : value mod portable contended) (b : value mod portable contended))
-      f (v : a) (w : b) =
-  DLS.access (fun access -> f (DLS.get access std_formatter_key) v w)
+let[@inline] apply1 f v = f (DLS.get std_formatter_key) v
+let[@inline] apply2 f v w = f (DLS.get std_formatter_key) v w
 
-let open_hbox = apply1' pp_open_hbox
-and open_vbox = apply1' pp_open_vbox
-and open_hvbox = apply1' pp_open_hvbox
-and open_hovbox = apply1' pp_open_hovbox
-and open_box = apply1' pp_open_box
-and close_box = apply1' pp_close_box
+let open_hbox = apply1 pp_open_hbox
+and open_vbox = apply1 pp_open_vbox
+and open_hvbox = apply1 pp_open_hvbox
+and open_hovbox = apply1 pp_open_hovbox
+and open_box = apply1 pp_open_box
+and close_box = apply1 pp_close_box
 and open_stag = apply1 pp_open_stag
-and close_stag = apply1' pp_close_stag
-and print_as = apply2' pp_print_as
-and print_string = apply1' pp_print_string
+and close_stag = apply1 pp_close_stag
+and print_as = apply2 pp_print_as
+and print_string = apply1 pp_print_string
 and print_bytes b =
   let s = Bytes.to_string b in
-  apply1' pp_print_string s
-and print_int = apply1' pp_print_int
-and print_float = apply1' pp_print_float
-and print_char = apply1' pp_print_char
-and print_bool = apply1' pp_print_bool
-and print_break = apply2' pp_print_break
-and print_cut = apply1' pp_print_cut
-and print_space = apply1' pp_print_space
-and force_newline = apply1' pp_force_newline
-and print_flush = apply1' pp_print_flush
-and print_newline = apply1' pp_print_newline
-and print_if_newline = apply1' pp_print_if_newline
+  apply1 pp_print_string s
+and print_int = apply1 pp_print_int
+and print_float = apply1 pp_print_float
+and print_char = apply1 pp_print_char
+and print_bool = apply1 pp_print_bool
+and print_break = apply2 pp_print_break
+and print_cut = apply1 pp_print_cut
+and print_space = apply1 pp_print_space
+and force_newline = apply1 pp_force_newline
+and print_flush = apply1 pp_print_flush
+and print_newline = apply1 pp_print_newline
+and print_if_newline = apply1 pp_print_if_newline
 
-and open_tbox = apply1' pp_open_tbox
-and close_tbox = apply1' pp_close_tbox
-and print_tbreak = apply2' pp_print_tbreak
+and open_tbox = apply1 pp_open_tbox
+and close_tbox = apply1 pp_close_tbox
+and print_tbreak = apply2 pp_print_tbreak
 
-and set_tab = apply1' pp_set_tab
-and print_tab = apply1' pp_print_tab
+and set_tab = apply1 pp_set_tab
+and print_tab = apply1 pp_print_tab
 
-and set_margin = apply1' pp_set_margin
-and get_margin = apply1' pp_get_margin
+and set_margin = apply1 pp_set_margin
+and get_margin = apply1 pp_get_margin
 
-and set_max_indent = apply1' pp_set_max_indent
-and get_max_indent = apply1' pp_get_max_indent
+and set_max_indent = apply1 pp_set_max_indent
+and get_max_indent = apply1 pp_get_max_indent
 
 and set_geometry ~max_indent ~margin =
-  DLS.access
-    (fun access -> pp_set_geometry (DLS.get access std_formatter_key) ~max_indent ~margin)
+  pp_set_geometry (DLS.get std_formatter_key) ~max_indent ~margin
 and safe_set_geometry ~max_indent ~margin =
-  DLS.access
-    (fun access -> pp_safe_set_geometry (DLS.get access std_formatter_key) ~max_indent ~margin)
-and get_geometry = apply1' pp_get_geometry
+  pp_safe_set_geometry (DLS.get std_formatter_key) ~max_indent ~margin
+and get_geometry = apply1 pp_get_geometry
 and update_geometry update =
-  let geometry =
-    DLS.access (fun access -> pp_get_geometry (DLS.get access std_formatter_key) ())
-  in
+  let geometry = pp_get_geometry (DLS.get std_formatter_key) () in
   let updated = update geometry in
-  DLS.access (fun access -> pp_set_full_geometry (DLS.get access std_formatter_key) updated)
+  pp_set_full_geometry (DLS.get std_formatter_key) updated
 
-and set_max_boxes = apply1' pp_set_max_boxes
-and get_max_boxes = apply1' pp_get_max_boxes
-and over_max_boxes = apply1' pp_over_max_boxes
+and set_max_boxes = apply1 pp_set_max_boxes
+and get_max_boxes = apply1 pp_get_max_boxes
+and over_max_boxes = apply1 pp_over_max_boxes
 
-and set_ellipsis_text = apply1' pp_set_ellipsis_text
-and get_ellipsis_text = apply1' pp_get_ellipsis_text
+and set_ellipsis_text = apply1 pp_set_ellipsis_text
+and get_ellipsis_text = apply1 pp_get_ellipsis_text
 
-and set_formatter_out_channel = apply1' pp_set_formatter_out_channel
+and set_formatter_out_channel = apply1 pp_set_formatter_out_channel
 
 and set_formatter_out_functions = apply1 pp_set_formatter_out_functions
 and get_formatter_out_functions = apply1 pp_get_formatter_out_functions
@@ -1270,11 +1262,11 @@ and get_formatter_output_functions = apply1 pp_get_formatter_output_functions
 
 and set_formatter_stag_functions = apply1 pp_set_formatter_stag_functions
 and get_formatter_stag_functions = apply1 pp_get_formatter_stag_functions
-and set_print_tags = apply1' pp_set_print_tags
-and get_print_tags = apply1' pp_get_print_tags
-and set_mark_tags = apply1' pp_set_mark_tags
-and get_mark_tags = apply1' pp_get_mark_tags
-and set_tags = apply1' pp_set_tags
+and set_print_tags = apply1 pp_set_print_tags
+and get_print_tags = apply1 pp_get_print_tags
+and set_mark_tags = apply1 pp_set_mark_tags
+and get_mark_tags = apply1 pp_get_mark_tags
+and set_tags = apply1 pp_set_tags
 
 
 (* Convenience functions *)
@@ -1455,12 +1447,12 @@ let fprintf ppf = kfprintf ignore ppf
 
 let printf (Format (fmt, _)) =
   make_printf
-    (fun acc -> output_acc (Domain.DLS.get std_formatter_key) acc)
+    (fun acc -> output_acc (DLS.get std_formatter_key) acc)
     End_of_acc fmt
 
 let eprintf (Format (fmt, _)) =
   make_printf
-    (fun acc -> output_acc (Domain.DLS.get err_formatter_key) acc)
+    (fun acc -> output_acc (DLS.get err_formatter_key) acc)
     End_of_acc fmt
 
 let kdprintf k (Format (fmt, _)) =
@@ -1493,20 +1485,15 @@ let kasprintf k (Format (fmt, _)) =
 let asprintf fmt = kasprintf id fmt
 
 module Safe = struct
-  let get_std_formatter = get_std_formatter'
-  let get_err_formatter = get_err_formatter'
-  let get_str_formatter = get_str_formatter'
-  let get_stdbuf = get_stdbuf'
   let make_synchronized_formatter = make_synchronized_formatter_safe
 end
-
 let make_synchronized_formatter = make_synchronized_formatter_unsafe
 
 (* Flushing standard formatters at end of execution. *)
 
 let flush_standard_formatters () =
-  pp_print_flush (Domain.DLS.get std_formatter_key) ();
-  pp_print_flush (Domain.DLS.get err_formatter_key) ()
+  pp_print_flush (DLS.get std_formatter_key) ();
+  pp_print_flush (DLS.get err_formatter_key) ()
 
 let () = at_exit flush_standard_formatters
 

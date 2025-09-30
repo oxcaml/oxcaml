@@ -701,11 +701,11 @@ module Default_environment : sig
 
   val is_empty : t -> bool
 
-  val pop : t -> ((int * matrix) * t) option
+  val pop : t -> ((Static_label.t * matrix) * t) option
 
   val empty : t
 
-  val cons : matrix -> int -> t -> t
+  val cons : matrix -> Static_label.t -> t -> t
 
   val specialize : Patterns.Head.t -> t -> t
 
@@ -717,7 +717,7 @@ module Default_environment : sig
 
   val pp : Format.formatter -> t -> unit
 end = struct
-  type t = (int * matrix) list
+  type t = (Static_label.t * matrix) list
   (** All matrices in the list should have the same arity -- their rows should
       have the same number of columns -- as it should match the arity of the
       current scrutiny vector. *)
@@ -865,9 +865,9 @@ end = struct
            Format.pp_print_list ~pp_sep:Format.pp_print_cut
              (fun ppf (i, pss) ->
                 Format.fprintf ppf
-                  "Matrix for %d:@,\
+                  "Matrix for %a:@,\
                    %a"
-                  i
+                  Static_label.format i
                   pretty_matrix pss
              ) ppf li
       ) def
@@ -890,9 +890,9 @@ module Jumps : sig
 
   val empty : t
 
-  val singleton : int -> Context.t -> t
+  val singleton : Static_label.t -> Context.t -> t
 
-  val add : int -> Context.t -> t -> t
+  val add : Static_label.t -> Context.t -> t -> t
 
   val union : t -> t -> t
 
@@ -900,32 +900,32 @@ module Jumps : sig
 
   val map : (Context.t -> Context.t) -> t -> t
 
-  val remove : int -> t -> t
+  val remove : Static_label.t -> t -> t
 
   (** [extract exit jumps] returns the context at the given exit
       and the rest of the jump summary. *)
-  val extract : int -> t -> Context.t * t
+  val extract : Static_label.t -> t -> Context.t * t
 
   val pp : Format.formatter -> t -> unit
 end = struct
-  type t = (int * Context.t) list
+  type t = (Static_label.t * Context.t) list
 
   let pp ppf (env : t) =
     if env = [] then Format.fprintf ppf "empty" else
     Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (i, ctx) ->
       Format.fprintf ppf
-        "jump for %d@,\
+        "jump for %a@,\
          %a"
-        i
+        Static_label.format i
         Context.pp ctx
     ) ppf env
 
   let rec extract i = function
     | [] -> (Context.empty, [])
     | ((j, pss) as x) :: rem as all ->
-        if i = j then
+        if Static_label.equal i j then
           (pss, rem)
-        else if j < i then
+        else if Static_label.compare j i < 0 then
           (Context.empty, all)
         else
           let r, rem = extract i rem in
@@ -933,7 +933,7 @@ end = struct
 
   let rec remove i = function
     | [] -> []
-    | (j, _) :: rem when i = j -> rem
+    | (j, _) :: rem when Static_label.equal i j -> rem
     | x :: rem -> x :: remove i rem
 
   let empty = []
@@ -952,9 +952,9 @@ end = struct
     let rec add = function
       | [] -> [ (i, ctx) ]
       | ((j, qss) as x) :: rem as all ->
-          if j > i then
+          if Static_label.compare j i > 0 then
             x :: add rem
-          else if j < i then
+          else if Static_label.compare j i < 0 then
             (i, ctx) :: all
           else
             (i, Context.union ctx qss) :: rem
@@ -969,9 +969,9 @@ end = struct
     | [], _ -> env2
     | _, [] -> env1
     | ((i1, pss1) as x1) :: rem1, ((i2, pss2) as x2) :: rem2 ->
-        if i1 = i2 then
+        if Static_label.equal i1 i2 then
           (i1, Context.union pss1 pss2) :: union rem1 rem2
-        else if i1 > i2 then
+        else if Static_label.compare i1 i2 > 0 then
           x1 :: union rem1 env2
         else
           x2 :: union env1 rem2
@@ -1004,7 +1004,7 @@ type 'row pattern_matching = {
 
 type handler = {
   provenance : matrix;
-  exit : int;
+  exit : Static_label.t;
   vars : (Ident.t * Lambda.debug_uid * Lambda.layout) list;
   pm : initial_clause pattern_matching
 }
@@ -1071,9 +1071,9 @@ let rec pretty_precompiled_ ~print_default ppf = function
       let pretty_handlers ppf handlers =
         List.iter (fun { exit = i; pm; _ } ->
           Format.fprintf ppf
-            "++ Handler %d ++@,\
+            "++ Handler %a ++@,\
              %a"
-            i
+            Static_label.format i
             (pretty_pm_ ~print_default) pm
         ) handlers
       in
@@ -1101,9 +1101,9 @@ let pretty_precompiled_res ppf (first, nexts) =
     (Format.pp_print_list ~pp_sep:Format.pp_print_cut
        (fun ppf (e, pmh) ->
           Format.fprintf ppf
-            "@[<v 2>Default matrix %d:@,\
+            "@[<v 2>Default matrix %a:@,\
              %a@]"
-            e
+            Static_label.format e
             pretty_precompiled_without_default pmh)
     ) nexts
 
@@ -1237,7 +1237,10 @@ let can_group discr pat =
   match (discr.pat_desc, (Simple.head pat).pat_desc) with
   | Any, Any
   | Constant (Const_int _), Constant (Const_int _)
+  | Constant (Const_int8 _), Constant (Const_int8 _)
+  | Constant (Const_int16 _), Constant (Const_int16 _)
   | Constant (Const_char _), Constant (Const_char _)
+  | Constant (Const_untagged_char _), Constant (Const_untagged_char _)
   | Constant (Const_string _), Constant (Const_string _)
   | Constant (Const_float _), Constant (Const_float _)
   | Constant (Const_float32 _), Constant (Const_float32 _)
@@ -1246,6 +1249,9 @@ let can_group discr pat =
   | Constant (Const_int32 _), Constant (Const_int32 _)
   | Constant (Const_int64 _), Constant (Const_int64 _)
   | Constant (Const_nativeint _), Constant (Const_nativeint _)
+  | Constant (Const_untagged_int _), Constant (Const_untagged_int _)
+  | Constant (Const_untagged_int8 _), Constant (Const_untagged_int8 _)
+  | Constant (Const_untagged_int16 _), Constant (Const_untagged_int16 _)
   | Constant (Const_unboxed_int32 _), Constant (Const_unboxed_int32 _)
   | Constant (Const_unboxed_int64 _), Constant (Const_unboxed_int64 _)
   | Constant (Const_unboxed_nativeint _), Constant (Const_unboxed_nativeint _)->
@@ -1272,9 +1278,12 @@ let can_group discr pat =
       | Constant
           ( Const_int _ | Const_char _ | Const_string _ | Const_float _
           | Const_float32 _ | Const_unboxed_float _ | Const_unboxed_float32 _
+          | Const_int8 _ | Const_int16 _
           | Const_int32 _ | Const_int64 _ | Const_nativeint _
+          | Const_untagged_char _
+          | Const_untagged_int8 _ | Const_untagged_int16 _
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
-          | Const_unboxed_nativeint _ )
+          | Const_untagged_int _ | Const_unboxed_nativeint _ )
       | Construct _ | Tuple _ | Unboxed_tuple _ | Record _
       | Record_unboxed_product _ | Array _ | Variant _ | Lazy ) ) ->
       false
@@ -2764,7 +2773,7 @@ module SArg = struct
   let make_isin h arg = Lprim (Pnot, [ make_isout h arg ], Loc_unknown)
 
   let make_is_nonzero arg =
-    if !Clflags.native_code
+    if !Clflags.native_code || Clflags.is_flambda2 ()
     then icmp Cne int arg (tagged_immediate 0) ~loc:Loc_unknown
     else arg
 
@@ -2805,9 +2814,10 @@ module SArg = struct
         },
         loc, kind ))
 
-  let make_catch = make_catch_delayed
+  let make_catch kind handler =
+    make_catch_delayed kind handler
 
-  let make_exit = make_exit
+  let make_exit i = make_exit i
 end
 
 (* Action sharing for Lswitch argument *)
@@ -2847,37 +2857,39 @@ let share_actions_sw kind sw =
 let reintroduce_fail sw =
   match sw.sw_failaction with
   | None ->
-      let t = Hashtbl.create 17 in
+      let t = Static_label.Tbl.create 17 in
       let seen (_, l) =
         match as_simple_exit l with
         | Some i ->
-            let old = try Hashtbl.find t i with Not_found -> 0 in
-            Hashtbl.replace t i (old + 1)
+            let old = try Static_label.Tbl.find t i with Not_found -> 0 in
+            Static_label.Tbl.replace t i (old + 1)
         | None -> ()
       in
       List.iter seen sw.sw_consts;
       List.iter seen sw.sw_blocks;
-      let i_max = ref (-1) and max = ref (-1) in
-      Hashtbl.iter
+      let i_max = ref None and max = ref (-1) in
+      Static_label.Tbl.iter
         (fun i c ->
           if c > !max then (
-            i_max := i;
+            i_max := Some i;
             max := c
           ))
         t;
       if !max >= 3 then
-        let default = !i_max in
-        let remove =
-          List.filter (fun (_, lam) ->
-              match as_simple_exit lam with
-              | Some j -> j <> default
-              | None -> true)
-        in
-        { sw with
-          sw_consts = remove sw.sw_consts;
-          sw_blocks = remove sw.sw_blocks;
-          sw_failaction = Some (make_exit default)
-        }
+        match !i_max with
+        | Some default ->
+            let remove =
+              List.filter (fun (_, lam) ->
+                  match as_simple_exit lam with
+                  | Some j -> not (Static_label.equal j default)
+                  | None -> true)
+            in
+            { sw with
+              sw_consts = remove sw.sw_consts;
+              sw_blocks = remove sw.sw_blocks;
+              sw_failaction = Some (make_exit default)
+            }
+        | None -> sw
       else
         sw
   | Some _ -> sw
@@ -3135,6 +3147,28 @@ let combine_constant value_kind loc arg cst partial ctx def
             const_lambda_list
         in
         call_switcher value_kind loc fail arg min_int max_int int_lambda_list
+    | Const_int8 _ ->
+        let int_lambda_list =
+          List.map
+            (function
+              | Const_int8 n, l -> (n, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        let max_excl = 1 lsl 7 in
+        call_switcher value_kind loc fail arg
+          (-max_excl) (max_excl - 1) int_lambda_list
+    | Const_int16 _ ->
+        let int_lambda_list =
+          List.map
+            (function
+              | Const_int16 n, l -> (n, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        let max_excl = 1 lsl 15 in
+        call_switcher value_kind loc fail arg
+          (-max_excl) (max_excl - 1) int_lambda_list
     | Const_char _ ->
         let int_lambda_list =
           List.map
@@ -3178,6 +3212,14 @@ let combine_constant value_kind loc arg cst partial ctx def
     | Const_nativeint _ ->
         make_scalar_test_sequence
           (Scalar.integral (Value (Boxable (Nativeint Any_locality_mode))))
+    | Const_untagged_char _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int8)))
+    | Const_untagged_int _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int)))
+    | Const_untagged_int8 _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int8)))
+    | Const_untagged_int16 _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int16)))
     | Const_unboxed_int32 _ ->
         make_scalar_test_sequence
           (Scalar.integral (Naked (Boxable (Int32 Any_locality_mode))))
@@ -3243,7 +3285,7 @@ let transl_match_on_option value_kind arg loc ~if_some ~if_none =
   (* Keeping the Pisint test would make the bytecode
       slightly worse, but it lets the native compiler generate
       better code -- see #10681. *)
-  if !Clflags.native_code then
+  if !Clflags.native_code || Clflags.is_flambda2 () then
     Lifthenelse(Lprim (Pisint { variant_only = true }, [ arg ], loc),
                 if_none, if_some, value_kind)
   else
@@ -3593,7 +3635,7 @@ let compile_orhandlers value_kind compile_fun lambda1 total1 ctx to_catch =
           if rem <> [] then separate_debug_output ();
           begin match raw_action r with
           | Lstaticraise (j, args) ->
-              if i = j then
+              if Static_label.equal i j then
                 ( List.fold_right2
                     (bind_with_layout Alias)
                     vars args handler_i,

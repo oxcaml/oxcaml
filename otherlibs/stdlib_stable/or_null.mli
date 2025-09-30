@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ portable
+
 (** Nullable values.
 
     Nullable values explicitly indicate the presence or absence of a value,

@@ -35,7 +35,7 @@ val transl_type_extension:
     Typedtree.type_extension * Env.t * Shape.t list
 
 val transl_value_decl:
-    Env.t -> modalities:Mode.Modality.Value.t -> Location.t ->
+    Env.t -> modalities:Mode.Modality.t -> Location.t ->
     Parsetree.value_description -> Typedtree.value_description * Env.t
 
 (* If the [fixed_row_path] optional argument is provided,
@@ -66,6 +66,8 @@ val check_coherence:
 
 (* for fixed types *)
 val is_fixed_type : Parsetree.type_declaration -> bool
+
+val mixed_block_element : Env.t -> type_expr -> _ jkind -> mixed_block_element
 
 type native_repr_kind = Unboxed | Untagged
 

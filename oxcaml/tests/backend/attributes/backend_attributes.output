@@ -1,0 +1,10 @@
+Backend_attributes__with_irc
+use_regalloc=irc
+Backend_attributes__with_irc
+use_regalloc=irc
+Backend_attributes__with_irc_and_param
+use_regalloc=irc
+regalloc_params=IRC_SPILLING_HEURISTICS=flat
+Backend_attributes__with_irc_and_param
+use_regalloc=irc
+regalloc_params=IRC_SPILLING_HEURISTICS=flat

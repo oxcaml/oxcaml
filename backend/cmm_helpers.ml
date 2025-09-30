@@ -2126,7 +2126,6 @@ let send_function_name arity result (mode : Cmx_format.alloc_mode) =
 
 let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     =
-  let cache = array_indexing log2_size_addr cache pos dbg in
   Compilenv.need_send_fun
     (List.map Extended_machtype.change_tagged_int_to_val args_type)
     (Extended_machtype.change_tagged_int_to_val result)
@@ -2140,7 +2139,7 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
             (Extended_machtype.change_tagged_int_to_val result)
             mode,
           dbg )
-      :: obj :: tag :: cache :: args,
+      :: obj :: tag :: cache :: pos :: args,
       dbg )
 
 (* Allocation *)
@@ -3021,7 +3020,7 @@ module SArgBlocks = struct
       ( i,
         fun body ->
           match body with
-          | Cexit (j, _, _) -> if Lbl i = j then handler else body
+          | Cexit (j, _, _) -> if j = Lbl i then handler else body
           | _ -> ccatch (i, [], body, handler, dbg, false) ))
 
   let make_exit i = Cexit (Lbl i, [], [])
@@ -3036,7 +3035,7 @@ end
 module StoreExpForSwitch = Switch.CtxStore (struct
   type t = expression
 
-  type key = int option * int
+  type key = Static_label.t option * int
 
   type context = int
 
@@ -3048,7 +3047,7 @@ module StoreExpForSwitch = Switch.CtxStore (struct
 
   let compare_key (cont, index) (cont', index') =
     match cont, cont' with
-    | Some i, Some i' when i = i' -> 0
+    | Some i, Some i' when Static_label.equal i i' -> 0
     | _, _ -> Stdlib.compare index index'
 end)
 
@@ -3323,7 +3322,12 @@ let cache_public_method meths tag cache dbg =
       [VP.create result_label_index, typ_int],
       Ccatch
         ( Recursive,
-          [loop_cont, [li_vp, typ_int; hi_vp, typ_int], loop_body, dbg, false],
+          [ { label = loop_cont;
+              params = [li_vp, typ_int; hi_vp, typ_int];
+              body = loop_body;
+              dbg;
+              is_cold = false
+            } ],
           (* Start the first iteration of the loop *)
           Cexit
             ( Lbl loop_cont,
@@ -3429,13 +3433,22 @@ let send_function (arity, result, mode) =
   let cconst_int i = Cconst_int (i, dbg ()) in
   let args, clos', body = apply_function_body (typ_val :: arity) result mode in
   let cache = V.create_local "cache"
+  and pos = V.create_local "pos"
   and obj = List.hd args
   and tag = V.create_local "tag" in
   let clos =
-    let cache = Cvar cache and obj = Cvar obj and tag = Cvar tag in
+    let cache = Cvar cache
+    and obj = Cvar obj
+    and tag = Cvar tag
+    and pos = Cvar pos in
     let meths = V.create_local "meths" and cached = V.create_local "cached" in
     let real = V.create_local "real" in
     let mask = get_field_gen Asttypes.Mutable (Cvar meths) 1 (dbg ()) in
+    let cache_ptr = V.create_local "cache_ptr" in
+    let cache_ptr_cvar = Cvar cache_ptr in
+    let cache_ptr_expr =
+      array_indexing ~typ:Addr log2_size_addr cache pos (dbg ())
+    in
     let cached_pos = Cvar cached in
     let tag_pos =
       Cop
@@ -3449,32 +3462,37 @@ let send_function (arity, result, mode) =
       ( VP.create meths,
         Cop (mk_load_mut Word_val, [obj], dbg ()),
         Clet
-          ( VP.create cached,
-            Cop
-              (Cand, [Cop (mk_load_mut Word_int, [cache], dbg ()); mask], dbg ()),
+          ( VP.create cache_ptr,
+            cache_ptr_expr,
             Clet
-              ( VP.create real,
-                Cifthenelse
-                  ( Cop (Ccmpi Cne, [tag'; tag], dbg ()),
-                    dbg (),
-                    cache_public_method (Cvar meths) tag cache (dbg ()),
-                    dbg (),
-                    cached_pos,
-                    dbg () ),
+              ( VP.create cached,
                 Cop
-                  ( mk_load_mut Word_val,
-                    [ Cop
-                        ( Cadda,
-                          [ Cop (Cadda, [Cvar real; Cvar meths], dbg ());
-                            cconst_int ((2 * size_addr) - 1) ],
-                          dbg () ) ],
-                    dbg () ) ) ) )
+                  ( Cand,
+                    [Cop (mk_load_mut Word_int, [cache_ptr_cvar], dbg ()); mask],
+                    dbg () ),
+                Clet
+                  ( VP.create real,
+                    Cifthenelse
+                      ( Cop (Ccmpi Cne, [tag'; tag], dbg ()),
+                        dbg (),
+                        cache_public_method (Cvar meths) tag cache_ptr_cvar
+                          (dbg ()),
+                        dbg (),
+                        cached_pos,
+                        dbg () ),
+                    Cop
+                      ( mk_load_mut Word_val,
+                        [ Cop
+                            ( Cadda,
+                              [ Cop (Cadda, [Cvar real; Cvar meths], dbg ());
+                                cconst_int ((2 * size_addr) - 1) ],
+                              dbg () ) ],
+                        dbg () ) ) ) ) )
   in
   let body = Clet (VP.create clos', clos, body) in
-  let cache = cache in
   let fun_name = send_function_name arity result mode in
   let fun_args =
-    [obj, typ_val; tag, typ_int; cache, typ_addr]
+    [obj, typ_val; tag, typ_int; cache, typ_val; pos, typ_int]
     @ List.combine (List.tl args) arity
   in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
@@ -4178,14 +4196,16 @@ let entry_point namelist =
         [],
         Ccatch
           ( Recursive,
-            [ ( cont,
-                [VP.create id, typ_int],
-                Csequence
-                  ( exit_if_last_iteration id,
-                    Csequence (call (Cvar id), Cexit (Lbl cont, [incr_i id], []))
-                  ),
-                dbg,
-                false ) ],
+            [ { label = cont;
+                params = [VP.create id, typ_int];
+                body =
+                  Csequence
+                    ( exit_if_last_iteration id,
+                      Csequence
+                        (call (Cvar id), Cexit (Lbl cont, [incr_i id], [])) );
+                dbg;
+                is_cold = false
+              } ],
             Cexit (Lbl cont, [cconst_int 0], []) ),
         Ctuple [],
         dbg,
@@ -4339,21 +4359,16 @@ let ite ~dbg ~then_dbg ~then_ ~else_dbg ~else_ cond =
 let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
   Ccatch
     ( Exn_handler,
-      [ ( handler_cont,
-          (exn_var, typ_val) :: extra_args,
-          handler,
-          dbg,
-          false (* is_cold *) ) ],
+      [ { label = handler_cont;
+          params = (exn_var, typ_val) :: extra_args;
+          body = handler;
+          dbg;
+          is_cold = false
+        } ],
       body )
 
-type static_handler =
-  int
-  * (Backend_var.With_provenance.t * Cmm.machtype) list
-  * Cmm.expression
-  * Debuginfo.t
-  * bool
-
-let handler ~dbg id vars body is_cold = id, vars, body, dbg, is_cold
+let handler ~dbg label params body is_cold =
+  Cmm.{ label; params; body; dbg; is_cold }
 
 let cexit id args trap_actions = Cmm.Cexit (Cmm.Lbl id, args, trap_actions)
 

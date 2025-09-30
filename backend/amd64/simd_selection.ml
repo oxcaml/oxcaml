@@ -27,25 +27,26 @@ exception Error of error
 
 module Seq = Simd.Seq
 
-let instr instr ?i args = Some (Simd.instruction instr i, args)
+let cfg_operation simd args = Some (Operation.Specific (Isimd simd), args)
 
-let seq seq ?i args = Some (Simd.sequence seq i, args)
+let instr instr ?i args = cfg_operation (Simd.instruction instr i) args
+
+let seq seq ?i args = cfg_operation (Simd.sequence seq i) args
 
 let sse_or_avx sse vex ?i args =
   let sse_or_avx = if Arch.Extension.enabled AVX then vex else sse in
-  Some (Simd.instruction sse_or_avx i, args)
+  cfg_operation (Simd.instruction sse_or_avx i) args
 
 let seq_or_avx sse vex ?i args =
   let seq = if Arch.Extension.enabled AVX then vex else sse in
-  Some (Simd.sequence seq i, args)
+  cfg_operation (Simd.sequence seq i) args
 
 let seq_or_avx_zeroed ~dbg seq instr ?i args =
   if Arch.Extension.enabled AVX
   then
-    Some
-      ( Simd.instruction instr i,
-        Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args )
-  else Some (Simd.sequence seq i, args)
+    cfg_operation (Simd.instruction instr i)
+      (Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args)
+  else cfg_operation (Simd.sequence seq i) args
 
 let bad_immediate fmt =
   Format.kasprintf (fun msg -> raise (Error (Bad_immediate msg))) fmt
@@ -114,8 +115,27 @@ let select_operation_bmi2 ~dbg:_ op args =
       sse_or_avx pdep_r64_r64_r64m64 pdep_r64_r64_r64m64 args
     | _ -> None
 
+let simd_load memory_chunk args =
+  Some
+    ( Operation.Load
+        { memory_chunk;
+          addressing_mode = Iindexed 0;
+          mutability = Mutable;
+          is_atomic = false
+        },
+      args )
+
+let simd_store memory_chunk args =
+  Some (Operation.Store (memory_chunk, Iindexed 0, true), args)
+
 let select_operation_sse ~dbg op args =
   match op with
+  | "caml_sse_load_aligned" -> simd_load Onetwentyeight_aligned args
+  | "caml_sse_load_unaligned" -> simd_load Onetwentyeight_unaligned args
+  | "caml_sse_store_aligned" ->
+    simd_store Onetwentyeight_aligned (List.rev args)
+  | "caml_sse_store_unaligned" ->
+    simd_store Onetwentyeight_unaligned (List.rev args)
   | "caml_sse_float32_sqrt" | "sqrtf" ->
     seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss args
   | "caml_simd_float32_max" | "caml_sse_float32_max" ->
@@ -579,6 +599,11 @@ let select_operation_avx ~dbg:_ op args =
   then None
   else
     match op with
+    | "caml_avx_load_aligned" -> simd_load Twofiftysix_aligned args
+    | "caml_avx_load_unaligned" -> simd_load Twofiftysix_unaligned args
+    | "caml_avx_store_aligned" -> simd_store Twofiftysix_aligned (List.rev args)
+    | "caml_avx_store_unaligned" ->
+      simd_store Twofiftysix_unaligned (List.rev args)
     | "caml_avx_float64x4_add" -> instr vaddpd_Y_Y_Ym256 args
     | "caml_avx_float32x8_add" -> instr vaddps_Y_Y_Ym256 args
     | "caml_avx_float32x8_addsub" -> instr vaddsubps_Y_Y_Ym256 args
@@ -859,7 +884,7 @@ let select_operation_avx2 ~dbg:_ op args =
     | "caml_avx2_vec128x2_interleave_low_16" -> instr vpunpcklwd_Y_Y_Ym256 args
     | _ -> None
 
-let select_simd_instr ~dbg op args =
+let select_operation_cfg ~dbg op args =
   let or_else try_ opt =
     match opt with Some x -> Some x | None -> try_ ~dbg op args
   in
@@ -874,10 +899,6 @@ let select_simd_instr ~dbg op args =
   |> or_else select_operation_sse42
   |> or_else select_operation_avx
   |> or_else select_operation_avx2
-
-let select_operation_cfg ~dbg op args =
-  select_simd_instr ~dbg op args
-  |> Option.map (fun (op, args) -> Operation.Specific (Isimd op), args)
 
 let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
   match op with
@@ -1227,7 +1248,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
           | Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence
           | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Iprefetch _
-          | Icldemote _ ->
+          | Icldemote _ | Illvm_intrinsic _ ->
             assert false)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
         | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
@@ -1360,7 +1381,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               ( Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _
               | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
               | Isimd _ | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32
-              | Izextend32 )
+              | Izextend32 | Illvm_intrinsic _ )
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Alloc _
           | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
@@ -1473,7 +1494,11 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       Misc.fatal_error "Unexpected simd operation with memory arguments"
     | Ioffset_loc _ | Ibswap _ | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
     | Ipackf32 | Isimd _ | Iprefetch _ | Icldemote _ ->
-      None)
+      None
+    | Illvm_intrinsic intr ->
+      Misc.fatal_errorf
+        "Simd_selection: Unexpected llvm_intrinsic %s: not using LLVM backend"
+        intr)
   | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
   | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _

@@ -199,12 +199,12 @@ let location d = if not !Clflags.locations then "" else Debuginfo.to_string d
 
 let exit_label ppf = function
   | Return_lbl -> fprintf ppf "*return*"
-  | Lbl lbl -> fprintf ppf "%d" lbl
+  | Lbl lbl -> fprintf ppf "%a" Static_label.format lbl
 
 let trap_action ppf ta =
   match ta with
-  | Push i -> fprintf ppf "push(%d)" i
-  | Pop i -> fprintf ppf "pop(%d)" i
+  | Push i -> fprintf ppf "push(%a)" Static_label.format i
+  | Pop i -> fprintf ppf "pop(%a)" Static_label.format i
 
 let trap_action_list ppf traps =
   match traps with
@@ -428,9 +428,10 @@ let rec expr ppf = function
         in
         fprintf ppf "@[<v 0>@[<2>(switch@ %a@ @]%t)@]" expr e1 print_cases)
   | Ccatch (flag, handlers, e1) ->
-    let print_handler ppf (i, ids, e2, dbg, is_cold) =
+    let print_handler ppf
+        Cmm.{ label = i; params = ids; body = e2; dbg; is_cold } =
       with_location_mapping ~label:"Ccatch-handler" ~dbg ppf (fun () ->
-          fprintf ppf "(%d%a)%s@ %a" i
+          fprintf ppf "(%a%a)%s@ %a" Static_label.format i
             (fun ppf ids ->
               List.iter
                 (fun (id, ty) -> fprintf ppf "@ %a: %a" VP.print id machtype ty)
@@ -457,6 +458,11 @@ let codegen_option = function
   | Reduce_code_size -> "reduce_code_size"
   | No_CSE -> "no_cse"
   | Use_linscan_regalloc -> "linscan"
+  | Use_regalloc regalloc -> Clflags.Register_allocator.to_string regalloc
+  | Use_regalloc_param params ->
+    Printf.sprintf "regalloc_param[%s]"
+      (String.concat ";" (List.map (Printf.sprintf "%S") params))
+  | Cold -> "cold"
   | Assume_zero_alloc { strict; never_returns_normally; never_raises; loc = _ }
     ->
     Printf.sprintf "assume_zero_alloc_%s%s%s"

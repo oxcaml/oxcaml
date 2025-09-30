@@ -555,9 +555,10 @@ let create_let_symbols uacc lifted_constant ~body =
             | Project_value_slot { project_from; value_slot } ->
               Unary (Project_value_slot { project_from; value_slot }, symbol)
           in
+          let machine_width = UE.machine_width (UA.uenv uacc) in
           ( Named.create_prim prim Debuginfo.none,
             coercion_from_proj_to_var,
-            Code_size.prim prim )
+            Code_size.prim ~machine_width prim )
       in
       (* It's possible that this might create duplicates of the same projection
          operation, but it's unlikely there will be a significant number, and
@@ -721,7 +722,8 @@ let no_rewrite_apply_cont uenv apply_cont =
 let rewrite_apply_cont0 uacc rewrite ~ctx id apply_cont :
     rewrite_apply_cont_result =
   let args = Apply_cont.args apply_cont in
-  match Apply_cont_rewrite.make_rewrite rewrite ~ctx id args with
+  let machine_width = UE.machine_width (UA.uenv uacc) in
+  match Apply_cont_rewrite.make_rewrite rewrite ~machine_width ~ctx id args with
   | Invalid -> Invalid { message = "" }
   | Ok (extra_lets, args) -> (
     let apply_cont = Apply_cont.update_args apply_cont ~args in

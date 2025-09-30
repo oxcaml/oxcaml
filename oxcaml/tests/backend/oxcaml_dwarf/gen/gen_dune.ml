@@ -30,8 +30,9 @@ let () =
  (name ${name})
  (modules ${name})
  ${enabled_if}
+ (libraries stdlib_stable)
  (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta))
  (foreign_archives simd_stubs))
 
@@ -74,4 +75,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
   print_dwarf_test "test_basic_dwarf";
   print_dwarf_test "test_unboxed_dwarf";
   print_dwarf_test "test_datatypes_dwarf";
-  print_dwarf_test "test_simd_dwarf"
+  print_dwarf_test "test_simd_dwarf";
+  print_dwarf_test "test_simple_functor_dwarf";
+  print_dwarf_test "test_parameters_dwarf";
+  print_dwarf_test "test_callstack_dwarf";
+  print_dwarf_test "test_stepping_dwarf"

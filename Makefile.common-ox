@@ -74,6 +74,7 @@ endef
 boot_targets = \
   $(boot_ocamlc) \
   $(boot_ocamlopt) \
+  $(boot_ocamlj) \
   $(boot_ocamlmklib) \
   $(boot_ocamldep) \
   $(boot_ocamlobjinfo) \
@@ -190,11 +191,12 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	cp $^ _build/_bootinstall/lib/ocaml
 	ln -sf ../../default/$(boot_ocamlopt) _build/_bootinstall/bin/ocamlopt.opt
 	ln -sf ../../default/$(boot_ocamlc) _build/_bootinstall/bin/ocamlc.opt
+	ln -sf ../../default/$(boot_ocamlj) _build/_bootinstall/bin/ocamlj.opt
 	ln -sf ../../default/$(boot_ocamlmklib) _build/_bootinstall/bin/ocamlmklib.opt
 	ln -sf ../../default/$(boot_ocamldep) _build/_bootinstall/bin/ocamldep.opt
 	ln -sf ../../default/$(boot_ocamlobjinfo) _build/_bootinstall/bin/ocamlobjinfo.opt
 	ln -sf "`which ocamllex`" _build/_bootinstall/bin/ocamllex.opt
-	for prog in ocamlopt ocamlc ocamllex ocamldep ocamlmklib; do \
+	for prog in ocamlopt ocamlj ocamlc ocamllex ocamldep ocamlmklib; do \
 	  ln -sf "$$prog.opt" "_build/_bootinstall/bin/$$prog"; \
 	done
 
@@ -478,7 +480,11 @@ boot-_install: runtime-stdlib
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
 	$(cpl) _build/runtime_stdlib_install/bin/* _install/bin/
-	$(cpl) _build/_bootinstall/bin/* _install/bin/
+	# can't use a hard link here because ocamllex comes from the system and
+	# is possibly on a different device
+	ln -sf $(realpath _build/_bootinstall/bin/ocamllex.opt) _install/bin/ocamllex.opt
+	$(cpl) _build/_bootinstall/bin/ocaml{c,opt,mklib,dep,objinfo}.opt _install/bin/
+	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
 	$(cpl) -R _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/* \
     _install/lib/ocaml/
 	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa,dynlink/dynlink.cmxa}

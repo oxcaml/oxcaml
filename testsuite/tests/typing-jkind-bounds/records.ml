@@ -69,12 +69,35 @@ type t = { x : int option; }
 type ('a : immutable_data) t = { x : 'a option; }
 |}]
 
+(* atomic or immutable records annotated as sync *)
+type t : sync_data = { mutable x : int [@atomic] }
+type t : sync_data = { x : int; y : int; mutable z : int [@atomic] }
+type t : sync_data = { mutable x : int Atomic.t [@atomic] }
+type t : sync_data = { x : int }
+type ('a : sync_data) t : sync_data = { x : 'a }
+type ('a : immutable_data) t : sync_data = { x : 'a }
+type t : sync_data = { x : int Atomic.t; y : string }
+type ('a : sync_data) t : sync_data = { x : 'a option }
+[%%expect {|
+type t = { mutable x : int [@atomic]; }
+type t = { x : int; y : int; mutable z : int [@atomic]; }
+type t = { mutable x : int Atomic.t [@atomic]; }
+type t = { x : int; }
+type ('a : sync_data) t = { x : 'a; }
+type ('a : immutable_data) t = { x : 'a; }
+type t = { x : int Atomic.t; y : string; }
+type ('a : sync_data) t = { x : 'a option; }
+|}]
+
 (* mutable or immutable records annotated as mutable *)
 type t : mutable_data = { mutable x : int }
 type t : mutable_data = { x : int; y : int; mutable z : int }
 type t : mutable_data = { mutable x : int ref }
 type t : mutable_data = { x : int }
+type t : mutable_data = { mutable x : int [@atomic] }
+type t : mutable_data = { mutable x : int ref [@atomic] }
 type ('a : mutable_data) t : mutable_data = { x : 'a }
+type ('a : sync_data) t : mutable_data = { x : 'a }
 type ('a : immutable_data) t : mutable_data = { x : 'a }
 type t : mutable_data = { x : int ref; y : string }
 type ('a : mutable_data) t : mutable_data = { x : 'a option }
@@ -83,13 +106,16 @@ type t = { mutable x : int; }
 type t = { x : int; y : int; mutable z : int; }
 type t = { mutable x : int ref; }
 type t = { x : int; }
+type t = { mutable x : int [@atomic]; }
+type t = { mutable x : int ref [@atomic]; }
 type ('a : mutable_data) t = { x : 'a; }
+type ('a : sync_data) t = { x : 'a; }
 type ('a : immutable_data) t = { x : 'a; }
 type t = { x : int ref; y : string; }
 type ('a : mutable_data) t = { x : 'a option; }
 |}]
 
-(* annotations that aren't mutable_data or immutable_data *)
+(* annotations that aren't mutable_data, sync_data, or immutable_data *)
 type t : value mod contended = { x : unit -> unit }
 type 'a t : value mod contended = { x : 'a -> 'a }
 type ('a : value mod contended portable, 'b : value mod portable) t : value mod portable
@@ -128,7 +154,7 @@ type 'a t : immutable_data = { mutable x : 'a }
 Line 1, characters 0-47:
 1 | type 'a t : immutable_data = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -239,9 +265,35 @@ Error: The kind of type "t" is immutable_data with 'a
          because of the annotation on the declaration of the type t.
 |}]
 
+type t : sync_data = { mutable x : int ref [@atomic] }
+[%%expect {|
+Line 1, characters 0-54:
+1 | type t : sync_data = { mutable x : int ref [@atomic] }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is mutable_data
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of sync_data
+         because of the annotation on the declaration of the type t.
+|}]
+
+type ('a : mutable_data) t : sync_data = { mutable x : 'a [@atomic] }
+[%%expect {|
+Line 1, characters 0-69:
+1 | type ('a : mutable_data) t : sync_data = { mutable x : 'a [@atomic] }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is sync_data with 'a @@ forkable unyielding many
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of sync_data
+         because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with 'a ≰ mod contended
+|}]
+
 (**** Test 2: Annotations with "with" are accepted when appropriate ****)
 type 'a t : immutable_data with 'a = { x : int }
 type 'a t : immutable_data with 'a = { x : 'a }
+type 'a t : sync_data with 'a = { mutable x : 'a [@atomic] }
 type 'a t : mutable_data with 'a = { mutable x : 'a }
 type 'a t : mutable_data with 'a = { x : 'a ref }
 type ('a, 'b) t : immutable_data with 'a with 'b = { x : 'a; y : 'b; z : 'a }
@@ -254,6 +306,7 @@ type 'a t : immutable_data with 'a -> 'a = { x : 'a -> 'a }
 [%%expect {|
 type 'a t = { x : int; }
 type 'a t = { x : 'a; }
+type 'a t = { mutable x : 'a [@atomic]; }
 type 'a t = { mutable x : 'a; }
 type 'a t = { x : 'a ref; }
 type ('a, 'b) t = { x : 'a; y : 'b; z : 'a; }
@@ -270,7 +323,7 @@ type 'a t : immutable_data with 'a = { mutable x : 'a }
 Line 1, characters 0-55:
 1 | type 'a t : immutable_data with 'a = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data with 'a
          because of the annotation on the declaration of the type t.
@@ -342,7 +395,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -350,7 +403,7 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type t = { mutable x : int }
@@ -367,7 +420,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -375,7 +428,7 @@ let foo (t : t @ aliased) = use_unique t
 Line 1, characters 39-40:
 1 | let foo (t : t @ aliased) = use_unique t
                                            ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let foo (t : t @ contended) = use_uncontended t
@@ -383,7 +436,7 @@ let foo (t : t @ contended) = use_uncontended t
 Line 1, characters 46-47:
 1 | let foo (t : t @ contended) = use_uncontended t
                                                   ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type 'a t = { x : 'a }
@@ -401,7 +454,7 @@ let foo (t : int t @ local) = use_global t [@nontail]
 Line 1, characters 41-42:
 1 | let foo (t : int t @ local) = use_global t [@nontail]
                                              ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -409,7 +462,7 @@ let foo (t : int t @ aliased) = use_unique t
 Line 1, characters 43-44:
 1 | let foo (t : int t @ aliased) = use_unique t
                                                ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -420,7 +473,7 @@ type 'a t = { x : 'a; }
 Line 3, characters 47-48:
 3 | let foo (t : _ t @ nonportable) = use_portable t
                                                    ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
@@ -428,7 +481,7 @@ let foo (t : _ t @ contended) = use_uncontended t
 Line 1, characters 48-49:
 1 | let foo (t : _ t @ contended) = use_uncontended t
                                                     ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ once) = use_many t
@@ -436,7 +489,7 @@ let foo (t : _ t @ once) = use_many t
 Line 1, characters 36-37:
 1 | let foo (t : _ t @ once) = use_many t
                                         ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
@@ -444,7 +497,7 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -452,7 +505,7 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -460,7 +513,7 @@ let foo (t : ('a : immutable_data) t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case *)
+(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
 [%%expect {|
 type 'a t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -469,7 +522,7 @@ type 'a t = { x : 'a; }
 Line 3, characters 15-16:
 3 |   use_portable t;
                    ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
@@ -477,7 +530,7 @@ let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
 Line 1, characters 59-60:
 1 | let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
                                                                ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
@@ -485,7 +538,7 @@ let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
 Line 1, characters 61-62:
 1 | let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
                                                                  ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type ('a : immutable_data) t = { x : 'a }
@@ -493,7 +546,7 @@ let foo (t : _ t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case *)
+(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
 [%%expect {|
 type ('a : immutable_data) t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -502,7 +555,7 @@ type ('a : immutable_data) t = { x : 'a; }
 Line 3, characters 15-16:
 3 |   use_portable t;
                    ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
@@ -510,7 +563,7 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -518,7 +571,7 @@ let foo (t : _ t @ aliased) = use_unique t
 Line 1, characters 41-42:
 1 | let foo (t : _ t @ aliased) = use_unique t
                                              ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 type 'a t = { x : 'a }
@@ -533,7 +586,7 @@ let foo (t : (unit -> unit) t @ nonportable) = use_portable t
 Line 1, characters 60-61:
 1 | let foo (t : (unit -> unit) t @ nonportable) = use_portable t
                                                                 ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (**** Test 4: Record types satisfy type constraints when appropriate ****)
@@ -581,7 +634,7 @@ let () =
 let () =
   cross_contended func;
   cross_nonnull func
-(* CR layouts v2.8: fix in principal case *)
+(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
 |}, Principal{|
 Line 2, characters 13-16:
@@ -675,7 +728,7 @@ type t_test = int t require_contended
 type t_test = (unit -> unit) t require_contended
 type ('a : value mod contended) t_test = 'a t require_contended
 type 'a t_test = 'a t require_nonnull
-(* CR layouts v2.8: fix principal case *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type 'a t = { x : 'a; }
 type t_test = int t require_many

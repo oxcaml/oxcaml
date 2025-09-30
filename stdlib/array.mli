@@ -35,7 +35,8 @@ open! Stdlib
 type 'a t = 'a array
 (** An alias for the type of arrays. *)
 
-external length : ('a array[@local_opt]) @ contended -> int = "%array_length"
+external length : ('a array[@local_opt]) @ immutable -> int @@ stateless
+  = "%array_length"
 (** Return the length (number of elements) of the given array. *)
 
 external get : ('a array[@local_opt]) -> int -> 'a = "%array_safe_get"
@@ -461,7 +462,7 @@ external unsafe_set : ('a array[@local_opt]) -> int -> 'a -> unit
 
 module Floatarray : sig
   external create : int -> floatarray = "caml_floatarray_create"
-  external length : (floatarray[@local_opt]) @ contended -> int
+  external length : (floatarray[@local_opt]) @ immutable -> int @@ stateless
     = "%floatarray_length"
   external get : (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])
     = "%floatarray_safe_get"

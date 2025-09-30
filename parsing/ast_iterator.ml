@@ -858,17 +858,17 @@ let default_iterator =
       (fun this { pjkind_loc; pjkind_desc } ->
          this.location this pjkind_loc;
          match pjkind_desc with
-         | Default -> ()
-         | Abbreviation (_ : string) -> ()
-         | Mod (t, mode_list) ->
+         | Pjk_default -> ()
+         | Pjk_abbreviation (_ : string) -> ()
+         | Pjk_mod (t, mode_list) ->
              this.jkind_annotation this t;
              this.modes this mode_list
-         | With (t, ty, modalities) ->
+         | Pjk_with (t, ty, modalities) ->
              this.jkind_annotation this t;
              this.typ this ty;
              this.modalities this modalities
-         | Kind_of ty -> this.typ this ty
-         | Product ts -> List.iter (this.jkind_annotation this) ts);
+         | Pjk_kind_of ty -> this.typ this ty
+         | Pjk_product ts -> List.iter (this.jkind_annotation this) ts);
 
     directive_argument =
       (fun this a ->

@@ -60,10 +60,10 @@ Specifically, it consists of one "block access" followed by zero or more
 
 Block accesses take the following forms:
 - Record field: `.foo`
-- Array index as an `int`, `int64#`, `int32#`, or `nativeint#`: `.(i)`, `.L(i)`,
-  `.l(i)`, or `.n(i)`
-- Immutable array index as an `int`, `int64#`, `int32#`, or `nativeint#`:
-  `.:(i)`, `.:L(i)`, `.:l(i)`, or `.:n(i)`
+- Array index as an `int`, `int64#`, `int32#`, `int16#`, `int8#`,
+  or `nativeint#`: `.(i)`, `.L(i)`, `.l(i)`, `.S(i)`, `.s(i)`, or `.n(i)`
+- Immutable array index as an `int`, `int64#`, `int32#`, `int16#`, `int8#`,
+  or `nativeint#`: `.:(i)`, `.:L(i)`, `.:l(i)`, `.S(i)`, `.s(i)`, or `.:n(i)`
 - Mutable or immutable block index: `.idx_mut(idx)` or `.idx_imm(idx)`
 
 Unboxed accesses take the following forms:

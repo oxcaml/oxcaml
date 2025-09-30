@@ -82,6 +82,25 @@ module Uid : sig
   include Identifiable.S with type t := t
 end
 
+(** We use de Bruijn indices for some binders in [Shape.t] below to increase
+    sharing. That is, de Bruijn indices ensure that alpha-equivalent terms are
+    actually equal. This reduces redundancy when we emit shape information into
+    the debug information in later stages of the compiler (see [dwarf_type.ml]),
+    since equal shapes produce the same debug information. *)
+module DeBruijn_index : sig
+  type t
+
+  (* Initial index, pick [0] for the top-level index. Cannot be negative. *)
+  val create : int -> t
+
+  val move_under_binder : t -> t
+
+  val equal: t -> t -> bool
+
+  val print: Format.formatter -> t -> unit
+
+end
+
 module Sig_component_kind : sig
   type t =
     | Value
@@ -127,6 +146,10 @@ module Item : sig
 
   val compare : t -> t -> int
 
+  val is_constructor : t -> bool
+  val is_label : t -> bool
+  val is_unboxed_label : t -> bool
+
   module Map : Map.S with type key = t
 end
 
@@ -162,6 +185,8 @@ module Predef : sig
     | Unboxed_nativeint
     | Unboxed_int64
     | Unboxed_int32
+    | Unboxed_int16
+    | Unboxed_int8
     | Unboxed_simd of simd_vec_split
 
   type t =
@@ -173,6 +198,8 @@ module Predef : sig
     | Float32
     | Floatarray
     | Int
+    | Int8
+    | Int16
     | Int32
     | Int64
     | Lazy_t
@@ -184,7 +211,11 @@ module Predef : sig
 
   val to_string : t -> string
 
-  val unboxed_type_to_layout : unboxed -> Jkind_types.Sort.base
+  val print : Format.formatter -> t -> unit
+
+  val equal : t -> t -> bool
+
+  val unboxed_type_to_base_layout : unboxed -> base_layout
 
   val to_layout : t -> Layout.t
 
@@ -204,40 +235,51 @@ and desc =
   | Comp_unit of string
   | Error of string
 
-(* Type shapes are abstract representations of type expressions. We define
-    them with a placeholder 'a for the layout inside. This allows one to
-    first create shapes without a type by picking [without_layout] for 'a
-    and then later substituting in a layout of type [Layout.t]. *)
-(* CR sspies: The layout merged into the type shapes is confusing and will
-    cause trouble when the type shapes are integrated into shapes. Move them
-    back out again in a subsequent PR and instead recurse over layout and shape
-    in the DWARF emission code. *)
-type without_layout = Layout_to_be_determined
+  (* constructors for types *)
+  | Constr of Ident.t * t list
+  | Tuple of t list (* boxed tuple (value layout) *)
+  | Unboxed_tuple of t list (* unboxed tuple (product layout) *)
+  | Predef of Predef.t * t list (* predef type with arguments *)
+  | Arrow
+  | Poly_variant of t poly_variant_constructors
+  | Mu of t
+  (** [Mu t] represents a binder for a recursive type with body [t]. Its
+      variables are [Rec_var n] below, where [n] is a DeBruijn-index to maximize
+      sharing between alpha-equivalent shapes.  *)
+  | Rec_var of DeBruijn_index.t
 
-type 'a ts =
-  | Ts_constr of (Uid.t * Path.t * 'a) * without_layout ts list
-      (** [Ts_constr ((uid, p, ly), args)] is the shape of the type constructor
-      [p] applied to the arguments [args], resulting in data of layout [ly].
-      Unlike for the resulting data, we do not definitely know the layout
-      of the arguments yet. This is only fully determined once we look at the
-      declaration behind [p]. Thus, even when the type constructor application
-      [Ts_constr((uid, p, ly), args)] itself carries a layout, the layout of
-      the arguments is still to be determined.  *)
-  | Ts_tuple of 'a ts list
-  | Ts_unboxed_tuple of 'a ts list
-  | Ts_var of string option * 'a
-  | Ts_predef of Predef.t * without_layout ts list
-      (** [Ts_predef(p, args)] is the shape for predefined type shapes.
-        Analogously to [Ts_constr], its arguments do not carry a layout yet.
-      *)
-  | Ts_arrow of without_layout ts * without_layout ts
-      (** [Ts_arrow(arg, ret)] is the shape for the function type
-          [arg -> ret]. When emitting DWARF information for this type, there
-          is no need to inspect the type arguments, and we never find out
-          their layout. As such, these remain [without_layout] even after
-          substituting in layouts.   *)
-  | Ts_variant of 'a ts poly_variant_constructors
-  | Ts_other of 'a
+  (* constructors for type declarations *)
+  | Variant of (t * Layout.t) complex_constructors
+      (* CR sspies: Rename this just to constructor now that simple constructors
+         are no longer a thing. *)
+  | Variant_unboxed of
+    { name : string;
+      variant_uid : Uid.t option;
+      arg_name : string option;
+      (** if this is [None], we are looking at a singleton tuple;
+          otherwise, it is a singleton record. *)
+      arg_uid : Uid.t option;
+      arg_shape : t;
+      arg_layout : Layout.t
+    }
+    (** An unboxed variant corresponds to the [@@unboxed] annotation.
+        It must have a single, complex constructor. *)
+  | Record of
+      { fields : (string * Uid.t option * t * Layout.t) list;
+        kind : record_kind
+      }
+  | Mutrec of t Ident.Map.t
+    (** [Mutrec m] represents a map of (potentially mutually-recursive)
+        declarations. Declarations with type variables are represented as
+        abstractions inside. To project out a declaration, [Proj_decl] can be
+        used. *)
+  | Proj_decl of t * Ident.t
+
+(** For DWARF type emission to work as expected, we store the layouts in the
+    declaration alongside the shapes in those cases where the layout "expands"
+    again such as variant constructors, which themselves are values but
+    point to blocks in memory.  Here, layouts are stored for the individual
+    fields. *)
 
 and 'a poly_variant_constructors = 'a poly_variant_constructor list
 
@@ -246,41 +288,6 @@ and 'a poly_variant_constructor =
     pv_constr_args : 'a list
   }
 
-
-(** For type substitution to work as expected, we store the layouts in the
-    declaration alongside the shapes instead of directly going for the
-    substituted version. *)
-type tds_desc =
-  | Tds_variant of
-      { simple_constructors : string list;
-            (** The string is the name of the constructor. The runtime
-                representation of the constructor at index [i] in this list is
-                [2 * i + 1]. See [dwarf_type.ml] for more details. *)
-        complex_constructors :
-          (without_layout ts * Layout.t)
-          complex_constructors
-            (** All constructors in this category are represented as blocks.
-                The index [i] in the list indicates the tag at runtime. The
-                length of the constructor argument list [args] determines the
-                size of the block. *)
-      }
-  | Tds_variant_unboxed of
-      { name : string;
-        arg_name : string option;
-            (** if this is [None], we are looking at a singleton tuple;
-              otherwise, it is a singleton record. *)
-        arg_shape : without_layout ts;
-        arg_layout : Layout.t
-      }
-      (** An unboxed variant corresponds to the [@@unboxed] annotation.
-        It must have a single, complex constructor. *)
-  | Tds_record of
-      { fields :
-          (string * without_layout ts * Layout.t) list;
-        kind : record_kind
-      }
-  | Tds_alias of without_layout ts
-  | Tds_other
 
 and record_kind =
   | Record_unboxed
@@ -300,12 +307,14 @@ and 'a complex_constructors = 'a complex_constructor list
 
 and 'a complex_constructor =
   { name : string;
+    constr_uid: Uid.t option;
     kind : constructor_representation;
     args : 'a complex_constructor_argument list
   }
 
 and 'a complex_constructor_argument =
   { field_name : string option;
+    field_uid: Uid.t option;
     field_value : 'a
   }
 
@@ -315,19 +324,18 @@ and constructor_representation = mixed_product_shape
 
 and mixed_product_shape = Layout.t array
 
-type tds =
-  { path : Path.t;
-    definition : tds_desc;
-    type_params : without_layout ts list
-  }
 
 
-(* Shapes *)
 val print : Format.formatter -> t -> unit
 
 val strip_head_aliases : t -> t
 
 val equal : t -> t -> bool
+
+val equal_record_kind : record_kind -> record_kind -> bool
+
+val equal_complex_constructor :
+  ('a -> 'a -> bool) -> 'a complex_constructor -> 'a complex_constructor -> bool
 
 (* Smart constructors *)
 
@@ -335,6 +343,7 @@ val for_unnamed_functor_param : var
 val fresh_var : ?name:string -> Uid.t -> var * t
 
 val var : Uid.t -> Ident.t -> t
+val var': Uid.t option -> Ident.t -> t
 val abs : ?uid:Uid.t -> var -> t -> t
 val app : ?uid:Uid.t -> t -> arg:t -> t
 val str : ?uid:Uid.t -> t Item.Map.t -> t
@@ -343,10 +352,34 @@ val error : ?uid:Uid.t -> string -> t
 val proj : ?uid:Uid.t -> t -> Item.t -> t
 val leaf : Uid.t -> t
 val leaf' : Uid.t option -> t
-val no_fuel_left : ?uid:Uid.t -> t -> t
 val comp_unit : ?uid:Uid.t -> string -> t
 
+(* constructors for types  *)
+val constr : ?uid:Uid.t -> Ident.t -> t list -> t
+val tuple : ?uid:Uid.t -> t list -> t
+val unboxed_tuple : ?uid:Uid.t -> t list -> t
+val predef : ?uid:Uid.t -> Predef.t -> t list -> t
+val arrow : ?uid:Uid.t -> unit -> t
+val poly_variant : ?uid:Uid.t -> t poly_variant_constructors -> t
+val mu : ?uid:Uid.t -> t -> t
+val rec_var : ?uid:Uid.t -> DeBruijn_index.t -> t
+
+(* constructors for type declarations *)
+val variant :
+  ?uid:Uid.t -> (t * Layout.t) complex_constructors -> t
+val variant_unboxed :
+  ?uid:Uid.t -> variant_uid:Uid.t option -> arg_uid:Uid.t option ->
+  string -> string option -> t -> Layout.t -> t
+val record : ?uid:Uid.t -> record_kind ->
+  (string * Uid.t option * t * Layout.t) list -> t
+val mutrec : ?uid:Uid.t -> t Ident.Map.t -> t
+val proj_decl : ?uid:Uid.t -> t -> Ident.t -> t
+
+
 val set_approximated : approximated:bool -> t -> t
+
+val app_list : t -> t list -> t
+val abs_list : t -> Ident.t list -> t
 
 val decompose_abs : t -> (var * t) option
 
@@ -354,20 +387,8 @@ val decompose_abs : t -> (var * t) option
 val for_persistent_unit : string -> t
 val leaf_for_unpack : t
 
-(* Type shapes *)
-val shape_layout : Layout.t ts -> Layout.t
-
-val shape_with_layout : layout:Layout.t -> without_layout ts -> Layout.t ts
-
-val print_type_shape : Format.formatter -> 'a ts -> unit
-
 val poly_variant_constructors_map :
   ('a -> 'b) -> 'a poly_variant_constructors -> 'b poly_variant_constructors
-
-(* Type declaration shapes *)
-val print_type_decl_shape : Format.formatter -> tds -> unit
-
-val replace_tvar : tds -> without_layout ts list -> tds
 
 val complex_constructor_map :
   ('a -> 'b) -> 'a complex_constructor -> 'b complex_constructor
@@ -425,3 +446,18 @@ val of_path :
   namespace:Sig_component_kind.t -> Path.t -> t
 
 val set_uid_if_none : t -> Uid.t -> t
+
+module Cache : Hashtbl.S with type key = t
+
+(** DeBruijn Environment for working with the recursive binders. *)
+module DeBruijn_env : sig
+  type 'a t
+
+  val empty : 'a t
+
+  val is_empty : 'a t -> bool
+
+  val push : 'a t -> 'a -> 'a t
+
+  val get_opt : 'a t -> de_bruijn_index:DeBruijn_index.t -> 'a option
+end

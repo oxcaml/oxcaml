@@ -9,4 +9,7 @@ sed -r 's/caml(.*)_[0-9]+_[0-9]+(_code)?/caml\1_HIDE_STAMP/' | \
 # sed 's/__/./' | \
 
 # hide target triple
-sed -r 's/target triple[^\n]*//'
+sed -r 's/target triple[^\n]*//' | \
+
+# hide calling convention (which depends on fp config)
+sed -r 's/(oxcaml_fpcc|oxcaml_nofpcc)/oxcamlcc/'

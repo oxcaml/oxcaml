@@ -276,7 +276,7 @@ let enter_type ?abstract_abbrevs rec_flag env sdecl (id, uid) =
          point. I think probably the solution will be to have
          [Jkind.of_type_decl_default] just return [max] every time it sees a
          [with]-kind... which basically just does this [type_exn] trick but much
-         more sanely. *)
+         more sanely. Internal ticket 5116. *)
       ~transl_type:(fun _ -> Predef.type_exn)
       ~default:(Jkind.disallow_right any)
       sdecl
@@ -821,17 +821,15 @@ let shape_declarations env decls =
   | Clflags.Old_merlin ->
     List.map (fun (_, decl) -> old_merlin_shape_declaration decl) decls
   | Clflags.Debugging_shapes ->
-    let _ = env in
-    List.map (fun _ -> Shape.leaf' None) decls
-    (* CR sspies: In the future, we will actually produce shapes with debugging
-       information here. For now, we just use a stub. *)
+    Type_shape.Type_decl_shape.of_type_declarations decls
+      (Env.shape_for_constr env)
 
-let shape_extension_constructor ext uid =
+let shape_extension_constructor ext =
   match !Clflags.shape_format with
-  | Clflags.Old_merlin -> old_merlin_shape_extension_constructor ext uid
-  | Clflags.Debugging_shapes -> Shape.leaf uid
-    (* CR sspies: In the future, we should use a more precise shape here. For
-      now we simply use a leaf to indicate that there is some shape here. *)
+  | Old_merlin ->
+    old_merlin_shape_extension_constructor ext.ext_args ext.ext_uid
+  | Debugging_shapes ->
+    Type_shape.Type_decl_shape.of_extension_constructor_merlin_only ext
 
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
@@ -858,12 +856,7 @@ let transl_declaration env sdecl (id, uid) =
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
   verify_unboxed_attr unboxed_attr sdecl;
-  (* CR layouts v2.8: This next call to [transl_simple_type] probably can loop
-     because it will do perhaps-circular jkind checks. But actually I think the
-     same problem exists in e.g. record fields. We should probably look into this. *)
   let transl_type sty =
-    (* CR layouts v2.8: The [~new_var_jkind:Any] is weird. The type is closed,
-       and so there shouldn't be any new vars. Investigate. *)
     let cty =
       Ctype.with_local_level begin fun () ->
         Typetexp.transl_simple_type env ~new_var_jkind:Any
@@ -876,7 +869,7 @@ let transl_declaration env sdecl (id, uid) =
       ~post:(fun cty -> Ctype.generalize_structure cty.ctyp_type)
     in
     cty.ctyp_type  (* CR layouts v2.8: Do this more efficiently. Or probably
-                      add with-kinds to Typedtree. *)
+                      add with-kinds to Typedtree. Internal ticekt 4435. *)
   in
   let jkind_from_annotation, jkind_annotation =
     match Jkind.of_type_decl ~context:(Type_declaration path) ~transl_type sdecl with
@@ -1111,6 +1104,10 @@ let transl_declaration env sdecl (id, uid) =
       in
       set_private_row env sdecl.ptype_loc p decl
     end;
+    (* CR sspies: We used to compute shapes here, which were then added to
+       various typing environments. The computation of the shapes has moved
+       further down in the translation, so they are currently not added to the
+       intermediate environments. Find out whether that is an issue. *)
     let decl =
       {
         typ_id = id;
@@ -1492,7 +1489,7 @@ let narrow_to_manifest_jkind env loc decl =
        Do not try this (that is, removing the use of [type_jkind_purely]) before
        removing the "horrible hack" just below, as that horrible hack sometimes
        avoids calling [constrain_type_jkind], which is necessary for the plan
-       above to work.  *)
+       above to work.  Internal ticket 2912. *)
     let manifest_jkind = Ctype.type_jkind_purely env ty in
     (* CR layouts v2.8: Remove this horrible hack. In practice, this
        [try_allow_r] fails in the case of a record re-export, because the jkind
@@ -1501,7 +1498,7 @@ let narrow_to_manifest_jkind env loc decl =
        [sub_jkind_l] here. The right way forward is to parameterize
        [constrain_type_jkind] over the [l]-ness of its bound. But probably not
        until we have proper subsumption working, as this hack will likely hold
-       up for a little while. *)
+       up for a little while. Internal ticket 5115. *)
     begin match Jkind.try_allow_r decl.type_jkind with
     | None -> begin
         let type_equal = Ctype.type_equal env in
@@ -1702,7 +1699,28 @@ module Element_repr = struct
        don't give us enough information to do this reliably, and you could just
        use unboxed floats instead. *)
 
-  let classify env  ty jkind =
+  let to_shape_element t : mixed_block_element =
+    let rec of_t : t -> mixed_block_element = function
+    | Unboxed_element unboxed -> of_unboxed_element unboxed
+    | Float_element | Value_element -> Value
+    | Void -> Void
+    and of_unboxed_element : unboxed_element -> mixed_block_element = function
+      | Float64 -> Float64
+      | Float32 -> Float32
+      | Bits8 -> Bits8
+      | Bits16 -> Bits16
+      | Bits32 -> Bits32
+      | Bits64 -> Bits64
+      | Vec128 -> Vec128
+      | Vec256 -> Vec256
+      | Vec512 -> Vec512
+      | Word -> Word
+      | Untagged_immediate -> Untagged_immediate
+      | Product l -> Product (Array.map of_t l)
+    in
+    of_t t
+
+  let classify env ty jkind =
     if is_float env ty
     then Float_element
     else
@@ -1732,28 +1750,7 @@ module Element_repr = struct
       in
       sort_to_t sort
 
-  and mixed_product_shape loc ts kind =
-    let to_shape_element (t,_ty) : mixed_block_element =
-      let rec of_t : t -> mixed_block_element = function
-      | Unboxed_element unboxed -> of_unboxed_element unboxed
-      | Float_element | Value_element -> Value
-      | Void -> Void
-      and of_unboxed_element : unboxed_element -> mixed_block_element = function
-        | Float64 -> Float64
-        | Float32 -> Float32
-        | Bits8 -> Bits8
-        | Bits16 -> Bits16
-        | Bits32 -> Bits32
-        | Bits64 -> Bits64
-        | Vec128 -> Vec128
-        | Vec256 -> Vec256
-        | Vec512 -> Vec512
-        | Word -> Word
-        | Untagged_immediate -> Untagged_immediate
-        | Product l -> Product (Array.map of_t l)
-      in
-      of_t t
-    in
+  let mixed_product_shape loc ts kind =
     let boxed_elements =
       let rec count_boxed_in_t acc : t -> int = function
         | Unboxed_element u -> count_boxed_in_unboxed_element acc u
@@ -1773,9 +1770,13 @@ module Element_repr = struct
     in
     if not mixed then None else begin
       assert_mixed_product_support loc kind ~value_prefix_len:boxed_elements;
-      Some (List.map to_shape_element ts |> Array.of_list)
+      Some (List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list)
     end
 end
+
+let mixed_block_element env ty jkind =
+  let unboxed_element = Element_repr.classify env ty jkind in
+  Element_repr.to_shape_element unboxed_element
 
 let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
@@ -2758,10 +2759,10 @@ let normalize_decl_jkinds env decls =
         that we computed, either from a user-written annotation or as a dummy jkind.
 
          (see Note [Default jkinds in transl_declaration]) *)
-      (* CR layouts v2.8: it almost definitely has changed, but also we probably trust
-         the new jkind (we really only want this check here to check against the
-         user-written annotation). We might be able to do a better job here and save
-         some work. *)
+      (* CR layouts: it almost definitely has changed, but also we probably
+         trust the new jkind (we really only want this check here to check
+         against the user-written annotation). We might be able to do a better
+         job here and save some work. Internal ticket 5117. *)
       let context = Ctype.mk_jkind_context_always_principal env in
       let type_equal = Ctype.type_equal env in
       match
@@ -3041,11 +3042,15 @@ let transl_type_decl env rec_flag sdecl_list =
   let final_env = add_types_to_env ~shapes:(Some shapes) decls env in
   (* Save the type shapes of the declarations in [Type_shape] for debug info. *)
   if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
-    List.iter (fun (id, decl) ->
-      Type_shape.add_to_type_decls
-        (Pident id) decl
-        (Env.find_uid_of_path final_env)
-    ) decls;
+    List.iter (fun (sh, (_, decl)) ->
+      (* CR sspies: Adding the shapes to the table below is obsolete. The
+         information is now contained in the shapes themselves. Remove it in a
+         subsequent PR (and adjust the printing of the declarations as
+         appropriate).
+      *)
+      let uid = decl.type_uid in
+      Uid.Tbl.add Type_shape.all_type_decls uid sh
+    ) (List.combine shapes decls);
   (* Keep original declaration *)
   let final_decls =
     List.map2
@@ -3205,7 +3210,7 @@ let transl_extension_constructor ~scope env type_path type_params
       Typedtree.ext_loc = sext.pext_loc;
       Typedtree.ext_attributes = sext.pext_attributes; }
   in
-  let shape = shape_extension_constructor args ext_cstrs.ext_type.ext_uid in
+  let shape = shape_extension_constructor ext in
   ext_cstrs, shape
 
 let transl_extension_constructor ~scope env type_path type_params
@@ -3414,19 +3419,18 @@ type sort_or_poly = Sort of Jkind.Sort.Const.t | Poly
 
 let native_repr_of_type env kind ty sort_or_poly =
   match kind, get_desc (Ctype.expand_head_opt env ty) with
-  | Untagged, Tconstr (_, _, _) when
-         Typeopt.maybe_pointer_type env ty
-         = (Lambda.Immediate, Lambda.Non_nullable)
-      (* Only allow [@untagged] on immediate values. [maybe_pointer_type]
-         currently returns [Immediate] on unboxed number types, which
-         do not support [@untagged].
-      *)
-      && match sort_or_poly with
-         | Poly -> false
-         | Sort (Base Value) -> true
-         | Sort (Base _ | Product _) -> false
-    ->
-    Some (Unboxed_or_untagged_integer Untagged_int)
+  | Untagged, Tconstr (_, _, _) ->
+    let is_immediate = Ctype.is_always_gc_ignorable env ty in
+    let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
+    let is_value =
+      match sort_or_poly with
+      | Poly -> false
+      | Sort (Base Value) -> true
+      | Sort (Base _ | Product _) -> false
+    in
+    if is_immediate && is_non_nullable && is_value
+    then Some (Unboxed_or_untagged_integer Untagged_int)
+    else None
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float ->
     Some (Unboxed_float Boxed_float64)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32 ->
@@ -4823,7 +4827,8 @@ let report_error ppf = function
       fprintf ppf
         "@[The label %a must be mutable to be declared atomic.@]"
         Style.inline_code name
-  | Constructor_submode_failed (Error (ax, {left; right})) ->
+  | Constructor_submode_failed e ->
+      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
       fprintf ppf "@[This constructor is at mode %a, \
         but expected to be at mode %a.@]"
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left

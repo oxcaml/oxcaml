@@ -12,13 +12,20 @@
  script = "${program} foo.ml foo.ml._.preprocess";
  script;
 
+ (* Now delete foo.ml. In a real-world scenario, the original source file may
+    no longer exist (for example, due to dune sandboxing). *)
+ script = "rm foo.ml";
+ script;
+
  (* Compile the .mli file. *)
  module = "foo.mli";
  ocamlc.byte;
 
- (* Feed the compiler the serialzed AST. *)
+ (* Feed the compiler the serialzed AST. We also pass -bin-annot and
+    -bin-annot-cms to verify that .cmt/.cms generation works as expected when
+    the original source file no longer exists. *)
  module = "-impl foo.ml._.preprocess";
- flags = "-cmi-file foo.cmi";
+ flags = "-cmi-file foo.cmi -bin-annot -bin-annot-cms";
  ocamlc_byte_exit_status = "2";
  ocamlc.byte;
  check-ocamlc.byte-output;
