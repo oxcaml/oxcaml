@@ -1137,7 +1137,7 @@ type alerts = string Stdlib.String.Map.t
 
 val remove_double_underscores : string -> string
 
-(** {1 {Sexp printing utulities} *)
+(** {1 {Sexp printing utilities} *)
 module Sexp : sig
 
   type field =

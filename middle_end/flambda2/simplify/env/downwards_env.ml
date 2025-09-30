@@ -158,7 +158,7 @@ let print ppf
         (Format.pp_print_list ~pp_sep:Format.pp_print_space
            Lifted_cont_params.print)
         defined_variables_by_scope;
-      i "cost_of_lifting_continuation_out_of_current_one"
+      i "cost_of_lifting_continuations_out_of_current_one"
         cost_of_lifting_continuations_out_of_current_one ]
 
 let define_continuations t conts =
