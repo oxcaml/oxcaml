@@ -1,9 +1,0 @@
-(executables
- (names main)
- (libraries ppx_js ppxlib))
-
-(install
- (section lib)
- (package js_of_ocaml-ppx)
- (files
-  (main.exe as ppx_js)))
