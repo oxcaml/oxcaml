@@ -11,7 +11,7 @@
 ;**************************************************************************
 
 (library
- (name eval)
+ (name camlinternaleval)
  (modes byte native)
  (libraries dynlink_internal unix)
  (flags
@@ -28,14 +28,14 @@
 
 (install
  (files
-  (.eval.objs/native/eval.cmx as eval.cmx)
-  eval.cmxa
-  eval.a
-  eval.cmxs
-  eval.cma
-  ; (eval.mli as eval/eval.mli)
-  (.eval.objs/byte/eval.cmi as eval.cmi)
-  (.eval.objs/byte/eval.cmt as eval.cmt)
-  (.eval.objs/byte/eval.cmti as eval.cmti))
+  (.camlinternaleval.objs/native/camlinternaleval.cmx as camlinternaleval.cmx)
+  camlinternaleval.cmxa
+  camlinternaleval.a
+  camlinternaleval.cmxs
+  camlinternaleval.cma
+  ; (camlinternaleval.mli as camlinternaleval/eval.mli)
+  (.camlinternaleval.objs/byte/camlinternaleval.cmi as camlinternaleval.cmi)
+  (.camlinternaleval.objs/byte/camlinternaleval.cmt as camlinternaleval.cmt)
+  (.camlinternaleval.objs/byte/camlinternaleval.cmti as camlinternaleval.cmti))
  (section lib)
  (package ocaml))
