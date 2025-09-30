@@ -1392,48 +1392,52 @@ module Const = struct
         name : string
       }
 
-    let mk_jkind ~mode_crossing ~nullability ~separability
+    (* Mode crossing that crosses everything except staticity *)
+    let cross_all_except_staticity =
+      let ax : _ Crossing.Axis.t = Monadic Staticity in
+      Crossing.(set ax (Per_axis.max ax) min)
+
+    let mk_jkind ~crossing ~nullability ~separability ~externality
         (layout : Layout.Const.t) =
       let mod_bounds =
-        (match mode_crossing with
-        | true -> Mod_bounds.min
-        | false -> Mod_bounds.max)
-        |> Mod_bounds.set_nullability nullability
-        |> Mod_bounds.set_separability separability
+        Mod_bounds.create crossing ~nullability ~separability ~externality
       in
       { layout; mod_bounds; with_bounds = No_with_bounds }
 
     let any =
       { jkind =
-          mk_jkind Any ~mode_crossing:false ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+          mk_jkind Any ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Maybe_null ~separability:Maybe_separable;
         name = "any"
       }
 
     let any_mod_everything =
       { jkind =
-          mk_jkind Any ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+          mk_jkind Any ~crossing:Crossing.min ~externality:Externality.min
+            ~nullability:Maybe_null ~separability:Maybe_separable;
         name = "any mod everything"
       }
 
     let value_or_null =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:false ~nullability:Maybe_null
+          mk_jkind (Base Value) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Maybe_null
             ~separability:Maybe_separable;
         name = "value_or_null"
       }
 
     let value_or_null_mod_everything =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Value) ~crossing:Crossing.min
+            ~externality:Externality.min ~nullability:Maybe_null
             ~separability:Maybe_separable;
         name = "value_or_null mod everything"
       }
 
     let value =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Value) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Separable;
         name = "value"
       }
@@ -1512,28 +1516,32 @@ module Const = struct
 
     let void =
       { jkind =
-          mk_jkind (Base Void) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Void) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "void"
       }
 
     let void_mod_everything =
       { jkind =
-          mk_jkind (Base Void) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Void) ~crossing:Crossing.min
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "void mod everything"
       }
 
     let immediate =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Value) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "immediate"
       }
 
     let immediate_or_null =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Value) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Maybe_null
             ~separability:Non_float;
         name = "immediate_or_null"
       }
@@ -1592,7 +1600,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let float64 =
       { jkind =
-          mk_jkind (Base Float64) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Float64) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
@@ -1603,7 +1612,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float =
       { jkind =
-          mk_jkind (Base Float64) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Float64) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
@@ -1614,7 +1624,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let float32 =
       { jkind =
-          mk_jkind (Base Float32) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Float32) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
@@ -1625,7 +1636,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float32 =
       { jkind =
-          mk_jkind (Base Float32) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Float32) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
@@ -1636,7 +1648,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let word =
       { jkind =
-          mk_jkind (Base Word) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Word) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "word"
       }
@@ -1645,21 +1658,24 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_nativeint =
       { jkind =
-          mk_jkind (Base Word) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Word) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "word mod everything"
       }
 
     let untagged_immediate =
       { jkind =
-          mk_jkind (Base Untagged_immediate) ~mode_crossing:false
-            ~nullability:Non_null ~separability:Non_float;
+          mk_jkind (Base Untagged_immediate) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
+            ~separability:Non_float;
         name = "untagged_immediate"
       }
 
     let kind_of_untagged_immediate =
       { jkind =
-          mk_jkind (Base Untagged_immediate) ~mode_crossing:true
+          mk_jkind (Base Untagged_immediate)
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
             ~nullability:Non_null ~separability:Non_float;
         name = "untagged_immediate mod everything"
       }
@@ -1668,7 +1684,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits8 =
       { jkind =
-          mk_jkind (Base Bits8) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Bits8) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "bits8"
       }
@@ -1677,7 +1694,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int8 =
       { jkind =
-          mk_jkind (Base Bits8) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Bits8) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "bits8 mod everything"
       }
@@ -1686,7 +1704,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits16 =
       { jkind =
-          mk_jkind (Base Bits16) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Bits16) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "bits16"
       }
@@ -1695,7 +1714,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int16 =
       { jkind =
-          mk_jkind (Base Bits16) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Bits16) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "bits16 mod everything"
       }
@@ -1704,7 +1724,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits32 =
       { jkind =
-          mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Bits32) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "bits32"
       }
@@ -1713,7 +1734,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int32 =
       { jkind =
-          mk_jkind (Base Bits32) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Bits32) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "bits32 mod everything"
       }
@@ -1722,7 +1744,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits64 =
       { jkind =
-          mk_jkind (Base Bits64) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Bits64) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "bits64"
       }
@@ -1731,7 +1754,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int64 =
       { jkind =
-          mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Bits64) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "bits64 mod everything"
       }
@@ -1747,7 +1771,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let vec128 =
       { jkind =
-          mk_jkind (Base Vec128) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Vec128) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "vec128"
       }
@@ -1756,7 +1781,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let vec256 =
       { jkind =
-          mk_jkind (Base Vec256) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Vec256) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "vec256"
       }
@@ -1765,7 +1791,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let vec512 =
       { jkind =
-          mk_jkind (Base Vec512) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Vec512) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "vec512"
       }
@@ -1774,7 +1801,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_128bit_vectors =
       { jkind =
-          mk_jkind (Base Vec128) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Vec128) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "vec128 mod everything"
       }
@@ -1783,7 +1811,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_256bit_vectors =
       { jkind =
-          mk_jkind (Base Vec256) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Vec256) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "vec256 mod everything"
       }
@@ -1792,7 +1821,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_512bit_vectors =
       { jkind =
-          mk_jkind (Base Vec512) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Vec512) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "vec512 mod everything"
       }

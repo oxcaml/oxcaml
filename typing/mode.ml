@@ -4394,6 +4394,10 @@ module Crossing = struct
         =
       Modality (Join_with ((Axis.proj [@inlined hint]) ax c))
 
+    let set (type a) (ax : a Mode.Axis.t) (Modality (Join_with a) : a Atom.t)
+        (Modality (Join_const c)) =
+      Modality (Join_const ((Axis.set [@inlined hint]) ax a c))
+
     let le (Modality (Join_const c0)) (Modality (Join_const c1)) =
       Mode.Const.le c1 c0
 
@@ -4467,6 +4471,10 @@ module Crossing = struct
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Meet_const c)) : a Atom.t
         =
       Modality (Meet_with ((Axis.proj [@inlined hint]) ax c))
+
+    let set (type a) (ax : a Mode.Axis.t) (Modality (Meet_with a) : a Atom.t)
+        (Modality (Meet_const c)) =
+      Modality (Meet_const ((Axis.set [@inlined hint]) ax a c))
 
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
@@ -4653,6 +4661,14 @@ module Crossing = struct
     match ax with
     | Monadic ax -> (Monadic.proj [@inlined hint]) ax monadic
     | Comonadic ax -> (Comonadic.proj [@inlined hint]) ax comonadic
+
+  let[@inline available] set (type a) (ax : a Axis.t) (a : a)
+      { monadic; comonadic } : t =
+    match ax with
+    | Monadic ax ->
+      { monadic = (Monadic.set [@inlined hint]) ax a monadic; comonadic }
+    | Comonadic ax ->
+      { monadic; comonadic = (Comonadic.set [@inlined hint]) ax a comonadic }
 
   let create ~regionality ~linearity ~uniqueness ~portability ~contention
       ~forkable ~yielding ~statefulness ~visibility ~staticity =

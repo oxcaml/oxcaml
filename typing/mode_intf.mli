@@ -1052,6 +1052,9 @@ module type S = sig
     (** Project a mode crossing (of all axes) onto the specified axis. *)
     val proj : 'a Axis.t -> t -> 'a
 
+    (** Set the specified axis to the specified crossing. *)
+    val set : 'a Axis.t -> 'a -> t -> t
+
     include Lattice with type t := t
 
     (** [modality m t] gives the mode crossing of type [T] wrapped in modality
