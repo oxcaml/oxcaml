@@ -2656,6 +2656,6 @@ third-party libraries such as Lwt, but with a different API."
     let _jslib s =
       Compenv.defer (ProcessObjects (Misc.rev_split_words s))
     let _jsopt s =
-      Compenv.first_ccopts := (s :: (!Compenv.first_ccopts))
+      Compenv.first_jsopts := (s :: (!Compenv.first_jsopts))
   end
 end

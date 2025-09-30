@@ -295,7 +295,9 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
 
     (* Build the runtime *)
     let runtime = output_name ^ ".runtime.js" in
-    let debug_flag = if !Clflags.debug then ["--debug-info" ] else [] in
+    let debug_flag =
+      if !Clflags.debug then ["--debug-info"] else []
+    in
 
     (* Extract runtime files from ccobjs *)
     let runtime_files, other_objs =
@@ -316,7 +318,7 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
       (fun () ->
         Jscompile.run_jsoo_exn
           ~args:(["link"; "-o"; output_name ] @ linkall_flag @ debug_flag @ files_to_link
-                 @ (List.rev !Clflags.all_ccopts)
+                 @ (List.rev !Clflags.all_jsopts)
                 ))
       ~always:(fun () ->
         Misc.remove_file runtime)

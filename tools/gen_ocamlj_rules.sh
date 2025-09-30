@@ -32,6 +32,7 @@ OCAMLJ_FLAGS+=(-g)
 OCAMLJ_FLAGS+=(-absname)
 OCAMLJ_FLAGS+=(-bin-annot)
 OCAMLJ_FLAGS+=(-strict-formats)
+OCAMLJ_FLAGS+=(-jsopt --source-map-inline)
 
 if [[ $library == stdlib ]]; then
     OCAMLJ_FLAGS+=(-nopervasives -nostdlib)

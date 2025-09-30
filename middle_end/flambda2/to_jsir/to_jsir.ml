@@ -314,6 +314,9 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
         env, res)
 
 and apply_expr ~env ~res e =
+  (* Add debug event at the start of the apply *)
+  let dbg = Apply_expr.dbg e in
+  let res = To_jsir_result.maybe_add_debuginfo_exn res dbg ~pos:`Start in
   (* Pass in any extra arguments for the exception continuation in mutable
      variables. A slightly sad hack, but necessary since [Raise] only has one
      parameter. *)
@@ -643,12 +646,13 @@ and invalid ~env ~res msg =
   in
   env, To_jsir_result.end_block_with_last_exn res Stop
 
-let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
+let unit ~offsets ~all_code ~reachable_names flambda_unit =
   let env =
     To_jsir_env.create
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
       ~return_continuation:(Flambda_unit.return_continuation flambda_unit)
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
+      ~offsets ~all_code ~reachable_names
   in
   let res = To_jsir_result.create () in
   let res, _addr = To_jsir_result.new_block res ~params:[] in
