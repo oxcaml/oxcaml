@@ -1378,6 +1378,12 @@ let get_component = function
     None -> Lconst const_unit
   | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
 
+let () =
+  match Jkind.Sort.Const.for_module with
+  | Base Value -> ()
+  | _ -> Misc.fatal_error "Lambda.transl_package: expected modules to be values"
+    (* If this assumption is broken, [transl_package] should return a
+       module representation instead of a size *)
 let transl_package component_names coercion =
   let size =
     match coercion with
