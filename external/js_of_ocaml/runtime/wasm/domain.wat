@@ -163,6 +163,16 @@
    (func (export "caml_domain_dls_get") (param (ref eq)) (result (ref eq))
       (global.get $caml_domain_dls))
 
+   (global $caml_domain_tls (mut (ref eq))
+      (array.new_fixed $block 1 (ref.i31 (i32.const 0))))
+
+   (func (export "caml_domain_tls_set") (param $a (ref eq)) (result (ref eq))
+      (global.set $caml_domain_tls (local.get $a))
+      (ref.i31 (i32.const 0)))
+
+   (func (export "caml_domain_tls_get") (param (ref eq)) (result (ref eq))
+      (global.get $caml_domain_tls))
+
    (global $caml_ml_domain_unique_token (ref eq)
       (array.new_fixed $block 1 (ref.i31 (i32.const 0))))
 
@@ -328,6 +338,19 @@
             (array.set $block (local.get $b) (local.get $idx) (local.get $n))
             (return (ref.i31 (i32.const 1)))))
       (ref.i31 (i32.const 0)))
+
+   (func (export "caml_atomic_compare_exchange_field")
+      (param $ref (ref eq)) (param $field (ref eq)) (param $o (ref eq)) (param $n (ref eq)) (result (ref eq))
+      (local $b (ref $block))
+      (local $idx i32)
+      (local $old (ref eq))
+      (local.set $b (ref.cast (ref $block) (local.get $ref)))
+      (local.set $idx (i32.add (i31.get_s (ref.cast (ref i31) (local.get $field))) (i32.const 1)))
+      (local.set $old (array.get $block (local.get $b) (local.get $idx)))
+      (if (ref.eq (local.get $old) (local.get $o))
+         (then
+            (array.set $block (local.get $b) (local.get $idx) (local.get $n))))
+      (local.get $old))
 
    (func (export "caml_atomic_exchange_field")
       (param $ref (ref eq)) (param $field (ref eq)) (param $v (ref eq)) (result (ref eq))

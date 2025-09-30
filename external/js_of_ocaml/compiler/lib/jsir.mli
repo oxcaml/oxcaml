@@ -26,5 +26,43 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-module Jsir = Code
-module Parse_info = Parse_info
+
+open Stdlib
+
+module Debug : sig
+  type ml_unit =
+    { module_name : string
+    ; paths : string list
+    }
+
+  type summary =
+    { is_empty : bool
+    ; units : ml_unit list
+    }
+
+  val is_empty : summary -> bool
+
+  val default_summary : summary
+
+  val paths : summary -> units:StringSet.t -> StringSet.t
+end
+
+type one =
+  { code : Code.program
+  ; cmis : StringSet.t
+  ; debug : Debug.summary
+  }
+
+type compilation_unit =
+  { info : Unit_info.t
+  ; contents : one
+  }
+
+val save : compilation_unit -> filename:string -> unit
+
+val load :
+  filename:string
+  -> include_dirs:string list (** unused *)
+  -> include_cmis:bool (** unused *)
+  -> debug:bool (** unused *)
+  -> compilation_unit

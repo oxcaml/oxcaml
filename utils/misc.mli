@@ -964,6 +964,7 @@ module Magic_number : sig
     | Cmx | Cmxa
     | Cmxs
     | Cmt | Cms | Ast_impl | Ast_intf
+    | Jsir
 
   type info = {
     kind: kind;

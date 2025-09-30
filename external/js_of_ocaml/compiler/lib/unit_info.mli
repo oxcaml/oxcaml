@@ -28,14 +28,7 @@ type t =
   ; effects_without_cps : bool
   }
 
-val of_cmo : Cmo_format.compilation_unit_descr -> t
-
 val of_primitives : aliases:(string * string) list -> string list -> t
-
-val of_compilation_units : 
-  exported:Compilation_unit.t -> 
-  imported:Compilation_unit.t list -> 
-  t
 
 val union : t -> t -> t
 

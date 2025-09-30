@@ -27,9 +27,6 @@
  ******************************************************************************)
 
 type compilation_unit_descr =
-  { cu_name: Compilation_unit.t;
+  { cu_name: string;
     cu_pos: int;
     cu_codesize: int }
-
-type library =
-  { lib_units: compilation_unit_descr list }

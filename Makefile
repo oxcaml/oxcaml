@@ -9,6 +9,8 @@ boot_ocamlj = boot_ocamlj.exe
 boot_ocamlmklib = tools/ocamlmklib.exe
 boot_ocamldep = tools/ocamldep.exe
 boot_ocamlobjinfo = tools/objinfo.exe
+boot_js_of_ocaml = external/js_of_ocaml/compiler/bin-js_of_ocaml/js_of_ocaml.exe
+boot_jsoo_minify = external/js_of_ocaml/compiler/bin-jsoo_minify/jsoo_minify.exe
 ocamldir = .
 toplevels_installed = top opttop
 
@@ -38,8 +40,10 @@ ci-coverage: boot-runtest coverage
 
 .PHONY: minimizer
 minimizer: runtime-stdlib
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	cp chamelon/dune.ox chamelon/dune
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @chamelon/all
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 .PHONY: hacking-externals
 hacking-externals: _build/_bootinstall
@@ -59,9 +63,11 @@ test-tools: runtime-stdlib
 ARCHES=amd64 arm64
 .PHONY: check_all_arches
 check_all_arches: _build/_bootinstall
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	for arch in $(ARCHES); do \
 	  ARCH=$$arch RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) ocamloptcomp.cma; \
 	done
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 # Compare the OxCaml installation tree against the upstream one.
 
@@ -94,14 +100,17 @@ promote:
 
 .PHONY: fmt
 fmt:
-	$(if $(filter 1,$(V)),,@)find . \( -name "*.ml" -or -name "*.mli" \) | \
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
+	$(if $(filter 1,$(V)),,@)find . -not -path "./external/js_of_ocaml/*" \( -name "*.ml" -or -name "*.mli" \) | \
 	  xargs -P $$(nproc 2>/dev/null || echo 1) -n 20 ocamlformat -i
 ifndef SKIP_80CH
 	$(if $(filter 1,$(V)),,@)bash scripts/80ch.sh
 endif
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 .PHONY: check-fmt
 check-fmt:
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	@if [ "$$(git status --porcelain)" != "" ]; then \
 	  echo; \
 	  echo "Tree must be clean before running 'make check-fmt'"; \
@@ -117,6 +126,7 @@ check-fmt:
 	  git diff --no-ext-diff; \
 	  exit 1; \
 	fi
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 .PHONY: regen-flambda2-parser
 regen-flambda2-parser: $(dune_config_targets)
@@ -176,12 +186,14 @@ build_and_test_upstream: build_upstream
 
 .PHONY: coverage
 coverage: boot-runtest
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	rm -rf _coverage
 	bisect-ppx-report html --tree -o _coverage \
 	  --coverage-path=_build/default \
 		--source-path=. \
 	  --source-path=_build/default
 	@echo Coverage report generated in _coverage/index.html
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 .PHONY: debug
 .NOTPARALLEL: debug
