@@ -1,7 +1,9 @@
 (* TEST
  flambda;
+ flags = "-O2";
  native;
 *)
+(* CR-someday gyorsh: this test fails with -Oclassic *)
 
 type t = T of { pos : int }
 
