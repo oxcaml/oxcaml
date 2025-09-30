@@ -504,7 +504,7 @@ let mk_no_flambda2_reaper f =
 
 let mk_reaper_preserve_direct_calls f =
   ( "-reaper-preserve-direct-calls",
-    Arg.Symbol ([ "never"; "always"; "zero-alloc"; "auto" ], f),
+    Arg.Symbol ([ "never"; "always"; "zero-alloc" ], f),
     Printf.sprintf
       " Choose the direct call preservation strategy of the reaper (Flambda2 \
        only)\n\
@@ -512,9 +512,7 @@ let mk_reaper_preserve_direct_calls f =
       \       \"never\": do not try to preserve direct calls to old functions;\n\
       \       \"always\": always preserve existing direct calls;\n\
       \       \"zero-alloc\": preserve direct calls only in zero-alloc checked \
-       functions;\n\
-      \       \"auto\": preserve direct calls for which a set of possibly \
-       called functions cannot be determined." )
+       functions." )
 
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
