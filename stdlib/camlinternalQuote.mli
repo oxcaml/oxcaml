@@ -557,7 +557,8 @@ and Exp_desc : sig
 
   val letmodule_nonbinding : Module.t -> Exp.t -> t
 
-  val letmodule : Loc.t -> Name.t -> Module.t -> (Var.Module.t -> Exp.t) lam -> t
+  val letmodule :
+    Loc.t -> Name.t -> Module.t -> (Var.Module.t -> Exp.t) lam -> t
 
   val constraint_ : Exp.t -> Type_constraint.t -> t
 

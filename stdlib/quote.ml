@@ -17,7 +17,8 @@ module Expr = struct
   let int x = (Obj.magic (inject (Constant.int x)) : <[int]> expr)
   let int32 x = (Obj.magic (inject (Constant.int32 x)) : <[int32]> expr)
   let int64 x = (Obj.magic (inject (Constant.int64 x)) : <[int64]> expr)
-  let nativeint x = (Obj.magic (inject (Constant.nativeint x)) : <[nativeint]> expr)
+  let nativeint x =
+    (Obj.magic (inject (Constant.nativeint x)) : <[nativeint]> expr)
   let float x =
     let s = Format.sprintf "%h" x
     in (Obj.magic (inject (Constant.float s)) : <[float]> expr)

@@ -2855,7 +2855,8 @@ let add_unboxed_lock env = add_lock Unboxed_lock env
 
 let add_local_env_lock env = add_lock Local_env_lock env
 
-let add_quotation_lock env = add_lock Quotation_lock {env with stage = env.stage + 1}
+let add_quotation_lock env =
+  add_lock Quotation_lock {env with stage = env.stage + 1}
 
 let add_splice_lock env = add_lock Splice_lock {env with stage = env.stage - 1}
 
@@ -3787,7 +3788,9 @@ let lookup_dot_type ~errors ~use ~loc l s env =
       may_lookup_error errors loc env (Unbound_type (Ldot(l, s)))
 
 let lookup_dot_modtype ~errors ~use ~loc l s env =
-  let (p, (_, locks), comps) = lookup_structure_components ~errors ~use ~loc l env in
+  let (p, (_, locks), comps) =
+    lookup_structure_components ~errors ~use ~loc l env
+  in
   match NameMap.find s comps.comp_modtypes with
   | mta ->
       let path = Pdot(p, s) in

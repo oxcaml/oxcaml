@@ -256,8 +256,8 @@ module Var : sig
     (** [add v t] is the set containing [v] and the elements of [t]. *)
     val add : var -> t -> t
 
-    (** [union ~shared t1 t2] is the union of [t1] and [t2]. [shared] is run on all
-        the variables that are in both [t1] and [t2]. *)
+    (** [union ~shared t1 t2] is the union of [t1] and [t2]. [shared] is run on
+        all the variables that are in both [t1] and [t2]. *)
     val union : shared:(var -> unit) -> t -> t -> t
 
     (** [inter ~left_only ~right_only t1 t2] is the intersection of [t1]
@@ -270,9 +270,9 @@ module Var : sig
     (** [iter f t] runs [f] on every variable in [t]. *)
     val iter : (var -> unit) -> t -> unit
 
-    (** [differences ~left_only ~right_only t1 t2] runs [left_only] on every element of [t1]
-        that is not an element of [t2] and [right_only] on every element of [t2] that is
-        not an element of [t1]. *)
+    (** [differences ~left_only ~right_only t1 t2] runs [left_only] on every
+        element of [t1] that is not an element of [t2] and [right_only] on every
+        element of [t2] that is not an element of [t1]. *)
     val differences :
       left_only:(var -> unit) -> right_only:(var -> unit) -> t -> t -> unit
   end
@@ -284,7 +284,8 @@ module Var : sig
     (** [empty] is the empty set. *)
     val empty : 'a t
 
-    (** [singleton v data] is the map containing just a binding of [v] to [data]. *)
+    (** [singleton v data] is the map containing just a binding of [v] to
+        [data]. *)
     val singleton : var -> 'a -> 'a t
 
     (** [union ~join t1 t2] is the union of [t1] and [t2]. [join] is run on all
@@ -638,15 +639,15 @@ module With_free_vars : sig
   val value_bindings :
     Loc.t -> Name.t list -> (Var.Value.t list -> 'a t) -> 'a t
 
-  (** [type_var_bindings loc names t] is the value of [t]. [t] is expected to have
-      a list of free type variables names are [names]. [t] is represented as a function
-      from this type variable to the term itself. *)
+  (** [type_var_bindings loc names t] is the value of [t]. [t] is expected to
+      have a list of free type variables names are [names]. [t] is represented
+      as a function from this type variable to the term itself. *)
   val type_var_bindings :
     Loc.t -> Name.t list -> (Var.Type_var.t list -> 'a t) -> 'a t
 
   (** [type_bindings loc name t] is the value of [t]. [t] is expected to have
-      a single free type constructor variable named [name]. [t] is represented as
-      a function from these type constructor variables to the term itself. *)
+      a single free type constructor variable named [name]. [t] is represented
+      as a function from these type constructor variables to the term itself. *)
   val type_binding :
     Loc.t -> Name.t -> (Var.Type_constr.t -> 'a t) -> 'a t
 
@@ -659,8 +660,8 @@ module With_free_vars : sig
       value of [t]. [t] is expected to have free value-kinded variables (named
       [bound_values]) and free module variables (named [bound_modules]).
       [t] is expected to bind exactly these variables. [extra] is run on any
-      additional variables that are bound. [missing] is run on any variables that
-      are missing. *)
+      additional variables that are bound. [missing] is run on any variables
+      that are missing. *)
   val complex_bindings :
     Loc.t ->
     extra:(Var.t -> unit) ->
@@ -1345,8 +1346,8 @@ module Ast = struct
     | _ -> `Normal
 
   let view_fixity_of_exp = function
-    (* FIXME: properly check that it is safe to treat the operator as infix within
-       the quotation context *)
+    (* FIXME: properly check that it is safe to treat the operator as infix
+       within the quotation context *)
     | { desc = Ident l; attributes = [] } ->
       fixity_of_string (suffix_string_of_ident_value l)
     | _ -> `Normal
@@ -1380,7 +1381,8 @@ module Ast = struct
     | Recursive -> pp fmt "let@ rec"
 
   let rec print_vb env fmt ({ pat; expr } : value_binding) =
-    pp fmt "%a@ =@ @[<2>%a@]" (print_pat env) pat (print_exp_with_parens env) expr
+    pp fmt "%a@ =@ @[<2>%a@]"
+      (print_pat env) pat (print_exp_with_parens env) expr
 
   and print_const fmt = function
     | Int n -> pp fmt "%d" n

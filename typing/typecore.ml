@@ -8932,7 +8932,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   let unify_as_tuple ty_expected =
     let labeled_subtypes =
       List.map
-        (fun (label, _) -> label, newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element))
+        (fun (label, _) ->
+           label, newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element))
       sexpl
     in
     let to_unify = newgenty (Ttuple labeled_subtypes) in

@@ -182,7 +182,10 @@ type error =
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
   | Invalid_variable_stage of
-      {name : string; intro_stage : int; usage_loc : Location.t; usage_stage : int}
+      {name : string;
+       intro_stage : int;
+       usage_loc : Location.t;
+       usage_stage : int}
 
 exception Error of Location.t * Env.t * error
 

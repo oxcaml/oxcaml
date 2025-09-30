@@ -99,7 +99,10 @@ type error =
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
   | Invalid_variable_stage of
-      {name : string; intro_stage : int; usage_loc : Location.t; usage_stage : int}
+      {name : string;
+       intro_stage : int;
+       usage_loc : Location.t;
+       usage_stage : int}
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -246,7 +249,8 @@ end = struct
   (* These are the "global" type variables: they were in scope before
      we started processing the current type. See Note [Global type variables].
   *)
-  let type_variables = ref (TyVarMap.empty : (type_expr * jkind_lr * int) TyVarMap.t)
+  let type_variables =
+    ref (TyVarMap.empty : (type_expr * jkind_lr * int) TyVarMap.t)
 
   (* These are variables that have been used in the currently-being-checked
      type, possibly including the variables in [type_variables].
@@ -521,7 +525,10 @@ end = struct
             if stage <> s then
               raise
                 (Error (loc, env, (Invalid_variable_stage
-                   {name; intro_stage = stage; usage_loc = loc; usage_stage = s})));
+                                     {name;
+                                      intro_stage = stage;
+                                      usage_loc = loc;
+                                      usage_stage = s})));
             r := (loc, v, type_expr, stage) :: !r
           with Not_found ->
             match unbound_variable_policy, Btype.is_Tvar ty with
@@ -1090,7 +1097,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_open (path, mod_ident, cty)) cty.ctyp_type
   | Ptyp_of_kind jkind ->
-      let tjkind = jkind_of_annotation (Type_of_kind loc) styp.ptyp_attributes jkind in
+      let tjkind =
+        jkind_of_annotation (Type_of_kind loc) styp.ptyp_attributes jkind
+      in
       let ty = newty (Tof_kind tjkind) in
       ctyp (Ttyp_of_kind jkind) ty
   | Ptyp_quote t ->
