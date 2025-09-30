@@ -61,6 +61,12 @@ let print_param_decision ppf param_decision =
       (Field.Map.print (DS.print_unboxed_fields Variable.print))
       fields
 
+type should_preserve_direct_calls =
+      Traverse_acc.Env.should_preserve_direct_calls =
+  | Yes
+  | No
+  | Auto
+
 type env =
   { machine_width : Target_system.Machine_width.t;
     uses : DS.result;
@@ -74,7 +80,8 @@ type env =
     should_keep_function_param :
       Code_id.t -> Variable.t -> KS.t -> param_decision;
     function_return_decision : param_decision list Code_id.Map.t;
-    kinds : K.t Name.Map.t
+    kinds : K.t Name.Map.t;
+    should_preserve_direct_calls : should_preserve_direct_calls
   }
 
 type rebuild_result =
@@ -874,48 +881,45 @@ let decide_whether_apply_needs_calling_convention_change env apply =
   let code_id_actually_called, call_kind, _should_break_call =
     let called c alloc_mode call_kind was_indirect_unknown_arity =
       assert (not was_indirect_unknown_arity);
-      let code_id =
+      let code_ids =
         Simple.pattern_match c
           ~const:(fun _ -> Or_unknown.Unknown)
           ~name:(fun name ~coercion:_ ->
             DS.code_id_actually_directly_called env.uses name)
       in
-      match code_id with
+      match code_ids with
       | Unknown -> None, call_kind, false
       | Known code_ids ->
         let singleton_code_id = Code_id.Set.get_singleton code_ids in
         let new_call_kind =
           match singleton_code_id with
           | Some code_id -> Call_kind.direct_function_call code_id alloc_mode
-          | None -> Call_kind.indirect_function_call_known_arity alloc_mode
+          | None -> call_kind
         in
         singleton_code_id, new_call_kind, was_indirect_unknown_arity
     in
     match call_kind with
     | Function { function_call = Direct code_id; alloc_mode } -> (
       match Apply.callee apply with
-      | Some c
-        when Simple.pattern_match'
-               ~var:(fun _ ~coercion:_ -> true)
-               ~const:(fun _ -> true)
-               ~symbol:(fun s ~coercion:_ ->
-                 (* Sets of closures from other compilation units do not show
-                    their code_id in the graph, so we do not want to demote
-                    those calls to [Indirect_known_arity]. *)
-                 Compilation_unit.is_current (Symbol.compilation_unit s))
-               c ->
-        let code_ids = Code_id.Set.singleton code_id in
+      | None -> Some code_id, call_kind, false
+      | Some c ->
         let call_kind =
-          if Code_id.Set.exists
-               (fun code_id ->
-                 Compilation_unit.is_current
-                   (Code_id.get_compilation_unit code_id))
-               code_ids
-          then Call_kind.indirect_function_call_known_arity alloc_mode
-          else call_kind
+          if not
+               (Compilation_unit.is_current
+                  (Code_id.get_compilation_unit code_id))
+          then call_kind
+          else
+            match env.should_preserve_direct_calls with
+            | Yes -> call_kind
+            | No -> Call_kind.indirect_function_call_known_arity alloc_mode
+            | Auto ->
+              (* In [auto] mode, the direct call is preserved if and only if we
+                 cannot identify which set of code_ids can be called. Since this
+                 is exactly the same situation as the one where we do not
+                 replace the call_kind, we can leave the direct call here. *)
+              call_kind
         in
-        called c alloc_mode call_kind false
-      | None | Some _ -> Some code_id, call_kind, false)
+        called c alloc_mode call_kind false)
     | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
       (* called (Option.get (Apply.callee apply)) alloc_mode call_kind true *)
       None, call_kind, false
@@ -1755,6 +1759,17 @@ and rebuild_expr (env : env) (res : rebuild_result)
 
 and rebuild_function_params_and_body (env : env) res code_metadata
     (params_and_body : Rev_expr.rev_params_and_body) =
+  let env =
+    match Flambda_features.reaper_preserve_direct_calls () with
+    | Always | Never | Auto -> env
+    | Zero_alloc ->
+      let should_preserve_direct_calls =
+        match Code_metadata.zero_alloc_attribute code_metadata with
+        | Default_zero_alloc | Assume _ -> No
+        | Check _ -> Yes
+      in
+      { env with should_preserve_direct_calls }
+  in
   let { Rev_expr.return_continuation;
         exn_continuation;
         params;
@@ -2069,6 +2084,12 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
         List.map2 (should_keep_param cont) info.params info.arity)
       continuation_info
   in
+  let should_preserve_direct_calls =
+    match Flambda_features.reaper_preserve_direct_calls () with
+    | Never | Zero_alloc -> No
+    | Always -> Yes
+    | Auto -> Auto
+  in
   let env =
     { machine_width;
       uses = solved_dep;
@@ -2079,7 +2100,8 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       function_params_to_keep;
       should_keep_function_param;
       function_return_decision;
-      kinds
+      kinds;
+      should_preserve_direct_calls
     }
   in
   let res =

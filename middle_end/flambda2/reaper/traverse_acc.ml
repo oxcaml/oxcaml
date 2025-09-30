@@ -477,7 +477,7 @@ let record_set_of_closure_deps t =
 
 let graph t = t.deps
 
-let deps t ~get_code_metadata:_ ~le_monde_exterieur:_ ~all_constants =
+let deps t ~all_constants =
   List.iter
     (fun { function_containing_apply_expr;
            apply_code_id;

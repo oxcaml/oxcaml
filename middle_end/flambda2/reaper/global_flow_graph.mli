@@ -99,6 +99,8 @@ val any_usage_pred : (Code_id_or_name.t, _) rel1
 
 val any_source_pred : (Code_id_or_name.t, _) rel1
 
+(* An entry (code_id, v) in this relation means that [v] is the "my_closure"
+   variable of the code associated to [code_id]. *)
 val code_id_my_closure_rel : (Code_id_or_name.t, Code_id_or_name.t, _) rel2
 
 val create : unit -> graph

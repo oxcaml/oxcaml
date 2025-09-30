@@ -139,9 +139,4 @@ val code_deps : t -> code_dep Code_id.Map.t
 
 val graph : t -> Graph.graph
 
-val deps :
-  t ->
-  get_code_metadata:(Code_id.t -> Code_metadata.t) ->
-  le_monde_exterieur:Name.t ->
-  all_constants:Name.t ->
-  Graph.graph
+val deps : t -> all_constants:Name.t -> Graph.graph
