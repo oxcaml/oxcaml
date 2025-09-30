@@ -94,5 +94,6 @@ let eval code =
   Mutex.protect compile_mutex (fun () ->
       try eval code
       with exn ->
+        let backtrace = Printexc.get_raw_backtrace () in
         Location.report_exception Format.std_formatter exn;
-        raise exn)
+        Printexc.raise_with_backtrace exn backtrace)
