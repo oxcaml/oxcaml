@@ -61,6 +61,8 @@ module Mode_axis_pair = struct
     | "immutable" -> monadic Visibility Immutable
     | "read" -> monadic Visibility Read
     | "read_write" -> monadic Visibility Read_write
+    | "static" -> monadic Staticity Static
+    | "dynamic" -> monadic Staticity Dynamic
     | _ -> raise Not_found
 end
 
