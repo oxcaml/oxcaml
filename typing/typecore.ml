@@ -496,21 +496,25 @@ let mode_default mossing =
     strictly_local = false;
     tuple_modes = None }
 
-let mode_default_restrict mode crossing =
+let disallow_mossing mode crossing = { mode = mode |> Value.disallow_left; crossing }
+
+let mode_default_disallow mode crossing =
   { position = RNontail;
-    mode = { mode = mode |> Value.disallow_left; crossing };
+    mode = disallow_mossing mode crossing;
     strictly_local = false;
     tuple_modes = None }
 
 let mode_legacy =
-  mode_default_restrict Value.legacy (ref Crossing.Monadic.mod_default)
+  mode_default_disallow Value.legacy (ref Crossing.Monadic.mod_default)
 
 (* CR zeisbach: there are few signatures that could make sense here, but the Some
    branch is never currently taken anyways, so I just did what is simple for now *)
-let mode_default_opt mossing_opt =
-  match mossing_opt with
+let mode_default_opt mode_opt =
+  match mode_opt with
   | None -> mode_legacy
-  | Some mossing -> mode_default mossing
+  | Some mode ->
+    (* CR zeisbach: I don't think this branch is ever taken, but this seems... fine *)
+    mode_default { mode; crossing = (ref Crossing.Monadic.mod_default) }
 
 let as_single_mode {mode = {mode; _}; tuple_modes; _} =
   match tuple_modes with
@@ -564,7 +568,8 @@ let mode_region mode =
   }
 
 let mode_max =
-  mode_default_restrict Value.max (ref Crossing.Monadic.mod_default)
+  (* CR zeisbach: this might actually make sense to stay as the min always *)
+  mode_default_disallow Value.max (ref Crossing.Monadic.mod_default)
 
 let mode_with_position mode position =
   { (mode_default mode ) with position }
@@ -637,10 +642,7 @@ mode variable. We encode extra position information in the former. We need the
 latter to the both left and right mode because of how it will be used. *)
 let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   let vmode , _ = Value.newvar_below (alloc_as_value marg) in
-  (* CR zeisbach: maybe mode_default_restrict should call a helper which does
-     this mossing construction with the disallow, which could be used here too *)
-  let mossing = { mode = vmode |> Value.disallow_left;
-                  crossing = (ref Crossing.Monadic.mod_default) } in
+  let mossing = disallow_mossing vmode (ref Crossing.Monadic.mod_default) in
   if partial_app then mode_default mossing, vmode
   else match funct.exp_desc, index, position_and_mode.apply_position with
   | Texp_ident (_, _, {val_kind =
@@ -664,6 +666,8 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
 (* expected_mode.locality_context explains why expected_mode.mode is low;
    shared_context explains why mode.uniqueness is high *)
 let submode ~loc ~env ?(reason = Other) ?shared_context mode expected_mode =
+  (* CR zeisbach: will the crossings have to interact with submode thing?
+     maybe that only becomes relevant once we start passing into functions *)
   let res = Value.submode mode (as_single_mode expected_mode) in
   match res with
   | Ok () -> ()
@@ -681,6 +685,7 @@ let actual_submode ~loc ~env ?reason (actual_mode : Env.actual_mode)
 let escape ~loc ~env ~reason m =
   submode ~loc ~env ~reason m mode_legacy
 
+(* CR zeisbach: worth thinking about if this is something I should be changing *)
 type expected_pat_mode =
   { mode : Value.l;
     (** The mode of the current pattern. *)
@@ -725,10 +730,11 @@ let register_allocation_value_mode mode =
     [expected_mode]. Returns the mode of the allocation, and the expected mode
     of potential subcomponents. *)
 let register_allocation (expected_mode : expected_mode) =
+  let { mode; crossing } = as_mossing expected_mode in
   let alloc_mode, mode =
-    register_allocation_value_mode (as_single_mode expected_mode)
+    register_allocation_value_mode mode
   in
-  alloc_mode, mode_default mode
+  alloc_mode, mode_default { mode; crossing }
 
 let optimise_allocations () =
   (* CR zqian: Ideally we want to optimise all axes relavant to allocation. For
@@ -1054,6 +1060,7 @@ let expect_mode_cross_jkind env jkind (expected_mode : expected_mode) =
   let crossing = crossing_of_jkind env jkind in
   mode_morph (Crossing.apply_right crossing) expected_mode
 
+(* CR zeisbach: this surely is a function that I will have to change to accomodate *)
 let expect_mode_cross env ty (expected_mode : expected_mode) =
   let crossing = crossing_of_ty env ty in
   mode_morph (Crossing.apply_right crossing) expected_mode
@@ -1101,7 +1108,8 @@ let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
 *)
 let mutvar_mode ~loc ~env m0 exp_mode =
   let m = Value.newvar () in
-  let mode = mode_default m in
+  (* CR zeisbach: think harder about this *)
+  let mode = mode_default_disallow m (ref Crossing.Monadic.min) in
   let modalities = Typemode.let_mutable_modalities in
   submode ~loc ~env exp_mode (mode_modality modalities mode);
   check_construct_mutability ~loc ~env
@@ -1116,7 +1124,8 @@ let mode_project_mutable mut_name =
       contention = Contention.Const.Shared }
     |> Value.of_const ~hint_monadic:(Mutable_read mut_name)
   in
-  mode_default mode
+  (* CR zeisbach: this is something that might actually stay as min... *)
+  mode_default { mode; crossing = (ref Crossing.Monadic.min) }
 
 (** The [expected_mode] of the record when mutating a mutable field. *)
 let mode_mutate_mutable mut_name =
@@ -1126,7 +1135,7 @@ let mode_mutate_mutable mut_name =
       contention = Uncontended }
     |> Value.of_const ~hint_monadic:(Mutable_write mut_name)
   in
-  mode_default mode
+  mode_default { mode; crossing = (ref Crossing.Monadic.min) }
 
 (** The [expected_mode] of the lazy expression when forcing it. *)
 let mode_force_lazy =
@@ -1135,7 +1144,7 @@ let mode_force_lazy =
       contention = Uncontended }
     |> Value.of_const ~hint_monadic:Lazy_forced
   in
-  mode_default mode
+  mode_default { mode; crossing = (ref Crossing.Monadic.min) }
 
 let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
@@ -5288,10 +5297,12 @@ let unique_use ~loc ~env mode_l mode_r  =
     (* if unique extension is not enabled, we will not run uniqueness analysis;
        instead, we force all uses to be aliased and many. This is equivalent to
        running a UA which forces everything *)
+    (* CR zeisbach: I really don't have a good sense of if this is right... *)
     submode ~loc ~env Value.(of_const {Const.min with uniqueness = Aliased})
-      (mode_default mode_r);
-    submode ~loc ~env mode_l (mode_default Value.(of_const
-      {Const.max with linearity = Many}));
+      (mode_default_disallow mode_r (ref Crossing.Monadic.min));
+    submode ~loc ~env mode_l
+      (mode_default { mode = Value.(of_const {Const.max with linearity = Many});
+                      crossing = ref Crossing.Monadic.min });
     (Uniqueness.disallow_left Uniqueness.aliased,
      Linearity.disallow_right Linearity.many)
   end
@@ -5440,7 +5451,7 @@ let split_function_ty
     if not is_final_val_param then
       (* no need to check mode crossing in this case because ty_res always a
       function *)
-      mode_default ret_value_mode
+      mode_default_disallow ret_value_mode (ref Crossing.Monadic.min)
     else
       let ret_value_mode = mode_return ret_value_mode in
       let ret_value_mode = expect_mode_cross env ty_ret ret_value_mode in
@@ -5608,14 +5619,20 @@ let pat_modes ~force_toplevel rec_mode_var (attrs, spat) =
         match pat_tuple_arity spat with
         | Not_local_tuple | Maybe_local_tuple ->
             let mode = Value.newvar () in
-            simple_pat_mode mode, mode_default mode
+            simple_pat_mode mode,
+            mode_default_disallow mode (ref Crossing.Monadic.mod_default)
         | Local_tuple arity ->
             let modes = List.init arity (fun _ -> Value.newvar ()) in
             let mode = Value.newvar () in
-            tuple_pat_mode mode modes, mode_tuple mode modes
+            (* CR zeisbach: this non-uniformity is indicative of the wrong definitions *)
+            tuple_pat_mode mode modes,
+            mode_tuple (disallow_mossing mode (ref Crossing.Monadic.mod_default)) modes
       end
     | Some mode ->
-        simple_pat_mode mode, mode_default mode
+        (* CR zeisbach: in this case we are in a let rec, which is not supported
+           currently, so we just give up and pass the default crossing *)
+        simple_pat_mode mode,
+        mode_default_disallow mode (ref Crossing.Monadic.mod_default)
   in
   attrs, pat_mode, exp_mode, spat
 
@@ -5699,6 +5716,7 @@ and type_expect_
         (lid_sexp_list: (Longident.t loc * Parsetree.expression) list)
         (opt_sexp : Parsetree.expression option) =
       assert (lid_sexp_list <> []);
+      (* CR zeisbach: maybe this actually should have a mossing? *)
       let opt_exp =
         match opt_sexp with
         | None -> None
@@ -5706,7 +5724,9 @@ and type_expect_
             let exp, mode =
               with_local_level_if_principal begin fun () ->
                 let mode = Value.newvar () in
-                let exp = type_exp ~recarg env (mode_default mode) sexp in
+                let exp = type_exp ~recarg env
+                  (* CR zeisbach: just refactor this with mossing_newvar function! *)
+                  (mode_default_disallow mode (ref Crossing.Monadic.mod_default)) sexp in
                 exp, mode
               end ~post:(fun (exp, _) -> generalize_structure_exp exp)
             in
@@ -6192,7 +6212,8 @@ and type_expect_
           mode
         | Nontail | Default -> Value.newvar ()
       in
-      let funct_expected_mode = mode_default funct_mode in
+      let funct_expected_mode =
+        mode_default_disallow funct_mode (ref Crossing.Monadic.mod_default) in
       (* does the function return a tvar which is too generic? *)
       let rec ret_tvar seen ty_fun =
         let ty = expand_head env ty_fun in
@@ -6275,11 +6296,14 @@ and type_expect_
         match cases_tuple_arity caselist with
         | Not_local_tuple | Maybe_local_tuple ->
           let mode = Value.newvar () in
-          simple_pat_mode mode, mode_default mode
+          simple_pat_mode mode,
+          (* CR zeisbach: duplication from above and also probably not even right... *)
+          mode_default_disallow mode (ref Crossing.Monadic.mod_default)
         | Local_tuple arity ->
           let modes = List.init arity (fun _ -> Value.newvar ()) in
           let mode = Value.newvar () in
-          tuple_pat_mode mode modes, mode_tuple mode modes
+          tuple_pat_mode mode modes,
+          mode_tuple (disallow_mossing mode (ref Crossing.Monadic.mod_default)) modes
       in
       let arg, sort =
         with_local_level begin fun () ->
@@ -6487,7 +6511,8 @@ and type_expect_
           ignore atomic;  (* CR aspsmith: TODO *)
           submode ~loc:record.exp_loc ~env rmode (mode_mutate_mutable
             (Record_field label.lbl_name));
-          let mode = mutable_mode m0 |> mode_default in
+          let mode =
+            mode_default_disallow (mutable_mode m0) (ref Crossing.Monadic.mod_default) in
           let mode = mode_modality label.lbl_modalities mode in
           type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
             (lid, label, snewval) Legacy
@@ -6820,7 +6845,8 @@ and type_expect_
             raise(Error(loc, env, Instance_variable_not_mutable lab.txt))
         | Mutable_variable (id, mode, ty, sort) ->
             let newval =
-              type_expect env (mode_default mode)
+              (* CR zeisbach: min vs default? seems plausible to be min here... *)
+              type_expect env (mode_default {mode; crossing = (ref Crossing.Monadic.min)})
                 snewval (mk_expected (instance ty))
             in
             let lid = {txt = id; loc} in
@@ -7353,17 +7379,20 @@ and type_expect_
       let cell_mode, _ =
         (* The overwritten cell has to be unique
            and should have the areality expected here: *)
+        (* CR zeisbach: refactor this probably *)
         Value.newvar_below
           (Value.meet [
             Value.of_const {Value.Const.max with uniqueness = Unique};
             Value.max_with_comonadic Areality
-              (Value.proj_comonadic Areality expected_mode.mode)])
+              (* CR zeisbach: projection! this might have to be changed manually *)
+              (Value.proj_comonadic Areality expected_mode.mode.mode)])
       in
       let cell_type =
         (* CR uniqueness: this could be the jkind of exp2 *)
         mk_expected (newvar (Jkind.for_non_float ~why:Boxed_record))
       in
-      let exp1 = type_expect ~recarg env (mode_default cell_mode) exp1 cell_type in
+      let mode = mode_default_disallow cell_mode (ref Crossing.Monadic.mod_default) in
+      let exp1 = type_expect ~recarg env mode exp1 cell_type in
       let new_fields_mode =
         (* The newly-written fields have to be global to avoid heap-to-stack pointers.
            We enforce that here, by asking the allocation to be global.
@@ -7411,7 +7440,8 @@ and type_expect_
         assert (Language_extension.is_enabled Overwriting);
         with_explanation (fun () -> unify_exp_types loc env typ (instance ty_expected));
         submode ~loc ~env fields_mode expected_mode;
-        let use = unique_use ~loc ~env fields_mode expected_mode.mode in
+        (* CR zeisbach: manual projection -> may have to change! *)
+        let use = unique_use ~loc ~env fields_mode expected_mode.mode.mode in
         { exp_desc = Texp_hole use;
           exp_loc = loc; exp_extra = [];
           exp_type = ty_expected_explained.ty;
@@ -8146,6 +8176,8 @@ and type_function
        ret_info; fun_alloc_mode;
      }
 
+(* CR zeisbach: maybe this should return the mossing not just the mode?
+   probably not initially though since it is a Value.l *)
 and type_label_access
   : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
     _ * _ * _ * 'rep gen_label_description * _
@@ -8155,8 +8187,9 @@ and type_label_access
   let record =
     with_local_level_if_principal ~post:generalize_structure_exp
       (fun () ->
-         type_expect ~recarg:Allowed env (mode_default mode) srecord
-           (mk_expected (newvar record_jkind)))
+         type_expect ~recarg:Allowed env
+           (mode_default_disallow mode (ref Crossing.Monadic.mod_default))
+           srecord (mk_expected (newvar record_jkind)))
   in
   let ty_exp = record.exp_type in
   let expected_type =
@@ -8937,7 +8970,9 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
      we allow non-values in boxed tuples. *)
   let arity = List.length sexpl in
   assert (arity >= 2);
-  let alloc_mode, argument_mode = register_allocation_value_mode expected_mode.mode in
+  let alloc_mode, argument_mode =
+    (* CR zeisbach: change this projection eventually with better name *)
+    register_allocation_value_mode expected_mode.mode.mode in
   (* CR layouts v5: non-values in tuples *)
   let unify_as_tuple ty_expected =
     let labeled_subtypes =
@@ -8968,7 +9003,11 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     | None ->
         List.init arity (fun _ -> argument_mode)
   in
-  let types_and_modes = List.combine labeled_subtypes argument_modes in
+  (* CR zeisbach: THIS IS A TEMPORARY HACK! the tuple modes should really be mossings,
+     but for now that is not supported so we just bail out for all of them... *)
+  let argument_mossings =
+    List.map (fun mode -> { mode; crossing = ref Crossing.Monadic.min}) argument_modes in
+  let types_and_modes = List.combine labeled_subtypes argument_mossings in
   let overwrites =
     assign_children arity (fun _loc typ mode ->
       let labeled_subtypes = unify_as_tuple typ in
@@ -9001,7 +9040,8 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
   let arity = List.length sexpl in
   assert (arity >= 2);
-  let argument_mode = expected_mode.mode in
+  (* CR zeisbach: another projection note, and maybe this is a hack too...? *)
+  let argument_mode = expected_mode.mode.mode in
   (* elements must be representable *)
   let labels_types_and_sorts =
     List.map (fun (label, _) ->
@@ -9030,8 +9070,11 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     | None ->
         List.init arity (fun _ -> argument_mode)
   in
+  (* CR zeisbach: This is another TEMPORARY HACK *)
+  let argument_mossings =
+    List.map (fun mode -> { mode; crossing = ref Crossing.Monadic.min}) argument_modes in
   let types_sorts_and_modes =
-    List.combine labels_types_and_sorts argument_modes
+    List.combine labels_types_and_sorts argument_mossings
   in
   let expl =
     List.map2
@@ -9155,9 +9198,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
         Submode_failed (e, Constructor lid.txt, None)))
   in
   let expected_mode =
-    { expected_mode with mode =
-      Mode.Value.meet [ expected_mode.mode; constructor_mode ] }
-  in
+    mode_morph (fun m -> Mode.Value.meet [ m; constructor_mode ]) expected_mode in
   let (argument_mode, alloc_mode) =
     match constr.cstr_repr with
     | Variant_unboxed | Variant_with_null -> expected_mode, None
