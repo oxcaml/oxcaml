@@ -1,5 +1,5 @@
 (* This forces ikinds globally on. *)
-(* Clflags.ikinds := true *)
+Clflags.ikinds := true
 
 (* Types.ikind_debug := true *)
 let enable_crossing = true
@@ -40,7 +40,7 @@ let with_origin_tag (tag : string) (f : unit -> 'a) : 'a =
 let __ikind_log_depth = ref 0
 
 let log ?pp (msg : string) (f : unit -> 'a) : 'a =
-  (* Types.ikind_debug := !Clflags.ikinds; *)
+  (*= Types.ikind_debug := !Clflags.ikinds; *)
   if not !Types.ikind_debug
   then f ()
   else
@@ -104,10 +104,9 @@ let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
         |> List.map (fun (ty, info) ->
                let axes = Jkind.With_bounds.type_info_relevant_axes info in
                let mask = Axis_lattice_bits.of_axis_set axes in
-               let mask2 = Axis_lattice_bits.mask_shallow in
                log ~pp:ops.pp_kind "with-bound" (fun () ->
                    let kty = ops.kind_of ty in
-                   ops.modality mask2 (ops.modality mask kty)))
+                   (ops.modality mask kty)))
       in
       ops.join (base :: contribs))
 
@@ -481,20 +480,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
             in
             JK.Ty { args; kind; abstract = false })
     in
-    (* For abstract types, the cached ikind depends on the type_jkind annotation,
-       so we must not reuse it in a different jkind context (e.g. during module
-       inclusion checking). For concrete types (records/variants), the cached
-       ikind is structural and safe to reuse. *)
-    let ikind_safe_to_reuse =
-      match decl.type_kind with
-      | Types.Type_abstract _ -> false
-      | _ -> true
-    in
-    let ikind_to_use =
-      if ikind_safe_to_reuse then decl.type_ikind
-      else Types.No_constructor_ikind "abstract type: jkind context-dependent"
-    in
-    match ikind_to_use with
+    match decl.type_ikind with
     | Types.Constructor_ikind constructor when !Clflags.ikinds ->
       log_call ~pp:string_of_constr_decl
         (fun () ->
