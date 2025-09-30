@@ -1649,6 +1649,13 @@ module Const = struct
         name = "bits64 mod everything"
       }
 
+    let kind_of_idx =
+      { jkind =
+          mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits64 mod everything"
+      }
+
     (* CR or_null: nullability here should be [Maybe_null], but is set
        to [Non_null] for now due to inference limitations. *)
     let vec128 =

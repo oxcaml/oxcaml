@@ -589,7 +589,7 @@ let build_initial_env add_type add_extension empty_env =
          }))
        ~jkind:(
          Jkind.of_builtin ~why:(Primitive ident_idx_imm)
-           Jkind.Const.Builtin.bits64)
+           Jkind.Const.Builtin.kind_of_idx)
        ~type_variance:[Variance.full; Variance.covariant]
        ~type_separability:[Separability.Ind; Separability.Ind]
   |> add_type2 ident_idx_mut
@@ -607,7 +607,7 @@ let build_initial_env add_type add_extension empty_env =
          }))
        ~jkind:(
          Jkind.of_builtin ~why:(Primitive ident_idx_mut)
-           Jkind.Const.Builtin.bits64)
+           Jkind.Const.Builtin.kind_of_idx)
        ~type_variance:[Variance.full; Variance.full]
        ~type_separability:[Separability.Ind; Separability.Ind]
   |> add_type_with_jkind ident_lexing_position
