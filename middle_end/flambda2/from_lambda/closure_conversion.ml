@@ -3823,7 +3823,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       let block_access _pos : P.Block_access_kind.t =
         Values
           { tag = Known Tag.Scannable.zero;
-            size = Known (Target_ocaml_int.of_int size);
+            size = Known (Target_ocaml_int.of_int (Acc.machine_width acc) size);
             field_kind = Any_value
           }
       in
