@@ -803,7 +803,7 @@ type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
     
     Function slots are considered as aliases for this analysis. *)
 let get_all_usages :
-    for_unboxing:bool ->
+    follow_known_arity_calls:bool ->
     Datalog.database ->
     unit Code_id_or_name.Map.t ->
     usages =
@@ -844,10 +844,10 @@ let get_all_usages :
         usages_rel y z ]
       ==> out z )
   in
-  fun ~for_unboxing db s ->
+  fun ~follow_known_arity_calls db s ->
     let db = Datalog.set_table in_tbl s db in
     let rs =
-      if for_unboxing
+      if follow_known_arity_calls
       then [base; for_closures; function_slots]
       else [base; function_slots]
     in
@@ -1462,7 +1462,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
     (* CR ncourant: we should make sure poison is in the consts! *)
     (* We don't need to follow indirect code pointers for usage, since functions
        never appear in value_kinds *)
-    let usages = get_all_usages ~for_unboxing:false db flow_to in
+    let usages = get_all_usages ~follow_known_arity_calls:false db flow_to in
     let fields = get_fields db usages in
     let non_consts =
       Tag.Scannable.Map.map
@@ -1530,7 +1530,7 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db usages name_prefix =
             Some
               (Unboxed
                  (mk_unboxed_fields ~has_to_be_unboxed ~mk db
-                    (get_all_usages ~for_unboxing:true db flow_to)
+                    (get_all_usages ~follow_known_arity_calls:true db flow_to)
                     new_name))
           else if Code_id_or_name.Map.exists
                     (fun k () -> has_to_be_unboxed k)
@@ -1612,7 +1612,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
             mk_unboxed_fields ~has_to_be_unboxed
               ~mk:(fun kind name -> Variable.create name kind)
               db
-              (get_all_usages ~for_unboxing:true db
+              (get_all_usages ~follow_known_arity_calls:true db
                  (Code_id_or_name.Map.singleton to_patch ()))
               new_name
           in
@@ -1659,7 +1659,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
                   }) )
           in
           let uses =
-            get_all_usages ~for_unboxing:false db
+            get_all_usages ~follow_known_arity_calls:false db
               (Code_id_or_name.Map.singleton code_id_or_name ())
           in
           let repr = mk_unboxed_fields ~has_to_be_unboxed ~mk db uses "" in
@@ -1671,7 +1671,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
               ~name ~is_always_immediate:false kind
           in
           let uses =
-            get_all_usages ~for_unboxing:false db
+            get_all_usages ~follow_known_arity_calls:false db
               (List.fold_left
                  (fun acc (_, x) -> Code_id_or_name.Map.add x () acc)
                  Code_id_or_name.Map.empty l)
