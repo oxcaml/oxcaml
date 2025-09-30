@@ -2,6 +2,8 @@
  expect;
 *)
 
+#syntax quotations on
+
 <[ 42 ]>;;
 [%%expect {|
 - : <[ int ]> expr = <[ 42 ]>

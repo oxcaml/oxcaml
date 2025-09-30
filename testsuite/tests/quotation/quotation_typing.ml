@@ -2,6 +2,8 @@
  expect;
 *)
 
+#syntax quotations on
+
 type s0 = <[int]>;;
 [%%expect {|
 type s0 = <[ int ]>
@@ -29,10 +31,10 @@ type ('a, 'b, 'c) s4 = <[ $ ('a) list -> $ ('b) option -> $ ('c) ]> expr
 
 type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
 [%%expect {|
-Line 30, characters 35-37:
-30 | type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
+Line 32, characters 35-37:
+32 | type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
                                         ^^
-Error: Type variable "b" is used at Line 30, characters 35-37
+Error: Type variable "b" is used at Line 32, characters 35-37
        in a context with one layer of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
 |}];;
@@ -49,10 +51,10 @@ type 'a t1 = 'a expr
 
 type 'a t2 = <['a]> expr;;
 [%%expect {|
-Line 50, characters 15-17:
-50 | type 'a t2 = <['a]> expr;;
+Line 52, characters 15-17:
+52 | type 'a t2 = <['a]> expr;;
                     ^^
-Error: Type variable "a" is used at Line 50, characters 15-17
+Error: Type variable "a" is used at Line 52, characters 15-17
        in a context with one layer of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
 |}];;
@@ -84,10 +86,10 @@ Error: Type variable "a" is used at Line 1, characters 26-28
 
 fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
 [%%expect {|
-Line 85, characters 28-30:
-85 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
+Line 87, characters 28-30:
+87 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
                                  ^^
-Error: Type variable "a" is used at Line 85, characters 28-30
+Error: Type variable "a" is used at Line 87, characters 28-30
        in a context with 2 layers of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
 |}];;
