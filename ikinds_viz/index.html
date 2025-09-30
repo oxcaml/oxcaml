@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ikinds dependency graph</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="layout">
+      <section id="viz-container">
+        <div class="controls">
+          <input type="search" id="search" placeholder="Search nodes..." />
+          <button id="zoom-in" title="Zoom in">+</button>
+          <button id="zoom-out" title="Zoom out">−</button>
+          <button id="zoom-reset" title="Reset zoom">⊙</button>
+          <button id="toggle-dark" title="Toggle dark mode">◐</button>
+        </div>
+        <svg id="ikinds-graph" role="img" aria-labelledby="graph-title"></svg>
+        <div id="graph-title" class="sr-only">Dependency graph for ikinds modules</div>
+      </section>
+      <aside id="info-pane">
+        <h1>Ikinds graph explorer</h1>
+        <div id="info-title"></div>
+        <div id="info-body"></div>
+        <div id="dependencies-section">
+          <h3>Uses</h3>
+          <div id="dependencies-list"></div>
+        </div>
+        <div id="dependents-section">
+          <h3>Used by</h3>
+          <div id="dependents-list"></div>
+        </div>
+        <div class="legend">
+          <div class="legend-item">
+            <span class="legend-swatch"></span>
+            <span>Standard dependency edge</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch dashed"></span>
+            <span>Hacky/opaque dependency (Obj.magic, identity env, etc.)</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/elkjs/lib/elk.bundled.js"></script>
+    <script src="graph_data.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
