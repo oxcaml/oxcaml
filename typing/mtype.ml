@@ -515,7 +515,8 @@ and nondep_sig_item env va ids = function
       with Ctype.Nondep_cannot_erase _ as exn ->
         match va with
           Co -> Sig_modtype(id, {mtd_type=None; mtd_loc=Location.none;
-                                 mtd_attributes=[]; mtd_uid = d.mtd_uid}, vis)
+                                 mtd_attributes=[]; mtd_uid = d.mtd_uid;
+                                 mtd_discourse=Discourse_types.empty}, vis)
         | _  -> raise exn
       end
   | Sig_class(id, d, rs, vis) ->

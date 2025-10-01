@@ -355,6 +355,7 @@ type type_declaration =
     type_unboxed_default: bool;
     type_uid: Uid.t;
     type_unboxed_version : type_declaration option;
+    type_discourse: Discourse_types.t;
  }
 
 and type_decl_kind =
@@ -448,6 +449,7 @@ and constructor_declaration =
     cd_loc: Location.t;
     cd_attributes: Parsetree.attributes;
     cd_uid: Uid.t;
+    cd_discourse: Discourse_types.t;
   }
 
 and constructor_argument =
@@ -500,6 +502,7 @@ type class_declaration =
     cty_loc: Location.t;
     cty_attributes: Parsetree.attributes;
     cty_uid: Uid.t;
+    cty_discourse: Discourse_types.t;
  }
 
 type class_type_declaration =
@@ -511,6 +514,7 @@ type class_type_declaration =
     clty_loc: Location.t;
     clty_attributes: Parsetree.attributes;
     clty_uid: Uid.t;
+    clty_discourse: Discourse_types.t;
   }
 
 (* Type expressions for the module language *)
@@ -558,6 +562,7 @@ module type Wrapped = sig
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
       val_uid: Uid.t;
+      val_discourse: Discourse_types.t;
     }
 
   type module_type =
@@ -591,6 +596,7 @@ module type Wrapped = sig
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
+    md_discourse: Discourse_types.t;
   }
 
   and modtype_declaration =
@@ -599,6 +605,7 @@ module type Wrapped = sig
     mtd_attributes: Parsetree.attributes;
     mtd_loc: Location.t;
     mtd_uid: Uid.t;
+    mtd_discourse: Discourse_types.t;
   }
 
   val sort_of_signature_item :
@@ -659,7 +666,7 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       | Named (id,mty,mm) -> To.Named (id, module_type m mty,mm)
 
   let value_description m {val_type; val_modalities; val_kind; val_zero_alloc;
-                           val_attributes; val_loc; val_uid} =
+                           val_attributes; val_loc; val_uid; val_discourse} =
     To.{
       val_type = m.map_type_expr m val_type;
       val_modalities;
@@ -667,25 +674,29 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       val_zero_alloc;
       val_attributes;
       val_loc;
-      val_uid
+      val_uid;
+      val_discourse;
     }
 
   let module_declaration m {md_type; md_modalities; md_attributes;
-    md_loc; md_uid} =
+    md_loc; md_uid; md_discourse} =
     To.{
       md_type = module_type m md_type;
       md_modalities;
       md_attributes;
       md_loc;
       md_uid;
+      md_discourse;
     }
 
-  let modtype_declaration m {mtd_type; mtd_attributes; mtd_loc; mtd_uid} =
+  let modtype_declaration m
+    {mtd_type; mtd_attributes; mtd_loc; mtd_uid;mtd_discourse} =
     To.{
       mtd_type = Option.map (module_type m) mtd_type;
       mtd_attributes;
       mtd_loc;
       mtd_uid;
+      mtd_discourse;
     }
 
   let signature_item m = function
@@ -731,6 +742,7 @@ type constructor_description =
     cstr_attributes: Parsetree.attributes;
     cstr_inlined: type_declaration option;
     cstr_uid: Uid.t;
+    cstr_discourse: Discourse_types.t;
    }
 
 let equal_tag t1 t2 =
@@ -879,6 +891,7 @@ type 'a gen_label_description =
     lbl_loc: Location.t;
     lbl_attributes: Parsetree.attributes;
     lbl_uid: Uid.t;
+    lbl_discourse: Discourse_types.t;
   }
 
 type label_description = record_representation gen_label_description

@@ -2590,6 +2590,7 @@ let dummy =
     type_unboxed_default = false;
     type_uid = Uid.internal_not_actually_unique;
     type_unboxed_version = None;
+    type_discourse = Discourse_types.empty;
   }
 
 (** we hide items being defined from short-path to avoid shortening

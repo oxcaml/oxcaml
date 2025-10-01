@@ -1021,7 +1021,8 @@ let scrape_alias =
 
 let md md_type =
   {md_type; md_modalities = Mode.Modality.undefined; md_attributes=[];
-   md_loc=Location.none; md_uid = Uid.internal_not_actually_unique}
+   md_loc=Location.none; md_uid = Uid.internal_not_actually_unique;
+   md_discourse = Discourse_types.empty;}
 
 (** The caller is not interested in modes, and thus [val_modalities] is
 invalidated. *)
@@ -1207,6 +1208,7 @@ let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
       md_loc = Location.none;
       md_attributes = [];
       md_uid = uid;
+      md_discourse = Discourse_types.empty;
     }
   in
   let mda_address = Lazy_backtrack.create_forced addr in
@@ -1573,6 +1575,7 @@ and find_type_unboxed_version path env seen =
       type_unboxed_default = false;
       type_uid = Uid.unboxed_version decl.type_uid;
       type_unboxed_version = None;
+      type_discourse = Discourse_types.empty;
     }
 (* CR layouts v7.2: this should be reworked to expand abbrevations, e.g.
    in [type 'a id = 'a and f = float id], [f] can have an unboxed type.
@@ -2848,7 +2851,8 @@ let add_module_lazy ~update_summary id presence mty ?mode env =
                        md_modalities = Mode.Modality.undefined;
                        md_attributes = [];
                        md_loc = Location.none;
-                       md_uid = Uid.internal_not_actually_unique}
+                       md_uid = Uid.internal_not_actually_unique;
+                       md_discourse = Discourse_types.empty}
   in
   add_module_declaration_lazy ~update_summary ~check:false id presence md ?mode
     env

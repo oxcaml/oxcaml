@@ -157,6 +157,8 @@ COMPILERLIBS_SOURCES=\
   typing/typedecl.ml \
   typing/mtype.ml \
   typing/shape_reduce.ml \
+  typing/discourse_types.ml \
+  typing/discourse.ml \
   typing/type_shape.ml \
   typing/typedtree.ml \
   lambda/debuginfo.ml \
