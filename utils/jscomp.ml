@@ -21,9 +21,8 @@ let run_jsoo_exn ~args =
     | { Sys.extra = Some (Plus, "ox"); _ } ->
         Filename.concat Config.bindir "js_of_oxcaml"
     | _ ->
-        let exe_dir = Filename.dirname Sys.executable_name in
-        let jsoo_path = Filename.concat exe_dir "js_of_ocaml" in
-        if Sys.file_exists jsoo_path then jsoo_path else "js_of_ocaml"
+      (* during bootstrapping, js_of_oxcaml is put into our PATH by dune *)
+      "js_of_oxcaml"
   in
   let cmdline = Filename.quote_command prog args in
   match Ccomp.command cmdline with

@@ -225,131 +225,6 @@ let emit_js info (js_program : Jsoo_imports.Js_backend.program) =
            @ debug_flag
            @ List.rev !Clflags.all_ccopts))
 
-let native_implementation_aux ~machine_width unix ~(flambda2 : flambda2)
-      ~start_from ~source_file ~output_prefix ~keep_symbol_tables
-      ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
-  let pipeline : Asmgen.pipeline =
-    Direct_to_cmm (flambda2 ~machine_width ~keep_symbol_tables)
-  in
-  with_info ~source_file ~output_prefix ~dump_ext:"cmx" ~compilation_unit
-    ~kind:Impl
-  @@ fun info ->
-  if !Oxcaml_flags.internal_assembler then
-    Emitaux.binary_backend_available := true;
-  match start_from with
-  | Parsing ->
-    let backend info ({ structure; coercion; argument_interface; _ }
-                      : Typedtree.implementation) =
-      Compilenv.reset info.target;
-      let argument_coercion =
-        match argument_interface with
-        | Some { ai_coercion_from_primary; ai_signature = _ } ->
-            Some ai_coercion_from_primary
-        | None -> None
-      in
-      let typed = structure, coercion, argument_coercion in
-      let as_arg_for =
-        !Clflags.as_argument_for
-        |> Option.map Global_module.Parameter_name.of_string
-      in
-      if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-      compile_from_typed info typed ~unix ~pipeline ~as_arg_for
-    in
-    Compile_common.implementation
-      ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
-      ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
-        Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
-      info ~backend
-  | Emit -> emit unix info ~ppf_dump:info.ppf_dump
-  | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
-    Compilenv.reset info.target;
-    begin
-      match !Clflags.as_argument_for with
-      | Some _ ->
-        (* CR lmaurer: Needs nicer error message (this is a user error) *)
-        Misc.fatal_error
-          "-as-argument-for is not allowed (and not needed) with -instantiate"
-      | None -> ()
-    end;
-    let as_arg_for, arg_block_idx =
-      match (arg_descr : Lambda.arg_descr option) with
-      | Some { arg_param; arg_block_idx } -> Some arg_param, Some arg_block_idx
-      | None -> None, None
-    in
-    let impl =
-      Translmod.transl_instance info.module_name ~runtime_args
-        ~main_module_block_size ~arg_block_idx
-    in
-    if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-    compile_from_raw_lambda info impl ~unix ~pipeline ~as_arg_for
-
-let js_implementation_aux unix ~(lambda_to_jsir : lambda_to_jsir) ~start_from
-      ~source_file ~output_prefix ~keep_symbol_tables:(_ : bool)
-      ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
-  let module _ = (val unix : Compiler_owee.Unix_intf.S) in
-  let dump_ext = "cmjo" in
-  with_js_info ~source_file ~output_prefix ~dump_ext ~compilation_unit
-    ~kind:Impl
-  @@ fun info ->
-  match start_from with
-  | Emit ->
-      Misc.fatal_error "-stop-after Emit is not supported for the JavaScript backend"
-  | Parsing ->
-      let backend info (typed : Typedtree.implementation) =
-        Compilenv.reset info.target;
-        let as_arg_for =
-          !Clflags.as_argument_for
-          |> Option.map Global_module.Parameter_name.of_string
-        in
-        let result =
-          js_of_typedtree info typed ~lambda_to_jsir ~as_arg_for
-        in
-        emit_js info result.js_program;
-        Compilenv.save_unit_info
-          (Unit_info.Artifact.filename (Unit_info.cmjx info.target))
-          ~main_module_block_format:result.main_module_block_format
-          ~arg_descr:result.arg_descr;
-        Warnings.check_fatal ()
-      in
-      Compile_common.implementation
-        ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
-        ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
-          Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
-        info ~backend
-  | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
-      Compilenv.reset info.target;
-      begin
-        match !Clflags.as_argument_for with
-        | Some _ ->
-          Misc.fatal_error
-            "-as-argument-for is not allowed (and not needed) with -instantiate"
-        | None -> ()
-      end;
-      let as_arg_for, arg_block_idx =
-        match (arg_descr : Lambda.arg_descr option) with
-        | Some { arg_param; arg_block_idx } ->
-            (Some arg_param, Some arg_block_idx)
-        | None -> (None, None)
-      in
-      let raw_lambda =
-        Translmod.transl_instance info.module_name ~runtime_args
-          ~main_module_block_size ~arg_block_idx
-      in
-      let result =
-        js_of_raw_lambda info raw_lambda ~lambda_to_jsir ~as_arg_for
-      in
-      emit_js info result.js_program;
-      let arg_descr_to_save =
-        match arg_descr with
-        | Some arg_descr -> Some arg_descr
-        | None -> result.arg_descr
-      in
-      Compilenv.save_unit_info
-        (Unit_info.Artifact.filename (Unit_info.cmjx info.target))
-        ~main_module_block_format:result.main_module_block_format
-        ~arg_descr:arg_descr_to_save;
-      Warnings.check_fatal ()
-
 let implementation_aux ~machine_width unix ~(flambda2 : flambda2)
       ~(lambda_to_jsir : lambda_to_jsir) ~start_from
       ~source_file ~output_prefix ~keep_symbol_tables
@@ -359,13 +234,110 @@ let implementation_aux ~machine_width unix ~(flambda2 : flambda2)
     | Some Clflags.Backend.Js_of_ocaml -> `Js
     | _ -> `Native
   in
-  match backend with
-  | `Native ->
-      native_implementation_aux ~machine_width unix ~flambda2 ~start_from
-        ~source_file ~output_prefix ~keep_symbol_tables ~compilation_unit
-  | `Js ->
-      js_implementation_aux unix ~lambda_to_jsir ~start_from ~source_file
-        ~output_prefix ~keep_symbol_tables ~compilation_unit
+  let with_backend_info, dump_ext =
+    match backend with
+    | `Native -> with_info, "cmx"
+    | `Js -> with_js_info, "cmjo"
+  in
+  with_backend_info ~source_file ~output_prefix ~dump_ext ~compilation_unit
+    ~kind:Impl
+  @@ fun info ->
+  (match backend with
+  | `Native when !Oxcaml_flags.internal_assembler ->
+      Emitaux.binary_backend_available := true
+  | _ -> ());
+  let compile_parsing info (typed : Typedtree.implementation) =
+    Compilenv.reset info.target;
+    let as_arg_for =
+      !Clflags.as_argument_for
+      |> Option.map Global_module.Parameter_name.of_string
+    in
+    match backend with
+    | `Native ->
+        let { Typedtree.structure; coercion; argument_interface; _ } = typed in
+        let argument_coercion =
+          match argument_interface with
+          | Some { ai_coercion_from_primary; ai_signature = _ } ->
+              Some ai_coercion_from_primary
+          | None -> None
+        in
+        let typed = structure, coercion, argument_coercion in
+        if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
+        let pipeline : Asmgen.pipeline =
+          Direct_to_cmm (flambda2 ~machine_width ~keep_symbol_tables)
+        in
+        compile_from_typed info typed ~unix ~pipeline ~as_arg_for
+    | `Js ->
+        let result = js_of_typedtree info typed ~lambda_to_jsir ~as_arg_for in
+        emit_js info result.js_program;
+        Compilenv.save_unit_info
+          (Unit_info.Artifact.filename (Unit_info.cmjx info.target))
+          ~main_module_block_format:result.main_module_block_format
+          ~arg_descr:result.arg_descr;
+        Warnings.check_fatal ()
+  in
+  let instantiate info ~runtime_args ~main_module_block_size ~arg_descr =
+    Compilenv.reset info.target;
+    begin
+      match !Clflags.as_argument_for with
+      | Some _ ->
+          (* CR lmaurer: Needs nicer error message (this is a user error) *)
+          Misc.fatal_error
+            "-as-argument-for is not allowed (and not needed) with -instantiate"
+      | None -> ()
+    end;
+    let as_arg_for, arg_block_idx =
+      match (arg_descr : Lambda.arg_descr option) with
+      | Some { arg_param; arg_block_idx } -> Some arg_param, Some arg_block_idx
+      | None -> None, None
+    in
+    match backend with
+    | `Native ->
+        let impl =
+          Translmod.transl_instance info.module_name ~runtime_args
+            ~main_module_block_size ~arg_block_idx
+        in
+        if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
+        let pipeline : Asmgen.pipeline =
+          Direct_to_cmm (flambda2 ~machine_width ~keep_symbol_tables)
+        in
+        compile_from_raw_lambda info impl ~unix ~pipeline ~as_arg_for
+    | `Js ->
+        let raw_lambda =
+          Translmod.transl_instance info.module_name ~runtime_args
+            ~main_module_block_size ~arg_block_idx
+        in
+        let result =
+          js_of_raw_lambda info raw_lambda ~lambda_to_jsir ~as_arg_for
+        in
+        emit_js info result.js_program;
+        let arg_descr_to_save =
+          match arg_descr with
+          | Some arg_descr -> Some arg_descr
+          | None -> result.arg_descr
+        in
+        Compilenv.save_unit_info
+          (Unit_info.Artifact.filename (Unit_info.cmjx info.target))
+          ~main_module_block_format:result.main_module_block_format
+          ~arg_descr:arg_descr_to_save;
+        Warnings.check_fatal ()
+  in
+  match start_from with
+  | Parsing ->
+      Compile_common.implementation
+        ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
+        ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
+          Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
+        info ~backend:compile_parsing
+  | Emit ->
+      begin match backend with
+      | `Native -> emit unix info ~ppf_dump:info.ppf_dump
+      | `Js ->
+          Misc.fatal_error
+            "-stop-after Emit is not supported for the JavaScript backend"
+      end
+  | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
+      instantiate info ~runtime_args ~main_module_block_size ~arg_descr
 
 let implementation ~machine_width unix ~flambda2 ~lambda_to_jsir ~start_from
       ~source_file ~output_prefix ~keep_symbol_tables =
