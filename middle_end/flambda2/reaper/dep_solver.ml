@@ -1990,9 +1990,7 @@ module Rewriter = struct
   let rewrite (db, usages) typing_env flambda_type =
     let open Flambda2_types.Rewriter in
     let[@local] forget_type () =
-      Rule.rewrite
-        (Pattern.var (Var.create ()) (db, Any_usage))
-        (Expr.unknown (Flambda2_types.kind flambda_type))
+      Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
     in
     Format.eprintf "REWRITE usages = %a@." print_t0 usages;
     if match usages with
