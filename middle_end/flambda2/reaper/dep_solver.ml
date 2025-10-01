@@ -800,6 +800,13 @@ type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
     Sets are represented as unit maps for convenience with datalog.
     Usages is represented as a set of variables: those are the variables
     where the input variables flow with live accessor.
+
+    [follow_known_arity_calls] specifies that if the set of variables
+    corresponds to a closure that is called by an known arity call, we
+    should look at the [my_closure] value of the corresponding code_id as well.
+    This is only necessary if the set of variables can correspond to a closure
+    *and* the set of variables contains variables that are not the allocation
+    point of the set of closures.
     
     Function slots are considered as aliases for this analysis. *)
 let get_all_usages :
@@ -1078,7 +1085,9 @@ let datalog_rules =
        coderel call_witness; any_usage_pred indirect_call_witness; filter_field
        is_code_field coderel ] ==> field_of_constructor_is_used base
        relation); *)
-    (* XXX ncourant: reenable *)
+    (* CR ncourant: should this be reenabled? I think this is no longer
+       necessary because we remove unused arguments of continuations, including
+       return continuations. *)
     (* If any usage is possible, do not change the representation. Note that
        this rule will change in the future, when local value slots are properly
        tracked: a closure will only local value slots that has any_use will
@@ -1199,12 +1208,10 @@ let datalog_rules =
        cannot_change_witness_calling_convention call_witness ]
      ==> cannot_change_calling_convention code_id);
     (* CR ncourant: we're preventing changing the calling convention of
-       functions called with Indirect_unknown_arity. The two commented rules
-       below could allow to transform some Indirect_unknown_arity calls to
-       direct calls and not taking them into account here, but this would
-       require wrappers for over- and partial applications, as well as
-       untupling. As these wrappers are complex to write correctly, this is not
-       done yet. *)
+       functions called with Indirect_unknown_arity. We could still allow
+       changing the calling convention, but this would require wrappers for
+       over- and partial applications, as well as untupling. As these wrappers
+       are complex to write correctly, this is not done yet. *)
     (let$ [call_witness; codeid; set_of_closures] =
        ["call_witness"; "codeid"; "set_of_closures"]
      in
@@ -1223,22 +1230,6 @@ let datalog_rules =
        usages_rel call_witness _v;
        constructor_rel call_witness (fld Code_id_of_call_witness) codeid ]
      ==> cannot_change_calling_convention codeid);
-    (* (let$ [set_of_closures; coderel; indirect_call_witness; indirect1;
-       indirect2] = [ "set_of_closures"; "coderel"; "indirect_call_witness";
-       "indirect1"; "indirect2" ] in [ rev_accessor_rel set_of_closures coderel
-       indirect_call_witness; filter_field is_code_field coderel; any_usage_pred
-       indirect_call_witness; sources_rel indirect_call_witness indirect1;
-       sources_rel indirect_call_witness indirect2; distinct indirect1 indirect2
-       ] ==> cannot_change_calling_convention indirect1); *)
-    (* CR ncourant: we need to either check this is a total application or
-       introduce wrappers when rebuilding *)
-    (* (let$ [set_of_closures; coderel; calls_not_pure_witness; indirect] =
-       ["set_of_closures"; "coderel"; "calls_not_pure_witness"; "indirect"] in [
-       rev_accessor_rel set_of_closures coderel calls_not_pure_witness;
-       filter_field is_code_field coderel; any_usage_pred
-       calls_not_pure_witness; any_source_pred calls_not_pure_witness; alias_rel
-       calls_not_pure_witness indirect ] ==> cannot_change_calling_convention
-       indirect); *)
     (* CR-someday ncourant: we completely prevent changing the representation of
        symbols. While allowing them to be unboxed is difficult, due to symbols
        being always values, we could at least change their representation. This
@@ -1347,7 +1338,7 @@ let datalog_rules =
        (Unknown_arity_code_pointer, _) -> true | Param
        (Known_arity_code_pointer, _) -> false) [relation] ] ==> cannot_unbox0
        allocation_id); *)
-    (* XXX ncourant: restore this*)
+    (* CR ncourant: I'm not sure this is useful? *)
     (* An allocation that is stored in another can only be unboxed if either the
        representation of the other allocation can be changed, of it the field it
        is stored in is never read, as in that case a poison value will be stored
@@ -1358,8 +1349,6 @@ let datalog_rules =
      [ sources_rel alias allocation_id;
        rev_constructor_rel alias relation to_;
        field_of_constructor_is_used to_ relation;
-       filter_field real_field relation;
-       (* ^ XXX check *)
        cannot_change_representation to_;
        cannot_unbox0 to_ ]
      ==> cannot_unbox0 allocation_id);
@@ -1759,28 +1748,28 @@ let cannot_change_calling_convention uses v =
 let unknown_code_id_actually_directly_called_query =
   let open Syntax in
   let open! Global_flow_graph in
-  mk_exists_query ["set_of_closures"] ["indirect_call_witness"]
-    (fun [set_of_closures] [indirect_call_witness] ->
+  mk_exists_query ["set_of_closures"] ["known_arity_call_witness"]
+    (fun [set_of_closures] [known_arity_call_witness] ->
       [ rev_accessor_rel set_of_closures
           (Term.constant
              (Field.encode (Code_of_closure Known_arity_code_pointer)))
-          indirect_call_witness;
-        any_source_pred indirect_call_witness ])
+          known_arity_call_witness;
+        any_source_pred known_arity_call_witness ])
 
 let code_id_actually_directly_called_query =
   let open Syntax in
   let open! Global_flow_graph in
   compile [] (fun [] ->
       with_parameters ["set_of_closures"] (fun [set_of_closures] ->
-          foreach ["call_witness"; "indirect"; "codeid"]
-            (fun [call_witness; indirect; codeid] ->
+          foreach ["apply_widget"; "call_witness"; "codeid"]
+            (fun [apply_widget; call_witness; codeid] ->
               where
                 [ rev_accessor_rel set_of_closures
                     (Term.constant
                        (Field.encode (Code_of_closure Known_arity_code_pointer)))
-                    call_witness;
-                  sources_rel call_witness indirect;
-                  constructor_rel indirect
+                    apply_widget;
+                  sources_rel apply_widget call_witness;
+                  constructor_rel call_witness
                     (Term.constant (Field.encode Code_id_of_call_witness))
                     codeid ]
                 (yield [codeid]))))
