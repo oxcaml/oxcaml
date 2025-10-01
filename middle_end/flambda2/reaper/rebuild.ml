@@ -912,7 +912,9 @@ let decide_whether_apply_needs_calling_convention_change env apply =
           else
             match env.should_preserve_direct_calls with
             | Yes -> call_kind
-            | No -> Call_kind.indirect_function_call_known_arity ~code_ids:Unknown alloc_mode
+            | No ->
+              Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
+                alloc_mode
             | Auto ->
               (* In [auto] mode, the direct call is preserved if and only if we
                  cannot identify which set of code_ids can be called. Since this
