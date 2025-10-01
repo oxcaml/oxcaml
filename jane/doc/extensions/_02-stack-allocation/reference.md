@@ -872,7 +872,7 @@ making all of `a`,`b` and `c` local if any of `x`, `y` and `z` are.
 ## Primitive declarations
 ### Mode polymorphism
 
-A limited form of mode polymorphism is available for primivites, defined
+A limited form of mode polymorphism is available for primitives, defined
 with `external`.
 
 In the interface for the stdlib (and as re-exported by Base), this feature is
