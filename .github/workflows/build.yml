@@ -401,7 +401,7 @@ jobs:
         fi
 
     - name: Upload test diffs
-      if: env.DIFF_CREATED == 'true'
+      if: failure() && env.DIFF_CREATED == 'true'
       uses: actions/upload-artifact@v4
       continue-on-error: true
       with:
@@ -409,7 +409,7 @@ jobs:
         path: ${{ github.workspace }}/test-diffs.patch
 
     - name: Print diff artifact URL
-      if: env.DIFF_CREATED == 'true'
+      if: failure() && env.DIFF_CREATED == 'true'
       continue-on-error: true
       run: |
         echo "./tools/apply-diff.sh https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}"
