@@ -256,6 +256,22 @@ jobs:
         OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
         USE_RUNTIME: ${{ matrix.use_runtime }}
 
+    - name: Promote failed tests and capture diffs
+      working-directory: oxcaml
+      if: failure() && matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
+      continue-on-error: true
+      run: |
+        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+        make promote-failed
+        if ! git diff --quiet; then
+          git diff > $GITHUB_WORKSPACE/test-diffs.patch
+          echo "Test output differences detected and saved to artifact"
+          echo "DIFF_CREATED=true" >> $GITHUB_ENV
+        else
+          echo "No test output differences found"
+          echo "DIFF_CREATED=false" >> $GITHUB_ENV
+        fi
+
     - name: Install custom OxCaml LLVM
       if: matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
       run: |
@@ -287,6 +303,22 @@ jobs:
       env:
         OXCAML_LLDB: ${{ github.workspace }}/oxcaml-llvm/bin/lldb
 
+    - name: Promote failed DWARF tests and capture diffs
+      working-directory: oxcaml
+      if: failure() && matrix.dwarf_tests_only == true
+      continue-on-error: true
+      run: |
+        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+        make promote
+        if ! git diff --quiet; then
+          git diff > $GITHUB_WORKSPACE/test-diffs.patch
+          echo "Test output differences detected and saved to artifact"
+          echo "DIFF_CREATED=true" >> $GITHUB_ENV
+        else
+          echo "No test output differences found"
+          echo "DIFF_CREATED=false" >> $GITHUB_ENV
+        fi
+
     - name: Build and test OxCaml Llvmize
       if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
       run: |
@@ -294,6 +326,48 @@ jobs:
         make runtest-llvmize
       env:
         OXCAML_CLANG: ${{ github.workspace }}/oxcaml-llvm/bin/clang
+
+    - name: Promote failed llvmize tests and capture diffs
+      working-directory: oxcaml
+      if: failure() && matrix.llvmize_tests_only == true
+      continue-on-error: true
+      run: |
+        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+        make promote
+        if ! git diff --quiet; then
+          git diff > $GITHUB_WORKSPACE/test-diffs.patch
+          echo "Test output differences detected and saved to artifact"
+          echo "DIFF_CREATED=true" >> $GITHUB_ENV
+        else
+          echo "No test output differences found"
+          echo "DIFF_CREATED=false" >> $GITHUB_ENV
+        fi
+
+    - name: Upload test diffs
+      if: failure() && env.DIFF_CREATED == 'true'
+      uses: actions/upload-artifact@v4
+      continue-on-error: true
+      with:
+        name: test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
+        path: ${{ github.workspace }}/test-diffs.patch
+
+    - name: Print diff artifact URL
+      if: failure() && env.DIFF_CREATED == 'true'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        ARTIFACT_NAME="test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}"
+        # Wait a moment for artifact to be registered
+        sleep 5
+        # Get artifact URL from GitHub API
+        ARTIFACT_URL=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+          --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .archive_download_url")
+        if [ -n "$ARTIFACT_URL" ]; then
+          echo "./tools/apply-diff.sh $ARTIFACT_URL"
+        else
+          echo "Artifact uploaded but URL not yet available. Check: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        fi
 
     - name: Check other architectures
       if: matrix.check_arch == true
