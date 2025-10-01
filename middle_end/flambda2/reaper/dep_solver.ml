@@ -781,10 +781,9 @@ let exists_with_parameters cursor params db =
 
 let mk_exists_query params existentials f =
   Datalog.(
-    compile [] (fun [] ->
-        with_parameters params (fun params ->
-            foreach existentials (fun existentials ->
-                where (f params existentials) (yield [])))))
+    compile_with_parameters params [] (fun params [] ->
+        foreach existentials (fun existentials ->
+            where (f params existentials) (yield []))))
 
 let is_function_slot : Field.t -> _ = function[@ocaml.warning "-4"]
   | Function_slot _ -> true
@@ -807,7 +806,7 @@ type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
     This is only necessary if the set of variables can correspond to a closure
     *and* the set of variables contains variables that are not the allocation
     point of the set of closures.
-    
+
     The reason for this is that for a given closure that is called, the
     [usages] do not usually include the uses of the closure inside the code of
     the closure itself. However, when we allocate a set of closures, we include
@@ -931,13 +930,12 @@ let get_set_of_closures_def :
     Datalog.database -> Code_id_or_name.t -> set_of_closures_def =
   let q =
     Datalog.(
-      compile [] (fun [] ->
-          with_parameters ["x"] (fun [x] ->
-              foreach ["field"; "y"] (fun [field; y] ->
-                  where
-                    [ Global_flow_graph.constructor_rel x field y;
-                      filter_field is_function_slot field ]
-                    (yield [field; y])))))
+      compile_with_parameters ["x"] [] (fun [x] [] ->
+          foreach ["field"; "y"] (fun [field; y] ->
+              where
+                [ Global_flow_graph.constructor_rel x field y;
+                  filter_field is_function_slot field ]
+                (yield [field; y]))))
   in
   fun db v ->
     let l =
@@ -1767,20 +1765,19 @@ let unknown_code_id_actually_directly_called_query =
 let code_id_actually_directly_called_query =
   let open Syntax in
   let open! Global_flow_graph in
-  compile [] (fun [] ->
-      with_parameters ["set_of_closures"] (fun [set_of_closures] ->
-          foreach ["apply_widget"; "call_witness"; "codeid"]
-            (fun [apply_widget; call_witness; codeid] ->
-              where
-                [ rev_accessor_rel set_of_closures
-                    (Term.constant
-                       (Field.encode (Code_of_closure Known_arity_code_pointer)))
-                    apply_widget;
-                  sources_rel apply_widget call_witness;
-                  constructor_rel call_witness
-                    (Term.constant (Field.encode Code_id_of_call_witness))
-                    codeid ]
-                (yield [codeid]))))
+  compile_with_parameters ["set_of_closures"] [] (fun [set_of_closures] [] ->
+      foreach ["apply_widget"; "call_witness"; "codeid"]
+        (fun [apply_widget; call_witness; codeid] ->
+          where
+            [ rev_accessor_rel set_of_closures
+                (Term.constant
+                   (Field.encode (Code_of_closure Known_arity_code_pointer)))
+                apply_widget;
+              sources_rel apply_widget call_witness;
+              constructor_rel call_witness
+                (Term.constant (Field.encode Code_id_of_call_witness))
+                codeid ]
+            (yield [codeid])))
 
 let code_id_actually_directly_called uses v =
   if exists_with_parameters unknown_code_id_actually_directly_called_query

@@ -81,17 +81,20 @@ let rec add_parameters : type a. a String.hlist -> a Parameter.hlist = function
   | [] -> []
   | name :: names -> Parameter.create name :: add_parameters names
 
-let with_parameters params f info =
-  let [] = info.parameters in
-  let parameters = add_parameters params in
-  f (Term.parameters parameters) { info with parameters }
+let compile_with_parameters0 parameters f =
+  let parameters = add_parameters parameters in
+  let info = { context = Cursor.create_context (); parameters } in
+  f (Term.parameters parameters) info
 
 let foreach vars f info =
   let variables = add_variables info.context vars in
   f variables info
 
-let compile xs f =
-  foreach xs f { context = Cursor.create_context (); parameters = [] }
+let compile_with_parameters parameters vars f =
+  compile_with_parameters0 parameters (fun ps ->
+      foreach vars (fun vs -> f ps vs))
+
+let compile xs f = compile_with_parameters [] xs (fun [] xs -> f xs)
 
 let bind_iterator actions var iterator =
   Cursor.add_action actions (Cursor.bind_iterator var iterator)

@@ -45,8 +45,11 @@ val map_program : ('p, 'a) program -> ('a -> 'b) -> ('p, 'b) program
 
 val compile : 'v String.hlist -> ('v Term.hlist -> (nil, 'a) program) -> 'a
 
-val with_parameters :
-  'p String.hlist -> ('p Term.hlist -> ('p, 'a) program) -> (nil, 'a) program
+val compile_with_parameters :
+  'p String.hlist ->
+  'v String.hlist ->
+  ('p Term.hlist -> 'v Term.hlist -> ('p, 'a) program) ->
+  'a
 
 val foreach :
   'a String.hlist -> ('a Term.hlist -> ('p, 'b) program) -> ('p, 'b) program
