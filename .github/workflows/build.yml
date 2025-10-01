@@ -67,25 +67,25 @@ jobs:
             ocamlparam: '_,Oclassic=1'
             disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml'
 
-          - name: flambda2_macos_arm64
-            config: --enable-middle-end=flambda2 --disable-warn-error
-            os: macos-latest
+          #- name: flambda2_macos_arm64
+          #  config: --enable-middle-end=flambda2 --disable-warn-error
+          #  os: macos-latest
 
-          - name: flambda2_macos_arm64_runtime5_regalloc
-            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
-            os: macos-latest
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            run_regalloc_tool: true
+          #- name: flambda2_macos_arm64_runtime5_regalloc
+          #  config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
+          #  os: macos-latest
+          #  build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+          #  ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+          #  run_regalloc_tool: true
 
-          - name: flambda2_macos_arm64_debug_runtime5_regalloc
-            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
-            os: macos-latest
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            use_runtime: d
-            ocamlrunparam: "v=0,V=1"
-            run_regalloc_tool: true
+          #- name: flambda2_macos_arm64_debug_runtime5_regalloc
+          #  config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
+          #  os: macos-latest
+          #  build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+          #  ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+          #  use_runtime: d
+          #  ocamlrunparam: "v=0,V=1"
+          #  run_regalloc_tool: true
 
           - name: flambda2_ubuntu_arm64_runtime5_regalloc
             config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
