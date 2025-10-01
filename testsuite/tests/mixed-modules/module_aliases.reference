@@ -1,4 +1,4 @@
 Test: Based on pr11186.ml
-4. Hello
+1 2 3 Hello world!
 Test: Coercion with aliases, modules, and vals
-2. 3. 4. 5.
+0 1 2 3

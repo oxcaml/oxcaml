@@ -17,24 +17,35 @@ let _ = print_endline "Test: Based on pr11186.ml"
 
 module M_1 =
   (((struct
-       module N = struct let x = #4.0 let s = "Hello" end
+       let y = #(#2.0, "world!", #3.0)
+       module N = struct let x = #1.0 let s = "Hello" let y = #0.0 end
        module A = N
+       let z = #(#5.0, "don't print", #6.0)
        module B = A
        module C = B
      end : sig
        module A : sig val x : float# val s : string end
+       val y : #(float# * string * float#)
        module B = A
        module C = B
+       val z : #(float# * string * float#)
      end) : sig
-      module B : sig val x : float# val s : string end
+      module B : sig val s : string val x : float# end
       module C = B
+      val y : #(float# * string * float#)
     end) : sig
+     val y : #(float# * string * float#)
      module C : sig val x : float# val s : string end
    end)
 
-let _ = print_float (Float_u.to_float (id M_1.C.x))
-let _ = print_string " "
-let _ = print_endline (id M_1.C.s)
+let () =
+  let #(f2, world, f3) = id M_1.y in
+  Printf.printf "%.0f %.0f %.0f %s %s\n"
+    (Float_u.to_float (id M_1.C.x))
+    (Float_u.to_float f2)
+    (Float_u.to_float f3)
+    (id M_1.C.s)
+    world
 
 
 let _ = print_endline "Test: Coercion with aliases, modules, and vals"
@@ -57,26 +68,24 @@ module type S_2 = sig
 end
 
 module M_2 : S_2 = struct
-  let foo_1 = #1.0
+  let foo_1 = #10.0
   let foo_2 = "Hello, world"
   module Inner = struct
-    let inner_1 = #2.0
+    let inner_1 = #0.0
     let inner_2 = "Hello, world!"
     module Inner_inner = struct
-      let inner_inner_1 = #3.0
+      let inner_inner_1 = #1.0
       let inner_inner_2 = "Hello, world!!"
-      let inner_inner_3 = #4.0
+      let inner_inner_3 = #2.0
     end
   end
-  let foo_3 = #5.0
+  let foo_3 = #3.0
   module Other_inner = Inner.Inner_inner
 end
 
-let _ = print_float (Float_u.to_float (id M_2.Inner.inner_1))
-let _ = print_string " "
-let _ = print_float (Float_u.to_float (id M_2.Inner.Inner_inner.inner_inner_1))
-let _ = print_string " "
-let _ = print_float (Float_u.to_float (id M_2.Other_inner.inner_inner_3))
-let _ = print_string " "
-let _ = print_float (Float_u.to_float (id M_2.foo_3))
-let _ = print_endline ""
+let () =
+  Printf.printf "%.0f %.0f %.0f %.0f\n"
+    (Float_u.to_float (id M_2.Inner.inner_1))
+    (Float_u.to_float (id M_2.Inner.Inner_inner.inner_inner_1))
+    (Float_u.to_float (id M_2.Other_inner.inner_inner_3))
+    (Float_u.to_float (id M_2.foo_3))
