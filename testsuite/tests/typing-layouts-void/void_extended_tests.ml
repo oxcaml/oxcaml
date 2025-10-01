@@ -20,6 +20,7 @@
 
 type void : void mod everything
 external void : unit -> void = "%unbox_unit"
+external op : 'a -> 'a = "%opaque"
 
 let test_num = ref 0
 let start_test name =
@@ -67,8 +68,8 @@ let test1 () =
   Printf.printf "  Hash vh2: %d\n" (Hashtbl.hash vh2);
 
   (* Test polymorphic variants with void *)
-  let pv1 = Mixed (42, void (), "hello") in
-  let pv2 = Mixed (42, void (), "hello") in
+  let pv1 = Mixed (op 42, void (), "hello") in
+  let pv2 = Mixed (op 42, void (), "hello") in
   (try
     Printf.printf "  Equality pv1 = pv2: %b\n" (pv1 = pv2)
   with Invalid_argument msg ->
@@ -79,8 +80,8 @@ let test1 () =
     Printf.printf "  Compare pv1 pv2: failed (%s)\n" msg);
 
   (* Test records with void *)
-  let r1 = { rv = void (); rx = 100 } in
-  let r2 = { rv = void (); rx = 100 } in
+  let r1 = { rv = void (); rx = op 100 } in
+  let r2 = { rv = void (); rx = op 100 } in
   (try
     Printf.printf "  Equality r1 = r2: %b\n" (r1 = r2)
   with Invalid_argument msg ->
