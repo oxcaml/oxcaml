@@ -24,7 +24,6 @@ type constant =
   | Const_unboxed_int64 of int64
   | Const_unboxed_nativeint of nativeint
 [%%expect{|
-[ikind] constant/284[1]: base=[2,0,1,0,0,0,0,0,2,0,0], coeffs=[]
 type constant =
     Const_int of int
   | Const_char of char
@@ -49,7 +48,6 @@ type constant =
 
 type 'a eq_int = Eq : int eq_int
 [%%expect{|
-[ikind] eq_int/304[2]: base=⊥, coeffs=[⊥]
 type 'a eq_int = Eq : int eq_int
 |}]
 
@@ -61,15 +59,11 @@ end = struct
   let is_int : t eq_int = Eq
 end
 [%%expect{|
-[ikind] t/306[4]: base=⊥, coeffs=[]
-[ikind] t/306[4]: base=⊥, coeffs=[]
-[ikind] t/308[5]: base=[2,1,1,1,2,1,2,2,2,0,1] ⊓ t/308[5].0, coeffs=[]
 module M : sig type t val is_int : t eq_int end
 |}]
 
 type q = Foo of M.t | Bar of int
 [%%expect{|
-[ikind] q/311[6]: base=([0,1,0,1,2,1,2,2,0,0,0] ⊓ M/310[3].t.0) ⊔ [2,0,1,0,0,0,0,0,2,0,0], coeffs=[]
 type q = Foo of M.t | Bar of int
 |}]
 
