@@ -193,12 +193,13 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       then
         match successor_block.terminator.desc with
         | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Return ->
-          (* CR xclerc for xclerc: should we also copy `dbg`? *)
           block.terminator
             <- { block.terminator with
                  desc = successor_block.terminator.desc;
                  arg = Array.copy successor_block.terminator.arg;
-                 res = Array.copy successor_block.terminator.res
+                 res = Array.copy successor_block.terminator.res;
+                 dbg = successor_block.terminator.dbg;
+                 live = successor_block.terminator.live
                };
           true
         | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
