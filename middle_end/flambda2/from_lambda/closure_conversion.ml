@@ -991,24 +991,16 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
          Also note that [@untagged] and [@unboxed] on externals are irrelevant
          for what JS stubs should look like, since there is no tagging in JSIR
          and naked integers look just like boxed ones. *)
-      let has_unboxed_products =
+      let has_unboxed_products_or_void =
         List.exists
           (fun (_mode, repr) ->
-            Lambda.extern_repr_involves_unboxed_products repr)
+            Lambda.extern_repr_involves_unboxed_products_or_void repr)
           prim_native_repr_args
-        || Lambda.extern_repr_involves_unboxed_products
+        || Lambda.extern_repr_involves_unboxed_products_or_void
              (snd prim_native_repr_res)
       in
-      let has_void_args =
-        List.exists
-          (fun (_mode, repr) -> Lambda.extern_repr_involves_void repr)
-          prim_native_repr_args
-      in
-      let has_void_return =
-        Lambda.extern_repr_involves_void (snd prim_native_repr_res)
-      in
       let prim_native_name =
-        match has_unboxed_products || has_void_args || has_void_return with
+        match has_unboxed_products_or_void with
         | false -> ""
         | true -> prim_native_name
       in

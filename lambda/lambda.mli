@@ -589,9 +589,7 @@ val generic_value : value_kind
 *)
 val layout_of_extern_repr : extern_repr -> layout
 
-val extern_repr_involves_unboxed_products : extern_repr -> bool
-
-val extern_repr_involves_void : extern_repr -> bool
+val extern_repr_involves_unboxed_products_or_void : extern_repr -> bool
 
 type structured_constant =
     Const_base of constant
@@ -674,7 +672,7 @@ type loop_attribute =
 type regalloc_attribute =
   | Default_regalloc
   | Regalloc of Clflags.Register_allocator.t
-  
+
 type regalloc_param_attribute =
   | Default_regalloc_params
   | Regalloc_params of string list
