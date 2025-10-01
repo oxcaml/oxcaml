@@ -808,6 +808,14 @@ type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
     *and* the set of variables contains variables that are not the allocation
     point of the set of closures.
     
+    The reason for this is that for a given closure that is called, the
+    [usages] do not usually include the uses of the closure inside the code of
+    the closure itself. However, when we allocate a set of closures, we include
+    an alias between the allocated closures and their [my_closure] variable
+    inside the corresponding code. As such, the usages at an allocation point
+    are always representative of all the uses, and as such, do not require to
+    follow the calls.
+
     Function slots are considered as aliases for this analysis. *)
 let get_all_usages :
     follow_known_arity_calls:bool ->
