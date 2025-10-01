@@ -1,5 +1,5 @@
 (* TEST
- modules = "c_functions.c";
+ modules = "c_functions.c c_functions.js";
  include stdlib_stable;
  flambda2;
 
@@ -10,11 +10,17 @@
    flags = "-extension-universe alpha";
    bytecode;
  }{
+   flags = "-extension-universe alpha";
+   javascript;
+ }{
    flags = "-extension-universe beta";
    native;
  }{
    flags = "-extension-universe beta";
    bytecode;
+ }{
+   flags = "-extension-universe beta";
+   javascript;
  }
 *)
 

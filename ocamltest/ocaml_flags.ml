@@ -48,7 +48,8 @@ let runtime_flags env backend c_files =
           then ""
           else "-use-runtime " ^ Ocaml_files.ocamlrun
         end
-      end in
+      end
+    | Ocaml_backends.Javascript -> "" (* No runtime flags for JavaScript *) in
   rt_flags ^ " " ^ runtime_library_flags
 
 let toplevel_default_flags = "-noinit -no-version -noprompt"

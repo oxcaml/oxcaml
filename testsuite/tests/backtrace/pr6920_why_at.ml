@@ -19,4 +19,6 @@ let () =
  ocamlrunparam += ",b=1";
  ocamlopt_flags = "-inline 0";
  exit_status = "2";
+  { native; }
+  { bytecode; }
 *)

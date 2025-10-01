@@ -8,11 +8,16 @@
  }{
    bytecode;
  }{
+   javascript;
+ }{
    flags = "-extension layouts_beta";
    native;
  }{
    flags = "-extension layouts_beta";
    bytecode;
+ }{
+   flags = "-extension layouts_beta";
+   javascript;
  }
 *)
 (* Test compilation correctness for array of unboxed floats. General

@@ -1,6 +1,8 @@
 (* TEST
  flags += " -w a -alert -unsafe_multidomain ";
  modules = "globrootsprim.c globroots.ml";
+  { native; }
+  { bytecode; }
 *)
 open Globroots
 

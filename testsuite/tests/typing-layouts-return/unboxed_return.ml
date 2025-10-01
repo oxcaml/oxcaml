@@ -1,5 +1,5 @@
 (* TEST
- modules = "stubs.c";
+ modules = "stubs.c stubs.js";
  reference = "${test_source_directory}/unboxed_return.reference";
  include stdlib_stable;
  flambda2;
@@ -8,6 +8,9 @@
  }
  {
    bytecode;
+ }
+ {
+   javascript;
  }
 *)
 

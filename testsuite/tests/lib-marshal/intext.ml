@@ -1,5 +1,8 @@
 (* TEST
  modules = "intextaux.c";
+  { native; }
+  { bytecode; }
+ (* JavaScript disabled: closures cannot be marshaled *)
 *)
 
 (* Test for output_value / input_value *)

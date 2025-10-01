@@ -23,7 +23,7 @@ fi
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Extensions to track
-EXTENSIONS="exe opt a cmxa cma cmi cmx cmo cms cmsi cmt cmti o"
+EXTENSIONS="exe opt a cmxa cma cmi cmx cmo cms cmsi cmt cmti o cmjx cmjxa cmja cmjo"
 
 # Write CSV header
 echo "timestamp,commit_hash,extension,total_size_bytes" > "$CSV_FILE"

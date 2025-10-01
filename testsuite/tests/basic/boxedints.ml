@@ -81,25 +81,15 @@ struct
     test 1 (unsigned_to_int (of_int 0)) (Some 0);
     test 2 (unsigned_to_int (of_int 123)) (Some 123);
     test 3 (unsigned_to_int minus_one)
-      (match Sys.word_size with
-       | 32 -> None
-       | 64 -> Some (int_of_string "0xFFFFFFFF")
-       | _ -> assert false);
+      (if  Sys.int_size <= 32 then None else Some (int_of_string "0xFFFFFFFF"));
     test 4 (unsigned_to_int max_int)
-      (match Sys.word_size with
-       | 32 -> None
-       | 64 -> Some (to_int max_int)
-       | _ -> assert false);
+      (if Sys.int_size < 32 then None else Some (to_int max_int));
     test 5 (unsigned_to_int min_int)
-      (match Sys.word_size with
-       | 32 -> None
-       | 64 -> Some (int_of_string "0x80000000")
-       | _ -> assert false);
+      (if Sys.int_size <= 32 then None else Some (int_of_string "0x80000000"));
     test 6 (unsigned_to_int (of_int Stdlib.max_int))
-      (match Sys.word_size with
-       | 32 -> Some Stdlib.max_int
-       | 64 -> Some (int_of_string "0xFFFFFFFF")
-       | _ -> assert false);
+      (if Sys.int_size <= 32 || Sys.word_size <= 32
+       then Some Stdlib.max_int
+       else Some (int_of_string "0xFFFFFFFF"));
 
     testing_function "of_string";
     test 1 (of_string "0") (of_int 0);

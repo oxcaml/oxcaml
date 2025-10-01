@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+   { native; }
+   { bytecode; }
+*)
 
 (* Tests that an exception in the alloc_major callback propagates
    correctly to the top level. *)

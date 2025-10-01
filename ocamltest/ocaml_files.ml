@@ -54,6 +54,9 @@ let ocamlopt =
 let ocamlopt_dot_opt =
   Filename.make_path [Ocaml_directories.srcdir; Filename.mkexe "ocamlopt.opt"]
 
+let ocamlj_dot_opt =
+  Filename.make_path [Ocaml_directories.srcdir; Filename.mkexe "ocamlj.opt"]
+
 let ocamlnat =
   Filename.make_path [Ocaml_directories.srcdir; Filename.mkexe "ocamlnat"]
 
