@@ -491,7 +491,13 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
              let name = Format.flush_str_formatter () in
              Printtyp.type_scheme env Format.str_formatter v.Types.val_type;
              let desc = Format.flush_str_formatter () in
-             { Compl.name; kind = `Value; desc; info = ""; deprecated = false })
+             { Compl.name;
+               kind = `Value;
+               desc;
+               info = "";
+               deprecated = false;
+               ppx_template_generated = false
+             })
     in
     { Compl.entries; context = `Unknown }
   | Type_search (query, pos, limit, with_doc) ->

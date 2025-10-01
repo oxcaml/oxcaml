@@ -244,10 +244,17 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
       | _, _ -> `None)
   in
   let deprecated = Type_utils.is_deprecated attrs in
-  { name; kind; desc; info; deprecated }
+  let ppx_template_generated = Type_utils.is_ppx_template_generated attrs in
+  { name; kind; desc; info; deprecated; ppx_template_generated }
 
 let item_for_global_module name =
-  { name; kind = `Module; desc = `None; info = `None; deprecated = false }
+  { name;
+    kind = `Module;
+    desc = `None;
+    info = `None;
+    deprecated = false;
+    ppx_template_generated = false
+  }
 
 let fold_variant_constructors ~env ~init ~f =
   let rec aux acc t =
@@ -537,7 +544,8 @@ let complete_methods ~env ~prefix obj =
         kind = `MethodCall;
         desc = `Type_scheme ty;
         info;
-        deprecated = false
+        deprecated = false;
+        ppx_template_generated = false
       })
 
 type is_label =
@@ -639,7 +647,8 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
                   kind = `Keyword;
                   desc = `None;
                   info = `None;
-                  deprecated = false
+                  deprecated = false;
+                  ppx_template_generated = false
                 }
                 :: candidates
               else candidates)
@@ -654,7 +663,8 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
                 kind = `Module;
                 desc = `None;
                 info = `None;
-                deprecated = false
+                deprecated = false;
+                ppx_template_generated = false
               }
             in
             if name = prefix && uniq (`Mod, name) then

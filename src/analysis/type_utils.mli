@@ -83,6 +83,8 @@ val read_doc_attributes : Parsetree.attributes -> (string * Location.t) option
 
 val is_deprecated : Parsetree.attributes -> bool
 
+val is_ppx_template_generated : Parsetree.attributes -> bool
+
 val print_constr :
   verbosity:Mconfig.Verbosity.t ->
   Env.t ->

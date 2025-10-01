@@ -377,3 +377,9 @@ let is_deprecated =
       match Ast_helper.Attr.as_tuple attr with
       | { Location.txt = "deprecated" | "ocaml.deprecated"; loc = _ }, _ -> true
       | _ -> false)
+
+let is_ppx_template_generated =
+  List.exists ~f:(fun (attr : Parsetree.attribute) ->
+      match Ast_helper.Attr.as_tuple attr with
+      | { Location.txt = "merlin.ppx_template_generated"; loc = _ }, _ -> true
+      | _ -> false)

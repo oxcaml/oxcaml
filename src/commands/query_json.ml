@@ -304,14 +304,18 @@ let json_of_error (error : Location.error) =
   in
   with_location ~skip_none:true loc content
 
-let json_of_completion { Compl.name; kind; desc; info; deprecated } =
+let json_of_completion
+    { Compl.name; kind; desc; info; deprecated; ppx_template_generated } =
   `Assoc
-    [ ("name", `String name);
-      ("kind", `String (string_of_completion_kind kind));
-      ("desc", `String desc);
-      ("info", `String info);
-      ("deprecated", `Bool deprecated)
-    ]
+    ([ ("name", `String name);
+       ("kind", `String (string_of_completion_kind kind));
+       ("desc", `String desc);
+       ("info", `String info);
+       ("deprecated", `Bool deprecated)
+     ]
+    @
+    if ppx_template_generated then [ ("ppx_template_generated", `Bool true) ]
+    else [])
 
 let json_of_completions { Compl.entries; context } =
   `Assoc
