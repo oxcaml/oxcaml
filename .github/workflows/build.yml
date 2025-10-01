@@ -311,7 +311,7 @@ jobs:
 
     - name: Promote failed tests and capture diffs
       working-directory: oxcaml
-      if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
+      if: failure() && matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
       continue-on-error: true
       run: |
         export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
