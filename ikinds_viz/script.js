@@ -280,12 +280,28 @@
 
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     text.setAttribute('x', offsetX(layoutNode.x) + layoutNode.width / 2);
-    text.setAttribute('y', offsetY(layoutNode.y) + layoutNode.height / 2 + 4);
+    text.setAttribute('y', offsetY(layoutNode.y) + layoutNode.height / 2);
     text.setAttribute('text-anchor', 'middle');
     text.textContent = node.label;
 
     group.appendChild(rect);
     group.appendChild(text);
+
+    if (node.loc !== undefined) {
+      const locText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      locText.setAttribute('x', offsetX(layoutNode.x) + layoutNode.width / 2);
+      locText.setAttribute('y', offsetY(layoutNode.y) + layoutNode.height / 2 + 16);
+      locText.setAttribute('text-anchor', 'middle');
+      locText.setAttribute('font-size', '11');
+      locText.setAttribute('fill', '#64748b');
+      if (node.loc_mli !== undefined) {
+        locText.textContent = `${node.loc} + ${node.loc_mli} LOC`;
+      } else {
+        locText.textContent = `${node.loc} LOC`;
+      }
+      group.appendChild(locText);
+    }
+
     nodeGroup.appendChild(group);
     nodeElements.set(node.id, group);
 
