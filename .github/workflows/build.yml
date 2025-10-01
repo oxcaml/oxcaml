@@ -390,7 +390,7 @@ jobs:
       continue-on-error: true
       run: |
         export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
-        make promote-failed
+        make promote
         if ! git diff --quiet; then
           git diff > $GITHUB_WORKSPACE/test-diffs.patch
           echo "Test output differences detected and saved to artifact"
