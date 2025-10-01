@@ -38,14 +38,16 @@ module Shadow = struct
   let foo = "a"
   let x = #10.0
 
-  let i_1 = print_float (Float_u.to_float (id x)); 1
-  let i_2 = print_string " "; 2
+  let i_1 = Printf.printf "%.1f " (Float_u.to_float (id x)); 1
 
   let x = #20.0
   let baz = "y"
 
-  let i_3 = print_float (Float_u.to_float (id x)); 3
-  let i_4 = print_endline ""; 4
+  let i_2 = Printf.printf "%.1f " (Float_u.to_float (id x)); 2
+
+  let x = "30.0"
+
+  let i_3 = Printf.printf "%s\n" (id x); 2
 end
 
 
@@ -77,11 +79,11 @@ end = Pat_alias
 let _ = print_endline "Test: complicated unboxed products"
 
 module Complicated_unboxed_products = struct
-  let foo = #("hello", #42l, "world")
-  let bar = #(#10.0, "bar", #3.1)
-  let baz = #(#20l, #(30.0, #2.7, "!", "?"), "baz")
-  let qux = "qux"
-  let zil = #40L
+  let foo = #("0", #1l, "2")
+  let bar = #(#3.0, "4", #5.0)
+  let baz = #(#6l, #(7.0, #8.0, "9", "10"), "11")
+  let qux = "12"
+  let zil = #13L
 end
 
 let () =
@@ -91,7 +93,7 @@ let () =
   let m = id Complicated_unboxed_products.qux in
   let n = id Complicated_unboxed_products.zil in
 
-  Format.printf "%s %d %s\n%.1f %s %.1f\n%d %.1f %.1f %s %s %s\n%s\n%d\n"
+  Format.printf "%s %d %s %.0f %s %.0f %d %.0f %.0f %s %s %s %s %d\n"
     a (Int32_u.to_int b) c
     (Float_u.to_float d) e (Float_u.to_float f)
     (Int32_u.to_int g) h (Float_u.to_float i) j k l

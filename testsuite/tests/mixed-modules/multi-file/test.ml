@@ -40,7 +40,7 @@
  check-program-output;
 *)
 
-let _ = print_int (Ring.to_int (Ring_utils.pow Numbers.five 4))
-let _ = print_endline ""
-let _ = print_int (Ring.to_int (Ring_utils.pow Numbers.two 10))
-let _ = print_endline ""
+let _ =
+  Printf.printf "%s\n%s\n"
+    (Ring.to_string (Ring_utils.pow Numbers.five 4))
+    (Ring.to_string (Ring_utils.pow Numbers.two 10))
