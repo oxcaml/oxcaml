@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Generate dune rules for building libraries, including stdlib, for javascript
-# with ocamlj
+# using ocamlopt with the js_of_ocaml backend
 
 if [[ $# -ne 1 ]]; then
     echo "$0: expected an arguments" >&2
@@ -18,30 +18,31 @@ cmis_dir="${src}/.${library}.objs/byte"
 # has a way to expose the ocaml flags to a regular rule
 
 # flags from ../duneconf/runtime_stdlib.ws:
-OCAMLJ_FLAGS=()
-OCAMLJ_FLAGS+=(-directory "${library}")
-OCAMLJ_FLAGS+=(-warn-error +A)
-OCAMLJ_FLAGS+=(-alert -unsafe_multidomain)
+OCAML_OPT_JS_FLAGS=()
+OCAML_OPT_JS_FLAGS+=(-target js_of_ocaml)
+OCAML_OPT_JS_FLAGS+=(-directory "${library}")
+OCAML_OPT_JS_FLAGS+=(-warn-error +A)
+OCAML_OPT_JS_FLAGS+=(-alert -unsafe_multidomain)
 # flags from ../dune:
-OCAMLJ_FLAGS+=(-principal)
-OCAMLJ_FLAGS+=(-warn-error +A)
-OCAMLJ_FLAGS+=(-w +a-4-9-40-41-42-44-45-48-66-67-70)
+OCAML_OPT_JS_FLAGS+=(-principal)
+OCAML_OPT_JS_FLAGS+=(-warn-error +A)
+OCAML_OPT_JS_FLAGS+=(-w +a-4-9-40-41-42-44-45-48-66-67-70)
 # flags from ./dune:
-OCAMLJ_FLAGS+=(-strict-sequence)
-OCAMLJ_FLAGS+=(-g)
-OCAMLJ_FLAGS+=(-absname)
-OCAMLJ_FLAGS+=(-bin-annot)
-OCAMLJ_FLAGS+=(-strict-formats)
+OCAML_OPT_JS_FLAGS+=(-strict-sequence)
+OCAML_OPT_JS_FLAGS+=(-g)
+OCAML_OPT_JS_FLAGS+=(-absname)
+OCAML_OPT_JS_FLAGS+=(-bin-annot)
+OCAML_OPT_JS_FLAGS+=(-strict-formats)
 
 if [[ $library == stdlib ]]; then
-    OCAMLJ_FLAGS+=(-nopervasives -nostdlib)
+    OCAML_OPT_JS_FLAGS+=(-nopervasives -nostdlib)
 elif [[ $library == stdlib_* ]]; then
-    OCAMLJ_FLAGS+=(-extension-universe "${library#stdlib_}")
+    OCAML_OPT_JS_FLAGS+=(-extension-universe "${library#stdlib_}")
 fi
 
-OCAMLJ_FLAGS+=(-I "${cmis_dir}")
-OCAMLJ_FLAGS+=(-I "${dst}")
-OCAMLJ_FLAGS+=(-no-alias-deps)
+OCAML_OPT_JS_FLAGS+=(-I "${cmis_dir}")
+OCAML_OPT_JS_FLAGS+=(-I "${dst}")
+OCAML_OPT_JS_FLAGS+=(-no-alias-deps)
 
 # CR jvanburen: enable sourcemaps when available
 JSOO_FLAGS=(--debuginfo --enable=effects,with-js-error --pretty)
@@ -138,7 +139,7 @@ for cu in "${!srcs[@]}"; do
     fi
 
 
-    echo " (action (chdir ${src} (run %{bin:ocamlj} ${OCAMLJ_FLAGS[*]}${maybe_open_stdlib} -o ${dst}/${cu} -c -impl ${srcs[$cu]}))))"
+    echo " (action (chdir ${src} (run %{bin:ocamlopt.opt} ${OCAML_OPT_JS_FLAGS[*]}${maybe_open_stdlib} -o ${dst}/${cu} -c -impl ${srcs[$cu]}))))"
     echo ""
 done
 
@@ -146,5 +147,5 @@ cat <<EOF
 (rule
  (targets ${library}.cmjxa ${library}.cmja)
  (deps ${cmjxa_contents})
- (action (run %{bin:ocamlj} ${OCAMLJ_FLAGS[*]} -linkall -a -o ${library}.cmjxa %{deps})))
+ (action (run %{bin:ocamlopt.opt} ${OCAML_OPT_JS_FLAGS[*]} -linkall -a -o ${library}.cmjxa %{deps})))
 EOF

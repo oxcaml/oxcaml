@@ -33,9 +33,9 @@ Source → Lambda → Flambda2 → JSIR → js_of_ocaml → JavaScript
 
 ### Key Components
 
-#### 1. The `ocamlj` Compiler Driver
-- **Location**: `driver/jscompile.ml`, `driver/jsmaindriver.ml`
-- **Purpose**: JavaScript counterpart to `ocamlopt`
+#### 1. The JavaScript Driver (`ocamlopt -target js_of_ocaml`)
+- **Location**: `driver/jscompile.ml`, `driver/optmaindriver.ml`
+- **Purpose**: JavaScript counterpart to `ocamlopt`, enabled via `-target js_of_ocaml`
 - **Output files**:
   - `.cmjx` - JavaScript compilation metadata (identical format to `.cmx` but for 32-bit JavaScript)
   - `.cmjxa` - JavaScript archives (identical format to `.cmxa` but for 32-bit JavaScript)
@@ -112,8 +112,7 @@ The JavaScript linker (`jslink.ml`) implements the js_of_ocaml runtime building 
 ### Build System Integration
 
 #### Dune Configuration
-- New library: `ocamljcomp` containing JavaScript compilation components
-- New executable: `boot_ocamlj` for bootstrapping
+- JavaScript compilation modules (`jscompile`, `jslink`, `jslibrarian`) live in `ocamloptcomp`
 - Dynamic rule generation for standard library compilation (`tools/gen_ocamlj_rules.sh` )
 
 #### Parallel Build Infrastructure
@@ -194,8 +193,8 @@ function caml_float32_of_float(x) {
 ## Migration Path
 
 ### For OxCaml Users
-1. Use `ocamlj` instead of `ocamlopt` for JavaScript targets
-2. Link with `ocamlj -o output.js` instead of js_of_ocaml link
+1. Use `ocamlopt -target js_of_ocaml` for JavaScript targets
+2. Link with `ocamlopt -target js_of_ocaml -o output.js` instead of js_of_ocaml link
 3. Existing js_of_ocaml libraries should work unchanged
 
 ### For js_of_ocaml Users
@@ -231,7 +230,7 @@ function caml_float32_of_float(x) {
 ## Appendix: Key Source Locations
 
 - `driver/jscompile.ml` - Main compilation driver
-- `driver/jsmaindriver.ml` - Command-line interface
+- `driver/optmaindriver.ml` - Command-line interface (shared with native via `-target`)
 - `middle_end/flambda2/to_jsir/` - JSIR translation
 - `jscomp/` - JavaScript-specific compilation tools
 - `external/js_of_ocaml/` - Modified js_of_ocaml vendor

@@ -975,7 +975,7 @@ let ocamlj_opt =
     (javascript_action
       (Actions.make
         ~name:"ocamlj.opt"
-        ~description:"Compile the program using ocamlj.opt"
+        ~description:"Compile the program using ocamlopt -target js_of_ocaml"
         ~does_something:true
         (compile Ocaml_compilers.ocamlj_opt)))
 

@@ -120,6 +120,7 @@ module type Compiler_options = sig
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit
   val _linkall : unit -> unit
+  val _target : string -> unit
   val _noautolink : unit -> unit
   val _o : string -> unit
   val _opaque :  unit -> unit
@@ -129,6 +130,8 @@ module type Compiler_options = sig
   val _parameter : string -> unit
   val _plugin : string -> unit
   val _pp : string -> unit
+  val _jslib : string -> unit
+  val _jsopt : string -> unit
   val _principal : unit -> unit
   val _no_principal : unit -> unit
   val _rectypes : unit -> unit

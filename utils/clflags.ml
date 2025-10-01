@@ -213,6 +213,33 @@ let set_profile_granularity v =
 let native_code = ref false             (* set to true under ocamlopt *)
 let jsir = ref false                    (* set to true under ocamlj *)
 
+module Backend = struct
+  type t = Native | Js_of_ocaml
+
+  let all = [ "native", Native; "js_of_ocaml", Js_of_ocaml ]
+
+  let names = List.map fst all
+
+  let of_string name =
+    List.find_map (fun (n, target) -> if String.equal n name then Some target else None) all
+end
+
+let backend_target_ref = ref None
+
+let backend_target () = !backend_target_ref
+
+let set_backend_target target =
+  backend_target_ref := Some target;
+  match target with
+  | Backend.Native ->
+      native_code := true;
+      jsir := false
+  | Backend.Js_of_ocaml ->
+      native_code := false;
+      jsir := true
+
+let backend_target_of_string name = Backend.of_string name
+
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
 let cmm_invariants =

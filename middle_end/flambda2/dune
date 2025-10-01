@@ -34,9 +34,8 @@
   (:standard -O3 -open Int_replace_polymorphic_compare))
  (modules flambda2)
  (libraries
-  ocamlcommon
-  ocamlbytecomp
-  ocamloptcomp
+ ocamlcommon
+ ocamlbytecomp
   flambda2_lattices
   flambda2_cmx
   flambda2_from_lambda

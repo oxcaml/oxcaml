@@ -182,6 +182,16 @@ val debug_ocaml : bool ref
 val keep_startup_file : bool ref
 val native_code : bool ref
 val jsir : bool ref
+module Backend : sig
+  type t = Native | Js_of_ocaml
+
+  val names : string list
+  val of_string : string -> t option
+end
+
+val backend_target : unit -> Backend.t option
+val set_backend_target : Backend.t -> unit
+val backend_target_of_string : string -> Backend.t option
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref

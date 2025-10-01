@@ -109,9 +109,9 @@ let ocamlopt_opt = compiler
   ~target: Ocaml_backends.Native
 
 let ocamlj_opt = compiler
-  ~name: Ocaml_files.ocamlj_dot_opt
-  ~flags: ""
-  ~directory: "ocamlj.opt"
+  ~name: Ocaml_files.ocamlopt_dot_opt
+  ~flags: "-target js_of_ocaml"
+  ~directory: "js_of_ocaml"
   ~exit_status_variable: Ocaml_variables.ocamlj_opt_exit_status
   ~reference_variable: Ocaml_variables.compiler_reference
   ~output_variable: Ocaml_variables.compiler_output

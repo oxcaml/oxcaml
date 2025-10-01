@@ -76,6 +76,8 @@ let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
 let compile_from_typed i typed ~unix ~pipeline ~as_arg_for =
   typed
   |> Profile.(record transl)
+    (* OCaml upstream no longer exposes a [~style] argument here; the
+       representation choice is internal to [transl_implementation]. *)
     (Translmod.transl_implementation i.module_name)
   |> compile_from_raw_lambda i ~unix ~pipeline ~as_arg_for
 

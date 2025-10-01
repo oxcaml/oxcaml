@@ -31,8 +31,7 @@
  (ocamlopt_flags
   (:standard -O3))
  (libraries
-  ocamlcommon
-  ocamloptcomp
+ ocamlcommon
   jsoo_imports
   flambda2_bound_identifiers
   flambda2_cmx
