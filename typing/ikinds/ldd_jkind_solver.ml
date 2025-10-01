@@ -309,12 +309,14 @@ struct
   let leq (solver : solver) (k1 : ckind) (k2 : ckind) : bool =
     let k2' = k2 solver.ops in
     let k1' = k1 solver.ops in
+    Ldd.solve_pending ();
     Ldd.leq k1' k2'
 
   let leq_with_reason (solver : solver) (k1 : ckind) (k2 : ckind) :
       int list option =
     let k2' = k2 solver.ops in
     let k1' = k1 solver.ops in
+    Ldd.solve_pending ();
     Ldd.leq_with_reason k1' k2'
 
   let round_up (solver : solver) (k : ckind) : lat =
