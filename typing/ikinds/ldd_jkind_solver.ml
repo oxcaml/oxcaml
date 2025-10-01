@@ -240,15 +240,18 @@ struct
             (* We need to assert that kind' is less than or equal to the base *)
             Ldd.enqueue_gfp base
               (Ldd.meet base' (Ldd.var (Ldd.rigid (Ldd.Name.atomic c 0))));
-            List.iteri
-              (fun i (coeff, coeff') ->
+            let i = ref 0 in
+            List.iter2
+              (fun coeff coeff' ->
+                let idx = !i in
                 let rhs = Ldd.join coeff' base' in
                 let bound =
                   Ldd.meet rhs
-                    (Ldd.var (Ldd.rigid (Ldd.Name.atomic c (i + 1))))
+                    (Ldd.var (Ldd.rigid (Ldd.Name.atomic c (idx + 1))))
                 in
+                incr i;
                 Ldd.enqueue_gfp coeff bound)
-              (List.combine coeffs coeffs'))
+              coeffs coeffs')
           else (
             Ldd.solve_lfp base base';
             List.iter2
@@ -259,21 +262,15 @@ struct
       let base, coeffs = constr_kind c in
       (* Meet each arg with the corresponding coeff *)
       let ks' =
-        let nth_opt lst i = try Some (List.nth lst i) with _ -> None in
         List.mapi
           (fun i coeff ->
-            let k =
-              match nth_opt ks i with
-              | Some k -> k
-              | None -> failwith "Missing arg"
-            in
-            Ldd.meet k coeff)
+            match List.nth_opt ks i with
+            | Some k -> Ldd.meet k coeff
+            | None -> failwith "Missing arg")
           coeffs
       in
       (* Join all the ks'' plus the base *)
-      let k' = List.fold_left Ldd.join base ks' in
-      (* Return that kind *)
-      k'
+      List.fold_left Ldd.join base ks'
     and ops =
       { const;
         join;
@@ -289,12 +286,10 @@ struct
       let base, coeffs = constr_kind c in
       (* Ensure any pending fixpoints are installed before inspecting. *)
       Ldd.solve_pending ();
-      let base_norm = base in
-      let coeff_norms = List.map (fun coeff -> coeff) coeffs in
       let coeffs_minus_base =
-        List.map (fun p -> Ldd.sub_subsets p base_norm) coeff_norms
+        List.map (fun p -> Ldd.sub_subsets p base) coeffs
       in
-      base_norm, coeffs_minus_base
+      base, coeffs_minus_base
     in
     { ops; constr_kind_poly }
 

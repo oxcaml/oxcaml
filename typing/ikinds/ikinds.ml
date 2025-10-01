@@ -313,8 +313,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                 (fun (c : Types.constructor_declaration) ->
                   match c.cd_args with
                   | Types.Cstr_tuple args ->
-                    List.mapi
-                      (fun _i (arg : Types.constructor_argument) ->
+                    List.map
+                      (fun (arg : Types.constructor_argument) ->
                         let mask =
                           Axis_lattice_bits.mask_of_modality
                             ~relevant_for_shallow
@@ -420,17 +420,18 @@ let apply_constructor_ikind ~(context : Jkind.jkind_context)
     Ikind.Ldd.node =
   let payload = rehydrate_constructor_ikind ~context (unpack_constructor_ikind packed) in
   let arity = Array.length payload.coeffs in
-  if List.length args <> arity
+  let nargs = List.length args in
+  if nargs <> arity
   then
     Misc.fatal_errorf
       "ikinds: constructor arity mismatch (expected %d, got %d)"
-      arity (List.length args);
-  let contributions =
-    List.mapi
-      (fun i arg -> Ikind.Ldd.meet arg payload.coeffs.(i))
-      args
-  in
-  List.fold_left Ikind.Ldd.join payload.base contributions
+      arity nargs;
+  let coeffs = Array.to_list payload.coeffs in
+  List.fold_left2
+    (fun acc arg coeff ->
+      let contribution = Ikind.Ldd.meet arg coeff in
+      Ikind.Ldd.join acc contribution)
+    payload.base args coeffs
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
@@ -461,17 +462,16 @@ let sub_jkind_l ?allow_any_crossing ?origin
       match ik_leq with
       | None -> Ok ()
       | Some violating_axes ->
-        let violating_axis_names =
-          List.map Axis_lattice_bits.axis_number_to_axis_packed
-            violating_axes
-        in
         (* Do not try to adjust allowances; Violation.Not_a_subjkind
            accepts an r-jkind. *)
         let axis_reasons =
           List.map
-            (fun axis_name ->
+            (fun axis ->
+              let axis_name =
+                Axis_lattice_bits.axis_number_to_axis_packed axis
+              in
               Jkind.Sub_failure_reason.Axis_disagreement axis_name)
-            violating_axis_names
+            violating_axes
         in
         Error
           (Jkind.Violation.of_ ~context
@@ -600,22 +600,18 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
      proper evaluation against real declarations and cached constructor ikinds. *)
   let arity = max_arity_in_type Path.Map.empty body in
   let lookup p = identity_lookup_from_arity_map arity p in
-  let env : JK.env = { kind_of = (fun ty -> kind_of ~context:(
-                                  (* dummy context; currently ignored *)
-                                  { Jkind.jkind_of_type = (fun _ -> None)
-                                  ; is_abstract = (fun _ -> false)
-                                  ; lookup_type = (fun _ -> None)
-                                  ; debug_print_env = (fun _ppf -> ())
-                                  }
-                                ) ty)
-                    ; lookup } in
+  let dummy_context =
+    (* dummy context; currently ignored *)
+    { Jkind.jkind_of_type = (fun _ -> None)
+    ; is_abstract = (fun _ -> false)
+    ; lookup_type = (fun _ -> None)
+    ; debug_print_env = (fun _ppf -> ())
+    }
+  in
+  let kind_of_identity = kind_of ~context:dummy_context in
+  let env : JK.env = { kind_of = kind_of_identity; lookup } in
   let solver = JK.make_solver env in
-  let poly = JK.normalize solver (kind_of ~context:{
-                      Jkind.jkind_of_type = (fun _ -> None);
-                      is_abstract = (fun _ -> false);
-                      lookup_type = (fun _ -> None);
-                      debug_print_env = (fun _ -> ())
-                    } body)
+  let poly = JK.normalize solver (kind_of_identity body)
   in
   let rigid_vars =
     List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params

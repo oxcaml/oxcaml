@@ -22,7 +22,7 @@ module Make (S : SHAPE) = struct
 
   let equal (a : t) (b : t) : bool = Array.for_all2 ( = ) a b
 
-  let hash (a : t) = Hashtbl.hash (Array.to_list a)
+  let hash (a : t) = Hashtbl.hash a
 
   (* Axis-wise residual: zero out an axis if b's level >= a's level *)
   let co_sub (a : t) (b : t) : t =
