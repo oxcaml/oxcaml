@@ -79,7 +79,7 @@ open Format
 
 val report_error : formatter -> error -> unit
 
-(* CR jrayman *)
+(* Used to generate primitives.txt *)
 
 val indexing_primitive_names : string list
 val array_vec_primitive_names : string list
