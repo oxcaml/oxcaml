@@ -67,7 +67,7 @@ val unless_atom :
   ('p, 'a) program
 
 val unless_eq :
-  'k Cursor.value_repr ->
+  'k Value.repr ->
   'k Term.t ->
   'k Term.t ->
   ('p, 'a) program ->

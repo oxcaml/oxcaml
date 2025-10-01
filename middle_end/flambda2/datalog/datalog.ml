@@ -56,6 +56,7 @@ module Variable = struct
   module T0 = struct
     type 'a t =
       { name : string;
+        mutable repr : 'a Value.repr option;
         mutable level : 'a Cursor.Level.t option
       }
   end
@@ -63,11 +64,22 @@ module Variable = struct
   include T0
   include Heterogenous_list.Make (T0)
 
-  let create name = { name; level = None }
+  let create name = { name; repr = None; level = None }
 
   let rec list : type a. a String.hlist -> a hlist = function
     | [] -> []
     | name :: names -> create name :: list names
+
+  let set_repr var repr =
+    match var.repr with
+    | None -> var.repr <- Some repr
+    | Some existing_repr ->
+      if not (existing_repr == repr)
+      then
+        Misc.fatal_errorf
+          "Datalog variable %s used with different value representations (of \
+           the same type)"
+          var.name
 end
 
 module Term = struct
@@ -94,6 +106,20 @@ module Term = struct
     | var :: vars -> variable var :: variables vars
 
   let constant cte = Constant cte
+
+  let set_repr term repr =
+    match term with
+    | Constant _ | Parameter _ -> ()
+    | Variable var -> Variable.set_repr var repr
+
+  let rec set_repr_hlist : type t k v. k hlist -> (t, k, v) Column.hlist -> unit
+      =
+   fun terms columns ->
+    match terms, columns with
+    | [], [] -> ()
+    | term :: terms, column :: columns ->
+      set_repr term (Column.value_repr column);
+      set_repr_hlist terms columns
 end
 
 type atom = Atom : ('t, 'k, unit) Table.Id.t * 'k Term.hlist -> atom
@@ -103,7 +129,7 @@ type condition =
 
 type filter =
   | Unless_atom : ('t, 'k, 'v) Table.Id.t * 'k Term.hlist -> filter
-  | Unless_eq : 'k Cursor.value_repr * 'k Term.t * 'k Term.t -> filter
+  | Unless_eq : 'k Value.repr * 'k Term.t * 'k Term.t -> filter
   | User : ('k Constant.hlist -> bool) * 'k Term.hlist -> filter
 
 type callback =
@@ -148,7 +174,9 @@ let add_filter filter program =
 
 let map_program prog fn = { prog with terminator = Map (prog.terminator, fn) }
 
-let where_atom tid args body = add_condition (Where_atom (tid, args)) body
+let where_atom tid args body =
+  Term.set_repr_hlist args (Table.Id.columns tid);
+  add_condition (Where_atom (tid, args)) body
 
 let unless_atom tid args body = add_filter (Unless_atom (tid, args)) body
 

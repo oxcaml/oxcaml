@@ -46,14 +46,15 @@ module Id : sig
 
   val compare : (_, _, _) t -> (_, _, _) t -> int
 
+  val columns : ('t, 'k, 'v) t -> ('t, 'k, 'v) Column.hlist
+
   val is_trie : ('t, 'k, 'v) t -> ('t, 'k, 'v) Trie.is_trie
 
   type ('k, 'v) poly = Id : ('t, 'k, 'v) t -> ('k, 'v) poly
 
   val create :
     name:string ->
-    is_trie:('t, 'k, 'v) Trie.is_trie ->
-    print_keys:(Format.formatter -> 'k Constant.hlist -> unit) ->
+    columns:('t, 'k, 'v) Column.hlist ->
     default_value:'v ->
     ('t, 'k, 'v) t
 
