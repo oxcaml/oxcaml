@@ -282,7 +282,7 @@ module Lattices = struct
 
       let max = Local
 
-      let ord = Obj.magic
+      let ord = function Global -> 0 | Local -> 1
     end)
 
     let legacy = Global
@@ -307,7 +307,7 @@ module Lattices = struct
 
       let max = Local
 
-      let ord = Obj.magic
+      let ord = function Global -> 0 | Regional -> 1 | Local -> 2
     end)
 
     let legacy = Global
@@ -332,7 +332,7 @@ module Lattices = struct
 
       let max = Aliased
 
-      let ord = Obj.magic
+      let ord = function Unique -> 0 | Aliased -> 1
     end)
 
     let legacy = Aliased
@@ -354,7 +354,7 @@ module Lattices = struct
 
       let max = Once
 
-      let ord = Obj.magic
+      let ord = function Many -> 0 | Once -> 1
     end)
 
     let legacy = Many
@@ -376,7 +376,7 @@ module Lattices = struct
 
       let max = Nonportable
 
-      let ord = Obj.magic
+      let ord = function Portable -> 0 | Nonportable -> 1
     end)
 
     let legacy = Nonportable
@@ -399,7 +399,7 @@ module Lattices = struct
 
       let max = Contended
 
-      let ord = Obj.magic
+      let ord = function Uncontended -> 0 | Shared -> 1 | Contended -> 2
     end)
 
     let legacy = Uncontended
@@ -422,7 +422,7 @@ module Lattices = struct
 
       let max = Unforkable
 
-      let ord = Obj.magic
+      let ord = function Forkable -> 0 | Unforkable -> 1
     end)
 
     let legacy = Forkable
@@ -444,7 +444,7 @@ module Lattices = struct
 
       let max = Yielding
 
-      let ord = Obj.magic
+      let ord = function Unyielding -> 0 | Yielding -> 1
     end)
 
     let legacy = Unyielding
@@ -467,7 +467,7 @@ module Lattices = struct
 
       let max = Stateful
 
-      let ord = Obj.magic
+      let ord = function Stateless -> 0 | Observing -> 1 | Stateful -> 2
     end)
 
     let legacy = Stateful
@@ -491,7 +491,7 @@ module Lattices = struct
 
       let max = Immutable
 
-      let ord = Obj.magic
+      let ord = function Read_write -> 0 | Read -> 1 | Immutable -> 2
     end)
 
     let legacy = Read_write
@@ -967,7 +967,18 @@ module Lattices_mono = struct
       | Visibility : (Monadic_op.t, Visibility_op.t) t
       | Contention : (Monadic_op.t, Contention_op.t) t
 
-    let compare a b = (Obj.magic a : int) - (Obj.magic b : int)
+    let index = function
+      | Areality -> 0
+      | Forkable -> 1
+      | Yielding -> 2
+      | Linearity -> 3
+      | Statefulness -> 4
+      | Portability -> 5
+      | Uniqueness -> 6
+      | Visibility -> 7
+      | Contention -> 8
+
+    let compare a b = index a - index b
 
     let print : type p r. _ -> (p, r) t -> unit =
      fun ppf -> function
