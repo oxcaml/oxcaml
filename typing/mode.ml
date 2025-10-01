@@ -216,8 +216,8 @@ module Lattices = struct
   module type Total = sig
     (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
 
-      If it's also finite, then the ordering can be represented by a monotone
-      bijection to [int]. *)
+      If it's also finite, then the ordering can be represented as a monotone
+      injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
 
     type t
 
@@ -955,8 +955,6 @@ module Lattices_mono = struct
 
   module Axis = struct
     type ('t, 'r) t =
-      (* Constructors must be listed in implication order: if A implies B, then A is bofore B.
-         This is to make [compare] work. *)
       | Areality : ('a comonadic_with, 'a) t
       | Forkable : ('areality comonadic_with, Forkable.t) t
       | Yielding : ('areality comonadic_with, Yielding.t) t
@@ -967,7 +965,9 @@ module Lattices_mono = struct
       | Visibility : (Monadic_op.t, Visibility_op.t) t
       | Contention : (Monadic_op.t, Contention_op.t) t
 
-    let index = function
+    (* Index must reflect implication order: if A implies B, then index A <
+       index B. This is needed by the implication logic in [typemode]. *)
+    let index : type p r. (p, r) t -> int = function
       | Areality -> 0
       | Forkable -> 1
       | Yielding -> 2
