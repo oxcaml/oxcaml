@@ -368,7 +368,9 @@ let error_of_filter_arrow_failure ~explanation ~first ty_fun
 
 let type_module =
   ref ((fun _env _md -> assert false) :
-       Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t)
+       Env.t -> Parsetree.module_expr ->
+         Typedtree.module_expr * Shape.t *
+         Discourse_types.t * (Longident.t loc * Discourse_types.Item.t) option)
 
 (* Forward declaration, to be filled in by Typemod.type_open *)
 
@@ -1411,7 +1413,8 @@ let type_continuation_pat env expected_ty sp =
           Types.val_loc = loc; val_attributes = [];
           val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
-          val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()); }
+          val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+          val_discourse = Discourse_types.empty }
       in
         Some (id, desc)
   | Ppat_extension ext ->
@@ -1698,7 +1701,8 @@ let add_pattern_variables ?check ?check_as env pv =
           Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
-          val_uid = pv_uid
+          val_uid = pv_uid;
+          val_discourse = Discourse_types.empty;
          } env
     )
     pv env
@@ -1718,7 +1722,7 @@ let add_module_variables env module_variables =
          Here, on the other hand, we're calling [type_module] outside the
          raised level, so there's no extra step to take.
       *)
-      let modl, md_shape =
+      let modl, md_shape, md_discourse, md_discourse_alias =
         !type_module env
           Ast_helper.(
             Mod.unpack ~loc:mv_loc
@@ -1735,7 +1739,9 @@ let add_module_variables env module_variables =
         { md_type = modl.mod_type; md_attributes = [];
           md_modalities = Mode.Modality.undefined;
           md_loc = mv_name.loc;
-          md_uid = mv_uid; }
+          md_uid = mv_uid;
+          md_discourse;
+          md_discourse_alias }
       in
       let mode = Typedtree.mode_without_locks_exn modl.mod_mode in
       Env.add_module_declaration ~shape:md_shape ~check:true mv_id pres md
@@ -4129,6 +4135,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_modalities = Modality.undefined
             ; val_loc = pv_loc
             ; val_uid = pv_uid
+            ; val_discourse = Discourse_types.empty;
             }
             val_env
          in
@@ -4142,6 +4149,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_modalities = Modality.undefined
             ; val_loc = pv_loc
             ; val_uid = pv_uid
+            ; val_discourse = Discourse_types.empty;
             }
             met_env
          in
@@ -7019,6 +7027,7 @@ and type_expect_
       let path, actual_mode, layout_args, desc, kind =
         type_ident env ~recarg lid
       in
+      Discourse.use_value env lid path;
       let exp_desc =
         match desc.val_kind with
         | Val_ivar (_, cl_num) ->
@@ -8219,7 +8228,9 @@ and type_expect_
         with_local_level_generalize begin fun () ->
           let modl, pres, id, new_env =
             Typetexp.TyVarEnv.with_local_scope begin fun () ->
-              let modl, md_shape = !type_module env smodl in
+              let modl, md_shape, md_discourse, md_discourse_alias =
+                !type_module env smodl
+              in
               Mtype.lower_nongen lv modl.mod_type;
               let pres =
                 match modl.mod_type with
@@ -8233,7 +8244,7 @@ and type_expect_
                 { md_type = modl.mod_type; md_attributes = [];
                   md_modalities = Modality.undefined;
                   md_loc = name.loc;
-                  md_uid; }
+                  md_uid; md_discourse; md_discourse_alias}
               in
               let mode, locks = modl.mod_mode in
               let locks = Option.map (fun (a, _, _) -> a) locks in
@@ -9778,6 +9789,16 @@ and type_label_access
   let label, ambiguity =
     wrap_disambiguate "This expression has" (mk_expected ty_exp)
       (label_disambiguate record_form usage lid env expected_type) labels in
+  let () =
+    match labels with
+    | Ok ((label1,_) :: _) when label1 == label ->
+        (* We only add labels not used via type-based disambiguation to the
+          discourse. See the [Discourse] module. A label did not need
+          disambiguation if the selected name is the last introduced in scope.
+        *)
+        Discourse.use_label env lid label
+    | _ -> ()
+  in
   (record, record_sort, Mode.Value.disallow_right mode,
    label, expected_type, ambiguity)
 
@@ -10266,6 +10287,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
             val_modalities = Modality.undefined;
             val_loc = Location.none;
             val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+            val_discourse = Discourse_types.empty;
           }
         in
         let exp_env = Env.add_value ~mode id desc env in
@@ -10743,6 +10765,16 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
       ty_expected_explained
       (Constructor.disambiguate Env.Positive lid env expected_type) constrs
   in
+  let () =
+    match constrs with
+    | Ok (((constr1, _),_) :: _) when constr1 == constr ->
+        (* We only add constructors not used via type-based disambiguation to
+           the discourse. See the [Discourse] module. A constructor did not need
+           disambiguation if the selected name is the last introduced in scope.
+        *)
+        Discourse.use_constructor env lid constr
+    | _ -> ()
+ in
   let sargs =
     match sarg with
       None -> []

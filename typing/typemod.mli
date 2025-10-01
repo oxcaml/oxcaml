@@ -34,7 +34,8 @@ by inspecting the returned mode. *)
 (* CR zqian: Remove [?expected_mode] once we have mode error chain. *)
 
 val type_module:
-  Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
+  Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t *
+  Discourse_types.t * (Longident.t Location.loc * Discourse_types.Item.t) option
 val type_structure:
   Env.t -> Parsetree.structure ->
   Typedtree.structure * Types.signature * Mode.Value.lr * Signature_names.t *

@@ -39,6 +39,7 @@ type constructor_description =
     cstr_inlined: type_declaration option;
       (* [Some decl] here iff the cstr has an inline record (which is decl) *)
     cstr_uid: Uid.t;
+    cstr_discourse: Discourse_types.t;
    }
 
 (* Constructors are the same: they return (structurally)-equal values
@@ -68,6 +69,7 @@ type 'a gen_label_description =
     lbl_loc: Location.t;
     lbl_attributes: Parsetree.attributes;
     lbl_uid: Uid.t;
+    lbl_discourse: Discourse_types.t;
   }
 
 type label_description = record_representation gen_label_description

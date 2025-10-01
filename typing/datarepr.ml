@@ -96,6 +96,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
           type_unboxed_default = false;
           type_uid = Uid.mk ~current_unit;
           type_unboxed_version = None;
+          type_discourse = Discourse_types.empty;
         }
       in
       existentials,
@@ -227,7 +228,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       cstr_layouts
   in
   let describe_constructor (src_index, const_tag, nonconst_tag, acc)
-        {cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid} =
+        {cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid; cd_discourse} =
     let cstr_name = Ident.name cd_id in
     let cstr_res =
       match cd_res with
@@ -249,7 +250,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       match rep with
       | Variant_with_null ->
         begin match classify_variant_with_null_constructor
-          { cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid }
+          { cd_id; cd_args; cd_res; cd_loc;
+            cd_attributes; cd_uid; cd_discourse }
         with
         | Variant_with_null_null _ -> Null
         | Variant_with_null_payload _ -> Ordinary {src_index; runtime_tag}
@@ -279,6 +281,9 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         cstr_attributes = cd_attributes;
         cstr_inlined;
         cstr_uid = cd_uid;
+        (* A constructor's discourse is the one if its type.
+           See [Discourse] rule D7. *)
+        cstr_discourse = decl.type_discourse;
       } in
     (src_index+1, const_tag, nonconst_tag, (cd_id, cstr) :: acc)
   in
@@ -314,6 +319,7 @@ let extension_descr ~current_unit path_ext ext =
       cstr_attributes = ext.ext_attributes;
       cstr_inlined;
       cstr_uid = ext.ext_uid;
+      cstr_discourse = Discourse_types.empty;
     }
 
 let none =
@@ -335,9 +341,10 @@ let dummy_label (type rep) (record_form : rep record_form)
     lbl_loc = Location.none;
     lbl_attributes = [];
     lbl_uid = Uid.internal_not_actually_unique;
+    lbl_discourse = Discourse_types.empty;
   }
 
-let label_descrs record_form ty_res lbls repres priv =
+let label_descrs record_form ty_res lbls repres decl =
   let all_labels = Array.make (List.length lbls) (dummy_label record_form) in
   let rec describe_labels num = function
       [] -> []
@@ -352,10 +359,11 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_pos = num;
             lbl_all = all_labels;
             lbl_repres = repres;
-            lbl_private = priv;
+            lbl_private = decl.type_private;
             lbl_loc = l.ld_loc;
             lbl_attributes = l.ld_attributes;
             lbl_uid = l.ld_uid;
+            lbl_discourse = decl.type_discourse;
           } in
         all_labels.(num) <- lbl;
         (l.ld_id, lbl) :: describe_labels (num+1) rest in
@@ -390,7 +398,7 @@ let labels_of_type ty_path decl =
   match decl.type_kind with
   | Type_record(labels, rep, _) ->
       label_descrs Legacy (newgenconstr ty_path decl.type_params)
-        labels rep decl.type_private
+        labels rep decl
   | Type_record_unboxed_product _
   | Type_variant _ | Type_abstract _ | Type_open -> []
 
@@ -398,6 +406,6 @@ let unboxed_labels_of_type ty_path decl =
   match decl.type_kind with
   | Type_record_unboxed_product(labels, rep, _) ->
       label_descrs Unboxed_product (newgenconstr ty_path decl.type_params)
-        labels rep decl.type_private
+        labels rep decl
   | Type_record _
   | Type_variant _ | Type_abstract _ | Type_open -> []

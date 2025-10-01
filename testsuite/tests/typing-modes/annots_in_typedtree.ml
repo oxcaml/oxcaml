@@ -16,7 +16,7 @@ let run s =
   (* Parse and typecheck the string as an impl. *)
   let pi = Parse.implementation (Lexing.from_string s) in
   let pm = Ast_helper.Mod.structure pi in
-  let tm, _ = Typemod.type_module (Lazy.force Env.initial) pm in
+  let tm, _, _, _ = Typemod.type_module (Lazy.force Env.initial) pm in
   (* Check if the typedtree has a "@ portable" annotation anywhere in it. *)
   let has_portable_annotation = ref false in
   let modes iterator (modes : _ Typedtree.modes) =
