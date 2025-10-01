@@ -21,9 +21,8 @@ module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
 let main unix argv ppf ~flambda2 ~lambda_to_jsir =
-  let machine_width = Target_system.Machine_width.Sixty_four in
   if Clflags.backend_target () = None then
-    Clflags.set_backend_target Clflags.Backend.Native;
+        Clflags.set_backend_target Clflags.Backend.Native;
   let columns =
     match Sys.getenv "COLUMNS" with
     | exception Not_found -> None
@@ -95,7 +94,7 @@ let main unix argv ppf ~flambda2 ~lambda_to_jsir =
                (P.available_pass_names ~filter:(fun _ -> true) ~native:true))
     end
   in
-  let link_native () =
+  let link_native () ~machine_width =
     if !make_archive then begin
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
@@ -269,10 +268,10 @@ let main unix argv ppf ~flambda2 ~lambda_to_jsir =
       if !Oxcaml_flags.gc_timings then Gc_timings.start_collection (); ()
     in
     run_backend
-      ~machine_width
+      ~machine_width:Target_system.Machine_width.Sixty_four
       ~output_ext:".cmx"
       ~archive_ext:".cmxa"
-      ~linker:link_native
+      ~linker:( link_native ~machine_width:Target_system.Machine_width.Sixty_four)
       ~extra_checks
   in
 
@@ -291,9 +290,8 @@ let main unix argv ppf ~flambda2 ~lambda_to_jsir =
       if reaper_is_enabled () then
         Compenv.fatal "reaper is not supported in javascript";
     in
-    let js_machine_width = Target_system.Machine_width.Thirty_two_no_gc_tag_bit in
     run_backend
-      ~machine_width:js_machine_width
+      ~machine_width:Target_system.Machine_width.Thirty_two_no_gc_tag_bit
       ~output_ext:".cmjx"
       ~archive_ext:".cmjxa"
       ~linker:link_js

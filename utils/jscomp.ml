@@ -17,12 +17,11 @@
 
 let run_jsoo_exn ~args =
   let prog =
-    match Sys.ocaml_release with
-    | { Sys.extra = Some (Plus, "ox"); _ } ->
-        Filename.concat Config.bindir "js_of_oxcaml"
-    | _ ->
-      (* during bootstrapping, js_of_oxcaml is put into our PATH by dune *)
+    match Filename.basename Sys.executable_name with
+    | "boot_ocamlopt.exe" | "oxcaml_main_native.exe" ->
+      (* during bootstrapping / otherlibs compilation, dune puts this in our PATH *)
       "js_of_oxcaml"
+    | _ -> Filename.concat Config.bindir "js_of_oxcaml"
   in
   let cmdline = Filename.quote_command prog args in
   match Ccomp.command cmdline with

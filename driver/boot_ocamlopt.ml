@@ -1,5 +1,4 @@
 let () =
-  Clflags.set_backend_target Clflags.Backend.Native;
   exit
     (Optmaindriver.main (module Unix : Compiler_owee.Unix_intf.S) Sys.argv
       Format.err_formatter
