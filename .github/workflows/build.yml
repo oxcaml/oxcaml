@@ -411,8 +411,20 @@ jobs:
     - name: Print diff artifact URL
       if: failure() && env.DIFF_CREATED == 'true'
       continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
-        echo "./tools/apply-diff.sh https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}"
+        ARTIFACT_NAME="test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}"
+        # Wait a moment for artifact to be registered
+        sleep 5
+        # Get artifact URL from GitHub API
+        ARTIFACT_URL=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+          --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .archive_download_url")
+        if [ -n "$ARTIFACT_URL" ]; then
+          echo "./tools/apply-diff.sh $ARTIFACT_URL"
+        else
+          echo "Artifact uploaded but URL not yet available. Check: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        fi
 
     - name: Check other architectures
       working-directory: oxcaml
