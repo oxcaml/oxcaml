@@ -7376,7 +7376,7 @@ and type_expect_
       let quoted_ty = newgenty (Tquote ty) in
       let to_unify = Predef.type_code quoted_ty in
       with_explanation (fun () ->
-        unify_exp_types loc new_env to_unify (generic_instance ty_expected));
+        unify_exp_types loc env to_unify (generic_instance ty_expected));
       let arg = type_expect new_env expected_mode' exp (mk_expected ty) in
       re {
         exp_desc = Texp_quotation arg;
