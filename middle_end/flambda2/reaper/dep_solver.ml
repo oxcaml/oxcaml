@@ -43,7 +43,7 @@ let is_local_field (f : Field.t) =
     Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
   | Function_slot fs ->
     Compilation_unit.is_current (Function_slot.get_compilation_unit fs)
-  | Block _ | Code_of_closure _ | Apply _ | Code_id_of_call_witness _ | Is_int
+  | Block _ | Code_of_closure _ | Apply _ | Code_id_of_call_witness | Is_int
   | Get_tag ->
     false
 
@@ -1034,7 +1034,7 @@ let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
     then Used_as_top
     else
       let db =
-        Datalog.set_table in_field_tbl (FieldC.Map.singleton field ()) db
+        Datalog.set_table in_field_tbl (Field.Encoded.Map.singleton field ()) db
       in
       let db = Datalog.Schedule.(run (saturate [r]) db) in
       Used_as_vars (Datalog.get_table out_tbl db)
@@ -1119,7 +1119,7 @@ let get_fields_usage_of_constructors :
         db rs
     in
     fieldc_map_to_field_map
-      (FieldC.Map.merge
+      (Field.Encoded.Map.merge
          (fun k x y ->
            match x, y with
            | None, None -> assert false
@@ -1945,7 +1945,7 @@ module Rewriter = struct
         let db = Datalog.set_table in_tbl s db in
         let db =
           Datalog.set_table in_fs_tbl
-            (FieldC.Map.singleton
+            (Field.Encoded.Map.singleton
                (Field.encode (Function_slot current_function_slot))
                ())
             db
@@ -1954,8 +1954,8 @@ module Rewriter = struct
           Datalog.set_table in_all_fs_tbl
             (Function_slot.Map.fold
                (fun fs _ m ->
-                 FieldC.Map.add (Field.encode (Function_slot fs)) () m)
-               all_function_slots FieldC.Map.empty)
+                 Field.Encoded.Map.add (Field.encode (Function_slot fs)) () m)
+               all_function_slots Field.Encoded.Map.empty)
             db
         in
         let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
@@ -1967,10 +1967,11 @@ module Rewriter = struct
           let known_arity = Datalog.get_table out_known_arity_tbl db in
           let unkwown_arity = Datalog.get_table out_unknown_arity_tbl db in
           ( Usages uses_for_value_slots,
-            FieldC.Map.fold
+            Field.Encoded.Map.fold
               (fun fs uses m ->
                 let known_arity_call, unknown_arity_call =
-                  FieldC.Map.mem fs known_arity, FieldC.Map.mem fs unkwown_arity
+                  ( Field.Encoded.Map.mem fs known_arity,
+                    Field.Encoded.Map.mem fs unkwown_arity )
                 in
                 let calls =
                   if unknown_arity_call
