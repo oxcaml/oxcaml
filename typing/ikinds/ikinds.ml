@@ -1,5 +1,5 @@
 (* This forces ikinds globally on. *)
-(*= Clflags.ikinds := true *)
+Clflags.ikinds := true
 
 (* Types.ikind_debug := true *)
 let enable_crossing = true
@@ -39,16 +39,14 @@ let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
   in
   (* For each with-bound (ty, axes), contribute
      modality(axes_mask, kind_of ty). *)
-  let contribs =
-    Jkind.With_bounds.to_seq j.jkind.with_bounds
-    |> List.of_seq
-    |> List.map (fun (ty, info) ->
-           let axes = Jkind.With_bounds.type_info_relevant_axes info in
-           let mask = Axis_lattice_bits.of_axis_set axes in
-           let kty = ops.kind_of ty in
-           ops.modality mask kty)
-  in
-  ops.join (base :: contribs)
+  Jkind.With_bounds.to_seq j.jkind.with_bounds
+  |> List.of_seq
+  |> List.fold_left (fun acc (ty, info) ->
+         let axes = Jkind.With_bounds.type_info_relevant_axes info in
+         let mask = Axis_lattice_bits.of_axis_set axes in
+         let kty = ops.kind_of ty in
+         ops.join acc (ops.modality mask kty))
+       base
 
 let ckind_of_jkind_l (j : Types.jkind_l) : JK.ckind = ckind_of_jkind j
 
@@ -86,29 +84,23 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
       (* Boxed tuples: immutable_data base + per-element contributions
          under id modality. *)
       let base = ops.const Axis_lattice_bits.immutable_data in
-      let contribs =
-        List.map
-          (fun (_lbl, t) ->
-            let mask = Axis_lattice_bits.mask_shallow in
-            ops.modality mask (ops.kind_of t))
-          elts
-      in
-      ops.join (base :: contribs)
+      List.fold_left
+        (fun acc (_lbl, t) ->
+          let mask = Axis_lattice_bits.mask_shallow in
+          ops.join acc (ops.modality mask (ops.kind_of t)))
+        base elts
     | Types.Tunboxed_tuple elts ->
       (* Unboxed tuples: per-element contributions; shallow axes relevant
          only for arity = 1. *)
-      let contribs =
-        let mask =
-          match List.length elts with
-          | 1 -> Axis_lattice_bits.top  (* arity 1: include all axes *)
-          | _ -> Axis_lattice_bits.mask_shallow  (* arity > 1: exclude shallow axes *)
-        in
-        List.map
-          (fun (_lbl, t) ->
-            ops.modality mask (ops.kind_of t))
-          elts
+      let mask =
+        match List.length elts with
+        | 1 -> Axis_lattice_bits.top  (* arity 1: include all axes *)
+        | _ -> Axis_lattice_bits.mask_shallow  (* arity > 1: exclude shallow axes *)
       in
-      ops.join contribs
+      List.fold_left
+        (fun acc (_lbl, t) ->
+          ops.join acc (ops.modality mask (ops.kind_of t)))
+        (ops.const Axis_lattice_bits.bot) elts
     | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
       (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
       ops.const Axis_lattice_bits.arrow
@@ -139,7 +131,7 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
             (fun acc ty ->
               let k_ty = ops.kind_of ty in
               let k = ops.modality mask k_ty in
-              ops.join [k; acc])
+              ops.join acc k)
             base row
         else
           (* Open row: conservative non-float value (boxed). *)
@@ -227,18 +219,15 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           let kind : JK.ckind =
            fun (ops : JK.ops) ->
             let base = ops.const base_lat in
-            let contribs =
-              List.map
-                (fun (lbl : Types.label_declaration) ->
-                  let mask =
-                    Axis_lattice_bits.mask_of_modality
-                      ~relevant_for_shallow
-                      lbl.ld_modalities
-                  in
-                  ops.modality mask (ops.kind_of lbl.ld_type))
-                lbls
-            in
-            ops.join (base :: contribs)
+            List.fold_left
+              (fun acc (lbl : Types.label_declaration) ->
+                let mask =
+                  Axis_lattice_bits.mask_of_modality
+                    ~relevant_for_shallow
+                    lbl.ld_modalities
+                in
+                ops.join acc (ops.modality mask (ops.kind_of lbl.ld_type)))
+              base lbls
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
         | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
@@ -252,22 +241,19 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           let kind : JK.ckind =
            fun (ops : JK.ops) ->
             let base = ops.const base_lat in
-            let contribs =
-              let relevant_for_shallow =
-                match List.length lbls with
-                | 1 -> `Relevant
-                | _ -> `Irrelevant
-              in
-              List.map
-                (fun (lbl : Types.label_declaration) ->
-                  let mask =
-                    Axis_lattice_bits.mask_of_modality
-                      ~relevant_for_shallow lbl.ld_modalities
-                  in
-                  ops.modality mask (ops.kind_of lbl.ld_type))
-                lbls
+            let relevant_for_shallow =
+              match List.length lbls with
+              | 1 -> `Relevant
+              | _ -> `Irrelevant
             in
-            ops.join (base :: contribs)
+            List.fold_left
+              (fun acc (lbl : Types.label_declaration) ->
+                let mask =
+                  Axis_lattice_bits.mask_of_modality
+                    ~relevant_for_shallow lbl.ld_modalities
+                in
+                ops.join acc (ops.modality mask (ops.kind_of lbl.ld_type)))
+              base lbls
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
         | Types.Type_variant (cstrs, rep, _umc_opt) ->
@@ -308,33 +294,30 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           let kind : JK.ckind =
            fun (ops : JK.ops) ->
             let base = ops.const base_lat in
-            let contribs =
-              List.concat_map
-                (fun (c : Types.constructor_declaration) ->
-                  match c.cd_args with
-                  | Types.Cstr_tuple args ->
-                    List.map
-                      (fun (arg : Types.constructor_argument) ->
-                        let mask =
-                          Axis_lattice_bits.mask_of_modality
-                            ~relevant_for_shallow
-                            arg.ca_modalities
-                        in
-                        ops.modality mask (ops.kind_of arg.ca_type))
-                      args
-                  | Types.Cstr_record lbls ->
-                    List.map
-                      (fun (lbl : Types.label_declaration) ->
-                        let mask =
-                          Axis_lattice_bits.mask_of_modality
-                            ~relevant_for_shallow
-                            lbl.ld_modalities
-                        in
-                        ops.modality mask (ops.kind_of lbl.ld_type))
-                      lbls)
-                cstrs
-            in
-            ops.join (base :: contribs)
+            List.fold_left
+              (fun acc (c : Types.constructor_declaration) ->
+                match c.cd_args with
+                | Types.Cstr_tuple args ->
+                  List.fold_left
+                    (fun acc (arg : Types.constructor_argument) ->
+                      let mask =
+                        Axis_lattice_bits.mask_of_modality
+                          ~relevant_for_shallow
+                          arg.ca_modalities
+                      in
+                      ops.join acc (ops.modality mask (ops.kind_of arg.ca_type)))
+                    acc args
+                | Types.Cstr_record lbls ->
+                  List.fold_left
+                    (fun acc (lbl : Types.label_declaration) ->
+                      let mask =
+                        Axis_lattice_bits.mask_of_modality
+                          ~relevant_for_shallow
+                          lbl.ld_modalities
+                      in
+                      ops.join acc (ops.modality mask (ops.kind_of lbl.ld_type)))
+                    acc lbls)
+              base cstrs
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
         | Types.Type_open ->

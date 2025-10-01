@@ -96,7 +96,7 @@ module Make
 
   type ops =
     { const : lat -> kind;
-      join : kind list -> kind;
+      join : kind -> kind -> kind;
       meet : kind -> kind -> kind;
       modality : lat -> kind -> kind;
       constr : constr -> kind list -> kind;

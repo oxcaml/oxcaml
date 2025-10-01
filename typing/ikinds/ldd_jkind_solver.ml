@@ -102,7 +102,7 @@ struct
 
   type ops =
     { const : lat -> kind;
-      join : kind list -> kind;
+      join : kind -> kind -> kind;
       meet : kind -> kind -> kind;
       modality : lat -> kind -> kind;
       constr : constr -> kind list -> kind;
@@ -135,7 +135,7 @@ struct
     Ldd.clear_memos ();
     (* Define all the trivial ops *)
     let const l = Ldd.const l in
-    let join ks = List.fold_left Ldd.join Ldd.bot ks in
+    let join a b = Ldd.join a b in
     let modality l k = Ldd.meet (Ldd.const l) k in
     let meet a b = Ldd.meet a b in
     (* Create hash table mapping ty to kind for memoization *)
