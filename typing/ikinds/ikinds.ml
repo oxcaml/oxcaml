@@ -400,10 +400,19 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
   else
     let ikind = type_declaration_ikind ~context ~path in
     let payload = unpack_constructor_ikind ikind in
-    Format.eprintf "[ikind] %a: base=%s, coeffs=[%s]@."
-      Path.print path
-      (Ikind.Ldd.pp payload.base)
-      (String.concat "; " (Array.to_list (Array.map Ikind.Ldd.pp payload.coeffs)));
+    if !Types.ikind_debug
+    then begin
+      let stored_jkind =
+        match context.lookup_type path with
+        | None -> "?"
+        | Some decl -> Format.asprintf "%a" Jkind.format decl.type_jkind
+      in
+      Format.eprintf "[ikind] %a: stored=%s, base=%s, coeffs=[%s]@."
+        Path.print path
+        stored_jkind
+        (Ikind.Ldd.pp payload.base)
+        (String.concat "; " (Array.to_list (Array.map Ikind.Ldd.pp payload.coeffs)))
+    end;
     Types.Constructor_ikind ikind
 
 let apply_constructor_ikind ~(context : Jkind.jkind_context)
