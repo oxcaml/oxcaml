@@ -8,3 +8,10 @@ module Jsir = struct
   include Code
   include Jsir
 end
+
+module Js_backend = struct
+  type program =
+    { program : Jsir.program;
+      imported_compilation_units : Compilation_unit.Set.t
+    }
+end

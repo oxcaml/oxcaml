@@ -40,6 +40,13 @@ val lambda_to_flambda :
   Lambda.program ->
   flambda_result
 
+val lambda_to_jsir :
+  ppf_dump:Format.formatter ->
+  prefixname:string ->
+  machine_width:Target_system.Machine_width.t ->
+  Lambda.program ->
+  Jsoo_imports.Js_backend.program
+
 val reset_symbol_tables : unit -> unit
 
 val get_module_info :

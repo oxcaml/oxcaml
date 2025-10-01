@@ -34,4 +34,4 @@ val unit :
   all_code:Exported_code.t ->
   reachable_names:Name_occurrences.t ->
   Flambda_unit.t ->
-  To_jsir_result.program
+  Js_backend.program

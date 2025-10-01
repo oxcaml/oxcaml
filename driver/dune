@@ -17,4 +17,4 @@
 (ocamlopt_flags
  (:include %{project_root}/ocamlopt_flags.sexp))
 (libraries ocamloptcomp flambda2 flambda2_to_jsir gc_timings jsoo_imports)
-(modules optcompile js_backend))
+(modules optcompile))

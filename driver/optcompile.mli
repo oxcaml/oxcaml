@@ -27,6 +27,12 @@ val implementation
     keep_symbol_tables:bool ->
     Lambda.program ->
     Cmm.phrase list)
+  -> lambda_to_jsir:(
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    machine_width:Target_system.Machine_width.t ->
+    Lambda.program ->
+    Jsoo_imports.Js_backend.program)
   -> start_from:Clflags.Compiler_pass.t
   -> source_file:string -> output_prefix:string -> keep_symbol_tables:bool
   -> unit
@@ -41,6 +47,12 @@ val instance
     keep_symbol_tables:bool ->
     Lambda.program ->
     Cmm.phrase list)
+  -> lambda_to_jsir:(
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    machine_width:Target_system.Machine_width.t ->
+    Lambda.program ->
+    Jsoo_imports.Js_backend.program)
   -> source_file:string -> output_prefix:string
   -> compilation_unit:Compilation_unit.t
   -> runtime_args:Translmod.runtime_arg list

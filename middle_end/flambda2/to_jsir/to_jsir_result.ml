@@ -183,11 +183,6 @@ let global_data_var t =
     let var = Jsir.Var.fresh () in
     { t with global_data_var = Some var }, var
 
-type program =
-  { program : Jsir.program;
-    imported_compilation_units : Compilation_unit.Set.t
-  }
-
 let to_program_exn
     { complete_blocks;
       current_blocks;
@@ -220,7 +215,10 @@ let to_program_exn
       Jsir.Addr.Map.add Jsir.Addr.zero { entry_block with body } complete_blocks
   in
   let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in
-  let program =
+  let program : Jsir.program =
     { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
   in
-  { program; imported_compilation_units }
+  {
+    Js_backend.program = program;
+    imported_compilation_units = imported_compilation_units;
+  }

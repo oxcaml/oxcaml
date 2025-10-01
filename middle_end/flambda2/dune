@@ -44,6 +44,7 @@
   flambda2_simplify_shared
   flambda2_terms
   flambda2_to_cmm
+  jsoo_imports
   flambda2_to_jsir
   flambda2_ui
   flambda2_reaper))

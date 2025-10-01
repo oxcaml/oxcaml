@@ -37,4 +37,10 @@ val instantiate
       keep_symbol_tables:bool ->
       Lambda.program ->
       Cmm.phrase list)
+  -> lambda_to_jsir:(
+      ppf_dump:Format.formatter ->
+      prefixname:string ->
+      machine_width:Target_system.Machine_width.t ->
+      Lambda.program ->
+      Jsoo_imports.Js_backend.program)
   -> unit

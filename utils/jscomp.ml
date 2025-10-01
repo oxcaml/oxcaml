@@ -2,9 +2,9 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*           Damien Doligez, projet Moscova, INRIA Rocquencourt           *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
 (*                                                                        *)
-(*   Copyright 2000 Institut National de Recherche en Informatique et     *)
+(*   Copyright 2002 Institut National de Recherche en Informatique et     *)
 (*     en Automatique.                                                    *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
@@ -13,26 +13,19 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* [main argv ppf] runs the compiler with arguments [argv], printing any
-   errors encountered to [ppf], and returns the exit code.
+(** Helpers for invoking js_of_ocaml tooling. *)
 
-   NB: Due to internal state in the compiler, calling [main] twice during
-   the same process is unsupported. *)
-val main
-  : (module Compiler_owee.Unix_intf.S)
-  -> string array
-  -> Format.formatter
-  -> flambda2:(
-    ppf_dump:Format.formatter ->
-    prefixname:string ->
-    machine_width:Target_system.Machine_width.t ->
-    keep_symbol_tables:bool ->
-    Lambda.program ->
-    Cmm.phrase list)
-  -> lambda_to_jsir:(
-    ppf_dump:Format.formatter ->
-    prefixname:string ->
-    machine_width:Target_system.Machine_width.t ->
-    Lambda.program ->
-    Jsoo_imports.Js_backend.program)
-  -> int
+let run_jsoo_exn ~args =
+  let prog =
+    match Sys.ocaml_release with
+    | { Sys.extra = Some (Plus, "ox"); _ } ->
+        Filename.concat Config.bindir "js_of_oxcaml"
+    | _ ->
+        let exe_dir = Filename.dirname Sys.executable_name in
+        let jsoo_path = Filename.concat exe_dir "js_of_ocaml" in
+        if Sys.file_exists jsoo_path then jsoo_path else "js_of_ocaml"
+  in
+  let cmdline = Filename.quote_command prog args in
+  match Ccomp.command cmdline with
+  | 0 -> ()
+  | _ -> raise (Sys_error cmdline)

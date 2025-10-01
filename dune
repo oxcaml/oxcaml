@@ -149,6 +149,7 @@
   priority_queue
   terminfo
   ccomp
+  jscomp
   warnings
   consistbl
   strongly_connected_components
@@ -613,7 +614,6 @@
   opterrors
   optcompile
   optmaindriver
-  jscompile
   jslink
   jslibrarian
   compiler_hooks

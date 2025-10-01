@@ -20,7 +20,7 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 ~js_backend =
+let main unix argv ppf ~flambda2 ~lambda_to_jsir =
   let machine_width = Target_system.Machine_width.Sixty_four in
   if Clflags.backend_target () = None then
     Clflags.set_backend_target Clflags.Backend.Native;
@@ -65,7 +65,7 @@ let main unix argv ppf ~flambda2 ~js_backend =
         try
           Compenv.process_deferred_actions
             ( ppf,
-              Optcompile.implementation ~machine_width unix ~flambda2,
+              Optcompile.implementation ~machine_width unix ~flambda2 ~lambda_to_jsir,
               Optcompile.interface,
               ".cmx",
               ".cmxa" )
@@ -134,7 +134,7 @@ let main unix argv ppf ~flambda2 ~js_backend =
           | src :: args -> src, args
         in
         Asminstantiator.instantiate ~machine_width unix ~src ~args target
-          ~flambda2;
+          ~flambda2 ~lambda_to_jsir;
         Warnings.check_fatal ();
       end
       else if !shared then begin
@@ -237,15 +237,19 @@ let main unix argv ppf ~flambda2 ~js_backend =
         Compenv.fatal "reaper is not supported in javascript";
       begin
         try
+          let js_machine_width =
+            Target_system.Machine_width.Thirty_two_no_gc_tag_bit
+          in
           let js_implementation ~start_from ~source_file ~output_prefix
               ~keep_symbol_tables =
-            Jscompile.implementation ~backend:js_backend
+            Optcompile.implementation
+              ~machine_width:js_machine_width unix ~flambda2 ~lambda_to_jsir
               ~start_from ~source_file ~output_prefix ~keep_symbol_tables
           in
           Compenv.process_deferred_actions
             ( ppf,
               js_implementation,
-              Jscompile.interface,
+              Optcompile.interface,
               ".cmjx",
               ".cmjxa" )
         with Arg.Bad msg ->

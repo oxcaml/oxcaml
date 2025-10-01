@@ -29,9 +29,10 @@ let read_unit_info file : Instantiator.unit_info =
   let { Cmx_format.ui_unit; ui_arg_descr; ui_format; _ } = unit_info in
   { Instantiator.ui_unit; ui_arg_descr; ui_format; }
 
-let instantiate ~machine_width unix ~src ~args targetcmx ~flambda2 =
+let instantiate ~machine_width unix ~src ~args targetcmx ~flambda2
+    ~lambda_to_jsir =
   Instantiator.instantiate ~src ~args targetcmx
     ~expected_extension:".cmx"
     ~read_unit_info
-    ~compile:(Optcompile.instance ~machine_width unix ~flambda2
+    ~compile:(Optcompile.instance ~machine_width unix ~flambda2 ~lambda_to_jsir
       ~keep_symbol_tables:false)
