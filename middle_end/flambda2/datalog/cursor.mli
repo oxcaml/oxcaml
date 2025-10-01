@@ -156,7 +156,7 @@ val seminaive_run :
   unit
 
 module With_parameters : sig
-  type ('p, 'v) t
+  type ('p, !'v) t
 
   val print : Format.formatter -> ('p, 'v) t -> unit
 
