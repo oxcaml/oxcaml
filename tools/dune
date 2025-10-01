@@ -79,9 +79,9 @@
   (libraries ocamlcommon ocamlbytecomp))
 
 (executable
-  (name allprims)
+  (name listprims)
   (modes native)
-  (modules allprims)
+  (modules listprims)
   (libraries ocamlcommon))
 
 (executable

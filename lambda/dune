@@ -13,11 +13,13 @@
 ;**************************************************************************
 
 (rule
- (targets primitives)
+ (targets primitives.txt)
  (mode    promote)
- (deps    ../tools/allprims.exe)
+ (deps    (:listprims ../tools/listprims.exe) translprim.ml)
  (action  (with-stdout-to %{targets}
-            (run %{deps}))))
+            (progn
+              (bash "grep --only-matching --perl-regexp '(?<=\\| \")%[^\"]*(?=\"\\s*->)' %{dep:translprim.ml}")
+              (run %{listprims})))))
 
 (rule
  (targets runtimedef.ml)
