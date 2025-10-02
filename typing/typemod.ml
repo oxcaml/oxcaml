@@ -1201,21 +1201,21 @@ and apply_modalities_module_type env modalities = function
       Mty_signature sg
   | (Mty_functor _ | Mty_alias _) as mty -> mty
 
-let check_unsupported_modal_module ~env reason {pmode_modes; pmode_crossings; pmode_loc} =
-  (* CR zeisbach: obviously fix this to have better error reporting.
-     for now, just a stub *)
-  if pmode_crossings <> [] then Misc.fatal_error "ZJE: mods not supported yet";
-  match pmode_modes with
-  | [] -> ()
-  | _ :: _ -> raise(Error(pmode_loc, env, Unsupported_modal_module reason))
+let check_unsupported_modal_module ~env reason modes =
+  match modes with
+  | No_modes -> ()
+  | Modes {pmode_crossings = []; pmode_loc; _} ->
+      raise(Error(pmode_loc, env, Unsupported_modal_module reason))
+  | Modes {pmode_crossings = _ :: _; _} ->
+      Misc.fatal_error "ZJE: mods not supported yet"
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   modalities =
   match modalities with
-  | {pmoda_modalities = []; pmoda_crossings = []; _} -> default_modalities
-  | {pmoda_modalities = _ :: _; pmoda_crossings = []; _} ->
+  | No_modalities -> default_modalities
+  | Modalities {pmoda_crossings = []; _} ->
     Typemode.transl_modalities ~maturity:Stable Immutable modalities
-  | {pmoda_modalities = _; pmoda_crossings = _ :: _; _} ->
+  | Modalities {pmoda_crossings = _ :: _; _} ->
       Misc.fatal_error "ZJE: mods are not yet supported"
 
 let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
@@ -1430,8 +1430,10 @@ and approx_sig_items env ssg=
               let sg = extract_sig env loc mty in
               let sg =
                 match moda with
-                | { pmoda_modalities = []; pmoda_crossings = []; _ } -> sg
-                | { pmoda_modalities = _ :: _; pmoda_crossings = []; _ } ->
+                | No_modalities -> sg
+                | Modalities { pmoda_crossings = _ :: _; _ } ->
+                    Misc.fatal_error "ZJE: mods are not yet supported"
+                | Modalities { pmoda_crossings = []; _ } ->
                   let modalities =
                     Typemode.transl_modalities ~maturity:Stable Immutable moda
                   in
@@ -1439,8 +1441,6 @@ and approx_sig_items env ssg=
                     not @@ Builtin_attributes.has_attribute "no_recursive_modalities" attrs
                   in
                   apply_modalities_signature ~recursive env modalities sg
-                | { pmoda_modalities = _; pmoda_crossings = _ :: _; _ } ->
-                    Misc.fatal_error "ZJE: mods are not yet supported"
               in
               let sg, newenv = Env.enter_signature ~scope sg env in
               sg @ approx_sig_items newenv srem
@@ -2012,7 +2012,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     | Psig_value sdesc ->
         let modalities =
           match sdesc.pval_modalities with
-          | { pmoda_modalities = []; pmoda_crossings = []; _ } -> sig_modalities
+          | No_modalities -> sig_modalities
           | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
         in
         let modalities = Mode.Modality.of_const modalities in
@@ -3482,10 +3482,13 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         sense. We convert them to modes. *)
         (* CR zqian: remove this hack *)
         let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
-        let {pmoda_modalities; pmoda_crossings; pmoda_loc} = sdesc.pval_modalities in
-        let modes = { pmode_modes = List.map modality_to_mode pmoda_modalities;
-                      pmode_crossings = pmoda_crossings;
-                      pmode_loc = pmoda_loc } in
+        let modes =
+          match sdesc.pval_modalities with
+          | No_modalities -> No_modes
+          | Modalities {pmoda_modalities; pmoda_crossings; pmoda_loc} ->
+            Modes { pmode_modes = List.map modality_to_mode pmoda_modalities;
+                    pmode_crossings = pmoda_crossings;
+                    pmode_loc = pmoda_loc } in
         let mode =
           modes
           |> Typemode.transl_alloc_mode
@@ -3633,7 +3636,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
             (List.map (fun (name, smty, smode, _smodl, attrs, loc) ->
                  ({pmd_name=name; pmd_type=smty;
                    pmd_attributes=attrs; pmd_loc=loc;
-                   pmd_modalities=Ast_helper.Modalities.empty}
+                   pmd_modalities=No_modalities}
                   , Some smode)) sbind
             ) in
         List.iter

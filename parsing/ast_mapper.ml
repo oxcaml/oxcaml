@@ -972,15 +972,21 @@ let default_mapper =
       in
       { pjkind_loc; pjkind_desc });
 
-    modes = (fun this { pmode_modes; pmode_crossings; pmode_loc } ->
-      { pmode_modes = List.map (map_loc this) pmode_modes
-      ; pmode_crossings = List.map (map_loc this) pmode_crossings
-      ; pmode_loc = this.location this pmode_loc } );
+    modes = (fun this modes ->
+      match modes with
+      | No_modes -> No_modes
+      | Modes { pmode_modes; pmode_crossings; pmode_loc } ->
+        Modes { pmode_modes = List.map (map_loc this) pmode_modes
+              ; pmode_crossings = List.map (map_loc this) pmode_crossings
+              ; pmode_loc = this.location this pmode_loc } );
 
-    modalities = (fun this { pmoda_modalities; pmoda_crossings; pmoda_loc } ->
-      { pmoda_modalities = List.map (map_loc this) pmoda_modalities
-      ; pmoda_crossings = List.map (map_loc this) pmoda_crossings
-      ; pmoda_loc = this.location this pmoda_loc } );
+    modalities = (fun this modalities ->
+      match modalities with
+      | No_modalities -> No_modalities
+      | Modalities { pmoda_modalities; pmoda_crossings; pmoda_loc } ->
+        Modalities { pmoda_modalities = List.map (map_loc this) pmoda_modalities
+                   ; pmoda_crossings = List.map (map_loc this) pmoda_crossings
+                   ; pmoda_loc = this.location this pmoda_loc } );
 
     directive_argument =
       (fun this a ->
@@ -1256,7 +1262,7 @@ let apply_lazy ~source ~target mapper =
       with exn ->
         { psg_items = [{psig_desc = Psig_extension (extension_of_exn exn, []);
           psig_loc = Location.none}];
-          psg_modalities = Modalities.empty; psg_loc = Location.none }
+          psg_modalities = No_modalities; psg_loc = Location.none }
     in
     let fields = PpxContext.update_cookies fields in
     let psg_items = Sig.attribute (PpxContext.mk fields) :: psg_items in

@@ -188,7 +188,7 @@ let mkpat_with_modes ~loc ~pat ~cty ~modes =
     end
   | _ ->
     begin match cty, modes with
-    | None, { pmode_modes = []; pmode_crossings = []; _ } -> pat
+    | None, No_modes -> pat
     | cty, modes -> mkpat ~loc (Ppat_constraint (pat, cty, modes))
     end
 
@@ -210,7 +210,7 @@ let mkexp_constraint ~loc ~exp ~cty ~modes =
      end
   | _ ->
      begin match cty, modes with
-     | None, { pmode_modes = []; pmode_crossings = []; _ } -> exp
+     | None, No_modes -> exp
      | cty, modes -> mkexp ~loc (Pexp_constraint (exp, cty, modes))
      end
 
@@ -380,7 +380,7 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
      mk ~loc ~exp:e ~cty:(Some t) ~modes
   | Pcoerce(t1, t2)  ->
      match modes with
-     | { pmode_modes = []; pmode_crossings = []; _ } ->
+     | No_modes ->
       let mk = if ghost then ghexp else mkexp ?attrs:None in
       mk ~loc (Pexp_coerce(e, t1, t2))
      | _ -> not_expecting loc "mode annotations"
@@ -614,7 +614,7 @@ let wrap_sig_ext ~loc body ext =
   | None -> body
   | Some id ->
       ghsig ~loc (Psig_extension ((id, PSig {psg_items=[body];
-        psg_modalities=Modalities.empty; psg_loc=make_loc loc}), []))
+        psg_modalities=No_modalities; psg_loc=make_loc loc}), []))
 
 let wrap_mksig_ext ~loc (item, ext) =
   wrap_sig_ext ~loc (mksig ~loc item) ext
@@ -775,8 +775,8 @@ let all_params_as_newtypes =
 
 let empty_body_constraint =
   { ret_type_constraint = None;
-    mode_annotations = Modes.empty;
-    ret_mode_annotations = Modes.empty
+    mode_annotations = No_modes;
+    ret_mode_annotations = No_modes
   }
 
 (* Given a construct [fun (type a b c) : t -> e], we construct
@@ -819,7 +819,7 @@ let mk_functor_typ args mty_mm =
       let mty =
         mkmty ~loc:(startpos, mty.pmty_loc.loc_end) (Pmty_functor (arg, mty, mm))
       in
-      mty, Modes.empty)
+      mty, No_modes)
     mty_mm args
   in
   mty
@@ -951,7 +951,7 @@ let unboxed_type sloc lident tys =
 
 let maybe_pmod_constraint mode expr =
   match mode with
-  | { pmode_modes = []; pmode_crossings = []; _ } -> expr
+  | No_modes -> expr
   | _ -> Mod.constraint_ None mode expr
 %}
 
@@ -1667,11 +1667,11 @@ module_name:
 ;
 
 module_name_modes:
-  | mkrhs(module_name) { $1, Modes.empty }
+  | mkrhs(module_name) { $1, No_modes }
   | LPAREN mkrhs(module_name) core_modes_expr RPAREN { $2, $3 }
 
 module_name_modalities:
-  | mkrhs(module_name) { $1, Modalities.empty }
+  | mkrhs(module_name) { $1, No_modalities }
   | LPAREN mkrhs(module_name) core_modalities_expr RPAREN { $2, $3 }
 
 (* -------------------------------------------------------------------------- *)
@@ -1755,7 +1755,7 @@ paren_module_expr:
     e = expr
       { e }
   | e = expr COLON ty = package_type
-      { ghexp_constraint ~loc:$loc ~exp:e ~cty:(Some ty) ~modes:Modes.empty }
+      { ghexp_constraint ~loc:$loc ~exp:e ~cty:(Some ty) ~modes:No_modes }
   | e = expr COLON ty1 = package_type COLONGREATER ty2 = package_type
       { ghexp ~loc:$loc (Pexp_coerce (e, Some ty1, ty2)) }
   | e = expr COLONGREATER ty2 = package_type
@@ -2066,7 +2066,7 @@ module_type:
 ;
 
 %inline module_type_with_optional_modes:
-  | module_type { $1, Modes.empty }
+  | module_type { $1, No_modes }
   | module_type_atomic core_modes_expr { $1, $2 }
 
 (* A signature, which appears between SIG and END (among other places),
@@ -2156,7 +2156,7 @@ signature_item:
     let name, modalities' = name_ in
     let mty, modalities = body in
     let modalities =
-      Modalities.append modalities' (Option.value ~default:Modalities.empty modalities) in
+      Modalities.append modalities' (Option.value ~default:No_modalities modalities) in
     Md.mk name mty ~attrs ~loc ~docs ~modalities, ext
   }
 ;
@@ -2171,9 +2171,9 @@ module_declaration_body(module_type_with_optional_modal_expr):
       arg_and_pos = functor_arg body = module_declaration_body(module_type_with_optional_modes)
         { let (_, arg) = arg_and_pos in
           let (ret, mret) = body in
-          Pmty_functor(arg, ret, (Option.value ~default:Modes.empty mret)) }
+          Pmty_functor(arg, ret, (Option.value ~default:No_modes mret)) }
     )
-    // either Modes.empty or Modalities.empty provided at call site
+    // either No_modes or No_modalities provided at call site
     { $1, None }
 ;
 
@@ -2389,7 +2389,7 @@ class_self_pattern:
     LPAREN pattern RPAREN
       { reloc_pat ~loc:$sloc $2 }
   | LPAREN pattern COLON core_type RPAREN
-      { mkpat_with_modes ~loc:$sloc ~pat:$2 ~cty:(Some $4) ~modes:Modes.empty }
+      { mkpat_with_modes ~loc:$sloc ~pat:$2 ~cty:(Some $4) ~modes:No_modes }
   | /* empty */
       { ghpat ~loc:$sloc Ppat_any }
 ;
@@ -2434,7 +2434,7 @@ value:
       { ($4, $3, Cfk_concrete ($1, $6)), $2 }
   | override_flag attributes mutable_flag mkrhs(label) type_constraint
     EQUAL seq_expr
-      { let e = mkexp_type_constraint_with_modes ~loc:$sloc ~modes:Modes.empty $7 $5 in
+      { let e = mkexp_type_constraint_with_modes ~loc:$sloc ~modes:No_modes $7 $5 in
         ($4, $3, Cfk_concrete ($1, e)), $2
       }
 ;
@@ -2463,7 +2463,7 @@ method_:
             (* it seems odd to use the global ~loc here while poly_exp_loc
                is tighter, but this is what ocamlyacc does;
                TODO improve parser.mly *)
-            wrap_type_annotation ~loc:$sloc ~modes:Modes.empty $7 $9 $11 in
+            wrap_type_annotation ~loc:$sloc ~modes:No_modes $7 $9 $11 in
           ghexp ~loc:poly_exp_loc (Pexp_poly(exp, Some poly)) in
         ($4, $3,
         Cfk_concrete ($1, poly_exp)), $2 }
@@ -2722,7 +2722,7 @@ pattern_var:
 ;
 
 optional_poly_type_and_modes:
-      { None, Modes.empty }
+      { None, No_modes }
   | mode_annot_expr
       { None, $1 }
   | COLON cty_mm = poly_type_with_optional_modes
@@ -2782,7 +2782,7 @@ pattern_with_modes_or_poly:
       }
   | pat = pattern COLON cty = strictly_poly_type
       {
-        mkpat_with_modes ~loc:$sloc ~pat ~cty:(Some cty) ~modes:Modes.empty
+        mkpat_with_modes ~loc:$sloc ~pat ~cty:(Some cty) ~modes:No_modes
       }
 
 %inline indexop_expr(dot, index, right):
@@ -2808,13 +2808,13 @@ pattern_with_modes_or_poly:
 optional_atomic_constraint_:
   | COLON atomic_type {
     { ret_type_constraint = Some (Pconstraint $2)
-    ; mode_annotations = Modes.empty
-    ; ret_mode_annotations = Modes.empty
+    ; mode_annotations = No_modes
+    ; ret_mode_annotations = No_modes
     }
    }
   | mode_annot_expr {
     { ret_type_constraint = None
-    ; mode_annotations = Modes.empty
+    ; mode_annotations = No_modes
     ; ret_mode_annotations = $1
     }
   }
@@ -2983,7 +2983,7 @@ simple_expr:
   | LPAREN MODULE ext_attributes module_expr RPAREN
       { Pexp_pack $4, $3 }
   | LPAREN MODULE ext_attributes module_expr COLON package_type RPAREN
-      { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), Some $6, Modes.empty), $3 }
+      { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), Some $6, No_modes), $3 }
   | LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($1) ")" $loc($6) }
   | OBJECT ext_attributes class_structure END
@@ -3206,7 +3206,7 @@ block_access:
     package_type RPAREN
       { let modexp =
           mkexp_attrs ~loc:($startpos($3), $endpos)
-            (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, Modes.empty)) $5 in
+            (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, No_modes)) $5 in
         Pexp_open(od, modexp) }
   | LESSLBRACKET expr_semi_list RBRACKETGREATER
       { quotation_reserved "<[" $loc($1) }
@@ -3231,7 +3231,7 @@ labeled_simple_expr:
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN
       { (Labelled label,
          mkexp_type_constraint_with_modes ~loc:($startpos($2), $endpos)
-          ~modes:Modes.empty (mkexpvar ~loc:$loc(label) label) c) }
+          ~modes:No_modes (mkexpvar ~loc:$loc(label) label) c) }
   | QUESTION label = LIDENT
       { let loc = $loc(label) in
         (Optional label, mkexpvar ~loc label) }
@@ -3249,7 +3249,7 @@ labeled_simple_expr:
     }
 ;
 
-%inline empty_modes: { Modes.empty }
+%inline empty_modes: { No_modes }
 
 %inline let_ident_with_modes:
     optional_mode_expr_legacy let_ident
@@ -3300,15 +3300,15 @@ let_binding_body_no_punning:
          version, even though we are creating a slightly different [core_type].
       *)
       { let exp, poly =
-          wrap_type_annotation ~loc:$sloc ~modes:Modes.empty ~typloc:$loc(cty) ntys cty e
+          wrap_type_annotation ~loc:$sloc ~modes:No_modes ~typloc:$loc(cty) ntys cty e
         in
         let v, modes0 = $1 in
         let modes = Modes.append modes0 modes1 in
         let loc = ($startpos($1), $endpos(modes1)) in
-        (ghpat_with_modes ~loc ~pat:v ~cty:(Some poly) ~modes:Modes.empty, exp, None, modes)
+        (ghpat_with_modes ~loc ~pat:v ~cty:(Some poly) ~modes:No_modes, exp, None, modes)
        }
   | pattern_no_exn EQUAL seq_expr
-      { ($1, $3, None, Modes.empty) }
+      { ($1, $3, None, No_modes) }
   | simple_pattern_not_ident pvc_modes EQUAL seq_expr
       {
         let pvc, modes = $2 in
@@ -3320,7 +3320,7 @@ let_binding_body:
       { let p,e,c,modes = $1 in (p,e,c,modes,false) }
 /* BEGIN AVOID */
   | val_ident %prec below_HASH
-      { (mkpatvar ~loc:$loc $1, ghexpvar ~loc:$loc $1, None, Modes.empty, true) }
+      { (mkpatvar ~loc:$loc $1, ghexpvar ~loc:$loc $1, None, No_modes, true) }
   (* The production that allows puns is marked so that [make list-parse-errors]
      does not attempt to exploit it. That would be problematic because it
      would then generate bindings such as [let x], which are rejected by the
@@ -3365,7 +3365,7 @@ letop_binding_body:
   (* CR zqian: support mode annotation on letop. *)
   | pat = simple_pattern COLON typ = core_type EQUAL exp = seq_expr
       { let loc = ($startpos(pat), $endpos(typ)) in
-        (ghpat_with_modes ~loc ~pat ~cty:(Some typ) ~modes:Modes.empty, exp) }
+        (ghpat_with_modes ~loc ~pat ~cty:(Some typ) ~modes:No_modes, exp) }
   | pat = pattern_no_exn EQUAL exp = seq_expr
       { (pat, exp) }
 ;
@@ -3388,7 +3388,7 @@ strict_binding_modes:
         let constraint_ : function_constraint =
           let ret_type_constraint, ret_mode_annotations =
             match $2 with
-            | None -> None, Modes.empty
+            | None -> None, No_modes
             | Some (ret_type_constraint, ret_mode_annotations) ->
                 ret_type_constraint, ret_mode_annotations
           in
@@ -3401,7 +3401,7 @@ strict_binding_modes:
 ;
 %inline strict_binding:
   strict_binding_modes
-    {$1 Modes.empty}
+    {$1 No_modes}
 ;
 fun_body:
   | FUNCTION ext_attributes match_cases
@@ -3507,7 +3507,7 @@ fun_params:
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN %prec below_HASH
       { Some label,
         mkexp_type_constraint_with_modes
-          ~loc:($startpos($2), $endpos) ~modes:Modes.empty (mkexpvar ~loc:$loc(label) label) c }
+          ~loc:($startpos($2), $endpos) ~modes:No_modes (mkexpvar ~loc:$loc(label) label) c }
 ;
 reversed_labeled_tuple_body:
   (* > 2 elements *)
@@ -3534,7 +3534,7 @@ reversed_labeled_tuple_body:
   x2 = labeled_tuple_element
   { let x1 =
       mkexp_type_constraint_with_modes
-        ~loc:($startpos($2), $endpos) ~modes:Modes.empty (mkexpvar ~loc:$loc(l1) l1) c
+        ~loc:($startpos($2), $endpos) ~modes:No_modes (mkexpvar ~loc:$loc(l1) l1) c
     in
     [ x2; Some l1, x1] }
 ;
@@ -3560,7 +3560,7 @@ record_expr_content:
           | Some e ->
               ($startpos(c), $endpos), label, e
         in
-        label, mkexp_opt_type_constraint_with_modes ~loc:constraint_loc ~modes:Modes.empty e c }
+        label, mkexp_opt_type_constraint_with_modes ~loc:constraint_loc ~modes:No_modes e c }
 ;
 %inline object_expr_content:
   xs = separated_or_terminated_nonempty_list(SEMI, object_expr_field)
@@ -3708,7 +3708,7 @@ pattern_no_exn:
       { let lbl_loc = $loc(label) in
         let pat_loc = $startpos($2), $endpos in
         let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:Modes.empty ~pat ~cty:(Some cty) }
+        Some label, mkpat_with_modes ~loc:pat_loc ~modes:No_modes ~pat ~cty:(Some cty) }
 
 (* If changing this, don't forget to change its copy just above. *)
 %inline labeled_tuple_pat_element_noprec(self):
@@ -3722,7 +3722,7 @@ pattern_no_exn:
       { let lbl_loc = $loc(label) in
         let pat_loc = $startpos($2), $endpos in
         let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:Modes.empty ~pat ~cty:(Some cty) }
+        Some label, mkpat_with_modes ~loc:pat_loc ~modes:No_modes ~pat ~cty:(Some cty) }
 
 labeled_tuple_pat_element_list(self):
   | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
@@ -3776,7 +3776,7 @@ simple_pattern_not_ident:
       { mkpat_attrs ~loc:$sloc (Ppat_unpack $4) $3 }
   | LPAREN MODULE ext_attributes mkrhs(module_name) COLON package_type RPAREN
       { mkpat_attrs ~loc:$sloc
-          (Ppat_constraint(mkpat ~loc:$loc($4) (Ppat_unpack $4), Some $6, Modes.empty))
+          (Ppat_constraint(mkpat ~loc:$loc($4) (Ppat_unpack $4), Some $6, No_modes))
           $3 }
   | simple_pattern_not_ident_
       { $1 }
@@ -3819,7 +3819,7 @@ simple_pattern_not_ident:
       { Ppat_extension $1 }
   ) { $1 }
   | LPAREN pattern COLON core_type RPAREN
-    { mkpat_with_modes ~loc:$sloc ~pat:$2 ~cty:(Some $4) ~modes:Modes.empty }
+    { mkpat_with_modes ~loc:$sloc ~pat:$2 ~cty:(Some $4) ~modes:No_modes }
 ;
 
 simple_delimited_pattern:
@@ -3880,7 +3880,7 @@ simple_delimited_pattern:
         | Some pat ->
             ($startpos(octy), $endpos), label, pat
       in
-      label, mkpat_with_modes ~loc:constraint_loc ~modes:Modes.empty ~pat ~cty:octy
+      label, mkpat_with_modes ~loc:constraint_loc ~modes:No_modes ~pat ~cty:octy
     }
 ;
 
@@ -4425,11 +4425,11 @@ possibly_poly(X):
 
 %inline poly_type_with_optional_modes:
   | poly_type_with_modes { $1 }
-  | poly_type { $1, Modes.empty }
+  | poly_type { $1, No_modes }
 ;
 
 %inline strictly_poly_type_with_optional_modes:
-  | strictly_poly_type { $1, Modes.empty }
+  | strictly_poly_type { $1, No_modes }
   | strictly_poly_tuple_type mode_annot_expr { $1, $2 }
 ;
 
@@ -4452,7 +4452,7 @@ core_type:
 ;
 
 %inline core_type_with_optional_modes:
-    core_type { $1, Modes.empty }
+    core_type { $1, No_modes }
   | tuple_type mode_annot_expr { $1, $2 }
 
 (* A core type without attributes is currently defined as an alias type, but
@@ -4506,7 +4506,7 @@ strict_function_or_labeled_tuple_type:
       MINUSGREATER
       codomain = strict_function_or_labeled_tuple_type
         { let (domain, (_ : Lexing.position * Lexing.position)), arg_modes = domain_with_modes in
-          Ptyp_arrow(label, domain , codomain, arg_modes, Modes.empty) }
+          Ptyp_arrow(label, domain , codomain, arg_modes, No_modes) }
     )
     { $1 }
   | mktyp(
@@ -4545,7 +4545,7 @@ strict_function_or_labeled_tuple_type:
            let label = Labelled label in
            let domain = mktyp ~loc:tuple_loc (Ptyp_tuple ((None, ty) :: ltys)) in
            let domain = extra_rhs_core_type domain ~pos:(snd tuple_loc) in
-           Ptyp_arrow(label, domain, codomain, arg_modes, Modes.empty) }
+           Ptyp_arrow(label, domain, codomain, arg_modes, No_modes) }
     )
     { $1 }
   | mktyp(
@@ -4602,7 +4602,7 @@ strict_function_or_labeled_tuple_type:
 ;
 
 %inline optional_mode_expr_legacy:
-   | { Modes.empty }
+   | { No_modes }
    | mode_expr_legacy {$1}
 ;
 
@@ -4641,11 +4641,11 @@ at_mode_expr:
 mode_annot_expr:
   | pmode_modes = at_mode_expr
     pmode_crossings = optional_mod_crossing_expr
-    { let pmode_loc = make_loc $sloc in
-      { pmode_modes; pmode_crossings; pmode_loc } }
+    { let loc = make_loc $sloc in
+      Modes.mk ~loc pmode_modes pmode_crossings }
   | pmode_crossings = mod_crossing_expr
-    { let pmode_loc = make_loc $sloc in
-      { pmode_modes = []; pmode_crossings; pmode_loc } }
+    { let loc = make_loc $sloc in
+      Modes.mk ~loc [] pmode_crossings }
 ;
 
 %inline core_modes_expr:
@@ -4653,7 +4653,7 @@ mode_annot_expr:
 ;
 
 %inline optional_core_modes_expr:
-  | { Modes.empty }
+  | { No_modes }
   | core_modes_expr
     { $1 }
 ;
@@ -4682,16 +4682,16 @@ atat_modalities_expr:
 modality_annot_expr:
   | pmoda_modalities = atat_modalities_expr
     pmoda_crossings = optional_mod_crossing_expr
-    { let pmoda_loc = make_loc $sloc in
-      { pmoda_modalities; pmoda_crossings; pmoda_loc } }
+    { let loc = make_loc $sloc in
+      Modalities.mk ~loc pmoda_modalities pmoda_crossings }
   | pmoda_crossings = mod_crossing_expr
-    { let pmoda_loc = make_loc $sloc in
-      { pmoda_modalities = []; pmoda_crossings; pmoda_loc } }
+    { let loc = make_loc $sloc in
+      Modalities.mk ~loc [] pmoda_crossings }
 ;
 
 optional_modality_annot_expr:
   | %prec below_HASH
-    { Modalities.empty }
+    { No_modalities }
   | modality_annot_expr
     { $1 }
 ;
@@ -4701,7 +4701,7 @@ optional_modality_annot_expr:
 ;
 
 optional_core_modalities_expr:
-  | { Modalities.empty }
+  | { No_modalities }
   | atat_modalities_expr
     { Modalities.of_core_modalities $1 }
 ;
@@ -5243,15 +5243,15 @@ mutable_flag:
 ;
 mutable_or_global_flag:
     /* empty */
-    { Immutable, Modalities.empty }
+    { Immutable, No_modalities }
   | MUTABLE
-    { Mutable, Modalities.empty }
+    { Mutable, No_modalities }
   | GLOBAL
     { Immutable,
       Modalities.of_core_modalities [(mkloc (Modality "global") (make_loc $sloc))] }
 ;
 %inline global_flag:
-           { Modalities.empty }
+           { No_modalities }
   | GLOBAL { Modalities.of_core_modalities [(mkloc (Modality "global") (make_loc $sloc))]}
 ;
 virtual_flag:

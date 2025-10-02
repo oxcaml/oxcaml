@@ -285,8 +285,8 @@ let make_method loc cl_num expr =
       }
     ]
     { ret_type_constraint=None;
-      ret_mode_annotations=Modes.empty;
-      mode_annotations=Modes.empty
+      ret_mode_annotations=No_modes;
+      mode_annotations=No_modes
     }
     (Pfunction_body expr)
 

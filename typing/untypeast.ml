@@ -337,7 +337,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | { pat_extra= (Tpat_constraint ct, _, _attrs) :: rem; _ } ->
         (* CR cgunn: recover mode constraint info here *)
         Ppat_constraint (sub.pat sub { pat with pat_extra=rem },
-                         Some (sub.typ sub ct), Modes.empty)
+                         Some (sub.typ sub ct), No_modes)
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
@@ -390,7 +390,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
           match tyo, arg with
           | Some (vl, ty), Some arg ->
               (* CR cgunn: recover mode constraint info here *)
-              Some (vl, Pat.mk ~loc (Ppat_constraint (arg, Some ty, Modes.empty)))
+              Some (vl, Pat.mk ~loc (Ppat_constraint (arg, Some ty, No_modes)))
           | None, Some arg -> Some ([], arg)
           | _, None -> None)
     | Tpat_variant (label, pato, _) ->
@@ -421,7 +421,7 @@ let exp_extra sub (extra, loc, attrs) sexp =
                      Option.map (sub.typ sub) cty1,
                      sub.typ sub cty2)
     | Texp_constraint (cty) ->
-        Pexp_constraint (sexp, Some (sub.typ sub cty), Modes.empty)
+        Pexp_constraint (sexp, Some (sub.typ sub cty), No_modes)
     | Texp_poly cto -> Pexp_poly (sexp, Option.map (sub.typ sub) cto)
     | Texp_newtype (_, label_loc, jkind, _) ->
         Pexp_newtype (label_loc, jkind, sexp)
@@ -448,7 +448,7 @@ let value_binding sub vb =
                        modes) ->
       let constr = Pvc_constraint {locally_abstract_univars = []; typ = cty } in
       pat, Some constr, modes
-    | _ -> pat, None, Modes.empty
+    | _ -> pat, None, No_modes
   in
   Vb.mk ~loc ~attrs ?value_constraint ~modes pat (sub.expr sub vb.vb_expr)
 
@@ -526,9 +526,9 @@ let expression sub exp =
               (* Unlike function cases, the [exp_extra] is placed on the body
                  itself. *)
               Pfunction_body (sub.expr sub body),
-              { mode_annotations = Modes.empty;
+              { mode_annotations = No_modes;
                 ret_type_constraint = None;
-                ret_mode_annotations = Modes.empty
+                ret_mode_annotations = No_modes
               }
           | Tfunction_cases
               { fc_cases = cases; fc_loc = loc; fc_exp_extra = exp_extra;
@@ -549,8 +549,8 @@ let expression sub exp =
               in
               let constraint_ =
                 { ret_type_constraint;
-                  mode_annotations = Modes.empty;
-                  ret_mode_annotations = Modes.empty
+                  mode_annotations = No_modes;
+                  ret_mode_annotations = No_modes
                 }
               in
               Pfunction_cases (cases, loc, attributes), constraint_
@@ -872,7 +872,7 @@ let class_type_declaration sub = class_infos sub.class_type sub
 let functor_parameter sub : functor_parameter -> Parsetree.functor_parameter =
   function
   | Unit -> Unit
-  | Named (_, name, mtype) -> Named (name, sub.module_type sub mtype, Modes.empty)
+  | Named (_, name, mtype) -> Named (name, sub.module_type sub mtype, No_modes)
 
 let module_type (sub : mapper) mty =
   let loc = sub.location sub mty.mty_loc in
@@ -887,7 +887,7 @@ let module_type (sub : mapper) mty =
   | Tmty_functor (arg, mtype2) ->
       Mty.mk ~loc ~attrs
         (Pmty_functor
-          (functor_parameter sub arg, sub.module_type sub mtype2, Modes.empty))
+          (functor_parameter sub arg, sub.module_type sub mtype2, No_modes))
   | Tmty_with (mtype, list) ->
       Mty.mk ~loc ~attrs
         (Pmty_with (sub.module_type sub mtype,
@@ -935,7 +935,7 @@ let module_expr (sub : mapper) mexpr =
               Pmod_apply_unit (sub.module_expr sub mexp1)
           | Tmod_constraint (mexpr, _, Tmodtype_explicit mtype, _) ->
               Pmod_constraint (sub.module_expr sub mexpr,
-                Some (sub.module_type sub mtype), Modes.empty)
+                Some (sub.module_type sub mtype), No_modes)
           | Tmod_constraint (_mexpr, _, Tmodtype_implicit, _) ->
               assert false
           | Tmod_unpack (exp, _pack) ->
@@ -1026,7 +1026,7 @@ let core_type sub ct =
     | Ttyp_arrow (arg_label, ct1, ct2) ->
         (* CR cgunn: recover mode annotation here *)
         Ptyp_arrow
-          (label arg_label, sub.typ sub ct1, sub.typ sub ct2, Modes.empty, Modes.empty)
+          (label arg_label, sub.typ sub ct1, sub.typ sub ct2, No_modes, No_modes)
     | Ttyp_tuple list ->
         Ptyp_tuple (List.map (fun (lbl, t) -> lbl, sub.typ sub t) list)
     | Ttyp_unboxed_tuple list ->

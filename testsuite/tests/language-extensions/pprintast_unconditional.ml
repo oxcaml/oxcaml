@@ -63,7 +63,7 @@ module Example = struct
                                { pmd_name = located (Some "M")
                                ; pmd_type = module_type
                                ; pmd_attributes = []
-                               ; pmd_modalities = Ast_helper.Modalities.empty
+                               ; pmd_modalities = Ast_helper.No_modalities
                                ; pmd_loc = loc
                                }
                          ; psig_loc = loc
@@ -74,7 +74,7 @@ module Example = struct
                          ; pvb_attributes = []
                          ; pvb_loc = loc
                          ; pvb_constraint = None
-                         ; pvb_modes = Ast_helper.Modes.empty
+                         ; pvb_modes = Ast_helper.No_modes
                          }
   let payload          = PStr structure
   let class_signature  = { pcsig_self = core_type

@@ -46,48 +46,48 @@ end
 
 module Modes = struct
   let mk ?(loc = !default_loc) pmode_modes pmode_crossings =
-    { pmode_modes; pmode_crossings; pmode_loc = loc }
+    match pmode_modes, pmode_crossings with
+    | [], [] -> No_modes
+    | _, _ -> Modes { pmode_modes; pmode_crossings; pmode_loc = loc }
 
-  let empty = mk [] []
-  let is_empty m = m.pmode_modes = [] && m.pmode_crossings = []
   let of_core_modes core_modes =
-    let loc =
-      match core_modes with
-      | [] -> None
-      | _ :: _ ->
-          Some (Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modes)) in
-    mk ?loc core_modes []
+    match core_modes with
+    | [] -> No_modes
+    | _ :: _ ->
+      let loc = Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modes) in
+      mk ~loc core_modes []
 
-  let append ({ pmode_modes = m; pmode_crossings = c; pmode_loc = l } as mode)
-             ({ pmode_modes = m'; pmode_crossings = c'; pmode_loc = l' } as mode') =
-    (* handle empty cases explicitly so that appending with empty gives better locs *)
-    if is_empty mode then mode' else if is_empty mode' then mode else
-    { pmode_modes = m @ m';
-      pmode_crossings = c @ c';
-      pmode_loc = Location.merge ~ghost:false [l; l'] }
+  let append mode mode' =
+    match mode, mode' with
+    | No_modes, _ -> mode'
+    | _, No_modes -> mode
+    | Modes { pmode_modes = m; pmode_crossings = c; pmode_loc = l },
+      Modes { pmode_modes = m'; pmode_crossings = c'; pmode_loc = l' } ->
+      let loc = Location.merge ~ghost:false [l; l'] in
+      mk ~loc (m @ m') (c @ c')
 end
 
 module Modalities = struct
   let mk ?(loc = !default_loc) pmoda_modalities pmoda_crossings =
-    { pmoda_modalities; pmoda_crossings; pmoda_loc = loc }
-
-  let empty = mk [] []
-  let is_empty m = m.pmoda_modalities = [] && m.pmoda_crossings = []
+    match pmoda_modalities, pmoda_crossings with
+    | [], [] -> No_modalities
+    | _, _ -> Modalities { pmoda_modalities; pmoda_crossings; pmoda_loc = loc }
 
   let of_core_modalities core_modalities =
-    let loc =
-      match core_modalities with
-      | [] -> None
-      | _ :: _ ->
-          Some (Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modalities)) in
-    mk ?loc core_modalities []
+    match core_modalities with
+    | [] -> No_modalities
+    | _ :: _ ->
+      let loc = Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modalities) in
+      mk ~loc core_modalities []
 
-  let append ({ pmoda_modalities = m; pmoda_crossings = c; pmoda_loc = l } as moda)
-             ({ pmoda_modalities = m'; pmoda_crossings = c'; pmoda_loc = l' } as moda') =
-    if is_empty moda then moda' else if is_empty moda' then moda else
-    { pmoda_modalities = m @ m';
-      pmoda_crossings = c @ c';
-      pmoda_loc = Location.merge ~ghost:false [l; l'] }
+    let append moda moda' =
+    match moda, moda' with
+    | No_modalities, _ -> moda'
+    | _, No_modalities -> moda
+    | Modalities { pmoda_modalities = m; pmoda_crossings = c; pmoda_loc = l },
+      Modalities { pmoda_modalities = m'; pmoda_crossings = c'; pmoda_loc = l' } ->
+      let loc = Location.merge ~ghost:false [l; l'] in
+      mk ~loc (m @ m') (c @ c')
 end
 
 module Attr = struct
@@ -327,7 +327,7 @@ module Mty = struct
   let ident ?loc ?attrs a = mk ?loc ?attrs (Pmty_ident a)
   let alias ?loc ?attrs a = mk ?loc ?attrs (Pmty_alias a)
   let signature ?loc ?attrs a = mk ?loc ?attrs (Pmty_signature a)
-  let functor_ ?loc ?attrs ?(ret_mode=Modes.empty) a b = mk ?loc ?attrs (Pmty_functor (a, b, ret_mode))
+  let functor_ ?loc ?attrs ?(ret_mode=No_modes) a b = mk ?loc ?attrs (Pmty_functor (a, b, ret_mode))
   let with_ ?loc ?attrs a b = mk ?loc ?attrs (Pmty_with (a, b))
   let typeof_ ?loc ?attrs a = mk ?loc ?attrs (Pmty_typeof a)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pmty_extension a)
@@ -366,7 +366,7 @@ module Sig = struct
   let modtype ?loc a = mk ?loc (Psig_modtype a)
   let modtype_subst ?loc a = mk ?loc (Psig_modtypesubst a)
   let open_ ?loc a = mk ?loc (Psig_open a)
-  let include_ ?loc ?(modalities = Modalities.empty) a = mk ?loc (Psig_include (a, modalities))
+  let include_ ?loc ?(modalities = No_modalities) a = mk ?loc (Psig_include (a, modalities))
   let class_ ?loc a = mk ?loc (Psig_class a)
   let class_type ?loc a = mk ?loc (Psig_class_type a)
   let extension ?loc ?(attrs = []) a = mk ?loc (Psig_extension (a, attrs))
@@ -380,7 +380,7 @@ module Sig = struct
 end
 
 module Sg = struct
-  let mk ?(loc = !default_loc) ?(modalities = Modalities.empty) a =
+  let mk ?(loc = !default_loc) ?(modalities = No_modalities) a =
     {psg_items = a; psg_modalities = modalities; psg_loc = loc}
 end
 
@@ -501,7 +501,7 @@ end
 
 module Val = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(prim = []) ?(modalities = Modalities.empty) name typ =
+        ?(prim = []) ?(modalities = No_modalities) name typ =
     {
      pval_name = name;
      pval_type = typ;
@@ -515,7 +515,7 @@ end
 module Md = struct
   let mk ?(loc = !default_loc) ?(attrs = [])
         ?(docs = empty_docs) ?(text = [])
-        ?(modalities = Modalities.empty) name typ =
+        ?(modalities = No_modalities) name typ =
     {
      pmd_name = name;
      pmd_type = typ;
@@ -587,7 +587,7 @@ end
 
 module Vb = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(text = []) ?value_constraint ?(modes = Modes.empty) pat expr =
+        ?(text = []) ?value_constraint ?(modes = No_modes) pat expr =
     {
      pvb_pat = pat;
      pvb_expr = expr;
@@ -648,7 +648,7 @@ module Type = struct
     }
 
   let constructor_arg ?(loc = !default_loc)
-        ?(modalities = Modalities.empty) typ =
+        ?(modalities = No_modalities) typ =
     {
       pca_modalities = modalities;
       pca_type = typ;
@@ -656,7 +656,7 @@ module Type = struct
     }
 
   let field ?(loc = !default_loc) ?(attrs = []) ?(info = empty_info)
-        ?(mut = Immutable) ?(modalities = Modalities.empty) name typ =
+        ?(mut = Immutable) ?(modalities = No_modalities) name typ =
     {
      pld_name = name;
      pld_mutable = mut;
