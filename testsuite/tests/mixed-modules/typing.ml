@@ -871,7 +871,18 @@ end = struct
   let a_266 = "a"
 end
 [%%expect{|
-Error: Mixed modules may contain at most 254 value fields prior to the flat suffix, but this one contains 257.
+Lines 265-534, characters 6-3:
+265 | ......struct
+266 |   let f_0 = #42.0
+267 |   let a_0 = "a"
+268 |   let a_1 = "a"
+269 |   let a_2 = "a"
+...
+531 |   let a_264 = "a"
+532 |   let a_265 = "a"
+533 |   let a_266 = "a"
+534 | end
+Error: Mixed modules may contain at most 254 value fields prior to the flat suffix, but this one contains 261.
 |}]
 
 
