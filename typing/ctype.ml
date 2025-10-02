@@ -2115,7 +2115,8 @@ let rec quote_splice_cancel ty =
 let rec try_expand_once env ty =
   let expand_and_cancel t =
     match try_expand_once env t with
-    | _ | exception Cannot_expand -> quote_splice_cancel ty
+    | _v -> quote_splice_cancel ty
+    | exception Cannot_expand -> quote_splice_cancel ty
   in
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
@@ -4266,6 +4267,18 @@ and unify3 uenv t1 t1' t2 t2' =
           set_type_desc t1' d1;
           let t =
             newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
+          in
+          unify uenv s2 t
+      | (Tquote s1, _) ->
+          set_type_desc t2' d2;
+          let t =
+            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tsplice t2')
+          in
+          unify uenv s1 t
+      | (_, Tquote s2) ->
+          set_type_desc t1' d1;
+          let t =
+            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
           in
           unify uenv s2 t
       | (_, _) -> raise_unexplained_for Unify
