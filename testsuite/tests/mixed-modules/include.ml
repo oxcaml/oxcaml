@@ -146,6 +146,7 @@ let _ = print_endline "Test: include shadowing a val"
 module M6 = struct
   let a = #5.0
   let b = "before include"
+  let c = #0L
 
   include struct
     let b = "from include"
@@ -166,7 +167,7 @@ let _ = print_endline "Test: val shadowing an include"
 
 module M7 = struct
   include struct
-    let p = #8.0
+    let p = #0L
     let q = "from include"
   end
 
