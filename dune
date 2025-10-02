@@ -622,6 +622,7 @@
   opterrors
   optcompile
   optmaindriver
+  jscompile
   jslink
   jslibrarian
   compiler_hooks

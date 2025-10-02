@@ -1,0 +1,237 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 2002 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+open Misc
+open Compile_common
+
+let tool_name = "ocamlj"
+let with_info = Compile_common.with_info ~native:false ~tool_name
+
+let interface ~source_file ~output_prefix =
+  with_info ~source_file ~output_prefix ~dump_ext:"cmi"
+    ~compilation_unit:Inferred_from_output_prefix ~kind:Intf
+  @@ fun info ->
+  Compile_common.interface
+    ~hook_parse_tree:(fun _ -> ())
+    ~hook_typed_tree:(fun _ -> ())
+    info
+
+let run_jsoo_exn ~args =
+  let prog =
+    (* Use jsoo from our PATH when we're bootstrapping *)
+    match Sys.ocaml_release with
+    | { extra = Some (Plus, "ox"); _ } ->
+        Filename.concat Config.bindir "js_of_oxcaml"
+    | _ ->
+        (* Try to find js_of_oxcaml in the same directory as the current executable *)
+        let exe_dir = Filename.dirname Sys.executable_name in
+        let jsoo_path = Filename.concat exe_dir "js_of_oxcaml" in
+        if Sys.file_exists jsoo_path then jsoo_path else "js_of_oxcaml"
+  in
+  let cmdline = Filename.quote_command prog args in
+  match Ccomp.command cmdline with 0 -> () | _ -> raise (Sys_error cmdline)
+
+(** Js_of_ocaml IR compilation backend for .ml files. *)
+
+let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
+  match (param, arg_block_idx) with
+  | Some arg_param, Some arg_block_idx -> Some { arg_param; arg_block_idx }
+  | None, None -> None
+  | Some _, None -> Misc.fatal_error "No argument field"
+  | None, Some _ -> Misc.fatal_error "Unexpected argument field"
+
+let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
+  raw_lambda
+  |> Profile.(record ~accumulate:true generate)
+       (fun (program : Lambda.program) ->
+         Builtin_attributes.warn_unused ();
+         program.code
+         |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
+         |> Simplif.simplify_lambda
+         |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
+         |> fun lambda ->
+         let arg_descr =
+           make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
+         in
+         lambda |> fun code ->
+         Flambda2.lambda_to_flambda ~machine_width:Thirty_two_no_gc_tag_bit
+           ~ppf_dump:i.ppf_dump
+           ~prefixname:(Unit_info.prefix i.target)
+           { program with code }
+         |> fun (flambda_result : Flambda2.flambda_result) ->
+         let jsir =
+           Flambda2_to_jsir.To_jsir.unit ~offsets:flambda_result.offsets
+             ~all_code:flambda_result.all_code
+             ~reachable_names:flambda_result.reachable_names
+             flambda_result.flambda
+           |> print_if i.ppf_dump Clflags.dump_jsir
+                (fun ppf (jsir : Flambda2_to_jsir.To_jsir_result.program) ->
+                  Jsoo_imports.Jsir.Print.program ppf
+                    (fun _ _ -> "")
+                    jsir.program)
+         in
+         (jsir, program.main_module_block_format, arg_descr))
+
+let emit_jsir i
+    ({ program; imported_compilation_units } :
+      Flambda2_to_jsir.To_jsir_result.program) =
+  let jsir = Unit_info.jsir i.target in
+  let compilation_unit : Jsoo_imports.Jsir.compilation_unit =
+    let info : Jsoo_imports.Unit_info.t =
+      {
+        provides =
+          Jsoo_imports.StringSet.singleton
+            (Compilation_unit.full_path_as_string i.module_name);
+        requires =
+          Compilation_unit.Set.elements imported_compilation_units
+          |> List.map Compilation_unit.full_path_as_string
+          |> Jsoo_imports.StringSet.of_list;
+        primitives = [];
+        aliases = [];
+        force_link = false;
+        effects_without_cps = false;
+      }
+    in
+    {
+      info;
+      contents =
+        (* CR-soon jvanburen: add debug info for source maps *)
+        {
+          code = program;
+          cmis = Jsoo_imports.StringSet.empty;
+          debug = Jsoo_imports.Jsir.Debug.default_summary;
+        };
+    }
+  in
+  let filename = Unit_info.Artifact.filename jsir in
+  Jsoo_imports.Jsir.save compilation_unit ~filename;
+  Misc.try_finally
+    ~always:(fun () ->
+      (* Clean up the intermediate .jsir file *)
+      Misc.remove_file filename)
+    (fun () ->
+      let debug_flag = if !Clflags.debug then [ "--debug-info" ] else [] in
+      run_jsoo_exn
+        ~args:
+          ([
+             "compile";
+             "--enable=effects,with-js-error";
+             Unit_info.Artifact.filename (Unit_info.jsir i.target);
+             "-o";
+             Unit_info.Artifact.filename (Unit_info.cmjo i.target);
+           ]
+          @ debug_flag
+          @ List.rev !Clflags.all_ccopts))
+
+let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
+    ~as_arg_for =
+  let argument_coercion =
+    match argument_interface with
+    | Some { ai_coercion_from_primary; ai_signature = _ } ->
+        Some ai_coercion_from_primary
+    | None -> None
+  in
+  let raw_lambda =
+    (structure, coercion, argument_coercion)
+    |> Profile.(record transl) (Translmod.transl_implementation i.module_name)
+  in
+  let jsir, main_module_block_format, arg_descr =
+    raw_lambda_to_jsir i raw_lambda ~as_arg_for
+  in
+  Compilenv.save_unit_info
+    (Unit_info.Artifact.filename (Unit_info.cmjx i.target))
+    ~main_module_block_format ~arg_descr;
+  jsir
+
+type starting_point =
+  | Parsing
+  | Instantiation of {
+      runtime_args : Translmod.runtime_arg list;
+      main_module_block_size : int;
+      arg_descr : Lambda.arg_descr option;
+    }
+
+let starting_point_of_compiler_pass start_from =
+  match (start_from : Clflags.Compiler_pass.t) with
+  | Parsing -> Parsing
+  | _ ->
+      Misc.fatal_errorf "Cannot start from %s"
+        (Clflags.Compiler_pass.to_string start_from)
+
+let implementation_aux ~start_from ~source_file ~output_prefix
+    ~keep_symbol_tables:_
+    ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
+  with_info ~source_file ~output_prefix ~dump_ext:"cmjo" ~compilation_unit
+    ~kind:Impl
+  @@ fun info ->
+  match start_from with
+  | Parsing ->
+      let backend info typed =
+        Compilenv.reset info.target;
+        Jsoo_imports.Targetint.set_num_bits 32;
+        let as_arg_for =
+          !Clflags.as_argument_for
+          |> Option.map Global_module.Parameter_name.of_string
+        in
+        let jsir = to_jsir info typed ~as_arg_for in
+        emit_jsir info jsir
+      in
+      Compile_common.implementation
+        ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
+        ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
+          Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
+        info ~backend
+  | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
+      (match !Clflags.as_argument_for with
+      | Some _ ->
+          (* CR lmaurer: Needs nicer error message (this is a user error) *)
+          Misc.fatal_error
+            "-as-argument-for is not allowed (and not needed) with -instantiate"
+      | None -> ());
+      let as_arg_for, arg_block_idx =
+        match (arg_descr : Lambda.arg_descr option) with
+        | Some { arg_param; arg_block_idx } ->
+            (Some arg_param, Some arg_block_idx)
+        | None -> (None, None)
+      in
+      Compilenv.reset info.target;
+      let impl =
+        Translmod.transl_instance info.module_name ~runtime_args
+          ~main_module_block_size ~arg_block_idx
+      in
+      let jsir, main_module_block_format, arg_descr_computed =
+        raw_lambda_to_jsir info impl ~as_arg_for
+      in
+      emit_jsir info jsir;
+      Compilenv.save_unit_info
+        (Unit_info.Artifact.filename (Unit_info.cmjx info.target))
+        ~main_module_block_format
+        ~arg_descr:
+          (match arg_descr with
+          | None -> arg_descr_computed
+          | Some _ -> arg_descr)
+
+let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
+  let start_from = start_from |> starting_point_of_compiler_pass in
+  implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
+    ~compilation_unit:Inferred_from_output_prefix
+
+let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
+    ~main_module_block_size ~arg_descr ~keep_symbol_tables =
+  let start_from =
+    Instantiation { runtime_args; main_module_block_size; arg_descr }
+  in
+  implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
+    ~compilation_unit:(Exactly compilation_unit)

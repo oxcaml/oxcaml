@@ -124,7 +124,7 @@ let create_archive file_list lib_name =
           if !Clflags.link_everything then [ "--linkall" ] else []
         in
         let debug_flag = if !Clflags.debug then [ "--debug-info" ] else [] in
-        Jscomp.run_jsoo_exn
+        Jscompile.run_jsoo_exn
           ~args:
             ([ "link"; "-a" ] @ linkall_flag @ debug_flag
            @ [ "-o"; archive_name ] @ objfile_list))

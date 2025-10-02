@@ -303,7 +303,7 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
     in
 
     (* Always build runtime - it's required for JavaScript execution *)
-    Jscomp.run_jsoo_exn
+    Jscompile.run_jsoo_exn
       ~args:([ "build-runtime"; "--enable=effects,with-js-error"; "-o"; runtime ] @ debug_flag @ runtime_files);
 
     (* Link everything together *)
@@ -314,7 +314,7 @@ let link ~ppf_dump:(_ : Format.formatter) objfiles output_name =
     let linkall_flag = if !Clflags.link_everything then ["--linkall"] else [] in
     Misc.try_finally
       (fun () ->
-        Jscomp.run_jsoo_exn
+        Jscompile.run_jsoo_exn
           ~args:(["link"; "-o"; output_name ] @ linkall_flag @ debug_flag @ files_to_link
                  @ (List.rev !Clflags.all_ccopts)
                 ))
