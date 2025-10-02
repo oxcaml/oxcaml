@@ -12,7 +12,7 @@
 open Stdlib_upstream_compatible
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
-let _ = print_endline "Test: basic first-class mixed module"
+let () = print_endline "Test: basic first-class mixed module"
 
 module type S1 = sig
   val unboxed_float : float#
@@ -28,21 +28,19 @@ module M1 : S1 = struct
   let unboxed_int64 = #100L
 end
 
-let packed = (module M1 : S1)
+let packed = id (module M1 : S1)
 
 let () =
   let module M = (val packed : S1) in
-  print_int (id M.boxed_int);
-  print_endline "";
-  print_string (id M.boxed_string);
-  print_endline "";
-  print_float (Float_u.to_float (id M.unboxed_float));
-  print_endline "";
-  print_int (Int64_u.to_int (id M.unboxed_int64));
-  print_endline ""
+  print_endline "Expected: 42 hello 3.14 100";
+  Printf.printf "Actual:   %d %s %.2f %d\n\n"
+    (id M.boxed_int)
+    (id M.boxed_string)
+    (Float_u.to_float (id M.unboxed_float))
+    (Int64_u.to_int (id M.unboxed_int64))
 
 
-let _ = print_endline "Test: passing modules to functions"
+let () = print_endline "Test: passing modules to functions"
 
 let use_module m =
   let module M = (val m : S1) in
@@ -51,12 +49,10 @@ let use_module m =
   (sum, concat)
 
 let (sum, concat) = use_module packed
-let _ = print_int (id sum)
-let _ = print_endline ""
-let _ = print_endline (id concat)
+let () = Printf.printf "%d\n%s\n" (id sum) (id concat)
 
 
-let _ = print_endline "Test: returning modules from functions"
+let () = print_endline "Test: returning modules from functions"
 
 let make_module n s =
   (module struct
@@ -75,7 +71,7 @@ let () =
     (Int64_u.to_int (id M3.unboxed_int64))
 
 
-let _ = print_endline "Test: list of first-class modules"
+let () = print_endline "Test: list of first-class modules"
 
 let modules = [
   (module struct
@@ -104,11 +100,10 @@ let sum_ints mods =
     acc + (Int64_u.to_int M.unboxed_int64)
   ) 0 mods
 
-let _ = print_int (sum_ints (id modules))
-let _ = print_endline ""
+let () = Printf.printf "%d\n" (sum_ints (id modules))
 
 
-let _ = print_endline "Test: conditional module selection"
+let () = print_endline "Test: conditional module selection"
 
 let select_module b =
   if b then
@@ -127,10 +122,10 @@ let select_module b =
     end : S1)
 
 module Selected = (val (select_module (id false)) : S1)
-let _ = print_float (Float_u.to_float (id Selected.unboxed_float))
-let _ = print_endline ""
-let _ = print_string (id Selected.boxed_string)
-let _ = print_endline ""
+let () =
+  Printf.printf "%.3f\n%s\n"
+    (Float_u.to_float (id Selected.unboxed_float))
+    (id Selected.boxed_string)
 
 module Selected2 = (val (select_module (id true)) : S1)
 let _ = print_float (Float_u.to_float (id Selected2.unboxed_float))
@@ -138,7 +133,7 @@ let _ = print_endline ""
 let _ = print_string (id Selected2.boxed_string)
 let _ = print_endline ""
 
-let _ = print_endline "Test: unboxed tuples and records in a first-class module"
+let () = print_endline "Test: unboxed tuples and records in a first-class module"
 
 module type S6 = sig
   val regular_tuple : int * string
@@ -159,21 +154,21 @@ end
 let packed6 = (module M6 : S6)
 module M6_unpacked = (val (id packed6) : S6)
 
-let _ =
+let () =
   let (n, s) = M6_unpacked.regular_tuple in
   print_int (id n);
   print_endline "";
   print_string (id s);
   print_endline ""
 
-let _ =
+let () =
   let #(f, i) = M6_unpacked.unboxed_tuple in
   print_float (Float_u.to_float (id f));
   print_endline "";
   print_int (Int64_u.to_int (id i));
   print_endline ""
 
-let _ =
+let () =
   let #{ M6_unpacked.x; y } = M6_unpacked.unboxed_rec in
   print_float (Float_u.to_float (id x));
   print_endline "";
@@ -181,7 +176,7 @@ let _ =
   print_endline ""
 
 
-let _ = print_endline "Test: functor producing first-class mixed modules"
+let () = print_endline "Test: functor producing first-class mixed modules"
 
 module type Input = sig
   val n : int
@@ -204,13 +199,13 @@ let make_from_input n (base : float#) =
 
 let m7 = make_from_input 5 #1.5
 module M7 = (val m7 : S1)
-let _ = print_int (id M7.boxed_int)
+let () = print_int (id M7.boxed_int)
 let _ = print_endline ""
 let _ = print_float (Float_u.to_float (id M7.unboxed_float))
 let _ = print_endline ""
 
 
-let _ = print_endline "Test: first-class functors"
+let () = print_endline "Test: first-class functors"
 
 module type S8 = sig
   val foo : float#
@@ -363,13 +358,13 @@ end : S10_with_eq with type t = bool)
 
 let m10_fewer = (m10_eq :> (module S10_fewer_types with type t = bool))
 module M10 = (val m10_fewer : S10_fewer_types with type t = bool)
-let _ = print_int (id (M10.x true))
-let _ = print_endline ""
-let _ = print_float (Float_u.to_float (id M10.y))
-let _ = print_endline ""
+let _ =
+  Printf.printf "%d\n%.3f\n"
+    ((id M10.x) true)
+    (Float_u.to_float (id M10.y))
 
 
-let _ = print_endline "Test: subtype with unboxed type in forgotten types"
+let () = print_endline "Test: subtype with unboxed type in forgotten types"
 
 module type S11_many_unboxed = sig
   type t = float#
@@ -392,5 +387,4 @@ end : S11_many_unboxed with type v = string)
 
 let m11_one = (m11_many :> (module S11_one_unboxed))
 module M11 = (val m11_one : S11_one_unboxed)
-let _ = print_float (Float_u.to_float (id M11.x))
-let _ = print_endline ""
+let () = Printf.printf "%.1f\n" (Float_u.to_float (id M11.x))

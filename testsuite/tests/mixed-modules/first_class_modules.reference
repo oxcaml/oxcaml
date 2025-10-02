@@ -1,8 +1,7 @@
 Test: basic first-class mixed module
-42
-hello
-3.14
-100
+Expected: 42 hello 3.14 100
+Actual:   42 hello 3.14 100
+
 Test: passing modules to functions
 142
 hello 3.14
