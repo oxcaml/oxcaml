@@ -26,7 +26,7 @@ module ConstrTbl = Hashtbl.Make (struct
 
   let equal a b = Path.compare a b = 0
 
-  let hash x = Hashtbl.hash (constr_to_string x)
+  let hash x = Path.hash x
 end)
 
 type ops =
