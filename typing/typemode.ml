@@ -566,7 +566,7 @@ let sort_dedup_modalities ~warn l =
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
 let transl_modalities ~maturity mut
-    ({ pmoda_modalities; pmoda_crossings } : Parsetree.modalities) =
+    ({ pmoda_modalities; pmoda_crossings; _ } : Parsetree.modalities) =
   if pmoda_crossings <> []
   then Misc.fatal_error "ZJE: mods are not yet supported";
   let mut_modalities =

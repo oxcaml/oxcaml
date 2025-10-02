@@ -1201,35 +1201,21 @@ and apply_modalities_module_type env modalities = function
       Mty_signature sg
   | (Mty_functor _ | Mty_alias _) as mty -> mty
 
-let loc_of_modes (modes : Parsetree.mode loc list) : Location.t option =
-  (* CR zqian: [Parsetree.modes] should be a record with a field that is
-  the location of the whole modes string. *)
-  let rec loc_end_of_modes (head : Parsetree.mode loc) = function
-    | [] -> head.loc.loc_end
-    | head' :: rest -> loc_end_of_modes head' rest
-  in
-  match modes with
-  | [] -> None
-  | head :: rest ->
-    let loc_start = head.loc.loc_start in
-    let loc_end = loc_end_of_modes head rest in
-    Some {loc_start; loc_end; loc_ghost=false}
-
-let check_unsupported_modal_module ~env reason {pmode_modes; pmode_crossings; _} =
+let check_unsupported_modal_module ~env reason {pmode_modes; pmode_crossings; pmode_loc} =
   (* CR zeisbach: obviously fix this to have better error reporting.
      for now, just a stub *)
   if pmode_crossings <> [] then Misc.fatal_error "ZJE: mods not supported yet";
-  match loc_of_modes pmode_modes with
-  | None -> ()
-  | Some loc -> raise(Error(loc, env, Unsupported_modal_module reason))
+  match pmode_modes with
+  | [] -> ()
+  | _ :: _ -> raise(Error(pmode_loc, env, Unsupported_modal_module reason))
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   modalities =
   match modalities with
-  | {pmoda_modalities = []; pmoda_crossings = []} -> default_modalities
-  | {pmoda_modalities = _ :: _; pmoda_crossings = []} ->
+  | {pmoda_modalities = []; pmoda_crossings = []; _} -> default_modalities
+  | {pmoda_modalities = _ :: _; pmoda_crossings = []; _} ->
     Typemode.transl_modalities ~maturity:Stable Immutable modalities
-  | {pmoda_modalities = _; pmoda_crossings = _ :: _} ->
+  | {pmoda_modalities = _; pmoda_crossings = _ :: _; _} ->
       Misc.fatal_error "ZJE: mods are not yet supported"
 
 let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
@@ -1444,8 +1430,8 @@ and approx_sig_items env ssg=
               let sg = extract_sig env loc mty in
               let sg =
                 match moda with
-                | { pmoda_modalities = []; pmoda_crossings = [] } -> sg
-                | { pmoda_modalities = _ :: _; pmoda_crossings = [] } ->
+                | { pmoda_modalities = []; pmoda_crossings = []; _ } -> sg
+                | { pmoda_modalities = _ :: _; pmoda_crossings = []; _ } ->
                   let modalities =
                     Typemode.transl_modalities ~maturity:Stable Immutable moda
                   in
@@ -1453,7 +1439,7 @@ and approx_sig_items env ssg=
                     not @@ Builtin_attributes.has_attribute "no_recursive_modalities" attrs
                   in
                   apply_modalities_signature ~recursive env modalities sg
-                | { pmoda_modalities = _; pmoda_crossings = _ :: _ } ->
+                | { pmoda_modalities = _; pmoda_crossings = _ :: _; _ } ->
                     Misc.fatal_error "ZJE: mods are not yet supported"
               in
               let sg, newenv = Env.enter_signature ~scope sg env in
@@ -2026,7 +2012,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     | Psig_value sdesc ->
         let modalities =
           match sdesc.pval_modalities with
-          | { pmoda_modalities = []; pmoda_crossings = [] } -> sig_modalities
+          | { pmoda_modalities = []; pmoda_crossings = []; _ } -> sig_modalities
           | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
         in
         let modalities = Mode.Modality.of_const modalities in

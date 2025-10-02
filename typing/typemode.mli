@@ -11,7 +11,7 @@ val untransl_mode_annots : Mode.Alloc.Const.Option.t -> Parsetree.modes
     legacy if unspecified *)
 val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t
 
-(* CR zeisbach: like with the mode translation functoins above, maybe these should
+(* CR zeisbach: like with the mode translation functions above, maybe these should
    take and return core_modalities. this also depends on use *)
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places

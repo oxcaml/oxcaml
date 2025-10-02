@@ -1421,7 +1421,7 @@ let tree_of_modality_old (t: Parsetree.modality loc) =
   | _ -> None
 
 let tree_of_modalities mut t =
-  let ({ pmoda_modalities = t; pmoda_crossings } : Parsetree.modalities) =
+  let ({ pmoda_modalities = t; pmoda_crossings; _ } : Parsetree.modalities) =
     Typemode.untransl_modalities mut t in
   (* CR zeisbach: this should definitely not raise but I want to make sure that this
      will not silently pass through. but these should be printed somehow clearly *)
@@ -1431,7 +1431,7 @@ let tree_of_modalities mut t =
   | None -> List.map tree_of_modality_new t
 
 let tree_of_modalities_new mut t =
-  let ({ pmoda_modalities = l; pmoda_crossings } : Parsetree.modalities) =
+  let ({ pmoda_modalities = l; pmoda_crossings; _ } : Parsetree.modalities) =
     Typemode.untransl_modalities mut t in
   if pmoda_crossings <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   List.map (fun ({txt = Parsetree.Modality s; _}) -> s) l
