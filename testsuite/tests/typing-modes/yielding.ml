@@ -5,9 +5,9 @@
 (* CR dkalinichenko: allow [yielding] at toplevel? *)
 let my_effect : (unit -> unit) @ yielding = print_endline "Hello, world!"
 [%%expect{|
-Line 1, characters 4-41:
+Line 1, characters 4-73:
 1 | let my_effect : (unit -> unit) @ yielding = print_endline "Hello, world!"
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "yielding" but is expected to be "unyielding".
 |}]
 
