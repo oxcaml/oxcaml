@@ -1,5 +1,5 @@
-open Slambda0
+module SL := Slambda0
 
 open Format
 
-val slambda0 : (formatter -> 'lam -> unit) -> formatter -> 'lam slambda0 -> unit
+val slambda0 : (formatter -> 'lam -> unit) -> formatter -> 'lam SL.t0 -> unit

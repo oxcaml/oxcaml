@@ -1,2 +1,2 @@
-type 'lam slambda0 =
-  | SLquote of 'lam
+type 'lam t0 =
+  | Quote of 'lam

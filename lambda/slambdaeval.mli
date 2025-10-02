@@ -1,1 +1,3 @@
-val eval : Slambda.program -> Lambda.program
+module SL := Slambda
+
+val eval : SL.program -> Lambda.program

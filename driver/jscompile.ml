@@ -15,6 +15,7 @@
 
 open Misc
 open Compile_common
+module SL = Slambda
 
 let tool_name = "ocamlj"
 let with_info = Compile_common.with_info ~native:false ~tool_name
@@ -39,8 +40,7 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
 
 let slambda_to_jsir i slambda ~as_arg_for =
   slambda
-  |> Profile.(record ~accumulate:true generate)
-       (fun (program : Slambda.program) ->
+  |> Profile.(record ~accumulate:true generate) (fun (program : SL.program) ->
          Builtin_attributes.warn_unused ();
          program
          |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program

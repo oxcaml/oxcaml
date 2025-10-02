@@ -18,6 +18,8 @@
 open Misc
 open Compile_common
 
+module SL = Slambda
+
 let tool_name = "ocamlopt"
 
 let with_info = Compile_common.with_info ~native:true ~tool_name
@@ -43,7 +45,7 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
 let compile_from_slambda i slambda ~unix ~pipeline ~as_arg_for =
   slambda
   |> Profile.(record generate)
-   (fun (program : Slambda.program) ->
+   (fun (program : SL.program) ->
       Builtin_attributes.warn_unused ();
       program
       |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program

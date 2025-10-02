@@ -1,7 +1,7 @@
-open Slambda
+module SL := Slambda
 
 open Format
 
-val slambda : formatter -> slambda -> unit
+val slambda : formatter -> SL.t -> unit
 
-val program : formatter -> program -> unit
+val program : formatter -> SL.program -> unit

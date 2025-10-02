@@ -26,6 +26,8 @@ open Translcore
 open Translclass
 open Debuginfo.Scoped_location
 
+module SL = Slambda
+
 let const_int i = Lambda.const_int i
 
 type unsafe_component =
@@ -1051,7 +1053,7 @@ let transl_implementation compilation_unit impl =
     main_module_block_format;
     arg_block_idx;
     required_globals = required_globals ~flambda:true body;
-    code = Slambda0.SLquote body }
+    code = SL.Quote body }
 
 
 (* Compile a toplevel phrase *)
@@ -1298,7 +1300,7 @@ let transl_runtime_arg arg =
 let transl_instance_impl
       compilation_unit ~runtime_args ~main_module_block_size
       ~arg_block_idx
-    : Slambda.program =
+    : SL.program =
   let base_compilation_unit, _args =
     Compilation_unit.split_instance_exn compilation_unit
   in
@@ -1324,7 +1326,7 @@ let transl_instance_impl
       ap_probe = None;
     }
   in
-  let code = Slambda.SLquote code in
+  let code = SL.Quote code in
   let required_globals =
     base_compilation_unit :: List.filter_map unit_of_runtime_arg runtime_args
     |> Compilation_unit.Set.of_list
