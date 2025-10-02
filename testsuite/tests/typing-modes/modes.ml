@@ -5,25 +5,25 @@
 (* Let bindings *)
 let local_ foo : string @ unique = "hello"
 [%%expect{|
-Line 1, characters 4-32:
+Line 1, characters 4-42:
 1 | let local_ foo : string @ unique = "hello"
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 let local_ foo @ unique = "hello"
 [%%expect{|
-Line 1, characters 4-23:
+Line 1, characters 4-33:
 1 | let local_ foo @ unique = "hello"
-        ^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 let local_ foo : 'a. ('a -> 'a) @ unique = fun x -> x
 [%%expect{|
-Line 1, characters 4-40:
+Line 1, characters 4-53:
 1 | let local_ foo : 'a. ('a -> 'a) @ unique = fun x -> x
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -34,17 +34,17 @@ val foo : 'a -> 'a = <fun>
 
 let (x, y) @ local unique = "hello", "world"
 [%%expect{|
-Line 1, characters 4-25:
+Line 1, characters 4-44:
 1 | let (x, y) @ local unique = "hello", "world"
-        ^^^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 let (x, y) : _ @ local unique = "hello", "world"
 [%%expect{|
-Line 1, characters 4-29:
+Line 1, characters 4-48:
 1 | let (x, y) : _ @ local unique = "hello", "world"
-        ^^^^^^^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
