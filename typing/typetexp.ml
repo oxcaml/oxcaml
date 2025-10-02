@@ -680,7 +680,7 @@ let transl_label_from_pat (label : Parsetree.arg_label)
      to Position, as this means the type annotation is [%call_pos] and
      nothing more. *)
   | {ppat_desc =
-        Ppat_constraint (inner_pat, ty, {pmode_modes=[]; pmode_crossings=[]; _}); _} ->
+        Ppat_constraint (inner_pat, ty, No_modes); _} ->
       let label = transl_label label ty in
       let pat = if Btype.is_position label then inner_pat else pat in
       label, pat
@@ -691,7 +691,7 @@ let transl_label_from_expr (label : Parsetree.arg_label)
     (expr : Parsetree.expression) =
   match expr with
   | {pexp_desc =
-        Pexp_constraint (inner_expr, ty, {pmode_modes=[]; pmode_crossings=[]; _}); _} ->
+        Pexp_constraint (inner_expr, ty, No_modes); _} ->
       let label = transl_label label ty in
       let expr = if Btype.is_position label then inner_expr else expr in
       label, expr

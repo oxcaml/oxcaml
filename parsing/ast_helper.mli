@@ -57,13 +57,15 @@ end
 
 (** {1 Modes and Modalities} *)
 module Modes : sig
-  val empty : modes
+  val mk : ?loc:loc -> core_modes -> crossings -> modes
+
   val append : modes -> modes -> modes
   val of_core_modes : core_modes -> modes
 end
 
 module Modalities : sig
-  val empty : modalities
+  val mk : ?loc:loc -> core_modalities -> crossings -> modalities
+
   val append : modalities -> modalities -> modalities
   val of_core_modalities : core_modalities -> modalities
 end
