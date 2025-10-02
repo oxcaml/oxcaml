@@ -59,13 +59,13 @@ end
 module Modes : sig
   val empty : modes
   val append : modes -> modes -> modes
-  val of_core_modes : ?loc:loc -> core_modes -> modes
+  val of_core_modes : core_modes -> modes
 end
 
 module Modalities : sig
   val empty : modalities
   val append : modalities -> modalities -> modalities
-  val of_core_modalities : ?loc:loc -> core_modalities -> modalities
+  val of_core_modalities : core_modalities -> modalities
 end
 
 (** {1 Attributes} *)
