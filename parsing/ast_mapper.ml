@@ -972,13 +972,13 @@ let default_mapper =
       in
       { pjkind_loc; pjkind_desc });
 
-    modes = (fun this { core_modes; mod_modes } ->
-      { core_modes = List.map (map_loc this) core_modes
-      ; mod_modes = List.map (map_loc this) mod_modes});
+    modes = (fun this { pmode_modes; pmode_crossings } ->
+      { pmode_modes = List.map (map_loc this) pmode_modes
+      ; pmode_crossings = List.map (map_loc this) pmode_crossings});
 
-    modalities = (fun this { core_modalities; mod_modalities } ->
-      { core_modalities = List.map (map_loc this) core_modalities
-      ; mod_modalities = List.map (map_loc this) mod_modalities});
+    modalities = (fun this { pmoda_modalities; pmoda_crossings } ->
+      { pmoda_modalities = List.map (map_loc this) pmoda_modalities
+      ; pmoda_crossings = List.map (map_loc this) pmoda_crossings});
 
     directive_argument =
       (fun this a ->

@@ -160,8 +160,10 @@ module Transled_modifiers = struct
     | Nonmodal Separability -> { t with separability = value }
 end
 
-let transl_mod_bounds ({ core_modes = annots; mod_modes } : Parsetree.modes) =
-  if mod_modes <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
+let transl_mod_bounds
+    ({ pmode_modes = annots; pmode_crossings } : Parsetree.modes) =
+  if pmode_crossings <> []
+  then Misc.fatal_error "ZJE: mods are not yet supported";
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
     match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
@@ -314,9 +316,11 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   in
   { annots with yielding; contention; portability }
 
-let transl_mode_annots ({ core_modes = annots; mod_modes } : Parsetree.modes) :
+let transl_mode_annots
+    ({ pmode_modes = annots; pmode_crossings } : Parsetree.modes) :
     Alloc.Const.Option.t =
-  if mod_modes <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
+  if pmode_crossings <> []
+  then Misc.fatal_error "ZJE: mods are not yet supported";
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
     let (P (ax, a)) =
@@ -373,7 +377,7 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) : Parsetree.modes =
   let linearity =
     print_to_string_opt Mode.Linearity.Const.print modes.linearity
   in
-  let core_modes =
+  let pmode_modes =
     List.filter_map
       (fun x ->
         Option.map (fun s -> { txt = Parsetree.Mode s; loc = Location.none }) x)
@@ -386,7 +390,7 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) : Parsetree.modes =
         statefulness;
         visibility ]
   in
-  Ast_helper.Modes.of_core_modes core_modes
+  Ast_helper.Modes.of_core_modes pmode_modes
 
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
@@ -562,14 +566,14 @@ let sort_dedup_modalities ~warn l =
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
 let transl_modalities ~maturity mut
-    ({ core_modalities; mod_modalities } : Parsetree.modalities) =
-  if mod_modalities <> []
+    ({ pmoda_modalities; pmoda_crossings } : Parsetree.modalities) =
+  if pmoda_crossings <> []
   then Misc.fatal_error "ZJE: mods are not yet supported";
   let mut_modalities =
     mutable_implied_modalities (Types.is_mutable mut)
       ~for_mutable_variable:false
   in
-  let modalities = List.map (transl_modality ~maturity) core_modalities in
+  let modalities = List.map (transl_modality ~maturity) pmoda_modalities in
   (* axes listed in the order of implication. *)
   let modalities = sort_dedup_modalities ~warn:true modalities in
   let open Modality in
