@@ -15,6 +15,7 @@ module Make (V : ORDERED) = struct
   module C = Axis_lattice
 
   type node = Obj.t
+  (* node ::= node_block | int (leaf) -- we use Obj magic to unbox leaves *)
 
   type node_block =
     { v : var;
