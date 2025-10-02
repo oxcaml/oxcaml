@@ -327,9 +327,8 @@ let legacy_mode f { txt = Mode s; _ } =
 let legacy_core_modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") legacy_mode f m
 
-let optional_legacy_modes f { pmode_modes; pmode_crossings; _ } =
-  if pmode_crossings <> [] then Misc.fatal_error "legacy modes are incompatible with mod modes";
-  match pmode_modes with
+let optional_legacy_modes f core_modes =
+  match core_modes with
   | [] -> ()
   | m ->
     legacy_core_modes f m;
@@ -347,7 +346,7 @@ let legacy_modality f m =
 let legacy_core_modalities f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") legacy_modality f m
 
-let optional_legacy_modalities f { pmoda_modalities; pmoda_crossings } =
+let optional_legacy_modalities f { pmoda_modalities; pmoda_crossings; _ } =
   if pmoda_crossings <> [] then
     Misc.fatal_error "legacy modes are incompatible with mod modes";
   match pmoda_modalities with
@@ -401,8 +400,8 @@ let optional_atat_core_modalities f m =
 
 let optional_modality_annot ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m =
   match m with
-  | { pmoda_modalities = []; pmoda_crossings = [] } -> ()
-  | { pmoda_modalities; pmoda_crossings } ->
+  | { pmoda_modalities = []; pmoda_crossings = []; _ } -> ()
+  | { pmoda_modalities; pmoda_crossings; _ } ->
     pre f ();
     optional_atat_core_modalities f pmoda_modalities;
     optional_mod_crossings f pmoda_crossings;
@@ -417,19 +416,16 @@ let optional_modality_annot_newline f m =
 
 (** For a list of modes, we either print everything in old syntax (if they
   are purely old modes), or everything in new syntax. *)
-let print_modes_in_old_syntax { pmode_modes; pmode_crossings; _ } =
-  if pmode_crossings <> [] then false
-  else
-    List.for_all (fun m ->
-      let Mode txt = m.txt in
-      match txt with
-      | "local" -> true
-      | _ -> false
-    ) pmode_modes
+let core_modes_in_old_syntax { pmode_modes; pmode_crossings; _ } =
+  match pmode_crossings with
+  | [] -> None
+  | _ :: _ ->
+    if List.for_all (fun {txt = Mode txt; _} -> txt = "local") pmode_modes
+      then Some pmode_modes else None
 
 (** For a list of modalities, we either print all in old syntax (if they are
   purely old modalities), or all in new syntax. *)
-let print_modality_in_old_syntax { pmoda_modalities; pmoda_crossings } =
+let print_modality_in_old_syntax { pmoda_modalities; pmoda_crossings; _ } =
   if pmoda_crossings <> [] then false
   else
     List.for_all (fun m ->
@@ -465,10 +461,9 @@ and core_type_with_optional_legacy_modes pty ctxt f (c, m) =
   match m with
   | { pmode_modes = []; pmode_crossings = []; _ } -> pty ctxt f c
   | _ ->
-    if print_modes_in_old_syntax m then
-      pp f "%a%a" optional_legacy_modes m (core_type1 ctxt) c
-    else
-      pp f "%a%a" (core_type1 ctxt) c optional_mode_annot m
+    match core_modes_in_old_syntax m with
+    | Some m -> pp f "%a%a" optional_legacy_modes m (core_type1 ctxt) c
+    | None -> pp f "%a%a" (core_type1 ctxt) c optional_mode_annot m
 
 and type_with_label ctxt f (label, c, mode) =
   match label with
@@ -848,21 +843,21 @@ and labeled_tuple_pattern ctxt f ~unboxed l closed =
 and pattern2 ctxt f p =
   match p.ppat_desc with
   | Ppat_constraint(p, ct, m) ->
-    begin match ct, print_modes_in_old_syntax m with
-    | Some ct, true ->
+    begin match ct, core_modes_in_old_syntax m with
+    | Some ct, Some m ->
         pp f "@[<2>%a%a@;:@;%a@]"
         optional_legacy_modes m
         (simple_pattern ctxt) p
         (core_type ctxt) ct
-    | Some ct, false ->
+    | Some ct, None ->
         pp f "@[<2>%a@;:@;%a@]"
         (simple_pattern ctxt) p
         (core_type_with_optional_modes ctxt) (ct, m)
-    | None, true ->
+    | None, Some m ->
         pp f "@[<2>%a%a@]"
         optional_legacy_modes m
         (simple_pattern ctxt) p
-    | None, false ->
+    | None, None ->
         pp f "@[<2>%a%a@]"
         (simple_pattern ctxt) p
         optional_mode_annot m
@@ -1209,10 +1204,10 @@ and simple_expr ctxt f x =
     | Pexp_unboxed_tuple l ->
         labeled_tuple_expr ctxt f ~unboxed:true l
     | Pexp_constraint (e, ct, m) ->
-      begin match ct, print_modes_in_old_syntax m with
-      | None, true ->
+      begin match ct, core_modes_in_old_syntax m with
+      | None, Some m ->
         pp f "(%a %a)" optional_legacy_modes m (expression ctxt) e
-      | None, false ->
+      | None, None ->
         pp f "(%a : _%a)" (expression ctxt) e optional_mode_annot m
       | Some ct, _ ->
         pp f "(%a : %a)"
@@ -1860,10 +1855,9 @@ and bindings ctxt f (mf,rf,l) =
   let binding kwd mf rf f x =
     (* The other modes are printed inside [binding] *)
     let legacy, x =
-      if print_modes_in_old_syntax x.pvb_modes then
-        x.pvb_modes, {x with pvb_modes = Ast_helper.Modes.empty}
-      else
-        Ast_helper.Modes.empty, x
+      match core_modes_in_old_syntax x.pvb_modes with
+      | Some m -> m, {x with pvb_modes = Ast_helper.Modes.empty}
+      | None -> [], x
     in
     pp f "@[<2>%s %a%a%a%a@]%a" kwd mutable_flag mf rec_flag rf
       optional_legacy_modes legacy
