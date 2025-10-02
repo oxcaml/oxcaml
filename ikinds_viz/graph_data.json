@@ -372,7 +372,7 @@
       ],
       "style": "dashed",
       "label": "Obj.magic",
-      "info": "Obj.magic bridge: pack_poly/unpack_poly talk to Types.constructor_ikind without exposing the representation."
+      "info": "Obj.magic bridge: pack_constructor_ikind/unpack_constructor_ikind talk to Types.constructor_ikind without exposing the representation."
     },
     {
       "source": "typing/ikinds/ikind.ml",

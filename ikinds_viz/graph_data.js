@@ -30,7 +30,7 @@ window.IKINDS_GRAPH_DATA = {
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/ikinds/ldd_jkind_solver.ml", "style": "solid", "label": null, "info": "Ikinds instantiates Ldd_jkind_solver.Make to obtain JK operations."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/ikinds/axis_lattice_bits.ml", "style": "solid", "label": null, "info": "Ikinds calls Axis_lattice_bits for masks/constants when translating jkinds."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/jkind.ml", "style": "solid", "label": null, "info": "Ikinds consumes Jkind APIs (disallow/with_bounds/modality) while constructing ckinds."},
-    {"source": "typing/ikinds/ikinds.ml", "target": "typing/types.mli", "style": "dashed", "label": "Obj.magic", "info": "Obj.magic bridge: pack_poly/unpack_poly talk to Types.constructor_ikind without exposing the representation."},
+    {"source": "typing/ikinds/ikinds.ml", "target": "typing/types.mli", "style": "dashed", "label": "Obj.magic", "info": "Obj.magic bridge: pack_constructor_ikind/unpack_constructor_ikind talk to Types.constructor_ikind without exposing the representation."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/path.ml", "style": "solid", "label": null, "info": "Uses Path.compare, Path.print, and Path.Map for constructor paths."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/ident.ml", "style": "solid", "label": null, "info": "Uses Ident.name to extract label names from declarations."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/btype.ml", "style": "solid", "label": null, "info": "Uses Btype functions (tvariant_not_immediate, static_row, fold_row) for variant analysis."},

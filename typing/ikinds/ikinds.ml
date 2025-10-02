@@ -354,16 +354,6 @@ let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
   let solver = make_solver ~context in
   JK.normalize solver (ckind_of_jkind_l jkind)
 
-let pack_poly (poly : Ikind.Ldd.node) : Types.constructor_ikind = Obj.magic poly
-
-let unpack_poly (packed : Types.constructor_ikind) : Ikind.Ldd.node = Obj.magic packed
-
-let normalize_and_pack ~(context : Jkind.jkind_context) ~(path : Path.t)
-    (jkind : Types.jkind_l) : Types.constructor_ikind =
-  ignore path;
-  let poly = normalize ~context jkind in
-  pack_poly poly
-
 let type_declaration_ikind ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.constructor_ikind =
   let solver = make_solver ~context in
