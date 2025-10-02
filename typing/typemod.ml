@@ -1215,7 +1215,7 @@ let loc_of_modes (modes : Parsetree.mode loc list) : Location.t option =
     let loc_end = loc_end_of_modes head rest in
     Some {loc_start; loc_end; loc_ghost=false}
 
-let check_unsupported_modal_module ~env reason {pmode_modes; pmode_crossings} =
+let check_unsupported_modal_module ~env reason {pmode_modes; pmode_crossings; _} =
   (* CR zeisbach: obviously fix this to have better error reporting.
      for now, just a stub *)
   if pmode_crossings <> [] then Misc.fatal_error "ZJE: mods not supported yet";
@@ -3496,9 +3496,10 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         sense. We convert them to modes. *)
         (* CR zqian: remove this hack *)
         let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
-        let {pmoda_modalities; pmoda_crossings} = sdesc.pval_modalities in
+        let {pmoda_modalities; pmoda_crossings; pmoda_loc} = sdesc.pval_modalities in
         let modes = { pmode_modes = List.map modality_to_mode pmoda_modalities;
-                      pmode_crossings = pmoda_crossings } in
+                      pmode_crossings = pmoda_crossings;
+                      pmode_loc = pmoda_loc } in
         let mode =
           modes
           |> Typemode.transl_alloc_mode

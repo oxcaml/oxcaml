@@ -188,7 +188,7 @@ let mkpat_with_modes ~loc ~pat ~cty ~modes =
     end
   | _ ->
     begin match cty, modes with
-    | None, { pmode_modes = []; pmode_crossings = [] } -> pat
+    | None, { pmode_modes = []; pmode_crossings = []; _ } -> pat
     | cty, modes -> mkpat ~loc (Ppat_constraint (pat, cty, modes))
     end
 
@@ -210,7 +210,7 @@ let mkexp_constraint ~loc ~exp ~cty ~modes =
      end
   | _ ->
      begin match cty, modes with
-     | None, { pmode_modes = []; pmode_crossings = [] } -> exp
+     | None, { pmode_modes = []; pmode_crossings = []; _ } -> exp
      | cty, modes -> mkexp ~loc (Pexp_constraint (exp, cty, modes))
      end
 
@@ -380,7 +380,7 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
      mk ~loc ~exp:e ~cty:(Some t) ~modes
   | Pcoerce(t1, t2)  ->
      match modes with
-     | { pmode_modes = []; pmode_crossings = [] } ->
+     | { pmode_modes = []; pmode_crossings = []; _ } ->
       let mk = if ghost then ghexp else mkexp ?attrs:None in
       mk ~loc (Pexp_coerce(e, t1, t2))
      | _ -> not_expecting loc "mode annotations"
@@ -951,7 +951,7 @@ let unboxed_type sloc lident tys =
 
 let maybe_pmod_constraint mode expr =
   match mode with
-  | { pmode_modes = []; pmode_crossings = [] } -> expr
+  | { pmode_modes = []; pmode_crossings = []; _ } -> expr
   | _ -> Mod.constraint_ None mode expr
 %}
 
@@ -4641,9 +4641,11 @@ at_mode_expr:
 mode_annot_expr:
   | pmode_modes = at_mode_expr
     pmode_crossings = optional_mod_mods_expr
-    { { pmode_modes; pmode_crossings } }
+    { let pmode_loc = make_loc $sloc in
+      { pmode_modes; pmode_crossings; pmode_loc } }
   | pmode_crossings = mod_mods_expr
-    { { pmode_modes = []; pmode_crossings } }
+    { let pmode_loc = make_loc $sloc in
+      { pmode_modes = []; pmode_crossings; pmode_loc } }
 ;
 
 %inline core_modes_expr:
@@ -4678,9 +4680,11 @@ atat_modalities_expr:
 modality_annot_expr:
   | pmoda_modalities = atat_modalities_expr
     pmoda_crossings = optional_mod_mods_expr
-    { { pmoda_modalities; pmoda_crossings } }
+    { let pmoda_loc = make_loc $sloc in
+      { pmoda_modalities; pmoda_crossings; pmoda_loc } }
   | pmoda_crossings = mod_mods_expr
-    { { pmoda_modalities = []; pmoda_crossings } }
+    { let pmoda_loc = make_loc $sloc in
+      { pmoda_modalities = []; pmoda_crossings; pmoda_loc } }
 ;
 
 optional_modality_annot_expr:

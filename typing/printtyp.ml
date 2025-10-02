@@ -1472,7 +1472,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
 
   let diff = {diff with yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
-  let ({ pmode_modes = l; pmode_crossings } : Parsetree.modes) =
+  let ({ pmode_modes = l; pmode_crossings; _ } : Parsetree.modes) =
     Typemode.untransl_mode_annots diff in
   if pmode_crossings <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
   match all_or_none tree_of_mode_old l with
