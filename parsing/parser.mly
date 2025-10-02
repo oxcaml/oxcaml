@@ -4053,7 +4053,7 @@ type_parameters:
 ;
 
 jkind_desc:
-    (* CR zeisbach: replace this with mod_crossing_expr to change jkind mod type *)
+    (* CR modes: this should be replaced by mod_crossing_expr to change jkind mod type *)
     jkind_annotation MOD mkrhs(LIDENT)+ { (* LIDENTs here are for modes *)
       let core_modes =
         List.map
@@ -4659,6 +4659,8 @@ mode_annot_expr:
 ;
 
 %inline with_optional_mode_expr(ty):
+  (* CR modes: currently this does not support crossings, which notably prevents
+     crossings from appearing on arrow types. *)
   | m0=optional_mode_expr_legacy ty=ty m1=optional_core_modes_expr {
     (ty, $loc(ty)), Modes.append m0 m1
   }
