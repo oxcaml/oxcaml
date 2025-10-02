@@ -3,28 +3,6 @@
    unique tables. We keep the rigid-variable table so the same rigid names map
    to the same solver variables across a run. *)
 
-module type LATTICE = sig
-  type t
-
-  val bot : t
-
-  val top : t
-
-  val join : t -> t -> t
-
-  val meet : t -> t -> t
-
-  val co_sub : t -> t -> t (* residual: join a (co_sub b a) = join a b *)
-
-  val to_string : t -> string (* optional, for debug/printing *)
-
-  val equal : t -> t -> bool
-
-  val hash : t -> int
-
-  val non_bot_axes : t -> int list
-end
-
 module type ORDERED = sig
   type t
 
@@ -33,7 +11,8 @@ module type ORDERED = sig
   val to_string : t -> string
 end
 
-module Make (C : LATTICE) (V : ORDERED) = struct
+module Make (V : ORDERED) = struct
+  module C = Axis_lattice
   (* --------- variables --------- *)
   type node =
     | Leaf of C.t

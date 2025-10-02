@@ -1,25 +1,3 @@
-module type LATTICE = sig
-  type t
-
-  val bot : t
-
-  val top : t
-
-  val join : t -> t -> t
-
-  val meet : t -> t -> t
-
-  val co_sub : t -> t -> t
-
-  val to_string : t -> string
-
-  val equal : t -> t -> bool
-
-  val hash : t -> int
-
-  val non_bot_axes : t -> int list
-end
-
 module type ORDERED = sig
   type t
 
@@ -28,7 +6,7 @@ module type ORDERED = sig
   val to_string : t -> string
 end
 
-module Make (C : LATTICE) (V : ORDERED) : sig
+module Make (V : ORDERED) : sig
   type node
 
   type var
@@ -38,7 +16,7 @@ module Make (C : LATTICE) (V : ORDERED) : sig
 
   val top : node
 
-  val const : C.t -> node
+  val const : Axis_lattice.t -> node
 
   val rigid : V.t -> var
 
@@ -70,7 +48,7 @@ module Make (C : LATTICE) (V : ORDERED) : sig
   (* If [a ⊑ b] fails, return witness axis indices where they differ. *)
   val leq_with_reason : node -> node -> int list option
 
-  val round_up : node -> C.t
+  val round_up : node -> Axis_lattice.t
 
   (* Apply [f] to every rigid variable, replacing it with the returned node. *)
   val map_rigid : (V.t -> node) -> node -> node

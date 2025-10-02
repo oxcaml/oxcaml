@@ -20,7 +20,7 @@
       "width": 2.6064,
       "height": 0.5,
       "label": "typing/ikinds/ikind.ml",
-      "info": "Ikind core layer: defines rigid atoms and instantiates Ikind.Ldd over Axis_lattice_bits and the chosen backend."
+      "info": "Ikind core layer: defines rigid atoms and instantiates Ikind.Ldd over Axis_lattice and the chosen backend."
     },
     {
       "id": "typing/ikinds/ldd_jkind_solver.ml",
@@ -32,12 +32,12 @@
       "info": "JKind solver functor: interprets jkinds as lattice polynomials and provides normalize/leq/round_up operations."
     },
     {
-      "id": "typing/ikinds/axis_lattice_bits.ml",
+      "id": "typing/ikinds/axis_lattice.ml",
       "x": 15.803,
       "y": 1.8611,
       "width": 3.7438,
       "height": 0.5,
-      "label": "typing/ikinds/axis_lattice_bits.ml",
+      "label": "typing/ikinds/axis_lattice.ml",
       "info": "Bitset-backed axis lattice with modality masks, conversions to/from mod bounds, and canned constants."
     },
     {
@@ -95,12 +95,12 @@
       "info": "Global counter table used for lightweight solver profiling/instrumentation."
     },
     {
-      "id": "typing/ikinds/axis_lattice.ml",
+      "id": "typing/ikinds/axis_lattice_array.ml",
       "x": 15.803,
       "y": 3.2222,
       "width": 3.2462,
       "height": 0.5,
-      "label": "typing/ikinds/axis_lattice.ml",
+      "label": "typing/ikinds/axis_lattice_array.ml",
       "info": "Array-based axis lattice mirroring Jkind axis order and wrapping the generic product lattice."
     },
     {
@@ -229,7 +229,7 @@
     },
     {
       "source": "typing/ikinds/ikinds.ml",
-      "target": "typing/ikinds/axis_lattice_bits.ml",
+      "target": "typing/ikinds/axis_lattice.ml",
       "points": [
         [
           6.8477,
@@ -274,7 +274,7 @@
       ],
       "style": "solid",
       "label": null,
-      "info": "Ikinds calls Axis_lattice_bits for masks/constants when translating jkinds."
+      "info": "Ikinds calls Axis_lattice for masks/constants when translating jkinds."
     },
     {
       "source": "typing/ikinds/ikinds.ml",
@@ -376,7 +376,7 @@
     },
     {
       "source": "typing/ikinds/ikind.ml",
-      "target": "typing/ikinds/axis_lattice_bits.ml",
+      "target": "typing/ikinds/axis_lattice.ml",
       "points": [
         [
           12.029,
@@ -449,7 +449,7 @@
       "info": "Ikind.Ldd delegates diagram operations to the selected backend from Ldd."
     },
     {
-      "source": "typing/ikinds/axis_lattice_bits.ml",
+      "source": "typing/ikinds/axis_lattice_array.ml",
       "target": "typing/types.mli",
       "points": [
         [
@@ -483,10 +483,10 @@
       ],
       "style": "solid",
       "label": null,
-      "info": "Axis_lattice_bits reads/writes Types.Jkind_mod_bounds for conversions."
+      "info": "Axis_lattice reads/writes Types.Jkind_mod_bounds for conversions."
     },
     {
-      "source": "typing/ikinds/axis_lattice_bits.ml",
+      "source": "typing/ikinds/axis_lattice_array.ml",
       "target": "typing/jkind_axis.ml",
       "points": [
         [
@@ -520,10 +520,10 @@
       ],
       "style": "solid",
       "label": null,
-      "info": "Axis_lattice_bits iterates Jkind_axis metadata to map axes to bit positions."
+      "info": "Axis_lattice iterates Jkind_axis metadata to map axes to bit positions."
     },
     {
-      "source": "typing/ikinds/axis_lattice_bits.ml",
+      "source": "typing/ikinds/axis_lattice_array.ml",
       "target": "typing/mode.ml",
       "points": [
         [
@@ -545,7 +545,7 @@
       ],
       "style": "solid",
       "label": null,
-      "info": "Axis_lattice_bits queries Mode.Modality constants to determine relevant axes."
+      "info": "Axis_lattice_array queries Mode.Modality constants to determine relevant axes."
     },
     {
       "source": "typing/jkind.ml",
@@ -709,7 +709,7 @@
       "info": "Memo backend bumps Global_counters to track solver statistics."
     },
     {
-      "source": "typing/ikinds/axis_lattice.ml",
+      "source": "typing/ikinds/axis_lattice_array.ml",
       "target": "typing/types.mli",
       "points": [
         [
@@ -755,10 +755,10 @@
       ],
       "style": "solid",
       "label": null,
-      "info": "Axis_lattice encodes/decodes Types.Jkind_mod_bounds values."
+      "info": "Axis_lattice_array encodes/decodes Types.Jkind_mod_bounds values."
     },
     {
-      "source": "typing/ikinds/axis_lattice.ml",
+      "source": "typing/ikinds/axis_lattice_array.ml",
       "target": "typing/ikinds/product_lattice.ml",
       "points": [
         [
@@ -780,10 +780,10 @@
       ],
       "style": "solid",
       "label": null,
-      "info": "Axis_lattice is instantiated from the generic product lattice functor."
+      "info": "Axis_lattice_array is instantiated from the generic product lattice functor."
     },
     {
-      "source": "typing/ikinds/axis_lattice.ml",
+      "source": "typing/ikinds/axis_lattice_array.ml",
       "target": "typing/jkind_axis.ml",
       "points": [
         [
@@ -817,10 +817,10 @@
       ],
       "style": "solid",
       "label": null,
-      "info": "Axis_lattice reuses Jkind_axis metadata for naming/ordering."
+      "info": "Axis_lattice_array reuses Jkind_axis metadata for naming/ordering."
     },
     {
-      "source": "typing/ikinds/axis_lattice.ml",
+      "source": "typing/ikinds/axis_lattice_array.ml",
       "target": "typing/mode.ml",
       "points": [
         [
@@ -842,7 +842,7 @@
       ],
       "style": "solid",
       "label": null,
-      "info": "Axis_lattice queries Mode.Modality to compute relevant-axis masks."
+      "info": "Axis_lattice_array queries Mode.Modality to compute relevant-axis masks."
     },
     {
       "source": "typing/ctype.ml",

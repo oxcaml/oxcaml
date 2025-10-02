@@ -38,9 +38,9 @@ module RigidName = struct
 end
 
 module Ldd = struct
-  module Base = Ldd.Make (Axis_lattice_bits) (RigidName)
+  module Base = Ldd.Make (RigidName)
 
-  type lat = Axis_lattice_bits.t
+  type lat = Axis_lattice.t
 
   type constr = RigidName.constr
 

@@ -20,7 +20,7 @@ module RigidName : sig
 end
 
 module Ldd : sig
-  type lat = Axis_lattice_bits.t
+  type lat = Axis_lattice.t
 
   type constr = RigidName.constr
 
