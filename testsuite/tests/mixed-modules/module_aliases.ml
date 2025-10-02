@@ -17,8 +17,8 @@ let _ = print_endline "Test: Based on pr11186.ml"
 
 module M_1 =
   (((struct
-       let y = #(#2.0, "world!", #3.0)
-       module N = struct let x = #1.0 let s = "Hello" let y = #0.0 end
+       let y = #(#20.0, "world!", #30.0)
+       module N = struct let x = #10.0 let s = "Hello" let y = #0.0 end
        module A = N
        let z = #(#5.0, "don't print", #6.0)
        module B = A
@@ -68,18 +68,18 @@ module type S_2 = sig
 end
 
 module M_2 : S_2 = struct
-  let foo_1 = #10.0
+  let foo_1 = #50.0
   let foo_2 = "Hello, world"
   module Inner = struct
-    let inner_1 = #0.0
-    let inner_2 = "Hello, world!"
     module Inner_inner = struct
-      let inner_inner_1 = #1.0
+      let inner_inner_1 = #20.0
       let inner_inner_2 = "Hello, world!!"
-      let inner_inner_3 = #2.0
+      let inner_inner_3 = #30.0
     end
+    let inner_1 = #10.0
+    let inner_2 = "Hello, world!"
   end
-  let foo_3 = #3.0
+  let foo_3 = #40.0
   module Other_inner = Inner.Inner_inner
 end
 
